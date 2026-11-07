@@ -1,0 +1,131 @@
+"""Vendors and their per-language storefront texts and policies (spec 04 §4.2, VEN.1).
+
+Fields owned by later tasks are added there: `plan` (VEN.2), `payout_account` (VEN.6),
+`dac7_complete` (CMP.1), `logo` (media/images). Translation workflow status and `source_hash`
+come with the shared translation base model (I18N.2).
+"""
+
+from typing import Any
+
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.db import models
+
+from apps.core.fields import CountryField
+from apps.core.models import BaseModel
+
+from . import engine
+
+
+def validate_registered_address(value: Any) -> None:
+    errors = engine.address_errors(value)
+    if errors:
+        raise ValidationError(errors, code="invalid_address")
+
+
+class VendorStatus(models.TextChoices):
+    APPLICANT = engine.APPLICANT, "Applicant"
+    ONBOARDING = engine.ONBOARDING, "Onboarding"
+    ACTIVE = engine.ACTIVE, "Active"
+    SUSPENDED = engine.SUSPENDED, "Suspended"
+    CLOSED = engine.CLOSED, "Closed"
+
+
+class VendorSalesMode(models.TextChoices):
+    BUY = "buy", "Buy"
+    ON_REQUEST = "on_request", "On request"
+
+
+class Vendor(BaseModel):
+    Status = VendorStatus
+    SalesMode = VendorSalesMode
+
+    legal_name = models.CharField(max_length=200)
+    display_name = models.CharField(max_length=150)
+    slug = models.SlugField(
+        max_length=engine.SLUG_MAX_LENGTH,
+        unique=True,
+        blank=True,
+        help_text="Leave empty to generate it from the display name. Changing it breaks URLs.",
+    )
+    # Changed only through `services.change_status`, which checks the state machine and audits.
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.APPLICANT, editable=False
+    )
+    country = CountryField()
+    vat_number = models.CharField(max_length=32, blank=True)
+    tax_code = models.CharField(max_length=32, blank=True)
+    registered_address = models.JSONField(
+        default=dict,
+        blank=True,
+        validators=[validate_registered_address],
+        help_text="Keys: " + ", ".join(engine.ADDRESS_FIELDS) + ".",
+    )
+    contact_email = models.EmailField()
+    phone = models.CharField(max_length=32, blank=True)
+    sales_mode_default = models.CharField(
+        max_length=16, choices=SalesMode.choices, default=SalesMode.BUY
+    )
+    enquiries_enabled = models.BooleanField(default=False)
+    legacy_wp_user_id = models.PositiveBigIntegerField(
+        null=True, blank=True, unique=True, help_text="Vendor user id in the legacy system."
+    )
+
+    class Meta:
+        ordering = ["display_name", "id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(status__in=VendorStatus.values),
+                name="vendors_vendor_status_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(sales_mode_default__in=VendorSalesMode.values),
+                name="vendors_vendor_sales_mode_valid",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.display_name
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self.slug:
+            self.slug = engine.unique_slug(self.display_name, taken=_TakenSlugs(self.pk))
+        if self.registered_address is None:  # a cleared form field gives None; column is NOT NULL
+            self.registered_address = {}
+        super().save(*args, **kwargs)
+
+
+class _TakenSlugs:
+    """`slug in taken` asks the database, so `engine.unique_slug` stays pure."""
+
+    def __init__(self, exclude_pk: int | None) -> None:
+        self.exclude_pk = exclude_pk
+
+    def __contains__(self, slug: object) -> bool:
+        others = Vendor.objects.all()
+        if self.exclude_pk is not None:
+            others = others.exclude(pk=self.exclude_pk)
+        return others.filter(slug=slug).exists()
+
+
+class VendorTranslation(BaseModel):
+    """A vendor's storefront texts and policies in one language (explicit table, spec 09)."""
+
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="translations")
+    language = models.CharField(max_length=8, choices=settings.LANGUAGES)
+    tagline = models.CharField(max_length=200, blank=True)
+    description = models.TextField(blank=True)
+    shipping_policy = models.TextField(blank=True)
+    refund_policy = models.TextField(blank=True)
+    cancellation_policy = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["vendor", "language"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["vendor", "language"], name="vendors_translation_vendor_language_unique"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.vendor} [{self.language}]"
