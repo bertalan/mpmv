@@ -694,5 +694,15 @@ class VendorFeatureFlag(BaseModel):
         return f"{self.flag} {'on' if self.enabled else 'off'} for {self.vendor}"
 
     def clean(self) -> None:
-        if self.flag_id is not None and self.flag.spec is None:
+        if self.flag_id is None:
+            return
+        spec = self.flag.spec
+        if spec is None:
             raise ValidationError({"flag": f"{self.flag.name!r} is not a registered feature flag."})
+        if spec.kill_switch and self.enabled:
+            raise ValidationError(
+                {
+                    "enabled": f"{spec.name!r} is a kill switch: an override can only turn it off "
+                    "for this vendor, never on (when the platform value is off, it stays off)."
+                }
+            )
