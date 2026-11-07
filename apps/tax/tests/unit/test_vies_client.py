@@ -112,7 +112,7 @@ class _StubVies(BaseHTTPRequestHandler):
     status = 200
     body: bytes = b"{}"
     delay = 0.0
-    received: list[dict[str, Any]] = []  # noqa: RUF012 - shared by the stub's handler threads
+    received: list[dict[str, Any]] = []  # per stub server, set by the fixture
 
     def do_POST(self) -> None:
         length = int(self.headers.get("Content-Length", "0"))
@@ -170,6 +170,15 @@ def test_the_real_transport_reports_an_error_status_without_a_json_body(
     handler.body = b"<html>maintenance</html>"
     answer = HttpViesClient(url=url, timeout=2.0).check(DE)
     assert answer == ViesAnswer(result=engine.VAT_UNAVAILABLE, detail="http_503")
+
+
+def test_the_real_transport_refuses_json_that_is_not_an_object(
+    stub_vies: tuple[str, type[_StubVies]],
+) -> None:
+    url, handler = stub_vies
+    handler.body = b"[]"
+    answer = HttpViesClient(url=url, timeout=2.0).check(DE)
+    assert answer == ViesAnswer(result=engine.VAT_UNAVAILABLE, detail=engine.DETAIL_BAD_RESPONSE)
 
 
 def test_the_real_transport_gives_up_after_the_timeout(

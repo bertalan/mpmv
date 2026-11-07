@@ -490,11 +490,11 @@ class VatResult(models.TextChoices):
 class VatValidation(BaseModel):
     """One answer about a VAT number (ADR-0003: the cached side of VIES). Append-only.
 
-    Written by `apps.tax.services.record_vat_validation`, e.g. from a `VatNumberValidator`
-    (VEN.12); the VIES client with cache policy, timeout and fail-closed handling is TAX.5. The
-    number is stored without its country prefix; `country` is ISO (GR, never EL). Every row is
-    a VIES answer: staff-recorded answers are out of scope until a task gives them an actor and
-    an audited service.
+    Written by `apps.tax.services.record_vat_validation`; `verify_vat_number` (TAX.5) adds the
+    VIES client, the cache policy and the fail-closed handling. The number is stored without
+    its country prefix; `country` is ISO (GR, never EL). Every row is a VIES answer:
+    staff-recorded answers are out of scope until a task gives them an actor and an audited
+    service.
     """
 
     Result = VatResult

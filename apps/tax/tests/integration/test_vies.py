@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 from django.utils import timezone
-from pytest_django.fixtures import SettingsWrapper
+from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.core.audit import AuditContext
 from apps.core.tests.factories import PlatformOperatorFactory
@@ -89,6 +89,13 @@ def test_a_client_that_raises_fails_closed() -> None:
     check = services.verify_vat_number("DE", "123456789", client=BrokenViesClient())
     assert check.verified is False
     assert check.reason == engine.VAT_REASON_UNAVAILABLE
+    assert VatValidation.objects.get().result == engine.VAT_UNAVAILABLE
+
+
+def test_a_client_answering_something_else_than_a_vies_result_fails_closed() -> None:
+    client = FakeViesClient(default=ViesAnswer(result="VALID"))
+    check = services.verify_vat_number("DE", "123456789", client=client)
+    assert (check.verified, check.detail) == (False, engine.DETAIL_BAD_RESPONSE)
     assert VatValidation.objects.get().result == engine.VAT_UNAVAILABLE
 
 
@@ -284,12 +291,17 @@ def test_the_vendor_vat_check_goes_through_the_cached_vies_check() -> None:
 
 
 @pytest.mark.parametrize(
-    ("raw", "expected"),
-    [("123456789", engine.VAT_UNAVAILABLE), ("12#4", engine.VAT_INVALID)],
+    ("prefix", "raw", "expected"),
+    [
+        ("DE", "123456789", engine.VAT_UNAVAILABLE),
+        ("DE", "12#4", engine.VAT_INVALID),
+        ("DE", "ATU12345678", engine.VAT_INVALID),
+        ("GB", "123456789", engine.VAT_UNAVAILABLE),
+    ],
 )
-def test_the_vendor_validator_answers_a_vies_result(raw: str, expected: str) -> None:
+def test_the_vendor_validator_answers_a_vies_result(prefix: str, raw: str, expected: str) -> None:
     validator = ViesVatNumberValidator(client=DownViesClient())
-    assert validator.check("DE", raw) == expected
+    assert validator.check(prefix, raw) == expected
 
 
 def test_the_vendor_validator_reads_the_greek_prefix() -> None:
@@ -326,7 +338,5 @@ def test_the_background_recheck_ignores_a_number_vies_cannot_check(
 
 
 def test_the_background_recheck_retries_with_growing_delays() -> None:
-    delays = [tasks.VIES_RETRY.delay_after(attempt) for attempt in range(3)]
-    assert delays[0] is not None
-    assert delays == sorted(delays)
-    assert delays[0] < delays[2]  # type: ignore[operator]
+    delays = [tasks.VIES_RETRY.delay_after(attempt) or 0 for attempt in range(3)]
+    assert 0 < delays[0] < delays[1] < delays[2]
