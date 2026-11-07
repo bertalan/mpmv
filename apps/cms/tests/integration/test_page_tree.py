@@ -17,7 +17,7 @@ from apps.cms.tests.factories import HomePageFactory, StandardPageFactory
 
 pytestmark = pytest.mark.django_db
 
-LANGUAGES_PLUS_FRENCH = [*settings.LANGUAGES, ("fr", "Français")]
+LANGUAGES_PLUS_ONE = [*settings.LANGUAGES, ("pt", "Português")]  # a hypothetical new language
 
 
 def _codes() -> list[str]:
@@ -32,10 +32,10 @@ def test_every_configured_language_has_a_wagtail_locale() -> None:
     assert Locale.get_default().language_code == settings.LANGUAGE_CODE == "en"
 
 
-@override_settings(LANGUAGES=LANGUAGES_PLUS_FRENCH)
+@override_settings(LANGUAGES=LANGUAGES_PLUS_ONE)
 def test_a_language_added_in_settings_gets_its_locale_without_a_migration() -> None:
-    assert sync_locales() == ["fr"]
-    assert Locale.objects.filter(language_code="fr").exists()
+    assert sync_locales() == ["pt"]
+    assert Locale.objects.filter(language_code="pt").exists()
     assert sync_locales() == []  # idempotent
 
 

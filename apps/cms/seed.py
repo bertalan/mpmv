@@ -1,7 +1,8 @@
 """Sample texts for the seed pages (CMS.1): synthetic content for development, STAGE and e2e.
 
 Pure data, no ORM. A language without an entry gets the primary language's texts, as an
-untranslated Wagtail copy would; adding a language never needs an entry here.
+untranslated Wagtail copy would; adding a language never needs an entry here. The five planned
+languages (EN, IT, DE, FR, ES; I18N.1) have entries whether or not settings lists them yet.
 """
 
 from dataclasses import dataclass
@@ -57,6 +58,30 @@ SEED_TEXTS: dict[str, SiteTexts] = {
             title="Über uns",
             slug="ueber-uns",
             body="<p>Wir sind ein Marktplatz unabhängiger Händler.</p>",
+        ),
+    ),
+    "fr": SiteTexts(
+        home=PageText(
+            title="Accueil",
+            slug="home",
+            body="<p>Des produits de fabricants indépendants, expédiés depuis leurs ateliers.</p>",
+        ),
+        about=PageText(
+            title="Qui sommes-nous",
+            slug="qui-sommes-nous",
+            body="<p>Nous sommes une place de marché de vendeurs indépendants.</p>",
+        ),
+    ),
+    "es": SiteTexts(
+        home=PageText(
+            title="Inicio",
+            slug="home",
+            body="<p>Productos de artesanos independientes, enviados desde sus talleres.</p>",
+        ),
+        about=PageText(
+            title="Quiénes somos",
+            slug="quienes-somos",
+            body="<p>Somos un mercado de vendedores independientes.</p>",
         ),
     ),
 }

@@ -10,8 +10,15 @@ def test_every_configured_language_has_sample_texts() -> None:
     assert {code for code, _name in settings.LANGUAGES} <= set(SEED_TEXTS)
 
 
+def test_the_five_planned_languages_have_sample_texts() -> None:
+    # The five planned languages (I18N.1). The seed covers them whichever of them
+    # settings.LANGUAGES lists today, so adding FR and ES to settings needs no seed change.
+    assert {"en", "it", "de", "fr", "es"} <= set(SEED_TEXTS)
+
+
 def test_a_language_without_texts_gets_the_primary_language_texts() -> None:
-    assert seed_text("fr") == SEED_TEXTS[settings.LANGUAGE_CODE]
+    assert "pt" not in SEED_TEXTS  # a hypothetical sixth language
+    assert seed_text("pt") == SEED_TEXTS[settings.LANGUAGE_CODE]
 
 
 def test_static_page_slugs_are_translated_and_url_safe() -> None:
