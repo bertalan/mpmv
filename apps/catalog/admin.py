@@ -22,6 +22,7 @@ from treebeard.forms import TreeNodeChoiceField
 
 from apps.core.audit import audit_context
 
+from . import attribute_admin as attribute_admin  # registers the CAT.3 admins
 from . import engine
 from . import taxonomy_admin as taxonomy_admin  # registers the CAT.2 admins
 from .models import Category, Product, ProductTranslation, Term, Variant, VariantTranslation
@@ -275,6 +276,12 @@ class VariantAdmin(admin.ModelAdmin[Variant]):
         save_variant(obj, ctx=ctx)
         if new_prices is not None:
             set_variant_price(obj, **new_prices, ctx=ctx)
+
+    def save_related(self, request: HttpRequest, form: Any, formsets: Any, change: bool) -> None:
+        # The form has no many-to-many field: a variant's options (CAT.3) are set by
+        # services.create_product, never here. Only the translation inlines are saved.
+        for formset in formsets:
+            self.save_formset(request, form, formset, change=change)
 
     def delete_model(self, request: HttpRequest, obj: Variant) -> None:
         delete_variant(obj, ctx=audit_context(request))

@@ -1,8 +1,9 @@
 """Products, variants and their translations (spec 03 §3.2, CAT.1).
 
 The category tree, taxonomies, terms and brands (CAT.2) live in `taxonomy.py`; products link
-to them here. Fields owned by later tasks are added there: variant `options` and product
-attributes (CAT.3), images (CAT.4), slug generation and SlugHistory (CAT.5), `gpsr` (CMP.3).
+to them here, and to the typed attributes of `attributes.py` (CAT.3) through `ProductAttribute`
+and `VariantOption`. Fields owned by later tasks are added there: images (CAT.4), slug
+generation and SlugHistory (CAT.5), `gpsr` (CMP.3).
 Prices change only through `services.set_product_price` and `services.set_variant_price`, which
 audit them; the status changes through the publishing services of CAT.10.
 
@@ -31,6 +32,13 @@ from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager
 
 from . import engine
+from .attributes import (
+    Attribute,
+    AttributeKind,
+    AttributeTranslation,
+    AttributeValue,
+    AttributeValueTranslation,
+)
 from .fields import SkuField
 from .taxonomy import (
     Brand,
@@ -44,12 +52,18 @@ from .taxonomy import (
 )
 
 __all__ = [
+    "Attribute",
+    "AttributeKind",
+    "AttributeTranslation",
+    "AttributeValue",
+    "AttributeValueTranslation",
     "Brand",
     "BrandTranslation",
     "Category",
     "CategoryTranslation",
     "FiscalCategory",
     "Product",
+    "ProductAttribute",
     "ProductKind",
     "ProductStatus",
     "ProductTranslation",
@@ -61,6 +75,7 @@ __all__ = [
     "Term",
     "TermTranslation",
     "Variant",
+    "VariantOption",
     "VariantTranslation",
 ]
 
@@ -429,6 +444,10 @@ class Variant(BaseModel):
     )
     is_default = models.BooleanField("default variant", default=False)
     position = models.PositiveIntegerField(default=0)
+    # One value per variant axis of the product (CAT.3); see VariantOption.
+    options = models.ManyToManyField(
+        AttributeValue, through="VariantOption", related_name="variants", blank=True
+    )
 
     class Meta:
         ordering = ["product", "position", "id"]
@@ -521,3 +540,89 @@ class VariantTranslation(TranslationModel):
 
     def __str__(self) -> str:
         return f"{self.variant} [{self.language}]"
+
+
+class ProductAttribute(BaseModel):
+    """What a product says about one attribute, typed by the attribute's kind (CAT.3).
+
+    A choice attribute lists the product's values (`values`), a number attribute holds
+    `numeric_value` (in the attribute's unit), a text attribute `text_value` (language-neutral:
+    an author, an ISBN). On a variable product, the choice attributes marked `is_variant_axis`
+    are the axes its variants vary on, in `position` order: the first axis orders the variants
+    first. `services.create_product` checks the whole shape (`engine.product_structure_errors`).
+    """
+
+    vendor_scope: ClassVar[str] = "product__vendor"
+    objects = VendorScopedManager()
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="attributes")
+    attribute = models.ForeignKey(
+        Attribute, on_delete=models.PROTECT, related_name="product_attributes"
+    )
+    values = models.ManyToManyField(AttributeValue, blank=True, related_name="product_attributes")
+    numeric_value = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    text_value = models.CharField(max_length=255, blank=True)
+    is_variant_axis = models.BooleanField(
+        "variant axis", default=False, help_text="The product's variants vary on this attribute."
+    )
+    position = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["product", "position", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product", "attribute"],
+                name="catalog_productattribute_unique",
+                violation_error_message="The product already has this attribute.",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(numeric_value__isnull=True) | models.Q(text_value=""),
+                name="catalog_productattribute_one_typed_value",
+                violation_error_message="An attribute holds a number or a text, not both.",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(is_variant_axis=False)
+                | (models.Q(numeric_value__isnull=True) & models.Q(text_value="")),
+                name="catalog_productattribute_axis_has_values",
+                violation_error_message="A variant axis takes values, not a number or a text.",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.product}: {self.attribute}"
+
+
+class VariantOption(BaseModel):
+    """The value a variant takes on one axis of its product (`Variant.options`, CAT.3).
+
+    `attribute` repeats the value's attribute so that the database allows one value per
+    attribute and variant; a composite foreign key (migration 0003) keeps it equal to the
+    value's own attribute.
+    """
+
+    vendor_scope: ClassVar[str] = "variant__vendor"
+    objects = VendorScopedManager()
+
+    variant = models.ForeignKey(Variant, on_delete=models.CASCADE, related_name="variant_options")
+    attribute = models.ForeignKey(Attribute, on_delete=models.PROTECT, related_name="+")
+    value = models.ForeignKey(
+        AttributeValue, on_delete=models.PROTECT, related_name="variant_options"
+    )
+
+    class Meta:
+        ordering = ["variant", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["variant", "attribute"],
+                name="catalog_variantoption_one_value_per_axis",
+                violation_error_message="The variant already has a value for this attribute.",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.variant}: {self.value}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if self.attribute_id is None and self.value_id is not None:
+            self.attribute_id = self.value.attribute_id
+        super().save(*args, **kwargs)
