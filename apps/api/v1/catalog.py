@@ -115,7 +115,7 @@ class VariantIn(Schema):
     sku: str = Field(min_length=1, max_length=engine.SKU_MAX_LENGTH)
     options: dict[str, str] = Field(description="Value code per variant axis, e.g. {size: m}.")
     price_net_override: Decimal | None = None
-    weight_kg_override: Decimal | None = None
+    weight_kg_override: Decimal | None = Field(None, ge=0, max_digits=8, decimal_places=3)
     stock_qty: int = Field(0, ge=0)
     is_default: bool = False
 
