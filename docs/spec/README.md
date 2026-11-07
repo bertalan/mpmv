@@ -45,7 +45,7 @@ It also reviews the August 2026 rebuild plan.
 | 12 | [Security, infrastructure, operations](12-security-infra-operations.md) | Immediate actions, requirements, deploy, backups |
 | 13 | [Migration and cutover](13-migration-cutover.md) | ETL, parity, go-live and rollback runbook |
 | 90 | [Backlog](90-backlog.md) | All micro-tasks by phase (generated) |
-| 91 | [Estimates and plan](91-estimates.md) | Hours, schedule, phases, external costs |
+| 91 | [Estimates and plan](91-estimates.md) | Hours, schedule, phases, external costs, measured agent velocity |
 | 92 | [Open decisions](92-open-decisions.md) | 20 decisions to approve, with proposals |
 
 ## Summary
