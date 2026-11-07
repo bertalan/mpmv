@@ -12,7 +12,8 @@ import factory
 from django.utils.text import slugify
 from factory.django import DjangoModelFactory
 
-from apps.vendors.models import Vendor, VendorTranslation
+from apps.accounts.tests.factories import UserFactory
+from apps.vendors.models import Vendor, VendorMember, VendorTranslation
 
 
 def pseudonym(n: int) -> str:
@@ -58,3 +59,17 @@ class VendorTranslationFactory(DjangoModelFactory[VendorTranslation]):
     shipping_policy = factory.Faker("sentence")
     refund_policy = factory.Faker("sentence")
     cancellation_policy = factory.Faker("sentence")
+
+
+class VendorMemberFactory(DjangoModelFactory[VendorMember]):
+    """An owner of a new vendor; pass `vendor=` to add members to the same vendor.
+
+    Factories write the row directly: tests of the last-owner rule go through the services.
+    """
+
+    class Meta:
+        model = VendorMember
+
+    vendor = factory.SubFactory(VendorFactory)
+    user = factory.SubFactory(UserFactory)
+    role = VendorMember.Role.OWNER

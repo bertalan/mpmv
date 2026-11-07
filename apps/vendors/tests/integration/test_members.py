@@ -168,8 +168,12 @@ def test_promoting_staff_to_owner_is_saved_and_audited() -> None:
     entry = AuditLog.objects.get()
     assert entry.action == MEMBER_ROLE_CHANGED == "vendor.member_role_changed"
     assert entry.target_key == str(member.public_id)
-    assert entry.before["role"] == "staff"
-    assert entry.after["role"] == "owner"
+    assert entry.before == {
+        "vendor": str(member.vendor.public_id),
+        "user": str(member.user.public_id),
+        "role": "staff",
+    }
+    assert entry.after == {**entry.before, "role": "owner"}
 
 
 def test_demoting_an_owner_is_allowed_while_another_owner_remains() -> None:

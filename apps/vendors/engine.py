@@ -1,6 +1,8 @@
-"""Pure vendor rules (no ORM): status state machine, slug generation, address shape."""
+"""Pure vendor rules (no ORM): status state machine, slug generation, address shape, member
+roles and their permissions."""
 
-from collections.abc import Container, Mapping
+from collections.abc import Collection, Container, Mapping
+from enum import StrEnum
 from typing import Final
 
 from django.utils.text import slugify
@@ -87,3 +89,87 @@ def address_errors(value: object) -> list[str]:
         except InvalidCountry:
             errors.append(f"Address country: {country!r} is not an ISO code.")
     return errors
+
+
+# --- Member roles and permissions (spec 02 §2.2, CORE.2)
+
+OWNER: Final = "owner"
+STAFF: Final = "staff"
+
+ROLES: Final = (OWNER, STAFF)
+
+
+class VendorAction(StrEnum):
+    """What a vendor member can do on their own vendor, in the vendor area, API and MCP."""
+
+    ORDERS = "orders"
+    QUOTES = "quotes"
+    PRODUCTS = "products"
+    PROFILE = "profile"  # storefront texts, policies, logo
+    PAYOUTS = "payouts"
+    BANK_ACCOUNT = "bank_account"  # IBAN / payout account
+    TAX_REGIME = "tax_regime"  # tax regime change request
+    MEMBERS = "members"  # add and remove members, change roles
+
+
+# The role matrix. Owner: everything about their own vendor, financial settings included.
+# Staff: day-to-day operations only; no payouts, IBAN, tax regime, profile or members.
+ROLE_PERMISSIONS: Final[Mapping[str, frozenset[VendorAction]]] = {
+    OWNER: frozenset(VendorAction),
+    STAFF: frozenset({VendorAction.ORDERS, VendorAction.QUOTES, VendorAction.PRODUCTS}),
+}
+
+
+class MembershipError(ValueError):
+    """A vendor membership change that the rules refuse."""
+
+
+class UnknownRole(MembershipError):
+    """The role is not one of `ROLES`."""
+
+
+class UnknownAction(ValueError):
+    """The action is not a `VendorAction`."""
+
+
+class AlreadyMember(MembershipError):
+    """The user is already a member of the vendor."""
+
+
+class NoOwnerLeft(MembershipError):
+    """The change would leave the vendor without an owner."""
+
+
+def check_role(role: str) -> None:
+    if role not in ROLE_PERMISSIONS:
+        raise UnknownRole(f"unknown vendor member role {role!r}")
+
+
+def permissions_for(role: str) -> frozenset[VendorAction]:
+    check_role(role)
+    return ROLE_PERMISSIONS[role]
+
+
+def to_action(action: str) -> VendorAction:
+    try:
+        return VendorAction(action)
+    except ValueError:
+        raise UnknownAction(f"unknown vendor action {action!r}") from None
+
+
+def is_allowed(role: str, action: str) -> bool:
+    """Whether a member with `role` may perform `action` on their own vendor.
+
+    Unknown roles or actions raise instead of answering False, so a typo fails loudly.
+    """
+    return to_action(action) in permissions_for(role)
+
+
+def check_keeps_an_owner(roles_after: Collection[str]) -> None:
+    """Every vendor with members keeps at least one owner after a membership change.
+
+    `roles_after` holds the roles of the vendor's members once the change is applied; it also
+    means the first member of a vendor must be an owner.
+    """
+    if OWNER not in roles_after:
+        raise NoOwnerLeft("a vendor must keep at least one owner")
