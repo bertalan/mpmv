@@ -6,6 +6,7 @@ that key. Django changes the session key on sign-in (`cycle_key`) but keeps the 
 `user_logged_in` receiver still finds the guest cart and merges it into the user's cart.
 """
 
+import logging
 from typing import Any
 
 from django.contrib.auth.base_user import AbstractBaseUser
@@ -17,6 +18,8 @@ from . import services
 from .models import Cart
 
 GUEST_CART_SESSION_KEY = "cart.guest_session_key"
+
+logger = logging.getLogger(__name__)
 
 
 def current_cart(request: HttpRequest, *, create: bool = False) -> Cart | None:
@@ -49,12 +52,20 @@ def _language(request: HttpRequest) -> str | None:
 def merge_guest_cart_on_login(
     sender: Any, request: HttpRequest | None, user: AbstractBaseUser, **kwargs: Any
 ) -> None:
-    """`user_logged_in` receiver: merge the visitor's guest cart into the user's cart."""
+    """`user_logged_in` receiver: merge the visitor's guest cart into the user's cart.
+
+    A cart must never block signing in: a failed merge is logged and the guest cart is left as
+    it was (the merge runs in its own transaction, so nothing is half applied).
+    """
     if request is None or not isinstance(user, User) or not hasattr(request, "session"):
         return
     key = request.session.pop(GUEST_CART_SESSION_KEY, None)
     if not isinstance(key, str) or not key:
         return
     guest = services.get_cart(session_key=key)
-    if guest is not None:
+    if guest is None:
+        return
+    try:
         services.merge_carts(guest, user)
+    except Exception:  # any failure: the sign-in goes on without the merge
+        logger.exception("Could not merge guest cart %s into user %s's cart", guest.pk, user.pk)

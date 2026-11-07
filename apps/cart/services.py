@@ -14,6 +14,7 @@ from typing import Any
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.accounts.models import User
@@ -232,7 +233,7 @@ def _limit_or_zero(line: CartLine) -> int:
         return 0
 
 
-def merge_carts(guest: Cart, user: User, *, dry_run: bool = False) -> CartMerge:
+def merge_carts(guest: Cart, user: User, *, dry_run: bool = False) -> CartMerge | None:
     """Merge the guest cart into `user`'s cart, when the visitor signs in.
 
     The line rule is `engine.merge_lines`: same lines add up, guest-only lines move, every
@@ -240,12 +241,24 @@ def merge_carts(guest: Cart, user: User, *, dry_run: bool = False) -> CartMerge:
     the user has no cart yet, the guest cart becomes theirs. Otherwise the guest cart is deleted
     once its lines are merged, and its language and country hint (the visitor's current ones)
     replace the user cart's.
+
+    Returns None, changing nothing, when the guest cart is gone or no longer a guest cart by
+    the time it is locked: a concurrent sign-in on the same session (a double-submitted form)
+    merged it first.
     """
     if guest.user_id is not None or not guest.session_key:
         raise ValueError("Only a guest cart can be merged into a user's cart")
     with transaction.atomic():
-        guest = Cart.objects.select_for_update().get(pk=guest.pk)
-        target = Cart.objects.select_for_update().filter(user=user).first()
+        # Lock both carts in one statement, in pk order, so concurrent merges cannot deadlock;
+        # then check again what the rows are now that nobody else can change them.
+        locked = list(
+            Cart.objects.select_for_update().filter(Q(pk=guest.pk) | Q(user=user)).order_by("pk")
+        )
+        current = next((cart for cart in locked if cart.pk == guest.pk), None)
+        if current is None or current.user_id is not None or not current.session_key:
+            return None
+        guest = current
+        target = next((cart for cart in locked if cart.pk != guest.pk), None)
         guest_lines = list(guest.lines.select_related("product__vendor", "variant"))
         target_lines = (
             [] if target is None else list(target.lines.select_related("product", "variant"))

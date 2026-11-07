@@ -4,12 +4,15 @@ Django changes the session key on sign-in (`cycle_key`), so the guest cart is re
 session data, which survives the change.
 """
 
+import logging
 from decimal import Decimal
 
 import pytest
+from django.conf import settings
 from django.contrib.auth import login, logout
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.sessions.middleware import SessionMiddleware
+from django.db import DatabaseError
 from django.http import HttpRequest, HttpResponse
 from django.test import RequestFactory
 
@@ -17,7 +20,7 @@ from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.cart import services
 from apps.cart.models import Cart
-from apps.cart.session import current_cart
+from apps.cart.session import GUEST_CART_SESSION_KEY, current_cart
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import ProductFactory
 from apps.vendors.models import Vendor
@@ -95,6 +98,61 @@ def test_signing_in_without_a_guest_cart_creates_nothing() -> None:
     request = visitor_request()
     sign_in(request, UserFactory.create())
     assert not Cart.objects.exists()
+
+
+def same_session_request(request: HttpRequest) -> HttpRequest:
+    """A second request carrying the same session cookie, its session data loaded now."""
+    request.session.save()
+    twin = RequestFactory().get("/")
+    middleware = SessionMiddleware(lambda r: HttpResponse())
+    twin.COOKIES[settings.SESSION_COOKIE_NAME] = request.session.session_key or ""
+    middleware.process_request(twin)
+    assert twin.session.get(GUEST_CART_SESSION_KEY)  # loads the session data now
+    twin.user = AnonymousUser()
+    twin.LANGUAGE_CODE = "en"
+    return twin
+
+
+@pytest.mark.parametrize("user_has_a_cart", [False, True])
+def test_a_double_submitted_sign_in_merges_the_guest_cart_once(user_has_a_cart: bool) -> None:
+    user = UserFactory.create()
+    product = sellable()
+    if user_has_a_cart:
+        services.add_to_cart(services.get_or_create_cart(user=user), product, quantity=1)
+    request = visitor_request()
+    guest = current_cart(request, create=True)
+    assert guest is not None
+    services.add_to_cart(guest, product, quantity=2)
+    twin = same_session_request(request)  # loaded before the first sign-in rotates the key
+
+    sign_in(request, user)
+    sign_in(twin, user)
+
+    cart = Cart.objects.get()
+    assert cart.user == user
+    assert {line.product_id: line.quantity for line in cart.lines.all()} == {
+        product.pk: 3 if user_has_a_cart else 2
+    }
+
+
+def test_a_failed_merge_does_not_block_signing_in(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    def failing_merge(*args: object, **kwargs: object) -> None:
+        raise DatabaseError("simulated failure")
+
+    monkeypatch.setattr(services, "merge_carts", failing_merge)
+    user = UserFactory.create()
+    request = visitor_request()
+    guest = current_cart(request, create=True)
+    assert guest is not None
+
+    with caplog.at_level(logging.ERROR, logger="apps.cart.session"):
+        sign_in(request, user)
+
+    assert request.user == user
+    assert "guest cart" in caplog.text
+    assert Cart.objects.get() == guest  # left as it was
 
 
 def test_a_signed_in_users_cart_survives_signing_out() -> None:

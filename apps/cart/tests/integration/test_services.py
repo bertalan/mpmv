@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 from django.core.exceptions import ValidationError
 
+from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.cart import services
 from apps.cart.models import Cart, CartLine
@@ -40,6 +41,13 @@ def guest_cart(key: str = "guest-session") -> Cart:
 
 def quantities(cart: Cart) -> dict[tuple[int, int | None], int]:
     return {(line.product_id, line.variant_id): line.quantity for line in cart.lines.all()}
+
+
+def merge(guest: Cart, user: User, *, dry_run: bool = False) -> services.CartMerge:
+    """A merge that must happen (the guest cart is still a guest cart)."""
+    outcome = services.merge_carts(guest, user, dry_run=dry_run)
+    assert outcome is not None
+    return outcome
 
 
 # --- Getting a cart
@@ -225,7 +233,7 @@ def test_guest_cart_becomes_the_users_cart_when_the_user_has_none() -> None:
     product = sellable()
     services.add_to_cart(guest, product, quantity=2)
 
-    outcome = services.merge_carts(guest, user)
+    outcome = merge(guest, user)
     cart = Cart.objects.get()
     assert outcome.cart == cart
     assert (cart.pk, cart.user, cart.session_key) == (guest.pk, user, "")
@@ -246,7 +254,7 @@ def test_merge_adds_up_same_lines_moves_the_others_and_deletes_the_guest_cart() 
     services.add_to_cart(guest, both, quantity=3)
     services.add_to_cart(guest, only_guest, quantity=4)
 
-    outcome = services.merge_carts(guest, user)
+    outcome = merge(guest, user)
 
     assert outcome.cart == mine
     assert quantities(mine) == {
@@ -267,7 +275,7 @@ def test_merge_caps_quantities_at_the_stock_and_reports_the_adjustment() -> None
     guest = guest_cart()
     services.add_to_cart(guest, product, quantity=3)
 
-    outcome = services.merge_carts(guest, user)
+    outcome = merge(guest, user)
 
     assert quantities(mine) == {(product.pk, None): 5}
     (adjusted,) = outcome.adjusted
@@ -281,7 +289,7 @@ def test_merge_drops_guest_lines_that_can_no_longer_be_bought() -> None:
     services.add_to_cart(guest, product, quantity=1)
     Product.objects.filter(pk=product.pk).update(status=Product.Status.RETIRED)
 
-    outcome = services.merge_carts(guest, user)
+    outcome = merge(guest, user)
 
     assert outcome.cart.user == user
     assert not outcome.cart.lines.exists()
@@ -307,11 +315,47 @@ def test_merge_dry_run_changes_nothing() -> None:
     guest = guest_cart()
     services.add_to_cart(guest, product, quantity=1)
 
-    outcome = services.merge_carts(guest, user, dry_run=True)
+    outcome = merge(guest, user, dry_run=True)
 
     assert outcome.changeset.summary() == {"create": 0, "update": 1, "delete": 1}
     assert quantities(mine) == {(product.pk, None): 1}
     assert Cart.objects.filter(pk=guest.pk).exists()
+
+
+def test_merging_a_guest_cart_that_was_already_adopted_is_a_no_op() -> None:
+    # A double-submitted sign-in: both requests found the guest cart before either merged it.
+    user = UserFactory.create()
+    product = sellable()
+    guest = guest_cart()
+    services.add_to_cart(guest, product, quantity=2)
+    stale = Cart.objects.get(pk=guest.pk)
+
+    first = services.merge_carts(guest, user)
+    second = services.merge_carts(stale, user)
+
+    assert first is not None
+    assert second is None
+    cart = Cart.objects.get()
+    assert (cart.pk, cart.user, cart.session_key) == (guest.pk, user, "")
+    assert quantities(cart) == {(product.pk, None): 2}
+
+
+def test_merging_a_guest_cart_that_was_already_merged_is_a_no_op() -> None:
+    user = UserFactory.create()
+    mine = services.get_or_create_cart(user=user)
+    product = sellable()
+    services.add_to_cart(mine, product, quantity=1)
+    guest = guest_cart()
+    services.add_to_cart(guest, product, quantity=2)
+    stale = Cart.objects.get(pk=guest.pk)
+
+    first = services.merge_carts(guest, user)
+    second = services.merge_carts(stale, user)
+
+    assert first is not None
+    assert second is None
+    assert list(Cart.objects.all()) == [mine]
+    assert quantities(mine) == {(product.pk, None): 3}
 
 
 def test_a_users_own_cart_is_not_a_guest_cart() -> None:
