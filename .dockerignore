@@ -1,0 +1,40 @@
+# Build context exclusions for the Containerfile (read by `container build`, Podman/Buildah and
+# Docker BuildKit alike). Secrets and local state never enter the image.
+.env
+.env.*
+*.pem
+*.key
+private
+CLAUDE.local.md
+.claude
+.git
+.github
+.venv
+.vscode
+.idea
+.ruff_cache
+.mypy_cache
+.pytest_cache
+.import_linter_cache
+.coverage
+.coverage.*
+htmlcov
+**/__pycache__
+build
+dist
+media
+staticfiles
+node_modules
+var
+docs
+tests
+tools
+*.md
+.pre-commit-config.yaml
+# Only deploy/container (the entry point) is part of the image. No `!` re-includes: the
+# `container build` context transfer rejects them ("changes out of order").
+deploy/caddy
+deploy/local
+deploy/quadlet
+deploy/server
+deploy/README.md

@@ -12,6 +12,8 @@ dependencies = [
   "django-stubs-ext>=5.2",
   "procrastinate[django]>=3.10",
   "croniter>=6.2",
+  "gunicorn>=26.0",
+  "whitenoise>=6.12",
 ]
 
 [dependency-groups]

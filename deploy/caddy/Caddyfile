@@ -1,0 +1,7 @@
+# Reverse proxy for a STAGE/LIVE host (ARC.5). Copy to ~/.config/mpmv/Caddyfile on the server.
+# The site address comes from MPMV_SITE_ADDRESS in ~/.config/mpmv/caddy.env. Caddy sets
+# X-Forwarded-Proto, which Django trusts through SECURE_PROXY_SSL_HEADER (settings/live.py).
+{$MPMV_SITE_ADDRESS} {
+	encode zstd gzip
+	reverse_proxy mpmv-app:8000
+}

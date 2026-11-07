@@ -1,0 +1,30 @@
+# MPMV web process (gunicorn) on a STAGE/LIVE host (ARC.5, ADR-0005).
+# The image is the release selected by `mpmv-deploy`: it tags it localhost/mpmv-app:current.
+[Unit]
+Description=MPMV app (web)
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=mpmv-app
+Image=localhost/mpmv-app:current
+Pull=never
+Exec=web
+Network=mpmv.network
+# Secrets and per-environment settings (DJANGO_SETTINGS_MODULE, DATABASE_URL, ...).
+EnvironmentFile=%h/.config/mpmv/mpmv.env
+ReadOnly=true
+NoNewPrivileges=true
+DropCapability=ALL
+HealthCmd=python -m mpmv.healthcheck
+HealthInterval=30s
+HealthRetries=3
+HealthStartPeriod=20s
+HealthTimeout=10s
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target

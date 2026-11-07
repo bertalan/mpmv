@@ -1,0 +1,126 @@
+"""Lint rules for the Podman Quadlet units that run STAGE and LIVE (ARC.5, ADR-0005)."""
+
+import re
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[2]
+QUADLET_DIR = ROOT / "deploy" / "quadlet"
+
+SECRET_LIKE = re.compile(r"SECRET|PASSW|TOKEN|CREDENTIAL|PRIVATE|(^|_)KEY($|_)", re.IGNORECASE)
+PINNED_IMAGE = re.compile(r"^[\w.\-/]+:[\w.\-]+@sha256:[0-9a-f]{64}$")
+APP_IMAGE = "localhost/mpmv-app:current"
+APP_UNITS = ("mpmv-app.container", "mpmv-worker.container", "mpmv-migrate.container")
+LONG_RUNNING = ("mpmv-app.container", "mpmv-worker.container", "mpmv-caddy.container")
+
+Unit = dict[str, list[tuple[str, str]]]
+
+
+def parse_unit(text: str) -> Unit:
+    """Parse a systemd/Quadlet unit; keys may repeat (Environment=, Volume=...)."""
+    unit: Unit = {}
+    section = ""
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith(("#", ";")):
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            section = line[1:-1]
+            unit.setdefault(section, [])
+            continue
+        key, _, value = line.partition("=")
+        unit.setdefault(section, []).append((key.strip(), value.strip()))
+    return unit
+
+
+def values(unit: Unit, section: str, key: str) -> list[str]:
+    return [value for k, value in unit.get(section, []) if k == key]
+
+
+def load(name: str) -> Unit:
+    return parse_unit((QUADLET_DIR / name).read_text())
+
+
+def container_units() -> list[str]:
+    return sorted(path.name for path in QUADLET_DIR.glob("*.container"))
+
+
+def test_parser_keeps_repeated_keys() -> None:
+    unit = parse_unit("[Container]\n# c\nEnvironment=A=1\nEnvironment=B=2\n")
+    assert values(unit, "Container", "Environment") == ["A=1", "B=2"]
+
+
+def test_expected_units_exist() -> None:
+    names = {path.name for path in QUADLET_DIR.iterdir()}
+    assert {*APP_UNITS, "mpmv-caddy.container", "mpmv.network"} <= names
+
+
+@pytest.mark.parametrize("name", APP_UNITS)
+def test_app_units_run_the_current_release_image(name: str) -> None:
+    unit = load(name)
+    assert values(unit, "Container", "Image") == [APP_IMAGE]
+    assert values(unit, "Container", "Pull") == ["never"]
+
+
+@pytest.mark.parametrize("name", APP_UNITS)
+def test_app_units_read_secrets_from_an_environment_file(name: str) -> None:
+    unit = load(name)
+    assert values(unit, "Container", "EnvironmentFile")
+
+
+def test_every_container_follows_the_hardening_rules() -> None:
+    names = container_units()
+    assert names
+    for name in names:
+        unit = load(name)
+        container_name = values(unit, "Container", "ContainerName")
+        assert container_name, name
+        assert container_name[0].startswith("mpmv-"), name
+        assert values(unit, "Container", "Network") == ["mpmv.network"], name
+        assert values(unit, "Container", "NoNewPrivileges") == ["true"], name
+        assert values(unit, "Container", "ReadOnly") == ["true"], name
+        for user in values(unit, "Container", "User"):
+            assert user.split(":")[0] not in {"root", "0"}, name
+        image = values(unit, "Container", "Image")[0]
+        assert image == APP_IMAGE or PINNED_IMAGE.match(image), f"{name}: unpinned {image}"
+
+
+def test_no_secret_like_inline_environment() -> None:
+    for name in container_units():
+        for assignment in values(load(name), "Container", "Environment"):
+            variable = assignment.split("=", 1)[0]
+            assert not SECRET_LIKE.search(variable), f"{name}: {variable} belongs in the env file"
+
+
+def test_app_has_a_health_check_and_is_not_published() -> None:
+    unit = load("mpmv-app.container")
+    assert any("mpmv.healthcheck" in cmd for cmd in values(unit, "Container", "HealthCmd"))
+    assert not values(unit, "Container", "PublishPort"), "only Caddy faces the network"
+
+
+def test_worker_runs_the_worker_role() -> None:
+    unit = load("mpmv-worker.container")
+    assert values(unit, "Container", "Exec") == ["worker"]
+
+
+def test_migrations_run_as_a_one_shot_step() -> None:
+    unit = load("mpmv-migrate.container")
+    assert values(unit, "Container", "Exec") == ["migrate"]
+    assert values(unit, "Service", "Type") == ["oneshot"]
+    assert "Install" not in unit, "migrations run only from the deploy script"
+
+
+@pytest.mark.parametrize("name", LONG_RUNNING)
+def test_long_running_services_restart_and_start_at_boot(name: str) -> None:
+    unit = load(name)
+    assert values(unit, "Service", "Restart") in (["always"], ["on-failure"])
+    assert values(unit, "Install", "WantedBy") == ["default.target"]
+
+
+def test_network_and_volume_names_are_prefixed() -> None:
+    assert values(load("mpmv.network"), "Network", "NetworkName") == ["mpmv-net"]
+    for path in QUADLET_DIR.glob("*.volume"):
+        names = values(parse_unit(path.read_text()), "Volume", "VolumeName")
+        assert names, path.name
+        assert names[0].startswith("mpmv-"), path.name

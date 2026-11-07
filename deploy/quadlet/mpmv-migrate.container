@@ -1,0 +1,19 @@
+# One-shot database migration step, started only by `mpmv-deploy` before the app restarts
+# (ARC.5, spec 12 §12.4: migrations in a dedicated step). No [Install]: never runs at boot.
+[Unit]
+Description=MPMV database migrations
+
+[Container]
+ContainerName=mpmv-migrate
+Image=localhost/mpmv-app:current
+Pull=never
+Exec=migrate
+Network=mpmv.network
+EnvironmentFile=%h/.config/mpmv/mpmv.env
+ReadOnly=true
+NoNewPrivileges=true
+DropCapability=ALL
+
+[Service]
+Type=oneshot
+TimeoutStartSec=900
