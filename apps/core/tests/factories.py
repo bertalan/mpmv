@@ -7,7 +7,15 @@ from django.utils import timezone
 from factory.django import DjangoModelFactory
 
 from apps.core import flags
-from apps.core.models import AuditLog, FeatureFlag, Heartbeat, PlatformOperator, Throttle
+from apps.core.models import (
+    AuditLog,
+    FeatureFlag,
+    Heartbeat,
+    MediaImage,
+    MediaImageRendition,
+    PlatformOperator,
+    Throttle,
+)
 
 
 def utc(year: int, month: int = 1, day: int = 1, hour: int = 0) -> dt.datetime:
@@ -113,3 +121,28 @@ class FeatureFlagFactory(DjangoModelFactory[FeatureFlag]):
     name = factory.Sequence(_registered_flag)
     state = FeatureFlag.State.DEFAULT
     note = ""
+
+
+class MediaImageFactory(DjangoModelFactory[MediaImage]):
+    """A small generated PNG (I18N.3). Pass `file__filename` to recognise it in rendered HTML.
+
+    Saving writes the file to MEDIA_ROOT, a temporary directory under the test settings.
+    """
+
+    class Meta:
+        model = MediaImage
+
+    title = factory.Sequence(lambda n: f"Image {n}")
+    file = factory.django.ImageField(width=64, height=48, color="teal", filename="image.png")
+
+
+class MediaImageRenditionFactory(DjangoModelFactory[MediaImageRendition]):
+    """A rendition as Wagtail's `get_rendition` stores it; templates normally create these."""
+
+    class Meta:
+        model = MediaImageRendition
+
+    image = factory.SubFactory(MediaImageFactory)
+    filter_spec = factory.Sequence(lambda n: f"width-{n + 10}")
+    focal_point_key = ""
+    file = factory.django.ImageField(width=10, height=8, color="teal", filename="rendition.png")

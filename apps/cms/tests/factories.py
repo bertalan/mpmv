@@ -90,6 +90,9 @@ class StandardPageFactory(_InTree, DjangoModelFactory[StandardPage]):
     slug = factory.LazyAttribute(lambda page: slugify(page.title))
     parent = None
     body = factory.LazyFunction(lambda: [("paragraph", "<p>Sample text.</p>")])
+    image = None
+    image_alt_text = ""
+    image_caption = ""
 
     @classmethod
     def _default_parent(cls) -> Page:
