@@ -13,7 +13,7 @@ the ancestors with one indexed `LIKE 'prefix%'` or `IN` query, which listings, b
 the derived upper term levels need, and siblings keep a manual order. Terms of every taxonomy
 live in one table: each taxonomy's top-level terms are roots of the shared forest, and a child
 always belongs to its parent's taxonomy. Move nodes with treebeard (`move`), never by writing
-`path`.
+`path`: `Term.move` refuses, like the forms, a place its taxonomy does not allow.
 
 Texts: one `*Translation` row per language (`apps.core.models.TranslationModel`), EN only at
 go-live but ready for every language in settings.LANGUAGES. The slug is a URL segment per
@@ -242,7 +242,7 @@ class Term(MP_Node, BaseModel):  # type: ignore[misc,django-manager-missing]  # 
             return
         errors: dict[str, list[str]] = {}
         attribute_errors = engine.term_attribute_errors(
-            self.taxonomy.term_attributes or [], self.attributes
+            self.taxonomy.term_attributes, self.attributes
         )
         if attribute_errors:
             errors["attributes"] = attribute_errors
@@ -252,6 +252,18 @@ class Term(MP_Node, BaseModel):  # type: ignore[misc,django-manager-missing]  # 
                 errors[NON_FIELD_ERRORS] = [placement]
         if errors:
             raise ValidationError(errors)
+
+    def move(self, target: "Term", pos: str | None = None) -> None:
+        """Treebeard's move, refusing (ValidationError) a place the taxonomy does not allow.
+
+        Every move runs through here, the admin form's and a direct call alike. Treebeard's
+        child positions end in "-child"; the others (and no position) make a sibling of `target`.
+        """
+        child = pos is not None and pos.endswith("-child")
+        placement = self.placement_error(target if child else target.get_parent())
+        if placement:
+            raise ValidationError(placement)
+        super().move(target, pos)
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         # Treebeard sets the path before the first save: refuse a child in the wrong place.
