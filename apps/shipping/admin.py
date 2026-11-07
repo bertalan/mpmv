@@ -20,12 +20,16 @@ from . import engine
 from .models import (
     Carrier,
     CarrierTranslation,
+    CountryGroup,
+    CountryGroupTranslation,
     PickupOption,
     PickupOptionTranslation,
     ShippingConfigVersion,
+    ShippingMethod,
+    ShippingMethodTranslation,
     ShippingZone,
-    VendorZoneRate,
     WeightBand,
+    zones_using_groups,
 )
 from .services import CONFIG_MODELS, delete_config, save_config
 
@@ -71,14 +75,40 @@ class CarrierAdmin(AuditedAdmin[Carrier]):
     inlines = (CarrierTranslationInline,)
 
 
+class CountryGroupTranslationInline(admin.TabularInline[CountryGroupTranslation, CountryGroup]):
+    model = CountryGroupTranslation
+    extra = 1
+    fields = ("language", "status", "name")
+
+
+@admin.register(CountryGroup)
+class CountryGroupAdmin(AuditedAdmin[CountryGroup]):
+    list_display = ("code", "countries")
+    search_fields = ("code", "translations__name")
+    readonly_fields = ("public_id", "created_at", "updated_at")
+    inlines = (CountryGroupTranslationInline,)
+
+    def get_deleted_objects(
+        self, objs: Any, request: HttpRequest
+    ) -> tuple[list[Any], dict[Any, Any], set[Any], list[Any]]:
+        """Zones name groups by code, which Django's collector cannot see: list the zones that
+        use them as protected, so the delete page refuses instead of failing."""
+        deleted, counts, perms_needed, protected = super().get_deleted_objects(objs, request)
+        codes = [group.code for group in objs]
+        protected = [*protected, *(str(zone) for zone in zones_using_groups(codes))]
+        return deleted, counts, perms_needed, protected
+
+
 @admin.register(ShippingZone)
 class ShippingZoneAdmin(AuditedAdmin[ShippingZone]):
-    list_display = ("code", "name", "priority", "countries", "postcode_patterns")
-    search_fields = ("code", "name")
+    list_display = ("code", "name", "vendor", "priority", "countries", "country_groups")
+    list_filter = (("vendor", admin.EmptyFieldListFilter),)
+    search_fields = ("code", "name", "vendor__display_name")
+    list_select_related = ("vendor",)
     readonly_fields = ("public_id", "created_at", "updated_at")
 
 
-class WeightBandFormSet(BaseInlineFormSet[WeightBand, VendorZoneRate, Any]):
+class WeightBandFormSet(BaseInlineFormSet[WeightBand, ShippingMethod, Any]):
     """Refuses overlapping bands within one submission; the database refuses the rest."""
 
     def clean(self) -> None:
@@ -101,21 +131,38 @@ def _kg(band: engine.Band) -> str:
     return f"{band[0]}-{upper} kg"
 
 
-class WeightBandInline(admin.TabularInline[WeightBand, VendorZoneRate]):
+class ShippingMethodTranslationInline(
+    admin.TabularInline[ShippingMethodTranslation, ShippingMethod]
+):
+    model = ShippingMethodTranslation
+    extra = 0
+    fields = ("language", "status", "name")
+
+
+class WeightBandInline(admin.TabularInline[WeightBand, ShippingMethod]):
     model = WeightBand
     formset = WeightBandFormSet
     extra = 1
     fields = ("from_kg", "to_kg", "cost_net", "surcharge_net")
 
 
-@admin.register(VendorZoneRate)
-class VendorZoneRateAdmin(AuditedAdmin[VendorZoneRate]):
-    list_display = ("vendor", "zone", "carrier", "over_max_weight")
-    list_filter = ("carrier", "zone")
-    search_fields = ("vendor__display_name", "zone__code")
+@admin.register(ShippingMethod)
+class ShippingMethodAdmin(AuditedAdmin[ShippingMethod]):
+    list_display = (
+        "vendor",
+        "zone",
+        "key",
+        "carrier",
+        "service_level",
+        "is_default",
+        "tax_treatment",
+        "over_max_weight",
+    )
+    list_filter = ("carrier", "service_level", "tax_treatment", "is_default", "zone")
+    search_fields = ("vendor__display_name", "zone__code", "key")
     list_select_related = ("vendor", "zone", "carrier")
     readonly_fields = ("public_id", "created_at", "updated_at")
-    inlines = (WeightBandInline,)
+    inlines = (ShippingMethodTranslationInline, WeightBandInline)
 
 
 class PickupOptionTranslationInline(admin.TabularInline[PickupOptionTranslation, PickupOption]):

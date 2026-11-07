@@ -32,46 +32,115 @@ class Carrier(Model):
     code ("main", "vendor_own", "aggregator", "pickup"); label (translated); is_active: bool  # actually honored
     tracking_url_template; supports_api: bool
 
-class ShippingZone(Model):
-    code; name; priority (ASC = wins, 1..999)
-    countries = ArrayField(CharField(2))       # or ["*"] for "rest of the world"
-    postcode_patterns = ArrayField(CharField, default=[])   # "BT*", "70000-74999", "9000-9999"
-    states = ArrayField(CharField, default=[])
+class CountryGroup(Model):                     # platform data, editable by staff, audited (SHP.12)
+    code ("eu", "europe", "africa", "northern-america"…); name (translated)
+    countries = ArrayField(CharField(2))       # ISO alpha-2 members, never "*"
 
-class VendorZoneRate(Model):                   # vendor × zone × carrier
-    vendor; zone; carrier
-    UNIQUE(vendor, zone)                        # a single carrier per vendor and zone (today "the first one wins")
+class ShippingZone(Model):
+    vendor = FK(Vendor, null=True)             # null = platform zone; set = the vendor's own zone (SHP.12)
+    code (unique per vendor, and among platform zones); name; priority (ASC = wins, 1..999)
+    countries = ArrayField(CharField(2))       # explicit countries, or ["*"] for "rest of the world"
+    country_groups = ArrayField(SlugField)     # CountryGroup codes; effective countries = countries ∪ members
+    postcode_patterns = ArrayField(CharField)  # "BT*", "70000..74999", "9000..9999", "84600"
+    states = ArrayField(CharField)             # province / state codes ("SS", "CA"…)
+
+class ShippingMethod(Model):                   # vendor × zone × carrier × service level (SHP.12)
+    vendor; zone; carrier; key (unique per vendor and zone); name (translated)
+    service_level = CharField(choices=["standard", "express", "economy", "other"])
+    min_delivery_days; max_delivery_days       # indicative delivery time shown to the buyer
+    is_default: bool                           # at most one per vendor and zone (partial unique constraint)
+    free_shipping_threshold = Money(null=True) # net goods value of the package from which shipping is free
+    tax_treatment = CharField(choices=["follows_goods", "standard_rate", "exempt"])  # stored only, see below
     over_max_weight = CharField(choices=["last_band", "quote", "block"])   # D-06
 class WeightBand(Model):
-    rate = FK(VendorZoneRate); from_kg; to_kg (null = unlimited); cost_net; surcharge_net
-    # constraint: no overlaps (exclusion constraint on numrange)
+    method = FK(ShippingMethod); from_kg; to_kg (null = unlimited); cost_net; surcharge_net
+    # constraint: no overlaps within a method (exclusion constraint on numrange)
 class PickupOption(Model): vendor; key; cost_net; address; label (translated)
 
 class ShippingConfigVersion(Model):            # replaces the option backups
     snapshot (JSON); created_by; created_at; note   # one-click rollback
 ```
 
+`ShippingMethod` replaces the SHP.1 `VendorZoneRate` (renamed in place: every existing rate became
+the default method of its vendor and zone, with its bands, public id and history). The legacy
+"one carrier per vendor and zone" is superseded by owner decision (2026-11-07): a vendor can offer
+several methods to the same zone, for example a standard courier and an express one, each with its
+own weight bands, free-shipping threshold and delivery time.
+
+**VAT treatment per method.** `tax_treatment` is stored per method and applied by the tax engine
+(`resolve_shipping_tax`, TAX.4): `follows_goods` (default) treats shipping as ancillary to the goods
+and splits its VAT like the goods ([05](05-tax.md)); `standard_rate` and `exempt` are recorded for the
+cases the tax advisor confirms. Their exact computation belongs to TAX.4 and depends on D-03, which
+is open: SHP.12 only stores the choice.
+
+### Zones: vendor zones, country groups and postcodes
+
+- **Platform zones** (`vendor` empty) are shared by every vendor. **Vendor zones** belong to one
+  vendor and are visible only to that vendor (tenant scoping, CORE.3); a vendor's methods can use
+  platform zones and its own zones, never another vendor's.
+- A zone covers its explicit `countries` plus the members of its `country_groups`. Country groups are
+  data, seeded with the EU member states, Europe (UN M49 Europe plus Cyprus, so every EU member
+  state is in it) and the UN M49 continents and regions (Africa; the Americas, also split into
+  Northern America, Central America and the Caribbean, South America; Asia; Oceania) and edited
+  by staff, every change audited. `*` (rest of the world) stays a marker of its own and never
+  mixes with countries or groups.
+- `postcode_patterns` and `states` narrow a zone inside its countries: an address in those countries
+  matches when its postcode matches a pattern or its province / state is listed. An address without
+  a postcode never matches a postcode-only zone (case 5).
+
+Postcode pattern grammar (shared validator, `apps.core.postcodes`, used by the models, SHP.2 and the
+SHP.13 import). Postcodes are compared upper case with spaces and dashes removed, so `846 00` =
+`84600` and `9000-001` = `9000001`:
+
+| Pattern | Meaning | Example |
+|---|---|---|
+| `PREFIX*` | every postcode starting with the prefix | `BT*`, `846*` |
+| `LOW..HIGH` | the first N characters between the bounds, inclusive; bounds of equal length N, `LOW ≤ HIGH` | `70000..74999`, `9000..9999`, `1000-001..1999-999` |
+| `POSTCODE` | that postcode exactly | `84600`, `9000-001`, `00-950` |
+
+The range separator is `..` because postcodes of some countries contain a dash (PT `1000-001`,
+PL `00-950`): the SHP.1 syntax `70000-74999` was ambiguous. Stored ranges were migrated to `..`, and
+a dash between two equal-length numbers is refused with a hint to write the range with `..`.
+
+Zone precedence for one vendor and address (`resolve_zone`):
+
+1. Only platform zones and the vendor's own zones the vendor ships to are candidates; a zone matches
+   when the address is in its effective countries and, if it is narrowed, its postcode or province
+   matches.
+2. A matching **vendor zone wins over every platform zone** for that vendor; other vendors keep the
+   platform zones.
+3. Then the lowest `priority` wins.
+4. Then the most specific match: postcode > province / state > explicit country > country group.
+5. `*` only as a last resort, after every other zone of both kinds (case 7); the vendor's `*` before
+   the platform's.
+
 ### Algorithm (pure functions)
 
 ```python
-def resolve_zone(zones: list[ZoneSnap], vendor_id, country, postcode, state) -> ZoneSnap | None:
-    """1) zones with postcodes that include the country and the vendor, by priority; first matching pattern
-    2) zones with state; 3) country-only zones by priority; 4) "*" only if no other zone matches."""
+def resolve_zone(zones: list[ZoneSnap], vendor_id, dest: Destination) -> ZoneSnap | None:
+    """Candidates: platform zones and the vendor's own; precedence as above (vendor zone, priority,
+    specificity, "*" last)."""
 
 
 def match_postcode(pattern: str, postcode: str) -> bool:
-    """wildcard 'BT*'; range 'a-b' comparing the first N digits of the bound; exact ignoring spaces and '-'."""
+    """'BT*' prefix; 'a..b' comparing the first N characters; exact; spaces and '-' ignored."""
 
 
 def quote_shipping(
     package: VendorPackage, dest: Address, cfg: ShippingConfigSnap
 ) -> ShippingOutcome:
     """package = lines of ONE vendor; weight = Σ weight×qty (kg, 3 decimals).
-    → Rates([...])         carrier and/or pickup rates
-    → NeedsQuote(reason)   country not covered, weight beyond the bands with "quote" policy, weight 0
-    → Blocked(reason)      when quotes are disabled
+    → Rates([...])            one rate per method of the resolved zone (default first) and/or pickup rates
+    → IndicativeRates([...])  special areas (SHP.14) priced "subject to quote": the buyer sees the
+                              estimate and requests a quote for the exact price (SHP.9 quote flow)
+    → NeedsQuote(reason)      country not covered, weight beyond the bands with "quote" policy, weight 0
+    → Blocked(reason)         when quotes are disabled, or a special area is blocked for the method
     Never a silent empty list."""
 ```
+
+`IndicativeRates` behaves like `NeedsQuote` at checkout (no payment, the order goes to
+`quote_requested`, covered vendors keep their rates), but the request starts from the estimate so the
+vendor quotes against it.
 
 Checkout rules:
 
@@ -81,7 +150,24 @@ Checkout rules:
 4. A `buy` product without weight cannot be published (see [03](03-catalog.md)): the "weight 0" case
    becomes impossible instead of being handled.
 5. Local pickup: an alternative offered in addition to the carrier, if configured.
-6. Free shipping above a threshold per vendor and zone: an explicit rule (today there is no dedicated logic).
+6. Free shipping above a threshold **per method**: an explicit rule on the net goods value of the
+   package (today there is no dedicated logic).
+7. Several methods to the same zone are offered side by side with their delivery time; the default
+   method is preselected.
+
+### Standard template and special areas (SHP.13, SHP.14)
+
+- The platform proposes a **standard shipping template** (zones, country groups, weight bands, VAT
+  treatment, special areas) that a vendor copies and customises. The configuration is exported and
+  re-imported as JSON or CSV, validated by the same validators the tests use, with a dry-run preview
+  (ChangeSet) and an audit entry; the SHP.5 legacy import reuses the format.
+- **Special areas** are postcode or province lists seeded in the template: islands and remote areas
+  (IT islands and minor islands, Balearic Islands, Corsica, Greek islands, Azores and Madeira, UK
+  Highlands and Islands, Venice lagoon; carrier remote-area lists importable) and extra-VAT
+  territories linked to the TAX.1 `Territory` (Livigno, Campione d'Italia, Canary Islands, Ceuta and
+  Melilla, French overseas departments, Åland, Mount Athos, Heligoland, Büsingen). Each method sets
+  its treatment per area: surcharge (fixed, percent or per kg), extra delivery days, unavailable,
+  quote only, or blocked. The default is an indicative cost subject to quote (`IndicativeRates`).
 
 ### Quotes (single order)
 
@@ -159,25 +245,40 @@ forbids `apps.shipping` from importing `apps.events` (EVT.1, EVT.8).
 6. A zone with postcodes applies only to the listed countries.
 7. `*` only as a last resort (Vendor D: USA → World).
 8. Band bounds; `to = null` unlimited; beyond the last band → explicit policy (Vendor D, World).
-9. Vendor D never receives main-carrier rates; a vendor cannot be on two carriers in the same zone (DB constraint).
+9. Vendor D never receives main-carrier rates. ~~A vendor cannot be on two carriers in the same zone.~~
+   Superseded by owner decision (2026-11-07, SHP.12): a vendor may offer several methods (carriers,
+   service levels) to the same zone; at most one is the default (DB constraint).
 10. Carrier disabled → none of its rates.
 11. Country not covered: quotes enabled → `NeedsQuote`; disabled → `Blocked` with a message, never an empty checkout.
 12. Mixed covered + uncovered cart → single order under quote, the covered vendor's rate is kept.
 13. Local pickup does not intercept uncovered countries.
 14. All cases 22–35 of the quote flow listed in the analysis (token, revisions, expiry, fingerprint, rate limit).
+15. A vendor zone (e.g. a vendor's own island postcodes) beats the platform zone for that vendor's
+    matching addresses; another vendor at the same address keeps the platform zone.
+16. Two methods of one vendor to the same zone, each with its own bands and threshold; a second
+    default for the same vendor and zone is refused (DB constraint).
+17. Ranges with `..`: PT `9000..9999` matches `9000-001`; PL `00-000..19-999` matches `00-950`; the
+    old form `70000-74999` is refused by the validator.
+18. A zone built from a country group (EU) covers every member state; an explicit country zone beats
+    a group zone at the same priority.
+19. Sardinia (SHP.14): an indicative cost with a request-quote action; a vendor override to a fixed
+    surcharge applies.
 
 ## 6.4 Tasks
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
 | SHP.1 | Carrier, Zone, VendorZoneRate, WeightBand (exclusion constraint), PickupOption, ConfigVersion models | P1 | 10 | VEN.1 | DB constraints tested |
-| SHP.2 | `match_postcode` + `resolve_zone` pure functions with cases 1–7 | P1 | 8 | SHP.1 | Cases green |
-| SHP.3 | `quote_shipping` with Rates/NeedsQuote/Blocked outcomes, over-band policy, pickup, free-shipping threshold | P1 | 8 | SHP.2 | Cases 8–13 green |
+| SHP.2 | `match_postcode` + `resolve_zone` pure functions with cases 1–7 | P1 | 8 | SHP.12 | Cases green |
+| SHP.3 | `quote_shipping` with Rates/IndicativeRates/NeedsQuote/Blocked outcomes, over-band policy, pickup, free-shipping threshold per method | P1 | 8 | SHP.2, SHP.12, SHP.14 | Cases 8–13 green |
 | SHP.4 | Cart integration: package per vendor, VAT via the tax engine | P1 | 6 | SHP.3, TAX.4, ORD.1 | Correct cart totals in mixed tests |
 | SHP.5 | Import of the LIVE v2 config (JSON) into the new models with a parity report | P1 | 6 | SHP.1 | Same rates on 200 sample combinations |
-| SHP.6 | Admin zone/rate editor with diff, impact and versions/rollback | P2 | 12 | SHP.1, CORE.8 | Rollback to a previous version works |
+| SHP.6 | Admin zone/rate editor with diff, impact and versions/rollback | P2 | 12 | SHP.12, CORE.8 | Rollback to a previous version works |
 | SHP.7 | Cart simulator (admin + `/shipping/simulate`) | P2 | 6 | SHP.4 | Parity with the current simulator on seed cases |
 | SHP.8 | Daily health check + report | P2 | 6 | SHP.1, ARC.9, ARC.16 | Email report with the 7 checks |
 | SHP.9 | Quotes: models, states, `submit_vendor_quote`, `send_quote`, token link, expiry | P1 | 16 | ORD.2, SHP.3 | End-to-end flow with 2 vendors |
 | SHP.10 | Quotes: vendor and staff UI, emails (customer, vendor, staff), rate limit and honeypot | P1 | 10 | SHP.9, ARC.16 | Parity with 2.4.0 |
-| SHP.11 | Rate export for Google Merchant | P2 | 4 | SHP.1 | Feed without hardcoded rates |
+| SHP.11 | Rate export for Google Merchant | P2 | 4 | SHP.12 | Feed without hardcoded rates |
+| SHP.12 | Configurable shipping per vendor: several shipping methods per zone (carrier, service level, indicative delivery time, own weight bands, own free-shipping threshold, one default), vendor-defined zones on top of platform zones, zones by postcode range, province, country or continent/country group, configurable VAT treatment per method | P1 | 12 | SHP.1 | A vendor offers two methods to the same zone with different bands; a vendor zone overrides the platform zone for matching addresses; VAT treatment stored per method |
+| SHP.13 | Standard shipping template proposed by the platform (zones, country groups, weight bands, VAT treatment, special areas) that a vendor copies and customises; export and re-import as JSON/CSV validated by the same validators used in tests, dry-run preview (ChangeSet), audited; SHP.5 legacy import reuses the format | P1 | 10 | SHP.12 | Round trip export -> import is lossless; an invalid file is rejected with a per-row report and changes nothing |
+| SHP.14 | Special areas: islands, remote and extra-VAT territories as postcode/province lists seeded in the standard template (IT islands and minor islands, Baleari, Corsica, Greek islands, Azores/Madeira, UK Highlands and Islands, Venice lagoon, carrier remote-area lists importable; extra-VAT: Livigno, Campione d Italia, Canarias, Ceuta/Melilla, French DOM, Aland, Mount Athos, Heligoland, Busingen linked to the TAX.1 Territory); per-method treatment: surcharge (fixed, percent, per kg), extra delivery days, unavailable, quote only, blocked; default: indicative cost subject to quote (the buyer sees an estimate and requests a quote for the exact price) | P1 | 12 | SHP.12, SHP.13 | A Sardinia address shows an indicative cost with a request-quote action; a vendor override to a fixed surcharge applies |
