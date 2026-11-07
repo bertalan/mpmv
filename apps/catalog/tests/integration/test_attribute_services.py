@@ -116,6 +116,7 @@ def test_the_creation_is_audited(attributes: dict[str, Attribute], vendor: Vendo
     product = Product.objects.get()
     entry = entries.get(target_model="catalog.product")
     assert entry.target_key == str(product.public_id)
+    assert entry.after is not None
     assert entry.after["sku"] == "TEE-1"
     assert entry.after["price_net"] == "19.90"
 

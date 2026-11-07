@@ -1,9 +1,11 @@
-"""Pure catalog rules (spec 03 §3.2): SKU normalization, price validation, and the rules of the
-category and term trees and of the attributes a taxonomy declares for its terms. No ORM here."""
+"""Pure catalog rules (spec 03 §3.2): SKU normalization, price validation, the rules of the
+category and term trees and of the attributes a taxonomy declares for its terms, and the shape of
+a product's typed attributes, variant axes and variants (CAT.3). No ORM here."""
 
 import datetime as dt
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, cast
 
@@ -174,3 +176,198 @@ def term_attribute_errors(schema: object, values: object) -> list[str]:
         f"{code} is not an attribute of this taxonomy." for code in values if code not in declared
     )
     return errors
+
+
+# --- Typed attributes and variant axes (CAT.3, spec 03 §3.2, owner decision Q-32)
+#
+# A product lists the attributes that describe it. A choice attribute takes values from the
+# attribute's own list (translated labels), a number attribute one exact number (in the
+# attribute's unit), a text attribute one language-neutral text (an author, an ISBN). The choice
+# attributes a variable product varies on are its variant axes, in the order the product lists
+# them; every variant takes exactly one of the product's values on each axis.
+
+ATTRIBUTE_KINDS = ("choice", "number", "text")
+VARIANT_LABEL_SEPARATOR = " / "
+
+
+@dataclass(frozen=True)
+class AttributeSpec:
+    """What the platform knows of an attribute: its kind and, for a choice, its value codes."""
+
+    kind: str
+    values: frozenset[str] = frozenset()
+
+
+@dataclass(frozen=True)
+class AttributeIn:
+    """One attribute of a product as a client sends it."""
+
+    code: str
+    values: tuple[str, ...] = ()
+    number: Decimal | None = None
+    text: str = ""
+    axis: bool = False
+
+
+@dataclass(frozen=True)
+class VariantIn:
+    """One variant: its SKU, its value code on each axis, and its own overrides and stock."""
+
+    sku: str
+    options: Mapping[str, str]
+    price_net_override: Decimal | None = None
+    weight_kg_override: Decimal | None = None
+    stock_qty: int = 0
+    is_default: bool = False
+
+
+@dataclass(frozen=True)
+class TranslationIn:
+    language: str
+    title: str
+    short_description: str = ""
+    description: str = ""
+
+
+@dataclass(frozen=True)
+class ProductIn:
+    """A new product with its texts, attributes and (variable products only) variants."""
+
+    sku: str
+    price_net: Decimal
+    kind: str = "simple"
+    sales_mode: str = "buy"
+    fiscal_category: str = "standard"
+    weight_kg: Decimal | None = None
+    translations: tuple[TranslationIn, ...] = ()
+    attributes: tuple[AttributeIn, ...] = ()
+    variants: tuple[VariantIn, ...] = field(default=())
+
+
+def _attribute_errors(spec: AttributeSpec, given: AttributeIn) -> list[str]:
+    code = given.code
+    has_number, has_text = given.number is not None, bool(given.text)
+    if spec.kind == "choice":
+        if has_number or has_text:
+            return [f"{code} takes values, not a number or a text."]
+        if not given.values:
+            return [f"{code} needs at least one value."]
+        errors: list[str] = []
+        seen: set[str] = set()
+        for value in given.values:
+            if value in seen:
+                errors.append(f"{code} lists the value {value} twice.")
+            elif value not in spec.values:
+                errors.append(f"{code} has no value {value}.")
+            seen.add(value)
+        return errors
+    if given.axis:
+        return [f"{code} cannot be a variant axis: only choice attributes can."]
+    if spec.kind == "number":
+        if given.values or has_text:
+            return [f"{code} takes a number only."]
+        if given.number is None:
+            return [f"{code} needs a number."]
+        if not isinstance(given.number, Decimal) or not given.number.is_finite():
+            return [f"{code} needs an exact decimal number."]
+        return []
+    if given.values or has_number:
+        return [f"{code} takes a text only."]
+    return [] if has_text else [f"{code} needs a text."]
+
+
+def _variant_errors(
+    variant: VariantIn, axes: Sequence[str], allowed: Mapping[str, Iterable[str]]
+) -> list[str]:
+    errors = [
+        f"Variant {variant.sku} has no {axis}." for axis in axes if axis not in variant.options
+    ]
+    for code, value in variant.options.items():
+        if code not in allowed:
+            errors.append(f"Variant {variant.sku}: {code} is not a variant axis of this product.")
+        elif value not in allowed[code]:
+            errors.append(
+                f"Variant {variant.sku}: {value} is not one of the product's {code} values."
+            )
+    return errors
+
+
+def _is_choice(catalogue: Mapping[str, AttributeSpec], code: str) -> bool:
+    spec = catalogue.get(code)
+    return spec is not None and spec.kind == "choice"
+
+
+def product_structure_errors(
+    kind: str,
+    catalogue: Mapping[str, AttributeSpec],
+    attributes: Sequence[AttributeIn],
+    variants: Sequence[VariantIn],
+) -> list[str]:
+    """Why a product's attributes, axes and variants do not fit together; empty when valid.
+
+    `catalogue` maps the platform's attribute codes to their spec. Owner decision Q-32: only a
+    variable product has variant axes and variants, and it needs at least one of each.
+    """
+    errors: list[str] = []
+    seen: set[str] = set()
+    for given in attributes:
+        if given.code in seen:
+            errors.append(f"{given.code} is given twice.")
+            continue
+        seen.add(given.code)
+        spec = catalogue.get(given.code)
+        if spec is None:
+            errors.append(f"{given.code} is not a known attribute.")
+            continue
+        errors.extend(_attribute_errors(spec, given))
+
+    axes = [a.code for a in attributes if a.axis and _is_choice(catalogue, a.code)]
+    allowed = {a.code: a.values for a in attributes if a.axis}
+    if kind != "variable":
+        if axes:
+            errors.append("Only a variable product has variant axes.")
+        if variants:
+            errors.append("Only a variable product has variants.")
+        return errors
+    if not axes:
+        errors.append("A variable product needs at least one variant axis.")
+    if not variants:
+        errors.append("A variable product needs at least one variant.")
+
+    combinations: dict[tuple[str, ...], str] = {}
+    skus: set[str] = set()
+    for variant in variants:
+        errors.extend(_variant_errors(variant, axes, allowed))
+        sku = canonical_sku(variant.sku)
+        if sku in skus:
+            errors.append(f"The variant SKU {sku} is given twice.")
+        skus.add(sku)
+        combination = tuple(variant.options.get(axis, "") for axis in axes)
+        if combination in combinations:
+            errors.append(
+                f"Variants {combinations[combination]} and {variant.sku} have the same options."
+            )
+        else:
+            combinations[combination] = variant.sku
+    if sum(variant.is_default for variant in variants) > 1:
+        errors.append("Only one variant can be the default.")
+    return errors
+
+
+def variant_order(
+    axes: Sequence[str],
+    positions: Mapping[str, Mapping[str, int]],
+    options: Sequence[Mapping[str, str]],
+) -> list[int]:
+    """Indexes of `options` in display order: by the first axis, then the next, each by the
+    position of the value in its attribute's list (S, M, L rather than alphabetical)."""
+
+    def key(index: int) -> tuple[int, ...]:
+        return tuple(positions[axis][options[index][axis]] for axis in axes)
+
+    return sorted(range(len(options)), key=key)
+
+
+def variant_label(labels: Sequence[str]) -> str:
+    """A variant's name from its option labels in axis order, e.g. "M / Red"."""
+    return VARIANT_LABEL_SEPARATOR.join(labels)

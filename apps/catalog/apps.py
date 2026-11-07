@@ -22,4 +22,13 @@ class CatalogConfig(AppConfig):
         "termtranslation": "storefront texts under the translation workflow",
         "brand": "manufacturer names shown on product pages and feeds",
         "brandtranslation": "storefront texts under the translation workflow",
+        # CAT.3: attribute catalogue (platform data) and what products and variants say of it.
+        "attribute": "attribute catalogue (codes, kinds, units); no money, access or legal facts",
+        "attributetranslation": "storefront texts under the translation workflow",
+        "attributevalue": "values of a choice attribute and their order; no money or access",
+        "attributevaluetranslation": "storefront texts under the translation workflow",
+        "productattribute": "catalog content describing a product; creation with variants is "
+        "audited by services.create_product",
+        "variantoption": "which value a variant takes on an axis; created and audited by "
+        "services.create_product",
     }

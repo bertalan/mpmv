@@ -320,7 +320,7 @@ def test_a_variable_product_needs_axes_and_variants() -> None:
     [
         (_variant("T-L", size="s"), "Variant T-L has no color."),
         (
-            _variant("T-L", size="s", color="red", material="cotton"),
+            _variant("T-L", size="m", color="blue", material="cotton"),
             "Variant T-L: material is not a variant axis of this product.",
         ),
         (

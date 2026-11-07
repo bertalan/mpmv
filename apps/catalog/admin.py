@@ -17,6 +17,7 @@ from treebeard.forms import TreeNodeChoiceField
 
 from apps.core.audit import audit_context
 
+from . import attribute_admin as attribute_admin  # registers the CAT.3 admins
 from . import engine
 from . import taxonomy_admin as taxonomy_admin  # registers the CAT.2 admins
 from .models import Category, Product, ProductTranslation, Term, Variant, VariantTranslation
