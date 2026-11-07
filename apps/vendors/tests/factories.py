@@ -5,18 +5,30 @@ real vendor data. Legal identifiers (VAT numbers, codici fiscali, IBANs) are syn
 checksum-valid, generated at runtime from the factory sequence (VEN.12).
 """
 
+import datetime as dt
 import string
 from collections.abc import Iterable
 from decimal import Decimal
 from typing import Any
 
 import factory
+from django.db.models import Max
+from django.utils import timezone
 from django.utils.text import slugify
 from factory.django import DjangoModelFactory
 
 from apps.accounts.tests.factories import UserFactory
+from apps.core.translations import source_hash
 from apps.vendors import engine
-from apps.vendors.models import LegalFieldRequirement, Vendor, VendorMember, VendorTranslation
+from apps.vendors.models import (
+    ContractAcceptance,
+    LegalFieldRequirement,
+    Vendor,
+    VendorContract,
+    VendorContractTranslation,
+    VendorMember,
+    VendorTranslation,
+)
 
 
 def pseudonym(n: int) -> str:
@@ -218,3 +230,81 @@ class LegalFieldRequirementFactory(DjangoModelFactory[LegalFieldRequirement]):
     field_name = factory.Sequence(lambda n: engine.LEGAL_FIELDS[n % len(engine.LEGAL_FIELDS)])
     purpose = LegalFieldRequirement.Purpose.PAYOUT
     active = True
+
+
+def next_contract_version() -> int:
+    """The version after the latest one, as `services.save_contract` numbers them."""
+    latest: int | None = VendorContract.objects.aggregate(latest=Max("version"))["latest"]
+    return (latest or 0) + 1
+
+
+class VendorContractFactory(DjangoModelFactory[VendorContract]):
+    """A contract version in force since yesterday, with a published English text.
+
+    `languages=[...]` chooses the published texts (`[]`: none). Factories write rows directly:
+    the start-date rule is tested through `services.save_contract`.
+    """
+
+    class Meta:
+        model = VendorContract
+        skip_postgeneration_save = True
+
+    version = None  # numbered after the latest version when created
+    valid_from = factory.LazyFunction(lambda: timezone.now() - dt.timedelta(days=1))
+
+    @classmethod
+    def _create(cls, model_class: type[VendorContract], *args: Any, **kwargs: Any) -> Any:
+        if kwargs.get("version") is None:
+            kwargs["version"] = next_contract_version()
+        return super()._create(model_class, *args, **kwargs)  # type: ignore[no-untyped-call]
+
+    @factory.post_generation
+    def languages(
+        obj: VendorContract, create: bool, extracted: Iterable[str] | None, **kwargs: Any
+    ) -> None:
+        if create:
+            for language in ("en",) if extracted is None else extracted:
+                VendorContractTranslationFactory.create(contract=obj, language=language)
+
+
+class VendorContractTranslationFactory(DjangoModelFactory[VendorContractTranslation]):
+    class Meta:
+        model = VendorContractTranslation
+
+    contract = factory.SubFactory(VendorContractFactory, languages=[])
+    language = "en"
+    status = VendorContractTranslation.Status.PUBLISHED
+    title = factory.LazyAttribute(lambda o: f"Vendor agreement [{o.language}]")
+    body = factory.Faker("paragraph")
+
+
+class ContractAcceptanceFactory(DjangoModelFactory[ContractAcceptance]):
+    """The owner of an onboarding vendor accepted the English text of a contract in force.
+
+    When created, the user becomes an owner of the vendor (unless already a member) and the
+    text hash is the one of the contract's text in `language`.
+    """
+
+    class Meta:
+        model = ContractAcceptance
+        skip_postgeneration_save = True
+
+    vendor = factory.SubFactory(VendorFactory, status=Vendor.Status.ONBOARDING)
+    contract = factory.SubFactory(VendorContractFactory)
+    user = factory.SubFactory(UserFactory)
+    language = "en"
+    text_hash = ""
+    accepted_at = factory.LazyFunction(timezone.now)
+    ip = "198.51.100.1"
+
+    @classmethod
+    def _create(cls, model_class: type[ContractAcceptance], *args: Any, **kwargs: Any) -> Any:
+        if not kwargs.get("text_hash"):
+            text = kwargs["contract"].translations.get(language=kwargs["language"])
+            kwargs["text_hash"] = source_hash(text.source_values())
+        return super()._create(model_class, *args, **kwargs)  # type: ignore[no-untyped-call]
+
+    @factory.post_generation
+    def owner(obj: ContractAcceptance, create: bool, extracted: Any, **kwargs: Any) -> None:
+        if create and not VendorMember.objects.filter(vendor=obj.vendor, user=obj.user).exists():
+            VendorMemberFactory.create(vendor=obj.vendor, user=obj.user)

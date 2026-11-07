@@ -24,7 +24,12 @@ from apps.vendors.services import (
     save_requirement,
     save_vendor,
 )
-from apps.vendors.tests.factories import LegalFieldRequirementFactory, VendorFactory, italian_vat
+from apps.vendors.tests.factories import (
+    ContractAcceptanceFactory,
+    LegalFieldRequirementFactory,
+    VendorFactory,
+    italian_vat,
+)
 from apps.vendors.tests.fakes import FakeVatNumberValidator, seed_legal_requirements
 
 pytestmark = pytest.mark.django_db
@@ -357,6 +362,7 @@ def test_staff_rules_add_and_deactivated_rules_relax(seeded: None) -> None:
 
 def test_completeness_never_blocks_status_transitions(seeded: None) -> None:
     vendor = bare_vendor(country="IT")
+    ContractAcceptanceFactory.create(vendor=vendor)  # the only activation gate (VEN.5)
     for target in ("onboarding", "active"):
         change_status(vendor, target, ctx=CTX)
     vendor.refresh_from_db()

@@ -8,28 +8,37 @@ audit trail.
 from collections.abc import Callable
 from typing import Any
 
+from django import forms
 from django.contrib import admin, messages
+from django.core.exceptions import FieldDoesNotExist, ValidationError
 from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.urls import reverse
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django.utils.safestring import SafeString
 
 from apps.core.audit import audit_context
 
 from . import engine
 from .models import (
+    ContractAcceptance,
     LegalFieldRequirement,
     Vendor,
+    VendorContract,
+    VendorContractTranslation,
     VendorStatus,
     VendorTranslation,
     legal_field_label,
 )
 from .services import (
     change_status,
+    check_contract_start,
+    current_contract,
     delete_requirement,
     delete_vendor,
     legal_profile_completeness,
+    onboarding_checklist,
+    save_contract,
     save_requirement,
     save_vendor,
 )
@@ -82,6 +91,17 @@ def _labels(names: tuple[str, ...]) -> str:
     return ", ".join(legal_field_label(name) for name in names)
 
 
+def _field_labels(names: tuple[str, ...]) -> str:
+    """Labels of vendor fields; other names (e.g. "vat_number or tax_code") as they are."""
+    labels = []
+    for name in names:
+        try:
+            labels.append(legal_field_label(name))
+        except FieldDoesNotExist:
+            labels.append(name.replace("_", " "))
+    return ", ".join(labels)
+
+
 def _address(prefix: str) -> tuple[str, ...]:
     return tuple(
         f"{prefix}_{name}"
@@ -98,6 +118,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         "status",
         "public_id",
         "audit_trail",
+        "onboarding",
         "missing_for_payout",
         "vies_status",
         "vies_checked_at",
@@ -106,6 +127,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
     )
     fieldsets = (
         (None, {"fields": ("display_name", "slug", "status", "public_id", "audit_trail")}),
+        ("Onboarding", {"fields": ("onboarding",)}),
         ("Payout readiness", {"fields": ("missing_for_payout",)}),
         (
             "Legal identity",
@@ -180,6 +202,35 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
             parts.append("Invalid: " + _labels(result.invalid))
         return ". ".join(parts) + "."
 
+    @admin.display(description="Onboarding checklist")
+    def onboarding(self, obj: Vendor | None) -> SafeString | str:
+        """The VEN.5 checklist: only the contract blocks activation; data gaps gate payouts."""
+        if obj is None or obj.pk is None:
+            return "-"
+        checklist = onboarding_checklist(obj)
+        contract = current_contract()
+        lines = []
+        for item in checklist.items:
+            if item.key == engine.CONTRACT:
+                text = (
+                    "No contract in force"
+                    if contract is None
+                    else f"Contract version {contract.version}: "
+                    + ("accepted" if item.done else "not accepted")
+                )
+            else:
+                name = "DAC7 data" if item.key == engine.DAC7 else "Payout data"
+                text = f"{name}: " + (
+                    "complete" if item.done else "missing " + _field_labels(item.missing)
+                )
+            if item.blocking and not item.done:
+                text += " (Blocks activation)"
+            lines.append((text,))
+        summary = "Ready to activate" if checklist.ready else "Not ready to activate"
+        return format_html(
+            "<strong>{}</strong><ul>{}</ul>", summary, format_html_join("", "<li>{}</li>", lines)
+        )
+
     @admin.display(description="Audit trail")
     def audit_trail(self, obj: Vendor) -> SafeString | str:
         if obj.pk is None:
@@ -197,6 +248,93 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         ctx = audit_context(request)
         for vendor in queryset:
             delete_vendor(vendor, ctx=ctx)
+
+
+def _locked(obj: VendorContract | None) -> bool:
+    return obj is not None and obj.is_accepted
+
+
+class VendorContractTranslationInline(
+    admin.StackedInline[VendorContractTranslation, VendorContract]
+):
+    model = VendorContractTranslation
+    extra = 1
+    fields = ("language", "status", "title", "body")
+
+    def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return super().has_add_permission(request, obj) and not _locked(obj)
+
+    def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return super().has_change_permission(request, obj) and not _locked(obj)
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return super().has_delete_permission(request, obj) and not _locked(obj)
+
+
+class VendorContractForm(forms.ModelForm[VendorContract]):
+    class Meta:
+        model = VendorContract
+        fields = ("valid_from", "note")
+
+    def clean(self) -> dict[str, Any]:
+        cleaned: dict[str, Any] = super().clean() or {}
+        valid_from = cleaned.get("valid_from")
+        if valid_from is not None:
+            probe = VendorContract(
+                pk=self.instance.pk, version=self.instance.version, valid_from=valid_from
+            )
+            try:
+                check_contract_start(probe)
+            except ValidationError as exc:
+                self.add_error(None, exc)
+        return cleaned
+
+
+@admin.register(VendorContract)
+class VendorContractAdmin(admin.ModelAdmin[VendorContract]):
+    """Contract versions (VEN.5). A version nobody accepted yet can be edited; an accepted one
+    is read-only, and versions are never deleted: new terms are a new version."""
+
+    form = VendorContractForm
+    list_display = ("version", "valid_from", "note", "acceptance_count")
+    readonly_fields = ("version", "public_id", "created_at")
+    fields = ("version", "valid_from", "note", "public_id", "created_at")
+    inlines = (VendorContractTranslationInline,)
+
+    @admin.display(description="Acceptances")
+    def acceptance_count(self, obj: VendorContract) -> int:
+        return obj.acceptances.count()
+
+    def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return super().has_change_permission(request, obj) and not _locked(obj)
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+    def save_model(
+        self, request: HttpRequest, obj: VendorContract, form: Any, change: bool
+    ) -> None:
+        save_contract(obj, ctx=audit_context(request))
+
+
+@admin.register(ContractAcceptance)
+class ContractAcceptanceAdmin(admin.ModelAdmin[ContractAcceptance]):
+    """Who accepted which contract version, when and from where. Read-only: append-only rows
+    written by `services.accept_contract`."""
+
+    list_display = ("vendor", "contract", "user", "language", "accepted_at", "ip")
+    list_filter = ("contract", "language")
+    search_fields = ("vendor__display_name", "vendor__legal_name", "user__email")
+    list_select_related = ("vendor", "contract", "user")
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
 
 
 @admin.register(LegalFieldRequirement)
