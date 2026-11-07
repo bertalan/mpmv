@@ -2,7 +2,9 @@
 # ghcr.io/<owner>/mpmv-app:X.Y.Z (plus sha-<commit>). STAGE and LIVE deploy these tags with
 # deploy/server/mpmv-deploy; see deploy/README.md.
 # OPS.4: the GitHub release for the tag carries the CycloneDX SBOMs of the Python environment and
-# of the published image (docs/dev/dependency-updates.md).
+# of the published image (docs/dev/dependency-updates.md). Only the small attach job, which runs no
+# third-party action, can write to the repository; the image job builds and pushes with a
+# read-only repository token. Third-party actions in a job with a write token are pinned by commit.
 name: Release image
 
 on:
@@ -24,11 +26,13 @@ jobs:
     name: Build and publish
     runs-on: ubuntu-24.04
     permissions:
-      contents: write # create the GitHub release and attach the SBOMs
+      contents: read
       packages: write # push the image to ghcr.io
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       - name: Image name and version
         run: |
           echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/mpmv-app" >> "$GITHUB_ENV"
@@ -50,7 +54,7 @@ jobs:
       - name: Python SBOM (CycloneDX)
         run: make sbom
       - name: Image SBOM (CycloneDX)
-        uses: anchore/sbom-action@v0.24.3
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: ${{ env.IMAGE }}:${{ env.VERSION }}
           format: cyclonedx-json
@@ -61,7 +65,26 @@ jobs:
         run: |
           docker push "$IMAGE:$VERSION"
           docker push "$IMAGE:sha-${GITHUB_SHA::12}"
-      - name: Attach the SBOMs to the GitHub release
+      - name: Store the SBOMs for the attach job
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-sboms
+          path: build/sbom/*.cdx.json
+          if-no-files-found: error
+          retention-days: 7
+
+  attach:
+    name: Attach the SBOMs to the GitHub release
+    needs: image
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # create the GitHub release and attach the SBOMs
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-sboms
+          path: build/sbom
+      - name: Create the release and upload the SBOMs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
