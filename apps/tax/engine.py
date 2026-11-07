@@ -27,16 +27,25 @@ OTHER_EXEMPTION: Final = "other"
 EXEMPT_REASONS: Final = (ART74_PUBLISHING, FLAT_RATE_FORFETTARIO, OTHER_EXEMPTION)
 
 
-def profile_errors(regime: str, exempt_reason: str, *, fiscal_regime: str) -> dict[str, str]:
+def profile_errors(
+    regime: str,
+    exempt_reason: str,
+    *,
+    fiscal_regime: str,
+    oss_registered_since: dt.date | None = None,
+) -> dict[str, str]:
     """What is wrong with a VAT regime for a vendor declaring `fiscal_regime` (VEN.12).
 
     The fiscal regime (FatturaPA RegimeFiscale) is what the vendor declares on its invoices and
     stays on the vendor; the VAT regime lives here. They are never duplicated, only kept
     consistent: the flat-rate exemption is exactly the regime of a vendor declaring RF19
     (forfettario), which never charges VAT. A blank fiscal regime (identity not complete yet)
-    allows every regime except the flat-rate exemption.
+    allows every regime except the flat-rate exemption. Only the OSS regime has an OSS
+    registration date (optional there).
     """
     errors: dict[str, str] = {}
+    if oss_registered_since is not None and regime in REGIMES and regime != OSS:
+        errors["oss_registered_since"] = "Only the OSS regime has an OSS registration date."
     if regime not in REGIMES:
         errors["regime"] = f"Unknown VAT regime {regime!r}."
     if exempt_reason and exempt_reason not in EXEMPT_REASONS:
@@ -117,6 +126,7 @@ def request_errors(
     *,
     requested_fiscal_regime: str,
     current_fiscal_regime: str,
+    oss_registered_since: dt.date | None = None,
 ) -> dict[str, str]:
     """What is wrong with a requested regime for a vendor declaring `current_fiscal_regime`.
 
@@ -141,20 +151,23 @@ def request_errors(
     resulting = resulting_fiscal_regime(
         regime, exempt_reason, requested=requested_fiscal_regime, current=current_fiscal_regime
     )
-    return profile_errors(regime, exempt_reason, fiscal_regime=resulting)
+    return profile_errors(
+        regime, exempt_reason, fiscal_regime=resulting, oss_registered_since=oss_registered_since
+    )
 
 
-def fiscal_regime_change_error(effective_from: dt.datetime, *, now: dt.datetime) -> str | None:
+def fiscal_regime_change_error(effective_on: dt.date, *, today: dt.date) -> str | None:
     """Why an approval cannot change the declared fiscal regime yet; None when it can.
 
     The fiscal regime is not versioned (VEN.12): it is what invoices declare from now on. So a
     change that moves it is approved on or after its date, never ahead, or invoices issued
-    before the date would declare the new regime.
+    before the date would declare the new regime. Both dates are business-time dates (invoices
+    are dated by day), converted by the caller.
     """
-    if effective_from > now:
+    if effective_on > today:
         return (
             f"The request changes the declared fiscal regime from "
-            f"{effective_from.date().isoformat()}: approve it on or after that date."
+            f"{effective_on.isoformat()}: approve it on or after that date."
         )
     return None
 

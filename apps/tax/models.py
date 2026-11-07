@@ -284,7 +284,10 @@ class VendorTaxProfile(Versioned):
         if self.vendor_id is None or not self.regime:
             return
         errors = engine.profile_errors(
-            self.regime, self.exempt_reason, fiscal_regime=self.vendor.fiscal_regime
+            self.regime,
+            self.exempt_reason,
+            fiscal_regime=self.vendor.fiscal_regime,
+            oss_registered_since=self.oss_registered_since,
         )
         if errors:
             raise ValidationError(errors)
@@ -459,6 +462,7 @@ class TaxRegimeChangeRequest(BaseModel):
             self.exempt_reason,
             requested_fiscal_regime=self.fiscal_regime,
             current_fiscal_regime=self.vendor.fiscal_regime,
+            oss_registered_since=self.oss_registered_since,
         )
         if errors:
             raise ValidationError(errors)

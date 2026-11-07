@@ -14,7 +14,9 @@ import datetime as dt
 import logging
 from dataclasses import dataclass
 from typing import Any
+from zoneinfo import ZoneInfo
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q, QuerySet
@@ -265,11 +267,41 @@ def legal_note_snapshot(note: VendorTaxProfileTranslation) -> dict[str, Any]:
     return values
 
 
+def legal_note_error(note: VendorTaxProfileTranslation, *, at: dt.datetime) -> str | None:
+    """Why `note` cannot be written at `at`; None when it can.
+
+    A note belongs to one profile version for good, and the notes of a version whose period has
+    ended are history: they are what documents of that period printed.
+    """
+    if note.pk is not None:
+        stored = (
+            VendorTaxProfileTranslation.objects.filter(pk=note.pk)
+            .values_list("profile_id", flat=True)
+            .first()
+        )
+        if stored is not None and stored != note.profile_id:
+            return "A legal note stays with the tax profile version it was written for."
+    valid_to = note.profile.valid_to
+    if valid_to is not None and valid_to <= at:
+        return (
+            f"The tax profile version ended on {valid_to.isoformat()}: its legal notes are "
+            "history and cannot be changed."
+        )
+    return None
+
+
 def save_legal_note(
     note: VendorTaxProfileTranslation, *, ctx: AuditContext, dry_run: bool = False
 ) -> ChangeSet:
-    """Create or change a profile's legal note in one language, audited under its vendor."""
+    """Create or change a profile's legal note in one language, audited under its vendor.
+
+    Refused when the note would move to another profile version or its version has ended
+    (`legal_note_error`).
+    """
     note.full_clean()
+    error = legal_note_error(note, at=timezone.now())
+    if error is not None:
+        raise ValidationError({"profile": error})
     return save_audited(
         note,
         legal_note_snapshot,
@@ -311,6 +343,11 @@ REQUEST_FIELDS = (
 )
 
 
+def business_date(at: dt.datetime) -> dt.date:
+    """The date of `at` in business time (`settings.BUSINESS_TIME_ZONE`), as invoices see it."""
+    return timezone.localdate(at, ZoneInfo(settings.BUSINESS_TIME_ZONE))
+
+
 def _public_id(obj: Any) -> str | None:
     return str(obj.public_id) if obj is not None else None
 
@@ -332,13 +369,21 @@ def _same_regime(request: TaxRegimeChangeRequest, profile: VendorTaxProfile | No
     ) == (request.regime, request.exempt_reason, request.oss_registered_since)
 
 
+def _clear_review(request: TaxRegimeChangeRequest) -> None:
+    request.reviewed_by = None
+    request.reviewed_at = None
+    request.review_reason = ""
+    request.profile = None
+
+
 def request_regime_change(
     request: TaxRegimeChangeRequest, *, ctx: AuditContext, dry_run: bool = False
 ) -> ChangeSet:
     """Store `request` (new, unsaved) as a pending request of its vendor; audited.
 
     `request.requested_by` must be an active owner of the vendor (role matrix, CORE.2: vendor
-    staff cannot change the tax regime). The request must be consistent with the fiscal regime
+    staff cannot change the tax regime). The status and review fields are reset: a new request
+    is pending and unreviewed. The request must be consistent with the fiscal regime
     the vendor will declare (`engine.request_errors`), start after the vendor's latest profile
     and change something. Raises `engine.RegimeChangeNotAllowed`,
     `engine.PendingRequestExists` or `ValidationError`, also on dry-run.
@@ -359,6 +404,7 @@ def request_regime_change(
             )
         request.status = engine.PENDING
         request.requested_at = timezone.now()
+        _clear_review(request)  # a new request is unreviewed, whatever the caller set
         request.full_clean(validate_constraints=False)
         latest = latest_tax_profile(vendor)
         error = next_start_error(request.effective_from, latest)
@@ -452,7 +498,8 @@ def approve_regime_change(
 
     The checks run against the stored request and vendor, rows locked: the vendor's fiscal
     regime may have changed since the request. A change of the declared fiscal regime is
-    approved on or after its date only (`engine.fiscal_regime_change_error`). Each write is
+    approved on or after its business-time date only (`engine.fiscal_regime_change_error`).
+    Each write is
     audited by its own service (`vendor.updated`, `tax.vendor_tax_profile.configured`) plus
     `tax.regime_change.approved`; the returned ChangeSet holds them all. Raises
     `engine.RegimeChangeNotAllowed`, `engine.RequestNotPending`,
@@ -467,6 +514,7 @@ def approve_regime_change(
             current.exempt_reason,
             requested_fiscal_regime=current.fiscal_regime,
             current_fiscal_regime=vendor.fiscal_regime,
+            oss_registered_since=current.oss_registered_since,
         )
         if errors:
             raise ValidationError(errors)
@@ -477,7 +525,9 @@ def approve_regime_change(
             current=vendor.fiscal_regime,
         )
         if fiscal_regime != vendor.fiscal_regime:
-            error = engine.fiscal_regime_change_error(current.effective_from, now=timezone.now())
+            error = engine.fiscal_regime_change_error(
+                business_date(current.effective_from), today=business_date(timezone.now())
+            )
             if error is not None:
                 raise engine.FiscalRegimeChangeNotDue(error)
             vendor.fiscal_regime = fiscal_regime
@@ -602,7 +652,10 @@ def inconsistent_tax_profiles(at: dt.datetime | None = None) -> list[ProfileInco
     found = []
     for profile in current:
         errors = engine.profile_errors(
-            profile.regime, profile.exempt_reason, fiscal_regime=profile.vendor.fiscal_regime
+            profile.regime,
+            profile.exempt_reason,
+            fiscal_regime=profile.vendor.fiscal_regime,
+            oss_registered_since=profile.oss_registered_since,
         )
         if errors:
             found.append(ProfileInconsistency(profile=profile, errors=errors))
