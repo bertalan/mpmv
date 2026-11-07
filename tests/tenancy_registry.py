@@ -22,6 +22,20 @@ from django.db import models
 from django.test import Client
 
 from apps.api.tests.factories import ApiClientFactory
+from apps.catalog.models import Product, ProductTranslation, Variant, VariantTranslation
+from apps.catalog.tests.factories import (
+    ProductFactory,
+    ProductTranslationFactory,
+    VariantFactory,
+    VariantTranslationFactory,
+)
+from apps.shipping.models import PickupOption, PickupOptionTranslation, VendorZoneRate, WeightBand
+from apps.shipping.tests.factories import (
+    PickupOptionFactory,
+    PickupOptionTranslationFactory,
+    VendorZoneRateFactory,
+    WeightBandFactory,
+)
 from apps.vendors.models import Vendor, VendorMember, VendorTranslation
 from apps.vendors.tests.factories import VendorMemberFactory, VendorTranslationFactory
 from tests.tenancy import (
@@ -41,6 +55,26 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         vendor=vendor, role=VendorMember.Role.STAFF
     ),
     VendorTranslation: lambda vendor: VendorTranslationFactory.create(vendor=vendor, language="it"),
+    Product: lambda vendor: ProductFactory.create(vendor=vendor),
+    ProductTranslation: lambda vendor: ProductTranslationFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
+    Variant: lambda vendor: VariantFactory.create(
+        product=ProductFactory.create(vendor=vendor, kind=Product.Kind.VARIABLE)
+    ),
+    VariantTranslation: lambda vendor: VariantTranslationFactory.create(
+        variant=VariantFactory.create(
+            product=ProductFactory.create(vendor=vendor, kind=Product.Kind.VARIABLE)
+        )
+    ),
+    VendorZoneRate: lambda vendor: VendorZoneRateFactory.create(vendor=vendor),
+    WeightBand: lambda vendor: WeightBandFactory.create(
+        rate=VendorZoneRateFactory.create(vendor=vendor)
+    ),
+    PickupOption: lambda vendor: PickupOptionFactory.create(vendor=vendor),
+    PickupOptionTranslation: lambda vendor: PickupOptionTranslationFactory.create(
+        pickup_option=PickupOptionFactory.create(vendor=vendor)
+    ),
 }
 
 # Models with a ForeignKey chain to Vendor that are deliberately not vendor-scoped, by label,
