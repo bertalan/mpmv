@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **225** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **1896 h** (P1 1544 h · P2 334 h · P3 18 h)
+- Micro-tasks: **226** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **1902 h** (P1 1550 h · P2 334 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -32,8 +32,8 @@
 | CMP | Compliance | 25 | 157 | 69 | 0 | 226 |
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 5 | 19 | 11 | 0 | 30 |
-| MIG | Migration and cutover | 10 | 108 | 0 | 0 | 108 |
-| **Total** | | **225** | **1544** | **334** | **18** | **1896** |
+| MIG | Migration and cutover | 11 | 114 | 0 | 0 | 114 |
+| **Total** | | **226** | **1550** | **334** | **18** | **1902** |
 
 ## By phase
 
@@ -232,21 +232,22 @@
 | SEO.3 | Google feed (EN for every product, IT for products with a published IT translation, D-18) with legacy IDs, prices from the tax engine, shipping from tables; GTIN, brand and MPN from the product fields; on-request and catalogue-only products left out (Q-31, Q-33) | P1 | 8 | TAX.3, SHP.11 | Feed validated in STAGE Merchant Center; no item carries the vendor SKU as MPN; no on-request product is in the feed |
 | SEO.5 | Cookie consent + Consent Mode v2 + e-commerce events | P1 | 8 | ORD.5 | No tags fire before consent |
 
-### F5 — Migration, acceptance testing, go-live (11 tasks, 124 h)
+### F5 — Migration, acceptance testing, go-live (12 tasks, 130 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
 | SEC.6 | External penetration test and remediation | P1 | 16 | MIG.5 | Report with no open critical findings |
-| MIG.1 | Extractor from the WP DB (`kvsa_`) to an intermediate JSON format, with a meta inventory | P1 | 10 | — | Complete inventory of the fields in use |
+| MIG.1 | Extractor from the WP DB (`kvsa_`) to an intermediate JSON format, with a meta inventory; per-product URL hit counts from the legacy access logs (traffic fallback for MIG.11) | P1 | 10 | — | Complete inventory of the fields in use; hit counts per legacy product URL exported |
 | MIG.2 | Report of duplicate SKUs (same match key, products and variants together), tags without a role, orphan companion products → decisions | P1 | 6 | MIG.1 | Decision list approved |
 | MIG.3 | Loader for vendors, catalog, taxonomies, images (idempotent, dry-run); existing IT texts loaded as published translations (D-18) | P1 | 16 | MIG.1, CAT.1, CAT.2, CAT.3, CAT.4, CAT.13, CAT.14 | Reload with no duplicates; IT texts present where the current site has them |
 | MIG.4 | Loader for customers (WP password hasher) and read-only historical orders | P1 | 10 | MIG.1, ORD.2 | Migrated customer logs in with the old password |
 | MIG.5 | Automated parity reports (§13.3) | P1 | 10 | MIG.3 | Report generated on every run |
-| MIG.6 | Complete redirect map in every language + automated check of all WP sitemap URLs; every legacy product URL (SKU permalinks, plain and historical slugs, variant URLs, legacy query-string forms) to the new SKU-free URL with one permanent 301 (Q-91, §13.3); sitemaps, canonical tags and hreflang on the new URLs only | P1 | 8 | CAT.6, MIG.3 | 100% of URLs 200/301; a migrated IT URL serves its IT text, not the EN fallback; regression test on the migration dataset: every legacy URL resolves with exactly one 301 to a 200 page (no chains, no loops) and the number of legacy product URLs equals the number of mapped URLs; no legacy URL in the sitemaps |
+| MIG.6 | Complete redirect map in every language + automated check of all WP sitemap URLs; every legacy product URL (SKU permalinks, plain and historical slugs, variant URLs, legacy query-string forms) mapped to the product with its frozen legacy path per language, answering 200 in legacy mode and a single 301 to the SKU-free URL in new mode (Q-91, §13.3) | P1 | 8 | CAT.6, MIG.3 | 100% of URLs 200/301; a migrated IT URL serves its IT text, not the EN fallback; on the migration dataset every legacy URL resolves to a 200 page in at most one 301 hop (no chains, no loops), a legacy-mode product answers 200 on its old URL with a self-canonical, and the number of legacy product URLs equals the number of mapped URLs |
 | MIG.7 | Pages and blog migration (semi-manual) with StreamField; existing IT versions as published wagtail-localize translations (D-18) | P1 | 16 | CMS.2, I18N.3 | All public pages present, in IT too where the current site has them |
 | MIG.8 | Vendor ledger opening balances + verification against Stripe | P1 | 4 | VEN.4, MIG.3 | Balance = expected for every vendor |
 | MIG.9 | Three dress rehearsals on STAGE + cutover and rollback runbook | P1 | 16 | MIG.5, MIG.6 | Third rehearsal with no blockers |
-| MIG.10 | Cutover and post-go-live monitoring, including the daily 404 report and the Search Console review of the product URL change (Q-91) | P1 | 12 | MIG.9, SEC.6 | Go-live, 72 h with no critical issues; 404 report and Search Console review recorded at T+14 and T+28 |
+| MIG.10 | Cutover and post-go-live monitoring, including the daily 404 report, the Search Console review and the product URL batch schedule and gates of the runbook (Q-91) | P1 | 12 | MIG.9, SEC.6 | Go-live, 72 h with no critical issues; 404 report and Search Console review recorded at T+14 and T+28 |
+| MIG.11 | Staggered product URL switch (owner decision Q-91): per-product `url_mode` and frozen legacy paths, traffic ranking from analytics (SEO.5) or the MIG.1 legacy access-log counts, configurable batch size and cadence, batch switch and rollback as a management command and staff action with dry-run and audit, sitemap, canonical and hreflang by mode, gate on 404 rate, Search Console impressions and clicks against baseline, and errors with configurable thresholds | P1 | 6 | MIG.6, CAT.5 | A batch switch gives a single 301 hop and an updated sitemap; a rollback leaves no redirect loop; a legacy-mode page is 200 with a self-canonical; the next batch is refused when a gate metric is over threshold; the MIG.6 "no URL lost" count still holds after a switch and a rollback; products created after go-live start in new mode |
 
 ### F6 — After go-live (P2) (42 tasks, 334 h)
 

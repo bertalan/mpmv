@@ -62,11 +62,13 @@ class Product(VendorScopedModel):
     stock_policy = CharField(choices=["track", "always_open", "from_source"])
     stock_qty; stock_status                   # simple products only; variable products keep stock on their variants (Q-29)
     legacy_wp_id_en / legacy_wp_id_it = IntegerField(null=True)   # Merchant g:id, redirects, audit
+    url_mode = CharField(choices=["legacy", "new"])  # migrated products start "legacy"; new products are "new" (Q-91, MIG.11)
 
 class ProductTranslation(Model):              # one row per language, single source of truth for everything else
     product = FK(Product); language = CharField(choices=LANGUAGES)
     title; short_description; description (rich text)
-    slug = SlugField()                        # derived: {title}-{lang}-{sku}
+    slug = SlugField()                        # derived: {title}-{lang}, never the SKU
+    legacy_path = CharField(null=True)        # frozen legacy URL path of a migrated product (Q-91, MIG.11)
     seo_title; seo_description
     status = CharField(choices=["machine", "reviewed", "published"])  # translation workflow
     source_hash                                # detects when the EN changes → IT "to review"
@@ -140,9 +142,12 @@ def images_for_language(images: list[ImageRow], lang: str) -> list[ImageRow]
 | Vendor storefront | `/shop/{vendor}/` | `/it/shop/{vendor}/` |
 
 Category URLs **stay identical** to the current ones. Product slugs no longer carry the SKU
-(owner decision on the vendor SKU, Q-30 and Q-33): every current `{title}-{lang}-{sku}` slug is
-loaded into `SlugHistory` and answers with a single 301 to the new slug (CAT.5, MIG.6, owner
-decision Q-91; map, checks and accepted ranking risk in [13](13-migration-cutover.md)). The `/tag-product/{slug}/` and
+(owner decision on the vendor SKU, Q-30 and Q-33). The switch is staggered (owner decision Q-91,
+[13](13-migration-cutover.md)): at cutover every migrated product keeps answering 200 on its
+frozen legacy URL (`url_mode=legacy`); after go-live, batches ordered by traffic move to the new
+URL (`url_mode=new`), and the legacy URL becomes a single 301 to it (CAT.5, MIG.6, MIG.11).
+Canonical, sitemap and hreflang follow each product's current mode. Products created after
+go-live use the new URLs from the start. The `/tag-product/{slug}/` and
 `/it/tag-product-it/{slug}-it/` tags are redirected with a 301 to the new taxonomy pages (proposed default of the open decision D-07).
 
 ### Rules
