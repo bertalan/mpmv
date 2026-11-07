@@ -5,7 +5,7 @@ import datetime as dt
 import re
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from apps.core.money import CENT, to_decimal
 
@@ -146,11 +146,21 @@ def _kind_error(code: str, kind: str, value: object) -> str | None:
     return None
 
 
-def term_attribute_errors(schema: Sequence[Mapping[str, Any]], values: object) -> list[str]:
-    """Problems of a term's `attributes` against its taxonomy's (valid) declaration."""
+INVALID_SCHEMA = "The taxonomy declares its term attributes wrongly: correct the taxonomy first."
+
+
+def term_attribute_errors(schema: object, values: object) -> list[str]:
+    """Problems of a term's `attributes` against its taxonomy's declaration.
+
+    A declaration stored without validation (an import, a raw update) is checked first, so a
+    malformed one is reported, not met with a KeyError.
+    """
+    if term_schema_errors(schema):
+        return [INVALID_SCHEMA]
     if not isinstance(values, dict):
         return ["The attributes must be an object of attribute codes and values."]
-    declared = {str(entry["code"]): entry for entry in schema}
+    entries = cast(Sequence[Mapping[str, Any]], schema)  # checked above
+    declared = {str(entry["code"]): entry for entry in entries}
     errors: list[str] = []
     for code, entry in declared.items():
         if code not in values:

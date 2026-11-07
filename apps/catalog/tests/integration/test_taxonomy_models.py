@@ -210,6 +210,56 @@ def test_term_attributes_are_validated_against_the_taxonomy_schema() -> None:
     assert excinfo.value.message_dict["attributes"] == ["model_year must be a number."]
 
 
+@pytest.mark.parametrize("schema", [[{"kind": "text"}], ["model_year"], {"code": "x"}])
+def test_a_term_of_a_taxonomy_with_an_invalid_schema_fails_validation(schema: object) -> None:
+    # The schema is stored without validation (an import, a raw update): no KeyError.
+    term = TermFactory.create(taxonomy=TaxonomyFactory.create(term_attributes=schema))
+    with pytest.raises(ValidationError) as excinfo:
+        term.full_clean()
+    assert excinfo.value.message_dict["attributes"] == [
+        "The taxonomy declares its term attributes wrongly: correct the taxonomy first."
+    ]
+
+
+def test_moving_a_term_under_a_term_of_a_flat_taxonomy_is_refused() -> None:
+    taxonomy = TaxonomyFactory.create(hierarchical=False)
+    first = TermFactory.create(taxonomy=taxonomy)
+    second = TermFactory.create(taxonomy=taxonomy)
+    for position in ("first-child", "last-child", "sorted-child"):
+        with pytest.raises(ValidationError, match="This taxonomy is flat"):
+            second.move(first, position)
+    second.refresh_from_db()
+    assert second.is_root()
+
+
+def test_moving_a_term_under_a_term_of_another_taxonomy_is_refused() -> None:
+    other = TermFactory.create(taxonomy=TaxonomyFactory.create(hierarchical=True))
+    term = TermFactory.create(taxonomy=TaxonomyFactory.create(hierarchical=True))
+    with pytest.raises(ValidationError, match="same taxonomy"):
+        term.move(other, "last-child")
+    with pytest.raises(ValidationError, match="same taxonomy"):
+        term.move(TermFactory.create(parent=other), "left")  # a sibling of other's child
+    term.refresh_from_db()
+    assert term.is_root()
+
+
+def test_moving_terms_within_their_taxonomy_is_allowed() -> None:
+    taxonomy = TaxonomyFactory.create(hierarchical=True)
+    maker = TermFactory.create(taxonomy=taxonomy)
+    model = TermFactory.create(taxonomy=taxonomy)
+    model.move(maker, "first-child")
+    model.refresh_from_db()
+    assert model.get_parent() == maker
+    model.move(maker, "right")  # back to the top level, next to its old parent
+    model.refresh_from_db()
+    assert model.is_root()
+    # Roots of every taxonomy are siblings: a flat taxonomy's term can go next to another root.
+    flat = TermFactory.create(taxonomy=TaxonomyFactory.create(hierarchical=False))
+    flat.move(maker, "left")
+    flat.refresh_from_db()
+    assert flat.is_root()
+
+
 def test_sibling_terms_cannot_share_a_slug_in_one_language() -> None:
     taxonomy = TaxonomyFactory.create()
     TermTranslationFactory.create(term=TermFactory.create(taxonomy=taxonomy), slug="summer")

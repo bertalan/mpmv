@@ -68,3 +68,21 @@ def test_rates_become_default_methods_and_ranges_use_the_new_syntax() -> None:
     zone.full_clean()  # every migrated pattern is valid in the new grammar
 
     assert set(CountryGroup.objects.get(code="eu").countries) == set(EU_MEMBER_STATES)
+
+
+BEFORE_LOWER_CASE = [("shipping", "0005_seed_country_groups")]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_country_group_codes_stored_in_capitals_are_lower_cased() -> None:
+    executor = MigrationExecutor(connection)
+    executor.migrate(BEFORE_LOWER_CASE)
+    old_apps = executor.loader.project_state(BEFORE_LOWER_CASE).apps
+    OldGroup = old_apps.get_model("shipping", "CountryGroup")
+    OldGroup.objects.create(code="DACH", countries=["DE", "AT", "CH"])
+
+    executor.loader.build_graph()
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+    assert CountryGroup.objects.filter(code="dach").exists()
+    assert not CountryGroup.objects.filter(code="DACH").exists()

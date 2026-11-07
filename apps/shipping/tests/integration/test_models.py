@@ -17,6 +17,7 @@ from apps.shipping import engine
 from apps.shipping.models import (
     Carrier,
     CountryGroup,
+    PickupOption,
     ShippingConfigVersion,
     ShippingMethod,
     ShippingZone,
@@ -254,6 +255,22 @@ def test_country_group_code_is_unique() -> None:
         CountryGroupFactory.create(code="dach")
 
 
+def test_country_group_codes_are_lower_cased_on_validation() -> None:
+    # Zones reference groups in lower case (CountryGroupCodesField): a group must match them.
+    group = CountryGroupFactory.build(code=" DACH ", countries=["DE", "AT"])
+    group.full_clean()
+    group.save()
+    assert group.code == "dach"
+    zone = ShippingZoneFactory.build(countries=[], country_groups=["DACH"])
+    zone.full_clean()
+    assert zone.country_groups == ["dach"]
+
+
+def test_country_group_codes_in_capitals_are_refused_by_the_database() -> None:
+    with refused(), transaction.atomic():
+        CountryGroupFactory.create(code="Dach")
+
+
 def test_a_country_group_in_use_keeps_its_code() -> None:
     group = CountryGroupFactory.create(code="dach")
     ShippingZoneFactory.create(country_groups=["dach"])
@@ -400,6 +417,25 @@ def test_zones_and_carriers_in_use_cannot_be_deleted() -> None:
         method.zone.delete()
     with pytest.raises(ProtectedError):
         method.carrier.delete()
+
+
+@pytest.mark.parametrize("row", ["zone", "method", "pickup"])
+def test_a_vendor_with_shipping_configuration_cannot_be_deleted(row: str) -> None:
+    # Methods and pickups are prices: they leave through the audited services (delete_config),
+    # never as a silent cascade of a vendor deletion. Zones of a vendor likewise.
+    vendor = VendorFactory.create()
+    if row == "zone":
+        ShippingZoneFactory.create(vendor=vendor)
+    elif row == "method":
+        WeightBandFactory.create(method=ShippingMethodFactory.create(vendor=vendor))
+    else:
+        PickupOptionFactory.create(vendor=vendor)
+    with pytest.raises(ProtectedError), transaction.atomic():
+        vendor.delete()
+    assert ShippingZone.objects.filter(vendor=vendor).count() == (row == "zone")
+    assert ShippingMethod.objects.filter(vendor=vendor).count() == (row == "method")
+    assert WeightBand.objects.filter(method__vendor=vendor).count() == (row == "method")
+    assert PickupOption.objects.filter(vendor=vendor).count() == (row == "pickup")
 
 
 def test_deleting_a_method_deletes_its_bands() -> None:

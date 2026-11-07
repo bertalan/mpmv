@@ -6,6 +6,7 @@ from decimal import Decimal
 
 import pytest
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import ProtectedError
 
 from apps.core.audit import AuditContext
@@ -23,6 +24,7 @@ from apps.shipping.services import (
 from apps.shipping.tests.factories import (
     CarrierFactory,
     CountryGroupFactory,
+    PickupOptionFactory,
     ShippingMethodFactory,
     ShippingZoneFactory,
     WeightBandFactory,
@@ -265,6 +267,41 @@ def test_zone_snapshots_cover_the_zones_a_vendor_ships_to_with_groups_expanded()
     assert (snap.code, snap.priority, snap.vendor_id) == (europe.code, 50, None)
     assert snap.countries == frozenset()
     assert snap.group_countries == frozenset({"DE", "AT"})
+
+
+def test_zones_served_only_by_inactive_carriers_are_not_candidates() -> None:
+    # An inactive carrier offers no rates (spec 06 §6.3 case 10): its zone must not win the
+    # resolution over a zone the vendor can actually ship to.
+    vendor = VendorFactory.create()
+    sardinia = ShippingZoneFactory.create(
+        code="sardinia", postcode_patterns=["07000..09999"], priority=10
+    )
+    italy = ShippingZoneFactory.create(code="italy", priority=50)
+    stopped = CarrierFactory.create(is_active=False)
+    ShippingMethodFactory.create(vendor=vendor, zone=sardinia, carrier=stopped)
+    ShippingMethodFactory.create(vendor=vendor, zone=italy)
+    mixed = ShippingZoneFactory.create(code="mixed", countries=["FR"])
+    ShippingMethodFactory.create(vendor=vendor, zone=mixed, carrier=stopped)
+    ShippingMethodFactory.create(vendor=vendor, zone=mixed, key="express")
+    assert {snap.code for snap in zone_snaps(vendor)} == {"italy", "mixed"}
+    assert zone_for(vendor, Destination("IT", postcode="07100")) == italy.code
+
+
+def test_a_vendor_is_deleted_once_its_shipping_configuration_is() -> None:
+    vendor = VendorFactory.create()
+    zone = ShippingZoneFactory.create(vendor=vendor)
+    method = ShippingMethodFactory.create(vendor=vendor, zone=zone)
+    band = WeightBandFactory.create(method=method)
+    pickup = PickupOptionFactory.create(vendor=vendor)
+    with pytest.raises(ProtectedError), transaction.atomic():
+        vendor.delete()
+    delete_config([method, pickup, zone], ctx=CTX)
+    deleted = set(
+        AuditLog.objects.filter(action__endswith=".deleted").values_list("target_key", flat=True)
+    )
+    assert {str(row.public_id) for row in (zone, method, band, pickup)} <= deleted
+    vendor.delete()
+    assert not Vendor.objects.filter(pk=vendor.pk).exists()
 
 
 def test_a_vendor_zone_overrides_the_platform_zone_for_matching_addresses() -> None:

@@ -7,6 +7,10 @@ bands of a method that never overlap (an exclusion constraint), non-negative net
 that span tables (a method uses a platform zone or its vendor's own zone; a zone's country groups
 exist) are model validation, which every write runs through `apps.shipping.services`.
 
+Vendor deletion: a vendor's zones, methods and pickup options protect it (PROTECT), like its
+products and tax profiles. They are prices or decide them, so they leave only through the
+audited `services.delete_config`, never as an unaudited cascade of the vendor's deletion.
+
 Amounts are net of VAT: the tax engine adds VAT (spec 06 rule 2), following each method's stored
 `tax_treatment`. Orders keep snapshots of what they used, never references to these rows.
 
@@ -14,6 +18,7 @@ Versioning: the configuration is versioned as a whole by `ShippingConfigVersion`
 (spec 06 replaces the legacy option backups with it), not by validity periods on each row.
 """
 
+from collections.abc import Collection
 from typing import Any, ClassVar
 
 from django.conf import settings
@@ -22,6 +27,7 @@ from django.contrib.postgres.fields import DecimalRangeField, RangeOperators
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models.functions import Lower
 
 from apps.core.fields import MoneyField
 from apps.core.models import BaseModel, TranslationModel, resolve_translation
@@ -93,15 +99,20 @@ class CountryGroup(BaseModel):
     states, Europe, the UN M49 continents and regions (seeded), or groups staff add.
 
     Zones reference a group by its code (`ShippingZone.country_groups`), so a group in use keeps
-    its code and cannot be deleted (`apps.shipping.services.delete_config`).
+    its code and cannot be deleted (`apps.shipping.services.delete_config`). Zones store the codes
+    in lower case, so the group's code is lower-cased on validation and the database refuses
+    capitals.
     """
 
-    code = models.SlugField(max_length=50, unique=True)
+    code = models.SlugField(max_length=50, unique=True, help_text="Lower case, e.g. eu or dach.")
     countries = ZoneCountriesField(help_text="ISO country codes of the members, comma separated.")
 
     class Meta:
         ordering = ["code"]
         constraints = [
+            models.CheckConstraint(
+                condition=models.Q(code=Lower("code")), name="shipping_group_code_lower_case"
+            ),
             models.CheckConstraint(
                 condition=models.Q(countries__len__gte=1), name="shipping_group_has_countries"
             ),
@@ -116,6 +127,11 @@ class CountryGroup(BaseModel):
 
     def translation(self, language: str) -> "Resolved[CountryGroupTranslation]":
         return resolve_translation(self.translations.all(), language)
+
+    def clean_fields(self, exclude: Collection[str] | None = None) -> None:
+        if isinstance(self.code, str):
+            self.code = self.code.strip().lower()  # as CountryGroupCodesField stores references
+        super().clean_fields(exclude=exclude)
 
     def clean(self) -> None:
         if self.pk is None:
@@ -287,7 +303,7 @@ class ShippingMethod(BaseModel):
     objects = VendorScopedManager()
 
     vendor = models.ForeignKey(
-        "vendors.Vendor", on_delete=models.CASCADE, related_name="shipping_methods"
+        "vendors.Vendor", on_delete=models.PROTECT, related_name="shipping_methods"
     )
     zone = models.ForeignKey(ShippingZone, on_delete=models.PROTECT, related_name="methods")
     carrier = models.ForeignKey(Carrier, on_delete=models.PROTECT, related_name="methods")
@@ -470,7 +486,7 @@ class PickupOption(BaseModel):
     objects = VendorScopedManager()
 
     vendor = models.ForeignKey(
-        "vendors.Vendor", on_delete=models.CASCADE, related_name="pickup_options"
+        "vendors.Vendor", on_delete=models.PROTECT, related_name="pickup_options"
     )
     key = models.SlugField(max_length=50)
     cost_net = MoneyField(default=0, help_text="Net of VAT.")
