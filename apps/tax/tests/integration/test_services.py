@@ -182,7 +182,7 @@ def test_a_regime_change_closes_the_current_profile_and_keeps_history() -> None:
 def test_another_vendor_profile_is_not_closed() -> None:
     other = VendorTaxProfileFactory.create(valid_from=utc(2027))
     services.configure_vendor_tax_profile(
-        VendorTaxProfileFactory.build(valid_from=utc(2028)), ctx=CTX
+        VendorTaxProfileFactory.build(vendor=VendorFactory.create(), valid_from=utc(2028)), ctx=CTX
     )
     other.refresh_from_db()
     assert other.valid_to is None
@@ -203,7 +203,7 @@ def test_a_profile_inconsistent_with_the_fiscal_regime_is_refused() -> None:
 
 def test_a_profile_change_dry_run_writes_nothing() -> None:
     changeset = services.configure_vendor_tax_profile(
-        VendorTaxProfileFactory.build(), ctx=CTX, dry_run=True
+        VendorTaxProfileFactory.build(vendor=VendorFactory.create()), ctx=CTX, dry_run=True
     )
     assert changeset.summary()["create"] == 1
     assert VendorTaxProfile.objects.count() == 0
@@ -226,7 +226,7 @@ def test_legal_notes_are_saved_with_an_audit_entry_under_the_vendor() -> None:
 
 def test_a_vies_answer_is_recorded_without_the_country_prefix() -> None:
     check = services.record_vat_validation(
-        "GR", "EL 123.456.789", engine.VAT_VALID, name="Example AE", request_id="WAPIAAAA"
+        "GR", "el 123 456 789", engine.VAT_VALID, name="Example AE", request_id="WAPIAAAA"
     )
     stored = VatValidation.objects.get(pk=check.pk)
     assert (stored.country, stored.vat_number) == ("GR", "123456789")

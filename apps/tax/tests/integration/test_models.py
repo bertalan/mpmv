@@ -171,7 +171,9 @@ def test_profiles_of_every_regime_are_valid(trait: str) -> None:
 
 def test_an_exempt_profile_without_a_reason_is_refused() -> None:
     with pytest.raises(ValidationError) as exc:
-        VendorTaxProfileFactory.build(regime=engine.EXEMPT).full_clean()
+        VendorTaxProfileFactory.build(
+            vendor=VendorFactory.create(), regime=engine.EXEMPT
+        ).full_clean()
     assert "exempt_reason" in exc.value.message_dict
     with pytest.raises(IntegrityError), transaction.atomic():
         VendorTaxProfileFactory.create(regime=engine.EXEMPT)

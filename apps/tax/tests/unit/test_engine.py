@@ -81,6 +81,11 @@ def test_rates_are_percentages_with_four_decimals() -> None:
     assert engine.rate_error("zero", Decimal("0")) is None
 
 
+def test_rates_are_quantized_to_four_decimals() -> None:
+    assert str(engine.quantize_rate(Decimal("24"))) == "24.0000"
+    assert str(engine.quantize_rate(Decimal("25.5"))) == "25.5000"
+
+
 @pytest.mark.parametrize("rate", [Decimal("-0.0001"), Decimal("100.0001")])
 def test_a_rate_is_between_zero_and_one_hundred(rate: Decimal) -> None:
     assert engine.rate_error("standard", rate) == "A rate is a percentage from 0 to 100."
