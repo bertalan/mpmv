@@ -9,6 +9,7 @@ from django.db import models
 from django.db.models.functions import Lower
 from django.utils import timezone
 
+from apps.core.fields import LanguageField
 from apps.core.models import BaseModel
 
 
@@ -49,9 +50,7 @@ class UserManager(BaseUserManager["User"]):
 class User(BaseModel, AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(max_length=254, unique=True)
     full_name = models.CharField(max_length=150, blank=True)
-    preferred_language = models.CharField(
-        max_length=8, choices=settings.LANGUAGES, default=settings.LANGUAGE_CODE
-    )
+    preferred_language = LanguageField(default=settings.LANGUAGE_CODE)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False, help_text="Can log into the staff admin.")
     date_joined = models.DateTimeField(default=timezone.now)

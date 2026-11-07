@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from .countries import InvalidCountry, normalize_country
+from .i18n import language_choices
 
 
 class MoneyField(models.DecimalField[Any, Any]):
@@ -37,3 +38,17 @@ class CountryField(models.CharField[Any, Any]):
             return normalize_country(value)
         except InvalidCountry as exc:
             raise ValidationError(str(exc), code="invalid_country") from exc
+
+
+class LanguageField(models.CharField[Any, Any]):
+    """A language code from settings.LANGUAGES, validated against the settings at runtime.
+
+    The choices are the `language_choices` callable, so migrations never copy the language list:
+    adding a language is one settings entry (spec 09 §9.2). There is deliberately no database
+    check constraint on the codes, for the same reason.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("max_length", 8)
+        kwargs.setdefault("choices", language_choices)
+        super().__init__(*args, **kwargs)

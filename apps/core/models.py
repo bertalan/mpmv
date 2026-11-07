@@ -1,13 +1,16 @@
-"""Core models: the abstract base model, the append-only audit log, the platform operator."""
+"""Core models: the abstract base and translation models, the append-only audit log, the
+platform operator."""
 
 import uuid
-from typing import Any
+from typing import Any, ClassVar, Self
 
 from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import DateTimeRangeField, RangeOperators
-from django.db import models
+from django.db import models, transaction
+from django.utils import timezone
 
-from .fields import CountryField
+from . import translations
+from .fields import CountryField, LanguageField
 
 
 class BaseModel(models.Model):
@@ -19,6 +22,147 @@ class BaseModel(models.Model):
 
     class Meta:
         abstract = True
+
+
+class TranslationStatus(models.TextChoices):
+    MACHINE = translations.MACHINE, "Machine draft (needs review)"
+    REVIEWED = translations.REVIEWED, "Reviewed"
+    PUBLISHED = translations.PUBLISHED, "Published"
+
+
+class TranslationModel(BaseModel):
+    """Base for every explicit translation table (`*Translation`, spec 09 §9.2, I18N.2).
+
+    One row per translated entity and language holds that language's texts; the row in the
+    source language (settings.LANGUAGE_CODE, EN) is the source of the others.
+
+    Reuse contract (checked by `apps.core.checks`, so catalog tables follow it too):
+
+    - set `translation_of` to the name of the ForeignKey to the translated entity, and
+      `translated_fields` to the names of its CharField/TextField texts;
+    - declare `class Meta(TranslationModel.Meta)`, keep `*TranslationModel.Meta.constraints` and
+      add a `UniqueConstraint` on (`translation_of`, "language");
+    - read texts for visitors with `resolve_translation(entity.<related_name>.all(), language)`,
+      never by filtering on `language` alone: it applies the published-only rule and the
+      explicit EN fallback.
+
+    Workflow: rows start as `machine` drafts. Saving the source row stores the hash of its texts
+    in `source_hash`; when that hash changes, the reviewed and published rows in other languages
+    go back to `machine` ("needs review") and keep the hash they were made from, so a reviewer
+    can tell they are stale. Other rows record the source hash when they are created and when
+    they leave `machine` (a review is against the current source). Queryset `update()` bypasses
+    all this: change texts through `save()`.
+    """
+
+    Status = TranslationStatus
+
+    translation_of: ClassVar[str] = ""
+    translated_fields: ClassVar[tuple[str, ...]] = ()
+
+    language = LanguageField()
+    status = models.CharField(
+        max_length=16, choices=TranslationStatus.choices, default=TranslationStatus.MACHINE
+    )
+    source_hash = models.CharField(
+        max_length=64,
+        blank=True,
+        editable=False,
+        help_text="Hash of the source-language texts this row was made or reviewed from.",
+    )
+
+    class Meta:
+        abstract = True
+        constraints: ClassVar[list[models.BaseConstraint]] = [
+            models.CheckConstraint(
+                condition=models.Q(status__in=translations.STATUSES),
+                name="%(app_label)s_%(class)s_status_valid",
+            ),
+        ]
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        with transaction.atomic():
+            stored = type(self)._default_manager.filter(pk=self.pk)
+            previous = stored.values("status", "source_hash").first() if self.pk else None
+            source_changed = False
+            if self.is_source:
+                self.source_hash = translations.source_hash(self.source_values())
+                source_changed = previous is None or previous["source_hash"] != self.source_hash
+            elif (previous is None and not self.source_hash) or (
+                previous is not None
+                and previous["status"] == TranslationStatus.MACHINE
+                and self.status != TranslationStatus.MACHINE
+            ):
+                self.source_hash = self.current_source_hash() or ""
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None:
+                kwargs["update_fields"] = {*update_fields, "source_hash"}
+            super().save(*args, **kwargs)
+            if source_changed:
+                self.mark_stale_translations()
+
+    @property
+    def is_source(self) -> bool:
+        return bool(self.language == translations.source_language())
+
+    def source_values(self) -> dict[str, str]:
+        """The translated texts of this row, by field name."""
+        return {name: getattr(self, name) for name in self.translated_fields}
+
+    def family(self) -> "models.QuerySet[Self]":
+        """Every row (all languages, this one included) of the same translated entity."""
+        parent = self._meta.get_field(self.translation_of)
+        if not isinstance(parent, models.ForeignKey):
+            raise TypeError(f"{type(self).__name__}.translation_of must name a ForeignKey")
+        attname = parent.attname
+        return type(self)._default_manager.filter(**{attname: getattr(self, attname)})
+
+    def current_source_hash(self) -> str | None:
+        """The hash of the source texts as they are now; None when there is no source row."""
+        if self.is_source:
+            return translations.source_hash(self.source_values())
+        source = translations.source_language()
+        stored: str | None = (
+            self.family().filter(language=source).values_list("source_hash", flat=True).first()
+        )
+        return stored
+
+    @property
+    def is_stale(self) -> bool:
+        """True when the source texts changed after this translation was made or reviewed."""
+        if self.is_source:
+            return False
+        current = self.current_source_hash()
+        return current is not None and current != self.source_hash
+
+    def mark_stale_translations(self) -> int:
+        """Send the reviewed and published rows made from another source text back to review.
+
+        Called by `save()` on the source row when its texts change; returns the rows changed.
+        """
+        if not self.is_source:
+            return 0
+        return (
+            self.family()
+            .exclude(pk=self.pk)
+            .exclude(source_hash=self.source_hash)
+            .exclude(status=TranslationStatus.MACHINE)
+            .update(status=TranslationStatus.MACHINE, updated_at=timezone.now())
+        )
+
+
+def resolve_translation[TM: TranslationModel](
+    rows: "models.QuerySet[TM]", language: str
+) -> translations.Resolved[TM]:
+    """The published row of `rows` in `language`, else the published source-language row.
+
+    `rows` are the translations of one entity, e.g. `vendor.translations.all()`. The result's
+    `is_fallback` tells templates to show the "not available in your language" notice.
+    """
+    candidates = rows.filter(
+        status=TranslationStatus.PUBLISHED,
+        language__in={language, translations.source_language()},
+    )
+    return translations.resolve(candidates, language)
 
 
 class Heartbeat(BaseModel):

@@ -1,18 +1,18 @@
 """Vendors and their per-language storefront texts and policies (spec 04 §4.2, VEN.1).
 
 Fields owned by later tasks are added there: `plan` (VEN.2), `payout_account` (VEN.6),
-`dac7_complete` (CMP.1), `logo` (media/images). Translation workflow status and `source_hash`
-come with the shared translation base model (I18N.2).
+`dac7_complete` (CMP.1), `logo` (media/images). Storefront texts follow the shared translation
+workflow (`apps.core.models.TranslationModel`, I18N.2).
 """
 
 from typing import Any
 
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.core.fields import CountryField
-from apps.core.models import BaseModel
+from apps.core.models import BaseModel, TranslationModel, resolve_translation
+from apps.core.translations import Resolved
 
 from . import engine
 
@@ -87,6 +87,10 @@ class Vendor(BaseModel):
     def __str__(self) -> str:
         return self.display_name
 
+    def translation(self, language: str) -> "Resolved[VendorTranslation]":
+        """Storefront texts to show in `language`: published, or EN with a fallback flag."""
+        return resolve_translation(self.translations.all(), language)
+
     def save(self, *args: Any, **kwargs: Any) -> None:
         if not self.slug:
             self.slug = engine.unique_slug(self.display_name, taken=_TakenSlugs(self.pk))
@@ -108,20 +112,29 @@ class _TakenSlugs:
         return others.filter(slug=slug).exists()
 
 
-class VendorTranslation(BaseModel):
+class VendorTranslation(TranslationModel):
     """A vendor's storefront texts and policies in one language (explicit table, spec 09)."""
 
+    translation_of = "vendor"
+    translated_fields = (
+        "tagline",
+        "description",
+        "shipping_policy",
+        "refund_policy",
+        "cancellation_policy",
+    )
+
     vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="translations")
-    language = models.CharField(max_length=8, choices=settings.LANGUAGES)
     tagline = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
     shipping_policy = models.TextField(blank=True)
     refund_policy = models.TextField(blank=True)
     cancellation_policy = models.TextField(blank=True)
 
-    class Meta:
+    class Meta(TranslationModel.Meta):
         ordering = ["vendor", "language"]
         constraints = [
+            *TranslationModel.Meta.constraints,
             models.UniqueConstraint(
                 fields=["vendor", "language"], name="vendors_translation_vendor_language_unique"
             ),

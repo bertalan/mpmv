@@ -82,6 +82,7 @@ def test_translation_model_is_abstract_with_language_status_and_source_hash() ->
     assert isinstance(TranslationModel._meta.get_field("language"), LanguageField)
     status = TranslationModel._meta.get_field("status")
     assert status.default == "machine"
+    assert status.choices is not None
     assert [value for value, _label in status.choices] == ["machine", "reviewed", "published"]
     source_hash = TranslationModel._meta.get_field("source_hash")
     assert source_hash.max_length == 64
