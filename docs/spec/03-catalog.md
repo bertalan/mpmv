@@ -85,7 +85,7 @@ class Category(LEGACY_Node):          # tree (treebeard), + CategoryTranslation(
 class Taxonomy(Model):           # configurable per vertical; + translation (name, slug)
     code; hierarchical: bool; filterable: bool; has_landing: bool
     # e.g. "compatibility" (brand → model), "occasion", "technique", "season"
-class Term(LEGACY_Node):             # tree per taxonomy; + translation (slug, SEO text)
+class Term(LEGACY_Node):             # tree per taxonomy; + translation (slug, SEO text, legacy_path); url_mode (D-07)
     taxonomy = FK(Taxonomy); attributes (JSON, extra fields defined by the taxonomy)
 class Brand(Model):               # manufacturer; + translation
 
@@ -147,8 +147,18 @@ Category URLs **stay identical** to the current ones. Product slugs no longer ca
 frozen legacy URL (`url_mode=legacy`); after go-live, batches ordered by traffic move to the new
 URL (`url_mode=new`), and the legacy URL becomes a single 301 to it (CAT.5, MIG.6, MIG.11).
 Canonical, sitemap and hreflang follow each product's current mode. Products created after
-go-live use the new URLs from the start. The `/tag-product/{slug}/` and
-`/it/tag-product-it/{slug}-it/` tags are redirected with a 301 to the new taxonomy pages (proposed default of the open decision D-07).
+go-live use the new URLs from the start.
+
+Tag and taxonomy pages (owner decision D-07, 2026-11-07) get the descriptive URLs
+`/{taxonomy}/{term}/` (`/{taxonomy}/{term}/{child}/` for a second level, translated slugs per
+language). The legacy tag URLs `/tag-product/{slug}/` and `/it/tag-product-it/{slug}-it/` move with
+the same staggered mechanism as product URLs (MIG.11): at cutover every migrated term keeps
+answering 200 on its frozen legacy tag URL with a self-canonical (the term's `url_mode=legacy`,
+legacy path stored per term translation); after go-live, batches ordered by traffic switch to
+`url_mode=new`, and each legacy tag URL becomes a single 301 to the new term URL, with the same
+gate and rollback as products (MIG.6, MIG.11). Canonical, sitemap and hreflang follow each term's
+current mode. Terms created after go-live use the new URLs from the start. Pagination and filters
+on a taxonomy page build on the term's current URL (CAT.8).
 
 ### Rules
 
@@ -285,7 +295,7 @@ products can be part of another party's bundle only if that vendor opted in to b
 | CAT.5 | `build_product_slug` without the SKU + SlugHistory + 301 redirect middleware; current `{title}-{lang}-{sku}` slugs loaded as history | P1 | 8 | CAT.1 | Test cases ported from legacy-sku-permalink without the SKU part; a current SKU slug answers 301 to the new slug |
 | CAT.6 | `Redirect` model + admin management + import of existing maps (retired SKUs, merged tags, discontinued categories) | P1 | 6 | CAT.5 | All rules from the 4 mu-plugins covered by tests |
 | CAT.7 | Product page: gallery, variants with default, companion box, related products, visible SKU, "on request" | P1 | 16 | CAT.3, CAT.4 | Visual and functional parity with LIVE |
-| CAT.8 | Listings: category, taxonomy page, brand, vendor storefront, filters (category, taxonomy term, price, vendor) | P1 | 14 | CAT.2 | Pagination and filters with indexable URLs |
+| CAT.8 | Listings: category, taxonomy page on `/{taxonomy}/{term}/` and `/{taxonomy}/{term}/{child}/` with translated slugs (D-07), brand, vendor storefront, filters (category, taxonomy term, price, vendor) | P1 | 14 | CAT.2 | Pagination and filters with indexable URLs; a taxonomy page answers 200 on `/{taxonomy}/{term}/` in every configured language, and its paginated and filtered URLs build on the term's current URL |
 | CAT.9 | FTS + trigram + SKU prefix search on the SKU match key (including variants) | P1 | 8 | CAT.1, CAT.13 | Tests on partial SKUs and typos; `bag 100` finds `BAG  100` |
 | CAT.10 | `upsert_products`/`publish`/`retire` services with dry-run and publishing rules | P1 | 10 | CAT.1, CMP.3 | ChangeSet verified in tests |
 | CAT.13 | Internal identity and the vendor SKU as a label (owner decisions Q-30, Q-33): raw `sku` plus `sku_key` match key on Product and Variant, one per-vendor namespace across products and variants enforced in the database, `SkuAlias` history on rename, non-blocking SKU warnings, staff-only `staff_ref` sequence; drop the upper-case SKU normalisation of CAT.1 | P1 | 8 | CAT.1 | The §3.3 SKU cases are green; a product and a variant of one vendor cannot share a match key; the vendor never sees `staff_ref` |

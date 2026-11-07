@@ -1,5 +1,7 @@
 """Catalog services: audited price changes (CAT.1), audited product and variant edits (CAT.12),
-taxonomy queries (CAT.2) and the catalogue integrity rules (CAT.14).
+taxonomy queries (CAT.2), the catalogue integrity rules (CAT.14), and products created with
+typed attributes, variant axes and variants (CAT.3), and product slugs with their history
+(CAT.5).
 
 Every price change goes through here, whatever the adapter (admin, API, import, MCP): it is
 validated, returned as a ChangeSet (dry-run) and written to the audit log. The 30-day price
@@ -10,20 +12,39 @@ import datetime as dt
 from collections.abc import Iterable
 from typing import Any
 
+from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import NON_FIELD_ERRORS, PermissionDenied, ValidationError
 from django.db import models, transaction
-from django.db.models import Q, QuerySet
+from django.db.models import Prefetch, Q, QuerySet
+from django.utils import timezone
 
-from apps.core.audit import AuditContext
+from apps.core import translations
+from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.services import audit_changes, run_mutation
 from apps.vendors.models import Vendor
 from apps.vendors.services import vendors_in_suggestions
 
-from . import engine
-from .models import Category, Product, ProductStatus, StockStatus, Term, Variant
+from . import engine, slugs
+from .models import (
+    Attribute,
+    AttributeValue,
+    Category,
+    FiscalCategory,
+    Product,
+    ProductAttribute,
+    ProductKind,
+    ProductStatus,
+    ProductTranslation,
+    SalesMode,
+    SlugHistory,
+    StockStatus,
+    Term,
+    Variant,
+    VariantOption,
+)
 
 PRODUCT_MODEL = "catalog.product"
 VARIANT_MODEL = "catalog.variant"
@@ -489,3 +510,498 @@ def suggested_upsells(product: Product) -> "QuerySet[Product]":
     return product.upsells.filter(
         Q(vendor_id=product.vendor_id) | Q(vendor__in=vendors_in_suggestions())
     )
+
+
+# --- Products with typed attributes, variant axes and variants (CAT.3, spec 03 §3.2, Q-32)
+
+type Catalogue = dict[str, tuple[Attribute, dict[str, AttributeValue]]]
+
+
+def _add_error(errors: dict[str, list[str]], field: str, message: str) -> None:
+    errors.setdefault(field, []).append(message)
+
+
+def _check_choice(errors: dict[str, list[str]], field: str, value: str, allowed: list[str]) -> None:
+    if value not in allowed:
+        _add_error(errors, field, f"{value!r} is not one of {', '.join(allowed)}.")
+
+
+def _amount(errors: dict[str, list[str]], field: str, value: object) -> Any:
+    if value is None:
+        return None
+    try:
+        return engine.to_price(value)
+    except (TypeError, ValueError) as exc:
+        _add_error(errors, field, str(exc))
+        return None
+
+
+def _attribute_catalogue(codes: set[str]) -> Catalogue:
+    rows = Attribute.objects.filter(code__in=codes).prefetch_related("values")
+    return {a.code: (a, {v.value: v for v in a.values.all()}) for a in rows}
+
+
+def _product_errors(
+    vendor: Vendor, data: engine.ProductIn, catalogue: Catalogue
+) -> dict[str, list[str]]:
+    """Every reason the payload cannot be created, by field (NON_FIELD_ERRORS: its shape)."""
+    errors: dict[str, list[str]] = {}
+    price = _amount(errors, "price_net", data.price_net)
+    if price is not None and price == 0:  # CAT.14, Q-31: never 0.00
+        _add_error(errors, "price_net", engine.ZERO_PRICE)
+    _check_choice(errors, "kind", data.kind, list(ProductKind.values))
+    _check_choice(errors, "sales_mode", data.sales_mode, list(SalesMode.values))
+    _check_choice(errors, "fiscal_category", data.fiscal_category, list(FiscalCategory.values))
+    languages = [code for code, _ in settings.LANGUAGES]
+    seen: set[str] = set()
+    for text in data.translations:
+        _check_choice(errors, "translations", text.language, languages)
+        if text.language in seen:
+            _add_error(errors, "translations", f"{text.language} is given twice.")
+        seen.add(text.language)
+
+    specs = {
+        code: engine.AttributeSpec(attribute.kind, frozenset(values))
+        for code, (attribute, values) in catalogue.items()
+    }
+    for message in engine.product_structure_errors(
+        data.kind, specs, data.attributes, data.variants
+    ):
+        _add_error(errors, NON_FIELD_ERRORS, message)
+    for variant in data.variants:
+        _amount(errors, "variants", variant.price_net_override)
+        if variant.stock_qty < 0:
+            _add_error(errors, "variants", f"{variant.sku}: the stock cannot be negative.")
+
+    if Product.objects.filter(vendor=vendor, sku=engine.canonical_sku(data.sku)).exists():
+        _add_error(errors, "sku", "This vendor already has a product with this SKU.")
+    skus = [engine.canonical_sku(v.sku) for v in data.variants]
+    taken = Variant.objects.filter(vendor=vendor, sku__in=skus).values_list("sku", flat=True)
+    for sku in sorted(taken):
+        _add_error(errors, "variants", f"This vendor already has a variant with this SKU: {sku}.")
+    return errors
+
+
+def create_product(
+    vendor: Vendor,
+    data: engine.ProductIn,
+    *,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Create `vendor`'s product with its texts, typed attributes, variant axes and variants.
+
+    The whole payload is validated first (`engine.product_structure_errors`; owner decision
+    Q-32: variants only on variable products), then returned as a ChangeSet of creations and,
+    unless `dry_run`, written and audited in one transaction. The product's attributes keep the
+    order they are given in, so the first axis given is the first axis shown; the variants are
+    numbered in display order: by the first axis, then the next, each by the position of the
+    value in its attribute (S, M, L). Raises ValidationError, also on dry-run.
+    """
+    catalogue = _attribute_catalogue({a.code for a in data.attributes})
+    errors = _product_errors(vendor, data, catalogue)
+    if errors:
+        raise ValidationError(errors)
+
+    vendor_key = str(vendor.public_id)
+    product = Product(
+        vendor=vendor,
+        sku=engine.canonical_sku(data.sku),
+        kind=data.kind,
+        sales_mode=data.sales_mode,
+        fiscal_category=data.fiscal_category,
+        price_net=engine.to_price(data.price_net),
+        weight_kg=data.weight_kg,
+    )
+    product_key = str(product.public_id)
+    changes = ChangeSet()
+    changes.create(
+        PRODUCT_MODEL,
+        product_key,
+        {
+            "vendor": vendor_key,
+            "sku": product.sku,
+            "kind": product.kind,
+            "sales_mode": product.sales_mode,
+            "fiscal_category": product.fiscal_category,
+            "price_net": product.price_net,
+            "weight_kg": product.weight_kg,
+        },
+    )
+
+    texts = [
+        ProductTranslation(
+            product=product,
+            language=text.language,
+            title=text.title,
+            short_description=text.short_description,
+            description=text.description,
+        )
+        for text in data.translations
+    ]
+    for text in texts:
+        changes.create(
+            "catalog.producttranslation",
+            str(text.public_id),
+            {
+                "vendor": vendor_key,
+                "product": product_key,
+                "language": text.language,
+                "title": text.title,
+            },
+        )
+
+    rows: list[tuple[ProductAttribute, list[AttributeValue]]] = []
+    for position, given in enumerate(data.attributes):
+        attribute, values = catalogue[given.code]
+        row = ProductAttribute(
+            product=product,
+            attribute=attribute,
+            numeric_value=given.number,
+            text_value=given.text,
+            is_variant_axis=given.axis,
+            position=position,
+        )
+        rows.append((row, [values[value] for value in given.values]))
+        changes.create(
+            "catalog.productattribute",
+            str(row.public_id),
+            {
+                "vendor": vendor_key,
+                "product": product_key,
+                "attribute": given.code,
+                "values": list(given.values),
+                "numeric_value": given.number,
+                "text_value": given.text,
+                "is_variant_axis": given.axis,
+                "position": position,
+            },
+        )
+
+    axes = [given.code for given in data.attributes if given.axis]
+    positions = {code: {v: row.position for v, row in catalogue[code][1].items()} for code in axes}
+    order = engine.variant_order(axes, positions, [v.options for v in data.variants])
+    variants: list[tuple[Variant, list[AttributeValue]]] = []
+    for position, index in enumerate(order):
+        given_variant = data.variants[index]
+        variant = Variant(
+            product=product,
+            vendor=vendor,
+            sku=engine.canonical_sku(given_variant.sku),
+            price_net_override=_amount({}, "variants", given_variant.price_net_override),
+            weight_kg_override=given_variant.weight_kg_override,
+            stock_qty=given_variant.stock_qty,
+            is_default=given_variant.is_default,
+            position=position,
+        )
+        options = [catalogue[code][1][given_variant.options[code]] for code in axes]
+        variants.append((variant, options))
+        variant_key = str(variant.public_id)
+        changes.create(
+            VARIANT_MODEL,
+            variant_key,
+            {
+                "vendor": vendor_key,
+                "product": product_key,
+                "sku": variant.sku,
+                "position": position,
+                "is_default": variant.is_default,
+                "price_net_override": variant.price_net_override,
+                "weight_kg_override": variant.weight_kg_override,
+                "stock_qty": variant.stock_qty,
+            },
+        )
+        for code, value in zip(axes, options, strict=True):
+            changes.create(
+                "catalog.variantoption",
+                f"{variant_key}:{code}",
+                {
+                    "vendor": vendor_key,
+                    "variant": variant_key,
+                    "attribute": code,
+                    "value": value.value,
+                },
+            )
+
+    def apply() -> None:
+        product.save()
+        for text in texts:
+            text.save()
+        for row, values in rows:
+            row.save()
+            if values:
+                row.values.set(values)
+        for variant, options in variants:
+            variant.save()
+            VariantOption.objects.bulk_create(
+                VariantOption(variant=variant, attribute_id=value.attribute_id, value=value)
+                for value in options
+            )
+
+    return run_mutation(changes, apply, ctx=ctx, action=PRODUCT_CREATED, dry_run=dry_run)
+
+
+def _text(rows: Any, field: str, language: str, default: str) -> str:
+    """The published text in `language`, else in EN, else `default`; reads prefetched rows."""
+    resolved = translations.resolve(rows, language)
+    return default if resolved.translation is None else str(getattr(resolved.translation, field))
+
+
+def attribute_name(attribute: Attribute, language: str) -> str:
+    """The attribute's name in `language` (EN fallback); its code when it has no name yet."""
+    return _text(attribute.translations.all(), "name", language, attribute.code)
+
+
+def value_label(value: AttributeValue, language: str) -> str:
+    """The value's label in `language` (EN fallback); its code when it has no label yet."""
+    return _text(value.translations.all(), "label", language, value.value)
+
+
+def attribute_catalogue() -> "QuerySet[Attribute]":
+    """Every attribute with its names, values and labels prefetched, in display order."""
+    return Attribute.objects.prefetch_related(
+        "translations",
+        Prefetch("values", queryset=AttributeValue.objects.prefetch_related("translations")),
+    )
+
+
+def product_attributes(product: Product) -> "QuerySet[ProductAttribute]":
+    """The product's attributes in display order, with names, values and labels prefetched."""
+    return (
+        ProductAttribute.objects.filter(product_id=product.pk)
+        .select_related("attribute")
+        .prefetch_related(
+            "attribute__translations",
+            Prefetch("values", queryset=AttributeValue.objects.prefetch_related("translations")),
+        )
+        .order_by("position", "id")
+    )
+
+
+def variant_axes(product: Product) -> list[ProductAttribute]:
+    """The attributes the product's variants vary on, first axis first."""
+    return list(product_attributes(product).filter(is_variant_axis=True))
+
+
+def variant_options(variant: Variant) -> list[VariantOption]:
+    """The variant's options in the axis order of its product."""
+    axis_order = dict(
+        ProductAttribute.objects.filter(product_id=variant.product_id).values_list(
+            "attribute_id", "position"
+        )
+    )
+    options = VariantOption.objects.filter(variant_id=variant.pk).select_related(
+        "attribute", "value"
+    )
+    return sorted(
+        options.prefetch_related("value__translations"),
+        key=lambda option: axis_order.get(option.attribute_id, 0),
+    )
+
+
+def variant_label(variant: Variant, language: str) -> str:
+    """The variant's name in `language` from its translated option labels, e.g. "M / Rosso"."""
+    labels = [value_label(option.value, language) for option in variant_options(variant)]
+    return engine.variant_label(labels)
+
+
+# --- Product slugs (CAT.5, spec 03 §3.2): `{title}-{lang}`, never the SKU; old slugs answer 301.
+
+TRANSLATION_MODEL = "catalog.producttranslation"
+SLUG_HISTORY_MODEL = "catalog.slughistory"
+SLUG_CHANGED = "catalog.product.slug_changed"
+OLD_SLUG_RECORDED = "catalog.product.old_slug_recorded"
+OLD_SLUG_MAX_LENGTH = 200  # SlugHistory.slug: legacy slugs may be longer than 80 characters
+
+
+class _SlugsOfOtherProducts:
+    """The current and old slugs of the other products in one language, asked one at a time:
+    collisions are rare, so a few lookups beat loading every slug of the catalog."""
+
+    def __init__(self, language: str, product_id: int) -> None:
+        self.language = language
+        self.product_id = product_id
+
+    def __contains__(self, slug: object) -> bool:
+        return (
+            ProductTranslation.objects.filter(language=self.language, slug=slug)
+            .exclude(product_id=self.product_id)
+            .exists()
+            or SlugHistory.objects.filter(language=self.language, slug=slug)
+            .exclude(product_id=self.product_id)
+            .exists()
+        )
+
+
+def _slug_snapshot(product: Product, language: str, slug: str) -> dict[str, Any]:
+    return {"vendor": str(product.vendor.public_id), "language": language, "slug": slug}
+
+
+def sync_product_slug(
+    translation: ProductTranslation, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Derive the translation's slug from its title; a replaced slug moves to SlugHistory.
+
+    The slug is unique per language among the current and old slugs of every other product, so
+    an old slug always redirects to one product in a single hop. Going back to one of the
+    product's own old slugs takes it out of the history (no redirect loop). Replacing a slug is
+    audited; a first slug is not (no URL changes).
+    """
+    with transaction.atomic():
+        current = (
+            ProductTranslation.objects.select_for_update(of=("self",))
+            .select_related("product__vendor")
+            .get(pk=translation.pk)
+        )
+        product, language, old_slug = current.product, current.language, current.slug
+        new_slug = slugs.unique_product_slug(
+            current.title, language, taken=_SlugsOfOtherProducts(language, product.pk)
+        )
+        changes = ChangeSet()
+        if new_slug == old_slug:
+            return changes
+
+        changes.update(
+            TRANSLATION_MODEL, str(current.public_id), {"slug": old_slug}, {"slug": new_slug}
+        )
+        reclaimed = SlugHistory.objects.filter(
+            product=product, language=language, slug=new_slug
+        ).first()
+        if reclaimed is not None:
+            changes.delete(
+                SLUG_HISTORY_MODEL,
+                str(reclaimed.public_id),
+                _slug_snapshot(product, language, new_slug),
+            )
+        kept = SlugHistory(product=product, language=language, slug=old_slug) if old_slug else None
+        if kept is not None:
+            changes.create(
+                SLUG_HISTORY_MODEL, str(kept.public_id), _slug_snapshot(product, language, old_slug)
+            )
+        if dry_run:
+            return changes
+
+        if reclaimed is not None:
+            reclaimed.delete()
+        if kept is not None:
+            kept.save()
+        # A queryset update: the slug is derived data, not a text of the translation workflow.
+        ProductTranslation.objects.filter(pk=current.pk).update(
+            slug=new_slug, updated_at=timezone.now()
+        )
+        if old_slug:
+            record(
+                ctx,
+                SLUG_CHANGED,
+                PRODUCT_MODEL,
+                str(product.public_id),
+                _slug_snapshot(product, language, old_slug),
+                _slug_snapshot(product, language, new_slug),
+            )
+    translation.slug = new_slug
+    return changes
+
+
+def rebuild_product_slugs(
+    *,
+    ctx: AuditContext,
+    dry_run: bool = False,
+    translations: "QuerySet[ProductTranslation] | None" = None,
+) -> ChangeSet:
+    """`sync_product_slug` for every translation (or the given ones), in id order.
+
+    This loads the current `{title}-{lang}-{sku}` slugs as history. A dry run checks each
+    translation against the stored slugs only, so it can miss a `-2` that two translations of
+    the same run would need.
+    """
+    queryset = ProductTranslation.objects.all() if translations is None else translations
+    changes = ChangeSet()
+    for translation in queryset.order_by("pk").iterator():
+        changes.changes.extend(sync_product_slug(translation, ctx=ctx, dry_run=dry_run).changes)
+    return changes
+
+
+def record_old_slugs(
+    product: Product,
+    language: str,
+    old_slugs: Iterable[str],
+    *,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Add old slugs of `product` in `language` to SlugHistory (e.g. the legacy old slugs).
+
+    The product's current slug and the slugs already in its history are skipped. A slug that
+    is not valid, or that another product uses (current or old), stops the load with a
+    ValidationError naming the slugs; nothing is written.
+    """
+    if language not in dict(settings.LANGUAGES):
+        raise ValidationError(f"Unknown language: {language}.")
+    wanted = list(dict.fromkeys(old_slugs))
+    invalid = [slug for slug in wanted if not slugs.is_slug(slug, max_length=OLD_SLUG_MAX_LENGTH)]
+    if invalid:
+        raise ValidationError(f"These are not valid slugs: {', '.join(invalid)}.")
+    with transaction.atomic():
+        product = (
+            Product.objects.select_for_update(of=("self",))
+            .select_related("vendor")
+            .get(pk=product.pk)
+        )
+        own = {
+            *ProductTranslation.objects.filter(product=product, language=language).values_list(
+                "slug", flat=True
+            ),
+            *SlugHistory.objects.filter(product=product, language=language).values_list(
+                "slug", flat=True
+            ),
+        }
+        new = [slug for slug in wanted if slug not in own]
+        others = {
+            *ProductTranslation.objects.filter(language=language, slug__in=new)
+            .exclude(product=product)
+            .values_list("slug", flat=True),
+            *SlugHistory.objects.filter(language=language, slug__in=new)
+            .exclude(product=product)
+            .values_list("slug", flat=True),
+        }
+        if others:
+            raise ValidationError(
+                f"These slugs belong to another product: {', '.join(sorted(others))}."
+            )
+        entries = [SlugHistory(product=product, language=language, slug=slug) for slug in new]
+        changes = ChangeSet()
+        for entry in entries:
+            changes.create(
+                SLUG_HISTORY_MODEL,
+                str(entry.public_id),
+                _slug_snapshot(product, language, entry.slug),
+            )
+        run_mutation(
+            changes,
+            lambda: SlugHistory.objects.bulk_create(entries),
+            ctx=ctx,
+            action=OLD_SLUG_RECORDED,
+            dry_run=dry_run,
+        )
+    return changes
+
+
+def old_slug_redirect(language: str, slug: str) -> str | None:
+    """The current product path an old slug moves to (one hop); None if the slug is not old,
+    or its product has no current slug in that language."""
+    product_id = (
+        SlugHistory.objects.filter(language=language, slug=slug)
+        .values_list("product_id", flat=True)
+        .first()
+    )
+    if product_id is None:
+        return None
+    current = (
+        ProductTranslation.objects.filter(product_id=product_id, language=language)
+        .exclude(slug="")
+        .values_list("slug", flat=True)
+        .first()
+    )
+    if current is None:
+        return None
+    return slugs.product_path(language, current, default_language=settings.LANGUAGE_CODE)
