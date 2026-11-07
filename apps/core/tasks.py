@@ -5,9 +5,9 @@ moving to another queue later means changing this file only. Application code:
 
 - declares a job with `@task("<app>.<job>")` in `apps/<app>/tasks.py`; the worker imports
   every `tasks` module of the installed apps;
-- runs it on a cron schedule with `@periodic("<cron>")`, read in `settings.BUSINESS_TIME_ZONE`
-  (Europe/Rome), daylight saving time included; the job receives `timestamp`, the Unix time
-  of the tick;
+- runs it on a cron schedule with `@periodic("<cron>")`, read as wall-clock time in
+  `settings.BUSINESS_TIME_ZONE` (Europe/Rome), with cron's daylight saving time rules (see
+  `_BusinessTimeCron`); the job receives `timestamp`, the Unix time of the tick;
 - prevents overlaps with `@locked()`: at most one run at a time and one job waiting;
 - queues it with `enqueue(job, **kwargs)`, inside the caller's database transaction.
 
@@ -75,6 +75,9 @@ class Retry:
 DEFAULT_RETRY = Retry()
 NO_RETRY = Retry(max_attempts=0)
 
+#: How far the worker's clock may run ahead of the database's for an immediate retry.
+_CLOCK_SKEW = dt.timedelta(seconds=1)
+
 
 class _BackoffStrategy(BaseRetryStrategy):
     def __init__(self, policy: Retry) -> None:
@@ -87,8 +90,9 @@ class _BackoffStrategy(BaseRetryStrategy):
         if delay is None:
             return None
         if delay == 0:
-            # No date at all means "due now" by the database clock, whatever the worker's clock.
-            return RetryDecision()
+            # Procrastinate stamps "now" with the worker's clock; a database clock a few
+            # milliseconds behind would then keep the job waiting. Date it slightly in the past.
+            return RetryDecision(retry_at=dt.datetime.now(dt.UTC) - _CLOCK_SKEW)
         return RetryDecision(retry_in={"seconds": delay})
 
 
@@ -99,12 +103,43 @@ def business_tz() -> ZoneInfo:
     return ZoneInfo(settings.BUSINESS_TIME_ZONE)
 
 
-def _cron_iterator(cron: str, tz: dt.tzinfo) -> Any:
-    """A cron iterator that reads `cron` as wall-clock time in `tz`, DST included."""
-    return croniter.croniter(cron, dt.datetime.now(tz))
+class _BusinessTimeCron:
+    """The cron iterator of a schedule: `cron` read as wall-clock time in `tz`.
+
+    Daylight saving time follows cron's rules. On the spring night the ticks of the skipped
+    hour (02:00-02:59 in Europe/Rome) move to 03:00, so they are late, never lost. On the
+    autumn night 02:00-02:59 happens twice: a schedule that names its hours (`30 2 * * *`,
+    `0 1-3 * * *`, `0 */2 * * *`) fires on the first pass only, while one that runs every hour
+    (hour field `*`, such as `*/5 * * * *`) follows real time and fires on both.
+
+    It offers the part of the croniter interface that Procrastinate's scheduler uses.
+    """
+
+    def __init__(self, cron: str, tz: dt.tzinfo) -> None:
+        self._iterator = croniter.croniter(cron, dt.datetime.now(tz))
+        self.tzinfo = tz
+        self._names_its_hours = str(self._iterator.expressions[1]) != "*"
+
+    def set_current(self, start_time: float) -> float:
+        self._iterator.set_current(start_time=start_time)
+        return start_time
+
+    def get_next(self, ret_type: type = float, start_time: float | None = None) -> float:
+        if start_time is not None:
+            self._iterator.set_current(start_time=start_time)
+        return self._first_pass(lambda: float(self._iterator.get_next(ret_type=float)))
+
+    def get_prev(self, ret_type: type = float) -> float:
+        return self._first_pass(lambda: float(self._iterator.get_prev(ret_type=float)))
+
+    def _first_pass(self, step: Callable[[], float]) -> float:
+        tick = step()
+        while self._names_its_hours and dt.datetime.fromtimestamp(tick, self.tzinfo).fold:
+            tick = step()  # the second pass of a repeated wall-clock time: already fired
+        return tick
 
 
-def _next_tick(iterator: Any, after: dt.datetime) -> dt.datetime:
+def _next_tick(iterator: _BusinessTimeCron, after: dt.datetime) -> dt.datetime:
     if after.utcoffset() is None:
         raise ValueError("after must be a timezone-aware datetime")
     iterator.set_current(start_time=after.timestamp())
@@ -113,15 +148,15 @@ def _next_tick(iterator: Any, after: dt.datetime) -> dt.datetime:
 
 def next_run(cron: str, after: dt.datetime) -> dt.datetime:
     """First tick of `cron`, read in business time, strictly after `after` (returned in UTC)."""
-    return _next_tick(_cron_iterator(cron, business_tz()), after)
+    return _next_tick(_BusinessTimeCron(cron, business_tz()), after)
 
 
 class _BusinessTimePeriodicTask(PeriodicTask[..., Any, ...]):
     """A periodic task whose cron expression is read in business time (the queue assumes UTC)."""
 
     @functools.cached_property
-    def croniter(self) -> Any:
-        return _cron_iterator(self.cron, business_tz())
+    def croniter(self) -> Any:  # read by Procrastinate's scheduler
+        return _BusinessTimeCron(self.cron, business_tz())
 
 
 @dataclass(frozen=True)
@@ -132,7 +167,22 @@ class Schedule:
     time_zone: str  # the zone the scheduler reads `cron` in
 
     def next_run(self, after: dt.datetime) -> dt.datetime:
-        return _next_tick(_cron_iterator(self.cron, ZoneInfo(self.time_zone)), after)
+        return _next_tick(_BusinessTimeCron(self.cron, ZoneInfo(self.time_zone)), after)
+
+    def ticks(self, since: dt.datetime, until: dt.datetime) -> list[dt.datetime]:
+        """The ticks a running scheduler queues after `since`, up to `until` (in UTC)."""
+        if since.utcoffset() is None or until.utcoffset() is None:
+            raise ValueError("since and until must be timezone-aware datetimes")
+        registry = _ready_app().periodic_registry
+        registered = registry.periodic_tasks[(self.task_name, self.periodic_id)]
+        # A fresh copy, so that the live scheduler's iterator is left alone.
+        periodic_task = _BusinessTimePeriodicTask(
+            task=registered.task, cron=self.cron, periodic_id=self.periodic_id, configure_kwargs={}
+        )
+        timestamps = PeriodicDeferrer(registry=registry).get_timestamps(
+            periodic_task=periodic_task, since=int(since.timestamp()), until=until.timestamp()
+        )
+        return [dt.datetime.fromtimestamp(timestamp, tz=dt.UTC) for timestamp in timestamps]
 
 
 # --- The application ------------------------------------------------------------------------
@@ -258,6 +308,7 @@ class JobInfo:
     status: str  # todo, doing, succeeded, failed, cancelled, aborted
     attempts: int
     scheduled_at: dt.datetime | None
+    lock: str | None  # set by `@locked`: no two jobs with this key run at once
 
 
 def _job_info(row: _QueueRow) -> JobInfo:
@@ -270,6 +321,7 @@ def _job_info(row: _QueueRow) -> JobInfo:
         status=row.status,
         attempts=row.attempts,
         scheduled_at=row.scheduled_at,
+        lock=row.lock,
     )
 
 

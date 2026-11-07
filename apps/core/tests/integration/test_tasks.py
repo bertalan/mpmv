@@ -24,6 +24,7 @@ from apps.core.tasks import (
     heartbeat,
     list_jobs,
     locked,
+    periodic,
     run_worker,
     task,
 )
@@ -58,6 +59,18 @@ def hopeless(key: str) -> None:
 @task("tests.core.exclusive")
 def exclusive(n: int) -> None:
     """A job that must never be queued twice."""
+
+
+@periodic("30 2 * * *")
+@task("tests.core.nightly")
+def nightly(timestamp: int) -> None:
+    """A schedule inside the hour that the autumn DST night repeats."""
+
+
+def _set_status(job_id: int, status: str) -> None:
+    """Move a queued row by hand, standing in for a worker that holds the job."""
+    with connection.cursor() as cursor:
+        cursor.execute("UPDATE procrastinate_jobs SET status = %s WHERE id = %s", [status, job_id])
 
 
 def _purge_queue() -> None:
@@ -124,6 +137,38 @@ def test_a_waiting_heartbeat_blocks_the_next_tick() -> None:
 
     jobs = list_jobs("core.heartbeat")
     assert [job.status for job in jobs] == ["todo"]
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.usefixtures("empty_queue")
+def test_a_fixed_hour_job_is_queued_once_on_the_autumn_dst_night() -> None:
+    """02:30 happens twice on 25 October 2026 (00:30 and 01:30 UTC): one job, not two."""
+    first = dt.datetime(2026, 10, 25, 0, 32, tzinfo=dt.UTC)  # 02:32 CEST
+    defer_periodic(first)
+    defer_periodic(first + dt.timedelta(hours=1))  # 02:32 CET, a worker started after the switch
+
+    jobs = list_jobs("tests.core.nightly")
+    assert len(jobs) == 1
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.usefixtures("empty_queue")
+def test_a_locked_job_does_not_run_while_another_with_its_lock_runs() -> None:
+    """Run lock: the queueing lock lets a second job wait, the lock keeps it from overlapping."""
+    running = enqueue(exclusive, n=1)
+    assert running is not None
+    _set_status(running, "doing")
+    waiting = enqueue(exclusive, n=2)
+    assert waiting is not None  # the queueing lock only covers jobs that wait
+    assert get_job(waiting).lock == "tests.core.exclusive"
+
+    _drain()
+    assert get_job(waiting).status == "todo"
+    assert get_job(waiting).attempts == 0
+
+    _set_status(running, "succeeded")
+    _drain()
+    assert get_job(waiting).status == "succeeded"
 
 
 @pytest.mark.django_db(transaction=True)

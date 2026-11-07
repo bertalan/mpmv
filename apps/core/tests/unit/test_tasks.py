@@ -16,6 +16,12 @@ def morning_job(timestamp: int) -> None:
     """A schedule at 07:30 business time, to check how the registry reads cron expressions."""
 
 
+@periodic("30 2 * * *")
+@task("tests.core.unit_night")
+def night_job(timestamp: int) -> None:
+    """A schedule at 02:30 business time, inside the hour that DST repeats or skips."""
+
+
 def test_default_retry_backs_off_exponentially() -> None:
     assert [DEFAULT_RETRY.delay_after(attempts) for attempts in range(5)] == [30, 60, 120, 240, 480]
 
@@ -90,3 +96,48 @@ def test_registered_schedules_fire_in_business_time_across_dst() -> None:
     summer = morning.next_run(dt.datetime(2026, 7, 10, 12, 0, tzinfo=dt.UTC))
     assert winter == dt.datetime(2026, 1, 11, 6, 30, tzinfo=dt.UTC)
     assert summer == dt.datetime(2026, 7, 11, 5, 30, tzinfo=dt.UTC)
+
+
+# --- The DST nights: 02:00-02:59 happens twice in autumn and never in spring ----------------
+
+
+def _ticks(task_name: str, since: dt.datetime, until: dt.datetime) -> list[dt.datetime]:
+    return {s.task_name: s for s in schedules()}[task_name].ticks(since, until)
+
+
+def test_a_fixed_hour_schedule_fires_once_on_the_autumn_dst_night() -> None:
+    """02:30 happens at 00:30 and again at 01:30 UTC on 25 October 2026: run at the first one."""
+    ticks = _ticks(
+        "tests.core.unit_night",
+        since=dt.datetime(2026, 10, 24, 12, 0, tzinfo=dt.UTC),
+        until=dt.datetime(2026, 10, 26, 12, 0, tzinfo=dt.UTC),
+    )
+    assert ticks == [
+        dt.datetime(2026, 10, 25, 0, 30, tzinfo=dt.UTC),  # 02:30 CEST
+        dt.datetime(2026, 10, 26, 1, 30, tzinfo=dt.UTC),  # 02:30 CET
+    ]
+
+
+def test_a_fixed_hour_schedule_fires_at_three_on_the_spring_dst_night() -> None:
+    """02:30 does not exist on 29 March 2026: the tick moves to 03:00 CEST, it is not lost."""
+    ticks = _ticks(
+        "tests.core.unit_night",
+        since=dt.datetime(2026, 3, 28, 12, 0, tzinfo=dt.UTC),
+        until=dt.datetime(2026, 3, 30, 12, 0, tzinfo=dt.UTC),
+    )
+    assert ticks == [
+        dt.datetime(2026, 3, 29, 1, 0, tzinfo=dt.UTC),  # 03:00 CEST
+        dt.datetime(2026, 3, 30, 0, 30, tzinfo=dt.UTC),  # 02:30 CEST
+    ]
+
+
+def test_next_run_skips_the_repeated_hour_for_a_fixed_hour_schedule() -> None:
+    first_0230 = dt.datetime(2026, 10, 25, 0, 30, tzinfo=dt.UTC)
+    assert next_run("30 2 * * *", first_0230) == dt.datetime(2026, 10, 26, 1, 30, tzinfo=dt.UTC)
+
+
+def test_an_every_few_minutes_schedule_follows_real_time_through_the_repeated_hour() -> None:
+    """The heartbeat keeps beating every five minutes while 02:00-02:59 happens twice."""
+    since = dt.datetime(2026, 10, 24, 23, 55, tzinfo=dt.UTC)  # 01:55 CEST
+    ticks = _ticks("core.heartbeat", since=since, until=since + dt.timedelta(hours=2))
+    assert ticks == [since + dt.timedelta(minutes=5 * n) for n in range(1, 25)]

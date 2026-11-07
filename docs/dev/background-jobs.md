@@ -39,7 +39,7 @@ from apps.core.tasks import enqueue, locked, periodic, task
 from . import services
 
 
-@periodic("30 7 * * *")  # 07:30 Europe/Rome, all year round
+@periodic("30 7 * * *")  # 07:30 Europe/Rome, summer and winter time
 @locked()  # never overlaps itself, never piles up
 @task("ingest.stock")
 def sync_stock(timestamp: int) -> None:
@@ -69,7 +69,16 @@ Rules:
 (Europe/Rome), so `30 7 * * *` stays at 07:30 across daylight saving time changes; Procrastinate
 alone would read it in UTC. The job receives `timestamp`, the Unix time of the tick. Each tick
 is queued once even with several workers. A worker that starts within 10 minutes of a missed
-tick still queues it; older ticks are skipped. `schedules()` lists what the scheduler sees.
+tick still queues it; older ticks are skipped. `schedules()` lists what the scheduler sees, and
+`Schedule.ticks(since, until)` lists the ticks it would queue in a period.
+
+The two daylight saving time nights follow cron's rules:
+
+- **Spring** (02:00-02:59 does not exist): ticks in that hour run at 03:00, late but not lost.
+- **Autumn** (02:00-02:59 happens twice): a schedule that names its hours, such as
+  `30 2 * * *`, `0 1-3 * * *` or `0 */2 * * *`, fires on the first pass only, so a nightly job
+  never runs twice. A schedule whose hour field is `*`, such as `*/5 * * * *`, follows real
+  time and fires on both passes.
 
 ## Retries
 
@@ -82,7 +91,8 @@ the last retry the job stays `failed` in the admin.
 
 `@locked()` sets both locks of Procrastinate to the job name (or the key you pass):
 
-- **lock**: two jobs with the same key never run at the same time;
+- **lock**: two jobs with the same key never run at the same time; a job queued while another
+  runs waits for it to finish;
 - **queueing lock**: while one job with the key is waiting, `enqueue` and the scheduler do not
   queue another; `enqueue` returns `None` instead of a job id.
 
