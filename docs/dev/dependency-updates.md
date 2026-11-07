@@ -24,8 +24,9 @@ Rules:
   deprecations and migrations.
 - **The Python base image stays on the runtime minor** (3.13): moving to a new minor also
   changes `requires-python`, `.python-version` and CI, so it is a planned task, not a bot PR.
-- **Cooldown**: a release is proposed only after 5 days (14 for majors), which gives the
-  ecosystem time to spot a broken or hijacked release. Security updates skip the cooldown.
+- **Cooldown**: a release is proposed only after 5 days (14 for Python majors; Dependabot has no
+  per-semver cooldown for Actions and images), which gives the ecosystem time to spot a broken or
+  hijacked release. Security updates skip the cooldown.
 - **Labels** `dependencies` plus `python`, `github-actions` or `docker`; commit messages start
   with `OPS.4:`.
 

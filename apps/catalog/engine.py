@@ -1,7 +1,11 @@
-"""Pure catalog rules (spec 03 §3.2): SKU normalization and price validation. No ORM here."""
+"""Pure catalog rules (spec 03 §3.2): SKU normalization, price validation, and the rules of the
+category and term trees and of the attributes a taxonomy declares for its terms. No ORM here."""
 
 import datetime as dt
+import re
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
+from typing import Any
 
 from apps.core.money import CENT, to_decimal
 
@@ -59,4 +63,104 @@ def price_errors(
         errors["sale_price_net"] = "The sale price must be lower than the price."
     if sale_from is not None and sale_to is not None and sale_to <= sale_from:
         errors["sale_to"] = "The sale must end after it starts."
+    return errors
+
+
+# --- Trees (CAT.2): categories and terms use treebeard materialized paths.
+
+
+def ancestor_paths(path: str, steplen: int) -> list[str]:
+    """The paths of the ancestors of the node at `path`, root first.
+
+    A materialized path is the parent's path plus `steplen` characters, so the ancestors are its
+    prefixes. A product tagged with a lower-level term implies the upper levels (spec 03).
+    """
+    if not path or len(path) % steplen:
+        raise ValueError(f"{path!r} is not a tree path of {steplen} characters per level")
+    return [path[:end] for end in range(steplen, len(path), steplen)]
+
+
+def term_placement_error(
+    *, hierarchical: bool, taxonomy: object, parent_taxonomy: object | None
+) -> str | None:
+    """Why a term of `taxonomy` cannot go under a parent of `parent_taxonomy` (None: top level)."""
+    if parent_taxonomy is None:
+        return None
+    if parent_taxonomy != taxonomy:
+        return "A term can only be placed under a term of the same taxonomy."
+    if not hierarchical:
+        return "This taxonomy is flat: its terms cannot have children."
+    return None
+
+
+# --- Term attributes: each taxonomy declares the extra fields of its terms, as data.
+
+TERM_ATTRIBUTE_KINDS = ("text", "number", "boolean")
+_ATTRIBUTE_KEYS = {"code", "kind", "required", "label"}
+_ATTRIBUTE_CODE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+def term_schema_errors(schema: object) -> list[str]:
+    """Problems of a taxonomy's `term_attributes` declaration; empty when valid.
+
+    The declaration is a list of `{"code", "kind", "required"?, "label"?}` objects: `code` is the
+    key in each term's `attributes`, `kind` one of TERM_ATTRIBUTE_KINDS, `label` a staff hint.
+    """
+    if not isinstance(schema, list):
+        return ["The term attributes must be a list of attribute definitions."]
+    errors: list[str] = []
+    seen: set[str] = set()
+    for position, entry in enumerate(schema, start=1):
+        if not isinstance(entry, dict):
+            errors.append(f"Attribute {position} must be an object with a code and a kind.")
+            continue
+        code = entry.get("code")
+        if not isinstance(code, str) or not _ATTRIBUTE_CODE.match(code):
+            errors.append(f"Attribute {position} needs a code: lower case letters, digits and _.")
+            continue
+        if code in seen:
+            errors.append(f"An attribute code is declared twice: {code}.")
+        seen.add(code)
+        if entry.get("kind") not in TERM_ATTRIBUTE_KINDS:
+            kinds = ", ".join(TERM_ATTRIBUTE_KINDS)
+            errors.append(f"Attribute {code}: the kind must be one of {kinds}.")
+        if not isinstance(entry.get("required", False), bool):
+            errors.append(f"Attribute {code}: required must be true or false.")
+        if not isinstance(entry.get("label", ""), str):
+            errors.append(f"Attribute {code}: the label must be a text.")
+        unknown = sorted(entry.keys() - _ATTRIBUTE_KEYS)
+        errors.extend(f"Attribute {code}: unknown key {key}." for key in unknown)
+    return errors
+
+
+def _kind_error(code: str, kind: str, value: object) -> str | None:
+    if kind == "number":
+        # JSON numbers; a boolean is not a number even though Python's bool is an int.
+        if isinstance(value, bool) or not isinstance(value, int | float):
+            return f"{code} must be a number."
+    elif kind == "boolean":
+        if not isinstance(value, bool):
+            return f"{code} must be true or false."
+    elif not isinstance(value, str):
+        return f"{code} must be a text."
+    return None
+
+
+def term_attribute_errors(schema: Sequence[Mapping[str, Any]], values: object) -> list[str]:
+    """Problems of a term's `attributes` against its taxonomy's (valid) declaration."""
+    if not isinstance(values, dict):
+        return ["The attributes must be an object of attribute codes and values."]
+    declared = {str(entry["code"]): entry for entry in schema}
+    errors: list[str] = []
+    for code, entry in declared.items():
+        if code not in values:
+            if entry.get("required", False):
+                errors.append(f"{code} is required.")
+            continue
+        error = _kind_error(code, str(entry["kind"]), values[code])
+        if error:
+            errors.append(error)
+    errors.extend(
+        f"{code} is not an attribute of this taxonomy." for code in values if code not in declared
+    )
     return errors

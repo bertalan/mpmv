@@ -35,9 +35,9 @@ updates:
     labels: [dependencies, github-actions]
     commit-message:
       prefix: OPS.4
+    # Dependabot supports semver-specific cooldowns only for some ecosystems (not this one).
     cooldown:
       default-days: 5
-      semver-major-days: 14
     groups:
       actions-minor-patch:
         applies-to: version-updates
@@ -54,9 +54,9 @@ updates:
     labels: [dependencies, docker]
     commit-message:
       prefix: OPS.4
+    # Dependabot supports semver-specific cooldowns only for some ecosystems (not this one).
     cooldown:
       default-days: 5
-      semver-major-days: 14
     ignore:
       # A new Python minor also changes requires-python, .python-version and CI: a planned task.
       - dependency-name: "*python"

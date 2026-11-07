@@ -13,11 +13,13 @@ from django.contrib import admin
 from django.db import models
 from django.forms.models import BaseInlineFormSet
 from django.http import HttpRequest
+from treebeard.forms import TreeNodeChoiceField
 
 from apps.core.audit import audit_context
 
 from . import engine
-from .models import Product, ProductTranslation, Variant, VariantTranslation
+from . import taxonomy_admin as taxonomy_admin  # registers the CAT.2 admins
+from .models import Category, Product, ProductTranslation, Term, Variant, VariantTranslation
 from .services import (
     PRODUCT_PRICE_FIELDS,
     VARIANT_PRICE_FIELDS,
@@ -119,12 +121,36 @@ class ProductAdmin(admin.ModelAdmin[Product]):
         ),
         ("Stock", {"fields": ("stock_policy", "stock_qty", "stock_status")}),
         ("Shipping", {"fields": ("weight_kg", "length_cm", "width_cm", "height_cm")}),
+        (
+            "Classification",
+            {"fields": ("category", "secondary_categories", "brand", "terms")},
+        ),
         ("Identifiers", {"fields": ("gtin", "google_category_id")}),
         ("Related products", {"fields": ("required_companion", "upsells")}),
         ("Migration", {"fields": ("legacy_wp_id_en", "legacy_wp_id_it")}),
         ("Dates", {"fields": ("created_at", "updated_at")}),
     )
     inlines = (ProductTranslationInline, VariantInline)
+
+    def formfield_for_foreignkey(
+        self, db_field: models.ForeignKey[Any, Any], request: HttpRequest, **kwargs: Any
+    ) -> forms.ModelChoiceField[Any] | None:
+        if db_field.name == "category":
+            # The tree in order, children indented under their parent.
+            kwargs["form_class"] = TreeNodeChoiceField
+            kwargs["queryset"] = Category.objects.prefetch_related("translations")
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def formfield_for_manytomany(
+        self, db_field: models.ManyToManyField[Any, Any], request: HttpRequest, **kwargs: Any
+    ) -> forms.ModelMultipleChoiceField[Any] | None:
+        if db_field.name == "secondary_categories":
+            kwargs["queryset"] = Category.objects.prefetch_related("translations")
+        elif db_field.name == "terms":
+            kwargs["queryset"] = Term.objects.select_related("taxonomy").prefetch_related(
+                "translations"
+            )
+        return super().formfield_for_manytomany(db_field, request, **kwargs)
 
     def save_model(
         self, request: HttpRequest, obj: Product, form: forms.ModelForm[Product], change: bool

@@ -1,21 +1,22 @@
 """Core services: the dry-run + audit pattern shared by all mutating services (spec 01
-conventions), the platform operator, the worker heartbeat, throttle counters and the rotation of
-field encryption keys."""
+conventions), the platform operator, feature flags, the worker heartbeat, throttle counters and
+the rotation of field encryption keys."""
 
 import datetime as dt
 from collections import defaultdict
 from collections.abc import Callable
 from typing import Any
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import connection, transaction
 from django.db.models import F, Model, Q
 from django.utils import timezone
 
-from . import crypto, encryption
+from . import crypto, encryption, flags
 from .audit import AuditContext, record
 from .changeset import ChangeSet
-from .models import Heartbeat, PlatformOperator, Throttle
+from .models import VENDOR_OVERRIDES, FeatureFlag, Heartbeat, PlatformOperator, Throttle
 from .throttling import BackoffPolicy, ThrottleState, after_failure
 from .validity import NoValidRow, OverlappingValidity, next_start_error, pick_valid
 
@@ -169,6 +170,84 @@ def configure_platform_operator(
         new.save()
 
     return run_mutation(changeset, apply, ctx=ctx, action=OPERATOR_CONFIGURED, dry_run=dry_run)
+
+
+# --- Feature flags and kill switches (ARC.8, docs/dev/feature-flags.md)
+
+FLAG_MODEL = "core.featureflag"
+FLAG_CREATED = "core.feature_flag.created"
+FLAG_UPDATED = "core.feature_flag.updated"
+FLAG_FIELDS = ("name", "state", "note")
+
+# This process's copy of the stored switches, kept FEATURE_FLAGS_CACHE_SECONDS (0: no cache).
+FLAG_CACHE: flags.TtlCache[flags.FlagSnapshot] = flags.TtlCache()
+
+
+def flag_snapshot(flag: FeatureFlag) -> dict[str, Any]:
+    return {name: getattr(flag, name) for name in FLAG_FIELDS}
+
+
+def load_flags() -> flags.FlagSnapshot:
+    """Every staff switch and vendor override, as stored now (two small queries)."""
+    rows = FeatureFlag.objects.filter(**{f"{VENDOR_OVERRIDES}__isnull": False}).values_list(
+        "name", f"{VENDOR_OVERRIDES}__vendor_id", f"{VENDOR_OVERRIDES}__enabled"
+    )
+    return flags.FlagSnapshot(
+        states=dict(FeatureFlag.objects.values_list("name", "state")),
+        vendor_overrides={(name, vendor_id): enabled for name, vendor_id, enabled in rows},
+    )
+
+
+def environment_default(name: str) -> bool | None:
+    """This environment's default for `name` (`settings.FEATURE_FLAGS`), None when unset."""
+    value = settings.FEATURE_FLAGS.get(name)
+    return None if value is None else bool(value)
+
+
+def flag_enabled(name: str, vendor: Model | None = None) -> bool:
+    """Is the flag `name` on, for the platform or for `vendor` (a `Vendor`)?
+
+    The one helper code uses to read flags and kill switches, e.g.
+    `if not flag_enabled(flags.CHECKOUT, vendor=vendor): refuse`. Raises `UnknownFlag` for a name
+    nobody registered. Stored switches are cached per process for
+    `settings.FEATURE_FLAGS_CACHE_SECONDS`, so a change reaches every process within that time.
+    """
+    spec = flags.spec_of(name)
+    snapshot = FLAG_CACHE.get(load_flags, ttl=settings.FEATURE_FLAGS_CACHE_SECONDS)
+    return snapshot.enabled(
+        spec,
+        environment=environment_default(name),
+        vendor_id=None if vendor is None else vendor.pk,
+    )
+
+
+def flags_changed() -> None:
+    """Drop this process's cached flags once the current transaction commits.
+
+    Other processes reload within the TTL. Called by every service that writes switches or
+    overrides.
+    """
+    transaction.on_commit(FLAG_CACHE.clear)
+
+
+def save_flag(flag: FeatureFlag, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Create or change the staff switch of a registered flag (validated, audited).
+
+    Raises `ValidationError` for an unregistered name or an unknown state.
+    """
+    flag.full_clean()
+    changeset = save_audited(
+        flag,
+        flag_snapshot,
+        key=str(flag.public_id),
+        ctx=ctx,
+        created=FLAG_CREATED,
+        updated=FLAG_UPDATED,
+        dry_run=dry_run,
+    )
+    if not dry_run:
+        flags_changed()
+    return changeset
 
 
 # --- Worker heartbeat (ARC.9)
