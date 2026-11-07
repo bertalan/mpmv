@@ -3,19 +3,20 @@
 Zone matching and precedence live here (spec 06 §6.2): a vendor's own zone wins over platform
 zones for that vendor, then the lowest priority, then the most specific match (postcode >
 province > explicit country > country group), and the rest of the world (`*`) only as a last
-resort. SHP.2 adds the legacy regression cases 1-7 on top; the quote calculation (SHP.3) also
-lives here when that task adds it.
+resort. SHP.2 checks the legacy regression cases 1-7 against these functions, normalises the
+destination country once (`EL` -> `GR`, `UK` -> `GB`) and parses a zone's postcode patterns once,
+when its snapshot is built. The quote calculation (SHP.3) also lives here when that task adds it.
 """
 
 import re
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import IntEnum
 from typing import Final
 
 from apps.core.countries import normalize_country
-from apps.core.postcodes import match_postcode
+from apps.core.postcodes import PostcodePattern, normalize_postcode, parse_postcode_pattern
 
 # "Rest of the world" in `ShippingZone.countries`: only alone, and only as a last resort.
 WORLD: Final = "*"
@@ -106,9 +107,17 @@ class Specificity(IntEnum):
 
 @dataclass(frozen=True)
 class Destination:
+    """Where a package goes. The country is normalised here, the one place every match goes
+    through: an ISO alpha-2 code (`EL` -> `GR`, `UK` -> `GB`), or InvalidCountry. The province is
+    compared upper case."""
+
     country: str
     postcode: str = ""
     state: str = ""
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "country", normalize_country(self.country))
+        object.__setattr__(self, "state", self.state.strip().upper())
 
 
 @dataclass(frozen=True)
@@ -123,6 +132,13 @@ class ZoneSnap:
     postcode_patterns: tuple[str, ...] = ()
     states: tuple[str, ...] = ()
     vendor_id: int | None = None
+    # Parsed once when the snapshot is built, never per address; a malformed pattern is refused
+    # here (InvalidPostcodePattern). Derived from `postcode_patterns`, so not compared.
+    parsed_patterns: tuple[PostcodePattern, ...] = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        parsed = tuple(parse_postcode_pattern(raw) for raw in self.postcode_patterns)
+        object.__setattr__(self, "parsed_patterns", parsed)
 
     @property
     def is_world(self) -> bool:
@@ -136,15 +152,15 @@ def zone_match(zone: ZoneSnap, dest: Destination) -> Specificity | None:
     address matches when its postcode matches a pattern or its province is listed. An address
     without a postcode never matches a postcode-only zone (case 5).
     """
-    country = dest.country.strip().upper()
-    in_countries = country in zone.countries
-    in_groups = country in zone.group_countries
+    in_countries = dest.country in zone.countries
+    in_groups = dest.country in zone.group_countries
     if not (zone.is_world or in_countries or in_groups):
         return None
-    if zone.postcode_patterns or zone.states:
-        if dest.postcode and any(match_postcode(p, dest.postcode) for p in zone.postcode_patterns):
+    if zone.parsed_patterns or zone.states:
+        code = normalize_postcode(dest.postcode)
+        if code and any(pattern.matches_normalized(code) for pattern in zone.parsed_patterns):
             return Specificity.POSTCODE
-        if dest.state.strip() and dest.state.strip().upper() in zone.states:
+        if dest.state and dest.state in zone.states:
             return Specificity.PROVINCE
         return None
     if in_countries:
