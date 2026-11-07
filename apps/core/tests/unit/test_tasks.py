@@ -141,3 +141,9 @@ def test_an_every_few_minutes_schedule_follows_real_time_through_the_repeated_ho
     since = dt.datetime(2026, 10, 24, 23, 55, tzinfo=dt.UTC)  # 01:55 CEST
     ticks = _ticks("core.heartbeat", since=since, until=since + dt.timedelta(hours=2))
     assert ticks == [since + dt.timedelta(minutes=5 * n) for n in range(1, 25)]
+
+
+def test_expired_throttles_are_purged_every_night_in_business_time() -> None:
+    purge = {s.task_name: s for s in schedules()}["core.purge_throttles"]
+    assert purge.cron == "17 4 * * *"
+    assert purge.time_zone == "Europe/Rome"

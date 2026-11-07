@@ -124,3 +124,21 @@ def test_network_and_volume_names_are_prefixed() -> None:
         names = values(parse_unit(path.read_text()), "Volume", "VolumeName")
         assert names, path.name
         assert names[0].startswith("mpmv-"), path.name
+
+
+def env_example() -> dict[str, str]:
+    lines = (ROOT / "deploy" / "server" / "mpmv.env.example").read_text().splitlines()
+    pairs = (line.split("=", 1) for line in lines if "=" in line and not line.startswith("#"))
+    return {key.strip(): value.strip() for key, value in pairs}
+
+
+def test_the_app_trusts_the_client_ip_header_only_from_the_proxy_network() -> None:
+    """CORE.5: behind Caddy every request comes from Caddy's address. The app must read the
+    client IP from the header Caddy overwrites, and only from the mpmv-net subnet."""
+    env = env_example()
+    subnets = values(load("mpmv.network"), "Network", "Subnet")
+    assert subnets
+    assert env["MPMV_TRUSTED_PROXIES"].split(",") == subnets
+    header = env["MPMV_TRUSTED_PROXY_HEADER"]
+    caddyfile = (ROOT / "deploy" / "caddy" / "Caddyfile").read_text()
+    assert re.search(rf"^\s*header_up {re.escape(header)} \{{client_ip\}}$", caddyfile, re.M)

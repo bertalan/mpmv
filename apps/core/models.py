@@ -181,6 +181,25 @@ class Heartbeat(BaseModel):
         return f"{self.name} ({self.beats} beats, last {self.last_beat_at:%Y-%m-%d %H:%M})"
 
 
+class Throttle(BaseModel):
+    """Failure counter of one throttle key, for progressive lockout and rate limits (CORE.5).
+
+    Kept in PostgreSQL, the only datastore (ADR-0001): every gunicorn worker and container sees
+    the same counters, they survive restarts, and `select_for_update` makes each increment
+    atomic. A process-local cache would let an attacker multiply the budget by the number of
+    workers, and Django's database cache has no atomic increment. Only failures write here,
+    so the load is small. Expired rows are purged nightly (`core.purge_throttles`).
+    """
+
+    key = models.CharField(max_length=320, unique=True)
+    failures = models.PositiveIntegerField(default=0)
+    locked_until = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(db_index=True)
+
+    def __str__(self) -> str:
+        return f"{self.key} ({self.failures} failures)"
+
+
 class AuditLog(models.Model):
     """Who changed what, before/after, and from where. Append-only (DB trigger + save guard).
 

@@ -1,17 +1,20 @@
-"""System checks for the TranslationModel reuse contract (I18N.2).
+"""System checks registered in `CoreConfig.ready`.
 
-Registered in `CoreConfig.ready`, so `manage.py check` (and `make check`) fails when a
-`*Translation` table, e.g. a new catalog one, does not follow the contract.
+- The TranslationModel reuse contract (I18N.2): `manage.py check` (and `make check`) fails when
+  a `*Translation` table, e.g. a new catalog one, does not follow it (core.E101 to E104).
+- The client IP settings (CORE.5): core.E001, core.E002 and the deploy warning core.W001.
 """
 
 from collections.abc import Iterable
 from typing import Any
 
 from django.apps import AppConfig, apps
+from django.conf import settings
 from django.core import checks
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models
 
+from .http import trusted_proxy_networks
 from .models import TranslationModel
 
 # Workflow fields of the base model: never translated texts.
@@ -101,3 +104,51 @@ def translation_models(
         if issubclass(model, TranslationModel):
             errors.extend(check_translation_model(model))
     return errors
+
+
+def check_client_ip_settings(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """A trusted header needs the proxies it is trusted from, given as addresses or networks."""
+    if not settings.TRUSTED_PROXY_HEADER:
+        return []
+    proxies = tuple(settings.TRUSTED_PROXIES)
+    if not proxies:
+        return [
+            checks.Error(
+                "TRUSTED_PROXY_HEADER is set but TRUSTED_PROXIES is empty.",
+                hint="Set MPMV_TRUSTED_PROXIES to the reverse proxy's network (10.89.250.0/24).",
+                id="core.E001",
+            )
+        ]
+    try:
+        trusted_proxy_networks(proxies)
+    except ValueError as error:
+        return [
+            checks.Error(
+                f"TRUSTED_PROXIES has an entry that is not an IP address or network: {error}.",
+                hint="List addresses or CIDR networks, comma separated, never host names.",
+                id="core.E002",
+            )
+        ]
+    return []
+
+
+def check_trusted_proxy_for_deploy(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """Behind a reverse proxy, REMOTE_ADDR is the proxy: all clients share one IP throttle."""
+    if settings.TRUSTED_PROXY_HEADER:
+        return []
+    return [
+        checks.Warning(
+            "TRUSTED_PROXY_HEADER is not set, so the client IP is REMOTE_ADDR.",
+            hint=(
+                "Behind a reverse proxy every client then shares the proxy's address, and the "
+                "per-IP login lockout and registration limit apply to the whole site. Set "
+                "MPMV_TRUSTED_PROXY_HEADER and MPMV_TRUSTED_PROXIES as in "
+                "deploy/server/mpmv.env.example."
+            ),
+            id="core.W001",
+        )
+    ]

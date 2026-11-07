@@ -395,3 +395,12 @@ def heartbeat(timestamp: int) -> None:
         beat.beats,
         scheduled_for.astimezone(business_tz()).isoformat(),
     )
+
+
+@periodic("17 4 * * *")
+@locked()
+@task("core.purge_throttles", retry=NO_RETRY)
+def purge_throttles(timestamp: int) -> None:
+    """Every night: delete throttle counters whose lock and quiet period are over (CORE.5)."""
+    deleted = services.purge_expired_throttles()
+    logger.info("core.purge_throttles deleted %d expired rows", deleted)

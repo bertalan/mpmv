@@ -1,5 +1,5 @@
 """Core services: the dry-run + audit pattern shared by all mutating services (spec 01
-conventions), the platform operator and the worker heartbeat."""
+conventions), the platform operator, the worker heartbeat and throttle counters."""
 
 import datetime as dt
 from collections.abc import Callable
@@ -12,7 +12,8 @@ from django.utils import timezone
 
 from .audit import AuditContext, record
 from .changeset import ChangeSet
-from .models import Heartbeat, PlatformOperator
+from .models import Heartbeat, PlatformOperator, Throttle
+from .throttling import BackoffPolicy, ThrottleState, after_failure
 from .validity import NoValidRow, OverlappingValidity, pick_valid
 
 
@@ -145,3 +146,51 @@ def record_heartbeat(name: str, *, scheduled_for: dt.datetime | None = None) -> 
     )
     beat.refresh_from_db()
     return beat
+
+
+# --- Throttling (CORE.5)
+# Operational counters, not domain changes: no ChangeSet or dry-run. Callers audit the lockouts
+# they care about (see apps.accounts.services).
+
+
+def _state_of(row: Throttle | None, now: dt.datetime) -> ThrottleState:
+    if row is None:
+        return ThrottleState()
+    state = ThrottleState(
+        failures=row.failures, locked_until=row.locked_until, expires_at=row.expires_at
+    )
+    return ThrottleState() if state.is_expired(now) else state
+
+
+def throttle_state(key: str, *, now: dt.datetime | None = None) -> ThrottleState:
+    """The current state of `key`; a clean state when the key is unknown or expired."""
+    return _state_of(Throttle.objects.filter(key=key).first(), now or timezone.now())
+
+
+def record_throttle_failure(
+    key: str, policy: BackoffPolicy, *, now: dt.datetime | None = None
+) -> tuple[ThrottleState, ThrottleState]:
+    """Count one failure for `key` atomically; return the state before and after it."""
+    now = now or timezone.now()
+    with transaction.atomic():
+        row, _ = Throttle.objects.select_for_update().get_or_create(
+            key=key, defaults={"expires_at": now}
+        )
+        before = _state_of(row, now)
+        after = after_failure(before, now, policy)
+        row.failures = after.failures
+        row.locked_until = after.locked_until
+        row.expires_at = after.expires_at or now
+        row.save(update_fields=["failures", "locked_until", "expires_at", "updated_at"])
+    return before, after
+
+
+def clear_throttle(key: str) -> None:
+    """Forget every failure of `key` (e.g. after a successful login)."""
+    Throttle.objects.filter(key=key).delete()
+
+
+def purge_expired_throttles(*, now: dt.datetime | None = None) -> int:
+    """Delete the rows nobody needs any more; return how many were deleted."""
+    deleted, _ = Throttle.objects.filter(expires_at__lte=now or timezone.now()).delete()
+    return deleted

@@ -7,6 +7,7 @@ from django.db.models import QuerySet
 from django.http import HttpRequest
 
 from apps.core.audit import AuditContext
+from apps.core.http import client_ip
 
 from . import engine
 from .models import Vendor, VendorStatus, VendorTranslation
@@ -21,7 +22,7 @@ def audit_context(request: HttpRequest) -> AuditContext:
         actor_id=user.pk,
         actor_label=f"staff:{user.get_username()}",
         source="admin",
-        ip=request.META.get("REMOTE_ADDR"),
+        ip=client_ip(request),
     )
 
 

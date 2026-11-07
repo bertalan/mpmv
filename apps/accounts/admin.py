@@ -7,6 +7,9 @@ from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
 from .models import User
 
+# The admin login renders the Turnstile widget when the captcha is enabled (CORE.5).
+admin.site.login_template = "accounts/admin/login.html"
+
 
 @admin.register(User)
 class UserAdmin(DjangoUserAdmin[User]):

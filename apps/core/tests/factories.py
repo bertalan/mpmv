@@ -6,7 +6,7 @@ import factory
 from django.utils import timezone
 from factory.django import DjangoModelFactory
 
-from apps.core.models import AuditLog, Heartbeat, PlatformOperator
+from apps.core.models import AuditLog, Heartbeat, PlatformOperator, Throttle
 
 
 def utc(year: int, month: int = 1, day: int = 1, hour: int = 0) -> dt.datetime:
@@ -73,3 +73,19 @@ class PlatformOperatorFactory(DjangoModelFactory[PlatformOperator]):
     dac7_authority_country = "AT"
     valid_from = factory.Sequence(lambda n: utc(2027 + n))
     valid_to = factory.LazyAttribute(lambda o: _one_year_later(o.valid_from))
+
+
+class ThrottleFactory(DjangoModelFactory[Throttle]):
+    """A throttle counter below any lock, forgotten in a day (CORE.5).
+
+    Services write the real ones through `record_throttle_failure`; pass `failures`,
+    `locked_until` and `expires_at` explicitly when a test is about locking.
+    """
+
+    class Meta:
+        model = Throttle
+
+    key = factory.Sequence(lambda n: f"test:throttle:{n}")
+    failures = 1
+    locked_until = None
+    expires_at = factory.LazyFunction(lambda: timezone.now() + dt.timedelta(days=1))

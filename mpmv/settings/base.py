@@ -6,7 +6,7 @@ import dj_database_url
 import django_stubs_ext
 from django.utils.csp import CSP
 
-from .env import env_list, env_str
+from .env import env_bool, env_list, env_str
 
 # Allows `models.DecimalField[Any]`-style generics at runtime (django-stubs).
 django_stubs_ext.monkeypatch()
@@ -70,6 +70,11 @@ MIDDLEWARE = [
 
 # Custom user from the first migration (CORE.1): email login, preferred language.
 AUTH_USER_MODEL = "accounts.User"
+# Lockout and captcha checks run first, before any password is checked (CORE.5).
+AUTHENTICATION_BACKENDS = [
+    "apps.accounts.backends.LoginProtectionBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
 
 ROOT_URLCONF = "mpmv.urls"
 WSGI_APPLICATION = "mpmv.wsgi.application"
@@ -141,6 +146,28 @@ SECURE_CSP: dict[str, list[str] | bool] = {
     "frame-ancestors": [CSP.NONE],
     "form-action": [CSP.SELF],
 }
+
+# Client IP for throttles, audit and allow-lists (CORE.5, apps.core.http.client_ip): the header the
+# reverse proxy overwrites with the client address, read only from TRUSTED_PROXIES (addresses or
+# CIDR networks). Empty: REMOTE_ADDR, right when nothing sits in front of the app.
+TRUSTED_PROXY_HEADER = env_str("MPMV_TRUSTED_PROXY_HEADER", "")
+TRUSTED_PROXIES = env_list("MPMV_TRUSTED_PROXIES")
+
+# Bot protection on login and registration forms (CORE.5): Cloudflare Turnstile behind
+# apps.accounts.captcha.CaptchaVerifier. Off unless explicitly enabled; keys from the environment
+# (a system check fails when it is enabled without them).
+CAPTCHA_ENABLED = env_bool("MPMV_CAPTCHA_ENABLED", default=False)
+CAPTCHA_VERIFIER = "apps.accounts.captcha.TurnstileVerifier"
+TURNSTILE_SITE_KEY = env_str("TURNSTILE_SITE_KEY", "")
+TURNSTILE_SECRET_KEY = env_str("TURNSTILE_SECRET_KEY", "")
+if CAPTCHA_ENABLED:
+    _TURNSTILE_ORIGIN = "https://challenges.cloudflare.com"
+    SECURE_CSP = {
+        **SECURE_CSP,
+        "script-src": [*SECURE_CSP["script-src"], _TURNSTILE_ORIGIN],  # type: ignore[misc]
+        "frame-src": [_TURNSTILE_ORIGIN],
+    }
+
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
