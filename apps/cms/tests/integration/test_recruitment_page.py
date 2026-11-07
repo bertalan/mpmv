@@ -53,6 +53,21 @@ def test_without_the_application_form_the_page_shows_a_notice_not_a_link(
     assert ">Apply now</a>" not in html
 
 
+@pytest.mark.parametrize(
+    ("cta_label", "shown"), [("Open your shop", "Open your shop"), ("", "Apply now")]
+)
+def test_with_the_application_form_the_page_links_to_it(
+    client: Client, seeded: SeedReport, monkeypatch: pytest.MonkeyPatch, cta_label: str, shown: str
+) -> None:
+    # VEN.22's route stands in through the service the page asks for the URL.
+    monkeypatch.setattr("apps.cms.services.vendor_application_url", lambda: "/sell/apply/")
+    VendorRecruitmentPageFactory.create(title="Sell with us", cta_label=cta_label)
+
+    html = client.get("/sell-with-us/").content.decode()
+    assert f'<a class="button" href="/sell/apply/">{shown}</a>' in html
+    assert "Applications open soon." not in html
+
+
 def test_the_page_has_no_inline_scripts_or_styles(client: Client, seeded: SeedReport) -> None:
     VendorRecruitmentPageFactory.create(title="Sell with us")
     html = client.get("/sell-with-us/").content.decode()

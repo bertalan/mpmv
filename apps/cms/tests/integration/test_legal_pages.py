@@ -12,10 +12,11 @@ import re
 import secrets
 
 import pytest
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError, transaction
 from django.db.models import ProtectedError
-from django.test import Client
+from django.test import Client, RequestFactory
 from wagtail.models import Locale
 
 from apps.accounts.models import User
@@ -157,6 +158,22 @@ def test_the_translated_page_shows_its_own_effective_date(
     assert '<time datetime="2027-01-01">' not in html
 
 
+def test_an_alias_in_another_language_records_no_version(seeded: SeedReport) -> None:
+    """Wagtail republishes aliases with the source's revision (`page_published(alias=True)`):
+    an alias is not a translation, so it must not get a version with the source's text."""
+    english = _publish(LegalPageFactory.create(title="Terms of sale", live=False))
+    alias = english.copy_for_translation(Locale.objects.get(language_code="it"), alias=True)
+    assert alias.alias_of_id == english.pk
+
+    english.body = [("paragraph", "<p>New terms.</p>")]
+    english.effective_date = dt.date(2027, 6, 1)
+    _publish(english)
+
+    assert english.versions.count() == 2
+    assert not LegalPageVersion.objects.filter(page_id=alias.pk).exists()
+    assert not LegalPageVersion.objects.filter(language_code="it").exists()
+
+
 # --- Append-only archive
 
 
@@ -208,6 +225,30 @@ def test_the_page_shows_the_version_in_force_and_the_archive(
     assert "New terms." not in old
     assert '<time datetime="2027-01-01">' in old
     assert 'href="/terms-of-sale/"' in old
+
+
+def test_a_new_legal_page_can_be_previewed_before_its_first_save(seeded: SeedReport) -> None:
+    """The editor's preview on the "add page" form renders an unsaved page (no primary key)."""
+    home = LegalPageFactory._default_parent()
+    page = LegalPageFactory.build(title="Draft terms", slug="draft-terms", locale=home.locale)
+    # What Wagtail's PreviewOnCreate does: a realistic tree position, nothing saved.
+    page.depth = home.depth + 1
+    page.path = (
+        home.get_last_child()._inc_path()
+        if not home.is_leaf()
+        else page._get_path(home.path, page.depth, 1)
+    )
+    page.set_url_path(home)
+    assert page.pk is None
+
+    request = RequestFactory().get("/")
+    request.user = AnonymousUser()
+    response = page.serve_preview(request, page.default_preview_mode)
+    response.render()
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "<h1>Draft terms</h1>" in html
+    assert "Sample terms." in html
 
 
 def test_an_unknown_version_is_not_found(client: Client, seeded: SeedReport) -> None:
