@@ -222,6 +222,35 @@ def term_attribute_errors(schema: object, values: object) -> list[str]:
 
 ATTRIBUTE_KINDS = ("choice", "number", "text")
 VARIANT_LABEL_SEPARATOR = " / "
+# The columns' precision: ProductAttribute.numeric_value is DecimalField(12, 3), the product
+# weight and a variant's weight override DecimalField(8, 3).
+NUMBER_DIGITS, NUMBER_DECIMALS = 12, 3
+WEIGHT_DIGITS, WEIGHT_DECIMALS = 8, 3
+
+
+def decimal_fit_error(value: Decimal, max_digits: int, decimal_places: int) -> str | None:
+    """Why a finite `value` does not fit a DecimalField(max_digits, decimal_places), or None.
+
+    Too many decimals are refused, not rounded, so what is validated is what is stored.
+    """
+    integer_digits = max_digits - decimal_places
+    if abs(value) >= Decimal(10) ** integer_digits:
+        return f"has more than {integer_digits} digits before the decimal point"
+    if value != value.quantize(Decimal(1).scaleb(-decimal_places)):
+        return f"has more than {decimal_places} decimals"
+    return None
+
+
+def weight_error(value: object) -> str | None:
+    """Why `value` is not a valid weight in kg (None: no weight), or None; ends with a period."""
+    if value is None:
+        return None
+    if not isinstance(value, Decimal) or not value.is_finite():
+        return "needs an exact decimal number."
+    if value < 0:
+        return "cannot be negative."
+    error = decimal_fit_error(value, WEIGHT_DIGITS, WEIGHT_DECIMALS)
+    return None if error is None else f"{error}."
 
 
 @dataclass(frozen=True)
@@ -304,7 +333,8 @@ def _attribute_errors(spec: AttributeSpec, given: AttributeIn) -> list[str]:
             return [f"{code} needs a number."]
         if not isinstance(given.number, Decimal) or not given.number.is_finite():
             return [f"{code} needs an exact decimal number."]
-        return []
+        error = decimal_fit_error(given.number, NUMBER_DIGITS, NUMBER_DECIMALS)
+        return [] if error is None else [f"{code} {error}."]
     if given.values or has_number:
         return [f"{code} takes a text only."]
     return [] if has_text else [f"{code} needs a text."]
