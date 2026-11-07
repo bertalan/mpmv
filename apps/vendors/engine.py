@@ -972,3 +972,119 @@ def mask_iban(iban: str) -> str:
     if len(code) <= 6:
         return "*" * len(code)
     return code[:2] + "*" * (len(code) - 6) + code[-4:]
+
+
+# --- Onboarding (VEN.5): contract acceptance, checklist and activation gate
+#
+# Only the acceptance of the contract in force blocks activation. The DAC7 dataset and the payout
+# data are listed so staff and vendors see what is still missing, but they never block a status
+# change: completeness gates payouts (`assert_payout_allowed`, VEN.12).
+
+CONTRACT: Final = "contract"
+DAC7: Final = "dac7"
+PAYOUT_DATA: Final = "payout_data"
+
+# Statuses whose owners may accept the contract: approved vendors, also to accept a new version.
+ACCEPTING_STATUSES: Final = frozenset({ONBOARDING, ACTIVE, SUSPENDED})
+
+
+class ContractError(ValueError):
+    """A vendor contract operation that the rules refuse."""
+
+
+class NoContract(ContractError):
+    """No contract version (with a published text) is in force."""
+
+
+class ContractNotAcceptable(ContractError):
+    """This user cannot accept the contract for this vendor (status or role)."""
+
+
+class ContractLocked(ContractError):
+    """The contract version has been accepted: it can no longer change. Publish a new version."""
+
+
+def check_can_accept_contract(status: str, role: str | None) -> None:
+    """An owner of an approved vendor accepts the contract on the vendor's behalf."""
+    if status not in ACCEPTING_STATUSES:
+        raise ContractNotAcceptable(f"a vendor in status {status} cannot accept the contract")
+    if role != OWNER:
+        raise ContractNotAcceptable("only an owner of the vendor can accept the contract")
+
+
+def contract_start_error(valid_from: Any, latest_valid_from: Any | None) -> str | None:
+    """Why a new contract version cannot start at `valid_from`, or None: versions start in order."""
+    if latest_valid_from is not None and valid_from <= latest_valid_from:
+        return f"Must be after {latest_valid_from.isoformat()}, the start of the latest version."
+    return None
+
+
+@dataclasses.dataclass(frozen=True)
+class ChecklistItem:
+    """One onboarding step: done or not, whether it blocks activation, and what is missing."""
+
+    key: str
+    done: bool
+    blocking: bool
+    missing: tuple[str, ...] = ()
+
+
+@dataclasses.dataclass(frozen=True)
+class OnboardingChecklist:
+    items: tuple[ChecklistItem, ...]
+
+    @property
+    def blocking_missing(self) -> tuple[str, ...]:
+        """The keys of the blocking steps not done yet."""
+        return tuple(item.key for item in self.items if item.blocking and not item.done)
+
+    @property
+    def ready(self) -> bool:
+        """Every blocking step is done: the vendor can be activated."""
+        return not self.blocking_missing
+
+
+def onboarding_checklist(
+    *,
+    contract_version: int | None,
+    current_contract_version: int | None,
+    dac7_missing: Sequence[str],
+    payout: Completeness,
+) -> OnboardingChecklist:
+    """The onboarding checklist of a vendor.
+
+    `contract_version` is the version the vendor accepted, if it accepted the one in force
+    (`current_contract_version`); the DAC7 and payout items come from `dac7_missing` and the
+    payout `completeness` of the legal profile.
+    """
+    if current_contract_version is None:
+        contract = ChecklistItem(CONTRACT, False, True, ("no contract is in force",))
+    elif contract_version != current_contract_version:
+        contract = ChecklistItem(CONTRACT, False, True, (f"version {current_contract_version}",))
+    else:
+        contract = ChecklistItem(CONTRACT, True, True)
+    return OnboardingChecklist(
+        items=(
+            contract,
+            ChecklistItem(DAC7, not dac7_missing, False, tuple(dac7_missing)),
+            ChecklistItem(PAYOUT_DATA, payout.complete, False, payout.missing + payout.invalid),
+        )
+    )
+
+
+class ActivationNotAllowed(InvalidTransition):
+    """The vendor cannot be activated yet: `blocking` names the onboarding steps not done."""
+
+    def __init__(self, checklist: OnboardingChecklist) -> None:
+        self.blocking = checklist.blocking_missing
+        steps = {item.key: item for item in checklist.items}
+        detail = "; ".join(
+            f"{key} ({', '.join(steps[key].missing)})" if steps[key].missing else key
+            for key in self.blocking
+        )
+        super().__init__(f"the vendor cannot be activated until onboarding is done: {detail}")
+
+
+def check_activation(checklist: OnboardingChecklist) -> None:
+    if not checklist.ready:
+        raise ActivationNotAllowed(checklist)

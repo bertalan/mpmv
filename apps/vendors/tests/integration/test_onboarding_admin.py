@@ -48,7 +48,29 @@ def test_staff_add_a_contract_version_with_its_texts(staff_client: Client) -> No
     assert contract.translations.get().title == "Vendor agreement"
     entry = AuditLog.objects.get(action="vendor.contract_saved")
     assert entry.source == "admin"
-    assert entry.after["version"] == 1
+    assert entry.after == {
+        "version": 1,
+        "valid_from": "2026-01-01T00:00:00+00:00",
+        "note": "Launch terms",
+    }
+
+
+def test_a_version_starting_before_the_latest_one_is_a_form_error(staff_client: Client) -> None:
+    VendorContractFactory.create()  # in force since yesterday
+    response = staff_client.post(
+        reverse("admin:vendors_vendorcontract_add"),
+        {
+            "valid_from_0": "2020-01-01",
+            "valid_from_1": "00:00:00",
+            "translations-TOTAL_FORMS": "0",
+            "translations-INITIAL_FORMS": "0",
+            "translations-MIN_NUM_FORMS": "0",
+            "translations-MAX_NUM_FORMS": "1000",
+        },
+    )
+    assert response.status_code == 200
+    assert "the start of the latest version" in response.content.decode()
+    assert VendorContract.objects.count() == 1
 
 
 def test_an_accepted_contract_is_read_only_in_the_admin(staff_client: Client) -> None:

@@ -35,6 +35,7 @@ vendor's change page links to its trail (`?vendor=<public id>`).
 | Users and permissions (admin) | `accounts.user.created`, `.updated`, `.deleted`, `.password_changed`, `.access_changed`; `auth.group.created`, `.updated`, `.deleted`, `.access_changed` |
 | API keys (CORE.6) | `api.client.issued`, `.rotated`, `.revoked` |
 | Vendors (VEN.1, CORE.2, VEN.12) | `vendor.created`, `.updated` (legal identity included, IBAN and tax code masked: they are encrypted at rest, SEC.3), `.deleted`, `.status_changed`, `.vat_checked`, `.member_added`, `.member_role_changed`, `.member_removed`; `vendor.legal_requirement_saved`, `.legal_requirement_deleted` |
+| Vendor onboarding (VEN.5) | `vendor.application_submitted` (the applicant vendor and its owner membership), `vendor.contract_saved` (contract versions), `vendor.contract_accepted` (who, which version, language, text hash, IP; the acceptance rows are append-only too) |
 | Platform configuration (ARC.7) | `core.platform_operator.configured` |
 | Field encryption keys (SEC.3) | `core.field_keys.rotated` (one per object, key ids only; see [field-encryption.md](field-encryption.md)) |
 | Product prices (CAT.1) | `catalog.product.price_changed`, `catalog.variant.price_changed` |

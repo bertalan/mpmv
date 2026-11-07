@@ -135,6 +135,7 @@ def test_staff_publish_contract_versions_one_after_the_other() -> None:
     assert entry is not None
     assert entry.target_model == "vendors.vendorcontract"
     assert entry.target_key == str(second.public_id)
+    assert entry.after is not None
     assert entry.after["version"] == 2
     assert entry.after["note"] == "New fees"
     assert entry.vendor_key == ""  # platform configuration, not one vendor's data
@@ -147,6 +148,20 @@ def test_a_new_version_must_start_after_the_latest_one() -> None:
         save_contract(VendorContract(valid_from=now - dt.timedelta(days=1)), ctx=STAFF_CTX)
     assert "valid_from" in exc_info.value.message_dict
     assert VendorContract.objects.count() == 1
+
+
+def test_a_draft_cannot_move_before_the_previous_or_after_the_next_version() -> None:
+    now = timezone.now()
+    first = VendorContractFactory.create(valid_from=now - dt.timedelta(days=10))
+    draft = VendorContractFactory.create(valid_from=now + dt.timedelta(days=10))
+    VendorContractFactory.create(valid_from=now + dt.timedelta(days=20))
+    for start in (first.valid_from, now + dt.timedelta(days=20)):
+        draft.valid_from = start
+        with pytest.raises(ValidationError) as exc_info:
+            save_contract(draft, ctx=STAFF_CTX)
+        assert "valid_from" in exc_info.value.message_dict
+    draft.valid_from = now + dt.timedelta(days=15)
+    save_contract(draft, ctx=STAFF_CTX)
 
 
 def test_a_contract_dry_run_saves_nothing() -> None:
@@ -172,6 +187,8 @@ def test_a_draft_version_can_be_edited_and_the_edit_is_audited() -> None:
     contract.note = "Final"
     save_contract(contract, ctx=STAFF_CTX)
     entry = AuditLog.objects.get(action="vendor.contract_saved")
+    assert entry.before is not None
+    assert entry.after is not None
     assert (entry.before["note"], entry.after["note"]) == ("Draft", "Final")
 
 
@@ -216,6 +233,7 @@ def test_an_owner_accepts_the_current_contract_from_the_request_ip() -> None:
     entry = AuditLog.objects.get(action="vendor.contract_accepted")
     assert entry.target_model == "vendors.contractacceptance"
     assert entry.vendor_key == str(member.vendor.public_id)
+    assert entry.after is not None
     assert entry.after["contract_version"] == contract.version
     assert entry.after["user"] == str(member.user.public_id)
     assert entry.after["ip"] == "203.0.113.7"

@@ -4,7 +4,8 @@
 Fields owned by later tasks are added there: `plan` (VEN.2), `payout_account` (VEN.6),
 `dac7_complete` (CMP.1), `logo` (media/images). Storefront texts follow the shared translation
 workflow (`apps.core.models.TranslationModel`, I18N.2). Which legal fields are required, and for
-what, is data: `LegalFieldRequirement` (VEN.12).
+what, is data: `LegalFieldRequirement` (VEN.12). The versioned vendor contract and its
+append-only acceptances are VEN.5.
 """
 
 import dataclasses
@@ -14,7 +15,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
-from apps.core.fields import CountryField, EncryptedCharField, MoneyField
+from apps.core.fields import CountryField, EncryptedCharField, LanguageField, MoneyField
 from apps.core.models import BaseModel, TranslationModel, resolve_translation
 from apps.core.translations import Resolved
 
@@ -508,3 +509,107 @@ class LegalFieldRequirement(BaseModel):
             purpose=self.purpose,
             region=self.region,
         )
+
+
+class VendorContract(BaseModel):
+    """A version of the vendor contract (VEN.5); its texts are `VendorContractTranslation` rows.
+
+    Created and edited through `services.save_contract`, which numbers the versions and keeps
+    their start dates in order. The version in force is the latest one already started
+    (`services.current_contract`). Once a vendor has accepted a version, the version and its
+    texts can no longer change: new terms are a new version.
+    """
+
+    version = models.PositiveIntegerField(unique=True, editable=False)
+    valid_from = models.DateTimeField(help_text="When this version replaces the previous one.")
+    note = models.CharField(max_length=200, blank=True, help_text="Internal: what changed.")
+
+    class Meta:
+        ordering = ["-version"]
+
+    def __str__(self) -> str:
+        return f"Vendor contract v{self.version}"
+
+    def translation(self, language: str) -> "Resolved[VendorContractTranslation]":
+        """The published text in `language`, or the English one with a fallback flag."""
+        return resolve_translation(self.translations.all(), language)
+
+    @property
+    def is_accepted(self) -> bool:
+        return self.pk is not None and self.acceptances.exists()
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if self.is_accepted:
+            raise engine.ContractLocked(f"{self} has been accepted; publish a new version")
+        super().save(*args, **kwargs)
+
+
+class VendorContractTranslation(TranslationModel):
+    """The contract text of one version in one language."""
+
+    translation_of = "contract"
+    translated_fields = ("title", "body")
+
+    contract = models.ForeignKey(
+        VendorContract, on_delete=models.CASCADE, related_name="translations"
+    )
+    title = models.CharField(max_length=200)
+    body = models.TextField()
+
+    class Meta(TranslationModel.Meta):
+        ordering = ["contract", "language"]
+        constraints = [
+            *TranslationModel.Meta.constraints,
+            models.UniqueConstraint(
+                fields=["contract", "language"], name="vendors_contract_text_language_unique"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.contract} [{self.language}]"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if self.contract.is_accepted:
+            raise engine.ContractLocked(f"{self.contract} has been accepted; its texts are final")
+        super().save(*args, **kwargs)
+
+
+class ContractAcceptance(BaseModel):
+    """An owner accepted a contract version for a vendor (VEN.5). Append-only (DB trigger).
+
+    Records who, when, from which IP and which text: the language shown and the hash of its
+    title and body (`apps.core.translations.source_hash`). Written by `services.accept_contract`.
+    """
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
+
+    vendor = models.ForeignKey(
+        Vendor, on_delete=models.PROTECT, related_name="contract_acceptances"
+    )
+    contract = models.ForeignKey(
+        VendorContract, on_delete=models.PROTECT, related_name="acceptances"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="contract_acceptances"
+    )
+    language = LanguageField()
+    text_hash = models.CharField(max_length=64, help_text="SHA-256 of the accepted text.")
+    accepted_at = models.DateTimeField()
+    ip = models.GenericIPAddressField("IP address", null=True, blank=True)
+
+    class Meta:
+        ordering = ["-accepted_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["vendor", "contract"], name="vendors_acceptance_vendor_contract_unique"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.vendor} accepted {self.contract}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self._state.adding:
+            raise PermissionError("ContractAcceptance is append-only")
+        super().save(*args, **kwargs)

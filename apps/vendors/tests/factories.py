@@ -249,8 +249,14 @@ class VendorContractFactory(DjangoModelFactory[VendorContract]):
         model = VendorContract
         skip_postgeneration_save = True
 
-    version = factory.LazyFunction(next_contract_version)
+    version = None  # numbered after the latest version when created
     valid_from = factory.LazyFunction(lambda: timezone.now() - dt.timedelta(days=1))
+
+    @classmethod
+    def _create(cls, model_class: type[VendorContract], *args: Any, **kwargs: Any) -> Any:
+        if kwargs.get("version") is None:
+            kwargs["version"] = next_contract_version()
+        return super()._create(model_class, *args, **kwargs)  # type: ignore[no-untyped-call]
 
     @factory.post_generation
     def languages(
@@ -273,19 +279,32 @@ class VendorContractTranslationFactory(DjangoModelFactory[VendorContractTranslat
 
 
 class ContractAcceptanceFactory(DjangoModelFactory[ContractAcceptance]):
-    """The owner of an onboarding vendor accepted the English text of a contract in force."""
+    """The owner of an onboarding vendor accepted the English text of a contract in force.
+
+    When created, the user becomes an owner of the vendor (unless already a member) and the
+    text hash is the one of the contract's text in `language`.
+    """
 
     class Meta:
         model = ContractAcceptance
+        skip_postgeneration_save = True
 
     vendor = factory.SubFactory(VendorFactory, status=Vendor.Status.ONBOARDING)
     contract = factory.SubFactory(VendorContractFactory)
-    user = factory.LazyAttribute(
-        lambda o: VendorMemberFactory.create(vendor=o.vendor, role=VendorMember.Role.OWNER).user
-    )
+    user = factory.SubFactory(UserFactory)
     language = "en"
-    text_hash = factory.LazyAttribute(
-        lambda o: source_hash(o.contract.translations.get(language=o.language).source_values())
-    )
+    text_hash = ""
     accepted_at = factory.LazyFunction(timezone.now)
     ip = "198.51.100.1"
+
+    @classmethod
+    def _create(cls, model_class: type[ContractAcceptance], *args: Any, **kwargs: Any) -> Any:
+        if not kwargs.get("text_hash"):
+            text = kwargs["contract"].translations.get(language=kwargs["language"])
+            kwargs["text_hash"] = source_hash(text.source_values())
+        return super()._create(model_class, *args, **kwargs)  # type: ignore[no-untyped-call]
+
+    @factory.post_generation
+    def owner(obj: ContractAcceptance, create: bool, extracted: Any, **kwargs: Any) -> None:
+        if create and not VendorMember.objects.filter(vendor=obj.vendor, user=obj.user).exists():
+            VendorMemberFactory.create(vendor=obj.vendor, user=obj.user)

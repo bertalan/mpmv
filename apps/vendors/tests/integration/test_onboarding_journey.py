@@ -83,7 +83,8 @@ def test_a_test_vendor_is_activated_end_to_end(
     # 5. The owner accepts the current contract, in Italian.
     accept_contract(vendor, applicant, language="it", ctx=user_context(applicant, APPLICANT_IP))
     acceptance = ContractAcceptance.objects.get(vendor=vendor)
-    assert (acceptance.contract, acceptance.language, acceptance.ip) == (contract, "it", APPLICANT_IP)
+    assert acceptance.contract == contract
+    assert (acceptance.language, acceptance.ip) == ("it", APPLICANT_IP)
 
     # 6. Staff activate the vendor.
     run_action(staff, "move_to_active", vendor)
@@ -98,7 +99,5 @@ def test_a_test_vendor_is_activated_end_to_end(
         ("vendor.contract_accepted", "vendors.contractacceptance"),
         ("vendor.status_changed", "vendors.vendor"),
     ]
-    assert [entry.after["status"] for entry in trail if entry.action.endswith("status_changed")] == [
-        "onboarding",
-        "active",
-    ]
+    moves = trail.filter(action="vendor.status_changed")
+    assert [(entry.after or {}).get("status") for entry in moves] == ["onboarding", "active"]

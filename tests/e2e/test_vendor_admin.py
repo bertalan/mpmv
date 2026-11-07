@@ -1,5 +1,6 @@
-"""E2E: staff create a vendor with a translation and move it to onboarding (VEN.1), and
-complete its legal identity while the form shows what a payout still needs (VEN.12)."""
+"""E2E: staff create a vendor with a translation and move it to onboarding (VEN.1), complete
+its legal identity while the form shows what a payout still needs (VEN.12), and activate it once
+its owner accepted the contract (VEN.5)."""
 
 import secrets
 from collections.abc import Callable
@@ -13,7 +14,11 @@ from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from apps.core.models import AuditLog
 from apps.vendors.models import Vendor
-from apps.vendors.tests.factories import VendorFactory
+from apps.vendors.tests.factories import (
+    ContractAcceptanceFactory,
+    VendorContractFactory,
+    VendorFactory,
+)
 from apps.vendors.tests.fakes import seed_legal_requirements
 from tests.e2e.login import verify_with_totp
 
@@ -90,3 +95,39 @@ def test_staff_complete_an_incomplete_legal_profile(
     vendor.refresh_from_db()
     assert vendor.iban == "IT60X0542811101000000123456"
     assert AuditLog.objects.filter(action="vendor.updated").count() == 2
+
+
+def test_staff_activate_a_vendor_once_the_contract_is_accepted(
+    page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+) -> None:
+    """VEN.5: the checklist on the vendor page; activation waits for the contract only."""
+    contract = VendorContractFactory.create()
+    vendor = VendorFactory.create(status=Vendor.Status.ONBOARDING)
+    staff_login(page, live_server)
+
+    page.goto(f"{live_server.url}/django-admin/vendors/vendor/{vendor.pk}/change/")
+    checklist = page.locator(".field-onboarding")
+    expect(checklist).to_contain_text(f"Contract version {contract.version}: not accepted")
+    expect(checklist).to_contain_text("Not ready to activate")
+    shot("checklist")
+
+    page.goto(f"{live_server.url}/django-admin/vendors/vendor/")
+    page.locator("input[name='_selected_action']").first.check()
+    page.locator("select[name='action']").select_option("move_to_active")
+    page.get_by_role("button", name="Run").click()
+    expect(page.locator(".messagelist")).to_contain_text("cannot be activated")
+    shot("refused")
+
+    ContractAcceptanceFactory.create(vendor=vendor, contract=contract)  # the owner accepted
+    page.goto(f"{live_server.url}/django-admin/vendors/vendor/{vendor.pk}/change/")
+    expect(page.locator(".field-onboarding")).to_contain_text("Ready to activate")
+
+    page.goto(f"{live_server.url}/django-admin/vendors/vendor/")
+    page.locator("input[name='_selected_action']").first.check()
+    page.locator("select[name='action']").select_option("move_to_active")
+    page.get_by_role("button", name="Run").click()
+    expect(page.locator(".messagelist")).to_contain_text("moved to active")
+    shot("active")
+
+    vendor.refresh_from_db()
+    assert vendor.status == Vendor.Status.ACTIVE

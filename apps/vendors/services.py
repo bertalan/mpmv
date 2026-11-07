@@ -1,10 +1,13 @@
 """Vendor services: vendor data and status changes (VEN.1, SEC.4), memberships with their
-permissions (CORE.2) and the legal identity with its payout requirements (VEN.12)."""
+permissions (CORE.2), the legal identity with its payout requirements (VEN.12) and onboarding:
+application, versioned contract, acceptance and the activation gate (VEN.5)."""
 
+import datetime as dt
 from typing import Any
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
@@ -12,9 +15,10 @@ from apps.accounts.models import User
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.services import audit_changes, run_mutation
+from apps.core.translations import source_hash
 
 from . import engine
-from .models import LegalFieldRequirement, Vendor, VendorMember
+from .models import ContractAcceptance, LegalFieldRequirement, Vendor, VendorContract, VendorMember
 from .vies import VatNumberValidator
 
 STATUS_CHANGED = "vendor.status_changed"
@@ -107,13 +111,17 @@ def change_status(
     """Move `vendor` to `target` if the state machine allows it; audit the change.
 
     The check runs against the stored status (row locked), never a possibly stale instance.
-    Raises `engine.InvalidTransition`, also on dry-run.
+    Activating an onboarding vendor also needs its onboarding checklist (VEN.5): the contract in
+    force must be accepted. Raises `engine.InvalidTransition` (`engine.ActivationNotAllowed`
+    for the checklist), also on dry-run.
     """
     with transaction.atomic():
         current = (
             Vendor.objects.select_for_update().only("status", "slug", "public_id").get(pk=vendor.pk)
         )
         engine.check_transition(current.status, target)
+        if current.status == engine.ONBOARDING and target == engine.ACTIVE:
+            engine.check_activation(onboarding_checklist(current))
 
         # Keyed by public_id: the slug is editable and can be reused by another vendor, so it
         # would not identify the vendor across its audit history. The slug is kept for reading.
@@ -393,3 +401,181 @@ def delete_requirement(
         requirement.delete()
 
     return run_mutation(changes, apply, ctx=ctx, action=REQUIREMENT_DELETED, dry_run=dry_run)
+
+
+# --- Onboarding (VEN.5): application, versioned contract, acceptance, checklist
+#
+# Application → staff review (`change_status`: onboarding, or closed for a rejection) →
+# onboarding (contract acceptance; DAC7 and payout data listed, gated at payout time) →
+# activation by staff (`change_status`, gated by `onboarding_checklist`).
+
+APPLICATION_SUBMITTED = "vendor.application_submitted"
+CONTRACT_MODEL = "vendors.vendorcontract"
+CONTRACT_SAVED = "vendor.contract_saved"
+ACCEPTANCE_MODEL = "vendors.contractacceptance"
+CONTRACT_ACCEPTED = "vendor.contract_accepted"
+
+
+def submit_application(
+    vendor: Vendor, applicant: User, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Create `vendor` (new, unsaved) as an applicant with `applicant` as its owner; audited.
+
+    The application data is validated like any vendor profile (`full_clean`); legal data may be
+    incomplete. Being an owner, the applicant must enrol a second factor (CORE.4). Raises
+    `ValidationError`, or `ValueError` for a saved vendor or an inactive user, also on dry-run.
+    """
+    if not vendor._state.adding:
+        raise ValueError("submit_application takes a new vendor, not a saved one")
+    if not applicant.is_active:
+        raise ValueError("only an active user can apply as a vendor")
+    vendor.status = engine.APPLICANT
+    vendor.normalize()
+    vendor.full_clean()
+    member = VendorMember(vendor=vendor, user=applicant, role=engine.OWNER)
+    changes = ChangeSet()
+    changes.create(MODEL_LABEL, str(vendor.public_id), vendor_snapshot(vendor))
+    changes.create(MEMBER_MODEL, str(member.public_id), member_snapshot(member))
+
+    def apply() -> None:
+        vendor.save()
+        member.vendor = vendor
+        member.save()
+
+    return run_mutation(changes, apply, ctx=ctx, action=APPLICATION_SUBMITTED, dry_run=dry_run)
+
+
+def current_contract(at: dt.datetime | None = None) -> VendorContract | None:
+    """The contract version in force at `at` (default: now): the latest one already started."""
+    started = VendorContract.objects.filter(valid_from__lte=at or timezone.now())
+    return started.order_by("-version").first()
+
+
+def contract_snapshot(contract: VendorContract) -> dict[str, Any]:
+    return {"version": contract.version, "valid_from": contract.valid_from, "note": contract.note}
+
+
+def check_contract_start(contract: VendorContract) -> None:
+    """Versions start in order: after the previous version and before the next one.
+
+    A new contract (no version yet) is checked against the latest one. Raises `ValidationError`
+    on `valid_from`.
+    """
+    others = VendorContract.objects.exclude(pk=contract.pk)
+    following = None
+    if contract.version is None:
+        previous = others.order_by("-version").first()
+    else:
+        previous = others.filter(version__lt=contract.version).order_by("-version").first()
+        following = others.filter(version__gt=contract.version).order_by("version").first()
+    error = engine.contract_start_error(
+        contract.valid_from, previous.valid_from if previous else None
+    )
+    if error is None and following is not None and contract.valid_from >= following.valid_from:
+        error = (
+            f"Must be before {following.valid_from.isoformat()}, "
+            f"the start of version {following.version}."
+        )
+    if error:
+        raise ValidationError({"valid_from": error})
+
+
+def save_contract(
+    contract: VendorContract, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Create the next contract version, or edit one nobody has accepted yet; audited.
+
+    New versions are numbered after the latest one and must start after it. Raises
+    `ValidationError`, or `engine.ContractLocked` for an accepted version, also on dry-run.
+    """
+    contract.full_clean(exclude={"version"})
+    key = str(contract.public_id)
+    changes = ChangeSet()
+    with transaction.atomic():
+        if contract._state.adding:
+            latest = VendorContract.objects.select_for_update().order_by("-version").first()
+            check_contract_start(contract)
+            contract.version = (latest.version if latest else 0) + 1
+            changes.create(CONTRACT_MODEL, key, contract_snapshot(contract))
+        else:
+            stored = VendorContract.objects.select_for_update().get(pk=contract.pk)
+            if stored.is_accepted:
+                raise engine.ContractLocked(f"{stored} has been accepted; publish a new version")
+            check_contract_start(contract)
+            changes.update(
+                CONTRACT_MODEL, key, contract_snapshot(stored), contract_snapshot(contract)
+            )
+        if dry_run:
+            return changes
+        contract.save()
+        audit_changes(changes, ctx=ctx, action=CONTRACT_SAVED)
+    return changes
+
+
+def acceptance_snapshot(acceptance: ContractAcceptance) -> dict[str, Any]:
+    return {
+        "vendor": str(acceptance.vendor.public_id),
+        "contract": str(acceptance.contract.public_id),
+        "contract_version": acceptance.contract.version,
+        "user": str(acceptance.user.public_id),
+        "language": acceptance.language,
+        "text_hash": acceptance.text_hash,
+        "accepted_at": acceptance.accepted_at,
+        "ip": acceptance.ip,
+    }
+
+
+def accept_contract(
+    vendor: Vendor, user: User, *, language: str, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Record that `user`, an owner, accepts the contract in force for `vendor`; audited.
+
+    The text accepted is the published one in `language`, or the English one; the acceptance
+    stores its language and hash, and the IP of `ctx` (`audit_context` takes it from the request
+    through the trusted proxy, `apps.core.http.client_ip`). Accepting a version again changes
+    nothing. Raises `engine.ContractNotAcceptable` (vendor status, not an owner) or
+    `engine.NoContract`, also on dry-run.
+    """
+    with transaction.atomic():
+        locked = Vendor.objects.select_for_update().only("status", "public_id").get(pk=vendor.pk)
+        role = member_role(user, locked) if user.is_active else None
+        engine.check_can_accept_contract(locked.status, role)
+        contract = current_contract()
+        if contract is None:
+            raise engine.NoContract("no vendor contract is in force")
+        text = contract.translation(language).translation
+        if text is None:
+            raise engine.NoContract(f"{contract} has no published text")
+        if ContractAcceptance.objects.filter(vendor=locked, contract=contract).exists():
+            return ChangeSet()
+        acceptance = ContractAcceptance(
+            vendor=locked,
+            contract=contract,
+            user=user,
+            language=text.language,
+            text_hash=source_hash(text.source_values()),
+            accepted_at=timezone.now(),
+            ip=ctx.ip,
+        )
+        changes = ChangeSet()
+        changes.create(ACCEPTANCE_MODEL, str(acceptance.public_id), acceptance_snapshot(acceptance))
+        return run_mutation(
+            changes, acceptance.save, ctx=ctx, action=CONTRACT_ACCEPTED, dry_run=dry_run
+        )
+
+
+def onboarding_checklist(vendor: Vendor) -> engine.OnboardingChecklist:
+    """The stored vendor's onboarding checklist: contract in force accepted (blocks activation),
+    DAC7 dataset and payout data (listed only: VEN.12 gates payouts with them)."""
+    stored = Vendor.objects.get(pk=vendor.pk)
+    contract = current_contract()
+    accepted = (
+        contract is not None
+        and ContractAcceptance.objects.filter(vendor=stored, contract=contract).exists()
+    )
+    return engine.onboarding_checklist(
+        contract_version=contract.version if contract is not None and accepted else None,
+        current_contract_version=contract.version if contract is not None else None,
+        dac7_missing=engine.dac7_missing(stored.legal_identity()),
+        payout=legal_profile_completeness(stored),
+    )
