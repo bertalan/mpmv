@@ -57,6 +57,9 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+# Custom user from the first migration (CORE.1): email login, preferred language.
+AUTH_USER_MODEL = "accounts.User"
+
 ROOT_URLCONF = "mpmv.urls"
 WSGI_APPLICATION = "mpmv.wsgi.application"
 ASGI_APPLICATION = "mpmv.asgi.application"
