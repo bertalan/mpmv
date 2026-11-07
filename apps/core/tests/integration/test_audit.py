@@ -9,6 +9,7 @@ from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.models import AuditLog
 from apps.core.services import run_mutation
+from apps.core.tests.factories import AuditLogFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -36,19 +37,19 @@ def test_record_writes_who_what_before_after_and_where() -> None:
 
 
 def test_audit_rows_cannot_be_updated_even_with_a_raw_queryset() -> None:
-    entry = record(CTX, "x", "m", "k", {}, {"a": 1})
+    entry = AuditLogFactory.create()
     with pytest.raises(DatabaseError, match="append-only"), transaction.atomic():
         AuditLog.objects.filter(pk=entry.pk).update(action="tampered")
 
 
 def test_audit_rows_cannot_be_deleted() -> None:
-    entry = record(CTX, "x", "m", "k", {}, {"a": 1})
+    entry = AuditLogFactory.create()
     with pytest.raises(DatabaseError, match="append-only"), transaction.atomic():
         AuditLog.objects.filter(pk=entry.pk).delete()
 
 
 def test_saving_an_existing_audit_row_is_refused_in_python_too() -> None:
-    entry = record(CTX, "x", "m", "k", {}, {"a": 1})
+    entry = AuditLogFactory.create()
     entry.action = "tampered"
     with pytest.raises(PermissionError):
         entry.save()

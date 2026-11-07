@@ -10,18 +10,20 @@ from django.utils import timezone
 from apps.api.engine import AuthStatus, InvalidApiClient, Reason
 from apps.api.models import ApiClient
 from apps.api.services import (
+    IssuedKey,
     authenticate,
     issue_api_client,
     revoke_api_client,
     rotate_api_key,
 )
+from apps.api.tests.factories import ApiClientFactory
+from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
-
-from .conftest import CTX, IssueFn
 
 pytestmark = pytest.mark.django_db
 
 SCOPE = "catalog:write"
+CTX = AuditContext(actor_id=1, actor_label="staff:ops", source="admin", ip="127.0.0.1")
 
 
 def _bearer(key: str) -> str:
@@ -38,11 +40,24 @@ def _stored_values(client: ApiClient) -> list[str]:
     return [str(v) for v in row.values()]
 
 
+def _issued(issued: IssuedKey) -> tuple[ApiClient, str]:
+    assert issued.client is not None
+    assert issued.key is not None
+    return issued.client, issued.key
+
+
 # --- Issuance
 
 
-def test_issue_stores_only_prefix_and_hash_and_shows_the_key_once(issue: IssueFn) -> None:
-    client, key = issue()
+def test_issue_stores_only_prefix_and_hash_and_shows_the_key_once() -> None:
+    client, key = _issued(
+        issue_api_client(
+            name="Catalog pipeline",
+            scopes=["catalog:write", "stock:write"],
+            expires_at=timezone.now() + dt.timedelta(days=90),
+            ctx=CTX,
+        )
+    )
     prefix, secret = key.split("_", 2)[1:]
     assert client.key_prefix == prefix
     assert client.key_hash != key
@@ -53,8 +68,15 @@ def test_issue_stores_only_prefix_and_hash_and_shows_the_key_once(issue: IssueFn
     assert client.last_used_at is None
 
 
-def test_issue_writes_an_audit_entry_without_hash_or_secret(issue: IssueFn) -> None:
-    client, key = issue()
+def test_issue_writes_an_audit_entry_without_hash_or_secret() -> None:
+    client, key = _issued(
+        issue_api_client(
+            name="Catalog pipeline",
+            scopes=["catalog:write", "stock:write"],
+            expires_at=timezone.now() + dt.timedelta(days=90),
+            ctx=CTX,
+        )
+    )
     entry = AuditLog.objects.get(action="api.client.issued")
     assert entry.target_model == "api.apiclient"
     assert entry.target_key == str(client.public_id)
@@ -107,9 +129,8 @@ def test_issue_refuses_invalid_input_and_writes_nothing(overrides: dict[str, obj
     assert AuditLog.objects.count() == 0
 
 
-def test_key_prefix_is_unique(issue: IssueFn) -> None:
-    client, _ = issue()
-    other, _ = issue(name="Other")
+def test_key_prefix_is_unique() -> None:
+    client, other = ApiClientFactory.create_batch(2)
     with pytest.raises(IntegrityError), transaction.atomic():
         ApiClient.objects.filter(pk=other.pk).update(key_prefix=client.key_prefix)
 
@@ -117,8 +138,8 @@ def test_key_prefix_is_unique(issue: IssueFn) -> None:
 # --- Authentication
 
 
-def test_valid_key_authenticates_and_records_last_use(issue: IssueFn) -> None:
-    client, key = issue()
+def test_valid_key_authenticates_and_records_last_use() -> None:
+    client, key = ApiClientFactory.create_with_key()
     result = authenticate(_bearer(key), ip="203.0.113.7", required_scope=SCOPE)
     assert result.status == AuthStatus.OK
     assert result.http_status == 200
@@ -134,8 +155,8 @@ def test_missing_header_is_401() -> None:
     assert result.client is None
 
 
-def test_wrong_secret_for_an_existing_prefix_is_401(issue: IssueFn) -> None:
-    client, key = issue()
+def test_wrong_secret_for_an_existing_prefix_is_401() -> None:
+    client, key = ApiClientFactory.create_with_key()
     forged = key[:-4] + ("aaaa" if not key.endswith("aaaa") else "bbbb")
     result = authenticate(_bearer(forged), ip=None, required_scope=SCOPE)
     assert (result.http_status, result.reason) == (401, Reason.INVALID)
@@ -144,31 +165,28 @@ def test_wrong_secret_for_an_existing_prefix_is_401(issue: IssueFn) -> None:
     assert client.last_used_at is None
 
 
-def test_unknown_prefix_is_401_with_the_same_reason_as_a_wrong_secret(issue: IssueFn) -> None:
-    _, key = issue()
+def test_unknown_prefix_is_401_with_the_same_reason_as_a_wrong_secret() -> None:
+    _, key = ApiClientFactory.create_with_key()
     ApiClient.objects.all().delete()
     result = authenticate(_bearer(key), ip=None, required_scope=SCOPE)
     assert (result.http_status, result.reason) == (401, Reason.INVALID)
 
 
-def test_expired_key_is_401(issue: IssueFn) -> None:
-    client, key = issue()
-    ApiClient.objects.filter(pk=client.pk).update(
-        expires_at=timezone.now() - dt.timedelta(minutes=1)
-    )
+def test_expired_key_is_401() -> None:
+    _, key = ApiClientFactory.create_with_key(expired=True)
     result = authenticate(_bearer(key), ip=None, required_scope=SCOPE)
     assert (result.http_status, result.reason) == (401, Reason.EXPIRED)
     assert result.client is None
 
 
-def test_out_of_scope_key_is_403(issue: IssueFn) -> None:
-    _, key = issue(scopes=["stock:write"])
+def test_out_of_scope_key_is_403() -> None:
+    _, key = ApiClientFactory.create_with_key(scopes=["stock:write"])
     result = authenticate(_bearer(key), ip=None, required_scope=SCOPE)
     assert (result.http_status, result.reason) == (403, Reason.INSUFFICIENT_SCOPE)
 
 
-def test_ip_outside_the_allow_list_is_403(issue: IssueFn) -> None:
-    _, key = issue(allowed_ips=["198.51.100.0/24"])
+def test_ip_outside_the_allow_list_is_403() -> None:
+    _, key = ApiClientFactory.create_with_key(allowed_ips=["198.51.100.0/24"])
     denied = authenticate(_bearer(key), ip="203.0.113.7", required_scope=SCOPE)
     allowed = authenticate(_bearer(key), ip="198.51.100.20", required_scope=SCOPE)
     assert (denied.http_status, denied.reason) == (403, Reason.IP_NOT_ALLOWED)
@@ -178,8 +196,8 @@ def test_ip_outside_the_allow_list_is_403(issue: IssueFn) -> None:
 # --- Revocation
 
 
-def test_revoked_key_is_401_and_revocation_is_audited(issue: IssueFn) -> None:
-    client, key = issue()
+def test_revoked_key_is_401_and_revocation_is_audited() -> None:
+    client, key = ApiClientFactory.create_with_key()
     revoke_api_client(client, ctx=CTX)
     client.refresh_from_db()
     assert not client.is_active
@@ -192,16 +210,16 @@ def test_revoked_key_is_401_and_revocation_is_audited(issue: IssueFn) -> None:
     assert _payload(entry.after)["is_active"] is False
 
 
-def test_revoking_twice_is_a_no_op(issue: IssueFn) -> None:
-    client, _ = issue()
+def test_revoking_twice_is_a_no_op() -> None:
+    client = ApiClientFactory.create()
     revoke_api_client(client, ctx=CTX)
     second = revoke_api_client(client, ctx=CTX)
     assert second.is_empty
     assert AuditLog.objects.filter(action="api.client.revoked").count() == 1
 
 
-def test_revoke_dry_run_changes_nothing(issue: IssueFn) -> None:
-    client, key = issue()
+def test_revoke_dry_run_changes_nothing() -> None:
+    client, key = ApiClientFactory.create_with_key()
     changeset = revoke_api_client(client, ctx=CTX, dry_run=True)
     assert changeset.summary()["update"] == 1
     client.refresh_from_db()
@@ -212,8 +230,8 @@ def test_revoke_dry_run_changes_nothing(issue: IssueFn) -> None:
 # --- Rotation (the old key stops working immediately; no grace period)
 
 
-def test_rotation_invalidates_the_old_key_immediately(issue: IssueFn) -> None:
-    client, old_key = issue()
+def test_rotation_invalidates_the_old_key_immediately() -> None:
+    client, old_key = ApiClientFactory.create_with_key()
     rotated = rotate_api_key(client, ctx=CTX)
     assert rotated.key is not None
     assert rotated.key != old_key
@@ -226,8 +244,8 @@ def test_rotation_invalidates_the_old_key_immediately(issue: IssueFn) -> None:
     assert new.client.scopes == client.scopes
 
 
-def test_rotation_is_audited_with_old_and_new_prefix(issue: IssueFn) -> None:
-    client, _ = issue()
+def test_rotation_is_audited_with_old_and_new_prefix() -> None:
+    client = ApiClientFactory.create()
     old_prefix = client.key_prefix
     rotated = rotate_api_key(client, ctx=CTX)
     assert rotated.client is not None
@@ -238,26 +256,24 @@ def test_rotation_is_audited_with_old_and_new_prefix(issue: IssueFn) -> None:
     assert "key_hash" not in after
 
 
-def test_rotation_can_renew_an_expired_key(issue: IssueFn) -> None:
-    client, _ = issue()
-    ApiClient.objects.filter(pk=client.pk).update(expires_at=timezone.now() - dt.timedelta(days=1))
-    client.refresh_from_db()
+def test_rotation_can_renew_an_expired_key() -> None:
+    client = ApiClientFactory.create(expired=True)
     new_expiry = timezone.now() + dt.timedelta(days=30)
     rotated = rotate_api_key(client, ctx=CTX, expires_at=new_expiry)
     assert rotated.key is not None
     assert authenticate(_bearer(rotated.key), ip=None, required_scope=SCOPE).http_status == 200
 
 
-def test_revoked_clients_cannot_be_rotated(issue: IssueFn) -> None:
-    client, _ = issue()
+def test_revoked_clients_cannot_be_rotated() -> None:
+    client = ApiClientFactory.create()
     revoke_api_client(client, ctx=CTX)
     with pytest.raises(InvalidApiClient):
         rotate_api_key(client, ctx=CTX)
     assert not AuditLog.objects.filter(action="api.client.rotated").exists()
 
 
-def test_rotate_dry_run_keeps_the_old_key(issue: IssueFn) -> None:
-    client, old_key = issue()
+def test_rotate_dry_run_keeps_the_old_key() -> None:
+    client, old_key = ApiClientFactory.create_with_key()
     rotated = rotate_api_key(client, ctx=CTX, dry_run=True)
     assert rotated.key is None
     assert rotated.changeset.summary()["update"] == 1

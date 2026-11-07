@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
 from apps.accounts.models import User
+from apps.accounts.tests.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -37,9 +38,9 @@ def test_email_is_required() -> None:
 
 
 def test_email_is_unique_regardless_of_case() -> None:
-    User.objects.create_user(email="anna@example.com", password=PASSWORD)
+    UserFactory.create(email="anna@example.com")
     with pytest.raises(IntegrityError), transaction.atomic():
-        User.objects.create(email="ANNA@example.com")
+        UserFactory.create(email="ANNA@example.com")
 
 
 def test_superuser_is_staff_and_superuser() -> None:
@@ -54,20 +55,16 @@ def test_superuser_must_be_staff() -> None:
 
 
 def test_login_with_email_and_password() -> None:
-    User.objects.create_user(email="luca@example.com", password=PASSWORD)
+    UserFactory.create(email="luca@example.com", password=PASSWORD)
     assert authenticate(username="LUCA@example.com", password=PASSWORD) is not None
     assert authenticate(username="luca@example.com", password=PASSWORD + "-wrong") is None
 
 
 @pytest.mark.parametrize("language", ["en", "it", "de"])
 def test_preferred_language_accepts_configured_languages(language: str) -> None:
-    user = User(email=f"{language}@example.com", preferred_language=language)
-    user.set_unusable_password()
-    user.full_clean()
+    UserFactory.build(preferred_language=language).full_clean()
 
 
 def test_preferred_language_rejects_unknown_languages() -> None:
-    user = User(email="fr@example.com", preferred_language="fr")
-    user.set_unusable_password()
     with pytest.raises(ValidationError):
-        user.full_clean()
+        UserFactory.build(preferred_language="fr").full_clean()

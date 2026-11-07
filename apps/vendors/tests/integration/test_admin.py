@@ -1,50 +1,35 @@
 """VEN.1: staff CRUD for vendors and their translations in the Django admin."""
 
-import secrets
 from typing import Any
 
 import pytest
-from django.contrib.auth.models import Permission
 from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.models import User
+from apps.accounts.tests.factories import UserFactory
 from apps.core.models import AuditLog
 from apps.vendors.models import Vendor, VendorTranslation
+from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def staff_client(client: Client) -> Client:
-    admin = User.objects.create_superuser(
-        email="staff@example.com", password=secrets.token_urlsafe(16)
-    )
-    client.force_login(admin)
+def staff_client(client: Client, superuser: User) -> Client:
+    client.force_login(superuser)
     return client
 
 
 def staff_with(client: Client, *codenames: str) -> Client:
     """A logged-in staff user (not superuser) holding only the given vendors permissions."""
-    user = User.objects.create_user(
-        email="limited@example.com", password=secrets.token_urlsafe(16), is_staff=True
-    )
-    user.user_permissions.set(
-        Permission.objects.filter(content_type__app_label="vendors", codename__in=codenames)
+    user = UserFactory.create(
+        email="limited@example.com",
+        staff=True,
+        permissions=[f"vendors.{codename}" for codename in codenames],
     )
     client.force_login(user)
     return client
-
-
-def make_vendor(**fields: Any) -> Vendor:
-    data: dict[str, Any] = {
-        "legal_name": "Vendor A S.r.l.",
-        "display_name": "Vendor A",
-        "country": "IT",
-        "contact_email": "vendor-a@example.com",
-    }
-    data.update(fields)
-    return Vendor.objects.create(**data)
 
 
 def management_form(total: int, initial: int = 0) -> dict[str, Any]:
@@ -75,7 +60,7 @@ def vendor_form(**overrides: Any) -> dict[str, Any]:
 
 
 def test_changelist_lists_vendors_with_their_status(staff_client: Client) -> None:
-    make_vendor()
+    VendorFactory.create(display_name="Vendor A")
     response = staff_client.get(reverse("admin:vendors_vendor_changelist"))
     assert response.status_code == 200
     content = response.content.decode()
@@ -84,11 +69,11 @@ def test_changelist_lists_vendors_with_their_status(staff_client: Client) -> Non
 
 
 def test_changelist_filters_by_status(staff_client: Client) -> None:
-    make_vendor()
-    make_vendor(display_name="Vendor C", contact_email="c@example.com", status="active")
+    VendorFactory.create()
+    active = VendorFactory.create(status="active")
     response = staff_client.get(reverse("admin:vendors_vendor_changelist"), {"status": "active"})
     assert response.status_code == 200
-    assert list(response.context["cl"].result_list) == [Vendor.objects.get(slug="vendor-c")]
+    assert list(response.context["cl"].result_list) == [active]
 
 
 def test_add_vendor_with_translations(staff_client: Client) -> None:
@@ -148,7 +133,11 @@ def test_add_vendor_with_an_empty_address_stores_an_empty_object(staff_client: C
 def test_clearing_the_address_of_an_existing_vendor_stores_an_empty_object(
     staff_client: Client,
 ) -> None:
-    vendor = make_vendor(registered_address={"city": "Rome"})
+    vendor = VendorFactory.create(
+        display_name="Vendor A",
+        contact_email="vendor-a@example.com",
+        registered_address={"city": "Rome"},
+    )
     data = vendor_form(
         display_name="Vendor A",
         slug="vendor-a",
@@ -163,7 +152,7 @@ def test_clearing_the_address_of_an_existing_vendor_stores_an_empty_object(
 
 
 def test_change_vendor_does_not_let_staff_edit_the_status_directly(staff_client: Client) -> None:
-    vendor = make_vendor()
+    vendor = VendorFactory.create(display_name="Vendor A", contact_email="vendor-a@example.com")
     data = vendor_form(
         legal_name="Vendor A Holding S.r.l.",
         display_name="Vendor A",
@@ -180,8 +169,7 @@ def test_change_vendor_does_not_let_staff_edit_the_status_directly(staff_client:
 
 
 def test_delete_vendor(staff_client: Client) -> None:
-    vendor = make_vendor()
-    VendorTranslation.objects.create(vendor=vendor, language="en")
+    vendor = VendorFactory.create(languages=["en"])
     response = staff_client.post(
         reverse("admin:vendors_vendor_delete", args=[vendor.pk]), {"post": "yes"}
     )
@@ -191,7 +179,7 @@ def test_delete_vendor(staff_client: Client) -> None:
 
 
 def test_status_action_moves_vendors_through_the_transition_service(staff_client: Client) -> None:
-    vendor = make_vendor()
+    vendor = VendorFactory.create()
     response = staff_client.post(
         reverse("admin:vendors_vendor_changelist"),
         {"action": "move_to_onboarding", "_selected_action": [vendor.pk]},
@@ -209,7 +197,7 @@ def test_status_action_moves_vendors_through_the_transition_service(staff_client
 def test_status_action_reports_invalid_transitions_and_changes_nothing(
     staff_client: Client,
 ) -> None:
-    vendor = make_vendor()
+    vendor = VendorFactory.create()
     response = staff_client.post(
         reverse("admin:vendors_vendor_changelist"),
         {"action": "move_to_active", "_selected_action": [vendor.pk]},
@@ -224,7 +212,7 @@ def test_status_action_reports_invalid_transitions_and_changes_nothing(
 
 
 def test_view_only_staff_get_no_status_actions(client: Client) -> None:
-    make_vendor()
+    VendorFactory.create()
     viewer = staff_with(client, "view_vendor")
     response = viewer.get(reverse("admin:vendors_vendor_changelist"))
     assert response.status_code == 200
@@ -233,7 +221,7 @@ def test_view_only_staff_get_no_status_actions(client: Client) -> None:
 
 @pytest.mark.parametrize("action", ["move_to_onboarding", "move_to_closed"])
 def test_view_only_staff_cannot_run_status_actions(client: Client, action: str) -> None:
-    vendor = make_vendor()
+    vendor = VendorFactory.create()
     viewer = staff_with(client, "view_vendor")
     viewer.post(
         reverse("admin:vendors_vendor_changelist"),
@@ -245,7 +233,7 @@ def test_view_only_staff_cannot_run_status_actions(client: Client, action: str) 
 
 
 def test_staff_with_change_permission_can_run_status_actions(client: Client) -> None:
-    vendor = make_vendor()
+    vendor = VendorFactory.create()
     editor = staff_with(client, "view_vendor", "change_vendor")
     response = editor.post(
         reverse("admin:vendors_vendor_changelist"),
