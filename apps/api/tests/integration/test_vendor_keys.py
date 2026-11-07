@@ -1,7 +1,8 @@
 """CORE.13: vendor-bound API keys (`ApiClient.vendor`; null = platform key).
 
 A vendor key acts for its vendor only, through the CORE.3 scoping (`for_actor`). Only platform
-staff or an owner of that vendor may issue one, and the issuance is audited with the vendor.
+staff holding `api.add_apiclient` or an owner of that vendor may issue one, and the issuance is
+audited with the vendor.
 """
 
 import datetime as dt
@@ -28,6 +29,7 @@ pytestmark = pytest.mark.django_db
 
 SCOPES = ["catalog:write", "stock:write"]
 SYSTEM = AuditContext(actor_label="system:test", source="system")
+ADD_PERMISSION = "api.add_apiclient"
 
 
 def _issue(**kwargs: Any) -> IssuedKey:
@@ -104,15 +106,53 @@ def test_deleting_a_vendor_deletes_its_keys_and_never_turns_them_into_platform_k
 # --- Issuance: who may issue which key
 
 
+def _issuing_staff(**kwargs: Any) -> Any:
+    """Platform staff holding `api.add_apiclient`: the permission that lets staff issue keys."""
+    return UserFactory.create(staff=True, permissions=[ADD_PERMISSION], **kwargs)
+
+
 def test_platform_staff_issue_a_vendor_key() -> None:
     vendor = VendorFactory.create()
-    staff = UserFactory.create(staff=True)
+    staff = _issuing_staff()
 
     issued = _issue(vendor=vendor, issuer=staff, ctx=user_context(staff, "127.0.0.1"))
 
     assert issued.client is not None
     assert issued.key is not None
     assert ApiClient.objects.get().vendor == vendor
+
+
+def test_a_superuser_issues_platform_and_vendor_keys() -> None:
+    superuser = UserFactory.create(superuser=True)
+    assert _issue(issuer=superuser).client is not None
+    assert _issue(vendor=VendorFactory.create(), issuer=superuser).client is not None
+
+
+@pytest.mark.parametrize("permissions", [[], ["api.view_apiclient", "api.change_apiclient"]])
+@pytest.mark.parametrize("key", ["platform", "vendor"])
+def test_staff_without_the_add_permission_issue_no_key(key: str, permissions: list[str]) -> None:
+    """`is_staff` alone (admin login) is not a right to mint a cross-tenant credential."""
+    staff = UserFactory.create(staff=True, permissions=permissions)
+    vendor = VendorFactory.create() if key == "vendor" else None
+
+    with pytest.raises(PermissionDenied):
+        _issue(vendor=vendor, issuer=staff)
+    with pytest.raises(PermissionDenied):
+        _issue(vendor=vendor, issuer=staff, dry_run=True)
+    assert not ApiClient.objects.exists()
+    assert not AuditLog.objects.filter(action="api.client.issued").exists()
+
+
+def test_staff_without_the_add_permission_still_issue_keys_of_a_vendor_they_own() -> None:
+    owner = _owner(VendorFactory.create())
+    owner.user.is_staff = True
+    owner.user.save(update_fields=["is_staff"])
+
+    assert _issue(vendor=owner.vendor, issuer=owner.user).client is not None
+    with pytest.raises(PermissionDenied):
+        _issue(vendor=VendorFactory.create(), issuer=owner.user)
+    with pytest.raises(PermissionDenied):
+        _issue(issuer=owner.user)
 
 
 def test_an_owner_issues_a_key_for_their_own_vendor() -> None:
@@ -149,7 +189,7 @@ def test_nobody_else_issues_a_vendor_key(who: str) -> None:
 
 
 def test_inactive_staff_do_not_issue_vendor_keys() -> None:
-    staff = UserFactory.create(staff=True, is_active=False)
+    staff = _issuing_staff(is_active=False)
     with pytest.raises(PermissionDenied):
         _issue(vendor=VendorFactory.create(), issuer=staff)
 
@@ -164,7 +204,7 @@ def test_only_platform_staff_issue_platform_keys() -> None:
     owner = _owner(VendorFactory.create())
     with pytest.raises(PermissionDenied):
         _issue(issuer=owner.user)
-    assert _issue(issuer=UserFactory.create(staff=True)).client is not None
+    assert _issue(issuer=_issuing_staff()).client is not None
 
 
 def test_a_platform_key_issued_by_the_system_needs_no_issuer() -> None:

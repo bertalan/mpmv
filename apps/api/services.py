@@ -3,8 +3,9 @@
 Rotation replaces the key immediately: the old key stops working as soon as the rotation
 commits (no grace period). A pipeline rotates by deploying the new key right after receiving it.
 
-A vendor key (CORE.13) is issued only by platform staff or an owner of that vendor; a platform
-key only by platform staff, or by trusted code without an issuer (shell, deploy scripts).
+A vendor key (CORE.13) is issued only by platform staff holding `api.add_apiclient` or an owner
+of that vendor; a platform key only by such staff, or by trusted code without an issuer (shell,
+deploy scripts).
 """
 
 import datetime as dt
@@ -45,6 +46,8 @@ from .models import ApiClient, ApiMutationLog
 logger = logging.getLogger(__name__)
 
 MODEL = "api.apiclient"
+# The model permission platform staff need to issue a key (`is_staff` alone is admin login only).
+ISSUE_PERMISSION = "api.add_apiclient"
 _PREFIX_ATTEMPTS = 5
 # Compared against when the prefix is unknown, so both failure paths do the same work.
 _DUMMY_HASH = hash_key("")
@@ -99,8 +102,10 @@ def _future(expires_at: dt.datetime) -> dt.datetime:
 def check_issuer(issuer: AbstractBaseUser | AnonymousUser | None, vendor: Vendor | None) -> None:
     """Raise PermissionDenied unless `issuer` may issue a key for `vendor` (None = platform).
 
-    Platform staff issue any key; an owner of a vendor issues that vendor's keys only. Without an
-    issuer (trusted code: shell, deploy scripts) only platform keys can be issued.
+    Platform staff holding `api.add_apiclient` issue any key (a platform key reaches every
+    vendor's rows, so `is_staff` alone, i.e. admin login, is not enough); an owner of a vendor
+    issues that vendor's keys only. Without an issuer (trusted code: shell, deploy scripts) only
+    platform keys can be issued.
     """
     if issuer is None:
         if vendor is not None:
@@ -108,10 +113,10 @@ def check_issuer(issuer: AbstractBaseUser | AnonymousUser | None, vendor: Vendor
         return
     if not issuer.is_authenticated or not issuer.is_active:
         raise PermissionDenied("the issuer is not an active user")
-    if getattr(issuer, "is_staff", False):
+    if isinstance(issuer, User) and issuer.is_staff and issuer.has_perm(ISSUE_PERMISSION):
         return
     if vendor is None:
-        raise PermissionDenied("only platform staff issue platform API keys")
+        raise PermissionDenied("only platform staff with api.add_apiclient issue platform API keys")
     if not isinstance(issuer, User) or not has_vendor_permission(
         issuer, vendor, VendorAction.API_KEYS
     ):
