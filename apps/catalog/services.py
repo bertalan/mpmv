@@ -462,7 +462,10 @@ def duplicate_product_to_vendor(
                 "reason": reason,
             },
         )
-        copies = [_copy(variant, vendor_id=vendor.pk, stock_qty=0) for variant in variants]
+        copies = [
+            _copy(variant, vendor_id=vendor.pk, stock_qty=0, stock_status=StockStatus.OUT_OF_STOCK)
+            for variant in variants
+        ]
         for variant, variant_copy in zip(variants, copies, strict=True):
             changes.create(
                 VARIANT_MODEL,
