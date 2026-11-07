@@ -22,6 +22,6 @@ legal counsel. Once made, the decision is recorded as an ADR in the repository a
 | D-15 ⚖️ | Compliance | Is the platform a microenterprise for EAA purposes? | Design for WCAG 2.1 AA regardless | Legal counsel | CMP.7 |
 | D-16 | Migration | Historical orders: all, or only the last 24 months? Customers without orders? | All orders (read-only); customers with no orders in 3 years excluded | Owner + DPO | MIG.4 |
 | D-17 | Business | Affiliation, ambassadors and club/community referrals: when? | After go-live, as tracked coupons or referral codes | Owner | — |
-| D-18 | Business | German at go-live or right after? | Structure ready at go-live, DE content in phase 2 | Owner | I18N.1 |
+| D-18 ✅ | Business | German at go-live or right after? | **Decided (2026-11-07):** German at go-live, structure **and** content (I18N.4 moved to P1, I18N.7 added) | Owner | I18N.1 |
 | D-19 | Operations | Vendor E without Stripe Connect: catalog on request until they connect? | Yes (`sales_mode=on_request`) | Owner | VEN.6 |
 | D-20 | Migration | Quotes open at cutover time: closed beforehand or migrated? | Closed beforehand (7-day freeze on new requests) | Owner | MIG.9 |
