@@ -39,8 +39,10 @@ jobs:
         run: uv run lint-imports
       - name: Backlog up to date with the spec
         run: uv run tools/build_docs.py --check
-      - name: Django system checks
-        run: uv run python manage.py check
+      - name: Django system checks and missing migrations
+        run: |
+          uv run python manage.py check
+          uv run python manage.py makemigrations --check --dry-run
       - name: Dependency audit (pip-audit)
         run: make audit
 

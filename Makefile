@@ -98,3 +98,4 @@ audit: ## Scan pinned dependencies for known vulnerabilities (pip-audit)
 
 check: lint typecheck imports docs-check ## All static checks (no database needed)
 	$(MANAGE) check --settings=mpmv.settings.test
+	$(MANAGE) makemigrations --check --dry-run --settings=mpmv.settings.test

@@ -32,9 +32,17 @@ def test_round_internal_keeps_four_decimals() -> None:
     assert round_internal(Decimal("1")) == Decimal("1.0000")
 
 
-@pytest.mark.parametrize("value", ["12.30", 12, Decimal("12.3")])
-def test_to_decimal_accepts_exact_inputs(value: object) -> None:
-    assert to_decimal(value) == Decimal("12.3")
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("12.30", Decimal("12.30")),
+        (" 7 ", Decimal("7")),
+        (12, Decimal("12")),
+        (Decimal("1.5"), Decimal("1.5")),
+    ],
+)
+def test_to_decimal_accepts_exact_inputs(value: object, expected: Decimal) -> None:
+    assert to_decimal(value) == expected
 
 
 def test_to_decimal_rejects_floats() -> None:

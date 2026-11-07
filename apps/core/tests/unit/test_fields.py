@@ -38,7 +38,8 @@ def test_base_model_is_abstract_with_public_id_and_timestamps() -> None:
     assert BaseModel._meta.abstract
     public_id = BaseModel._meta.get_field("public_id")
     assert isinstance(public_id, models.UUIDField)
-    assert public_id.unique and not public_id.editable
+    assert public_id.unique
+    assert not public_id.editable
     assert public_id.default is uuid.uuid4
-    assert BaseModel._meta.get_field("created_at").auto_now_add  # type: ignore[attr-defined]
-    assert BaseModel._meta.get_field("updated_at").auto_now  # type: ignore[attr-defined]
+    assert BaseModel._meta.get_field("created_at").auto_now_add
+    assert BaseModel._meta.get_field("updated_at").auto_now
