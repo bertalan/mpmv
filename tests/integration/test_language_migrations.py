@@ -13,30 +13,32 @@ from apps.accounts.tests.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
 
-LANGUAGES_PLUS_FRENCH = [
+LANGUAGES_PLUS_PORTUGUESE = [
     ("en", "English"),
     ("it", "Italiano"),
     ("de", "Deutsch"),
     ("fr", "Français"),
+    ("es", "Español"),
+    ("pt", "Português"),
 ]
 
 
-@override_settings(LANGUAGES=LANGUAGES_PLUS_FRENCH)
+@override_settings(LANGUAGES=LANGUAGES_PLUS_PORTUGUESE)
 def test_adding_a_language_in_settings_needs_no_migration() -> None:
     # --check exits with status 1 when any model change has no migration.
     call_command("makemigrations", "--check", "--dry-run", verbosity=0)
 
 
-@override_settings(LANGUAGES=LANGUAGES_PLUS_FRENCH)
+@override_settings(LANGUAGES=LANGUAGES_PLUS_PORTUGUESE)
 def test_a_user_can_prefer_a_language_added_in_settings() -> None:
-    user = UserFactory.create(preferred_language="fr")
+    user = UserFactory.create(preferred_language="pt")
     user.full_clean()
     user.refresh_from_db()
-    assert user.preferred_language == "fr"
+    assert user.preferred_language == "pt"
 
 
 def test_a_user_cannot_prefer_an_unconfigured_language() -> None:
-    user = UserFactory.build(preferred_language="fr")
+    user = UserFactory.build(preferred_language="pt")
     with pytest.raises(ValidationError) as excinfo:
         user.full_clean()
     assert "preferred_language" in excinfo.value.message_dict

@@ -1,7 +1,8 @@
 """I18N.1: translating a path into another configured language keeps the page (spec 09 §9.2).
 
-`/` is EN (no prefix), `/it/` and `/de/` follow; paths outside the language-prefixed routes
-(health check, staff admin, unknown pages) are returned unchanged. No database involved.
+`/` is EN (no prefix), `/it/`, `/de/`, `/fr/` and `/es/` follow; paths outside the
+language-prefixed routes (health check, staff admin, unknown pages) are returned unchanged. No
+database involved.
 """
 
 import pytest
@@ -9,11 +10,13 @@ from django.test import override_settings
 
 from apps.core.i18n import language_choices, translate_path
 
-LANGUAGES_PLUS_FRENCH = [
+LANGUAGES_PLUS_PORTUGUESE = [
     ("en", "English"),
     ("it", "Italiano"),
     ("de", "Deutsch"),
     ("fr", "Français"),
+    ("es", "Español"),
+    ("pt", "Português"),
 ]
 
 
@@ -22,12 +25,16 @@ LANGUAGES_PLUS_FRENCH = [
     [
         ("/", "it", "/it/"),
         ("/", "de", "/de/"),
+        ("/", "fr", "/fr/"),
+        ("/", "es", "/es/"),
         ("/", "en", "/"),
         ("/it/", "de", "/de/"),
         ("/it/", "en", "/"),
         ("/de/", "it", "/it/"),
         ("/de/", "en", "/"),
         ("/it/", "it", "/it/"),
+        ("/fr/", "es", "/es/"),
+        ("/es/", "en", "/"),
     ],
 )
 def test_translate_path_swaps_the_language_prefix(path: str, language: str, expected: str) -> None:
@@ -40,7 +47,7 @@ def test_translate_path_keeps_the_query_string() -> None:
 
 
 @pytest.mark.parametrize("path", ["/healthz", "/django-admin/", "/no-such-page/"])
-@pytest.mark.parametrize("language", ["en", "it", "de"])
+@pytest.mark.parametrize("language", ["en", "it", "de", "fr", "es"])
 def test_translate_path_leaves_unprefixed_routes_alone(path: str, language: str) -> None:
     assert translate_path(path, language) == path
 
@@ -49,17 +56,23 @@ def test_translate_path_ignores_unknown_languages() -> None:
     assert translate_path("/it/", "xx") == "/it/"
 
 
-@override_settings(LANGUAGES=LANGUAGES_PLUS_FRENCH)
+@override_settings(LANGUAGES=LANGUAGES_PLUS_PORTUGUESE)
 def test_a_language_added_in_settings_is_routed_without_code_changes() -> None:
-    assert translate_path("/", "fr") == "/fr/"
-    assert translate_path("/fr/", "it") == "/it/"
-    assert translate_path("/fr/", "en") == "/"
+    assert translate_path("/", "pt") == "/pt/"
+    assert translate_path("/pt/", "it") == "/it/"
+    assert translate_path("/pt/", "en") == "/"
 
 
 def test_language_choices_are_read_from_settings_in_order() -> None:
-    assert language_choices() == [("en", "English"), ("it", "Italiano"), ("de", "Deutsch")]
+    assert language_choices() == [
+        ("en", "English"),
+        ("it", "Italiano"),
+        ("de", "Deutsch"),
+        ("fr", "Français"),
+        ("es", "Español"),
+    ]
 
 
-@override_settings(LANGUAGES=LANGUAGES_PLUS_FRENCH)
+@override_settings(LANGUAGES=LANGUAGES_PLUS_PORTUGUESE)
 def test_language_choices_follow_settings_at_runtime() -> None:
-    assert [code for code, _name in language_choices()] == ["en", "it", "de", "fr"]
+    assert [code for code, _name in language_choices()] == ["en", "it", "de", "fr", "es", "pt"]
