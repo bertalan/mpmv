@@ -14,13 +14,13 @@
 
 | Item | Hours | How it is calculated |
 |---|---:|---|
-| P1 micro-tasks | 1,542 | Sum from the generated backlog |
+| P1 micro-tasks | 1,544 | Sum from the generated backlog |
 | Integrated and end-to-end acceptance testing, exploratory tests | 100 | ~10% of P1 |
 | Mandatory human review of tax, payments, ledger, orders, security | 50 | ~15% of the hours for TAX, PAY, VEN, ORD, SEC |
 | Coordination, ADRs, meetings with tax advisor and legal counsel | 80 | ~8% of P1 |
-| **Subtotal** | **1,772** | |
+| **Subtotal** | **1,774** | |
 | Contingency for unforeseen issues (10–25% of P1) | 154–386 | Tax and payment domain, dirty legacy data |
-| **Go-live total** | **≈ 1,926–2,158** | |
+| **Go-live total** | **≈ 1,928–2,160** | |
 
 The SHP.12 implementation (#54) added the SHP.12 row it built and the SHP.13 and SHP.14 rows it
 found missing (+34 h of P1). Coherence check 5 (2026-11-07) added ARC.17 (1 h, e-invoicing
@@ -73,7 +73,8 @@ closed vendor), VEN.22 (8 h, public "Sell with us" application), CAT.13 (8 h, in
 and the vendor SKU as a label) and CAT.14 (8 h, catalogue integrity rules) are added. P2 gains
 50 h: CAT.15 (6 h, other sellers of the same article), and cross-vendor bundles with discount
 funding: CAT.16 (14 h, bundle and funding split), CAT.17 (18 h, checkout, ledger and returns) and
-CAT.18 (12 h, vendor acceptance of staff-assigned shares).
+CAT.18 (12 h, vendor acceptance of staff-assigned shares). The answer to Q-91 (new SKU-free
+product URLs with one 301 from every legacy URL) grows MIG.6 from 6 to 8 h: +2 h of P1.
 
 After go-live: P2 = 334 h and P3 = 18 h (MCP, advanced zone editor, OSS report, visitor content
 translation, reviews, advanced payouts, vendor branding, customer preferences and event
@@ -85,7 +86,7 @@ including contingency.
 | | August plan | This review |
 |---|---:|---:|
 | Scope | Full WCFM parity + P1 commercial modules | Parity **with what is actually used** + 2026 compliance |
-| Total hours (development, testing, migration) | 1,740–2,540 | 1,926–2,158 to go-live |
+| Total hours (development, testing, migration) | 1,740–2,540 | 1,928–2,160 to go-live |
 | With AI-assisted development | 1,450–2,100 | already included |
 
 Where the difference comes from:
@@ -200,7 +201,7 @@ Work that agents cannot speed up:
 | **Total** | **≈ 109–199** |
 
 **Result:** about **150–250 people hours** plus about two weekly agent budgets, against
-1,926–2,158 hours for a human team (§91.2). Realistic calendar to go-live: **2–3 months**. The
+1,928–2,160 hours for a human team (§91.2). Realistic calendar to go-live: **2–3 months**. The
 pace is set by external waits: legal counsel, the Hetzner account for STAGE, Stripe Connect
 verification, the external penetration test (SEC.6) and the three dress rehearsals (MIG.9).
 

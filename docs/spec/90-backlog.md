@@ -7,7 +7,7 @@
 ## Summary
 
 - Micro-tasks: **225** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **1894 h** (P1 1542 h · P2 334 h · P3 18 h)
+- Estimated hours (development + automated tests, AI-assisted development): **1896 h** (P1 1544 h · P2 334 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -32,8 +32,8 @@
 | CMP | Compliance | 25 | 157 | 69 | 0 | 226 |
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 5 | 19 | 11 | 0 | 30 |
-| MIG | Migration and cutover | 10 | 106 | 0 | 0 | 106 |
-| **Total** | | **225** | **1542** | **334** | **18** | **1894** |
+| MIG | Migration and cutover | 10 | 108 | 0 | 0 | 108 |
+| **Total** | | **225** | **1544** | **334** | **18** | **1896** |
 
 ## By phase
 
@@ -232,7 +232,7 @@
 | SEO.3 | Google feed (EN for every product, IT for products with a published IT translation, D-18) with legacy IDs, prices from the tax engine, shipping from tables; GTIN, brand and MPN from the product fields; on-request and catalogue-only products left out (Q-31, Q-33) | P1 | 8 | TAX.3, SHP.11 | Feed validated in STAGE Merchant Center; no item carries the vendor SKU as MPN; no on-request product is in the feed |
 | SEO.5 | Cookie consent + Consent Mode v2 + e-commerce events | P1 | 8 | ORD.5 | No tags fire before consent |
 
-### F5 — Migration, acceptance testing, go-live (11 tasks, 122 h)
+### F5 — Migration, acceptance testing, go-live (11 tasks, 124 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -242,11 +242,11 @@
 | MIG.3 | Loader for vendors, catalog, taxonomies, images (idempotent, dry-run); existing IT texts loaded as published translations (D-18) | P1 | 16 | MIG.1, CAT.1, CAT.2, CAT.3, CAT.4, CAT.13, CAT.14 | Reload with no duplicates; IT texts present where the current site has them |
 | MIG.4 | Loader for customers (WP password hasher) and read-only historical orders | P1 | 10 | MIG.1, ORD.2 | Migrated customer logs in with the old password |
 | MIG.5 | Automated parity reports (§13.3) | P1 | 10 | MIG.3 | Report generated on every run |
-| MIG.6 | Complete EN/IT redirect map + automated check of all WP sitemap URLs | P1 | 6 | CAT.6, MIG.3 | 100% of URLs 200/301; a migrated IT URL serves its IT text, not the EN fallback |
+| MIG.6 | Complete redirect map in every language + automated check of all WP sitemap URLs; every legacy product URL (SKU permalinks, plain and historical slugs, variant URLs, legacy query-string forms) to the new SKU-free URL with one permanent 301 (Q-91, §13.3); sitemaps, canonical tags and hreflang on the new URLs only | P1 | 8 | CAT.6, MIG.3 | 100% of URLs 200/301; a migrated IT URL serves its IT text, not the EN fallback; regression test on the migration dataset: every legacy URL resolves with exactly one 301 to a 200 page (no chains, no loops) and the number of legacy product URLs equals the number of mapped URLs; no legacy URL in the sitemaps |
 | MIG.7 | Pages and blog migration (semi-manual) with StreamField; existing IT versions as published wagtail-localize translations (D-18) | P1 | 16 | CMS.2, I18N.3 | All public pages present, in IT too where the current site has them |
 | MIG.8 | Vendor ledger opening balances + verification against Stripe | P1 | 4 | VEN.4, MIG.3 | Balance = expected for every vendor |
 | MIG.9 | Three dress rehearsals on STAGE + cutover and rollback runbook | P1 | 16 | MIG.5, MIG.6 | Third rehearsal with no blockers |
-| MIG.10 | Cutover and post-go-live monitoring | P1 | 12 | MIG.9, SEC.6 | Go-live, 72 h with no critical issues |
+| MIG.10 | Cutover and post-go-live monitoring, including the daily 404 report and the Search Console review of the product URL change (Q-91) | P1 | 12 | MIG.9, SEC.6 | Go-live, 72 h with no critical issues; 404 report and Search Console review recorded at T+14 and T+28 |
 
 ### F6 — After go-live (P2) (42 tasks, 334 h)
 
