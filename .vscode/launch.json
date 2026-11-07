@@ -1,0 +1,43 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Django: runserver (dev)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/manage.py",
+      "args": ["runserver", "--noreload"],
+      "django": true,
+      "justMyCode": true,
+      "env": { "DJANGO_SETTINGS_MODULE": "mpmv.settings.dev" },
+      "preLaunchTask": "db: start"
+    },
+    {
+      "name": "Pytest: current file",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${file}", "-x", "-q"],
+      "django": true,
+      "justMyCode": false
+    },
+    {
+      "name": "Pytest: unit suite",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["-m", "unit", "-q"],
+      "justMyCode": false
+    },
+    {
+      "name": "Pytest: e2e headed (watch the browser)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["-m", "e2e", "--headed", "--slowmo", "300", "-q"],
+      "django": true,
+      "justMyCode": false,
+      "preLaunchTask": "db: start"
+    }
+  ]
+}

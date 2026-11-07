@@ -1,6 +1,6 @@
 # MPMV task runner. Local containers use Apple `container` (ADR-0002); no Docker, no compose.
 .DEFAULT_GOAL := help
-.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell migrate run test check lint fmt typecheck imports
+.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell migrate run test test-unit test-e2e test-all check lint fmt typecheck imports audit
 
 DB_NAME      := mpmv-db
 DB_IMAGE     := docker.io/library/postgres:17
@@ -11,8 +11,9 @@ MANAGE       := uv run python manage.py
 help: ## List available targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*## "}{printf "  %-12s %s\n", $$1, $$2}'
 
-install: ## Install Python deps (uv) and git hooks
+install: ## Install Python deps (uv), the Playwright browser and git hooks
 	uv sync
+	uv run playwright install chromium
 	uv run pre-commit install
 
 # --- Spec and backlog
@@ -25,14 +26,14 @@ docs-check: ## Fail if the committed backlog is out of date with the spec tables
 docs-open: docs ## Build and open the HTML spec
 	open build/mpmv-spec.html
 
-# --- Local database (Apple container)
+# --- Local database (Apple container). Trust auth, bound to 127.0.0.1 only: no credentials in git.
 db: ## Start local PostgreSQL in an Apple container (idempotent)
 	@container volume inspect $(DB_VOLUME) >/dev/null 2>&1 || container volume create $(DB_VOLUME) >/dev/null
 	@if container inspect $(DB_NAME) >/dev/null 2>&1; then \
 		container start $(DB_NAME) >/dev/null 2>&1 || true; \
 	else \
 		container run -d --name $(DB_NAME) -p 127.0.0.1:$(DB_PORT):5432 \
-			-e POSTGRES_USER=mpmv -e POSTGRES_PASSWORD=mpmv -e POSTGRES_DB=mpmv \
+			-e POSTGRES_USER=mpmv -e POSTGRES_DB=mpmv -e POSTGRES_HOST_AUTH_METHOD=trust \
 			-e PGDATA=/var/lib/postgresql/data/pgdata \
 			-v $(DB_VOLUME):/var/lib/postgresql/data $(DB_IMAGE) >/dev/null; \
 	fi
@@ -61,8 +62,20 @@ run: migrate ## Run the development server
 	$(MANAGE) runserver
 
 # --- Quality gates
-test: db ## Run the test suite (needs the local database)
-	uv run pytest
+# Test suites (ADR-0006): unit = no database; integration = real PostgreSQL; e2e = Playwright.
+REPORTS := build/reports
+
+test-unit: ## Unit suite only (no database, no container)
+	uv run pytest -m unit
+
+test: db ## Unit + integration suites
+	uv run pytest -m "unit or integration" --junitxml=$(REPORTS)/junit.xml \
+		--cov --cov-report=term-missing:skip-covered --cov-report=html:$(REPORTS)/coverage
+
+test-e2e: db ## E2E suite in headless Chromium; screenshots in build/e2e/screenshots/
+	uv run pytest -m e2e --junitxml=$(REPORTS)/junit-e2e.xml
+
+test-all: test test-e2e ## All three suites
 
 lint: ## Lint with ruff
 	uv run ruff check .
@@ -77,6 +90,11 @@ typecheck: ## Static type check with mypy
 
 imports: ## Enforce the app dependency graph (spec 01 §1.3)
 	uv run lint-imports
+
+audit: ## Scan pinned dependencies for known vulnerabilities (pip-audit)
+	@mkdir -p build
+	uv export --no-emit-project --format requirements-txt > build/requirements.txt
+	uvx pip-audit --strict --disable-pip --require-hashes -r build/requirements.txt
 
 check: lint typecheck imports docs-check ## All static checks (no database needed)
 	$(MANAGE) check --settings=mpmv.settings.test

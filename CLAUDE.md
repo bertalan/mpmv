@@ -38,11 +38,20 @@ Guidance for AI agents working in this repository. Read [README.md](README.md) a
 - Tax, payments, ledger and order code needs regression tests from the spec, and the PR must
   flag it for human review.
 
+## Testing (TDD, ADR-0006)
+
+- Write the failing tests first, from the task's "Done when" and the spec's regression cases.
+- Suites by directory: `tests/unit` (no DB), `tests/integration` (real PostgreSQL, no mocks),
+  `tests/e2e` (Playwright + screenshots). App tests go in `apps/<app>/tests/{unit,integration}`.
+- Mock only external providers, through our own interfaces.
+
 ## Commands
 
 ```sh
 make db           # local PostgreSQL (Apple container, port 55432)
-make test         # pytest
+make test-unit    # unit suite, no database
+make test         # unit + integration (real PostgreSQL)
+make test-e2e     # Playwright e2e, screenshots in build/e2e/screenshots
 make check        # ruff + mypy --strict + import contracts + backlog freshness + Django checks
 make fmt          # auto-fix and format
 make docs         # regenerate backlog + HTML spec after editing spec task tables

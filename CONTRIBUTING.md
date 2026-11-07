@@ -25,6 +25,20 @@ and developer docs.
 Changing scope or an estimate means editing the task row in the spec in the same PR, then running
 `make docs`.
 
+## Test-driven development
+
+Every task follows red → green → refactor ([ADR-0006](docs/adr/0006-testing-strategy.md)):
+
+1. Turn the task's "Done when" criterion and the spec's regression cases into failing tests.
+   The first commit on the branch contains only those tests: `test(TASK.ID): …`.
+2. Write the minimum code that makes them pass.
+3. Refactor while the tests stay green.
+
+Tests live in three suites, chosen by directory: `tests/unit` and `apps/<app>/tests/unit` (pure
+functions, no database), `.../tests/integration` (real Django + PostgreSQL, no mocks), and
+`tests/e2e` (Playwright on a live server, with screenshots). Mock only external boundaries, and
+only through our own interfaces. Editor setup: [docs/dev/vscode.md](docs/dev/vscode.md).
+
 ## Commits
 
 - Imperative mood, ≤72-character subject, task ID as a prefix: `ARC.6: add MoneyField with ROUND_HALF_UP per line`.
@@ -32,8 +46,8 @@ Changing scope or an estimate means editing the task row in the spec in the same
 
 ## Definition of done (every task)
 
-- Automated tests cover the behaviour. Domain regression cases listed in the spec are mandatory.
-- `make check` is green (lint, types, tests, import rules; available from ARC.3/ARC.4).
+- Tests were written first (TDD) and cover the behaviour. Domain regression cases listed in the spec are mandatory.
+- `make check` and `make test` are green; `make test-e2e` too when the task touches a user journey.
 - Human line-by-line review for anything touching tax, payments, ledger, orders or security.
 - No secrets in code, fixtures or docs. Config comes from environment variables only.
 - Spec and ADRs are updated if behaviour or decisions changed.

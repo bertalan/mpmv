@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "db: start", "type": "shell", "command": "make db", "problemMatcher": [] },
+    { "label": "db: stop", "type": "shell", "command": "make db-stop", "problemMatcher": [] },
+    { "label": "test: unit", "type": "shell", "command": "make test-unit", "group": "test", "problemMatcher": [] },
+    {
+      "label": "test: unit + integration",
+      "type": "shell",
+      "command": "make test",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    { "label": "test: e2e", "type": "shell", "command": "make test-e2e", "group": "test", "problemMatcher": [] },
+    { "label": "check: all static checks", "type": "shell", "command": "make check", "group": "build", "problemMatcher": [] },
+    { "label": "docs: rebuild spec + backlog", "type": "shell", "command": "make docs", "problemMatcher": [] },
+    { "label": "docs: open HTML spec", "type": "shell", "command": "make docs-open", "problemMatcher": [] }
+  ]
+}

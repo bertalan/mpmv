@@ -1,0 +1,129 @@
+# CI pipeline (ARC.4, ADR-0006). All jobs are required before merging into main.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  UV_FROZEN: "1"
+  DJANGO_SETTINGS_MODULE: mpmv.settings.test
+  # Throwaway service database with trust auth: no credentials in the repository.
+  DATABASE_URL: postgres://mpmv@localhost:5432/mpmv
+
+jobs:
+  static:
+    name: Static checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+      - run: uv sync
+      - name: Ruff (lint + format)
+        run: |
+          uv run ruff check . --output-format github
+          uv run ruff format --check .
+      - name: Mypy (strict)
+        run: uv run mypy .
+      - name: Import contracts (app dependency graph)
+        run: uv run lint-imports
+      - name: Backlog up to date with the spec
+        run: uv run tools/build_docs.py --check
+      - name: Django system checks
+        run: uv run python manage.py check
+      - name: Dependency audit (pip-audit)
+        run: make audit
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  tests:
+    name: Unit + integration
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mpmv
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: mpmv
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mpmv -d mpmv"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+      - run: uv sync
+      - name: Pytest (unit + integration)
+        run: >-
+          uv run pytest -m "unit or integration"
+          --junitxml=build/reports/junit.xml
+          --cov --cov-report=term-missing:skip-covered
+          --cov-report=html:build/reports/coverage --cov-report=xml:build/reports/coverage.xml
+      - name: Store reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports
+          path: build/reports/
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mpmv
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: mpmv
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mpmv -d mpmv"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+      - run: uv sync
+      - name: Install Chromium
+        run: uv run playwright install --with-deps chromium
+      - name: Pytest (e2e)
+        run: uv run pytest -m e2e --junitxml=build/reports/junit-e2e.xml
+      - name: Store screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-screenshots
+          path: build/e2e/screenshots/
+          if-no-files-found: ignore
+      - name: Store reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-reports
+          path: build/reports/

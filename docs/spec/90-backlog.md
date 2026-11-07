@@ -6,15 +6,15 @@
 
 ## Summary
 
-- Micro-tasks: **141** in **17** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **1230 h** (P1 1023 h · P2 189 h · P3 18 h)
+- Micro-tasks: **142** in **17** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **1236 h** (P1 1029 h · P2 189 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **126 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CAT.1 → ORD.1 → ORD.2 → ORD.4 → PAY.1 → PAY.2 → PAY.3 → PAY.4 → ORD.8
 
 ## By macro area
 
 | Macro | Area | Tasks | P1 h | P2 h | P3 h | Total h |
 |---|---|---:|---:|---:|---:|---:|
-| ARC | Architecture and foundations | 10 | 68 | 6 | 0 | 74 |
+| ARC | Architecture and foundations | 11 | 74 | 6 | 0 | 80 |
 | CORE | Identity, permissions, API, backoffice | 10 | 80 | 4 | 0 | 84 |
 | CAT | Product catalog | 11 | 104 | 10 | 0 | 114 |
 | VEN | Vendors, commissions, ledger | 11 | 80 | 14 | 0 | 94 |
@@ -31,11 +31,11 @@
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 4 | 16 | 11 | 0 | 27 |
 | MIG | Migration and cutover | 10 | 106 | 0 | 0 | 106 |
-| **Total** | | **141** | **1023** | **189** | **18** | **1230** |
+| **Total** | | **142** | **1029** | **189** | **18** | **1236** |
 
 ## By phase
 
-### F0 — Foundations (25 tasks, 189 h)
+### F0 — Foundations (26 tasks, 195 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -47,6 +47,7 @@
 | ARC.6 | `core`: base model, `MoneyField`, Country, `ChangeSet`/dry-run, `AuditLog` | P1 | 12 | ARC.3 | Tests on rounding and audit |
 | ARC.7 | `PlatformOperator` (country, VAT number, regime, e-invoice channel, DAC7 authority) as configuration | P1 | 4 | ARC.6 | No "IT" constant in the tax code |
 | ARC.9 | Task worker + cron scheduler on Postgres, with locks and retries | P1 | 8 | ARC.2 | Test job scheduled and observable |
+| ARC.11 | Test harness per ADR-0006: unit / integration / e2e suites, auto-markers, Playwright with screenshots, CI reports | P1 | 6 | ARC.3 | `make test-unit`, `make test`, `make test-e2e` green; e2e screenshots saved |
 | CORE.1 | Custom `User`, login via email, preferred language | P1 | 6 | ARC.6 | Initial migration with custom User |
 | CORE.2 | `VendorMember` with owner/staff roles, per-role permissions | P1 | 6 | CORE.1, VEN.1 | Role matrix tested |
 | CORE.3 | `VendorScopedQuerySet` + 404 helper + reusable cross-tenant test fixture | P1 | 8 | CORE.2 | Negative tests generated for every endpoint |

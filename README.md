@@ -1,5 +1,7 @@
 # MPMV (Marketplace Multi Vendor)
 
+[![CI](https://github.com/bertalan/mpmv/actions/workflows/ci.yml/badge.svg)](https://github.com/bertalan/mpmv/actions/workflows/ci.yml)
+
 A vertical-agnostic multivendor marketplace built as a Django + Wagtail modular monolith on
 PostgreSQL. It replaces a WordPress + WooCommerce + WCFM + WPML stack.
 
@@ -12,7 +14,7 @@ PostgreSQL. It replaces a WordPress + WooCommerce + WCFM + WPML stack.
 mpmv/          Django project: settings per environment (base/dev/test/stage/live), urls, asgi/wsgi
 apps/          One Django app per bounded context (core, accounts, vendors, catalog, tax, shipping,
                cart, orders, payments, ledger, ingest, cms, seo, compliance, api, mcp)
-tests/         Project-level tests
+tests/         Project-level tests: unit/, integration/, e2e/ (ADR-0006)
 docs/
   spec/        Functional and technical specification; README.md is the entry point,
                90-backlog.md and backlog.csv are GENERATED
@@ -31,7 +33,7 @@ Requirements: macOS with Apple [`container`](https://github.com/apple/container)
 [ADR-0002](docs/adr/0002-local-containers-apple.md)) and [uv](https://docs.astral.sh/uv/).
 
 ```sh
-make install     # Python deps + git hooks
+make install     # Python deps, Playwright browser, git hooks
 make db          # PostgreSQL 17 in an Apple container on 127.0.0.1:55432
 make run         # migrate + development server
 ```
@@ -39,7 +41,9 @@ make run         # migrate + development server
 ## Common commands
 
 ```sh
-make test        # pytest (starts the local database if needed)
+make test-unit   # unit suite: pure functions, no database
+make test        # unit + integration suites (starts the local database)
+make test-e2e    # Playwright e2e suite, screenshots in build/e2e/screenshots/
 make check       # ruff, mypy, import contracts, backlog freshness, Django system checks
 make fmt         # auto-fix and format
 make docs        # regenerate backlog + build/mpmv-spec.html
@@ -50,6 +54,7 @@ make db-reset    # destroy the local database container and volume
 ## Working on the project
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the task lifecycle, branch/commit conventions and the
-definition of done. AI agents also read [CLAUDE.md](CLAUDE.md).
+definition of done, including the TDD workflow. Editor setup: [docs/dev/vscode.md](docs/dev/vscode.md).
+AI agents also read [CLAUDE.md](CLAUDE.md).
 
 The legacy system is a separate private repository and a **read-only reference**.

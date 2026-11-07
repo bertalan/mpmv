@@ -21,6 +21,7 @@ dev = [
   "django-stubs[compatible-mypy]>=5.2",
   "import-linter>=2.5",
   "pre-commit>=4.3",
+  "pytest-playwright>=0.7",
 ]
 
 [tool.uv]
@@ -38,6 +39,7 @@ ignore = ["RUF012"]
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S101"]
 "tests/**" = ["S101"]
+"conftest.py" = ["S101"]
 "tools/**" = ["S", "E501", "RUF005"]
 
 [tool.mypy]
@@ -57,6 +59,16 @@ django_settings_module = "mpmv.settings.test"
 DJANGO_SETTINGS_MODULE = "mpmv.settings.test"
 addopts = "-ra --strict-markers"
 testpaths = ["tests", "apps"]
+python_files = ["test_*.py"]
+filterwarnings = [
+  # Raised by pytest-base-url (a pytest-playwright dependency), not by our code.
+  "ignore:Session-scoped fixtures defined as instance methods",
+]
+markers = [
+  "unit: pure functions, no database (ADR-0006)",
+  "integration: real Django + PostgreSQL",
+  "e2e: Playwright against a live server",
+]
 
 [tool.coverage.run]
 source = ["apps", "mpmv"]

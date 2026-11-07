@@ -13,11 +13,11 @@
 
 | Item | Hours | How it is calculated |
 |---|---:|---|
-| P1 micro-tasks | 1,023 | Sum from the generated backlog |
+| P1 micro-tasks | 1,029 | Sum from the generated backlog |
 | Integrated and end-to-end acceptance testing, exploratory tests | 100 | ~10% of P1 |
 | Mandatory human review of tax, payments, ledger, orders, security | 50 | ~15% of the hours for TAX, PAY, VEN, ORD, SEC |
 | Coordination, ADRs, meetings with tax advisor and legal counsel | 80 | ~8% of P1 |
-| **Subtotal** | **1,253** | |
+| **Subtotal** | **1,259** | |
 | Contingency for unforeseen issues (10–25% of P1) | 100–255 | Tax and payment domain, dirty legacy data |
 | **Go-live total** | **≈ 1,350–1,510** | |
 
