@@ -1,6 +1,7 @@
 """CORE.6: ApiClient issuance, hashing, scopes, expiry, rotation, revocation, IP allow-list."""
 
 import datetime as dt
+from typing import Any
 
 import pytest
 from django.db import IntegrityError, transaction
@@ -25,6 +26,11 @@ SCOPE = "catalog:write"
 
 def _bearer(key: str) -> str:
     return f"Bearer {key}"
+
+
+def _payload(value: Any) -> dict[str, Any]:
+    assert isinstance(value, dict)
+    return value
 
 
 def _stored_values(client: ApiClient) -> list[str]:
@@ -54,10 +60,11 @@ def test_issue_writes_an_audit_entry_without_hash_or_secret(issue: IssueFn) -> N
     assert entry.target_key == str(client.public_id)
     assert entry.actor_label == "staff:ops"
     assert entry.before is None
-    assert entry.after["key_prefix"] == client.key_prefix
-    assert entry.after["scopes"] == ["catalog:write", "stock:write"]
-    assert "key_hash" not in entry.after
-    assert key.split("_", 2)[2] not in str(entry.after)
+    after = _payload(entry.after)
+    assert after["key_prefix"] == client.key_prefix
+    assert after["scopes"] == ["catalog:write", "stock:write"]
+    assert "key_hash" not in after
+    assert key.split("_", 2)[2] not in str(after)
 
 
 def test_issue_dry_run_creates_nothing() -> None:
@@ -181,8 +188,8 @@ def test_revoked_key_is_401_and_revocation_is_audited(issue: IssueFn) -> None:
     assert (result.http_status, result.reason) == (401, Reason.REVOKED)
     entry = AuditLog.objects.get(action="api.client.revoked")
     assert entry.target_key == str(client.public_id)
-    assert entry.before["is_active"] is True
-    assert entry.after["is_active"] is False
+    assert _payload(entry.before)["is_active"] is True
+    assert _payload(entry.after)["is_active"] is False
 
 
 def test_revoking_twice_is_a_no_op(issue: IssueFn) -> None:
@@ -225,9 +232,10 @@ def test_rotation_is_audited_with_old_and_new_prefix(issue: IssueFn) -> None:
     rotated = rotate_api_key(client, ctx=CTX)
     assert rotated.client is not None
     entry = AuditLog.objects.get(action="api.client.rotated")
-    assert entry.before["key_prefix"] == old_prefix
-    assert entry.after["key_prefix"] == rotated.client.key_prefix != old_prefix
-    assert "key_hash" not in entry.after
+    after = _payload(entry.after)
+    assert _payload(entry.before)["key_prefix"] == old_prefix
+    assert after["key_prefix"] == rotated.client.key_prefix != old_prefix
+    assert "key_hash" not in after
 
 
 def test_rotation_can_renew_an_expired_key(issue: IssueFn) -> None:
