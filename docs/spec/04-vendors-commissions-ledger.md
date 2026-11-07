@@ -54,8 +54,8 @@ class VendorTranslation(Model): vendor; language; tagline; description; shipping
 
 class VendorPlan(Model):                       # plans are DATA, not code
     code ("basic", "intermediate", "advanced", "special", "launch"); name (translated)
-    max_products (null = unlimited); features (JSON: featured, api_sync, custom_tax…)
-    monthly_fee (MoneyField, null)             # plan fee billing: phase 2 (D-04)
+    max_products (null = unlimited); features (JSON: featured, api_sync, custom_tax, vendor_branding…)
+    monthly_fee (MoneyField, null)             # plan fee charging: P2, VEN.19 (D-04)
 
 class CommissionRule(Model):                   # versioned: never modified, only new rows
     vendor (null = platform default); plan (null)
@@ -73,7 +73,8 @@ class PayoutAccount(Model):
 class LedgerEntry(Model):                      # append-only, never UPDATE/DELETE
     vendor; vendor_order = FK(VendorOrder, null=True)
     kind = CharField(choices=["sale", "shipping", "commission", "payment_fee", "refund",
-                              "commission_reversal", "adjustment", "payout", "transfer"])
+                              "commission_reversal", "adjustment", "payout", "transfer",
+                              "plan_fee"])        # plan_fee: VEN.19 (P2)
     amount = MoneyField()                      # sign: + vendor credit, − vendor debit
     platform_entity = FK(PlatformOperator)     # multi-entity (e.g. relocation to another EU country)
     gateway_account; external_ref (tr_…, po_…, re_…)
@@ -123,7 +124,9 @@ def payout_eligibility(vendor) -> Eligibility               # DAC7 complete, acc
 
 1. **Vendor application**: public form (Turnstile) → `applicant` → staff review → `onboarding`
    (DAC7 data, Stripe Express account via onboarding link, acceptance of the versioned contract
-   with the signature flow below, tax regime) → `active`. Every step is recorded in `AuditLog`.
+   with the signature flow below, tax regime) → `active`. Activation is refused when neither the
+   registered office nor a permanent establishment is in the allowed countries of the
+   `PlatformOperator`, the EU-27 at go-live (CMP.13, D-21). Every step is recorded in `AuditLog`.
 2. **Paid order**: for each `VendorOrder` the rule snapshot is frozen, `compute_commission` is
    computed, and the ledger rows are written (`sale`, `shipping`, `commission`, `payment_fee`).
 3. **Transfer**: with *separate charges and transfers* (see [07](07-cart-orders-payments.md)) a Stripe
@@ -131,6 +134,22 @@ def payout_eligibility(vendor) -> Eligibility               # DAC7 complete, acc
 4. **Refund**: proportional `refund` and `commission_reversal` rows; current business rule
    "on a full refund the platform returns the commission and the payment fee" (to be confirmed, D-05).
 5. **Nightly reconciliation**: ledger ↔ Stripe transfers and balance; discrepancies → alert and report.
+
+### Plan entitlements and plan fees (VEN.19, P2)
+
+Plans are data (VEN.2), and their `features` keys are the **entitlements**: what a plan allows
+beyond commission and product limits (for example `vendor_branding`, spec 14 §14.12). Code never
+tests a plan code; it asks `plan_allows(vendor, feature) -> bool` in `apps/vendors/services.py`,
+backed by a pure `engine.plan_allows(plan_features, feature)`. A plan change has an effective date
+and is audited; losing an entitlement hides the feature and keeps its data.
+
+Plan fees (D-04: not at launch). From P2, a plan with a `monthly_fee` is charged once per month
+and vendor by a scheduled job (ARC.9) as a `plan_fee` ledger debit, so it is settled against the
+vendor's balance like the commission. The job is idempotent per vendor and period. The
+**marketplace issues no invoice** for the fee (owner principle): each charge produces a
+**non-fiscal statement** (PDF in the vendor's language, in the document area of VEN.15) that says
+it is not a tax invoice, and the operator invoices the fee outside the platform. The statement
+shows the plan, period, amount and the ledger reference.
 
 ### Legal and e-invoicing identity (VEN.12)
 
@@ -180,6 +199,10 @@ These rows are the payout gate, and the seeded rows include the DAC7 dataset of
 | EU member states, Italy included | VAT number, IBAN |
 | Outside the EU | IBAN, foreign TIN (`tax_code`) |
 
+The "Outside the EU" rows stay at go-live: a vendor with its registered office outside the EU
+and a permanent establishment in the EU can be activated (CMP.13), and the rows are ready for the
+later opening to non-EU vendors (CMP.17 to CMP.22).
+
 So every vendor that passes the gate has a VAT number or a TIN, and the legal name is always
 present. Payout code (VEN.6, VEN.7) calls `assert_payout_allowed(vendor)`, which refuses with
 the list of missing or invalid fields (and, from VEN.16, with an overdue contract acceptance). A vendor that passes it has the complete DAC7 dataset
@@ -203,8 +226,8 @@ structure the operator's invoicing tool can map to FatturaPA.
 Owner decisions of 2026-11-07. The vendor contract and the other legal documents a vendor
 accepts (for example a data processing agreement) are not visitor content. They are versioned
 documents with one text per language, handled apart from the CMS pages of
-[09](09-multilingual.md) and [10](10-content-seo-ai.md): CMS content stays English only until
-after go-live, while vendor legal documents exist in every vendor language from the start (IT,
+[09](09-multilingual.md) and [10](10-content-seo-ai.md): new CMS content stays English only until
+after go-live (existing IT pages are migrated, D-18), while vendor legal documents exist in every vendor language from the start (IT,
 EN, DE, FR, ES). The legal translation of the texts is the owner's business task and a go-live
 prerequisite; the platform only stores and serves the texts it is given.
 
@@ -480,7 +503,7 @@ adopted the regulation applies in full.
 
 Own orders and order lines, entry of shipping quotes, products (editing of texts, price and stock
 if the vendor is not fed by a pipeline), balance and payouts, documents (accepted contracts and their
-evidence from VEN.15, non-fiscal commission statements from CMP.2, obligations checklist from CMP.10),
+evidence from VEN.15, non-fiscal commission statements from CMP.2, obligations checklist from CMP.10, plan fee statements from VEN.19),
 tax regime change request (approved by staff, as today), store policies per language.
 
 ## 4.3 Tasks
@@ -505,6 +528,7 @@ tax regime change request (approved by staff, as today), store policies per lang
 | VEN.16 | Contract updates and specific approval completion: re-acceptance deadlines per vendor, reminders, automatic consequences, specific approval pending requirement with its own deadline and consequence, paper original route with staff moderation (receipt date, scan, archive location, approve or reject with reason), completion routes per version and per vendor, staff pending view with route and paper status | P1 | 20 | VEN.14, ARC.9, SEC.4, ARC.16 | A vendor that misses its deadline gets the configured consequence (warn, payouts blocked, sales blocked or suspended); staff can extend the deadline, change the consequence or exclude the vendor, all audited with a reason; accepting the document lifts the automatic restrictions but not a staff suspension; a vendor with both acts online but no completion gets the specific approval consequence at its deadline, and a staff-approved paper original lifts it; a rejected original stays pending and the vendor is emailed the reason |
 | VEN.17 | Qualified and advanced digital signature upload and verification (PAdES/CAdES) of the whole document or of the specific approval sheet, pyHanko, EU trusted lists for qualified and staff-listed trust anchors for advanced; completes the specific approval and is stored as a stronger acceptance | P1 | 18 | VEN.14, VEN.16 | A PAdES and a `.p7m` test file signed with a certificate from a test trusted list are accepted; a file that signs a different PDF, an altered file or an untrusted certificate is refused with the reason; a signed approval sheet satisfies the vendor's specific approval requirement |
 | VEN.18 | Fiscal regime RF20 (cross-border VAT franchise, Directive (EU) 2020/285, FatturaPA specification 1.9 from 2025-04-01): add the choice with its official SDI label, update the check constraint with a data migration, and record the FatturaPA specification version (1.9.1) the party block follows | P1 | 2 | VEN.12 | A vendor can save RF20; the constraint accepts RF01–RF20 except RF03; `fatturapa_party()` emits `RegimeFiscale` RF20; a test pins the label list to the specification version |
+| VEN.19 | Plan entitlements and plan fees: `plan_allows(vendor, feature)` service over `VendorPlan.features`, plan change with effective date and audit; monthly `plan_fee` ledger debit by a scheduled idempotent job; non-fiscal statement PDF per charge in the vendor's language (no invoice issued by the marketplace; the operator invoices outside the platform) | P2 | 8 | VEN.2, VEN.4, VEN.15, ARC.9 | A vendor whose plan lacks a feature cannot use it and keeps its data; a plan with a monthly fee gets exactly one `plan_fee` entry per period even when the job runs twice; the statement PDF states that it is not a tax invoice and matches the ledger entry; no fiscal document or e-invoice is produced |
 
 ## 4.4 Mandatory regression cases
 

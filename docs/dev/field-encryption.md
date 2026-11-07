@@ -11,7 +11,7 @@ not expose them (spec 12, backlog SEC.3). The key lives outside the database and
 | `vendors.Vendor` | `tax_code` | DAC7 TIN; for a sole proprietor, a personal identifier (codice fiscale) |
 
 Deliberately in clear: the VAT number (public in VIES, searched by staff, checked against
-VIES), names and addresses (printed on every invoice and searched). A company's tax code is often
+VIES), names and addresses (printed on order confirmations and commission statements, and searched). A company's tax code is often
 its VAT number, which stays readable in `vat_number`; the case encryption protects is the
 personal one.
 

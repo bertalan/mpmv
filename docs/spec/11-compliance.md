@@ -94,7 +94,7 @@ class GpsrInfo(Model):
 ### CMP.4 — Operational GDPR `[P1]`
 - Customer data export (JSON/PDF) and erasure as **anonymization** (orders are kept
   for accounting obligations).
-- Record of processing activities and sub-processors (Stripe, carriers, email provider, AI provider, hosting),
+- Record of processing activities and sub-processors (Stripe, carriers, email provider, AI provider, hosting, geocoding providers and map tile upstream of [15](15-events.md)),
   retention per data type, DPA.
 - No tracking pixels in emails without consent (Garante privacy, provision 284 of 2026-04-17,
   compliance from about 2026-10-29): transactional and service emails (ARC.16, CMP.10 reminders)
@@ -108,7 +108,8 @@ class GpsrInfo(Model):
   terms with the content moderation rules (article 14), a form for reporting illegal content and
   unsafe products (notice and action, article 16) with tracking, a statement of reasons to the
   vendor for every restriction (article 17), and notification of suspected criminal offences
-  (article 18).
+  (article 18). Notices can target products, vendor storefronts and event pages; hiding an event
+  after a notice unpublishes it through the events service ([15](15-events.md), EVT.11).
 - Micro and small platforms are exempt from DSA articles 19–32 (articles 19 and 29) and from the
   transparency report (article 15(2)), until 12 months after they stop being small. The marketplace
   duties of articles 30–32 are still built at go-live (CMP.11), because GPSR article 22 and the
@@ -121,7 +122,7 @@ class GpsrInfo(Model):
   are VEN.5 and VEN.13 to VEN.16.
 
 ### Vendor contracts: language and acceptance evidence
-- The vendor contract follows the vendor's language (IT, EN, DE, FR, ES), one text per language,
+- The vendor contract follows the vendor's language (EN, IT, DE, FR, ES), one text per language,
   and each version declares a prevailing language that wins in case of discrepancies; the clause
   is printed in every rendered PDF. Without a text in the vendor's language the vendor accepts the
   English text and explicitly acknowledges it. Details in [04](04-vendors-commissions-ledger.md).
@@ -222,7 +223,8 @@ the vendor, and when, is evidence that the vendor was informed.
   audited: code, title and explanation in the five interface languages, legal basis, competent
   authority, applicability (vendor country, EU or non-EU, legal form, product categories,
   destination countries), reminder settings and an optional consequence. The legal wording of
-  every obligation and of the reminder emails gets a one-time review by legal counsel ⚖️ (L).
+  every obligation and of the reminder emails is marked (L): the team drafts it and legal counsel
+  approves it through CMP.24 before it reaches production ⚖️.
 - **Three answers per binding obligation**: "yes, compliant"; "no"; "in progress", which requires
   an expected completion date. Each answer is a new append-only `ObligationAttestation` row with
   timestamp, checklist version, actor (user and VendorMember role) and an AuditLog entry; an answer
@@ -260,6 +262,7 @@ Seed obligations (first checklist version; staff can add more):
 | Code | Obligation | Applies to | Legal basis (Italian authority as example) |
 |---|---|---|---|
 | VAT | VAT registration in the vendor's country; OSS for EU B2C distance sales above €10,000 a year | Every vendor; OSS for EU vendors selling to other member states | Directive 2006/112/EC art. 59c and Title XII; tax authority of the vendor's country (IT: Agenzia delle Entrate) |
+| DISPATCH | Goods are dispatched from inside the EU, with no drop-shipping from outside the EU, while the platform admits only EU-established vendors (D-21) | Every vendor | Directive 2006/112/EC art. 14a(1); the platform would otherwise be the deemed supplier (CMP.13) |
 | INVOICE | Issue the invoice or receipt for every sale, including the e-invoicing mandate of the vendor's country: IT SDI (B2B since 2019); BE Peppol (B2B from 2026-01-01); PL KSeF (2026-02-01 large, 2026-04-01 others, micro 2027-01-01); FR (receipt for all and issuing for large and mid-size from 2026-09-01, issuing for SMEs from 2027-09-01); DE (receipt from 2025-01-01, issuing from 2027-01-01 above €800,000 turnover and from 2028-01-01 for all); HR (B2B from 2026-01-01); intra-EU B2B e-invoicing in EN 16931 with digital reporting from 2030-07-01 (ViDA, directive (EU) 2025/516) | Every vendor | National VAT law; tax authority of the vendor's country |
 | CONSUMER | 14-day withdrawal, refunds, legal guarantee of conformity | Every vendor selling to consumers | Directive 2011/83/EU, directive (EU) 2019/771; IT: Codice del Consumo, AGCM |
 | GPSR | Manufacturer and, for non-EU manufacturers, EU responsible person data and safety information for each product | Vendors of consumer products | Regulation (EU) 2023/988; market surveillance authority (IT: MIMIT) |
@@ -297,8 +300,15 @@ Seed obligations (first checklist version; staff can add more):
   l'environnement L.541-10-9, where an unchecked marketplace takes on the seller's EPR obligations;
   ES: RD 1055/2022, RD 27/2021). Product categories map to EPR streams; an offer is not sold into a
   country whose check is active and for which the vendor has no registration number. The checks
-  are configurable per country and stream. ⚖️ Whether the EU checks bind a small platform and
-  whether the national checks bind a foreign marketplace is Q-67.
+  are configurable per country and stream.
+- **Activation per country is an owner decision** (owner answer to Q-67, 2026-11-07). The checks
+  are built at go-live and every country starts **off**. Turning a country's check on or off is a
+  two-step flow: a staff operator proposes it (country, streams, reason, legal basis), and a
+  platform owner (spec [02](02-core-identity-permissions.md)) approves or rejects it; the proposer
+  can never approve their own proposal. Both steps write an AuditLog entry, and the setting shows
+  its approval record (proposer, approver, dates, reason). ⚖️ The owner decides country by country
+  on legal counsel's advice: whether the EU checks bind a small platform, and whether the national
+  checks bind a foreign marketplace.
 
 ### CMP.12 — VAT records of facilitated supplies `[P1]`
 - A platform that facilitates supplies must keep records of them (article 242a of directive
@@ -309,17 +319,162 @@ Seed obligations (first checklist version; staff can add more):
 - Built from the order snapshots (ORD.2) and the VEN.12 identity: an export per vendor and period,
   and a retention rule that keeps the data out of CMP.4 erasure. This is a record, not bookkeeping.
 
-### CMP.13 — Deemed-supplier flow gate `[P1]`
-- Under article 14a of the VAT directive the platform itself becomes the VAT supplier when a vendor
-  not established in the EU sells goods already in the EU to consumers (widened from 2027-01-01 by
-  directive (EU) 2025/516), or when goods are imported in consignments of €150 or less. Similar
-  rules make the platform liable in the UK (consignments of £135 or less sold to UK consumers) and
-  in Switzerland (article 20a of the Swiss VAT act, from CHF 100,000 of small consignments). These
-  flows conflict with the no-invoicing principle.
-- `Vendor.established_in_eu` derives from the registered office and any permanent establishment;
-  checkout applies the rules decided in D-21 (proposal: EU-established vendors only, B2C
-  consignments to Great Britain of £135 or less refused, a counter of small consignments to
-  Switzerland with an alert before CHF 100,000). Blocked by D-21.
+### Deemed-supplier rules: decision D-21
+Under article 14a of the VAT directive the platform itself becomes the VAT supplier when a vendor
+not established in the EU sells goods already in the EU to consumers (widened from 2027-01-01 by
+directive (EU) 2025/516), or when goods are imported in consignments of €150 or less. Similar rules
+make the platform liable in the UK (consignments of £135 or less sold to UK consumers) and in
+Switzerland (article 20a of the Swiss VAT act, from CHF 100,000 a year of small consignments).
+These flows conflict with the no-invoicing principle. Owner decisions of 2026-11-07 (D-21, owner
+answers to Q-65 and Q-66):
+
+- **EU**: at go-live only vendors established in the EU can sell (CMP.13). Non-EU vendors (for
+  example from Serbia or China) come later; the opening is designed now as P2 rows CMP.17 to
+  CMP.22 and switched on only with the tax advisor ⚖️ (L).
+- **United Kingdom**: B2C consignments to Great Britain of £135 or less are not sold on the
+  platform. The buyer sends an order request to the vendor, who completes the sale outside the
+  platform (CMP.14). ⚖️ (L) The tax advisor confirms before go-live that this design is not
+  "facilitating" the supply under the UK online marketplace rules.
+- **Switzerland**: a yearly counter of small consignments with alerts to the owner (CMP.15); the
+  response at the threshold is decided with the tax advisor ⚖️ (L) (CMP.16).
+
+### CMP.13 — Vendor establishment gate `[P1]`
+- `PlatformOperator.allowed_vendor_countries`: the set of ISO 3166-1 countries where a vendor may
+  be established, seeded with the EU-27 from the shared country constants (never a literal list in
+  application code). It is changed only through
+  `core.services.set_allowed_vendor_countries(countries, *, actor, reason, dry_run)`. The caller
+  needs the platform owner permission (spec [02](02-core-identity-permissions.md)), which this task
+  adds. The service creates a new `PlatformOperator` version, writes an AuditLog entry with the
+  set before and after and the reason, and returns a `ChangeSet` that also lists the active vendors
+  outside the new set. Shrinking the set suspends nobody: staff decide on the vendors listed.
+- `engine.vendor_establishment(vendor)` is a pure function of the VEN.12 identity. It returns the
+  registered office country and the country of the permanent establishment, when there is one. A
+  vendor is admissible when one of them is in the allowed set. ⚖️ Evidence of a permanent
+  establishment is checked by staff with the tax advisor's criteria.
+- VEN.5 activation (`onboarding` → `active`) calls `assert_establishment_allowed(vendor)`, which
+  refuses with a clear message naming the country. Applications from other countries can still be
+  received and kept. When an active vendor's registered office or permanent establishment moves
+  out of the set, staff get a flag and decide.
+- Goods must also be dispatched from inside the EU: an import in a consignment of €150 or less
+  makes the platform the deemed supplier whoever the vendor is (for example an EU vendor that
+  drop-ships from a non-EU warehouse). At go-live this is a vendor declaration in the contract and
+  a seed obligation of the CMP.10 checklist; CMP.17 later stores the ship-from country as data.
+
+### CMP.14 — UK low-value consumer orders as vendor requests `[P1]`
+- Scope: buyers in Great Britain who are not businesses, for each vendor consignment (the
+  `VendorOrder` package) whose goods are worth £135 or less (intrinsic value, without transport
+  and insurance unless they are part of the price). Northern Ireland follows D-02. The value is
+  converted from EUR at the HMRC monthly exchange rate, kept as data. A buyer is B2B when a UK
+  VAT number passes the HMRC check, through a client behind the same interface as the VIES client
+  of TAX.5.
+- Checkout turns such a consignment into **"send request to vendor"**. It reuses the quote request
+  entry point and the vendor notifications of SHP.9 and SHP.10, but creates a `VendorLead`, not an
+  order. The buyer sees a clear notice: the platform does not sell these goods, the vendor will
+  contact them, and any sale is between the buyer and the vendor. Other vendors' consignments in
+  the same cart stay normal sales.
+- No Stripe charge, no `Order`, no ledger row and no commission. The platform sets no terms of
+  sale and takes no part in payment or delivery: its role is lead referral only.
+- The buyer's contact data goes to the vendor only after the buyer confirms it on the request
+  screen (transparency notice, and consent where needed under GDPR). The transfer is logged, and
+  the lead is in the CMP.4 export, erasure and retention rules.
+- The vendor gets the request by email and in the vendor area, and contacts the buyer directly.
+- The customer terms (CMS legal pages) say the platform is not a party to these sales.
+- The rule is data (destination country, buyer type, value threshold and currency, validity),
+  changed through an audited service; the seed row is Great Britain, B2C, £135. CMP.16 can add a
+  Swiss row without code changes.
+- Goods already in the UK sold by an overseas seller also make the marketplace liable, whatever
+  their value. The CMP.13 dispatch rule (goods leave from inside the EU) keeps them out.
+- UK orders above £135 stay normal platform sales. The buyer is told before payment that UK import
+  VAT and duty are charged at delivery (DAP), unless the vendor's shipping method is marked as
+  duties paid (DDP); the flag is stored per method.
+- ⚖️ (L) The tax advisor confirms before go-live that the "no facilitation" test holds for this
+  design: HMRC treats an operator that only lists, advertises or redirects, with no further
+  involvement, as outside the online marketplace rules.
+
+### CMP.15 — Swiss small-consignment counter `[P1]`
+- A running counter per calendar year of the platform's turnover from small consignments to Swiss
+  consumers: consignments whose computed Swiss import tax is CHF 5 or less, converted to CHF at the
+  Swiss tax administration's published rate, kept as data. It is measured against the CHF 100,000
+  deemed-supplier threshold of article 20a of the Swiss VAT act.
+- Alerts by email to the owner and staff at configurable levels (default 70% and 90%), once per
+  level and year. The levels are changed through an audited service.
+- The response at the threshold is CMP.16.
+
+### CMP.16 — Swiss threshold response `[P2]`
+- ⚖️ (L) Decided with the tax advisor before the counter reaches the threshold. The options are
+  to register for Swiss VAT as the supplier of small consignments (against the no-invoicing
+  principle, with recurring costs) or to switch Swiss small consignments to the CMP.14
+  lead-only flow by adding a Swiss rule row. The second option needs only configuration, a
+  checkout test and the matching terms text.
+
+### Opening to non-EU vendors `[P2]`
+Designed now, implemented later (D-21). None of this is active at go-live: CMP.13 keeps non-EU
+vendors out until the owner, with the tax advisor, widens the allowed set. Each row is switched on
+by its own setting, off by default.
+
+- **CMP.17 — Non-EU origin in shipping.** The ship-from country is stored per shipping method or
+  stock location and travels with the package to the tax and shipping engines. It decides whether a
+  sale is an import or a supply of goods already in the EU. Zones, indicative delivery times and
+  extra days for customs are configured per origin, on top of the shipping methods and special
+  areas of SHP.12 and SHP.14.
+- **CMP.18 — Deemed-supplier VAT flows.** Covers goods already in the EU sold by a non-EU vendor
+  (article 14a(2)) and imports in consignments of €150 or less (article 14a(1), IOSS). The tax
+  engine gets a `deemed_supplier` outcome. The order snapshot records the two supplies: vendor to
+  platform, exempt under article 136a, and platform to customer at the destination rate. The VAT
+  of a deemed supply is withheld from the vendor transfer and recorded in the ledger as a
+  `deemed_vat` row. The marketplace issues no invoices: the platform produces the deemed-supplier
+  VAT data and records (the article 242a records of CMP.12, plus OSS union and IOSS return data per
+  member state and period), and the operator's accountant does the fiscal side (registration,
+  returns, payment). ⚖️ (L) Turning the flow on is an owner step with the tax advisor.
+- **CMP.19 — Imports above €150 and IOSS per order.** Before payment the buyer sees who pays
+  import VAT, customs duty and the carrier's clearance fee: at delivery (DAP, the default) or
+  included in the price (DDP, flag per shipping method, shared with CMP.14). The low-value duty of
+  €3 per item and the €2 handling fee of the EU customs reform are shown where they apply. For
+  consignments of €150 or less under CMP.18, the IOSS number is recorded per order and passed only
+  to the carrier and the vendor for the customs declaration, never shown to buyers.
+- **CMP.20 — GPSR for products of non-EU manufacturers sold by non-EU vendors.** A product of a
+  non-EU manufacturer needs an economic operator established in the EU (GPSR article 16, Market
+  Surveillance Regulation article 4): manufacturer, importer, authorised representative or
+  fulfilment service provider. CMP.3 already collects and shows the EU responsible person. CMP.20
+  adds its type, its EU country and evidence of the mandate or contract. A non-EU vendor cannot be
+  the importer itself. A listing without a valid EU operator is blocked, on the import pipelines
+  too.
+- **CMP.21 — DSA trader traceability for non-EU traders, and sanctions screening.** The article 30
+  data of CMP.11 for traders outside the EU: identity document, trade register of the vendor's
+  country where one exists, best-effort checks without VIES, and documents kept in their original
+  language with staff notes. The spec had no sanctions screening. CMP.21 adds it: the vendor and
+  its legal representative are screened against the EU consolidated financial sanctions list at
+  activation and on every list update, matches go to staff review, and countries under
+  comprehensive EU restrictions are never in the allowed set. It is a prerequisite for the first
+  non-EU vendor.
+- **CMP.22 — Stripe Connect for non-EU vendor countries.** Which vendor countries an EU platform can
+  onboard as connected accounts, and which can receive only cross-border payouts under the
+  recipient service agreement, is kept as data and checked against Stripe at review time
+  (UNCERTAIN for Serbia and China). Charges and transfers stay in EUR, the payout currency and its
+  conversion follow the Stripe account. A country without support keeps the vendor `on_request`
+  (the D-19 pattern) or out of the allowed set. Builds on VEN.6 and PAY.3.
+
+### CMP.23 — Order-data export for vendors' invoicing tools `[P2]`
+- Owner answer to Q-68 (2026-11-07). Per `VendorOrder`, a non-fiscal export of the order snapshot
+  mapped to the EN 16931 business terms (seller and buyer parties, lines, VAT category and rate,
+  totals), so that a vendor's own invoicing tool (for example a Peppol or SDI tool) can import it
+  and issue the invoice. Formats are CSV and JSON, plus an optional UBL-like XML.
+- Every format is labelled "Documento non fiscale / Non-fiscal document, not an invoice". It has no
+  invoice number, and the XML uses its own document type, so that no tool takes it for an issued
+  invoice.
+
+### CMP.24 — Approval of legal wording `[P1]`
+- Owner answer to Q-70 (2026-11-07): the team and the agents draft the legal wording, and legal
+  counsel approves it. Vendor contracts already have their own versioning and approval (VEN.13);
+  CMP.24 covers every other text marked (L): obligation texts and reminder emails (CMP.10), the
+  non-fiscal label, pre-contractual and marketplace information (CMP.6), withdrawal labels and
+  emails (ORD.8), the CMP.14 notices, and legal notices in emails.
+- Each (L) text, in every language, stores a version (SHA-256 hash of the text), its draft author
+  (person or agent) and the counsel approval (approver name or role, date, approved hash). gettext
+  keys carry an `(L)` context; database texts carry the same fields.
+- A text whose current hash has no matching approval cannot be published to production. The
+  release check fails on it, and a production system check refuses to start. STAGE shows the text
+  with a "pending legal approval" marker. Approvals are audited.
 
 ### Regimes reviewed and not applicable at launch
 Checked on 2026-11-07 ([regulatory check](../dev/regulatory-check-2026-11.md)); reassess at every
@@ -335,11 +490,13 @@ regulatory check and when the platform grows.
 - PSD3 and the Payment Services Regulation: provisionally agreed on 2025-11-27, not yet published;
   application about 21 months after publication. Stripe is the licensed provider; D-08 stays open.
 - ViDA (directive (EU) 2025/516): Single VAT Registration from 2028-07-01, intra-EU digital
-  reporting and e-invoicing from 2030-07-01, both vendor duties; the article 14a change from
-  2027-01-01 is CMP.13.
+  reporting and e-invoicing from 2030-07-01, both vendor duties. The article 14a change from
+  2027-01-01 does not apply at go-live, since CMP.13 admits only EU-established vendors; CMP.18
+  handles it when non-EU vendors are admitted.
 - EU customs reform: a €3 duty per item on low-value consignments from 2026-07-01 (regulation (EU)
-  2026/382) and a €2 handling fee per item from 2026-11-01 apply to imports only, so only to
-  non-EU vendors if D-21 allows them.
+  2026/382) and a €2 handling fee per item from 2026-11-01 apply to imports only. At go-live D-21
+  admits only EU-established vendors, so they matter only after the opening to non-EU vendors
+  (CMP.19).
 
 ## 11.3 Tasks
 
@@ -354,7 +511,18 @@ regulatory check and when the platform grows.
 | CMP.7 | Automated accessibility audit in CI (axe, WCAG 2.2 AA tags) + manual review + statement | P1 | 8 | THM.5 | Zero axe violations with the `wcag22aa` tag on key pages; manual review recorded; statement published |
 | CMP.8 | AI Act transparency: "AI generated" or "AI edited" label and metadata flag on AI-produced product images, origin tracking of AI text, staff AI literacy briefing | P1 | 4 | CAT.4, ING.5 | An AI-edited image shows its label on the product page and in its metadata; unreviewed machine text cannot be published as reviewed |
 | CMP.9 | WCAG 2.2 SC 3.3.8 (accessible authentication) on the authentication templates of CORE.4 and CORE.5: paste allowed in every password and code field, `autocomplete` tokens (`current-password`, `new-password`, `one-time-code`, `username webauthn`), passkeys offered, Turnstile without a puzzle | P1 | 3 | CORE.4, CORE.5, THM.3 | e2e test pastes a password and a TOTP code; the template lint finds the `autocomplete` tokens; Turnstile runs in managed or invisible mode |
-| CMP.10 | Vendor obligations checklist with self-attestation: versioned `VendorObligation` data with applicability rules, three answers (yes, no, in progress with date) as append-only attestations, date-based and "no" reminders with one-click links, staff flags after N unanswered reminders, optional VEN.16 consequence per obligation, staff view of open answers, seed obligations; email wording reviewed once by counsel (L) | P1 | 24 | VEN.12, VEN.16, ARC.16, ARC.9, CORE.9, SEC.4 | A seed vendor sees only the obligations that apply to it; an "in progress" answer without a date is refused; changing an answer adds a row and an AuditLog entry; a "no" answer sends reminders at the configured cadence that stop when the answer becomes "in progress" or "yes"; an overdue date and N unanswered reminders flag the vendor to staff; every reminder is in the audit log and the outbox; suspension is mentioned only when a consequence is configured |
-| CMP.11 | DSA articles 30–32 (trader data, display on offers, compliance by design, buyer notification) and EPR registration checks per vendor, stream and destination country (Batteries art. 62(6), PPWR art. 45(4), DE/FR/ES national checks), vendor identification on request for product liability | P1 | 16 | VEN.12, CMP.3, CMP.10, CAT.1 | An offer in a category mapped to an EPR stream is not sold into a country whose check is active without the vendor's registration number there; the trader data shows on the offer; an illegal-product decision produces the list of buyers of the last 6 months to inform |
+| CMP.10 | Vendor obligations checklist with self-attestation: versioned `VendorObligation` data with applicability rules, three answers (yes, no, in progress with date) as append-only attestations, date-based and "no" reminders with one-click links, staff flags after N unanswered reminders, optional VEN.16 consequence per obligation, staff view of open answers, seed obligations; email wording approved by counsel through CMP.24 (L) | P1 | 24 | VEN.12, VEN.16, ARC.16, ARC.9, CORE.9, SEC.4 | A seed vendor sees only the obligations that apply to it; an "in progress" answer without a date is refused; changing an answer adds a row and an AuditLog entry; a "no" answer sends reminders at the configured cadence that stop when the answer becomes "in progress" or "yes"; an overdue date and N unanswered reminders flag the vendor to staff; every reminder is in the audit log and the outbox; suspension is mentioned only when a consequence is configured |
+| CMP.11 | DSA articles 30–32 (trader data, display on offers, compliance by design, buyer notification) and EPR registration checks per vendor, stream and destination country (Batteries art. 62(6), PPWR art. 45(4), DE/FR/ES national checks), vendor identification on request for product liability; per-country activation off by default, proposed by staff and approved by a platform owner, both steps audited | P1 | 19 | VEN.12, CMP.3, CMP.10, CAT.1, CMP.13 | An offer in a category mapped to an EPR stream is not sold into a country whose check is active without the vendor's registration number there; every country's check is off until a platform owner approves a staff proposal, the proposer cannot approve it, both steps are in the audit log and the setting shows who approved it and when; the trader data shows on the offer; an illegal-product decision produces the list of buyers of the last 6 months to inform |
 | CMP.12 | VAT records of facilitated supplies (art. 242a VAT directive, art. 54c Reg. 282/2011): export per vendor and period, 10-year retention outside CMP.4 erasure | P1 | 4 | ORD.2, VEN.12 | The export of a seed period holds every field of article 54c(2) and an erasure request leaves the records in place |
-| CMP.13 | Deemed-supplier flow gate: `Vendor.established_in_eu`, checkout rules per D-21 for non-EU vendors, GB consignments and the Swiss threshold counter | P1 | 6 | VEN.12, ORD.3 | The D-21 rules hold in checkout tests: a refused flow is blocked with a clear message and an allowed one passes |
+| CMP.13 | Vendor establishment gate (D-21): `PlatformOperator.allowed_vendor_countries` seeded with the EU-27, changed only through an audited service with the platform owner permission; `vendor_establishment()` from the VEN.12 registered office and permanent establishment; VEN.5 activation refused outside the allowed set | P1 | 5 | VEN.5, VEN.12, ARC.7, SEC.4 | A vendor with its registered office in a non-EU country (RS, CN) and no permanent establishment in the allowed set cannot be activated and gets a clear message, while an IT vendor can; the default set is the EU-27; changing the set writes an AuditLog entry with before and after, a dry run writes nothing, and a user without the platform owner permission is refused |
+| CMP.14 | UK B2C consignments of £135 or less per vendor as lead-only `VendorLead` requests (D-21): checkout notice, no charge, no order, no ledger or commission, buyer contact passed to the vendor only after confirmation and logged, vendor email and vendor area entry, HMRC VAT number check for B2B, HMRC monthly rate as data, rule rows as data; DAP or DDP notice per shipping method for UK orders above £135; ⚖️ (L) tax advisor confirms the no-facilitation test before go-live | P1 | 12 | ORD.3, SHP.9, SHP.10, TAX.5 | A GB consumer cart with a £100 consignment from one vendor and a £200 one from another creates one lead and one paid order; the lead has no PaymentIntent, ledger row or commission; the vendor receives the request only after the buyer confirms the data transfer, and the transfer is in the audit log; a buyer with a valid UK VAT number pays normally; the £200 order shows the DAP notice |
+| CMP.15 | Swiss small-consignment counter: yearly turnover of consignments to Swiss consumers with import tax of CHF 5 or less, CHF rate as data, alerts to owner and staff at configurable levels (default 70% and 90% of CHF 100,000), levels changed through an audited service | P1 | 4 | ORD.2, ARC.9, ARC.16 | Seed orders above and below the CHF 5 import tax limit count correctly; crossing 70% and then 90% sends one alert each, once a year; the counter restarts on 1 January |
+| CMP.16 | Swiss threshold response, ⚖️ (L) decided with the tax advisor: Swiss VAT registration as supplier, or a Swiss row in the CMP.14 lead-only rules | P2 | 3 | CMP.14, CMP.15 | With the Swiss rule active, a Swiss consumer's small consignment becomes a lead and a larger one stays a normal order; the customer terms mention Switzerland |
+| CMP.17 | Non-EU origin in shipping: ship-from country per shipping method or stock location passed to the tax and shipping engines, zones, indicative delivery times and customs extra days per origin, built on SHP.12 and SHP.14 | P2 | 6 | SHP.3, SHP.4, CMP.13 | A package shipped from RS to IT carries its origin to the tax context and shows the customs extra days; a method without a ship-from country is refused |
+| CMP.18 | Deemed-supplier VAT flows for non-EU vendors (art. 14a(1) and (2)): `deemed_supplier` tax outcome, two-supply snapshot (art. 136a exempt vendor supply, platform supply at the destination rate), VAT withheld from the vendor transfer as a `deemed_vat` ledger row, OSS union and IOSS return data per member state and period added to the CMP.12 records, no invoices; ⚖️ (L) switched on by the owner with the tax advisor | P2 | 20 | TAX.3, TAX.10, CMP.12, CMP.17, VEN.4, PAY.3 | With the flow on, a non-EU vendor's sale of goods in an IT warehouse to a DE consumer and a €100 import to an FR consumer get the `deemed_supplier` outcome; the transfer leaves out the VAT; the ledger, the CMP.12 export and the OSS and IOSS data agree to the cent; with the flow off such a checkout is blocked |
+| CMP.19 | Imports into the EU: buyer information on import VAT, duty, carrier clearance fee, the €3 low-value duty and €2 handling fee, DAP (default) or DDP per shipping method; IOSS number recorded per order for consignments of €150 or less and passed only to the carrier and vendor | P2 | 12 | CMP.18, CMP.14, CMP.6, ORD.3 | A €300 import shows the DAP charges before payment and a DDP method shows none; a €100 IOSS consignment stores the IOSS number on the order and the shipping data, and the number never appears on buyer pages or emails |
+| CMP.20 | GPSR for non-EU vendors: EU economic operator (GPSR art. 16, Market Surveillance Regulation art. 4) with type, EU country and mandate or contract evidence on `GpsrInfo`; a non-EU vendor cannot be its own importer; listing blocked without it, pipelines included | P2 | 6 | CMP.3, CMP.13 | A non-EU vendor's product of a non-EU manufacturer without a valid EU operator cannot be published or imported, with one it shows the operator on the product page |
+| CMP.21 | DSA art. 30 trader traceability for non-EU traders (identity document, third-country trade register, checks without VIES, documents in the original language) and EU consolidated financial sanctions screening of the vendor and its legal representative at activation and on each list update, matches to staff review | P2 | 8 | CMP.11, CMP.13, ARC.9 | A non-EU test vendor cannot be activated without its article 30 data; a name on a test sanctions list blocks activation and opens a staff review; a list update re-screens active vendors |
+| CMP.22 | Stripe Connect for non-EU vendor countries: supported connected-account and cross-border payout countries (recipient service agreement) as data, EUR charges and transfers, payout currency per account; an unsupported country keeps the vendor `on_request` | P2 | 6 | VEN.6, PAY.3, CMP.13 | A vendor from a country marked unsupported cannot sell online and shows as on request; a supported cross-border country gets a recipient account and its EUR transfers reconcile with the ledger |
+| CMP.23 | Non-fiscal order-data export per `VendorOrder` mapped to EN 16931 business terms, as CSV, JSON and optional UBL-like XML with its own document type, labelled not an invoice | P2 | 8 | ORD.2, VEN.12 | A seed order's export maps parties, lines, VAT category, rate and totals to the listed BT codes; every format carries the non-fiscal label and no invoice number; the XML is not accepted as an invoice by an EN 16931 validator |
+| CMP.24 | Approval of (L) legal wording: per text and language a version hash, draft author (person or agent) and counsel approval (approver name or role, date, approved hash) for gettext keys with an `(L)` context and database texts; release check and production system check refuse unapproved texts; STAGE shows a pending marker; approvals audited | P1 | 6 | I18N.7, ARC.16, SEC.4 | Changing an approved (L) text in any language makes the release check fail until a new approval matches its hash; production refuses to start with an unapproved text; STAGE shows the marker; each approval is in the audit log |

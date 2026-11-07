@@ -215,6 +215,16 @@ Rules carried over from version 2.4 (all as tests):
 - A state changed manually by staff does not make an unquoted request payable (bug of 2026-09-23).
 - Historical two-phase orders are migrated read-only.
 
+### Vendor closures and the dispatch date
+
+A vendor closure (an `EventPage` of type `closure`, [15](15-events.md)) moves the dispatch date of
+that vendor's package and the delivery estimate, while the buyer can still order. The shipping
+engine stays a pure calculator that knows nothing about events: it exposes the `ClosedPeriod`
+dataclass and the pure `earliest_dispatch_date(ordered_on, closed)` and
+`delivery_window(dispatch_on, min_days, max_days)` functions, and the checkout (`cart`) passes in
+the periods it reads from `events`. The delivery estimate counts from the dispatch date. Import-linter
+forbids `apps.shipping` from importing `apps.events` (EVT.1, EVT.8).
+
 ### Management tools
 
 - Zone and rate editor in admin with **diff preview** and impact check (how many sample

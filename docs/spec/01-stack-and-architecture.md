@@ -51,7 +51,7 @@ adapters on top of the same services.
 ```
 mpmv/                     # settings (base/dev/stage/live), urls, asgi/wsgi
 apps/
-  core/                   # base model, Money, Country, PlatformOperator, AuditLog, FeatureFlag
+  core/                   # base model, Money, Country, PlatformOperator, AuditLog, FeatureFlag, Geocoder, map tile proxy
   accounts/               # User, roles, MFA, sessions
   vendors/                # Vendor, VendorMember, VendorPlan, KYC/DAC7 documents, policies
   catalog/                # Product, Variant, translations, navigation taxonomies, attributes, media, redirects
@@ -63,6 +63,7 @@ apps/
   ledger/                 # LedgerEntry, commissions, payouts, reconciliation
   ingest/                 # supplier sources, adapters, staging, catalog upsert
   cms/                    # Wagtail pages: Home, Standard, Blog, Taxonomy landing, Vendor storefront, Legal
+  events/                 # EventIndexPage and EventPage (Wagtail), recurrence, moderation, RSS/ICS feeds, maps (spec 15)
   themes/                 # theme registry, theme-aware template loader, design tokens (spec 14); theme files in themes/<slug>/
   seo/                    # sitemap, JSON-LD, Google/Meta feeds, llms.txt, robots
   compliance/             # DAC7, GPSR, GDPR requests, DSA reports, withdrawal
@@ -77,6 +78,7 @@ flowchart TD
   core --> accounts
   core --> themes
   core --> vendors
+  themes -.pure palette functions, THM.11.-> vendors
   accounts --> vendors
   vendors --> catalog
   vendors --> tax
@@ -91,9 +93,15 @@ flowchart TD
   catalog --> ingest
   catalog --> seo
   cms --> seo
+  catalog --> events
+  cms --> events
+  shipping --> events
+  events --> cart
+  events --> seo
+  events --> compliance
   orders --> compliance
   ledger --> compliance
-  api -.adapter.-> orders & catalog & ingest & shipping & tax
+  api -.adapter.-> orders & catalog & ingest & shipping & tax & events
   mcp -.adapter.-> api
 ```
 
@@ -101,6 +109,9 @@ flowchart TD
 - `tax` and `shipping` do not know about `orders`: they receive a *context* (dataclass) and return a
   *decision*. This keeps them testable in isolation.
 - `api` and `mcp` contain no logic: they call the services.
+- `events` sits between the `catalog`/`cms` layer and `cart` ([15](15-events.md)): `cart` reads vendor
+  closures from it and passes them to the shipping engine as data (`ClosedPeriod`); `shipping`,
+  `catalog` and `cms` never import `events`.
 - An import-linter rule in CI enforces the graph.
 
 ### Cross-cutting conventions
@@ -114,7 +125,7 @@ flowchart TD
 | History | Configuration tables with `valid_from` / `valid_to`; orders store snapshots, not live references |
 | Dry-run | Every mutating service accepts `dry_run=True` and returns a `ChangeSet` (diff) |
 | Audit | Every sensitive mutation writes an `AuditLog` (who, what, before/after, from where) |
-| Languages | Order EN (primary, source) → IT → DE → FR → ES → later languages; all five at go-live for interface text, visitor content in EN only until after go-live (D-18); languages are configuration; no hardcoded text in templates |
+| Languages | Order EN (primary, source) → IT → DE → FR → ES → later languages; all five at go-live for interface text, visitor content in EN only until after go-live, except the existing IT texts migrated from the current site (D-18); languages are configuration; no hardcoded text in templates |
 | Time | UTC in the DB; Europe/Rome for cron jobs and documents |
 
 ## 1.4 Example of the service + pure function pattern

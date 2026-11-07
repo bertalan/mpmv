@@ -1,6 +1,6 @@
 # MPMV task runner. Local containers use Apple `container` (ADR-0002); no Docker, no compose.
 .DEFAULT_GOAL := help
-.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell image dev dev-down dev-reset dev-status dev-logs migrate run worker test test-unit test-e2e test-all check lint fmt typecheck imports audit
+.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell image dev dev-down dev-reset dev-status dev-logs migrate run worker test test-unit test-e2e test-all check lint fmt typecheck imports audit sbom
 
 DB_NAME      := mpmv-db
 DB_IMAGE     := docker.io/library/postgres:17
@@ -123,6 +123,13 @@ audit: ## Scan pinned dependencies for known vulnerabilities (pip-audit)
 	@mkdir -p build
 	uv export --no-emit-project --format requirements-txt > build/requirements.txt
 	uvx pip-audit --strict --disable-pip --require-hashes -r build/requirements.txt
+
+# OPS.4: the image SBOM comes from syft in CI (docs/dev/dependency-updates.md).
+sbom: ## CycloneDX SBOM of the production Python environment (no dev group) in build/sbom/
+	@mkdir -p build/sbom
+	UV_PROJECT_ENVIRONMENT=build/sbom/venv uv sync --frozen --no-dev --quiet
+	uv run cyclonedx-py environment --pyproject pyproject.toml --mc-type application \
+		--of JSON --output-file build/sbom/mpmv-python.cdx.json build/sbom/venv/bin/python
 
 check: lint typecheck imports docs-check ## All static checks (no database needed)
 	$(MANAGE) check --settings=mpmv.settings.test

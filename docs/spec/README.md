@@ -45,9 +45,10 @@ It also reviews the August 2026 rebuild plan.
 | 12 | [Security, infrastructure, operations](12-security-infra-operations.md) | Immediate actions, requirements, deploy, backups |
 | 13 | [Migration and cutover](13-migration-cutover.md) | ETL, parity, go-live and rollback runbook |
 | 14 | [Frontend themes](14-frontend-themes.md) | Theme system, design tokens, CSP, WCAG 2.2 AA, first vertical theme |
+| 15 | [Events](15-events.md) | Event pages (closures, promotions, trade fairs), moderation, RSS and ICS feeds, maps and geocoding, closure-aware dispatch date |
 | 90 | [Backlog](90-backlog.md) | All micro-tasks by phase (generated) |
 | 91 | [Estimates and plan](91-estimates.md) | Hours, schedule, phases, external costs, measured agent velocity |
-| 92 | [Open decisions](92-open-decisions.md) | 20 decisions to approve, with proposals |
+| 92 | [Open decisions](92-open-decisions.md) | 21 decisions with proposals (D-11, D-12 and D-18 decided) |
 
 ## Summary
 
@@ -56,16 +57,17 @@ It also reviews the August 2026 rebuild plan.
 - **Main simplifications**: a single entity per product (not two EN/IT posts), a single source for
   shipping, our own ledger and commissions, import pipelines in the same project, no operational
   scripts outside version control.
-- **Go-live scope**: 137 P1 micro-tasks, **≈ 1,570–1,760 h** including acceptance testing, review and contingency.
+- **Go-live scope**: 164 P1 micro-tasks, **≈ 1,810–2,025 h** including acceptance testing, review and contingency
+  ([91](91-estimates.md) §91.2).
   The August plan estimated 1,740–2,540 h.
-- **Do immediately**, regardless of the rebuild: rotate the credentials found in plain text
-  (see [12](12-security-infra-operations.md) §12.1).
+- **Do immediately**, regardless of the rebuild: the confidential security actions on the current
+  system (see [12](12-security-infra-operations.md) §12.1).
 
 ## Approval checklist
 
 - [ ] 00 Vision and principles
 - [ ] 01 Stack (decisions D-11, D-12)
-- [ ] 02–13 Domain documents (one tick per document)
+- [ ] 02–15 Domain documents (one tick per document)
 - [ ] 92 Open decisions: proposals accepted or amended
 - [ ] 91 P1 scope and schedule
 - [ ] Import of `backlog.csv` into the task management tool
