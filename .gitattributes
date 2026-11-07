@@ -1,0 +1,5 @@
+* text=auto eol=lf
+
+# Generated from docs/spec/*.md by tools/build_docs.py: collapse in diffs/reviews
+docs/spec/90-backlog.md linguist-generated=true
+docs/spec/backlog.csv   linguist-generated=true
