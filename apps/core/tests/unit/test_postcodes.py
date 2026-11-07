@@ -1,0 +1,103 @@
+"""SHP.12: the postcode pattern grammar shared by shipping zones, SHP.2 and the SHP.13 import.
+
+Ranges use `..` because postcodes of some countries contain a dash (PT 1000-001, PL 00-950).
+"""
+
+import pytest
+
+from apps.core.postcodes import (
+    InvalidPostcodePattern,
+    match_postcode,
+    normalize_postcode,
+    normalize_postcode_pattern,
+)
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [("846 00", "84600"), (" bt1 1aa ", "BT11AA"), ("9000-001", "9000001"), ("", "")],
+)
+def test_postcodes_are_compared_upper_case_without_spaces_and_dashes(
+    raw: str, expected: str
+) -> None:
+    assert normalize_postcode(raw) == expected
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("bt*", "BT*"),
+        (" 846* ", "846*"),
+        ("70000..74999", "70000..74999"),
+        ("70000 .. 74999", "70000..74999"),
+        ("1000-001..1999-999", "1000-001..1999-999"),
+        ("00-000..19-999", "00-000..19-999"),
+        ("84600", "84600"),
+        ("846  00", "846 00"),
+        ("9000-001", "9000-001"),
+        ("00-950", "00-950"),
+    ],
+)
+def test_valid_patterns_are_kept_in_a_canonical_form(raw: str, expected: str) -> None:
+    assert normalize_postcode_pattern(raw) == expected
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "",
+        "   ",
+        "*",
+        "B*T",
+        "BT**",
+        "74999..70000",  # lower bound above the upper one
+        "700..74999",  # bounds of different lengths
+        "70000..",
+        "..74999",
+        "1..2..3",
+        "70*..74999",
+        "70000-74999",  # the SHP.1 range syntax: ambiguous, refused with a hint
+        "9000/001",
+        "X" * 33,
+    ],
+)
+def test_malformed_patterns_are_refused(raw: str) -> None:
+    with pytest.raises(InvalidPostcodePattern):
+        normalize_postcode_pattern(raw)
+
+
+def test_the_old_range_syntax_is_refused_with_a_hint() -> None:
+    with pytest.raises(InvalidPostcodePattern, match=r"70000\.\.74999"):
+        normalize_postcode_pattern("70000-74999")
+
+
+@pytest.mark.parametrize(
+    ("pattern", "postcode", "matches"),
+    [
+        ("BT*", "BT1 1AA", True),
+        ("BT*", "B1 1AA", False),
+        ("846*", "846 00", True),
+        ("70000..74999", "70100", True),
+        ("70000..74999", "70000", True),
+        ("70000..74999", "74999", True),
+        ("70000..74999", "75000", False),
+        ("70000..74999", "7010", False),  # shorter than the bounds
+        ("9000..9999", "9000-001", True),  # PT islands: the first 4 characters
+        ("9000..9999", "1000-001", False),
+        ("1000-001..1999-999", "1500-100", True),
+        ("00-000..19-999", "00-950", True),
+        ("00-000..19-999", "20-001", False),
+        ("84600", "846 00", True),
+        ("84600", "84601", False),
+        ("9000-001", "9000 001", True),
+        ("BT*", "", False),
+        ("70000..74999", "", False),
+    ],
+)
+def test_match_postcode(pattern: str, postcode: str, matches: bool) -> None:
+    assert match_postcode(pattern, postcode) is matches
+
+
+def test_matching_refuses_a_malformed_pattern() -> None:
+    with pytest.raises(InvalidPostcodePattern):
+        match_postcode("74999..70000", "70100")

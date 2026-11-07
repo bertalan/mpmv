@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **203** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **1735 h** (P1 1435 h · P2 282 h · P3 18 h)
+- Micro-tasks: **206** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **1769 h** (P1 1469 h · P2 282 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -19,7 +19,7 @@
 | CAT | Product catalog | 11 | 106 | 10 | 0 | 116 |
 | VEN | Vendors, commissions, ledger | 19 | 174 | 22 | 0 | 196 |
 | TAX | Tax engine | 10 | 42 | 28 | 0 | 70 |
-| SHP | Shipping and quotes | 11 | 64 | 28 | 0 | 92 |
+| SHP | Shipping and quotes | 14 | 98 | 28 | 0 | 126 |
 | ORD | Cart, orders, returns | 10 | 102 | 0 | 0 | 102 |
 | PAY | Payments (Stripe Connect) | 4 | 40 | 0 | 0 | 40 |
 | ING | Supplier import and pipelines | 13 | 92 | 26 | 0 | 118 |
@@ -33,7 +33,7 @@
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 4 | 16 | 11 | 0 | 27 |
 | MIG | Migration and cutover | 10 | 106 | 0 | 0 | 106 |
-| **Total** | | **203** | **1435** | **282** | **18** | **1735** |
+| **Total** | | **206** | **1469** | **282** | **18** | **1769** |
 
 ## By phase
 
@@ -111,7 +111,7 @@
 | THM.5 | Theme quality gates, parametrised over registered themes: CSP template lint, axe-core (`wcag22aa`) on the styleguide, visual comparison harness with CI-only baselines, size budgets, `LICENSES.toml` check | P1 | 6 | THM.4, ARC.11 | A theme with a 3:1 text pair, an inline style, an unlicensed font or a 50 KB CSS file fails CI; `base` passes |
 | THM.6 | First vertical theme `ride`: colour tokens from the operator palette (§14.4, §14.12), type scale, spacing and shapes from the reference template's visual language, self-hosted Barlow and Barlow Condensed (OFL 1.1, from upstream), SVG icon subset, header, hero and home block overrides, placeholder imagery, `LICENSES.toml` | P1 | 8 | THM.4, CMS.2 | Home page renders with `ride` and passes the THM.5 gates; no file derived from the reference template (PR checklist) |
 
-### F2 — Checkout: tax, shipping, orders, payments (28 tasks, 258 h)
+### F2 — Checkout: tax, shipping, orders, payments (31 tasks, 292 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -123,12 +123,15 @@
 | TAX.5 | VIES client with cache, timeout, fail-closed | P1 | 6 | TAX.1 | Test with simulated VIES down |
 | TAX.7 | Special territories by postcode (initial dataset) | P1 | 4 | TAX.1 | T15 green |
 | SHP.1 | Carrier, Zone, VendorZoneRate, WeightBand (exclusion constraint), PickupOption, ConfigVersion models | P1 | 10 | VEN.1 | DB constraints tested |
-| SHP.2 | `match_postcode` + `resolve_zone` pure functions with cases 1–7 | P1 | 8 | SHP.1 | Cases green |
-| SHP.3 | `quote_shipping` with Rates/NeedsQuote/Blocked outcomes, over-band policy, pickup, free-shipping threshold | P1 | 8 | SHP.2 | Cases 8–13 green |
+| SHP.2 | `match_postcode` + `resolve_zone` pure functions with cases 1–7 | P1 | 8 | SHP.12 | Cases green |
+| SHP.3 | `quote_shipping` with Rates/IndicativeRates/NeedsQuote/Blocked outcomes, over-band policy, pickup, free-shipping threshold per method | P1 | 8 | SHP.2, SHP.12, SHP.14 | Cases 8–13 green |
 | SHP.4 | Cart integration: package per vendor, VAT via the tax engine | P1 | 6 | SHP.3, TAX.4, ORD.1 | Correct cart totals in mixed tests |
 | SHP.5 | Import of the LIVE v2 config (JSON) into the new models with a parity report | P1 | 6 | SHP.1 | Same rates on 200 sample combinations |
 | SHP.9 | Quotes: models, states, `submit_vendor_quote`, `send_quote`, token link, expiry | P1 | 16 | ORD.2, SHP.3 | End-to-end flow with 2 vendors |
 | SHP.10 | Quotes: vendor and staff UI, emails (customer, vendor, staff), rate limit and honeypot | P1 | 10 | SHP.9, ARC.16 | Parity with 2.4.0 |
+| SHP.12 | Configurable shipping per vendor: several shipping methods per zone (carrier, service level, indicative delivery time, own weight bands, own free-shipping threshold, one default), vendor-defined zones on top of platform zones, zones by postcode range, province, country or continent/country group, configurable VAT treatment per method | P1 | 12 | SHP.1 | A vendor offers two methods to the same zone with different bands; a vendor zone overrides the platform zone for matching addresses; VAT treatment stored per method |
+| SHP.13 | Standard shipping template proposed by the platform (zones, country groups, weight bands, VAT treatment, special areas) that a vendor copies and customises; export and re-import as JSON/CSV validated by the same validators used in tests, dry-run preview (ChangeSet), audited; SHP.5 legacy import reuses the format | P1 | 10 | SHP.12 | Round trip export -> import is lossless; an invalid file is rejected with a per-row report and changes nothing |
+| SHP.14 | Special areas: islands, remote and extra-VAT territories as postcode/province lists seeded in the standard template (IT islands and minor islands, Baleari, Corsica, Greek islands, Azores/Madeira, UK Highlands and Islands, Venice lagoon, carrier remote-area lists importable; extra-VAT: Livigno, Campione d Italia, Canarias, Ceuta/Melilla, French DOM, Aland, Mount Athos, Heligoland, Busingen linked to the TAX.1 Territory); per-method treatment: surcharge (fixed, percent, per kg), extra delivery days, unavailable, quote only, blocked; default: indicative cost subject to quote (the buyer sees an estimate and requests a quote for the exact price) | P1 | 12 | SHP.12, SHP.13 | A Sardinia address shows an indicative cost with a request-quote action; a vendor override to a fixed surcharge applies |
 | ORD.1 | Cart, CartLine, guest/user session, merge on login | P1 | 8 | CAT.1 | Cart merge test |
 | ORD.2 | Order, VendorOrder, OrderLine with snapshots, numbering, FSM | P1 | 12 | ORD.1 | Illegal transitions impossible (test) |
 | ORD.3 | `build_checkout` (tax + shipping per vendor), preview and blocking messages | P1 | 12 | TAX.4, SHP.4 | Mixed 3-vendor cart correct |
@@ -245,10 +248,10 @@
 | TAX.8 | `distance_sales_eu` + `suggest_regime` from the ledger | P2 | 6 | VEN.4 | T16 green |
 | TAX.9 | Cart tax simulator in admin and API (`/tax/simulate`) | P2 | 6 | TAX.4, SHP.4 | Staff simulate a mixed cart |
 | TAX.10 | Quarterly OSS report per country and per-vendor report | P2 | 8 | ORD.4 | CSV export verified on seed orders |
-| SHP.6 | Admin zone/rate editor with diff, impact and versions/rollback | P2 | 12 | SHP.1, CORE.8 | Rollback to a previous version works |
+| SHP.6 | Admin zone/rate editor with diff, impact and versions/rollback | P2 | 12 | SHP.12, CORE.8 | Rollback to a previous version works |
 | SHP.7 | Cart simulator (admin + `/shipping/simulate`) | P2 | 6 | SHP.4 | Parity with the current simulator on seed cases |
 | SHP.8 | Daily health check + report | P2 | 6 | SHP.1, ARC.9, ARC.16 | Email report with the 7 checks |
-| SHP.11 | Rate export for Google Merchant | P2 | 4 | SHP.1 | Feed without hardcoded rates |
+| SHP.11 | Rate export for Google Merchant | P2 | 4 | SHP.12 | Feed without hardcoded rates |
 | ING.10 | Daily report (email + admin page) with identity anomalies | P2 | 6 | ING.8, ARC.16 | Parity with `daily_report.py` |
 | ING.11 | Supplier review import | P2 | 4 | ING.1, CMS.6 | Reviews imported with original date |
 | ING.12 | `/api/v1` import API for external vendors (upsert, stock, prices, media) | P2 | 8 | CORE.7, CAT.10 | Sample client in dry-run |
