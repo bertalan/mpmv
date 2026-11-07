@@ -253,15 +253,15 @@ def has_vendor_permission(user: User, vendor: Vendor, action: str) -> bool:
     return role is not None and engine.is_allowed(role, checked)
 
 
-def owns_a_vendor(user: AbstractBaseUser | AnonymousUser) -> bool:
-    """Whether `user` is an owner of at least one vendor.
+def is_vendor_member(user: AbstractBaseUser | AnonymousUser) -> bool:
+    """Whether `user` is a member (owner or staff) of at least one vendor.
 
-    Listed in `settings.MFA_REQUIRED_POLICIES`: vendor owners must use MFA (CORE.4). Vendor
-    staff members are not required to.
+    Listed in `settings.MFA_REQUIRED_POLICIES`: everyone who reaches a store's management area
+    must use MFA (CORE.4, owner decision Q-09), whatever their role.
     """
     if not user.is_authenticated:
         return False
-    return VendorMember.objects.filter(user_id=user.pk, role=engine.OWNER).exists()
+    return VendorMember.objects.filter(user_id=user.pk).exists()
 
 
 # --- Legal and e-invoicing identity (VEN.12)

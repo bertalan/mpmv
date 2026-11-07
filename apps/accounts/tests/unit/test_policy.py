@@ -41,7 +41,7 @@ def test_anonymous_visitors_never_need_mfa() -> None:
 
 
 def test_extra_policies_from_settings_extend_the_rule(settings: SettingsWrapper) -> None:
-    """CORE.2 adds vendor owners by listing a check in settings.MFA_REQUIRED_POLICIES."""
+    """CORE.2 adds vendor members by listing a check in settings.MFA_REQUIRED_POLICIES."""
     settings.MFA_REQUIRED_POLICIES = [f"{THIS_MODULE}.nobody", f"{THIS_MODULE}.everyone"]
     assert mfa_required(UserFactory.build()) is True
 

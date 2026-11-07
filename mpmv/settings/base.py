@@ -86,9 +86,10 @@ AUTHENTICATION_BACKENDS = [
 
 # Multi-factor authentication (CORE.4, spec 02 §2.2). Staff and superusers must verify a second
 # factor (TOTP or passkey) before any page; each dotted path below names an extra
-# `check(user) -> bool` that makes MFA mandatory for more roles.
+# `check(user) -> bool` that makes MFA mandatory for more roles. Every vendor member, owner or
+# staff, must use MFA (owner decision Q-09).
 MFA_REQUIRED_POLICIES: list[str] = [
-    "apps.vendors.services.owns_a_vendor",  # vendor owners (CORE.2)
+    "apps.vendors.services.is_vendor_member",  # all vendor members (CORE.2)
 ]
 MFA_STEP_UP_MAX_AGE = 300  # seconds a verification counts as fresh for sensitive actions
 # Step-up for sensitive views of apps that cannot import accounts (the core audit log view, SEC.4).
