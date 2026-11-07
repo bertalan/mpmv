@@ -29,17 +29,20 @@
 | `TermLandingPage` | Editorial page for a taxonomy term | SEO intro, the term's products by category, related articles |
 | `VendorLandingPage` | The vendor's story (heritage, workshop) beyond the standard vendor storefront | story, images, featured products |
 | `VendorRecruitmentPage` | "Become a seller" with plans and application form | plans (from `VendorPlan`), FAQ, form |
+| `EventIndexPage` / `EventPage` | Events of vendors and of the platform: closures, promotions, trade fairs and meetings, with RSS and ICS feeds and maps ([15](15-events.md), `events` app) | the block library above, the launch countdown, structured dates, recurrence, location and coordinates |
+
+Events have their own page type, `EventPage`, in the `events` app ([15](15-events.md)). This
+supersedes owner decision Q-61 for events, which had made them blog articles. There are still no
+page types for tours, trails or packages: they are product categories (CAT.2) or article content.
+The launch countdown block below is also available in `EventPage` bodies.
 
 Taxonomy and vendor pages combine editorial content with catalog data: they are the SEO strong point
 ("browse by taxonomy term") and today they are fragmented across tags, categories and articles.
 
-There are no page types for events, tours, trails or packages (owner decision Q-61): an event is
-a blog article, and tours, trails or packages are product categories (CAT.2) or article content.
-
 ### Launch countdown block (CMS.9)
 
-A StreamField block that announces a product launch, available in `HomePage`, `StandardPage` and
-`BlogPostPage` bodies.
+A StreamField block that announces a product launch, available in `HomePage`, `StandardPage`,
+`BlogPostPage` and `EventPage` bodies ([15](15-events.md)).
 
 | Field | Rule |
 |---|---|
@@ -111,7 +114,8 @@ def product_jsonld(product, lang) -> dict
 def breadcrumb_jsonld(obj, lang) -> dict
 def robots_meta(request, obj) -> str            # noindex on 404, empty search, pagination beyond a threshold
 def sitemaps() -> dict[str, Sitemap]           # per language and type; excludes fallbacks
-def llms_txt(lang) -> str                       # generated from vendors, brands and taxonomy terms, key pages
+def llms_txt(lang) -> str                       # generated from vendors, brands and taxonomy terms, key pages, event feeds
+def event_jsonld(page, lang) -> dict | None     # schema.org Event with Place, PostalAddress, GeoCoordinates (spec 15, EVT.10)
 ```
 
 ### Feeds and Merchant
