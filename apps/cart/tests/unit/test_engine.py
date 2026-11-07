@@ -20,6 +20,14 @@ def state(key: LineKey, quantity: int, price: str = "10.00") -> LineState:
     return LineState(key=key, quantity=quantity, added_price_net=Decimal(price))
 
 
+def test_the_engine_constants_match_the_catalog_choices() -> None:
+    from apps.catalog.models import Product
+
+    assert engine.PUBLISHED == Product.Status.PUBLISHED
+    assert engine.ALWAYS_OPEN == Product.StockPolicy.ALWAYS_OPEN
+    assert engine.OUT_OF_STOCK == Product.StockStatus.OUT_OF_STOCK
+
+
 # --- Stock and limits
 
 
