@@ -381,6 +381,28 @@ Deferred to other tasks:
 Review findings not fixed (all minor): the 26 items are consolidated, with those of wave 5, in the
 cleanup table of [coherence check 5](#check-5-2026-11-07-after-waves-5-and-6-and-the-spec-prs-47-to-61).
 
+## Cleanup wave (2026-11-07)
+
+The five cleanup batches of check 5 are merged, in this order: E (#65, OPS.4), A (#66, TAX.1 and
+TAX.2), B (#69, SEC.3, VEN.5, ARC.8, CORE.13), C (#70, ARC.8 and CMS.1), D (#67, CAT.2 and
+SHP.12). 39 of the 41 consolidated items are fixed; items 7 and 22 were skipped (reasons under the
+[consolidated table](#minor-findings-consolidated)).
+
+- Behaviour changes worth a human look: tax legal notes are read-only once their profile period
+  has ended, and regime changes are approved on the business-time date (#66); ordering by an
+  encrypted field raises, both a secret variable and its `_FILE` form refuse to start, and
+  contract versions are numbered under a table lock (#69); the MFA middleware exempts Wagtail's
+  sign-out, and the deploy check `cms.E001` requires a real `WAGTAILADMIN_BASE_URL` (#70); a vendor
+  with shipping methods or pickup options can no longer be deleted before `delete_config` removes
+  them (#67); the release workflow attaches SBOMs from a separate job with `contents: write` (#65).
+- New tool: `manage.py verify_encrypted_data` checks every encrypted value (#69).
+- Follow-up: CAT.8's done-when should say that taxonomy descriptions are sanitized with an
+  allow-list before rendering (#67, item 32); record it at the next spec 03 edit.
+- New owner questions in the private register: Q-92 (is the OSS registration date required for
+  the OSS regime?) and Q-93 (bind encrypted values to their row, item 7).
+- Tests on the final main (`MPMV_TEST_DB_NAME=test_mpmv_cleanup_integration`): `make check` green,
+  `make test` 2714 passed (unit and integration, e2e deselected), coverage 98%.
+
 ## Coherence checks
 
 Run at least every 5 completed tasks: code vs spec and ADRs, done-when criteria, docs drift,
@@ -735,51 +757,65 @@ Ten left the list: the TAX.1 dash ranges (TAX.11), the TAX.1 PR wording (no acti
 key scope question and per-key audit on vendor deletion (CORE.14), the OPS.4 backlog rows and the
 TAX.2 past effective date (owner questions), the SHP.12 spec 06 D-03 note (already fixed), the
 SHP.2 narrowing (done here), and the SHP.12 country normalisation, pattern pre-parsing and spaced
-range (now in SHP.2). Every remaining item is still open in the code.
+range (now in SHP.2). The [cleanup wave](#cleanup-wave-2026-11-07) fixed 39 of the 41 items; the
+Status column gives the PR, and the two skipped items are listed under the table.
 
-| # | Batch | Task | File | Issue | Fix | Size |
-|---:|---|---|---|---|---|---|
-| 1 | A | TAX.1 | `apps/tax/admin.py` | Legal notes can be moved to another profile or edited on a closed profile | Profile read-only on change; refuse edits on closed profiles | S |
-| 2 | A | TAX.1 | `apps/tax/models.py`, `apps/core/models.py` | `Versioned` copies PlatformOperator's versioning code | Move it to `apps/core` and use it in both | M |
-| 3 | A | TAX.1 | `apps/tax/engine.py` | `oss_registered_since` is not checked against the regime | Add the rule to `profile_errors` | S |
-| 4 | A | TAX.2 | `apps/tax/engine.py`, `apps/tax/services.py` | "Approve on or after" compares the UTC date | Pass the business-time local date | S |
-| 5 | A | TAX.2 | `apps/tax/services.py` | `request_regime_change` keeps caller-set review fields | Clear them | S |
-| 6 | A | TAX.2 | `apps/tax/admin.py` | The change page runs `regime_history` twice | Compute it once | S |
-| 7 | B | SEC.3 | `apps/core/encryption.py` | Associated data binds a value to its column, not its row | Bind model and primary key; re-encrypt in a migration | M |
-| 8 | B | SEC.3 | `apps/core/fields.py` | Ordering by an encrypted field is not blocked | Raise on ordering and lookups | S |
-| 9 | B | SEC.3 | `apps/core/checks.py` | The migrate check decrypts one sample per key id | Check every row in a command, keep the sample at migrate | S |
-| 10 | B | SEC.3 | `apps/vendors/engine.py` | `mask_tax_code` shows the last 4 characters of a short TIN | Show at most a third of the characters | S |
-| 11 | B | SEC.3 | `mpmv/settings/env.py` | With the key variable and its `_FILE` form both set, the file wins silently | Refuse both | S |
-| 12 | B | SEC.3 | `apps/vendors/migrations/0008_encrypt_iban_and_tax_code.py` | Imports live helpers, assumes an `id` primary key | Freeze the helpers in the migration | S |
-| 13 | B | VEN.5 | `apps/vendors/services.py` | Two first contract versions saved at once end in an IntegrityError | Lock or catch and return a clear error | S |
-| 14 | B | VEN.5 | `apps/vendors/services.py` | `submit_application` keeps `vies_status`, `vies_checked_at` and `legacy_wp_user_id` | Reset them | S |
-| 15 | B | VEN.5 | `apps/vendors/tests/integration/test_onboarding.py` | No test for an inactive owner accepting a contract | Add it | S |
-| 16 | B | VEN.5 | `apps/vendors/admin.py` | The change page computes the current contract twice | Compute it once | S |
-| 17 | B | ARC.8 | `apps/vendors/models.py`, `apps/vendors/admin.py` | An `enabled=True` override of a kill switch is accepted and has no effect | Refuse it in `clean()` | S |
-| 18 | B | CORE.13 | `tests/tenancy.py` | The harness skips a marker that is a substring of the request path | Match whole path segments | S |
-| 19 | C | ARC.8 | `apps/core/tests/integration/test_feature_flags.py` | The TTL test bypasses the cache | Let the TTL expire under a frozen clock, or rename it | S |
-| 20 | C | ARC.8 | `apps/core/flags.py` | Registration in `AppConfig.ready()` is not required | System check and docs | S |
-| 21 | C | ARC.8 | `apps/core/services.py` | `flag_enabled` accepts any model as vendor | Take a vendor id or check the model label | S |
-| 22 | C | CMS.1 | `apps/cms/tests/factories.py` | ContentType patch for `.build()` that no test uses | Remove it | S |
-| 23 | C | CMS.1 | `apps/accounts/middleware.py` | MFA middleware does not exempt Wagtail's sign-out | Exempt it | S |
-| 24 | C | CMS.1 | `apps/cms/services.py` | Seeded menus of other languages are not translations of the EN menu | Seed them as translations (same translation key) | M |
-| 25 | C | CMS.1 | `mpmv/settings/base.py` | `WAGTAILADMIN_BASE_URL` falls back to localhost on live | Require it on live | S |
-| 26 | C | CMS.1 | `apps/cms/apps.py` | Locale sync after migrate always writes to the default database | Honour `using` | S |
-| 27 | C | CMS.1 | `apps/cms/models.py` | Editors can create a second HomePage in a locale | One HomePage per locale | S |
-| 28 | C | CMS.1 | `apps/cms/tests/integration/test_pages.py` | FR and ES pages are never requested over HTTP (check 5) | Parametrize over every configured language | S |
-| 29 | D | CAT.2 | `apps/catalog/tests/integration/test_taxonomy_admin.py` | No test moves a node under a same-slug sibling or inside a flat taxonomy | Add both | S |
-| 30 | D | CAT.2 | `apps/catalog/taxonomy.py` | `Term.clean` raises KeyError on an invalid taxonomy schema | Validate the schema first | S |
-| 31 | D | CAT.2 | `apps/catalog/taxonomy_admin.py`, `apps/catalog/admin.py` | Term reference and `Product.terms` widgets do not scale | Autocomplete filtered by taxonomy | M |
-| 32 | D | CAT.2 | `apps/catalog/taxonomy.py` | Descriptions are raw HTML | Document that CAT.8 and CMS rendering sanitize them | S |
-| 33 | D | CAT.2 | `apps/catalog/taxonomy.py` | A direct `Term.move()` skips the placement rules | Override `move` | S |
-| 34 | D | CAT.2 | `apps/catalog/tests/unit/test_taxonomy_engine.py` | Name breaks the ADR-0006 convention | Merge into `test_engine.py` | S |
-| 35 | D | SHP.12 | `apps/shipping/services.py` | `zone_snaps` counts zones served only by disabled carriers | Filter on active carriers | S |
-| 36 | D | SHP.12 | `apps/shipping/models.py` | `CountryGroup.code` accepts capitals that zones cannot reference | Lower-case it with a constraint | S |
-| 37 | D | SHP.12 | `apps/shipping/models.py` | `ShippingZone.vendor` is PROTECT while methods CASCADE | Align them and test vendor deletion | S |
-| 38 | E | OPS.4 | `.github/workflows/release.yml` | The whole job holds `contents: write`; no `persist-credentials: false`; `anchore/sbom-action` pinned by tag | Small attach job with write access; set the flag; pin by SHA | S |
-| 39 | E | OPS.4 | `docs/dev/dependency-updates.md` | The Python SBOM has no hashes, the doc says it has | Drop "and hashes" | S |
-| 40 | E | OPS.4 | `.github/dependabot.yml` | The uv image is in the docker minor/patch group; 0.x minors break (#60 already does it) | Exclude it from the group | S |
-| 41 | E | OPS.4 | `tests/unit/test_dependency_updates.py` | `open-pull-requests-limit` and "majors never grouped" are not asserted | Assert both | S |
+| # | Batch | Task | File | Issue | Fix | Size | Status |
+|---:|---|---|---|---|---|---|---|
+| 1 | A | TAX.1 | `apps/tax/admin.py` | Legal notes can be moved to another profile or edited on a closed profile | Profile read-only on change; refuse edits on closed profiles | S | done (#66) |
+| 2 | A | TAX.1 | `apps/tax/models.py`, `apps/core/models.py` | `Versioned` copies PlatformOperator's versioning code | Move it to `apps/core` and use it in both | M | done (#66) |
+| 3 | A | TAX.1 | `apps/tax/engine.py` | `oss_registered_since` is not checked against the regime | Add the rule to `profile_errors` | S | done (#66) |
+| 4 | A | TAX.2 | `apps/tax/engine.py`, `apps/tax/services.py` | "Approve on or after" compares the UTC date | Pass the business-time local date | S | done (#66) |
+| 5 | A | TAX.2 | `apps/tax/services.py` | `request_regime_change` keeps caller-set review fields | Clear them | S | done (#66) |
+| 6 | A | TAX.2 | `apps/tax/admin.py` | The change page runs `regime_history` twice | Compute it once | S | done (#66) |
+| 7 | B | SEC.3 | `apps/core/encryption.py` | Associated data binds a value to its column, not its row | Bind model and primary key; re-encrypt in a migration | M | skipped |
+| 8 | B | SEC.3 | `apps/core/fields.py` | Ordering by an encrypted field is not blocked | Raise on ordering and lookups | S | done (#69) |
+| 9 | B | SEC.3 | `apps/core/checks.py` | The migrate check decrypts one sample per key id | Check every row in a command, keep the sample at migrate | S | done (#69) |
+| 10 | B | SEC.3 | `apps/vendors/engine.py` | `mask_tax_code` shows the last 4 characters of a short TIN | Show at most a third of the characters | S | done (#69) |
+| 11 | B | SEC.3 | `mpmv/settings/env.py` | With the key variable and its `_FILE` form both set, the file wins silently | Refuse both | S | done (#69) |
+| 12 | B | SEC.3 | `apps/vendors/migrations/0008_encrypt_iban_and_tax_code.py` | Imports live helpers, assumes an `id` primary key | Freeze the helpers in the migration | S | done (#69) |
+| 13 | B | VEN.5 | `apps/vendors/services.py` | Two first contract versions saved at once end in an IntegrityError | Lock or catch and return a clear error | S | done (#69) |
+| 14 | B | VEN.5 | `apps/vendors/services.py` | `submit_application` keeps `vies_status`, `vies_checked_at` and `legacy_wp_user_id` | Reset them | S | done (#69) |
+| 15 | B | VEN.5 | `apps/vendors/tests/integration/test_onboarding.py` | No test for an inactive owner accepting a contract | Add it | S | done (#69) |
+| 16 | B | VEN.5 | `apps/vendors/admin.py` | The change page computes the current contract twice | Compute it once | S | done (#69) |
+| 17 | B | ARC.8 | `apps/vendors/models.py`, `apps/vendors/admin.py` | An `enabled=True` override of a kill switch is accepted and has no effect | Refuse it in `clean()` | S | done (#69) |
+| 18 | B | CORE.13 | `tests/tenancy.py` | The harness skips a marker that is a substring of the request path | Match whole path segments | S | done (#69) |
+| 19 | C | ARC.8 | `apps/core/tests/integration/test_feature_flags.py` | The TTL test bypasses the cache | Let the TTL expire under a frozen clock, or rename it | S | done (#70) |
+| 20 | C | ARC.8 | `apps/core/flags.py` | Registration in `AppConfig.ready()` is not required | System check and docs | S | done (#70) |
+| 21 | C | ARC.8 | `apps/core/services.py` | `flag_enabled` accepts any model as vendor | Take a vendor id or check the model label | S | done (#70) |
+| 22 | C | CMS.1 | `apps/cms/tests/factories.py` | ContentType patch for `.build()` that no test uses | Remove it | S | skipped |
+| 23 | C | CMS.1 | `apps/accounts/middleware.py` | MFA middleware does not exempt Wagtail's sign-out | Exempt it | S | done (#70) |
+| 24 | C | CMS.1 | `apps/cms/services.py` | Seeded menus of other languages are not translations of the EN menu | Seed them as translations (same translation key) | M | done (#70) |
+| 25 | C | CMS.1 | `mpmv/settings/base.py` | `WAGTAILADMIN_BASE_URL` falls back to localhost on live | Require it on live | S | done (#70) |
+| 26 | C | CMS.1 | `apps/cms/apps.py` | Locale sync after migrate always writes to the default database | Honour `using` | S | done (#70) |
+| 27 | C | CMS.1 | `apps/cms/models.py` | Editors can create a second HomePage in a locale | One HomePage per locale | S | done (#70) |
+| 28 | C | CMS.1 | `apps/cms/tests/integration/test_pages.py` | FR and ES pages are never requested over HTTP (check 5) | Parametrize over every configured language | S | done (#70) |
+| 29 | D | CAT.2 | `apps/catalog/tests/integration/test_taxonomy_admin.py` | No test moves a node under a same-slug sibling or inside a flat taxonomy | Add both | S | done (#67) |
+| 30 | D | CAT.2 | `apps/catalog/taxonomy.py` | `Term.clean` raises KeyError on an invalid taxonomy schema | Validate the schema first | S | done (#67) |
+| 31 | D | CAT.2 | `apps/catalog/taxonomy_admin.py`, `apps/catalog/admin.py` | Term reference and `Product.terms` widgets do not scale | Autocomplete filtered by taxonomy | M | done (#67) |
+| 32 | D | CAT.2 | `apps/catalog/taxonomy.py` | Descriptions are raw HTML | Document that CAT.8 and CMS rendering sanitize them | S | done (#67) |
+| 33 | D | CAT.2 | `apps/catalog/taxonomy.py` | A direct `Term.move()` skips the placement rules | Override `move` | S | done (#67) |
+| 34 | D | CAT.2 | `apps/catalog/tests/unit/test_taxonomy_engine.py` | Name breaks the ADR-0006 convention | Merge into `test_engine.py` | S | done (#67) |
+| 35 | D | SHP.12 | `apps/shipping/services.py` | `zone_snaps` counts zones served only by disabled carriers | Filter on active carriers | S | done (#67) |
+| 36 | D | SHP.12 | `apps/shipping/models.py` | `CountryGroup.code` accepts capitals that zones cannot reference | Lower-case it with a constraint | S | done (#67) |
+| 37 | D | SHP.12 | `apps/shipping/models.py` | `ShippingZone.vendor` is PROTECT while methods CASCADE | Align them and test vendor deletion | S | done (#67) |
+| 38 | E | OPS.4 | `.github/workflows/release.yml` | The whole job holds `contents: write`; no `persist-credentials: false`; `anchore/sbom-action` pinned by tag | Small attach job with write access; set the flag; pin by SHA | S | done (#65) |
+| 39 | E | OPS.4 | `docs/dev/dependency-updates.md` | The Python SBOM has no hashes, the doc says it has | Drop "and hashes" | S | done (#65) |
+| 40 | E | OPS.4 | `.github/dependabot.yml` | The uv image is in the docker minor/patch group; 0.x minors break (#60 already does it) | Exclude it from the group | S | done (#65) |
+| 41 | E | OPS.4 | `tests/unit/test_dependency_updates.py` | `open-pull-requests-limit` and "majors never grouped" are not asserted | Assert both | S | done (#65) |
+
+Skipped in the cleanup wave:
+
+- 7 (SEC.3, row binding). Needs an owner decision. Django's `from_db_value` gets no row, so
+  decryption would move into a model-level descriptor: `QuerySet.update()` and `bulk_update()`
+  could no longer write the field, `values()` would return tokens, rotation and the migrate check
+  would need the row id, and every stored value would need a re-encryption migration. That is a
+  design change, not a cleanup. Owner question Q-93 recommends a separate SEC.3 follow-up task of
+  about 6 h before VEN.6.
+- 22 (CMS.1, factory ContentType patch). The finding is wrong:
+  `tests/unit/test_factories.py::test_every_factory_builds_without_the_database` calls `.build()`
+  on every factory, and without the patch the HomePage and StandardPage builds hit the database.
+  The patch stays and its docstring now says why.
 
 Cleanup batches (disjoint files, one agent each):
 
