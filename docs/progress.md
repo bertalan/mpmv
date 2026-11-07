@@ -36,6 +36,11 @@ part of the done-when still open) · `not started`.
 | CORE.3 | done | #26 | VendorScopedQuerySet, 404 helpers, cross-tenant harness with negative tests generated for every endpoint, API operation and vendor-owned model (catalog and shipping included) |
 | SEC.4 | done | #28 | AuditLog on logins, MFA, users, groups, vendors and shipping rates with before/after; read-only staff audit view with filters and step-up; audit policy system check; one request audit context |
 | VEN.12 | done | #29 | Vendor legal and e-invoicing identity, staff-editable payout requirements by country, region and legal form including the DAC7 dataset, FatturaPA party block |
+| TAX.1 | done | #35 | TaxRate with non-overlapping validity periods, Territory, versioned VendorTaxProfile tied to the VEN.12 fiscal regime, VatValidation as an append-only VIES cache; audited services with dry-run, add-only admin. Tax code, flagged for careful human review |
+| CORE.13 | done | #34 | Optional `ApiClient.vendor` (empty means a platform key); vendor keys scoped through CORE.3 with negative tests for every API operation; issuing needs `api.add_apiclient` or vendor ownership; read-only admin with audited revoke |
+| SEC.3 | done | #36 | AES-256-GCM field encryption with versioned keys outside the database for Vendor.iban and Vendor.tax_code; raw SQL dump test finds no cleartext; key checks at migrate, `rotate_field_keys` with dry-run and audit. KYC files and the DAC7 date of birth get it when their models exist |
+| VEN.5 | done | #37 | Application, onboarding and activation flow; versioned contract with per-language texts locked by database triggers once accepted; append-only acceptances tied to the version, language and text hash shown; activation blocked until the contract is accepted |
+| CMS.1 | done | #40 | Wagtail 8.1 with one locale per configured language, home and About pages per language, per-language header and footer menus, editors' admin at /admin/ under MFA and strict CSP, repeatable `seed_cms` |
 
 ## Owner decisions 2026-11-07
 
@@ -253,6 +258,67 @@ Review findings not fixed (all minor):
 - VEN.12: a sole proprietor without first and last name falls back to the legal name without a problem being reported.
 - VEN.12: the address data migration does not check field lengths before copying legacy values.
 - VEN.12: seed_legal_requirements lives in tests/fakes.py, which is meant for doubles of external boundaries.
+
+## Follow-ups from wave 5
+
+Integration notes:
+
+- Merge order: TAX.1 (#35), CORE.13 (#34), SEC.3 (#36), VEN.5 (#37), CMS.1 (#40).
+- VEN.5's vendor migrations were renumbered to 0009, 0010 and 0011 so they follow SEC.3's 0008_encrypt_iban_and_tax_code (one leaf).
+- CMS.1 merged after the five-language change (#41): locales come from settings.LANGUAGES, the seed has synthetic FR and ES texts, and the "language added in settings" tests use a hypothetical sixth language (pt).
+- CMS.1 keeps MFA_REQUIRED_POLICIES at exactly `is_vendor_member` plus `can_access_cms_admin`.
+- TAX.1 and SHP.1 both need btree_gist; the tax migration creates it with IF NOT EXISTS and never drops it.
+
+Open questions for the owner:
+
+- TAX.1: for the tax advisor, confirm that a forfettario vendor (RF19) must be exempt with reason flat_rate_forfettario, and that this reason is allowed only for RF19.
+- TAX.1: validity bounds are instants in UTC; decide whether staff enter local midnight of the rate's country or business time, before TAX.3 turns a date into an instant.
+- CORE.13: which scopes may a vendor key hold? Today an owner can give their key any valid scope; this needs a vendor-grantable scope set or platform-only operations before API v1 exposes platform data.
+- CORE.13: should keys of a suspended or closed vendor keep authenticating? Today they do, limited to their own vendor.
+- SEC.3: confirm the encrypted field list: IBAN and TIN now, KYC files, payout accounts and the DAC7 date of birth later; the registered office address stays in clear.
+- SEC.3: should TOTP secrets be encrypted too? They belong to django-otp and would need a custom device model.
+- VEN.5: add a backlog row for the public vendor application form with account creation, or leave it to CORE.9?
+- VEN.5: should missing DAC7 data block activation? Today it is listed but does not block, as the VEN.12 spec says.
+- VEN.5: once a version is accepted, no new language text can be added to it; allow adding new languages to an accepted version?
+- CMS.1: Wagtail's default Editors and Moderators groups are kept; confirm, or define editor roles in CORE.8.
+
+Deferred to other tasks:
+
+- TAX.1: re-checking a tax profile when the vendor's fiscal_regime changes goes to TAX.2 or VEN.11; the request and review workflow is TAX.2.
+- TAX.1: the VIES client, its cache lifetime, timeout and fail-closed policy are TAX.5; seeding territories and rates is TAX.6 and TAX.7.
+- TAX.1: staff-recorded VAT answers were removed; they need a task with a recorded_by actor and an audited service.
+- CORE.13: rotating and revoking a vendor key do not check the actor; owner self-service belongs to CORE.9, and issuing from the admin (show the key once) to CORE.8.
+- SEC.3: moving the key to a Podman secret and a key backup kept apart from pgBackRest belong to OPS.1 and OPS.3; step-up on the admin IBAN view is not planned yet.
+- VEN.5: the vendor pages (application form with Turnstile, onboarding page) go to CORE.9; tax regime and Stripe Express checklist items to TAX.2 and VEN.6; re-acceptance of new versions to VEN.16; a rejection reason to CORE.8.
+- CMS.1: wagtail-localize is I18N.3, hreflang and the EN fallback notice I18N.6; the Turnstile widget on /admin/login/ goes to CORE.8.
+- CMS.1: Wagtail's inline panels, page choosers and the editor's accessibility checker need inline scripts or styles; CMS.2 should use StreamField and chooser blocks.
+
+Review findings not fixed (all minor):
+
+- TAX.1: legal notes can be moved to another profile, or edited on a closed profile, from the admin.
+- TAX.1: the `Versioned` base is a copy of PlatformOperator's versioning code; it should move to apps/core.
+- TAX.1: postcode ranges use a dash, which is ambiguous for Portuguese and Polish postcodes, and range bounds are not checked.
+- TAX.1: oss_registered_since is not checked against the regime.
+- TAX.1: the PR text calls the 4-decimal rate and the extra territory statuses a task requirement; they are implementation choices.
+- CORE.13: deleting a vendor deletes its API keys without an audit entry for each key.
+- CORE.13: the vendor-key scope question and the suspended-vendor question are not yet in the spec or the decision log.
+- CORE.13: the tenancy harness skips any marker that is a substring of the request path.
+- SEC.3: the associated data binds a value to its column but not to its row, so a value copied to another vendor's row decrypts.
+- SEC.3: ordering by an encrypted field is not blocked, although the docs say it cannot be sorted.
+- SEC.3: the migrate check decrypts one sample per key id, not every row.
+- SEC.3: mask_tax_code shows the last 4 characters even of a short TIN.
+- SEC.3: with both MPMV_FIELD_ENCRYPTION_KEYS and its _FILE variant set, the file wins without a warning.
+- SEC.3: the encryption data migration imports live helpers and assumes an `id` primary key.
+- VEN.5: two first contract versions saved at once fail with an IntegrityError instead of a clear error.
+- VEN.5: submit_application does not reset vies_status, vies_checked_at and legacy_wp_user_id on the incoming vendor.
+- VEN.5: no test covers an inactive owner accepting a contract.
+- VEN.5: the vendor change page computes the current contract twice.
+- CMS.1: the page factories patch ContentType lookups for `.build()`, which no test uses.
+- CMS.1: the MFA middleware does not exempt Wagtail's sign-out for editors who have not verified yet.
+- CMS.1: seeded menus of other languages are not Wagtail translations of the EN menu, which wagtail-localize (I18N.3) will need.
+- CMS.1: WAGTAILADMIN_BASE_URL falls back to localhost in every environment instead of being required on live.
+- CMS.1: locale sync after migrate always writes to the default database.
+- CMS.1: editors can create extra HomePages in a locale that already has one.
 
 ## Coherence checks
 
