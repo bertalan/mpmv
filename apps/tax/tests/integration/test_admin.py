@@ -155,6 +155,23 @@ def test_territories_are_added_and_changed_with_an_audit_entry(staff_client: Cli
     assert actions == ["tax.territory.created", "tax.territory.updated"]
 
 
+def test_the_admin_refuses_an_old_style_range_with_the_dotdot_hint(
+    staff_client: Client,
+) -> None:
+    form = {
+        "code": "it-co",
+        "name": "Como area",
+        "country": "IT",
+        "vat_status": "own_rates",
+        "postcode_patterns": "22100-22199",
+    }
+    response = staff_client.post(reverse("admin:tax_territory_add"), form)
+    assert response.status_code == 200
+    errors = response.context["adminform"].form.errors
+    assert "22100..22199" in " ".join(errors["postcode_patterns"])
+    assert not Territory.objects.exists()
+
+
 def test_territories_cannot_be_deleted_from_the_admin(staff_client: Client) -> None:
     territory = TerritoryFactory.create()
     delete = reverse("admin:tax_territory_delete", args=[territory.pk])
