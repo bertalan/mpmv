@@ -3,8 +3,12 @@
 from pathlib import Path
 
 import dj_database_url
+import django_stubs_ext
 
 from .env import env_list, env_str
+
+# Allows `models.DecimalField[Any]`-style generics at runtime (django-stubs).
+django_stubs_ext.monkeypatch()
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
