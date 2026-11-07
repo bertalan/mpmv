@@ -533,6 +533,40 @@ class PickupOptionTranslation(TranslationModel):
         return f"{self.pickup_option} [{self.language}]"
 
 
+class ShippingTemplate(BaseModel):
+    """A shipping configuration the platform proposes to vendors (SHP.13): zones, the country
+    groups they use, methods with weight bands and VAT treatment, and later special areas
+    (SHP.14).
+
+    `document` is a file of the configuration format (`apps.shipping.config_format`) without a
+    vendor. A vendor copies it into its own configuration (`config_io.copy_template`): the
+    template's zones become the vendor's zones, which it then customises; the template never
+    changes with them. Saved only through `config_io.save_template`, which validates the document
+    with the models' validators and audits the change.
+    """
+
+    code = models.SlugField(max_length=50, unique=True)
+    name = models.CharField(max_length=100)
+    is_standard = models.BooleanField(
+        default=False, help_text="The template the platform proposes; at most one."
+    )
+    document = models.JSONField(help_text="A shipping configuration file (format version 1).")
+
+    class Meta:
+        ordering = ["code"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["is_standard"],
+                condition=models.Q(is_standard=True),
+                name="shipping_template_one_standard",
+                violation_error_message="Another template is already the standard one.",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.code
+
+
 class ShippingConfigVersion(BaseModel):
     """A snapshot of the whole shipping configuration, for diff and one-click rollback.
 

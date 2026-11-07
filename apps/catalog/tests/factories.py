@@ -1,4 +1,4 @@
-"""factory_boy factories for the catalog (CAT.1, CAT.2).
+"""factory_boy factories for the catalog (CAT.1, CAT.2, CAT.3).
 
 SKUs are synthetic ("SKU-00001", "VAR-00001"), slugs and codes are numbered ("category-1",
 "taxonomy-1") and texts come from the seeded Faker: never real catalog data.
@@ -15,11 +15,16 @@ import factory
 from factory.django import DjangoModelFactory
 
 from apps.catalog.models import (
+    Attribute,
+    AttributeTranslation,
+    AttributeValue,
+    AttributeValueTranslation,
     Brand,
     BrandTranslation,
     Category,
     CategoryTranslation,
     Product,
+    ProductAttribute,
     ProductTranslation,
     SlugHistory,
     Taxonomy,
@@ -27,6 +32,7 @@ from apps.catalog.models import (
     Term,
     TermTranslation,
     Variant,
+    VariantOption,
     VariantTranslation,
 )
 from apps.vendors.tests.factories import VendorFactory
@@ -202,3 +208,121 @@ class BrandTranslationFactory(DjangoModelFactory[BrandTranslation]):
     language = "en"
     slug = factory.Sequence(lambda n: f"brand-{n}")
     description = factory.Faker("sentence")
+
+
+class AttributeFactory(DjangoModelFactory[Attribute]):
+    """A choice attribute ("attribute_1"); pass `kind=` and `unit=` for a number attribute."""
+
+    class Meta:
+        model = Attribute
+
+    code = factory.Sequence(lambda n: f"attribute_{n}")
+    kind = Attribute.Kind.CHOICE
+
+
+class AttributeTranslationFactory(DjangoModelFactory[AttributeTranslation]):
+    class Meta:
+        model = AttributeTranslation
+
+    attribute = factory.SubFactory(AttributeFactory)
+    language = "en"
+    name = factory.Faker("word")
+
+
+class AttributeValueFactory(DjangoModelFactory[AttributeValue]):
+    """A value of a new choice attribute."""
+
+    class Meta:
+        model = AttributeValue
+
+    attribute = factory.SubFactory(AttributeFactory)
+    value = factory.Sequence(lambda n: f"value-{n}")
+    position = factory.Sequence(lambda n: n)
+
+
+class AttributeValueTranslationFactory(DjangoModelFactory[AttributeValueTranslation]):
+    class Meta:
+        model = AttributeValueTranslation
+
+    value = factory.SubFactory(AttributeValueFactory)
+    language = "en"
+    label = factory.Faker("word")
+
+
+class ProductAttributeFactory(DjangoModelFactory[ProductAttribute]):
+    """A choice attribute of a new simple product, without values; add them with `values.set`."""
+
+    class Meta:
+        model = ProductAttribute
+
+    product = factory.SubFactory(ProductFactory)
+    attribute = factory.SubFactory(AttributeFactory)
+    position = factory.Sequence(lambda n: n)
+
+
+class VariantOptionFactory(DjangoModelFactory[VariantOption]):
+    """The value a variant takes on one axis; the attribute is always the value's."""
+
+    class Meta:
+        model = VariantOption
+
+    variant = factory.SubFactory(VariantFactory)
+    value = factory.SubFactory(AttributeValueFactory)
+    attribute = factory.SelfAttribute("value.attribute")
+
+
+PUBLISHED = AttributeValueTranslation.Status.PUBLISHED
+
+
+def attribute_with_values(
+    code: str,
+    names: dict[str, str],
+    values: dict[str, dict[str, str]],
+    *,
+    kind: str = Attribute.Kind.CHOICE,
+    unit: str = "",
+) -> Attribute:
+    """An attribute with published names and, for a choice attribute, values in the given order.
+
+    `names` and each value's labels map a language to its text, e.g. {"en": "Red", "it": "Rosso"}.
+    """
+    attribute = AttributeFactory.create(code=code, kind=kind, unit=unit)
+    for language, name in names.items():
+        AttributeTranslationFactory.create(
+            attribute=attribute, language=language, name=name, status=PUBLISHED
+        )
+    for position, (value, labels) in enumerate(values.items()):
+        row = AttributeValueFactory.create(attribute=attribute, value=value, position=position)
+        for language, label in labels.items():
+            AttributeValueTranslationFactory.create(
+                value=row, language=language, label=label, status=PUBLISHED
+            )
+    return attribute
+
+
+def clothing_attributes() -> dict[str, Attribute]:
+    """Synthetic size, color, material, bag_width (cm) and author attributes.
+
+    Sizes have EN labels only (an IT page falls back to them); colors are also in IT.
+    """
+    return {
+        "size": attribute_with_values(
+            "size",
+            {"en": "Size", "it": "Taglia"},
+            {"s": {"en": "S"}, "m": {"en": "M"}, "l": {"en": "L"}},
+        ),
+        "color": attribute_with_values(
+            "color",
+            {"en": "Color", "it": "Colore"},
+            {"red": {"en": "Red", "it": "Rosso"}, "blue": {"en": "Blue", "it": "Blu"}},
+        ),
+        "material": attribute_with_values(
+            "material",
+            {"en": "Material"},
+            {"cotton": {"en": "Cotton", "it": "Cotone"}, "linen": {"en": "Linen"}},
+        ),
+        "bag_width": attribute_with_values(
+            "bag_width", {"en": "Width"}, {}, kind=Attribute.Kind.NUMBER, unit="cm"
+        ),
+        "author": attribute_with_values("author", {"en": "Author"}, {}, kind=Attribute.Kind.TEXT),
+    }

@@ -28,16 +28,20 @@ from apps.api.models import ApiClient
 from apps.api.tests.factories import ApiClientFactory
 from apps.catalog.models import (
     Product,
+    ProductAttribute,
     ProductTranslation,
     SlugHistory,
     Variant,
+    VariantOption,
     VariantTranslation,
 )
 from apps.catalog.tests.factories import (
+    ProductAttributeFactory,
     ProductFactory,
     ProductTranslationFactory,
     SlugHistoryFactory,
     VariantFactory,
+    VariantOptionFactory,
     VariantTranslationFactory,
 )
 from apps.core.tests.factories import utc
@@ -65,6 +69,7 @@ from apps.tax.tests.factories import (
 )
 from apps.vendors.models import (
     ContractAcceptance,
+    CrossVendorConsent,
     Vendor,
     VendorFeatureFlag,
     VendorMember,
@@ -72,6 +77,7 @@ from apps.vendors.models import (
 )
 from apps.vendors.tests.factories import (
     ContractAcceptanceFactory,
+    CrossVendorConsentFactory,
     VendorFeatureFlagFactory,
     VendorMemberFactory,
     VendorTranslationFactory,
@@ -82,6 +88,7 @@ from tests.tenancy import (
     NoVendorData,
     ObjectMaker,
     StaffOnly,
+    VendorScoped,
 )
 
 # --- Vendor-owned models: how to make one object owned by a given vendor
@@ -95,6 +102,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     VendorTranslation: lambda vendor: VendorTranslationFactory.create(vendor=vendor, language="it"),
     ContractAcceptance: lambda vendor: ContractAcceptanceFactory.create(vendor=vendor),
     VendorFeatureFlag: lambda vendor: VendorFeatureFlagFactory.create(vendor=vendor),
+    CrossVendorConsent: lambda vendor: CrossVendorConsentFactory.create(vendor=vendor),
     Product: lambda vendor: ProductFactory.create(vendor=vendor),
     ProductTranslation: lambda vendor: ProductTranslationFactory.create(
         product=ProductFactory.create(vendor=vendor)
@@ -106,6 +114,14 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         product=ProductFactory.create(vendor=vendor, kind=Product.Kind.VARIABLE)
     ),
     VariantTranslation: lambda vendor: VariantTranslationFactory.create(
+        variant=VariantFactory.create(
+            product=ProductFactory.create(vendor=vendor, kind=Product.Kind.VARIABLE)
+        )
+    ),
+    ProductAttribute: lambda vendor: ProductAttributeFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
+    VariantOption: lambda vendor: VariantOptionFactory.create(
         variant=VariantFactory.create(
             product=ProductFactory.create(vendor=vendor, kind=Product.Kind.VARIABLE)
         )
@@ -221,4 +237,15 @@ def classify(endpoint: Endpoint) -> Access | None:
 
 API_OPERATIONS: dict[str, Access] = {
     "GET /api/v1/me": NoVendorData("The calling API client itself, with its own vendor."),
+    # CAT.3
+    "GET /api/v1/catalog/attributes": NoVendorData(
+        "The platform's attribute catalogue (codes, kinds, value labels): shared by every vendor."
+    ),
+    "POST /api/v1/catalog/products": NoVendorData(
+        "Creates a product for the caller's own vendor; a vendor key naming another vendor gets "
+        "404. Shows only the ChangeSet of what it creates."
+    ),
+    "GET /api/v1/catalog/products/{public_id}": VendorScoped(
+        make=lambda vendor: ProductFactory.create(vendor=vendor)
+    ),
 }
