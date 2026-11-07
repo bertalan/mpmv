@@ -123,6 +123,20 @@ def test_updates_wait_a_cooldown_after_each_release(updates: dict[str, dict[str,
         assert entry["cooldown"]["default-days"] >= 3, name
 
 
+# Dependabot refuses the whole file when a semver-specific cooldown is set for an ecosystem that
+# does not version by semver (it reported this for github-actions and docker on the first run).
+SEMVER_COOLDOWN_ECOSYSTEMS = {"uv"}
+
+
+def test_semver_cooldowns_are_set_only_where_dependabot_supports_them(
+    updates: dict[str, dict[str, Any]],
+) -> None:
+    for name, entry in updates.items():
+        semver_keys = {key for key in entry["cooldown"] if key.startswith("semver-")}
+        if name not in SEMVER_COOLDOWN_ECOSYSTEMS:
+            assert not semver_keys, name
+
+
 def test_dependabot_config_needs_no_secrets() -> None:
     text = DEPENDABOT.read_text()
     assert "registries" not in load(DEPENDABOT)
