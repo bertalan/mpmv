@@ -1,15 +1,22 @@
 """Products, variants and their translations (spec 03 §3.2, CAT.1).
 
 The category tree, taxonomies, terms and brands (CAT.2) live in `taxonomy.py`; products link
-to them here. Fields owned by later tasks are added there: variant `options` and product
-attributes (CAT.3), images (CAT.4), slug generation and SlugHistory (CAT.5), `gpsr` (CMP.3).
+to them here, and to the typed attributes of `attributes.py` (CAT.3) through `ProductAttribute`
+and `VariantOption`. Fields owned by later tasks are added there: images (CAT.4), `gpsr` (CMP.3).
+Slugs are derived from the title by `services.sync_product_slug` (CAT.5), which keeps the
+replaced ones in `SlugHistory`.
 Prices change only through `services.set_product_price` and `services.set_variant_price`, which
 audit them; the status changes through the publishing services of CAT.10.
 
 Vendor scoping (CORE.3): every model here uses `VendorScopedManager`. `Variant.vendor` copies
 its product's vendor so that the database can enforce one SKU per vendor among variants; a
-composite foreign key (migration 0001) keeps the copy equal to the product's vendor, and moves
-it along when the product changes vendor.
+composite foreign key (migration 0001) keeps the copy equal to the product's vendor.
+
+Integrity rules (CAT.14, owner decisions Q-29, Q-31, Q-32, Q-33), enforced by the database
+(migration 0003) and reported by `clean()` for forms: a product never changes vendor (staff use
+`services.duplicate_product_to_vendor`); only a `buy` product needs a price, and a price is never
+0.00; variants exist only on variable products; a required companion has the same vendor.
+Suggestions across vendors are checked by `services.check_upsells` (signal in `signals.py`).
 
 Identity (CAT.13, owner decisions Q-30 and Q-33): the platform refers to products and variants
 by `public_id`, and staff by `staff_ref`, a prefixed sequence the vendor never sees. The vendor
@@ -26,14 +33,22 @@ from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models.functions import Now
+from django.utils import timezone
 
-from apps.core.fields import MoneyField
+from apps.core.fields import LanguageField, MoneyField
 from apps.core.models import BaseModel, TranslationModel, resolve_translation
 from apps.core.translations import Resolved
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager
 
 from . import engine
+from .attributes import (
+    Attribute,
+    AttributeKind,
+    AttributeTranslation,
+    AttributeValue,
+    AttributeValueTranslation,
+)
 from .fields import SkuField
 from .taxonomy import (
     Brand,
@@ -47,17 +62,24 @@ from .taxonomy import (
 )
 
 __all__ = [
+    "Attribute",
+    "AttributeKind",
+    "AttributeTranslation",
+    "AttributeValue",
+    "AttributeValueTranslation",
     "Brand",
     "BrandTranslation",
     "Category",
     "CategoryTranslation",
     "FiscalCategory",
     "Product",
+    "ProductAttribute",
     "ProductKind",
     "ProductStatus",
     "ProductTranslation",
     "SalesMode",
     "SkuAlias",
+    "SlugHistory",
     "StockPolicy",
     "StockStatus",
     "Taxonomy",
@@ -65,6 +87,7 @@ __all__ = [
     "Term",
     "TermTranslation",
     "Variant",
+    "VariantOption",
     "VariantTranslation",
 ]
 
@@ -237,7 +260,13 @@ class Product(BaseModel):
         max_length=16, choices=FiscalCategory.choices, default=FiscalCategory.STANDARD
     )
 
-    price_net = MoneyField("net price", help_text="EUR, VAT excluded.")
+    # Required only for `buy`; kept, never public, for the other modes (Q-31, engine.public_price).
+    price_net = MoneyField(
+        "net price",
+        null=True,
+        blank=True,
+        help_text="EUR, VAT excluded. Required to sell; never 0.00 (leave it empty instead).",
+    )
     sale_price_net = MoneyField("net sale price", null=True, blank=True)
     sale_from = models.DateTimeField(null=True, blank=True)
     sale_to = models.DateTimeField(null=True, blank=True)
@@ -275,6 +304,13 @@ class Product(BaseModel):
         blank=True,
         validators=[gtin_validator],
         help_text="EAN or ISBN; when empty the SKU is used as MPN.",
+    )
+    mpn = models.CharField(
+        "MPN",
+        max_length=70,
+        blank=True,
+        help_text="Manufacturer part number: with the brand it links the same article across "
+        "vendors.",
     )
     google_category_id = models.PositiveIntegerField(
         "Google product category", null=True, blank=True
@@ -337,11 +373,21 @@ class Product(BaseModel):
             _choice("fiscal_category", FiscalCategory, "catalog_product_fiscal_category_valid"),
             _choice("stock_policy", StockPolicy, "catalog_product_stock_policy_valid"),
             _choice("stock_status", StockStatus, "catalog_product_stock_status_valid"),
-            _not_negative("price_net", "price", "catalog_product_price_net_not_negative"),
+            models.CheckConstraint(
+                condition=models.Q(price_net__isnull=True) | models.Q(price_net__gt=0),
+                name="catalog_product_price_net_positive",
+                violation_error_message="The price must be above 0.00; leave it empty instead.",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(sales_mode=SalesMode.BUY) | models.Q(price_net__isnull=False),
+                name="catalog_product_price_required_to_buy",
+                violation_error_message="A product for sale needs a price.",
+            ),
             models.CheckConstraint(
                 condition=models.Q(sale_price_net__isnull=True)
                 | (
-                    models.Q(sale_price_net__gte=0)
+                    models.Q(price_net__isnull=False)
+                    & models.Q(sale_price_net__gte=0)
                     & models.Q(sale_price_net__lt=models.F("price_net"))
                 ),
                 name="catalog_product_sale_price_below_price",
@@ -382,7 +428,51 @@ class Product(BaseModel):
         return str(self.sku)
 
     def clean(self) -> None:
-        _check_sku(self)
+        super().clean()
+        errors: dict[str, list[str]] = {}
+        for check in (lambda: _check_sku(self), self.clean_integrity):
+            try:
+                check()
+            except ValidationError as error:
+                for name, messages in error.message_dict.items():
+                    errors.setdefault(name, []).extend(messages)
+        if errors:
+            raise ValidationError(errors)
+
+    def clean_integrity(self) -> None:
+        """The CAT.14 rules the database enforces, as form errors (Q-31, Q-32, Q-33)."""
+        errors: dict[str, str] = {}
+        stored = (
+            None
+            if self._state.adding or self.pk is None
+            else Product.objects.filter(pk=self.pk).values("vendor_id").first()
+        )
+        if stored is not None and stored["vendor_id"] != self.vendor_id:
+            errors["vendor"] = (
+                "A product never changes vendor: duplicate it to the new vendor instead."
+            )
+        if (
+            stored is not None
+            and self.kind != ProductKind.VARIABLE
+            and Variant.objects.filter(product_id=self.pk).exists()
+        ):
+            errors["kind"] = "Only a variable product has variants: remove them first."
+        if self.required_companion_id is not None and self.vendor_id is not None:
+            companion_vendor = (
+                Product.objects.filter(pk=self.required_companion_id)
+                .values_list("vendor_id", flat=True)
+                .first()
+            )
+            if companion_vendor is not None and companion_vendor != self.vendor_id:
+                errors["required_companion"] = (
+                    "A required companion must belong to the same vendor."
+                )
+        if "price_net" not in errors:
+            missing = engine.price_required_error(self.sales_mode, self.price_net)
+            if missing is not None:
+                errors["price_net"] = missing
+        if errors:
+            raise ValidationError(errors)
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         _with_sku_key(self, kwargs)
@@ -412,8 +502,9 @@ class ProductTranslation(TranslationModel):
     title = models.CharField(max_length=255)
     short_description = models.TextField(blank=True)
     description = models.TextField(blank=True, help_text="HTML.")
-    # Derived {title}-{lang} by `build_product_slug` (CAT.5), never the SKU; empty until then.
-    slug = models.SlugField(max_length=80, blank=True)
+    # Derived {title}-{lang} from the title by `services.sync_product_slug` (CAT.5), never the
+    # SKU; empty until generated. Replaced slugs move to SlugHistory and answer a 301.
+    slug = models.SlugField(max_length=80, blank=True, editable=False)
     seo_title = models.CharField("SEO title", max_length=255, blank=True)
     seo_description = models.TextField("SEO description", blank=True)
 
@@ -434,6 +525,39 @@ class ProductTranslation(TranslationModel):
 
     def __str__(self) -> str:
         return f"{self.product} [{self.language}]"
+
+
+class SlugHistory(BaseModel):
+    """A product's former slug in one language (CAT.5); it answers a 301 to the current slug.
+
+    Replaces the legacy `_legacy_old_slugs` meta, without its limit of 10. The legacy
+    `{title}-{lang}-{sku}` slugs are loaded here. One slug belongs to at most one product per
+    language, among current and old slugs alike (checked by the services), so every old slug
+    redirects in a single hop.
+    """
+
+    vendor_scope: ClassVar[str] = "product__vendor"
+    objects = VendorScopedManager()
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="slug_history")
+    language = LanguageField()
+    # Legacy slugs may be longer than the current 80-character limit.
+    slug = models.SlugField(max_length=200)
+    replaced_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["product", "language", "-replaced_at"]
+        verbose_name_plural = "slug history"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["language", "slug"],
+                name="catalog_slughistory_language_slug_unique",
+                violation_error_message="This old slug already belongs to a product.",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.slug} [{self.language}]"
 
 
 class Variant(BaseModel):
@@ -467,6 +591,10 @@ class Variant(BaseModel):
     )
     is_default = models.BooleanField("default variant", default=False)
     position = models.PositiveIntegerField(default=0)
+    # One value per variant axis of the product (CAT.3); see VariantOption.
+    options = models.ManyToManyField(
+        AttributeValue, through="VariantOption", related_name="variants", blank=True
+    )
 
     class Meta:
         ordering = ["product", "position", "id"]
@@ -504,6 +632,10 @@ class Variant(BaseModel):
         super().clean_fields(exclude)
 
     def clean(self) -> None:
+        # Variants only on variable products (Q-29, Q-32; a database trigger enforces it too).
+        kind = Product.objects.filter(pk=self.product_id).values_list("kind", flat=True).first()
+        if kind is not None and kind != ProductKind.VARIABLE:
+            raise ValidationError({"product": "Only a variable product can have variants."})
         # `vendor` and `sku_key` are not form fields, so forms skip the (vendor, sku_key)
         # constraint, and no constraint spans products and variants: check here.
         _check_sku(self)
@@ -591,3 +723,89 @@ class SkuAlias(BaseModel):
 
     def __str__(self) -> str:
         return str(self.sku)
+
+
+class ProductAttribute(BaseModel):
+    """What a product says about one attribute, typed by the attribute's kind (CAT.3).
+
+    A choice attribute lists the product's values (`values`), a number attribute holds
+    `numeric_value` (in the attribute's unit), a text attribute `text_value` (language-neutral:
+    an author, an ISBN). On a variable product, the choice attributes marked `is_variant_axis`
+    are the axes its variants vary on, in `position` order: the first axis orders the variants
+    first. `services.create_product` checks the whole shape (`engine.product_structure_errors`).
+    """
+
+    vendor_scope: ClassVar[str] = "product__vendor"
+    objects = VendorScopedManager()
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="attributes")
+    attribute = models.ForeignKey(
+        Attribute, on_delete=models.PROTECT, related_name="product_attributes"
+    )
+    values = models.ManyToManyField(AttributeValue, blank=True, related_name="product_attributes")
+    numeric_value = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    text_value = models.CharField(max_length=255, blank=True)
+    is_variant_axis = models.BooleanField(
+        "variant axis", default=False, help_text="The product's variants vary on this attribute."
+    )
+    position = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["product", "position", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product", "attribute"],
+                name="catalog_productattribute_unique",
+                violation_error_message="The product already has this attribute.",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(numeric_value__isnull=True) | models.Q(text_value=""),
+                name="catalog_productattribute_one_typed_value",
+                violation_error_message="An attribute holds a number or a text, not both.",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(is_variant_axis=False)
+                | (models.Q(numeric_value__isnull=True) & models.Q(text_value="")),
+                name="catalog_productattribute_axis_has_values",
+                violation_error_message="A variant axis takes values, not a number or a text.",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.product}: {self.attribute}"
+
+
+class VariantOption(BaseModel):
+    """The value a variant takes on one axis of its product (`Variant.options`, CAT.3).
+
+    `attribute` repeats the value's attribute so that the database allows one value per
+    attribute and variant; a composite foreign key (migration 0003) keeps it equal to the
+    value's own attribute.
+    """
+
+    vendor_scope: ClassVar[str] = "variant__vendor"
+    objects = VendorScopedManager()
+
+    variant = models.ForeignKey(Variant, on_delete=models.CASCADE, related_name="variant_options")
+    attribute = models.ForeignKey(Attribute, on_delete=models.PROTECT, related_name="+")
+    value = models.ForeignKey(
+        AttributeValue, on_delete=models.PROTECT, related_name="variant_options"
+    )
+
+    class Meta:
+        ordering = ["variant", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["variant", "attribute"],
+                name="catalog_variantoption_one_value_per_axis",
+                violation_error_message="The variant already has a value for this attribute.",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.variant}: {self.value}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if self.attribute_id is None and self.value_id is not None:
+            self.attribute_id = self.value.attribute_id
+        super().save(*args, **kwargs)

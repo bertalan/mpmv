@@ -169,6 +169,71 @@ Checkout rules:
   its treatment per area: surcharge (fixed, percent or per kg), extra delivery days, unavailable,
   quote only, or blocked. The default is an indicative cost subject to quote (`IndicativeRates`).
 
+### Configuration file format (SHP.13)
+
+One versioned format carries a shipping configuration in and out: vendor and platform exports and
+imports, the standard template, and the SHP.5 legacy import (which converts the legacy option into
+this format and imports it). The parser is `apps.shipping.config_format` (pure); export, import and
+templates are `apps.shipping.config_io`; staff use the `shipping_config` management command until
+the SHP.6 editor.
+
+**JSON**: an object with `format` = `"mpmv.shipping-config"`, `version` = `1` and these sections
+(lists of objects; a missing optional field takes the model default on create and keeps the stored
+value on update):
+
+| Section | Fields | Named by |
+|---|---|---|
+| `country_groups` | `code`, `countries` | `code` |
+| `zones` | `code`, `name`, `priority`, `countries`, `country_groups`, `postcode_patterns`, `states` | `code` |
+| `methods` | `zone_scope` (`own` default, or `platform`), `zone`, `key`, `carrier` (code), `service_level`, `min_delivery_days`, `max_delivery_days`, `is_default`, `free_shipping_threshold`, `tax_treatment`, `over_max_weight`, `bands` | `zone_scope` + `zone` + `key` |
+| `methods[].bands` | `from_kg`, `to_kg` (`null` = unlimited), `cost_net`, `surcharge_net` | `from_kg` within its method |
+| `pickup_options` | `key`, `cost_net`, `address` | `key` |
+| `special_areas` | reserved for SHP.14: version 1 files keep it empty | |
+
+Amounts and weights are decimal strings (`"9.90"`, `"5.000"`), never floats. Lists hold text.
+`tax_treatment` and `over_max_weight` travel as stored data only: their meaning depends on D-03
+(TAX.4) and D-06 (SHP.3). Translated names (method and group names, pickup labels) are not part of
+version 1: they stay with the translation workflow.
+
+**CSV**: the same rows, one per line, with the header `record, code, version, name, priority,
+countries, country_groups, postcode_patterns, states, zone_scope, zone, key, carrier,
+service_level, min_delivery_days, max_delivery_days, is_default, free_shipping_threshold,
+tax_treatment, over_max_weight, from_kg, to_kg, cost_net, surcharge_net, address`. `record` is
+`format` (first line, with `code` and `version`), `country_group`, `zone`, `method`, `band` or
+`pickup_option`; a band names its method with `zone_scope`, `zone` and `key`, and its method must
+be in the same file. Lists are separated by `|`; an empty number cell is `null`; booleans are
+`true` / `false`; a cell that does not apply to its record must be empty.
+
+**Validation and import.** The parser checks only the shape (format, version, known fields, lists
+of text, every row named once). The values are validated by the models themselves (field
+validators such as `apps.core.postcodes`, check constraints, `clean`), the same validators the
+admin and the tests use, first on unsaved rows and then on write through `save_config`, with the
+cross-row rules of the database (one default method per zone, bands that do not overlap). The
+report has one entry per row (`zones[1]`, `methods[0].bands[2]` or `line 7`) with its status
+(created, updated, unchanged, skipped, error), errors by field and warnings. The import is atomic:
+a file with any error changes nothing; a dry run returns the ChangeSet and the report and writes
+nothing. Every written row is audited, and the import itself as `shipping.config.imported` with
+its source and summary.
+
+- A vendor file writes that vendor's zones, methods, bands and pickup options; its methods ship to
+  its own zones (`own`) or to platform zones (`platform`). Country groups are platform data: they
+  are compared, never written (a missing one is an error, a different one a warning).
+- A platform file writes country groups and platform zones; methods and pickup options are refused.
+- Rows are matched by name and created or updated; rows missing from the file are kept. A row
+  may be partial: a missing field takes the model default on create and keeps the stored value on
+  update (a stored method keeps its carrier), and the row is checked with the stored values it
+  keeps.
+- The bands a file lists for a method replace its stored bands, whatever their order in the file.
+  A method that lists no bands keeps its stored ones: in JSON a method without a `bands` key
+  (`"bands": []` removes every band), in CSV a method without band lines (CSV cannot write an
+  empty list: removing every band of a method takes a JSON file).
+
+**Standard template.** `ShippingTemplate` stores a document of this format without a vendor, saved
+by staff through an audited service that validates it like a vendor file; at most one template is
+the standard one. Copying it into a vendor is an import of its document (dry-run preview, report,
+audit with source `template:<code>`): its zones become the vendor's own zones, which the vendor then
+customises without changing the template.
+
 ### Quotes (single order)
 
 If a package returns `NeedsQuote`, the whole checkout becomes a **quote request**:

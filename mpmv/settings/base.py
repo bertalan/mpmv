@@ -78,6 +78,8 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
+    # CAT.5: a 404 on a product's old slug becomes a 301 to its current slug.
+    "apps.catalog.middleware.OldProductSlugRedirectMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     # CORE.4: which device verified the session, then confine required roles to the MFA pages.
@@ -110,6 +112,13 @@ MFA_LOGIN_URL = "admin:login"  # until the site and vendor login pages exist
 MFA_ISSUER = "MPMV"  # name shown in authenticator apps and passkey prompts
 OTP_TOTP_ISSUER = MFA_ISSUER
 OTP_ADMIN_HIDE_SENSITIVE_DATA = True
+
+# Vendor deletion (CORE.14): `vendors` cannot import the apps above it (spec 01 §1.3). Each dotted
+# path names a `hook(vendor, changes)` that adds one delete to the deletion's ChangeSet per row
+# the deletion cascades to, so every such row gets its own AuditLog entry.
+VENDOR_DELETION_AUDIT_HOOKS: list[str] = [
+    "apps.api.services.vendor_key_deletions",  # the vendor's API keys (CORE.13)
+]
 
 ROOT_URLCONF = "mpmv.urls"
 WSGI_APPLICATION = "mpmv.wsgi.application"

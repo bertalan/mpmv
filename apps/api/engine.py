@@ -21,6 +21,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Final
 
+from apps.vendors import engine as vendor_engine
+
 KEY_NAMESPACE: Final = "mpmv"
 PREFIX_LENGTH: Final = 8
 SECRET_BYTES: Final = 32
@@ -29,6 +31,29 @@ _KEY_RE: Final = re.compile(
     rf"^{KEY_NAMESPACE}_(?P<prefix>[0-9a-f]{{{PREFIX_LENGTH}}})_(?P<secret>[A-Za-z0-9_-]{{32,}})$"
 )
 _SCOPE_RE: Final = re.compile(r"^[a-z][a-z0-9_-]*:[a-z][a-z0-9_-]*$")
+
+# The scopes a vendor key may hold (CORE.14): operations on the vendor's own data only, scoped by
+# `for_actor` (CORE.3). Every other scope is platform-only. An allow-list, so a new scope stays
+# platform-only until it is added here on purpose; vendor-facing endpoints (EVT.5 and later)
+# add their scopes to this set, and only here.
+VENDOR_GRANTABLE_SCOPES: Final = frozenset(
+    {
+        "catalog:read",
+        "catalog:write",
+        "stock:read",
+        "stock:write",
+        "events:read",  # EVT.5
+        "events:write",  # EVT.5
+    }
+)
+
+# HTTP methods that change state. A key of a suspended vendor may not use them (CORE.14), dry-runs
+# included; API v1 also requires `?dry_run=` on each of them (CORE.7).
+MUTATING_METHODS: Final = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+
+def is_write(method: str) -> bool:
+    return method.upper() in MUTATING_METHODS
 
 
 class InvalidApiClient(ValueError):
@@ -55,6 +80,13 @@ class Reason(StrEnum):
     EXPIRED = "expired"
     IP_NOT_ALLOWED = "ip_not_allowed"
     INSUFFICIENT_SCOPE = "insufficient_scope"
+    VENDOR_CLOSED = "vendor_closed"  # CORE.14: the key's vendor is closed
+    VENDOR_SUSPENDED = "vendor_suspended"  # CORE.14: a write by a suspended vendor's key
+
+
+_FORBIDDEN_REASONS: Final = frozenset(
+    {Reason.IP_NOT_ALLOWED, Reason.INSUFFICIENT_SCOPE, Reason.VENDOR_SUSPENDED}
+)
 
 
 @dataclass(frozen=True)
@@ -71,7 +103,7 @@ ALLOWED: Final = Decision(AuthStatus.OK, None)
 
 
 def deny(reason: Reason) -> Decision:
-    forbidden = reason in (Reason.IP_NOT_ALLOWED, Reason.INSUFFICIENT_SCOPE)
+    forbidden = reason in _FORBIDDEN_REASONS
     return Decision(AuthStatus.FORBIDDEN if forbidden else AuthStatus.UNAUTHENTICATED, reason)
 
 
@@ -129,6 +161,7 @@ class ClientState:
     expires_at: dt.datetime
     scopes: Sequence[str]
     allowed_ips: Sequence[str] | None
+    vendor_status: str | None = None  # the status of the key's vendor; None for a platform key
 
 
 def ip_allowed(ip: str | None, allowed: Sequence[str] | None) -> bool:
@@ -145,20 +178,32 @@ def ip_allowed(ip: str | None, allowed: Sequence[str] | None) -> bool:
 
 
 def evaluate(
-    state: ClientState, *, now: dt.datetime, ip: str | None, required_scope: str | None
+    state: ClientState,
+    *,
+    now: dt.datetime,
+    ip: str | None,
+    required_scope: str | None,
+    write: bool = True,
 ) -> Decision:
-    """Order: revoked → expired (401), then IP allow-list → scope (403).
+    """Order: revoked → expired → closed vendor (401), then IP allow-list → scope → suspended
+    vendor writing (403).
 
     `required_scope=None` is for operations open to any valid key (e.g. `GET /api/v1/me`).
+    `write` says whether the call changes state (`is_write(method)`); it defaults to True so a
+    caller that does not say is refused like a write (CORE.14: a suspended vendor's key reads only).
     """
     if not state.is_active:
         return deny(Reason.REVOKED)
     if state.expires_at <= now:
         return deny(Reason.EXPIRED)
+    if state.vendor_status == vendor_engine.CLOSED:
+        return deny(Reason.VENDOR_CLOSED)
     if not ip_allowed(ip, state.allowed_ips):
         return deny(Reason.IP_NOT_ALLOWED)
     if required_scope is not None and required_scope not in state.scopes:
         return deny(Reason.INSUFFICIENT_SCOPE)
+    if write and state.vendor_status == vendor_engine.SUSPENDED:
+        return deny(Reason.VENDOR_SUSPENDED)
     return ALLOWED
 
 
@@ -181,14 +226,23 @@ def bearer_challenge(decision: Decision, required_scope: str | None, *, realm: s
 # --- Issuance input
 
 
-def validate_scopes(scopes: Iterable[str]) -> list[str]:
-    """Scopes look like `resource:action` (e.g. `catalog:write`); matched exactly, no wildcard."""
+def validate_scopes(scopes: Iterable[str], *, vendor_key: bool = False) -> list[str]:
+    """Scopes look like `resource:action` (e.g. `catalog:write`); matched exactly, no wildcard.
+
+    A vendor key (`vendor_key=True`) takes only `VENDOR_GRANTABLE_SCOPES` (CORE.14).
+    """
     cleaned = sorted(set(scopes))
     if not cleaned:
         raise InvalidApiClient("an API client needs at least one scope")
     invalid = [scope for scope in cleaned if not _SCOPE_RE.match(scope)]
     if invalid:
         raise InvalidApiClient(f"invalid scopes: {invalid!r} (expected resource:action)")
+    if vendor_key:
+        platform_only = [scope for scope in cleaned if scope not in VENDOR_GRANTABLE_SCOPES]
+        if platform_only:
+            raise InvalidApiClient(
+                f"platform-only scopes cannot be granted to a vendor key: {platform_only!r}"
+            )
     return cleaned
 
 

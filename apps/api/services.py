@@ -6,6 +6,10 @@ commits (no grace period). A pipeline rotates by deploying the new key right aft
 A vendor key (CORE.13) is issued only by platform staff holding `api.add_apiclient` or an owner
 of that vendor; a platform key only by such staff, or by trusted code without an issuer (shell,
 deploy scripts).
+
+Vendor key policy (CORE.14): a vendor key holds only `engine.VENDOR_GRANTABLE_SCOPES`; a key of
+a suspended vendor only reads (403 on writes); a key of a closed vendor is refused (401); deleting
+a vendor audits each of its keys (`vendor_key_deletions`).
 """
 
 import datetime as dt
@@ -145,7 +149,7 @@ def issue_api_client(
     client = ApiClient(
         vendor=vendor,
         name=name.strip(),
-        scopes=validate_scopes(scopes),
+        scopes=validate_scopes(scopes, vendor_key=vendor is not None),
         key_prefix=generated.prefix,
         key_hash=hash_key(generated.key),
         expires_at=_future(expires_at),
@@ -212,9 +216,17 @@ def authenticate(
     *,
     ip: str | None,
     required_scope: str | None,
+    write: bool = True,
     now: dt.datetime | None = None,
 ) -> AuthResult:
-    """Check an `Authorization` header: 401 for bad/expired/revoked keys, 403 for IP or scope."""
+    """Check an `Authorization` header: 401 for bad/expired/revoked keys and closed vendors,
+    403 for IP, scope, or a write by a suspended vendor's key (CORE.14).
+
+    `write` says whether the call changes state; a caller that does not say is treated as
+    writing, so a suspended vendor's key is refused unless the call is known to be a read.
+    The vendor status is read with the key on every call: suspending, reinstating or closing a
+    vendor takes effect on its keys at once.
+    """
     now = now or timezone.now()
     parsed = parse_authorization(authorization)
     if isinstance(parsed, Decision):
@@ -224,7 +236,7 @@ def authenticate(
     if client is None or not matches:
         logger.info("API key refused: prefix=%s reason=%s", parsed.prefix, Reason.INVALID)
         return AuthResult(deny(Reason.INVALID), None)
-    decision = evaluate(client.state(), now=now, ip=ip, required_scope=required_scope)
+    decision = evaluate(client.state(), now=now, ip=ip, required_scope=required_scope, write=write)
     if decision.status is AuthStatus.UNAUTHENTICATED:
         logger.info("API key refused: prefix=%s reason=%s", parsed.prefix, decision.reason)
         return AuthResult(decision, None)
@@ -234,6 +246,20 @@ def authenticate(
     ApiClient.objects.filter(pk=client.pk).update(last_used_at=now)
     client.last_used_at = now
     return AuthResult(decision, client)
+
+
+# --- Vendor deletion (CORE.14)
+
+
+def vendor_key_deletions(vendor: Vendor, changes: ChangeSet) -> None:
+    """Add a delete per key of `vendor` to its deletion's ChangeSet: one audit entry per key.
+
+    Named in `settings.VENDOR_DELETION_AUDIT_HOOKS` and called by
+    `apps.vendors.services.delete_vendor`, which cannot import this app. The keys themselves go
+    with the vendor (`on_delete=CASCADE`); revoked keys are listed too.
+    """
+    for client in ApiClient.objects.select_related("vendor").filter(vendor=vendor).order_by("pk"):
+        changes.delete(MODEL, str(client.public_id), client.snapshot())
 
 
 # --- Mutation log (CORE.7)

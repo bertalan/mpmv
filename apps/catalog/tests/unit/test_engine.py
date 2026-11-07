@@ -190,3 +190,172 @@ def test_term_attributes_against_an_invalid_schema_are_refused(schema: object) -
     assert engine.term_attribute_errors(schema, {"x": 1}) == [
         "The taxonomy declares its term attributes wrongly: correct the taxonomy first."
     ]
+
+
+# --- Typed attributes and variant axes (CAT.3, spec 03 §3.2, Q-32)
+
+SIZE_COLOR = {
+    "size": engine.AttributeSpec("choice", frozenset({"s", "m", "l"})),
+    "color": engine.AttributeSpec("choice", frozenset({"red", "blue"})),
+    "material": engine.AttributeSpec("choice", frozenset({"cotton", "linen"})),
+    "bag_width": engine.AttributeSpec("number"),
+    "author": engine.AttributeSpec("text"),
+}
+AXES = (
+    engine.AttributeIn("size", values=("s", "m"), axis=True),
+    engine.AttributeIn("color", values=("red", "blue"), axis=True),
+)
+
+
+def _variant(sku: str, **options: str) -> engine.VariantIn:
+    return engine.VariantIn(sku=sku, options=options)
+
+
+def _grid() -> tuple[engine.VariantIn, ...]:
+    return (
+        _variant("T-S-RED", size="s", color="red"),
+        _variant("T-S-BLUE", size="s", color="blue"),
+        _variant("T-M-RED", size="m", color="red"),
+        _variant("T-M-BLUE", size="m", color="blue"),
+    )
+
+
+def test_a_size_by_color_variable_product_is_valid() -> None:
+    attributes = (
+        *AXES,
+        engine.AttributeIn("material", values=("cotton",)),
+        engine.AttributeIn("bag_width", number=Decimal("30.5")),
+        engine.AttributeIn("author", text="A. Writer"),
+    )
+    assert engine.product_structure_errors("variable", SIZE_COLOR, attributes, _grid()) == []
+
+
+def test_a_simple_product_with_plain_attributes_is_valid() -> None:
+    attributes = (engine.AttributeIn("material", values=("cotton", "linen")),)
+    assert engine.product_structure_errors("simple", SIZE_COLOR, attributes, ()) == []
+
+
+@pytest.mark.parametrize(
+    ("attribute", "message"),
+    [
+        (engine.AttributeIn("size"), "size needs at least one value."),
+        (
+            engine.AttributeIn("size", values=("s",), number=Decimal(1)),
+            "size takes values, not a number or a text.",
+        ),
+        (engine.AttributeIn("size", values=("xxl",)), "size has no value xxl."),
+        (engine.AttributeIn("size", values=("s", "s")), "size lists the value s twice."),
+        (engine.AttributeIn("bag_width"), "bag_width needs a number."),
+        (
+            engine.AttributeIn("bag_width", number=Decimal(3), values=("s",)),
+            "bag_width takes a number only.",
+        ),
+        (engine.AttributeIn("author"), "author needs a text."),
+        (engine.AttributeIn("author", text="x", number=Decimal(1)), "author takes a text only."),
+        (engine.AttributeIn("weight", values=("x",)), "weight is not a known attribute."),
+    ],
+)
+def test_attribute_values_must_match_the_attribute_kind(
+    attribute: engine.AttributeIn, message: str
+) -> None:
+    assert engine.product_structure_errors("simple", SIZE_COLOR, (attribute,), ()) == [message]
+
+
+def test_an_attribute_is_given_once() -> None:
+    attributes = (
+        engine.AttributeIn("material", values=("cotton",)),
+        engine.AttributeIn("material", values=("linen",)),
+    )
+    assert engine.product_structure_errors("simple", SIZE_COLOR, attributes, ()) == [
+        "material is given twice."
+    ]
+
+
+def test_a_float_is_never_a_number_value() -> None:
+    attribute = engine.AttributeIn("bag_width", number=30.5)  # type: ignore[arg-type]
+    assert engine.product_structure_errors("simple", SIZE_COLOR, (attribute,), ()) == [
+        "bag_width needs an exact decimal number."
+    ]
+
+
+def test_only_choice_attributes_can_be_variant_axes() -> None:
+    attributes = (*AXES, engine.AttributeIn("author", text="x", axis=True))
+    assert engine.product_structure_errors("variable", SIZE_COLOR, attributes, _grid()) == [
+        "author cannot be a variant axis: only choice attributes can."
+    ]
+
+
+def test_a_simple_product_has_no_variants_and_no_axes() -> None:
+    # Owner decision Q-32: variants exist only on variable products.
+    errors = engine.product_structure_errors("simple", SIZE_COLOR, AXES, _grid())
+    assert errors == [
+        "Only a variable product has variant axes.",
+        "Only a variable product has variants.",
+    ]
+
+
+def test_a_variable_product_needs_axes_and_variants() -> None:
+    assert engine.product_structure_errors("variable", SIZE_COLOR, (), ()) == [
+        "A variable product needs at least one variant axis.",
+        "A variable product needs at least one variant.",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("variant", "message"),
+    [
+        (_variant("T-L", size="s"), "Variant T-L has no color."),
+        (
+            _variant("T-L", size="m", color="blue", material="cotton"),
+            "Variant T-L: material is not a variant axis of this product.",
+        ),
+        (
+            _variant("T-L", size="l", color="red"),
+            "Variant T-L: l is not one of the product's size values.",
+        ),
+    ],
+)
+def test_a_variant_takes_one_listed_value_per_axis(variant: engine.VariantIn, message: str) -> None:
+    variants = (*_grid()[:3], variant)
+    assert engine.product_structure_errors("variable", SIZE_COLOR, AXES, variants) == [message]
+
+
+def test_two_variants_cannot_share_a_combination_or_a_sku() -> None:
+    variants = (
+        *_grid(),
+        _variant("T-OTHER", size="s", color="red"),
+        _variant("t-s-red ", size="m", color="blue"),
+    )
+    errors = engine.product_structure_errors("variable", SIZE_COLOR, AXES, variants)
+    assert "Variants T-S-RED and T-OTHER have the same options." in errors
+    assert "The variant SKU T-S-RED is given twice." in errors
+
+
+def test_at_most_one_default_variant() -> None:
+    first, second, *rest = _grid()
+    variants = (
+        engine.VariantIn(sku=first.sku, options=first.options, is_default=True),
+        engine.VariantIn(sku=second.sku, options=second.options, is_default=True),
+        *rest,
+    )
+    assert engine.product_structure_errors("variable", SIZE_COLOR, AXES, variants) == [
+        "Only one variant can be the default."
+    ]
+
+
+def test_variants_are_ordered_by_axis_order_then_value_position() -> None:
+    positions = {"size": {"s": 0, "m": 1, "l": 2}, "color": {"red": 0, "blue": 1}}
+    options = [
+        {"size": "m", "color": "blue"},
+        {"size": "s", "color": "blue"},
+        {"size": "m", "color": "red"},
+        {"size": "s", "color": "red"},
+    ]
+    assert engine.variant_order(("size", "color"), positions, options) == [3, 1, 2, 0]
+    # Color first: the axis order of the product decides.
+    assert engine.variant_order(("color", "size"), positions, options) == [3, 2, 1, 0]
+
+
+def test_a_variant_label_joins_the_option_labels_in_axis_order() -> None:
+    assert engine.variant_label(["M", "Rosso"]) == "M / Rosso"
+    assert engine.variant_label([]) == ""

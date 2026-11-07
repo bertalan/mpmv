@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **226** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **1902 h** (P1 1550 h · P2 334 h · P3 18 h)
+- Micro-tasks: **227** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **1910 h** (P1 1558 h · P2 334 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -15,7 +15,7 @@
 | Macro | Area | Tasks | P1 h | P2 h | P3 h | Total h |
 |---|---|---:|---:|---:|---:|---:|
 | ARC | Architecture and foundations | 17 | 103 | 6 | 0 | 109 |
-| CORE | Identity, permissions, API, backoffice | 14 | 103 | 4 | 0 | 107 |
+| CORE | Identity, permissions, API, backoffice | 14 | 105 | 4 | 0 | 109 |
 | CAT | Product catalog | 18 | 126 | 60 | 0 | 186 |
 | VEN | Vendors, commissions, ledger | 22 | 197 | 22 | 0 | 219 |
 | TAX | Tax engine | 11 | 44 | 28 | 0 | 72 |
@@ -23,7 +23,7 @@
 | ORD | Cart, orders, returns | 11 | 102 | 4 | 0 | 106 |
 | PAY | Payments (Stripe Connect) | 4 | 40 | 0 | 0 | 40 |
 | ING | Supplier import and pipelines | 13 | 92 | 26 | 0 | 118 |
-| I18N | Multilingual | 8 | 44 | 6 | 0 | 50 |
+| I18N | Multilingual | 9 | 50 | 6 | 0 | 56 |
 | CMS | Wagtail content | 8 | 51 | 10 | 0 | 61 |
 | EVT | Events, feeds and maps | 17 | 111 | 12 | 0 | 123 |
 | THM | Frontend themes | 11 | 70 | 12 | 0 | 82 |
@@ -33,11 +33,11 @@
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 5 | 19 | 11 | 0 | 30 |
 | MIG | Migration and cutover | 11 | 114 | 0 | 0 | 114 |
-| **Total** | | **226** | **1550** | **334** | **18** | **1902** |
+| **Total** | | **227** | **1558** | **334** | **18** | **1910** |
 
 ## By phase
 
-### F0 — Foundations (37 tasks, 250 h)
+### F0 — Foundations (37 tasks, 252 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -63,7 +63,7 @@
 | CORE.5 | Rate limiting and progressive lockout on login/registration, Turnstile | P1 | 6 | CORE.1 | Tests on failed attempts |
 | CORE.6 | `ApiClient`: issuance, hashing, scopes, expiry, rotation, revocation, IP allow-list | P1 | 10 | CORE.1 | Expired or out-of-scope key → 401/403 |
 | CORE.7 | Ninja API v1 skeleton: auth, dry-run, RFC 9457 errors, OpenAPI, mutation log | P1 | 10 | CORE.6, ARC.13 | OpenAPI spec published on STAGE |
-| CORE.8 | Wagtail admin: staff menu, base ViewSet with tenant filters and bulk actions; platform staff as a dedicated permission instead of `is_staff` in `for_actor` (Q-34); staff unlock of a locked account with audit, and automatic unlock after a completed password reset (Q-18) | P1 | 13 | CORE.3 | Staff manage vendors and products from the admin; a user with Wagtail admin access but without the platform staff permission sees no vendor's data (negative test); staff unlock a locked account and the unlock is in the AuditLog; a completed password reset clears the lockout |
+| CORE.8 | Wagtail admin: staff menu, base ViewSet with tenant filters and bulk actions; platform staff as a dedicated permission instead of `is_staff` in `for_actor` (Q-34); staff unlock of a locked account with audit, and automatic unlock after a completed password reset (Q-18); our own editor roles (for example blog editors, legal pages, event moderators) replacing Wagtail's default Editors and Moderators groups, which stay until then (Q-58) | P1 | 15 | CORE.3 | Staff manage vendors and products from the admin; a blog editor cannot edit the About page or a legal page; Wagtail's default Editors and Moderators groups no longer exist after the data migration; a user with Wagtail admin access but without the platform staff permission sees no vendor's data (negative test); staff unlock a locked account and the unlock is in the AuditLog; a completed password reset clears the lockout |
 | CORE.9 | Vendor area `/vendor/`: layout, navigation, essential KPI dashboard; storefront profile editing (texts, logo, return and shipping policies) for the owner only, with post-moderation notice to the moderators, audit and staff revert (Q-16); new applicants arrive from the VEN.22 public application | P1 | 16 | CORE.3 | Vendor sees only their own data; vendor staff cannot edit the storefront profile; an owner's profile change notifies the moderators, is in the AuditLog with before and after, and staff revert it to the previous version |
 | CORE.12 | Per-API-key rate limit (Q-18): limits per `ApiClient` from settings, counters in a cache shared by every app process (PostgreSQL-backed, spec 01), 429 response in RFC 9457 format with `Retry-After` | P1 | 4 | CORE.7 | Two app processes share one counter; the request over the limit gets 429 with `Retry-After`; another key is not affected |
 | CORE.13 | `ApiClient.vendor`: optional vendor FK on API keys (empty = platform key), vendor-scoped API keys enforced through CORE.3 scoping, admin and tests | P1 | 3 | CORE.3, CORE.6 | A vendor key cannot read or change another vendor's data (negative tests) |
@@ -79,7 +79,7 @@
 | OPS.2 | Observability: JSON logs, error tracking, healthchecks, alerts (including database disk space, WAL archiving and backup age) | P1 | 8 | ARC.5 | Alert on a simulated checkout error |
 | OPS.5 | Technical Django admin reachable only from a restricted network (owner decision Q-18): allow-list at the reverse proxy plus an app-level check on the Django admin path (defence in depth), the allowed networks as environment configuration, staff operations moved to the Wagtail admin (CORE.8) | P1 | 3 | ARC.13, CORE.8 | On STAGE the Django admin answers 404 from outside the allowed networks and works from inside; a test covers the app-level check |
 
-### F1 — Catalog, import, base frontend (36 tasks, 320 h)
+### F1 — Catalog, import, base frontend (37 tasks, 326 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -112,6 +112,7 @@
 | I18N.5 | gettext catalogs for templates and emails; tax wording as keys | P1 | 6 | ORD.9 | No hardcoded strings (lint) |
 | I18N.6 | hreflang, canonical, per-language sitemap with fallback excluded | P1 | 4 | SEO.1 | Validation on a sample of URLs: fallback copies have the EN canonical and are absent from hreflang and from the language sitemap |
 | I18N.7 | Interface strings in IT, DE, FR and ES for go-live (D-18): gettext catalogs for templates, emails, notifications, error and validation messages, MFA pages and tax/legal wording keys; AI draft, human review of checkout, emails and legal/tax wording; coverage report | P1 | 10 | I18N.5 | Coverage report: 100% of interface strings translated in IT, DE, FR and ES; checkout, email and legal/tax wording reviewed by a human |
+| I18N.9 | Customer legal and checkout pages at go-live (Q-42): terms of sale, privacy, withdrawal, shipping and returns as `LegalPage` translations in EN, IT, DE, FR and ES through wagtail-localize, each language with its own version and effective date; AI draft, native-speaker review and legal counsel check recorded per language; no EN fallback for these pages | P1 | 6 | CMS.5, I18N.3 | Every one of the five pages is published in all five languages; a go-live readiness check fails when a legal or checkout page lacks a published translation in a go-live language; a translation of a legal page shows its own effective date |
 | CMS.1 | Wagtail: site, locales, base page types, per-language navigation and footer | P1 | 8 | ARC.3 | Home and static pages in every configured language |
 | THM.1 | Theme framework: `apps/themes` registry and manifest, theme-aware template loader with parent fallback and `(theme, name)` cache, `ThemeSettings` per Wagtail Site with audit, `MPMV_THEME_DEFAULT`, system checks, import-linter rule, ADR for the frontend toolchain | P1 | 8 | CMS.1 | Two sites render different themes in an integration test; a template missing in the child comes from `base`; an unknown theme fails the system check |
 | THM.2 | Design-token pipeline: `tokens.toml` resolution and inheritance, token contract with contrast pairs, `tokens.css` rendering, `tools/build_theme.py` and `make assets`, Containerfile build step | P1 | 6 | THM.1 | Unit tests on `resolve_tokens`, `contrast_ratio` and `check_tokens` (a pair below 4.5:1 fails); the image build produces hashed `theme.css` for every theme |
@@ -205,7 +206,7 @@
 | CMS.2 | Reusable StreamField blocks (hero, product grid, CTA, FAQ, choosers) | P1 | 10 | CMS.1, CAT.8 | An editor builds the home page without code |
 | CMS.3 | Blog with scheduling, author, product/term/vendor chooser | P1 | 8 | CMS.2 | Migrated article published |
 | CMS.4 | TermLandingPage and VendorLandingPage | P1 | 10 | CMS.2, CAT.8 | A term page with its products |
-| CMS.5 | Versioned LegalPage + VendorRecruitmentPage (plans, FAQ) leading to the VEN.22 application form | P1 | 6 | CMS.1, VEN.5 | Legal page versions kept; the recruitment page shows the plans and links to the application |
+| CMS.5 | Versioned LegalPage + VendorRecruitmentPage (plans, FAQ) leading to the VEN.22 application form | P1 | 6 | CMS.1, VEN.5 | Legal page versions kept per language, so a translated legal page has its own version and effective date (Q-42); the recruitment page shows the plans and links to the application |
 | CMS.8 | Image source, licence and credit: custom Wagtail image model `MediaImage` in `core` with licence, source, author, credit and permission fields, staff-editable `ImageLicence` allow list seeded per §10.2, upload validation in admin and services, `image_credit` component and per-page image credits disclosure, review list for migrated images without metadata | P1 | 5 | CMS.1, ARC.15 | An upload without licence or author is refused; an NC licence cannot be added to the allow list; a CC BY image shows its credit in the caption, a CC BY hero in the page credits disclosure; a CC0 image shows none; `WAGTAILIMAGES_IMAGE_MODEL` points to `MediaImage` before CAT.4 |
 | CMS.9 | Launch countdown StreamField block: fields per §10.2, `countdown_state` pure function, server-rendered absolute date and expired state, page cache capped at the target, CSP-safe ES module with visitor time zone, minute updates and pause button, single polite announcement at expiry | P1 | 4 | CMS.2, THM.4 | Without JavaScript the block shows the absolute date and the CTA; with it the remaining time updates once a minute in the visitor's time zone and the pause button stops it; after the target the server and the module both show the expired text and link; no `aria-live` on the counter; no CSP violation and no axe violation on a page with the block |
 | EVT.1 | `events` app: `EventIndexPage` and `EventPage` page types on the CMS.1 conventions (structured fields, attendance, venue and address, latitude and longitude with geocoding metadata, StreamField body from the CMS.2 library, ParentalManyToMany links, vendor-scoped page manager, denormalised `status` with its sync function, `original_locale`, synchronised and translatable fields), an `EventIndexPage` in every enabled locale, `VendorEventPolicy`, `EventSettings`; `"events.EventIndexPage"` in the home page's subpage types; import-linter layer between `cart` and `catalog`, `apps.events` forbidden for `tax`, `shipping`, `cart` and `orders`; factories | P1 | 9 | CMS.2, CMS.8, CORE.3, CAT.2, I18N.3 | Constraints tested (end after start, one of COUNT or UNTIL, no `closure` type, regression case 19); vendor A cannot see vendor B's draft page (cross-tenant fixture); a test import of `apps.events` from `apps.shipping` or `apps.cart` fails `make check`; an IT page translates to EN with dates synchronised |
