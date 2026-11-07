@@ -44,7 +44,7 @@ def test_encrypting_twice_gives_different_tokens() -> None:
 
 def test_non_ascii_text_round_trips() -> None:
     keyring = parse_keys([generate_key("k1")])
-    text = "Ünïcødé – 12/345/67890"
+    text = "Ünïcødé € 12/345/67890"
     assert keyring.decrypt(keyring.encrypt(text, context=CONTEXT), context=CONTEXT) == text
 
 

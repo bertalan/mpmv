@@ -1,15 +1,18 @@
 """Core services: the dry-run + audit pattern shared by all mutating services (spec 01
-conventions), the platform operator, the worker heartbeat and throttle counters."""
+conventions), the platform operator, the worker heartbeat, throttle counters and the rotation of
+field encryption keys."""
 
 import datetime as dt
+from collections import defaultdict
 from collections.abc import Callable
 from typing import Any
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import F, Model, Q
 from django.utils import timezone
 
+from . import crypto, encryption
 from .audit import AuditContext, record
 from .changeset import ChangeSet
 from .models import Heartbeat, PlatformOperator, Throttle
@@ -232,3 +235,56 @@ def purge_expired_throttles(*, now: dt.datetime | None = None) -> int:
     """Delete the rows nobody needs any more; return how many were deleted."""
     deleted, _ = Throttle.objects.filter(expires_at__lte=now or timezone.now()).delete()
     return deleted
+
+
+# --- Field encryption keys (SEC.3)
+
+FIELD_KEYS_ROTATED = "core.field_keys.rotated"
+
+
+def _key_label(raw: str) -> str:
+    key_id = encryption.key_id_of_raw(raw)
+    return f"key {key_id}" if key_id else "cleartext"
+
+
+def rotate_field_keys(*, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Re-encrypt with the primary key every encrypted value that uses an older key or is
+    stored in clear (e.g. restored from an old dump). Rows are locked while they are rewritten.
+
+    One change (and one audit entry) per object, naming only key ids: `{"iban": "key k1"}` to
+    `{"iban": "key k2"}`, never values. Every value is decrypted first, also on dry-run, so a
+    wrong or missing key raises `DecryptionError` before anything is written. Afterwards the
+    older keys can be removed from the configuration.
+    """
+    keyring = encryption.configured_keyring()
+    after_label = f"key {keyring.primary_id}"
+    by_model: dict[type[Any], list[encryption.EncryptedColumn]] = defaultdict(list)
+    for column in encryption.encrypted_columns():
+        by_model[column.model].append(column)
+
+    changeset = ChangeSet()
+    updates: list[tuple[type[Any], Any, dict[str, str]]] = []
+    with transaction.atomic():
+        for model, columns in by_model.items():
+            contexts = {column.field.name: column.context for column in columns}
+            for pk, key, stale in encryption.stale_rows(connection, model, columns):
+                plaintext = {
+                    name: keyring.decrypt(raw, context=contexts[name])
+                    if crypto.is_encrypted(raw)
+                    else raw
+                    for name, raw in stale.items()
+                }
+                changeset.update(
+                    model._meta.label_lower,
+                    key,
+                    {name: _key_label(raw) for name, raw in stale.items()},
+                    dict.fromkeys(stale, after_label),
+                )
+                updates.append((model, pk, plaintext))
+
+        def apply() -> None:
+            for model, pk, values in updates:
+                # The fields encrypt with the primary key on the way in.
+                model._base_manager.filter(pk=pk).update(**values)
+
+        return run_mutation(changeset, apply, ctx=ctx, action=FIELD_KEYS_ROTATED, dry_run=dry_run)

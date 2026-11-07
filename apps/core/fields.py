@@ -2,10 +2,13 @@
 
 from typing import Any
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import FieldError, ValidationError
 from django.db import models
+from django.db.models import lookups
 
 from .countries import InvalidCountry, normalize_country
+from .crypto import DecryptionError
+from .encryption import configured_keyring, encryption_context
 from .i18n import language_choices
 
 
@@ -52,3 +55,75 @@ class LanguageField(models.CharField[Any, Any]):
         kwargs.setdefault("max_length", 8)
         kwargs.setdefault("choices", language_choices)
         super().__init__(*args, **kwargs)
+
+
+class _EmptyOnlyExact(lookups.Exact):
+    """`field=""` only: ciphertexts are randomized, so equality on a value never matches."""
+
+    def get_prep_lookup(self) -> Any:
+        if self.rhs not in ("", None):
+            raise FieldError(_not_searchable(self.lhs.output_field))
+        return super().get_prep_lookup()
+
+
+def _not_searchable(field: Any) -> str:
+    return (
+        f"{field.model._meta.label_lower}.{field.name} is encrypted at rest and cannot be "
+        "searched, compared or sorted in SQL. Only `=''` and `__isnull` work; a lookup needs a "
+        "keyed blind index (docs/dev/field-encryption.md)."
+    )
+
+
+class EncryptedFieldMixin(models.Field[Any, Any]):
+    """Encrypts the value at rest (SEC.3): AES-256-GCM, key outside the database, rotatable.
+
+    Python code sees the plaintext; the column holds an `enc1:<key id>:...` token
+    (`apps.core.crypto`). Empty strings and NULL are stored as they are. A value that does not
+    decrypt (wrong or missing key, cleartext, tampering) raises `DecryptionError`: never a
+    silent fallback. Lookups other than `=''` and `__isnull` raise `FieldError`.
+
+    Mask the field in audit snapshots too: an encrypted column is pointless if the audit log
+    copies the value in clear. See docs/dev/field-encryption.md.
+    """
+
+    def _context(self) -> str:
+        return encryption_context(self.model, self.name)
+
+    def get_prep_value(self, value: Any) -> Any:
+        value = super().get_prep_value(value)
+        if value is None or value == "":
+            return value
+        return configured_keyring().encrypt(str(value), context=self._context())
+
+    def from_db_value(self, value: Any, expression: Any, connection: Any) -> Any:
+        if value is None or value == "":
+            return value
+        try:
+            return configured_keyring().decrypt(value, context=self._context())
+        except DecryptionError as exc:
+            raise DecryptionError(
+                f"Cannot read {exc}. Check the field encryption keys: "
+                "`manage.py check --database default`."
+            ) from None
+
+    def get_lookup(self, lookup_name: str) -> Any:
+        if lookup_name == "exact":
+            return _EmptyOnlyExact
+        if lookup_name == "isnull":
+            return super().get_lookup(lookup_name)
+        return None  # Django raises FieldError("Unsupported lookup ...")
+
+    def get_transform(self, lookup_name: str) -> Any:
+        return None
+
+
+class EncryptedCharField(EncryptedFieldMixin, models.CharField[Any, Any]):
+    """A CharField encrypted at rest. `max_length` validates the plaintext; the column is
+    `text`, since the token is longer than the value."""
+
+    def get_internal_type(self) -> str:
+        return "TextField"
+
+
+class EncryptedTextField(EncryptedFieldMixin, models.TextField[Any, Any]):
+    """A TextField encrypted at rest."""

@@ -959,6 +959,13 @@ def fatturapa_transmission(identity: LegalIdentity) -> dict[str, str]:
     return transmission
 
 
+def mask_tax_code(tax_code: str) -> str:
+    """Last four characters only: for audit rows and screens (SEC.3)."""
+    if len(tax_code) <= 4:
+        return "*" * len(tax_code)
+    return "*" * (len(tax_code) - 4) + tax_code[-4:]
+
+
 def mask_iban(iban: str) -> str:
     """Country code and last four characters only: for audit rows and screens."""
     code = compact(iban)

@@ -123,7 +123,7 @@ def test_a_wrong_key_fails_the_database_check_and_every_read() -> None:
     vendor = VendorFactory.create(italian_sole_proprietor=True)
     with override_settings(FIELD_ENCRYPTION_KEYS=[generate_key("test")]):
         assert database_check() == ["core.E304", "core.E304"]
-        with pytest.raises(DecryptionError, match="vendors.vendor"):
+        with pytest.raises(DecryptionError, match=r"vendors\.vendor"):
             Vendor.objects.get(pk=vendor.pk)
 
 

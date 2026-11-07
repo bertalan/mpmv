@@ -7,7 +7,7 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 
 from apps.core.crypto import parse_keys
-from mpmv.settings.env import env_bool, env_list, env_secret_list, env_str, ensure_key_file
+from mpmv.settings.env import ensure_key_file, env_bool, env_list, env_secret_list, env_str
 
 
 def test_env_str_returns_value(monkeypatch: pytest.MonkeyPatch) -> None:

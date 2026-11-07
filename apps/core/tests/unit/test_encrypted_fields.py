@@ -8,8 +8,8 @@ from typing import Any
 
 import pytest
 from django.core import checks
-from django.core.management import call_command
 from django.core.exceptions import FieldError, ImproperlyConfigured, ValidationError
+from django.core.management import call_command
 from django.db import models
 from django.test import override_settings
 from django.test.utils import isolate_apps
