@@ -1036,6 +1036,7 @@ class ChecklistItem:
 @dataclasses.dataclass(frozen=True)
 class OnboardingChecklist:
     items: tuple[ChecklistItem, ...]
+    current_contract_version: int | None = None  # the version in force, if any
 
     @property
     def blocking_missing(self) -> tuple[str, ...]:
@@ -1072,7 +1073,8 @@ def onboarding_checklist(
             contract,
             ChecklistItem(DAC7, not dac7_missing, False, tuple(dac7_missing)),
             ChecklistItem(PAYOUT_DATA, payout.complete, False, payout.missing + payout.invalid),
-        )
+        ),
+        current_contract_version=current_contract_version,
     )
 
 
