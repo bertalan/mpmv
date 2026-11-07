@@ -23,6 +23,10 @@ from apps.core.checks import check_audit_policy
 NOT_SENSITIVE_SERVICES = {
     "apps.accounts.services.set_preferred_language": "a display preference, not a security fact",
     "apps.api.services.record_mutation_call": "logs the API call itself; `dry_run` is a field",
+    # I18N.3: CMS page content; Wagtail's revisions and action log record every page change.
+    "apps.cms.services.translate_page": "CMS content, in Wagtail revisions and log",
+    "apps.cms.services.sync_page_translations": "CMS content, in Wagtail revisions and log",
+    "apps.cms.services.override_image": "CMS content, in Wagtail revisions and log",
 }
 
 

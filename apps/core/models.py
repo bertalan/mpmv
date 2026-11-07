@@ -1,5 +1,5 @@
 """Core models: the abstract base, translation and versioned-configuration models, the
-append-only audit log, the platform operator, the feature flags."""
+append-only audit log, the platform operator, the feature flags, the shared image model."""
 
 import uuid
 from typing import Any, ClassVar, Self
@@ -9,6 +9,7 @@ from django.contrib.postgres.fields import DateTimeRangeField, RangeOperators
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils import timezone
+from wagtail.images.models import AbstractImage, AbstractRendition, Image
 
 from . import flags, translations
 from .fields import CountryField, LanguageField
@@ -390,3 +391,32 @@ class FeatureFlag(BaseModel):
     def spec(self) -> flags.FlagSpec | None:
         """The flag's declaration in code; None for a row left by removed code."""
         return flags.spec_of(self.name) if flags.is_registered(self.name) else None
+
+
+class MediaImage(AbstractImage):  # type: ignore[misc]  # Wagtail is untyped
+    """The site's image model (`WAGTAILIMAGES_IMAGE_MODEL`, spec 10 §10.2).
+
+    Shared by CMS pages, products (CAT.4), vendor logos and banners. It is the image model from
+    the first image on (I18N.3), so no image ever has to move between models; CMS.8 adds the
+    licence, source, author, credit and permission fields and their upload validation.
+    """
+
+    admin_form_fields = Image.admin_form_fields
+
+    class Meta(AbstractImage.Meta):  # type: ignore[misc]
+        verbose_name = "image"
+        verbose_name_plural = "images"
+
+
+class MediaImageRendition(AbstractRendition):  # type: ignore[misc]
+    """A resized copy of a `MediaImage`, made on first use by templates."""
+
+    image = models.ForeignKey(MediaImage, on_delete=models.CASCADE, related_name="renditions")
+
+    class Meta:
+        constraints: ClassVar[list[models.BaseConstraint]] = [
+            models.UniqueConstraint(
+                fields=["image", "filter_spec", "focal_point_key"],
+                name="core_one_rendition_per_filter",
+            ),
+        ]

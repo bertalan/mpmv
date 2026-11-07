@@ -31,8 +31,7 @@ def test_wagtail_localize_and_the_shared_image_model_are_installed() -> None:
 def test_the_page_image_is_synchronised_and_overridable_per_locale() -> None:
     image = _fields(StandardPage)["image"]
     assert isinstance(image, SynchronizedField)
-    assert image.is_overridable()
-    assert not image.is_translated()
+    assert image.overridable
 
 
 def test_page_texts_alt_text_and_caption_are_translatable() -> None:

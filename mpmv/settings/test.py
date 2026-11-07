@@ -1,6 +1,8 @@
 """Settings for the automated test suite."""
 
 import os
+import tempfile
+from pathlib import Path
 
 from apps.core.crypto import generate_key
 
@@ -20,3 +22,6 @@ PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]  # fast has
 
 # Parallel runs (several agents or worktrees) each get their own test database.
 DATABASES["default"]["TEST"] = {"NAME": os.environ.get("MPMV_TEST_DB_NAME", "test_mpmv")}  # noqa: F405
+
+# Uploaded images and their renditions (I18N.3) go to a directory of this test process only.
+MEDIA_ROOT = Path(tempfile.mkdtemp(prefix="mpmv-test-media-"))

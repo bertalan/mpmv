@@ -63,6 +63,7 @@ def test_a_translator_replaces_the_main_image_of_the_italian_page_only(
 
     page.goto(f"{live_server.url}/admin/pages/{italian_page.pk}/edit/")
     expect(page.get_by_text("A workbench with tools").first).to_be_visible()
+    expect(page.locator(".preview-image img").first).to_have_attribute("title", "Workshop EN")
     shot("translation-editor")
 
     page.get_by_role("button", name="Change image").first.click()
@@ -71,6 +72,7 @@ def test_a_translator_replaces_the_main_image_of_the_italian_page_only(
     shot("image-chooser")
     modal.get_by_text("Workshop IT").click()
     expect(modal).to_be_hidden()
+    expect(page.locator(".preview-image img").first).to_have_attribute("title", "Workshop IT")
     shot("image-replaced")
 
     page.get_by_role("button", name=re.compile(r"^Publish in")).click()

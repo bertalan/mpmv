@@ -36,6 +36,15 @@ from apps.core.tests.factories import MediaImageFactory
 pytestmark = pytest.mark.django_db
 
 
+@pytest.fixture(autouse=True)
+def _commit_hooks_run_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """wagtail-localize publishes a translation when the transaction commits; a test runs in
+    one transaction that never commits, so the hooks run at once here."""
+    monkeypatch.setattr(
+        "django.db.transaction.on_commit", lambda func, using=None, robust=False: func()
+    )
+
+
 def _image(name: str) -> MediaImage:
     image: MediaImage = MediaImageFactory.create(title=name, file__filename=f"{name}.png")
     return image
@@ -234,6 +243,7 @@ def test_a_translator_replaces_one_image_in_one_locale_only(
     assert _in(workshop, "it").image == italian
     assert _in(workshop, "de").image == workshop.image
     workshop.refresh_from_db()
+    assert workshop.image is not None
     assert workshop.image.title == "main-en"
 
     it_html = client.get(_in(workshop, "it").url).content.decode()
@@ -385,7 +395,6 @@ def test_the_translation_editor_loads_without_inline_scripts(
     assert "js-translation-editor" in html
     assert reverse("wagtailimages_chooser:choose") in html  # read from a data attribute
     assert "window.chooserUrls" not in html
-    assert "wagtaildocs" not in html
 
 
 def test_the_submit_translation_form_has_no_inline_script(
@@ -399,3 +408,36 @@ def test_the_submit_translation_form_has_no_inline_script(
     html = response.content.decode()
     assert 'name="locales"' in html
     assert '<script type="text/javascript">' not in html
+
+
+def test_the_editor_image_preview_answers_with_a_thumbnail(
+    workshop: StandardPage, editor: User, client: Client
+) -> None:
+    """wagtail-localize asks Wagtail's former admin API for the preview of an image segment."""
+    image = workshop.image
+    assert image is not None
+    url = f"/admin/api/main/images/{image.pk}/"
+    assert client.get(url).status_code == 302  # to the login
+
+    verified_login(client, editor)
+    data = client.get(url).json()
+
+    assert data["id"] == image.pk
+    assert data["title"] == "main-en"
+    assert "main-en" in data["thumbnail"]["url"]
+    assert data["thumbnail"]["width"] <= 165
+
+
+def test_the_image_preview_needs_permission_on_images(
+    workshop: StandardPage, client: Client
+) -> None:
+    from django.contrib.auth.models import Permission
+
+    user = UserFactory.create()
+    user.user_permissions.add(Permission.objects.get(codename="access_admin"))
+    verified_login(client, user)
+    assert workshop.image is not None
+
+    response = client.get(f"/admin/api/main/images/{workshop.image.pk}/")
+    assert response.status_code in (302, 403)  # Wagtail's admin turns a refusal into a redirect
+    assert response.get("Content-Type") != "application/json"

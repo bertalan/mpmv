@@ -7,7 +7,7 @@ from django.urls import URLPattern, path
 from django.views.decorators.cache import never_cache
 from wagtail.admin.auth import require_admin_access
 
-from .admin_views import EditorAccountView
+from .admin_views import EditorAccountView, localize_image_info
 
 # Same decorators as Wagtail's own admin URLs: admin permission check and no caching.
 # Wagtail's URL name is kept: its views redirect to it, and the shadowed route has the same path.
@@ -16,5 +16,11 @@ urlpatterns: list[URLPattern] = [
         "account/",
         never_cache(require_admin_access(EditorAccountView.as_view())),
         name="wagtailadmin_account",
+    ),
+    # wagtail-localize's image preview (I18N.3): the path of Wagtail's former admin API.
+    path(
+        "api/main/images/<int:pk>/",
+        never_cache(require_admin_access(localize_image_info)),
+        name="cms_localize_image_info",
     ),
 ]

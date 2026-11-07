@@ -12,6 +12,9 @@ class CoreConfig(AppConfig):
         "auditlog": "the audit log itself (append-only)",
         "heartbeat": "worker telemetry, not a domain change",
         "throttle": "login counters; the lockouts they cause are audited by accounts",
+        "mediaimage": "Wagtail image: editor upload, logged in Wagtail's action log (CMS.8 adds "
+        "the licence fields)",
+        "mediaimagerendition": "a resized copy of an image, made by templates",
         # The job queue (ADR-0004) is used only through apps.core.tasks; its admin is read-only.
         "procrastinate.procrastinatejob": "background job queue, read-only admin",
         "procrastinate.procrastinateevent": "background job history, read-only admin",

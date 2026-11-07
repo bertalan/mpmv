@@ -6,13 +6,17 @@ script, `<script>initDateChooser("<id>", <JSON config>);</script>`, which the CS
 nonce: the whole script must be one call of a picker initialiser with an HTML id and a JSON
 object, and JSON cannot run code, so injected markup cannot borrow the nonce to run anything
 else. Every other inline script stays blocked.
+
+The image and document chooser widgets (I18N.3) start the same way,
+`<script>new ImageChooser("<id>", <JSON config>);</script>`, and get the nonce on the same terms.
 """
 
 import json
 import re
 
 PICKER_SCRIPT = re.compile(
-    r"<script>(?P<call>(?:initDateChooser|initTimeChooser|initDateTimeChooser)"
+    r"<script>(?P<call>(?:initDateChooser|initTimeChooser|initDateTimeChooser"
+    r"|new ImageChooser|new DocumentChooser)"
     r'\("[A-Za-z0-9_-]+", (?P<config>\{[^<]*?\})\);)</script>'
 )
 
