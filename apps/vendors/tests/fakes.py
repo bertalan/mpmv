@@ -21,10 +21,10 @@ class FakeVatNumberValidator:
 
 
 def seed_legal_requirements() -> None:
-    """Re-run the seeding data migration (idempotent).
+    """Re-run the seeding data migrations (idempotent).
 
     Transactional tests flush the tables, seeded rows included; tests that rely on the seeded
     rules call this instead of assuming the migration's rows are still there.
     """
-    migration = importlib.import_module("apps.vendors.migrations.0005_seed_legal_requirements")
-    migration.seed(apps, None)
+    for name in ("0005_seed_legal_requirements", "0007_seed_dac7_requirements"):
+        importlib.import_module(f"apps.vendors.migrations.{name}").seed(apps, None)

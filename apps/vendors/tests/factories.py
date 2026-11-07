@@ -53,9 +53,9 @@ class VendorFactory(DjangoModelFactory[Vendor]):
     """An applicant vendor in Italy; the slug comes from the display name, as in production.
 
     `languages=["en", "it"]` also creates one translation per language. Traits fill a complete
-    legal identity: `italian_company`, `italian_sole_proprietor`, `eu_company` (Germany) and
-    `non_eu_company` (Switzerland, with an Italian fiscal representative) and `non_eu_without_vat`
-(United States: a TIN and no VAT number).
+    legal identity: `italian_company`, `italian_sole_proprietor`, `eu_company` (Germany),
+    `non_eu_company` (Switzerland, with an Italian fiscal representative) and
+    `non_eu_without_vat` (United States: a TIN and no VAT number).
     """
 
     class Meta:

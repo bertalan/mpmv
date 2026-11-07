@@ -53,7 +53,7 @@ def test_a_vendor_with_no_legal_data_is_valid_and_saves() -> None:
     assert vendor.vies_status == Vendor.ViesStatus.UNCHECKED
 
 
-@pytest.mark.parametrize("trait", (*TRAITS, "non_eu_without_vat"))
+@pytest.mark.parametrize("trait", [*TRAITS, "non_eu_without_vat"])
 def test_factory_traits_build_valid_identities(trait: str) -> None:
     vendor = VendorFactory.create(**{trait: True})
     vendor.full_clean()

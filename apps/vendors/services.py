@@ -302,7 +302,15 @@ def assert_payout_allowed(vendor: Vendor) -> None:
 REQUIREMENT_MODEL = "vendors.legalfieldrequirement"
 REQUIREMENT_SAVED = "vendor.legal_requirement_saved"
 REQUIREMENT_DELETED = "vendor.legal_requirement_deleted"
-REQUIREMENT_FIELDS = ("country", "legal_form", "field_name", "purpose", "active", "note")
+REQUIREMENT_FIELDS = (
+    "country",
+    "region",
+    "legal_form",
+    "field_name",
+    "purpose",
+    "active",
+    "note",
+)
 
 
 def requirement_snapshot(requirement: LegalFieldRequirement) -> dict[str, Any]:

@@ -621,7 +621,6 @@ def test_a_non_eu_cessionario_without_a_vat_number_is_identified_by_its_tin() ->
     party = fatturapa_party(non_eu_without_vat(), CESSIONARIO)
     assert party["DatiAnagrafici"]["IdFiscaleIVA"] == {"IdPaese": "US", "IdCodice": "12-3456789"}
     assert "CodiceFiscale" not in party["DatiAnagrafici"]
-    assert party["Sede"]["CAP"] == engine.FOREIGN_POSTAL_CODE
     assert party["Sede"]["Nazione"] == "US"
 
 

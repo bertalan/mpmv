@@ -151,10 +151,13 @@ class Vendor(BaseModel):
     )
     vies_checked_at = models.DateTimeField("VIES checked at", null=True, blank=True, editable=False)
     tax_code = models.CharField(
-        "tax code (codice fiscale)",
+        "tax code (codice fiscale) or TIN",
         max_length=32,
         blank=True,
         help_text="Italy: 16 characters, or 11 digits for entities. Elsewhere: the national TIN.",
+    )
+    tax_residence_country = CountryField(
+        "country of tax residence", blank=True, help_text="DAC7: the country that issued the TIN."
     )
     fiscal_regime = models.CharField(
         max_length=4,
@@ -399,6 +402,11 @@ class RequirementPurpose(models.TextChoices):
     PAYOUT = engine.PAYOUT, "Payout request"
 
 
+class RequirementRegion(models.TextChoices):
+    EU = engine.EU, "EU member states"
+    NON_EU = engine.NON_EU, "Outside the EU"
+
+
 def legal_field_label(name: str) -> str:
     """The verbose name of a vendor legal field, e.g. "PEC address" for `pec`."""
     return str(getattr(Vendor._meta.get_field(name), "verbose_name", name))
@@ -422,6 +430,12 @@ class LegalFieldRequirement(BaseModel):
     Purpose = RequirementPurpose
 
     country = CountryField(blank=True, help_text="Empty: every country.")
+    region = models.CharField(
+        max_length=8,
+        choices=RequirementRegion.choices,
+        blank=True,
+        help_text="Empty: every region. EU or non-EU: every vendor established there.",
+    )
     legal_form = models.CharField(
         max_length=24, choices=LegalForm.choices, blank=True, help_text="Empty: every legal form."
     )
@@ -434,7 +448,7 @@ class LegalFieldRequirement(BaseModel):
         ordering = ["purpose", "country", "legal_form", "field_name"]
         constraints = [
             models.UniqueConstraint(
-                fields=["country", "legal_form", "field_name", "purpose"],
+                fields=["country", "region", "legal_form", "field_name", "purpose"],
                 name="vendors_requirement_unique",
             ),
             models.CheckConstraint(
@@ -449,10 +463,26 @@ class LegalFieldRequirement(BaseModel):
                 condition=models.Q(legal_form__in=["", *LegalForm.values]),
                 name="vendors_requirement_legal_form_valid",
             ),
+            models.CheckConstraint(
+                condition=models.Q(region__in=["", *RequirementRegion.values]),
+                name="vendors_requirement_region_valid",
+            ),
         ]
 
     def __str__(self) -> str:
-        scope = " ".join(filter(None, [self.country, self.legal_form])) or "all vendors"
+        scope = (
+            " ".join(
+                filter(
+                    None,
+                    [
+                        self.country,
+                        self.get_region_display() if self.region else "",
+                        self.legal_form,
+                    ],
+                )
+            )
+            or "all vendors"
+        )
         return f"{self.field_name} for {self.purpose} ({scope})"
 
     def as_rule(self) -> engine.Requirement:
@@ -461,4 +491,5 @@ class LegalFieldRequirement(BaseModel):
             country=self.country,
             legal_form=self.legal_form,
             purpose=self.purpose,
+            region=self.region,
         )

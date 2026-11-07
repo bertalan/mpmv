@@ -11,7 +11,7 @@ from typing import Any, Final
 
 from django.utils.text import slugify
 
-from apps.core.countries import ISO_3166_ALPHA2
+from apps.core.countries import ISO_3166_ALPHA2, is_eu
 
 # --- Status state machine (spec 04 §4.2)
 
@@ -411,6 +411,7 @@ class LegalIdentity:
     last_name: str = ""
     vat_number: str = ""
     tax_code: str = ""
+    tax_residence_country: str = ""
     fiscal_regime: str = ""
     ateco_code: str = ""
     eori: str = ""
@@ -558,6 +559,15 @@ def identity_errors(identity: LegalIdentity) -> dict[str, list[str]]:
 PAYOUT: Final = "payout"
 PURPOSES: Final = (PAYOUT,)
 
+# Regions a rule can target instead of one country (empty: every vendor).
+EU: Final = "eu"
+NON_EU: Final = "non_eu"
+REGIONS: Final = (EU, NON_EU)
+
+
+def region_of(country: str) -> str:
+    return EU if is_eu(country) else NON_EU
+
 
 class UnknownLegalField(ValueError):
     """A requirement names a field that is not one of `LEGAL_FIELDS`."""
@@ -567,13 +577,15 @@ class UnknownLegalField(ValueError):
 class Requirement:
     """`field` is required for `purpose` from vendors of `country` with `legal_form`.
 
-    An empty country or legal form matches every vendor.
+    An empty country, region or legal form matches every vendor; `region` (EU or NON_EU) matches
+    every vendor established inside or outside the EU.
     """
 
     field: str
     country: str = ""
     legal_form: str = ""
     purpose: str = PAYOUT
+    region: str = ""
 
 
 def required_fields(
@@ -593,6 +605,8 @@ def required_fields(
         if rule.field not in LEGAL_FIELDS:
             raise UnknownLegalField(f"{rule.field!r} is not a legal field")
         if rule.purpose != purpose or rule.country not in ("", country):
+            continue
+        if rule.region and (not country or rule.region != region_of(country)):
             continue
         if rule.legal_form and not legal_form:
             required.add("legal_form")
@@ -654,6 +668,37 @@ def completeness(
         if name in errors and name not in missing
     ]
     return Completeness(missing=tuple(missing), invalid=tuple(invalid))
+
+
+# --- DAC7 dataset (spec 11 CMP.1). The seeded payout requirements include it for every vendor.
+
+VAT_OR_TIN: Final = "vat_number or tax_code"
+
+
+def dac7_missing(identity: LegalIdentity) -> tuple[str, ...]:
+    """What the vendor's DAC7 dataset still lacks: legal name, VAT number or TIN, country of tax
+    residence, registered office (street, postal code, city, country; province in Italy), IBAN.
+
+    A permanent establishment is reported only when the vendor has one, so it is never missing.
+    """
+    ident = normalized(identity)
+    missing: list[str] = []
+    if not ident.legal_name.strip():
+        missing.append("legal_name")
+    if not (ident.vat_number or ident.tax_code):
+        missing.append(VAT_OR_TIN)
+    if not ident.tax_residence_country:
+        missing.append("tax_residence_country")
+    for name in ("street", "postal_code", "city"):
+        if not str(getattr(ident, f"registered_{name}")).strip():
+            missing.append(f"registered_{name}")
+    if ident.registered_country == ITALY and not ident.registered_province:
+        missing.append("registered_province")
+    if not ident.registered_country:
+        missing.append("registered_country")
+    if not ident.iban:
+        missing.append("iban")
+    return tuple(missing)
 
 
 class PayoutNotAllowed(ValueError):
@@ -836,6 +881,12 @@ def fatturapa_party(identity: LegalIdentity, role: str = CEDENTE) -> dict[str, A
         dati["IdFiscaleIVA"] = _id_fiscale_iva(block, "vat_number", ident.vat_number, ident.country)
     elif role == CEDENTE:
         block.problems.append("vat_number: IdFiscaleIVA is mandatory for the CedentePrestatore")
+    elif role == CESSIONARIO and ident.country != ITALY and ident.tax_code:
+        # A foreign vendor without a VAT number is identified by its national TIN.
+        dati["IdFiscaleIVA"] = {
+            "IdPaese": block.text("country", "IdPaese", ident.country, max_length=2, min_length=2),
+            "IdCodice": block.text("tax_code", "IdCodice", ident.tax_code, max_length=28),
+        }
     if ident.tax_code and is_valid_codice_fiscale(ident.tax_code):
         dati["CodiceFiscale"] = ident.tax_code  # Italian codes only
     if role == CESSIONARIO and not dati:

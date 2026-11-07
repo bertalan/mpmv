@@ -122,6 +122,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
                     "vies_status",
                     "vies_checked_at",
                     "tax_code",
+                    "tax_residence_country",
                     "fiscal_regime",
                     "ateco_code",
                     "eori",
@@ -189,10 +190,10 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
 class LegalFieldRequirementAdmin(admin.ModelAdmin[LegalFieldRequirement]):
     """Which legal fields vendors need, per country and legal form. Every change is audited."""
 
-    list_display = ("field_name", "country", "legal_form", "purpose", "active", "note")
-    list_filter = ("purpose", "active", "country", "legal_form", "field_name")
+    list_display = ("field_name", "country", "region", "legal_form", "purpose", "active", "note")
+    list_filter = ("purpose", "active", "country", "region", "legal_form", "field_name")
     search_fields = ("field_name", "country", "note")
-    fields = ("country", "legal_form", "field_name", "purpose", "active", "note")
+    fields = ("country", "region", "legal_form", "field_name", "purpose", "active", "note")
 
     def save_model(
         self, request: HttpRequest, obj: LegalFieldRequirement, form: Any, change: bool
