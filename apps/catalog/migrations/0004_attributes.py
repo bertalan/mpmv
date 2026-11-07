@@ -14,7 +14,7 @@ import apps.core.i18n
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("catalog", "0002_taxonomies"),
+        ("catalog", "0003_catalog_integrity"),
     ]
 
     operations = [
