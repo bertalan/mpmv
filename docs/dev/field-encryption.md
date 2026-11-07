@@ -36,7 +36,8 @@ Planned users of the same fields: KYC data and payout accounts (VEN.6), DAC7 dat
   `apps.core.crypto.DecryptionError`. There is no silent fallback.
 - Only `field=""` and `field__isnull` work in queries. Anything else (`=value`, `icontains`,
   `in`, transforms) raises `FieldError`, because the ciphertext is randomized and a search would
-  silently match nothing. Ordering by an encrypted field is meaningless.
+  silently match nothing. Ordering by an encrypted field (`order_by`, `Meta.ordering`, an
+  admin column) raises `FieldError` too: the order of random ciphertexts means nothing.
 
 ### Searching (blind index)
 

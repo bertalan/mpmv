@@ -5,6 +5,7 @@ from typing import Any
 from django.core.exceptions import FieldError, ValidationError
 from django.db import models
 from django.db.models import lookups
+from django.db.models.expressions import Col
 
 from .countries import InvalidCountry, normalize_country
 from .crypto import DecryptionError
@@ -57,13 +58,36 @@ class LanguageField(models.CharField[Any, Any]):
         super().__init__(*args, **kwargs)
 
 
+class _EncryptedCol(Col):
+    """The column of an encrypted field. Resolving it on its own means sorting by it (`ORDER BY`
+    resolves its columns, a SELECT does not), so it raises `FieldError`: the order of random
+    ciphertexts would look plausible and be wrong. The allowed lookups unwrap it first."""
+
+    def resolve_expression(self, *args: Any, **kwargs: Any) -> Any:
+        raise FieldError(_not_searchable(self.target))
+
+
+def _plain(lhs: Any) -> Any:
+    if isinstance(lhs, _EncryptedCol):
+        return Col(lhs.alias, lhs.target, lhs.output_field)
+    return lhs
+
+
 class _EmptyOnlyExact(lookups.Exact):
     """`field=""` only: ciphertexts are randomized, so equality on a value never matches."""
+
+    def __init__(self, lhs: Any, rhs: Any) -> None:
+        super().__init__(_plain(lhs), rhs)
 
     def get_prep_lookup(self) -> Any:
         if self.rhs not in ("", None):
             raise FieldError(_not_searchable(self.lhs.output_field))
         return super().get_prep_lookup()
+
+
+class _IsNull(lookups.IsNull):
+    def __init__(self, lhs: Any, rhs: Any) -> None:
+        super().__init__(_plain(lhs), rhs)
 
 
 def _not_searchable(field: Any) -> str:
@@ -80,7 +104,8 @@ class EncryptedFieldMixin(models.Field[Any, Any]):
     Python code sees the plaintext; the column holds an `enc1:<key id>:...` token
     (`apps.core.crypto`). Empty strings and NULL are stored as they are. A value that does not
     decrypt (wrong or missing key, cleartext, tampering) raises `DecryptionError`: never a
-    silent fallback. Lookups other than `=''` and `__isnull` raise `FieldError`.
+    silent fallback. Lookups other than `=''` and `__isnull`, and ordering by the field, raise
+    `FieldError`.
 
     Mask the field in audit snapshots too: an encrypted column is pointless if the audit log
     copies the value in clear. See docs/dev/field-encryption.md.
@@ -110,11 +135,20 @@ class EncryptedFieldMixin(models.Field[Any, Any]):
         if lookup_name == "exact":
             return _EmptyOnlyExact
         if lookup_name == "isnull":
-            return super().get_lookup(lookup_name)
+            return _IsNull
         return None  # Django raises FieldError("Unsupported lookup ...")
 
     def get_transform(self, lookup_name: str) -> Any:
         return None
+
+    def get_col(self, alias: str | None, output_field: Any = None) -> Col:
+        if output_field is None or output_field == self:
+            return _EncryptedCol(alias, self)
+        return super().get_col(alias, output_field)
+
+    @property
+    def cached_col(self) -> Col:  # type: ignore[override]
+        return _EncryptedCol(self.model._meta.db_table, self)
 
 
 class EncryptedCharField(EncryptedFieldMixin, models.CharField[Any, Any]):
