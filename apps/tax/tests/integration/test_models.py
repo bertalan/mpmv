@@ -1,11 +1,13 @@
 """TAX.1: tax models on the real database (spec 05 §5.2): constraints, validation, history."""
 
+import logging
 from decimal import Decimal
 
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
+from apps.core.postcodes import PostcodePattern, parse_postcode_pattern
 from apps.core.tests.factories import utc
 from apps.tax import engine
 from apps.tax.models import TaxRate, Territory, VatValidation, VendorTaxProfile
@@ -73,20 +75,89 @@ def test_a_dotdot_range_is_accepted_and_matches() -> None:
     territory.save()
     stored = Territory.objects.get(pk=territory.pk)
     assert stored.postcode_patterns == ["9000..9999"]
-    assert stored.matches_postcode("9500-100") is True
-    assert stored.matches_postcode("8999-999") is False
+    assert stored.matches("PT", "9500-100") is True
+    assert stored.matches("PT", "8999-999") is False
 
 
 def test_portuguese_and_polish_postcodes_with_a_dash_match_as_exact_postcodes() -> None:
-    territory = TerritoryFactory.build(postcode_patterns=[" 9000-001 ", "00-950"])
-    territory.full_clean()
-    territory.save()
+    madeira = TerritoryFactory.create(code="PT-30", country="PT", postcode_patterns=[" 9000-001 "])
+    polish = TerritoryFactory.create(code="PL-T1", country="PL", postcode_patterns=["00-950"])
+    madeira, polish = (Territory.objects.get(pk=t.pk) for t in (madeira, polish))
+    assert (madeira.postcode_patterns, polish.postcode_patterns) == (["9000-001"], ["00-950"])
+    assert madeira.matches("PT", "9000-001") is True
+    assert madeira.matches("PT", "9000-002") is False
+    assert polish.matches("PL", "00-950") is True
+    assert polish.matches("PL", "00-951") is False
+    # A territory never matches an address in another country (TAX.11 review).
+    assert madeira.matches("PL", "9000-001") is False
+    assert polish.matches("PT", "00-950") is False
+
+
+# --- A territory matches only addresses in its own country (TAX.11 review, T15)
+
+
+def test_an_italian_address_does_not_match_the_canary_islands() -> None:
+    canary = TerritoryFactory.create(code="ES-CN", country="ES", postcode_patterns=["35*", "38*"])
+    assert canary.matches("IT", "35100") is False  # Padova
+    assert canary.matches("IT", "38100") is False  # Trento
+    assert canary.matches("ES", "35100") is True
+
+
+def test_livigno_matches_italian_addresses_only() -> None:
+    livigno = TerritoryFactory.create(code="IT-LIVIGNO", country="IT", postcode_patterns=["23041"])
+    assert livigno.matches("IT", "23041") is True
+    assert livigno.matches("ES", "23041") is False
+
+
+# --- Patterns are validated on every save and parsed once (TAX.11 review)
+
+
+def test_saving_validates_the_postcode_patterns() -> None:
+    with pytest.raises(ValidationError) as exc:
+        TerritoryFactory.create(postcode_patterns=["35*", "22100-22199"])
+    assert "postcode_patterns" in exc.value.message_dict
+    assert not Territory.objects.exists()
+
+
+def test_saving_normalizes_the_postcode_patterns() -> None:
+    territory = TerritoryFactory.create(postcode_patterns=[" 38* ", "22100 .. 22199"])
+    assert Territory.objects.get(pk=territory.pk).postcode_patterns == ["38*", "22100..22199"]
+
+
+@pytest.mark.parametrize("patterns", [["22100-22199", "35*"], ["35*", "22100-22199"]])
+def test_an_invalid_stored_row_raises_a_logged_configuration_error(
+    patterns: list[str], caplog: pytest.LogCaptureFixture
+) -> None:
+    # Writes that bypass save() (update, bulk_create, fixtures) can still store a bad pattern.
+    territory = TerritoryFactory.create(code="ES-CN")
+    Territory.objects.filter(pk=territory.pk).update(postcode_patterns=patterns)
     stored = Territory.objects.get(pk=territory.pk)
-    assert stored.postcode_patterns == ["9000-001", "00-950"]
-    assert stored.matches_postcode("9000-001") is True
-    assert stored.matches_postcode("00-950") is True
-    assert stored.matches_postcode("9000-002") is False
-    assert stored.matches_postcode("00-951") is False
+    for country, postcode in [("ES", "35001"), ("ES", "28001"), ("IT", "35001")]:
+        caplog.clear()
+        with (
+            caplog.at_level(logging.ERROR, logger="apps.tax.models"),
+            pytest.raises(engine.TerritoryConfigError, match=r"ES-CN"),
+        ):
+            stored.matches(country, postcode)
+        assert any("ES-CN" in record.getMessage() for record in caplog.records)
+
+
+def test_a_territory_parses_its_patterns_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    territory = Territory.objects.get(pk=TerritoryFactory.create(postcode_patterns=["35*"]).pk)
+    calls: list[str] = []
+    parse = parse_postcode_pattern
+
+    def counting_parse(raw: str) -> PostcodePattern:
+        calls.append(raw)
+        return parse(raw)
+
+    monkeypatch.setattr(engine, "parse_postcode_pattern", counting_parse)
+    for postcode in ["35001", "38001", "35100"]:
+        territory.matches("ES", postcode)
+    assert calls == ["35*"]
+    territory.postcode_patterns = ["38*"]  # a changed list is parsed again
+    assert territory.matches("ES", "38001") is True
+    assert calls == ["35*", "38*"]
 
 
 def test_territory_codes_are_unique() -> None:
