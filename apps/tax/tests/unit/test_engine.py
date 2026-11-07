@@ -138,18 +138,34 @@ def test_malformed_territory_codes_are_refused(raw: str) -> None:
         engine.normalize_territory_code(raw)
 
 
+def test_the_tax_engine_has_no_postcode_grammar_of_its_own() -> None:
+    # TAX.11: territories use the shared grammar of apps.core.postcodes (SHP.12).
+    assert not hasattr(engine, "normalize_postcode_pattern")
+    assert not hasattr(engine, "InvalidPostcodePattern")
+
+
 @pytest.mark.parametrize(
-    ("raw", "pattern"),
-    [("35*", "35*"), (" 23041 ", "23041"), ("bt*", "BT*"), ("22100-22199", "22100-22199")],
+    ("patterns", "postcode", "matches"),
+    [
+        (["9000..9999"], "9500", True),
+        (["9000..9999"], "9000-001", True),  # PT islands: the first 4 characters
+        (["9000..9999"], "8999", False),
+        (["35*", "38*"], "38001", True),
+        (["35*", "38*"], "28001", False),
+        (["23041"], "23041", True),
+        (["9000-001"], "9000-001", True),  # PT postcode with a dash: an exact postcode
+        (["9000-001"], "9000 001", True),
+        (["9000-001"], "9000-002", False),
+        (["00-950"], "00-950", True),  # PL postcode with a dash: an exact postcode
+        (["00-950"], "00-951", False),
+        (["35*"], "", False),
+        ([], "35001", False),
+    ],
 )
-def test_postcode_patterns_are_normalized(raw: str, pattern: str) -> None:
-    assert engine.normalize_postcode_pattern(raw) == pattern
-
-
-@pytest.mark.parametrize("raw", ["", "*", "3*5", "35**", "35%", "1-2-3"])
-def test_malformed_postcode_patterns_are_refused(raw: str) -> None:
-    with pytest.raises(engine.InvalidPostcodePattern):
-        engine.normalize_postcode_pattern(raw)
+def test_territory_postcodes_match_with_the_shared_grammar(
+    patterns: list[str], postcode: str, matches: bool
+) -> None:
+    assert engine.postcode_in_territory(patterns, postcode) is matches
 
 
 def test_territory_statuses_leave_northern_ireland_to_an_explicit_rule() -> None:
