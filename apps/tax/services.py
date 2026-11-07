@@ -24,6 +24,7 @@ from apps.accounts.models import User
 from apps.core.audit import VENDOR_FIELD, AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.countries import normalize_country
+from apps.core.models import Versioned
 from apps.core.services import run_mutation, save_audited
 from apps.core.validity import NoValidRow, next_start_error, pick_valid
 from apps.vendors.engine import VendorAction, split_vat_number
@@ -38,7 +39,6 @@ from .models import (
     VatValidation,
     VendorTaxProfile,
     VendorTaxProfileTranslation,
-    Versioned,
 )
 
 TAX_RATE_MODEL = "tax.taxrate"
