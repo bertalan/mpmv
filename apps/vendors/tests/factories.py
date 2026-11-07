@@ -18,6 +18,7 @@ from django.utils.text import slugify
 from factory.django import DjangoModelFactory
 
 from apps.accounts.tests.factories import UserFactory
+from apps.core.tests.factories import FeatureFlagFactory
 from apps.core.translations import source_hash
 from apps.vendors import engine
 from apps.vendors.models import (
@@ -26,6 +27,7 @@ from apps.vendors.models import (
     Vendor,
     VendorContract,
     VendorContractTranslation,
+    VendorFeatureFlag,
     VendorMember,
     VendorTranslation,
 )
@@ -308,3 +310,15 @@ class ContractAcceptanceFactory(DjangoModelFactory[ContractAcceptance]):
     def owner(obj: ContractAcceptance, create: bool, extracted: Any, **kwargs: Any) -> None:
         if create and not VendorMember.objects.filter(vendor=obj.vendor, user=obj.user).exists():
             VendorMemberFactory.create(vendor=obj.vendor, user=obj.user)
+
+
+class VendorFeatureFlagFactory(DjangoModelFactory[VendorFeatureFlag]):
+    """A vendor's override switching a registered flag off for that vendor (ARC.8)."""
+
+    class Meta:
+        model = VendorFeatureFlag
+
+    vendor = factory.SubFactory(VendorFactory)
+    flag = factory.SubFactory(FeatureFlagFactory)
+    enabled = False
+    note = ""

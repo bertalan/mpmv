@@ -12,11 +12,12 @@ from django import forms
 from django.contrib import admin, messages
 from django.core.exceptions import FieldDoesNotExist, ValidationError
 from django.db.models import QuerySet
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse
 from django.urls import reverse
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import SafeString
 
+from apps.core.admin import step_up
 from apps.core.audit import audit_context
 
 from . import engine
@@ -26,6 +27,7 @@ from .models import (
     Vendor,
     VendorContract,
     VendorContractTranslation,
+    VendorFeatureFlag,
     VendorStatus,
     VendorTranslation,
     legal_field_label,
@@ -36,11 +38,13 @@ from .services import (
     current_contract,
     delete_requirement,
     delete_vendor,
+    delete_vendor_flag,
     legal_profile_completeness,
     onboarding_checklist,
     save_contract,
     save_requirement,
     save_vendor,
+    save_vendor_flag,
 )
 
 StatusAction = Callable[[admin.ModelAdmin[Vendor], HttpRequest, QuerySet[Vendor]], None]
@@ -360,3 +364,74 @@ class LegalFieldRequirementAdmin(admin.ModelAdmin[LegalFieldRequirement]):
         ctx = audit_context(request)
         for requirement in queryset:
             delete_requirement(requirement, ctx=ctx)
+
+
+def _overrides_kill_switch(override: VendorFeatureFlag | None) -> bool:
+    spec = None if override is None else override.flag.spec
+    return spec is not None and spec.kill_switch
+
+
+@admin.register(VendorFeatureFlag)
+class VendorFeatureFlagAdmin(admin.ModelAdmin[VendorFeatureFlag]):
+    """Per-vendor feature flag overrides (ARC.8). Pages that can change a kill switch ask for a
+    fresh second factor (CORE.4 step-up): the add page (the flag is chosen there) and the change
+    and delete pages of a kill switch override. No bulk delete: it would bypass the step-up."""
+
+    list_display = ("vendor", "flag", "kill_switch", "enabled", "note", "updated_at")
+    list_filter = ("flag", "enabled")
+    search_fields = ("vendor__display_name", "vendor__legal_name", "flag__name", "note")
+    list_select_related = ("vendor", "flag")
+    autocomplete_fields = ("vendor",)
+    fields = ("vendor", "flag", "enabled", "note")
+    actions = None
+
+    @admin.display(description="Kill switch", boolean=True)
+    def kill_switch(self, obj: VendorFeatureFlag) -> bool:
+        return _overrides_kill_switch(obj)
+
+    def save_model(
+        self, request: HttpRequest, obj: VendorFeatureFlag, form: Any, change: bool
+    ) -> None:
+        save_vendor_flag(obj, ctx=audit_context(request))
+
+    def delete_model(self, request: HttpRequest, obj: VendorFeatureFlag) -> None:
+        delete_vendor_flag(obj, ctx=audit_context(request))
+
+    def delete_queryset(self, request: HttpRequest, queryset: QuerySet[VendorFeatureFlag]) -> None:
+        ctx = audit_context(request)
+        for override in queryset:
+            delete_vendor_flag(override, ctx=ctx)
+
+    def add_view(
+        self, request: HttpRequest, form_url: str = "", extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        parent = super().add_view
+        return step_up(lambda req: parent(req, form_url, extra_context))(request)
+
+    def change_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+        form_url: str = "",
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        parent = super().change_view
+
+        def view(req: HttpRequest) -> HttpResponse:
+            return parent(req, object_id, form_url, extra_context)
+
+        if _overrides_kill_switch(self.get_object(request, object_id)):
+            return step_up(view)(request)
+        return view(request)
+
+    def delete_view(
+        self, request: HttpRequest, object_id: str, extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        parent = super().delete_view
+
+        def view(req: HttpRequest) -> HttpResponse:
+            return parent(req, object_id, extra_context)
+
+        if _overrides_kill_switch(self.get_object(request, object_id)):
+            return step_up(view)(request)
+        return view(request)

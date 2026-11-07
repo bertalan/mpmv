@@ -6,7 +6,7 @@ import dj_database_url
 import django_stubs_ext
 from django.utils.csp import CSP
 
-from .env import env_bool, env_list, env_secret_list, env_str
+from .env import env_bool, env_flags, env_list, env_secret_list, env_str
 
 # Allows `models.DecimalField[Any]`-style generics at runtime (django-stubs).
 django_stubs_ext.monkeypatch()
@@ -233,6 +233,13 @@ if CAPTCHA_ENABLED:
 # System checks fail without a valid key (core.E301/E302) or when the stored data does not
 # decrypt with these keys (core.E303/E304, run by `migrate`).
 FIELD_ENCRYPTION_KEYS = env_secret_list("MPMV_FIELD_ENCRYPTION_KEYS")
+
+# Feature flags and kill switches (ARC.8, docs/dev/feature-flags.md): this environment's defaults,
+# e.g. MPMV_FEATURE_FLAGS="checkout=off"; staff switches in the admin override them. Each process
+# caches the stored switches for FEATURE_FLAGS_CACHE_SECONDS, so a pulled kill switch takes effect
+# everywhere within that time (at once in the process that saved it).
+FEATURE_FLAGS = env_flags("MPMV_FEATURE_FLAGS")
+FEATURE_FLAGS_CACHE_SECONDS = 5
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"

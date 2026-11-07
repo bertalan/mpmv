@@ -11,6 +11,7 @@
   database is checked (`migrate`, `check --database default`), every stored value decrypts with
   the configured keys (core.E303, E304); values in clear or on an older key are warnings
   (core.W302, W301) that `manage.py rotate_field_keys` fixes.
+- Feature flags (ARC.8): every environment default names a registered flag (core.E401).
 """
 
 import ast
@@ -27,7 +28,7 @@ from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from django.db import DatabaseError, connections, models, transaction
 from django.http import HttpRequest
 
-from . import encryption
+from . import encryption, flags
 from .crypto import DecryptionError
 from .http import trusted_proxy_networks
 from .models import TranslationModel
@@ -454,3 +455,23 @@ def _column_messages(
                     )
                 )
     return messages
+
+
+# --- Feature flags (ARC.8, docs/dev/feature-flags.md)
+
+
+def check_feature_flag_settings(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """Environment defaults name registered flags: a typo must not leave a kill switch as is."""
+    unknown = sorted(name for name in settings.FEATURE_FLAGS if not flags.is_registered(name))
+    if not unknown:
+        return []
+    known = ", ".join(spec.name for spec in flags.registered_flags())
+    return [
+        checks.Error(
+            f"FEATURE_FLAGS names flags that are not registered: {', '.join(unknown)}.",
+            hint=f"Fix MPMV_FEATURE_FLAGS; registered flags: {known}.",
+            id="core.E401",
+        )
+    ]

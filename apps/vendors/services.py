@@ -1,6 +1,7 @@
 """Vendor services: vendor data and status changes (VEN.1, SEC.4), memberships with their
 permissions (CORE.2), the legal identity with its payout requirements (VEN.12) and onboarding:
-application, versioned contract, acceptance and the activation gate (VEN.5)."""
+application, versioned contract, acceptance and the activation gate (VEN.5); per-vendor feature
+flag overrides (ARC.8)."""
 
 import dataclasses
 import datetime as dt
@@ -15,7 +16,7 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
-from apps.core.services import audit_changes, run_mutation
+from apps.core.services import audit_changes, flags_changed, run_mutation, save_audited
 
 from . import engine
 from .models import (
@@ -24,6 +25,7 @@ from .models import (
     Vendor,
     VendorContract,
     VendorContractTranslation,
+    VendorFeatureFlag,
     VendorMember,
 )
 from .vies import VatNumberValidator
@@ -635,3 +637,55 @@ def onboarding_checklist(vendor: Vendor) -> engine.OnboardingChecklist:
         dac7_missing=engine.dac7_missing(stored.legal_identity()),
         payout=legal_profile_completeness(stored),
     )
+
+
+# --- Per-vendor feature flag overrides (ARC.8, docs/dev/feature-flags.md)
+
+VENDOR_FLAG_MODEL = "vendors.vendorfeatureflag"
+VENDOR_FLAG_SAVED = "vendor.feature_flag_saved"
+VENDOR_FLAG_DELETED = "vendor.feature_flag_deleted"
+
+
+def vendor_flag_snapshot(override: VendorFeatureFlag) -> dict[str, Any]:
+    return {
+        "vendor": str(override.vendor.public_id),
+        "flag": override.flag.name,
+        "enabled": override.enabled,
+        "note": override.note,
+    }
+
+
+def save_vendor_flag(
+    override: VendorFeatureFlag, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Create or change one vendor's override of a registered flag (validated, audited).
+
+    Raises `ValidationError` for an unregistered flag or a second override of the same flag.
+    """
+    override.full_clean()
+    changeset = save_audited(
+        override,
+        vendor_flag_snapshot,
+        key=str(override.public_id),
+        ctx=ctx,
+        created=VENDOR_FLAG_SAVED,
+        updated=VENDOR_FLAG_SAVED,
+        dry_run=dry_run,
+    )
+    if not dry_run:
+        flags_changed()
+    return changeset
+
+
+def delete_vendor_flag(
+    override: VendorFeatureFlag, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Remove an override (audited): the vendor follows the platform value again."""
+    changes = ChangeSet()
+    changes.delete(VENDOR_FLAG_MODEL, str(override.public_id), vendor_flag_snapshot(override))
+
+    def apply() -> None:
+        override.delete()
+        flags_changed()
+
+    return run_mutation(changes, apply, ctx=ctx, action=VENDOR_FLAG_DELETED, dry_run=dry_run)

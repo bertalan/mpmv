@@ -2,12 +2,12 @@
 
 import time
 from collections.abc import Iterator
-from typing import Any
 from urllib.parse import urlsplit
 
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
+from django.http.response import HttpResponseBase
 from django.test import Client
 from django.urls import reverse
 
@@ -16,8 +16,8 @@ from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.core import flags
 from apps.core.audit import AuditContext
-from apps.core.models import AuditLog, FeatureFlag
-from apps.core.services import VENDOR_OVERRIDES, flag_enabled, save_flag
+from apps.core.models import VENDOR_OVERRIDES, AuditLog, FeatureFlag
+from apps.core.services import flag_enabled, save_flag
 from apps.core.tests.factories import FeatureFlagFactory
 from apps.core.tests.flags import registered
 from apps.vendors.models import VendorFeatureFlag
@@ -42,7 +42,7 @@ def switch(name: str) -> FeatureFlag:
 
 def test_core_reads_the_overrides_through_the_documented_relation() -> None:
     field = VendorFeatureFlag._meta.get_field("flag")
-    assert field.remote_field.related_name == VENDOR_OVERRIDES  # type: ignore[union-attr]
+    assert field.remote_field.related_name == VENDOR_OVERRIDES
 
 
 def test_a_vendor_override_turns_a_feature_on_for_that_vendor_only(
@@ -152,10 +152,10 @@ def stale_client(client: Client, staff: User) -> Client:
     return client
 
 
-def asks_for_step_up(response: Any) -> bool:
-    return response.status_code == 302 and urlsplit(response["Location"]).path == reverse(
-        "mfa:verify"
-    )
+def asks_for_step_up(response: HttpResponseBase) -> bool:
+    if response.status_code != 302:
+        return False
+    return urlsplit(response["Location"]).path == reverse("mfa:verify")
 
 
 def test_staff_pull_a_kill_switch_for_one_vendor_from_the_admin(staff_client: Client) -> None:

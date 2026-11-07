@@ -5,6 +5,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 import pytest
+from django.http.response import HttpResponseBase
 from django.test import Client
 from django.urls import reverse
 from pytest_django.fixtures import Settings as SettingsWrapper
@@ -49,10 +50,10 @@ def form(flag: FeatureFlag, **overrides: str) -> dict[str, str]:
     return {"state": flag.state, "note": flag.note, **overrides}
 
 
-def asks_for_step_up(response: Any) -> bool:
-    return response.status_code == 302 and urlsplit(response["Location"]).path == reverse(
-        "mfa:verify"
-    )
+def asks_for_step_up(response: HttpResponseBase) -> bool:
+    if response.status_code != 302:
+        return False
+    return urlsplit(response["Location"]).path == reverse("mfa:verify")
 
 
 def test_the_changelist_lists_the_kill_switches_and_their_effective_value(
@@ -135,9 +136,7 @@ def test_a_kill_switch_asks_for_a_fresh_second_factor(staff_client: Client) -> N
 
 
 @pytest.mark.usefixtures("stale_verification")
-def test_an_ordinary_flag_needs_no_step_up(
-    staff_client: Client, feature: flags.FlagSpec
-) -> None:
+def test_an_ordinary_flag_needs_no_step_up(staff_client: Client, feature: flags.FlagSpec) -> None:
     flag = FeatureFlagFactory.create(name=feature.name)
     assert staff_client.get(change_url(flag)).status_code == 200
     assert staff_client.get(reverse(CHANGELIST)).status_code == 200

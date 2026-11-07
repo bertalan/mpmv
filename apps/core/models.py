@@ -1,15 +1,16 @@
 """Core models: the abstract base and translation models, the append-only audit log, the
-platform operator."""
+platform operator, the feature flags."""
 
 import uuid
 from typing import Any, ClassVar, Self
 
 from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import DateTimeRangeField, RangeOperators
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils import timezone
 
-from . import translations
+from . import flags, translations
 from .fields import CountryField, LanguageField
 
 
@@ -324,3 +325,50 @@ class PlatformOperator(BaseModel):
                 "PlatformOperator rows are never edited in place; configure a new row instead"
             )
         super().save(*args, **kwargs)
+
+
+# Per-vendor overrides are vendor-owned rows (CORE.3) in apps.vendors, which core cannot import:
+# their ForeignKey to FeatureFlag uses this related name, and core reads them through it.
+VENDOR_OVERRIDES = "vendor_overrides"
+
+
+class FeatureFlag(BaseModel):
+    """The staff switch of one registered flag (ARC.8, `apps.core.flags`).
+
+    `state` is `default` (this environment's default, `settings.FEATURE_FLAGS`, else the code
+    default), `on` or `off`. Per-vendor overrides are vendor-owned rows in the vendors app
+    (`VendorFeatureFlag`, related name `vendor_overrides`). Rows are never deleted: set the state
+    back to `default` instead. Write through `apps.core.services.save_flag` (audited); read with
+    `flag_enabled`.
+    """
+
+    class State(models.TextChoices):
+        DEFAULT = flags.DEFAULT, "Environment default"
+        ON = flags.ON, "On"
+        OFF = flags.OFF, "Off"
+
+    name = models.CharField(max_length=flags.NAME_MAX_LENGTH, unique=True)
+    state = models.CharField(max_length=16, choices=State.choices, default=State.DEFAULT)
+    note = models.CharField(
+        max_length=200, blank=True, help_text="Why it was switched, e.g. the incident reference."
+    )
+
+    class Meta:
+        ordering = ["name"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(state__in=flags.STATES), name="core_featureflag_state_valid"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def clean(self) -> None:
+        if not flags.is_registered(self.name):
+            raise ValidationError({"name": f"{self.name!r} is not a registered feature flag."})
+
+    @property
+    def spec(self) -> flags.FlagSpec | None:
+        """The flag's declaration in code; None for a row left by removed code."""
+        return flags.spec_of(self.name) if flags.is_registered(self.name) else None
