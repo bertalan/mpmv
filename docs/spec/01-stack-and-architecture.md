@@ -30,7 +30,7 @@ image management and staff backoffice.
 | DB | **PostgreSQL 17** | Single datastore: data, queues, full-text and trigram search, session cache |
 | API | **django-ninja** (Pydantic schemas) | The pipelines already use Pydantic: shared contracts |
 | Async tasks and cron | **Procrastinate** (PostgreSQL queue, periodic tasks, locks) behind `apps.core.tasks` | No Redis or Celery. Decided in ADR-0004 |
-| Frontend | Django templates + **HTMX** + minimal Alpine.js; CSS with a lightweight build | No SPA; accessible (EAA) and fast |
+| Frontend | Django templates + **HTMX** + minimal Alpine.js; CSS with a lightweight build | No SPA; accessible (EAA) and fast; themes with design tokens, see [14](14-frontend-themes.md) |
 | Search | Postgres FTS + `pg_trgm` (SKU prefix, typos) | Wagtail search backend on Postgres |
 | Media | Hetzner Object Storage (S3 compatible, EU) + CDN (Cloudflare already in use); private buckets and signed URLs for documents | WebP/AVIF renditions generated in the platform |
 | Payments | Stripe Connect (Express), behind a `PaymentGateway` interface | See [07](07-cart-orders-payments.md) |
@@ -63,6 +63,7 @@ apps/
   ledger/                 # LedgerEntry, commissions, payouts, reconciliation
   ingest/                 # supplier sources, adapters, staging, catalog upsert
   cms/                    # Wagtail pages: Home, Standard, Blog, Taxonomy landing, Vendor storefront, Legal
+  themes/                 # theme registry, theme-aware template loader, design tokens (spec 14); theme files in themes/<slug>/
   seo/                    # sitemap, JSON-LD, Google/Meta feeds, llms.txt, robots
   compliance/             # DAC7, GPSR, GDPR requests, DSA reports, withdrawal
   api/                    # django-ninja router /api/v1
@@ -74,6 +75,7 @@ apps/
 ```mermaid
 flowchart TD
   core --> accounts
+  core --> themes
   core --> vendors
   accounts --> vendors
   vendors --> catalog
