@@ -103,6 +103,7 @@ class ProductAdmin(admin.ModelAdmin[Product]):
     search_fields = ("sku", "gtin", "translations__title")
     list_select_related = ("vendor",)
     raw_id_fields = ("vendor", "required_companion", "upsells")
+    autocomplete_fields = ("terms",)  # terms can be thousands: searched, never listed
     readonly_fields = ("status", *TIMESTAMPS)
     fieldsets = (
         (None, {"fields": ("vendor", "sku", "kind", "status", "public_id")}),

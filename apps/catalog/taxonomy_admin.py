@@ -6,17 +6,25 @@ writes to the tree before the inlines are validated, so the whole request is rol
 anything on the page is invalid (as treebeard's own TreeAdmin does). Deleting a node with
 children is refused, and so is the bulk delete action: treebeard would delete the whole subtree
 without listing it on the confirmation page.
+
+Terms can be many thousands (every maker and model of a compatibility taxonomy), so the forms never
+list them all: a term's place ("Relative to") and a product's terms are looked up by autocomplete,
+which searches term names, slugs and taxonomy codes, and a term's place among the terms of its own
+taxonomy only.
 """
 
 from typing import Any
 
 from django import forms
 from django.contrib import admin
+from django.contrib.admin.widgets import AutocompleteSelect
 from django.db import models, transaction
 from django.http import HttpRequest
 from django.utils.html import format_html
+from django.utils.http import urlencode
 from treebeard.forms import MoveNodeForm
 
+from .models import Product
 from .taxonomy import (
     Brand,
     BrandTranslation,
@@ -31,6 +39,27 @@ from .taxonomy import (
 TIMESTAMPS = ("public_id", "created_at", "updated_at")
 TREE_FIELDS = ("treebeard_position", "treebeard_ref_node")
 SEO_TEXTS = ("description", "seo_title", "seo_description")
+# Query parameter of the admin autocomplete view that narrows term results to one taxonomy.
+TAXONOMY_PARAM = "taxonomy"
+
+
+class TermReferenceWidget(AutocompleteSelect):
+    """A term looked up by the admin autocomplete, narrowed to `taxonomy` when it is known.
+
+    Django's autocomplete view needs a model field pointing to the terms to authorize and run the
+    search: `Product.terms` is that field (it has no `limit_choices_to`), and `TermAdmin` reads
+    the taxonomy from the URL.
+    """
+
+    def __init__(self, taxonomy: int | None) -> None:
+        super().__init__(Product._meta.get_field("terms"), admin.site)
+        self.taxonomy = taxonomy
+
+    def get_url(self) -> str:
+        url = super().get_url()
+        if self.taxonomy is None:
+            return url
+        return f"{url}?{urlencode({TAXONOMY_PARAM: self.taxonomy})}"
 
 
 class TreeNodeForm(MoveNodeForm):  # type: ignore[misc]  # treebeard is untyped
@@ -112,10 +141,22 @@ class TermForm(TreeNodeForm):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         field = self.fields["treebeard_ref_node"]
+        field.widget = TermReferenceWidget(self._known_taxonomy())
+        field.widget.is_required = field.required
+        field.help_text = "Empty: the top level of the taxonomy."
+        # Setting the queryset also gives the new widget its choices.
         field.queryset = field.queryset.select_related("taxonomy")
         if self.instance.taxonomy_id is not None:
             # An existing term moves only within its taxonomy.
             field.queryset = field.queryset.filter(taxonomy_id=self.instance.taxonomy_id)
+
+    def _known_taxonomy(self) -> int | None:
+        """The taxonomy the term belongs to, or the one chosen (posted, or given in the URL)."""
+        if self.instance.taxonomy_id is not None:
+            return int(self.instance.taxonomy_id)
+        chosen = self.data.get("taxonomy") if self.is_bound else self.initial.get("taxonomy")
+        chosen = str(getattr(chosen, "pk", chosen) or "")
+        return int(chosen) if chosen.isdigit() else None
 
     def clean(self) -> dict[str, Any]:
         cleaned: dict[str, Any] = super().clean()
@@ -219,12 +260,25 @@ class TermAdmin(TreeNodeAdmin[Term]):
     list_display = ("indented_name", "taxonomy", "children")
     list_filter = ("taxonomy",)
     list_select_related = ("taxonomy",)
-    search_fields = ("translations__name", "translations__slug")
+    search_fields = ("translations__name", "translations__slug", "taxonomy__code")
     fields = ("taxonomy", "attributes", *TREE_FIELDS, *TIMESTAMPS)
     inlines = (TermTranslationInline,)
 
     def get_queryset(self, request: HttpRequest) -> "models.QuerySet[Term]":
         return super().get_queryset(request).prefetch_related("translations")
+
+    def get_search_results(
+        self, request: HttpRequest, queryset: "models.QuerySet[Term]", search_term: str
+    ) -> tuple["models.QuerySet[Term]", bool]:
+        """The admin search; an autocomplete lookup may also name a taxonomy (TAXONOMY_PARAM)."""
+        queryset, may_have_duplicates = super().get_search_results(request, queryset, search_term)
+        match = request.resolver_match
+        taxonomy = request.GET.get(TAXONOMY_PARAM)
+        if match is None or match.url_name != "autocomplete" or taxonomy is None:
+            return queryset, may_have_duplicates
+        if not taxonomy.isdigit():
+            return queryset.none(), may_have_duplicates
+        return queryset.filter(taxonomy_id=int(taxonomy)), may_have_duplicates
 
     def get_readonly_fields(self, request: HttpRequest, obj: Term | None = None) -> Any:
         # A term changes taxonomy only by being recreated: its children would be left behind.
