@@ -7,6 +7,7 @@ rows are history, a change is a new row valid from a date that closes the curren
 snapshot of what they used (spec 07), so past documents stay explainable.
 """
 
+import logging
 from typing import Any, ClassVar
 
 from django.conf import settings
@@ -23,12 +24,15 @@ from apps.core.models import BaseModel, TranslationModel, TsTzRange, Versioned, 
 from apps.core.postcodes import (
     MAX_PATTERN_LENGTH,
     InvalidPostcodePattern,
+    PostcodePattern,
     normalize_postcode_pattern,
 )
 from apps.vendors.models import FiscalRegime, Vendor
 from apps.vendors.scoping import VendorScopedManager
 
 from . import engine
+
+logger = logging.getLogger(__name__)
 
 # --- Territories
 
@@ -109,9 +113,40 @@ class Territory(BaseModel):
     def __str__(self) -> str:
         return f"{self.code} ({self.name})"
 
-    def matches_postcode(self, postcode: str) -> bool:
-        """True when `postcode` matches one of the territory's postcode patterns."""
-        return engine.postcode_in_territory(self.postcode_patterns, postcode)
+    # The patterns parsed by `parsed_postcode_patterns`, keyed by the list they were parsed from.
+    _parsed_patterns: tuple[tuple[str, ...], tuple[PostcodePattern, ...]] | None = None
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        # Every save validates and normalizes the fields, postcode patterns included, so create()
+        # and seeds cannot store a pattern the grammar refuses (TAX.11 review). Uniqueness and
+        # constraints are left to the database. Writes that bypass save() are caught when the
+        # patterns are loaded (`parsed_postcode_patterns`).
+        self.full_clean(validate_unique=False, validate_constraints=False)
+        super().save(*args, **kwargs)
+
+    def parsed_postcode_patterns(self) -> tuple[PostcodePattern, ...]:
+        """The postcode patterns, parsed once per list.
+
+        Policy for an invalid stored row: log it and raise engine.TerritoryConfigError, so the
+        tax decision gets a typed, controlled error rather than an arbitrary crash, the same for
+        every address and whatever the order of the patterns.
+        """
+        key = tuple(self.postcode_patterns)
+        if self._parsed_patterns is None or self._parsed_patterns[0] != key:
+            try:
+                parsed = engine.parse_territory_patterns(key, code=self.code)
+            except engine.TerritoryConfigError:
+                logger.error("Territory %s has an invalid stored postcode pattern", self.code)
+                raise
+            self._parsed_patterns = (key, parsed)
+        return self._parsed_patterns[1]
+
+    def matches(self, country: str, postcode: str) -> bool:
+        """True when an address in `country` with `postcode` lies in this territory: same
+        country, and the postcode matches one of the patterns."""
+        return engine.postcode_in_territory(
+            self.country, self.parsed_postcode_patterns(), country, postcode
+        )
 
 
 # --- Tax rates

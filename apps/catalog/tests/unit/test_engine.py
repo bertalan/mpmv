@@ -370,3 +370,44 @@ def test_variants_are_ordered_by_axis_order_then_value_position() -> None:
 def test_a_variant_label_joins_the_option_labels_in_axis_order() -> None:
     assert engine.variant_label(["M", "Rosso"]) == "M / Rosso"
     assert engine.variant_label([]) == ""
+
+
+@pytest.mark.parametrize(
+    ("number", "message"),
+    [
+        (Decimal("30.5555"), "bag_width has more than 3 decimals."),
+        (Decimal("1000000000"), "bag_width has more than 9 digits before the decimal point."),
+        (Decimal("-1000000000"), "bag_width has more than 9 digits before the decimal point."),
+        (Decimal("1E+40"), "bag_width has more than 9 digits before the decimal point."),
+    ],
+)
+def test_a_number_value_must_fit_the_stored_precision(number: Decimal, message: str) -> None:
+    attribute = engine.AttributeIn("bag_width", number=number)
+    assert engine.product_structure_errors("simple", SIZE_COLOR, (attribute,), ()) == [message]
+
+
+@pytest.mark.parametrize(
+    "number", [Decimal("999999999.999"), Decimal("-0.001"), Decimal("30.5000")]
+)
+def test_a_number_value_within_the_stored_precision_is_valid(number: Decimal) -> None:
+    attribute = engine.AttributeIn("bag_width", number=number)
+    assert engine.product_structure_errors("simple", SIZE_COLOR, (attribute,), ()) == []
+
+
+@pytest.mark.parametrize(
+    ("weight", "message"),
+    [
+        (None, None),
+        (Decimal("0"), None),
+        (Decimal("99999.999"), None),
+        (Decimal("-1"), "cannot be negative."),
+        (Decimal("0.0001"), "has more than 3 decimals."),
+        (Decimal("123456"), "has more than 5 digits before the decimal point."),
+        (Decimal("NaN"), "needs an exact decimal number."),
+        (0.5, "needs an exact decimal number."),
+    ],
+)
+def test_a_weight_is_not_negative_and_fits_the_stored_precision(
+    weight: object, message: str | None
+) -> None:
+    assert engine.weight_error(weight) == message

@@ -170,6 +170,49 @@ def test_a_sku_matching_another_by_case_and_spaces_is_a_validation_problem(
     assert Product.objects.count() == 1
 
 
+def _with_variant(**fields: Any) -> dict[str, Any]:
+    payload = t_shirt()
+    payload["variants"][0].update(fields)
+    return payload
+
+
+def _with_width(number: str) -> dict[str, Any]:
+    payload = t_shirt()
+    payload["attributes"][3]["number"] = number
+    return payload
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        (
+            _with_width("10000000000"),
+            "bag_width has more than 9 digits before the decimal point.",
+        ),
+        (_with_width("30.5555"), "bag_width has more than 3 decimals."),
+        # The schema refuses a bad weight override; the service does too for other callers.
+        (_with_variant(weight_kg_override="123456"), "no more than 5 digits before"),
+        (_with_variant(weight_kg_override="-1"), "greater than or equal to 0"),
+        (t_shirt(sku="   "), "A SKU cannot be empty."),
+        (_with_variant(sku=" "), "A variant SKU cannot be empty."),
+    ],
+)
+def test_values_the_database_would_refuse_are_validation_problems(
+    client: Client,
+    attributes: dict[str, Attribute],
+    vendor: Vendor,
+    payload: dict[str, Any],
+    message: str,
+) -> None:
+    headers = _headers(vendor)
+    for query in ("?dry_run=true", ""):
+        response = _post(client, payload, headers, query)
+        assert response.status_code == 422, response.json()
+        messages = [error["msg"] for error in response.json()["errors"]]
+        assert any(message in msg for msg in messages), messages
+    assert not Product.objects.exists()
+
+
 def test_creating_needs_the_write_scope(
     client: Client, attributes: dict[str, Attribute], vendor: Vendor
 ) -> None:
