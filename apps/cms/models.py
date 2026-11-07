@@ -207,7 +207,8 @@ class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
 
     def get_context(self, request: HttpRequest, *args: Any, **kwargs: Any) -> dict[str, Any]:
         context: dict[str, Any] = super().get_context(request, *args, **kwargs)
-        versions = list(self.versions.order_by("-number"))
+        # An unsaved page (the editor's preview before the first save) has no versions yet.
+        versions = list(self.versions.order_by("-number")) if self.pk else []
         stamps = [engine.VersionStamp(v.number, v.effective_date) for v in versions]
         in_force = engine.version_in_force(stamps, timezone.localdate())
         context["current_version"] = versions[0] if versions else None
