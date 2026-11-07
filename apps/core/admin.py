@@ -74,6 +74,12 @@ class PlatformOperatorAdmin(admin.ModelAdmin[PlatformOperator]):
     )
     readonly_fields = ("public_id", "valid_to", "created_at")
 
+    def get_readonly_fields(self, request: HttpRequest, obj: Any = None) -> tuple[str, ...]:
+        # Shown on stored rows only: a new row carries the latest row's set over (CMP.13), and
+        # only a platform owner changes it, through `set_allowed_vendor_countries`.
+        fields = tuple(self.readonly_fields)
+        return (*fields, "allowed_vendor_countries") if obj is not None else fields
+
     def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         return False
 

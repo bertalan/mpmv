@@ -1,10 +1,12 @@
 """Vendor services: vendor data and status changes (VEN.1, SEC.4), memberships with their
 permissions (CORE.2), the legal identity with its payout requirements (VEN.12) and onboarding:
-application, versioned contract, acceptance and the activation gate (VEN.5); per-vendor feature
+application, versioned contract, acceptance and the activation gates (VEN.5, the establishment
+gate of CMP.13); per-vendor feature
 flag overrides (ARC.8)."""
 
 import dataclasses
 import datetime as dt
+from collections.abc import Collection
 from typing import Any
 
 from django.conf import settings
@@ -18,7 +20,13 @@ from django.utils.module_loading import import_string
 from apps.accounts.models import User
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
-from apps.core.services import audit_changes, flags_changed, run_mutation, save_audited
+from apps.core.services import (
+    allowed_vendor_countries,
+    audit_changes,
+    flags_changed,
+    run_mutation,
+    save_audited,
+)
 
 from . import engine
 from .models import (
@@ -133,16 +141,20 @@ def change_status(
     """Move `vendor` to `target` if the state machine allows it; audit the change.
 
     The check runs against the stored status (row locked), never a possibly stale instance.
-    Activating an onboarding vendor also needs its onboarding checklist (VEN.5): the contract in
-    force must be accepted. Raises `engine.InvalidTransition` (`engine.ActivationNotAllowed`
-    for the checklist), also on dry-run.
+    Activating an onboarding vendor needs an establishment in an allowed country (CMP.13) and
+    its onboarding checklist (VEN.5): the contract in force must be accepted. Raises
+    `engine.InvalidTransition` (`engine.EstablishmentNotAllowed` for the establishment,
+    `engine.ActivationNotAllowed` for the checklist), also on dry-run.
     """
     with transaction.atomic():
         current = (
-            Vendor.objects.select_for_update().only("status", "slug", "public_id").get(pk=vendor.pk)
+            Vendor.objects.select_for_update()
+            .only("status", "slug", "public_id", *ESTABLISHMENT_FIELDS)
+            .get(pk=vendor.pk)
         )
         engine.check_transition(current.status, target)
         if current.status == engine.ONBOARDING and target == engine.ACTIVE:
+            assert_establishment_allowed(current)
             engine.check_activation(onboarding_checklist(current))
 
         # Keyed by public_id: the slug is editable and can be reused by another vendor, so it
@@ -164,6 +176,49 @@ def change_status(
     if not dry_run:
         vendor.status = target
     return changes
+
+
+# --- Establishment gate (D-21, CMP.13)
+
+# The identity fields `engine.vendor_establishment` reads.
+ESTABLISHMENT_FIELDS = ("country", "registered_country", "establishment_country")
+
+
+def vendor_establishment(vendor: Vendor) -> engine.Establishment:
+    """Where `vendor` is established, from its VEN.12 registered office and establishment."""
+    return engine.vendor_establishment(
+        engine.LegalIdentity(**{name: getattr(vendor, name) for name in ESTABLISHMENT_FIELDS})
+    )
+
+
+def assert_establishment_allowed(vendor: Vendor) -> None:
+    """Raise `engine.EstablishmentNotAllowed`, naming the countries, unless `vendor` is
+    established in a country of `PlatformOperator.allowed_vendor_countries` now."""
+    engine.check_establishment(vendor_establishment(vendor), allowed_vendor_countries())
+
+
+def active_vendors_outside(countries: Collection[str]) -> list[dict[str, str]]:
+    """The active vendors established outside `countries`, for staff to decide on.
+
+    Named by `settings.VENDORS_OUTSIDE_COUNTRIES_HOOK`: `core.set_allowed_vendor_countries`
+    lists them in its ChangeSet.
+    """
+    vendors = Vendor.objects.filter(status=engine.ACTIVE).only(
+        "public_id", "display_name", *ESTABLISHMENT_FIELDS
+    )
+    rows = []
+    for vendor in vendors.order_by("display_name", "id"):
+        place = vendor_establishment(vendor)
+        if engine.establishment_error(place, countries) is not None:
+            rows.append(
+                {
+                    "vendor": str(vendor.public_id),
+                    "name": vendor.display_name,
+                    "registered_office": place.registered_office,
+                    "permanent_establishment": place.permanent_establishment,
+                }
+            )
+    return rows
 
 
 # --- Memberships (CORE.2)

@@ -12,8 +12,14 @@ from apps.vendors import engine
 EU = frozenset(EU_MEMBER_STATES)
 
 
-def identity(**fields: str) -> engine.LegalIdentity:
-    return engine.LegalIdentity(**{"country": "IT", **fields})
+def identity(
+    country: str = "IT", registered_country: str = "", establishment_country: str = ""
+) -> engine.LegalIdentity:
+    return engine.LegalIdentity(
+        country=country,
+        registered_country=registered_country,
+        establishment_country=establishment_country,
+    )
 
 
 def test_the_establishment_is_the_registered_office_and_the_permanent_establishment() -> None:

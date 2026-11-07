@@ -1,22 +1,34 @@
 """Core services: the dry-run + audit pattern shared by all mutating services (spec 01
-conventions), the platform operator, feature flags, the worker heartbeat, throttle counters and
-the rotation of field encryption keys."""
+conventions), the platform operator with its allowed vendor countries (CMP.13), feature flags,
+the worker heartbeat, throttle counters and the rotation of field encryption keys."""
 
 import datetime as dt
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
 from typing import Any
 
 from django.conf import settings
-from django.core.exceptions import ValidationError
+from django.contrib.auth.base_user import AbstractBaseUser
+from django.contrib.auth.models import AnonymousUser, PermissionsMixin
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection, transaction
 from django.db.models import F, Model, Q
 from django.utils import timezone
+from django.utils.module_loading import import_string
 
 from . import crypto, encryption, flags
-from .audit import VENDOR_MODEL, AuditContext, record
+from .audit import VENDOR_MODEL, AuditContext, record, user_context
 from .changeset import ChangeSet
-from .models import VENDOR_OVERRIDES, FeatureFlag, Heartbeat, PlatformOperator, Throttle
+from .countries import InvalidCountry, default_allowed_vendor_countries, normalize_countries
+from .models import (
+    PLATFORM_OWNER_CODENAME,
+    VENDOR_OVERRIDES,
+    FeatureFlag,
+    Heartbeat,
+    PlatformOperator,
+    Throttle,
+)
 from .throttling import BackoffPolicy, ThrottleState, after_failure
 from .validity import NoValidRow, OverlappingValidity, next_start_error, pick_valid
 
@@ -98,6 +110,7 @@ OPERATOR_FIELDS = (
     "commission_vat_mode",
     "einvoice_channel",
     "dac7_authority_country",
+    "allowed_vendor_countries",
     "valid_from",
     "valid_to",
 )
@@ -138,16 +151,41 @@ def configure_platform_operator(
     """Add a configuration row from `new.valid_from`, closing the open-ended current one.
 
     Existing rows are never edited, so documents and snapshots computed under an earlier
-    configuration remain explainable.
+    configuration remain explainable. The allowed vendor countries are carried over from the
+    latest row (the EU-27 for the first one), whatever `new` holds: only
+    `set_allowed_vendor_countries` changes them.
     """
     if new.pk is not None:
         raise ValueError("Pass a new, unsaved PlatformOperator")
+    latest = latest_operator()
+    new.allowed_vendor_countries = (
+        list(latest.allowed_vendor_countries)
+        if latest is not None
+        else default_allowed_vendor_countries()
+    )
+    return _add_operator_version(
+        new, latest, ctx=ctx, action=OPERATOR_CONFIGURED, dry_run=dry_run, changeset=ChangeSet()
+    )
+
+
+def _add_operator_version[C: ChangeSet](
+    new: PlatformOperator,
+    latest: PlatformOperator | None,
+    *,
+    ctx: AuditContext,
+    action: str,
+    dry_run: bool,
+    changeset: C,
+    extra: dict[str, Any] | None = None,
+) -> C:
+    """Validate `new`, then save it from `new.valid_from`, closing `latest` when open-ended.
+
+    `extra` is added to the audited `after` of the new row (e.g. the reason for a change).
+    """
     new.valid_to = None
     new.full_clean(validate_constraints=False)  # constraints are enforced by the database
-    latest = latest_operator()
     check_operator_start(new.valid_from, latest)
 
-    changeset = ChangeSet()
     closing = latest if latest is not None and latest.valid_to is None else None
     if closing is not None:
         changeset.update(
@@ -159,7 +197,7 @@ def configure_platform_operator(
     changeset.create(
         OPERATOR_MODEL,
         str(new.public_id),
-        operator_snapshot(new),
+        operator_snapshot(new) | (extra or {}),
         supersedes=operator_snapshot(latest) if latest is not None else None,
     )
 
@@ -169,7 +207,125 @@ def configure_platform_operator(
             closing.save(update_fields=["valid_to", "updated_at"])
         new.save()
 
-    return run_mutation(changeset, apply, ctx=ctx, action=OPERATOR_CONFIGURED, dry_run=dry_run)
+    run_mutation(changeset, apply, ctx=ctx, action=action, dry_run=dry_run)
+    return changeset
+
+
+# --- Allowed vendor establishment countries (D-21, CMP.13)
+
+PLATFORM_OWNER_PERMISSION = f"core.{PLATFORM_OWNER_CODENAME}"
+ALLOWED_VENDOR_COUNTRIES_CHANGED = "core.platform_operator.allowed_vendor_countries_changed"
+# The fields a change of the allowed set copies from the latest version.
+OPERATOR_COPIED_FIELDS = tuple(
+    name
+    for name in OPERATOR_FIELDS
+    if name not in {"allowed_vendor_countries", "valid_from", "valid_to"}
+)
+
+
+class PlatformOwnerRequired(PermissionDenied):
+    """The user does not hold the platform owner permission (or is not active)."""
+
+
+@dataclass
+class AllowedCountriesChangeSet(ChangeSet):
+    """The change of the allowed set, with the active vendors established outside the new set.
+
+    Staff decide on each listed vendor: shrinking the set suspends nobody.
+    """
+
+    vendors_outside: list[dict[str, str]] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return super().to_dict() | {"vendors_outside": self.vendors_outside}
+
+
+def is_platform_owner(user: AbstractBaseUser | AnonymousUser) -> bool:
+    """An active user holding the dedicated permission; staff or admin access is not enough."""
+    return bool(
+        user.is_active
+        and isinstance(user, PermissionsMixin)
+        and user.has_perm(PLATFORM_OWNER_PERMISSION)
+    )
+
+
+def allowed_vendor_countries(at: dt.datetime | None = None) -> frozenset[str]:
+    """The countries where a vendor may be established at `at` (default: now).
+
+    Before any operator is configured, the default (the EU-27) applies.
+    """
+    try:
+        countries = current_operator(at).allowed_vendor_countries
+    except NoPlatformOperator:
+        countries = default_allowed_vendor_countries()
+    return frozenset(countries)
+
+
+def vendors_outside(countries: frozenset[str]) -> list[dict[str, str]]:
+    """The active vendors established outside `countries`, from the vendors app.
+
+    Core cannot import vendors (spec 01 §1.3): `settings.VENDORS_OUTSIDE_COUNTRIES_HOOK` names
+    the function (empty: none).
+    """
+    path: str = getattr(settings, "VENDORS_OUTSIDE_COUNTRIES_HOOK", "")
+    if not path:
+        return []
+    rows: list[dict[str, str]] = import_string(path)(countries)
+    return rows
+
+
+def set_allowed_vendor_countries(
+    countries: Iterable[str],
+    *,
+    actor: AbstractBaseUser | AnonymousUser,
+    reason: str,
+    ctx: AuditContext | None = None,
+    valid_from: dt.datetime | None = None,
+    dry_run: bool = False,
+) -> AllowedCountriesChangeSet:
+    """Change the countries where vendors may be established, as a new operator version.
+
+    Only a platform owner may (`PlatformOwnerRequired`, also on dry-run). The new version starts
+    at `valid_from` (default: now) with the other settings of the latest one; the audit entry of
+    the new row holds the set before and after and the `reason`. The result also lists the
+    active vendors outside the new set. Raises `ValidationError` for an unknown country, an empty
+    set or a missing reason, and `NoPlatformOperator` when no operator is configured yet. The
+    same set again changes nothing.
+    """
+    if not is_platform_owner(actor):
+        raise PlatformOwnerRequired(
+            "Changing the allowed vendor countries needs the platform owner permission."
+        )
+    reason = reason.strip()
+    if not reason:
+        raise ValidationError({"reason": "Say why the allowed vendor countries change."})
+    try:
+        allowed = normalize_countries(countries)
+    except InvalidCountry as exc:
+        raise ValidationError({"allowed_vendor_countries": str(exc)}) from exc
+    if not allowed:
+        raise ValidationError({"allowed_vendor_countries": "Allow at least one country."})
+    latest = latest_operator()
+    if latest is None:
+        raise NoPlatformOperator("Configure the platform operator first.")
+
+    changeset = AllowedCountriesChangeSet(vendors_outside=vendors_outside(frozenset(allowed)))
+    if sorted(latest.allowed_vendor_countries) == allowed:
+        return changeset
+    new = PlatformOperator(
+        **{name: getattr(latest, name) for name in OPERATOR_COPIED_FIELDS},
+        allowed_vendor_countries=allowed,
+        valid_from=valid_from or timezone.now(),
+    )
+    return _add_operator_version(
+        new,
+        latest,
+        ctx=ctx or user_context(actor, None),
+        action=ALLOWED_VENDOR_COUNTRIES_CHANGED,
+        dry_run=dry_run,
+        changeset=changeset,
+        extra={"reason": reason},
+    )
 
 
 # --- Feature flags and kill switches (ARC.8, docs/dev/feature-flags.md)

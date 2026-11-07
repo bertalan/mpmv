@@ -6,13 +6,15 @@ as a new operator version with an audit entry holding the set before and after a
 
 import datetime as dt
 import secrets
+from collections.abc import Callable
 from typing import Any
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.test import override_settings
+from django.test import Client, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.core.audit import AuditContext
@@ -198,6 +200,22 @@ def test_without_a_vendors_hook_no_vendor_is_listed(operator: PlatformOperator) 
         ["IT"], actor=make_user(owner=True), reason=REASON, ctx=CTX, dry_run=True
     )
     assert changeset.vendors_outside == []
+
+
+# --- Admin
+
+
+def test_the_admin_shows_the_set_and_never_offers_it_on_a_new_row(
+    client: Client, superuser: Any, mfa_login: Callable[[Client, Any], Client]
+) -> None:
+    # `superuser` and `mfa_login` come from the root conftest: core must not import accounts.
+    staff = mfa_login(client, superuser)
+    op = PlatformOperatorFactory.create(allowed_vendor_countries=["AT", "IT"])
+    page = staff.get(reverse("admin:core_platformoperator_change", args=[op.pk]))
+    assert page.status_code == 200
+    assert "Allowed vendor establishment countries" in page.content.decode()
+    add = staff.get(reverse("admin:core_platformoperator_add")).content.decode()
+    assert "allowed_vendor_countries" not in add
 
 
 # --- Other operator changes keep the set

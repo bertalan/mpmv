@@ -118,6 +118,10 @@ VENDOR_DELETION_AUDIT_HOOKS: list[str] = [
     "apps.api.services.vendor_key_deletions",  # the vendor's API keys (CORE.13)
 ]
 
+# Allowed vendor countries (CMP.13): `core` cannot import `vendors`, so this names the function
+# that lists the active vendors established outside a new allowed set.
+VENDORS_OUTSIDE_COUNTRIES_HOOK = "apps.vendors.services.active_vendors_outside"
+
 ROOT_URLCONF = "mpmv.urls"
 WSGI_APPLICATION = "mpmv.wsgi.application"
 ASGI_APPLICATION = "mpmv.asgi.application"

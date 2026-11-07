@@ -7,9 +7,12 @@ Applications from other countries are still received and kept.
 
 import datetime as dt
 import secrets
+from collections.abc import Callable
 
 import pytest
 from django.contrib.auth.models import Permission
+from django.test import Client
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import User
@@ -35,7 +38,7 @@ STAFF_CTX = AuditContext(actor_id=1, actor_label="staff:reviewer", source="admin
 REASON = "Owner decision"
 
 
-def ready_to_activate(**fields: str) -> Vendor:
+def ready_to_activate(**fields: object) -> Vendor:
     """An onboarding vendor that accepted the contract in force: only the gate is left."""
     vendor = VendorFactory.create(status=Vendor.Status.ONBOARDING, **fields)
     ContractAcceptanceFactory.create(vendor=vendor)
@@ -163,3 +166,22 @@ def test_active_vendors_outside_a_set() -> None:
     rows = active_vendors_outside(frozenset({"IT"}))
     assert [row["vendor"] for row in rows] == [str(outside.public_id)]
     assert str(inside.public_id) not in {row["vendor"] for row in rows}
+
+
+# --- Admin
+
+
+def test_staff_activating_a_vendor_outside_the_set_see_the_reason(
+    client: Client, superuser: User, mfa_login: Callable[[Client, User], Client]
+) -> None:
+    vendor = ready_to_activate(country="RS", registered_country="RS")
+    staff = mfa_login(client, superuser)
+    response = staff.post(
+        reverse("admin:vendors_vendor_changelist"),
+        {"action": "move_to_active", "_selected_action": [vendor.pk]},
+        follow=True,
+    )
+    assert response.status_code == 200
+    assert "registered office is in RS" in response.content.decode()
+    vendor.refresh_from_db()
+    assert vendor.status == Vendor.Status.ONBOARDING
