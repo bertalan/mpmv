@@ -81,6 +81,8 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
+    # CAT.5: a 404 on a product's old slug becomes a 301 to its current slug.
+    "apps.catalog.middleware.OldProductSlugRedirectMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     # CORE.4: which device verified the session, then confine required roles to the MFA pages.
