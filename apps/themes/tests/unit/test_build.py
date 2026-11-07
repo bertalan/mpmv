@@ -212,4 +212,4 @@ def test_the_image_builds_the_themes_before_collectstatic() -> None:
     containerfile = (ROOT / "Containerfile").read_text(encoding="utf-8")
     build_stage = containerfile.split(" AS runtime", 1)[0]
     assert "-m apps.themes.build" in build_stage
-    assert build_stage.index("-m apps.themes.build") < build_stage.index("collectstatic")
+    assert build_stage.index("-m apps.themes.build") < build_stage.index("manage.py collectstatic")

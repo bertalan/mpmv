@@ -1,0 +1,28 @@
+/* Base theme, reset layer (THM.2). THM.3 adds the base, layout and component layers.
+   Every rule sits in a cascade layer; the build declares the layer order first. */
+@layer reset {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+  }
+
+  img,
+  svg,
+  video {
+    display: block;
+    max-inline-size: 100%;
+    block-size: auto;
+  }
+
+  input,
+  button,
+  textarea,
+  select {
+    font: inherit;
+  }
+}

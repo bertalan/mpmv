@@ -11,8 +11,7 @@
 
 import contextlib
 import functools
-import tomllib
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
@@ -25,8 +24,8 @@ from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.services import save_audited
 
+from .build import read_manifest_sources
 from .engine import (
-    MANIFEST_FILE,
     ThemeError,
     ThemeManifest,
     ThemeRegistry,
@@ -52,27 +51,10 @@ def themes_dir() -> Path:
     return Path(settings.MPMV_THEMES_DIR)
 
 
-def _read_sources(root: Path) -> dict[str, Mapping[str, object] | ThemeError]:
-    sources: dict[str, Mapping[str, object] | ThemeError] = {}
-    if not root.is_dir():
-        return sources
-    for path in sorted(root.iterdir()):
-        if not path.is_dir() or path.name.startswith((".", "_")):
-            continue
-        manifest = path / MANIFEST_FILE
-        try:
-            sources[path.name] = tomllib.loads(manifest.read_text(encoding="utf-8"))
-        except FileNotFoundError:
-            sources[path.name] = ThemeError(f"{MANIFEST_FILE} is missing")
-        except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
-            sources[path.name] = ThemeError(f"{MANIFEST_FILE} cannot be read: {exc}")
-    return sources
-
-
 @functools.cache
 def load_registry(root: Path) -> ThemeRegistry:
     """The themes under `root`, read once per process (see `clear_caches`)."""
-    return build_registry(_read_sources(root))
+    return build_registry(read_manifest_sources(root))
 
 
 def get_registry() -> ThemeRegistry:

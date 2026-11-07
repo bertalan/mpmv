@@ -169,14 +169,14 @@ def test_valid_tokens_have_no_violations() -> None:
 
 
 def test_a_text_pair_below_4_5_fails() -> None:
-    # #767676 on white is 4.54:1 (passes); #777777 is 4.48:1 (fails).
+    # #767676 on white is 4.54:1 (passes); #777777 is 4.478:1 (fails, reported truncated).
     passing = {"color.text": "#767676", "color.surface": "#FFFFFF", "color.focus": "#2563EB"}
     assert check_tokens(passing, CONTRACT) == []
     failing = {**passing, "color.text": "#777777"}
     (violation,) = check_tokens(failing, CONTRACT)
     assert violation.kind == "contrast"
     assert violation.token == "color.text/color.surface"
-    assert "4.48:1" in violation.message
+    assert "4.47:1" in violation.message
     assert "4.5:1" in violation.message
 
 

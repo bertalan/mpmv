@@ -5,13 +5,17 @@ A theme is a directory `themes/<slug>/` with a `theme.toml` manifest. Every them
 Templates are looked up along the chain, then in the app template directories.
 
 `services.py` reads the manifests from disk and hands them to `build_registry`; the template
-loader asks `template_candidates` where to look. THM.2 adds the token functions
-(`resolve_tokens`, `contrast_ratio`, `check_tokens`, `render_tokens_css`) here.
+loader asks `template_candidates` where to look.
+
+Design tokens (THM.2, §14.4): `parse_tokens` flattens a decoded `tokens.toml`, `resolve_tokens`
+merges a chain (child values win) and resolves `{token}` references, `check_tokens` applies the
+token contract (`contract.py`) with `contrast_ratio`, and `render_tokens_css` /
+`build_theme_css` write the CSS that `build.py` saves.
 """
 
 import posixpath
 import re
-from collections.abc import Container, Mapping
+from collections.abc import Container, Mapping, Sequence
 from dataclasses import dataclass, field
 
 BASE_THEME = "base"
@@ -200,3 +204,242 @@ def pick_theme(site_choice: str, env_default: str, registry: Container[str]) -> 
         if slug and slug in registry:
             return slug
     raise ThemeError(f"the {BASE_THEME!r} theme is not registered")
+
+
+# --- Design tokens (THM.2, spec 14 §14.4, §14.5)
+
+TOKENS_FILE = "tokens.toml"
+CSS_LAYERS = ("reset", "tokens", "base", "layout", "components", "utilities", "overrides")
+
+Tokens = Mapping[str, str]
+
+_SEGMENT_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+_REFERENCE_RE = re.compile(r"\{([^{}]*)\}")
+_TOKEN_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+$")
+# A token value is pasted into a CSS declaration: nothing that could end it, open a block,
+# escape a character, start a comment or close the stylesheet.
+_FORBIDDEN_VALUE_RE = re.compile(r"[;{}<>\\\x00-\x1f\x7f]|/\*|\*/")
+_HEX_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
+
+
+def _check_value(name: str, value: str) -> None:
+    if not value.strip():
+        raise ThemeError(f"token {name!r} is empty")
+    for reference in _REFERENCE_RE.findall(value):
+        if not _TOKEN_NAME_RE.match(reference):
+            raise ThemeError(f"token {name!r} refers to an invalid name {{{reference}}}")
+    if _FORBIDDEN_VALUE_RE.search(_REFERENCE_RE.sub("", value)):
+        raise ThemeError(f"token {name!r} has a character not allowed in a CSS value")
+
+
+def parse_tokens(data: Mapping[str, object]) -> dict[str, str]:
+    """Flatten a decoded `tokens.toml`: `[color.red] 700 = "#B3261E"` -> `color.red.700`.
+
+    Values are strings or numbers; a name has at least two lowercase segments. Raises
+    ThemeError for anything else, and for values that could break out of a CSS declaration.
+    """
+    tokens: dict[str, str] = {}
+
+    def walk(prefix: tuple[str, ...], table: Mapping[str, object]) -> None:
+        for key, value in table.items():
+            if not _SEGMENT_RE.match(key):
+                raise ThemeError(f"invalid token name segment {key!r}")
+            path = (*prefix, key)
+            name = ".".join(path)
+            if isinstance(value, Mapping):
+                walk(path, value)
+                continue
+            if isinstance(value, bool) or not isinstance(value, str | int | float):
+                raise ThemeError(f"token {name!r} must be a string or a number")
+            if len(path) < 2:
+                raise ThemeError(f"token {name!r} must sit in a table, like color.{name}")
+            text = str(value)
+            _check_value(name, text)
+            tokens[name] = text
+
+    walk((), data)
+    return tokens
+
+
+def resolve_tokens(chain: Sequence[str], tokens_by_theme: Mapping[str, Tokens]) -> dict[str, str]:
+    """Merge the tokens of a chain (`["ride", "base"]`, child first) and resolve references.
+
+    Child values override parent values; a theme missing from `tokens_by_theme` changes nothing.
+    References (`"{color.red.700}"`, also inside a value) are resolved after the merge, so a
+    child that changes a primitive changes every token derived from it. Unknown and cyclic
+    references stay in the value, and `check_tokens` reports them.
+    """
+    merged: dict[str, str] = {}
+    for slug in reversed(chain):
+        merged.update(tokens_by_theme.get(slug, {}))
+
+    resolved: dict[str, str] = {}
+    resolving: set[str] = set()
+
+    def resolve(name: str) -> str:
+        if name in resolved:
+            return resolved[name]
+        resolving.add(name)
+
+        def substitute(match: re.Match[str]) -> str:
+            target = match.group(1)
+            if target not in merged or target in resolving:
+                return match.group(0)
+            return resolve(target)
+
+        value = _REFERENCE_RE.sub(substitute, merged[name])
+        resolving.discard(name)
+        resolved[name] = value
+        return value
+
+    for name in merged:
+        resolve(name)
+    return resolved
+
+
+def _channels(colour: str) -> tuple[int, int, int]:
+    if not isinstance(colour, str) or not _HEX_RE.match(colour):
+        raise ThemeError(f"{colour!r} is not a #rgb or #rrggbb colour")
+    digits = colour[1:]
+    if len(digits) == 3:
+        digits = "".join(c * 2 for c in digits)
+    return int(digits[0:2], 16), int(digits[2:4], 16), int(digits[4:6], 16)
+
+
+def relative_luminance(colour: str) -> float:
+    """WCAG 2.x relative luminance of a `#rgb` or `#rrggbb` sRGB colour."""
+
+    def linear(channel: int) -> float:
+        c = channel / 255
+        return c / 12.92 if c <= 0.04045 else float(((c + 0.055) / 1.055) ** 2.4)
+
+    r, g, b = (linear(c) for c in _channels(colour))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def contrast_ratio(fg: str, bg: str) -> float:
+    """WCAG 2.x contrast ratio, from 1 to 21 (unrounded: compare it with the minimum as is)."""
+    light, dark = sorted((relative_luminance(fg), relative_luminance(bg)), reverse=True)
+    return (light + 0.05) / (dark + 0.05)
+
+
+@dataclass(frozen=True)
+class ContrastPair:
+    """Two colour tokens that must reach `minimum` contrast (4.5 for text, 3 for UI)."""
+
+    foreground: str
+    background: str
+    minimum: float
+
+
+@dataclass(frozen=True)
+class TokenContract:
+    """The tokens every theme must define and the contrast pairs they must satisfy."""
+
+    required: tuple[str, ...]
+    pairs: tuple[ContrastPair, ...]
+
+
+@dataclass(frozen=True)
+class TokenViolation:
+    """One contract failure; `kind` is missing, unresolved, invalid or contrast."""
+
+    kind: str
+    token: str
+    message: str
+
+    def __str__(self) -> str:
+        return f"{self.token}: {self.message}"
+
+
+def _floor2(ratio: float) -> str:
+    # Truncate, never round up: 4.497 is reported as 4.49, not as a passing-looking 4.50.
+    return f"{int(ratio * 100) / 100:.2f}"
+
+
+def check_tokens(tokens: Tokens, contract: TokenContract) -> list[TokenViolation]:
+    """Missing required tokens, unresolved references and contrast pairs below their minimum."""
+    violations = [
+        TokenViolation("missing", name, "required by the token contract")
+        for name in contract.required
+        if name not in tokens
+    ]
+    violations += [
+        TokenViolation("unresolved", name, f"unresolved reference in {value!r}")
+        for name, value in sorted(tokens.items())
+        if _REFERENCE_RE.search(value)
+    ]
+    invalid: set[str] = set()
+    for pair in contract.pairs:
+        colours: list[str] = []
+        for name in (pair.foreground, pair.background):
+            value = tokens.get(name)
+            if value is None or _REFERENCE_RE.search(value):
+                break  # reported above
+            try:
+                _channels(value)
+            except ThemeError as exc:
+                if name not in invalid:
+                    invalid.add(name)
+                    violations.append(TokenViolation("invalid", name, str(exc)))
+                break
+            colours.append(value)
+        if len(colours) != 2:
+            continue
+        ratio = contrast_ratio(colours[0], colours[1])
+        if ratio < pair.minimum:
+            violations.append(
+                TokenViolation(
+                    "contrast",
+                    f"{pair.foreground}/{pair.background}",
+                    f"{colours[0]} on {colours[1]} is {_floor2(ratio)}:1, "
+                    f"below the {pair.minimum:g}:1 minimum",
+                )
+            )
+    return violations
+
+
+def css_name(token: str) -> str:
+    """The custom property of a token: `color.text-muted` -> `--color-text-muted`."""
+    return "--" + token.replace(".", "-")
+
+
+def render_tokens_css(tokens: Tokens) -> str:
+    """`@layer tokens{:root{--color-text:...}}`, properties sorted by name."""
+    body = ";".join(f"{css_name(name)}:{tokens[name]}" for name in sorted(tokens))
+    return f"@layer tokens{{:root{{{body}}}}}\n"
+
+
+_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
+_SPACE_RE = re.compile(r"\s+")
+_AROUND_RE = re.compile(r"\s*([{};,>])\s*")
+_AFTER_COLON_RE = re.compile(r":\s+")
+
+
+def minify_css(css: str) -> str:
+    """Drop comments and the whitespace CSS does not need.
+
+    Whitespace stays where it can matter: before `:` (`.card :hover` is a descendant selector),
+    around `+` and `-` (`calc()`), and between the words of a value. Sources must not put
+    `/*`, `;`, `{` or `}` inside strings (none of our CSS needs to).
+    """
+    css = _COMMENT_RE.sub("", css)
+    css = _SPACE_RE.sub(" ", css)
+    css = _AROUND_RE.sub(r"\1", css)
+    css = _AFTER_COLON_RE.sub(":", css)
+    return css.replace(";}", "}").strip()
+
+
+def build_theme_css(
+    chain: Sequence[str], *, tokens_css: str, sources: Mapping[str, Sequence[str]]
+) -> str:
+    """One minified `theme.css`: the layer order, the tokens, then the CSS sources of the chain.
+
+    Sources are concatenated from `base` down to the theme itself, each theme's files in the
+    given order; the layer statement comes first, so the cascade follows the layers, not the
+    file order.
+    """
+    parts = [f"@layer {', '.join(CSS_LAYERS)};", tokens_css]
+    for slug in reversed(chain):
+        parts.extend(sources.get(slug, ()))
+    return minify_css("\n".join(parts)) + "\n"

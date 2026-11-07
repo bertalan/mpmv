@@ -1,0 +1,101 @@
+# Design tokens of the base theme (spec 14 §14.4): a neutral, accessible palette and the system
+# font stack. Every token of the contract (apps/themes/contract.py) is set here; a child theme
+# lists only the tokens it changes. Names become custom properties: color.text -> --color-text.
+# "{name}" refers to another token and is resolved after the chain is merged.
+
+# --- Primitive tier
+
+[color.neutral]
+0 = "#FFFFFF"
+50 = "#F8FAFC"
+100 = "#F1F5F9"
+300 = "#CBD5E1"
+500 = "#64748B"
+600 = "#475569"
+700 = "#334155"
+800 = "#1E293B"
+900 = "#0F172A"
+
+[color.blue]
+50 = "#EFF6FF"
+600 = "#2563EB"
+700 = "#1D4ED8"
+800 = "#1E40AF"
+
+[color.red]
+700 = "#B91C1C"
+
+# --- Semantic tier (the token contract)
+
+[color]
+text = "{color.neutral.900}"
+text-muted = "{color.neutral.600}"
+text-inverse = "{color.neutral.0}"
+surface = "{color.neutral.0}"
+surface-raised = "{color.neutral.50}"
+surface-sunken = "{color.neutral.100}"
+surface-inverse = "{color.neutral.900}"
+border = "{color.neutral.300}"
+border-control = "{color.neutral.500}"
+accent = "{color.blue.700}"
+on-accent = "{color.neutral.0}"
+accent-hover = "{color.blue.800}"
+accent-tint = "{color.blue.50}"
+secondary = "{color.neutral.700}"
+on-secondary = "{color.neutral.0}"
+secondary-hover = "{color.neutral.800}"
+secondary-text = "{color.neutral.700}"
+link = "{color.accent}"
+focus = "{color.blue.600}"
+danger = "{color.red.700}"
+
+[font]
+body = "system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', sans-serif"
+display = "{font.body}"
+mono = "ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace"
+
+# Fluid type scale (ratio about 1.2), 360 px to 1280 px viewports.
+[step]
+0 = "clamp(1rem, 0.96rem + 0.2vw, 1.125rem)"
+1 = "clamp(1.2rem, 1.13rem + 0.33vw, 1.35rem)"
+2 = "clamp(1.44rem, 1.33rem + 0.52vw, 1.62rem)"
+3 = "clamp(1.73rem, 1.56rem + 0.78vw, 1.94rem)"
+4 = "clamp(2.07rem, 1.82rem + 1.13vw, 2.33rem)"
+5 = "clamp(2.49rem, 2.13rem + 1.6vw, 2.8rem)"
+
+[space]
+xs = "0.25rem"
+s = "0.5rem"
+m = "1rem"
+l = "1.5rem"
+xl = "2rem"
+2xl = "3rem"
+3xl = "4rem"
+
+[radius]
+control = "0.375rem"
+card = "0.5rem"
+
+[shadow]
+raised = "0 1px 3px rgb(15 23 42 / 0.12), 0 1px 2px rgb(15 23 42 / 0.08)"
+
+[duration]
+fast = "150ms"
+
+[header]
+height = "4rem"
+
+# --- Component tier: derived from the semantic tokens; a theme may override any of them.
+
+[button]
+bg = "{color.accent}"
+fg = "{color.on-accent}"
+bg-hover = "{color.accent-hover}"
+radius = "{radius.control}"
+
+[card]
+padding = "{space.l}"
+radius = "{radius.card}"
+
+[price]
+sale-color = "{color.danger}"
