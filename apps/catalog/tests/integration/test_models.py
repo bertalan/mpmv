@@ -86,7 +86,7 @@ def test_validation_reports_a_duplicate_sku_before_saving() -> None:
     duplicate = ProductFactory.build(vendor=vendor, sku="abc-123")
     with pytest.raises(ValidationError) as exc:
         duplicate.full_clean()
-    assert "SKU" in str(exc.value)
+    assert "This vendor already has a product with this SKU." in str(exc.value)
 
 
 def test_queryset_updates_normalize_the_sku_too() -> None:

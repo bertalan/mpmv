@@ -75,15 +75,14 @@ def product_form(vendor: Vendor, **overrides: Any) -> dict[str, Any]:
 
 
 def existing_product_form(product: Product, **overrides: Any) -> dict[str, Any]:
-    return product_form(
-        product.vendor,
-        sku=product.sku,
-        kind=product.kind,
-        price_net=str(product.price_net),
-        weight_kg=str(product.weight_kg),
-        stock_qty=str(product.stock_qty),
-        **overrides,
-    )
+    stored = {
+        "sku": product.sku,
+        "kind": product.kind,
+        "price_net": str(product.price_net),
+        "weight_kg": str(product.weight_kg),
+        "stock_qty": str(product.stock_qty),
+    }
+    return product_form(product.vendor, **{**stored, **overrides})
 
 
 def test_changelist_lists_products_with_their_sku(staff_client: Client) -> None:
@@ -155,7 +154,7 @@ def test_add_product_rejects_a_duplicate_sku_of_the_same_vendor(staff_client: Cl
         reverse("admin:catalog_product_add"), product_form(existing.vendor, sku="bag-01")
     )
     assert response.status_code == 200  # form redisplayed with errors
-    assert "SKU" in response.content.decode()
+    assert "This vendor already has a product with this SKU." in response.content.decode()
     assert Product.objects.count() == 1
 
 
@@ -165,7 +164,7 @@ def test_add_product_rejects_a_sale_price_above_the_price(staff_client: Client) 
         product_form(VendorFactory.create(), price_net="10.00", sale_price_net="12.00"),
     )
     assert response.status_code == 200
-    assert "sale price" in response.content.decode().lower()
+    assert "The sale price must be lower than the price." in response.content.decode()
     assert Product.objects.count() == 0
 
 
@@ -201,7 +200,8 @@ def test_changing_the_price_in_the_admin_writes_the_audit_log(staff_client: Clie
     assert entry.action == "catalog.product.price_changed"
     assert entry.source == "admin"
     assert entry.actor_id is not None
-    assert (entry.before["price_net"], entry.after["price_net"]) == ("25.00", "29.00")
+    assert (entry.before or {}).get("price_net") == "25.00"
+    assert (entry.after or {}).get("price_net") == "29.00"
 
 
 def test_changing_other_fields_writes_no_price_audit(staff_client: Client) -> None:
@@ -251,7 +251,7 @@ def test_changing_a_variant_price_in_the_product_page_writes_the_audit_log(
     assert variant.price_net_override == Decimal("31.00")
     entry = AuditLog.objects.get()
     assert entry.action == "catalog.variant.price_changed"
-    assert entry.after["price_net_override"] == "31.00"
+    assert (entry.after or {}).get("price_net_override") == "31.00"
 
 
 def test_delete_product(staff_client: Client) -> None:

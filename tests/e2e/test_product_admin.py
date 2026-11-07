@@ -31,9 +31,9 @@ def test_staff_create_a_product_and_change_its_price(
 
     page.goto(f"{live_server.url}/django-admin/catalog/product/add/")
     page.locator("#id_vendor").fill(str(vendor.pk))
-    page.get_by_label("SKU", exact=True).fill("bag-01")
-    page.get_by_label("Net price", exact=True).fill("25.00")
-    page.get_by_label("Weight (kg)", exact=True).fill("0.750")
+    page.locator("#id_sku").fill("bag-01")
+    page.locator("#id_price_net").fill("25.00")
+    page.locator("#id_weight_kg").fill("0.750")
     page.locator("#id_translations-0-language").select_option("en")
     page.locator("#id_translations-0-title").fill("Leather bag")
     shot("filled")
@@ -44,7 +44,7 @@ def test_staff_create_a_product_and_change_its_price(
     assert product.sku == "BAG-01"
     assert product.translations.get(language="en").title == "Leather bag"
 
-    page.get_by_label("Net price", exact=True).fill("29.00")
+    page.locator("#id_price_net").fill("29.00")
     page.get_by_role("button", name="Save", exact=True).click()
     expect(page.locator(".messagelist")).to_contain_text("was changed successfully")
     shot("price-changed")
@@ -52,4 +52,5 @@ def test_staff_create_a_product_and_change_its_price(
     product.refresh_from_db()
     assert product.price_net == Decimal("29.00")
     entry = AuditLog.objects.get(action="catalog.product.price_changed")
-    assert (entry.before["price_net"], entry.after["price_net"]) == ("25.00", "29.00")
+    assert (entry.before or {}).get("price_net") == "25.00"
+    assert (entry.after or {}).get("price_net") == "29.00"

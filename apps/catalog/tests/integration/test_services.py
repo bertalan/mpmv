@@ -40,7 +40,7 @@ def test_price_change_is_applied_and_audited() -> None:
     assert entry.action == "catalog.product.price_changed"
     assert entry.target_model == "catalog.product"
     assert entry.target_key == str(product.public_id)
-    assert entry.before == {
+    before = {
         "sku": "SKU-1",
         "vendor": str(product.vendor.public_id),
         "price_net": "10.00",
@@ -48,9 +48,14 @@ def test_price_change_is_applied_and_audited() -> None:
         "sale_from": None,
         "sale_to": None,
     }
-    assert entry.after["price_net"] == "12.00"
-    assert entry.after["sale_price_net"] == "9.50"
-    assert entry.after["sale_from"] == JAN.isoformat()
+    assert entry.before == before
+    assert entry.after == {
+        **before,
+        "price_net": "12.00",
+        "sale_price_net": "9.50",
+        "sale_from": JAN.isoformat(),
+        "sale_to": FEB.isoformat(),
+    }
     assert entry.actor_label == "staff:pricing"
 
 
@@ -146,12 +151,13 @@ def test_variant_price_override_is_applied_and_audited() -> None:
     assert entry.action == "catalog.variant.price_changed"
     assert entry.target_model == "catalog.variant"
     assert entry.target_key == str(variant.public_id)
-    assert entry.before == {
+    before = {
         "sku": "VAR-1",
         "product": str(variant.product.public_id),
         "price_net_override": None,
     }
-    assert entry.after["price_net_override"] == "14.00"
+    assert entry.before == before
+    assert entry.after == {**before, "price_net_override": "14.00"}
 
 
 def test_a_variant_override_can_be_cleared() -> None:
@@ -159,7 +165,9 @@ def test_a_variant_override_can_be_cleared() -> None:
     set_variant_price(variant, price_net_override=None, ctx=CTX)
     variant.refresh_from_db()
     assert variant.price_net_override is None
-    assert AuditLog.objects.get().after["price_net_override"] is None
+    after = AuditLog.objects.get().after or {}
+    assert "price_net_override" in after
+    assert after["price_net_override"] is None
 
 
 def test_variant_dry_run_applies_nothing() -> None:
