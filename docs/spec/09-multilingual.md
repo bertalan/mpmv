@@ -35,15 +35,21 @@ Rules:
   messages, emails, notifications, and the legal and tax wording keys used on documents
   (`legal_note_key`). The process is an AI draft followed by human review of checkout, emails and
   legal or tax wording (I18N.7). Content shown to visitors (products, categories and taxonomy terms,
-  vendor storefront texts, CMS pages, blog, landing pages) stays in EN only until after go-live; the
-  owner then decides whether and how to translate it (I18N.8). Whether legal pages (terms, privacy,
+  vendor storefront texts, CMS pages, blog, landing pages) follows two rules at go-live (owner
+  decision of 2026-11-07). The **existing Italian texts** of the current site are migrated and
+  published in IT (MIG.3 for vendors, catalog and taxonomies, MIG.7 for pages and blog), so the
+  current IT URLs keep their content. **New** visitor content created after the migration (new
+  products from the pipelines, new pages and articles) stays EN only until after go-live, and DE, FR
+  and ES visitor content comes after go-live; the owner then decides whether and how to translate
+  it (I18N.8). Whether legal pages (terms, privacy,
   withdrawal) count as visitor content or must be translated at go-live is still an open owner
   question.
 - **Explicit fallback**: if the published translation is missing, the base language (EN) is shown with a notice, and the
   page is not included in that language's sitemap (never empty or duplicate content indexed).
   A fallback copy declares the EN page as its canonical URL (no `noindex`, so the two signals never
   conflict), and `hreflang` lists only the languages that have a published translation. At go-live
-  this applies to all visitor content in IT, DE, FR and ES.
+  this applies to all visitor content in DE, FR and ES, and to new visitor content in IT: a
+  migrated page with its IT translation lists EN and IT in `hreflang`, a new page lists EN only.
 - Images (D-18): an image is language neutral by default. An image can optionally be dedicated to
   one language (for example packaging printed in German). Replacement rule: when a product, or a CMS
   gallery, has at least one image dedicated to the requested language, that language shows only its
@@ -64,7 +70,7 @@ Rules:
 - Machine (AI) translation as a draft, with human review where required; editorial rule
   unchanged: titles in sentence case.
 - Emails and documents in the recipient's language (`Order.language`, `User.preferred_language`).
-- Vendor legal documents are an exception to the rule that content is English only until after
+- Vendor legal documents are an exception to the rule that new content is English only until after
   go-live (owner decision, 2026-11-07). They exist in every vendor language from the start (IT,
   EN, DE, FR, ES), are never machine drafts, and are not part of the CMS translation workflow or
   the visitor fallback: when the vendor's language has no text, the vendor accepts the English

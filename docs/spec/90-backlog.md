@@ -90,9 +90,9 @@
 | ING.2 | Port of `state.py` (source state, change history, stock state) to Django models + existing tests | P1 | 12 | ING.1 | Current pytest suite passes on the new storage |
 | ING.3 | HTML adapter (Vendor A) + generic Store API adapter | P1 | 12 | ING.2 | Dry-run equivalent to the current one |
 | ING.4 | Port of extraction (step 5) and JSON mappings → MappingTable with FKs | P1 | 10 | ING.1, CAT.2 | Same output as step 5 on 50 sample products |
-| ING.5 | `TextEnricher` (Gemini) with policy, schema validation, version archive | P1 | 8 | ING.1 | Out-of-policy texts end up in review |
+| ING.5 | `TextEnricher` (Gemini) with policy, schema validation, version archive; EN texts only until after go-live (D-18; other languages through I18N.4 and I18N.8) | P1 | 8 | ING.1 | Out-of-policy texts end up in review |
 | ING.6 | Images: hash → storage → rendition pipeline, cover protection | P1 | 6 | CAT.4 | Changed photos detected by hash |
-| ING.7 | `publish_drafts` via `catalog.services` with dry-run and scheduled publication | P1 | 8 | CAT.10 | Draft → EN/IT product in one step |
+| ING.7 | `publish_drafts` via `catalog.services` with dry-run and scheduled publication | P1 | 8 | CAT.10 | Draft → published EN product in one step; an IT translation migrated by MIG.3 is kept |
 | ING.8 | `plan_stock_actions` / `plan_price_actions` + jobs and ReviewItem | P1 | 10 | ING.2 | Supplier rules (404, stale, >15%, sales) green |
 | ING.9 | XLSX adapter (Vendor B), publisher feed (Vendor D), YAML light (Vendor E), generic CSV | P1 | 16 | ING.4 | One dry-run per vendor |
 | I18N.1 | Language configuration, URL prefixes, middleware, language switcher | P1 | 4 | ARC.3, ARC.13 | `/it/`, `/de/`, `/fr/` and `/es/` active on STAGE |
@@ -193,7 +193,7 @@
 | THM.10 | Visual regression baselines for `base` and `ride`: styleguide and key pages at three widths, CI job, update procedure in the developer docs | P1 | 4 | THM.5, THM.7, THM.8, THM.9 | CI compares every key page with its baseline; an intentional change needs a reviewed baseline update |
 | SEO.1 | JSON-LD Product/Offer/Breadcrumb/ReturnPolicy/ShippingDetails, robots, canonical | P1 | 10 | CAT.7, SHP.3 | Rich Results Test with no errors |
 | SEO.2 | Per-language and per-type sitemaps, generated `llms.txt` | P1 | 4 | I18N.6 | Valid sitemaps |
-| SEO.3 | Google feed (EN/IT) with legacy IDs, prices from the tax engine, shipping from tables | P1 | 8 | TAX.3, SHP.11 | Feed validated in STAGE Merchant Center |
+| SEO.3 | Google feed (EN for every product, IT for products with a published IT translation, D-18) with legacy IDs, prices from the tax engine, shipping from tables | P1 | 8 | TAX.3, SHP.11 | Feed validated in STAGE Merchant Center |
 | SEO.5 | Cookie consent + Consent Mode v2 + e-commerce events | P1 | 8 | ORD.5 | No tags fire before consent |
 
 ### F5 — Migration, acceptance testing, go-live (11 tasks, 122 h)
@@ -203,11 +203,11 @@
 | SEC.6 | External penetration test and remediation | P1 | 16 | MIG.5 | Report with no open critical findings |
 | MIG.1 | Extractor from the WP DB (`kvsa_`) to an intermediate JSON format, with a meta inventory | P1 | 10 | — | Complete inventory of the fields in use |
 | MIG.2 | Report of duplicate SKUs, tags without a role, orphan companion products → decisions | P1 | 6 | MIG.1 | Decision list approved |
-| MIG.3 | Loader for vendors, catalog, taxonomies, images (idempotent, dry-run) | P1 | 16 | MIG.1, CAT.1, CAT.2, CAT.3, CAT.4 | Reload with no duplicates |
+| MIG.3 | Loader for vendors, catalog, taxonomies, images (idempotent, dry-run); existing IT texts loaded as published translations (D-18) | P1 | 16 | MIG.1, CAT.1, CAT.2, CAT.3, CAT.4 | Reload with no duplicates; IT texts present where the current site has them |
 | MIG.4 | Loader for customers (WP password hasher) and read-only historical orders | P1 | 10 | MIG.1, ORD.2 | Migrated customer logs in with the old password |
 | MIG.5 | Automated parity reports (§13.3) | P1 | 10 | MIG.3 | Report generated on every run |
-| MIG.6 | Complete EN/IT redirect map + automated check of all WP sitemap URLs | P1 | 6 | CAT.6, MIG.3 | 100% of URLs 200/301 |
-| MIG.7 | Pages and blog migration (semi-manual) with StreamField | P1 | 16 | CMS.2 | All public pages present |
+| MIG.6 | Complete EN/IT redirect map + automated check of all WP sitemap URLs | P1 | 6 | CAT.6, MIG.3 | 100% of URLs 200/301; a migrated IT URL serves its IT text, not the EN fallback |
+| MIG.7 | Pages and blog migration (semi-manual) with StreamField; existing IT versions as published wagtail-localize translations (D-18) | P1 | 16 | CMS.2, I18N.3 | All public pages present, in IT too where the current site has them |
 | MIG.8 | Vendor ledger opening balances + verification against Stripe | P1 | 4 | VEN.4, MIG.3 | Balance = expected for every vendor |
 | MIG.9 | Three dress rehearsals on STAGE + cutover and rollback runbook | P1 | 16 | MIG.5, MIG.6 | Third rehearsal with no blockers |
 | MIG.10 | Cutover and post-go-live monitoring | P1 | 12 | MIG.9, SEC.6 | Go-live, 72 h with no critical issues |
