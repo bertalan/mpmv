@@ -64,7 +64,7 @@ exclude = ["^build/", "^private/", "^tools/", "^\\.claude/"]
 untyped_calls_exclude = ["factory"]
 
 [[tool.mypy.overrides]]
-module = ["dj_database_url", "croniter", "django_otp", "django_otp.*"]
+module = ["dj_database_url", "croniter", "django_otp", "django_otp.*", "whitenoise", "whitenoise.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
