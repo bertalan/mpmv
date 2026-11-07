@@ -29,7 +29,7 @@ Rules:
 - Language-prefix routing (`/` = EN, `/it/`, `/de/`, `/fr/`, `/es/`, `/<code>/` for later languages),
   language switcher and translation tables ready for all five languages; automatic `hreflang` and
   canonical.
-- **Interface text versus visitor content** (D-18). Every fixed interface string is translated into
+- Interface text versus visitor content (D-18): Every fixed interface string is translated into
   all five languages at go-live: buttons, cart, checkout, account and MFA pages, error and validation
   messages, emails, notifications, and the legal and tax wording keys used on documents
   (`legal_note_key`). The process is an AI draft followed by human review of checkout, emails and
@@ -43,7 +43,7 @@ Rules:
   A fallback copy declares the EN page as its canonical URL (no `noindex`, so the two signals never
   conflict), and `hreflang` lists only the languages that have a published translation. At go-live
   this applies to all visitor content in IT, DE, FR and ES.
-- **Images** (D-18). An image is language neutral by default. An image can optionally be dedicated to
+- Images (D-18): an image is language neutral by default. An image can optionally be dedicated to
   one language (for example packaging printed in German). Replacement rule: when a product, or a CMS
   gallery, has at least one image dedicated to the requested language, that language shows only its
   dedicated images; otherwise it shows the neutral images. Alt text and captions are always
