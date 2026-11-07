@@ -8,9 +8,11 @@ import pytest
 from playwright.sync_api import Page, expect
 from pytest_django.live_server_helper import LiveServer
 
-from apps.accounts.tests.factories import UserFactory
+from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
+from apps.accounts.tests.mfa import totp_token
 from apps.core.models import AuditLog
 from apps.vendors.models import Vendor
+from tests.e2e.login import verify_with_totp
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -19,11 +21,13 @@ def test_staff_create_vendor_and_start_onboarding(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
     password = secrets.token_urlsafe(16)  # generated: no credential literals in git
-    UserFactory.create(email="staff@example.com", password=password, superuser=True)
+    user = UserFactory.create(email="staff@example.com", password=password, superuser=True)
+    device = TOTPDeviceFactory.create(user=user)  # staff must verify a second factor (CORE.4)
     page.goto(f"{live_server.url}/django-admin/login/")
     page.get_by_label("Email").fill("staff@example.com")
     page.get_by_label("Password").fill(password)
     page.get_by_role("button", name="Log in").click()
+    verify_with_totp(page, totp_token(device))
 
     page.goto(f"{live_server.url}/django-admin/vendors/vendor/add/")
     page.get_by_label("Legal name").fill("Vendor A S.r.l.")
