@@ -30,7 +30,7 @@ part of the done-when still open) · `not started`.
 | I18N.2 | done | #19 | Shared TranslationModel with status, source_hash, stale detection and EN fallback; language choices no longer frozen in migrations. Reused by vendor and catalog (CAT.1, #27) |
 | CORE.7 | partial: OpenAPI proven locally and in CI, STAGE publication pending hosting | #20 | Ninja API v1 skeleton: API key auth, dry-run, RFC 9457 problem details, OpenAPI 3.1, mutation log |
 | CORE.5 | done | #21 | Progressive login lockout per account and IP, registration rate limit, Turnstile captcha, trusted-proxy client IP |
-| CORE.4 | done | #22 | Mandatory MFA for staff, superusers and vendor owners: TOTP, passkeys, recovery codes, step-up |
+| CORE.4 | done | #22, #32 | Mandatory MFA for staff, superusers and every vendor member (owners and staff since #32, owner decision): TOTP, passkeys, recovery codes, step-up |
 | SHP.1 | done | #25 | Carrier, zones, vendor rates, weight bands (exclusion constraint), pickup options, config versions; audited admin |
 | CAT.1 | done | #27 | Product, Variant and translations, per-vendor SKU constraints, audited price services, admin |
 | CORE.3 | done | #26 | VendorScopedQuerySet, 404 helpers, cross-tenant harness with negative tests generated for every endpoint, API operation and vendor-owned model (catalog and shipping included) |
@@ -52,12 +52,12 @@ Open questions for the owner:
 
 - ARC.7: confirm the choice values for tax_regime, commission_vat_mode and einvoice_channel with the tax advisor.
 - ARC.7: may staff configure a PlatformOperator row that starts in the past? The service allows it today.
-- ARC.7: should a future platform_entity FK (VEN.4, VEN.6) point to a configuration version row or to a stable legal entity key?
+- ARC.7: should a future platform_entity FK (VEN.4, VEN.6) point to a configuration version row or to a stable legal entity key? Resolved: the version row (owner decisions 2026-11-07).
 - VEN.1: confirm the extra status transitions (suspended to active, closing from any open status).
 - VEN.1: should the vendor slug become read-only after creation?
 - CORE.6: confirm that key authentication logic may live in apps/api, and record it in spec 01.
 - CORE.6: confirm that rotation revokes the old key at once with no grace period, and record it in spec 02.
-- CORE.6: track the ApiClient.vendor FK migration under VEN.1 or CORE.3? VEN.1 is now merged.
+- CORE.6: track the ApiClient.vendor FK migration under VEN.1 or CORE.3? Resolved: new task CORE.13.
 
 Deferred to other tasks:
 
@@ -104,8 +104,8 @@ Review findings not fixed (all minor):
 
 Open questions for the owner:
 
-- ARC.5: choose the hosting provider (price, EU region, managed PostgreSQL 17 with PITR) and record it as ADR-0005 requires.
-- ARC.5: either provision STAGE and run a real tag deploy, rollback and unhealthy deploy, or narrow the done-when and add a new spec 01 row for the STAGE deploy.
+- ARC.5: choose the hosting provider (price, EU region, managed PostgreSQL 17 with PITR) and record it as ADR-0005 requires. Resolved: Hetzner with self-managed PostgreSQL, ADR-0007 supersedes ADR-0005.
+- ARC.5: either provision STAGE and run a real tag deploy, rollback and unhealthy deploy, or narrow the done-when and add a new spec 01 row for the STAGE deploy. Resolved: done-when narrowed, new task ARC.13.
 - I18N.1: should `/` redirect signed-in users to their preferred language prefix? Today it always serves EN.
 
 Deferred to other tasks:
@@ -113,7 +113,7 @@ Deferred to other tasks:
 - ARC.5: there is no automatic deploy from CI to STAGE; deploys run by hand with mpmv-deploy until a host and SSH secrets exist.
 - ARC.5: release images are built only for linux/amd64; an arm64 server needs a multi-platform build.
 - ARC.5: rollback does not undo migrations, so migrations must stay compatible with the previous release (expand, then contract).
-- ARC.5: media has no writable location on STAGE/LIVE (read-only root, no volume); it needs an object storage backlog row before CAT.4 and SEC.2.
+- ARC.5: media has no writable location on STAGE/LIVE (read-only root, no volume); it needs an object storage backlog row before CAT.4 and SEC.2. Resolved: new task ARC.15.
 - I18N.1: the staff admin is always in EN, because unprefixed paths use the primary language.
 - I18N.1: page strings are marked for translation, but .po/.mo catalogs come with I18N.5.
 - I18N.1: hreflang, canonical and sitemaps go to I18N.6; wagtail-localize goes to I18N.3.
@@ -139,7 +139,7 @@ Open questions for the owner:
 - CORE.2: confirm that the storefront profile (texts, policies, logo) is owner-only, since spec 02 lists only orders, quotes and products for vendor staff.
 - I18N.2: should a stale published translation stay visible until review, instead of falling back to EN after any EN edit?
 - CORE.7: confirm the fail-open choice when a mutation-log row cannot be written (error logged, response still returned).
-- CORE.4: confirm that vendor staff members (not owners) do not need MFA.
+- CORE.4: confirm that vendor staff members (not owners) do not need MFA. Resolved: every vendor member needs MFA (owner decision, #32).
 
 Deferred to other tasks:
 
@@ -155,7 +155,7 @@ Deferred to other tasks:
 - CORE.4: step-up must be applied to IBAN, payout, rate and export views when they exist.
 - CORE.4: passkeys are bound to the request host; MFA_WEBAUTHN_RP_ID and allowed origins settings are not added yet.
 - CORE.2: no admin or UI for memberships yet; CORE.8 and CORE.9 must call the membership services.
-- CORE.2: ApiClient.vendor FK still missing (CORE.6 follow-up or CORE.3).
+- CORE.2: ApiClient.vendor FK still missing (CORE.6 follow-up or CORE.3). Now task CORE.13.
 - CORE.2: GDPR erasure must remove memberships first, since deleting a member user is blocked.
 - I18N.2: review-before-publish transition rules go to I18N.4; the fallback notice and sitemap exclusion go to the storefront and SEO tasks.
 
@@ -220,7 +220,7 @@ Deferred to other tasks:
 - SEC.4: commissions, IBAN, payouts and data exports get audited when their models exist (pattern in docs/dev/audit-trail.md).
 - SEC.4: product deletion and non-price product edits are classified as unaudited catalog content.
 - SEC.4: anonymous failed-login entries grow the append-only table; retention or partitioning is an OPS item.
-- VEN.12: a real VIES client and periodic re-check need a backlog row (could reuse the TAX VatValidation cache).
+- VEN.12: a real VIES client and periodic re-check: the client is task TAX.5 (VIES client with cache, timeout, fail-closed); the periodic re-check of vendor numbers has no row yet.
 - VEN.12: the IBAN and DAC7 values are stored in clear and kept in append-only audit rows until SEC.3 adds field-level encryption.
 - VEN.12: there is no vendor-facing profile form yet (VEN.9, CORE.9).
 - VEN.12: fiscal_regime is not checked against VendorTaxProfile.exempt_reason (TAX.2, CMP.2).
@@ -340,9 +340,9 @@ spec against spec; coherence check 2 findings; repo hygiene.
 |---|---|
 | Done-when criteria | Met for ARC.12, CORE.2, CORE.5 and CORE.4 (role matrix, failed-attempt and MFA enforcement tests, vendor owner MFA through the real settings). ARC.5 and CORE.7 are partial and recorded as such. I18N.1 and I18N.2 were marked done but their done-when is not met yet (no STAGE; no catalog model): now partial |
 | Spec 01 conventions | Logic in `services.py` and `engine.py`; engines import no ORM. Mutating services of CORE.2 and CORE.4 take `dry_run` and return a `ChangeSet`, except `register_passkey` and `confirm_totp_device` (finding 4). MFA and membership changes write `AuditLog` |
-| App dependency graph | import-linter 3/3 kept. The layers contract lists whole packages, so `apps.api.v1`, the accounts MFA modules, `apps.core.http`, `apps.core.i18n` and `apps.core.translations` are covered. Vendor owner MFA reaches `apps.vendors` through the `MFA_REQUIRED_POLICIES` dotted path, not an import |
+| App dependency graph | import-linter 3/3 kept. The layers contract lists whole packages, so `apps.api.v1`, the accounts MFA modules, `apps.core.http`, `apps.core.i18n` and `apps.core.translations` are covered. Vendor owner MFA reaches `apps.vendors` through the `MFA_REQUIRED_POLICIES` dotted path, not an import (since #32 the policy is `is_vendor_member`, all members) |
 | Check 2 findings | Finding 1 resolved: with an extra `("fr", ...)` entry in LANGUAGES, `makemigrations --check` reports no changes and both language fields offer the new code at runtime. Finding 2 still open (owner question 5 of check 2). Findings 3, 4 and 5 still open. Finding 6 did not recur |
-| Security | MFA required for staff, superusers and vendor owners, enforced by middleware (system check accounts.E002); step-up guards device removal and the admin MFA reset. Lockout per account and IP, trusted-proxy client IP in throttles, captcha, API auth, API mutation log and the core and vendor admin audit (not MFA audit, finding 1). CSP unchanged and strict; Turnstile sources only when the captcha is on; Swagger UI and the passkey script are served from our static files with the nonce |
+| Security | MFA required for staff, superusers and vendor owners (all vendor members since #32), enforced by middleware (system check accounts.E002); step-up guards device removal and the admin MFA reset. Lockout per account and IP, trusted-proxy client IP in throttles, captcha, API auth, API mutation log and the core and vendor admin audit (not MFA audit, finding 1). CSP unchanged and strict; Turnstile sources only when the captcha is on; Swagger UI and the passkey script are served from our static files with the nonce |
 | Factories | One factory per model (14 models incl. TOTPDevice), guard tests for coverage and use, fixed Faker seed, pseudonymous names. Remaining `objects.create` calls are migration and constraint tests |
 | Spec vs spec | `make docs-check` green. No D-xx blocks a merged task or is decided by code |
 | Anonymization | No real vendor names, legacy order numbers or hostnames; legacy user ids in tests are synthetic |
@@ -373,6 +373,7 @@ Findings and actions:
    from confirmed devices and uses `is_staff`. Update the sketch when spec 02 is next edited.
 7. Minor. Removing the `owns_a_vendor` entry from `MFA_REQUIRED_POLICIES` would drop owner MFA
    silently; only the integration test guards it. A system check would make it a hard error.
+   Since #32 the entry is `is_vendor_member` (all members); the same holds for it.
 8. Minor. The passkey e2e test does not assert zero CSP violations, unlike the TOTP, admin and
    API docs tests. MFA views run a few read-only device queries directly instead of through
    services.
@@ -385,7 +386,69 @@ Owner questions:
 1. CORE.7: `/api/v1/docs` and `/api/v1/openapi.json` are open without a key in every
    environment, LIVE included. Keep them public, or require a key or staff login on LIVE?
 2. CORE.4: a verification counts as fresh for step-up for 5 minutes, and each user gets 10
-   recovery codes of 16 characters. Confirm.
+   recovery codes of 16 characters. Confirm. Resolved: confirmed by the owner and written into
+   spec 02 (#32).
 3. SEC.3: add TOTP secrets to the field-level encryption scope next to IBAN, KYC and DAC7?
 4. Spec 02: which task takes the compromised-password check (a CORE.1 follow-up or a new CORE
    row)?
+
+### Check 4 (2026-11-07, after SHP.1, CAT.1, CORE.3, SEC.4, VEN.12)
+
+Scope: main at b4b7cd5. Owner decisions (#30: ADR-0007, ARC.13, ARC.15, CORE.13, OPS.1),
+SHP.1, CAT.1, CORE.3, SEC.4, VEN.12, the wave 4 progress update (#31) and MFA for all vendor
+members (#32). Code against spec chapters 01, 02, 03, 04, 06, 11 and 12 and ADRs 0005 and 0007;
+spec against spec; coherence check 3 findings; repo hygiene.
+
+| Area | Result |
+|---|---|
+| Done-when criteria | Met for SHP.1 (constraint tests incl. the weight band exclusion constraint), CAT.1 (migrations and constraint tests), CORE.3 (cross-tenant tests generated from a registry of every endpoint, API operation and vendor-owned model; no exemptions), SEC.4 (a band change is audited with before and after; the staff view shows a vendor change in e2e) and VEN.12 (FatturaPA party block checked field by field, `assert_payout_allowed` refuses incomplete vendors while `save_vendor` accepts an incomplete profile). The official XSD check of the party block belongs to CMP.2. CORE.4 after #32: a password-only vendor staff member is sent to enrolment |
+| Spec 01 conventions | Engines import no ORM. Catalog prices go through `set_product_price` and `set_variant_price` with `dry_run`, `ChangeSet` and audit; vendor saves go through `save_vendor`. Shipping writes have no service (finding 1). Money is `MoneyField` everywhere (prices, band costs, pickup cost, share capital); weights and sizes are `Decimal`; no `FloatField` in any model |
+| App dependency graph | import-linter 3/3 kept. Catalog, tax, shipping and cms are independent siblings above vendors, as in spec 01 §1.3. Shipping imports only `apps.core` and `apps.vendors`; the tax and shipping contract forbids orders, cart, payments and ledger |
+| Tenancy | All 11 vendor-owned models (vendor, translations, members, products, variants and their translations, rates, bands, pickup options and their translations) use `VendorScopedManager` with a `vendor_scope` path that reaches Vendor; `NOT_VENDOR_OWNED` is empty. `for_actor` treats every active `is_staff` user as platform staff (CORE.3 question under the wave 4 follow-ups) |
+| Audit | One `apps.core.audit.audit_context` for views and admins, with the trusted-proxy client IP; the API keeps its own context with the API client as actor, and anonymous login events build theirs in `accounts.services`. Check 3 finding 1 resolved |
+| Factories | 27 factories for 27 models (TOTPDevice included); coverage and use guard tests pass |
+| Check 3 findings | Finding 1 resolved (SEC.4). Finding 2 (spec 12 ID collision) still open: §12.3 still numbers requirements SEC.1 to SEC.10. Finding 7 now applies to `is_vendor_member`. Finding 9: `ApiClient.vendor` is now task CORE.13; the engine import contract and the API-key-shaped literal in `test_problems.py` are still open |
+| Spec vs spec | `make docs-check` green. P1 1,074 h, P2 181 h and P3 18 h in the backlog match spec 91 and its go-live total (1,304 h subtotal, 1,410 to 1,570 h). D-06 is left open on purpose (empty `over_max_weight` means the platform default). D-19 is not decided by code: `on_request` exists as a value, as spec 03 sketches. ADR-0005 is marked superseded and spec 01, 12, 91, 92 and deploy/README name ADR-0007; leftovers in finding 3 |
+| Anonymization | No real vendor names, legacy order numbers, legacy plan or carrier names or hostnames; only example domains in tests. gitleaks on the working tree reports one generic-api-key false positive in `backlog.csv` (CMP.7 row) |
+| Migrations | One leaf per app; `makemigrations --check` clean |
+| Gates | `make check` green; `make test` 1547 passed; `make test-e2e` 17 passed |
+
+Findings and actions:
+
+1. Major. Shipping rates are written by the admin with no service. `apps/shipping/admin.py`
+   (`AuditedAdmin`) saves carriers, zones, rates, bands and pickup options directly and writes
+   the audit rows itself, with no `dry_run` and no `ChangeSet`. This breaks the spec 01 rule for
+   mutating services and rule 2 of docs/dev/audit-trail.md ("write audited models only through
+   services"), and `core.E203` does not catch it because the admin overrides `save_model`. Rates
+   are money. SHP.5 (import of the LIVE configuration with a parity report) and SHP.6 (editor)
+   will need the same writes with dry-run. Action: a shipping `services.py` with audited,
+   dry-run rate and band services, as an SHP.1 follow-up or inside SHP.5 (owner question 3).
+2. Major. No backlog task depends on VEN.12, although its payout gate and party block are meant
+   to be used by others. VEN.7 (payouts, "block if DAC7 incomplete") depends on VEN.4 and PAY.3
+   only; CMP.1 ("DAC7 dataset on the vendor") repeats what VEN.12 now holds; CMP.2 (commission
+   invoices) needs the FatturaPA party block. A payout flow built from the VEN.7 row alone could
+   skip `assert_payout_allowed`. Action: add VEN.12 to the dependencies of VEN.7, CMP.1 and CMP.2
+   and narrow CMP.1 to aggregates and export (owner question 2).
+3. Minor. ADR-0005 leftovers. `deploy/server/mpmv.env.example` still says "Managed PostgreSQL 17
+   in the same EU region (ADR-0005)"; the Containerfile, the Quadlet units, the release workflow,
+   two deploy test docstrings and docs/dev/background-jobs.md cite ADR-0005 instead of ADR-0007;
+   spec 01 lists "PostgreSQL 16+" while ADR-0007 and the local stack use 17. Action: fix with
+   ARC.13, which touches these files.
+4. Minor. `docs/spec/README.md` still gives the old go-live scope ("116 P1 micro-tasks,
+   ≈ 1,350–1,510 h"); the backlog has 121 P1 tasks and spec 91 says 1,410 to 1,570 h. Action:
+   update it with the next spec edit.
+5. Minor. OPS.2 asks for alerts on database disk space, WAL archiving and backup age but depends
+   on ARC.5 only; those exist only once the database VPS (ARC.13) and pgBackRest (OPS.1) do.
+   Action: add ARC.13 or OPS.1 to its dependencies (owner question 2).
+6. Minor. The CORE.4 row still says "mandatory for staff/owners" while spec 02 and the code now
+   require MFA for every vendor member (#32). Action: reword the row with the next spec 02 edit.
+7. Minor. `ShippingConfigVersion` stores a snapshot of every vendor's rates and is not vendor
+   scoped. Correct for staff today; the SHP.6 editor must not show it to vendors.
+
+Owner questions:
+
+1. CAT.1, CORE.3, SEC.4 and VEN.12: the eleven wave 4 questions listed under "Follow-ups from
+   wave 4".
+2. May we add VEN.12 to the dependencies of VEN.7, CMP.1 and CMP.2, narrow CMP.1, and make OPS.2
+   depend on ARC.13 (findings 2 and 5)?
+3. Which task takes the shipping services with dry-run: an SHP.1 follow-up now, or SHP.5?
