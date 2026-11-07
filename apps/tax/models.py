@@ -20,6 +20,11 @@ from django.utils import timezone
 
 from apps.core.fields import CountryField
 from apps.core.models import BaseModel, TranslationModel, TsTzRange, Versioned, valid_period_check
+from apps.core.postcodes import (
+    MAX_PATTERN_LENGTH,
+    InvalidPostcodePattern,
+    normalize_postcode_pattern,
+)
 from apps.vendors.models import FiscalRegime, Vendor
 from apps.vendors.scoping import VendorScopedManager
 
@@ -46,10 +51,11 @@ class TerritoryCodeField(models.CharField[Any, Any]):
 
 
 class PostcodePatternsField(ArrayField[Any, Any]):
-    """Postcode patterns, each normalized on validation (exact, `35*` prefix or a range)."""
+    """Postcode patterns of the grammar shared with shipping zones (`apps.core.postcodes`,
+    TAX.11), each normalized on validation: exact `23041`, prefix `35*`, range `9000..9999`."""
 
     def __init__(self, **kwargs: Any) -> None:
-        kwargs.setdefault("base_field", models.CharField(max_length=32))
+        kwargs.setdefault("base_field", models.CharField(max_length=MAX_PATTERN_LENGTH))
         super().__init__(**kwargs)
 
     def to_python(self, value: Any) -> Any:
@@ -58,10 +64,10 @@ class PostcodePatternsField(ArrayField[Any, Any]):
             return value
         try:
             return [
-                engine.normalize_postcode_pattern(item) if isinstance(item, str) else item
+                normalize_postcode_pattern(item) if isinstance(item, str) else item
                 for item in value
             ]
-        except engine.InvalidPostcodePattern as exc:
+        except InvalidPostcodePattern as exc:
             raise ValidationError(str(exc), code="invalid_postcode_pattern") from exc
 
 
@@ -88,7 +94,7 @@ class Territory(BaseModel):
     postcode_patterns = PostcodePatternsField(
         default=list,
         blank=True,
-        help_text='Exact postcode "23041", prefix "35*" or range "22100-22199", comma separated.',
+        help_text='Exact postcode "23041", prefix "35*" or range "22100..22199", comma separated.',
     )
 
     class Meta:
@@ -102,6 +108,10 @@ class Territory(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.code} ({self.name})"
+
+    def matches_postcode(self, postcode: str) -> bool:
+        """True when `postcode` matches one of the territory's postcode patterns."""
+        return engine.postcode_in_territory(self.postcode_patterns, postcode)
 
 
 # --- Tax rates
