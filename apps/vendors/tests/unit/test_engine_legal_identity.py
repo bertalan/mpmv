@@ -194,14 +194,57 @@ def test_italian_provinces_are_the_official_list() -> None:
     assert not engine.is_valid_province("XX")
 
 
-def test_fiscal_regimes_are_rf01_to_rf19_without_rf03() -> None:
-    expected = [f"RF{n:02d}" for n in range(1, 20) if n != 3]
+def test_fiscal_regimes_are_rf01_to_rf20_without_rf03() -> None:
+    expected = [f"RF{n:02d}" for n in range(1, 21) if n != 3]
     assert list(engine.FISCAL_REGIMES) == expected
     assert engine.FISCAL_REGIMES["RF01"] == "Ordinario"
     assert engine.FISCAL_REGIMES["RF18"] == "Altro"
     assert engine.FISCAL_REGIMES[engine.FLAT_RATE_REGIME] == (
         "Regime forfettario (art.1, c.54-89, L. 190/2014)"
     )
+
+
+# VEN.18: the RegimeFiscale labels of the FatturaPA technical specification 1.9.1 (Agenzia delle
+# Entrate). A new specification version must update both the version and this list, on purpose.
+SPECIFICATION_1_9_1_REGIMES = {
+    "RF01": "Ordinario",
+    "RF02": "Contribuenti minimi (art.1, c.96-117, L. 244/07)",
+    "RF04": "Agricoltura e attività connesse e pesca (artt.34 e 34-bis, DPR 633/72)",
+    "RF05": "Vendita sali e tabacchi (art.74, c.1, DPR. 633/72)",
+    "RF06": "Commercio fiammiferi (art.74, c.1, DPR 633/72)",
+    "RF07": "Editoria (art.74, c.1, DPR 633/72)",
+    "RF08": "Gestione servizi telefonia pubblica (art.74, c.1, DPR 633/72)",
+    "RF09": "Rivendita documenti di trasporto pubblico e di sosta (art.74, c.1, DPR 633/72)",
+    "RF10": (
+        "Intrattenimenti, giochi e altre attività di cui alla tariffa allegata al DPR 640/72 "
+        "(art.74, c.6, DPR 633/72)"
+    ),
+    "RF11": "Agenzie viaggi e turismo (art.74-ter, DPR 633/72)",
+    "RF12": "Agriturismo (art.5, c.2, L. 413/91)",
+    "RF13": "Vendite a domicilio (art.25-bis, c.6, DPR 600/73)",
+    "RF14": (
+        "Rivendita beni usati, oggetti d'arte, d'antiquariato o da collezione (art.36, DL 41/95)"
+    ),
+    "RF15": (
+        "Agenzie di vendite all'asta di oggetti d'arte, antiquariato o da collezione "
+        "(art.40-bis, DL 41/95)"
+    ),
+    "RF16": "IVA per cassa P.A. (art.6, c.5, DPR 633/72)",
+    "RF17": "IVA per cassa (art. 32-bis, DL 83/2012)",
+    "RF18": "Altro",
+    "RF19": "Regime forfettario (art.1, c.54-89, L. 190/2014)",
+    "RF20": "Regime transfrontaliero di Franchigia IVA (Direttiva UE 2020/285)",
+}
+
+
+def test_the_regime_labels_are_pinned_to_the_specification_version() -> None:
+    assert engine.FATTURAPA_SPECIFICATION_VERSION == "1.9.1"
+    assert dict(engine.FISCAL_REGIMES) == SPECIFICATION_1_9_1_REGIMES
+
+
+def test_rf20_is_the_cross_border_vat_franchise() -> None:
+    assert engine.CROSS_BORDER_FRANCHISE_REGIME == "RF20"
+    assert "2020/285" in engine.FISCAL_REGIMES[engine.CROSS_BORDER_FRANCHISE_REGIME]
 
 
 @pytest.mark.parametrize(("value", "valid"), [("IT01234567897", True), ("DE12", False)])
@@ -499,6 +542,17 @@ def test_sole_proprietor_uses_first_and_last_name_and_no_rea() -> None:
         "RegimeFiscale": "RF19",
     }
     assert "IscrizioneREA" not in party
+
+
+def test_a_cross_border_franchise_vendor_declares_rf20() -> None:
+    party = fatturapa_party(italian_company(fiscal_regime=engine.CROSS_BORDER_FRANCHISE_REGIME))
+    assert party["DatiAnagrafici"]["RegimeFiscale"] == "RF20"
+
+
+def test_a_missing_regime_names_the_whole_range() -> None:
+    with pytest.raises(PartyBlockError) as exc:
+        fatturapa_party(italian_company(fiscal_regime=""))
+    assert "fiscal_regime: RegimeFiscale is mandatory (RF01-RF20)" in exc.value.problems
 
 
 def test_vat_prefix_is_split_into_id_paese_and_id_codice() -> None:
