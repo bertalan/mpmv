@@ -33,6 +33,8 @@ ROOT = Path(__file__).resolve().parent.parent
 SPEC = ROOT / "docs" / "spec"
 BUILD = ROOT / "build"
 HTML_OUT = BUILD / "mpmv-spec.html"
+PROGRESS = ROOT / "docs" / "progress.md"
+PROGRESS_ROW = re.compile(r"^\|\s*([A-Z0-9]+\.\d+)\s*\|\s*(done|in review|in progress)\s*\|")
 GENERATED = {"90-backlog.md"}
 
 MACRO = {
@@ -384,10 +386,30 @@ def build_html(files: list[Path], out: Path) -> None:
     out.write_text(page, encoding="utf-8")
 
 
+def validate_progress(tasks: list[Task]) -> list[str]:
+    """Every task ID listed in docs/progress.md must exist in the spec, once."""
+    if not PROGRESS.exists():
+        return []
+    ids = {t.id for t in tasks}
+    seen: set[str] = set()
+    errors = []
+    for line in PROGRESS.read_text(encoding="utf-8").splitlines():
+        m = PROGRESS_ROW.match(line)
+        if not m:
+            continue
+        tid = m.group(1)
+        if tid not in ids:
+            errors.append(f"docs/progress.md: unknown task {tid}")
+        if tid in seen:
+            errors.append(f"docs/progress.md: {tid} listed twice")
+        seen.add(tid)
+    return errors
+
+
 def main() -> int:
     check = "--check" in sys.argv[1:]
     tasks = parse_tasks()
-    errors = validate(tasks)
+    errors = validate(tasks) + validate_progress(tasks)
     if errors:
         print("\n".join(errors))
         return 1
