@@ -113,6 +113,14 @@ def test_the_mfa_pages_and_admin_logout_stay_reachable(client: Client) -> None:
     assert client.post(reverse("admin:logout")).status_code == 200
 
 
+def test_an_unverified_editor_can_sign_out_of_the_wagtail_admin(client: Client) -> None:
+    password_login(client, UserFactory.create(staff=True))
+    response = client.post(reverse("wagtailadmin_logout"))
+    assert response.status_code == 302
+    assert _redirect_target(response)[0] == reverse("wagtailadmin_login")
+    assert "_auth_user_id" not in client.session
+
+
 def test_customers_are_not_asked_for_mfa(client: Client) -> None:
     password_login(client, UserFactory.create())
     assert client.get("/").status_code == 200
