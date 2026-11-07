@@ -8,8 +8,14 @@ test the spec makes mandatory: Vendor A's member asks for Vendor B's data and mu
   answer 404, which proves the URL and the object maker are right (positive control).
 - `StaffOnly`: platform staff only (the admin). A vendor member gets no 2xx, the same status for
   B's object as for a missing one (no enumeration), and staff do reach the object.
-- `NoVendorData`: public pages, the user's own account, the API client itself. The response to A's
-  member must not contain any of B's identifying values (`CrossTenant.markers`).
+- `VendorScopedList`: a collection of vendor-owned objects (a list, an export, a search page). With
+  one object per vendor, B's identifier must not appear in the response (body or Location) to any
+  declared method and B's object must stay unchanged; A's own identifier must appear in the
+  response to the first method (positive control: the page lists what it should).
+- `NoVendorData`: public pages, the user's own account, the API client itself. Vendor B first gets
+  one object of every vendor-owned model (`CrossTenant.seed_b`), so a page that lists vendor data
+  without a tenant filter has something to leak; the response to A's member must contain none of
+  B's identifying values (`CrossTenant.markers`) nor the public ids of those objects.
 
 `endpoints()` lists every URL pattern of a URLconf and `api_operations()` every API v1 operation,
 so `tests.integration.test_tenant_isolation` generates one test per endpoint and fails when one
@@ -37,6 +43,9 @@ from tests.factory_registry import project_models
 
 # --- Two tenants
 
+# Creates an object owned by the given vendor.
+ObjectMaker = Callable[[Vendor], models.Model]
+
 
 @dataclass(frozen=True)
 class Tenant:
@@ -46,13 +55,21 @@ class Tenant:
 
 @dataclass(frozen=True)
 class CrossTenant:
-    """`a` is the caller's vendor; `b` is the other vendor, whose data `a` must never reach."""
+    """`a` is the caller's vendor; `b` is the other vendor, whose data `a` must never reach.
+
+    `makers` make one object of every vendor-owned model (`tests.tenancy_registry.OWNED_OBJECTS`
+    for the `cross_tenant` fixture): `seed_b` gives one of each to Vendor B.
+    """
 
     a: Tenant
     b: Tenant
+    makers: tuple[ObjectMaker, ...] = ()
 
-    def markers(self) -> tuple[str, ...]:
-        """Values that identify Vendor B: none may appear in a response to Vendor A."""
+    def markers(self, *objects: models.Model) -> tuple[str, ...]:
+        """Values that identify Vendor B, plus the public ids of B's `objects`.
+
+        None may appear in a response to Vendor A.
+        """
         vendor = self.b.vendor
         return (
             vendor.legal_name,
@@ -60,7 +77,12 @@ class CrossTenant:
             vendor.contact_email,
             vendor.vat_number,
             self.b.owner.email,
+            *(str(obj.public_id) for obj in objects if hasattr(obj, "public_id")),
         )
+
+    def seed_b(self) -> tuple[models.Model, ...]:
+        """One object of every vendor-owned model, owned by Vendor B."""
+        return tuple(make(self.b.vendor) for make in self.makers)
 
 
 def make_tenant(letter: str) -> Tenant:
@@ -72,16 +94,14 @@ def make_tenant(letter: str) -> Tenant:
     return Tenant(vendor=vendor, owner=owner)
 
 
-def make_cross_tenant() -> CrossTenant:
-    return CrossTenant(a=make_tenant("A"), b=make_tenant("B"))
+def make_cross_tenant(makers: Iterable[ObjectMaker] = ()) -> CrossTenant:
+    return CrossTenant(a=make_tenant("A"), b=make_tenant("B"), makers=tuple(makers))
 
 
 # --- Access classes
 
 # Signs the caller in on `client` and returns extra request headers (an API key, for example).
 Login = Callable[[Client, CrossTenant], dict[str, str]]
-# Creates an object owned by the given vendor.
-ObjectMaker = Callable[[Vendor], models.Model]
 
 
 def member_session(client: Client, tenants: CrossTenant) -> dict[str, str]:
@@ -91,7 +111,11 @@ def member_session(client: Client, tenants: CrossTenant) -> dict[str, str]:
 
 
 def by_public_id(obj: models.Model) -> dict[str, str]:
-    return {"public_id": str(obj.public_id)}  # type: ignore[attr-defined]  # BaseModel
+    return {"public_id": public_id_of(obj)}
+
+
+def public_id_of(obj: models.Model) -> str:
+    return str(obj.public_id)  # type: ignore[attr-defined]  # BaseModel
 
 
 @dataclass(frozen=True)
@@ -102,6 +126,20 @@ class VendorScoped:
     kwargs: Callable[[models.Model], dict[str, str]] = by_public_id
     methods: tuple[str, ...] = ("GET",)
     login: Login = member_session
+
+
+@dataclass(frozen=True)
+class VendorScopedList:
+    """Lists, exports or searches vendor-owned objects; `identify(obj)` is how one shows up.
+
+    `kwargs` fill the URL parameters, if any (a search term, a format).
+    """
+
+    make: ObjectMaker
+    identify: Callable[[models.Model], str] = public_id_of
+    methods: tuple[str, ...] = ("GET",)
+    login: Login = member_session
+    kwargs: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -127,7 +165,7 @@ class NoVendorData:
     path: str | None = None
 
 
-type Access = VendorScoped | StaffOnly | NoVendorData
+type Access = VendorScoped | VendorScopedList | StaffOnly | NoVendorData
 
 
 # --- Endpoints
@@ -265,6 +303,8 @@ def check_endpoint(
     match access:
         case VendorScoped():
             _check_vendor_scoped(client, endpoint, access, tenants)
+        case VendorScopedList():
+            _check_vendor_scoped_list(client, endpoint, access, tenants)
         case StaffOnly():
             _check_staff_only(client, endpoint, access, tenants)
         case NoVendorData():
@@ -294,10 +334,18 @@ def _assert_routes_to(endpoint: Endpoint, path: str) -> None:
 
 
 def _assert_no_markers(
-    endpoint: Endpoint, response: HttpResponseBase, tenants: CrossTenant
+    endpoint: Endpoint,
+    response: HttpResponseBase,
+    tenants: CrossTenant,
+    *objects: models.Model,
+    body: str | None = None,
 ) -> None:
-    body = _body(response)
-    for marker in tenants.markers():
+    """Assert that the response (or its `body`, already read) shows nothing of B or B's `objects`.
+
+    A streaming response can be read only once, so a caller that needs the body passes it.
+    """
+    body = _body(response) if body is None else body
+    for marker in tenants.markers(*objects):
         assert marker not in body, (
             f"{endpoint.key}: response shows another vendor's data ({marker})"
         )
@@ -331,6 +379,39 @@ def _check_vendor_scoped(
     assert own.status_code != 404, (
         f"{endpoint.key}: the caller's own object answers 404 too, so the URL kwargs or the "
         "object maker are wrong and the cross-tenant 404 proves nothing"
+    )
+
+
+def _sample_path(endpoint: Endpoint, kwargs: Mapping[str, str]) -> str:
+    return endpoint.path(**{name: kwargs.get(name, "0") for name in endpoint.params})
+
+
+def _check_vendor_scoped_list(
+    client: Client, endpoint: Endpoint, access: VendorScopedList, tenants: CrossTenant
+) -> None:
+    headers = access.login(client, tenants)
+    mine, theirs = access.make(tenants.a.vendor), access.make(tenants.b.vendor)
+    path = _sample_path(endpoint, access.kwargs)
+    _assert_routes_to(endpoint, path)
+
+    bodies = []
+    for method in access.methods:
+        before = _snapshot(theirs)
+        response = _request(client, method, path, headers)
+        body = _body(response)
+        assert access.identify(theirs) not in body, (
+            f"{endpoint.key}: {method} lists another vendor's object ({access.identify(theirs)})"
+        )
+        _assert_no_markers(endpoint, response, tenants, theirs, body=body)
+        assert _snapshot(theirs) == before, (
+            f"{endpoint.key}: {method} changed another vendor's object"
+        )
+        bodies.append(body)
+
+    assert access.identify(mine) in bodies[0], (
+        f"{endpoint.key}: the caller's own object ({access.identify(mine)}) is not listed "
+        "either, so the URL, `identify` or the object maker are wrong and the absence of "
+        "another vendor's object proves nothing"
     )
 
 
@@ -371,9 +452,8 @@ def _check_staff_only(
 def _check_no_vendor_data(
     client: Client, endpoint: Endpoint, access: NoVendorData, tenants: CrossTenant, method: str
 ) -> None:
+    seeded = tenants.seed_b()  # so that a page leaking vendor data has something to leak
     headers = access.login(client, tenants)
-    path = access.path or endpoint.path(
-        **{name: access.kwargs.get(name, "0") for name in endpoint.params}
-    )
+    path = access.path or _sample_path(endpoint, access.kwargs)
     _assert_routes_to(endpoint, path)
-    _assert_no_markers(endpoint, _request(client, method, path, headers), tenants)
+    _assert_no_markers(endpoint, _request(client, method, path, headers), tenants, *seeded)

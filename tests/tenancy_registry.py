@@ -6,7 +6,12 @@ fails when an endpoint, an API operation or a vendor-owned model is missing here
 - a vendor-owned model: give it the scoped manager (`apps.vendors.scoping`) and add an object
   maker to `OWNED_OBJECTS`;
 - a page or API operation that shows or changes one vendor's object: declare it `VendorScoped`
-  with the maker of that object; if it shows nothing of a vendor, `NoVendorData` with a reason.
+  with the maker of that object;
+- a list, export or search of vendor-owned objects (page or API): `VendorScopedList` with the
+  maker of the listed objects and, when they do not show their public id, `identify`;
+- a page or API operation that shows nothing of a vendor: `NoVendorData` with a reason. Never
+  declare a list of vendor data `NoVendorData`: it is only checked against Vendor B's seeded
+  objects, while `VendorScopedList` also proves that the caller's own objects are listed.
 
 The Django admin is classified as a whole: staff only, with the object pages of vendor-owned
 models tested on Vendor B's objects.

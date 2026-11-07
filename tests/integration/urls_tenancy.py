@@ -7,7 +7,15 @@ views make the classic mistakes, so the tests can prove that the harness catches
 import uuid
 
 from django.contrib.auth.decorators import user_passes_test
-from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
+from django.db.models import QuerySet
+from django.http import (
+    Http404,
+    HttpRequest,
+    HttpResponse,
+    HttpResponseRedirect,
+    JsonResponse,
+    StreamingHttpResponse,
+)
 from django.urls import path
 
 from apps.vendors.models import Vendor, VendorMember, VendorTranslation
@@ -68,6 +76,40 @@ def every_vendor(request: HttpRequest) -> HttpResponse:
     return HttpResponse(", ".join(Vendor.objects.values_list("legal_name", flat=True)))
 
 
+def _member_ids(members: QuerySet[VendorMember]) -> list[str]:
+    return [str(public_id) for public_id in members.values_list("public_id", flat=True)]
+
+
+def member_list(request: HttpRequest) -> JsonResponse:
+    return JsonResponse({"members": _member_ids(VendorMember.objects.for_member(request.user))})
+
+
+def leaky_member_list(request: HttpRequest) -> JsonResponse:
+    return JsonResponse({"members": _member_ids(VendorMember.objects.all())})  # no tenant filter
+
+
+def leaky_member_emails(request: HttpRequest) -> JsonResponse:
+    emails = VendorMember.objects.values_list("user__email", flat=True)  # no tenant filter
+    return JsonResponse({"emails": list(emails)})
+
+
+def leaky_member_export(request: HttpRequest) -> StreamingHttpResponse:
+    rows = (f"{public_id}\n" for public_id in _member_ids(VendorMember.objects.all()))
+    return StreamingHttpResponse(rows, content_type="text/csv")
+
+
+def leaky_member_search(request: HttpRequest, term: str) -> HttpResponse:
+    others = VendorMember.objects.exclude(vendor__in=Vendor.objects.for_member(request.user))
+    found = others.order_by("-pk").first()
+    if found is None:  # the caller's own members are "not found"; jumps to another vendor's
+        raise Http404
+    return HttpResponseRedirect(f"/members/{found.public_id}/")
+
+
+def empty_member_list(request: HttpRequest) -> JsonResponse:
+    return JsonResponse({"members": []})  # lists nothing: hiding B's objects proves nothing
+
+
 def own_profile(request: HttpRequest) -> HttpResponse:
     return HttpResponse(
         ", ".join(Vendor.objects.for_member(request.user).values_list("legal_name", flat=True))
@@ -89,4 +131,10 @@ urlpatterns = [
     path("leaky/staff/vendors/<str:object_id>/", leaky_staff_vendor_detail, name="leaky-staff"),
     path("vendors/", every_vendor, name="every-vendor"),
     path("profile/", own_profile, name="own-profile"),
+    path("members/", member_list, name="member-list"),
+    path("leaky/members/", leaky_member_list, name="leaky-member-list"),
+    path("leaky/members/emails/", leaky_member_emails, name="leaky-member-emails"),
+    path("leaky/members.csv", leaky_member_export, name="leaky-member-export"),
+    path("leaky/members/search/<str:term>/", leaky_member_search, name="leaky-member-search"),
+    path("empty/members/", empty_member_list, name="empty-member-list"),
 ]

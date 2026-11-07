@@ -96,8 +96,10 @@ def cross_tenant(db: None) -> "CrossTenant":
     """Vendor A and Vendor B, with an owner each, for negative cross-tenant tests (CORE.3).
 
     See `tests.tenancy`: `check_endpoint(client, endpoint, access, cross_tenant)` asserts that
-    Vendor A's owner gets 404 on Vendor B's objects.
+    Vendor A's owner gets 404 on Vendor B's objects and sees none of them in lists and pages.
+    `cross_tenant.seed_b()` makes one object of every vendor-owned model for Vendor B.
     """
     from tests.tenancy import make_cross_tenant
+    from tests.tenancy_registry import OWNED_OBJECTS
 
-    return make_cross_tenant()
+    return make_cross_tenant(OWNED_OBJECTS.values())
