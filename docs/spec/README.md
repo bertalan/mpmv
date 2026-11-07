@@ -57,7 +57,7 @@ It also reviews the August 2026 rebuild plan.
 - **Main simplifications**: a single entity per product (not two EN/IT posts), a single source for
   shipping, our own ledger and commissions, import pipelines in the same project, no operational
   scripts outside version control.
-- **Go-live scope**: 164 P1 micro-tasks, **≈ 1,810–2,025 h** including acceptance testing, review and contingency
+- **Go-live scope**: 174 P1 micro-tasks, **≈ 1,873–2,098 h** including acceptance testing, review and contingency
   ([91](91-estimates.md) §91.2).
   The August plan estimated 1,740–2,540 h.
 - **Do immediately**, regardless of the rebuild: the confidential security actions on the current

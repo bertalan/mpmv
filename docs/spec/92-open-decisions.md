@@ -7,7 +7,7 @@ legal counsel. Once made, the decision is recorded as an ADR in the repository a
 |---|---|---|---|---|---|
 | D-01 ⚖️ | VAT | Is the B2C country of taxation the country of **delivery** (EU distance-selling rule) or of billing (as today)? | Delivery for B2C; billing only to validate B2B | Tax advisor | TAX.3 |
 | D-02 ⚖️ | VAT | Northern Ireland (`XI`): EU goods rules (Windsor Framework) or non-EU as today? | EU goods rules for `BT*` | Tax advisor | TAX.7 |
-| D-03 ⚖️ | VAT | Does the carrier flag `force_vat` (vendor-country VAT on shipping even for exports or exempt sales) have a legal basis? | Remove it | Tax advisor | TAX.4 |
+| D-03 ⚖️ | VAT | Does the carrier flag `force_vat` (vendor-country VAT on shipping even for exports or exempt sales) have a legal basis? The same question covers the non-default values of `ShippingMethod.tax_treatment` (SHP.12) | Remove it; shipping VAT follows the goods | Tax advisor | TAX.4 |
 | D-04 | Business | Are paid-plan fees invoiced from day 1? | No: at launch plans are only commission rules and limits; billing in phase 2 (VEN.19). When fees are charged, the marketplace issues no invoice: a non-fiscal statement documents each charge and the operator invoices outside the platform (owner, 2026-11-07) | Owner | VEN.2, VEN.19 |
 | D-05 | Business | On a full refund, does the platform return the commission **and** the payment fee? And on a partial refund? | Full: both; partial: proportional | Owner | PAY.4 |
 | D-06 | Shipping | Weight above the last band: last band (today), quote or block? | Quote | Owner | SHP.3 |
