@@ -306,6 +306,122 @@ def test_the_bands_of_an_imported_method_replace_the_stored_ones() -> None:
     assert AuditLog.objects.filter(action="shipping.weightband.deleted").count() == 1
 
 
+def stored_bands(vendor: Vendor) -> list[tuple[Decimal, Decimal | None, Decimal]]:
+    bands = WeightBand.objects.filter(method__vendor=vendor, method__zone__code="home")
+    return [(b.from_kg, b.to_kg, b.cost_net) for b in bands.order_by("from_kg")]
+
+
+STORED_BANDS = [
+    (Decimal("0.000"), Decimal("5.000"), Decimal("9.90")),
+    (Decimal("5.000"), None, Decimal("19.90")),
+]
+
+
+def test_a_method_without_a_band_list_keeps_its_stored_bands() -> None:
+    vendor = configured_vendor()
+    document = fmt.empty_document()
+    document["methods"] = [{"zone": "home", "key": "standard", "carrier": "main"}]
+
+    result = import_config(fmt.parse_json(document), vendor=vendor, ctx=CTX)
+
+    assert result.ok, result.to_dict()
+    assert result.changeset.is_empty
+    assert stored_bands(vendor) == STORED_BANDS
+
+
+def test_an_empty_band_list_removes_the_stored_bands() -> None:
+    vendor = configured_vendor()
+    document = fmt.empty_document()
+    document["methods"] = [{"zone": "home", "key": "standard", "carrier": "main", "bands": []}]
+
+    result = import_config(fmt.parse_json(document), vendor=vendor, ctx=CTX)
+
+    assert result.ok, result.to_dict()
+    assert result.changeset.summary() == {"create": 0, "update": 0, "delete": 2}
+    assert stored_bands(vendor) == []
+
+
+def test_a_csv_method_without_band_lines_keeps_its_stored_bands() -> None:
+    vendor = configured_vendor()
+    document = export_config(vendor)
+    for method in document["methods"]:
+        method["bands"] = []
+    text = fmt.dump_csv(document)
+
+    result = import_config(fmt.parse_csv(text), vendor=vendor, ctx=CTX)
+
+    assert result.ok, result.to_dict()
+    assert result.changeset.is_empty
+    assert stored_bands(vendor) == STORED_BANDS
+
+
+def test_a_partial_row_updates_only_the_fields_it_names() -> None:
+    vendor = configured_vendor()
+    document = fmt.empty_document()
+    document["zones"] = [{"code": "home", "name": "Home renamed"}]
+    document["methods"] = [
+        {
+            "zone": "home",
+            "key": "standard",  # no carrier: the stored one stays
+            "max_delivery_days": 9,
+            "bands": [
+                {"from_kg": "0", "cost_net": "8.00"},  # to_kg and surcharge_net stay
+                {"from_kg": "5", "to_kg": None},  # cost_net stays
+            ],
+        }
+    ]
+    document["pickup_options"] = [{"key": "shop", "cost_net": "2.00"}]
+
+    result = import_config(fmt.parse_json(document), vendor=vendor, ctx=CTX)
+
+    assert result.ok, result.to_dict()
+    assert result.changeset.summary() == {"create": 0, "update": 4, "delete": 0}
+    zone = ShippingZone.objects.get(vendor=vendor, code="home")
+    assert (zone.name, zone.priority, zone.countries) == ("Home renamed", 100, ["FR"])
+    method = ShippingMethod.objects.get(vendor=vendor, zone=zone, key="standard")
+    assert (method.carrier.code, method.is_default, method.max_delivery_days) == ("main", True, 9)
+    assert method.free_shipping_threshold == Decimal("99.00")
+    assert stored_bands(vendor) == [
+        (Decimal("0.000"), Decimal("5.000"), Decimal("8.00")),
+        (Decimal("5.000"), None, Decimal("19.90")),
+    ]
+    pickup = vendor.pickup_options.get(key="shop")
+    assert (pickup.cost_net, pickup.address) == (Decimal("2.00"), "1 Example Street")
+
+
+def test_a_partial_row_is_checked_with_its_stored_values() -> None:
+    vendor = configured_vendor()
+    document = fmt.empty_document()
+    document["methods"] = [
+        {"zone": "home", "key": "standard", "min_delivery_days": 30}  # the stored max is 5
+    ]
+
+    result = import_config(fmt.parse_json(document), vendor=vendor, ctx=CTX)
+
+    assert ("methods[0]", "__all__") in errors(result)
+    assert not result.applied
+
+
+def test_bands_in_any_order_can_split_a_stored_band() -> None:
+    vendor = configured_vendor()
+    document = export_config(vendor)
+    standard = index(document["methods"], zone="home", key="standard")
+    document["methods"][standard]["bands"] = [
+        {"from_kg": "5", "to_kg": None, "cost_net": "19.90", "surcharge_net": "1.50"},
+        {"from_kg": "2", "to_kg": "5", "cost_net": "7.00", "surcharge_net": "0"},
+        {"from_kg": "0", "to_kg": "2", "cost_net": "5.00", "surcharge_net": "0"},
+    ]
+
+    result = import_config(fmt.parse_json(document), vendor=vendor, ctx=CTX)
+
+    assert result.ok, result.to_dict()
+    assert stored_bands(vendor) == [
+        (Decimal("0.000"), Decimal("2.000"), Decimal("5.00")),
+        (Decimal("2.000"), Decimal("5.000"), Decimal("7.00")),
+        (Decimal("5.000"), None, Decimal("19.90")),
+    ]
+
+
 def test_a_vendor_file_never_changes_the_platform_country_groups() -> None:
     vendor = configured_vendor()
     document = export_config(vendor)

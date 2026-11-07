@@ -119,6 +119,27 @@ def test_csv_round_trips_through_its_rows() -> None:
     ]
 
 
+def test_a_json_method_without_a_band_list_keeps_its_bands() -> None:
+    document = sample_document()
+    del document["methods"][0]["bands"]  # absent: keep the stored bands
+    parsed = fmt.parse_json(document)
+
+    assert parsed.ok, parsed.issues
+    # The world method lists its bands (an empty list): they replace the stored ones.
+    assert parsed.band_methods == {(fmt.PLATFORM, "world", "express")}
+    assert fmt.to_document(parsed) == document
+
+
+def test_a_csv_method_without_band_lines_keeps_its_bands() -> None:
+    parsed = fmt.parse_csv(fmt.dump_csv(sample_document()))
+
+    assert parsed.ok, parsed.issues
+    # CSV cannot write an empty list: a method without band lines keeps its stored bands.
+    assert parsed.band_methods == {(fmt.OWN, "home", "standard")}
+    world = fmt.to_document(parsed)["methods"][1]
+    assert fmt.BANDS not in world
+
+
 def test_csv_cells_become_lists_nulls_and_booleans() -> None:
     lines = fmt.dump_csv(sample_document()).splitlines()
     assert lines[0].split(",") == list(fmt.CSV_COLUMNS)

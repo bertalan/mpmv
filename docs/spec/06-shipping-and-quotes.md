@@ -219,8 +219,14 @@ its source and summary.
   its own zones (`own`) or to platform zones (`platform`). Country groups are platform data: they
   are compared, never written (a missing one is an error, a different one a warning).
 - A platform file writes country groups and platform zones; methods and pickup options are refused.
-- Rows are matched by name and created or updated; rows missing from the file are kept. A
-  method's bands in the file replace its stored bands.
+- Rows are matched by name and created or updated; rows missing from the file are kept. A row
+  may be partial: a missing field takes the model default on create and keeps the stored value on
+  update (a stored method keeps its carrier), and the row is checked with the stored values it
+  keeps.
+- The bands a file lists for a method replace its stored bands, whatever their order in the file.
+  A method that lists no bands keeps its stored ones: in JSON a method without a `bands` key
+  (`"bands": []` removes every band), in CSV a method without band lines (CSV cannot write an
+  empty list: removing every band of a method takes a JSON file).
 
 **Standard template.** `ShippingTemplate` stores a document of this format without a vendor, saved
 by staff through an audited service that validates it like a vendor file; at most one template is

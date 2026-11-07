@@ -22,6 +22,11 @@ A JSON document:
 
 A CSV file holds the same rows, one per line, in the `CSV_COLUMNS` order; the `record` column
 says what a line is, and the first line after the header is the `format` record.
+
+The weight bands a file gives for a method replace the method's stored bands; a method that gives
+none keeps them (`ParsedConfig.band_methods`). In JSON that is a method row without a `bands` key
+(`"bands": []` removes every band); in CSV, a method without band lines (CSV cannot write an empty
+list, so removing every band of a method takes a JSON file).
 """
 
 import csv
@@ -185,6 +190,9 @@ class Row:
 class ParsedConfig:
     rows: list[Row] = field(default_factory=list)
     issues: list[Issue] = field(default_factory=list)
+    # The methods whose bands the file lists: those replace the stored bands; the other methods
+    # of the file keep theirs.
+    band_methods: set[MethodId] = field(default_factory=set)
 
     @property
     def ok(self) -> bool:
@@ -242,7 +250,10 @@ def parse_json(source: str | bytes | Mapping[str, Any]) -> ParsedConfig:
     for section, record in SECTIONS.items():
         for ref, item in _items(data.get(section, []), section, parsed):
             values = dict(item)
-            bands = values.pop(BANDS, []) if record == METHOD else []
+            bands: Any = []
+            if record == METHOD and BANDS in values:
+                bands = values.pop(BANDS)
+                parsed.band_methods.add(method_id(values))
             _add_row(parsed, record, ref, values)
             for band_ref, band in _items(bands, f"{ref}.{BANDS}", parsed):
                 _add_row(parsed, BAND, band_ref, dict(band), method=method_id(values))
@@ -295,7 +306,9 @@ def parse_csv(text: str) -> ParsedConfig:
         _add_csv_row(parsed, ref, cells)
     methods = {method_id(row.values) for row in parsed.rows if row.record == METHOD}
     for row in parsed.rows:
-        if row.record == BAND and row.method is not None and row.method not in methods:
+        if row.record == BAND and row.method is not None and row.method in methods:
+            parsed.band_methods.add(row.method)
+        elif row.record == BAND and row.method is not None:
             parsed.issue(
                 row.ref,
                 "key",
@@ -432,7 +445,7 @@ def to_document(parsed: ParsedConfig) -> dict[str, Any]:
         if row.record == BAND:
             continue
         item = dict(row.values)
-        if row.record == METHOD:
+        if row.record == METHOD and method_id(row.values) in parsed.band_methods:
             item[BANDS] = []
             methods[method_id(row.values)] = item
         document[sections[row.record]].append(item)

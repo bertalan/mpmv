@@ -4,11 +4,11 @@ Files use the format of `apps.shipping.config_format` (version 1, JSON or CSV). 
 in three steps, and an invalid file changes nothing:
 
 1. shape: the format parser (`config_format.parse_json` / `parse_csv`);
-2. rows: every row is built as an unsaved model instance and validated by the model itself
-   (`clean_fields`, `clean` and its check constraints), the validators the admin and the tests
-   use; then what only the whole file shows: references to carriers, zones and country groups,
-   one default method per zone, weight bands that do not overlap (`engine.overlapping_bands`,
-   the rule of the database constraint);
+2. rows: every row is built as the writer will build it (the stored row with the file's values
+   on top, or a new row) and validated by the model itself (`clean_fields`, `clean` and its check
+   constraints), the validators the admin and the tests use; then what only the whole file
+   shows: references to carriers, zones and country groups, one default method per zone, weight
+   bands that do not overlap (`engine.overlapping_bands`, the rule of the database constraint);
 3. writes: in one transaction every row goes through `services.save_config` (full validation,
    the database constraints, one audit entry per row). When a row fails, the report names it
    and the transaction is rolled back. A dry run is rolled back as well, once the ChangeSet is
@@ -24,7 +24,9 @@ Who owns a file: a vendor, or the platform (`vendor=None`).
 - A platform file writes country groups and platform zones; methods and pickup options belong to
   a vendor and are refused.
 - Rows are matched by their names (codes and keys) and created or updated; rows missing from the
-  file are kept. The weight bands of a method in the file replace its stored bands.
+  file are kept. A field missing from a row takes the model default on create and keeps the
+  stored value on update (a method's carrier too). The weight bands a file lists for a method
+  replace its stored bands; a method that lists none keeps them (`ParsedConfig.band_methods`).
 
 `tax_treatment` and `over_max_weight` travel as stored data only: their meaning belongs to TAX.4
 (D-03) and SHP.3 (D-06).
@@ -277,6 +279,8 @@ class _Checker:
         self.rows = list(zip(parsed.rows, reports, strict=True))
         self.vendor = vendor
         self.platform = platform
+        # A template has no stored rows: its rows are checked as new ones.
+        self.owned = platform or vendor is not None
         self.carriers = set(
             Carrier.objects.filter(
                 code__in=[row.values.get("carrier") for row, _ in self.rows]
@@ -312,7 +316,8 @@ class _Checker:
                 )
 
     def check_row(self, row: fmt.Row, report: RowReport) -> None:
-        instance = MODELS[row.record](**_model_values(row))
+        stored = _stored_row(row, self.vendor) if self.owned else None
+        instance = _assign(stored or MODELS[row.record](), _model_values(row))
         # A platform zone may use a group of the same file, written before it: its own rule
         # (`ShippingZone.clean`) then runs when the zone is written.
         _validate(instance, report, run_clean=not (self.platform and row.record == fmt.ZONE))
@@ -323,7 +328,8 @@ class _Checker:
 
     def check_method(self, row: fmt.Row, method: ShippingMethod, report: RowReport) -> None:
         scope, zone, _ = fmt.method_id(row.values)
-        if row.values.get("carrier") not in self.carriers:
+        keeps_carrier = "carrier" not in row.values and method.pk is not None
+        if not keeps_carrier and row.values.get("carrier") not in self.carriers:
             report.fail("carrier", f"Unknown carrier {row.values.get('carrier')!r}.")
         known = (
             self.platform_zones if scope == fmt.PLATFORM else self.file_zones | self.vendor_zones
@@ -334,6 +340,38 @@ class _Checker:
             first = self.defaults.setdefault((scope, zone), report.ref)
             if first != report.ref:
                 report.fail("is_default", f"{first} is already the default method of the zone.")
+
+
+def _stored_row(row: fmt.Row, vendor: Vendor | None) -> models.Model | None:
+    """The stored row that `row` names in the configuration of `vendor` (or of the platform)."""
+    if row.record == fmt.COUNTRY_GROUP:
+        return CountryGroup.objects.filter(code=str(row.values["code"]).strip().lower()).first()
+    if row.record == fmt.ZONE:
+        return ShippingZone.objects.filter(vendor=vendor, code=row.values["code"]).first()
+    if row.record == fmt.METHOD:
+        return _stored_method(vendor, fmt.method_id(row.values))
+    if row.record == fmt.PICKUP_OPTION:
+        return PickupOption.objects.filter(vendor=vendor, key=row.values["key"]).first()
+    method = None if row.method is None else _stored_method(vendor, row.method)
+    if method is None:
+        return None
+    try:
+        start = _from_kg(row.values)
+    except ValidationError:  # reported by the band's own validation
+        return None
+    return method.bands.filter(from_kg=start).first()
+
+
+def _stored_method(vendor: Vendor | None, method_id: fmt.MethodId) -> ShippingMethod | None:
+    if vendor is None:
+        return None
+    scope, code, key = method_id
+    zone = ShippingZone.objects.filter(
+        vendor=None if scope == fmt.PLATFORM else vendor, code=code
+    ).first()
+    if zone is None:
+        return None
+    return ShippingMethod.objects.filter(vendor=vendor, zone=zone, key=key).first()
 
 
 def _model_values(row: fmt.Row) -> dict[str, Any]:
@@ -402,6 +440,7 @@ class _Writer:
         self.vendor = vendor
         self.ctx = ctx
         self.changeset = changeset
+        self.band_methods = parsed.band_methods
         self.methods: dict[fmt.MethodId, ShippingMethod | None] = {}
 
     def write(self) -> None:
@@ -422,6 +461,8 @@ class _Writer:
             ok = method is not None and self.save(report, method)
             self.methods[fmt.method_id(row.values)] = method if ok else None
         for method_id, method in self.methods.items():
+            if method_id not in self.band_methods:
+                continue  # the file lists no bands for it: its stored bands stay
             bands = [item for item in kind(fmt.BAND) if item[0].method == method_id]
             self.write_bands(method, bands)
         for row, report in kind(fmt.PICKUP_OPTION):
@@ -456,23 +497,34 @@ class _Writer:
         return _assign(zone or ShippingZone(vendor=self.vendor), row.values)
 
     def method(self, row: fmt.Row, report: RowReport) -> ShippingMethod | None:
-        scope, code, key = fmt.method_id(row.values)
-        zone_owner = None if scope == fmt.PLATFORM else self.vendor
-        zone = ShippingZone.objects.filter(vendor=zone_owner, code=code).first()
-        carrier = Carrier.objects.filter(code=row.values.get("carrier")).first()
-        if zone is None or carrier is None:  # its zone row failed (checked before writing)
-            report.fail("zone" if zone is None else "carrier", "Not available: see its row.")
-            return None
-        method = ShippingMethod.objects.filter(vendor=self.vendor, zone=zone, key=key).first()
-        method = method or ShippingMethod(vendor=self.vendor, zone=zone, key=key)
-        method.carrier = carrier
+        method_id = fmt.method_id(row.values)
+        method = _stored_method(self.vendor, method_id)
+        if method is None:
+            scope, code, key = method_id
+            zone_owner = None if scope == fmt.PLATFORM else self.vendor
+            zone = ShippingZone.objects.filter(vendor=zone_owner, code=code).first()
+            if zone is None:  # its zone row failed (checked before writing)
+                report.fail("zone", "Not available: see its row.")
+                return None
+            method = ShippingMethod(vendor=self.vendor, zone=zone, key=key)
+        if "carrier" in row.values or method.pk is None:  # a stored method keeps its carrier
+            carrier = Carrier.objects.filter(code=row.values.get("carrier")).first()
+            if carrier is None:  # checked before writing
+                report.fail("carrier", "Not available: see its row.")
+                return None
+            method.carrier = carrier
         return _assign(method, _model_values(row))
 
     def write_bands(
         self, method: ShippingMethod | None, bands: list[tuple[fmt.Row, RowReport]]
     ) -> None:
         """The file's bands replace the method's: stored bands are matched by `from_kg`, the
-        unmatched ones deleted first (so the new bands cannot overlap them)."""
+        unmatched ones deleted first (so the new bands cannot overlap them).
+
+        The bands are written in ascending `from_kg` order, whatever the file's order. The file's
+        bands do not overlap each other (checked before), so a band written then ends before any
+        stored band still waiting to be rewritten starts: splitting a stored band never trips the
+        database's exclusion constraint half way."""
         if method is None:
             for _, report in bands:
                 report.status = SKIPPED
@@ -483,7 +535,7 @@ class _Writer:
         removed = [band for start, band in stored.items() if start not in wanted]
         if removed:
             self.changeset.changes.extend(delete_config(removed, ctx=self.ctx).changes)
-        for start, (row, report) in wanted.items():
+        for start, (row, report) in sorted(wanted.items()):
             band = stored.get(start) or WeightBand(method=method)
             self.save(report, _assign(band, row.values))
 
