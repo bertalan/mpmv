@@ -21,6 +21,22 @@ class BaseModel(models.Model):
         abstract = True
 
 
+class Heartbeat(BaseModel):
+    """Proof that the worker and its scheduler are alive: one row per name, updated in place.
+
+    Written by the periodic `core.heartbeat` job (ARC.9); monitoring alerts when `last_beat_at`
+    gets old (OPS tasks).
+    """
+
+    name = models.CharField(max_length=100, unique=True)
+    beats = models.PositiveBigIntegerField(default=0)
+    last_beat_at = models.DateTimeField()
+    scheduled_for = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.beats} beats, last {self.last_beat_at:%Y-%m-%d %H:%M})"
+
+
 class AuditLog(models.Model):
     """Who changed what, before/after, and from where. Append-only (DB trigger + save guard).
 

@@ -44,8 +44,13 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.postgres",  # range fields and exclusion constraints (validity periods)
+    # Task queue tables, admin and `manage.py procrastinate`; used only via apps.core.tasks.
+    "procrastinate.contrib.django",
     *LOCAL_APPS,
 ]
+
+# Background jobs (ADR-0004): cron schedules are read in BUSINESS_TIME_ZONE by this hook.
+PROCRASTINATE_ON_APP_READY = "apps.core.tasks.on_app_ready"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

@@ -1,4 +1,5 @@
-"""Core services: the dry-run + audit pattern (spec 01 conventions) and the platform operator."""
+"""Core services: the dry-run + audit pattern shared by all mutating services (spec 01
+conventions), the platform operator and the worker heartbeat."""
 
 import datetime as dt
 from collections.abc import Callable
@@ -6,12 +7,12 @@ from typing import Any
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import F, Q
 from django.utils import timezone
 
 from .audit import AuditContext, record
 from .changeset import ChangeSet
-from .models import PlatformOperator
+from .models import Heartbeat, PlatformOperator
 from .validity import NoValidRow, OverlappingValidity, pick_valid
 
 
@@ -126,3 +127,21 @@ def configure_platform_operator(
         new.save()
 
     return run_mutation(changeset, apply, ctx=ctx, action=OPERATOR_CONFIGURED, dry_run=dry_run)
+
+
+# --- Worker heartbeat (ARC.9)
+
+
+def record_heartbeat(name: str, *, scheduled_for: dt.datetime | None = None) -> Heartbeat:
+    """Count one beat for `name` and remember when it happened.
+
+    Operational telemetry, not a domain change: no ChangeSet, dry-run or audit entry.
+    """
+    now = timezone.now()
+    beat, _ = Heartbeat.objects.update_or_create(
+        name=name,
+        defaults={"beats": F("beats") + 1, "last_beat_at": now, "scheduled_for": scheduled_for},
+        create_defaults={"beats": 1, "last_beat_at": now, "scheduled_for": scheduled_for},
+    )
+    beat.refresh_from_db()
+    return beat
