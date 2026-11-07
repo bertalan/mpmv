@@ -9,7 +9,12 @@ patterns deliberately share their digits with mainland Italian postcodes (case 1
 import pytest
 
 from apps.core.countries import EU_MEMBER_STATES, InvalidCountry
-from apps.core.postcodes import InvalidPostcodePattern, match_postcode
+from apps.core.postcodes import (
+    InvalidPostcodePattern,
+    PostcodePattern,
+    match_postcode,
+    parse_postcode_pattern,
+)
 from apps.shipping import engine
 from apps.shipping.engine import Destination, ZoneSnap
 
@@ -208,11 +213,10 @@ def test_the_destination_province_is_compared_upper_case() -> None:
 
 def test_a_zone_parses_its_patterns_once_when_it_is_built(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
-    parse = engine.parse_postcode_pattern
 
-    def counting_parse(raw: str) -> object:
+    def counting_parse(raw: str) -> PostcodePattern:
         calls.append(raw)
-        return parse(raw)
+        return parse_postcode_pattern(raw)
 
     monkeypatch.setattr(engine, "parse_postcode_pattern", counting_parse)
     zone = ZoneSnap(
