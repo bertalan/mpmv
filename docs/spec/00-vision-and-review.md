@@ -5,7 +5,8 @@
 The current system is a curated, vertical multivendor marketplace. Customers also browse
 **by navigation taxonomies** (today a two-level taxonomy, such as brand → model). The site is
 bilingual EN/IT; the new system launches with EN, IT, DE, FR and ES for interface text, and
-visitor content in EN until the owner decides on its translation after go-live (D-18).
+visitor content in EN plus the existing IT texts migrated from the current site; new content and
+the other languages wait until the owner decides on their translation after go-live (D-18).
 
 Current operating model (to be kept):
 

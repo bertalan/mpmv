@@ -220,8 +220,8 @@ structure the operator's invoicing tool can map to FatturaPA.
 Owner decisions of 2026-11-07. The vendor contract and the other legal documents a vendor
 accepts (for example a data processing agreement) are not visitor content. They are versioned
 documents with one text per language, handled apart from the CMS pages of
-[09](09-multilingual.md) and [10](10-content-seo-ai.md): CMS content stays English only until
-after go-live, while vendor legal documents exist in every vendor language from the start (IT,
+[09](09-multilingual.md) and [10](10-content-seo-ai.md): new CMS content stays English only until
+after go-live (existing IT pages are migrated, D-18), while vendor legal documents exist in every vendor language from the start (IT,
 EN, DE, FR, ES). The legal translation of the texts is the owner's business task and a go-live
 prerequisite; the platform only stores and serves the texts it is given.
 
