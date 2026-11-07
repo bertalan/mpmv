@@ -109,7 +109,7 @@ flowchart TD
 |---|---|
 | Money | `Decimal` with 2 decimal places in the DB (`MoneyField` = `DecimalField(12,2)`), internal calculations to 4 decimal places, `ROUND_HALF_UP` rounding **per line**; explicit EUR currency |
 | Countries | ISO 3166-1 alpha-2 (`GR`, not `EL`); EU special territories modeled (see [05](05-tax.md)) |
-| Platform operator | Country, VAT number, regime, commission VAT mode, e-invoice channel and DAC7 authority come from the versioned `PlatformOperator` (`apps.core.services.current_operator(at)`); never a literal such as `"IT"` in application code (guarded by `tests/unit/test_no_platform_country_literal.py`; tests and migrations excluded) |
+| Platform operator | Country, VAT number, regime, commission VAT mode, e-invoice channel (informational only: the platform sends no e-invoices, see [00](00-vision-and-review.md)) and DAC7 authority come from the versioned `PlatformOperator` (`apps.core.services.current_operator(at)`); never a literal such as `"IT"` in application code (guarded by `tests/unit/test_no_platform_country_literal.py`; tests and migrations excluded) |
 | Identifiers | Internal `bigint` PK; UUID `public_id` for APIs and technical URLs; natural key `(vendor, sku)` |
 | History | Configuration tables with `valid_from` / `valid_to`; orders store snapshots, not live references |
 | Dry-run | Every mutating service accepts `dry_run=True` and returns a `ChangeSet` (diff) |
