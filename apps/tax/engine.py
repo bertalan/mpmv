@@ -14,8 +14,9 @@ from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Final
 
+from apps.core import postcodes
 from apps.core.countries import EU_MEMBER_STATES, InvalidCountry, normalize_country
-from apps.core.postcodes import match_postcode
+from apps.core.postcodes import PostcodePattern, normalize_postcode, parse_postcode_pattern
 from apps.vendors import engine as vendors
 
 # --- Vendor VAT regime (VendorTaxProfile)
@@ -256,13 +257,55 @@ def normalize_territory_code(raw: str) -> str:
     return code
 
 
-def postcode_in_territory(patterns: Iterable[str], postcode: str) -> bool:
-    """True when `postcode` matches one of a territory's postcode patterns.
+class TerritoryConfigError(ValueError):
+    """A stored territory cannot be used: one of its postcode patterns is not in the shared
+    grammar. Patterns are validated on save, but writes that bypass `save()` (queryset updates,
+    bulk creation, fixtures) can still store one. Raised for every address and whatever the
+    order of the patterns, so a tax decision fails the same controlled way each time."""
 
-    The patterns follow the grammar shared with shipping zones (`apps.core.postcodes`, TAX.11):
-    exact `23041`, prefix `35*`, range `9000..9999`. An empty postcode matches nothing.
+
+def parse_territory_patterns(
+    patterns: Iterable[str | PostcodePattern], *, code: str = ""
+) -> tuple[PostcodePattern, ...]:
+    """Parse a territory's postcode patterns once, all of them; raises TerritoryConfigError
+    naming the territory and the pattern. Already parsed patterns pass through."""
+    parsed: list[PostcodePattern] = []
+    for pattern in patterns:
+        if isinstance(pattern, PostcodePattern):
+            parsed.append(pattern)
+            continue
+        try:
+            parsed.append(parse_postcode_pattern(pattern))
+        except postcodes.InvalidPostcodePattern as exc:
+            territory = f"territory {code}" if code else "a territory"
+            raise TerritoryConfigError(
+                f"{territory} has an invalid stored postcode pattern: {exc}"
+            ) from exc
+    return tuple(parsed)
+
+
+def postcode_in_territory(
+    territory_country: str,
+    patterns: Iterable[str | PostcodePattern],
+    country: str,
+    postcode: str,
+) -> bool:
+    """True when an address in `country` with `postcode` lies in a territory of
+    `territory_country` with these postcode patterns.
+
+    A territory matches only addresses in its own country: Padova (IT 35100) is not in the
+    Canary Islands (ES `35*`). Countries are compared as ISO codes (`EL` = `GR`); an invalid
+    one raises InvalidCountry. The patterns follow the grammar shared with shipping zones
+    (`apps.core.postcodes`, TAX.11): exact `23041`, prefix `35*`, range `9000..9999`. An empty
+    postcode matches nothing. Every pattern is parsed before any comparison, so an invalid one
+    raises TerritoryConfigError whatever the address and the order of the patterns; pass the
+    result of `parse_territory_patterns` to avoid parsing on every call.
     """
-    return any(match_postcode(pattern, postcode) for pattern in patterns)
+    parsed = parse_territory_patterns(patterns)
+    if normalize_country(country) != normalize_country(territory_country):
+        return False
+    code = normalize_postcode(postcode)
+    return bool(code) and any(pattern.matches_normalized(code) for pattern in parsed)
 
 
 # --- VIES answers (VatValidation), the results of VEN.12's VatNumberValidator
