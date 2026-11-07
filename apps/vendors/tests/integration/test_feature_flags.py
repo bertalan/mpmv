@@ -66,8 +66,20 @@ def test_a_kill_switch_can_be_pulled_for_one_vendor() -> None:
     assert flag_enabled(flags.CHECKOUT) is True
 
 
+@pytest.mark.parametrize("name", [flags.CHECKOUT, flags.IMPORT, flags.PAYMENTS])
+def test_an_override_turning_a_kill_switch_on_is_refused(name: str) -> None:
+    override = VendorFeatureFlag(vendor=VendorFactory.create(), flag=switch(name), enabled=True)
+    with pytest.raises(ValidationError) as exc_info:
+        save_vendor_flag(override, ctx=CTX)
+    assert "enabled" in exc_info.value.message_dict
+    assert "kill switch" in str(exc_info.value)
+    assert not VendorFeatureFlag.objects.exists()
+    assert not AuditLog.objects.exists()
+
+
 def test_a_vendor_override_cannot_bypass_the_platform_kill_switch() -> None:
     vendor = VendorFactory.create()
+    # Written without validation, e.g. before the flag became a kill switch.
     VendorFeatureFlagFactory.create(vendor=vendor, flag=switch(flags.PAYMENTS), enabled=True)
     killed = switch(flags.PAYMENTS)
     killed.state = flags.OFF
@@ -181,9 +193,16 @@ def test_staff_change_and_remove_an_override_from_the_admin(staff_client: Client
     change = reverse("admin:vendors_vendorfeatureflag_change", args=[override.pk])
     staff_client.post(
         change,
+        {"vendor": override.vendor.pk, "flag": override.flag.pk, "enabled": "", "note": "Feed"},
+    )
+    assert VendorFeatureFlag.objects.get(pk=override.pk).note == "Feed"
+    refused = staff_client.post(
+        change,
         {"vendor": override.vendor.pk, "flag": override.flag.pk, "enabled": "on", "note": ""},
     )
-    assert VendorFeatureFlag.objects.get(pk=override.pk).enabled is True
+    assert refused.status_code == 200
+    assert "kill switch" in refused.content.decode()
+    assert VendorFeatureFlag.objects.get(pk=override.pk).enabled is False
 
     delete = reverse("admin:vendors_vendorfeatureflag_delete", args=[override.pk])
     staff_client.post(delete, {"post": "yes"})

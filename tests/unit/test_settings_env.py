@@ -69,12 +69,29 @@ def test_env_secret_list_reads_the_variable(monkeypatch: pytest.MonkeyPatch) -> 
     assert env_secret_list("MPMV_TEST_KEYS") == ["a:1", "b:2"]
 
 
-def test_env_secret_list_prefers_the_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+@pytest.mark.parametrize("inline", [None, "", "  "])
+def test_env_secret_list_reads_the_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, inline: str | None
+) -> None:
     keys = tmp_path / "keys"
     keys.write_text("# newest first\nb:2\n\n  a:1  \n")
-    monkeypatch.setenv("MPMV_TEST_KEYS", "ignored:0")
+    if inline is None:
+        monkeypatch.delenv("MPMV_TEST_KEYS", raising=False)
+    else:
+        monkeypatch.setenv("MPMV_TEST_KEYS", inline)  # set but empty, as in mpmv.env.example
     monkeypatch.setenv("MPMV_TEST_KEYS_FILE", str(keys))
     assert env_secret_list("MPMV_TEST_KEYS") == ["b:2", "a:1"]
+
+
+def test_env_secret_list_refuses_the_variable_and_the_file_together(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    keys = tmp_path / "keys"
+    keys.write_text("b:2\n")
+    monkeypatch.setenv("MPMV_TEST_KEYS", "a:1")
+    monkeypatch.setenv("MPMV_TEST_KEYS_FILE", str(keys))
+    with pytest.raises(ImproperlyConfigured, match="MPMV_TEST_KEYS and MPMV_TEST_KEYS_FILE"):
+        env_secret_list("MPMV_TEST_KEYS")
 
 
 def test_env_secret_list_with_an_unreadable_file_is_a_configuration_error(

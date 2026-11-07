@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 from django.conf import settings
 from django.core import checks
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.db import connection
 from django.test import override_settings
 
@@ -216,3 +216,46 @@ def test_the_rotation_command_previews_then_applies() -> None:
     entry = AuditLog.objects.get(action=FIELD_KEYS_ROTATED)
     assert entry.source == AuditLog.Source.COMMAND
     assert vendor.iban not in preview
+
+
+# --- Full verification: every row, not one sample per key
+
+
+def test_the_verify_command_decrypts_every_value() -> None:
+    VendorFactory.create_batch(2, italian_sole_proprietor=True)
+    VendorFactory.create(vat_number="")  # blanks are not counted
+    out = run("verify_encrypted_data")
+    assert "vendors.vendor.iban: 2 value(s) decrypt" in out
+    assert "vendors.vendor.tax_code: 2 value(s) decrypt" in out
+
+
+def test_the_verify_command_names_every_row_that_does_not_decrypt() -> None:
+    good, bad = VendorFactory.create_batch(2, italian_sole_proprietor=True)
+    set_raw(bad, "iban", raw_values(good)["tax_code"])  # a token moved from another column
+    with pytest.raises(CommandError) as exc_info:
+        run("verify_encrypted_data")
+    message = str(exc_info.value)
+    assert f"vendors.vendor.iban: 1 value(s) do not decrypt: {bad.public_id}" in message
+    assert str(good.public_id) not in message
+    for secret in (good.iban, good.tax_code, bad.iban, bad.tax_code):
+        assert secret not in message
+
+
+def test_the_verify_command_fails_on_a_key_that_is_not_configured() -> None:
+    vendor = VendorFactory.create(italian_sole_proprietor=True)
+    with (
+        override_settings(FIELD_ENCRYPTION_KEYS=[generate_key("k2")]),
+        pytest.raises(CommandError, match=f"key 'test' is not configured: {vendor.public_id}"),
+    ):
+        run("verify_encrypted_data")
+
+
+def test_the_verify_command_reports_values_in_clear_or_on_an_older_key() -> None:
+    vendor = VendorFactory.create(italian_sole_proprietor=True)
+    set_raw(vendor, "tax_code", vendor.tax_code)
+    with override_settings(FIELD_ENCRYPTION_KEYS=[generate_key("k2"), current_key()]):
+        out = run("verify_encrypted_data")
+    assert "vendors.vendor.iban: 1 value(s) decrypt, 1 on an older key" in out
+    assert "vendors.vendor.tax_code: 1 value(s) in clear" in out
+    assert "rotate_field_keys" in out
+    assert vendor.tax_code not in out
