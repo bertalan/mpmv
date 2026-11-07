@@ -5,6 +5,7 @@ answer does not tell whether another vendor's object exists.
 """
 
 import uuid
+from dataclasses import dataclass
 
 import pytest
 from django.contrib.auth.models import AnonymousUser
@@ -147,6 +148,54 @@ def test_for_actor_gives_inactive_staff_nothing(
 ) -> None:
     staff = UserFactory.create(staff=True, is_active=False)
     assert not Vendor.objects.for_actor(staff).exists()
+
+
+# --- for_actor with a machine credential (CORE.13): API keys bound to a vendor, or platform-wide
+
+
+@dataclass(frozen=True)
+class StubCredential:
+    """What `for_actor` needs from a credential such as `ApiClient` (vendors cannot import api)."""
+
+    credential_vendor_id: int | None
+
+
+def test_a_vendor_credential_reaches_only_its_vendors_rows(
+    two_vendors: tuple[VendorMember, VendorMember],
+) -> None:
+    owner_a, owner_b = two_vendors
+    key_a = StubCredential(owner_a.vendor.pk)
+    assert list(Vendor.objects.for_actor(key_a)) == [owner_a.vendor]
+    assert list(VendorMember.objects.for_actor(key_a)) == [owner_a]
+    assert list(VendorTranslation.objects.for_actor(key_a)) == [owner_a.vendor.translations.get()]
+    assert owner_b not in VendorMember.objects.for_actor(key_a)
+
+
+def test_a_platform_credential_reaches_every_vendor(
+    two_vendors: tuple[VendorMember, VendorMember],
+) -> None:
+    owner_a, owner_b = two_vendors
+    assert set(Vendor.objects.for_actor(StubCredential(None))) == {owner_a.vendor, owner_b.vendor}
+
+
+def test_a_vendor_credential_gets_404_for_another_vendors_object(
+    two_vendors: tuple[VendorMember, VendorMember],
+) -> None:
+    owner_a, owner_b = two_vendors
+    key_a = StubCredential(owner_a.vendor.pk)
+    assert get_for_actor_or_404(VendorMember, key_a, public_id=owner_a.public_id) == owner_a
+    with pytest.raises(Http404) as theirs:
+        get_for_actor_or_404(VendorMember, key_a, public_id=owner_b.public_id)
+    with pytest.raises(Http404) as missing:
+        get_for_actor_or_404(VendorMember, key_a, public_id=uuid.uuid4())
+    assert str(theirs.value) == str(missing.value)
+    assert get_for_actor_or_404(VendorMember, StubCredential(None), pk=owner_b.pk) == owner_b
+
+
+def test_a_credential_is_never_a_member() -> None:
+    """Member helpers are for signed-in users: a credential must go through `for_actor`."""
+    with pytest.raises(TypeError, match="for_actor"):
+        Vendor.objects.for_member(StubCredential(None))  # type: ignore[arg-type]
 
 
 # --- get_vendor_object_or_404

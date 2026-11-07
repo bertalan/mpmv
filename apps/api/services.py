@@ -1,7 +1,11 @@
-"""ApiClient lifecycle and request authentication (CORE.6).
+"""ApiClient lifecycle and request authentication (CORE.6, CORE.13).
 
 Rotation replaces the key immediately: the old key stops working as soon as the rotation
 commits (no grace period). A pipeline rotates by deploying the new key right after receiving it.
+
+A vendor key (CORE.13) is issued only by platform staff holding `api.add_apiclient` or an owner
+of that vendor; a platform key only by such staff, or by trusted code without an issuer (shell,
+deploy scripts).
 """
 
 import datetime as dt
@@ -9,11 +13,18 @@ import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from django.contrib.auth.base_user import AbstractBaseUser
+from django.contrib.auth.models import AnonymousUser
+from django.core.exceptions import PermissionDenied
 from django.utils import timezone
 
+from apps.accounts.models import User
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.services import run_mutation
+from apps.vendors.engine import VendorAction
+from apps.vendors.models import Vendor
+from apps.vendors.services import has_vendor_permission
 
 from .engine import (
     AuthStatus,
@@ -35,6 +46,8 @@ from .models import ApiClient, ApiMutationLog
 logger = logging.getLogger(__name__)
 
 MODEL = "api.apiclient"
+# The model permission platform staff need to issue a key (`is_staff` alone is admin login only).
+ISSUE_PERMISSION = "api.add_apiclient"
 _PREFIX_ATTEMPTS = 5
 # Compared against when the prefix is unknown, so both failure paths do the same work.
 _DUMMY_HASH = hash_key("")
@@ -86,19 +99,51 @@ def _future(expires_at: dt.datetime) -> dt.datetime:
     return expires_at
 
 
+def check_issuer(issuer: AbstractBaseUser | AnonymousUser | None, vendor: Vendor | None) -> None:
+    """Raise PermissionDenied unless `issuer` may issue a key for `vendor` (None = platform).
+
+    Platform staff holding `api.add_apiclient` issue any key (a platform key reaches every
+    vendor's rows, so `is_staff` alone, i.e. admin login, is not enough); an owner of a vendor
+    issues that vendor's keys only. Without an issuer (trusted code: shell, deploy scripts) only
+    platform keys can be issued.
+    """
+    if issuer is None:
+        if vendor is not None:
+            raise PermissionDenied("a vendor API key needs an issuer")
+        return
+    if not issuer.is_authenticated or not issuer.is_active:
+        raise PermissionDenied("the issuer is not an active user")
+    if isinstance(issuer, User) and issuer.is_staff and issuer.has_perm(ISSUE_PERMISSION):
+        return
+    if vendor is None:
+        raise PermissionDenied("only platform staff with api.add_apiclient issue platform API keys")
+    if not isinstance(issuer, User) or not has_vendor_permission(
+        issuer, vendor, VendorAction.API_KEYS
+    ):
+        raise PermissionDenied("only platform staff or an owner of the vendor issue its API keys")
+
+
 def issue_api_client(
     *,
     name: str,
     scopes: Iterable[str],
     expires_at: dt.datetime,
     allowed_ips: Iterable[str] | None = None,
+    vendor: Vendor | None = None,
+    issuer: AbstractBaseUser | AnonymousUser | None = None,
     ctx: AuditContext,
     dry_run: bool = False,
 ) -> IssuedKey:
+    """Issue a key: for `vendor` (a vendor key) or, without one, a platform key.
+
+    `issuer` is the user asking for it (see `check_issuer`); the audit entry names the vendor.
+    """
+    check_issuer(issuer, vendor)
     if not name.strip():
         raise InvalidApiClient("name is required")
     generated = _new_key()
     client = ApiClient(
+        vendor=vendor,
         name=name.strip(),
         scopes=validate_scopes(scopes),
         key_prefix=generated.prefix,
@@ -174,7 +219,7 @@ def authenticate(
     parsed = parse_authorization(authorization)
     if isinstance(parsed, Decision):
         return AuthResult(parsed, None)
-    client = ApiClient.objects.filter(key_prefix=parsed.prefix).first()
+    client = ApiClient.objects.select_related("vendor").filter(key_prefix=parsed.prefix).first()
     matches = key_matches(parsed.key, client.key_hash if client else _DUMMY_HASH)
     if client is None or not matches:
         logger.info("API key refused: prefix=%s reason=%s", parsed.prefix, Reason.INVALID)
