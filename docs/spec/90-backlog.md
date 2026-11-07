@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **226** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **1902 h** (P1 1550 h · P2 334 h · P3 18 h)
+- Micro-tasks: **228** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **1911 h** (P1 1559 h · P2 334 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -15,7 +15,7 @@
 | Macro | Area | Tasks | P1 h | P2 h | P3 h | Total h |
 |---|---|---:|---:|---:|---:|---:|
 | ARC | Architecture and foundations | 17 | 103 | 6 | 0 | 109 |
-| CORE | Identity, permissions, API, backoffice | 14 | 103 | 4 | 0 | 107 |
+| CORE | Identity, permissions, API, backoffice | 14 | 105 | 4 | 0 | 109 |
 | CAT | Product catalog | 18 | 126 | 60 | 0 | 186 |
 | VEN | Vendors, commissions, ledger | 22 | 197 | 22 | 0 | 219 |
 | TAX | Tax engine | 11 | 44 | 28 | 0 | 72 |
@@ -23,8 +23,8 @@
 | ORD | Cart, orders, returns | 11 | 102 | 4 | 0 | 106 |
 | PAY | Payments (Stripe Connect) | 4 | 40 | 0 | 0 | 40 |
 | ING | Supplier import and pipelines | 13 | 92 | 26 | 0 | 118 |
-| I18N | Multilingual | 8 | 44 | 6 | 0 | 50 |
-| CMS | Wagtail content | 8 | 51 | 10 | 0 | 61 |
+| I18N | Multilingual | 9 | 50 | 6 | 0 | 56 |
+| CMS | Wagtail content | 9 | 52 | 10 | 0 | 62 |
 | EVT | Events, feeds and maps | 17 | 111 | 12 | 0 | 123 |
 | THM | Frontend themes | 11 | 70 | 12 | 0 | 82 |
 | SEO | SEO, feeds, analytics | 6 | 30 | 14 | 0 | 44 |
@@ -33,11 +33,11 @@
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 5 | 19 | 11 | 0 | 30 |
 | MIG | Migration and cutover | 11 | 114 | 0 | 0 | 114 |
-| **Total** | | **226** | **1550** | **334** | **18** | **1902** |
+| **Total** | | **228** | **1559** | **334** | **18** | **1911** |
 
 ## By phase
 
-### F0 — Foundations (37 tasks, 250 h)
+### F0 — Foundations (37 tasks, 252 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -63,7 +63,7 @@
 | CORE.5 | Rate limiting and progressive lockout on login/registration, Turnstile | P1 | 6 | CORE.1 | Tests on failed attempts |
 | CORE.6 | `ApiClient`: issuance, hashing, scopes, expiry, rotation, revocation, IP allow-list | P1 | 10 | CORE.1 | Expired or out-of-scope key → 401/403 |
 | CORE.7 | Ninja API v1 skeleton: auth, dry-run, RFC 9457 errors, OpenAPI, mutation log | P1 | 10 | CORE.6, ARC.13 | OpenAPI spec published on STAGE |
-| CORE.8 | Wagtail admin: staff menu, base ViewSet with tenant filters and bulk actions; platform staff as a dedicated permission instead of `is_staff` in `for_actor` (Q-34); staff unlock of a locked account with audit, and automatic unlock after a completed password reset (Q-18) | P1 | 13 | CORE.3 | Staff manage vendors and products from the admin; a user with Wagtail admin access but without the platform staff permission sees no vendor's data (negative test); staff unlock a locked account and the unlock is in the AuditLog; a completed password reset clears the lockout |
+| CORE.8 | Wagtail admin: staff menu, base ViewSet with tenant filters and bulk actions; platform staff as a dedicated permission instead of `is_staff` in `for_actor` (Q-34); staff unlock of a locked account with audit, and automatic unlock after a completed password reset (Q-18); our own editor roles (for example blog editors, legal pages, event moderators) replacing Wagtail's default Editors and Moderators groups, which stay until then (Q-58) | P1 | 15 | CORE.3 | Staff manage vendors and products from the admin; a blog editor cannot edit the About page or a legal page; Wagtail's default Editors and Moderators groups no longer exist after the data migration; a user with Wagtail admin access but without the platform staff permission sees no vendor's data (negative test); staff unlock a locked account and the unlock is in the AuditLog; a completed password reset clears the lockout |
 | CORE.9 | Vendor area `/vendor/`: layout, navigation, essential KPI dashboard; storefront profile editing (texts, logo, return and shipping policies) for the owner only, with post-moderation notice to the moderators, audit and staff revert (Q-16); new applicants arrive from the VEN.22 public application | P1 | 16 | CORE.3 | Vendor sees only their own data; vendor staff cannot edit the storefront profile; an owner's profile change notifies the moderators, is in the AuditLog with before and after, and staff revert it to the previous version |
 | CORE.12 | Per-API-key rate limit (Q-18): limits per `ApiClient` from settings, counters in a cache shared by every app process (PostgreSQL-backed, spec 01), 429 response in RFC 9457 format with `Retry-After` | P1 | 4 | CORE.7 | Two app processes share one counter; the request over the limit gets 429 with `Retry-After`; another key is not affected |
 | CORE.13 | `ApiClient.vendor`: optional vendor FK on API keys (empty = platform key), vendor-scoped API keys enforced through CORE.3 scoping, admin and tests | P1 | 3 | CORE.3, CORE.6 | A vendor key cannot read or change another vendor's data (negative tests) |
@@ -79,7 +79,7 @@
 | OPS.2 | Observability: JSON logs, error tracking, healthchecks, alerts (including database disk space, WAL archiving and backup age) | P1 | 8 | ARC.5 | Alert on a simulated checkout error |
 | OPS.5 | Technical Django admin reachable only from a restricted network (owner decision Q-18): allow-list at the reverse proxy plus an app-level check on the Django admin path (defence in depth), the allowed networks as environment configuration, staff operations moved to the Wagtail admin (CORE.8) | P1 | 3 | ARC.13, CORE.8 | On STAGE the Django admin answers 404 from outside the allowed networks and works from inside; a test covers the app-level check |
 
-### F1 — Catalog, import, base frontend (36 tasks, 320 h)
+### F1 — Catalog, import, base frontend (37 tasks, 326 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -90,7 +90,7 @@
 | CAT.5 | `build_product_slug` without the SKU + SlugHistory + 301 redirect middleware; current `{title}-{lang}-{sku}` slugs loaded as history | P1 | 8 | CAT.1 | Test cases ported from legacy-sku-permalink without the SKU part; a current SKU slug answers 301 to the new slug |
 | CAT.6 | `Redirect` model + admin management + import of existing maps (retired SKUs, merged tags, discontinued categories) | P1 | 6 | CAT.5 | All rules from the 4 mu-plugins covered by tests |
 | CAT.7 | Product page: gallery, variants with default, companion box, related products, visible SKU, "on request" | P1 | 16 | CAT.3, CAT.4 | Visual and functional parity with LIVE |
-| CAT.8 | Listings: category, taxonomy page, brand, vendor storefront, filters (category, taxonomy term, price, vendor) | P1 | 14 | CAT.2 | Pagination and filters with indexable URLs |
+| CAT.8 | Listings: category, taxonomy page on `/{taxonomy}/{term}/` and `/{taxonomy}/{term}/{child}/` with translated slugs (D-07), brand, vendor storefront, filters (category, taxonomy term, price, vendor) | P1 | 14 | CAT.2 | Pagination and filters with indexable URLs; a taxonomy page answers 200 on `/{taxonomy}/{term}/` in every configured language, and its paginated and filtered URLs build on the term's current URL |
 | CAT.9 | FTS + trigram + SKU prefix search on the SKU match key (including variants) | P1 | 8 | CAT.1, CAT.13 | Tests on partial SKUs and typos; `bag 100` finds `BAG  100` |
 | CAT.10 | `upsert_products`/`publish`/`retire` services with dry-run and publishing rules | P1 | 10 | CAT.1, CMP.3 | ChangeSet verified in tests |
 | CAT.12 | Audited product edit service (coherence check 5): changes to `fiscal_category`, `sales_mode`, weight and dimensions go through a `catalog.services` function (the owning vendor never changes, Q-33 and CAT.14) with dry-run, ChangeSet and AuditLog; the product and variant admins call it instead of saving directly | P1 | 4 | CAT.1, SEC.4 | A fiscal category change made in the admin shows in the audit view with before and after; a dry run writes nothing; `core.E203` passes without the price-only exemption |
@@ -112,6 +112,7 @@
 | I18N.5 | gettext catalogs for templates and emails; tax wording as keys | P1 | 6 | ORD.9 | No hardcoded strings (lint) |
 | I18N.6 | hreflang, canonical, per-language sitemap with fallback excluded | P1 | 4 | SEO.1 | Validation on a sample of URLs: fallback copies have the EN canonical and are absent from hreflang and from the language sitemap |
 | I18N.7 | Interface strings in IT, DE, FR and ES for go-live (D-18): gettext catalogs for templates, emails, notifications, error and validation messages, MFA pages and tax/legal wording keys; AI draft, human review of checkout, emails and legal/tax wording; coverage report | P1 | 10 | I18N.5 | Coverage report: 100% of interface strings translated in IT, DE, FR and ES; checkout, email and legal/tax wording reviewed by a human |
+| I18N.9 | Customer legal and checkout pages at go-live (Q-42): terms of sale, privacy, withdrawal, shipping and returns as `LegalPage` translations in EN, IT, DE, FR and ES through wagtail-localize, each language with its own version and effective date; AI draft, native-speaker review and legal counsel check recorded per language; no EN fallback for these pages | P1 | 6 | CMS.5, I18N.3 | Every one of the five pages is published in all five languages; a go-live readiness check fails when a legal or checkout page lacks a published translation in a go-live language; a translation of a legal page shows its own effective date |
 | CMS.1 | Wagtail: site, locales, base page types, per-language navigation and footer | P1 | 8 | ARC.3 | Home and static pages in every configured language |
 | THM.1 | Theme framework: `apps/themes` registry and manifest, theme-aware template loader with parent fallback and `(theme, name)` cache, `ThemeSettings` per Wagtail Site with audit, `MPMV_THEME_DEFAULT`, system checks, import-linter rule, ADR for the frontend toolchain | P1 | 8 | CMS.1 | Two sites render different themes in an integration test; a template missing in the child comes from `base`; an unknown theme fails the system check |
 | THM.2 | Design-token pipeline: `tokens.toml` resolution and inheritance, token contract with contrast pairs, `tokens.css` rendering, `tools/build_theme.py` and `make assets`, Containerfile build step | P1 | 6 | THM.1 | Unit tests on `resolve_tokens`, `contrast_ratio` and `check_tokens` (a pair below 4.5:1 fails); the image build produces hashed `theme.css` for every theme |
@@ -198,16 +199,17 @@
 | CMP.24 | Approval of (L) legal wording: per text and language a version hash, draft author (person or agent) and counsel approval (approver name or role, date, approved hash) for gettext keys with an `(L)` context and database texts; release check and production system check refuse unapproved texts; STAGE shows a pending marker; approvals audited | P1 | 6 | I18N.7, ARC.16, SEC.4 | Changing an approved (L) text in any language makes the release check fail until a new approval matches its hash; production refuses to start with an unapproved text; STAGE shows the marker; each approval is in the audit log |
 | CMP.25 | Activation gate for platform duties (coherence check 5): an `activation` purpose in `LegalFieldRequirement` seeded with the DSA article 30 trader data (name, address, telephone, email, trade register entry where registered), the article 30(1)(e) self-certification recorded as an append-only acceptance with text hash, both checked by the VEN.5 activation next to the CMP.13 gate; DAC7 data still blocks payouts only; CMP.11 keeps the checks, display on offers and EPR | P1 | 4 | VEN.5, VEN.12, CMP.13 | An EU vendor missing its telephone, its trade register entry (when registered) or the self-certification cannot be activated and gets the reason; a complete vendor is activated; missing DAC7 data does not block activation; the self-certification row stores version, language and hash |
 
-### F4 — Content, SEO, feeds (29 tasks, 204 h)
+### F4 — Content, SEO, feeds (30 tasks, 205 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
-| CMS.2 | Reusable StreamField blocks (hero, product grid, CTA, FAQ, choosers) | P1 | 10 | CMS.1, CAT.8 | An editor builds the home page without code |
+| CMS.2 | Reusable StreamField blocks (hero, CTA, FAQ, choosers) | P1 | 8 | CMS.1 | An editor builds the home page without code |
 | CMS.3 | Blog with scheduling, author, product/term/vendor chooser | P1 | 8 | CMS.2 | Migrated article published |
 | CMS.4 | TermLandingPage and VendorLandingPage | P1 | 10 | CMS.2, CAT.8 | A term page with its products |
-| CMS.5 | Versioned LegalPage + VendorRecruitmentPage (plans, FAQ) leading to the VEN.22 application form | P1 | 6 | CMS.1, VEN.5 | Legal page versions kept; the recruitment page shows the plans and links to the application |
-| CMS.8 | Image source, licence and credit: custom Wagtail image model `MediaImage` in `core` with licence, source, author, credit and permission fields, staff-editable `ImageLicence` allow list seeded per §10.2, upload validation in admin and services, `image_credit` component and per-page image credits disclosure, review list for migrated images without metadata | P1 | 5 | CMS.1, ARC.15 | An upload without licence or author is refused; an NC licence cannot be added to the allow list; a CC BY image shows its credit in the caption, a CC BY hero in the page credits disclosure; a CC0 image shows none; `WAGTAILIMAGES_IMAGE_MODEL` points to `MediaImage` before CAT.4 |
+| CMS.5 | Versioned LegalPage + VendorRecruitmentPage (plans, FAQ) leading to the VEN.22 application form | P1 | 6 | CMS.1, VEN.5 | Legal page versions kept per language, so a translated legal page has its own version and effective date (Q-42); the recruitment page shows the plans and links to the application |
+| CMS.8 | Image source, licence and credit: custom Wagtail image model `MediaImage` in `core` with licence, source, author, credit and permission fields, staff-editable `ImageLicence` allow list seeded per §10.2, upload validation in admin and services, `image_credit` component and per-page image credits disclosure, review list for migrated images without metadata; works with local storage, ARC.15 later moves only the storage backend | P1 | 5 | CMS.1 | An upload without licence or author is refused; an NC licence cannot be added to the allow list; a CC BY image shows its credit in the caption, a CC BY hero in the page credits disclosure; a CC0 image shows none; `WAGTAILIMAGES_IMAGE_MODEL` points to `MediaImage` before CAT.4 |
 | CMS.9 | Launch countdown StreamField block: fields per §10.2, `countdown_state` pure function, server-rendered absolute date and expired state, page cache capped at the target, CSP-safe ES module with visitor time zone, minute updates and pause button, single polite announcement at expiry | P1 | 4 | CMS.2, THM.4 | Without JavaScript the block shows the absolute date and the CTA; with it the remaining time updates once a minute in the visitor's time zone and the pause button stops it; after the target the server and the module both show the expired text and link; no `aria-live` on the counter; no CSP violation and no axe violation on a page with the block |
+| CMS.10 | Product grid block (StreamField): products by category, term, brand or vendor, using the CAT.8 listing query | P1 | 3 | CMS.2, CAT.8 | An editor places a product grid filtered by a term on a page and it renders the CAT.8 results |
 | EVT.1 | `events` app: `EventIndexPage` and `EventPage` page types on the CMS.1 conventions (structured fields, attendance, venue and address, latitude and longitude with geocoding metadata, StreamField body from the CMS.2 library, ParentalManyToMany links, vendor-scoped page manager, denormalised `status` with its sync function, `original_locale`, synchronised and translatable fields), an `EventIndexPage` in every enabled locale, `VendorEventPolicy`, `EventSettings`; `"events.EventIndexPage"` in the home page's subpage types; import-linter layer between `cart` and `catalog`, `apps.events` forbidden for `tax`, `shipping`, `cart` and `orders`; factories | P1 | 9 | CMS.2, CMS.8, CORE.3, CAT.2, I18N.3 | Constraints tested (end after start, one of COUNT or UNTIL, no `closure` type, regression case 19); vendor A cannot see vendor B's draft page (cross-tenant fixture); a test import of `apps.events` from `apps.shipping` or `apps.cart` fails `make check`; an IT page translates to EN with dates synchronised |
 | EVT.2 | Recurrence engine in `events/engine.py`: RRULE subset validator, `expand` in the event's zone with DST handling, exdates, all-day spans, horizon and limit | P1 | 8 | EVT.1 | Regression cases 5–8 green (DST end 2026-10-25 and start 2027-03-28, non-existent and ambiguous local times, "every August", refused parts) |
 | EVT.3 | Services and moderation: `save_event_draft` through revisions, `submit_event`, hide, restore, cancel, vendor policy, with dry-run `ChangeSet` and `AuditLog`; "Event review" workflow with a `GroupApprovalTask`, `get_workflow()` driven by `needs_review` and the configurable threshold; signal handlers for approval, changes requested and status sync; `sequence` bump rule; same-vendor link and vendor-safe block validation | P1 | 10 | EVT.2, ARC.6 | Regression cases 1–4 green; every mutation writes one audit entry and `dry_run` writes no revision; `sequence` grows on a date change and stays on a no-op publish; a hide without a reason is refused; a hidden page cannot be resubmitted by the vendor |
@@ -242,12 +244,12 @@
 | MIG.3 | Loader for vendors, catalog, taxonomies, images (idempotent, dry-run); existing IT texts loaded as published translations (D-18) | P1 | 16 | MIG.1, CAT.1, CAT.2, CAT.3, CAT.4, CAT.13, CAT.14 | Reload with no duplicates; IT texts present where the current site has them |
 | MIG.4 | Loader for customers (WP password hasher) and read-only historical orders | P1 | 10 | MIG.1, ORD.2 | Migrated customer logs in with the old password |
 | MIG.5 | Automated parity reports (§13.3) | P1 | 10 | MIG.3 | Report generated on every run |
-| MIG.6 | Complete redirect map in every language + automated check of all WP sitemap URLs; every legacy product URL (SKU permalinks, plain and historical slugs, variant URLs, legacy query-string forms) mapped to the product with its frozen legacy path per language, answering 200 in legacy mode and a single 301 to the SKU-free URL in new mode (Q-91, §13.3) | P1 | 8 | CAT.6, MIG.3 | 100% of URLs 200/301; a migrated IT URL serves its IT text, not the EN fallback; on the migration dataset every legacy URL resolves to a 200 page in at most one 301 hop (no chains, no loops), a legacy-mode product answers 200 on its old URL with a self-canonical, and the number of legacy product URLs equals the number of mapped URLs |
+| MIG.6 | Complete redirect map in every language + automated check of all WP sitemap URLs; every legacy product URL (SKU permalinks, plain and historical slugs, variant URLs, legacy query-string forms) mapped to the product with its frozen legacy path per language, answering 200 in legacy mode and a single 301 to the SKU-free URL in new mode (Q-91, §13.3); every legacy tag URL (`/tag-product/{slug}/`, `/it/tag-product-it/{slug}-it/`) mapped the same way to its taxonomy term, with a single 301 to `/{taxonomy}/{term}/` in new mode (D-07) | P1 | 8 | CAT.6, MIG.3 | 100% of URLs 200/301; a migrated IT URL serves its IT text, not the EN fallback; on the migration dataset every legacy URL resolves to a 200 page in at most one 301 hop (no chains, no loops), a legacy-mode product or term answers 200 on its old URL with a self-canonical, and the number of legacy product and tag URLs equals the number of mapped URLs |
 | MIG.7 | Pages and blog migration (semi-manual) with StreamField; existing IT versions as published wagtail-localize translations (D-18) | P1 | 16 | CMS.2, I18N.3 | All public pages present, in IT too where the current site has them |
 | MIG.8 | Vendor ledger opening balances + verification against Stripe | P1 | 4 | VEN.4, MIG.3 | Balance = expected for every vendor |
 | MIG.9 | Three dress rehearsals on STAGE + cutover and rollback runbook | P1 | 16 | MIG.5, MIG.6 | Third rehearsal with no blockers |
 | MIG.10 | Cutover and post-go-live monitoring, including the daily 404 report, the Search Console review and the product URL batch schedule and gates of the runbook (Q-91) | P1 | 12 | MIG.9, SEC.6 | Go-live, 72 h with no critical issues; 404 report and Search Console review recorded at T+14 and T+28 |
-| MIG.11 | Staggered product URL switch (owner decision Q-91): per-product `url_mode` and frozen legacy paths, traffic ranking from analytics (SEO.5) or the MIG.1 legacy access-log counts, configurable batch size and cadence, batch switch and rollback as a management command and staff action with dry-run and audit, sitemap, canonical and hreflang by mode, gate on 404 rate, Search Console impressions and clicks against baseline, and errors with configurable thresholds | P1 | 6 | MIG.6, CAT.5 | A batch switch gives a single 301 hop and an updated sitemap; a rollback leaves no redirect loop; a legacy-mode page is 200 with a self-canonical; the next batch is refused when a gate metric is over threshold; the MIG.6 "no URL lost" count still holds after a switch and a rollback; products created after go-live start in new mode |
+| MIG.11 | Staggered product and tag URL switch (owner decisions Q-91 and D-07): per-product and per-term `url_mode` and frozen legacy paths, traffic ranking from analytics (SEO.5) or the MIG.1 legacy access-log counts, configurable batch size and cadence, batch switch and rollback as a management command and staff action with dry-run and audit, sitemap, canonical and hreflang by mode, gate on 404 rate, Search Console impressions and clicks against baseline, and errors with configurable thresholds | P1 | 6 | MIG.6, CAT.5, CAT.8 | A batch switch gives a single 301 hop and an updated sitemap; a rollback leaves no redirect loop; a legacy-mode page is 200 with a self-canonical; a switched legacy tag URL is a single 301 to `/{taxonomy}/{term}/`; the next batch is refused when a gate metric is over threshold; the MIG.6 "no URL lost" count still holds after a switch and a rollback; products and terms created after go-live start in new mode |
 
 ### F6 — After go-live (P2) (42 tasks, 334 h)
 

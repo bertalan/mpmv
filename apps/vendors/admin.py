@@ -23,6 +23,7 @@ from apps.core.audit import audit_context
 from . import engine
 from .models import (
     ContractAcceptance,
+    CrossVendorConsent,
     LegalFieldRequirement,
     Vendor,
     VendorContract,
@@ -44,6 +45,7 @@ from .services import (
     save_requirement,
     save_vendor,
     save_vendor_flag,
+    set_cross_vendor_consent,
 )
 
 StatusAction = Callable[[admin.ModelAdmin[Vendor], HttpRequest, QuerySet[Vendor]], None]
@@ -443,3 +445,37 @@ class VendorFeatureFlagAdmin(admin.ModelAdmin[VendorFeatureFlag]):
         if _overrides_kill_switch(self.get_object(request, object_id)):
             return step_up(view)(request)
         return view(request)
+
+
+@admin.register(CrossVendorConsent)
+class CrossVendorConsentAdmin(admin.ModelAdmin[CrossVendorConsent]):
+    """A vendor's opt-in to other vendors' suggestions and bundles (CAT.14). Versions are
+    append-only: staff record a new one, starting now, through the audited service."""
+
+    list_display = ("vendor", "in_suggestions", "in_bundles", "valid_from", "set_by")
+    list_filter = ("in_suggestions", "in_bundles")
+    search_fields = ("vendor__display_name", "vendor__legal_name")
+    list_select_related = ("vendor",)
+    raw_id_fields = ("vendor",)
+    fields = ("vendor", "in_suggestions", "in_bundles", "valid_from", "set_by")
+    readonly_fields = ("valid_from", "set_by")
+
+    def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+    def save_model(
+        self, request: HttpRequest, obj: CrossVendorConsent, form: Any, change: bool
+    ) -> None:
+        changes = set_cross_vendor_consent(
+            obj.vendor,
+            in_suggestions=obj.in_suggestions,
+            in_bundles=obj.in_bundles,
+            ctx=audit_context(request),
+        )
+        # The admin links to and logs the row the service wrote.
+        saved = CrossVendorConsent.objects.get(public_id=changes.changes[0].key)
+        obj.pk, obj.valid_from, obj.set_by = saved.pk, saved.valid_from, saved.set_by
+        obj._state.adding = False

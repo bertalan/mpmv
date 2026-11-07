@@ -42,9 +42,10 @@ Rules:
   current IT URLs keep their content. **New** visitor content created after the migration (new
   products from the pipelines, new pages and articles) stays EN only until after go-live, and DE, FR
   and ES visitor content comes after go-live; the owner then decides whether and how to translate
-  it (I18N.8). Whether legal pages (terms, privacy,
-  withdrawal) count as visitor content or must be translated at go-live is still an open owner
-  question.
+  it (I18N.8). **Customer legal and checkout pages are the exception** (owner, 2026-11-07, Q-42):
+  terms of sale, privacy, withdrawal, shipping and returns are translated into all five languages
+  at go-live (AI draft, native-speaker review, legal counsel check per language) and never fall
+  back to EN (I18N.9). Vendor contracts follow the vendor's language (VEN.13, VEN.14).
 - **Explicit fallback**: except for events (below), if the published translation is missing, the base language (EN) is shown with a notice, and the
   page is not included in that language's sitemap (never empty or duplicate content indexed).
   A fallback copy declares the EN page as its canonical URL (no `noindex`, so the two signals never
@@ -101,3 +102,4 @@ Rules:
 | I18N.6 | hreflang, canonical, per-language sitemap with fallback excluded | P1 | 4 | SEO.1 | Validation on a sample of URLs: fallback copies have the EN canonical and are absent from hreflang and from the language sitemap |
 | I18N.7 | Interface strings in IT, DE, FR and ES for go-live (D-18): gettext catalogs for templates, emails, notifications, error and validation messages, MFA pages and tax/legal wording keys; AI draft, human review of checkout, emails and legal/tax wording; coverage report | P1 | 10 | I18N.5 | Coverage report: 100% of interface strings translated in IT, DE, FR and ES; checkout, email and legal/tax wording reviewed by a human |
 | I18N.8 | Visitor content translation after go-live (D-18): products, categories, taxonomy terms, vendor storefronts, CMS pages, blog and landing pages, with the method the owner chooses (AI, professional or other) through the I18N.4 queue; per-language coverage report | P2 | 6 | I18N.4, I18N.3, I18N.6 | Per-language coverage report; only published translations appear in hreflang and sitemaps |
+| I18N.9 | Customer legal and checkout pages at go-live (Q-42): terms of sale, privacy, withdrawal, shipping and returns as `LegalPage` translations in EN, IT, DE, FR and ES through wagtail-localize, each language with its own version and effective date; AI draft, native-speaker review and legal counsel check recorded per language; no EN fallback for these pages | P1 | 6 | CMS.5, I18N.3 | Every one of the five pages is published in all five languages; a go-live readiness check fails when a legal or checkout page lacks a published translation in a go-live language; a translation of a legal page shows its own effective date |

@@ -14,13 +14,13 @@
 
 | Item | Hours | How it is calculated |
 |---|---:|---|
-| P1 micro-tasks | 1,550 | Sum from the generated backlog |
+| P1 micro-tasks | 1,559 | Sum from the generated backlog |
 | Integrated and end-to-end acceptance testing, exploratory tests | 100 | ~10% of P1 |
 | Mandatory human review of tax, payments, ledger, orders, security | 50 | ~15% of the hours for TAX, PAY, VEN, ORD, SEC |
 | Coordination, ADRs, meetings with tax advisor and legal counsel | 80 | ~8% of P1 |
-| **Subtotal** | **1,780** | |
-| Contingency for unforeseen issues (10–25% of P1) | 155–388 | Tax and payment domain, dirty legacy data |
-| **Go-live total** | **≈ 1,935–2,168** | |
+| **Subtotal** | **1,789** | |
+| Contingency for unforeseen issues (10–25% of P1) | 156–390 | Tax and payment domain, dirty legacy data |
+| **Go-live total** | **≈ 1,945–2,179** | |
 
 The SHP.12 implementation (#54) added the SHP.12 row it built and the SHP.13 and SHP.14 rows it
 found missing (+34 h of P1). Coherence check 5 (2026-11-07) added ARC.17 (1 h, e-invoicing
@@ -28,6 +28,11 @@ leftovers), ARC.18 (2 h, architecture guards), CAT.12 (4 h, audited product edit
 vendor key policy), TAX.11 (2 h, shared postcode grammar for tax territories) and CMP.25 (4 h,
 activation gate for the DSA article 30 data), grew VEN.18 (2 → 3 h, RF20 in the tax request) and
 narrowed SHP.2 to the legacy cases (8 → 6 h): +15 h of P1.
+
+The owner's decision D-07 (2026-11-07: descriptive `/{taxonomy}/{term}/` URLs, legacy tag URLs
+moved with the staggered product URL mechanism) widens CAT.8, MIG.6 and MIG.11 at the same hours.
+The product grid block leaves CMS.2 (10 → 8 h, now depending on CMS.1 only) for the new row CMS.10
+(3 h, depends on CMS.2 and CAT.8), and CMS.8 no longer depends on ARC.15: +1 h of P1.
 
 The events module (2026-11-07, [15](15-events.md)) adds EVT.1 to EVT.15 (113 h of P1: event
 pages and moderation, recurrence, vendor area and API, public pages, closure-aware dispatch date,
@@ -77,6 +82,10 @@ CAT.18 (12 h, vendor acceptance of staff-assigned shares). The answer to Q-91 (n
 product URLs with one 301 from every legacy URL) grows MIG.6 from 6 to 8 h, and its refinement (switch staggered
 by traffic after go-live, with gates and rollback) adds MIG.11 (6 h): +8 h of P1.
 
+The owner's answers on editor roles and customer legal pages (Q-58 and Q-42, 2026-11-07) changed
+P1 by +8 h: CORE.8 grows (13 → 15 h: our own editor roles instead of Wagtail's default groups) and
+the new row I18N.9 (6 h, customer legal and checkout pages in five languages at go-live) is added.
+
 After go-live: P2 = 334 h and P3 = 18 h (MCP, advanced zone editor, OSS report, visitor content
 translation, reviews, advanced payouts, vendor branding, customer preferences and event
 notifications, Google geocoder and map layer, cross-vendor bundles…), about **385–440 h**
@@ -87,7 +96,7 @@ including contingency.
 | | August plan | This review |
 |---|---:|---:|
 | Scope | Full WCFM parity + P1 commercial modules | Parity **with what is actually used** + 2026 compliance |
-| Total hours (development, testing, migration) | 1,740–2,540 | 1,935–2,168 to go-live |
+| Total hours (development, testing, migration) | 1,740–2,540 | 1,945–2,179 to go-live |
 | With AI-assisted development | 1,450–2,100 | already included |
 
 Where the difference comes from:
@@ -133,8 +142,9 @@ A milestone is closed only with a working demo on STAGE and the domain regressio
 - External penetration test (SEC.6; the hours listed are for remediation).
 - Tax advisor and legal counsel for the ⚖️ decisions in [92-open-decisions.md](92-open-decisions.md).
 - Interface text in IT, DE, FR and ES at go-live (D-18): native-speaker review of the AI drafts for
-  checkout, emails and legal/tax wording. If the owner decides that legal pages are translated at
-  go-live, counsel also checks the legal texts in each language (Impressum, terms, withdrawal notice).
+  checkout, emails and legal/tax wording. Customer legal and checkout pages are translated at
+  go-live (Q-42, I18N.9), so counsel also checks the legal texts in each language (Impressum,
+  terms, privacy, withdrawal notice, shipping and returns).
 - Translation of visitor content after go-live (I18N.8), with the method the owner chooses.
 - CMP for cookies; transactional email provider. No SDI intermediary: the platform issues no
   invoices, and the operator's accountant invoices commissions with its own tool from the CMP.2
@@ -170,10 +180,11 @@ Source: merged pull requests and their timestamps, the generated backlog, and th
 
 ### Forecast for the rest of P1
 
-**141 P1 tasks remain, worth 1,241 estimated hours.** At the previous measurement 134 tasks and
+**142 P1 tasks remain, worth 1,242 estimated hours.** At the previous measurement 134 tasks and
 1,210 hours remained; since then the owner's events answers added VEN.20 and shrank EVT.7 (+10 h),
 wave 6 closed 28 P1 hours, the SHP.12 implementation added SHP.12 to SHP.14 (+34 h) and coherence
-check 5 added six small rows and resized two (+15 h, §91.2).
+check 5 added six small rows and resized two (+15 h, §91.2), and the D-07 follow-up split the
+product grid out of CMS.2 into CMS.10 (+1 task, +1 h, §91.2).
 
 | Part | Estimated hours | Done by | Forecast |
 |---|---:|---|---|
@@ -184,8 +195,9 @@ check 5 added six small rows and resized two (+15 h, §91.2).
 That is at least two weekly budgets, so **3–4 calendar weeks for P1 code**, provided the open
 decisions are answered in time. The schedule is now gated more by decisions and accounts than by
 agent time: STAGE (ARC.13, which needs the Hetzner account) gates 51 P1 tasks worth 489 hours, and
-the open D-xx decisions gate most of the rest (D-07 29 tasks and 241 hours, D-04 20 tasks and 239
-hours, D-06 21 tasks and 173 hours, D-14 11 tasks and 124 hours, D-01 12 tasks and 106 hours).
+the open D-xx decisions gate most of the rest (D-04 20 tasks and 239 hours, D-06 21 tasks and
+173 hours, D-14 11 tasks and 124 hours, D-01 12 tasks and 106 hours). D-07 (29 tasks and 241 hours
+at this measurement) was decided by the owner on the same day and no longer gates them.
 
 Work that agents cannot speed up:
 
@@ -202,7 +214,7 @@ Work that agents cannot speed up:
 | **Total** | **≈ 109–199** |
 
 **Result:** about **150–250 people hours** plus about two weekly agent budgets, against
-1,935–2,168 hours for a human team (§91.2). Realistic calendar to go-live: **2–3 months**. The
+1,945–2,179 hours for a human team (§91.2). Realistic calendar to go-live: **2–3 months**. The
 pace is set by external waits: legal counsel, the Hetzner account for STAGE, Stripe Connect
 verification, the external penetration test (SEC.6) and the three dress rehearsals (MIG.9).
 
