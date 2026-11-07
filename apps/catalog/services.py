@@ -9,6 +9,7 @@ history for the Omnibus rule (CMP.6) can be built from these audit rows.
 """
 
 import datetime as dt
+import logging
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
@@ -53,6 +54,8 @@ from .models import (
     Variant,
     VariantOption,
 )
+
+logger = logging.getLogger(__name__)
 
 PRODUCT_MODEL = "catalog.product"
 VARIANT_MODEL = "catalog.variant"
@@ -1119,29 +1122,54 @@ def listing_products(
     return products.order_by(*LISTING_ORDER)
 
 
-def _owners_by_slug(
-    rows: "QuerySet[Any]", owner: str, slugs_: Iterable[str], language: str
-) -> dict[str, set[int]]:
-    """Owner ids per slug, in `language` or, for owners without a text in it, the source
-    language (explicit EN fallback, D-18)."""
+def _paths_by_slug_path(
+    rows: "QuerySet[Any]", owner: str, values: Iterable[str], language: str
+) -> dict[str, str]:
+    """The tree path of the one category or term each slug path names; values that name none,
+    or more than one, are left out.
+
+    Each level matches its slug in `language` or, for nodes without a text in it, in the source
+    language (explicit EN fallback, D-18). Slugs are unique among siblings in one language only,
+    so a level is matched below the previous one; a slug two siblings answer to (one's own
+    text, the other's fallback) is ambiguous and matches nothing.
+    """
+    paths = {value: listings.slug_path(value) for value in values}
+    segments = {slug for path in paths.values() for slug in path}
     source = translations.source_language()
-    found = rows.filter(slug__in=list(slugs_), language__in={language, source})
-    candidates = list(found.values_list(f"{owner}_id", "language", "slug"))
+    candidates = list(
+        rows.filter(slug__in=segments, language__in={language, source}).values_list(
+            f"{owner}_id", "language", "slug", f"{owner}__path", f"{owner}__depth"
+        )
+    )
     translated = set(
         rows.filter(
             language=language, **{f"{owner}_id__in": {c[0] for c in candidates}}
         ).values_list(f"{owner}_id", flat=True)
     )
-    owners: dict[str, set[int]] = {}
-    for owner_id, row_language, slug in candidates:
+    level: dict[tuple[int, str], list[str]] = {}
+    for owner_id, row_language, slug, tree_path, depth in candidates:
         if row_language == language or owner_id not in translated:
-            owners.setdefault(slug, set()).add(owner_id)
-    return owners
+            level.setdefault((depth, slug), []).append(tree_path)
+    found: dict[str, str] = {}
+    for value, slug_path in paths.items():
+        parent = ""
+        for depth, slug in enumerate(slug_path, start=1):
+            matches = [p for p in level.get((depth, slug), []) if p.startswith(parent)]
+            if len(matches) != 1:
+                break
+            parent = matches[0]
+        else:
+            found[value] = parent
+    return found
 
 
 def listing_term_keys(language: str) -> dict[str, Taxonomy]:
     """The filterable taxonomies by their slug in `language` (EN fallback): the query keys of
-    the term filters. A slug equal to a reserved listing parameter is left out."""
+    the term filters. A slug equal to a reserved listing parameter is left out.
+
+    The slug constraint holds per language, so one taxonomy's slug in `language` can equal
+    another's EN fallback slug: the slug in `language` wins, and the clash is logged.
+    """
     source = translations.source_language()
     by_taxonomy: dict[int, TaxonomyTranslation] = {}
     rows = TaxonomyTranslation.objects.filter(
@@ -1150,11 +1178,24 @@ def listing_term_keys(language: str) -> dict[str, Taxonomy]:
     for row in rows:
         if row.taxonomy_id not in by_taxonomy or row.language == language:
             by_taxonomy[row.taxonomy_id] = row
-    return {
-        row.slug: row.taxonomy
-        for row in by_taxonomy.values()
-        if row.slug and row.slug not in listings.RESERVED_KEYS
-    }
+    keys: dict[str, TaxonomyTranslation] = {}
+    for row in sorted(by_taxonomy.values(), key=lambda r: r.taxonomy_id):
+        if not row.slug or row.slug in listings.RESERVED_KEYS:
+            continue
+        taken = keys.get(row.slug)
+        if taken is not None:
+            kept, dropped = (taken, row) if taken.language == language else (row, taken)
+            logger.warning(
+                "Listing filter key %r in %r: taxonomy %s (fallback slug) is hidden by "
+                "taxonomy %s; give it a slug in this language.",
+                row.slug,
+                language,
+                dropped.taxonomy.code,
+                kept.taxonomy.code,
+            )
+            row = kept
+        keys[row.slug] = row
+    return {slug: row.taxonomy for slug, row in keys.items()}
 
 
 def parse_listing_query(query: Mapping[str, Sequence[str]], language: str) -> listings.ParsedParams:
@@ -1162,36 +1203,32 @@ def parse_listing_query(query: Mapping[str, Sequence[str]], language: str) -> li
     return listings.parse_listing_params(query, term_keys=listing_term_keys(language).keys())
 
 
-def _paths(model: Any, ids: Iterable[int]) -> tuple[str, ...]:
-    return tuple(
-        model.objects.filter(pk__in=set(ids)).order_by("path").values_list("path", flat=True)
-    )
-
-
 def resolve_listing_filter(params: listings.ListingParams, language: str) -> ResolvedFilter:
     """Turn the slugs of `params` into a filter. A value that matches nothing (a renamed term,
     a closed vendor) is reported in `unknown`, and the filter then matches nothing: the
-    adapter answers 404 or redirects to the canonical URL without it."""
+    adapter answers 404 or redirects to the canonical URL without it. Category and term values
+    are slug paths from the top of their tree (`parent/child`)."""
     unknown: list[str] = []
     category_paths: tuple[str, ...] = ()
     if params.category:
-        owners = _owners_by_slug(
+        category = _paths_by_slug_path(
             CategoryTranslation.objects.all(), "category", [params.category], language
-        )
-        category_paths = _paths(Category, owners.get(params.category, set()))
-        if not category_paths:
+        ).get(params.category)
+        if category is not None:
+            category_paths = (category,)
+        else:
             unknown.append(listings.CATEGORY)
     taxonomies = listing_term_keys(language) if params.terms else {}
     term_groups: list[tuple[str, ...]] = []
     for key, term_slugs in params.terms:
         taxonomy = taxonomies.get(key)
-        owners = {}
+        found: dict[str, str] = {}
         if taxonomy is not None:
             rows = TermTranslation.objects.filter(term__taxonomy=taxonomy)
-            owners = _owners_by_slug(rows, "term", term_slugs, language)
-        if any(slug not in owners for slug in term_slugs):
+            found = _paths_by_slug_path(rows, "term", term_slugs, language)
+        if any(slug not in found for slug in term_slugs):
             unknown.append(key)
-        term_groups.append(_paths(Term, set().union(*owners.values())))
+        term_groups.append(tuple(sorted(set(found.values()))))
     vendor = None
     if params.vendor:
         vendor = Vendor.objects.filter(slug=params.vendor, status=Vendor.Status.ACTIVE).first()

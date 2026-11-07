@@ -2,7 +2,9 @@
 
 A listing page (category, taxonomy term, brand, vendor storefront) takes filters from its query
 string: `category`, one key per filterable taxonomy (the taxonomy's slug in the page language),
-`vendor`, `price_min`, `price_max`, and `page`. This module parses and normalises them, and
+`vendor`, `price_min`, `price_max`, and `page`. A category or term value is its slug path
+from the top of its tree (`parent/child`, the D-07 URL shape): slugs are unique among siblings
+only, so a bare child slug would be ambiguous. This module parses and normalises them, and
 writes them back in one canonical order, so a filtered or paginated listing has exactly one
 indexable URL, built on the page's current URL (for a term, the URL its `url_mode` gives).
 
@@ -28,8 +30,13 @@ PAGE = "page"
 RESERVED_KEYS = frozenset({CATEGORY, VENDOR, PRICE_MIN, PRICE_MAX, PAGE})
 
 # Same shape as the stored URL slugs (catalog.taxonomy.url_slug_validator, vendor slugs).
-_SLUG = re.compile(r"^[a-z0-9]+(?:[-_][a-z0-9]+)*$")
-_PAGE = re.compile(r"^[0-9]+$")
+_SEGMENT = r"[a-z0-9]+(?:[-_][a-z0-9]+)*"
+_SLUG = re.compile(rf"^{_SEGMENT}$")
+# A category or term: the slugs from the top of its tree, joined by "/".
+_SLUG_PATH = re.compile(rf"^{_SEGMENT}(?:/{_SEGMENT})*$")
+PATH_SEPARATOR = "/"
+# Nine digits: far beyond any real listing, and int() never sees an oversized string.
+_PAGE = re.compile(r"^[0-9]{1,9}$")
 
 
 @dataclass(frozen=True)
@@ -71,9 +78,14 @@ class ParsedParams:
     ignored: tuple[str, ...] = ()  # keys that are not listing filters (tracking, other pages)
 
 
-def _slug(value: str) -> str | None:
+def _slug(value: str, pattern: re.Pattern[str] = _SLUG) -> str | None:
     slug = value.strip().lower()
-    return slug if _SLUG.match(slug) else None
+    return slug if pattern.match(slug) else None
+
+
+def slug_path(value: str) -> tuple[str, ...]:
+    """The slugs of a category or term value, from the top of its tree."""
+    return tuple(value.split(PATH_SEPARATOR))
 
 
 def _amount(value: str) -> Decimal:
@@ -91,8 +103,9 @@ def parse_listing_params(
     """Listing filters from a query (`dict(request.GET.lists())`).
 
     `term_keys` are the slugs of the filterable taxonomies in the page language. Single-value
-    keys keep their first value; term keys take repeated values and comma-separated lists. A
-    reversed price range is swapped.
+    keys keep their first value; term keys take repeated values and comma-separated lists.
+    Category and term values are slug paths (`parent/child`). A reversed price range is
+    swapped.
     """
     clash = RESERVED_KEYS.intersection(term_keys)
     if clash:
@@ -105,11 +118,11 @@ def parse_listing_params(
             errors.append(f"{key}: only one value is allowed")
         return values[0] if values else None
 
-    def slug_of(key: str) -> str | None:
+    def slug_of(key: str, pattern: re.Pattern[str] = _SLUG) -> str | None:
         raw = single(key)
         if raw is None:
             return None
-        slug = _slug(raw)
+        slug = _slug(raw, pattern)
         if slug is None:
             errors.append(f"{key}: {raw!r} is not a valid slug")
         return slug
@@ -124,7 +137,7 @@ def parse_listing_params(
             errors.append(f"{key}: {raw!r} is not a valid amount")
             return None
 
-    category = slug_of(CATEGORY)
+    category = slug_of(CATEGORY, _SLUG_PATH)
     vendor = slug_of(VENDOR)
     price_min, price_max = amount_of(PRICE_MIN), amount_of(PRICE_MAX)
     if price_min is not None and price_max is not None and price_min > price_max:
@@ -133,8 +146,9 @@ def parse_listing_params(
     page = 1
     raw_page = single(PAGE)
     if raw_page is not None:
-        if _PAGE.match(raw_page.strip()) and int(raw_page) >= 1:
-            page = int(raw_page)
+        digits = raw_page.strip()
+        if _PAGE.match(digits) and int(digits) >= 1:
+            page = int(digits)
         else:
             errors.append(f"{PAGE}: {raw_page!r} is not a page number")
 
@@ -143,7 +157,7 @@ def parse_listing_params(
         slugs: set[str] = set()
         for value in query[key]:
             for part in value.split(","):
-                slug = _slug(part)
+                slug = _slug(part, _SLUG_PATH)
                 if slug is None:
                     errors.append(f"{key}: {part!r} is not a valid slug")
                 else:
@@ -190,7 +204,7 @@ def canonical_pairs(params: ListingParams) -> list[tuple[str, str]]:
 
 def canonical_query(params: ListingParams) -> str:
     """The canonical query string, without the "?"; empty for an unfiltered first page."""
-    return urlencode(canonical_pairs(params), safe=",", quote_via=quote)
+    return urlencode(canonical_pairs(params), safe=",/", quote_via=quote)
 
 
 def listing_url(base_path: str, params: ListingParams) -> str:
