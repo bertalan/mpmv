@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0002_auditlog_append_only'),
+        ('core', '0003_platform_operator'),
     ]
 
     operations = [
