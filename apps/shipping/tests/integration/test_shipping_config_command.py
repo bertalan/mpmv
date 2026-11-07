@@ -25,9 +25,11 @@ def run(*args: str) -> str:
 
 
 def vendor_file(tmp_path: Path, name: str = "config.json") -> tuple[Path, dict[str, object]]:
-    vendor = VendorFactory()
-    zone = ShippingZoneFactory(vendor=vendor, code="home", countries=["FR"])
-    ShippingMethodFactory(vendor=vendor, zone=zone, carrier=CarrierFactory(code="main"))
+    vendor = VendorFactory.create()
+    zone = ShippingZoneFactory.create(vendor=vendor, code="home", countries=["FR"])
+    ShippingMethodFactory.create(
+        vendor=vendor, zone=zone, carrier=CarrierFactory.create(code="main")
+    )
     document = export_config(vendor)
     path = tmp_path / name
     path.write_text(fmt.dump_csv(document) if name.endswith(".csv") else fmt.dump_json(document))
@@ -35,8 +37,8 @@ def vendor_file(tmp_path: Path, name: str = "config.json") -> tuple[Path, dict[s
 
 
 def test_export_prints_a_vendor_configuration_as_json_or_csv() -> None:
-    vendor = VendorFactory()
-    ShippingZoneFactory(vendor=vendor, code="home", countries=["FR"])
+    vendor = VendorFactory.create()
+    ShippingZoneFactory.create(vendor=vendor, code="home", countries=["FR"])
     printed = run("export", "--vendor", str(vendor.public_id))
     assert json.loads(printed) == export_config(vendor)
     csv_text = run("export", "--vendor", str(vendor.public_id), "--csv")
@@ -45,7 +47,7 @@ def test_export_prints_a_vendor_configuration_as_json_or_csv() -> None:
 
 def test_import_is_a_dry_run_unless_applied(tmp_path: Path) -> None:
     path, _ = vendor_file(tmp_path, "config.csv")
-    target = VendorFactory()
+    target = VendorFactory.create()
 
     report = json.loads(run("import", str(path), "--vendor", str(target.public_id)))
     assert report["ok"] is True
@@ -64,7 +66,7 @@ def test_an_invalid_file_fails_the_command_with_its_report(tmp_path: Path) -> No
     path, document = vendor_file(tmp_path)
     document["zones"][0]["countries"] = ["XX"]  # type: ignore[index]
     path.write_text(fmt.dump_json(document))
-    target = VendorFactory()
+    target = VendorFactory.create()
     out = StringIO()
     with pytest.raises(CommandError):
         call_command(
@@ -88,7 +90,7 @@ def test_staff_save_the_standard_template_and_a_vendor_copies_it(tmp_path: Path)
     assert template.is_standard
     assert template.document == document
 
-    vendor = VendorFactory()
+    vendor = VendorFactory.create()
     report = json.loads(run("copy-template", "--vendor", str(vendor.public_id), "--apply"))
     assert report["ok"] is True
     assert export_config(vendor) == document

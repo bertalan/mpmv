@@ -51,14 +51,14 @@ CTX = AuditContext(actor_id=1, actor_label="staff:shipping", source="admin", ip=
 
 def configured_vendor() -> Vendor:
     """A vendor with two own zones, a method on a platform zone, bands and a pickup option."""
-    carrier = CarrierFactory(code="main")
-    CountryGroupFactory(code="dach", countries=["AT", "CH", "DE"])
-    world = ShippingZoneFactory(code="world", world=True)
-    vendor = VendorFactory()
-    home = ShippingZoneFactory(
+    carrier = CarrierFactory.create(code="main")
+    CountryGroupFactory.create(code="dach", countries=["AT", "CH", "DE"])
+    world = ShippingZoneFactory.create(code="world", world=True)
+    vendor = VendorFactory.create()
+    home = ShippingZoneFactory.create(
         vendor=vendor, code="home", countries=["FR"], country_groups=["dach"]
     )
-    islands = ShippingZoneFactory(
+    islands = ShippingZoneFactory.create(
         vendor=vendor,
         code="islands",
         priority=10,
@@ -66,7 +66,7 @@ def configured_vendor() -> Vendor:
         postcode_patterns=["846*", "70000..74999"],
         states=["SS"],
     )
-    standard = ShippingMethodFactory(
+    standard = ShippingMethodFactory.create(
         vendor=vendor,
         zone=home,
         carrier=carrier,
@@ -76,21 +76,21 @@ def configured_vendor() -> Vendor:
         tax_treatment=engine.STANDARD_RATE,
         over_max_weight=engine.QUOTE,
     )
-    WeightBandFactory(method=standard, from_kg=Decimal(0), to_kg=Decimal(5))
-    WeightBandFactory(
+    WeightBandFactory.create(method=standard, from_kg=Decimal(0), to_kg=Decimal(5))
+    WeightBandFactory.create(
         method=standard,
         from_kg=Decimal(5),
         to_kg=None,
         cost_net=Decimal("19.90"),
         surcharge_net=Decimal("1.50"),
     )
-    ShippingMethodFactory(
+    ShippingMethodFactory.create(
         vendor=vendor, zone=world, carrier=carrier, express=True, tax_treatment=engine.EXEMPT
     )
-    ShippingMethodFactory(
+    ShippingMethodFactory.create(
         vendor=vendor, zone=islands, carrier=carrier, key="standard", default=True
     )
-    PickupOptionFactory(vendor=vendor, key="shop", address="1 Example Street")
+    PickupOptionFactory.create(vendor=vendor, key="shop", address="1 Example Street")
     return vendor
 
 
@@ -150,7 +150,7 @@ def test_the_platform_export_holds_country_groups_and_platform_zones() -> None:
 
 def test_a_json_round_trip_into_another_vendor_is_lossless() -> None:
     document = export_config(configured_vendor())
-    other = VendorFactory()
+    other = VendorFactory.create()
 
     result = import_config(fmt.parse_json(fmt.dump_json(document)), vendor=other, ctx=CTX)
 
@@ -161,7 +161,7 @@ def test_a_json_round_trip_into_another_vendor_is_lossless() -> None:
 
 def test_a_csv_round_trip_into_another_vendor_is_lossless() -> None:
     document = export_config(configured_vendor())
-    other = VendorFactory()
+    other = VendorFactory.create()
 
     result = import_config(fmt.parse_csv(fmt.dump_csv(document)), vendor=other, ctx=CTX)
 
@@ -186,7 +186,7 @@ def test_importing_a_vendor_export_back_changes_nothing() -> None:
 
 def test_a_dry_run_reports_the_changes_and_writes_nothing() -> None:
     document = export_config(configured_vendor())
-    other = VendorFactory()
+    other = VendorFactory.create()
     before = configuration_counts()
 
     result = import_config(fmt.parse_json(document), vendor=other, ctx=CTX, dry_run=True)
@@ -203,7 +203,7 @@ def test_a_dry_run_reports_the_changes_and_writes_nothing() -> None:
 
 def test_an_import_audits_every_row_and_the_file() -> None:
     document = export_config(configured_vendor())
-    other = VendorFactory()
+    other = VendorFactory.create()
 
     import_config(fmt.parse_json(document), vendor=other, ctx=CTX, source="upload.json")
 
@@ -214,9 +214,10 @@ def test_an_import_audits_every_row_and_the_file() -> None:
     assert actions.count("shipping.pickupoption.created") == 1
     summary = AuditLog.objects.get(action="shipping.config.imported")
     assert summary.vendor_key == str(other.public_id)
-    assert summary.after["source"] == "upload.json"
-    assert summary.after["version"] == fmt.VERSION
-    assert summary.after["summary"] == {"create": 8, "update": 0, "delete": 0}
+    after = summary.after or {}
+    assert after["source"] == "upload.json"
+    assert after["version"] == fmt.VERSION
+    assert after["summary"] == {"create": 8, "update": 0, "delete": 0}
 
 
 # --- Invalid files (Done when: per-row report, nothing changes)
@@ -259,9 +260,9 @@ def test_an_invalid_file_is_rejected_with_a_per_row_report_and_changes_nothing()
 
 def test_a_database_rule_broken_late_rolls_back_the_rows_before_it() -> None:
     document = export_config(configured_vendor())
-    other = VendorFactory()
-    home = ShippingZoneFactory(vendor=other, code="home", countries=["FR"])
-    ShippingMethodFactory(vendor=other, zone=home, key="legacy", default=True)
+    other = VendorFactory.create()
+    home = ShippingZoneFactory.create(vendor=other, code="home", countries=["FR"])
+    ShippingMethodFactory.create(vendor=other, zone=home, key="legacy", default=True)
     before = configuration_counts()
 
     result = import_config(fmt.parse_json(document), vendor=other, ctx=CTX)
@@ -350,7 +351,7 @@ def test_a_platform_file_holds_no_vendor_rows() -> None:
 
 
 def test_the_standard_template_is_validated_before_it_is_saved() -> None:
-    CarrierFactory(code="main")
+    CarrierFactory.create(code="main")
     document = fmt.empty_document()
     document["zones"] = [{"code": "home", "name": "Home", "priority": 0, "countries": ["XX"]}]
     document["methods"] = [{"zone": "elsewhere", "carrier": "main"}]
@@ -379,7 +380,7 @@ def test_a_vendor_copies_the_standard_template_and_customises_it() -> None:
     assert AuditLog.objects.filter(action="shipping.shippingtemplate.created").exists()
     assert standard_template() == template
 
-    vendor = VendorFactory()
+    vendor = VendorFactory.create()
     preview = copy_template(template, vendor, ctx=CTX, dry_run=True)
     assert preview.ok
     assert not preview.applied
@@ -390,7 +391,7 @@ def test_a_vendor_copies_the_standard_template_and_customises_it() -> None:
     copied = AuditLog.objects.get(
         action="shipping.config.imported", vendor_key=str(vendor.public_id)
     )
-    assert copied.after["source"] == "template:standard"
+    assert (copied.after or {})["source"] == "template:standard"
 
     band = WeightBand.objects.get(method__vendor=vendor, method__zone__code="home", to_kg=5)
     band.cost_net = Decimal("7.50")
@@ -398,7 +399,7 @@ def test_a_vendor_copies_the_standard_template_and_customises_it() -> None:
 
     template.refresh_from_db()
     assert template.document == document
-    later = VendorFactory()
+    later = VendorFactory.create()
     copy_template(template, later, ctx=CTX)
     assert WeightBand.objects.get(
         method__vendor=later, method__zone__code="home", to_kg=5
@@ -406,12 +407,12 @@ def test_a_vendor_copies_the_standard_template_and_customises_it() -> None:
 
 
 def test_there_is_at_most_one_standard_template() -> None:
-    ShippingTemplateFactory(is_standard=True)
-    ShippingTemplateFactory(is_standard=False)
+    ShippingTemplateFactory.create(is_standard=True)
+    ShippingTemplateFactory.create(is_standard=False)
     with pytest.raises(IntegrityError):
-        ShippingTemplateFactory(is_standard=True)
+        ShippingTemplateFactory.create(is_standard=True)
 
 
 def test_without_a_standard_template_there_is_nothing_to_copy() -> None:
-    ShippingTemplateFactory(is_standard=False)
+    ShippingTemplateFactory.create(is_standard=False)
     assert standard_template() is None

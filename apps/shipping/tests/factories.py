@@ -1,4 +1,4 @@
-"""factory_boy factories for shipping (SHP.1, SHP.12). Synthetic values only.
+"""factory_boy factories for shipping (SHP.1, SHP.12, SHP.13). Synthetic values only.
 
 Codes and labels are generic ("carrier-0", "Zone 0", "group-0"); vendors come from the vendors
 factories (pseudonyms). Weight bands default to 0-5 kg; pass `from_kg`/`to_kg` explicitly in
