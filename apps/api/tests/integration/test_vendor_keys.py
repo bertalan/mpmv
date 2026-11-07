@@ -78,6 +78,7 @@ def test_a_vendor_member_lists_only_their_vendors_keys_and_never_platform_keys()
 def test_a_vendor_keys_actor_scope_is_its_vendor() -> None:
     key_a = ApiClientFactory.create(vendor_key=True)
     vendor_b = VendorFactory.create()
+    assert key_a.vendor is not None
 
     assert list(Vendor.objects.for_actor(key_a)) == [key_a.vendor]
     assert get_for_actor_or_404(Vendor, key_a, pk=key_a.vendor.pk) == key_a.vendor
@@ -93,6 +94,7 @@ def test_a_platform_keys_actor_scope_is_every_vendor() -> None:
 def test_deleting_a_vendor_deletes_its_keys_and_never_turns_them_into_platform_keys() -> None:
     key = ApiClientFactory.create(vendor_key=True)
     platform = ApiClientFactory.create()
+    assert key.vendor is not None
     delete_vendor(key.vendor, ctx=SYSTEM)
 
     assert not ApiClient.objects.filter(pk=key.pk).exists()
@@ -207,6 +209,7 @@ def test_a_platform_key_is_audited_without_a_vendor() -> None:
 
 def test_rotating_and_revoking_a_vendor_key_are_audited_under_its_vendor() -> None:
     client = ApiClientFactory.create(vendor_key=True)
+    assert client.vendor is not None
     rotate_api_key(client, ctx=SYSTEM)
     revoke_api_client(client, ctx=SYSTEM)
 

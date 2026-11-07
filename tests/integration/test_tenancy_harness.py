@@ -11,9 +11,9 @@ import pytest
 from django.db import models
 from django.test import Client
 
+from apps.api.models import ApiClient
 from apps.vendors.models import Vendor, VendorMember
 from apps.vendors.tests.factories import VendorMemberFactory, VendorTranslationFactory
-from apps.api.models import ApiClient
 from tests.tenancy import (
     ApiOperation,
     CrossTenant,

@@ -20,11 +20,15 @@ test the spec makes mandatory: Vendor A's member asks for Vendor B's data and mu
 `endpoints()` lists every URL pattern of a URLconf and `api_operations()` every API v1 operation,
 so `tests.integration.test_tenant_isolation` generates one test per endpoint and fails when one
 is not declared in `tests.tenancy_registry`.
+
+Web endpoints are called by Vendor A's owner, signed in. API v1 operations go through
+`check_api_operation` and are called with an API key bound to Vendor A that holds the
+operation's scope (CORE.13): a vendor key asking for Vendor B's object gets 404, never 403.
 """
 
 import re
-from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass, field
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from typing import Any
 from urllib.parse import quote
 
@@ -33,10 +37,12 @@ from django.http.response import HttpResponseBase
 from django.test import Client
 from django.urls import URLPattern, URLResolver, get_resolver, resolve
 from django.utils.regex_helper import normalize
+from ninja import NinjaAPI
 
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
+from apps.api.tests.factories import ApiClientFactory
 from apps.vendors.models import Vendor, VendorMember
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 from tests.factory_registry import project_models
@@ -101,13 +107,30 @@ def make_cross_tenant(makers: Iterable[ObjectMaker] = ()) -> CrossTenant:
 # --- Access classes
 
 # Signs the caller in on `client` and returns extra request headers (an API key, for example).
+# An access class without one uses the default caller of its surface: `member_session` for web
+# endpoints, `vendor_api_key(<the operation's scopes>)` for API v1 operations.
 Login = Callable[[Client, CrossTenant], dict[str, str]]
+
+# Given to a vendor key for an operation open to any valid key (`ApiKey(None)`).
+ANY_KEY_SCOPE = "catalog:read"
 
 
 def member_session(client: Client, tenants: CrossTenant) -> dict[str, str]:
     """Vendor A's owner, signed in with a verified second factor (owners need MFA, CORE.4)."""
     verified_login(client, tenants.a.owner)
     return {}
+
+
+def vendor_api_key(scopes: Sequence[str]) -> Login:
+    """An API key bound to Vendor A (CORE.13) with `scopes`, as an `Authorization` header."""
+
+    def login(client: Client, tenants: CrossTenant) -> dict[str, str]:
+        _, key = ApiClientFactory.create_with_key(
+            vendor=tenants.a.vendor, scopes=list(scopes) or [ANY_KEY_SCOPE]
+        )
+        return {"Authorization": f"Bearer {key}"}
+
+    return login
 
 
 def by_public_id(obj: models.Model) -> dict[str, str]:
@@ -125,7 +148,7 @@ class VendorScoped:
     make: ObjectMaker
     kwargs: Callable[[models.Model], dict[str, str]] = by_public_id
     methods: tuple[str, ...] = ("GET",)
-    login: Login = member_session
+    login: Login | None = None
 
 
 @dataclass(frozen=True)
@@ -138,7 +161,7 @@ class VendorScopedList:
     make: ObjectMaker
     identify: Callable[[models.Model], str] = public_id_of
     methods: tuple[str, ...] = ("GET",)
-    login: Login = member_session
+    login: Login | None = None
     kwargs: Mapping[str, str] = field(default_factory=dict)
 
 
@@ -161,7 +184,7 @@ class NoVendorData:
 
     reason: str
     kwargs: Mapping[str, str] = field(default_factory=dict)
-    login: Login = member_session
+    login: Login | None = None
     path: str | None = None
 
 
@@ -244,6 +267,7 @@ class ApiOperation:
     method: str
     path: str  # as in the OpenAPI description
     endpoint: Endpoint
+    scopes: tuple[str, ...] = ()  # API key scopes the operation requires (OpenAPI `security`)
 
     @property
     def key(self) -> str:
@@ -253,18 +277,27 @@ class ApiOperation:
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 
 
-def api_operations(urlconf: str | None = None) -> list[ApiOperation]:
-    """Every operation of the published API v1, with the URL pattern that serves it."""
-    from apps.api.v1.api import api
+def _required_scopes(operation: Mapping[str, Any]) -> tuple[str, ...]:
+    requirements = operation.get("security") or []
+    return tuple(
+        sorted({scope for req in requirements for scopes in req.values() for scope in scopes})
+    )
 
+
+def api_operations(urlconf: str | None = None, api: NinjaAPI | None = None) -> list[ApiOperation]:
+    """Every operation of `api` (default: the published API v1), with the URL pattern serving it."""
+    if api is None:
+        from apps.api.v1.api import api as published
+
+        api = published
     served = {openapi_path(e.route): e for e in endpoints(urlconf) if e.is_api_operation}
     operations: list[ApiOperation] = []
     for path, item in api.get_openapi_schema()["paths"].items():
         if path not in served:
             raise LookupError(f"API operation path {path} is not served by the URLconf")
         operations.extend(
-            ApiOperation(method.upper(), path, served[path])
-            for method in item
+            ApiOperation(method.upper(), path, served[path], _required_scopes(operation))
+            for method, operation in item.items()
             if method in HTTP_METHODS
         )
     return operations
@@ -339,13 +372,18 @@ def _assert_no_markers(
     tenants: CrossTenant,
     *objects: models.Model,
     body: str | None = None,
+    known: str = "",
 ) -> None:
     """Assert that the response (or its `body`, already read) shows nothing of B or B's `objects`.
 
     A streaming response can be read only once, so a caller that needs the body passes it.
+    Markers the caller sent in the request path (`known`) may be echoed back, e.g. as the
+    `instance` of an API problem: they tell the caller nothing new.
     """
     body = _body(response) if body is None else body
     for marker in tenants.markers(*objects):
+        if marker in known:
+            continue
         assert marker not in body, (
             f"{endpoint.key}: response shows another vendor's data ({marker})"
         )
@@ -355,10 +393,36 @@ def _snapshot(obj: models.Model) -> dict[str, Any] | None:
     return type(obj)._default_manager.filter(pk=obj.pk).values().first()
 
 
+def check_api_operation(
+    client: Client, operation: ApiOperation, access: Access, tenants: CrossTenant
+) -> None:
+    """The negative cross-tenant test of an API v1 operation, called with Vendor A's API key.
+
+    Unless the access class names its own `login`, the caller is an API key bound to Vendor A
+    with the operation's scope (`vendor_api_key`), and the operation's method is the one tested.
+    """
+    match access:
+        case VendorScoped() | VendorScopedList():
+            login = access.login or vendor_api_key(operation.scopes)
+            access = replace(access, login=login, methods=(operation.method,))
+        case NoVendorData():
+            access = replace(access, login=access.login or vendor_api_key(operation.scopes))
+        case StaffOnly():
+            raise TypeError(
+                f"{operation.key}: StaffOnly describes staff web pages; an API operation is "
+                "VendorScoped, VendorScopedList or NoVendorData"
+            )
+    check_endpoint(client, operation.endpoint, access, tenants, method=operation.method)
+
+
+def _login(access: VendorScoped | VendorScopedList | NoVendorData) -> Login:
+    return access.login or member_session
+
+
 def _check_vendor_scoped(
     client: Client, endpoint: Endpoint, access: VendorScoped, tenants: CrossTenant
 ) -> None:
-    headers = access.login(client, tenants)
+    headers = _login(access)(client, tenants)
     mine, theirs = access.make(tenants.a.vendor), access.make(tenants.b.vendor)
     their_path = endpoint.path(**access.kwargs(theirs))
     _assert_routes_to(endpoint, their_path)
@@ -373,7 +437,7 @@ def _check_vendor_scoped(
         assert _snapshot(theirs) == before, (
             f"{endpoint.key}: {method} changed another vendor's object before answering 404"
         )
-        _assert_no_markers(endpoint, response, tenants)
+        _assert_no_markers(endpoint, response, tenants, known=their_path)
 
     own = _request(client, access.methods[0], endpoint.path(**access.kwargs(mine)), headers)
     assert own.status_code != 404, (
@@ -389,7 +453,7 @@ def _sample_path(endpoint: Endpoint, kwargs: Mapping[str, str]) -> str:
 def _check_vendor_scoped_list(
     client: Client, endpoint: Endpoint, access: VendorScopedList, tenants: CrossTenant
 ) -> None:
-    headers = access.login(client, tenants)
+    headers = _login(access)(client, tenants)
     mine, theirs = access.make(tenants.a.vendor), access.make(tenants.b.vendor)
     path = _sample_path(endpoint, access.kwargs)
     _assert_routes_to(endpoint, path)
@@ -453,7 +517,7 @@ def _check_no_vendor_data(
     client: Client, endpoint: Endpoint, access: NoVendorData, tenants: CrossTenant, method: str
 ) -> None:
     seeded = tenants.seed_b()  # so that a page leaking vendor data has something to leak
-    headers = access.login(client, tenants)
+    headers = _login(access)(client, tenants)
     path = access.path or _sample_path(endpoint, access.kwargs)
     _assert_routes_to(endpoint, path)
     _assert_no_markers(endpoint, _request(client, method, path, headers), tenants, *seeded)
