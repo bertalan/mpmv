@@ -6,7 +6,6 @@ from django.views.decorators.http import require_POST
 
 from apps.core.i18n import configured_languages, translate_path
 
-from .models import User
 from .services import set_preferred_language
 
 
@@ -25,6 +24,6 @@ def switch_language(request: HttpRequest) -> HttpResponseRedirect:
     language = request.POST.get("language", "")
     if language not in configured_languages():
         return HttpResponseRedirect(next_url)
-    if isinstance(request.user, User):  # signed in; anonymous visitors are AnonymousUser
+    if request.user.is_authenticated:
         set_preferred_language(request.user, language)
     return HttpResponseRedirect(translate_path(next_url, language))
