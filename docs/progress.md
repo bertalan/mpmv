@@ -51,7 +51,6 @@ part of the done-when still open) · `not started`.
 | SHP.13 | done | #77 | Shipping configuration file format v1 (JSON and CSV), audited export/import with per-row report and all-or-nothing writes, `ShippingTemplate` with one standard template, `shipping_config` command |
 | CORE.14 | done | #75 | Vendor API keys limited to vendor-grantable scopes, suspended vendors read-only and closed vendors refused, per-key audit when a vendor is deleted. Security code, flagged for careful human review |
 | CAT.12 | done | #76 | Audited product and variant edit and delete services (fiscal category, sales mode, weight, dimensions), vendor and price rules enforced in the service, admin routed through them |
-| CAT.3 | in review | #84 | Typed attributes (choice, number, text) with translated names and value labels, ordered variant axes per product, variant options with one value per axis enforced in the database; `create_product` service with dry-run and audit; API v1 `POST /catalog/products`, `GET /catalog/products/{id}`, `GET /catalog/attributes` |
 
 ## Owner decisions 2026-11-07
 
