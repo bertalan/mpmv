@@ -43,6 +43,18 @@ jobs:
         run: |
           uv run python manage.py check
           uv run python manage.py makemigrations --check --dry-run
+      # CORE.7: publish the API v1 OpenAPI schema as a build artifact until STAGE serves it.
+      - name: Export and validate the OpenAPI schema
+        run: |
+          mkdir -p build
+          uv run python manage.py export_openapi_schema --api apps.api.v1.api.api \
+            --indent 2 --output build/openapi-v1.json
+          uv run openapi-spec-validator build/openapi-v1.json
+      - name: Store the OpenAPI schema
+        uses: actions/upload-artifact@v7
+        with:
+          name: openapi-v1
+          path: build/openapi-v1.json
       - name: Dependency audit (pip-audit)
         run: make audit
 

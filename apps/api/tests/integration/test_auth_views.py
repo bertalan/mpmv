@@ -1,4 +1,7 @@
-"""CORE.6 done-when: expired or out-of-scope key → 401/403, through a real Django view."""
+"""CORE.6 done-when: expired or out-of-scope key → 401/403, through a real Django view.
+
+Since CORE.7 the refusals are RFC 9457 problem details, as in API v1.
+"""
 
 import pytest
 from django.test import Client
@@ -21,7 +24,9 @@ def test_missing_credentials_are_401_with_a_bearer_challenge(client: Client) -> 
     response = client.get(URL)
     assert response.status_code == 401
     assert response["WWW-Authenticate"].startswith("Bearer")
-    assert response.json() == {"error": "unauthenticated", "reason": "missing_credentials"}
+    assert response["Content-Type"] == "application/problem+json"
+    assert response.json()["status"] == 401
+    assert response.json()["code"] == "missing_credentials"
 
 
 def test_expired_key_is_401(client: Client) -> None:
@@ -29,14 +34,14 @@ def test_expired_key_is_401(client: Client) -> None:
     response = client.get(URL, headers={"Authorization": f"Bearer {key}"})
     assert response.status_code == 401
     assert 'error="invalid_token"' in response["WWW-Authenticate"]
-    assert response.json() == {"error": "unauthenticated", "reason": "expired"}
+    assert response.json()["code"] == "expired"
 
 
 def test_revoked_key_is_401(client: Client) -> None:
     _, key = ApiClientFactory.create_with_key(revoked=True)
     response = client.get(URL, headers={"Authorization": f"Bearer {key}"})
     assert response.status_code == 401
-    assert response.json()["reason"] == "revoked"
+    assert response.json()["code"] == "revoked"
 
 
 def test_out_of_scope_key_is_403(client: Client) -> None:
@@ -45,7 +50,9 @@ def test_out_of_scope_key_is_403(client: Client) -> None:
     assert response.status_code == 403
     assert 'error="insufficient_scope"' in response["WWW-Authenticate"]
     assert 'scope="catalog:write"' in response["WWW-Authenticate"]
-    assert response.json() == {"error": "forbidden", "reason": "insufficient_scope"}
+    assert response["Content-Type"] == "application/problem+json"
+    assert response.json()["code"] == "insufficient_scope"
+    assert response.json()["required_scope"] == "catalog:write"
 
 
 def test_ip_outside_the_allow_list_is_403(client: Client) -> None:
@@ -54,5 +61,5 @@ def test_ip_outside_the_allow_list_is_403(client: Client) -> None:
     denied = client.get(URL, headers=headers, REMOTE_ADDR="203.0.113.7")
     allowed = client.get(URL, headers=headers, REMOTE_ADDR="198.51.100.9")
     assert denied.status_code == 403
-    assert denied.json()["reason"] == "ip_not_allowed"
+    assert denied.json()["code"] == "ip_not_allowed"
     assert allowed.status_code == 200

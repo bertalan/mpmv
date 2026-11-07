@@ -1,5 +1,6 @@
-"""Machine credentials for API v1 and MCP (CORE.6, spec 02 §2.2)."""
+"""API keys for API v1 and MCP (CORE.6, spec 02 §2.2) and the API mutation log (CORE.7)."""
 
+import uuid
 from typing import Any
 
 from django.contrib.postgres.fields import ArrayField
@@ -58,3 +59,43 @@ class ApiClient(BaseModel):
             "is_active": self.is_active,
             "revoked_at": self.revoked_at,
         }
+
+
+class ApiMutationLog(models.Model):
+    """One mutating API call (POST/PUT/PATCH/DELETE) by a known client: who, which key, what.
+
+    Complements AuditLog rather than replacing it: AuditLog records each applied domain change
+    (before/after), whatever the channel; this log records the *call*, including dry-runs,
+    refusals (403) and failures, which change nothing and so leave no AuditLog row. The two
+    join on `request_id`. Calls without a valid key are not stored (anonymous traffic must not
+    be able to fill the table); they go to the application log.
+
+    The client is stored by public id, name and key prefix, not as a foreign key, so rows
+    outlive the client. Request bodies and query strings are not stored (they may carry
+    personal data). Append-only: save guard plus a database trigger.
+    """
+
+    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    request_id = models.CharField(max_length=64, db_index=True)
+    client_public_id = models.UUIDField(db_index=True)
+    client_name = models.CharField(max_length=100)
+    key_prefix = models.CharField(max_length=PREFIX_LENGTH)
+    method = models.CharField(max_length=8)
+    path = models.CharField(max_length=500)
+    route = models.CharField(max_length=500, blank=True)
+    dry_run = models.BooleanField(default=False)
+    status_code = models.PositiveSmallIntegerField()
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    duration_ms = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"{self.created_at:%Y-%m-%d %H:%M} {self.key_prefix} {self.method} {self.path}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if self.pk is not None:
+            raise PermissionError("ApiMutationLog is append-only")
+        super().save(*args, **kwargs)

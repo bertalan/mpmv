@@ -30,7 +30,7 @@ from .engine import (
     parse_authorization,
     validate_scopes,
 )
-from .models import ApiClient
+from .models import ApiClient, ApiMutationLog
 
 logger = logging.getLogger(__name__)
 
@@ -166,7 +166,7 @@ def authenticate(
     authorization: str | None,
     *,
     ip: str | None,
-    required_scope: str,
+    required_scope: str | None,
     now: dt.datetime | None = None,
 ) -> AuthResult:
     """Check an `Authorization` header: 401 for bad/expired/revoked keys, 403 for IP or scope."""
@@ -189,3 +189,34 @@ def authenticate(
     ApiClient.objects.filter(pk=client.pk).update(last_used_at=now)
     client.last_used_at = now
     return AuthResult(decision, client)
+
+
+# --- Mutation log (CORE.7)
+
+
+def record_mutation_call(
+    client: ApiClient,
+    *,
+    request_id: str,
+    method: str,
+    path: str,
+    route: str,
+    dry_run: bool,
+    status_code: int,
+    ip: str | None,
+    duration_ms: int,
+) -> ApiMutationLog:
+    """Store one mutating API call by a known client (see ApiMutationLog for the scope)."""
+    return ApiMutationLog.objects.create(
+        request_id=request_id,
+        client_public_id=client.public_id,
+        client_name=client.name,
+        key_prefix=client.key_prefix,
+        method=method.upper(),
+        path=path[:500],
+        route=route[:500],
+        dry_run=dry_run,
+        status_code=status_code,
+        ip=ip,
+        duration_ms=max(duration_ms, 0),
+    )
