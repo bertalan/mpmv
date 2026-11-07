@@ -77,6 +77,7 @@ flowchart TD
   core --> accounts
   core --> themes
   core --> vendors
+  themes -.pure palette functions, THM.11.-> vendors
   accounts --> vendors
   vendors --> catalog
   vendors --> tax
@@ -109,12 +110,12 @@ flowchart TD
 |---|---|
 | Money | `Decimal` with 2 decimal places in the DB (`MoneyField` = `DecimalField(12,2)`), internal calculations to 4 decimal places, `ROUND_HALF_UP` rounding **per line**; explicit EUR currency |
 | Countries | ISO 3166-1 alpha-2 (`GR`, not `EL`); EU special territories modeled (see [05](05-tax.md)) |
-| Platform operator | Country, VAT number, regime, commission VAT mode, e-invoice channel and DAC7 authority come from the versioned `PlatformOperator` (`apps.core.services.current_operator(at)`); never a literal such as `"IT"` in application code (guarded by `tests/unit/test_no_platform_country_literal.py`; tests and migrations excluded) |
+| Platform operator | Country, VAT number, regime, commission VAT mode, e-invoice channel (informational only: the platform sends no e-invoices, see [00](00-vision-and-review.md)) and DAC7 authority come from the versioned `PlatformOperator` (`apps.core.services.current_operator(at)`); never a literal such as `"IT"` in application code (guarded by `tests/unit/test_no_platform_country_literal.py`; tests and migrations excluded) |
 | Identifiers | Internal `bigint` PK; UUID `public_id` for APIs and technical URLs; natural key `(vendor, sku)` |
 | History | Configuration tables with `valid_from` / `valid_to`; orders store snapshots, not live references |
 | Dry-run | Every mutating service accepts `dry_run=True` and returns a `ChangeSet` (diff) |
 | Audit | Every sensitive mutation writes an `AuditLog` (who, what, before/after, from where) |
-| Languages | Order EN (primary, source) → IT → DE → FR → ES → later languages; all five at go-live for interface text, visitor content in EN only until after go-live (D-18); languages are configuration; no hardcoded text in templates |
+| Languages | Order EN (primary, source) → IT → DE → FR → ES → later languages; all five at go-live for interface text, visitor content in EN only until after go-live, except the existing IT texts migrated from the current site (D-18); languages are configuration; no hardcoded text in templates |
 | Time | UTC in the DB; Europe/Rome for cron jobs and documents |
 
 ## 1.4 Example of the service + pure function pattern
