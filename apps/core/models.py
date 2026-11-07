@@ -15,7 +15,8 @@ from .countries import default_allowed_vendor_countries
 from .fields import CountryField, LanguageField
 
 # The dedicated platform owner permission (spec 02 roles, CMP.13): never implied by staff or
-# admin access. Checked as `core.platform_owner`.
+# admin access, superuser status included. Granted as `core.platform_owner`, directly or through a
+# group, and checked by `services.is_platform_owner`, not `has_perm` (true for any superuser).
 PLATFORM_OWNER_CODENAME = "platform_owner"
 
 
