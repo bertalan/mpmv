@@ -60,8 +60,10 @@ def test_empty_detail_and_instance_are_omitted() -> None:
 
 
 def test_extensions_cannot_override_standard_members() -> None:
+    with pytest.raises(ValueError, match="type"):
+        problem(400, type="about:blank")
     with pytest.raises(ValueError, match="status"):
-        problem(400, status=200)
+        problem(400).to_dict(status=200)
 
 
 def test_problem_is_immutable() -> None:

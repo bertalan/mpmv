@@ -109,6 +109,6 @@ def test_contract_check_flags_unsecured_operations_and_mutations_without_dry_run
     bad_api.add_router("", router)
     errors = check_api(bad_api)
     assert all(isinstance(e, Error) for e in errors)
-    assert sorted(e.id for e in errors) == ["api.E001", "api.E002"]
+    assert sorted(str(e.id) for e in errors) == ["api.E001", "api.E002"]
     assert any("/open" in e.msg for e in errors)
     assert any("/write" in e.msg for e in errors)

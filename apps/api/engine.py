@@ -145,18 +145,37 @@ def ip_allowed(ip: str | None, allowed: Sequence[str] | None) -> bool:
 
 
 def evaluate(
-    state: ClientState, *, now: dt.datetime, ip: str | None, required_scope: str
+    state: ClientState, *, now: dt.datetime, ip: str | None, required_scope: str | None
 ) -> Decision:
-    """Order: revoked → expired (401), then IP allow-list → scope (403)."""
+    """Order: revoked → expired (401), then IP allow-list → scope (403).
+
+    `required_scope=None` is for operations open to any valid key (e.g. `GET /api/v1/me`).
+    """
     if not state.is_active:
         return deny(Reason.REVOKED)
     if state.expires_at <= now:
         return deny(Reason.EXPIRED)
     if not ip_allowed(ip, state.allowed_ips):
         return deny(Reason.IP_NOT_ALLOWED)
-    if required_scope not in state.scopes:
+    if required_scope is not None and required_scope not in state.scopes:
         return deny(Reason.INSUFFICIENT_SCOPE)
     return ALLOWED
+
+
+def bearer_challenge(decision: Decision, required_scope: str | None, *, realm: str) -> str | None:
+    """The `WWW-Authenticate` value for a refusal (RFC 6750 §3), or None when none is due.
+
+    401 always gets a challenge (`invalid_token` unless credentials were missing); 403 gets one
+    only for a missing scope. A refused IP gets none: no token change would help.
+    """
+    if decision.status is AuthStatus.UNAUTHENTICATED:
+        challenge = f'Bearer realm="{realm}"'
+        if decision.reason is not Reason.MISSING:
+            challenge += ', error="invalid_token"'
+        return challenge
+    if decision.reason is Reason.INSUFFICIENT_SCOPE and required_scope is not None:
+        return f'Bearer realm="{realm}", error="insufficient_scope", scope="{required_scope}"'
+    return None
 
 
 # --- Issuance input

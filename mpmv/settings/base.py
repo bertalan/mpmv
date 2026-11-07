@@ -47,6 +47,8 @@ INSTALLED_APPS = [
     "django.contrib.postgres",  # range fields and exclusion constraints (validity periods)
     # Task queue tables, admin and `manage.py procrastinate`; used only via apps.core.tasks.
     "procrastinate.contrib.django",
+    # API v1 (CORE.7): serves the Swagger UI from local static files, without inline scripts.
+    "ninja",
     *LOCAL_APPS,
 ]
 
