@@ -72,9 +72,12 @@ def test_a_title_change_regenerates_the_slug_and_keeps_the_old_one() -> None:
     assert history(translation) == ["leather-bag-en"]
     assert changes.summary() == {"create": 1, "update": 1, "delete": 0}
     entry = slug_entries().get()
-    assert entry.before == {"language": "en", "slug": "leather-bag-en"}
-    assert entry.after == {"language": "en", "slug": "leather-travel-bag-en"}
+    vendor = str(translation.product.vendor.public_id)
+    assert entry.before == {"vendor": vendor, "language": "en", "slug": "leather-bag-en"}
+    assert entry.after == {"vendor": vendor, "language": "en", "slug": "leather-travel-bag-en"}
+    assert entry.target_model == "catalog.product"
     assert entry.target_key == str(translation.product.public_id)
+    assert entry.vendor_key == vendor
 
 
 def test_an_unchanged_title_changes_nothing() -> None:

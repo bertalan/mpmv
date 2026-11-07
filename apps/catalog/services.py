@@ -1,4 +1,5 @@
-"""Catalog services: audited price changes (CAT.1) and taxonomy queries (CAT.2).
+"""Catalog services: audited price changes (CAT.1), taxonomy queries (CAT.2) and product slugs
+with their history (CAT.5).
 
 Every price change goes through here, whatever the adapter (admin, API, import, MCP): it is
 validated, returned as a ChangeSet (dry-run) and written to the audit log. The 30-day price
@@ -6,18 +7,21 @@ history for the Omnibus rule (CMP.6) can be built from these audit rows.
 """
 
 import datetime as dt
+from collections.abc import Iterable
 from typing import Any
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q, QuerySet
+from django.utils import timezone
 
-from apps.core.audit import AuditContext
+from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.services import run_mutation
 
-from . import engine
-from .models import Category, Product, Term, Variant
+from . import engine, slugs
+from .models import Category, Product, ProductTranslation, SlugHistory, Term, Variant
 
 PRODUCT_MODEL = "catalog.product"
 VARIANT_MODEL = "catalog.variant"
@@ -157,3 +161,205 @@ def products_in_category(
     if include_secondary:
         in_tree |= Q(secondary_categories__path__startswith=category.path)
     return Product.objects.filter(in_tree).distinct()
+
+
+# --- Product slugs (CAT.5, spec 03 §3.2): `{title}-{lang}`, never the SKU; old slugs answer 301.
+
+TRANSLATION_MODEL = "catalog.producttranslation"
+SLUG_HISTORY_MODEL = "catalog.slughistory"
+SLUG_CHANGED = "catalog.product.slug_changed"
+OLD_SLUG_RECORDED = "catalog.product.old_slug_recorded"
+OLD_SLUG_MAX_LENGTH = 200  # SlugHistory.slug: legacy slugs may be longer than 80 characters
+
+
+class _SlugsOfOtherProducts:
+    """The current and old slugs of the other products in one language, asked one at a time:
+    collisions are rare, so a few lookups beat loading every slug of the catalog."""
+
+    def __init__(self, language: str, product_id: int) -> None:
+        self.language = language
+        self.product_id = product_id
+
+    def __contains__(self, slug: object) -> bool:
+        return (
+            ProductTranslation.objects.filter(language=self.language, slug=slug)
+            .exclude(product_id=self.product_id)
+            .exists()
+            or SlugHistory.objects.filter(language=self.language, slug=slug)
+            .exclude(product_id=self.product_id)
+            .exists()
+        )
+
+
+def _slug_snapshot(product: Product, language: str, slug: str) -> dict[str, Any]:
+    return {"vendor": str(product.vendor.public_id), "language": language, "slug": slug}
+
+
+def sync_product_slug(
+    translation: ProductTranslation, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Derive the translation's slug from its title; a replaced slug moves to SlugHistory.
+
+    The slug is unique per language among the current and old slugs of every other product, so
+    an old slug always redirects to one product in a single hop. Going back to one of the
+    product's own old slugs takes it out of the history (no redirect loop). Replacing a slug is
+    audited; a first slug is not (no URL changes).
+    """
+    with transaction.atomic():
+        current = (
+            ProductTranslation.objects.select_for_update(of=("self",))
+            .select_related("product__vendor")
+            .get(pk=translation.pk)
+        )
+        product, language, old_slug = current.product, current.language, current.slug
+        new_slug = slugs.unique_product_slug(
+            current.title, language, taken=_SlugsOfOtherProducts(language, product.pk)
+        )
+        changes = ChangeSet()
+        if new_slug == old_slug:
+            return changes
+
+        changes.update(
+            TRANSLATION_MODEL, str(current.public_id), {"slug": old_slug}, {"slug": new_slug}
+        )
+        reclaimed = SlugHistory.objects.filter(
+            product=product, language=language, slug=new_slug
+        ).first()
+        if reclaimed is not None:
+            changes.delete(
+                SLUG_HISTORY_MODEL,
+                str(reclaimed.public_id),
+                _slug_snapshot(product, language, new_slug),
+            )
+        kept = SlugHistory(product=product, language=language, slug=old_slug) if old_slug else None
+        if kept is not None:
+            changes.create(
+                SLUG_HISTORY_MODEL, str(kept.public_id), _slug_snapshot(product, language, old_slug)
+            )
+        if dry_run:
+            return changes
+
+        if reclaimed is not None:
+            reclaimed.delete()
+        if kept is not None:
+            kept.save()
+        # A queryset update: the slug is derived data, not a text of the translation workflow.
+        ProductTranslation.objects.filter(pk=current.pk).update(
+            slug=new_slug, updated_at=timezone.now()
+        )
+        if old_slug:
+            record(
+                ctx,
+                SLUG_CHANGED,
+                PRODUCT_MODEL,
+                str(product.public_id),
+                _slug_snapshot(product, language, old_slug),
+                _slug_snapshot(product, language, new_slug),
+            )
+    translation.slug = new_slug
+    return changes
+
+
+def rebuild_product_slugs(
+    *,
+    ctx: AuditContext,
+    dry_run: bool = False,
+    translations: "QuerySet[ProductTranslation] | None" = None,
+) -> ChangeSet:
+    """`sync_product_slug` for every translation (or the given ones), in id order.
+
+    This loads the current `{title}-{lang}-{sku}` slugs as history. A dry run checks each
+    translation against the stored slugs only, so it can miss a `-2` that two translations of
+    the same run would need.
+    """
+    queryset = ProductTranslation.objects.all() if translations is None else translations
+    changes = ChangeSet()
+    for translation in queryset.order_by("pk").iterator():
+        changes.changes.extend(sync_product_slug(translation, ctx=ctx, dry_run=dry_run).changes)
+    return changes
+
+
+def record_old_slugs(
+    product: Product,
+    language: str,
+    old_slugs: Iterable[str],
+    *,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Add old slugs of `product` in `language` to SlugHistory (e.g. the legacy old slugs).
+
+    The product's current slug and the slugs already in its history are skipped. A slug that
+    is not valid, or that another product uses (current or old), stops the load with a
+    ValidationError naming the slugs; nothing is written.
+    """
+    if language not in dict(settings.LANGUAGES):
+        raise ValidationError(f"Unknown language: {language}.")
+    wanted = list(dict.fromkeys(old_slugs))
+    invalid = [slug for slug in wanted if not slugs.is_slug(slug, max_length=OLD_SLUG_MAX_LENGTH)]
+    if invalid:
+        raise ValidationError(f"These are not valid slugs: {', '.join(invalid)}.")
+    with transaction.atomic():
+        product = (
+            Product.objects.select_for_update(of=("self",))
+            .select_related("vendor")
+            .get(pk=product.pk)
+        )
+        own = {
+            *ProductTranslation.objects.filter(product=product, language=language).values_list(
+                "slug", flat=True
+            ),
+            *SlugHistory.objects.filter(product=product, language=language).values_list(
+                "slug", flat=True
+            ),
+        }
+        new = [slug for slug in wanted if slug not in own]
+        others = {
+            *ProductTranslation.objects.filter(language=language, slug__in=new)
+            .exclude(product=product)
+            .values_list("slug", flat=True),
+            *SlugHistory.objects.filter(language=language, slug__in=new)
+            .exclude(product=product)
+            .values_list("slug", flat=True),
+        }
+        if others:
+            raise ValidationError(
+                f"These slugs belong to another product: {', '.join(sorted(others))}."
+            )
+        entries = [SlugHistory(product=product, language=language, slug=slug) for slug in new]
+        changes = ChangeSet()
+        for entry in entries:
+            changes.create(
+                SLUG_HISTORY_MODEL,
+                str(entry.public_id),
+                _slug_snapshot(product, language, entry.slug),
+            )
+        run_mutation(
+            changes,
+            lambda: SlugHistory.objects.bulk_create(entries),
+            ctx=ctx,
+            action=OLD_SLUG_RECORDED,
+            dry_run=dry_run,
+        )
+    return changes
+
+
+def old_slug_redirect(language: str, slug: str) -> str | None:
+    """The current product path an old slug moves to (one hop); None if the slug is not old,
+    or its product has no current slug in that language."""
+    product_id = (
+        SlugHistory.objects.filter(language=language, slug=slug)
+        .values_list("product_id", flat=True)
+        .first()
+    )
+    if product_id is None:
+        return None
+    current = (
+        ProductTranslation.objects.filter(product_id=product_id, language=language)
+        .exclude(slug="")
+        .values_list("slug", flat=True)
+        .first()
+    )
+    if current is None:
+        return None
+    return slugs.product_path(language, current, default_language=settings.LANGUAGE_CODE)

@@ -6,7 +6,8 @@ class CatalogConfig(AppConfig):
     label = "catalog"
 
     # Audit policy (SEC.4, docs/dev/audit-trail.md).
-    audited_models = ()
+    # CAT.5: URL changes; written by services.sync_product_slug and services.record_old_slugs.
+    audited_models = ("slughistory",)
     unaudited_models = {
         "product": "catalog content; price changes are audited by services.set_product_price "
         "(CAT.1), publishing by the CAT.10 services",
