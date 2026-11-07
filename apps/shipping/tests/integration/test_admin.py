@@ -160,11 +160,12 @@ def test_changing_a_band_is_audited_with_before_and_after(staff_client: Client) 
     assert entry.before["cost_net"] == "9.90"
     assert entry.after is not None
     assert entry.after["cost_net"] == "11.50"
+    assert entry.vendor_key == str(rate.vendor.public_id)
     assert not AuditLog.objects.filter(action="shipping.vendorzonerate.updated").exists()
 
 
-def test_deleting_a_rate_is_audited(staff_client: Client) -> None:
-    rate = VendorZoneRateFactory.create()
+def test_deleting_a_rate_is_audited_with_its_bands(staff_client: Client) -> None:
+    rate = WeightBandFactory.create().rate
     response = staff_client.post(
         reverse("admin:shipping_vendorzonerate_delete", args=[rate.pk]), {"post": "yes"}
     )
@@ -173,6 +174,7 @@ def test_deleting_a_rate_is_audited(staff_client: Client) -> None:
     entry = AuditLog.objects.get(action="shipping.vendorzonerate.deleted")
     assert entry.target_key == str(rate.public_id)
     assert entry.after is None
+    assert AuditLog.objects.filter(action="shipping.weightband.deleted").count() == 1
 
 
 def test_deleting_a_band_inline_is_audited(staff_client: Client) -> None:
