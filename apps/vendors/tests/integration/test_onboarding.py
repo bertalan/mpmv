@@ -116,6 +116,23 @@ def test_an_application_starts_as_applicant_whatever_the_instance_says() -> None
     assert Vendor.objects.get().status == Vendor.Status.APPLICANT
 
 
+def test_an_application_does_not_keep_checks_or_links_set_by_the_caller() -> None:
+    user = UserFactory.create()
+    vendor = application(vat_number="IT00743110157")
+    vendor.vies_status = Vendor.ViesStatus.VALID
+    vendor.vies_checked_at = timezone.now()
+    vendor.legacy_wp_user_id = 42
+    changes = submit_application(vendor, user, ctx=vendor_ctx(user.pk))
+
+    stored = Vendor.objects.get()
+    assert stored.vies_status == Vendor.ViesStatus.UNCHECKED
+    assert stored.vies_checked_at is None
+    assert stored.legacy_wp_user_id is None
+    created = changes.changes[0].after
+    assert created is not None
+    assert created["legacy_wp_user_id"] is None  # the audit row shows what was stored
+
+
 def test_an_application_dry_run_creates_nothing() -> None:
     user = UserFactory.create()
     changes = submit_application(application(), user, ctx=vendor_ctx(user.pk), dry_run=True)
@@ -357,6 +374,21 @@ def test_vendor_staff_and_strangers_cannot_accept_for_the_vendor() -> None:
     assert not ContractAcceptance.objects.exists()
 
 
+def test_an_inactive_owner_cannot_accept_the_contract() -> None:
+    member = onboarding_owner()
+    VendorContractFactory.create()
+    member.user.is_active = False
+    member.user.save()
+    with pytest.raises(engine.ContractNotAcceptable, match="owner"):
+        accept(member.vendor, member.user, language="en", ctx=vendor_ctx(member.user.pk))
+    with pytest.raises(engine.ContractNotAcceptable):
+        accept(
+            member.vendor, member.user, language="en", ctx=vendor_ctx(member.user.pk), dry_run=True
+        )
+    assert not ContractAcceptance.objects.exists()
+    assert not AuditLog.objects.exists()
+
+
 @pytest.mark.parametrize("status", [Vendor.Status.APPLICANT, Vendor.Status.CLOSED])
 def test_applicants_and_closed_vendors_cannot_accept(status: str) -> None:
     member = VendorMemberFactory.create(vendor=VendorFactory.create(status=status))
@@ -511,6 +543,28 @@ def _in_thread(work: Callable[[], object]) -> tuple[threading.Thread, list[objec
     thread = threading.Thread(target=run)
     thread.start()
     return thread, outcome
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("existing", [0, 1], ids=["first version", "next version"])
+def test_two_new_versions_saved_at_once_are_numbered_one_after_the_other(existing: int) -> None:
+    now = timezone.now()
+    if existing:
+        save_contract(VendorContract(valid_from=now - dt.timedelta(days=30)), ctx=STAFF_CTX)
+    with transaction.atomic():
+        mine = VendorContract(valid_from=now - dt.timedelta(days=2))
+        save_contract(mine, ctx=STAFF_CTX)
+        thread, outcome = _in_thread(
+            lambda: save_contract(
+                VendorContract(valid_from=now - dt.timedelta(days=1)), ctx=STAFF_CTX
+            )
+        )
+        _wait_for_a_blocked_query()
+    thread.join(timeout=10)
+    assert len(outcome) == 1
+    assert isinstance(outcome[0], ChangeSet), outcome[0]
+    versions = list(VendorContract.objects.order_by("version").values_list("version", flat=True))
+    assert versions == list(range(1, existing + 3))
 
 
 @pytest.mark.django_db(transaction=True)

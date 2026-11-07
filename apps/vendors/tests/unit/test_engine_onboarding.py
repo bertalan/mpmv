@@ -76,6 +76,7 @@ def test_accepting_an_older_version_does_not_count() -> None:
     assert not result.ready
     contract = result.items[0]
     assert contract.missing == ("version 3",)
+    assert result.current_contract_version == 3  # what the admin shows
 
 
 def test_without_any_contract_nobody_can_be_activated() -> None:
@@ -84,6 +85,7 @@ def test_without_any_contract_nobody_can_be_activated() -> None:
     )
     assert not result.ready
     assert result.items[0].missing == ("no contract is in force",)
+    assert result.current_contract_version is None
 
 
 def test_activation_passes_when_ready() -> None:

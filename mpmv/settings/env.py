@@ -49,10 +49,14 @@ def env_secret_list(name: str) -> list[str]:
     """Secrets from the file named by `<name>_FILE` (one per line, `#` comments), else `name`.
 
     The file form keeps keys out of the process environment (e.g. a Podman secret, SEC.3).
+    Both set (not empty) is a configuration error: silently preferring one of them would hide
+    a key someone meant to use.
     """
     path = os.environ.get(f"{name}_FILE", "")
     if not path:
         return env_list(name)
+    if env_list(name):
+        raise ImproperlyConfigured(f"{name} and {name}_FILE are both set: keep one of them.")
     try:
         text = Path(path).read_text(encoding="utf-8")
     except OSError as exc:
