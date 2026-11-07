@@ -143,6 +143,17 @@ def test_a_simple_product_cannot_get_variants(
     assert not Product.objects.exists()
 
 
+@pytest.mark.parametrize("dry_run", [True, False])
+def test_a_zero_price_is_refused_as_a_validation_error(
+    attributes: dict[str, Attribute], vendor: Vendor, dry_run: bool
+) -> None:
+    # CAT.14 (Q-31): a price is never 0.00. The service reports it before the database check.
+    data = t_shirt(price_net=Decimal("0.00"))
+    with pytest.raises(ValidationError, match=r"cannot be 0\.00"):
+        create_product(vendor, data, ctx=CTX, dry_run=dry_run)
+    assert not Product.objects.exists()
+
+
 def test_an_unknown_value_is_refused(attributes: dict[str, Attribute], vendor: Vendor) -> None:
     data = t_shirt(attributes=(engine.AttributeIn("size", values=("xxl",), axis=True),))
     with pytest.raises(ValidationError, match="size has no value xxl"):
