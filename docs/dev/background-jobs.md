@@ -26,7 +26,7 @@ Where to look:
 - **CLI**: `uv run python manage.py procrastinate healthchecks` checks the connection and the
   queue tables; `uv run python manage.py procrastinate --help` lists the other commands.
 
-STAGE and LIVE run the same command in a dedicated `worker` container (ARC.5, ADR-0005).
+STAGE and LIVE run the same command in a dedicated `worker` container (ARC.5, [ADR-0007](../adr/0007-hosting-hetzner-self-managed-postgres.md)).
 
 ## Declaring a job
 

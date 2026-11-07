@@ -12,6 +12,10 @@ os.environ.setdefault("MPMV_FIELD_ENCRYPTION_KEYS", generate_key("test"))
 
 from .base import *  # noqa: F403
 
+# Feature flags: the code defaults, whatever the shell exports, read from the database on every
+# check (tests roll back their writes, so a cached value could leak into the next test).
+FEATURE_FLAGS = {}
+FEATURE_FLAGS_CACHE_SECONDS = 0
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]  # fast hashing in tests only
 
 # Parallel runs (several agents or worktrees) each get their own test database.

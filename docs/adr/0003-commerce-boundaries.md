@@ -26,7 +26,7 @@ we write ourselves and what we delegate. Anything we write, we also maintain, te
 | Concern | Delegated to | Our side |
 |---|---|---|
 | Card and wallet payments, KYC, payouts | Stripe Connect (Express) | `PaymentGateway` protocol and webhooks |
-| E-invoicing transmission | Accredited SDI intermediary | `EInvoiceChannel` interface |
+| E-invoicing transmission | Nobody: superseded on 2026-11-07, see the update below | None |
 | Transactional email delivery | EU email provider API | Templates and events |
 | Cookie consent | Certified CMP (D-10) | Consent Mode wiring |
 | VAT number validation | VIES | Cached `VatValidation` records |
@@ -42,3 +42,10 @@ PostgreSQL full-text and trigram search.
 - Each delegated concern sits behind an interface we own, so we can switch providers without
   touching domain code.
 - Out-of-scope items need a new ADR before any code is written.
+
+## Update 2026-11-07: no invoicing
+
+The owner decided that the platform issues no invoices and keeps no bookkeeping (spec 00 and
+11). The `EInvoiceChannel` interface and the SDI intermediary are dropped: the platform issues only
+non-fiscal documents (order confirmations, the CMP.2 commission statement, payout statements), and
+the operator's accountant and the vendors invoice with their own tools.

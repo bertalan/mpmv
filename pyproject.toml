@@ -35,6 +35,11 @@ dev = [
   "pytest-playwright>=0.7",
   "factory-boy>=3.3.3",
   "openapi-spec-validator>=0.9.0",
+  # OPS.4: workflow and Dependabot config checks, CycloneDX SBOM of the Python environment.
+  "pyyaml>=6.0.3",
+  "types-pyyaml>=6.0",
+  "check-jsonschema>=0.39.0",
+  "cyclonedx-bom>=7.6.0,<8",
 ]
 
 [tool.uv]

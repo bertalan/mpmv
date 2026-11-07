@@ -6,7 +6,8 @@ import factory
 from django.utils import timezone
 from factory.django import DjangoModelFactory
 
-from apps.core.models import AuditLog, Heartbeat, PlatformOperator, Throttle
+from apps.core import flags
+from apps.core.models import AuditLog, FeatureFlag, Heartbeat, PlatformOperator, Throttle
 
 
 def utc(year: int, month: int = 1, day: int = 1, hour: int = 0) -> dt.datetime:
@@ -89,3 +90,26 @@ class ThrottleFactory(DjangoModelFactory[Throttle]):
     failures = 1
     locked_until = None
     expires_at = factory.LazyFunction(lambda: timezone.now() + dt.timedelta(days=1))
+
+
+def _registered_flag(n: int) -> str:
+    names = [spec.name for spec in flags.registered_flags()]
+    return names[n % len(names)]
+
+
+class FeatureFlagFactory(DjangoModelFactory[FeatureFlag]):
+    """The staff switch of a registered flag, at its environment default (ARC.8).
+
+    Names cycle through the registered flags, and rows are looked up by name: the kill switch
+    rows exist from the first migrate, so `FeatureFlagFactory()` returns one of them. For a flag
+    of your own, register it with `apps.core.tests.flags.registered` and pass its name. Services
+    validate names; use `.build()` with `save_flag`.
+    """
+
+    class Meta:
+        model = FeatureFlag
+        django_get_or_create = ("name",)
+
+    name = factory.Sequence(_registered_flag)
+    state = FeatureFlag.State.DEFAULT
+    note = ""

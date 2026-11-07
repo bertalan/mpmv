@@ -139,9 +139,9 @@ Goal: a vendor with a WooCommerce website is activated **without writing code**.
 | ING.2 | Port of `state.py` (source state, change history, stock state) to Django models + existing tests | P1 | 12 | ING.1 | Current pytest suite passes on the new storage |
 | ING.3 | HTML adapter (Vendor A) + generic Store API adapter | P1 | 12 | ING.2 | Dry-run equivalent to the current one |
 | ING.4 | Port of extraction (step 5) and JSON mappings → MappingTable with FKs | P1 | 10 | ING.1, CAT.2 | Same output as step 5 on 50 sample products |
-| ING.5 | `TextEnricher` (Gemini) with policy, schema validation, version archive | P1 | 8 | ING.1 | Out-of-policy texts end up in review |
+| ING.5 | `TextEnricher` (Gemini) with policy, schema validation, version archive; EN texts only until after go-live (D-18; other languages through I18N.4 and I18N.8) | P1 | 8 | ING.1 | Out-of-policy texts end up in review |
 | ING.6 | Images: hash → storage → rendition pipeline, cover protection | P1 | 6 | CAT.4 | Changed photos detected by hash |
-| ING.7 | `publish_drafts` via `catalog.services` with dry-run and scheduled publication | P1 | 8 | CAT.10 | Draft → EN/IT product in one step |
+| ING.7 | `publish_drafts` via `catalog.services` with dry-run and scheduled publication | P1 | 8 | CAT.10 | Draft → published EN product in one step; an IT translation migrated by MIG.3 is kept |
 | ING.8 | `plan_stock_actions` / `plan_price_actions` + jobs and ReviewItem | P1 | 10 | ING.2 | Supplier rules (404, stale, >15%, sales) green |
 | ING.9 | XLSX adapter (Vendor B), publisher feed (Vendor D), YAML light (Vendor E), generic CSV | P1 | 16 | ING.4 | One dry-run per vendor |
 | ING.10 | Daily report (email + admin page) with identity anomalies | P2 | 6 | ING.8, ARC.16 | Parity with `daily_report.py` |

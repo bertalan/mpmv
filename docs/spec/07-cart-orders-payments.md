@@ -28,6 +28,7 @@ class StockReservation(Model):                 # oversell prevention
 
 class Order(Model):
     number (sequential with configurable prefix, e.g. "2027-000123"); public_id; customer (null = guest); email; language
+    # the number is an order reference, never an invoice number: the vendor invoices (spec 00)
     billing_address; shipping_address (structured JSON + ISO country)
     customer_tax_status (b2c | b2b) ; vat_validation snapshot
     state = FSMField(...)                      # see diagram
@@ -113,6 +114,9 @@ class PaymentGateway(Protocol):
   charges allow only one destination account per payment.
 - A single payment collection flow: no "non-split" gateway leaving orphaned vendor credits.
 - Vendor not connected (currently Vendor E) → products not purchasable (`on_request`) until the account is active.
+- Connected accounts are in EU countries at go-live, since only EU-established vendors are
+  admitted (D-21, [11](11-compliance.md) CMP.13). Vendor countries outside the EU and cross-border
+  payouts are CMP.22. UK consumer consignments of £135 or less create no charge at all (CMP.14).
 - Customer funds do not sit in the platform's accounts beyond the technical time needed for the
   transfer (PSD2 constraint, to be confirmed with the advisor: D-08).
 - Methods: cards, Apple Pay and Google Pay; other Stripe methods (SEPA, PayPal via Stripe) to be checked
@@ -123,8 +127,11 @@ class PaymentGateway(Protocol):
 
 - Full or partial refund by line; VAT reversed using the rates in the snapshot.
 - Ledger: proportional `refund` and `commission_reversal`; `reverse_transfer` towards the vendor.
-- **Online withdrawal function** in the customer area ("Withdraw from contract" button with confirmation and
-  receipt on a durable medium): mandatory from 2026-06-19, see [11](11-compliance.md).
+- **Online withdrawal function** in the customer area (button labelled "withdraw from contract
+  here", in Italian "recedere dal contratto qui", then a confirmation labelled "confirm withdrawal",
+  in Italian "conferma recesso", and an acknowledgement on a durable medium with the date and time):
+  mandatory from 2026-06-19 (directive (EU) 2023/2673; Italy: article 54-bis of the Codice del
+  Consumo, added by legislative decree 209/2025), see [11](11-compliance.md).
 - Return: request per line → vendor authorization (or automatic within 14 days for withdrawal)
   → receipt → refund.
 
@@ -134,6 +141,11 @@ Orders with timeline and tracking, quotes to confirm, withdrawal and returns, ad
 deletion (anonymization, see GDPR), preferred language. Guest checkout allowed.
 
 ### Transactional emails (in the recipient's language)
+
+The platform sends order confirmations and order summaries, never invoices or receipts. Each
+order confirmation is per vendor, carries the vendor's identity, and is labelled "Documento non
+fiscale / Non-fiscal document" in the recipient's language; the vendor issues the invoice or
+receipt with its own tools ([00](00-vision-and-review.md)).
 
 Customer: order received, payment confirmed, shipped (tracking), quote received/ready,
 refund, withdrawal registered. Vendor: new order (only after payment), quote to be entered,
@@ -155,6 +167,6 @@ webhooks, quotes about to expire).
 | PAY.4 | Full/partial refunds with VAT and commissions reversed | P1 | 10 | PAY.3 | Partial refund cases green |
 | ORD.6 | Vendor fulfillment: accept, ship with tracking, delivered | P1 | 8 | ORD.2, CORE.9 | Vendor fulfills from its own panel |
 | ORD.7 | Customer area: orders, timeline, tracking, quotes | P1 | 10 | ORD.2 | Parity with My Account |
-| ORD.8 | Online withdrawal and returns flow | P1 | 12 | PAY.4, CMP.6, ARC.16 | Compliant withdrawal button, email receipt |
-| ORD.9 | Transactional emails per language (customer, vendor, staff) | P1 | 10 | ORD.2, ARC.16 | All emails in EN, IT, DE, FR and ES with snapshot tests |
+| ORD.8 | Online withdrawal and returns flow | P1 | 12 | PAY.4, CMP.6, ARC.16 | Withdrawal button "withdraw from contract here" (IT "recedere dal contratto qui") visible for the whole withdrawal period, confirmation "confirm withdrawal" (IT "conferma recesso"), acknowledgement email with content, date and time |
+| ORD.9 | Transactional emails per language (customer, vendor, staff); per-vendor order confirmation as a non-fiscal document | P1 | 10 | ORD.2, ARC.16 | All emails in EN, IT, DE, FR and ES with snapshot tests; the order confirmation (email and PDF) is per vendor, labelled "Documento non fiscale / Non-fiscal document" in all five languages, carries the order reference and never an invoice number, and no email or document calls itself an invoice or receipt |
 | ORD.10 | Checkout and payments kill-switch, alert on payment without transfer | P1 | 4 | ARC.8, PAY.3 | Kill-switch verified on STAGE |
