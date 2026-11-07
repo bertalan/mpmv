@@ -21,10 +21,10 @@
 
 ### CMP.1 — DAC7 `[P1]`
 - Dataset collected at vendor onboarding: legal name, VAT number/tax code, registered office address,
-  country of tax residence, IBAN, permanent establishment. Completeness = precondition for payouts:
-  the fields required per country and legal form are the staff-editable `LegalFieldRequirement`
-  rows (purpose `payout`, see [04](04-vendors-commissions-ledger.md), VEN.12). They are checked
-  when the vendor requests a payout, never when it edits its profile or is activated.
+  country of tax residence, IBAN, permanent establishment. Completeness = precondition for payouts.
+  DAC7 completeness (`dac7_complete`, this task and VEN.7) is its own check on this dataset, for
+  every vendor including non-EU sellers. The staff-editable `LegalFieldRequirement` rows (VEN.12,
+  see [04](04-vendors-commissions-ledger.md)) are an additional payout gate and do not replace it.
 - Aggregation per vendor and quarter from the ledger (consideration, commissions, number of transactions).
 - Annual export in the format of the authority of the **platform's country of establishment**
   (`PlatformOperator`). ⚖️ Verify the exclusion thresholds (e.g. vendors with fewer than 30 sales and less than €2,000).

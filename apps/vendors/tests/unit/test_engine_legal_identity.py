@@ -221,6 +221,17 @@ def test_vat_prefix_of_greece_is_el() -> None:
     assert engine.split_vat_number(IT_VAT, "IT") == ("IT", IT_VAT)
 
 
+@pytest.mark.parametrize("value", ["CHE123456789", "che 123 456 789"])
+def test_swiss_vat_numbers_keep_che_it_is_not_a_country_prefix(value: str) -> None:
+    # The Swiss VAT number is the UID "CHE" + 9 digits: stripping "CH" would leave "E123456789".
+    assert engine.split_vat_number(value, "CH") == ("CH", "CHE123456789")
+    assert "vat_number" not in identity_errors(LegalIdentity(country="CH", vat_number=value))
+
+
+def test_eu_prefixes_followed_by_letters_are_still_stripped() -> None:
+    assert engine.split_vat_number("ATU12345678", "AT") == ("AT", "U12345678")
+
+
 def test_mask_iban_keeps_the_country_and_the_last_four_characters() -> None:
     assert mask_iban(IT_IBAN) == "IT" + "*" * 21 + "3456"
     assert mask_iban("") == ""
@@ -611,6 +622,66 @@ def test_non_eu_vendor_fiscal_representative() -> None:
         "Denominazione": "Representative Example S.r.l.",
     }
     assert fatturapa_fiscal_representative(LegalIdentity(country="IT")) is None
+    assert cessionario["DatiAnagrafici"]["IdFiscaleIVA"] == {
+        "IdPaese": "CH",
+        "IdCodice": "CHE123456789",
+    }
+    cedente = fatturapa_party(identity, CEDENTE)
+    assert cedente["DatiAnagrafici"]["IdFiscaleIVA"] == {
+        "IdPaese": "CH",
+        "IdCodice": "CHE123456789",
+    }
+
+
+def test_invalid_identifiers_are_reported_not_emitted() -> None:
+    identity = italian_company(
+        vat_number="12345678901",  # 11 digits, wrong check digit
+        tax_code="RSSMRA85T10A562T",  # wrong check character
+        eori="IT12345678901-",
+        registered_province="ZZ",
+        rea_office="ZZ",
+        sole_shareholder="XX",
+        share_capital=Decimal("-1"),
+    )
+    with pytest.raises(PartyBlockError) as excinfo:
+        fatturapa_party(identity, CEDENTE)
+    fields = {problem.split(":", 1)[0] for problem in excinfo.value.problems}
+    assert {
+        "vat_number",
+        "tax_code",
+        "eori",
+        "registered_province",
+        "rea_office",
+        "sole_shareholder",
+        "share_capital",
+    } <= fields
+    assert (
+        "vat_number: Not a valid Italian VAT number (11 digits with a check digit)."
+        in excinfo.value.problems
+    )
+
+
+def test_an_invalid_fiscal_representative_vat_number_is_reported() -> None:
+    identity = LegalIdentity(
+        country="CH",
+        legal_name="Vendor C AG",
+        vat_number="CHE123456789",
+        registered_street="Example Strasse",
+        registered_postal_code="8001",
+        registered_city="Zurich",
+        fiscal_representative_name="Representative Example S.r.l.",
+        fiscal_representative_vat_number="12345678901",
+    )
+    problem = (
+        "fiscal_representative_vat_number: "
+        "The fiscal representative needs a valid Italian VAT number."
+    )
+    with pytest.raises(PartyBlockError) as excinfo:
+        fatturapa_party(identity, CESSIONARIO)
+    assert excinfo.value.problems == (problem,)
+    with pytest.raises(PartyBlockError) as excinfo:
+        fatturapa_fiscal_representative(identity)
+    assert excinfo.value.problems == (problem,)
 
 
 def test_transmission_recipient() -> None:

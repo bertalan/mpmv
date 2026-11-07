@@ -243,7 +243,9 @@ def test_the_guard_checks_stored_data_not_unsaved_edits(seeded: None) -> None:
         assert_payout_allowed(vendor)
 
 
-def test_a_non_eu_vendor_has_no_requirement_by_default(seeded: None) -> None:
+def test_the_seeded_rows_require_nothing_from_a_non_eu_vendor(seeded: None) -> None:
+    # Only the LegalFieldRequirement gate: DAC7 completeness of non-EU sellers is a separate
+    # payout precondition (`dac7_complete`, CMP.1 / VEN.7), not decided by these rows.
     assert legal_profile_completeness(bare_vendor(country="US")).complete
 
 
@@ -339,6 +341,26 @@ def test_saving_legal_changes_writes_an_audit_row_with_the_iban_masked() -> None
     assert vendor.iban not in str(entry.before) + str(entry.after)
 
 
+def test_saving_refuses_present_but_invalid_values() -> None:
+    vendor = VendorFactory.create(italian_company=True)
+    stored_vat = vendor.vat_number
+    vendor.vat_number = "12345678901"  # wrong check digit
+    vendor.iban = "IT60X0542811101000000123457"  # wrong checksum
+    for dry_run in (True, False):
+        with pytest.raises(ValidationError) as excinfo:
+            save_vendor(vendor, ctx=CTX, dry_run=dry_run)
+        assert set(excinfo.value.message_dict) == {"vat_number", "iban"}
+    assert Vendor.objects.get(pk=vendor.pk).vat_number == stored_vat
+    assert AuditLog.objects.count() == 0
+
+
+def test_saving_accepts_an_incomplete_profile_and_stores_identifiers_compact() -> None:
+    vendor = bare_vendor(country="IT")
+    vendor.iban = "it60 x054 2811 1010 0000 0123 456"
+    save_vendor(vendor, ctx=CTX)
+    assert Vendor.objects.get(pk=vendor.pk).iban == "IT60X0542811101000000123456"
+
+
 def test_saving_other_fields_writes_no_audit_row() -> None:
     vendor = VendorFactory.create(italian_company=True)
     vendor.display_name = "Vendor A Renamed"
@@ -363,12 +385,32 @@ def test_an_iban_replaced_with_the_same_mask_is_still_audited() -> None:
 # --- Done when: a vendor's data fills a valid FatturaPA party block
 
 
+# FatturaPA IdCodice of each trait's VAT number: an EU prefix moves to IdPaese, while the Swiss
+# "CHE" is part of the number.
+ID_CODICE = {
+    "italian_company": lambda vat: vat,
+    "italian_sole_proprietor": lambda vat: vat,
+    "eu_company": lambda vat: vat.removeprefix("DE"),
+    "non_eu_company": lambda vat: vat,
+}
+
+
+def test_the_swiss_trait_keeps_che_in_id_codice() -> None:
+    vendor = VendorFactory.create(non_eu_company=True)
+    assert vendor.vat_number.startswith("CHE")
+    cedente = engine.fatturapa_party(vendor.legal_identity())
+    assert cedente["DatiAnagrafici"]["IdFiscaleIVA"]["IdCodice"] == vendor.vat_number
+
+
 @pytest.mark.parametrize("trait", TRAITS)
 def test_vendor_data_fills_a_valid_fatturapa_party_block(trait: str) -> None:
     vendor = VendorFactory.create(**{trait: True})
     identity = Vendor.objects.get(pk=vendor.pk).legal_identity()
     cedente = engine.fatturapa_party(identity, engine.CEDENTE)
-    assert cedente["DatiAnagrafici"]["IdFiscaleIVA"]["IdPaese"] == vendor.country
+    assert cedente["DatiAnagrafici"]["IdFiscaleIVA"] == {
+        "IdPaese": vendor.country,
+        "IdCodice": ID_CODICE[trait](vendor.vat_number),
+    }
     assert cedente["DatiAnagrafici"]["RegimeFiscale"] == vendor.fiscal_regime
     assert cedente["Sede"]["Nazione"] == vendor.country
     assert len(cedente["Sede"]["CAP"]) == 5

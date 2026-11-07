@@ -205,12 +205,15 @@ def legal_snapshot(vendor: Vendor) -> dict[str, Any]:
 
 
 def save_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
-    """Save `vendor` and audit what changed in its legal identity (IBAN masked).
+    """Validate and save `vendor`, and audit what changed in its legal identity (IBAN masked).
 
     Incomplete legal data is always accepted: completeness is checked when a payout is
-    requested (`assert_payout_allowed`), never here. Changes to other fields are saved without
-    an audit row.
+    requested (`assert_payout_allowed`), never here. A value that is present must be valid:
+    `full_clean` (field rules plus `engine.identity_errors`) runs for every adapter, also on
+    dry-run, and raises `ValidationError`; it also stores identifiers compact. Changes to other
+    fields are saved without an audit row.
     """
+    vendor.full_clean()
     with transaction.atomic():
         stored = (
             Vendor.objects.select_for_update().filter(pk=vendor.pk).first() if vendor.pk else None

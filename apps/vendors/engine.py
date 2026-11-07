@@ -238,6 +238,10 @@ VIES_RESULTS: Final = frozenset({VIES_VALID, VIES_INVALID, VIES_UNAVAILABLE})
 
 # VAT prefixes that differ from the ISO country code.
 VAT_PREFIXES: Final[Mapping[str, str]] = {"GR": "EL"}
+# Countries whose VAT number starts with letters that belong to the number itself, so they are
+# never stripped as a country prefix: the Swiss VAT number is the UID "CHE" + 9 digits, and its
+# FatturaPA IdCodice keeps "CHE" (stripping "CH" would leave "E123456789").
+VAT_NUMBER_LETTERS: Final[Mapping[str, str]] = {"CH": "CHE"}
 
 # IBAN lengths of the SEPA countries; other countries only get the generic 15-34 check.
 IBAN_LENGTHS: Final[Mapping[str, int]] = {
@@ -285,8 +289,14 @@ def vat_prefix(country: str) -> str:
 
 
 def split_vat_number(vat_number: str, country: str) -> tuple[str, str]:
-    """(country, number) of a VAT number, with the country's prefix removed if present."""
+    """(country, number) of a VAT number, with the country's prefix removed if present.
+
+    The letters of `VAT_NUMBER_LETTERS` (Swiss "CHE") are part of the number and are kept.
+    """
     code = compact(vat_number)
+    letters = VAT_NUMBER_LETTERS.get(country)
+    if letters and code.startswith(letters):
+        return country, code
     for prefix in (vat_prefix(country), country):
         if prefix and code.startswith(prefix) and len(code) > len(prefix):
             return country, code[len(prefix) :]
@@ -669,6 +679,13 @@ class PayoutNotAllowed(ValueError):
 CEDENTE: Final = "CedentePrestatore"  # the vendor invoices (its customers)
 CESSIONARIO: Final = "CessionarioCommittente"  # the vendor is invoiced (platform commissions)
 FOREIGN_POSTAL_CODE: Final = "00000"
+_REA_FIELDS: Final = (
+    "rea_office",
+    "rea_number",
+    "share_capital",
+    "sole_shareholder",
+    "liquidation_status",
+)
 
 
 class PartyBlockError(ValueError):
@@ -693,6 +710,12 @@ class _Block:
         elif not min_length <= len(value) <= max_length:
             self.problems.append(f"{field}: {element} takes {min_length}-{max_length} characters")
         return value
+
+    def identifiers(self, ident: LegalIdentity, names: Iterable[str]) -> None:
+        """Report the `identity_errors` of the emitted `names` (checksums, codes, formats)."""
+        errors = identity_errors(ident)
+        for name in names:
+            self.problems.extend(f"{name}: {message}" for message in errors.get(name, ()))
 
 
 def _id_fiscale_iva(block: _Block, field: str, vat_number: str, country: str) -> dict[str, str]:
@@ -791,12 +814,23 @@ def fatturapa_party(identity: LegalIdentity, role: str = CEDENTE) -> dict[str, A
     """The FatturaPA 1.2.x `CedentePrestatore` or `CessionarioCommittente` block, as a dict.
 
     Keys follow the FatturaPA element names and order. Raises `PartyBlockError` listing every
-    missing or invalid value; nothing is truncated or guessed.
+    missing or invalid value (presence and length, plus the `identity_errors` of the emitted
+    identifiers: VAT and codice fiscale checksums, EORI, province and REA codes, the fiscal
+    representative's VAT number); nothing is truncated or guessed.
     """
     if role not in (CEDENTE, CESSIONARIO):
         raise ValueError(f"unknown FatturaPA party role {role!r}")
     ident = normalized(identity)
     block = _Block()
+    # Postal codes and the fiscal regime are checked by the block itself.
+    checked = ["vat_number", "tax_code", "eori", "registered_province"]
+    if ident.establishment_street:
+        checked.append("establishment_province")
+    if role == CEDENTE and (ident.rea_office or ident.rea_number):
+        checked += _REA_FIELDS
+    if role == CESSIONARIO:
+        checked.append("fiscal_representative_vat_number")
+    block.identifiers(ident, checked)
     dati: dict[str, Any] = {}
     if ident.vat_number:
         dati["IdFiscaleIVA"] = _id_fiscale_iva(block, "vat_number", ident.vat_number, ident.country)
@@ -853,6 +887,7 @@ def fatturapa_fiscal_representative(identity: LegalIdentity) -> dict[str, Any] |
     if not (ident.fiscal_representative_name or ident.fiscal_representative_vat_number):
         return None
     block = _Block()
+    block.identifiers(ident, ["fiscal_representative_vat_number"])
     representative = {"DatiAnagrafici": _representative(block, ident)}
     if block.problems:
         raise PartyBlockError(block.problems)

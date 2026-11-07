@@ -147,7 +147,13 @@ legacy data) counts as incomplete too. The initial rows: Italy requires PEC, cod
 fiscal regime and the delivery channel, plus REA office, REA number and liquidation status for
 companies (not sole proprietors); every EU member state, Italy included, requires the VAT number
 and the IBAN. Payout code (VEN.6, VEN.7) calls `assert_payout_allowed(vendor)`, which refuses
-with the list of missing fields.
+with the list of missing fields. This gate comes on top of DAC7 completeness
+(`dac7_complete`, CMP.1), which `payout_eligibility` checks separately on the DAC7 dataset for
+every vendor, non-EU sellers included: the seeded rows do not cover that dataset (no registered
+office address, no TIN for non-Italian vendors, nothing for non-EU vendors), so passing
+`assert_payout_allowed` means neither DAC7-complete nor ready for a FatturaPA block, which
+`engine.fatturapa_party()` checks on its own. Saving a profile (`save_vendor`, every adapter)
+runs the model validation, so present values are always valid.
 
 `engine.fatturapa_party()` turns the identity into a FatturaPA 1.2.x party block
 (`CedentePrestatore` or `CessionarioCommittente`: `IdFiscaleIVA`, `CodiceFiscale`,
