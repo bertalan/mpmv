@@ -7,7 +7,7 @@ class CoreConfig(AppConfig):
     label = "core"
 
     # Audit policy (SEC.4, docs/dev/audit-trail.md), enforced by the core.E2xx system check.
-    audited_models = ("platformoperator",)
+    audited_models = ("platformoperator", "featureflag")
     unaudited_models = {
         "auditlog": "the audit log itself (append-only)",
         "heartbeat": "worker telemetry, not a domain change",
@@ -22,6 +22,7 @@ class CoreConfig(AppConfig):
             check_audit_policy,
             check_client_ip_settings,
             check_encrypted_data,
+            check_feature_flag_settings,
             check_field_encryption_keys,
             check_trusted_proxy_for_deploy,
             translation_models,
@@ -33,3 +34,4 @@ class CoreConfig(AppConfig):
         checks.register(check_trusted_proxy_for_deploy, checks.Tags.security, deploy=True)
         checks.register(check_field_encryption_keys, checks.Tags.security)
         checks.register(check_encrypted_data, checks.Tags.database)
+        checks.register(check_feature_flag_settings)

@@ -27,7 +27,7 @@ Under the platform's current tax regime the commission is charged **without VAT*
 `completed` at charge time. Standard (non-split) payout on `wc-completed`, monthly, minimum €50,
 7-day waiting period. Four vendors out of five are connected to Stripe Express (Vendor E is not).
 
-**Historical bugs** (they become tests, see §4.4): `tax_enable` read with `isset()`; transaction charge
+**Historical bugs** (they become tests, see 4.4): `tax_enable` read with `isset()`; transaction charge
 on the net instead of the gross (case FEE-NETTO: 9.3424 expected, 8.07 computed); VAT computed on
 commission + payment fee (34.07 instead of 26.00); rule frozen at `fixed 0` (case REGOLA-ZERO) or 25% (case PERC-CONGELATA);
 `stripe_cc` orders without split, with orphaned vendor credits (case NO-SPLIT).
@@ -54,8 +54,8 @@ class VendorTranslation(Model): vendor; language; tagline; description; shipping
 
 class VendorPlan(Model):                       # plans are DATA, not code
     code ("basic", "intermediate", "advanced", "special", "launch"); name (translated)
-    max_products (null = unlimited); features (JSON: featured, api_sync, custom_tax…)
-    monthly_fee (MoneyField, null)             # plan fee billing: phase 2 (D-04)
+    max_products (null = unlimited); features (JSON: featured, api_sync, custom_tax, vendor_branding…)
+    monthly_fee (MoneyField, null)             # plan fee charging: P2, VEN.19 (D-04)
 
 class CommissionRule(Model):                   # versioned: never modified, only new rows
     vendor (null = platform default); plan (null)
@@ -73,7 +73,8 @@ class PayoutAccount(Model):
 class LedgerEntry(Model):                      # append-only, never UPDATE/DELETE
     vendor; vendor_order = FK(VendorOrder, null=True)
     kind = CharField(choices=["sale", "shipping", "commission", "payment_fee", "refund",
-                              "commission_reversal", "adjustment", "payout", "transfer"])
+                              "commission_reversal", "adjustment", "payout", "transfer",
+                              "plan_fee"])        # plan_fee: VEN.19 (P2)
     amount = MoneyField()                      # sign: + vendor credit, − vendor debit
     platform_entity = FK(PlatformOperator)     # multi-entity (e.g. relocation to another EU country)
     gateway_account; external_ref (tr_…, po_…, re_…)
@@ -90,6 +91,14 @@ regime creates a new version, so one company can appear across several version r
 reports per company are recomposed by grouping the versions that share the same legal identity
 (the VAT number of the platform operator). A relocation to a new company with a new VAT number
 starts a new group.
+
+**The ledger is not accounting** (owner decision of 2026-11-07, see [00](00-vision-and-review.md)).
+`LedgerEntry` is an operational record of what each vendor is owed and paid, kept to compute
+balances and payouts and to reconcile them with Stripe. It is not a general ledger, a VAT register
+or a bookkeeping record of the operator or of the vendors, and the platform issues no invoices
+from it. Ledger extracts and payout statements are non-fiscal documents with a stable reference
+ID; the operator's accountant and each vendor do their own bookkeeping and invoicing outside the
+platform.
 
 ### Pure functions
 
@@ -115,7 +124,9 @@ def payout_eligibility(vendor) -> Eligibility               # DAC7 complete, acc
 
 1. **Vendor application**: public form (Turnstile) → `applicant` → staff review → `onboarding`
    (DAC7 data, Stripe Express account via onboarding link, acceptance of the versioned contract
-   with the signature flow below, tax regime) → `active`. Every step is recorded in `AuditLog`.
+   with the signature flow below, tax regime) → `active`. Activation is refused when neither the
+   registered office nor a permanent establishment is in the allowed countries of the
+   `PlatformOperator`, the EU-27 at go-live (CMP.13, D-21). Every step is recorded in `AuditLog`.
 2. **Paid order**: for each `VendorOrder` the rule snapshot is frozen, `compute_commission` is
    computed, and the ledger rows are written (`sale`, `shipping`, `commission`, `payment_fee`).
 3. **Transfer**: with *separate charges and transfers* (see [07](07-cart-orders-payments.md)) a Stripe
@@ -123,6 +134,22 @@ def payout_eligibility(vendor) -> Eligibility               # DAC7 complete, acc
 4. **Refund**: proportional `refund` and `commission_reversal` rows; current business rule
    "on a full refund the platform returns the commission and the payment fee" (to be confirmed, D-05).
 5. **Nightly reconciliation**: ledger ↔ Stripe transfers and balance; discrepancies → alert and report.
+
+### Plan entitlements and plan fees (VEN.19, P2)
+
+Plans are data (VEN.2), and their `features` keys are the **entitlements**: what a plan allows
+beyond commission and product limits (for example `vendor_branding`, spec 14 §14.12). Code never
+tests a plan code; it asks `plan_allows(vendor, feature) -> bool` in `apps/vendors/services.py`,
+backed by a pure `engine.plan_allows(plan_features, feature)`. A plan change has an effective date
+and is audited; losing an entitlement hides the feature and keeps its data.
+
+Plan fees (D-04: not at launch). From P2, a plan with a `monthly_fee` is charged once per month
+and vendor by a scheduled job (ARC.9) as a `plan_fee` ledger debit, so it is settled against the
+vendor's balance like the commission. The job is idempotent per vendor and period. The
+**marketplace issues no invoice** for the fee (owner principle): each charge produces a
+**non-fiscal statement** (PDF in the vendor's language, in the document area of VEN.15) that says
+it is not a tax invoice, and the operator invoices the fee outside the platform. The statement
+shows the plan, period, amount and the ledger reference.
 
 ### Legal and e-invoicing identity (VEN.12)
 
@@ -134,7 +161,7 @@ only add a "profile row missing" state.
 |---|---|---|
 | Legal form | `legal_form` (sole proprietorship, partnership, S.r.l., S.p.A., cooperative, other or foreign); `first_name`, `last_name` for sole proprietors | FatturaPA `Anagrafica`: `Nome` + `Cognome` for a sole proprietor, `Denominazione` (the legal name) otherwise |
 | Registered office | `registered_street`, `registered_street_number`, `registered_postal_code`, `registered_city`, `registered_province`, `registered_country` | Italy: 5-digit postal code and official 2-letter province code. Replaces the former JSON address (data-preserving migration) |
-| Tax identity | `vat_number` with `vies_status` (unchecked, valid, invalid, unavailable) and `vies_checked_at`; `tax_code` (codice fiscale in Italy, the national TIN elsewhere); `tax_residence_country` (DAC7); `fiscal_regime` (RF01–RF19 with the official SDI labels; there is no RF03; RF19 = forfettario); `ateco_code`; `eori` | Italian VAT checksum; codice fiscale check character (omocodia included) or the 11-digit numeric form. VIES is reached only through the `VatNumberValidator` interface; changing the VAT number resets the status to unchecked |
+| Tax identity | `vat_number` with `vies_status` (unchecked, valid, invalid, unavailable) and `vies_checked_at`; `tax_code` (codice fiscale in Italy, the national TIN elsewhere); `tax_residence_country` (DAC7); `fiscal_regime` (RF01–RF20 with the official SDI labels; there is no RF03; RF19 = forfettario; RF20 = cross-border VAT franchise for small enterprises, Directive (EU) 2020/285, added by the FatturaPA technical specification 1.9 from 2025-04-01, VEN.18); `ateco_code`; `eori` | Italian VAT checksum; codice fiscale check character (omocodia included) or the 11-digit numeric form. VIES is reached only through the `VatNumberValidator` interface; changing the VAT number resets the status to unchecked |
 | Company register (REA) | `rea_office` (province), `rea_number`, `share_capital`, `sole_shareholder` (SU/SM), `liquidation_status` (LS/LN) | FatturaPA `IscrizioneREA` |
 | E-invoicing | `sdi_recipient_code`, `pec` | 7 characters; `0000000` when invoices go to the PEC; `XXXXXXX` for foreign vendors only; 6-character codes belong to public administration offices and are refused |
 | Non-resident vendors | fiscal representative (`fiscal_representative_name`, `fiscal_representative_vat_number`), permanent establishment address (`establishment_*`) | FatturaPA `RappresentanteFiscale`, `StabileOrganizzazione` |
@@ -142,6 +169,12 @@ only add a "profile row missing" state.
 
 `fiscal_regime` is what the vendor declares on its invoices; the VAT computation regime stays in
 `VendorTaxProfile` ([05](05-tax.md)).
+
+Purpose of the e-invoicing fields. The platform issues no invoices (see
+[00](00-vision-and-review.md)). The e-invoicing identity is kept because it is useful data: the
+operator's accountant needs it to invoice commissions outside the platform, and it goes into the
+non-fiscal commission statement and its data export (CMP.2). It also shows the vendor which data
+its own invoicing needs.
 
 **Required fields are data, not code.** Every legal field is optional while the profile is
 created and edited: a vendor can always open and save an incomplete profile (a value that is
@@ -166,6 +199,10 @@ These rows are the payout gate, and the seeded rows include the DAC7 dataset of
 | EU member states, Italy included | VAT number, IBAN |
 | Outside the EU | IBAN, foreign TIN (`tax_code`) |
 
+The "Outside the EU" rows stay at go-live: a vendor with its registered office outside the EU
+and a permanent establishment in the EU can be activated (CMP.13), and the rows are ready for the
+later opening to non-EU vendors (CMP.17 to CMP.22).
+
 So every vendor that passes the gate has a VAT number or a TIN, and the legal name is always
 present. Payout code (VEN.6, VEN.7) calls `assert_payout_allowed(vendor)`, which refuses with
 the list of missing or invalid fields (and, from VEN.16, with an overdue contract acceptance). A vendor that passes it has the complete DAC7 dataset
@@ -174,20 +211,23 @@ and enough data for a FatturaPA `CessionarioCommittente` block; tests pin both. 
 profile (`save_vendor`, every adapter) runs the model validation, so present values are always
 valid.
 
-`engine.fatturapa_party()` turns the identity into a FatturaPA 1.2.x party block
+`engine.fatturapa_party()` turns the identity into a FatturaPA party block (transmission format
+FPR12, XSD schema 1.2.3; technical specification 1.9.1, usable from 2026-05-15)
 (`CedentePrestatore` or `CessionarioCommittente`: `IdFiscaleIVA`, `CodiceFiscale`,
 `Anagrafica`, `RegimeFiscale`, `Sede`, `StabileOrganizzazione`, `IscrizioneREA`, `Contatti`);
 companion functions give the transmission recipient (`CodiceDestinatario`, `PECDestinatario`)
 and the fiscal representative. A foreign `CessionarioCommittente` without a VAT number is
-identified by its national TIN in `IdFiscaleIVA`. Writing the XML is CMP.2.
+identified by its national TIN in `IdFiscaleIVA`. The platform writes no FatturaPA XML and sends
+nothing to SDI: CMP.2 puts these party data in the non-fiscal commission statement export, in a
+structure the operator's invoicing tool can map to FatturaPA.
 
 ### Vendor legal documents and signature (VEN.5, VEN.13 to VEN.17)
 
 Owner decisions of 2026-11-07. The vendor contract and the other legal documents a vendor
 accepts (for example a data processing agreement) are not visitor content. They are versioned
 documents with one text per language, handled apart from the CMS pages of
-[09](09-multilingual.md) and [10](10-content-seo-ai.md): CMS content stays English only until
-after go-live, while vendor legal documents exist in every vendor language from the start (IT,
+[09](09-multilingual.md) and [10](10-content-seo-ai.md): new CMS content stays English only until
+after go-live (existing IT pages are migrated, D-18), while vendor legal documents exist in every vendor language from the start (IT,
 EN, DE, FR, ES). The legal translation of the texts is the owner's business task and a go-live
 prerequisite; the platform only stores and serves the texts it is given.
 
@@ -408,7 +448,11 @@ can be added later without changing the vendor pages. No provider is planned for
 
 Qualified and advanced digital signature (VEN.17, P1 since it is one of the two completion
 routes). A vendor with a qualified or advanced signature can download the PDF or the approval
-sheet, sign it (PAdES, or CAdES as `.p7m`) and upload it. The upload is accepted only if it signs
+sheet, sign it (PAdES, or CAdES as `.p7m`) and upload it. Qualified signatures created with a
+European Digital Identity Wallet (eIDAS as amended by Regulation (EU) 2024/1183; member states
+must offer wallets by 2026-12-24, with free qualified signatures for natural persons, which a
+member state may limit to non-professional use) are ordinary PAdES or CAdES signatures and are
+accepted the same way. The upload is accepted only if it signs
 the exact stored file (same hash for CAdES, unchanged signed revision for PAdES) and the
 signature and certificate verify (pyHanko, with the EU trusted lists for the qualified status; an
 advanced signature only from a trust anchor staff have listed). It is stored as a
@@ -448,14 +492,18 @@ the paper status (awaiting, received, approved, rejected with reason), with acti
 receipt, upload the scan, approve or reject.
 
 ⚖️ P2B (regulation 2019/1150) requires at least 15 days' notice of changes to
-the terms, so a new version's `valid_from` is at least 15 days after it is issued unless a legal
-obligation requires otherwise.
+the terms (article 3(2)), so a new version's `valid_from` is at least 15 days after it is issued
+unless a legal obligation requires otherwise. It also requires a statement of reasons on a
+restriction or suspension and 30 days' notice before terminating a vendor (article 4); the VEN.1
+status machine and VEN.16 consequences record the reason and the notice date (CMP.5). The
+Commission's Digital Omnibus proposal of 2025-11-19 would repeal parts of P2B; until it is
+adopted the regulation applies in full.
 
 ### Vendor dashboard (bare minimum)
 
 Own orders and order lines, entry of shipping quotes, products (editing of texts, price and stock
 if the vendor is not fed by a pipeline), balance and payouts, documents (accepted contracts and their
-evidence from VEN.15, commission invoices),
+evidence from VEN.15, non-fiscal commission statements from CMP.2, obligations checklist from CMP.10, plan fee statements from VEN.19),
 tax regime change request (approved by staff, as today), store policies per language.
 
 ## 4.3 Tasks
@@ -464,7 +512,7 @@ tax regime change request (approved by staff, as today), store policies per lang
 |---|---|---|---|---|---|
 | VEN.1 | Vendor models, translations and policies, statuses, slug | P1 | 8 | ARC.6 | Admin CRUD + status tests |
 | VEN.2 | VendorPlan and versioned CommissionRule with constraints (no implicit zero rule) | P1 | 6 | VEN.1 | Tests on overlapping validity periods |
-| VEN.3 | `compute_commission` pure function + real-case suite (REGOLA-ZERO, PERC-CONGELATA, FEE-NETTO) | P1 | 8 | VEN.2 | All §4.4 cases green |
+| VEN.3 | `compute_commission` pure function + real-case suite (REGOLA-ZERO, PERC-CONGELATA, FEE-NETTO) | P1 | 8 | VEN.2 | All 4.4 cases green |
 | VEN.4 | Append-only LedgerEntry (DB constraint/trigger), balance, per-vendor report | P1 | 10 | VEN.3 | UPDATE/DELETE impossible; balance = sum |
 | VEN.5 | Application → onboarding → active flow, with versioned contract and DAC7 checklist | P1 | 12 | VEN.1 | Test vendor activated end-to-end |
 | VEN.6 | Stripe Express onboarding (account link, status, `account.updated` webhook) | P1 | 8 | PAY.1 | Account status synchronized |
@@ -475,10 +523,12 @@ tax regime change request (approved by staff, as today), store policies per lang
 | VEN.11 | Tax regime change request by vendor with staff review and email | P2 | 6 | TAX.2, ARC.16 | Parity with VTO 2.4 |
 | VEN.12 | Vendor legal and e-invoicing identity (EU + IT): legal form, structured address, VAT with VIES status, codice fiscale, fiscal regime RF01-RF19, REA, SDI recipient code, PEC, EORI, fiscal representative, permanent establishment, invoicing bank details; required fields per country, region (EU or non-EU) and legal form, including the DAC7 dataset for every vendor, defined in a staff-editable table, enforced when the vendor requests a payout | P1 | 8 | VEN.1 | A vendor's data fills a valid FatturaPA party block; a vendor missing a required field for its country cannot request a payout, but can open and edit its profile |
 | VEN.13 | Contract templates with merge fields, vendor-specific clauses with four-eyes approval, custom uploaded contracts: per-vendor `VendorContractDocument` rendered to PDF per language through a `DocumentRenderer` interface (WeasyPrint), prevailing language, legal representative field on the VEN.12 identity; clausole vessatorie marked on templates and vendor clauses (number, title, text), two signature blocks with the art. 1341 and 1342 c.c. formula, the fixed clause on how to complete the specific approval, page footers with the short hash, one-page specific approval sheet | P1 | 18 | VEN.5, VEN.2, VEN.12, ARC.15 | A test vendor's IT and EN PDFs carry its legal identity, commission rule and approved clauses; a missing merge field blocks issuing; a clause or custom upload approved by its own author is refused; a new template version or clause issues a new document for each vendor concerned; a document with marked clauses renders two signature blocks whose formula lists exactly their numbers, and an approval sheet with their full texts and the main PDF hash |
-| VEN.14 | Vendor contract e-signature in two separate acts: acceptance of the whole contract (checkbox, email OTP, MFA step-up), then the specific approval of the marked clauses on a separate screen with a second, separate email OTP; email OTP simple electronic signature, PDF of the exact version per language with SHA-256 hash and RFC 3161 timestamp per act behind a `TimestampAuthority` interface, evidence per act (user, member role, time, trusted-proxy IP, user agent, OTP id), evidence package by email, completion route choice, `SignatureProvider` interface | P1 | 22 | VEN.13, CORE.4, CORE.5, ARC.9, ARC.16 | A test vendor signs end to end; the stored PDF matches its hash and both timestamp tokens verify against their evidence manifests (fake TSA in tests, a real TSA on STAGE); the evidence email arrives in the signer's language; without a text in its language the vendor can accept only after acknowledging English; a wrong, expired or reused code records no acceptance; the specific approval needs its own screen and its own code, the acceptance code is refused for it, and no single request records both acts; the OTP fields accept paste and carry `autocomplete="one-time-code"` (WCAG 2.2 SC 3.3.8, spec 14 §14.6) |
+| VEN.14 | Vendor contract e-signature in two separate acts: acceptance of the whole contract (checkbox, email OTP, MFA step-up), then the specific approval of the marked clauses on a separate screen with a second, separate email OTP; email OTP simple electronic signature, PDF of the exact version per language with SHA-256 hash and RFC 3161 timestamp per act behind a `TimestampAuthority` interface, evidence per act (user, member role, time, trusted-proxy IP, user agent, OTP id), evidence package by email, completion route choice, `SignatureProvider` interface | P1 | 22 | VEN.13, CORE.4, CORE.5, ARC.9, ARC.16 | A test vendor signs end to end; the stored PDF matches its hash and both timestamp tokens verify against their evidence manifests (fake TSA in tests, a real TSA on STAGE); the evidence email arrives in the signer's language; without a text in its language the vendor can accept only after acknowledging English; a wrong, expired or reused code records no acceptance; the specific approval needs its own screen and its own code, the acceptance code is refused for it, and no single request records both acts; the OTP fields accept paste and carry `autocomplete="one-time-code"` (WCAG 2.2 SC 3.3.8, spec 14 14.6) |
 | VEN.15 | Vendor document area: download accepted contracts and evidence (PDF, approval sheet, evidence package, timestamp tokens, uploaded signed file, paper original scan) through signed URLs, kept per the retention rules | P1 | 6 | VEN.14, CORE.9 | A vendor downloads all and only its own accepted documents; another vendor's file gives 404; files stay downloadable for staff after the vendor is closed |
 | VEN.16 | Contract updates and specific approval completion: re-acceptance deadlines per vendor, reminders, automatic consequences, specific approval pending requirement with its own deadline and consequence, paper original route with staff moderation (receipt date, scan, archive location, approve or reject with reason), completion routes per version and per vendor, staff pending view with route and paper status | P1 | 20 | VEN.14, ARC.9, SEC.4, ARC.16 | A vendor that misses its deadline gets the configured consequence (warn, payouts blocked, sales blocked or suspended); staff can extend the deadline, change the consequence or exclude the vendor, all audited with a reason; accepting the document lifts the automatic restrictions but not a staff suspension; a vendor with both acts online but no completion gets the specific approval consequence at its deadline, and a staff-approved paper original lifts it; a rejected original stays pending and the vendor is emailed the reason |
 | VEN.17 | Qualified and advanced digital signature upload and verification (PAdES/CAdES) of the whole document or of the specific approval sheet, pyHanko, EU trusted lists for qualified and staff-listed trust anchors for advanced; completes the specific approval and is stored as a stronger acceptance | P1 | 18 | VEN.14, VEN.16 | A PAdES and a `.p7m` test file signed with a certificate from a test trusted list are accepted; a file that signs a different PDF, an altered file or an untrusted certificate is refused with the reason; a signed approval sheet satisfies the vendor's specific approval requirement |
+| VEN.18 | Fiscal regime RF20 (cross-border VAT franchise, Directive (EU) 2020/285, FatturaPA specification 1.9 from 2025-04-01): add the choice with its official SDI label, update the check constraint with a data migration, and record the FatturaPA specification version (1.9.1) the party block follows | P1 | 2 | VEN.12 | A vendor can save RF20; the constraint accepts RF01–RF20 except RF03; `fatturapa_party()` emits `RegimeFiscale` RF20; a test pins the label list to the specification version |
+| VEN.19 | Plan entitlements and plan fees: `plan_allows(vendor, feature)` service over `VendorPlan.features`, plan change with effective date and audit; monthly `plan_fee` ledger debit by a scheduled idempotent job; non-fiscal statement PDF per charge in the vendor's language (no invoice issued by the marketplace; the operator invoices outside the platform) | P2 | 8 | VEN.2, VEN.4, VEN.15, ARC.9 | A vendor whose plan lacks a feature cannot use it and keeps its data; a plan with a monthly fee gets exactly one `plan_fee` entry per period even when the job runs twice; the statement PDF states that it is not a tax invoice and matches the ledger entry; no fiscal document or e-invoice is produced |
 
 ## 4.4 Mandatory regression cases
 

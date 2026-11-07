@@ -32,6 +32,19 @@ def env_list(name: str, default: str = "") -> list[str]:
     return [item.strip() for item in os.environ.get(name, default).split(",") if item.strip()]
 
 
+def env_flags(name: str) -> dict[str, bool]:
+    """Feature flag defaults (ARC.8), e.g. `checkout=off,beta_search=on`; names checked later
+    against the registry by the core.E401 system check."""
+    flags: dict[str, bool] = {}
+    for item in env_list(name):
+        key, _, raw = item.partition("=")
+        key, value = key.strip(), raw.strip().lower()
+        if not key or value not in (_TRUE | _FALSE) - {""}:
+            raise ImproperlyConfigured(f"{name}: expected name=on or name=off, got {item!r}")
+        flags[key] = value in _TRUE
+    return flags
+
+
 def env_secret_list(name: str) -> list[str]:
     """Secrets from the file named by `<name>_FILE` (one per line, `#` comments), else `name`.
 

@@ -16,7 +16,13 @@ from django.core.exceptions import ValidationError
 from django.db import models, transaction
 
 from apps.core.fields import CountryField, EncryptedCharField, LanguageField, MoneyField
-from apps.core.models import BaseModel, TranslationModel, resolve_translation
+from apps.core.models import (
+    VENDOR_OVERRIDES,
+    BaseModel,
+    FeatureFlag,
+    TranslationModel,
+    resolve_translation,
+)
 from apps.core.translations import Resolved, source_hash
 
 from . import engine
@@ -654,3 +660,39 @@ class ContractAcceptance(BaseModel):
         if not self._state.adding:
             raise PermissionError("ContractAcceptance is append-only")
         super().save(*args, **kwargs)
+
+
+class VendorFeatureFlag(BaseModel):
+    """One vendor's override of a feature flag (ARC.8, `apps.core.flags`).
+
+    On or off for this vendor whatever the platform value, except that a kill switch pulled for
+    the platform stays off for every vendor. No row: the vendor follows the platform. Written by
+    `services.save_vendor_flag` and `delete_vendor_flag` (audited); read with
+    `apps.core.services.flag_enabled(name, vendor=vendor)`, which reaches these rows through the
+    `vendor_overrides` related name.
+    """
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
+
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="feature_flags")
+    flag = models.ForeignKey(FeatureFlag, on_delete=models.PROTECT, related_name=VENDOR_OVERRIDES)
+    enabled = models.BooleanField(
+        default=False, help_text="Unticked: the feature is off for this vendor."
+    )
+    note = models.CharField(
+        max_length=200, blank=True, help_text="Why it was switched, e.g. the incident reference."
+    )
+
+    class Meta:
+        ordering = ["vendor", "flag"]
+        constraints = [
+            models.UniqueConstraint(fields=["vendor", "flag"], name="vendors_featureflag_unique"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.flag} {'on' if self.enabled else 'off'} for {self.vendor}"
+
+    def clean(self) -> None:
+        if self.flag_id is not None and self.flag.spec is None:
+            raise ValidationError({"flag": f"{self.flag.name!r} is not a registered feature flag."})

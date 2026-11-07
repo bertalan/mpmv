@@ -60,11 +60,11 @@ cheapest solution is a **single cutover, rehearsed several times**, not a prolon
 |---|---|---|---|---|---|
 | MIG.1 | Extractor from the WP DB (`kvsa_`) to an intermediate JSON format, with a meta inventory | P1 | 10 | — | Complete inventory of the fields in use |
 | MIG.2 | Report of duplicate SKUs, tags without a role, orphan companion products → decisions | P1 | 6 | MIG.1 | Decision list approved |
-| MIG.3 | Loader for vendors, catalog, taxonomies, images (idempotent, dry-run) | P1 | 16 | MIG.1, CAT.1, CAT.2, CAT.3, CAT.4 | Reload with no duplicates |
+| MIG.3 | Loader for vendors, catalog, taxonomies, images (idempotent, dry-run); existing IT texts loaded as published translations (D-18) | P1 | 16 | MIG.1, CAT.1, CAT.2, CAT.3, CAT.4 | Reload with no duplicates; IT texts present where the current site has them |
 | MIG.4 | Loader for customers (WP password hasher) and read-only historical orders | P1 | 10 | MIG.1, ORD.2 | Migrated customer logs in with the old password |
 | MIG.5 | Automated parity reports (§13.3) | P1 | 10 | MIG.3 | Report generated on every run |
-| MIG.6 | Complete EN/IT redirect map + automated check of all WP sitemap URLs | P1 | 6 | CAT.6, MIG.3 | 100% of URLs 200/301 |
-| MIG.7 | Pages and blog migration (semi-manual) with StreamField | P1 | 16 | CMS.2 | All public pages present |
+| MIG.6 | Complete EN/IT redirect map + automated check of all WP sitemap URLs | P1 | 6 | CAT.6, MIG.3 | 100% of URLs 200/301; a migrated IT URL serves its IT text, not the EN fallback |
+| MIG.7 | Pages and blog migration (semi-manual) with StreamField; existing IT versions as published wagtail-localize translations (D-18) | P1 | 16 | CMS.2, I18N.3 | All public pages present, in IT too where the current site has them |
 | MIG.8 | Vendor ledger opening balances + verification against Stripe | P1 | 4 | VEN.4, MIG.3 | Balance = expected for every vendor |
 | MIG.9 | Three dress rehearsals on STAGE + cutover and rollback runbook | P1 | 16 | MIG.5, MIG.6 | Third rehearsal with no blockers |
 | MIG.10 | Cutover and post-go-live monitoring | P1 | 12 | MIG.9, SEC.6 | Go-live, 72 h with no critical issues |

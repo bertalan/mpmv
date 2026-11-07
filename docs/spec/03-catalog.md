@@ -82,7 +82,8 @@ class Term(LEGACY_Node):             # tree per taxonomy; + translation (slug, S
 class Brand(Model):               # manufacturer; + translation
 
 class ProductImage(Model):
-    product; variant (null); image = FK(wagtailimages.Image); position; is_cover; cover_locked
+    product; variant (null); image = FK(core.MediaImage);   # custom Wagtail image model with licence metadata (CMS.8)
+    position; is_cover; cover_locked
     language = LanguageField(null=True)        # null = language neutral (default); set = dedicated to one language
     # cover_locked: a hand-picked cover is not overwritten by the pipelines (current rule)
 class ProductImageTranslation(TranslationModel):  # alt_text; caption (EN fallback, I18N.2 workflow)
@@ -124,7 +125,7 @@ def images_for_language(images: list[ImageRow], lang: str) -> list[ImageRow]
 
 Product and category URLs **stay identical** to the current ones, so no redirect is
 needed for most of the catalog. The `/tag-product/{slug}/` and
-`/it/tag-product-it/{slug}-it/` tags are redirected with a 301 to the new taxonomy pages (decision D-07).
+`/it/tag-product-it/{slug}-it/` tags are redirected with a 301 to the new taxonomy pages (proposed default of the open decision D-07).
 
 ### Rules
 
@@ -147,7 +148,7 @@ needed for most of the catalog. The `/tag-product/{slug}/` and
 | CAT.1 | Product and Variant models, translations, `(vendor, sku)` constraints | P1 | 12 | ARC.6, VEN.1 | Migrations + constraint tests |
 | CAT.2 | Taxonomies: Category (tree), configurable Taxonomy/Term, Brand, translations and SEO texts | P1 | 10 | CAT.1 | Admin CRUD with translations |
 | CAT.3 | Typed attributes and translated values; variant axes with ordering | P1 | 10 | CAT.1 | Variable size×color product created via API |
-| CAT.4 | Media: ProductImage on Wagtail Images, WebP/AVIF renditions, dedup by hash, cover lock; optional image language with the replacement rule, translatable alt text and captions (D-18) | P1 | 12 | CAT.1, ARC.15 | Upload → automatic renditions; a DE-dedicated image replaces the neutral gallery in DE only; alt text falls back to EN |
+| CAT.4 | Media: ProductImage on Wagtail Images, WebP/AVIF renditions, dedup by hash, cover lock; optional image language with the replacement rule, translatable alt text and captions (D-18) | P1 | 12 | CAT.1, ARC.15, CMS.8 | Upload → automatic renditions; a DE-dedicated image replaces the neutral gallery in DE only; alt text falls back to EN |
 | CAT.5 | `build_product_slug` + SlugHistory + 301 redirect middleware | P1 | 8 | CAT.1 | Test cases ported from legacy-sku-permalink |
 | CAT.6 | `Redirect` model + admin management + import of existing maps (retired SKUs, merged tags, discontinued categories) | P1 | 6 | CAT.5 | All rules from the 4 mu-plugins covered by tests |
 | CAT.7 | Product page: gallery, variants with default, companion box, related products, visible SKU, "on request" | P1 | 16 | CAT.3, CAT.4 | Visual and functional parity with LIVE |
