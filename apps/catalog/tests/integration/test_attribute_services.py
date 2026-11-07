@@ -184,6 +184,89 @@ def test_a_vendor_cannot_reuse_a_variant_sku(
     assert Product.objects.count() == 1
 
 
+# --- The vendor SKU namespace (CAT.13): match key, products and variants together
+
+
+def test_create_product_keeps_the_sku_raw_and_sets_the_match_key(
+    attributes: dict[str, Attribute], vendor: Vendor
+) -> None:
+    create_product(vendor, t_shirt(sku="Tee 1"), ctx=CTX)
+    product = Product.objects.get(vendor=vendor)
+    assert (product.sku, product.sku_key) == ("Tee 1", "tee 1")
+    assert product.staff_ref.startswith("P-")
+
+
+def test_create_product_refuses_a_product_sku_matching_by_key(
+    attributes: dict[str, Attribute], vendor: Vendor
+) -> None:
+    ProductFactory.create(vendor=vendor, sku="tee-1")
+    with pytest.raises(ValidationError, match="already has a product with this SKU"):
+        create_product(vendor, t_shirt(), ctx=CTX)
+    assert Product.objects.count() == 1
+
+
+def test_create_product_refuses_a_product_sku_a_variant_holds(
+    attributes: dict[str, Attribute], vendor: Vendor
+) -> None:
+    VariantFactory.create(product__vendor=vendor, sku="Tee-1")
+    with pytest.raises(ValidationError, match="already has a variant with this SKU"):
+        create_product(vendor, t_shirt(), ctx=CTX)
+    assert Product.objects.count() == 1
+
+
+def test_create_product_refuses_a_variant_sku_a_product_holds(
+    attributes: dict[str, Attribute], vendor: Vendor
+) -> None:
+    ProductFactory.create(vendor=vendor, sku="tee-1-s-red ")
+    with pytest.raises(ValidationError, match="already has a product with this SKU: TEE-1-S-RED"):
+        create_product(vendor, t_shirt(), ctx=CTX)
+    assert Product.objects.count() == 1
+
+
+def test_create_product_refuses_a_variant_sku_matching_another_variant_by_key(
+    attributes: dict[str, Attribute], vendor: Vendor
+) -> None:
+    VariantFactory.create(product__vendor=vendor, sku="tee-1  s-red")
+    data = t_shirt(
+        variants=(
+            _variant("TEE-1-M-BLUE", "m", "blue"),
+            _variant("TEE-1 S-RED", "s", "red"),
+            _variant("TEE-1-M-RED", "m", "red"),
+            _variant("TEE-1-S-BLUE", "s", "blue"),
+        )
+    )
+    with pytest.raises(ValidationError, match="already has a variant with this SKU: TEE-1 S-RED"):
+        create_product(vendor, data, ctx=CTX)
+    assert Product.objects.count() == 1
+
+
+def test_create_product_refuses_a_variant_with_the_product_sku(
+    attributes: dict[str, Attribute], vendor: Vendor
+) -> None:
+    data = t_shirt(
+        variants=(
+            _variant("tee-1", "m", "blue"),
+            _variant("TEE-1-S-RED", "s", "red"),
+            _variant("TEE-1-M-RED", "m", "red"),
+            _variant("TEE-1-S-BLUE", "s", "blue"),
+        )
+    )
+    with pytest.raises(ValidationError, match="cannot have the SKU of its product"):
+        create_product(vendor, data, ctx=CTX)
+    assert not Product.objects.exists()
+
+
+@pytest.mark.parametrize("sku", ["   ", "X" * 64 + "\u00e9"])
+def test_create_product_refuses_an_unusable_sku(
+    attributes: dict[str, Attribute], vendor: Vendor, sku: str
+) -> None:
+    with pytest.raises(ValidationError, match="A SKU cannot be"):
+        create_product(vendor, t_shirt(sku=sku), ctx=CTX)
+    with pytest.raises(ValidationError, match="A SKU cannot be"):
+        create_product(vendor, t_shirt(sku=sku), ctx=CTX, dry_run=True)
+    assert not Product.objects.exists()
+
+
 def test_variant_labels_use_the_translated_values_in_axis_order(
     attributes: dict[str, Attribute], vendor: Vendor
 ) -> None:

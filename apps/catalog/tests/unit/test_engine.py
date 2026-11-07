@@ -331,6 +331,17 @@ def test_two_variants_cannot_share_a_combination_or_a_sku() -> None:
     assert "The variant SKU T-S-RED is given twice." in errors
 
 
+def test_variant_skus_given_twice_compare_by_match_key() -> None:
+    """CAT.13: two variant SKUs that differ only in case and spaces are the same SKU."""
+    variants = (
+        _variant("T-S  RED", size="s", color="red"),
+        _variant("t-s red", size="s", color="blue"),
+        *_grid()[2:],
+    )
+    errors = engine.product_structure_errors("variable", SIZE_COLOR, AXES, variants)
+    assert errors == ["The variant SKU T-S  RED is given twice."]
+
+
 def test_at_most_one_default_variant() -> None:
     first, second, *rest = _grid()
     variants = (

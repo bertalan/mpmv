@@ -158,6 +158,18 @@ def test_a_simple_product_with_variants_is_a_validation_problem(
     assert not Product.objects.exists()
 
 
+def test_a_sku_matching_another_by_case_and_spaces_is_a_validation_problem(
+    client: Client, attributes: dict[str, Attribute], vendor: Vendor
+) -> None:
+    """CAT.13: the vendor's SKU namespace compares match keys, products and variants together."""
+    ProductFactory.create(vendor=vendor, sku="tee-1-s-red")
+    response = _post(client, t_shirt(sku="Tee-1 "), _headers(vendor))
+    assert response.status_code == 422
+    messages = [error["msg"] for error in response.json()["errors"]]
+    assert "This vendor already has a product with this SKU: TEE-1-S-RED." in messages
+    assert Product.objects.count() == 1
+
+
 def test_creating_needs_the_write_scope(
     client: Client, attributes: dict[str, Attribute], vendor: Vendor
 ) -> None:

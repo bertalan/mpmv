@@ -356,3 +356,56 @@ def test_a_duplicate_onto_a_taken_sku_is_refused() -> None:
             original, target, actor=UserFactory.create(staff=True), reason="x", ctx=CTX
         )
     assert Product.objects.filter(vendor=target).count() == 1
+
+
+# --- Duplicates and the vendor SKU namespace (CAT.13): fresh identity, match keys
+
+
+def test_a_duplicate_gets_its_own_staff_refs_and_match_keys() -> None:
+    original = make_rich_product()
+    original_variant = original.variants.get()
+    target = VendorFactory.create()
+    duplicate_product_to_vendor(
+        original, target, actor=UserFactory.create(staff=True), reason="transfer", ctx=CTX
+    )
+    copy = Product.objects.get(vendor=target)
+    copied_variant = Variant.objects.get(product=copy)
+    assert copy.staff_ref.startswith("P-")
+    assert copy.staff_ref != original.staff_ref
+    assert copied_variant.staff_ref.startswith("V-")
+    assert copied_variant.staff_ref != original_variant.staff_ref
+    assert copy.sku_key == engine.sku_match_key(copy.sku)
+    assert copied_variant.sku_key == engine.sku_match_key(copied_variant.sku)
+
+
+def test_a_duplicate_onto_a_variant_holding_the_product_sku_is_refused() -> None:
+    original = ProductFactory.create(sku="Bag 100")
+    target = VendorFactory.create()
+    VariantFactory.create(product__vendor=target, sku="BAG  100")
+    with pytest.raises(ValidationError, match="already has a variant with this SKU"):
+        duplicate_product_to_vendor(
+            original, target, actor=UserFactory.create(staff=True), reason="x", ctx=CTX
+        )
+    assert Product.objects.filter(vendor=target).count() == 1  # the variant's product
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_a_duplicate_whose_variant_sku_the_target_uses_is_refused(dry_run: bool) -> None:
+    original = ProductFactory.create(kind="variable")
+    VariantFactory.create(product=original, sku="VAR RED")
+    target = VendorFactory.create()
+    ProductFactory.create(vendor=target, sku="var  red")
+    VariantFactory.create(product__vendor=target, sku=" Var Red-2")
+    VariantFactory.create(product=original, sku="var red-2")
+    with pytest.raises(
+        ValidationError, match="The vendor already uses these SKUs: VAR RED, var red-2"
+    ):
+        duplicate_product_to_vendor(
+            original,
+            target,
+            actor=UserFactory.create(staff=True),
+            reason="x",
+            ctx=CTX,
+            dry_run=dry_run,
+        )
+    assert Product.objects.filter(vendor=target).count() == 2
