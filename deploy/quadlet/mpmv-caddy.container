@@ -1,0 +1,27 @@
+# TLS reverse proxy in front of the app (ARC.5, ADR-0005, spec 12 §12.4).
+# Rootless Podman needs `net.ipv4.ip_unprivileged_port_start=80` to bind 80/443.
+[Unit]
+Description=MPMV reverse proxy (Caddy)
+Wants=network-online.target mpmv-app.service
+After=network-online.target mpmv-app.service
+
+[Container]
+ContainerName=mpmv-caddy
+Image=docker.io/library/caddy:2.11.9@sha256:0c2243efcf437ab7f7a978f1027fcf0d4f9be8a75df27b1b3fbc5dbe0ffa8cf0
+Network=mpmv.network
+PublishPort=80:80
+PublishPort=443:443
+PublishPort=443:443/udp
+# MPMV_SITE_ADDRESS (the public host name) comes from the env file; see deploy/README.md.
+EnvironmentFile=%h/.config/mpmv/caddy.env
+Volume=%h/.config/mpmv/Caddyfile:/etc/caddy/Caddyfile:ro,Z
+Volume=mpmv-caddy-data.volume:/data
+Tmpfs=/config
+ReadOnly=true
+NoNewPrivileges=true
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

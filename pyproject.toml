@@ -10,6 +10,8 @@ dependencies = [
   "psycopg[binary]>=3.3",
   "dj-database-url>=2.3",
   "django-stubs-ext>=5.2",
+  "gunicorn>=26.0",
+  "whitenoise>=6.12",
 ]
 
 [dependency-groups]

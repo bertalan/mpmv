@@ -1,0 +1,3 @@
+# Caddy state (ACME account and certificates); survives container replacement.
+[Volume]
+VolumeName=mpmv-caddy-data

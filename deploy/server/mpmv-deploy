@@ -1,0 +1,107 @@
+#!/bin/sh
+# Release management on a STAGE/LIVE host (ARC.5, ADR-0005): rootless Podman with the systemd
+# --user Quadlet units from deploy/quadlet. A release is an immutable image tag built by CI from a
+# git tag; rollback means switching back to the previous tag.
+#
+#   mpmv-deploy deploy <version>   pull, migrate, restart, health check; rolls back if unhealthy
+#   mpmv-deploy rollback           back to the previous release (migrations are not reverted)
+#   mpmv-deploy status             current and previous release
+set -eu
+
+REGISTRY_IMAGE="${MPMV_IMAGE:-ghcr.io/bertalan/mpmv-app}"
+LOCAL_IMAGE=localhost/mpmv-app:current
+STATE_DIR="${MPMV_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/mpmv}"
+RELEASES="$STATE_DIR/releases"
+HEALTH_RETRIES="${MPMV_HEALTH_RETRIES:-30}"
+HEALTH_INTERVAL="${MPMV_HEALTH_INTERVAL:-2}"
+
+log() { echo "mpmv-deploy: $*" >&2; }
+die() {
+  log "$*"
+  exit 1
+}
+
+# The release history is a stack: the last line is live, the one before it is the rollback target.
+current() { if [ -f "$RELEASES" ]; then tail -n 1 "$RELEASES"; fi; }
+previous() { if [ -f "$RELEASES" ]; then awk '{ prev = last; last = $0 } END { print prev }' "$RELEASES"; fi; }
+
+record() {
+  mkdir -p "$STATE_DIR"
+  [ "$(current)" = "$1" ] || echo "$1" >>"$RELEASES"
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $2 $1" >>"$STATE_DIR/deploy.log"
+}
+
+validate() {
+  case "$1" in
+    "" | latest | [.-]* | *[!A-Za-z0-9._-]*) die "invalid release tag '$1': use an immutable version tag" ;;
+  esac
+}
+
+healthy() {
+  i=0
+  while [ "$i" -lt "$HEALTH_RETRIES" ]; do
+    if podman healthcheck run mpmv-app >/dev/null 2>&1; then return 0; fi
+    i=$((i + 1))
+    sleep "$HEALTH_INTERVAL"
+  done
+  return 1
+}
+
+activate() {
+  podman tag "$REGISTRY_IMAGE:$1" "$LOCAL_IMAGE"
+  systemctl --user restart mpmv-app.service mpmv-worker.service
+}
+
+deploy() {
+  version="$1"
+  validate "$version"
+  live="$(current)"
+
+  podman pull "$REGISTRY_IMAGE:$version" >/dev/null
+  podman tag "$REGISTRY_IMAGE:$version" "$LOCAL_IMAGE"
+  if ! systemctl --user start mpmv-migrate.service; then
+    # The running containers were never restarted: put the tag back so a reboot keeps them.
+    if [ -n "$live" ]; then podman tag "$REGISTRY_IMAGE:$live" "$LOCAL_IMAGE"; fi
+    die "migrations failed; $version not activated"
+  fi
+  systemctl --user restart mpmv-app.service mpmv-worker.service
+
+  if healthy; then
+    record "$version" deploy
+    log "release $version is live"
+    return 0
+  fi
+  if [ -n "$live" ]; then
+    log "release $version is unhealthy; rolling back to $live"
+    activate "$live"
+    healthy || log "release $live is unhealthy too: check journalctl --user -u mpmv-app"
+  fi
+  die "release $version failed its health check"
+}
+
+rollback() {
+  target="$(previous)"
+  [ -n "$target" ] || die "no previous release to roll back to"
+  from="$(current)"
+  activate "$target"
+  healthy || die "release $target is unhealthy: check journalctl --user -u mpmv-app"
+  sed '$d' "$RELEASES" >"$RELEASES.tmp" && mv "$RELEASES.tmp" "$RELEASES"
+  record "$target" "rollback-from-$from"
+  log "rolled back from $from to $target"
+}
+
+status() {
+  echo "image: $REGISTRY_IMAGE"
+  echo "current: $(current)"
+  echo "previous: $(previous)"
+}
+
+case "${1:-}" in
+  deploy)
+    [ "$#" -eq 2 ] || die "usage: mpmv-deploy deploy <version>"
+    deploy "$2"
+    ;;
+  rollback) rollback ;;
+  status) status ;;
+  *) die "usage: mpmv-deploy deploy <version> | rollback | status" ;;
+esac

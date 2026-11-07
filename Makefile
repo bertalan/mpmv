@@ -1,6 +1,6 @@
 # MPMV task runner. Local containers use Apple `container` (ADR-0002); no Docker, no compose.
 .DEFAULT_GOAL := help
-.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell migrate run test test-unit test-e2e test-all check lint fmt typecheck imports audit
+.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell image dev dev-down dev-reset dev-status dev-logs migrate run test test-unit test-e2e test-all check lint fmt typecheck imports audit
 
 DB_NAME      := mpmv-db
 DB_IMAGE     := docker.io/library/postgres:17
@@ -53,6 +53,31 @@ db-reset: ## Destroy the local database container and its volume
 
 db-shell: ## Open psql in the local database
 	container exec -it $(DB_NAME) psql -U mpmv -d mpmv
+
+# --- Local stack (ARC.5): the OCI image plus network, media volume, app and worker on `container`.
+# Release images are built by CI from git tags; see deploy/README.md for tags and rollback.
+IMAGE_NAME := mpmv-app
+VERSION    ?= dev
+STACK      := sh deploy/local/stack.sh
+
+image: ## Build the app image $(IMAGE_NAME):$(VERSION) from the Containerfile
+	container build --file Containerfile --tag $(IMAGE_NAME):$(VERSION) \
+		--build-arg MPMV_VERSION=$(VERSION) .
+
+dev: db image ## Run the local stack: PostgreSQL, app on http://127.0.0.1:8000, worker
+	MPMV_IMAGE=$(IMAGE_NAME):$(VERSION) $(STACK) up
+
+dev-down: ## Stop and remove the app and worker containers (the database keeps running)
+	$(STACK) down
+
+dev-reset: ## dev-down, then delete the stack network and media volume (database untouched)
+	$(STACK) reset
+
+dev-status: ## List the mpmv-* containers
+	$(STACK) status
+
+dev-logs: ## Follow the app logs (WHAT=worker for the worker)
+	$(STACK) logs $(WHAT)
 
 # --- Application
 migrate: db ## Apply migrations to the local database

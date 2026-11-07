@@ -35,7 +35,7 @@ def parse(text: str) -> list[Instruction]:
         if line.startswith("#"):
             continue
         if line.endswith("\\"):
-            buffer += line[:-1] + " "
+            buffer += line[:-1].rstrip() + " "
             continue
         buffer += line
         keyword, _, args = buffer.strip().partition(" ")

@@ -1,0 +1,24 @@
+# MPMV background worker and scheduler on a STAGE/LIVE host (ARC.5, ADR-0004, ADR-0005).
+# Until ARC.9 lands the `worker` role idles (see deploy/container/entrypoint.sh).
+[Unit]
+Description=MPMV worker
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=mpmv-worker
+Image=localhost/mpmv-app:current
+Pull=never
+Exec=worker
+Network=mpmv.network
+EnvironmentFile=%h/.config/mpmv/mpmv.env
+ReadOnly=true
+NoNewPrivileges=true
+DropCapability=ALL
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target
