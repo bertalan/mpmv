@@ -63,7 +63,7 @@
 | SEC.3 | Field-level encryption (IBAN, KYC, DAC7) with key rotation | P1 | 8 | VEN.1 | DB dump with no cleartext data |
 | SEC.4 | AuditLog extended to all sensitive mutations + staff view with filters | P1 | 6 | ARC.6 | Rate change visible with before/after |
 | SEC.5 | Security tests in CI (permissions by role and tenant, unauthenticated endpoints) | P1 | 8 | CORE.3 | Undeclared public endpoint → CI red |
-| OPS.1 | PITR backup + encrypted off-site dumps + restore test | P1 | 8 | ARC.5 | Documented restore on an empty environment |
+| OPS.1 | PITR backup + encrypted off-site dumps + restore test; least-privilege DB roles (app role without DDL or TRUNCATE, so the audit log stays append-only) | P1 | 8 | ARC.5 | Documented restore on an empty environment; app role cannot TRUNCATE `core_auditlog` |
 | OPS.2 | Observability: JSON logs, error tracking, healthchecks, alerts | P1 | 8 | ARC.5 | Alert on a simulated checkout error |
 
 ### F1 — Catalog, import, base frontend (26 tasks, 252 h)

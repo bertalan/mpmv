@@ -81,7 +81,7 @@ flowchart LR
 | SEC.4 | AuditLog extended to all sensitive mutations + staff view with filters | P1 | 6 | ARC.6 | Rate change visible with before/after |
 | SEC.5 | Security tests in CI (permissions by role and tenant, unauthenticated endpoints) | P1 | 8 | CORE.3 | Undeclared public endpoint → CI red |
 | SEC.6 | External penetration test and remediation | P1 | 16 | MIG.5 | Report with no open critical findings |
-| OPS.1 | PITR backup + encrypted off-site dumps + restore test | P1 | 8 | ARC.5 | Documented restore on an empty environment |
+| OPS.1 | PITR backup + encrypted off-site dumps + restore test; least-privilege DB roles (app role without DDL or TRUNCATE, so the audit log stays append-only) | P1 | 8 | ARC.5 | Documented restore on an empty environment; app role cannot TRUNCATE `core_auditlog` |
 | OPS.2 | Observability: JSON logs, error tracking, healthchecks, alerts | P1 | 8 | ARC.5 | Alert on a simulated checkout error |
 | OPS.3 | Runbooks: incidents (including 72 h data breach), payouts, rate updates, vendor onboarding | P2 | 8 | — | Runbooks in the repo |
 | OPS.4 | Automated dependency updates (PRs) + SBOM | P2 | 3 | ARC.4 | Weekly update PRs |

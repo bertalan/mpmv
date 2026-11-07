@@ -5,8 +5,8 @@
 A vertical-agnostic multivendor marketplace built as a Django + Wagtail modular monolith on
 PostgreSQL. It replaces a WordPress + WooCommerce + WCFM + WPML stack.
 
-> Status: **foundations (phase F0)**. The stack is decided ([ADR-0001](docs/adr/0001-stack.md)) and
-> the project skeleton is in place (ARC.3). Domain apps are empty shells until their tasks start.
+> Status: **foundations (phase F0)**. The stack is decided ([ADR-0001](docs/adr/0001-stack.md)).
+> Task status and coherence checks: [docs/progress.md](docs/progress.md).
 
 ## Repository layout
 
