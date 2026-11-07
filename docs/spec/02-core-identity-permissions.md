@@ -52,6 +52,7 @@ class ApiClient(Model):  # api — machine credential (pipelines, MCP, integrati
 | Vendor staff | Vendor dashboard | Orders, quotes, products; no payouts, IBAN or tax regime |
 | Editor | Wagtail admin | Pages, blog, SEO copy, translations |
 | Staff operator | Wagtail admin + commerce admin | Vendors, catalog, orders, quotes, zones, rates |
+| Platform owner | Commerce admin | Staff operator rights plus the owner-only settings: allowed vendor establishment countries (CMP.13) and approval of staff proposals to turn EPR checks on or off per country (CMP.11). A dedicated permission, never implied by staff or admin access; it never approves its own proposal |
 | Technical superuser | Django admin (restricted network) | Maintenance; exceptional, tracked use |
 
 ### Tenant (vendor) isolation

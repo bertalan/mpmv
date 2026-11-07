@@ -124,7 +124,9 @@ def payout_eligibility(vendor) -> Eligibility               # DAC7 complete, acc
 
 1. **Vendor application**: public form (Turnstile) → `applicant` → staff review → `onboarding`
    (DAC7 data, Stripe Express account via onboarding link, acceptance of the versioned contract
-   with the signature flow below, tax regime) → `active`. Every step is recorded in `AuditLog`.
+   with the signature flow below, tax regime) → `active`. Activation is refused when neither the
+   registered office nor a permanent establishment is in the allowed countries of the
+   `PlatformOperator`, the EU-27 at go-live (CMP.13, D-21). Every step is recorded in `AuditLog`.
 2. **Paid order**: for each `VendorOrder` the rule snapshot is frozen, `compute_commission` is
    computed, and the ledger rows are written (`sale`, `shipping`, `commission`, `payment_fee`).
 3. **Transfer**: with *separate charges and transfers* (see [07](07-cart-orders-payments.md)) a Stripe
@@ -196,6 +198,10 @@ These rows are the payout gate, and the seeded rows include the DAC7 dataset of
 | Italian companies (not sole proprietors) | REA office, REA number, liquidation status |
 | EU member states, Italy included | VAT number, IBAN |
 | Outside the EU | IBAN, foreign TIN (`tax_code`) |
+
+The "Outside the EU" rows stay at go-live: a vendor with its registered office outside the EU
+and a permanent establishment in the EU can be activated (CMP.13), and the rows are ready for the
+later opening to non-EU vendors (CMP.17 to CMP.22).
 
 So every vendor that passes the gate has a VAT number or a TIN, and the legal name is always
 present. Payout code (VEN.6, VEN.7) calls `assert_payout_allowed(vendor)`, which refuses with
