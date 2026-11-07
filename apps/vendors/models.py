@@ -129,3 +129,42 @@ class VendorTranslation(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.vendor} [{self.language}]"
+
+
+class VendorMemberRole(models.TextChoices):
+    OWNER = engine.OWNER, "Owner"
+    STAFF = engine.STAFF, "Staff"
+
+
+class VendorMember(BaseModel):
+    """A user's membership of a vendor, with a role (spec 02 §2.2, CORE.2).
+
+    Created, re-roled and removed only through `services.add_member`, `change_member_role` and
+    `remove_member`, which keep at least one owner per vendor and write the audit log. What a
+    role may do is the matrix in `engine.ROLE_PERMISSIONS`.
+    """
+
+    Role = VendorMemberRole
+
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="members")
+    # PROTECT: a membership disappears through `remove_member` (last-owner rule, audit), never as
+    # a side effect of deleting the user.
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="vendor_memberships"
+    )
+    role = models.CharField(max_length=16, choices=Role.choices, editable=False)
+
+    class Meta:
+        ordering = ["vendor", "role", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["vendor", "user"], name="vendors_member_vendor_user_unique"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(role__in=VendorMemberRole.values),
+                name="vendors_member_role_valid",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user} @ {self.vendor} ({self.role})"
