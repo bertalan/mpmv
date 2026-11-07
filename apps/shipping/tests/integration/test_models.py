@@ -280,9 +280,8 @@ def test_the_seeded_continents_cover_every_country(seeded_groups: None) -> None:
     assert set(covered) == ISO_3166_ALPHA2 - {"AQ"}
     assert sorted(c for c in set(covered) if covered.count(c) > 1) == ["CY"]
     assert set(EU_MEMBER_STATES) <= members("europe")
-    assert members("americas") == (
-        members("northern-america") | members("central-america-caribbean") | members("south-america")
-    )
+    americas = ("northern-america", "central-america-caribbean", "south-america")
+    assert members("americas") == set().union(*(members(code) for code in americas))
 
 
 # --- ShippingMethod
@@ -368,9 +367,13 @@ def test_method_name_is_translated() -> None:
 
 def test_a_method_uses_platform_zones_or_its_vendors_own_zones() -> None:
     own_zone = ShippingZoneFactory.create(vendor_zone=True)
-    ShippingMethodFactory.build(vendor=own_zone.vendor, zone=own_zone).full_clean()
-    ShippingMethodFactory.build(vendor=own_zone.vendor).full_clean()  # platform zone
-    foreign = ShippingMethodFactory.build(zone=own_zone)  # another vendor's zone
+    vendor, carrier = own_zone.vendor, CarrierFactory.create()
+    ShippingMethodFactory.build(vendor=vendor, zone=own_zone, carrier=carrier).full_clean()
+    platform_zone = ShippingZoneFactory.create()
+    ShippingMethodFactory.build(vendor=vendor, zone=platform_zone, carrier=carrier).full_clean()
+    foreign = ShippingMethodFactory.build(  # another vendor's zone
+        vendor=VendorFactory.create(), zone=own_zone, carrier=carrier
+    )
     with pytest.raises(ValidationError) as excinfo:
         foreign.full_clean()
     assert "zone" in excinfo.value.message_dict
@@ -421,9 +424,7 @@ def test_adjacent_bands_are_allowed() -> None:
     [("4.999", "10"), ("1", "2"), ("0", "5"), ("3", None)],
     ids=["straddles", "inside", "same", "unlimited"],
 )
-def test_overlapping_bands_of_the_same_method_are_refused(
-    from_kg: str, to_kg: str | None
-) -> None:
+def test_overlapping_bands_of_the_same_method_are_refused(from_kg: str, to_kg: str | None) -> None:
     method = ShippingMethodFactory.create()
     WeightBandFactory.create(method=method, from_kg=kg("0"), to_kg=kg("5"))
     with refused(), transaction.atomic():

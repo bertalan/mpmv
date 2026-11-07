@@ -79,9 +79,10 @@ is open: SHP.12 only stores the choice.
   vendor and are visible only to that vendor (tenant scoping, CORE.3); a vendor's methods can use
   platform zones and its own zones, never another vendor's.
 - A zone covers its explicit `countries` plus the members of its `country_groups`. Country groups are
-  data, seeded with the EU member states, Europe and the UN M49 continents and regions (Africa,
-  Northern America, Central America and the Caribbean, South America, Asia, Europe, Oceania) and
-  edited by staff, every change audited. `*` (rest of the world) stays a marker of its own and never
+  data, seeded with the EU member states, Europe (UN M49 Europe plus Cyprus, so every EU member
+  state is in it) and the UN M49 continents and regions (Africa; the Americas, also split into
+  Northern America, Central America and the Caribbean, South America; Asia; Oceania) and edited
+  by staff, every change audited. `*` (rest of the world) stays a marker of its own and never
   mixes with countries or groups.
 - `postcode_patterns` and `states` narrow a zone inside its countries: an address in those countries
   matches when its postcode matches a pattern or its province / state is listed. An address without

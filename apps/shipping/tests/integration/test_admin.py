@@ -153,7 +153,11 @@ def test_add_vendor_zone_from_country_groups(staff_client: Client) -> None:
     vendor = VendorFactory.create()
     group = CountryGroupFactory.create(code="dach", countries=["DE", "AT", "CH"])
     data = zone_form(
-        vendor=str(vendor.pk), code="dach", countries="", country_groups="dach", postcode_patterns=""
+        vendor=str(vendor.pk),
+        code="dach",
+        countries="",
+        country_groups="dach",
+        postcode_patterns="",
     )
     response = staff_client.post(reverse("admin:shipping_shippingzone_add"), data)
     assert response.status_code == 302, response.content.decode()

@@ -134,7 +134,8 @@ def test_a_narrowed_zone_does_not_match_outside_its_postcodes_or_provinces() -> 
         Specificity.PROVINCE
     )
     # An address without a postcode never matches a postcode-only zone (case 5).
-    assert engine.zone_match(zone("bt", "GB", postcode_patterns=("BT*",)), Destination("GB")) is None
+    northern_ireland = zone("bt", "GB", postcode_patterns=("BT*",))
+    assert engine.zone_match(northern_ireland, Destination("GB")) is None
 
 
 def test_a_postcode_zone_applies_only_to_its_countries() -> None:
