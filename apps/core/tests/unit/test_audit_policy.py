@@ -7,6 +7,7 @@ reason. The admin of an audited model may not write through Django's default, un
 
 from typing import Any
 
+import pytest
 from django.contrib import admin
 from django.core import checks
 from django.db import models
@@ -42,6 +43,30 @@ class AuditedWritesAdmin(admin.ModelAdmin[Any]):
 
     def delete_queryset(self, request: HttpRequest, queryset: QuerySet[Any]) -> None:
         raise NotImplementedError
+
+
+class SavesDirectlyAdmin(admin.ModelAdmin[Any]):
+    """Overrides the writes but still saves through Django's default (coherence check 4)."""
+
+    def save_model(self, request: HttpRequest, obj: Any, form: Any, change: bool) -> None:
+        super().save_model(request, obj, form, change)
+
+    def delete_model(self, request: HttpRequest, obj: Any) -> None:
+        raise NotImplementedError
+
+    def delete_queryset(self, request: HttpRequest, queryset: QuerySet[Any]) -> None:
+        super().delete_queryset(request, queryset)
+
+
+class InheritsDirectSaveAdmin(SavesDirectlyAdmin):
+    pass
+
+
+class ExtendsAuditedWritesAdmin(AuditedWritesAdmin):
+    """Calls super(), which reaches an audited override, not Django's default."""
+
+    def save_model(self, request: HttpRequest, obj: Any, form: Any, change: bool) -> None:
+        super().save_model(request, obj, form, change)
 
 
 class SavesOnlyAdmin(admin.ModelAdmin[Any]):
@@ -97,6 +122,24 @@ def test_a_read_only_admin_of_an_audited_model_passes() -> None:
 def test_an_admin_that_overrides_every_write_passes() -> None:
     policy = {"core.platformoperator": None}
     assert audit_policy_errors([], registry(PlatformOperator, AuditedWritesAdmin), policy) == []
+
+
+@pytest.mark.parametrize("admin_class", [SavesDirectlyAdmin, InheritsDirectSaveAdmin])
+def test_an_override_that_calls_the_default_write_is_still_unaudited(
+    admin_class: type[admin.ModelAdmin[Any]],
+) -> None:
+    policy = {"core.platformoperator": None}
+    errors = audit_policy_errors([], registry(PlatformOperator, admin_class), policy)
+    assert ids(errors) == ["core.E203"]
+    assert "save_model" in errors[0].msg
+    assert "delete_queryset" in errors[0].msg
+    assert "delete_model" not in errors[0].msg
+
+
+def test_an_override_may_call_an_audited_parent_override() -> None:
+    policy = {"core.platformoperator": None}
+    registered = registry(PlatformOperator, ExtendsAuditedWritesAdmin)
+    assert audit_policy_errors([], registered, policy) == []
 
 
 def test_the_admin_of_an_exempt_model_is_not_checked() -> None:
