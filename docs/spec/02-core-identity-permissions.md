@@ -74,8 +74,26 @@ def get_for_actor_or_404(qs, actor, **lookup):  # 404 (not 403) to prevent enume
 ### Authentication
 
 - Web session: modern password handling (check against compromised passwords), **mandatory TOTP/passkey
-  MFA** for staff and vendor owners, progressive lockout per account and IP.
+  MFA** for everyone who reaches a management area, progressive lockout per account and IP.
 - Step-up (re-authentication) for: IBAN change, payout, rate changes, customer data export.
+
+### Multi-factor authentication
+
+MFA is mandatory for platform staff, superusers and every vendor member, owners and staff alike
+(owner decision Q-09). A user in one of these groups who has no confirmed second factor is sent to
+enrolment before any page; one who has a factor must verify it after the password. Customers with
+no vendor membership and no staff flag are not forced. Staff and superusers are always covered in
+`apps.accounts.services.mfa_required`. Further groups come from the dotted paths in
+`MFA_REQUIRED_POLICIES` in the settings; vendor members are added there by
+`apps.vendors.services.is_vendor_member`. A policy can only add a requirement, never remove one.
+
+The second factor is a TOTP authenticator app or a passkey. The confirmed parameters are:
+
+| Parameter | Value | Where it is configured |
+|---|---|---|
+| Step-up window | 300 seconds since the last verification | `MFA_STEP_UP_MAX_AGE` in the settings |
+| Recovery codes | 10 codes of 16 characters each | `RECOVERY_CODE_COUNT` and `RECOVERY_CODE_LENGTH` in `apps/accounts/engine.py` |
+| TOTP codes | 6 digits, 30 second step | django-otp defaults, stored per device on `TOTPDevice` |
 - API: `Authorization: Bearer mpmv_<prefix>_<secret>` header, constant-time comparison,
   scope checked per route, rate limit per client, logging of every mutating call.
 - Impersonation for support (equivalent of Login as User), staff only, with audit.
