@@ -24,7 +24,7 @@ from apps.catalog.services import (
     rename_variant_sku,
     update_by_sku,
 )
-from apps.catalog.tests.factories import ProductFactory, VariantFactory
+from apps.catalog.tests.factories import ProductFactory, SkuAliasFactory, VariantFactory
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 from apps.vendors.tests.factories import VendorFactory
@@ -337,3 +337,9 @@ def test_the_vendor_facing_label_is_the_sku_not_the_staff_ref() -> None:
     product = ProductFactory.create(sku="BAG-100")
     assert str(product) == "BAG-100"
     assert product.staff_ref not in str(product)
+
+
+def test_a_staged_alias_matches_its_product_only_within_its_vendor() -> None:
+    alias = SkuAliasFactory.create(sku="OLD 1", sku_key="old 1")
+    assert match_skus(alias.vendor, [" old  1"]) == {" old  1": alias.product}
+    assert match_skus(VendorFactory.create(), ["OLD 1"]) == {"OLD 1": None}

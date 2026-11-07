@@ -3,13 +3,16 @@ CAT.11).
 
 Price fields stay editable, but a change to them on an existing product or variant is saved
 through the audited price services, never as a plain model save.
+
+The SKU is saved as typed (CAT.13); odd characters show a warning, never an error. A SKU change
+leaves a `SkuAlias` (database trigger). `staff_ref` is shown read-only.
 """
 
 from collections.abc import Iterable
 from typing import Any
 
 from django import forms
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db import models
 from django.forms.models import BaseInlineFormSet
 from django.http import HttpRequest
@@ -28,6 +31,15 @@ from .services import (
 )
 
 TIMESTAMPS = ("public_id", "created_at", "updated_at")
+
+
+def warn_about_sku(model_admin: admin.ModelAdmin[Any], request: HttpRequest, sku: str) -> None:
+    """Non-blocking SKU warnings (spec 03 §3.2): the SKU is saved as entered."""
+    warnings = engine.sku_warnings(sku)
+    if warnings:
+        model_admin.message_user(
+            request, f"SKU {sku!r} {'; '.join(warnings)}.", level=messages.WARNING
+        )
 
 
 def take_price_change(
@@ -66,18 +78,22 @@ class ProductTranslationInline(admin.StackedInline[ProductTranslation, Product])
 
 class VariantInlineFormSet(BaseInlineFormSet[Variant, Product, forms.ModelForm[Variant]]):
     def clean(self) -> None:
-        """Two variants of one submission with the same SKU (the database would refuse them)."""
+        """SKUs of one submission sharing a match key with each other or with their product
+        (one namespace per vendor, CAT.13; the database would refuse them)."""
         super().clean()
+        product_key = engine.sku_match_key(self.instance.sku or "")
         seen: set[str] = set()
         for form in self.forms:
             if not hasattr(form, "cleaned_data") or form in self.deleted_forms:
                 continue
-            sku = engine.canonical_sku(form.cleaned_data.get("sku") or "")
-            if not sku:
+            key = engine.sku_match_key(form.cleaned_data.get("sku") or "")
+            if not key:
                 continue
-            if sku in seen:
+            if key == product_key:
+                form.add_error("sku", "A variant cannot have the SKU of its product.")
+            elif key in seen:
                 form.add_error("sku", "Two variants cannot have the same SKU.")
-            seen.add(sku)
+            seen.add(key)
 
 
 class VariantInline(admin.TabularInline[Variant, Product]):
@@ -100,13 +116,13 @@ class VariantInline(admin.TabularInline[Variant, Product]):
 class ProductAdmin(admin.ModelAdmin[Product]):
     list_display = ("sku", "vendor", "kind", "status", "price_net", "stock_qty", "stock_status")
     list_filter = ("status", "kind", "sales_mode", "fiscal_category", "stock_status", "vendor")
-    search_fields = ("sku", "gtin", "translations__title")
+    search_fields = ("sku", "staff_ref", "gtin", "translations__title")
     list_select_related = ("vendor",)
     raw_id_fields = ("vendor", "required_companion", "upsells")
     autocomplete_fields = ("terms",)  # terms can be thousands: searched, never listed
-    readonly_fields = ("status", *TIMESTAMPS)
+    readonly_fields = ("status", "staff_ref", *TIMESTAMPS)
     fieldsets = (
-        (None, {"fields": ("vendor", "sku", "kind", "status", "public_id")}),
+        (None, {"fields": ("vendor", "sku", "kind", "status", "staff_ref", "public_id")}),
         (
             "Sales and prices",
             {
@@ -160,6 +176,7 @@ class ProductAdmin(admin.ModelAdmin[Product]):
         super().save_model(request, obj, form, change)
         if new_prices is not None:
             set_product_price(obj, **new_prices, ctx=audit_context(request))
+        warn_about_sku(self, request, obj.sku)
 
     def save_formset(self, request: HttpRequest, form: Any, formset: Any, change: bool) -> None:
         if formset.model is not Variant:
@@ -174,6 +191,8 @@ class ProductAdmin(admin.ModelAdmin[Product]):
             new_prices = take_price_change(variant, variant_form.changed_data, VARIANT_PRICE_FIELDS)
             if new_prices is not None:
                 repriced.append((variant, new_prices))
+            if "sku" in variant_form.changed_data:
+                warn_about_sku(self, request, variant.sku)
         super().save_formset(request, form, formset, change)
         ctx = audit_context(request)
         for variant, prices in repriced:
@@ -190,14 +209,15 @@ class VariantTranslationInline(admin.StackedInline[VariantTranslation, Variant])
 class VariantAdmin(admin.ModelAdmin[Variant]):
     list_display = ("sku", "product", "vendor", "stock_qty", "stock_status", "is_default")
     list_filter = ("stock_status", "vendor")
-    search_fields = ("sku", "product__sku")
+    search_fields = ("sku", "staff_ref", "product__sku")
     list_select_related = ("product", "vendor")
     raw_id_fields = ("product",)
-    readonly_fields = ("vendor", *TIMESTAMPS)
+    readonly_fields = ("vendor", "staff_ref", *TIMESTAMPS)
     fields = (
         "product",
         "vendor",
         "sku",
+        "staff_ref",
         "position",
         "is_default",
         "stock_qty",
@@ -215,3 +235,4 @@ class VariantAdmin(admin.ModelAdmin[Variant]):
         super().save_model(request, obj, form, change)
         if new_prices is not None:
             set_variant_price(obj, **new_prices, ctx=audit_context(request))
+        warn_about_sku(self, request, obj.sku)

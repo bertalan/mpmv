@@ -10,6 +10,14 @@ Vendor scoping (CORE.3): every model here uses `VendorScopedManager`. `Variant.v
 its product's vendor so that the database can enforce one SKU per vendor among variants; a
 composite foreign key (migration 0001) keeps the copy equal to the product's vendor, and moves
 it along when the product changes vendor.
+
+Identity (CAT.13, owner decisions Q-30 and Q-33): the platform refers to products and variants
+by `public_id`, and staff by `staff_ref`, a prefixed sequence the vendor never sees. The vendor
+SKU is a label kept raw in `sku`; `sku_key` (`engine.sku_match_key`, set on save) is unique per
+vendor across products and variants together. Within a table a unique constraint enforces it,
+across the two tables a database trigger (migration 0003), which also writes a `SkuAlias` row
+whenever a match key changes, so older import files still match. Change SKUs with `save()` or
+the rename services, never with `QuerySet.update()`, which skips the match key.
 """
 
 from typing import Any, ClassVar
@@ -17,7 +25,7 @@ from typing import Any, ClassVar
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
-from django.db.models.functions import Trim, Upper
+from django.db.models.functions import Now
 
 from apps.core.fields import MoneyField
 from apps.core.models import BaseModel, TranslationModel, resolve_translation
@@ -25,6 +33,7 @@ from apps.core.translations import Resolved
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager
 
+from . import engine
 from .fields import SkuField
 from .taxonomy import (
     Brand,
@@ -48,6 +57,7 @@ __all__ = [
     "ProductStatus",
     "ProductTranslation",
     "SalesMode",
+    "SkuAlias",
     "StockPolicy",
     "StockStatus",
     "Taxonomy",
@@ -73,12 +83,95 @@ def _not_negative(field: str, label: str, name: str) -> models.CheckConstraint:
     )
 
 
-def _sku_normalized(name: str) -> models.CheckConstraint:
+def _sku_key_present(name: str) -> models.CheckConstraint:
     return models.CheckConstraint(
-        condition=models.Q(sku=Upper(Trim("sku"))) & ~models.Q(sku=""),
+        condition=~models.Q(sku_key=""),
         name=name,
-        violation_error_message="The SKU must be upper case, without surrounding spaces.",
+        violation_error_message="A SKU cannot be empty.",
     )
+
+
+def _vendor_sku_unique(name: str, label: str) -> models.UniqueConstraint:
+    return models.UniqueConstraint(
+        fields=["vendor", "sku_key"],
+        name=name,
+        violation_error_message=f"This vendor already has a {label} with this SKU.",
+    )
+
+
+def _staff_ref(prefix: str, sequence: str) -> "models.CharField[Any, Any]":
+    """A short prefixed sequence for staff ("P-000123"), drawn by the database on insert."""
+    return models.CharField(
+        "staff reference",
+        max_length=24,
+        unique=True,
+        editable=False,
+        db_default=models.Func(
+            models.Value(prefix),
+            models.Value(sequence),
+            function="catalog_staff_ref",
+            output_field=models.CharField(),
+        ),
+        help_text="Internal reference for staff; never shown to vendors.",
+    )
+
+
+def _sku_key_field() -> "models.CharField[Any, Any]":
+    return models.CharField(
+        "SKU match key",
+        max_length=64,
+        editable=False,
+        help_text="The SKU normalised for matching; unique per vendor.",
+    )
+
+
+def sku_owner(
+    vendor_id: int, sku_key: str, *, product_pk: int | None = None, variant_pk: int | None = None
+) -> "Product | Variant | None":
+    """The product or variant of the vendor that holds `sku_key`, other than the given ones."""
+    products = Product.objects.filter(vendor_id=vendor_id, sku_key=sku_key)
+    if product_pk is not None:
+        products = products.exclude(pk=product_pk)
+    product = products.first()
+    if product is not None:
+        return product
+    variants = Variant.objects.filter(vendor_id=vendor_id, sku_key=sku_key)
+    if variant_pk is not None:
+        variants = variants.exclude(pk=variant_pk)
+    return variants.first()
+
+
+def sku_taken_message(owner: "Product | Variant") -> str:
+    label = "product" if isinstance(owner, Product) else "variant"
+    return f"This vendor already has a {label} with this SKU."
+
+
+def _check_sku(item: "Product | Variant") -> None:
+    """Model validation of the SKU: usable, and its match key free in the vendor's namespace."""
+    if not item.sku:
+        return  # the required-field error is already reported
+    errors = engine.sku_errors(item.sku)
+    if errors:
+        raise ValidationError({"sku": errors})
+    item.sku_key = engine.sku_match_key(item.sku)
+    if item.vendor_id is None:
+        return
+    owner = sku_owner(
+        item.vendor_id,
+        item.sku_key,
+        product_pk=item.pk if isinstance(item, Product) else None,
+        variant_pk=item.pk if isinstance(item, Variant) else None,
+    )
+    if owner is not None:
+        raise ValidationError({"sku": sku_taken_message(owner)})
+
+
+def _with_sku_key(item: "Product | Variant", kwargs: dict[str, Any]) -> None:
+    """Set the match key before a save; a save limited to `sku` also writes `sku_key`."""
+    item.sku_key = engine.sku_match_key(item.sku)
+    update_fields = kwargs.get("update_fields")
+    if update_fields is not None and "sku" in update_fields:
+        kwargs["update_fields"] = {*update_fields, "sku_key"}
 
 
 class ProductKind(models.TextChoices):
@@ -128,7 +221,12 @@ class Product(BaseModel):
     objects = VendorScopedManager()
 
     vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="products")
-    sku = SkuField(help_text="Unique per vendor; stored upper case.")
+    staff_ref = _staff_ref("P-", "catalog_product_staff_ref_seq")
+    sku = SkuField(
+        help_text="The vendor's label, kept as entered; unique per vendor ignoring case and "
+        "spaces, across products and variants."
+    )
+    sku_key = _sku_key_field()
     kind = models.CharField(max_length=16, choices=ProductKind.choices, default=ProductKind.SIMPLE)
     # Changed only by the publishing services (CAT.10), which check the publishing rules.
     status = models.CharField(
@@ -227,16 +325,12 @@ class Product(BaseModel):
     class Meta:
         ordering = ["sku", "id"]
         constraints = [
-            models.UniqueConstraint(
-                fields=["vendor", "sku"],
-                name="catalog_product_vendor_sku_unique",
-                violation_error_message="This vendor already has a product with this SKU.",
-            ),
+            _vendor_sku_unique("catalog_product_vendor_sku_key_unique", "product"),
             # Target of the variants' composite foreign key (product, vendor).
             models.UniqueConstraint(
                 fields=["id", "vendor"], name="catalog_product_id_vendor_unique"
             ),
-            _sku_normalized("catalog_product_sku_normalized"),
+            _sku_key_present("catalog_product_sku_key_present"),
             _choice("kind", ProductKind, "catalog_product_kind_valid"),
             _choice("status", ProductStatus, "catalog_product_status_valid"),
             _choice("sales_mode", SalesMode, "catalog_product_sales_mode_valid"),
@@ -287,6 +381,13 @@ class Product(BaseModel):
     def __str__(self) -> str:
         return str(self.sku)
 
+    def clean(self) -> None:
+        _check_sku(self)
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        _with_sku_key(self, kwargs)
+        super().save(*args, **kwargs)
+
     def translation(self, language: str) -> "Resolved[ProductTranslation]":
         """Texts to show in `language`: published, or EN with a fallback flag."""
         return resolve_translation(self.translations.all(), language)
@@ -311,7 +412,7 @@ class ProductTranslation(TranslationModel):
     title = models.CharField(max_length=255)
     short_description = models.TextField(blank=True)
     description = models.TextField(blank=True, help_text="HTML.")
-    # Derived {title}-{lang}-{sku} with `build_product_slug` (CAT.5); empty until generated.
+    # Derived {title}-{lang} by `build_product_slug` (CAT.5), never the SKU; empty until then.
     slug = models.SlugField(max_length=80, blank=True)
     seo_title = models.CharField("SEO title", max_length=255, blank=True)
     seo_description = models.TextField("SEO description", blank=True)
@@ -348,7 +449,12 @@ class Variant(BaseModel):
     vendor = models.ForeignKey(
         Vendor, on_delete=models.PROTECT, related_name="variants", editable=False
     )
-    sku = SkuField(help_text="Unique per vendor; stored upper case.")
+    staff_ref = _staff_ref("V-", "catalog_variant_staff_ref_seq")
+    sku = SkuField(
+        help_text="The vendor's label, kept as entered; unique per vendor ignoring case and "
+        "spaces, across products and variants."
+    )
+    sku_key = _sku_key_field()
     price_net_override = MoneyField(
         "net price override", null=True, blank=True, help_text="Empty: the product's price."
     )
@@ -365,18 +471,14 @@ class Variant(BaseModel):
     class Meta:
         ordering = ["product", "position", "id"]
         constraints = [
-            models.UniqueConstraint(
-                fields=["vendor", "sku"],
-                name="catalog_variant_vendor_sku_unique",
-                violation_error_message="This vendor already has a variant with this SKU.",
-            ),
+            _vendor_sku_unique("catalog_variant_vendor_sku_key_unique", "variant"),
             models.UniqueConstraint(
                 fields=["product"],
                 condition=models.Q(is_default=True),
                 name="catalog_variant_one_default_per_product",
                 violation_error_message="The product already has a default variant.",
             ),
-            _sku_normalized("catalog_variant_sku_normalized"),
+            _sku_key_present("catalog_variant_sku_key_present"),
             _choice("stock_status", StockStatus, "catalog_variant_stock_status_valid"),
             _not_negative(
                 "price_net_override", "price override", "catalog_variant_price_not_negative"
@@ -402,15 +504,13 @@ class Variant(BaseModel):
         super().clean_fields(exclude)
 
     def clean(self) -> None:
-        # `vendor` is not a form field, so forms skip the (vendor, sku) constraint: check it here.
-        if self.vendor_id is None or not self.sku:
-            return
-        taken = Variant.objects.filter(vendor_id=self.vendor_id, sku=self.sku).exclude(pk=self.pk)
-        if taken.exists():
-            raise ValidationError({"sku": "This vendor already has a variant with this SKU."})
+        # `vendor` and `sku_key` are not form fields, so forms skip the (vendor, sku_key)
+        # constraint, and no constraint spans products and variants: check here.
+        _check_sku(self)
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         self._sync_vendor()
+        _with_sku_key(self, kwargs)
         update_fields = kwargs.get("update_fields")
         if update_fields is not None:
             kwargs["update_fields"] = {*update_fields, "vendor"}
@@ -449,3 +549,45 @@ class VariantTranslation(TranslationModel):
 
     def __str__(self) -> str:
         return f"{self.variant} [{self.language}]"
+
+
+class SkuAlias(BaseModel):
+    """A SKU match key a product or variant used before a rename (CAT.13).
+
+    Written by a database trigger whenever a match key changes (migration 0003), whatever made
+    the change, so imports keep matching older files. Never edited by hand.
+    """
+
+    vendor_scope: ClassVar[str] = "vendor"
+
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="sku_aliases")
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, null=True, blank=True, related_name="sku_aliases"
+    )
+    variant = models.ForeignKey(
+        Variant, on_delete=models.CASCADE, null=True, blank=True, related_name="sku_aliases"
+    )
+    sku = SkuField(help_text="The SKU as it was entered.")
+    sku_key = models.CharField("SKU match key", max_length=64)
+    replaced_at = models.DateTimeField(db_default=Now())
+
+    objects = VendorScopedManager()
+
+    class Meta:
+        verbose_name = "SKU alias"
+        verbose_name_plural = "SKU aliases"
+        ordering = ["vendor", "sku_key", "replaced_at"]
+        indexes = [
+            models.Index(fields=["vendor", "sku_key"], name="catalog_skualias_vendor_key"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(models.Q(product__isnull=False) & models.Q(variant__isnull=True))
+                | (models.Q(product__isnull=True) & models.Q(variant__isnull=False)),
+                name="catalog_skualias_product_xor_variant",
+                violation_error_message="An alias belongs to a product or to a variant.",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return str(self.sku)

@@ -220,7 +220,7 @@ def test_deleting_a_product_deletes_its_translations_and_variants() -> None:
 
 def test_new_variant_defaults() -> None:
     product = ProductFactory.create(kind="variable")
-    variant = Variant.objects.create(product=product, sku="var-1")
+    variant = Variant.objects.create(product=product, sku="VAR-1")
     assert variant.sku == "VAR-1"
     assert variant.vendor == product.vendor
     assert variant.price_net_override is None

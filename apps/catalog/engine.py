@@ -1,8 +1,10 @@
-"""Pure catalog rules (spec 03 §3.2): SKU normalization, price validation, and the rules of the
-category and term trees and of the attributes a taxonomy declares for its terms. No ORM here."""
+"""Pure catalog rules (spec 03 §3.2): the vendor SKU match key and warnings (CAT.13), price
+validation, and the rules of the category and term trees and of the attributes a taxonomy
+declares for its terms. No ORM here."""
 
 import datetime as dt
 import re
+import unicodedata
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import Any, cast
@@ -11,22 +13,50 @@ from apps.core.money import CENT, to_decimal
 
 SKU_MAX_LENGTH = 64
 
-
-class InvalidSku(ValueError):
-    """The SKU is empty once normalized."""
-
-
-def canonical_sku(value: str) -> str:
-    """The stored form of a SKU: no surrounding whitespace, upper case. Never raises."""
-    return value.strip().upper()
+# Characters that commonly break exports, URLs, spreadsheets or matching (spec 03 §3.2).
+_SKU_SLASHES = frozenset("/\\")
+_SKU_QUOTES = frozenset("'\"`\u2018\u2019\u201a\u201b\u201c\u201d\u201e\u00b4")
 
 
-def normalize_sku(value: str) -> str:
-    """`canonical_sku`, refusing a SKU that is empty once normalized."""
-    sku = canonical_sku(value)
-    if not sku:
-        raise InvalidSku("A SKU cannot be empty.")
-    return sku
+def sku_match_key(raw: str) -> str:
+    """The key a vendor SKU is matched on: NFKC, trimmed, inner whitespace collapsed to one
+    space, case-folded. Never raises; an empty key means an unusable SKU (`sku_errors`)."""
+    text = unicodedata.normalize("NFKC", raw)
+    text = " ".join(text.split()).casefold()
+    return unicodedata.normalize("NFKC", text)
+
+
+def sku_errors(raw: str) -> list[str]:
+    """Why a SKU cannot be used at all; empty when usable. Odd characters are warnings."""
+    key = sku_match_key(raw)
+    if not key:
+        return ["A SKU cannot be empty."]
+    if len(key) > SKU_MAX_LENGTH:
+        return [f"A SKU cannot be longer than {SKU_MAX_LENGTH} characters once normalised."]
+    return []
+
+
+def sku_warnings(raw: str) -> list[str]:
+    """Characters that commonly cause trouble in a SKU. Never blocks: the SKU is kept as
+    entered, the vendor is told."""
+    warnings: list[str] = []
+    if raw != raw.strip():
+        warnings.append("starts or ends with a space")
+    inner = raw.strip()
+    if "  " in inner or any(c.isspace() and c != " " for c in inner):
+        warnings.append("contains repeated spaces, tabs or line breaks")
+    if any(c in _SKU_SLASHES for c in raw):
+        warnings.append("contains a slash")
+    if any(c in _SKU_QUOTES for c in raw):
+        warnings.append("contains quotes")
+    if any(unicodedata.category(c)[0] == "C" and not c.isspace() for c in raw):
+        warnings.append("contains control or invisible characters")
+    if any(
+        ord(c) > 127 and not unicodedata.category(c).startswith("C") and c not in _SKU_QUOTES
+        for c in raw
+    ):
+        warnings.append("contains non-ASCII characters that can look like others")
+    return warnings
 
 
 def to_price(value: object) -> Decimal:

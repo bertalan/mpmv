@@ -21,6 +21,7 @@ from apps.catalog.models import (
     CategoryTranslation,
     Product,
     ProductTranslation,
+    SkuAlias,
     Taxonomy,
     TaxonomyTranslation,
     Term,
@@ -76,6 +77,19 @@ class VariantFactory(DjangoModelFactory[Variant]):
     product = factory.SubFactory(ProductFactory, kind=Product.Kind.VARIABLE)
     sku = factory.Sequence(lambda n: f"VAR-{n:05d}")
     position = factory.Sequence(lambda n: n)
+
+
+class SkuAliasFactory(DjangoModelFactory[SkuAlias]):
+    """An old SKU of a product. Real aliases are written by the database on a rename (CAT.13);
+    this inserts one directly, e.g. to stage an import history."""
+
+    class Meta:
+        model = SkuAlias
+
+    product = factory.SubFactory(ProductFactory)
+    vendor = factory.SelfAttribute("product.vendor")
+    sku = factory.Sequence(lambda n: f"OLD-{n:05d}")
+    sku_key = factory.LazyAttribute(lambda o: o.sku.casefold())
 
 
 class VariantTranslationFactory(DjangoModelFactory[VariantTranslation]):
