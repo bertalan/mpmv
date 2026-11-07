@@ -100,8 +100,9 @@ retiring a key.
 
 1. Use `EncryptedCharField` (or `EncryptedTextField`) on the model.
 2. Mask it in the model's audit snapshot.
-3. For an existing column, write a migration: `AlterField`, then
-   `RunPython(encrypt, decrypt)` with `apps.core.encryption.encrypt_column` /
-   `decrypt_column` (see `apps/vendors/migrations/0008_encrypt_iban_and_tax_code.py`), and a
-   migration test.
+3. For an existing column, write a migration: `AlterField`, then `RunPython(encrypt, decrypt)`
+   that rewrites the values in place, and a migration test. Freeze the rewrite in the migration
+   (copy the `_rewrite` of `apps/vendors/migrations/0008_encrypt_iban_and_tax_code.py`, which
+   reads the primary key column from the historical model) instead of importing live helpers:
+   a later change to `apps.core.encryption` must not change what an applied migration does.
 4. Extend the database dump test (`apps/vendors/tests/integration/test_field_encryption.py`).

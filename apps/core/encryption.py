@@ -1,5 +1,9 @@
 """Field-level encryption plumbing (SEC.3): the configured keys and raw access to the encrypted
-columns, for the system checks, key rotation and data migrations.
+columns, for the system checks, key rotation and verification.
+
+Data migrations do not import these helpers: each one freezes its own copy (see
+`apps/vendors/migrations/0008_encrypt_iban_and_tax_code.py`), so a later change here cannot
+change what an old migration does.
 
 The cipher itself is `apps.core.crypto` (pure); the model fields are
 `apps.core.fields.EncryptedCharField` / `EncryptedTextField`. Raw SQL is used on purpose: the
@@ -8,7 +12,7 @@ Table and column names come from model metadata and are quoted; values are param
 """
 
 import functools
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -64,9 +68,9 @@ def encrypted_columns() -> Iterator[EncryptedColumn]:
     for model in apps.get_models():
         if model._meta.proxy or not model._meta.managed:
             continue
-        for field in model._meta.concrete_fields:
-            if isinstance(field, EncryptedFieldMixin):
-                yield EncryptedColumn(model, field)
+        for model_field in model._meta.concrete_fields:
+            if isinstance(model_field, EncryptedFieldMixin):
+                yield EncryptedColumn(model, model_field)
 
 
 def _names(connection: BaseDatabaseWrapper, table: str, column: str) -> tuple[str, str]:
@@ -100,8 +104,7 @@ def stale_rows(
     primary = configured_keyring().primary_id
     table = model._meta.db_table
     pk_column = str(model._meta.pk.column) if model._meta.pk else "id"
-    has_public_id = any(f.name == "public_id" for f in model._meta.concrete_fields)
-    selected = [pk_column, "public_id" if has_public_id else pk_column]
+    selected = [pk_column, _row_key_column(model)]
     selected += [column.column for column in columns]
     quoted = ", ".join(connection.ops.quote_name(name) for name in selected)
     conditions = " OR ".join(
@@ -193,58 +196,3 @@ def _verify_value(report: ColumnReport, key: str, value: str, keyring: crypto.Ke
 def key_id_of_raw(value: str) -> str:
     """The key id of a stored value, `CLEARTEXT` when it is not a token."""
     return crypto.key_id_of(value) or CLEARTEXT
-
-
-# --- Data migrations: encrypt a column in place, and back
-
-
-def encrypt_column(connection: BaseDatabaseWrapper, table: str, column: str, context: str) -> int:
-    """Encrypt the values stored in clear with the primary key; return how many rows changed.
-
-    For the data migration that turns an existing column into an encrypted one. Idempotent:
-    values that are already tokens are left alone.
-    """
-    keyring = configured_keyring()
-    return _rewrite(
-        connection,
-        table,
-        column,
-        lambda value: (
-            None if crypto.is_encrypted(value) else keyring.encrypt(value, context=context)
-        ),
-    )
-
-
-def decrypt_column(connection: BaseDatabaseWrapper, table: str, column: str, context: str) -> int:
-    """Store the column in clear again (the reverse of `encrypt_column`)."""
-    keyring = configured_keyring()
-    return _rewrite(
-        connection,
-        table,
-        column,
-        lambda value: (
-            keyring.decrypt(value, context=context) if crypto.is_encrypted(value) else None
-        ),
-    )
-
-
-def _rewrite(
-    connection: BaseDatabaseWrapper, table: str, column: str, convert: Callable[[str], str | None]
-) -> int:
-    """Apply `convert` to every non-empty value (rows keyed by `id`); None leaves it alone."""
-    quoted_table, quoted_column = _names(connection, table, column)
-    changed = 0
-    with connection.cursor() as cursor:
-        cursor.execute(
-            f"SELECT id, {quoted_column} FROM {quoted_table}"  # noqa: S608
-            f" WHERE {quoted_column} <> '' FOR UPDATE"
-        )
-        for pk, value in cursor.fetchall():
-            new = convert(value)
-            if new is not None:
-                cursor.execute(
-                    f"UPDATE {quoted_table} SET {quoted_column} = %s WHERE id = %s",  # noqa: S608
-                    [new, pk],
-                )
-                changed += 1
-    return changed
