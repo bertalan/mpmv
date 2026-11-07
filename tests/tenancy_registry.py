@@ -30,6 +30,7 @@ from apps.catalog.models import (
     Product,
     ProductAttribute,
     ProductTranslation,
+    SlugHistory,
     Variant,
     VariantOption,
     VariantTranslation,
@@ -38,6 +39,7 @@ from apps.catalog.tests.factories import (
     ProductAttributeFactory,
     ProductFactory,
     ProductTranslationFactory,
+    SlugHistoryFactory,
     VariantFactory,
     VariantOptionFactory,
     VariantTranslationFactory,
@@ -103,6 +105,9 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     CrossVendorConsent: lambda vendor: CrossVendorConsentFactory.create(vendor=vendor),
     Product: lambda vendor: ProductFactory.create(vendor=vendor),
     ProductTranslation: lambda vendor: ProductTranslationFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
+    SlugHistory: lambda vendor: SlugHistoryFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
     Variant: lambda vendor: VariantFactory.create(
