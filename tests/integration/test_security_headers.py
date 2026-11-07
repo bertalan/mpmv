@@ -171,8 +171,10 @@ def test_strict_csp_and_permissions_policy_apply_in_every_environment(client: Cl
 
 @pytest.mark.parametrize("module", ["mpmv.settings.live", "mpmv.settings.stage"])
 def test_deploy_check_passes(module: str) -> None:
+    # A production-like environment: no DJANGO_* variables leaking from the test session
+    # (the e2e suite sets DJANGO_ALLOW_ASYNC_UNSAFE, which the deploy check rightly rejects).
     env = {
-        **os.environ,
+        **{name: value for name, value in os.environ.items() if not name.startswith("DJANGO_")},
         "DJANGO_SETTINGS_MODULE": module,
         "DJANGO_SECRET_KEY": secrets.token_urlsafe(64),
         "DJANGO_ALLOWED_HOSTS": "shop.example.com",
