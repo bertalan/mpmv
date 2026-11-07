@@ -43,6 +43,8 @@ _AUTH_DETAILS: Final[Mapping[Reason, str]] = {
     Reason.EXPIRED: "The API key has expired.",
     Reason.IP_NOT_ALLOWED: "The API key may not be used from this address.",
     Reason.INSUFFICIENT_SCOPE: "The API key lacks the scope this operation requires.",
+    Reason.VENDOR_CLOSED: "The vendor this API key acts for is closed.",
+    Reason.VENDOR_SUSPENDED: "The vendor of this API key is suspended: the key may only read.",
 }
 
 
