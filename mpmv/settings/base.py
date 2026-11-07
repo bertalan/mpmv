@@ -243,6 +243,34 @@ FIELD_ENCRYPTION_KEYS = env_secret_list("MPMV_FIELD_ENCRYPTION_KEYS")
 FEATURE_FLAGS = env_flags("MPMV_FEATURE_FLAGS")
 FEATURE_FLAGS_CACHE_SECONDS = 5
 
+# Server-side geocoding (EVT.12, spec 15): the provider chain in order, each name mapped to its
+# adapter. Adding a provider is a new adapter and an entry here. Keyed providers are skipped
+# without a key; keys come from the environment only. Nominatim's usage policy: at most one
+# request per second for the whole platform (the PostgreSQL limiter) and an identifying
+# User-Agent with the operator contact.
+GEOCODING_PROVIDERS = env_list("MPMV_GEOCODING_PROVIDERS", "nominatim,photon,locationiq,opencage")
+GEOCODING_ADAPTERS = {
+    "nominatim": "apps.core.geocoding.adapters.NominatimGeocoder",
+    "photon": "apps.core.geocoding.adapters.PhotonGeocoder",
+    "locationiq": "apps.core.geocoding.adapters.LocationIQGeocoder",
+    "opencage": "apps.core.geocoding.adapters.OpenCageGeocoder",
+}
+GEOCODING_TRANSPORT = "apps.core.geocoding.adapters.http_get_json"
+GEOCODING_CONTACT = env_str("MPMV_GEOCODING_CONTACT", "")
+GEOCODING_LOCATIONIQ_KEY = env_str("MPMV_GEOCODING_LOCATIONIQ_KEY", "")
+GEOCODING_OPENCAGE_KEY = env_str("MPMV_GEOCODING_OPENCAGE_KEY", "")
+GEOCODING_MIN_INTERVALS = {"nominatim": 1.0, "photon": 1.0, "locationiq": 0.5, "opencage": 1.0}
+GEOCODING_CALL_TIMEOUT = 3.0  # seconds per provider call
+GEOCODING_CHAIN_BUDGET = 10.0  # seconds for the whole chain
+GEOCODING_BREAKER_THRESHOLD = 5  # consecutive failures or rate limits that open the circuit
+GEOCODING_BREAKER_COOLDOWN = 300  # seconds before an open circuit lets one try through
+GEOCODING_CACHE_DAYS = 180
+GEOCODING_USER_LIMIT = 10  # "Find coordinates" lookups per user and window
+GEOCODING_USER_WINDOW = 60  # seconds
+# Who may use "Find coordinates" besides staff: dotted `check(user) -> bool` paths, so that core
+# does not import the vendors app.
+GEOCODING_ACCESS_POLICIES: list[str] = ["apps.vendors.services.is_vendor_member"]
+
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"

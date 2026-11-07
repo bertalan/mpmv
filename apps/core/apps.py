@@ -12,6 +12,8 @@ class CoreConfig(AppConfig):
         "auditlog": "the audit log itself (append-only)",
         "heartbeat": "worker telemetry, not a domain change",
         "throttle": "login counters; the lockouts they cause are audited by accounts",
+        "geocodecacheentry": "cache of public geocoding answers, not a domain change",
+        "geocoderstate": "provider rate limiter and circuit breaker, operational state",
         # The job queue (ADR-0004) is used only through apps.core.tasks; its admin is read-only.
         "procrastinate.procrastinatejob": "background job queue, read-only admin",
         "procrastinate.procrastinateevent": "background job history, read-only admin",

@@ -404,3 +404,14 @@ def purge_throttles(timestamp: int) -> None:
     """Every night: delete throttle counters whose lock and quiet period are over (CORE.5)."""
     deleted = services.purge_expired_throttles()
     logger.info("core.purge_throttles deleted %d expired rows", deleted)
+
+
+@periodic("27 4 * * *")
+@locked()
+@task("core.purge_geocode_cache", retry=NO_RETRY)
+def purge_geocode_cache(timestamp: int) -> None:
+    """Every night: delete geocoding cache entries past their 180 days (EVT.12)."""
+    from .geocoding.services import purge_expired_geocode_cache
+
+    deleted = purge_expired_geocode_cache()
+    logger.info("core.purge_geocode_cache deleted %d expired rows", deleted)

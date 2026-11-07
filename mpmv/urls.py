@@ -29,6 +29,7 @@ urlpatterns = [
     path("i18n/switch/", switch_language, name="switch_language"),
     path("api/v1/", include("apps.api.urls")),
     path("account/mfa/", include("apps.accounts.urls")),
+    path("geocoding/", include("apps.core.geocoding.urls")),  # "Find coordinates" (EVT.12)
     *i18n_patterns(
         path("", include("apps.cms.urls")),
         prefix_default_language=False,

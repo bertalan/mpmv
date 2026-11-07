@@ -9,7 +9,12 @@ from typing import Any
 
 import pytest
 
-from apps.core.geocoding import AddressQuery, GeocoderTimeout, GeocoderUnavailable
+from apps.core.geocoding import (
+    AddressQuery,
+    GeocodeOutcome,
+    GeocoderTimeout,
+    GeocoderUnavailable,
+)
 from apps.core.geocoding import services as geo
 from apps.core.geocoding.adapters import LocationIQGeocoder, OpenCageGeocoder
 from apps.core.geocoding.fakes import FakeGeocoder, fake_result
@@ -49,7 +54,7 @@ def address(n: int) -> AddressQuery:
     return AddressQuery(country="IT", city="Milano", street=f"Via Roma {n}")
 
 
-def lookup(query: AddressQuery, chain: list[Any], clock: FakeClock) -> geo.GeocodeOutcome:
+def lookup(query: AddressQuery, chain: list[Any], clock: FakeClock) -> GeocodeOutcome:
     return geo.geocode_address(
         query, language="it", geocoders=chain, clock=clock, sleep=clock.sleep
     )
@@ -263,3 +268,15 @@ def test_a_key_never_appears_in_the_logs(
     assert caplog.records, "failures are logged"
     assert key not in caplog.text
     assert key not in repr(outcome)
+
+
+def test_the_nightly_job_purges_the_expired_cache() -> None:
+    from django.utils import timezone
+
+    from apps.core.tasks import purge_geocode_cache
+
+    now = timezone.now()
+    GeocodeCacheEntryFactory.create(expires_at=now - dt.timedelta(minutes=1))
+    fresh = GeocodeCacheEntryFactory.create(expires_at=now + dt.timedelta(days=1))
+    purge_geocode_cache.func(timestamp=int(now.timestamp()))
+    assert list(GeocodeCacheEntry.objects.all()) == [fresh]
