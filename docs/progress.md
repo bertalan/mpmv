@@ -452,3 +452,15 @@ Owner questions:
 2. May we add VEN.12 to the dependencies of VEN.7, CMP.1 and CMP.2, narrow CMP.1, and make OPS.2
    depend on ARC.13 (findings 2 and 5)?
 3. Which task takes the shipping services with dry-run: an SHP.1 follow-up now, or SHP.5?
+
+Resolved:
+
+- Finding 1 in #38: `apps/shipping/services.py` (`save_config`, `delete_config`) with dry-run,
+  ChangeSet and audit; the shipping admin calls them, and `core.E203` now also fails for an
+  admin override that saves through Django's default with `super()` (owner question 3).
+- Finding 2 in #39: VEN.7, CMP.1 and CMP.2 depend on VEN.12; CMP.1 reads the DAC7 dataset from
+  VEN.12 and keeps the aggregates and the export (owner question 2, OPS.2 part still open).
+- Finding 3 in #39: `mpmv.env.example` names self-managed PostgreSQL 17 on a dedicated VPS
+  (ADR-0007) and spec 01 says PostgreSQL 17. The ADR-0005 citations in the Containerfile, Quadlet
+  units, release workflow, deploy tests and docs/dev/background-jobs.md stay for ARC.13.
+- Finding 4 in #39: the spec README gives 121 P1 tasks and 1,410 to 1,570 h, as spec 91.
