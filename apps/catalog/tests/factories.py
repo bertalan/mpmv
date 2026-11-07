@@ -21,6 +21,7 @@ from apps.catalog.models import (
     CategoryTranslation,
     Product,
     ProductTranslation,
+    SlugHistory,
     Taxonomy,
     TaxonomyTranslation,
     Term,
@@ -65,6 +66,17 @@ class ProductTranslationFactory(DjangoModelFactory[ProductTranslation]):
     title = factory.Faker("sentence", nb_words=3)
     short_description = factory.Faker("sentence")
     description = factory.Faker("paragraph")
+
+
+class SlugHistoryFactory(DjangoModelFactory[SlugHistory]):
+    """An old slug of a product (CAT.5); the product has no translation unless given one."""
+
+    class Meta:
+        model = SlugHistory
+
+    product = factory.SubFactory(ProductFactory)
+    language = "en"
+    slug = factory.Sequence(lambda n: f"old-product-{n}-en")
 
 
 class VariantFactory(DjangoModelFactory[Variant]):

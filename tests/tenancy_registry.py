@@ -26,10 +26,17 @@ from django.db import models
 
 from apps.api.models import ApiClient
 from apps.api.tests.factories import ApiClientFactory
-from apps.catalog.models import Product, ProductTranslation, Variant, VariantTranslation
+from apps.catalog.models import (
+    Product,
+    ProductTranslation,
+    SlugHistory,
+    Variant,
+    VariantTranslation,
+)
 from apps.catalog.tests.factories import (
     ProductFactory,
     ProductTranslationFactory,
+    SlugHistoryFactory,
     VariantFactory,
     VariantTranslationFactory,
 )
@@ -90,6 +97,9 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     VendorFeatureFlag: lambda vendor: VendorFeatureFlagFactory.create(vendor=vendor),
     Product: lambda vendor: ProductFactory.create(vendor=vendor),
     ProductTranslation: lambda vendor: ProductTranslationFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
+    SlugHistory: lambda vendor: SlugHistoryFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
     Variant: lambda vendor: VariantFactory.create(
