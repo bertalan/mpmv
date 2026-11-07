@@ -34,11 +34,20 @@ from apps.catalog.tests.factories import (
     VariantTranslationFactory,
 )
 from apps.core.tests.factories import utc
-from apps.shipping.models import PickupOption, PickupOptionTranslation, VendorZoneRate, WeightBand
+from apps.shipping.models import (
+    PickupOption,
+    PickupOptionTranslation,
+    ShippingMethod,
+    ShippingMethodTranslation,
+    ShippingZone,
+    WeightBand,
+)
 from apps.shipping.tests.factories import (
     PickupOptionFactory,
     PickupOptionTranslationFactory,
-    VendorZoneRateFactory,
+    ShippingMethodFactory,
+    ShippingMethodTranslationFactory,
+    ShippingZoneFactory,
     WeightBandFactory,
 )
 from apps.tax.models import VendorTaxProfile, VendorTaxProfileTranslation
@@ -79,9 +88,13 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
             product=ProductFactory.create(vendor=vendor, kind=Product.Kind.VARIABLE)
         )
     ),
-    VendorZoneRate: lambda vendor: VendorZoneRateFactory.create(vendor=vendor),
+    ShippingZone: lambda vendor: ShippingZoneFactory.create(vendor=vendor),  # a vendor zone
+    ShippingMethod: lambda vendor: ShippingMethodFactory.create(vendor=vendor),
+    ShippingMethodTranslation: lambda vendor: ShippingMethodTranslationFactory.create(
+        method=ShippingMethodFactory.create(vendor=vendor)
+    ),
     WeightBand: lambda vendor: WeightBandFactory.create(
-        rate=VendorZoneRateFactory.create(vendor=vendor)
+        method=ShippingMethodFactory.create(vendor=vendor)
     ),
     PickupOption: lambda vendor: PickupOptionFactory.create(vendor=vendor),
     PickupOptionTranslation: lambda vendor: PickupOptionTranslationFactory.create(
