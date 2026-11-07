@@ -17,6 +17,7 @@ The Django admin is classified as a whole: staff only, with the object pages of 
 models tested on Vendor B's objects.
 """
 
+from apps.tax.models import VendorTaxProfile, VendorTaxProfileTranslation
 from django.contrib import admin
 from django.db import models
 from django.test import Client
@@ -36,6 +37,7 @@ from apps.shipping.tests.factories import (
     VendorZoneRateFactory,
     WeightBandFactory,
 )
+from apps.tax.tests.factories import VendorTaxProfileFactory, VendorTaxProfileTranslationFactory
 from apps.vendors.models import Vendor, VendorMember, VendorTranslation
 from apps.vendors.tests.factories import VendorMemberFactory, VendorTranslationFactory
 from tests.tenancy import (
@@ -74,6 +76,10 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     PickupOption: lambda vendor: PickupOptionFactory.create(vendor=vendor),
     PickupOptionTranslation: lambda vendor: PickupOptionTranslationFactory.create(
         pickup_option=PickupOptionFactory.create(vendor=vendor)
+    ),
+    VendorTaxProfile: lambda vendor: VendorTaxProfileFactory.create(vendor=vendor),
+    VendorTaxProfileTranslation: lambda vendor: VendorTaxProfileTranslationFactory.create(
+        profile=VendorTaxProfileFactory.create(vendor=vendor)
     ),
 }
 

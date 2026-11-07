@@ -5,7 +5,13 @@ from dataclasses import dataclass
 
 import pytest
 
-from apps.core.validity import NoValidRow, OverlappingValidity, covers, pick_valid
+from apps.core.validity import (
+    NoValidRow,
+    OverlappingValidity,
+    covers,
+    next_start_error,
+    pick_valid,
+)
 
 JAN = dt.datetime(2027, 1, 1, tzinfo=dt.UTC)
 FEB = dt.datetime(2027, 2, 1, tzinfo=dt.UTC)
@@ -51,3 +57,19 @@ def test_pick_valid_with_overlapping_rows_is_a_clear_error() -> None:
 def test_both_errors_are_lookup_errors() -> None:
     assert issubclass(NoValidRow, LookupError)
     assert issubclass(OverlappingValidity, LookupError)
+
+
+def test_a_first_row_may_start_any_time() -> None:
+    assert next_start_error(JAN, None) is None
+
+
+def test_a_new_row_starts_after_the_latest_start() -> None:
+    assert next_start_error(FEB, Row("current", JAN, None)) is None
+    error = next_start_error(JAN, Row("current", JAN, None))
+    assert error == "Must be after 2027-01-01T00:00:00+00:00, the latest start."
+
+
+def test_a_new_row_never_shortens_an_already_closed_row() -> None:
+    error = next_start_error(FEB, Row("closed", JAN, MAR))
+    assert error == "Must not be before the latest end, 2027-03-01T00:00:00+00:00."
+    assert next_start_error(MAR, Row("closed", JAN, MAR)) is None
