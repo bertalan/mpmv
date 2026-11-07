@@ -22,12 +22,19 @@ def change_status(
     Raises `engine.InvalidTransition`, also on dry-run.
     """
     with transaction.atomic():
-        current = Vendor.objects.select_for_update().only("status", "slug").get(pk=vendor.pk)
+        current = (
+            Vendor.objects.select_for_update().only("status", "slug", "public_id").get(pk=vendor.pk)
+        )
         engine.check_transition(current.status, target)
 
+        # Keyed by public_id: the slug is editable and can be reused by another vendor, so it
+        # would not identify the vendor across its audit history. The slug is kept for reading.
         changes = ChangeSet()
         changes.update(
-            MODEL_LABEL, current.slug, before={"status": current.status}, after={"status": target}
+            MODEL_LABEL,
+            str(current.public_id),
+            before={"status": current.status, "slug": current.slug},
+            after={"status": str(target), "slug": current.slug},
         )
 
         def apply() -> None:

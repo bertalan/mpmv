@@ -46,7 +46,10 @@ def status_action(target: VendorStatus) -> StatusAction:
             )
 
     action.__name__ = f"move_to_{target.value}"
-    return admin.action(description=f"Move selected vendors to {target.label.lower()}")(action)
+    # Without `permissions` Django offers the action to anyone who can view the changelist.
+    return admin.action(
+        description=f"Move selected vendors to {target.label.lower()}", permissions=["change"]
+    )(action)
 
 
 class VendorTranslationInline(admin.StackedInline[VendorTranslation, Vendor]):

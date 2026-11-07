@@ -4,6 +4,7 @@ import secrets
 from typing import Any
 
 import pytest
+from django.contrib.auth.models import Permission
 from django.test import Client
 from django.urls import reverse
 
@@ -20,6 +21,18 @@ def staff_client(client: Client) -> Client:
         email="staff@example.com", password=secrets.token_urlsafe(16)
     )
     client.force_login(admin)
+    return client
+
+
+def staff_with(client: Client, *codenames: str) -> Client:
+    """A logged-in staff user (not superuser) holding only the given vendors permissions."""
+    user = User.objects.create_user(
+        email="limited@example.com", password=secrets.token_urlsafe(16), is_staff=True
+    )
+    user.user_permissions.set(
+        Permission.objects.filter(content_type__app_label="vendors", codename__in=codenames)
+    )
+    client.force_login(user)
     return client
 
 
@@ -124,6 +137,31 @@ def test_add_vendor_rejects_an_invalid_address(staff_client: Client) -> None:
     assert Vendor.objects.count() == 0
 
 
+def test_add_vendor_with_an_empty_address_stores_an_empty_object(staff_client: Client) -> None:
+    data = vendor_form(registered_address="")
+    data.update(management_form(0))
+    response = staff_client.post(reverse("admin:vendors_vendor_add"), data)
+    assert response.status_code == 302, response.content.decode()
+    assert Vendor.objects.get().registered_address == {}
+
+
+def test_clearing_the_address_of_an_existing_vendor_stores_an_empty_object(
+    staff_client: Client,
+) -> None:
+    vendor = make_vendor(registered_address={"city": "Rome"})
+    data = vendor_form(
+        display_name="Vendor A",
+        slug="vendor-a",
+        contact_email="vendor-a@example.com",
+        registered_address="",
+    )
+    data.update(management_form(0))
+    response = staff_client.post(reverse("admin:vendors_vendor_change", args=[vendor.pk]), data)
+    assert response.status_code == 302, response.content.decode()
+    vendor.refresh_from_db()
+    assert vendor.registered_address == {}
+
+
 def test_change_vendor_does_not_let_staff_edit_the_status_directly(staff_client: Client) -> None:
     vendor = make_vendor()
     data = vendor_form(
@@ -183,6 +221,41 @@ def test_status_action_reports_invalid_transitions_and_changes_nothing(
     vendor.refresh_from_db()
     assert vendor.status == Vendor.Status.APPLICANT
     assert AuditLog.objects.count() == 0
+
+
+def test_view_only_staff_get_no_status_actions(client: Client) -> None:
+    make_vendor()
+    viewer = staff_with(client, "view_vendor")
+    response = viewer.get(reverse("admin:vendors_vendor_changelist"))
+    assert response.status_code == 200
+    assert "move_to_" not in response.content.decode()
+
+
+@pytest.mark.parametrize("action", ["move_to_onboarding", "move_to_closed"])
+def test_view_only_staff_cannot_run_status_actions(client: Client, action: str) -> None:
+    vendor = make_vendor()
+    viewer = staff_with(client, "view_vendor")
+    viewer.post(
+        reverse("admin:vendors_vendor_changelist"),
+        {"action": action, "_selected_action": [vendor.pk]},
+    )
+    vendor.refresh_from_db()
+    assert vendor.status == Vendor.Status.APPLICANT
+    assert AuditLog.objects.count() == 0
+
+
+def test_staff_with_change_permission_can_run_status_actions(client: Client) -> None:
+    vendor = make_vendor()
+    editor = staff_with(client, "view_vendor", "change_vendor")
+    response = editor.post(
+        reverse("admin:vendors_vendor_changelist"),
+        {"action": "move_to_onboarding", "_selected_action": [vendor.pk]},
+        follow=True,
+    )
+    assert response.status_code == 200
+    vendor.refresh_from_db()
+    assert vendor.status == Vendor.Status.ONBOARDING
+    assert AuditLog.objects.get().actor_label == "staff:limited@example.com"
 
 
 def test_anonymous_users_cannot_reach_the_vendor_admin(client: Client) -> None:

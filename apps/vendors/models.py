@@ -90,6 +90,8 @@ class Vendor(BaseModel):
     def save(self, *args: Any, **kwargs: Any) -> None:
         if not self.slug:
             self.slug = engine.unique_slug(self.display_name, taken=_TakenSlugs(self.pk))
+        if self.registered_address is None:  # a cleared form field gives None; column is NOT NULL
+            self.registered_address = {}
         super().save(*args, **kwargs)
 
 

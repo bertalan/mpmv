@@ -35,9 +35,9 @@ def test_valid_transition_updates_the_status_and_writes_the_audit_log() -> None:
     entry = AuditLog.objects.get()
     assert entry.action == "vendor.status_changed"
     assert entry.target_model == "vendors.vendor"
-    assert entry.target_key == "vendor-a"
-    assert entry.before == {"status": "applicant"}
-    assert entry.after == {"status": "onboarding"}
+    assert entry.target_key == str(vendor.public_id)
+    assert entry.before == {"status": "applicant", "slug": "vendor-a"}
+    assert entry.after == {"status": "onboarding", "slug": "vendor-a"}
     assert entry.actor_label == "staff:reviewer"
     assert entry.source == "admin"
 
@@ -49,6 +49,22 @@ def test_full_lifecycle_writes_one_audit_row_per_step() -> None:
     vendor.refresh_from_db()
     assert vendor.status == Vendor.Status.CLOSED
     assert AuditLog.objects.filter(action="vendor.status_changed").count() == 5
+
+
+def test_audit_key_survives_a_slug_change_and_is_not_inherited_by_a_slug_reuse() -> None:
+    vendor = make_vendor()
+    change_status(vendor, Vendor.Status.ONBOARDING, ctx=CTX)
+    vendor.slug = "vendor-a-renamed"
+    vendor.save()
+    change_status(vendor, Vendor.Status.ACTIVE, ctx=CTX)
+
+    other = make_vendor()  # takes the freed slug "vendor-a"
+    assert other.slug == "vendor-a"
+    change_status(other, Vendor.Status.ONBOARDING, ctx=CTX)
+
+    history = AuditLog.objects.filter(target_model="vendors.vendor")
+    assert history.filter(target_key=str(vendor.public_id)).count() == 2
+    assert history.filter(target_key=str(other.public_id)).count() == 1
 
 
 def test_invalid_transition_is_refused_and_nothing_changes() -> None:
@@ -84,7 +100,7 @@ def test_dry_run_returns_the_change_without_applying_or_auditing() -> None:
         {
             "op": "update",
             "model": "vendors.vendor",
-            "key": "vendor-a",
+            "key": str(vendor.public_id),
             "fields": {"status": ["applicant", "onboarding"]},
         }
     ]
