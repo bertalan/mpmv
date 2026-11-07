@@ -1,5 +1,5 @@
-"""Staff admin for the platform operator and the audit log (Wagtail admin replaces this in
-CORE.8).
+"""Staff admin for the platform operator, the audit log and the feature flags (Wagtail admin
+replaces this in CORE.8).
 
 Configuration rows are history: staff add a new row (closing the current one through the audited
 service) and can view earlier rows, but never edit or delete them.
@@ -23,10 +23,17 @@ from django.http import HttpRequest, HttpResponse
 from django.template.response import TemplateResponse
 from django.utils.module_loading import import_string
 
+from . import flags
 from .audit import audit_context
 from .changeset import diff
-from .models import AuditLog, PlatformOperator
-from .services import check_operator_start, configure_platform_operator, latest_operator
+from .models import AuditLog, FeatureFlag, PlatformOperator
+from .services import (
+    check_operator_start,
+    configure_platform_operator,
+    environment_default,
+    latest_operator,
+    save_flag,
+)
 
 
 class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
@@ -261,6 +268,132 @@ class AuditLogAdmin(admin.ModelAdmin[AuditLog]):
     ) -> HttpResponse | TemplateResponse:
         parent = super().history_view
         return step_up(lambda req: parent(req, object_id, extra_context))(request)
+
+
+# --- Feature flags and kill switches (ARC.8, docs/dev/feature-flags.md)
+
+
+def _on_off(value: bool) -> str:
+    return "on" if value else "off"
+
+
+class FeatureFlagForm(forms.ModelForm[FeatureFlag]):
+    """On a new row, the name is picked among the registered flags that have no row yet."""
+
+    class Meta:
+        model = FeatureFlag
+        fields = ("name", "state", "note")
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        if "name" in self.fields:
+            taken = set(FeatureFlag.objects.values_list("name", flat=True))
+            choices = [
+                (spec.name, f"{spec.name}: {spec.description}")
+                for spec in flags.registered_flags()
+                if spec.name not in taken
+            ]
+            self.fields["name"] = forms.ChoiceField(choices=choices)
+
+
+def _is_kill_switch(flag: FeatureFlag | None) -> bool:
+    spec = None if flag is None else flag.spec
+    return spec is not None and spec.kill_switch
+
+
+@admin.register(FeatureFlag)
+class FeatureFlagAdmin(admin.ModelAdmin[FeatureFlag]):
+    """Staff switches of the registered flags. Kill switches ask for a fresh second factor
+    (CORE.4 step-up), and so does the add page, where the flag is chosen. Rows are never
+    deleted: the state goes back to "Environment default" instead. Per-vendor overrides are
+    under Vendors → Vendor feature flags."""
+
+    form = FeatureFlagForm
+    list_display = (
+        "name",
+        "description",
+        "kill_switch",
+        "state",
+        "environment_default",
+        "effective",
+        "note",
+        "updated_at",
+    )
+    list_filter = ("state",)
+    search_fields = ("name", "note")
+    readonly_fields = (
+        "description",
+        "kill_switch",
+        "environment_default",
+        "effective",
+        "public_id",
+        "updated_at",
+    )
+
+    def get_readonly_fields(self, request: HttpRequest, obj: Any = None) -> tuple[str, ...]:
+        fields = tuple(self.readonly_fields)
+        return ("name", *fields) if obj is not None else fields
+
+    def get_fields(self, request: HttpRequest, obj: Any = None) -> tuple[str, ...]:
+        if obj is None:
+            return ("name", "state", "note")
+        return ("name", "description", "kill_switch", "state", "note", *self.readonly_fields[2:])
+
+    @admin.display(description="Description")
+    def description(self, obj: FeatureFlag) -> str:
+        spec = obj.spec
+        return "Not a registered flag (left by removed code)" if spec is None else spec.description
+
+    @admin.display(description="Kill switch", boolean=True)
+    def kill_switch(self, obj: FeatureFlag) -> bool:
+        return _is_kill_switch(obj)
+
+    @admin.display(description="Environment default")
+    def environment_default(self, obj: FeatureFlag) -> str:
+        spec = obj.spec
+        if spec is None:
+            return "-"
+        value = environment_default(obj.name)
+        return _on_off(spec.default if value is None else value)
+
+    @admin.display(description="Effective (platform)")
+    def effective(self, obj: FeatureFlag) -> str:
+        """The value for the platform; vendor overrides may differ for their vendor."""
+        spec = obj.spec
+        if spec is None:
+            return "-"
+        value = flags.platform_value(
+            spec, environment=environment_default(obj.name), state=obj.state
+        )
+        return _on_off(value)
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+    def save_model(self, request: HttpRequest, obj: FeatureFlag, form: Any, change: bool) -> None:
+        save_flag(obj, ctx=audit_context(request))
+
+    def add_view(
+        self, request: HttpRequest, form_url: str = "", extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        parent = super().add_view
+        return step_up(lambda req: parent(req, form_url, extra_context))(request)
+
+    def change_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+        form_url: str = "",
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        parent = super().change_view
+
+        def view(req: HttpRequest) -> HttpResponse:
+            return parent(req, object_id, form_url, extra_context)
+
+        if _is_kill_switch(self.get_object(request, object_id)):
+            return step_up(view)(request)
+        return view(request)
 
 
 def changed_fields(entry: AuditLog) -> list[tuple[str, Any, Any]]:

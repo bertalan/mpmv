@@ -7,7 +7,14 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 
 from apps.core.crypto import parse_keys
-from mpmv.settings.env import ensure_key_file, env_bool, env_list, env_secret_list, env_str
+from mpmv.settings.env import (
+    ensure_key_file,
+    env_bool,
+    env_flags,
+    env_list,
+    env_secret_list,
+    env_str,
+)
 
 
 def test_env_str_returns_value(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -86,6 +93,32 @@ def test_ensure_key_file_creates_a_private_key_once(tmp_path: Path) -> None:
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
     ensure_key_file(path, key_id="dev")
     assert path.read_text() == first  # never replaced: that would lose the local data
+
+
+# --- ARC.8: per-environment feature flag defaults
+
+
+def test_env_flags_reads_names_and_on_off_values(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MPMV_TEST_FLAGS", " checkout=off, beta_search=ON ,import=0")
+    assert env_flags("MPMV_TEST_FLAGS") == {
+        "checkout": False,
+        "beta_search": True,
+        "import": False,
+    }
+
+
+def test_env_flags_is_empty_when_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("MPMV_TEST_FLAGS", raising=False)
+    assert env_flags("MPMV_TEST_FLAGS") == {}
+
+
+@pytest.mark.parametrize("raw", ["checkout", "checkout=", "=on", "checkout=maybe"])
+def test_env_flags_rejects_entries_without_a_clear_value(
+    monkeypatch: pytest.MonkeyPatch, raw: str
+) -> None:
+    monkeypatch.setenv("MPMV_TEST_FLAGS", raw)
+    with pytest.raises(ImproperlyConfigured, match="MPMV_TEST_FLAGS"):
+        env_flags("MPMV_TEST_FLAGS")
 
 
 def env_lines(text: str) -> list[str]:
