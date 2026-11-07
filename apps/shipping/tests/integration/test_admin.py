@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
+from django.db.models import QuerySet
 from django.test import Client
 from django.urls import reverse
 
@@ -22,6 +23,12 @@ from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
+
+
+def domain_entries() -> "QuerySet[AuditLog]":
+    """Audit entries of this app: signing in staff writes a login entry too (SEC.4)."""
+    return AuditLog.objects.filter(action__startswith="shipping.")
+
 
 MfaLogin = Callable[[Client, User], Client]
 
@@ -122,7 +129,7 @@ def test_overlapping_bands_in_one_submission_are_refused_with_a_form_error(
     assert response.status_code == 200
     assert "Weight bands overlap" in response.content.decode()
     assert not VendorZoneRate.objects.exists()
-    assert not AuditLog.objects.exists()
+    assert not domain_entries().exists()
 
 
 def test_a_second_carrier_for_the_same_vendor_and_zone_is_a_form_error(

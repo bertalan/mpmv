@@ -14,9 +14,7 @@ from django.db import models
 from django.forms.models import BaseInlineFormSet
 from django.http import HttpRequest
 
-from apps.core.audit import AuditContext
-from apps.core.http import client_ip
-from apps.core.models import AuditLog
+from apps.core.audit import audit_context
 
 from . import engine
 from .models import Product, ProductTranslation, Variant, VariantTranslation
@@ -28,16 +26,6 @@ from .services import (
 )
 
 TIMESTAMPS = ("public_id", "created_at", "updated_at")
-
-
-def audit_context(request: HttpRequest) -> AuditContext:
-    user = request.user
-    return AuditContext(
-        actor_id=user.pk,
-        actor_label=f"staff:{user.get_username()}",
-        source=AuditLog.Source.ADMIN,
-        ip=client_ip(request),
-    )
 
 
 def take_price_change(

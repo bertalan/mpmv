@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
+from django.db.models import QuerySet
 from django.test import Client
 from django.urls import reverse
 
@@ -23,6 +24,12 @@ from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
+
+
+def domain_entries() -> "QuerySet[AuditLog]":
+    """Audit entries of this app: signing in staff writes a login entry too (SEC.4)."""
+    return AuditLog.objects.filter(action__startswith="catalog.")
+
 
 MfaLogin = Callable[[Client, User], Client]
 
@@ -145,7 +152,7 @@ def test_add_product_with_translations_and_a_variant(staff_client: Client) -> No
     variant = product.variants.get()
     assert (variant.sku, variant.vendor, variant.is_default) == ("BAG-01-RED", vendor, True)
     assert variant.price_net_override == Decimal("27.00")
-    assert AuditLog.objects.count() == 0  # a first price is not a price change
+    assert not domain_entries().exists()  # a first price is not a price change
 
 
 def test_add_product_rejects_a_duplicate_sku_of_the_same_vendor(staff_client: Client) -> None:
@@ -196,7 +203,7 @@ def test_changing_the_price_in_the_admin_writes_the_audit_log(staff_client: Clie
     product.refresh_from_db()
     assert product.price_net == Decimal("29.00")
     assert product.stock_qty == 7
-    entry = AuditLog.objects.get()
+    entry = domain_entries().get()
     assert entry.action == "catalog.product.price_changed"
     assert entry.source == "admin"
     assert entry.actor_id is not None
@@ -213,7 +220,7 @@ def test_changing_other_fields_writes_no_price_audit(staff_client: Client) -> No
     assert response.status_code == 302, response.content.decode()
     product.refresh_from_db()
     assert product.stock_qty == 9
-    assert AuditLog.objects.count() == 0
+    assert not domain_entries().exists()
 
 
 def test_staff_cannot_set_the_status_directly(staff_client: Client) -> None:
@@ -249,7 +256,7 @@ def test_changing_a_variant_price_in_the_product_page_writes_the_audit_log(
     assert response.status_code == 302, response.content.decode()
     variant.refresh_from_db()
     assert variant.price_net_override == Decimal("31.00")
-    entry = AuditLog.objects.get()
+    entry = domain_entries().get()
     assert entry.action == "catalog.variant.price_changed"
     assert (entry.after or {}).get("price_net_override") == "31.00"
 
@@ -291,7 +298,7 @@ def test_variant_page_edits_translations_and_audits_the_price(staff_client: Clie
     assert variant.stock_qty == 4
     assert variant.price_net_override == Decimal("33.00")
     assert variant.translation("en").translation is not None
-    assert AuditLog.objects.get().action == "catalog.variant.price_changed"
+    assert domain_entries().get().action == "catalog.variant.price_changed"
 
 
 def test_variant_changelist_filters_by_vendor(staff_client: Client) -> None:

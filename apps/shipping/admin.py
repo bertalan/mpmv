@@ -13,9 +13,8 @@ from django.db.models import QuerySet
 from django.forms.models import BaseInlineFormSet, model_to_dict
 from django.http import HttpRequest
 
-from apps.core.audit import AuditContext, record
+from apps.core.audit import audit_context, record
 from apps.core.changeset import diff
-from apps.core.http import client_ip
 from apps.core.models import AuditLog
 
 from . import engine
@@ -29,16 +28,6 @@ from .models import (
     VendorZoneRate,
     WeightBand,
 )
-
-
-def audit_context(request: HttpRequest) -> AuditContext:
-    user = request.user
-    return AuditContext(
-        actor_id=user.pk,
-        actor_label=f"staff:{user.get_username()}",
-        source=AuditLog.Source.ADMIN,
-        ip=client_ip(request),
-    )
 
 
 def snapshot(obj: models.Model) -> dict[str, Any]:

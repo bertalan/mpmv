@@ -36,6 +36,8 @@ vendor's change page links to its trail (`?vendor=<public id>`).
 | API keys (CORE.6) | `api.client.issued`, `.rotated`, `.revoked` |
 | Vendors (VEN.1, CORE.2) | `vendor.created`, `.updated`, `.deleted`, `.status_changed`, `.member_added`, `.member_role_changed`, `.member_removed` |
 | Platform configuration (ARC.7) | `core.platform_operator.configured` |
+| Product prices (CAT.1) | `catalog.product.price_changed`, `catalog.variant.price_changed` |
+| Shipping configuration (SHP.1, admin) | `shipping.<model>.created`, `.updated`, `.deleted` for carriers, zones, vendor rates, weight bands and pickup options |
 
 Deliberately not stored: password hashes (only `has_usable_password`), API key hashes, TOTP
 secrets, and the identifier typed in a failed login that matches no account (it may be a typo
