@@ -14,13 +14,19 @@
 
 | Item | Hours | How it is calculated |
 |---|---:|---|
-| P1 micro-tasks | 1,322 | Sum from the generated backlog |
+| P1 micro-tasks | 1,435 | Sum from the generated backlog |
 | Integrated and end-to-end acceptance testing, exploratory tests | 100 | ~10% of P1 |
 | Mandatory human review of tax, payments, ledger, orders, security | 50 | ~15% of the hours for TAX, PAY, VEN, ORD, SEC |
 | Coordination, ADRs, meetings with tax advisor and legal counsel | 80 | ~8% of P1 |
-| **Subtotal** | **1,552** | |
-| Contingency for unforeseen issues (10–25% of P1) | 132–331 | Tax and payment domain, dirty legacy data |
-| **Go-live total** | **≈ 1,685–1,885** | |
+| **Subtotal** | **1,665** | |
+| Contingency for unforeseen issues (10–25% of P1) | 144–359 | Tax and payment domain, dirty legacy data |
+| **Go-live total** | **≈ 1,810–2,025** | |
+
+The events module (2026-11-07, [15](15-events.md)) adds EVT.1 to EVT.15 (113 h of P1: event
+pages and moderation, recurrence, vendor area and API, public pages, closure-aware dispatch date,
+RSS and ICS feeds, JSON-LD, emails, geocoding, map picker, tile proxy and public maps) and EVT.16
+and EVT.17 (14 h of P2: follower emails, and the Google geocoder and map layer that the owner
+postponed until after go-live). It supersedes owner decision Q-61 for events.
 
 The theme system (2026-11-07, [14](14-frontend-themes.md)) replaced the 24 h CMS.7 row with
 THM.1 to THM.10 (70 h: framework, token pipeline, `base` theme, components, quality gates and the
@@ -42,8 +48,9 @@ requests), CMP.15 (4 h, Swiss counter) and CMP.24 (6 h, approval of legal wordin
 gains 69 h: CMP.16 (3 h, Swiss threshold response), the opening to non-EU vendors CMP.17 to
 CMP.22 (58 h) and CMP.23 (8 h, EN 16931 order-data export).
 
-After go-live: P2 = 268 h and P3 = 18 h (MCP, advanced zone editor, OSS report, visitor content
-translation, reviews, advanced payouts, vendor branding…), about **315–360 h** including contingency.
+After go-live: P2 = 282 h and P3 = 18 h (MCP, advanced zone editor, OSS report, visitor content
+translation, reviews, advanced payouts, vendor branding, event follower emails, Google geocoder and
+map layer…), about **330–380 h** including contingency.
 
 ## 91.3 Comparison with the August plan
 
@@ -133,11 +140,12 @@ Source: merged pull requests and their timestamps, the generated backlog, and th
 THM.10 and CMP.9, replacing CMS.7) bring this to 107 tasks and 996 hours, the regulatory check
 rows (CMP.5 moved to P1, CMP.8, CMP.10 to CMP.13, VEN.18) to 114 tasks and 1,064 hours, the
 owner's theme answers (CMS.8 and CMS.9) to 116 tasks and 1,073 hours, and the D-21 answers
-(CMP.11 grows, CMP.14, CMP.15 and CMP.24 added) to 119 tasks and 1,097 hours.
+(CMP.11 grows, CMP.14, CMP.15 and CMP.24 added) to 119 tasks and 1,097 hours, and the events
+module (EVT.1 to EVT.15) to 134 tasks and 1,210 hours.
 
 | Part | Estimated hours | Done by | Forecast |
 |---|---:|---|---|
-| Code and tests (CAT, ORD, SHP, TAX, PAY, VEN, CMP, ING, SEO, CMS, THM, …) | ~900 | agents | 40–50 h of agent runtime, including ~30% for integration, coherence checks and rework |
+| Code and tests (CAT, ORD, SHP, TAX, PAY, VEN, CMP, ING, SEO, CMS, THM, EVT, …) | ~1,010 | agents | 40–50 h of agent runtime, including ~30% for integration, coherence checks and rework |
 | Migration with real data, dress rehearsals, cutover (MIG.7, MIG.9, MIG.10) | ~45 | agents and people | included in the people hours below |
 
 That is at least two weekly budgets, so **3–4 calendar weeks for P1 code**, provided the open

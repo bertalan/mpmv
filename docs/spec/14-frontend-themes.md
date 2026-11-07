@@ -175,7 +175,9 @@ CSP rules for every theme (SEC.1 policy, no `unsafe-inline`, no `unsafe-eval`):
   registered components, no inline expressions.
 - Fonts, icons and theme images are served from `'self'`. Product and CMS images come from the
   media origin added once to `img-src` (ARC.15, SEO.6). No Google Fonts, no icon CDN, no map or
-  video embed without consent (SEO.5). Third-party UI that needs its own origin (Stripe Payment
+  video embed without consent (SEO.5). Event maps use vendored Leaflet and same-origin tiles from
+  the tile proxy, so they need no extra origin ([15](15-events.md)); a Google layer, if added after
+  go-live (EVT.17, P2), adds its sources only on consented responses. Third-party UI that needs its own origin (Stripe Payment
   Element, Turnstile, the consent tool if D-10 picks an external one) is added by its own task, and
   the theme only styles it: the Payment Element through Stripe's Appearance API with values read
   from the active theme's tokens.
@@ -287,12 +289,14 @@ override; they do not add features.
 | 404, 500 | Error layout | Visual restyle |
 | Consent banner (SEO.5) | Markup or CSS hooks for the chosen tool | Visual restyle |
 
-Pages of the reference template with no MPMV counterpart are dropped unless Wagtail covers the
-feature natively (owner decision Q-61):
+Pages of the reference template with no MPMV counterpart are dropped (owner decision Q-61), except
+events, which the owner later asked for as a module of their own:
 
 - Tours, trails and packages are not sold. When needed they are product categories (CAT.2) or
   content inside CMS articles; there are no dedicated page types.
-- Events have no module, because Wagtail core has none: an event is a CMS article.
+- Events have a dedicated page type, `EventPage`, with an events index, month view, RSS and ICS
+  feeds and maps ([15](15-events.md)). This supersedes the earlier answer "an event is a CMS
+  article"; articles can still tell the story of an event.
 - The countdown is kept for announcing a product launch, as the **launch countdown** StreamField
   block usable in CMS pages and articles ([10](10-content-seo-ai.md) §10.2, CMS.9). `base` provides
   its component; vertical themes restyle it.
