@@ -65,3 +65,5 @@ updates:
       images-minor-patch:
         applies-to: version-updates
         update-types: [minor, patch]
+        # uv is still 0.x and its minor releases break things: its image always gets its own PR.
+        exclude-patterns: [astral-sh/uv]

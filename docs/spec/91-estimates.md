@@ -14,13 +14,13 @@
 
 | Item | Hours | How it is calculated |
 |---|---:|---|
-| P1 micro-tasks | 1,494 | Sum from the generated backlog |
+| P1 micro-tasks | 1,544 | Sum from the generated backlog |
 | Integrated and end-to-end acceptance testing, exploratory tests | 100 | ~10% of P1 |
 | Mandatory human review of tax, payments, ledger, orders, security | 50 | ~15% of the hours for TAX, PAY, VEN, ORD, SEC |
 | Coordination, ADRs, meetings with tax advisor and legal counsel | 80 | ~8% of P1 |
-| **Subtotal** | **1,724** | |
-| Contingency for unforeseen issues (10–25% of P1) | 149–374 | Tax and payment domain, dirty legacy data |
-| **Go-live total** | **≈ 1,873–2,098** | |
+| **Subtotal** | **1,774** | |
+| Contingency for unforeseen issues (10–25% of P1) | 154–386 | Tax and payment domain, dirty legacy data |
+| **Go-live total** | **≈ 1,928–2,160** | |
 
 The SHP.12 implementation (#54) added the SHP.12 row it built and the SHP.13 and SHP.14 rows it
 found missing (+34 h of P1). Coherence check 5 (2026-11-07) added ARC.17 (1 h, e-invoicing
@@ -64,16 +64,29 @@ requests), CMP.15 (4 h, Swiss counter) and CMP.24 (6 h, approval of legal wordin
 gains 69 h: CMP.16 (3 h, Swiss threshold response), the opening to non-EU vendors CMP.17 to
 CMP.22 (58 h) and CMP.23 (8 h, EN 16931 order-data export).
 
-After go-live: P2 = 284 h and P3 = 18 h (MCP, advanced zone editor, OSS report, visitor content
+The owner's answers on vendors, access and the catalogue (Q-16 to Q-18, Q-29 to Q-34, Q-55,
+Q-56, 2026-11-07) changed P1 by +48 h: CORE.8 grows (10 → 13 h: platform staff permission,
+account unlock), CORE.9 grows (12 → 16 h: owner-only storefront profile with post-moderation),
+CMP.4 grows (10 → 12 h: erasure for a closed vendor's owner), and the new rows CORE.12 (4 h,
+per-key API rate limit), CORE.15 (6 h, secure action links for approval emails), OPS.5 (3 h, Django admin on a restricted network), VEN.21 (2 h, reopen a
+closed vendor), VEN.22 (8 h, public "Sell with us" application), CAT.13 (8 h, internal identity
+and the vendor SKU as a label) and CAT.14 (8 h, catalogue integrity rules) are added. P2 gains
+50 h: CAT.15 (6 h, other sellers of the same article), and cross-vendor bundles with discount
+funding: CAT.16 (14 h, bundle and funding split), CAT.17 (18 h, checkout, ledger and returns) and
+CAT.18 (12 h, vendor acceptance of staff-assigned shares). The answer to Q-91 (new SKU-free
+product URLs with one 301 from every legacy URL) grows MIG.6 from 6 to 8 h: +2 h of P1.
+
+After go-live: P2 = 334 h and P3 = 18 h (MCP, advanced zone editor, OSS report, visitor content
 translation, reviews, advanced payouts, vendor branding, customer preferences and event
-notifications, Google geocoder and map layer…), about **330–380 h** including contingency.
+notifications, Google geocoder and map layer, cross-vendor bundles…), about **385–440 h**
+including contingency.
 
 ## 91.3 Comparison with the August plan
 
 | | August plan | This review |
 |---|---:|---:|
 | Scope | Full WCFM parity + P1 commercial modules | Parity **with what is actually used** + 2026 compliance |
-| Total hours (development, testing, migration) | 1,740–2,540 | 1,873–2,098 to go-live |
+| Total hours (development, testing, migration) | 1,740–2,540 | 1,928–2,160 to go-live |
 | With AI-assisted development | 1,450–2,100 | already included |
 
 Where the difference comes from:
@@ -188,7 +201,7 @@ Work that agents cannot speed up:
 | **Total** | **≈ 109–199** |
 
 **Result:** about **150–250 people hours** plus about two weekly agent budgets, against
-1,873–2,098 hours for a human team (§91.2). Realistic calendar to go-live: **2–3 months**. The
+1,928–2,160 hours for a human team (§91.2). Realistic calendar to go-live: **2–3 months**. The
 pace is set by external waits: legal counsel, the Hetzner account for STAGE, Stripe Connect
 verification, the external penetration test (SEC.6) and the three dress rehearsals (MIG.9).
 

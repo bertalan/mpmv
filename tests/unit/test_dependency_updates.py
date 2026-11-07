@@ -24,6 +24,9 @@ GUIDE = ROOT / "docs" / "dev" / "dependency-updates.md"
 
 ECOSYSTEMS = {"uv", "github-actions", "docker"}
 SBOM_ACTION = "anchore/sbom-action@"
+COMMIT_SHA = re.compile(r"[0-9a-f]{40}")
+# uv is still 0.x: its minor releases carry breaking changes, so its image is never grouped.
+UV_IMAGE = "astral-sh/uv"
 
 
 def load(path: Path) -> dict[Any, Any]:
@@ -75,7 +78,15 @@ def test_dependabot_covers_python_actions_and_base_images(
 def test_updates_run_weekly(updates: dict[str, dict[str, Any]]) -> None:
     for name, entry in updates.items():
         assert entry["schedule"]["interval"] == "weekly", name
-        assert entry.get("open-pull-requests-limit", 5) >= 5, name
+
+
+def test_each_ecosystem_sets_its_open_pull_request_limit(
+    updates: dict[str, dict[str, Any]],
+) -> None:
+    # Set explicitly, so a grouped PR plus a few majors are never held back by the default.
+    for name, entry in updates.items():
+        assert "open-pull-requests-limit" in entry, name
+        assert entry["open-pull-requests-limit"] >= 5, name
 
 
 def test_minor_and_patch_updates_are_grouped_and_majors_are_not(
@@ -87,6 +98,23 @@ def test_minor_and_patch_updates_are_grouped_and_majors_are_not(
         assert grouped, f"{name}: no group for version updates"
         for group in grouped:
             assert sorted(group["update-types"]) == ["minor", "patch"], name
+
+
+def test_major_updates_are_never_grouped(updates: dict[str, dict[str, Any]]) -> None:
+    # A group with no `applies-to` applies to version updates, and one with no `update-types`
+    # takes every update type, majors included. Security updates are not grouped either.
+    for name, entry in updates.items():
+        for group_name, group in entry["groups"].items():
+            label = f"{name}: {group_name}"
+            assert group.get("applies-to") == "version-updates", label
+            assert "update-types" in group, label
+            assert "major" not in group["update-types"], label
+
+
+def test_uv_image_gets_its_own_pr(updates: dict[str, dict[str, Any]]) -> None:
+    assert f"/{UV_IMAGE}:" in (ROOT / "Containerfile").read_text()
+    for group_name, group in updates["docker"]["groups"].items():
+        assert UV_IMAGE in group.get("exclude-patterns", []), group_name
 
 
 def test_framework_upgrades_get_their_own_pr(updates: dict[str, dict[str, Any]]) -> None:
@@ -212,16 +240,58 @@ def test_ci_publishes_python_and_image_sboms() -> None:
 
 def test_release_attaches_both_sboms_to_the_github_release() -> None:
     release = load(RELEASE)
-    job = release["jobs"]["image"]
-    assert job["permissions"]["contents"] == "write"
     job_steps = steps(release, "image")
     assert any(step.get("run", "").strip() == "make sbom" for step in job_steps)
     sbom = [step for step in job_steps if step.get("uses", "").startswith(SBOM_ACTION)]
     assert sbom, "the release must generate an SBOM of the published image"
     assert sbom[0]["with"]["format"] == "cyclonedx-json"
-    scripts = " ".join(step.get("run", "") for step in job_steps)
+    uploads = [
+        step for step in job_steps if step.get("uses", "").startswith("actions/upload-artifact@")
+    ]
+    assert any("build/sbom" in str(step["with"]["path"]) for step in uploads)
+    attach = release["jobs"]["attach"]
+    assert attach["needs"] == "image"
+    attach_steps = steps(release, "attach")
+    assert any(
+        step.get("uses", "").startswith("actions/download-artifact@") for step in attach_steps
+    )
+    scripts = " ".join(step.get("run", "") for step in attach_steps)
     assert "gh release upload" in scripts
     assert "build/sbom/" in scripts
+
+
+def test_release_grants_write_access_to_the_repository_only_to_the_attach_job() -> None:
+    # The image job runs the build and a third-party action: it must not be able to write to
+    # the repository. The small attach job creates the release and uploads the SBOMs.
+    jobs = load(RELEASE)["jobs"]
+    assert jobs["image"]["permissions"] == {"contents": "read", "packages": "write"}
+    assert jobs["attach"]["permissions"] == {"contents": "write"}
+    for step in jobs["attach"]["steps"]:
+        uses = step.get("uses", "")
+        assert not uses or uses.startswith("actions/"), f"attach job runs {uses}"
+
+
+def test_release_checkout_does_not_persist_the_token() -> None:
+    for job_name, job in load(RELEASE)["jobs"].items():
+        for step in job.get("steps", []):
+            if step.get("uses", "").startswith("actions/checkout@"):
+                assert step.get("with", {}).get("persist-credentials") is False, job_name
+
+
+def test_third_party_actions_with_write_access_are_pinned_by_commit() -> None:
+    # A moved tag cannot swap the code that runs with a write token.
+    for path in sorted(WORKFLOWS.glob("*.yml")):
+        workflow = load(path)
+        default = workflow.get("permissions", {})
+        for job_name, job in workflow["jobs"].items():
+            permissions = job.get("permissions", default)
+            if "write" not in permissions.values():
+                continue
+            for step in job.get("steps", []):
+                uses = step.get("uses", "")
+                if uses and not uses.startswith("actions/"):
+                    ref = uses.split("@", 1)[1]
+                    assert COMMIT_SHA.fullmatch(ref), f"{path.name} {job_name}: {uses}"
 
 
 def test_review_guide_is_documented() -> None:

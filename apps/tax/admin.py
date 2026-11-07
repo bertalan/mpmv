@@ -162,7 +162,8 @@ class VendorTaxProfileAdmin(HistoryAdmin[VendorTaxProfile]):
 
 @admin.register(VendorTaxProfileTranslation)
 class VendorTaxProfileTranslationAdmin(NoDeleteAdmin[VendorTaxProfileTranslation]):
-    """Legal notes per language; the profile version they belong to never changes."""
+    """Legal notes per language; the profile version they belong to never changes, and the
+    notes of a version whose period has ended are view-only (`services.legal_note_error`)."""
 
     list_display = ("profile", "language", "status")
     list_filter = ("language", "status")
@@ -170,6 +171,19 @@ class VendorTaxProfileTranslationAdmin(NoDeleteAdmin[VendorTaxProfileTranslation
     list_select_related = ("profile__vendor",)
     raw_id_fields = ("profile",)
     readonly_fields = ("public_id", "source_hash", "created_at", "updated_at")
+
+    def get_readonly_fields(
+        self, request: HttpRequest, obj: VendorTaxProfileTranslation | None = None
+    ) -> tuple[str, ...]:
+        fields = tuple(super().get_readonly_fields(request, obj))
+        return fields if obj is None else ("profile", *fields)
+
+    def has_change_permission(
+        self, request: HttpRequest, obj: VendorTaxProfileTranslation | None = None
+    ) -> bool:
+        if obj is not None and services.legal_note_error(obj, at=timezone.now()) is not None:
+            return False
+        return super().has_change_permission(request, obj)
 
     def save_model(
         self, request: HttpRequest, obj: VendorTaxProfileTranslation, form: Any, change: bool
@@ -305,6 +319,15 @@ class TaxRegimeChangeRequestAdmin(HistoryAdmin[TaxRegimeChangeRequest]):
 
     # --- Read-only panels
 
+    @staticmethod
+    def _history(obj: TaxRegimeChangeRequest) -> services.RegimeHistory:
+        """The vendor's history, read once per change page (both panels use it)."""
+        cached: services.RegimeHistory | None = getattr(obj, "_regime_history", None)
+        if cached is None:
+            cached = services.regime_history(obj.vendor)
+            obj._regime_history = cached  # type: ignore[attr-defined]
+        return cached
+
     @admin.display(description="Review")
     def review(self, obj: TaxRegimeChangeRequest) -> SafeString | str:
         if obj.status != engine.PENDING:
@@ -334,7 +357,7 @@ class TaxRegimeChangeRequestAdmin(HistoryAdmin[TaxRegimeChangeRequest]):
                 _regime_label(profile.regime, profile.exempt_reason),
                 profile.approved_by or "-",
             )
-            for profile in services.regime_history(obj.vendor).profiles
+            for profile in self._history(obj).profiles
         ]
         return _table(("From", "To", "VAT regime", "Approved by"), rows, "No tax profile yet.")
 
@@ -349,7 +372,7 @@ class TaxRegimeChangeRequestAdmin(HistoryAdmin[TaxRegimeChangeRequest]):
                 item.reviewed_by or "-",
                 item.review_reason or "-",
             )
-            for item in services.regime_history(obj.vendor).requests
+            for item in self._history(obj).requests
             if item.pk != obj.pk
         ]
         return _table(

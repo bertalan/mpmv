@@ -22,6 +22,8 @@ Rules:
   reverted on its own.
 - **Django and Wagtail always get their own PR**, patches included: their releases carry
   deprecations and migrations.
+- **The `uv` image always gets its own PR**: uv is still at 0.x, where a minor release can
+  break things, so it stays out of `images-minor-patch`.
 - **The Python base image stays on the runtime minor** (3.13): moving to a new minor also
   changes `requires-python`, `.python-version` and CI, so it is a planned task, not a bot PR.
 - **Cooldown**: a release is proposed only after 5 days (14 for Python majors; Dependabot has no
@@ -99,7 +101,7 @@ Every CI run and every release produce two [CycloneDX](https://cyclonedx.org/) 1
 
 | SBOM | Produced by | Content |
 |---|---|---|
-| `mpmv-python.cdx.json` | `make sbom` (`cyclonedx-py`) | The production Python environment from `uv.lock`, no dev group, with licenses and hashes |
+| `mpmv-python.cdx.json` | `make sbom` (`cyclonedx-py`) | The production Python environment from `uv.lock`, no dev group, with licenses |
 | `mpmv-image.cdx.json` | syft (`anchore/sbom-action`) | The built image: Debian packages, Python and every package in the virtualenv |
 
 Where to find them:

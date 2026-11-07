@@ -14,9 +14,10 @@ from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.core.tests.factories import utc
-from apps.tax import engine
+from apps.tax import engine, services
 from apps.tax.models import TaxRegimeChangeRequest, VendorTaxProfile
 from apps.tax.tests.factories import TaxRegimeChangeRequestFactory, VendorTaxProfileFactory
+from apps.vendors.models import Vendor
 
 pytestmark = pytest.mark.django_db
 
@@ -72,6 +73,22 @@ def test_the_request_page_shows_the_vendor_history_and_the_review_links(
     assert "Missing registration." in content  # the earlier, rejected request
     assert approve_url(request) in content
     assert reject_url(request) in content
+
+
+def test_the_request_page_reads_the_vendor_history_once(
+    staff_client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request = TaxRegimeChangeRequestFactory.create()
+    calls: list[object] = []
+    regime_history = services.regime_history
+
+    def counted(vendor: Vendor) -> services.RegimeHistory:
+        calls.append(vendor)
+        return regime_history(vendor)
+
+    monkeypatch.setattr(services, "regime_history", counted)
+    assert staff_client.get(change_url(request)).status_code == 200
+    assert len(calls) == 1
 
 
 def test_staff_approve_a_request_from_the_admin(staff_client: Client, superuser: User) -> None:
