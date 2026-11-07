@@ -50,6 +50,7 @@ node_modules/
 
 # --- Claude Code local settings
 .claude/settings.local.json
+.claude/worktrees/
 
 # --- Private notes: unredacted spec, vendor map, legacy security findings (never publish)
 /private/
