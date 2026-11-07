@@ -1,70 +1,70 @@
-# piac — Ricostruzione in Python di un marketplace multivendor
+# MPMV — Rebuilding a multivendor marketplace in Python
 
-Specifica funzionale e tecnica per sostituire lo stack WordPress + WooCommerce + WCFM + WPML
-con un sistema **Django + Wagtail** più semplice da gestire.
+Functional and technical specification for replacing the WordPress + WooCommerce + WCFM + WPML stack
+with a **Django + Wagtail** system that is simpler to run.
 
-Il documento è stato ricavato dall'analisi del codice attuale: plugin custom IVA e spedizioni,
-mu-plugin, 132 route API, pipeline Python di import, report di audit e configurazioni LIVE.
-Rivede anche il piano di ricostruzione di agosto 2026.
+The document was derived from an analysis of the current code: custom VAT and shipping plugins,
+mu-plugins, 132 API routes, Python import pipelines, audit reports and LIVE configurations.
+It also reviews the August 2026 rebuild plan.
 
-## Come leggere
+## How to read this spec
 
-> **Versione pubblica.** I vendor sono pseudonimizzati (A–E), gli ordini di riferimento sono
-> indicati con il nome del caso (es. FEE-NETTO) e i dettagli di sicurezza del sistema attuale sono
-> omessi. Gli identificativi del sistema attuale (plugin, classi, meta) usano il prefisso
-> generico `mp`. La versione integrale e la mappa degli pseudonimi sono in `private/`, fuori da git.
+> **Public version.** Vendors are pseudonymized (A–E), reference orders are identified by case
+> name (e.g. FEE-NETTO) and security details of the current system are omitted. Identifiers from
+> the current system (plugins, classes, meta) use the generic `legacy` prefix. The full version and the
+> pseudonym map are in `private/`, outside git.
 
-- Ogni documento di dominio ha la stessa struttura:
-  1. **Come funziona oggi**: classi, funzioni e dati del sistema WordPress, con i bug noti.
-  2. **Come funzionerà**: modelli (classi Django), servizi e funzioni pure con le firme, algoritmi, regole.
-  3. **Casi di regressione**: bug storici che diventano test obbligatori (dove rilevante).
-  4. **Task**: micro-task con ID, priorità, ore, dipendenze e criterio di "fatto".
-- Macro-task = prefisso dell'ID (es. `TAX` = motore fiscale). Micro-task = riga (es. `TAX.3`).
-- Priorità: **P1** necessario al go-live · **P2** subito dopo · **P3** evoluzione.
-- Il backlog completo ([90-backlog.md](90-backlog.md) e `backlog.csv`) è **generato** dalle tabelle dei
-  documenti: `make docs` (oppure `uv run tools/build_docs.py`). Lo script verifica anche ID unici,
-  dipendenze esistenti e assenza di cicli. Lo stesso comando rigenera `build/piac-specifica.html`
-  (fuori dal versionamento); `make docs-check` segnala backlog non aggiornato.
+- Every domain document has the same structure:
+  1. **How it works today**: classes, functions and data of the WordPress system, with known bugs.
+  2. **How it will work**: models (Django classes), services and pure functions with their signatures, algorithms, rules.
+  3. **Regression cases**: historical bugs that become mandatory tests (where relevant).
+  4. **Tasks**: micro-tasks with ID, priority, hours, dependencies and a "done" criterion.
+- Macro-task = ID prefix (e.g. `TAX` = tax engine). Micro-task = row (e.g. `TAX.3`).
+- Priority: **P1** required for go-live · **P2** right after · **P3** later evolution.
+- The full backlog ([90-backlog.md](90-backlog.md) and `backlog.csv`) is **generated** from the documents'
+  tables: `make docs` (or `uv run tools/build_docs.py`). The script also checks for unique IDs,
+  existing dependencies and absence of cycles. The same command regenerates `build/mpmv-spec.html`
+  (not under version control); `make docs-check` flags an out-of-date backlog.
 
-## Indice
+## Contents
 
-| # | Documento | Contenuto |
+| # | Document | Content |
 |---|---|---|
-| 00 | [Visione e revisione](00-visione-e-revisione.md) | Idea, principi, delta rispetto al piano di agosto |
-| 01 | [Stack e architettura](01-stack-e-architettura.md) | Wagtail e alternative a confronto, monolite modulare, convenzioni |
-| 02 | [Identità, permessi, API, backoffice](02-core-identita-permessi.md) | Ruoli, isolamento vendor, API v1 che sostituisce `api.php` |
-| 03 | [Catalogo](03-catalogo.md) | Prodotti, varianti, tassonomie di navigazione, slug SKU, redirect, ricerca |
-| 04 | [Vendor, commissioni, ledger](04-vendor-commissioni-ledger.md) | Piani, regole di commissione, ledger, payout |
-| 05 | [Motore fiscale](05-fiscale.md) | Regimi IVA, albero decisionale, territori speciali, test |
-| 06 | [Spedizioni e preventivi](06-spedizioni-preventivi.md) | Zone, fasce di peso, CAP, flusso preventivo |
-| 07 | [Carrello, ordini, pagamenti](07-carrello-ordini-pagamenti.md) | Sotto-ordini, Stripe Connect, rimborsi, recesso |
-| 08 | [Import e pipeline](08-import-pipeline.md) | Riuso delle pipeline Python, adapter per vendor, job |
-| 09 | [Multilingua](09-multilingua.md) | Traduzioni dei modelli, wagtail-localize, workflow |
-| 10 | [Contenuti, SEO, canali AI](10-contenuti-seo-ai.md) | Pagine Wagtail, JSON-LD, feed, MCP |
-| 11 | [Compliance](11-compliance.md) | DAC7, GPSR, GDPR, DSA, recesso online, EAA |
-| 12 | [Sicurezza, infrastruttura, operatività](12-sicurezza-infra-operativita.md) | Azioni immediate, requisiti, deploy, backup |
-| 13 | [Migrazione e cutover](13-migrazione-cutover.md) | ETL, parità, runbook di go-live e rollback |
-| 90 | [Backlog](90-backlog.md) | Tutti i micro-task per fase (generato) |
-| 91 | [Stime e piano](91-stime.md) | Ore, calendario, fasi, costi esterni |
-| 92 | [Decisioni aperte](92-decisioni-aperte.md) | 20 decisioni da approvare, con proposta |
+| 00 | [Vision and review](00-vision-and-review.md) | Idea, principles, delta from the August plan |
+| 01 | [Stack and architecture](01-stack-and-architecture.md) | Wagtail and alternatives compared, modular monolith, conventions |
+| 02 | [Identity, permissions, API, backoffice](02-core-identity-permissions.md) | Roles, vendor isolation, API v1 replacing `api.php` |
+| 03 | [Catalog](03-catalog.md) | Products, variants, navigation taxonomies, SKU slugs, redirects, search |
+| 04 | [Vendors, commissions, ledger](04-vendors-commissions-ledger.md) | Plans, commission rules, ledger, payouts |
+| 05 | [Tax engine](05-tax.md) | VAT regimes, decision tree, special territories, tests |
+| 06 | [Shipping and quotes](06-shipping-and-quotes.md) | Zones, weight bands, postcodes, quote flow |
+| 07 | [Cart, orders, payments](07-cart-orders-payments.md) | Vendor sub-orders, Stripe Connect, refunds, withdrawal |
+| 08 | [Import and pipelines](08-import-pipelines.md) | Reuse of the Python pipelines, per-vendor adapters, jobs |
+| 09 | [Multilingual](09-multilingual.md) | Model translations, wagtail-localize, workflow |
+| 10 | [Content, SEO, AI channels](10-content-seo-ai.md) | Wagtail pages, JSON-LD, feeds, MCP |
+| 11 | [Compliance](11-compliance.md) | DAC7, GPSR, GDPR, DSA, online withdrawal, EAA |
+| 12 | [Security, infrastructure, operations](12-security-infra-operations.md) | Immediate actions, requirements, deploy, backups |
+| 13 | [Migration and cutover](13-migration-cutover.md) | ETL, parity, go-live and rollback runbook |
+| 90 | [Backlog](90-backlog.md) | All micro-tasks by phase (generated) |
+| 91 | [Estimates and plan](91-estimates.md) | Hours, schedule, phases, external costs |
+| 92 | [Open decisions](92-open-decisions.md) | 20 decisions to approve, with proposals |
 
-## Sintesi
+## Summary
 
-- **Stack raccomandato**: Django (6.x → 6.2 LTS) + commerce custom e snello + Wagtail per contenuti e
-  backoffice, PostgreSQL come unico datastore (anche per code e ricerca), HTMX, Stripe Connect.
-- **Semplificazioni principali**: una sola entità per prodotto (non due post EN/IT), una sola fonte per
-  le spedizioni, ledger e commissioni nostri, pipeline di import nello stesso progetto, nessuno script
-  operativo fuori dal versionamento.
-- **Perimetro go-live**: 113 micro-task P1, **≈ 1.350–1.510 h** inclusi collaudo, revisione e riserva.
-  Il piano di agosto stimava 1.740–2.540 h.
-- **Da fare subito**, indipendentemente dalla ricostruzione: ruotare le credenziali trovate in chiaro
-  (vedi [12](12-sicurezza-infra-operativita.md) §12.1).
+- **Recommended stack**: Django (6.x → 6.2 LTS) + a lean custom commerce layer + Wagtail for content and
+  backoffice, PostgreSQL as the single datastore (also for queues and search), HTMX, Stripe Connect.
+- **Main simplifications**: a single entity per product (not two EN/IT posts), a single source for
+  shipping, our own ledger and commissions, import pipelines in the same project, no operational
+  scripts outside version control.
+- **Go-live scope**: 113 P1 micro-tasks, **≈ 1,350–1,510 h** including acceptance testing, review and contingency.
+  The August plan estimated 1,740–2,540 h.
+- **Do immediately**, regardless of the rebuild: rotate the credentials found in plain text
+  (see [12](12-security-infra-operations.md) §12.1).
 
-## Checklist di approvazione
+## Approval checklist
 
-- [ ] 00 Visione e principi
-- [ ] 01 Stack (decisioni D-11, D-12)
-- [ ] 02–13 Documenti di dominio (una spunta per documento)
-- [ ] 92 Decisioni aperte: proposte accettate o modificate
-- [ ] 91 Perimetro P1 e calendario
-- [ ] Import del `backlog.csv` nello strumento di gestione dei task
+- [ ] 00 Vision and principles
+- [ ] 01 Stack (decisions D-11, D-12)
+- [ ] 02–13 Domain documents (one tick per document)
+- [ ] 92 Open decisions: proposals accepted or amended
+- [ ] 91 P1 scope and schedule
+- [ ] Import of `backlog.csv` into the task management tool

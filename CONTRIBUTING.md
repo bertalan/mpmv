@@ -7,19 +7,19 @@
 | Functional/technical spec | `docs/spec/NN-*.md` | Yes, through review |
 | Micro-tasks (ID, priority, hours, deps, done-when) | Task tables in each `docs/spec/NN-*.md` | Yes |
 | Backlog by phase, CSV export | `docs/spec/90-backlog.md`, `docs/spec/backlog.csv` | **No**, run `make docs` |
-| Open decisions | `docs/spec/92-decisioni-aperte.md` | Yes, and close each one with an ADR |
+| Open decisions | `docs/spec/92-open-decisions.md` | Yes, and close each one with an ADR |
 | Architecture decisions | `docs/adr/NNNN-*.md` | Yes, never rewrite an accepted ADR; supersede it |
 
-The spec is in Italian because the project owner approves it. Everything else is in English: code,
-comments, docstrings, commit messages, ADRs and developer docs.
+Everything in the repository is in English: spec, ADRs, code, comments, docstrings, commit messages
+and developer docs.
 
 ## Task lifecycle
 
 1. **Ready**: the task's dependencies are done and the open decisions blocking it (see
-   `92-decisioni-aperte.md`, column "Blocca") are closed.
+   `92-open-decisions.md`, column "Blocks") are closed.
 2. **In progress**: branch `<task-id>-<slug>`, e.g. `arc-3-bootstrap`, `tax-3-resolve-goods-tax`.
 3. **Review**: PR titled `[ARC.3] Bootstrap repository`. The PR body links the spec section and
-   restates the task's "Done quando" criterion.
+   restates the task's "Done when" criterion.
 4. **Done**: merged into `main` with the criterion demonstrably met (test, demo on STAGE or report).
 
 Changing scope or an estimate means editing the task row in the spec in the same PR, then running

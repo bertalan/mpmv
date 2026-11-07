@@ -1,95 +1,100 @@
-# 11 — Compliance normativa del marketplace
+# 11 — Marketplace regulatory compliance
 
-> Questo documento elenca **requisiti di prodotto** da implementare. Non è un parere legale: ogni
-> voce marcata ⚖️ va confermata con consulente fiscale o legale (vedi [92-decisioni-aperte.md](92-decisioni-aperte.md)).
+> This document lists **product requirements** to implement. It is not legal advice: every
+> item marked ⚖️ must be confirmed with a tax advisor or legal counsel (see [92-open-decisions.md](92-open-decisions.md)).
 
-## 11.1 Stato attuale
+## 11.1 Current state
 
-| Obbligo | Oggi |
+| Obligation | Today |
 |---|---|
-| DAC7 (reporting ricavi vendor) | Dati sparsi nelle meta WCFM; nessun export strutturato |
-| GPSR (sicurezza prodotti, dal 13/12/2024) | **Nessun campo** |
-| Fatturazione elettronica commissioni | Fuori dal sistema |
-| GDPR | Complianz per i cookie; nessun flusso di export/cancellazione; dump LIVE copiati su STAGE |
-| DSA (segnalazioni, trasparenza) | Nessun flusso dedicato |
-| P2B (trasparenza verso i vendor) | Termini in pagine statiche |
-| Omnibus (prezzo più basso 30 giorni, recensioni) | Non gestito (nessuna promozione strutturata) |
-| European Accessibility Act (dal 28/06/2025) | Non valutato |
-| Funzione di recesso online (dal 19/06/2026) | **Assente** |
+| DAC7 (vendor revenue reporting) | Data scattered across WCFM meta; no structured export |
+| GPSR (product safety, since 2024-12-13) | **No fields** |
+| E-invoicing of commissions | Outside the system |
+| GDPR | Complianz for cookies; no export/erasure flow; LIVE dumps copied to STAGE |
+| DSA (notices, transparency) | No dedicated flow |
+| P2B (transparency towards vendors) | Terms in static pages |
+| Omnibus (lowest price in 30 days, reviews) | Not handled (no structured promotions) |
+| European Accessibility Act (since 2025-06-28) | Not assessed |
+| Online withdrawal function (from 2026-06-19) | **Missing** |
 
-## 11.2 Requisiti
+## 11.2 Requirements
 
 ### CMP.1 — DAC7 `[P1]`
-- Dataset raccolto all'onboarding del vendor: denominazione, P.IVA/codice fiscale, indirizzo della sede,
-  paese di residenza fiscale, IBAN, stabile organizzazione. Completezza = condizione per i payout.
-- Aggregazione per vendor e trimestre dal ledger (corrispettivi, commissioni, numero di operazioni).
-- Export annuale nel formato dell'autorità del **paese di stabilimento della piattaforma**
-  (`PlatformOperator`). ⚖️ Verificare le soglie di esclusione (es. vendor con meno di 30 vendite e meno di 2.000 €).
+- Dataset collected at vendor onboarding: legal name, VAT number/tax code, registered office address,
+  country of tax residence, IBAN, permanent establishment. Completeness = precondition for payouts.
+- Aggregation per vendor and quarter from the ledger (consideration, commissions, number of transactions).
+- Annual export in the format of the authority of the **platform's country of establishment**
+  (`PlatformOperator`). ⚖️ Verify the exclusion thresholds (e.g. vendors with fewer than 30 sales and less than €2,000).
 
-### CMP.2 — Fatturazione delle commissioni `[P1]`
-- Documento commissioni piattaforma → vendor per periodo, generato dal ledger.
-- Canale dipendente dal `PlatformOperator`: per una piattaforma italiana è SDI (FatturaPA), con le
-  diciture del regime fiscale della piattaforma ⚖️; interfaccia astratta `EInvoiceChannel` (SDI tramite intermediario
-  oggi, altri canali in futuro, predisposizione ViDA).
-- Le fatture verso i clienti restano del vendor: la piattaforma fornisce i dati per riga e per ordine
-  (export per vendor). ⚖️ Chiarire il confine nel contratto vendor.
+### CMP.2 — Commission invoicing `[P1]`
+- Platform → vendor commission document per period, generated from the ledger.
+- Channel depends on the `PlatformOperator`: for an Italian platform it is SDI (FatturaPA), with the
+  wording of the platform's tax regime ⚖️; abstract `EInvoiceChannel` interface (SDI via an intermediary
+  today, other channels in the future, ready for ViDA).
+- Invoices to customers remain the vendor's: the platform provides the data per line and per order
+  (export per vendor). ⚖️ Clarify the boundary in the vendor contract.
 
 ### CMP.3 — GPSR `[P1]`
 ```python
 class GpsrInfo(Model):
-    manufacturer_name; manufacturer_address; manufacturer_contact
-    eu_responsible_name; eu_responsible_address; eu_responsible_contact  # obbligatorio se produttore extra UE
-    product_identifiers (lotto, modello, GTIN)
-    warnings (tradotte); safety_documents (file)
+    manufacturer_name
+    manufacturer_address
+    manufacturer_contact
+    eu_responsible_name
+    eu_responsible_address
+    eu_responsible_contact  # mandatory if the manufacturer is outside the EU
+    product_identifiers(batch, model, GTIN)
+    warnings(translated)
+    safety_documents(file)
 ```
-- Visibile nella scheda prodotto; **pubblicazione bloccata** se mancano i campi obbligatori; il
-  contratto di import li richiede. Default per vendor (il produttore spesso coincide col vendor).
-- Procedura di richiamo o rimozione rapida su segnalazione delle autorità o di sicurezza.
+- Visible on the product page; **publication blocked** if mandatory fields are missing; the
+  import contract requires them. Per-vendor defaults (the manufacturer often is the vendor).
+- Rapid recall or removal procedure upon notice from the authorities or a safety report.
 
-### CMP.4 — GDPR operativo `[P1]`
-- Export dei dati del cliente (JSON/PDF) e cancellazione come **anonimizzazione** (gli ordini restano
-  per obblighi contabili).
-- Registro dei trattamenti e sub-processor (Stripe, corrieri, provider email, provider AI, hosting),
-  retention per tipo di dato, DPA.
-- Ambienti non di produzione solo con dati sintetici o anonimizzati (oggi si clona LIVE su STAGE).
-- Consenso cookie con Consent Mode (vedi [10](10-contenuti-seo-ai.md)).
+### CMP.4 — Operational GDPR `[P1]`
+- Customer data export (JSON/PDF) and erasure as **anonymization** (orders are kept
+  for accounting obligations).
+- Record of processing activities and sub-processors (Stripe, carriers, email provider, AI provider, hosting),
+  retention per data type, DPA.
+- Non-production environments only with synthetic or anonymized data (today LIVE is cloned to STAGE).
+- Cookie consent with Consent Mode (see [10](10-content-seo-ai.md)).
 
-### CMP.5 — DSA e P2B `[P2]`
-- Modulo di segnalazione di contenuti illeciti (notice & action) con tracciamento, esito motivato e
-  comunicazione al vendor.
-- Tracciabilità dei vendor (KYBC): dati identificativi verificati prima dell'attivazione (copre anche D.1).
-- Termini piattaforma-vendor versionati con accettazione tracciata; preavviso per modifiche e
-  sospensioni; trasparenza sui criteri di ordinamento dei risultati (pagina dedicata).
+### CMP.5 — DSA and P2B `[P2]`
+- Form for reporting illegal content (notice & action) with tracking, a reasoned decision and
+  notification to the vendor.
+- Vendor traceability (KYBC): identification data verified before activation (also covers D.1).
+- Versioned platform-vendor terms with tracked acceptance; advance notice of changes and
+  suspensions; transparency on the ranking criteria of results (dedicated page).
 
-### CMP.6 — Diritti del consumatore `[P1]`
-- **Funzione di recesso online** (direttiva UE 2023/2673, che modifica la direttiva 2011/83/UE):
-  pulsante ben visibile per l'intera durata del recesso, dati minimi, conferma, ricevuta su supporto
-  durevole. ⚖️ Verificare il recepimento italiano e i dettagli dell'etichetta del pulsante.
-- Informazioni precontrattuali per lingua; garanzia legale; recesso di 14 giorni per paese del consumatore.
-- Geo-blocking: nessuna discriminazione per residenza nei paesi serviti.
-- Omnibus: prezzo barrato = prezzo più basso degli ultimi 30 giorni (storico prezzi in `catalog`);
-  informativa sulla verifica delle recensioni.
+### CMP.6 — Consumer rights `[P1]`
+- **Online withdrawal function** (EU directive 2023/2673, amending directive 2011/83/EU):
+  clearly visible button for the entire withdrawal period, minimal data, confirmation, receipt on a durable
+  medium. ⚖️ Verify the Italian transposition and the details of the button label.
+- Pre-contractual information per language; legal guarantee; 14-day withdrawal by consumer country.
+- Geo-blocking: no discrimination based on residence in the countries served.
+- Omnibus: strikethrough price = lowest price in the last 30 days (price history in `catalog`);
+  information on how reviews are verified.
 
 ### CMP.7 — European Accessibility Act `[P1]`
-- I servizi di e-commerce rientrano nell'EAA. ⚖️ Le **microimprese** di servizi (meno di 10 dipendenti
-  e fatturato o bilancio ≤ 2 M€) sono esentate: verificare lo status della piattaforma.
-- Raccomandazione: progettare comunque a livello **WCAG 2.1 AA** (EN 301 549). Costa poco se fatto
-  dall'inizio, è un requisito di fatto per crescere, e i vendor con più di 10 dipendenti potrebbero
-  chiederlo. Dichiarazione di accessibilità pubblicata.
+- E-commerce services fall under the EAA. ⚖️ Service **microenterprises** (fewer than 10 employees
+  and turnover or balance sheet ≤ €2M) are exempt: verify the platform's status.
+- Recommendation: design to **WCAG 2.1 AA** (EN 301 549) anyway. It costs little if done
+  from the start, it is a de facto requirement for growth, and vendors with more than 10 employees may
+  ask for it. Published accessibility statement.
 
-### CMP.8 — Contenuti generati con AI `[P3]`
-- Le descrizioni prodotto sono generate con AI e riviste. ⚖️ Valutare eventuali obblighi di trasparenza
-  dell'AI Act per i contenuti pubblicati; in ogni caso tracciare in `ProductTranslation` l'origine
+### CMP.8 — AI-generated content `[P3]`
+- Product descriptions are AI-generated and reviewed. ⚖️ Assess any AI Act transparency obligations
+  for published content; in any case track the origin in `ProductTranslation`
   (`machine` / `reviewed`).
 
-## 11.3 Task
+## 11.3 Tasks
 
-| ID | Micro-task | Pri | Ore | Dipende da | Done quando |
+| ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
-| CMP.1 | Dataset DAC7 nel vendor + completezza + aggregati trimestrali + export | P1 | 12 | VEN.5, VEN.4 | Export di prova validato dal consulente |
-| CMP.2 | Documento commissioni dal ledger + interfaccia `EInvoiceChannel` + export per vendor | P1 | 12 | VEN.4 | Documento di prova generato |
-| CMP.3 | `GpsrInfo` con default per vendor, blocco pubblicazione, scheda prodotto, procedura di richiamo | P1 | 8 | CAT.1 | Prodotto senza GPSR non pubblicabile |
-| CMP.4 | GDPR: export e anonimizzazione cliente, registro sub-processor, retention job | P1 | 10 | ORD.2 | Richiesta di cancellazione su ordine seed |
-| CMP.5 | DSA notice & action + termini vendor versionati con accettazione | P2 | 8 | VEN.5 | Segnalazione con esito tracciato |
-| CMP.6 | Recesso online, storico prezzi 30 gg (Omnibus), informative precontrattuali | P1 | 8 | ORD.2, CAT.1 | Prezzo barrato corretto nei test |
-| CMP.7 | Audit accessibilità automatico in CI (axe) + revisione manuale + dichiarazione | P1 | 8 | CMS.7 | Zero violazioni critiche sulle pagine chiave |
+| CMP.1 | DAC7 dataset on the vendor + completeness + quarterly aggregates + export | P1 | 12 | VEN.5, VEN.4 | Test export validated by the advisor |
+| CMP.2 | Commission document from the ledger + `EInvoiceChannel` interface + export per vendor | P1 | 12 | VEN.4 | Test document generated |
+| CMP.3 | `GpsrInfo` with per-vendor defaults, publication block, product page, recall procedure | P1 | 8 | CAT.1 | Product without GPSR cannot be published |
+| CMP.4 | GDPR: customer export and anonymization, sub-processor register, retention job | P1 | 10 | ORD.2 | Erasure request on a seed order |
+| CMP.5 | DSA notice & action + versioned vendor terms with acceptance | P2 | 8 | VEN.5 | Notice with tracked outcome |
+| CMP.6 | Online withdrawal, 30-day price history (Omnibus), pre-contractual information | P1 | 8 | ORD.2, CAT.1 | Correct strikethrough price in tests |
+| CMP.7 | Automated accessibility audit in CI (axe) + manual review + statement | P1 | 8 | CMS.7 | Zero critical violations on key pages |
