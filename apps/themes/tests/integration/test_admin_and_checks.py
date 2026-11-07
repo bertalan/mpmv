@@ -10,7 +10,7 @@ from django.core.management import call_command
 from django.core.management.base import SystemCheckError
 from django.test import Client
 from django.urls import reverse
-from pytest_django.fixtures import SettingsWrapper
+from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.core.models import AuditLog
 from apps.themes.checks import check_site_themes

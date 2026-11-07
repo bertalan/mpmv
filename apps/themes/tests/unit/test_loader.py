@@ -6,11 +6,12 @@ served to a site using another theme.
 """
 
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 from django.conf import settings as django_settings
 from django.template import Context, Engine, TemplateDoesNotExist
-from pytest_django.fixtures import SettingsWrapper
+from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.themes.loaders import ThemeLoader
 from apps.themes.services import current_chain, use_theme
@@ -133,10 +134,9 @@ def test_use_theme_rejects_an_unknown_theme(themes: Path) -> None:
 
 
 def test_the_project_engine_puts_the_theme_loader_first_and_uncached() -> None:
-    (options,) = [t["OPTIONS"] for t in django_settings.TEMPLATES]
-    loaders = options["loaders"]
+    (engine,) = django_settings.TEMPLATES
+    options = cast("dict[str, Any]", engine["OPTIONS"])
+    loaders: list[Any] = options["loaders"]
     assert loaders[0] == LOADER
     # Django's cached.Loader keys by name only: it must never wrap the theme loader.
-    for entry in loaders[1:]:
-        if isinstance(entry, tuple | list):
-            assert LOADER not in entry[1]
+    assert LOADER not in repr(loaders[1:])

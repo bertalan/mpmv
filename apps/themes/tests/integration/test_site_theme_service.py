@@ -9,7 +9,7 @@ import pytest
 from django.http import HttpRequest
 from django.test import RequestFactory
 from pytest_django import DjangoAssertNumQueries
-from pytest_django.fixtures import SettingsWrapper
+from pytest_django.fixtures import Settings as SettingsWrapper
 from wagtail.models import Site
 
 from apps.core.audit import AuditContext

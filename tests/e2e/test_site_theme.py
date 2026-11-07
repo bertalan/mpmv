@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 from playwright.sync_api import Page, expect
-from pytest_django.fixtures import SettingsWrapper
+from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
 
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory

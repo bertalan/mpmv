@@ -35,7 +35,9 @@ class SiteFactory(DjangoModelFactory[Site]):
     def _create(cls, model_class: type[Site], *args: Any, **kwargs: Any) -> Site:
         if kwargs.get("root_page") is None:
             kwargs["root_page"] = _default_root()
-        return super()._create(model_class, *args, **kwargs)
+        site = model_class(*args, **kwargs)
+        site.save()
+        return site
 
 
 class ThemeSettingsFactory(DjangoModelFactory[ThemeSettings]):

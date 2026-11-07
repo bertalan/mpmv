@@ -77,7 +77,7 @@ def test_base_has_no_parent_and_description_and_direction_have_defaults() -> Non
         (manifest_data("ride", direction="rtl"), "ride", "direction"),
         (manifest_data("ride", colour="red"), "ride", "colour"),
         (manifest_data("Ride!"), "Ride!", "slug"),
-        (manifest_data("ride", slug=None), "ride", "slug"),
+        ({k: v for k, v in manifest_data("ride").items() if k != "slug"}, "ride", "slug"),
     ],
 )
 def test_an_invalid_manifest_is_rejected_with_the_reason(

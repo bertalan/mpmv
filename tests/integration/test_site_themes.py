@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 from django.test import Client
-from pytest_django.fixtures import SettingsWrapper
+from pytest_django.fixtures import Settings as SettingsWrapper
 from wagtail.models import Site
 
 from apps.cms.services import seed_site

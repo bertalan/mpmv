@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 from django.core import checks
-from pytest_django.fixtures import SettingsWrapper
+from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.themes.checks import check_site_themes, check_themes
 from apps.themes.tests.builders import write_theme
@@ -78,7 +78,7 @@ def test_a_missing_base_theme_fails(tmp_path: Path, settings: SettingsWrapper) -
 
 
 def test_the_checks_are_registered() -> None:
-    registered = checks.registry.registry.get_checks()
+    registered: list[object] = list(checks.registry.registry.get_checks())
     assert check_themes in registered
     # The stored site settings are read from the database: `migrate` and
     # `check --database default` run it.
