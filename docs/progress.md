@@ -45,7 +45,6 @@ part of the done-when still open) · `not started`.
 | ARC.8 | done | #51 | Feature flag registry with code, environment, staff and per-vendor values; kill switches for checkout, import and payments seeded on; `flag_enabled` helper; audited services with dry-run; admins with step-up on kill switches |
 | CAT.2 | done | #53 | Category and term trees (treebeard), configurable taxonomies with typed term attributes, brands, per-language names, slugs and SEO texts; product links; admin CRUD with translations |
 | SHP.12 | done | #54 | Several shipping methods per vendor and zone (VendorZoneRate renamed in place), vendor zones overriding platform zones, country groups, shared postcode grammar in apps/core/postcodes.py, per-method free-shipping threshold and stored VAT treatment |
-| EVT.12 | in review | #82 | Geocoding behind the `Geocoder` protocol in `apps/core/geocoding`: Nominatim, Photon, LocationIQ and OpenCage adapters (keyed ones off without a key), settings chain with fallback, PostgreSQL limiter and circuit breaker per provider, 3 s call timeout and 10 s budget, 180-day normalised-address cache, `FakeGeocoder`; "Find coordinates" POST endpoint for staff and vendor members, 10 lookups a minute per user |
 | TAX.2 | done | #52 | Regime change workflow: owner request, staff approval or rejection with the review permission checked in the service, step-up, one transaction for the new profile version and fiscal regime, history. Tax code, flagged for careful human review |
 
 ## Owner decisions 2026-11-07
