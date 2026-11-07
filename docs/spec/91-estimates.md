@@ -14,13 +14,13 @@
 
 | Item | Hours | How it is calculated |
 |---|---:|---|
-| P1 micro-tasks | 1,550 | Sum from the generated backlog |
+| P1 micro-tasks | 1,558 | Sum from the generated backlog |
 | Integrated and end-to-end acceptance testing, exploratory tests | 100 | ~10% of P1 |
 | Mandatory human review of tax, payments, ledger, orders, security | 50 | ~15% of the hours for TAX, PAY, VEN, ORD, SEC |
 | Coordination, ADRs, meetings with tax advisor and legal counsel | 80 | ~8% of P1 |
-| **Subtotal** | **1,780** | |
-| Contingency for unforeseen issues (10–25% of P1) | 155–388 | Tax and payment domain, dirty legacy data |
-| **Go-live total** | **≈ 1,935–2,168** | |
+| **Subtotal** | **1,788** | |
+| Contingency for unforeseen issues (10–25% of P1) | 156–390 | Tax and payment domain, dirty legacy data |
+| **Go-live total** | **≈ 1,944–2,178** | |
 
 The SHP.12 implementation (#54) added the SHP.12 row it built and the SHP.13 and SHP.14 rows it
 found missing (+34 h of P1). Coherence check 5 (2026-11-07) added ARC.17 (1 h, e-invoicing
@@ -77,6 +77,10 @@ CAT.18 (12 h, vendor acceptance of staff-assigned shares). The answer to Q-91 (n
 product URLs with one 301 from every legacy URL) grows MIG.6 from 6 to 8 h, and its refinement (switch staggered
 by traffic after go-live, with gates and rollback) adds MIG.11 (6 h): +8 h of P1.
 
+The owner's answers on editor roles and customer legal pages (Q-58 and Q-42, 2026-11-07) changed
+P1 by +8 h: CORE.8 grows (13 → 15 h: our own editor roles instead of Wagtail's default groups) and
+the new row I18N.9 (6 h, customer legal and checkout pages in five languages at go-live) is added.
+
 After go-live: P2 = 334 h and P3 = 18 h (MCP, advanced zone editor, OSS report, visitor content
 translation, reviews, advanced payouts, vendor branding, customer preferences and event
 notifications, Google geocoder and map layer, cross-vendor bundles…), about **385–440 h**
@@ -87,7 +91,7 @@ including contingency.
 | | August plan | This review |
 |---|---:|---:|
 | Scope | Full WCFM parity + P1 commercial modules | Parity **with what is actually used** + 2026 compliance |
-| Total hours (development, testing, migration) | 1,740–2,540 | 1,935–2,168 to go-live |
+| Total hours (development, testing, migration) | 1,740–2,540 | 1,944–2,178 to go-live |
 | With AI-assisted development | 1,450–2,100 | already included |
 
 Where the difference comes from:
@@ -133,8 +137,9 @@ A milestone is closed only with a working demo on STAGE and the domain regressio
 - External penetration test (SEC.6; the hours listed are for remediation).
 - Tax advisor and legal counsel for the ⚖️ decisions in [92-open-decisions.md](92-open-decisions.md).
 - Interface text in IT, DE, FR and ES at go-live (D-18): native-speaker review of the AI drafts for
-  checkout, emails and legal/tax wording. If the owner decides that legal pages are translated at
-  go-live, counsel also checks the legal texts in each language (Impressum, terms, withdrawal notice).
+  checkout, emails and legal/tax wording. Customer legal and checkout pages are translated at
+  go-live (Q-42, I18N.9), so counsel also checks the legal texts in each language (Impressum,
+  terms, privacy, withdrawal notice, shipping and returns).
 - Translation of visitor content after go-live (I18N.8), with the method the owner chooses.
 - CMP for cookies; transactional email provider. No SDI intermediary: the platform issues no
   invoices, and the operator's accountant invoices commissions with its own tool from the CMP.2
@@ -202,7 +207,7 @@ Work that agents cannot speed up:
 | **Total** | **≈ 109–199** |
 
 **Result:** about **150–250 people hours** plus about two weekly agent budgets, against
-1,935–2,168 hours for a human team (§91.2). Realistic calendar to go-live: **2–3 months**. The
+1,944–2,178 hours for a human team (§91.2). Realistic calendar to go-live: **2–3 months**. The
 pace is set by external waits: legal counsel, the Hetzner account for STAGE, Stripe Connect
 verification, the external penetration test (SEC.6) and the three dress rehearsals (MIG.9).
 
