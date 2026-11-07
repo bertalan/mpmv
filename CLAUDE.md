@@ -44,6 +44,10 @@ Guidance for AI agents working in this repository. Read [README.md](README.md) a
 - Suites by directory: `tests/unit` (no DB), `tests/integration` (real PostgreSQL, no mocks),
   `tests/e2e` (Playwright + screenshots). App tests go in `apps/<app>/tests/{unit,integration}`.
 - Mock only external providers, through our own interfaces.
+- No credential-like literals anywhere, tests included (GitGuardian and gitleaks run on every PR):
+  generate test passwords with `secrets.token_urlsafe()`.
+- Parallel work (worktrees, agents): set `MPMV_TEST_DB_NAME=test_mpmv_<branch>` so test databases
+  do not collide on the shared local PostgreSQL.
 
 ## Commands
 
