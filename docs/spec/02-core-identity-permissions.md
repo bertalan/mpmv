@@ -116,7 +116,8 @@ The ~85 "recurring" routes are consolidated into ~15 REST resources:
 | `/vendors/{id}` | profile, policies, logo (per language) | `update_vendor_*` |
 | `/reviews` | supplier review import | `manage_product_reviews` |
 | `/content/posts` | blog drafts | `create_post`, `update_post` |
-| `/events` | vendor events (closures, promotions, fairs) as `EventPage` drafts: CRUD, submit, cancel, dry-run ([15](15-events.md)) | new |
+| `/vendors/{id}/closures` | holiday and closure schedule: CRUD, dry-run, audit (VEN.20, [04](04-vendors-commissions-ledger.md)) | new |
+| `/events` | vendor events (promotions, trade fairs and meetings, other) as `EventPage` drafts in any enabled language, with translations: CRUD, submit, cancel, dry-run ([15](15-events.md)) | new |
 
 Common rules: every mutating POST accepts `?dry_run=true` and returns the diff; bulk operations
 are idempotent (same request twice = same state); errors in RFC 9457 format.
@@ -129,7 +130,7 @@ admin reports or read-only MCP tools.
   products, zones, rates, orders and quotes, with filters and bulk actions.
 - **Vendor dashboard** as a separate area (`/vendor/`), HTMX templates, tenant-filtered views:
   orders, quote entry, products (limited editing), payouts, tax regime change
-  request, events. Vendors never get the Wagtail admin: their event pages are created and edited
+  request, holiday and closure schedule (VEN.20), events. Vendors never get the Wagtail admin: their event pages are created and edited
   as revisions through the events services ([15](15-events.md)).
 - **Django admin** only for the technical superuser, reachable from a restricted network.
 - **MCP server** (see [10](10-content-seo-ai.md)): tools on top of the same services.

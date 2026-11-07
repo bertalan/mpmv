@@ -29,7 +29,7 @@
 | `TermLandingPage` | Editorial page for a taxonomy term | SEO intro, the term's products by category, related articles |
 | `VendorLandingPage` | The vendor's story (heritage, workshop) beyond the standard vendor storefront | story, images, featured products |
 | `VendorRecruitmentPage` | "Become a seller" with plans and application form | plans (from `VendorPlan`), FAQ, form |
-| `EventIndexPage` / `EventPage` | Events of vendors and of the platform: closures, promotions, trade fairs and meetings, with RSS and ICS feeds and maps ([15](15-events.md), `events` app) | the block library above, the launch countdown, structured dates, recurrence, location and coordinates |
+| `EventIndexPage` / `EventPage` | Events of vendors and of the platform: promotions, trade fairs and meetings, other events, in any enabled language, with RSS and ICS feeds and maps ([15](15-events.md), `events` app) | the block library above, the launch countdown, structured dates, recurrence, location and coordinates |
 
 Events have their own page type, `EventPage`, in the `events` app ([15](15-events.md)). This
 supersedes owner decision Q-61 for events, which had made them blog articles. There are still no

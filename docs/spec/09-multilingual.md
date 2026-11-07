@@ -18,6 +18,7 @@
 |---|---|---|
 | Products, categories, taxonomy terms, brands, attributes, vendors | **Explicit translation tables** (`*Translation`: language + text fields) | A single entity: SKU, price, stock, weight and relations exist once. Adding German = new rows, no schema migration |
 | CMS pages, blog, landing pages, legal texts | **wagtail-localize** (per-locale trees, synchronization, translation status) | Native Wagtail tool |
+| Events (`EventPage`) | **Wagtail i18n** (`Locale`, `TranslatableMixin`, per-locale trees), any enabled language as the original, optional translations ([15](15-events.md)) | Exception to D-18 for vendor-authored events (owner decision Q-72) |
 | Interface strings, emails, messages | **gettext** (`.po`/`.mo`) | Django standard; the `i18n/add_it_translations.py` scripts already exist |
 | Tax wording (art. 74, reverse charge, export) | gettext keys referenced by `legal_note_key` | The text follows the document language; it is not a free-text field to be duplicated |
 | Vendor legal documents (vendor contract, other vendor-facing terms) | Versioned documents with one text per language (`VendorContractTranslation`, vendor clauses and custom uploads, see [04](04-vendors-commissions-ledger.md)) | Not visitor content: the vendor accepts the exact text in its own language, with a prevailing language per version |
@@ -44,7 +45,7 @@ Rules:
   it (I18N.8). Whether legal pages (terms, privacy,
   withdrawal) count as visitor content or must be translated at go-live is still an open owner
   question.
-- **Explicit fallback**: if the published translation is missing, the base language (EN) is shown with a notice, and the
+- **Explicit fallback**: except for events (below), if the published translation is missing, the base language (EN) is shown with a notice, and the
   page is not included in that language's sitemap (never empty or duplicate content indexed).
   A fallback copy declares the EN page as its canonical URL (no `noindex`, so the two signals never
   conflict), and `hreflang` lists only the languages that have a published translation. At go-live
@@ -76,6 +77,17 @@ Rules:
   the visitor fallback: when the vendor's language has no text, the vendor accepts the English
   text with an explicit acknowledgement (VEN.14). The legal translation of these texts is the
   owner's business task, not a backlog task.
+- **Events are an exception to D-18** (owner decision Q-72, 2026-11-07; spec 15, EVT.8). Vendors
+  (and staff) write an event in any enabled language (EN, IT, DE, FR, ES, and later languages),
+  with no required source language: English is not required. Translations into the other enabled
+  languages are optional and use Wagtail's i18n, the mechanism of CMS pages (`Locale`,
+  `TranslatableMixin`, pages linked by `translation_key`). An event has a URL only in the
+  languages it has a published translation in; there are no fallback copies, `hreflang` lists
+  only the existing translations and each language's sitemap only that language's translations.
+  The listings and the RSS and ICS feeds of a language show each event in that language's
+  translation, or else in the event's **original language**, marked with a `lang` attribute (and
+  `dc:language` in RSS, `LANGUAGE` in ICS) and linking to the original page. The EN fallback with
+  a notice does not apply to events.
 
 ## 9.3 Tasks
 

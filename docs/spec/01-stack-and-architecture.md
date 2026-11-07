@@ -95,8 +95,6 @@ flowchart TD
   cms --> seo
   catalog --> events
   cms --> events
-  shipping --> events
-  events --> cart
   events --> seo
   events --> compliance
   orders --> compliance
@@ -109,9 +107,10 @@ flowchart TD
 - `tax` and `shipping` do not know about `orders`: they receive a *context* (dataclass) and return a
   *decision*. This keeps them testable in isolation.
 - `api` and `mcp` contain no logic: they call the services.
-- `events` sits between the `catalog`/`cms` layer and `cart` ([15](15-events.md)): `cart` reads vendor
-  closures from it and passes them to the shipping engine as data (`ClosedPeriod`); `shipping`,
-  `catalog` and `cms` never import `events`.
+- `events` sits one layer above `catalog` and `cms` ([15](15-events.md)); `shipping`, `cart`,
+  `orders`, `catalog` and `cms` never import `events`. Vendor holiday closures are a vendor setting
+  (VEN.20): the `shipping` service reads them and passes them to the shipping engine as data
+  (`ClosedPeriod`), and `cart` gets the dispatch date from `shipping`.
 - An import-linter rule in CI enforces the graph.
 
 ### Cross-cutting conventions
@@ -125,7 +124,7 @@ flowchart TD
 | History | Configuration tables with `valid_from` / `valid_to`; orders store snapshots, not live references |
 | Dry-run | Every mutating service accepts `dry_run=True` and returns a `ChangeSet` (diff) |
 | Audit | Every sensitive mutation writes an `AuditLog` (who, what, before/after, from where) |
-| Languages | Order EN (primary, source) → IT → DE → FR → ES → later languages; all five at go-live for interface text, visitor content in EN only until after go-live, except the existing IT texts migrated from the current site (D-18); languages are configuration; no hardcoded text in templates |
+| Languages | Order EN (primary, source) → IT → DE → FR → ES → later languages; all five at go-live for interface text, visitor content in EN only until after go-live, except the existing IT texts migrated from the current site and vendor-authored events, written in any enabled language (D-18, [15](15-events.md)); languages are configuration; no hardcoded text in templates |
 | Time | UTC in the DB; Europe/Rome for cron jobs and documents |
 
 ## 1.4 Example of the service + pure function pattern

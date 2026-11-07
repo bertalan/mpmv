@@ -499,12 +499,88 @@ status machine and VEN.16 consequences record the reason and the notice date (CM
 Commission's Digital Omnibus proposal of 2025-11-19 would repeal parts of P2B; until it is
 adopted the regulation applies in full.
 
+### Holiday and closure schedule (VEN.20)
+
+A vendor's holidays and shop closures are a **vendor setting**, not an event (owner decision
+Q-73; the events module of [15](15-events.md) has no closure type). The buyer can still order
+during a closure; a neutral notice and the checkout say when the package will leave.
+
+```python
+# apps/vendors/models.py
+class VendorClosure(Model):                     # vendor-scoped (CORE.3)
+    vendor = FK(Vendor)
+    start_date, end_date: date                  # inclusive; end_date ≥ start_date
+    repeats_yearly: bool                        # same dates every year; may cross 31 December
+    notice_days = PositiveSmallInt(default=14)  # 0–60: how early the notice appears
+```
+
+- **No free text, no moderation.** The notice is a fixed interface string with the dates only,
+  translated into all five languages (I18N.7), so nothing the vendor writes reaches visitors. A
+  change takes effect at once.
+- Validation: a yearly range lasts less than one year and never starts or ends on 29 February.
+  Ranges may overlap; the calculation merges them. A range that has ended stays as history and
+  cannot be edited.
+- Dates are calendar dates in the platform's local time zone (spec 01); "today" is the current
+  date in that zone.
+- **Services** (`apps/vendors/services.py`): `add_closure`, `update_closure` and `delete_closure`
+  accept `dry_run=True`, return a `ChangeSet` and write an `AuditLog` entry (actor, before and
+  after, source: vendor area, admin or API).
+- **Vendor area** (CORE.9, `/vendor/settings/closures/`): list of current and upcoming ranges,
+  add, edit and delete forms, a preview of the notice. Staff use a Wagtail admin ViewSet. **API**:
+  `/api/v1/vendors/{id}/closures` (list, create, update, delete, `?dry_run=true`, RFC 9457 errors);
+  a vendor-scoped key (CORE.13) reaches only its own vendor, anything else is a 404.
+
+**Dispatch date through a shipping-side interface.** `shipping` may import `vendors` (spec 01
+§1.3), never the other way round, and the shipping engine stays pure:
+
+```python
+# apps/shipping/engine.py (pure, no ORM, knows nothing about vendors or orders)
+@dataclass(frozen=True)
+class ClosureRule:
+    start: date; end: date; repeats_yearly: bool
+@dataclass(frozen=True)
+class ClosedPeriod:
+    start: date; end: date                      # inclusive
+
+def expand_closures(rules: Sequence[ClosureRule], window_start: date, window_end: date) -> tuple[ClosedPeriod, ...]
+def earliest_dispatch_date(ordered_on: date, closed: Sequence[ClosedPeriod]) -> date:
+    """Merge overlapping and adjacent periods (next.start <= current.end + 1 day); if ordered_on
+    falls inside a merged period, return its end + 1 day, else ordered_on."""
+def delivery_window(dispatch_on: date, min_days: int, max_days: int) -> tuple[date, date]
+
+# apps/shipping/services.py
+def vendor_closed_periods(vendor_ids, start: date, end: date) -> dict[int, tuple[ClosedPeriod, ...]]
+def closure_notice(vendor_id, today: date) -> ClosureNotice | None   # merged period and dispatch date
+```
+
+- `vendor_closed_periods` reads `VendorClosure` rows and maps them to `ClosureRule`; the engine
+  only receives dataclasses.
+- **Notice.** From `notice_days` before a closure until its end, the vendor storefront (VEN.10),
+  each product page of the vendor (CAT.7, next to the add-to-cart button) and the cart (per vendor
+  package) show: "This shop is closed from 1 to 31 August 2027. Orders placed now will be
+  dispatched from 1 September 2027." Overlapping or adjacent ranges show as one merged period. The
+  templates use the `shipping` template tag library (`{% load dispatch %}`) inside theme
+  templates, which adds no Python import to `vendors` or `catalog`. The notice is a `role="region"`
+  landmark with a heading (not an alert: it does not interrupt) and does not rely on colour.
+- **Checkout.** `cart.build_checkout` (ORD.3) asks `vendor_closed_periods` for the vendors in the
+  cart (today to 180 days ahead) and passes each package's periods to `earliest_dispatch_date`.
+  The delivery estimate counts from the dispatch date (the method's indicative delivery time of
+  SHP.12 and any extra days of a special area of SHP.14 on top). Ordering stays possible, with no
+  extra confirmation step.
+- The order snapshot (ORD.2) stores the expected dispatch date per `VendorOrder`, so a later
+  change of the schedule does not rewrite what the buyer was told; vendor and customer order
+  emails (ORD.9) show it.
+- The anonymous page cache (SEO.6) is invalidated for the vendor's storefront and product pages
+  when the schedule changes, and a page with a notice is never cached past the notice's start or
+  end.
+
 ### Vendor dashboard (bare minimum)
 
 Own orders and order lines, entry of shipping quotes, products (editing of texts, price and stock
 if the vendor is not fed by a pipeline), balance and payouts, documents (accepted contracts and their
 evidence from VEN.15, non-fiscal commission statements from CMP.2, obligations checklist from CMP.10, plan fee statements from VEN.19),
-tax regime change request (approved by staff, as today), store policies per language.
+tax regime change request (approved by staff, as today), store policies per language, holiday
+and closure schedule (VEN.20).
 
 ## 4.3 Tasks
 
@@ -529,6 +605,7 @@ tax regime change request (approved by staff, as today), store policies per lang
 | VEN.17 | Qualified and advanced digital signature upload and verification (PAdES/CAdES) of the whole document or of the specific approval sheet, pyHanko, EU trusted lists for qualified and staff-listed trust anchors for advanced; completes the specific approval and is stored as a stronger acceptance | P1 | 18 | VEN.14, VEN.16 | A PAdES and a `.p7m` test file signed with a certificate from a test trusted list are accepted; a file that signs a different PDF, an altered file or an untrusted certificate is refused with the reason; a signed approval sheet satisfies the vendor's specific approval requirement |
 | VEN.18 | Fiscal regime RF20 (cross-border VAT franchise, Directive (EU) 2020/285, FatturaPA specification 1.9 from 2025-04-01): add the choice with its official SDI label, update the check constraint with a data migration, and record the FatturaPA specification version (1.9.1) the party block follows | P1 | 2 | VEN.12 | A vendor can save RF20; the constraint accepts RF01–RF20 except RF03; `fatturapa_party()` emits `RegimeFiscale` RF20; a test pins the label list to the specification version |
 | VEN.19 | Plan entitlements and plan fees: `plan_allows(vendor, feature)` service over `VendorPlan.features`, plan change with effective date and audit; monthly `plan_fee` ledger debit by a scheduled idempotent job; non-fiscal statement PDF per charge in the vendor's language (no invoice issued by the marketplace; the operator invoices outside the platform) | P2 | 8 | VEN.2, VEN.4, VEN.15, ARC.9 | A vendor whose plan lacks a feature cannot use it and keeps its data; a plan with a monthly fee gets exactly one `plan_fee` entry per period even when the job runs twice; the statement PDF states that it is not a tax invoice and matches the ledger entry; no fiscal document or e-invoice is produced |
+| VEN.20 | Holiday and closure schedule (owner decision Q-73): `VendorClosure` in the vendor settings (date ranges, optional yearly recurrence, notice lead time, no free text, no moderation), audited services with dry-run, vendor-area and admin forms, API `/vendors/{id}/closures`; `ClosureRule`, `ClosedPeriod`, `expand_closures`, `earliest_dispatch_date` and `delivery_window` pure functions in `shipping/engine.py`, `vendor_closed_periods` and `closure_notice` shipping services; neutral notice on the storefront, product pages and cart through a `shipping` template tag; `build_checkout` shifts the dispatch date and the estimate; expected dispatch date in the order snapshot; page cache invalidation | P1 | 12 | CORE.9, CORE.13, VEN.10, CAT.7, SHP.3, ORD.2, ORD.3 | Regression cases 8–12 of §4.4 green; a checkout with a closed and an open vendor shows the notice only on the closed vendor's package and still places the order; import-linter stays green |
 
 ## 4.4 Mandatory regression cases
 
@@ -540,3 +617,18 @@ tax regime change request (approved by staff, as today), store policies per lang
 6. Payment without split is not possible: a single collection flow (case NO-SPLIT).
 7. A change of the platform's regime (e.g. VAT on commissions after a relocation) is
    a `PlatformOperator` configuration, not a code change.
+8. **Closure overlap moves the dispatch date** (VEN.20): closures 1–15 August and 10–31 August
+   2027, order on 5 August → dispatch on 1 September; adjacent closures 1–15 and 16–31 August →
+   1 September; order on 31 July → dispatch on 31 July; order on 1 September → 1 September.
+9. A yearly closure 24 December–6 January: order on 2 January 2028 → dispatch on 7 January 2028;
+   order on 20 December 2027 → 20 December; a yearly range starting or ending on 29 February is
+   refused.
+10. A closure starting in 10 days with `notice_days` 14 shows the notice with the dispatch date on
+    the storefront, the product pages and the cart in all five languages; one starting in 20 days
+    shows nothing yet. Saving it needs no review, takes effect at once and writes one `AuditLog`
+    entry; `dry_run` writes nothing.
+11. The order snapshot keeps the expected dispatch date shown at checkout after the vendor edits
+    or deletes the closure.
+12. The shipping engine tests use no `vendors` code, `apps.vendors` never imports
+    `apps.shipping` (import-linter), and a vendor's API key cannot read or change another
+    vendor's closures (404).

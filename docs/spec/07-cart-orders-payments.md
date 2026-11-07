@@ -140,6 +140,13 @@ class PaymentGateway(Protocol):
 Orders with timeline and tracking, quotes to confirm, withdrawal and returns, addresses, data export and
 deletion (anonymization, see GDPR), preferred language. Guest checkout allowed.
 
+**Preferences and request history (ORD.11, P2, scope to be defined).** The owner wants one section
+of the customer account where the customer sees all their product information and quote requests
+and sets other preferences, including following vendors and event notifications (owner decision
+Q-74; event notifications are EVT.16, [15](15-events.md)). The owner has still to review its
+content, so it is not designed here: ORD.11 is a placeholder with a small estimate, re-estimated
+and detailed in this section once the owner's answers are in.
+
 ### Transactional emails (in the recipient's language)
 
 The platform sends order confirmations and order summaries, never invoices or receipts. Each
@@ -170,3 +177,4 @@ webhooks, quotes about to expire).
 | ORD.8 | Online withdrawal and returns flow | P1 | 12 | PAY.4, CMP.6, ARC.16 | Withdrawal button "withdraw from contract here" (IT "recedere dal contratto qui") visible for the whole withdrawal period, confirmation "confirm withdrawal" (IT "conferma recesso"), acknowledgement email with content, date and time |
 | ORD.9 | Transactional emails per language (customer, vendor, staff); per-vendor order confirmation as a non-fiscal document | P1 | 10 | ORD.2, ARC.16 | All emails in EN, IT, DE, FR and ES with snapshot tests; the order confirmation (email and PDF) is per vendor, labelled "Documento non fiscale / Non-fiscal document" in all five languages, carries the order reference and never an invoice number, and no email or document calls itself an invoice or receipt |
 | ORD.10 | Checkout and payments kill-switch, alert on payment without transfer | P1 | 4 | ARC.8, PAY.3 | Kill-switch verified on STAGE |
+| ORD.11 | Customer account: preferences and request history (scope to be defined with the owner): one section listing the customer's product information and quote requests and holding preferences such as followed vendors and event notifications; placeholder, hours to be re-estimated once the scope is agreed | P2 | 4 | ORD.7, SHP.10 | The owner has agreed the scope, this row is re-estimated and the section is detailed in §7.2 before any code is written |
