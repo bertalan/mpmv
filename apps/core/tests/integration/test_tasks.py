@@ -28,6 +28,7 @@ from apps.core.tasks import (
     run_worker,
     task,
 )
+from apps.core.tests.factories import HeartbeatFactory
 
 ROME = ZoneInfo("Europe/Rome")
 QUEUE_TABLES = (
@@ -239,6 +240,19 @@ def test_each_heartbeat_updates_a_single_row() -> None:
     assert beat.beats == 2
     assert beat.scheduled_for == second
     assert beat.last_beat_at is not None
+
+
+@pytest.mark.django_db
+def test_a_heartbeat_continues_the_count_of_an_existing_row() -> None:
+    earlier = HeartbeatFactory.create(name="core.heartbeat", beats=41)
+    tick = dt.datetime(2026, 11, 7, 10, 0, tzinfo=ROME)
+
+    heartbeat(timestamp=int(tick.timestamp()))
+
+    beat = Heartbeat.objects.get(name="core.heartbeat")
+    assert beat.beats == 42
+    assert beat.last_beat_at > earlier.last_beat_at
+    assert beat.scheduled_for == tick
 
 
 @pytest.mark.django_db

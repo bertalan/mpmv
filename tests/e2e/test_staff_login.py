@@ -8,7 +8,7 @@ import pytest
 from playwright.sync_api import Page, expect
 from pytest_django.live_server_helper import LiveServer
 
-from apps.accounts.models import User
+from apps.accounts.tests.factories import UserFactory
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -17,7 +17,7 @@ def test_staff_logs_in_with_email(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
     password = secrets.token_urlsafe(16)  # generated: no credential literals in git
-    User.objects.create_superuser(email="staff@example.com", password=password)
+    UserFactory.create(email="staff@example.com", password=password, superuser=True)
     page.goto(f"{live_server.url}/django-admin/login/")
     expect(page.get_by_label("Email")).to_be_visible()
     page.get_by_label("Email").fill("staff@example.com")

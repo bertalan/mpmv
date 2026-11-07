@@ -1,26 +1,75 @@
-"""Test data builders for core models (synthetic values only)."""
+"""factory_boy factories for core models (ARC.12). Synthetic values only."""
 
 import datetime as dt
-from typing import Any
 
-from apps.core.models import PlatformOperator
+import factory
+from django.utils import timezone
+from factory.django import DjangoModelFactory
+
+from apps.core.models import AuditLog, Heartbeat, PlatformOperator
 
 
 def utc(year: int, month: int = 1, day: int = 1, hour: int = 0) -> dt.datetime:
     return dt.datetime(year, month, day, hour, tzinfo=dt.UTC)
 
 
-def operator(**overrides: Any) -> PlatformOperator:
-    """An unsaved PlatformOperator with synthetic, valid configuration."""
-    values: dict[str, Any] = {
-        "legal_name": "Example Marketplace Ltd",
-        "country": "AT",
-        "vat_number": "ATU00000000",
-        "tax_regime": PlatformOperator.TaxRegime.SMALL_BUSINESS,
-        "commission_vat_mode": PlatformOperator.CommissionVatMode.NONE,
-        "einvoice_channel": PlatformOperator.EInvoiceChannel.NONE,
-        "dac7_authority_country": "AT",
-        "valid_from": utc(2027),
-    }
-    values.update(overrides)
-    return PlatformOperator(**values)
+def _one_year_later(start: dt.datetime) -> dt.datetime:
+    try:
+        return start.replace(year=start.year + 1)
+    except ValueError:  # 29 February
+        return start.replace(year=start.year + 1, day=28)
+
+
+class HeartbeatFactory(DjangoModelFactory[Heartbeat]):
+    class Meta:
+        model = Heartbeat
+
+    name = factory.Sequence(lambda n: f"test.job.{n}")
+    beats = 1
+    last_beat_at = factory.LazyFunction(lambda: timezone.now() - dt.timedelta(minutes=5))
+    scheduled_for = None
+
+
+class AuditLogFactory(DjangoModelFactory[AuditLog]):
+    """An audit row as `apps.core.audit.record` writes it.
+
+    Services write the real ones; use this only for tests about the log itself (append-only
+    guards, listings). Rows are inserted once and never updated.
+    """
+
+    class Meta:
+        model = AuditLog
+
+    actor_id = factory.Sequence(lambda n: n + 1)
+    actor_label = factory.LazyAttribute(lambda o: f"staff:user{o.actor_id}@example.com")
+    source = AuditLog.Source.ADMIN
+    action = "test.record.updated"
+    target_model = "test.record"
+    target_key = factory.Sequence(lambda n: f"record-{n}")
+    before = factory.LazyFunction(lambda: {"value": 1})
+    after = factory.LazyFunction(lambda: {"value": 2})
+    ip = "127.0.0.1"
+
+
+class PlatformOperatorFactory(DjangoModelFactory[PlatformOperator]):
+    """A closed one-year configuration period; consecutive rows are adjacent, never overlapping.
+
+    `open_ended=True` gives the current, open-ended row. Pass explicit dates when a test is
+    about validity periods. For `configure_platform_operator`, use `.build()`: the service saves.
+    """
+
+    class Meta:
+        model = PlatformOperator
+
+    class Params:
+        open_ended = factory.Trait(valid_to=None)
+
+    legal_name = factory.Faker("company")
+    country = "AT"
+    vat_number = factory.Sequence(lambda n: f"ATU{n:08d}")
+    tax_regime = PlatformOperator.TaxRegime.SMALL_BUSINESS
+    commission_vat_mode = PlatformOperator.CommissionVatMode.NONE
+    einvoice_channel = PlatformOperator.EInvoiceChannel.NONE
+    dac7_authority_country = "AT"
+    valid_from = factory.Sequence(lambda n: utc(2027 + n))
+    valid_to = factory.LazyAttribute(lambda o: _one_year_later(o.valid_from))

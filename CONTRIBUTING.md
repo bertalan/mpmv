@@ -39,6 +39,17 @@ functions, no database), `.../tests/integration` (real Django + PostgreSQL, no m
 `tests/e2e` (Playwright on a live server, with screenshots). Mock only external boundaries, and
 only through our own interfaces. Editor setup: [docs/dev/vscode.md](docs/dev/vscode.md).
 
+## Test data
+
+Tests build their data with [factory_boy](https://factoryboy.readthedocs.io/en/stable/). Each app
+keeps one `DjangoModelFactory` per model in `apps/<app>/tests/factories.py`; a new model needs a
+factory, and a test enforces it. Use `.build()` in unit tests (no database) and `.create()`
+elsewhere, and pass explicitly the values a test asserts on. Faker runs with a fixed seed that is
+reset before every test (`MPMV_TEST_SEED` changes it), so failures are reproducible. Data is
+synthetic only: pseudonyms like "Vendor A", `example.com` addresses, never real people or
+vendors. No credential-like literals: generate passwords and keys at runtime with
+`secrets.token_urlsafe()`. Details in [ADR-0006](docs/adr/0006-testing-strategy.md).
+
 ## Commits
 
 - Imperative mood, ≤72-character subject, task ID as a prefix: `ARC.6: add MoneyField with ROUND_HALF_UP per line`.

@@ -8,7 +8,7 @@ import pytest
 from playwright.sync_api import Page, expect
 from pytest_django.live_server_helper import LiveServer
 
-from apps.accounts.models import User
+from apps.accounts.tests.factories import UserFactory
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -30,7 +30,7 @@ def test_admin_works_under_strict_csp(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
     password = secrets.token_urlsafe(16)  # generated: no credential literals in git
-    User.objects.create_superuser(email="staff@example.com", password=password)
+    UserFactory.create(email="staff@example.com", password=password, superuser=True)
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
     response = page.goto(f"{live_server.url}/django-admin/login/")

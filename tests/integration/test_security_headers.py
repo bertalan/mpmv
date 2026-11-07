@@ -17,7 +17,7 @@ from typing import Any
 import pytest
 from django.test import Client, override_settings
 
-from apps.accounts.models import User
+from apps.accounts.tests.factories import UserFactory
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
@@ -128,7 +128,7 @@ def test_live_csrf_cookie_is_secure_httponly_and_samesite(live_client: Client) -
 @pytest.mark.django_db
 def test_live_session_cookie_is_secure_httponly_and_samesite(live_client: Client) -> None:
     password = secrets.token_urlsafe(16)  # generated: no credential literals in git
-    User.objects.create_superuser(email="staff@example.com", password=password)
+    UserFactory.create(email="staff@example.com", password=password, superuser=True)
     response = live_client.post(
         "/django-admin/login/",
         {"username": "staff@example.com", "password": password},

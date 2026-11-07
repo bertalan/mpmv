@@ -3,24 +3,20 @@
 - **Status:** Accepted
 - **Date:** 2026-11-07
 - **Deciders:** project owner, tech lead
-- **Backlog:** ARC.11, ARC.4
+- **Backlog:** ARC.11, ARC.4, ARC.12
 
 ## Context
 
-The project owner asked for TDD, modelled on the Fabric (Minecraft modding) approach to automatic
-testing (https://docs.fabricmc.net/develop/automatic-testing). Its principles carry over to a
-Django marketplace:
+The project owner asked for TDD, with test data built by factory_boy
+(https://factoryboy.readthedocs.io/en/stable/). The strategy rests on a few principles:
 
-- **Test against the real runtime, not mocks.** Fabric loads tests through its own runtime and
-  starts a real client and server for game tests. For us, that means the real Django stack on a
-  real PostgreSQL.
-- **Separate suites for separate concerns.** Fabric splits unit tests from server game tests and
-  client game tests, and gives game tests their own source set.
-- **Bootstrap only what a test needs.** Fabric bootstraps just enough of the game for registries.
-  Our pure engines run with no database at all.
-- **Explicit assertions.** Tests check concrete values and finish in a known state.
-- **Diagnosable failures.** Fabric uploads reports when a build fails and always uploads
-  client-test screenshots.
+- Test against the real runtime, not mocks: the real Django stack on a real PostgreSQL.
+- Separate suites for separate concerns: pure logic, the integrated application, and user
+  journeys in a browser.
+- Bootstrap only what a test needs: pure engines run with no database at all.
+- Explicit assertions: tests check concrete values and finish in a known state.
+- Diagnosable failures: reports are kept when a build fails, and e2e screenshots are always kept.
+- Reproducible data: every test builds its own synthetic data from factories with a fixed seed.
 
 ## Decision
 
@@ -35,19 +31,37 @@ Every task follows red → green → refactor:
 
 ### Three suites
 
-| Suite | Fabric analogue | What it covers | Database | Location | Marker |
-|---|---|---|---|---|---|
-| **unit** | Fabric Loader JUnit | Pure functions (`engine.py`), value objects, validators | **Forbidden** | `apps/<app>/tests/unit/`, `tests/unit/` | `unit` |
-| **integration** | Server game tests | Services, models, constraints, views and API through the Django test client, real PostgreSQL | Real PostgreSQL | `apps/<app>/tests/integration/`, `tests/integration/` | `integration` |
-| **e2e** | Client game tests | User journeys in a real browser (Playwright) against a live server; a screenshot at every key step | Real PostgreSQL | `tests/e2e/` | `e2e` |
+| Suite | What it covers | Database | Location | Marker |
+|---|---|---|---|---|
+| **unit** | Pure functions (`engine.py`), value objects, validators | **Forbidden** | `apps/<app>/tests/unit/`, `tests/unit/` | `unit` |
+| **integration** | Services, models, constraints, views and API through the Django test client, real PostgreSQL | Real PostgreSQL | `apps/<app>/tests/integration/`, `tests/integration/` | `integration` |
+| **e2e** | User journeys in a real browser (Playwright) against a live server; a screenshot at every key step | Real PostgreSQL | `tests/e2e/` | `e2e` |
 
 - The directory decides the marker. A root `conftest.py` assigns it, so no test is left unclassified.
 - Unit tests that touch the database fail: pytest-django blocks access without `django_db`, and
   the unit suite never uses that marker.
 - Test files mirror the module under test: `apps/tax/engine.py` → `apps/tax/tests/unit/test_engine.py`.
-- Shared test data comes from factories and the synthetic seed (ARC.10), never from LIVE dumps.
 - Mocks are allowed only at external boundaries (Stripe, VIES, email provider, supplier sites),
   and only through the interfaces we own (ADR-0003). Recorded fixtures are preferred to hand-written mocks.
+
+### Test data (ARC.12)
+
+- Tests build their data with factory_boy: one `DjangoModelFactory` per model, in
+  `apps/<app>/tests/factories.py`. A test in `tests/unit/test_factories.py` fails when a model
+  has no factory or a factory is not used by any test.
+- Unit tests use `.build()`, which never touches the database; integration and e2e tests use
+  `.create()`. Tests pass the values they assert on explicitly and leave the rest to the factory.
+- Faker and factory_boy are reseeded with a fixed seed before every test, and factory sequences
+  restart, so a failing test replays with the same data whatever ran before it. The seed is
+  printed in the pytest header and can be changed with `MPMV_TEST_SEED`.
+- Data is synthetic: pseudonyms such as "Vendor A", `example.com` addresses, Faker text. Never
+  real vendors, customers or LIVE dumps. The synthetic seed for local and STAGE data (ARC.10)
+  is expected to reuse these factories.
+- No credential-like literals: passwords and API keys are generated at runtime with
+  `secrets.token_urlsafe()` or the app's own key generator.
+- pytest fixtures wrap factories only when they save real repetition across apps, such as the
+  `superuser` fixture in the root `conftest.py`. pytest-factoryboy is not used: explicit
+  factory calls keep each test's data visible in the test.
 
 ### Commands
 

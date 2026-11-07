@@ -8,7 +8,7 @@ import pytest
 from playwright.sync_api import Page, expect
 from pytest_django.live_server_helper import LiveServer
 
-from apps.accounts.models import User
+from apps.accounts.tests.factories import UserFactory
 from apps.core.models import AuditLog
 from apps.vendors.models import Vendor
 
@@ -19,7 +19,7 @@ def test_staff_create_vendor_and_start_onboarding(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
     password = secrets.token_urlsafe(16)  # generated: no credential literals in git
-    User.objects.create_superuser(email="staff@example.com", password=password)
+    UserFactory.create(email="staff@example.com", password=password, superuser=True)
     page.goto(f"{live_server.url}/django-admin/login/")
     page.get_by_label("Email").fill("staff@example.com")
     page.get_by_label("Password").fill(password)

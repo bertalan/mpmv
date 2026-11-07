@@ -1,13 +1,12 @@
 """I18N.1: the language switcher keeps the current page and remembers a signed-in user's choice."""
 
-import secrets
-
 import pytest
 from django.test import Client, override_settings
 from django.urls import reverse
 
 from apps.accounts.models import User
 from apps.accounts.services import set_preferred_language
+from apps.accounts.tests.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -68,7 +67,7 @@ def test_switcher_only_accepts_post(client: Client) -> None:
 
 
 def test_switcher_remembers_the_choice_of_a_signed_in_user(client: Client) -> None:
-    user = User.objects.create_user(email="anna@example.com", password=secrets.token_urlsafe(16))
+    user = UserFactory.create()
     client.force_login(user)
     assert _switch(client, "de", "/it/") == "/de/"
     user.refresh_from_db()
@@ -81,9 +80,7 @@ def test_switcher_works_for_anonymous_visitors_without_storing_anything(client: 
 
 
 def test_an_explicit_prefix_wins_over_the_preferred_language(client: Client) -> None:
-    user = User.objects.create_user(
-        email="hans@example.com", password=secrets.token_urlsafe(16), preferred_language="de"
-    )
+    user = UserFactory.create(preferred_language="de")
     client.force_login(user)
     response = client.get("/it/")
     assert response.status_code == 200
@@ -91,7 +88,7 @@ def test_an_explicit_prefix_wins_over_the_preferred_language(client: Client) -> 
 
 
 def test_set_preferred_language_dry_run_returns_the_change_without_saving() -> None:
-    user = User.objects.create_user(email="luca@example.com", password=secrets.token_urlsafe(16))
+    user = UserFactory.create()
     changeset = set_preferred_language(user, "it", dry_run=True)
     assert changeset.summary() == {"create": 0, "update": 1, "delete": 0}
     assert changeset.changes[0].fields == {"preferred_language": ("en", "it")}
@@ -100,7 +97,7 @@ def test_set_preferred_language_dry_run_returns_the_change_without_saving() -> N
 
 
 def test_set_preferred_language_saves_and_is_a_no_op_when_unchanged() -> None:
-    user = User.objects.create_user(email="mia@example.com", password=secrets.token_urlsafe(16))
+    user = UserFactory.create()
     assert not set_preferred_language(user, "de").is_empty
     user.refresh_from_db()
     assert user.preferred_language == "de"
@@ -108,6 +105,6 @@ def test_set_preferred_language_saves_and_is_a_no_op_when_unchanged() -> None:
 
 
 def test_set_preferred_language_rejects_unconfigured_languages() -> None:
-    user = User.objects.create_user(email="max@example.com", password=secrets.token_urlsafe(16))
+    user = UserFactory.create()
     with pytest.raises(ValueError, match="xx"):
         set_preferred_language(user, "xx")
