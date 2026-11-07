@@ -97,11 +97,15 @@ class Vendor(BaseModel):
         """Storefront texts to show in `language`: published, or EN with a fallback flag."""
         return resolve_translation(self.translations.all(), language)
 
-    def save(self, *args: Any, **kwargs: Any) -> None:
+    def normalize(self) -> None:
+        """Fill what `save` would derive (slug, empty address), so audits see stored values."""
         if not self.slug:
             self.slug = engine.unique_slug(self.display_name, taken=_TakenSlugs(self.pk))
         if self.registered_address is None:  # a cleared form field gives None; column is NOT NULL
             self.registered_address = {}
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        self.normalize()
         super().save(*args, **kwargs)
 
 

@@ -1,29 +1,26 @@
-"""Staff admin for vendors and their translations (Wagtail admin replaces this in CORE.8)."""
+"""Staff admin for vendors and their translations (Wagtail admin replaces this in CORE.8).
+
+Vendor writes go through the audited services (SEC.4); the change page links to the vendor's
+audit trail.
+"""
 
 from collections.abc import Callable
+from typing import Any
 
 from django.contrib import admin, messages
 from django.db.models import QuerySet
 from django.http import HttpRequest
+from django.urls import reverse
+from django.utils.html import format_html
+from django.utils.safestring import SafeString
 
-from apps.core.audit import AuditContext
-from apps.core.http import client_ip
+from apps.core.audit import audit_context
 
 from . import engine
 from .models import Vendor, VendorStatus, VendorTranslation
-from .services import change_status
+from .services import change_status, delete_vendor, save_vendor
 
 StatusAction = Callable[[admin.ModelAdmin[Vendor], HttpRequest, QuerySet[Vendor]], None]
-
-
-def audit_context(request: HttpRequest) -> AuditContext:
-    user = request.user
-    return AuditContext(
-        actor_id=user.pk,
-        actor_label=f"staff:{user.get_username()}",
-        source="admin",
-        ip=client_ip(request),
-    )
 
 
 def status_action(target: VendorStatus) -> StatusAction:
@@ -72,9 +69,9 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
     list_display = ("display_name", "legal_name", "status", "country", "contact_email")
     list_filter = ("status", "country", "sales_mode_default")
     search_fields = ("display_name", "legal_name", "slug", "vat_number", "contact_email")
-    readonly_fields = ("status", "public_id", "created_at", "updated_at")
+    readonly_fields = ("status", "public_id", "audit_trail", "created_at", "updated_at")
     fieldsets = (
-        (None, {"fields": ("display_name", "slug", "status", "public_id")}),
+        (None, {"fields": ("display_name", "slug", "status", "public_id", "audit_trail")}),
         (
             "Legal and tax",
             {"fields": ("legal_name", "country", "vat_number", "tax_code", "registered_address")},
@@ -91,3 +88,21 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         for status in VendorStatus
         if any(status in targets for targets in engine.TRANSITIONS.values())
     )
+
+    @admin.display(description="Audit trail")
+    def audit_trail(self, obj: Vendor) -> SafeString | str:
+        if obj.pk is None:
+            return "-"
+        url = f"{reverse('admin:core_auditlog_changelist')}?vendor={obj.public_id}"
+        return format_html('<a href="{}">Changes to this vendor</a>', url)
+
+    def save_model(self, request: HttpRequest, obj: Vendor, form: Any, change: bool) -> None:
+        save_vendor(obj, ctx=audit_context(request))
+
+    def delete_model(self, request: HttpRequest, obj: Vendor) -> None:
+        delete_vendor(obj, ctx=audit_context(request))
+
+    def delete_queryset(self, request: HttpRequest, queryset: QuerySet[Vendor]) -> None:
+        ctx = audit_context(request)
+        for vendor in queryset:
+            delete_vendor(vendor, ctx=ctx)

@@ -1,0 +1,22 @@
+{% load i18n %}
+<details data-filter-title="{{ title }}" open>
+  <summary>
+    {% blocktranslate with filter_title=title %} By {{ filter_title }} {% endblocktranslate %}
+  </summary>
+  {% for choice in choices %}
+    <form method="get" class="input-filter">
+      {% for name, value in choice.preserved %}
+        <input type="hidden" name="{{ name }}" value="{{ value }}">
+      {% endfor %}
+      <ul>
+        {% for name, label, kind, value in choice.inputs %}
+          <li>
+            <label for="input-filter-{{ name }}">{{ label }}</label>
+            <input type="{{ kind }}" id="input-filter-{{ name }}" name="{{ name }}" value="{{ value }}">
+          </li>
+        {% endfor %}
+        <li><button type="submit">{% translate "Filter" %}</button></li>
+      </ul>
+    </form>
+  {% endfor %}
+</details>

@@ -1,0 +1,27 @@
+{% extends "admin/change_form.html" %}
+{% comment %}SEC.4: what an audit entry changed, field by field, above the raw before/after.{% endcomment %}
+
+{% block field_sets %}
+  <fieldset class="module">
+    <h2>Changes</h2>
+    {% if audit_changes %}
+      <table>
+        <thead>
+          <tr><th scope="col">Field</th><th scope="col">Before</th><th scope="col">After</th></tr>
+        </thead>
+        <tbody>
+          {% for name, before, after in audit_changes %}
+            <tr>
+              <th scope="row">{{ name }}</th>
+              <td>{{ before|default_if_none:"—" }}</td>
+              <td>{{ after|default_if_none:"—" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No field values recorded.</p>
+    {% endif %}
+  </fieldset>
+  {{ block.super }}
+{% endblock %}

@@ -4,22 +4,7 @@ from django.conf import settings
 from django.http import HttpRequest
 from django.utils.http import url_has_allowed_host_and_scheme
 
-from apps.core.audit import AuditContext
-from apps.core.models import AuditLog
-
 from .engine import RelyingParty
-
-
-def audit_context(request: HttpRequest) -> AuditContext:
-    """Who acts on their own account, or on someone else's from the admin."""
-    user = request.user
-    staff = bool(getattr(user, "is_staff", False))
-    return AuditContext(
-        actor_id=user.pk,
-        actor_label=f"{'staff' if staff else 'user'}:{user.get_username()}",
-        source=AuditLog.Source.ADMIN if staff else AuditLog.Source.SYSTEM,
-        ip=request.META.get("REMOTE_ADDR"),
-    )
 
 
 def safe_next(request: HttpRequest, default: str = "/") -> str:

@@ -156,7 +156,7 @@ def test_the_admin_reset_needs_a_recent_verification(client: Client) -> None:
         {"action": "reset_mfa", "_selected_action": [target.pk]},
     )
     assert services.has_second_factor(target)
-    assert not AuditLog.objects.exists()
+    assert not AuditLog.objects.filter(action__startswith="accounts.mfa.").exists()
 
 
 def test_devices_cannot_be_created_from_the_admin(client: Client) -> None:

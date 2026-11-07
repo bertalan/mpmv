@@ -64,3 +64,24 @@ def test_to_dict_is_json_ready() -> None:
             }
         ],
     }
+
+
+def test_a_new_version_records_the_version_it_supersedes() -> None:
+    """Versioned configuration (operator, rates) is a new row; its audit shows the old one."""
+    cs = ChangeSet()
+    cs.create(
+        "tax.taxrate",
+        "IT-standard-2027",
+        {"rate": Decimal("23.00"), "country": "IT"},
+        supersedes={"rate": Decimal("22.00"), "country": "IT"},
+    )
+    (change,) = cs.changes
+    assert change.op == "create"
+    assert change.before == {"rate": Decimal("22.00"), "country": "IT"}
+    assert change.fields == {"rate": (Decimal("22.00"), Decimal("23.00"))}
+
+
+def test_a_plain_create_has_no_before() -> None:
+    cs = ChangeSet()
+    cs.create("tax.taxrate", "IT-standard", {"rate": Decimal("22.00")})
+    assert cs.changes[0].before is None

@@ -7,7 +7,7 @@ from typing import Any
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import F, Q
+from django.db.models import F, Model, Q
 from django.utils import timezone
 
 from .audit import AuditContext, record
@@ -19,7 +19,7 @@ from .validity import NoValidRow, OverlappingValidity, pick_valid
 
 def run_mutation(
     changeset: ChangeSet,
-    apply: Callable[[], None],
+    apply: Callable[[], object],
     *,
     ctx: AuditContext,
     action: str,
@@ -30,8 +30,46 @@ def run_mutation(
         return changeset
     with transaction.atomic():
         apply()
-        for change in changeset.changes:
-            record(ctx, action, change.model, change.key, change.before, change.after)
+        audit_changes(changeset, ctx=ctx, action=action)
+    return changeset
+
+
+def audit_changes(changeset: ChangeSet, *, ctx: AuditContext, action: str) -> None:
+    """One AuditLog entry per change. For changes already applied by the caller in the same
+    transaction (e.g. many-to-many fields saved by a form); otherwise use `run_mutation`."""
+    for change in changeset.changes:
+        record(ctx, action, change.model, change.key, change.before, change.after)
+
+
+def save_audited[M: Model](
+    instance: M,
+    snapshot: Callable[[M], dict[str, Any]],
+    *,
+    key: str,
+    ctx: AuditContext,
+    created: str,
+    updated: str,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Insert or update `instance`, auditing the fields `snapshot` exposes (SEC.4).
+
+    For an existing row, `before` is read from the database (row locked), never from the
+    edited instance. The row is saved even when no audited field changed, but only real
+    changes are audited.
+    """
+    label = instance._meta.label_lower
+    adding = instance._state.adding
+    changeset = ChangeSet()
+    with transaction.atomic():
+        if adding:
+            changeset.create(label, key, snapshot(instance))
+        else:
+            stored = type(instance)._default_manager.select_for_update().get(pk=instance.pk)
+            changeset.update(label, key, snapshot(stored), snapshot(instance))
+        if dry_run:
+            return changeset
+        instance.save()
+        audit_changes(changeset, ctx=ctx, action=created if adding else updated)
     return changeset
 
 
@@ -119,7 +157,12 @@ def configure_platform_operator(
             {"valid_to": None},
             {"valid_to": new.valid_from},
         )
-    changeset.create(OPERATOR_MODEL, str(new.public_id), operator_snapshot(new))
+    changeset.create(
+        OPERATOR_MODEL,
+        str(new.public_id),
+        operator_snapshot(new),
+        supersedes=operator_snapshot(latest) if latest is not None else None,
+    )
 
     def apply() -> None:
         if closing is not None:
