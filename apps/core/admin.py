@@ -23,9 +23,8 @@ from django.http import HttpRequest, HttpResponse
 from django.template.response import TemplateResponse
 from django.utils.module_loading import import_string
 
-from .audit import AuditContext
+from .audit import audit_context
 from .changeset import diff
-from .http import client_ip
 from .models import AuditLog, PlatformOperator
 from .services import check_operator_start, configure_platform_operator, latest_operator
 
@@ -77,13 +76,7 @@ class PlatformOperatorAdmin(admin.ModelAdmin[PlatformOperator]):
     def save_model(
         self, request: HttpRequest, obj: PlatformOperator, form: Any, change: bool
     ) -> None:
-        ctx = AuditContext(
-            actor_id=request.user.pk,
-            actor_label=f"staff:{request.user.get_username()}",
-            source=AuditLog.Source.ADMIN,
-            ip=client_ip(request),
-        )
-        configure_platform_operator(obj, ctx=ctx)
+        configure_platform_operator(obj, ctx=audit_context(request))
 
 
 # --- Audit log (SEC.4)

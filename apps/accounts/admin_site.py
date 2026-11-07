@@ -16,8 +16,9 @@ from django.http import HttpRequest, HttpResponse
 from django.template.response import TemplateResponse
 from django.urls import reverse
 
+from apps.core.audit import audit_context
+
 from . import services
-from .http import audit_context
 from .models import User
 
 

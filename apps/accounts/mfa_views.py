@@ -21,9 +21,11 @@ from django.utils.http import urlencode
 from django.views.decorators.http import require_http_methods, require_POST
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
+from apps.core.audit import audit_context
+
 from . import engine, services
 from .decorators import mfa_exempt, mfa_redirect, step_up_required
-from .http import audit_context, relying_party, safe_next
+from .http import relying_party, safe_next
 from .mfa_session import complete_verification, is_recently_verified
 from .models import PasskeyDevice, User
 

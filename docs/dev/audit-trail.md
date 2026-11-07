@@ -53,6 +53,9 @@ Failures refused during a lockout are not audited one by one: the lockout entry 
    AuditContext` and `dry_run`, builds a `ChangeSet` and applies it with `run_mutation` (or
    `save_audited` for a plain create-or-update). `tests/unit/test_audit_coverage.py` fails for
    a service that offers `dry_run` without `ctx`, unless it is listed there with the reason.
+   Views and admins build `ctx` with `apps.core.audit.audit_context(request)`, which records
+   the trusted-proxy client IP (`apps.core.http.client_ip`); do not write another helper. The
+   API builds its own context, because its actor is the API client.
 3. **Admins call those services.** The admin of an audited model overrides `save_model`,
    `delete_model` and `delete_queryset` (plus `save_related` for many-to-many fields and
    `save_formset` for audited inlines), or denies the permission. Otherwise the system check

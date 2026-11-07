@@ -14,24 +14,13 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
 
-from apps.core.audit import AuditContext
-from apps.core.http import client_ip
+from apps.core.audit import audit_context
 
 from . import engine
 from .models import Vendor, VendorStatus, VendorTranslation
 from .services import change_status, delete_vendor, save_vendor
 
 StatusAction = Callable[[admin.ModelAdmin[Vendor], HttpRequest, QuerySet[Vendor]], None]
-
-
-def audit_context(request: HttpRequest) -> AuditContext:
-    user = request.user
-    return AuditContext(
-        actor_id=user.pk,
-        actor_label=f"staff:{user.get_username()}",
-        source="admin",
-        ip=client_ip(request),
-    )
 
 
 def status_action(target: VendorStatus) -> StatusAction:

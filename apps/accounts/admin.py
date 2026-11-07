@@ -16,8 +16,9 @@ from django.db.models import QuerySet
 from django.http import HttpRequest
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
+from apps.core.audit import audit_context
+
 from . import services
-from .http import audit_context
 from .mfa_session import is_recently_verified
 from .models import User
 from .services import has_second_factor, reset_mfa

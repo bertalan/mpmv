@@ -10,7 +10,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from django.contrib.auth.base_user import AbstractBaseUser
+from django.contrib.auth.models import AnonymousUser
+from django.http import HttpRequest
+
 from .changeset import to_jsonable
+from .http import client_ip
 from .models import AuditLog
 
 # Snapshots of vendor-owned objects name their vendor under this key (its public id).
@@ -27,6 +32,25 @@ class AuditContext:
     actor_id: int | None = None
     ip: str | None = None
     request_id: str = ""
+
+
+def user_context(user: AbstractBaseUser | AnonymousUser, ip: str | None) -> AuditContext:
+    """`user` acting on their own account, or staff acting from the admin."""
+    staff = bool(getattr(user, "is_staff", False))
+    return AuditContext(
+        actor_id=user.pk,
+        actor_label=f"{'staff' if staff else 'user'}:{user.get_username()}",
+        source=AuditLog.Source.ADMIN if staff else AuditLog.Source.SYSTEM,
+        ip=ip,
+    )
+
+
+def audit_context(request: HttpRequest) -> AuditContext:
+    """Who acts, from a web request: the signed-in user and the client IP (CORE.5 rules).
+
+    The one helper for views and admins; the API builds its own (the actor is the API client).
+    """
+    return user_context(request.user, client_ip(request))
 
 
 def vendor_key_of(target_model: str, target_key: str, before: Any, after: Any) -> str:

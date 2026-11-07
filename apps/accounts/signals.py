@@ -6,9 +6,9 @@ from typing import Any
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.http import HttpRequest
 
+from apps.core.audit import user_context
 from apps.core.http import client_ip
 
-from .http import user_context
 from .models import User
 from .services import record_failed_login, record_successful_login
 

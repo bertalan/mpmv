@@ -7,12 +7,13 @@ the admins used the trusted-proxy client IP. Every request-based context now com
 
 import ast
 from pathlib import Path
+from typing import Any
 
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth import get_user_model
+from django.contrib.auth.base_user import AbstractBaseUser
 from django.http import HttpRequest
 from django.test import RequestFactory, override_settings
 
-from apps.accounts.models import User
 from apps.core.audit import audit_context, user_context
 
 PROXY = "10.89.250.2"
@@ -21,15 +22,15 @@ BEHIND_PROXY = {"TRUSTED_PROXY_HEADER": "X-Real-IP", "TRUSTED_PROXIES": ["10.89.
 APPS = Path(__file__).resolve().parents[3]
 
 
-def request_as(user: User | AnonymousUser, remote_addr: str, client: str = CLIENT) -> HttpRequest:
+def request_as(user: Any, remote_addr: str, client: str = CLIENT) -> HttpRequest:
     request = RequestFactory().post("/", headers={"X-Real-IP": client})
     request.META["REMOTE_ADDR"] = remote_addr
     request.user = user
     return request
 
 
-def unsaved_user(*, staff: bool) -> User:
-    user = User(email="someone@example.test", is_staff=staff)
+def unsaved_user(*, staff: bool) -> AbstractBaseUser:
+    user = get_user_model()(email="someone@example.test", is_staff=staff)
     user.pk = 7
     return user
 

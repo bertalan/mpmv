@@ -10,8 +10,9 @@ import django_otp
 from django.conf import settings
 from django.http import HttpRequest
 
+from apps.core.audit import audit_context
+
 from . import engine, services
-from .http import audit_context
 
 VERIFIED_AT_SESSION_KEY = "mfa_verified_at"
 
