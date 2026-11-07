@@ -34,7 +34,7 @@ def backfill(apps: Any, schema_editor: Any) -> None:
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('vendors', '0001_initial'),
+        ('vendors', '0002_vendormember'),
     ]
 
     operations = [

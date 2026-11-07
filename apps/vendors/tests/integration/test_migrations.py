@@ -11,7 +11,7 @@ from django.db.migrations.executor import MigrationExecutor
 from apps.core.translations import PUBLISHED, source_hash
 from apps.vendors.models import VendorTranslation
 
-BEFORE = [("vendors", "0001_initial")]
+BEFORE = [("vendors", "0002_vendormember")]
 
 TEXTS = ("tagline", "description", "shipping_policy", "refund_policy", "cancellation_policy")
 
