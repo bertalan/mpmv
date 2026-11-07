@@ -1,5 +1,7 @@
 # MPMV (Marketplace Multi Vendor)
 
+[![CI](https://github.com/bertalan/mpmv/actions/workflows/ci.yml/badge.svg)](https://github.com/bertalan/mpmv/actions/workflows/ci.yml)
+
 A vertical-agnostic multivendor marketplace built as a Django + Wagtail modular monolith on
 PostgreSQL. It replaces a WordPress + WooCommerce + WCFM + WPML stack.
 
