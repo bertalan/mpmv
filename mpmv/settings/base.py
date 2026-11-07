@@ -85,8 +85,10 @@ AUTHENTICATION_BACKENDS = [
 
 # Multi-factor authentication (CORE.4, spec 02 §2.2). Staff and superusers must verify a second
 # factor (TOTP or passkey) before any page; each dotted path below names an extra
-# `check(user) -> bool` that makes MFA mandatory for more roles (vendor owners: CORE.2).
-MFA_REQUIRED_POLICIES: list[str] = []
+# `check(user) -> bool` that makes MFA mandatory for more roles.
+MFA_REQUIRED_POLICIES: list[str] = [
+    "apps.vendors.services.owns_a_vendor",  # vendor owners (CORE.2)
+]
 MFA_STEP_UP_MAX_AGE = 300  # seconds a verification counts as fresh for sensitive actions
 MFA_LOGIN_URL = "admin:login"  # until the site and vendor login pages exist
 MFA_ISSUER = "MPMV"  # name shown in authenticator apps and passkey prompts

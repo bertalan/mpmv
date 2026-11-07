@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from django.contrib.auth.base_user import AbstractBaseUser
+from django.contrib.auth.models import AnonymousUser
 from django.db import transaction
 
 from apps.accounts.models import User
@@ -172,3 +174,14 @@ def has_vendor_permission(user: User, vendor: Vendor, action: str) -> bool:
         return False
     role = member_role(user, vendor)
     return role is not None and engine.is_allowed(role, checked)
+
+
+def owns_a_vendor(user: AbstractBaseUser | AnonymousUser) -> bool:
+    """Whether `user` is an owner of at least one vendor.
+
+    Listed in `settings.MFA_REQUIRED_POLICIES`: vendor owners must use MFA (CORE.4). Vendor
+    staff members are not required to.
+    """
+    if not user.is_authenticated:
+        return False
+    return VendorMember.objects.filter(user_id=user.pk, role=engine.OWNER).exists()

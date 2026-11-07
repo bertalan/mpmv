@@ -29,7 +29,10 @@ def test_superusers_must_use_mfa() -> None:
     assert mfa_required(UserFactory.build(superuser=True)) is True
 
 
-def test_customers_do_not_need_mfa_by_default() -> None:
+def test_customers_do_not_need_mfa_without_extra_policies(settings: SettingsWrapper) -> None:
+    # The installed vendor-owner policy reads the database: tested in
+    # apps/vendors/tests/integration/test_owner_mfa.py.
+    settings.MFA_REQUIRED_POLICIES = []
     assert mfa_required(UserFactory.build()) is False
 
 

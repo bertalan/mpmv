@@ -207,7 +207,7 @@ def mfa_required(user: AbstractBaseUser | AnonymousUser) -> bool:
     """Whether `user` must verify a second factor before using the site or the admin.
 
     Staff and superusers always must. Each dotted path in `settings.MFA_REQUIRED_POLICIES`
-    names a `check(user) -> bool` that adds more roles (vendor owners arrive with CORE.2);
+    names a `check(user) -> bool` that adds more roles (vendor owners: `owns_a_vendor`);
     extra checks can only add requirements, never lift them.
     """
     if not user.is_authenticated:
