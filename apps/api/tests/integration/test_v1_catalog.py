@@ -31,7 +31,7 @@ def attributes() -> dict[str, Attribute]:
 
 @pytest.fixture
 def vendor() -> Vendor:
-    return VendorFactory.create()
+    return VendorFactory.create(status=Vendor.Status.ACTIVE)  # only an active vendor's key writes
 
 
 def _headers(vendor: Vendor | None, scopes: list[str] = SCOPES) -> dict[str, str]:

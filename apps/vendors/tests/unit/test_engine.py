@@ -4,6 +4,7 @@ The registered address is structured fields since VEN.12 (test_engine_legal_iden
 """
 
 import pytest
+from django.core.exceptions import PermissionDenied
 
 from apps.vendors import engine
 from apps.vendors.engine import (
@@ -107,3 +108,23 @@ def test_slug_respects_the_maximum_length_including_the_suffix() -> None:
     second = unique_slug(name, taken={first}, max_length=20)
     assert second == "x" * 18 + "-2"
     assert len(second) == 20
+
+
+# --- Writes through a vendor's API keys (CORE.14)
+
+
+def test_an_active_vendor_can_write() -> None:
+    engine.check_can_write(engine.ACTIVE)
+
+
+@pytest.mark.parametrize(
+    "status", [engine.APPLICANT, engine.ONBOARDING, engine.SUSPENDED, engine.CLOSED]
+)
+def test_a_vendor_that_is_not_active_cannot_write(status: str) -> None:
+    with pytest.raises(engine.VendorCannotWrite) as refused:
+        engine.check_can_write(status)
+    assert refused.value.status == status
+
+
+def test_a_refused_vendor_write_is_a_permission_denial() -> None:
+    assert issubclass(engine.VendorCannotWrite, PermissionDenied)
