@@ -184,6 +184,7 @@ def _deploy_check(module: str, **extra: str) -> subprocess.CompletedProcess[str]
         "DJANGO_SECRET_KEY": secrets.token_urlsafe(64),
         "DJANGO_ALLOWED_HOSTS": "shop.example.com",
         "DATABASE_URL": "postgres://mpmv@127.0.0.1:55432/mpmv",
+        "MPMV_BASE_URL": "https://shop.example.com",
         **extra,
     }
     return subprocess.run(
@@ -203,6 +204,18 @@ def test_deploy_check_passes(module: str) -> None:
         module, MPMV_TRUSTED_PROXY_HEADER="X-Real-IP", MPMV_TRUSTED_PROXIES="10.89.250.0/24"
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_deploy_check_fails_without_the_public_base_url() -> None:
+    """CMS.1: Wagtail's admin emails would link to localhost."""
+    result = _deploy_check(
+        "mpmv.settings.live",
+        MPMV_TRUSTED_PROXY_HEADER="X-Real-IP",
+        MPMV_TRUSTED_PROXIES="10.89.250.0/24",
+        MPMV_BASE_URL="",
+    )
+    assert result.returncode != 0
+    assert "cms.E001" in result.stdout + result.stderr
 
 
 def test_deploy_check_warns_without_a_trusted_proxy_header() -> None:

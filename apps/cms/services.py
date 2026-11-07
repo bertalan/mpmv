@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser, PermissionsMixin
-from django.db import transaction
+from django.db import DEFAULT_DB_ALIAS, transaction
 from django.utils.text import slugify
 from wagtail.models import Locale, Page, Site
 
@@ -21,16 +21,17 @@ from .seed import PageText, seed_text
 CMS_ADMIN_PERMISSION = "wagtailadmin.access_admin"
 
 
-def sync_locales() -> list[str]:
+def sync_locales(using: str = DEFAULT_DB_ALIAS) -> list[str]:
     """Create the Locale of every language in settings.LANGUAGES that has none yet.
 
-    Runs after every `migrate` (CmsConfig.ready), so adding a language is a settings entry.
-    Locales of languages removed from settings are kept: their pages may still exist.
-    Returns the language codes created.
+    Runs after every `migrate` (CmsConfig.ready) on the database that was migrated, so adding a
+    language is a settings entry. Locales of languages removed from settings are kept: their
+    pages may still exist. Returns the language codes created.
     """
-    existing = set(Locale.objects.values_list("language_code", flat=True))
+    locales = Locale.objects.using(using)
+    existing = set(locales.values_list("language_code", flat=True))
     missing = [code for code in configured_languages() if code not in existing]
-    Locale.objects.bulk_create([Locale(language_code=code) for code in missing])
+    locales.bulk_create([Locale(language_code=code) for code in missing])
     return missing
 
 
@@ -115,26 +116,49 @@ def _translated[P: Page](source: P, locale: Locale, text: PageText, report: Seed
     return page
 
 
-def _ensure_menus(locale: Locale, home: HomePage, about: StandardPage, report: SeedReport) -> None:
+def _ensure_menus(
+    locale: Locale,
+    home: HomePage,
+    about: StandardPage,
+    report: SeedReport,
+    *,
+    sources: dict[str, NavigationMenu] | None = None,
+) -> dict[str, NavigationMenu]:
+    """The header and footer menus of `locale`, by location, created when missing.
+
+    A new menu with a menu in `sources` for its location becomes its translation (same
+    `translation_key`), as an editor's "translate" would make it.
+    """
     layouts: dict[str, list[Page]] = {
         NavigationMenu.Location.HEADER: [about],
         NavigationMenu.Location.FOOTER: [home, about],
     }
+    menus: dict[str, NavigationMenu] = {}
     for location, pages in layouts.items():
-        if NavigationMenu.objects.filter(locale=locale, location=location).exists():
-            continue
-        links = [("page", {"page": page, "label": ""}) for page in pages]
-        NavigationMenu.objects.create(locale=locale, location=location, links=links)
-        report.created.append(f"{locale.language_code} {location} menu")
+        menu = NavigationMenu.objects.filter(locale=locale, location=location).first()
+        if menu is None:
+            menu = NavigationMenu(
+                locale=locale,
+                location=location,
+                links=[("page", {"page": page, "label": ""}) for page in pages],
+            )
+            source = (sources or {}).get(location)
+            if source is not None:
+                menu.translation_key = source.translation_key
+            menu.save()
+            report.created.append(f"{locale.language_code} {location} menu")
+        menus[location] = menu
+    return menus
 
 
 @transaction.atomic
 def seed_site() -> SeedReport:
     """Make sure every configured language has a home, an About page and its two menus.
 
-    Idempotent: only what is missing is created, and existing pages are never changed. The
-    primary-language pages are created first; the other languages are Wagtail translations of
-    them (same `translation_key`), with the sample texts of `apps.cms.seed`.
+    Idempotent: only what is missing is created, and existing pages and menus are never
+    changed. The primary-language pages and menus are created first; the other languages get
+    Wagtail translations of them (same `translation_key`), with the sample texts of
+    `apps.cms.seed`.
     """
     report = SeedReport()
     sync_locales()
@@ -148,7 +172,7 @@ def seed_site() -> SeedReport:
         home.add_child(instance=about)
         about = _publish(about)
         report.created.append(f"{primary.language_code} StandardPage {about.url_path}")
-    _ensure_menus(primary, home, about, report)
+    primary_menus = _ensure_menus(primary, home, about, report)
 
     for code in configured_languages():
         if code == primary.language_code:
@@ -157,5 +181,5 @@ def seed_site() -> SeedReport:
         texts = seed_text(code)
         local_home = _translated(home, locale, texts.home, report)
         local_about = _translated(about, locale, texts.about, report)
-        _ensure_menus(locale, local_home, local_about, report)
+        _ensure_menus(locale, local_home, local_about, report, sources=primary_menus)
     return report

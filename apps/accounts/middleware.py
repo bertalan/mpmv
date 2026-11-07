@@ -2,9 +2,9 @@
 
 Runs after `django_otp.middleware.OTPMiddleware`. A signed-in user who must use MFA (see
 `services.mfa_required`), or who enrolled a factor voluntarily, and whose session is not
-verified yet can only reach views marked `@mfa_exempt` (the MFA pages) and the admin logout.
-Everything else redirects to enrolment (no confirmed factor yet) or verification; JSON
-clients get 403.
+verified yet can only reach views marked `@mfa_exempt` (the MFA pages) and the sign-out of the
+Django and Wagtail admins. Everything else redirects to enrolment (no confirmed factor yet) or
+verification; JSON clients get 403.
 """
 
 from collections.abc import Callable
@@ -17,7 +17,8 @@ from .decorators import MFA_EXEMPT_ATTR, mfa_redirect
 from .mfa_session import is_verified
 from .services import has_second_factor, mfa_required
 
-EXEMPT_VIEW_NAMES = frozenset({"admin:logout"})
+# Signing out is always possible: the staff admin's and the editors' (Wagtail, CMS.1).
+EXEMPT_VIEW_NAMES = frozenset({"admin:logout", "wagtailadmin_logout"})
 
 
 class MfaRequiredMiddleware:

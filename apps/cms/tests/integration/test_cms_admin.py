@@ -11,13 +11,14 @@ import pytest
 from django.contrib.auth.models import Group
 from django.test import Client
 from django.urls import NoReverseMatch, reverse
+from wagtail.models import Page
 from wagtail.users.models import UserProfile
 
 from apps.accounts.models import User
 from apps.accounts.services import mfa_required
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
-from apps.cms.models import NavigationMenu
+from apps.cms.models import HomePage, NavigationMenu
 from apps.cms.services import SeedReport, can_access_cms_admin
 
 pytestmark = pytest.mark.django_db
@@ -46,6 +47,18 @@ def test_a_verified_staff_member_edits_pages(client: Client, seeded: SeedReport)
     assert client.get("/admin/").status_code == 200
     assert client.get("/admin/pages/").status_code == 200
     assert client.get("/admin/snippets/cms/navigationmenu/").status_code == 200
+
+
+def test_the_admin_refuses_a_second_home_page_in_a_language(client: Client) -> None:
+    verified_login(client, UserFactory.create(superuser=True))
+    root = Page.get_first_root_node()
+    url = reverse("wagtailadmin_pages:add", args=("cms", "homepage", root.pk))
+    response = client.post(
+        f"{url}?locale=en", {"title": "Second home", "slug": "second-home", "body-count": "0"}
+    )
+    assert response.status_code == 200  # the form again, with the error
+    assert "This language already has a home page." in response.content.decode()
+    assert HomePage.objects.filter(locale__language_code="en").count() == 1
 
 
 def test_wagtail_editors_must_use_mfa_even_without_staff_status() -> None:

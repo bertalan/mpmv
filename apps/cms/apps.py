@@ -1,6 +1,7 @@
 from typing import Any
 
 from django.apps import AppConfig
+from django.core import checks
 from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.models.signals import post_migrate
 
@@ -8,11 +9,11 @@ from django.db.models.signals import post_migrate
 def _sync_locales(using: str = DEFAULT_DB_ALIAS, **kwargs: Any) -> None:
     from wagtail.models import Locale
 
-    from .services import sync_locales
+    from . import services
 
     # A partial migrate (an older target) may not have created Wagtail's tables yet.
     if Locale._meta.db_table in connections[using].introspection.table_names():
-        sync_locales()
+        services.sync_locales(using=using)
 
 
 class CmsConfig(AppConfig):
@@ -32,6 +33,9 @@ class CmsConfig(AppConfig):
     }
 
     def ready(self) -> None:
+        from .checks import check_base_url
+
+        checks.register(check_base_url, deploy=True)
         # After every migrate (and every test database flush): one Locale per configured
         # language, so adding a language to settings.LANGUAGES needs no migration (spec 09).
         post_migrate.connect(_sync_locales, sender=self, dispatch_uid="cms.sync_locales")

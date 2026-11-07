@@ -14,7 +14,7 @@ from django.db.models import F, Model, Q
 from django.utils import timezone
 
 from . import crypto, encryption, flags
-from .audit import AuditContext, record
+from .audit import VENDOR_MODEL, AuditContext, record
 from .changeset import ChangeSet
 from .models import VENDOR_OVERRIDES, FeatureFlag, Heartbeat, PlatformOperator, Throttle
 from .throttling import BackoffPolicy, ThrottleState, after_failure
@@ -211,7 +211,11 @@ def flag_enabled(name: str, vendor: Model | None = None) -> bool:
     `if not flag_enabled(flags.CHECKOUT, vendor=vendor): refuse`. Raises `UnknownFlag` for a name
     nobody registered. Stored switches are cached per process for
     `settings.FEATURE_FLAGS_CACHE_SECONDS`, so a change reaches every process within that time.
+    Raises `TypeError` when `vendor` is not a `Vendor`: overrides are keyed by the vendor's
+    primary key, so another model's would read some vendor's override.
     """
+    if vendor is not None and vendor._meta.label_lower != VENDOR_MODEL:
+        raise TypeError(f"vendor must be a {VENDOR_MODEL}, got a {vendor._meta.label_lower}")
     spec = flags.spec_of(name)
     snapshot = FLAG_CACHE.get(load_flags, ttl=settings.FEATURE_FLAGS_CACHE_SECONDS)
     return snapshot.enabled(

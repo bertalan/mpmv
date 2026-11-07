@@ -39,6 +39,25 @@ def test_flag_names_are_lowercase_identifiers() -> None:
             flags.FlagSpec(bad, "Bad name.")
 
 
+def test_flags_registered_while_the_apps_load_pass_the_registration_check() -> None:
+    assert flags.check_flag_registration(None) == []
+
+
+def test_a_flag_registered_after_the_apps_loaded_fails_the_registration_check() -> None:
+    """Such a flag is unknown to every process that has not imported its module yet."""
+    with registered(FEATURE):
+        errors = flags.check_flag_registration(None)
+    assert [error.id for error in errors] == ["core.E402"]
+    assert "test_feature" in errors[0].msg
+    assert "ready()" in (errors[0].hint or "")
+    assert flags.check_flag_registration(None) == []  # forgotten once unregistered
+
+
+def test_the_registration_check_runs_with_the_system_checks() -> None:
+    registered_checks: list[object] = list(checks.registry.registry.get_checks())
+    assert flags.check_flag_registration in registered_checks
+
+
 def test_a_registered_test_flag_is_gone_afterwards() -> None:
     with registered(FEATURE):
         assert flags.spec_of(FEATURE.name) is FEATURE

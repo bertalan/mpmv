@@ -1,30 +1,52 @@
-"""CMS.1: EN/IT/DE home and static pages served by Wagtail under the language prefixes.
+"""CMS.1: home and static pages of every configured language, served by Wagtail.
 
-`/` is the EN tree, `/it/` and `/de/` the translated trees (I18N.1); pages render under the
-strict CSP of SEC.1 (no inline scripts or styles), and the language switcher leads to the same
-page in the other language even when its slug is translated.
+`/` is the EN tree, `/it/`, `/de/`, `/fr/` and `/es/` the translated trees (I18N.1); pages render
+under the strict CSP of SEC.1 (no inline scripts or styles), and the language switcher leads to
+the same page in the other language even when its slug is translated.
 """
 
 import re
 
 import pytest
+from django.conf import settings
 from django.test import Client
 from django.urls import reverse
 from wagtail.models import Site
 
+from apps.cms.seed import seed_text
 from apps.cms.services import SeedReport
 from apps.cms.tests.factories import StandardPageFactory
+from apps.core.i18n import configured_languages
 
 pytestmark = pytest.mark.django_db
 
+
+def _prefix(language: str) -> str:
+    return "/" if language == settings.LANGUAGE_CODE else f"/{language}/"
+
+
+def _about_path(language: str) -> str:
+    return f"{_prefix(language)}{seed_text(language).about.slug}/"
+
+
+# (path, language, title): the seeded home and About page of every configured language.
 PAGES = [
-    ("/", "en", "Home"),
-    ("/it/", "it", "Home"),
-    ("/de/", "de", "Startseite"),
-    ("/about/", "en", "About us"),
-    ("/it/chi-siamo/", "it", "Chi siamo"),
-    ("/de/ueber-uns/", "de", "Über uns"),
+    page
+    for code in configured_languages()
+    for page in (
+        (_prefix(code), code, seed_text(code).home.title),
+        (_about_path(code), code, seed_text(code).about.title),
+    )
 ]
+ABOUT_IN_EACH_LANGUAGE = {code: _about_path(code) for code in configured_languages()}
+HOME_IN_EACH_LANGUAGE = {code: _prefix(code) for code in configured_languages()}
+
+
+def test_the_go_live_languages_are_all_requested() -> None:
+    assert ("/it/chi-siamo/", "it", "Chi siamo") in PAGES
+    assert ("/de/ueber-uns/", "de", "Über uns") in PAGES
+    assert ("/fr/qui-sommes-nous/", "fr", "Qui sommes-nous") in PAGES
+    assert ("/es/quienes-somos/", "es", "Quiénes somos") in PAGES
 
 
 @pytest.mark.parametrize(("path", "language", "title"), PAGES)
@@ -79,9 +101,8 @@ def test_pages_render_under_the_strict_csp(
 @pytest.mark.parametrize(
     ("path", "targets"),
     [
-        ("/about/", {"en": "/about/", "it": "/it/chi-siamo/", "de": "/de/ueber-uns/"}),
-        ("/it/chi-siamo/", {"en": "/about/", "it": "/it/chi-siamo/", "de": "/de/ueber-uns/"}),
-        ("/de/", {"en": "/", "it": "/it/", "de": "/de/"}),
+        *((about, ABOUT_IN_EACH_LANGUAGE) for about in ABOUT_IN_EACH_LANGUAGE.values()),
+        *((home, HOME_IN_EACH_LANGUAGE) for home in HOME_IN_EACH_LANGUAGE.values()),
     ],
 )
 def test_the_switcher_offers_the_same_page_in_each_language(

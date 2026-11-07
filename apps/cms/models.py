@@ -13,6 +13,7 @@ grid, CTA, FAQ) are CMS.2.
 
 from typing import Any, ClassVar
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from wagtail import blocks
@@ -33,7 +34,11 @@ def body_field() -> StreamField:
 
 
 class HomePage(Page):  # type: ignore[misc]  # Wagtail is untyped
-    """The root page of one language: `/` for EN, `/<code>/` for the others."""
+    """The root page of one language: `/` for EN, `/<code>/` for the others.
+
+    One per locale: a second one would never be served. Checked in `clean()`, which Wagtail runs
+    on every save (the page table holds the locale, so no database constraint can).
+    """
 
     body = body_field()
 
@@ -44,6 +49,12 @@ class HomePage(Page):  # type: ignore[misc]  # Wagtail is untyped
 
     class Meta:
         verbose_name = _("home page")
+
+    def clean(self) -> None:
+        super().clean()
+        others = HomePage.objects.filter(locale_id=self.locale_id).exclude(pk=self.pk)
+        if self.locale_id is not None and others.exists():
+            raise ValidationError(_("This language already has a home page."))
 
 
 class StandardPage(Page):  # type: ignore[misc]
