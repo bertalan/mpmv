@@ -63,11 +63,13 @@ class ApiClient(BaseModel):
         return self.vendor_id
 
     def state(self) -> ClientState:
+        """What the authorization decision needs, the vendor's current status included."""
         return ClientState(
             is_active=self.is_active,
             expires_at=self.expires_at,
             scopes=tuple(self.scopes),
             allowed_ips=None if self.allowed_ips is None else tuple(self.allowed_ips),
+            vendor_status=None if self.vendor is None else self.vendor.status,
         )
 
     def snapshot(self) -> dict[str, Any]:
