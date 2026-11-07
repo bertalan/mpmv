@@ -7,7 +7,8 @@
   assistant (Claude Code or similar).
 - They do not include cross-cutting costs, which are added below.
 - They are top-down estimates per micro-task, not a quote: they must be reviewed after phase F0, when
-  the project skeleton exists and the actual velocity can be measured.
+  the project skeleton exists and the actual velocity can be measured. The measured velocity
+  with agents is in §91.6.
 
 ## 91.2 Go-live total (P1 only)
 
@@ -82,3 +83,60 @@ A milestone is closed only with a working demo on STAGE and the domain regressio
 In exchange, the recurring costs of premium WordPress licenses disappear (WCFM Ultimate, Membership,
 Affiliate, Groups & Staffs, Analytics, WPML, WPSSO Premium and add-ons) and, above all, so do the
 maintenance hours for updates, incompatibilities and fixes (STAGE, test matrices, option patches).
+
+## 91.6 Measured velocity with agents (non-binding)
+
+This section is a forecast, not a commitment. It does not replace the hours above, which stay the
+reference for a human team. It is refreshed at every coherence check.
+
+### Measurement of 2026-11-07
+
+Source: merged pull requests and their timestamps, the generated backlog, and the plan usage meter.
+
+- **Done:** 30 P1 tasks, worth **225 estimated hours**. They are waves 0–5: ARC, CORE, VEN.1/5/12,
+  SEC.1/3/4, I18N.1/2, SHP.1, CAT.1, TAX.1 and CMS.1.
+- **Throughput:** one wave of 5 tasks is worth 36–44 estimated hours. Implementation, independent
+  review, fixes, CI and merge take **80–95 minutes** of wall-clock time, about 25–30 times faster
+  than the estimate.
+- **Real limit:** the AI plan's weekly budget, not speed. At 35% of the weekly budget (spec writing
+  included) with work stopping at 80%, one week covers about **500 estimated hours** of agent work.
+
+### Forecast for the rest of P1
+
+97 P1 tasks remain, worth 947 estimated hours.
+
+| Part | Estimated hours | Done by | Forecast |
+|---|---:|---|---|
+| Code and tests (CAT, ORD, SHP, TAX, PAY, VEN, CMP, ING, SEO, CMS, …) | ~850 | agents | 40–50 h of agent runtime, including ~30% for integration, coherence checks and rework |
+| Migration with real data, dress rehearsals, cutover (MIG.7, MIG.9, MIG.10) | ~45 | agents and people | included in the people hours below |
+
+That is at least two weekly budgets, so **3–4 calendar weeks for P1 code**, provided the open
+decisions are answered in time.
+
+Work that agents cannot speed up:
+
+| Activity | People hours |
+|---|---:|
+| Owner decisions (question register and open D-xx) | 5–8 |
+| Tax advisor and legal counsel (D-01, D-02, D-03, D-08, double signature) | 5–10, plus 2–6 weeks of waiting |
+| Human review of tax, payments, ledger and orders code | 30–50 |
+| Hetzner, DNS, Stripe Connect and email provider accounts | 6–12 |
+| Migration checks and dress rehearsals | 15–25 |
+| Content, legal pages, semi-manual blog migration | 15–30 |
+| Acceptance testing with vendors A–E | 20–40 |
+| Go-live and monitoring | 10–20 |
+| **Total** | **≈ 105–195** |
+
+**Result:** about **150–250 people hours** plus about two weekly agent budgets, against
+1,520–1,700 hours for a human team (§91.2). Realistic calendar to go-live: **2–3 months**. The
+pace is set by external waits: legal counsel, Stripe Connect verification, the external
+penetration test (SEC.6) and the three dress rehearsals (MIG.9).
+
+### Limits of this forecast
+
+- The 30 tasks done so far are foundations with a very clear spec. Tax, payments and orders need
+  more integration, and agent speed may halve. Even then, P1 code stays within 4–6 weeks.
+- Minor review findings are still open (see [progress](../progress.md)). They are rework that the
+  measurement does not yet include.
+- People hours assume one owner working with the agents. A separate senior reviewer changes who
+  does the review, not the total.
