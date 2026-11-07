@@ -121,7 +121,7 @@ class GpsrInfo(Model):
   are VEN.5 and VEN.13 to VEN.16.
 
 ### Vendor contracts: language and acceptance evidence
-- The vendor contract follows the vendor's language (IT, EN, DE, FR, ES), one text per language,
+- The vendor contract follows the vendor's language (EN, IT, DE, FR, ES), one text per language,
   and each version declares a prevailing language that wins in case of discrepancies; the clause
   is printed in every rendered PDF. Without a text in the vendor's language the vendor accepts the
   English text and explicitly acknowledges it. Details in [04](04-vendors-commissions-ledger.md).

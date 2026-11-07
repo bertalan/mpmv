@@ -56,14 +56,14 @@
 | CORE.1 | Custom `User`, login via email, preferred language | P1 | 6 | ARC.6 | Initial migration with custom User |
 | CORE.2 | `VendorMember` with owner/staff roles, per-role permissions | P1 | 6 | CORE.1, VEN.1 | Role matrix tested |
 | CORE.3 | `VendorScopedQuerySet` + 404 helper + reusable cross-tenant test fixture | P1 | 8 | CORE.2 | Negative tests generated for every endpoint |
-| CORE.4 | MFA (TOTP + passkey) mandatory for staff/owners, recovery codes, step-up | P1 | 12 | CORE.1 | Login without MFA impossible for required roles |
+| CORE.4 | MFA (TOTP + passkey) mandatory for staff and every vendor member, recovery codes, step-up | P1 | 12 | CORE.1 | Login without MFA impossible for required roles |
 | CORE.5 | Rate limiting and progressive lockout on login/registration, Turnstile | P1 | 6 | CORE.1 | Tests on failed attempts |
 | CORE.6 | `ApiClient`: issuance, hashing, scopes, expiry, rotation, revocation, IP allow-list | P1 | 10 | CORE.1 | Expired or out-of-scope key → 401/403 |
 | CORE.7 | Ninja API v1 skeleton: auth, dry-run, RFC 9457 errors, OpenAPI, mutation log | P1 | 10 | CORE.6, ARC.13 | OpenAPI spec published on STAGE |
 | CORE.8 | Wagtail admin: staff menu, base ViewSet with tenant filters and bulk actions | P1 | 10 | CORE.3 | Staff manage vendors and products from the admin |
 | CORE.9 | Vendor area `/vendor/`: layout, navigation, essential KPI dashboard | P1 | 12 | CORE.3 | Vendor sees only their own data |
 | CORE.13 | `ApiClient.vendor`: optional vendor FK on API keys (empty = platform key), vendor-scoped API keys enforced through CORE.3 scoping, admin and tests | P1 | 3 | CORE.3, CORE.6 | A vendor key cannot read or change another vendor's data (negative tests) |
-| SEC.0 | Immediate actions from §12.1 on the current system | P1 | 3 | — | Credentials rotated, files cleaned up |
+| SEC.0 | Immediate actions from §12.1 on the current system | P1 | 3 | — | Confidential §12.1 checklist completed and recorded |
 | SEC.1 | HTTP hardening + CSP + cookies + headers (automated tests) | P1 | 6 | ARC.3 | Header scan passed |
 | SEC.2 | Secure uploads and image re-encoding | P1 | 4 | CAT.4, ARC.15 | Tests with malicious files |
 | SEC.3 | Field-level encryption (IBAN, KYC, DAC7) with key rotation | P1 | 8 | VEN.1 | DB dump with no cleartext data |
@@ -102,7 +102,7 @@
 | I18N.5 | gettext catalogs for templates and emails; tax wording as keys | P1 | 6 | ORD.9 | No hardcoded strings (lint) |
 | I18N.6 | hreflang, canonical, per-language sitemap with fallback excluded | P1 | 4 | SEO.1 | Validation on a sample of URLs: fallback copies have the EN canonical and are absent from hreflang and from the language sitemap |
 | I18N.7 | Interface strings in IT, DE, FR and ES for go-live (D-18): gettext catalogs for templates, emails, notifications, error and validation messages, MFA pages and tax/legal wording keys; AI draft, human review of checkout, emails and legal/tax wording; coverage report | P1 | 10 | I18N.5 | Coverage report: 100% of interface strings translated in IT, DE, FR and ES; checkout, email and legal/tax wording reviewed by a human |
-| CMS.1 | Wagtail: site, locales, base page types, per-language navigation and footer | P1 | 8 | ARC.3 | EN/IT home and static pages |
+| CMS.1 | Wagtail: site, locales, base page types, per-language navigation and footer | P1 | 8 | ARC.3 | Home and static pages in every configured language |
 | THM.1 | Theme framework: `apps/themes` registry and manifest, theme-aware template loader with parent fallback and `(theme, name)` cache, `ThemeSettings` per Wagtail Site with audit, `MPMV_THEME_DEFAULT`, system checks, import-linter rule, ADR for the frontend toolchain | P1 | 8 | CMS.1 | Two sites render different themes in an integration test; a template missing in the child comes from `base`; an unknown theme fails the system check |
 | THM.2 | Design-token pipeline: `tokens.toml` resolution and inheritance, token contract with contrast pairs, `tokens.css` rendering, `tools/build_theme.py` and `make assets`, Containerfile build step | P1 | 6 | THM.1 | Unit tests on `resolve_tokens`, `contrast_ratio` and `check_tokens` (a pair below 4.5:1 fails); the image build produces hashed `theme.css` for every theme |
 | THM.3 | `base` theme: layouts, skip link, header with disclosure navigation, language switcher, consistent help link, footer, typography, form controls, buttons, alerts, focus and target-size rules, reduced motion; vendored htmx and Alpine CSP build with `VENDORED.toml`; CMS.1 and account templates moved onto the layouts | P1 | 10 | THM.2 | Home, standard page and login render with `base`; CSP lint and the hash check of vendored files pass; keyboard-only e2e reaches every control with a visible focus |

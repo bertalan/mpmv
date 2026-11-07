@@ -125,7 +125,7 @@ def images_for_language(images: list[ImageRow], lang: str) -> list[ImageRow]
 
 Product and category URLs **stay identical** to the current ones, so no redirect is
 needed for most of the catalog. The `/tag-product/{slug}/` and
-`/it/tag-product-it/{slug}-it/` tags are redirected with a 301 to the new taxonomy pages (decision D-07).
+`/it/tag-product-it/{slug}-it/` tags are redirected with a 301 to the new taxonomy pages (proposed default of the open decision D-07).
 
 ### Rules
 

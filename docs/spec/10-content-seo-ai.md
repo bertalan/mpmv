@@ -169,7 +169,7 @@ with design tokens, template overrides, CSP-safe components and WCAG 2.2 AA rule
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
-| CMS.1 | Wagtail: site, locales, base page types, per-language navigation and footer | P1 | 8 | ARC.3 | EN/IT home and static pages |
+| CMS.1 | Wagtail: site, locales, base page types, per-language navigation and footer | P1 | 8 | ARC.3 | Home and static pages in every configured language |
 | CMS.2 | Reusable StreamField blocks (hero, product grid, CTA, FAQ, choosers) | P1 | 10 | CMS.1, CAT.8 | An editor builds the home page without code |
 | CMS.3 | Blog with scheduling, author, product/term/vendor chooser | P1 | 8 | CMS.2 | Migrated article published |
 | CMS.4 | TermLandingPage and VendorLandingPage | P1 | 10 | CMS.2, CAT.8 | A term page with its products |

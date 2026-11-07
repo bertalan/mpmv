@@ -31,7 +31,7 @@ part of the done-when still open) · `not started`.
 | CORE.7 | partial: OpenAPI proven locally and in CI, STAGE publication pending hosting | #20 | Ninja API v1 skeleton: API key auth, dry-run, RFC 9457 problem details, OpenAPI 3.1, mutation log |
 | CORE.5 | done | #21 | Progressive login lockout per account and IP, registration rate limit, Turnstile captcha, trusted-proxy client IP |
 | CORE.4 | done | #22, #32 | Mandatory MFA for staff, superusers and every vendor member (owners and staff since #32, owner decision): TOTP, passkeys, recovery codes, step-up |
-| SHP.1 | done | #25 | Carrier, zones, vendor rates, weight bands (exclusion constraint), pickup options, config versions; audited admin |
+| SHP.1 | done | #25, #38 | Carrier, zones, vendor rates, weight bands (exclusion constraint), pickup options, config versions; audited admin |
 | CAT.1 | done | #27 | Product, Variant and translations, per-vendor SKU constraints, audited price services, admin |
 | CORE.3 | done | #26 | VendorScopedQuerySet, 404 helpers, cross-tenant harness with negative tests generated for every endpoint, API operation and vendor-owned model (catalog and shipping included) |
 | SEC.4 | done | #28 | AuditLog on logins, MFA, users, groups, vendors and shipping rates with before/after; read-only staff audit view with filters and step-up; audit policy system check; one request audit context |
@@ -60,6 +60,8 @@ part of the done-when still open) · `not started`.
 - Double signature for clausole vessatorie (articles 1341 comma 2 and 1342 of the Italian civil code, which apply to vendor contracts too): templates and staff-added vendor clauses mark them with number and title (VEN.13, 18 h); the PDF has two signature blocks, the second with the formula "Ai sensi e per gli effetti degli artt. 1341 e 1342 c.c. si approvano specificamente le clausole n. ..."; the signature flow has two separate acts, the acceptance of the whole contract and then the specific approval of the marked clauses on a separate screen with a second email one-time code, never both in one action, with evidence and an RFC 3161 timestamp for each act (VEN.14, 22 h). The legal risk of a simple electronic signature for article 1341 is recorded in [spec 11](spec/11-compliance.md), to be confirmed by counsel ([spec 04](spec/04-vendors-commissions-ledger.md)).
 - The specific approval is completed only with a qualified or advanced electronic signature upload (VEN.17, now P1, 18 h) or with the paper original signed by hand and sent by post or courier, checked and approved by a staff moderator who records the receipt date, the scan and the archive location (VEN.16, 20 h). The two online acts let the vendor start operating; until completion a "specific approval pending" requirement applies with its own deadline and consequence on the VEN.16 machinery (defaults are an owner question), and the contract text warns the vendor. Staff can narrow the routes per version or per vendor, for example to require a qualified signature.
 - Transactional email: new task [ARC.16](spec/01-stack-and-architecture.md) (P1, 8 h): `EmailSender` interface with an EU provider (choice pending), per-language templates, DKIM, SPF and DMARC, bounce and complaint handling, outbox with retries on the task queue, test backend. VEN.11, VEN.14, VEN.16, ORD.8, ORD.9, SHP.8, SHP.10 and ING.10 depend on it.
+- Frontend themes ([spec 14](spec/14-frontend-themes.md), #47): a vertical-neutral `base` theme plus vertical themes with design tokens, template overrides and CSP-safe components; the CMS.7 row is replaced by THM.1 to THM.10 (70 h), CMP.9 (3 h, accessible authentication) is added, and WCAG 2.2 AA is the target: P1 +49 h.
+- Theme answers (#50, Q-59 to Q-64): `ride` is the first vertical theme and both `ride` and `base` ship at go-live; fonts Barlow and Barlow Condensed, self-hosted; images only from free commercial-use licences or own work, with source, licence and author required (new task CMS.8, 5 h) and a launch countdown block (new task CMS.9, 4 h); vendor branding as a paid plan option (THM.11, P2) with plan entitlements and plan fees on non-fiscal statements (VEN.19, P2): P1 +9 h.
 - No invoicing and no bookkeeping: the marketplace issues only non-fiscal documents (per-vendor order confirmations, the CMP.2 commission statement or pro-forma, payout statements and ledger extracts), each labelled "Documento non fiscale / Non-fiscal document" in all five languages, with a stable reference ID and never an invoice number sequence; vendors invoice customers and the operator's accountant invoices commissions outside the platform. The ledger is an operational record for balances, payouts and Stripe reconciliation, not accounting. The `EInvoiceChannel` and the SDI intermediary are dropped (ADR-0003 updated); the VEN.12 e-invoicing fields stay as data for the accountant and for vendors ([spec 00](spec/00-vision-and-review.md), [spec 04](spec/04-vendors-commissions-ledger.md), [spec 11](spec/11-compliance.md)).
 - Vendor obligations checklist with self-attestation (new task CMP.10, 24 h): per vendor, the obligations that apply (VAT and OSS, invoices and e-invoicing mandates, consumer rights, GPSR, batteries, WEEE, packaging, tyres, oils, product conformity, green claims, connected products), each answered "yes", "no" or "in progress" with an expected date; append-only answers with version, actor and audit; date-based reminders and periodic reminders on "no" with a one-click link, staff flag after N unanswered reminders or an overdue date; default consequence is reminder plus staff flag, with an optional per-obligation consequence on the VEN.16 mechanism; reminders are service emails, logged as evidence. Platform duties (DAC7 data, DSA article 30 trader data, KYC) stay blocking in the VEN.12 payout table and VEN.5 activation.
 - Regulatory check 2026-11 ([report](dev/regulatory-check-2026-11.md)): CMP.2 reworked (8 h), CMP.3 (12 h), CMP.5 moved to P1 (10 h), CMP.6 (10 h), new CMP.8 (4 h), CMP.11 (16 h), CMP.12 (4 h), CMP.13 (6 h, blocked by D-21) and VEN.18 (2 h): P1 +68 h, P2 −6 h.
@@ -97,7 +99,7 @@ Review findings not fixed (all minor):
 - ARC.7: history rows are immutable only in Python; QuerySet.update() and re-closing a closed row bypass the guard.
 - ARC.7: concurrent configure_platform_operator calls end in a raw IntegrityError instead of a ValidationError.
 - ARC.7: dac7_authority_country accepts non-EU countries.
-- ARC.7: PlatformOperator.EInvoiceChannel shares its name with the CMP.2 EInvoiceChannel interface.
+- ARC.7: PlatformOperator.EInvoiceChannel shares its name with the CMP.2 EInvoiceChannel interface. Moot since #49: the interface is dropped and the field is informational only.
 - ARC.7: current_operator() raises TypeError on a naive datetime instead of a clear error.
 - ARC.9: the heartbeat worker test asserts on the whole log text, so Procrastinate's own log lines satisfy it.
 - ARC.9: no test shows that rolling back the caller's transaction drops an enqueued job.
@@ -226,7 +228,7 @@ Open questions for the owner:
 - SEC.4: lockout audit entries still store the typed identifier for unknown accounts; treat them like failed logins?
 - SEC.4: should vendor refund and shipping policy texts be audited (VendorTranslation is exempt today)?
 - VEN.12: the payout gate requires a postal code from every vendor; how should vendors in countries without postal codes fill it?
-- VEN.12: Greece uses GR as FatturaPA IdPaese and EL in VIES; confirm with the SDI intermediary (CMP.2).
+- VEN.12: Greece uses GR as FatturaPA IdPaese and EL in VIES; confirm with the SDI intermediary (CMP.2). Since #49 there is no SDI intermediary: the question applies to the FatturaPA-mappable CMP.2 export and goes to the operator's accountant.
 - VEN.12: accept the `# country-literal:` pragma added to the ARC.7 scanner, or restrict it to named constants?
 
 Deferred to other tasks:
@@ -543,3 +545,20 @@ Resolved:
   (ADR-0007) and spec 01 says PostgreSQL 17. The ADR-0005 citations in the Containerfile, Quadlet
   units, release workflow, deploy tests and docs/dev/background-jobs.md stay for ARC.13.
 - Finding 4 in #39: the spec README gives 121 P1 tasks and 1,410 to 1,570 h, as spec 91.
+
+### Docs check (2026-11-07, Markdown only, after #49 and #50)
+
+Scope: main at 538cfe2. Every versioned Markdown file: relative links, task IDs, spec index,
+language lists, WCAG target, hours and totals against the generated backlog (175 tasks, P1 146
+tasks and 1,298 h, P2 199 h, P3 18 h, critical path 144 h), D-xx status, the no-invoicing
+leftovers of #49, and redaction. No code was checked.
+
+| Area | Result |
+|---|---|
+| Links and index | No broken relative link; every spec file is in the spec README index |
+| Task IDs | Every referenced ID exists, except the CMS.7 history notes (intended) and the spec 12 §12.3 requirement IDs SEC.7 to SEC.10 (check 2 finding 2, still open); §12.3 now says its IDs are not task IDs |
+| Totals | Spec 91 §91.2 (1,528 h subtotal, ≈ 1,660–1,850 h go-live), §91.4 (critical path 144 h), the §91.6 remaining work (116 tasks, 1,073 h) and the spec README (146 P1 tasks) match the backlog. The §91.6 forecast table still sizes the remaining code at ~900 h, from the 947 h measured before the theme and regulatory rows; refresh it at the next velocity measurement |
+| Stale facts fixed | CORE.4 row (MFA for every vendor member, check 4 finding 6), CMS.1 done-when (every configured language), D-07 shown as a proposal, 21 decisions in the spec index, 02–14 in the approval checklist, background-jobs.md cites ADR-0007, SHP.1 lists #38, the #47 theme decision recorded above |
+| No invoicing | Spec 02, spec 05 and field-encryption.md no longer speak of platform invoices; the ARC.7 and VEN.12 follow-ups note that the SDI intermediary and `EInvoiceChannel` are gone |
+| Redaction | No vendor names, legacy hostnames, order numbers or credentials, and no reference template name. Spec 12 §12.1, its SEC.0 done-when and the spec README no longer name kinds of weakness on the current system |
+| Owner questions | One new question on the existing IT texts at go-live against D-18 (migration, ING.5 and ING.7, SEO.3 feed) |
