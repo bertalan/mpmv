@@ -252,6 +252,15 @@ FIELD_ENCRYPTION_KEYS = env_secret_list("MPMV_FIELD_ENCRYPTION_KEYS")
 FEATURE_FLAGS = env_flags("MPMV_FEATURE_FLAGS")
 FEATURE_FLAGS_CACHE_SECONDS = 5
 
+# Per-API-key rate limit (CORE.12, apps.api.engine): fixed windows counted in PostgreSQL, so every
+# app process shares one counter per key. API_RATE_LIMIT is the key-wide limit of every key;
+# API_RATE_LIMIT_SCOPES gives a costly scope its own counter and limit for every key, e.g.
+# {"catalog:write": "120/minute"}; API_RATE_LIMIT_CLIENTS replaces the key-wide limit of one key,
+# by ApiClient public id. Rates read "<calls>/<second|minute|hour|day>" (system check api.E003).
+API_RATE_LIMIT = "600/minute"
+API_RATE_LIMIT_SCOPES: dict[str, str] = {}
+API_RATE_LIMIT_CLIENTS: dict[str, str] = {}
+
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"

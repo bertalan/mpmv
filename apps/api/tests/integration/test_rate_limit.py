@@ -15,7 +15,7 @@ from collections.abc import Callable
 import pytest
 from django.db import connection
 from django.test import Client
-from pytest_django.fixtures import SettingsWrapper
+from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.api.engine import KEY_WIDE_BUCKET
 from apps.api.models import ApiMutationLog, ApiRateCounter

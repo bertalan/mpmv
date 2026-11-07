@@ -24,8 +24,8 @@ models tested on Vendor B's objects.
 from django.contrib import admin
 from django.db import models
 
-from apps.api.models import ApiClient
-from apps.api.tests.factories import ApiClientFactory
+from apps.api.models import ApiClient, ApiRateCounter
+from apps.api.tests.factories import ApiClientFactory, ApiRateCounterFactory
 from apps.catalog.models import (
     Product,
     ProductAttribute,
@@ -96,6 +96,7 @@ from tests.tenancy import (
 OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     Vendor: lambda vendor: vendor,
     ApiClient: lambda vendor: ApiClientFactory.create(vendor=vendor),
+    ApiRateCounter: lambda vendor: ApiRateCounterFactory.create(client__vendor=vendor),
     VendorMember: lambda vendor: VendorMemberFactory.create(
         vendor=vendor, role=VendorMember.Role.STAFF
     ),

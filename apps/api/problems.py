@@ -124,6 +124,17 @@ def validation_problem(errors: Iterable[Mapping[str, Any]]) -> Problem:
     return problem(422, detail="The request is not valid.", errors=cleaned)
 
 
+def rate_limit_problem() -> Problem:
+    """429 for a key over its rate limit (CORE.12); the delay goes in the `Retry-After` header."""
+    return problem(
+        429,
+        detail=(
+            "This API key has made too many requests; retry after the delay in the "
+            "Retry-After header."
+        ),
+    )
+
+
 def auth_problem(decision: Decision, required_scope: str | None) -> Problem:
     """401/403 for a refused API key; `code` is the refusal reason."""
     if decision.status is AuthStatus.OK or decision.reason is None:

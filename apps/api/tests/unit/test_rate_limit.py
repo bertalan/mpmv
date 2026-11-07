@@ -4,7 +4,7 @@ import datetime as dt
 import uuid
 
 import pytest
-from pytest_django.fixtures import SettingsWrapper
+from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.api.checks import check_rate_limit_settings
 from apps.api.engine import (
