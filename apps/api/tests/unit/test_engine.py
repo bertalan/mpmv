@@ -14,6 +14,8 @@ from apps.api.engine import (
     InvalidApiClient,
     ParsedKey,
     Reason,
+    bearer_challenge,
+    deny,
     evaluate,
     generate_key,
     hash_key,
@@ -205,3 +207,44 @@ def test_allowed_ips_are_normalized_to_networks() -> None:
 def test_invalid_allowed_ips_are_refused(entries: list[str]) -> None:
     with pytest.raises(InvalidApiClient):
         normalize_allowed_ips(entries)
+
+
+# --- Operations open to any valid key (CORE.7)
+
+
+def test_no_required_scope_allows_any_valid_key() -> None:
+    decision = evaluate(_state(scopes=("stock:write",)), now=NOW, ip=None, required_scope=None)
+    assert decision == Decision(AuthStatus.OK, None)
+
+
+def test_no_required_scope_still_refuses_expired_keys_and_foreign_ips() -> None:
+    expired = _state(expires_at=NOW - dt.timedelta(seconds=1))
+    fenced = _state(allowed_ips=["198.51.100.0/24"])
+    assert evaluate(expired, now=NOW, ip=None, required_scope=None).reason == Reason.EXPIRED
+    decision = evaluate(fenced, now=NOW, ip="203.0.113.7", required_scope=None)
+    assert decision.reason == Reason.IP_NOT_ALLOWED
+
+
+# --- Bearer challenge (RFC 6750 §3)
+
+
+@pytest.mark.parametrize(
+    ("reason", "scope", "challenge"),
+    [
+        (Reason.MISSING, "catalog:write", 'Bearer realm="api"'),
+        (Reason.MALFORMED, "catalog:write", 'Bearer realm="api", error="invalid_token"'),
+        (Reason.EXPIRED, None, 'Bearer realm="api", error="invalid_token"'),
+        (
+            Reason.INSUFFICIENT_SCOPE,
+            "catalog:write",
+            'Bearer realm="api", error="insufficient_scope", scope="catalog:write"',
+        ),
+        (Reason.IP_NOT_ALLOWED, "catalog:write", None),
+    ],
+)
+def test_bearer_challenge(reason: Reason, scope: str | None, challenge: str | None) -> None:
+    assert bearer_challenge(deny(reason), scope, realm="api") == challenge
+
+
+def test_allowed_requests_get_no_challenge() -> None:
+    assert bearer_challenge(Decision(AuthStatus.OK, None), "x:y", realm="api") is None

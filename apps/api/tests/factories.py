@@ -1,6 +1,7 @@
 """factory_boy factories for the API app (ARC.12). Keys are generated at runtime, never stored."""
 
 import datetime as dt
+import uuid
 from typing import Any
 
 import factory
@@ -8,7 +9,7 @@ from django.utils import timezone
 from factory.django import DjangoModelFactory
 
 from apps.api.engine import generate_key, hash_key
-from apps.api.models import ApiClient
+from apps.api.models import ApiClient, ApiMutationLog
 
 
 class ApiClientFactory(DjangoModelFactory[ApiClient]):
@@ -42,3 +43,22 @@ class ApiClientFactory(DjangoModelFactory[ApiClient]):
         """Create a client and return it with its full key (the only time the key exists)."""
         generated = generate_key()
         return cls.create(generated=generated, **kwargs), generated.key
+
+
+class ApiMutationLogFactory(DjangoModelFactory[ApiMutationLog]):
+    """A logged mutating call (CORE.7). Rows are append-only: build the values you assert on."""
+
+    class Meta:
+        model = ApiMutationLog
+
+    request_id = factory.LazyFunction(lambda: uuid.uuid4().hex)
+    client_public_id = factory.LazyFunction(uuid.uuid4)
+    client_name = factory.Sequence(lambda n: f"Pipeline {n}")
+    key_prefix = factory.LazyFunction(lambda: generate_key().prefix)
+    method = "POST"
+    path = "/api/v1/products"
+    route = "api/v1/products"
+    dry_run = False
+    status_code = 201
+    ip = "203.0.113.7"
+    duration_ms = 12

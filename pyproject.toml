@@ -14,6 +14,7 @@ dependencies = [
   "croniter>=6.2",
   "gunicorn>=26.0",
   "whitenoise>=6.12",
+  "django-ninja>=1.7.3",
 ]
 
 [dependency-groups]
@@ -28,6 +29,7 @@ dev = [
   "pre-commit>=4.3",
   "pytest-playwright>=0.7",
   "factory-boy>=3.3.3",
+  "openapi-spec-validator>=0.9.0",
 ]
 
 [tool.uv]
