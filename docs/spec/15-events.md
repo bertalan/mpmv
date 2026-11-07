@@ -1,26 +1,27 @@
-# 15 — Events: closures, promotions, trade fairs
+# 15 — Events: promotions, trade fairs, meetings
 
-Vendors (mainly) and staff publish **events** from time to time: periodic closures and holidays,
-promotional announcements, trade-fair appearances and meetings. Each event is a Wagtail page with
-structured fields and a StreamField body. Events have an RSS feed and an ICS calendar, both
-discoverable automatically, and a vendor closure moves the dispatch date and the delivery
-estimate shown at checkout.
+Vendors (mainly) and staff publish **events** from time to time: promotional announcements,
+trade-fair appearances, meetings and other happenings. Each event is a Wagtail page with
+structured fields and a StreamField body, written in any of the site's languages. Events have an
+RSS feed and an ICS calendar per language, both discoverable automatically.
+
+A vendor's holiday or shop closure is **not an event** (owner decision Q-73): it is a closure
+schedule in the vendor settings, with no moderation, that shows a neutral notice and moves the
+dispatch date at checkout (VEN.20, [04](04-vendors-commissions-ledger.md) and
+[06](06-shipping-and-quotes.md)). The events module has no closure type and no checkout effect.
 
 This module supersedes owner decision Q-61, which said that events would only be blog articles
 ([10](10-content-seo-ai.md), [14](14-frontend-themes.md) §14.9). Blog articles can still tell the
-story of an event; the event itself, with its dates, feeds and checkout effect, is an `EventPage`.
+story of an event; the event itself, with its dates, feeds and map, is an `EventPage`.
 
 ## 15.1 How it works today
 
-- Legacy: no events feature. Vendors announce holidays in their storefront description or in a
-  blog article, by hand. The checkout knows nothing about closures, so a buyer who orders during a
-  closure learns about the delay only from the vendor, after paying.
-- Trade fairs and promotions appear as blog articles or social posts. There is no feed and no
-  calendar.
+- Legacy: no events feature. Trade fairs and promotions appear as blog articles or social posts.
+  There is no feed and no calendar. (Vendors announce holidays by hand too; the closure schedule
+  that replaces this is VEN.20, outside this module.)
 - MPMV: nothing yet. The pieces to build on are the CMS.1 page tree and conventions, the CMS.2
-  block library, wagtail-localize (I18N.3), the vendor area (CORE.9), the vendor API keys
-  (CORE.13), the vendor storefront (VEN.10), the product page (CAT.7) and the shipping outcome of
-  SHP.3.
+  block library, Wagtail's i18n with wagtail-localize (I18N.3), the vendor area (CORE.9), the vendor
+  API keys (CORE.13) and the vendor storefront (VEN.10).
 
 ## 15.2 How it will work
 
@@ -32,11 +33,9 @@ locale's `HomePage`, linked as translations by wagtail-localize, `TranslatableMi
 resolved by the theme loader.
 
 The page types live in a new app, `apps/events/`, not in `cms`, because of the dependency graph
-of spec 01 §1.3: an event links products and categories (`catalog`) and its closures feed the
-checkout (`cart`). `cms` and `catalog` are independent siblings in the same import-linter layer,
-so a page type in `cms` could not validate product links or query the catalog, and the checkout
-would depend on the CMS app to read closures. A small app one layer up solves both, and the
-shipping engine still only receives data:
+of spec 01 §1.3: an event links products and categories (`catalog`). `cms` and `catalog` are
+independent siblings in the same import-linter layer, so a page type in `cms` could not validate
+product links or query the catalog. A small app one layer up solves this:
 
 ```mermaid
 flowchart TD
@@ -44,27 +43,24 @@ flowchart TD
   vendors --> events
   catalog --> events
   cms --> events
-  shipping --> events
-  events --> cart
   events --> seo
   events --> compliance
   api -.adapter.-> events
 ```
 
-- `events` may import `core`, `vendors`, `catalog` (product and category links), `cms` (the
-  StreamField block library of CMS.2 and the page conventions) and the shipping **dataclasses**
-  of `apps/shipping/engine.py` (`ClosedPeriod`, below).
-- `cart` imports `events` to build the vendor dispatch calendars for the checkout (ORD.3).
+- `events` may import `core`, `vendors`, `catalog` (product and category links) and `cms` (the
+  StreamField block library of CMS.2 and the page conventions).
 - `seo` imports `events` for JSON-LD and sitemaps; `compliance` imports it to hide an event after a
-  DSA notice (CMP.5); `api` exposes it.
-- `shipping`, `tax`, `catalog` and `cms` **never import `events`**. `cms.HomePage` allows the index
+  DSA notice (CMP.5); `api` exposes it. Nothing in the checkout reads events.
+- `shipping`, `tax`, `cart`, `orders`, `catalog` and `cms` **never import `events`**. `cms.HomePage` allows the index
   page with the string `"events.EventIndexPage"` in `subpage_types`, which is not an import. The
   storefront and product page show event content through the `events` template tags
   (`{% load events %}`) inside theme templates, which adds no Python import to `catalog` or `cms`.
 - Import-linter (added by EVT.1): `apps.events` becomes its own layer between `apps.cart` and
-  `apps.catalog | apps.tax | apps.shipping | apps.cms` in the "Domain layers" contract, and
+  `apps.catalog | apps.tax | apps.shipping | apps.cms` in the "Domain layers" contract;
   `apps.events` joins the forbidden modules of the "Tax and shipping engines stay independent"
-  contract.
+  contract, and a forbidden contract keeps `apps.cart` and `apps.orders` from importing it, so the
+  checkout never depends on events.
 
 ### Page models
 
@@ -75,19 +71,20 @@ class EventIndexPage(RoutablePageMixin, Page):  # /events/ in each locale
     # routes: list (default), calendar/YYYY-MM/, past/, feed.rss, calendar.ics,
     #         vendor/<vendor-slug>/feed.rss|calendar.ics, type/<type>/feed.rss|calendar.ics
 
-class EventPage(RoutablePageMixin, Page):      # /events/<slug>/ ; route calendar.ics (one event)
+class EventPage(RoutablePageMixin, Page):      # /<lang>/events/<slug>/ ; route calendar.ics (one event)
     objects = EventPageManager()               # PageManager over a PageQuerySet with the CORE.3
                                                # for_actor() scoping: staff all, vendor members own, others none
     vendor = FK(Vendor, null=True)             # null = platform event (staff only)
-    event_type = CharField(choices=["closure", "promotion", "fair", "other"])  # "fair" = trade fair or meeting
+    event_type = CharField(choices=["promotion", "fair", "other"])  # "fair" = trade fair or meeting
+    original_locale = FK(wagtail.Locale)       # the locale the author wrote the event in (below)
     summary (≤ 300)                            # listing, feeds and meta description
-    all_day: bool                              # closures are always all day (check constraint)
+    all_day: bool
     starts_at, ends_at (timestamptz)           # timed events; ends_at > starts_at
     start_date, end_date (date)                # all-day events, inclusive end; end_date ≥ start_date
     timezone = CharField                       # IANA name; default: the platform local time zone (spec 01)
     rrule = CharField(blank=True)              # RFC 5545 RRULE, validated subset (below)
     exdates = ArrayField(DateTimeField | DateField)  # excluded occurrences
-    attendance = CharField(choices=["in_person", "online", "mixed"])   # fair / other; closures: none
+    attendance = CharField(choices=["in_person", "online", "mixed"])   # fair / other; promotions: none
     online_url                                 # https only, online and mixed events
     venue_name; address (street, postcode, city, region, country ISO alpha-2); booth  # fair / other
     latitude, longitude = DecimalField(9, 6, null=True)   # both or neither; -90..90, -180..180
@@ -96,7 +93,6 @@ class EventPage(RoutablePageMixin, Page):      # /events/<slug>/ ; route calenda
     products = ParentalManyToManyField(catalog.Product)    # same vendor only; platform events: any
     categories = ParentalManyToManyField(catalog.Category)
     listing_image = FK(image model, null=True) # licence metadata per CMS.8; used in lists and JSON-LD
-    closure_notice_days = PositiveSmallInt(default=14)     # closure only: banner lead time, 0–60
     status = CharField(choices=["draft", "pending", "published", "cancelled", "hidden"])  # denormalised
     sequence = PositiveInteger(default=0)      # ICS SEQUENCE
     cancelled_at; hidden_at; hidden_by; hidden_reason; dsa_notice_ref (null)   # CMP.5
@@ -113,9 +109,10 @@ class EventSettings(BaseSiteSetting):          # Wagtail site setting, staff-edi
 ```
 
 - **Structured fields versus body.** Type, dates, time zone, recurrence, location and coordinates,
-  vendor, links and status are page fields, synchronised across locales by wagtail-localize
-  (`SynchronizedField`); title, summary, body and venue name are translatable. Feeds, the
-  checkout, JSON-LD and listings read only the structured fields and the summary, never the body.
+  vendor, original locale, links, cancellation and hiding are page fields, identical in every
+  translation of the event (`SynchronizedField`, see "Languages" below); title, summary, body and venue name are
+  translatable. Feeds, JSON-LD and listings read only the structured fields and the summary, never
+  the body.
 - **Body.** A StreamField built from the site's block library (CMS.2): rich text, images and
   galleries with the licence metadata of CMS.8, CTA, product grid, FAQ, the launch countdown block
   of CMS.9 (promotions: its target defaults to the event start), and the embeds that the CSP and
@@ -152,8 +149,8 @@ per-vendor subtree permissions (`GroupPagePermission` on `/events/<vendor>/`) wo
 other vendors' data and bypass the CORE.3 `VendorScopedQuerySet` rule and its negative tests.
 
 - The **vendor area** (CORE.9, `/vendor/events/`) and the **vendor API** create and edit
-  `EventPage` drafts through `apps/events/services.py`, which calls `save_revision()` on the page
-  as the acting user. Every change is a Wagtail revision, so staff see the history and the diff in
+  `EventPage` drafts, in the locale the author chooses (see "Languages"), through
+  `apps/events/services.py`, which calls `save_revision()` on the page as the acting user. Every change is a Wagtail revision, so staff see the history and the diff in
   the admin like for any page.
 - The vendor area edits the structured fields with a normal form and the body with a small
   server-rendered block editor (HTMX partials: add a block of an allowed type, edit it, move it up
@@ -166,6 +163,45 @@ other vendors' data and bypass the CORE.3 `VendorScopedQuerySet` rule and its ne
   other block type, also through the API.
 - Links in vendor rich text get `rel="nofollow ugc"`; `javascript:` and `data:` URLs are refused.
 - Staff edit any event in the Wagtail admin with the full block library.
+
+### Languages: authors write in any site language (owner decision Q-72)
+
+Event content is an **explicit exception to D-18** for vendor-authored events (spec
+[09](09-multilingual.md), [92](92-open-decisions.md)): there is no required source language and no
+English fallback. It uses Wagtail's own i18n, the mechanism of CMS pages (I18N.3): `Locale`,
+`TranslatableMixin`, one page per locale in that locale's page tree, the pages of one event linked
+by the same `translation_key`. Staff-authored platform events follow the same rules.
+
+- **Original language.** The author creates the event in any enabled locale (EN, IT, DE, FR, ES,
+  and any language added later to `settings.LANGUAGES`); `original_locale` records it. English is
+  not required. EVT.1 creates an `EventIndexPage` in every enabled locale, and adding a locale
+  creates its index.
+- **Translations are optional.** The author may add a translation in any other enabled locale.
+  In the vendor area and the API, "Add translation" creates the page in the target locale with
+  Wagtail's `copy_for_translation()` (same `translation_key`) and the author writes the title,
+  summary, body and venue name. The service copies the structured fields from the original page
+  to every translation on each publish, so dates, location, links and status never diverge. Staff
+  can also use wagtail-localize's translation editor in the admin. Vendors get no machine
+  translation at go-live.
+- **Moderation** covers every language: a translation's first publication follows the same
+  `get_workflow()` rule as an edit, and the threshold counts events (distinct `translation_key`),
+  not translations. Cancelling, hiding and restoring act on all translations of the event together.
+- **One URL per existing translation.** `/<lang>/events/<slug>/` exists only where the event has a
+  published translation in that locale; there are no fallback copies of event pages, so no
+  duplicate content. Each translation is its own canonical URL; `hreflang` alternates list only
+  the published translations, with `x-default` on the EN translation when there is one and on the
+  original otherwise. The per-language sitemap (SEO.2, I18N.6) lists only the translations in
+  that language.
+- **Listings and feeds per language, with an original-language fallback.** `/<lang>/events/`, its
+  month view, past archive and index map, the storefront "Upcoming events" section and the feeds
+  under that prefix contain every public event: in the translation for that language when it
+  exists, otherwise in the event's **original language**. A fallback item links to the original
+  page and is marked as another language: a `lang` attribute (and `hreflang` on the link) on its
+  `<article>`, plus the visible language name in that language (for example "Deutsch"), so the
+  page meets WCAG 2.2 SC 3.1.2; `<dc:language>` (Dublin Core namespace) on the RSS item; the
+  `LANGUAGE` parameter (RFC 5545 §3.2.10) on `SUMMARY`, `DESCRIPTION` and `LOCATION` in the ICS.
+  Interface strings around it (type label, dates, "Cancelled") stay in the page's language. A
+  filter "Only events in <language>" limits a listing to real translations.
 
 ### Moderation with Wagtail workflows
 
@@ -214,14 +250,15 @@ writes an `AuditLog` entry (actor, before and after, source: vendor area, admin 
 Wagtail revision and log entry:
 
 ```python
-def save_event_draft(actor, data: EventInput, page: EventPage | None = None, *, dry_run=False) -> ChangeSet
+def save_event_draft(actor, data: EventInput, page: EventPage | None = None, *, locale=None, dry_run=False) -> ChangeSet
+def add_event_translation(actor, page, locale, data: EventTextInput, *, dry_run=False) -> ChangeSet
 def submit_event(actor, page, *, dry_run=False) -> ChangeSet       # workflow or direct publish
 def hide_event(staff, page, reason: str, dsa_notice_ref=None, *, dry_run=False) -> ChangeSet
 def restore_event(staff, page, *, dry_run=False) -> ChangeSet
 def cancel_event(actor, page, *, dry_run=False) -> ChangeSet
 def set_vendor_policy(staff, vendor, mode, *, dry_run=False) -> ChangeSet
 def occurrences(page, start, end) -> list[Occurrence]
-def vendor_closed_periods(vendor_ids, start: date, end: date) -> dict[int, tuple[ClosedPeriod, ...]]
+def events_for_locale(locale, filters) -> list[LocalisedEvent]   # translation or original-language fallback
 ```
 
 - Approval and rejection are Wagtail workflow actions; a signal handler writes their `AuditLog`
@@ -235,23 +272,25 @@ def vendor_closed_periods(vendor_ids, start: date, end: date) -> dict[int, tuple
 
 ### Vendor area, staff admin and API
 
-- **Vendor area** (`/vendor/events/`): list with status, the moderator's comment and the hide
-  reason; create and edit form (type-dependent fields, recurrence presets, block editor, product
-  and category choosers limited to the vendor), preview, submit, cancel. No JavaScript is needed
+- **Vendor area** (`/vendor/events/`): list with status, languages, the moderator's comment and
+  the hide reason; create and edit form (language choice, type-dependent fields, recurrence
+  presets, block editor, product and category choosers limited to the vendor), "Add translation",
+  preview, submit, cancel. No JavaScript is needed
   to complete a task.
 - **Staff admin**: the Wagtail page explorer and edit view for event pages, the moderation
   dashboard and "Awaiting your review" panel for "Event review", the hide and restore actions, a
   ViewSet for `VendorEventPolicy` and the `EventSettings` setting.
-- **API** (`/api/v1/events`, django-ninja on CORE.7): list, get, create, update, submit, cancel,
-  with scopes `events:read` and `events:write`; the body is StreamField JSON limited to the
+- **API** (`/api/v1/events`, django-ninja on CORE.7): list, get, create (with a `locale`),
+  update, add or update a translation (`/api/v1/events/{id}/translations/{locale}`), submit,
+  cancel, with scopes `events:read` and `events:write`; the body is StreamField JSON limited to the
   vendor-safe blocks. A vendor-scoped key (CORE.13) sees and changes only its vendor's events;
   another vendor's event is a 404. Mutations accept `?dry_run=true` and return the diff; errors are
   RFC 9457. Moderation and hiding stay staff actions in the admin.
 
 ### Recurrence: an RFC 5545 subset
 
-`rrule` holds one RRULE in RFC 5545 syntax. The supported subset covers the real cases ("closed
-every August", "every Monday", "first Saturday of the month"):
+`rrule` holds one RRULE in RFC 5545 syntax. The supported subset covers the real cases ("a fair
+every year at the end of August", "every Monday", "first Saturday of the month"):
 
 | Part | Allowed |
 |---|---|
@@ -287,14 +326,13 @@ def validate_rrule(text: str, all_day: bool) -> RRuleSubset      # raises Recurr
   one (fall back) takes the first instance, as RFC 5545 §3.3.5 requires.
 - The duration of each occurrence is the duration of the first one; for all-day events it is the
   number of days.
-- Listings and the month view expand up to 18 months ahead; the checkout expands up to 180 days
-  ahead. `limit` caps runaway rules. The ICS feed does not expand: it passes the RRULE through.
+- Listings and the month view expand up to 18 months ahead. `limit` caps runaway rules. The ICS feed does not expand: it passes the RRULE through.
 
 ### Location, coordinates and geocoding
 
 - **Validation** (model `clean()` and a check constraint): `latitude` and `longitude` are both set
   or both empty, latitude in −90..90, longitude in −180..180, six decimal places (about 0.1 m).
-  Closures have no location, no coordinates and no attendance mode; `online` events have no
+  Promotions have no location, no coordinates and no attendance mode; `online` events have no
   venue and no coordinates; `in_person` and `mixed` events may have a venue, an address and
   coordinates, all optional.
 - **Privacy**: coordinates are only the ones the event author enters or confirms for a public
@@ -374,9 +412,9 @@ OpenStreetMap when there is an address, and nothing when there is none.
   `data-label`; an external theme ES module (`events/map.js`) reads them and builds the map.
   Leaflet positions elements through CSSOM properties, which `style-src 'self'` allows; the e2e
   CSP check proves there is no violation.
-- **Tiles through a `TileProvider` setting** (owner question Q-75). Recommended
-  default: a **caching tile proxy on our own domain**, `/maps/tiles/{z}/{x}/{y}.png`, so
-  `img-src 'self'` holds and the visitor's IP address never reaches a third party (GDPR). The proxy
+- **Tiles through a `TileProvider` setting** (owner decision Q-75): a **caching tile proxy on our
+  own domain**, `/maps/tiles/{z}/{x}/{y}.png`, with OpenStreetMap's public tile servers as the
+  upstream at launch, so `img-src 'self'` holds and the visitor's IP address never reaches a third party (GDPR). The proxy
   sends a valid identifying `User-Agent`, caches tiles in object storage (ARC.15) for at least 7
   days or the upstream's cache headers if longer, serves them with long cache headers through the
   CDN, accepts only integer `z`, `x`, `y` within range (zoom 2–18, no other URL input, so no
@@ -384,8 +422,8 @@ OpenStreetMap when there is an address, and nothing when there is none.
   settings, so the upstream can switch from OpenStreetMap's public tile servers to a paid EU tile
   provider without code changes. OpenStreetMap's tile usage policy allows light use only: heavy
   or bulk commercial traffic on the public tiles is against it, so the upstream request count is
-  monitored and the switch is planned before traffic grows. The alternative is a paid EU tile
-  provider loaded directly, with its origin added to `img-src` and listed in the privacy notice.
+  monitored and the switch to a paid EU tile provider, behind the same proxy, is planned before
+  traffic grows. Tiles are never loaded directly from a third-party host.
 - **Attribution** "© OpenStreetMap contributors", linked to the OSM copyright page, is always
   visible: in the map's attribution control and in the no-JavaScript fallback.
 - **Event page map**: one marker with a popup (venue name and address). The text address is always
@@ -453,74 +491,24 @@ categories concerned, a CTA and, if the author adds it, the launch countdown blo
 belong to the catalog price tools (CAT.10, the `/prices` API) and to CMP.6. A vendor who announces
 a discount sets the prices there; the announcement does not check or compute them.
 
-### Closures, storefront notices and the checkout
-
-A `closure` is an all-day event (one-off or recurring) during which the vendor does not dispatch.
-The buyer can still order.
-
-**Public notices.** From `closure_notice_days` before the start until the end of an occurrence,
-the vendor storefront (VEN.10) shows a closure banner and each product page of the vendor (CAT.7)
-shows a notice next to the add-to-cart button. The text is an interface string, translated into
-all five languages, with the dates: "This vendor is closed from 1 to 31 August 2027. Orders placed
-now will be dispatched from 1 September 2027." The event's summary, if any, follows it, with a
-link to the event page. The banner is a `role="region"` landmark with a heading (not an alert: it
-does not interrupt), and does not rely on colour.
-
-**Dispatch date (shipping, pure).** `apps/shipping/engine.py` gets a dataclass and two pure
-functions; it knows nothing about events:
-
-```python
-@dataclass(frozen=True)
-class ClosedPeriod:
-    start: date; end: date                       # inclusive, in the vendor's local dates
-
-def earliest_dispatch_date(ordered_on: date, closed: Sequence[ClosedPeriod]) -> date:
-    """Merge overlapping and adjacent periods (next.start <= current.end + 1 day); if ordered_on
-    falls inside a merged period, return its end + 1 day, else ordered_on."""
-
-def delivery_window(dispatch_on: date, min_days: int, max_days: int) -> tuple[date, date]
-```
-
-- `cart.build_checkout` (ORD.3) asks `events.services.vendor_closed_periods` for the vendors in
-  the cart (occurrences from today to 180 days ahead) and passes each package's periods to
-  `earliest_dispatch_date`. The delivery estimate of the package then counts from the dispatch
-  date instead of the order date (the method's indicative delivery time of SHP.12 and any extra
-  days of a special area of SHP.14 are added on top).
-- The checkout shows, per affected vendor package, the closure notice with the dispatch date and
-  the shifted delivery estimate. Ordering stays possible; there is no extra confirmation step.
-- The order snapshot (ORD.2) stores the expected dispatch date per `VendorOrder`, so a later edit
-  of the closure does not rewrite what the buyer was told. Vendor order emails (ORD.9) show it.
-- Closures count for the dispatch date in the statuses `pending`, `published` and `hidden`,
-  because the vendor is really closed in all three; in `pending` and `hidden` the notices show the
-  dates only, never the event's text (owner question Q-73). `draft` and
-  `cancelled` closures have no effect.
-- A recurring closure is expanded in the event's time zone, and `ordered_on` is today's date in
-  the same zone.
-- The anonymous page cache (SEO.6) is invalidated for the vendor's storefront and product pages
-  when a closure is published, changed, hidden or cancelled, and a page with a closure notice is
-  never cached past the notice's start or end.
-
 ### Public pages
 
 | URL (under the language prefix) | Content |
 |---|---|
-| `/events/` | Upcoming and ongoing events, list first: grouped by month, one `<article>` per event with a heading, `<time datetime>` dates, type as text (not colour only), vendor link. Filters as a plain GET form (vendor, type, month) with labels and a results count; pagination. Map of the listed events that have coordinates (see Maps) |
+| `/events/` | Upcoming and ongoing events in the page's language, with the original-language fallback (see "Languages"), list first: grouped by month, one `<article>` per event with a heading, `<time datetime>` dates, type as text (not colour only), vendor link. Filters as a plain GET form (vendor, type, month) with labels and a results count; pagination. Map of the listed events that have coordinates (see Maps) |
 | `/events/calendar/YYYY-MM/` | Month view as an enhancement: a server-rendered `<table>` with `<caption>`, weekday `<th scope="col">`, event links in the day cells, previous and next month links. Below the small breakpoint it shows the list layout. It has the same filters and links back to the list |
 | `/events/past/` | Archive of events that ended, newest first |
 | `/events/<slug>/` | `EventPage`: title, dates with the time zone name, type, vendor, venue, address and booth, map and directions links when the event has coordinates, body, linked products and categories, "Add to calendar" (single-event ICS), subscribe links, report link. A cancelled event shows a "Cancelled" status message |
-| Vendor storefront | "Upcoming events" section (next 3 published events other than closures, link to the vendor's events) and the closure banner |
-| Product page | Closure notice |
+| Vendor storefront | "Upcoming events" section (next 3 public events of the vendor, same language rule, link to the vendor's events). The closure notice on the storefront is VEN.20, not an event |
 
 - Templates are part of the `base` theme (spec 14): components from the THM.4 library, WCAG 2.2
   AA, keyboard reachable, visible focus, and the CSP rules of §14.5: no inline script or style.
   Maps use the vendored Leaflet and same-origin tiles (see Maps), never a third-party embed; any
   embed in a staff-authored body follows the consent rules (SEO.5).
-- Event content follows D-18 like every other visitor content (spec 09): the EN page is the
-  source, the other locales are wagtail-localize translations created after go-live (I18N.8), with
-  the explicit EN fallback and no hreflang for missing translations. Interface strings (labels,
-  type names, filters, the closure notice, feed titles) are translated into all five languages
-  (I18N.7). Whether vendors may write events in their own language at go-live is owner question
-  Q-72.
+- Event content is the D-18 exception described in "Languages": written in any enabled language,
+  optional translations, original-language fallback with `lang`, `hreflang` only for existing
+  translations. Interface strings (labels, type names, filters, language names, feed titles) are
+  translated into all five languages (I18N.7).
 - Robots: past events stay reachable and become `noindex` 30 days after their end; cancelled
   events are `noindex`.
 
@@ -588,8 +576,9 @@ dates), `eventStatus` (`EventScheduled`, or `EventCancelled` for a cancelled eve
 `PostalAddress` and, only when both coordinates are set, `geo` as `GeoCoordinates` with
 `latitude` and `longitude`; plus `VirtualLocation` with the URL for online and mixed events),
 `organizer` (`Organization`: vendor or platform name and URL), `image` and `url`. Only `fair`
-events, and `other` events with a location or an online URL, get it: closures and promotions are not events in the schema.org
-sense, and marking up sales or closures as `Event` goes against the search engines' guidelines.
+events, and `other` events with a location or an online URL, get it: promotions are not events in
+the schema.org sense, and marking up sales as `Event` goes against the search engines' guidelines.
+`inLanguage` is the translation's language.
 Recurring events emit the next occurrence only.
 
 ### Emails (ARC.16)
@@ -600,8 +589,10 @@ Recurring events emit the next occurrence only.
   vendors are turned off, because vendors are not admin users.
 - To staff: Wagtail's "submitted for moderation" notification to the "Event moderators" group,
   plus a daily digest of events waiting for review, only when the queue is not empty.
-- Emails to buyers who follow a vendor or subscribe to events are not part of go-live: the feeds
-  cover subscribers. They are the P2 row EVT.16 (owner question Q-74).
+- Notifications to customers about new events are not part of go-live: the feeds cover
+  subscribers. Following a vendor and choosing event notifications belong in the customer's
+  account preferences (owner decision Q-74), a section whose scope the owner has still to define
+  (ORD.11, P2). EVT.16 (P2) adds the event notifications once ORD.11 is designed.
 
 ## 15.3 Regression cases
 
@@ -620,18 +611,24 @@ Recurring events emit the next occurrence only.
    10:00 local on both; the same rule across 28 March 2027 goes back to 08:00 UTC.
 6. A daily event at 02:30 local in Europe/Rome on 28 March 2027 (time that does not exist) moves
    to 03:30 local; on 25 October 2026 (02:30 occurs twice) it takes the first instance (00:30 UTC).
-7. "Closed every August" (`FREQ=YEARLY`, all-day 1–31 August) expands to 1–31 August of each year,
-   never 1 August to 30 August or 2 September; `UNTIL` and `COUNT` stop it; an `EXDATE` removes
+7. "A fair every year from 28 August to 2 September" (`FREQ=YEARLY`, all-day 28 August to
+   2 September) expands to 28 August–2 September of each year, never ending on 1 or 3 September; `UNTIL` and `COUNT` stop it; an `EXDATE` removes
    one year.
 8. `BYSETPOS`, `FREQ=HOURLY`, `BYHOUR`, `RDATE` and an RRULE with both `COUNT` and `UNTIL` are
    refused with a field error.
-9. **Closure overlap moves the dispatch date**: closures 1–15 August and 10–31 August 2027, order
-   on 5 August → dispatch on 1 September; adjacent closures 1–15 and 16–31 August → 1 September;
-   order on 31 July → dispatch on 31 July; order on 1 September → 1 September.
-10. A closure in `pending` or `hidden` still moves the dispatch date and its notice shows no event
-    text; a `draft` or `cancelled` closure does not move it.
-11. The order snapshot keeps the expected dispatch date shown at checkout after the vendor edits or
-    cancels the closure.
+9. **Any original language**: a vendor creates an event in DE with no other translation; it is
+   published at `/de/events/<slug>/` only; `/it/events/<slug>/` and `/events/<slug>/` return 404;
+   its `hreflang` alternates list DE only, with `x-default` on the DE page; the DE sitemap lists
+   it and the EN, IT, FR and ES sitemaps do not.
+10. **Original-language fallback**: the same event appears in `/it/events/`, in the IT RSS and in
+    the IT ICS in German: the `<article>` has `lang="de"` and the visible label "Deutsch", the RSS
+    item has `<dc:language>de</dc:language>`, the ICS `SUMMARY` has `LANGUAGE=de`, and the link
+    points to the DE page. After the vendor adds an IT translation, `/it/events/` shows the IT text
+    with no `lang` override, `hreflang` lists DE and IT, and both pages share one ICS `UID`.
+11. **Synchronised structured fields**: changing the dates on the original page and publishing
+    changes them in every translation; a translation's first publication by a vendor under the
+    threshold goes through "Event review" and does not count as a new event towards the threshold;
+    cancelling the event cancels every translation.
 12. **Feeds exclude hidden events**: a published event that staff hides disappears from the
     platform, vendor and type RSS and ICS feeds and from the single-event ICS (404) on the next
     origin response, and its page returns 404 to visitors; the same for draft and pending events.
@@ -643,11 +640,11 @@ Recurring events emit the next occurrence only.
     name (scan of the rendered output in the tests).
 17. A vendor's API key cannot read, list or change another vendor's event (404); a vendor cannot
     link another vendor's product or add an embed or raw HTML block, in the vendor area or the API.
-18. A closure or promotion page has no `Event` JSON-LD; a fair page has one that passes the Rich
+18. A promotion page has no `Event` JSON-LD; a fair page has one that passes the Rich
     Results Test, with `geo` only when both coordinates are set, and a cancelled fair has
     `EventCancelled`.
 19. **Coordinates**: latitude 90.000001 or longitude −180.5 is refused; a latitude without a
-    longitude is refused; a closure or an online event with coordinates is refused; six decimal
+    longitude is refused; a promotion or an online event with coordinates is refused; six decimal
     places are kept exactly.
 20. **ICS GEO**: an event at 45.464204, 9.189982 emits `GEO:45.464204;9.189982`; an event without
     coordinates emits no `GEO` line; the RSS item has `<georss:point>45.464204 9.189982</georss:point>`
@@ -684,20 +681,20 @@ Cases 26–28 belong to the P2 row EVT.17.
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
-| EVT.1 | `events` app: `EventIndexPage` and `EventPage` page types on the CMS.1 conventions (structured fields, attendance, venue and address, latitude and longitude with geocoding metadata, StreamField body from the CMS.2 library, ParentalManyToMany links, vendor-scoped page manager, denormalised `status` with its sync function, wagtail-localize synchronised and translatable fields), `VendorEventPolicy`, `EventSettings`; `"events.EventIndexPage"` in the home page's subpage types; import-linter layer between `cart` and `catalog`, `apps.events` forbidden for `tax` and `shipping`; factories | P1 | 9 | CMS.2, CMS.8, CORE.3, CAT.2, I18N.3 | Constraints tested (closure always all day, end after start, one of COUNT or UNTIL, regression case 19); vendor A cannot see vendor B's draft page (cross-tenant fixture); a test import of `apps.events` from `apps.shipping` fails `make check`; the EN page translates to IT with dates synchronised |
+| EVT.1 | `events` app: `EventIndexPage` and `EventPage` page types on the CMS.1 conventions (structured fields, attendance, venue and address, latitude and longitude with geocoding metadata, StreamField body from the CMS.2 library, ParentalManyToMany links, vendor-scoped page manager, denormalised `status` with its sync function, `original_locale`, synchronised and translatable fields), an `EventIndexPage` in every enabled locale, `VendorEventPolicy`, `EventSettings`; `"events.EventIndexPage"` in the home page's subpage types; import-linter layer between `cart` and `catalog`, `apps.events` forbidden for `tax`, `shipping`, `cart` and `orders`; factories | P1 | 9 | CMS.2, CMS.8, CORE.3, CAT.2, I18N.3 | Constraints tested (end after start, one of COUNT or UNTIL, no `closure` type, regression case 19); vendor A cannot see vendor B's draft page (cross-tenant fixture); a test import of `apps.events` from `apps.shipping` or `apps.cart` fails `make check`; an IT page translates to EN with dates synchronised |
 | EVT.2 | Recurrence engine in `events/engine.py`: RRULE subset validator, `expand` in the event's zone with DST handling, exdates, all-day spans, horizon and limit | P1 | 8 | EVT.1 | Regression cases 5–8 green (DST end 2026-10-25 and start 2027-03-28, non-existent and ambiguous local times, "every August", refused parts) |
 | EVT.3 | Services and moderation: `save_event_draft` through revisions, `submit_event`, hide, restore, cancel, vendor policy, with dry-run `ChangeSet` and `AuditLog`; "Event review" workflow with a `GroupApprovalTask`, `get_workflow()` driven by `needs_review` and the configurable threshold; signal handlers for approval, changes requested and status sync; `sequence` bump rule; same-vendor link and vendor-safe block validation | P1 | 10 | EVT.2, ARC.6 | Regression cases 1–4 green; every mutation writes one audit entry and `dry_run` writes no revision; `sequence` grows on a date change and stays on a no-op publish; a hide without a reason is refused; a hidden page cannot be resubmitted by the vendor |
-| EVT.4 | Vendor area `/vendor/events/`: list, structured form with recurrence presets, HTMX block editor for the vendor-safe blocks, image upload with licence fields, the map picker with "Find coordinates", product and category choosers, preview of the latest revision, submit, cancel; staff side: hide and restore actions with a reason form, `VendorEventPolicy` ViewSet, settings, moderator comment shown to the vendor | P1 | 12 | EVT.3, EVT.13, CORE.8, CORE.9 | Keyboard-only e2e creates a closure with two body blocks and submits it; a moderator approves it in the Wagtail admin; negative tenant tests on every vendor view; a "request changes" comment appears in the vendor area |
+| EVT.4 | Vendor area `/vendor/events/`: list, structured form with recurrence presets, HTMX block editor for the vendor-safe blocks, image upload with licence fields, the map picker with "Find coordinates", product and category choosers, preview of the latest revision, submit, cancel; staff side: hide and restore actions with a reason form, `VendorEventPolicy` ViewSet, settings, moderator comment shown to the vendor | P1 | 12 | EVT.3, EVT.13, CORE.8, CORE.9 | Keyboard-only e2e creates a promotion in IT with two body blocks and submits it; a moderator approves it in the Wagtail admin; negative tenant tests on every vendor view; a "request changes" comment appears in the vendor area |
 | EVT.5 | Vendor API `/api/v1/events`: list, get, create, update, submit, cancel; StreamField JSON limited to the vendor-safe blocks; scopes `events:read` and `events:write`; vendor-scoped keys; dry-run diff; RFC 9457 errors; OpenAPI | P1 | 6 | EVT.3, CORE.7, CORE.13 | Regression case 17 green; `?dry_run=true` returns the diff and writes no revision; an invalid RRULE returns a 422 problem document naming the field |
 | EVT.6 | Public pages in the `base` theme: `EventIndexPage` list with vendor, type and month filters and pagination, month calendar table, past archive, `EventPage` template with cancelled state, single-event ICS link and report link to CMP.5, robots rules; interface strings in gettext for all five languages | P1 | 10 | EVT.3, THM.4, I18N.6, CMS.9 | axe (WCAG 2.2 AA) and the CSP lint pass on the list, month and event pages; the list works without JavaScript; pending and hidden events return 404 to visitors; strings present in the IT, DE, FR and ES catalogs |
-| EVT.7 | Storefront and product page: `events` template tags for the upcoming events section and the closure banner on the vendor storefront and the closure notice on product pages; notice window from `closure_notice_days`; date-only text for pending and hidden closures; page cache invalidation hooks | P1 | 5 | EVT.6, VEN.10, CAT.7 | A closure starting in 10 days shows the banner and the product notice with the dispatch date in all five languages; a closure starting in 20 days with a 14-day notice shows nothing yet; a hidden closure shows the dates without the event's text |
-| EVT.8 | Closure-aware dispatch date: `ClosedPeriod`, `earliest_dispatch_date` and `delivery_window` pure functions in `shipping/engine.py`; `vendor_closed_periods` service; `build_checkout` integration with per-package notice and shifted estimate; expected dispatch date in the order snapshot | P1 | 8 | EVT.2, SHP.3, ORD.2, ORD.3 | Regression cases 9–11 green; the shipping engine tests use no events code and import-linter stays green; a checkout with a closed and an open vendor shows the notice only on the closed vendor's package and still places the order |
-| EVT.9 | Feeds: RSS 2.0 and ICS for the platform, per vendor and per type, single-event ICS; ICS serializer (UID, SEQUENCE, DTSTAMP, VTIMEZONE, RRULE and EXDATE pass-through, STATUS:CANCELLED retention, GEO), `georss:point` in RSS; field allow list; ETag, Last-Modified, 304, Cache-Control; rate limit; `<link rel="alternate">` discovery, Subscribe block with `webcal://`; feed URLs in `llms.txt` | P1 | 10 | EVT.6, CORE.5, SEO.2 | Regression cases 12–16 and 20 green; every feed parses with `icalendar` and an RSS 2.0 validator in the tests; the 31st request in a minute from one IP gets 429 with `Retry-After`; every page in the discovery list carries both alternate links |
+| EVT.7 | Storefront "Upcoming events" section: `events` template tag on the vendor storefront (next 3 public events of the vendor with the language rule of EVT.8, link to the vendor's events), page cache invalidation when an event of the vendor is published, cancelled or hidden | P1 | 3 | EVT.8, VEN.10 | The storefront in IT shows the vendor's next 3 events, a DE-only event with `lang="de"` and the label "Deutsch"; a hidden event disappears from the storefront on the next origin response; axe passes on the section |
+| EVT.8 | Multilingual events (owner decision Q-72, D-18 exception): language choice on create, `original_locale`, "Add translation" through `copy_for_translation` in the vendor area and the API (`add_event_translation`), structured fields copied from the original to every translation on publish, moderation of translations, `events_for_locale` with the original-language fallback (`lang`, `hreflang` on the link, visible language name), "Only events in <language>" filter, `hreflang` and `x-default` for existing translations only, per-language sitemap entries | P1 | 8 | EVT.4, EVT.5, EVT.6, I18N.6 | Regression cases 9 and 11 and the HTML part of case 10 green; axe passes on an IT listing with a DE fallback item; no event page has a fallback copy in a locale without a translation |
+| EVT.9 | Feeds per language: RSS 2.0 and ICS for the platform, per vendor and per type, single-event ICS; ICS serializer (UID, SEQUENCE, DTSTAMP, VTIMEZONE, RRULE and EXDATE pass-through, STATUS:CANCELLED retention, GEO, `LANGUAGE` on fallback items), `georss:point` and `dc:language` in RSS; field allow list; ETag, Last-Modified, 304, Cache-Control; rate limit; `<link rel="alternate">` discovery, Subscribe block with `webcal://`; feed URLs in `llms.txt` | P1 | 10 | EVT.8, CORE.5, SEO.2 | The feed part of regression case 10 and cases 12–16 and 20 green; every feed parses with `icalendar` and an RSS 2.0 validator in the tests; the 31st request in a minute from one IP gets 429 with `Retry-After`; every page in the discovery list carries both alternate links |
 | EVT.10 | SEO: `event_jsonld` for fairs and located or online `other` events (attendance mode, status, `Place` with `PostalAddress` and `GeoCoordinates` only with both coordinates, next occurrence for recurring ones), `seo` template tag, event pages in the per-language sitemaps without noindex pages | P1 | 4 | EVT.6, SEO.1, SEO.2 | Regression case 18 green; hidden, pending and noindex pages are not in the sitemap |
 | EVT.11 | Event emails through the ARC.16 outbox (approved, changes requested, hidden, restored, staff digest; Wagtail moderation emails to vendors off) and the DSA link: an event page as a CMP.5 notice target, a hide decision through `hide_event` with the notice reference | P1 | 5 | EVT.3, ARC.16, CMP.5 | Each transition queues exactly one email in the vendor's language; the digest is not sent for an empty queue; a CMP.5 notice on an event ends with the page unpublished, a statement of reasons and the event gone from pages and feeds |
 | EVT.12 | Geocoding behind our `Geocoder` protocol in `apps/core/geocoding`: Nominatim, Photon, LocationIQ and OpenCage adapters (keyed ones off without a key), pluggable for later providers, configurable chain with fallback, PostgreSQL-backed per-provider throttle (Nominatim 1 request per second, identifying User-Agent and contact), timeouts, circuit breaker, normalised-address cache, keys from environment, `FakeGeocoder`; "Find coordinates" endpoint for staff and vendor members with a per-user limit | P1 | 8 | ARC.6, CORE.5 | Regression case 24 green; no test reaches the network; the endpoint returns 403 to a customer and to an anonymous visitor; a key never appears in logs or the repository (secret scan) |
 | EVT.13 | Map picker for the Wagtail admin panel and the vendor-area form: vendored Leaflet 1.9.4 (`VENDORED.toml`, licence entry), shared `events/map.js` module in picker mode (click to place, drag, latitude and longitude inputs, candidate list from "Find coordinates"), `wagtailgeowidget` evaluated against the CSP and server-side geocoding rules | P1 | 6 | EVT.1, EVT.12, THM.3 | A staff user and a vendor each set a point by click, by drag and by typing, and the saved values match; the admin picker passes the regression case 23 check; the vendored hash check passes |
 | EVT.14 | Tile proxy `/maps/tiles/{z}/{x}/{y}.png` behind the `TileProvider` setting: upstream URL and attribution from settings, identifying User-Agent, object-storage cache of at least 7 days or the upstream headers, long cache headers for the CDN, strict `z`/`x`/`y` validation, per-IP rate limit, upstream request counter for the OSM policy | P1 | 6 | ARC.15, CORE.5 | A second request for a tile is served from the cache without an upstream call (fake upstream); `z=19`, negative or non-integer values return 404 with no upstream call; switching the upstream setting needs no code change; the attribution comes from the setting |
 | EVT.15 | Public maps: event page map with popup, text address above, skip link, labelled region, keyboard-focusable marker, wheel zoom off until focus, reduced motion, no-JavaScript fallback, directions links (Google, OpenStreetMap, `geo:`), "Open in maps" search link without coordinates; index map of the listed events with coordinates | P1 | 6 | EVT.6, EVT.13, EVT.14 | Regression cases 21–23 green; axe (WCAG 2.2 AA) passes on an event page and the index with a map; the attribution is visible with and without JavaScript |
-| EVT.16 | Opt-in event emails for buyers who follow a vendor (follow button, double opt-in, one-click unsubscribe, weekly digest of new events, consent records per CMP.4) | P2 | 6 | EVT.11, CMP.4 | A follower gets one digest a week with the vendor's new published events only; unsubscribe works in one click; no email without a confirmed opt-in |
+| EVT.16 | Event notifications in the customer's account preferences (owner decision Q-74): follow a vendor and turn its event notifications on or off in the ORD.11 section; channel and frequency as ORD.11 defines them, consent records per CMP.4 for any email; hours to be re-estimated once ORD.11 is scoped | P2 | 4 | ORD.11, EVT.11, CMP.4 | A customer who follows a vendor with notifications on is told about that vendor's new published events only; turning them off stops them at once; no email is sent without a recorded consent |
 | EVT.17 | Google option after go-live (owner decision: no Google at go-live): Google Geocoding adapter last in the chain and off without a key; vendored GoogleMutant on the official Maps JavaScript API (never direct tile URLs), per-site setting and key; consent purpose and click-to-load placeholder; Google CSP sources with nonce only on consented Google-map responses, security review of the exception; `geo_expires_at` (30 days), confirmation request and daily expiry job; Google-geocoded points never on a non-Google map and never in feeds, JSON-LD or the index map | P2 | 8 | EVT.12, EVT.15, SEO.5, ARC.9, ARC.16 | Regression cases 26–28 green; with consent, a Google-geocoded point renders on the Google layer and the CSP e2e check passes on that response; Google tile URLs never appear in any request |

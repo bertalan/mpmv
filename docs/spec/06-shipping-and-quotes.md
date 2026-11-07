@@ -217,13 +217,16 @@ Rules carried over from version 2.4 (all as tests):
 
 ### Vendor closures and the dispatch date
 
-A vendor closure (an `EventPage` of type `closure`, [15](15-events.md)) moves the dispatch date of
-that vendor's package and the delivery estimate, while the buyer can still order. The shipping
-engine stays a pure calculator that knows nothing about events: it exposes the `ClosedPeriod`
-dataclass and the pure `earliest_dispatch_date(ordered_on, closed)` and
-`delivery_window(dispatch_on, min_days, max_days)` functions, and the checkout (`cart`) passes in
-the periods it reads from `events`. The delivery estimate counts from the dispatch date. Import-linter
-forbids `apps.shipping` from importing `apps.events` (EVT.1, EVT.8).
+A vendor closure (a range of the vendor's holiday and closure schedule, a vendor setting with no
+moderation, VEN.20 in [04](04-vendors-commissions-ledger.md); not an event, owner decision Q-73)
+moves the dispatch date of that vendor's package and the delivery estimate, while the buyer can
+still order. The shipping engine stays a pure calculator: it exposes the `ClosureRule` and
+`ClosedPeriod` dataclasses and the pure `expand_closures`, `earliest_dispatch_date(ordered_on,
+closed)` and `delivery_window(dispatch_on, min_days, max_days)` functions. The shipping service
+`vendor_closed_periods` reads the vendors' schedules (`shipping` may import `vendors`, never the
+other way round) and the checkout (`cart`) passes the periods to the engine. The delivery estimate
+counts from the dispatch date. Import-linter keeps `apps.vendors` from importing `apps.shipping`
+and `apps.shipping` from importing `apps.events` (VEN.20, EVT.1).
 
 ### Management tools
 
