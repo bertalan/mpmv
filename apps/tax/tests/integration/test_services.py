@@ -230,7 +230,15 @@ def test_a_vies_answer_is_recorded_without_the_country_prefix() -> None:
     )
     stored = VatValidation.objects.get(pk=check.pk)
     assert (stored.country, stored.vat_number) == ("GR", "123456789")
-    assert (stored.result, stored.source, stored.name) == ("valid", "vies", "Example AE")
+    assert (stored.result, stored.name) == ("valid", "Example AE")
+
+
+def test_a_vies_answer_cannot_be_recorded_as_a_staff_claim() -> None:
+    with pytest.raises(TypeError):
+        services.record_vat_validation(  # type: ignore[call-arg]
+            "DE", "123456789", engine.VAT_VALID, source="manual"
+        )
+    assert VatValidation.objects.count() == 0
 
 
 def test_an_unknown_vies_result_is_refused() -> None:

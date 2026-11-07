@@ -141,4 +141,10 @@ def test_territory_statuses_leave_northern_ireland_to_an_explicit_rule() -> None
 
 def test_vat_validation_results_are_the_vies_results_of_ven_12() -> None:
     assert engine.VAT_RESULTS == ("valid", "invalid", "unavailable")
-    assert engine.VAT_SOURCES == ("vies", "manual")
+
+
+def test_only_vies_answers_are_recorded() -> None:
+    # A staff claim that a number is valid would zero the customer's VAT (T1) with no actor and
+    # no audit trail: until a task designs an audited service for it, there is no manual source.
+    assert not hasattr(engine, "VAT_SOURCE_MANUAL")
+    assert not hasattr(engine, "VAT_SOURCES")

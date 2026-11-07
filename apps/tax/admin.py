@@ -147,8 +147,8 @@ class VendorTaxProfileTranslationAdmin(NoDeleteAdmin[VendorTaxProfileTranslation
 class VatValidationAdmin(HistoryAdmin[VatValidation]):
     """Answers are recorded by the VIES client (TAX.5); staff only look at them."""
 
-    list_display = ("checked_at", "country", "vat_number", "result", "source", "name")
-    list_filter = ("result", "source", "country")
+    list_display = ("checked_at", "country", "vat_number", "result", "name")
+    list_filter = ("result", "country")
     search_fields = ("vat_number", "name")
     readonly_fields = (
         "public_id",
@@ -158,7 +158,6 @@ class VatValidationAdmin(HistoryAdmin[VatValidation]):
         "name",
         "address",
         "request_id",
-        "source",
         "checked_at",
         "created_at",
     )

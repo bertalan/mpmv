@@ -357,21 +357,17 @@ class VatResult(models.TextChoices):
     UNAVAILABLE = engine.VAT_UNAVAILABLE, "VIES unavailable"
 
 
-class VatSource(models.TextChoices):
-    VIES = engine.VAT_SOURCE_VIES, "VIES"
-    MANUAL = engine.VAT_SOURCE_MANUAL, "Recorded by staff"
-
-
 class VatValidation(BaseModel):
     """One answer about a VAT number (ADR-0003: the cached side of VIES). Append-only.
 
     Written by `apps.tax.services.record_vat_validation`, e.g. from a `VatNumberValidator`
     (VEN.12); the VIES client with cache policy, timeout and fail-closed handling is TAX.5. The
-    number is stored without its country prefix; `country` is ISO (GR, never EL).
+    number is stored without its country prefix; `country` is ISO (GR, never EL). Every row is
+    a VIES answer: staff-recorded answers are out of scope until a task gives them an actor and
+    an audited service.
     """
 
     Result = VatResult
-    Source = VatSource
 
     country = CountryField(help_text="ISO 3166-1 alpha-2 (GR for a VIES EL number).")
     vat_number = models.CharField("VAT number", max_length=32, help_text="Without the prefix.")
@@ -381,7 +377,6 @@ class VatValidation(BaseModel):
     request_id = models.CharField(
         max_length=64, blank=True, help_text="VIES consultation number, when given."
     )
-    source = models.CharField(max_length=16, choices=Source.choices)
     checked_at = models.DateTimeField()
 
     class Meta:
@@ -395,10 +390,6 @@ class VatValidation(BaseModel):
             models.CheckConstraint(
                 condition=models.Q(result__in=engine.VAT_RESULTS),
                 name="tax_vatvalidation_result_valid",
-            ),
-            models.CheckConstraint(
-                condition=models.Q(source__in=engine.VAT_SOURCES),
-                name="tax_vatvalidation_source_valid",
             ),
         ]
 

@@ -145,7 +145,5 @@ VAT_VALID: Final = vendors.VIES_VALID
 VAT_INVALID: Final = vendors.VIES_INVALID
 VAT_UNAVAILABLE: Final = vendors.VIES_UNAVAILABLE
 VAT_RESULTS: Final = (VAT_VALID, VAT_INVALID, VAT_UNAVAILABLE)
-
-VAT_SOURCE_VIES: Final = "vies"
-VAT_SOURCE_MANUAL: Final = "manual"  # recorded by staff from an official check
-VAT_SOURCES: Final = (VAT_SOURCE_VIES, VAT_SOURCE_MANUAL)
+# Every row is a VIES answer. A staff-recorded answer would be a claim that zeroes the
+# customer's VAT (T1), so it needs its own task with an actor and an audited service.

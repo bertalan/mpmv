@@ -66,8 +66,8 @@ class VendorTaxProfile(Model):                 # versioned: new row on every app
 
 class VatValidation(Model):                    # cache of VIES results, append-only
     vat_number (without prefix); country (ISO, GR not EL)
-    result ("valid", "invalid", "unavailable"); source ("vies", "manual")
-    name; address; checked_at; request_id
+    result ("valid", "invalid", "unavailable")
+    name; address; checked_at; request_id      # VIES answers only, no staff-recorded rows
 ```
 
 Rates and vendor tax profiles are versioned like `PlatformOperator`: an exclusion constraint

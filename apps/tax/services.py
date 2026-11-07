@@ -24,7 +24,6 @@ from apps.core.validity import NoValidRow, next_start_error, pick_valid
 from apps.vendors.engine import split_vat_number
 from apps.vendors.models import Vendor
 
-from . import engine
 from .models import (
     TaxRate,
     Territory,
@@ -284,19 +283,17 @@ def record_vat_validation(
     vat_number: str,
     result: str,
     *,
-    source: str = engine.VAT_SOURCE_VIES,
     name: str = "",
     address: str = "",
     request_id: str = "",
     checked_at: dt.datetime | None = None,
 ) -> VatValidation:
-    """Store one answer about a VAT number (prefix and separators removed). Append-only."""
+    """Store one VIES answer about a VAT number (prefix and separators removed). Append-only."""
     country, number = _vat_key(country, vat_number)
     check = VatValidation(
         country=country,
         vat_number=number,
         result=result,
-        source=source,
         name=name,
         address=address,
         request_id=request_id,

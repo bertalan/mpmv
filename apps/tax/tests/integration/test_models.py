@@ -244,14 +244,17 @@ def test_a_vat_validation_keeps_the_vies_answer() -> None:
     stored = VatValidation.objects.get(pk=check.pk)
     assert stored.country == "GR"
     assert stored.result == "valid"
-    assert stored.source == "vies"
 
 
-@pytest.mark.parametrize(("field", "value"), [("result", "maybe"), ("source", "guess")])
-def test_invalid_vat_validations_are_rejected(field: str, value: str) -> None:
+def test_a_vat_validation_has_no_staff_recorded_source() -> None:
+    # Every row is a VIES answer; a staff-recorded one needs its own audited design.
+    assert "source" not in {field.name for field in VatValidation._meta.get_fields()}
+
+
+def test_an_invalid_vat_validation_result_is_rejected() -> None:
     with pytest.raises(ValidationError) as exc:
-        VatValidationFactory.build(**{field: value}).full_clean()
-    assert field in exc.value.message_dict
+        VatValidationFactory.build(result="maybe").full_clean()
+    assert "result" in exc.value.message_dict
 
 
 def test_vat_validations_are_append_only() -> None:

@@ -9,6 +9,7 @@ class TaxConfig(AppConfig):
     # audited services; territories and legal notes are saved through audited services too.
     audited_models = ("taxrate", "territory", "vendortaxprofile", "vendortaxprofiletranslation")
     unaudited_models = {
-        "vatvalidation": "append-only record of VIES answers (a cache of an external source); "
-        "the rows are the history, view-only admin, and vendor VAT checks are audited by vendors",
+        "vatvalidation": "append-only record of VIES answers only (a cache of an external "
+        "source, no staff-recorded rows); the rows are the history, view-only admin, and vendor "
+        "VAT checks are audited by vendors",
     }

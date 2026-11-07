@@ -113,5 +113,4 @@ class VatValidationFactory(DjangoModelFactory[VatValidation]):
     name = factory.Sequence(lambda n: f"Example Customer {n} GmbH")
     address = "Example Strasse 1, 10115 Berlin"
     request_id = factory.Sequence(lambda n: f"REQ{n:08d}")
-    source = engine.VAT_SOURCE_VIES
     checked_at = factory.LazyFunction(timezone.now)

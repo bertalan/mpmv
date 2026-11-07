@@ -60,13 +60,12 @@ class Migration(migrations.Migration):
                 ('name', models.CharField(blank=True, max_length=200)),
                 ('address', models.TextField(blank=True)),
                 ('request_id', models.CharField(blank=True, help_text='VIES consultation number, when given.', max_length=64)),
-                ('source', models.CharField(choices=[('vies', 'VIES'), ('manual', 'Recorded by staff')], max_length=16)),
                 ('checked_at', models.DateTimeField()),
             ],
             options={
                 'ordering': ['-checked_at', '-id'],
                 'indexes': [models.Index(fields=['country', 'vat_number', '-checked_at'], name='tax_vatvalidation_lookup')],
-                'constraints': [models.CheckConstraint(condition=models.Q(('result__in', ('valid', 'invalid', 'unavailable'))), name='tax_vatvalidation_result_valid'), models.CheckConstraint(condition=models.Q(('source__in', ('vies', 'manual'))), name='tax_vatvalidation_source_valid')],
+                'constraints': [models.CheckConstraint(condition=models.Q(('result__in', ('valid', 'invalid', 'unavailable'))), name='tax_vatvalidation_result_valid')],
             },
         ),
         migrations.CreateModel(
