@@ -11,6 +11,7 @@ import pytest
 from django.contrib.auth.models import Group
 from django.test import Client
 from django.urls import NoReverseMatch, reverse
+from wagtail.users.models import UserProfile
 
 from apps.accounts.models import User
 from apps.accounts.services import mfa_required
@@ -110,6 +111,46 @@ def test_admin_editors_edit_menus_without_inline_scripts(
     html = client.get(f"/admin/snippets/cms/navigationmenu/edit/{menu.pk}/").content.decode()
     assert "Chi siamo" in html
     assert not re.search(r"<script(?![^>]*\b(?:src|type)=)[^>]*>", html)
+
+
+def test_an_editor_saves_admin_preferences_without_a_name_form(client: Client) -> None:
+    """Our User has `full_name`, not Wagtail's first and last name: its name panel is left out."""
+    editor = _editor()
+    verified_login(client, editor)
+    html = client.get("/admin/account/").content.decode()
+    assert 'name="name_email-first_name"' not in html
+    assert 'name="name_email-last_name"' not in html
+    assert 'name="theme-theme"' in html
+
+    response = client.post(
+        "/admin/account/",
+        {
+            "locale-preferred_language": "it",
+            "locale-current_time_zone": "",
+            "theme-theme": "dark",
+            "theme-contrast": "system",
+            "theme-density": "snug",
+        },
+    )
+    assert response.status_code == 302
+    assert response["Location"] == "/admin/account/"
+    profile = UserProfile.get_for_user(editor)
+    assert (profile.preferred_language, profile.theme, profile.density) == ("it", "dark", "snug")
+
+
+def test_editors_upload_no_profile_picture(client: Client) -> None:
+    """No spec item stores editors' avatars, so the panel that uploads one is left out."""
+    verified_login(client, _editor())
+    html = client.get("/admin/account/").content.decode()
+    assert 'name="avatar-avatar"' not in html
+    assert 'type="file"' not in html
+
+
+def test_the_account_page_still_requires_admin_access(client: Client) -> None:
+    verified_login(client, UserFactory.create())  # no `wagtailadmin.access_admin`
+    response = client.get("/admin/account/")
+    assert response.status_code == 302
+    assert response["Location"].startswith("/admin/login/")
 
 
 @pytest.mark.parametrize("path", ["/admin/account/change_password/", "/admin/password_reset/"])

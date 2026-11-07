@@ -24,6 +24,7 @@ def healthz(request: HttpRequest) -> JsonResponse:
 urlpatterns = [
     path("healthz", healthz, name="healthz"),
     path("django-admin/", admin.site.urls),
+    path("admin/", include("apps.cms.admin_urls")),  # replaces Wagtail's account page (CMS.1)
     path("admin/", include(wagtailadmin_urls)),  # editors' admin (Wagtail, CMS.1)
     path("i18n/switch/", switch_language, name="switch_language"),
     path("api/v1/", include("apps.api.urls")),
