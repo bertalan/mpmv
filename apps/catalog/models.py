@@ -22,7 +22,7 @@ Identity (CAT.13, owner decisions Q-30 and Q-33): the platform refers to product
 by `public_id`, and staff by `staff_ref`, a prefixed sequence the vendor never sees. The vendor
 SKU is a label kept raw in `sku`; `sku_key` (`engine.sku_match_key`, set on save) is unique per
 vendor across products and variants together. Within a table a unique constraint enforces it,
-across the two tables a database trigger (migration 0003), which also writes a `SkuAlias` row
+across the two tables a database trigger (migration 0006), which also writes a `SkuAlias` row
 whenever a match key changes, so older import files still match. Change SKUs with `save()` or
 the rename services, never with `QuerySet.update()`, which skips the match key.
 """
@@ -686,7 +686,7 @@ class VariantTranslation(TranslationModel):
 class SkuAlias(BaseModel):
     """A SKU match key a product or variant used before a rename (CAT.13).
 
-    Written by a database trigger whenever a match key changes (migration 0003), whatever made
+    Written by a database trigger whenever a match key changes (migration 0006), whatever made
     the change, so imports keep matching older files. Never edited by hand.
     """
 

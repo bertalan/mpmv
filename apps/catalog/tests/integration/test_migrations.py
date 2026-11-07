@@ -30,7 +30,7 @@ def test_catalog_migrations_are_reversible() -> None:
 @pytest.mark.django_db(transaction=True)
 def test_cat13_migration_fills_match_keys_and_staff_refs_of_existing_rows() -> None:
     """CAT.13: rows saved before the migration get a match key and a staff_ref."""
-    before = [("catalog", "0002_taxonomies")]
+    before = [("catalog", "0005_slug_history")]
     executor = MigrationExecutor(connection)
     executor.migrate(before)
     old = executor.loader.project_state(before).apps
