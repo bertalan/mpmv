@@ -16,7 +16,7 @@ pytestmark = pytest.mark.django_db
 
 
 def test_the_page_shows_every_plan_with_its_features(client: Client, seeded: SeedReport) -> None:
-    VendorRecruitmentPageFactory.create()
+    VendorRecruitmentPageFactory.create(title="Sell with us")
 
     response = client.get("/sell-with-us/")
     assert response.status_code == 200
@@ -35,7 +35,7 @@ def test_the_page_shows_every_plan_with_its_features(client: Client, seeded: See
 
 
 def test_the_page_shows_the_faq(client: Client, seeded: SeedReport) -> None:
-    VendorRecruitmentPageFactory.create()
+    VendorRecruitmentPageFactory.create(title="Sell with us")
     html = client.get("/sell-with-us/").content.decode()
     assert "Who can sell?" in html
     assert "Independent makers." in html
@@ -45,7 +45,7 @@ def test_without_the_application_form_the_page_shows_a_notice_not_a_link(
     client: Client, seeded: SeedReport
 ) -> None:
     assert vendor_application_url() is None  # VEN.22 not merged yet
-    VendorRecruitmentPageFactory.create(cta_label="Apply now")
+    VendorRecruitmentPageFactory.create(title="Sell with us", cta_label="Apply now")
 
     html = client.get("/sell-with-us/").content.decode()
     assert 'class="recruitment-cta"' in html
@@ -54,7 +54,7 @@ def test_without_the_application_form_the_page_shows_a_notice_not_a_link(
 
 
 def test_the_page_has_no_inline_scripts_or_styles(client: Client, seeded: SeedReport) -> None:
-    VendorRecruitmentPageFactory.create()
+    VendorRecruitmentPageFactory.create(title="Sell with us")
     html = client.get("/sell-with-us/").content.decode()
     assert "<script" not in html
     assert "style=" not in html

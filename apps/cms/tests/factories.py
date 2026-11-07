@@ -14,6 +14,7 @@ from typing import Any
 from unittest import mock
 
 import factory
+from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Model
 from django.utils import timezone
@@ -154,7 +155,12 @@ class LegalPageVersionFactory(DjangoModelFactory[LegalPageVersion]):
 
     page = factory.SubFactory(LegalPageFactory)
     title = factory.LazyAttribute(lambda version: version.page.title)
-    language_code = factory.LazyAttribute(lambda version: version.page.locale.language_code)
+    # A built page has no locale yet (`.build()` stays off the database).
+    language_code = factory.LazyAttribute(
+        lambda version: (
+            version.page.locale.language_code if version.page.locale_id else settings.LANGUAGE_CODE
+        )
+    )
     effective_date = factory.LazyAttribute(lambda version: version.page.effective_date)
     body = factory.LazyFunction(lambda: [("paragraph", "<p>Sample terms.</p>")])
     published_at = factory.LazyFunction(timezone.now)
@@ -168,12 +174,15 @@ class LegalPageVersionFactory(DjangoModelFactory[LegalPageVersion]):
 
 
 class VendorRecruitmentPageFactory(_InTree, DjangoModelFactory[VendorRecruitmentPage]):
-    """The "Sell with us" page under the primary language's home, with two plans and a FAQ."""
+    """A recruitment page under the primary language's home, with two plans and a FAQ.
+
+    Titles are numbered so two pages fit under one home: pass `title="Sell with us"` for the
+    page at `/sell-with-us/`."""
 
     class Meta:
         model = VendorRecruitmentPage
 
-    title = "Sell with us"
+    title = factory.Sequence(lambda n: f"Sell with us {n}")
     slug = factory.LazyAttribute(lambda page: slugify(page.title))
     parent = None
     intro = factory.LazyFunction(lambda: [("paragraph", "<p>Open your shop.</p>")])

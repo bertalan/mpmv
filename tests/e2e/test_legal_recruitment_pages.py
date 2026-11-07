@@ -81,7 +81,7 @@ def test_visitor_reads_the_terms_their_archive_and_the_italian_version(
 def test_visitor_sees_the_plans_and_how_to_apply(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
-    VendorRecruitmentPageFactory.create()
+    VendorRecruitmentPageFactory.create(title="Sell with us")
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
     page.goto(f"{live_server.url}/sell-with-us/")
