@@ -4,6 +4,7 @@ from pathlib import Path
 
 import dj_database_url
 import django_stubs_ext
+from django.utils.csp import CSP
 
 from .env import env_list, env_str
 
@@ -43,11 +44,19 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",  # range fields and exclusion constraints (validity periods)
+    # Task queue tables, admin and `manage.py procrastinate`; used only via apps.core.tasks.
+    "procrastinate.contrib.django",
     *LOCAL_APPS,
 ]
 
+# Background jobs (ADR-0004): cron schedules are read in BUSINESS_TIME_ZONE by this hook.
+PROCRASTINATE_ON_APP_READY = "apps.core.tasks.on_app_ready"
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "django.middleware.csp.ContentSecurityPolicyMiddleware",
+    "apps.core.middleware.PermissionsPolicyMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -74,6 +83,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "django.template.context_processors.csp",
             ],
         },
     },
@@ -112,6 +122,42 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# HTTP hardening shared by every environment (SEC.1, spec 12 SEC.3). Transport-only settings
+# (HSTS, HTTPS redirect, Secure cookies) live in live.py, since dev runs over plain HTTP.
+# Strict CSP without 'unsafe-inline': inline code needs the per-request nonce
+# ({% csp_nonce_attr %} or {{ csp_nonce }} in templates).
+SECURE_CSP: dict[str, list[str] | bool] = {
+    "default-src": [CSP.SELF],
+    "script-src": [CSP.SELF, CSP.NONCE],
+    "style-src": [CSP.SELF, CSP.NONCE],
+    "img-src": [CSP.SELF],
+    "font-src": [CSP.SELF],
+    "connect-src": [CSP.SELF],
+    "object-src": [CSP.NONE],
+    "base-uri": [CSP.NONE],
+    "frame-ancestors": [CSP.NONE],
+    "form-action": [CSP.SELF],
+}
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+X_FRAME_OPTIONS = "DENY"
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = "Lax"
+# Powerful browser features are denied until a task needs one (e.g. payment for wallets).
+PERMISSIONS_POLICY: dict[str, list[str]] = {
+    "accelerometer": [],
+    "camera": [],
+    "geolocation": [],
+    "gyroscope": [],
+    "magnetometer": [],
+    "microphone": [],
+    "payment": [],
+    "usb": [],
+}
 
 LOGGING = {
     "version": 1,

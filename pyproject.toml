@@ -10,6 +10,8 @@ dependencies = [
   "psycopg[binary]>=3.3",
   "dj-database-url>=2.3",
   "django-stubs-ext>=5.2",
+  "procrastinate[django]>=3.10",
+  "croniter>=6.2",
   "gunicorn>=26.0",
   "whitenoise>=6.12",
 ]
@@ -52,7 +54,7 @@ plugins = ["mypy_django_plugin.main"]
 exclude = ["^build/", "^private/", "^tools/", "^\\.claude/"]
 
 [[tool.mypy.overrides]]
-module = ["dj_database_url"]
+module = ["dj_database_url", "croniter"]
 ignore_missing_imports = true
 
 [tool.django-stubs]
@@ -80,6 +82,7 @@ branch = true
 
 [tool.importlinter]
 root_packages = ["apps", "mpmv"]
+include_external_packages = true  # needed to forbid third-party imports (procrastinate)
 
 # App dependency graph from spec 01 §1.3: an arrow A → B means B may import A, never the reverse.
 [[tool.importlinter.contracts]]
@@ -99,6 +102,14 @@ layers = [
   "apps.core",
 ]
 exhaustive = false
+
+[[tool.importlinter.contracts]]
+name = "Procrastinate is used only through apps.core.tasks (ADR-0004)"
+type = "forbidden"
+source_modules = ["apps", "mpmv"]
+forbidden_modules = ["procrastinate"]
+ignore_imports = ["apps.core.tasks -> procrastinate"]
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "Tax and shipping engines stay independent of orders and cart"

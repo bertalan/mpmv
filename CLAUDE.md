@@ -35,6 +35,7 @@ Guidance for AI agents working in this repository. Read [README.md](README.md) a
 - Money: `Decimal`, `MoneyField` = `DecimalField(12,2)`, `ROUND_HALF_UP` per line, never floats.
 - Mutating services accept `dry_run=True` and return a `ChangeSet`. Sensitive mutations write `AuditLog`.
 - Orders store snapshots (prices, tax, commission rule), never live references.
+- The platform's country and tax position come from `current_operator()` (`PlatformOperator`), never a literal like `"IT"`.
 - Tax, payments, ledger and order code needs regression tests from the spec, and the PR must
   flag it for human review.
 

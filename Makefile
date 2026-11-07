@@ -1,6 +1,6 @@
 # MPMV task runner. Local containers use Apple `container` (ADR-0002); no Docker, no compose.
 .DEFAULT_GOAL := help
-.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell image dev dev-down dev-reset dev-status dev-logs migrate run test test-unit test-e2e test-all check lint fmt typecheck imports audit
+.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell image dev dev-down dev-reset dev-status dev-logs migrate run worker test test-unit test-e2e test-all check lint fmt typecheck imports audit
 
 DB_NAME      := mpmv-db
 DB_IMAGE     := docker.io/library/postgres:17
@@ -85,6 +85,9 @@ migrate: db ## Apply migrations to the local database
 
 run: migrate ## Run the development server
 	$(MANAGE) runserver
+
+worker: migrate ## Run the background worker: queued jobs and periodic schedules (ADR-0004)
+	$(MANAGE) procrastinate worker
 
 # --- Quality gates
 # Test suites (ADR-0006): unit = no database; integration = real PostgreSQL; e2e = Playwright.
