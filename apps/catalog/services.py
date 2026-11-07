@@ -582,8 +582,11 @@ def update_by_sku(
 PRODUCT_DUPLICATED = "catalog.product.duplicated_to_vendor"
 UPSELL_NOT_ALLOWED = "{sku}: its vendor has not opted in to other vendors' suggestions."
 
-# A copy gets its own identity and timestamps.
-DUPLICATE_SKIPPED = frozenset({"id", "public_id", "created_at", "updated_at"})
+# A copy gets its own identity and timestamps: a new staff_ref from the database sequence and a
+# match key set on save from its SKU (CAT.13).
+DUPLICATE_SKIPPED = frozenset(
+    {"id", "public_id", "created_at", "updated_at", "staff_ref", "sku_key"}
+)
 
 
 def _copy[M: models.Model](instance: M, **overrides: Any) -> M:
@@ -642,10 +645,20 @@ def duplicate_product_to_vendor(
         )
         copy.full_clean()
         variants = list(original.variants.prefetch_related("translations"))
-        taken = Variant.objects.filter(vendor=vendor, sku__in=[v.sku for v in variants])
-        if taken.exists():
-            skus = ", ".join(sorted(taken.values_list("sku", flat=True)))
-            raise ValidationError({"sku": f"The vendor already has variants with SKU {skus}."})
+        # The copy's own SKU was checked by full_clean; its variants share the target vendor's
+        # namespace with products and variants alike, by match key (CAT.13).
+        keys = {variant.sku_key: variant.sku for variant in variants}
+        taken = {
+            *Product.objects.filter(vendor=vendor, sku_key__in=keys).values_list(
+                "sku_key", flat=True
+            ),
+            *Variant.objects.filter(vendor=vendor, sku_key__in=keys).values_list(
+                "sku_key", flat=True
+            ),
+        }
+        if taken:
+            skus = ", ".join(sorted(keys[key] for key in taken))
+            raise ValidationError({"sku": f"The vendor already uses these SKUs: {skus}."})
 
         changes = ChangeSet()
         changes.create(
@@ -768,13 +781,43 @@ def _product_errors(
         if variant.stock_qty < 0:
             _add_error(errors, "variants", f"{variant.sku}: the stock cannot be negative.")
 
-    if Product.objects.filter(vendor=vendor, sku=data.sku).exists():
-        _add_error(errors, "sku", "This vendor already has a product with this SKU.")
-    skus = [v.sku for v in data.variants]
-    taken = Variant.objects.filter(vendor=vendor, sku__in=skus).values_list("sku", flat=True)
-    for sku in sorted(taken):
-        _add_error(errors, "variants", f"This vendor already has a variant with this SKU: {sku}.")
+    _sku_namespace_errors(errors, vendor, data)
     return errors
+
+
+def _sku_namespace_errors(
+    errors: dict[str, list[str]], vendor: Vendor, data: engine.ProductIn
+) -> None:
+    """The SKUs are usable and free in the vendor's namespace: one per match key, across
+    products and variants together (CAT.13, Q-30); the database would refuse them."""
+    for message in engine.sku_errors(data.sku):
+        _add_error(errors, "sku", message)
+    product_key = engine.sku_match_key(data.sku)
+    if product_key:
+        owner = sku_owner(vendor.pk, product_key)
+        if owner is not None:
+            _add_error(errors, "sku", sku_taken_message(owner))
+    given: dict[str, str] = {}  # match key -> the variant SKU as first given
+    for variant in data.variants:
+        for message in engine.sku_errors(variant.sku):
+            _add_error(errors, "variants", f"{variant.sku!r}: {message}")
+        key = engine.sku_match_key(variant.sku)
+        if key:
+            given.setdefault(key, variant.sku)
+    if product_key in given:
+        _add_error(
+            errors,
+            "variants",
+            f"A variant cannot have the SKU of its product: {given[product_key]}.",
+        )
+    for model, label in ((Product, "product"), (Variant, "variant")):
+        taken = model.objects.filter(vendor=vendor, sku_key__in=given).values_list(
+            "sku_key", flat=True
+        )
+        for sku in sorted(given[key] for key in taken):
+            _add_error(
+                errors, "variants", f"This vendor already has a {label} with this SKU: {sku}."
+            )
 
 
 def create_product(

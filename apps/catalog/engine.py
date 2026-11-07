@@ -399,13 +399,14 @@ def product_structure_errors(
         errors.append("A variable product needs at least one variant.")
 
     combinations: dict[tuple[str, ...], str] = {}
-    skus: set[str] = set()
+    skus: dict[str, str] = {}  # match key (CAT.13) -> the SKU as first given
     for variant in variants:
         errors.extend(_variant_errors(variant, axes, allowed))
-        sku = variant.sku
-        if sku in skus:
-            errors.append(f"The variant SKU {sku} is given twice.")
-        skus.add(sku)
+        key = sku_match_key(variant.sku)
+        if key in skus:
+            errors.append(f"The variant SKU {skus[key]} is given twice.")
+        else:
+            skus[key] = variant.sku
         combination = tuple(variant.options.get(axis, "") for axis in axes)
         if combination in combinations:
             errors.append(
