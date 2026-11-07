@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",  # range fields and exclusion constraints (validity periods)
     *LOCAL_APPS,
 ]
 
