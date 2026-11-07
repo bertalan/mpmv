@@ -113,16 +113,29 @@ def test_a_fiscal_regime_change_from_a_future_date_waits_for_that_date() -> None
 # --- Who may review
 
 
-def test_active_staff_other_than_the_requester_may_review() -> None:
-    assert engine.reviewer_error(is_staff=True, is_active=True, is_requester=False) is None
+def test_active_staff_with_the_review_permission_other_than_the_requester_may_review() -> None:
+    error = engine.reviewer_error(
+        is_staff=True, is_active=True, has_permission=True, is_requester=False
+    )
+    assert error is None
 
 
 @pytest.mark.parametrize(
-    ("is_staff", "is_active", "is_requester"),
-    [(False, True, False), (True, False, False), (True, True, True)],
+    ("is_staff", "is_active", "has_permission", "is_requester"),
+    [
+        (False, True, True, False),
+        (True, False, True, False),
+        (True, True, False, False),
+        (True, True, True, True),
+    ],
 )
-def test_customers_inactive_users_and_the_requester_may_not_review(
-    is_staff: bool, is_active: bool, is_requester: bool
+def test_customers_inactive_users_staff_without_permission_and_the_requester_may_not_review(
+    is_staff: bool, is_active: bool, has_permission: bool, is_requester: bool
 ) -> None:
-    error = engine.reviewer_error(is_staff=is_staff, is_active=is_active, is_requester=is_requester)
+    error = engine.reviewer_error(
+        is_staff=is_staff,
+        is_active=is_active,
+        has_permission=has_permission,
+        is_requester=is_requester,
+    )
     assert error is not None

@@ -6,6 +6,7 @@ import datetime as dt
 from typing import Any
 
 import pytest
+from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
@@ -34,7 +35,7 @@ def owner_of(vendor: Vendor) -> User:
 
 
 def reviewer() -> User:
-    user: User = UserFactory.create(staff=True)
+    user: User = UserFactory.create(staff=True, permissions=[services.REVIEW_PERMISSION])
     return user
 
 
@@ -322,6 +323,10 @@ def test_only_staff_other_than_the_requester_review() -> None:
     requester = owner_of(vendor)
     User.objects.filter(pk=requester.pk).update(is_staff=True)
     requester.refresh_from_db()
+    app_label, codename = services.REVIEW_PERMISSION.split(".")
+    requester.user_permissions.add(
+        Permission.objects.get(content_type__app_label=app_label, codename=codename)
+    )
     request = submitted(vendor, requested_by=requester)
     customer = UserFactory.create()
     for user in (requester, customer):
@@ -330,6 +335,18 @@ def test_only_staff_other_than_the_requester_review() -> None:
         with pytest.raises(engine.RegimeChangeNotAllowed):
             services.reject_regime_change(request, user, reason="No.", ctx=STAFF_CTX)
     assert TaxRegimeChangeRequest.objects.get().status == engine.PENDING
+
+
+def test_staff_without_the_review_permission_cannot_review() -> None:
+    request = submitted(VendorFactory.create(fiscal_regime="RF01"))
+    viewer = UserFactory.create(staff=True, permissions=["tax.view_taxregimechangerequest"])
+    with pytest.raises(engine.RegimeChangeNotAllowed):
+        services.approve_regime_change(request, viewer, ctx=STAFF_CTX)
+    with pytest.raises(engine.RegimeChangeNotAllowed):
+        services.reject_regime_change(request, viewer, reason="No.", ctx=STAFF_CTX)
+    assert TaxRegimeChangeRequest.objects.get().status == engine.PENDING
+    assert VendorTaxProfile.objects.count() == 0
+    assert actions() == ["tax.regime_change.requested"]
 
 
 # --- History

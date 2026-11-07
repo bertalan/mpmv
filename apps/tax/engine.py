@@ -159,13 +159,18 @@ def fiscal_regime_change_error(effective_from: dt.datetime, *, now: dt.datetime)
     return None
 
 
-def reviewer_error(*, is_staff: bool, is_active: bool, is_requester: bool) -> str | None:
+def reviewer_error(
+    *, is_staff: bool, is_active: bool, has_permission: bool, is_requester: bool
+) -> str | None:
     """Why a user may not review a request; None when they may.
 
-    Reviews are for active platform staff, and never by the person who asked for the change.
+    Reviews are for active platform staff holding the review permission (being staff, i.e.
+    admin login, is not enough), and never by the person who asked for the change.
     """
     if not (is_staff and is_active):
         return "Only active platform staff review tax regime change requests."
+    if not has_permission:
+        return "Reviewing tax regime change requests needs the review permission."
     if is_requester:
         return "A request is reviewed by someone other than the person who made it."
     return None

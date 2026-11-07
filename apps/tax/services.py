@@ -293,6 +293,9 @@ REQUEST_MODEL = "tax.taxregimechangerequest"
 REGIME_CHANGE_REQUESTED = "tax.regime_change.requested"
 REGIME_CHANGE_APPROVED = "tax.regime_change.approved"
 REGIME_CHANGE_REJECTED = "tax.regime_change.rejected"
+# Checked here, not only in the admin: every adapter (admin, API, MCP, shell) reviews through
+# these services, and admin login alone (`is_staff`) does not allow a review.
+REVIEW_PERMISSION = "tax.review_taxregimechangerequest"
 REQUEST_FIELDS = (
     "status",
     "regime",
@@ -387,6 +390,7 @@ def _lock_for_review(request: TaxRegimeChangeRequest, reviewer: User) -> TaxRegi
     error = engine.reviewer_error(
         is_staff=reviewer.is_staff,
         is_active=reviewer.is_active,
+        has_permission=reviewer.has_perm(REVIEW_PERMISSION),
         is_requester=reviewer.pk == current.requested_by_id,
     )
     if error is not None:

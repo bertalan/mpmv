@@ -202,7 +202,6 @@ class VatValidationAdmin(HistoryAdmin[VatValidation]):
 
 # --- Regime change requests (TAX.2)
 
-REVIEW_PERMISSION = "tax.review_taxregimechangerequest"
 REVIEW_TEMPLATE = "admin/tax/taxregimechangerequest/review.html"
 
 
@@ -387,7 +386,7 @@ class TaxRegimeChangeRequestAdmin(HistoryAdmin[TaxRegimeChangeRequest]):
         obj = self.get_object(request, unquote(object_id))
         if obj is None:
             raise Http404("No such tax regime change request.")
-        if not request.user.has_perm(REVIEW_PERMISSION):
+        if not request.user.has_perm(services.REVIEW_PERMISSION):  # the services check it too
             raise PermissionDenied
         change_url = reverse("admin:tax_taxregimechangerequest_change", args=[obj.pk])
         if obj.status != engine.PENDING:
