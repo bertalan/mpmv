@@ -3,10 +3,10 @@
 import secrets
 
 import pytest
+from django.contrib.auth import get_user_model
 from django.test import Client
 from django.urls import reverse
 
-from apps.accounts.models import User
 from apps.core.models import AuditLog, PlatformOperator
 from apps.core.tests.factories import operator
 
@@ -15,7 +15,8 @@ pytestmark = pytest.mark.django_db
 
 @pytest.fixture
 def staff_client(client: Client) -> Client:
-    user = User.objects.create_superuser(
+    # Through get_user_model(): core must not import accounts (spec 01 §1.3).
+    user = get_user_model()._default_manager.create_superuser(
         email="ops@example.com", password=secrets.token_urlsafe(16)
     )
     client.force_login(user)

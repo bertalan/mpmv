@@ -155,6 +155,21 @@ def test_new_configuration_must_start_after_the_current_one() -> None:
     assert PlatformOperator.objects.count() == 1
 
 
+def test_new_configuration_never_shortens_an_already_closed_row() -> None:
+    operator(valid_from=utc(2027), valid_to=utc(2029)).save()
+    with pytest.raises(ValidationError) as exc:
+        configure_platform_operator(operator(valid_from=utc(2028)), ctx=CTX)
+    assert "valid_from" in exc.value.message_dict
+    assert PlatformOperator.objects.get().valid_to == utc(2029)
+
+
+def test_saved_rows_cannot_be_reconfigured() -> None:
+    op = operator()
+    op.save()
+    with pytest.raises(ValueError, match="unsaved"):
+        configure_platform_operator(op, ctx=CTX)
+
+
 def test_new_configuration_is_validated_before_writing() -> None:
     with pytest.raises(ValidationError):
         configure_platform_operator(operator(country="XX"), ctx=CTX)
