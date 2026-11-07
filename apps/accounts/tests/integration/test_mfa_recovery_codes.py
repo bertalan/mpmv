@@ -3,7 +3,7 @@
 import re
 
 import pytest
-from django.test import Client
+from django.test import Client, override_settings
 from django.urls import reverse
 from pytest_django.fixtures import Settings as SettingsWrapper
 
@@ -118,3 +118,18 @@ def test_failed_attempts_are_throttled(client: Client) -> None:
     assert _use(client, engine.generate_recovery_codes(1)[0]) == 200
     assert _use(client, code) == 200  # right code, but too soon after a failure
     assert RecoveryCode.objects.get().used_at is None
+
+
+@override_settings(TRUSTED_PROXY_HEADER="X-Real-IP", TRUSTED_PROXIES=["10.89.250.0/24"])
+def test_mfa_audit_rows_record_the_client_ip_behind_the_trusted_proxy() -> None:
+    """Coherence check 3, finding 1: not the proxy's REMOTE_ADDR."""
+    user = UserFactory.create(staff=True)
+    TOTPDeviceFactory.create(user=user)
+    code = engine.generate_recovery_codes(1)[0]
+    RecoveryCodeFactory.create(device=RecoveryCodeDeviceFactory.create(user=user), code=code)
+    proxied = Client(REMOTE_ADDR="10.89.250.2", headers={"X-Real-IP": "203.0.113.7"})
+    password_login(proxied, user)
+
+    assert _use(proxied, code) == 302
+    audit = AuditLog.objects.get(action="accounts.mfa.recovery_code_used")
+    assert audit.ip == "203.0.113.7"
