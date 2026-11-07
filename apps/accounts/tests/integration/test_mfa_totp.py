@@ -90,6 +90,7 @@ def test_the_right_code_confirms_verifies_and_shows_recovery_codes_once(
     audit = AuditLog.objects.get(action="accounts.mfa.enrolled")
     assert audit.actor_id == staff.pk
     assert audit.target_model == "otp_totp.totpdevice"
+    assert audit.after is not None
     assert audit.after["kind"] == "totp"
     assert AuditLog.objects.filter(action="accounts.mfa.recovery_codes_generated").count() == 1
 

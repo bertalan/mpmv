@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 from django.contrib.auth.models import AnonymousUser
-from pytest_django.fixtures import SettingsWrapper
+from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.accounts.checks import check_mfa_middleware
 from apps.accounts.services import mfa_required
@@ -61,10 +61,10 @@ def test_the_check_fails_when_an_mfa_middleware_is_missing(
 ) -> None:
     settings.MIDDLEWARE = [m for m in settings.MIDDLEWARE if m != missing]
     errors = check_mfa_middleware(None)
-    assert [e.id for e in errors] == ["accounts.E001"]
+    assert [e.id for e in errors] == ["accounts.E002"]
 
 
 def test_the_check_fails_when_mfa_runs_before_authentication(settings: SettingsWrapper) -> None:
     mfa = "apps.accounts.middleware.MfaRequiredMiddleware"
     settings.MIDDLEWARE = [mfa, *(m for m in settings.MIDDLEWARE if m != mfa)]
-    assert [e.id for e in check_mfa_middleware(None)] == ["accounts.E001"]
+    assert [e.id for e in check_mfa_middleware(None)] == ["accounts.E002"]

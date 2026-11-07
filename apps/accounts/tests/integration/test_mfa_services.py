@@ -90,6 +90,7 @@ def test_reset_mfa_deletes_every_factor_and_forces_a_new_enrolment(client: Clien
     assert not RecoveryCode.objects.filter(device__user=user).exists()
     audit = AuditLog.objects.get(action="accounts.mfa.disabled")
     assert audit.actor_label == CTX.actor_label
+    assert audit.before is not None
     assert audit.before["factors"] == ["passkey", "recovery_codes", "totp"]
     # The open session was verified by a device that no longer exists.
     assert client.get("/django-admin/")["Location"].startswith(reverse("mfa:setup"))

@@ -49,6 +49,10 @@ INSTALLED_APPS = [
     "procrastinate.contrib.django",
     # API v1 (CORE.7): serves the Swagger UI from local static files, without inline scripts.
     "ninja",
+    # Second factors (CORE.4): device framework and TOTP devices; passkeys and recovery codes
+    # are accounts models. Listed before accounts so its admin can unregister the raw device admin.
+    "django_otp",
+    "django_otp.plugins.otp_totp",
     *LOCAL_APPS,
 ]
 
@@ -64,6 +68,9 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # CORE.4: which device verified the session, then confine required roles to the MFA pages.
+    "django_otp.middleware.OTPMiddleware",
+    "apps.accounts.middleware.MfaRequiredMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -75,6 +82,16 @@ AUTHENTICATION_BACKENDS = [
     "apps.accounts.backends.LoginProtectionBackend",
     "django.contrib.auth.backends.ModelBackend",
 ]
+
+# Multi-factor authentication (CORE.4, spec 02 §2.2). Staff and superusers must verify a second
+# factor (TOTP or passkey) before any page; each dotted path below names an extra
+# `check(user) -> bool` that makes MFA mandatory for more roles (vendor owners: CORE.2).
+MFA_REQUIRED_POLICIES: list[str] = []
+MFA_STEP_UP_MAX_AGE = 300  # seconds a verification counts as fresh for sensitive actions
+MFA_LOGIN_URL = "admin:login"  # until the site and vendor login pages exist
+MFA_ISSUER = "MPMV"  # name shown in authenticator apps and passkey prompts
+OTP_TOTP_ISSUER = MFA_ISSUER
+OTP_ADMIN_HIDE_SENSITIVE_DATA = True
 
 ROOT_URLCONF = "mpmv.urls"
 WSGI_APPLICATION = "mpmv.wsgi.application"

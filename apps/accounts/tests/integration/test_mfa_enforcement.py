@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 from django.test import Client
 from django.urls import reverse
-from pytest_django.fixtures import SettingsWrapper
+from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.accounts.models import User
 from apps.accounts.tests.factories import (
@@ -19,7 +19,6 @@ from apps.accounts.tests.factories import (
     UserFactory,
 )
 from apps.accounts.tests.mfa import password_login, verified_login
-from apps.vendors.models import Vendor
 
 pytestmark = pytest.mark.django_db
 
@@ -85,12 +84,13 @@ def test_every_page_is_closed_until_mfa_is_verified(client: Client, url: str) ->
 
 def test_admin_writes_are_refused_without_mfa(client: Client) -> None:
     password_login(client, UserFactory.create(superuser=True))
+    password = secrets.token_urlsafe(16)
     response = client.post(
-        "/django-admin/vendors/vendor/add/",
-        {"legal_name": "Vendor A S.r.l.", "display_name": "Vendor A", "country": "IT"},
+        "/django-admin/accounts/user/add/",
+        {"email": "new@example.com", "password1": password, "password2": password},
     )
     assert response.status_code == 302
-    assert not Vendor.objects.exists()
+    assert not User.objects.filter(email="new@example.com").exists()
 
 
 def test_json_requests_get_403_instead_of_a_redirect(client: Client) -> None:

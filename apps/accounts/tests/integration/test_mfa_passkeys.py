@@ -79,6 +79,7 @@ def test_first_passkey_enrols_verifies_and_returns_recovery_codes(client: Client
 
     audit = AuditLog.objects.get(action="accounts.mfa.enrolled")
     assert audit.target_model == "accounts.passkeydevice"
+    assert audit.after is not None
     assert audit.after["kind"] == "passkey"
 
 

@@ -5,7 +5,7 @@ import re
 import pytest
 from django.test import Client
 from django.urls import reverse
-from pytest_django.fixtures import SettingsWrapper
+from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.accounts import engine
 from apps.accounts.models import RecoveryCode

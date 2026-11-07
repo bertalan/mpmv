@@ -1,0 +1,8 @@
+<form method="post" data-passkey="register" data-options-url="{{ register_options_url }}" data-finish-url="{{ register_url }}">
+  {% csrf_token %}
+  <p><label for="id_passkey_name">Passkey name</label>
+    <input id="id_passkey_name" name="name" value="Passkey" maxlength="64"></p>
+  <button type="submit">Register a passkey</button>
+  <p data-passkey-error role="alert" hidden></p>
+</form>
+{% include "accounts/mfa/_recovery_codes_list.html" with codes=None %}
