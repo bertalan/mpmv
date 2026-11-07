@@ -1,10 +1,10 @@
 """Products, variants and their translations (spec 03 §3.2, CAT.1).
 
-Fields owned by later tasks are added there: `category`, `brand` and `terms` (CAT.2), variant
-`options` and product attributes (CAT.3), images (CAT.4), slug generation and SlugHistory
-(CAT.5), `gpsr` (CMP.3). Prices change only through `services.set_product_price` and
-`services.set_variant_price`, which audit them; the status changes through the publishing
-services of CAT.10.
+The category tree, taxonomies, terms and brands (CAT.2) live in `taxonomy.py`; products link
+to them here. Fields owned by later tasks are added there: variant `options` and product
+attributes (CAT.3), images (CAT.4), slug generation and SlugHistory (CAT.5), `gpsr` (CMP.3).
+Prices change only through `services.set_product_price` and `services.set_variant_price`, which
+audit them; the status changes through the publishing services of CAT.10.
 
 Vendor scoping (CORE.3): every model here uses `VendorScopedManager`. `Variant.vendor` copies
 its product's vendor so that the database can enforce one SKU per vendor among variants; a
@@ -26,6 +26,37 @@ from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager
 
 from .fields import SkuField
+from .taxonomy import (
+    Brand,
+    BrandTranslation,
+    Category,
+    CategoryTranslation,
+    Taxonomy,
+    TaxonomyTranslation,
+    Term,
+    TermTranslation,
+)
+
+__all__ = [
+    "Brand",
+    "BrandTranslation",
+    "Category",
+    "CategoryTranslation",
+    "FiscalCategory",
+    "Product",
+    "ProductKind",
+    "ProductStatus",
+    "ProductTranslation",
+    "SalesMode",
+    "StockPolicy",
+    "StockStatus",
+    "Taxonomy",
+    "TaxonomyTranslation",
+    "Term",
+    "TermTranslation",
+    "Variant",
+    "VariantTranslation",
+]
 
 gtin_validator = RegexValidator(r"^\d{8,14}$", "A GTIN (EAN, UPC, ISBN) has 8 to 14 digits.")
 
@@ -162,6 +193,29 @@ class Product(BaseModel):
     upsells = models.ManyToManyField(
         "self", symmetrical=False, blank=True, related_name="upsold_by"
     )
+
+    # Classification (CAT.2). A draft may have no category yet; publishing rules are CAT.10's.
+    category = models.ForeignKey(
+        Category,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="products",
+        help_text="Main category: the product's breadcrumb and Google category fallback.",
+    )
+    secondary_categories = models.ManyToManyField(
+        Category, blank=True, related_name="secondary_products"
+    )
+    brand = models.ForeignKey(
+        Brand,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="products",
+        help_text="Manufacturer brand.",
+    )
+    # Tag the most specific terms: their upper levels are derived (services.effective_terms).
+    terms = models.ManyToManyField(Term, blank=True, related_name="products")
 
     legacy_wp_id_en = models.PositiveBigIntegerField(
         "legacy EN post id", null=True, blank=True, unique=True
