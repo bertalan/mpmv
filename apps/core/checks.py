@@ -389,7 +389,9 @@ def check_encrypted_data(
     """Every encrypted column decrypts with the configured keys (one sample per key id).
 
     Runs only when a database is checked: `migrate` does it before migrating, so a deploy with
-    a wrong or retired key stops there. Tables not created yet are skipped.
+    a wrong or retired key stops there. Tables not created yet are skipped. One sample per key
+    keeps the deploy fast but cannot see a single bad row: `manage.py verify_encrypted_data`
+    decrypts them all.
     """
     if not databases:
         return []

@@ -81,6 +81,11 @@ its key in the same place protect nothing, and a lost key means lost data.
 
 A deploy with a wrong key therefore stops at the `migrate` step.
 
+One sample per key cannot see a single row that does not decrypt (altered, or a token moved from
+another column). `manage verify_encrypted_data` decrypts every value, read-only, and fails
+naming those rows by public id, never by value. Run it after restoring a backup and before
+retiring a key.
+
 ## Rotating a key
 
 1. `manage generate_field_key <new id>` and put the new key **first**, keeping the old one

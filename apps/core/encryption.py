@@ -9,7 +9,7 @@ Table and column names come from model metadata and are quoted; values are param
 
 import functools
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from django.apps import apps
@@ -125,6 +125,69 @@ def stale_rows(
         }
         rows.append((pk, str(key), stale))
     return rows
+
+
+def _row_key_column(model: type[models.Model]) -> str:
+    """The column that names a row in reports: the public id when the model has one."""
+    if any(f.name == "public_id" for f in model._meta.concrete_fields):
+        return "public_id"
+    return str(model._meta.pk.column) if model._meta.pk else "id"
+
+
+@dataclass
+class ColumnReport:
+    """What `verify_column` found in one encrypted column. Rows are named by their key only."""
+
+    context: str
+    decrypted: int = 0
+    older_key: int = 0  # among `decrypted`
+    cleartext: int = 0
+    unknown_key: dict[str, list[str]] = field(default_factory=dict)  # key id -> row keys
+    undecryptable: list[str] = field(default_factory=list)  # row keys
+
+    @property
+    def ok(self) -> bool:
+        return not self.unknown_key and not self.undecryptable
+
+
+def verify_column(
+    connection: BaseDatabaseWrapper, column: EncryptedColumn, keyring: crypto.Keyring
+) -> ColumnReport:
+    """Decrypt every non-empty value of `column` (read-only; the values are never returned).
+
+    The `migrate` check decrypts one sample per key id, which is fast but misses a single row
+    that does not decrypt (altered, or moved from another column or row): this reads them all.
+    """
+    model = column.model
+    report = ColumnReport(column.context)
+    quoted_key = connection.ops.quote_name(_row_key_column(model))
+    quoted_table, quoted_column = _names(connection, model._meta.db_table, column.column)
+    with connection.chunked_cursor() as cursor:
+        cursor.execute(
+            f"SELECT {quoted_key}, {quoted_column} FROM {quoted_table}"  # noqa: S608
+            f" WHERE {quoted_column} <> '' ORDER BY 1"
+        )
+        while rows := cursor.fetchmany(1000):
+            for key, value in rows:
+                _verify_value(report, str(key), value, keyring)
+    return report
+
+
+def _verify_value(report: ColumnReport, key: str, value: str, keyring: crypto.Keyring) -> None:
+    key_id = key_id_of_raw(value)
+    if key_id == CLEARTEXT:
+        report.cleartext += 1
+    elif key_id not in keyring.key_ids:
+        report.unknown_key.setdefault(key_id, []).append(key)
+    else:
+        try:
+            keyring.decrypt(value, context=report.context)
+        except crypto.DecryptionError:
+            report.undecryptable.append(key)
+            return
+        report.decrypted += 1
+        if key_id != keyring.primary_id:
+            report.older_key += 1
 
 
 def key_id_of_raw(value: str) -> str:
