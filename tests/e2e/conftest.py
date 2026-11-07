@@ -15,6 +15,22 @@ os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
 SCREENSHOT_DIR = Path(__file__).resolve().parents[2] / "build" / "e2e" / "screenshots"
 
 
+@pytest.fixture(autouse=True)
+def _cms_site(request: pytest.FixtureRequest) -> None:
+    """The site's pages for every test that runs a live server (CMS.1).
+
+    Transactional tests flush the database after each test, so the home page created by the
+    migrations is gone after the first one: the seed puts a home, an About page and the menus
+    back in every configured language.
+    """
+    if "live_server" not in request.fixturenames:
+        return
+    request.getfixturevalue("transactional_db")
+    from apps.cms.services import seed_site
+
+    seed_site()
+
+
 @pytest.fixture
 def shot(page: Page, request: pytest.FixtureRequest) -> Callable[[str], Path]:
     """Save a named full-page screenshot for the current test; always kept for review."""

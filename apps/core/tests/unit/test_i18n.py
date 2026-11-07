@@ -1,8 +1,8 @@
 """I18N.1: translating a path into another configured language keeps the page (spec 09 §9.2).
 
 `/` is EN (no prefix), `/it/`, `/de/`, `/fr/` and `/es/` follow; paths outside the
-language-prefixed routes (health check, staff admin, unknown pages) are returned unchanged. No
-database involved.
+language-prefixed routes (health check, staff admin) are returned unchanged. Any other path is a
+CMS page path (CMS.1): it moves under the other prefix, slug unchanged. No database involved.
 """
 
 import pytest
@@ -46,10 +46,21 @@ def test_translate_path_keeps_the_query_string() -> None:
     assert translate_path("/?page=2", "it") == "/it/?page=2"
 
 
-@pytest.mark.parametrize("path", ["/healthz", "/django-admin/", "/no-such-page/"])
+@pytest.mark.parametrize("path", ["/healthz", "/django-admin/"])
 @pytest.mark.parametrize("language", ["en", "it", "de", "fr", "es"])
 def test_translate_path_leaves_unprefixed_routes_alone(path: str, language: str) -> None:
     assert translate_path(path, language) == path
+
+
+@pytest.mark.parametrize(
+    ("path", "language", "expected"),
+    [("/about/", "it", "/it/about/"), ("/it/chi-siamo/", "en", "/chi-siamo/")],
+)
+def test_translate_path_moves_page_paths_under_the_other_prefix(
+    path: str, language: str, expected: str
+) -> None:
+    # The CMS language switcher sends the translated page's own URL (slugs differ by language).
+    assert translate_path(path, language) == expected
 
 
 def test_translate_path_ignores_unknown_languages() -> None:
