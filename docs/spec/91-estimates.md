@@ -74,7 +74,7 @@ A milestone is closed only with a working demo on STAGE and the domain regressio
 - German at go-live (D-18): native-speaker review of the AI drafts for legal pages, checkout and
   emails, and German legal texts checked by counsel (Impressum, terms, withdrawal notice).
 - SDI intermediary for commission invoices; CMP for cookies; transactional email provider.
-- Hosting: EU VPS, managed Postgres, object storage and CDN, error tracking.
+- Hosting: Hetzner Cloud VPS (app and database per environment), Hetzner Object Storage for media and backups, CDN, error tracking.
 - Custom graphics and UX, if you want to go beyond a clean, accessible theme.
 
 In exchange, the recurring costs of premium WordPress licenses disappear (WCFM Ultimate, Membership,

@@ -41,24 +41,33 @@ flowchart LR
   U[Users] --> CF[Cloudflare<br/>CDN · WAF · Turnstile]
   CF --> CA[Caddy<br/>TLS]
   CA --> APP[Django app<br/>gunicorn/uvicorn]
-  APP --> PG[(PostgreSQL<br/>data · queues · search)]
+  APP --> PG[(PostgreSQL 17<br/>dedicated DB VPS<br/>data · queues · search)]
   W[Task worker + cron] --> PG
-  APP --> S3[(EU object storage<br/>media)]
+  APP --> S3[(Hetzner Object Storage<br/>media)]
   W --> S3
   APP --> ST[Stripe]
   W --> EXT[Suppliers · VIES · Merchant API · AI]
-  PG --> BK[(Encrypted backups<br/>off-site, PITR)]
+  PG --> BK[(pgBackRest: WAL + base backups<br/>encrypted, Object Storage)]
 ```
 
 - **Environments**: local (Apple `container`, same OCI images), STAGE, LIVE; differences only via env; STAGE with synthetic data.
+  STAGE and LIVE run on Hetzner Cloud, EU region, x86 servers
+  ([ADR-0007](../adr/0007-hosting-hetzner-self-managed-postgres.md)): each has an app VPS (app,
+  worker and Caddy as Podman Quadlets) and a dedicated database VPS running self-managed
+  PostgreSQL 17, reachable only over the Hetzner private network.
 - **Deploy**: versioned image built by CI, migrations in a dedicated step, rollback by tag; no
   `git pull` on the servers.
-- **Backup**: PostgreSQL with PITR (WAL) and encrypted daily off-site dumps; versioned object storage;
-  documented quarterly restore test. RPO ≤ 15 min, RTO ≤ 4 h (to be confirmed).
+- **Backup**: run by us, since PostgreSQL is self-managed. pgBackRest archives WAL continuously and
+  takes scheduled base backups to Hetzner Object Storage (S3 compatible, EU), encrypted, with a
+  documented retention policy, in a bucket separate from media; versioned object storage for media;
+  documented quarterly restore test to an empty server at a chosen point in time. RPO ≤ 15 min,
+  RTO ≤ 4 h (to be confirmed). Database operations are ours too: OS and PostgreSQL patching on a
+  schedule, major upgrades tested on STAGE first, alerts on disk space, WAL archive lag or failure
+  and backup age (OPS.2).
 - **Observability**: JSON logs, error tracking, healthchecks, business metrics (orders per day,
   checkout errors, failed webhooks, failed jobs, translation queues), alerts via email or chat.
-- **Initial sizing**: one VPS with 4 vCPUs and 8–16 GB is enough for app, workers and Postgres at the current
-  scale; managed Postgres as an option if we prefer to delegate backups and upgrades.
+- **Initial sizing**: per environment, an app VPS with 4 vCPUs and 8 GB for app and workers, and a
+  database VPS with 4 vCPUs and 8–16 GB for PostgreSQL, are enough at the current scale.
 
 ## 12.5 Operations: replacing the scripts
 
@@ -76,12 +85,12 @@ flowchart LR
 |---|---|---|---|---|---|
 | SEC.0 | Immediate actions from §12.1 on the current system | P1 | 3 | — | Credentials rotated, files cleaned up |
 | SEC.1 | HTTP hardening + CSP + cookies + headers (automated tests) | P1 | 6 | ARC.3 | Header scan passed |
-| SEC.2 | Secure uploads and image re-encoding | P1 | 4 | CAT.4 | Tests with malicious files |
+| SEC.2 | Secure uploads and image re-encoding | P1 | 4 | CAT.4, ARC.15 | Tests with malicious files |
 | SEC.3 | Field-level encryption (IBAN, KYC, DAC7) with key rotation | P1 | 8 | VEN.1 | DB dump with no cleartext data |
 | SEC.4 | AuditLog extended to all sensitive mutations + staff view with filters | P1 | 6 | ARC.6 | Rate change visible with before/after |
 | SEC.5 | Security tests in CI (permissions by role and tenant, unauthenticated endpoints) | P1 | 8 | CORE.3 | Undeclared public endpoint → CI red |
 | SEC.6 | External penetration test and remediation | P1 | 16 | MIG.5 | Report with no open critical findings |
-| OPS.1 | PITR backup + encrypted off-site dumps + restore test; least-privilege DB roles (app role without DDL or TRUNCATE, so the audit log stays append-only) | P1 | 8 | ARC.5 | Documented restore on an empty environment; app role cannot TRUNCATE `core_auditlog` |
-| OPS.2 | Observability: JSON logs, error tracking, healthchecks, alerts | P1 | 8 | ARC.5 | Alert on a simulated checkout error |
+| OPS.1 | Self-managed PITR with pgBackRest (continuous WAL archiving + base backups) to Hetzner Object Storage, encrypted, with retention + restore test; least-privilege DB roles (app role without DDL or TRUNCATE, so the audit log stays append-only) | P1 | 8 | ARC.13 | Documented point-in-time restore on an empty database VPS; app role cannot TRUNCATE `core_auditlog` |
+| OPS.2 | Observability: JSON logs, error tracking, healthchecks, alerts (including database disk space, WAL archiving and backup age) | P1 | 8 | ARC.5 | Alert on a simulated checkout error |
 | OPS.3 | Runbooks: incidents (including 72 h data breach), payouts, rate updates, vendor onboarding | P2 | 8 | — | Runbooks in the repo |
 | OPS.4 | Automated dependency updates (PRs) + SBOM | P2 | 3 | ARC.4 | Weekly update PRs |
