@@ -26,8 +26,11 @@ part of the done-when still open) · `not started`.
 | I18N.1 | done | #12 | Language-prefix routing, language switcher, preferred language |
 | ARC.5 | partial: STAGE deploy pending hosting decision | #13 | OCI image, Apple container local stack, Podman Quadlets, tag deploy and rollback tooling, Procrastinate worker role |
 | ARC.12 | done | #16 | factory_boy factories per model, hand-written test builders converted |
-| CORE.4 | not started (rerun in wave 3) | none | |
-| CORE.5 | not started (rerun in wave 3) | none | |
+| CORE.2 | done | #18 | VendorMember with owner and staff roles, role matrix, last-owner rule, audited membership services |
+| I18N.2 | done | #19 | Shared TranslationModel with status, source_hash, stale detection and EN fallback; language choices no longer frozen in migrations |
+| CORE.7 | partial: OpenAPI proven locally and in CI, STAGE publication pending hosting | #20 | Ninja API v1 skeleton: API key auth, dry-run, RFC 9457 problem details, OpenAPI 3.1, mutation log |
+| CORE.5 | done | #21 | Progressive login lockout per account and IP, registration rate limit, Turnstile captcha, trusted-proxy client IP |
+| CORE.4 | done | #22 | Mandatory MFA for staff, superusers and vendor owners: TOTP, passkeys, recovery codes, step-up |
 
 ## Follow-ups from wave 1
 
@@ -111,6 +114,65 @@ Review findings not fixed (all minor):
 - ARC.5: .dockerignore patterns for .env and key files match only at the root of the build context.
 - ARC.5: the Caddy unit does not drop capabilities, and Caddy has no trusted_proxies for Cloudflare, so the app sees Cloudflare IPs.
 - ARC.5: the implementation commit changed a parser in the test-only commit.
+
+## Follow-ups from wave 3
+
+Open questions for the owner:
+
+- CORE.5: approve the lockout numbers (account 5 failures, IP 20, lock from 1 minute doubling to 1 hour, forgotten after 24 hours; registration 5 per IP per day) or set others in spec 02.
+- CORE.5: should a locked user see a "too many attempts" message instead of the generic wrong-credentials error?
+- CORE.2: may a closed vendor lose all its members (a staff-only removal), or must it always keep an owner?
+- CORE.2: confirm that the storefront profile (texts, policies, logo) is owner-only, since spec 02 lists only orders, quotes and products for vendor staff.
+- I18N.2: should a stale published translation stay visible until review, instead of falling back to EN after any EN edit?
+- CORE.7: confirm the fail-open choice when a mutation-log row cannot be written (error logged, response still returned).
+- CORE.4: confirm that vendor staff members (not owners) do not need MFA.
+
+Deferred to other tasks:
+
+- CORE.7: serve and smoke-test /api/v1/openapi.json on STAGE once it exists; until then the CI artifact openapi-v1 is the published schema.
+- CORE.7: per-client API rate limit (spec 02) has no backlog row yet; it needs a cache shared across workers.
+- CORE.7: ApiMutationLog needs a retention policy and an admin or report view (CORE.8, OPS), since it stores client IPs.
+- CORE.7: 405 responses from the ninja dispatcher are plain text, not problem+json.
+- CORE.5: no staff action to unlock an account, and a password reset does not clear the lock; candidate for CORE.8.
+- CORE.5: future login forms must render the captcha widget when the captcha is enabled.
+- CORE.5: the core.W001 trusted-proxy warning does not block deploys; Caddyfile and Quadlet subnet are tested statically only.
+- CORE.4: no site or vendor login page yet, so MFA pages send anonymous users to the admin login.
+- CORE.4: TOTP secrets are stored in plain text by django-otp; field-level encryption goes to SEC.6.
+- CORE.4: step-up must be applied to IBAN, payout, rate and export views when they exist.
+- CORE.4: passkeys are bound to the request host; MFA_WEBAUTHN_RP_ID and allowed origins settings are not added yet.
+- CORE.2: no admin or UI for memberships yet; CORE.8 and CORE.9 must call the membership services.
+- CORE.2: ApiClient.vendor FK still missing (CORE.6 follow-up or CORE.3).
+- CORE.2: GDPR erasure must remove memberships first, since deleting a member user is blocked.
+- I18N.2: review-before-publish transition rules go to I18N.4; the fallback notice and sitemap exclusion go to the storefront and SEO tasks.
+
+Review findings not fixed (all minor):
+
+- CORE.4: no test asserts that the session key rotates on verification.
+- CORE.4: a wrong code during TOTP enrolment is not throttled, and concurrent device removals can leave zero factors.
+- CORE.4: register_passkey has no dry_run, and a duplicate credential ends in a 500 instead of a 400.
+- CORE.4: self-service actions by non-staff users are audited with source system.
+- CORE.5: an attacker can keep an account locked indefinitely with one attempt per hour.
+- CORE.5: the lock check is check-then-act, so a parallel burst gets a few extra guesses.
+- CORE.5: TOO_MANY_ATTEMPTS and VERIFICATION_FAILED are not marked for translation.
+- CORE.5: Turnstile answers are not checked for hostname, and token length is not bounded.
+- CORE.5: the admin login template copies Django's upstream block and can drift on upgrades.
+- CORE.5: every new lock writes an append-only AuditLog row keyed on the submitted identifier.
+- CORE.2: change_member_role leaves updated_at stale on the caller's instance, and remove_member leaves its pk.
+- CORE.2: Meta.ordering on the vendor FK adds a join to every default query.
+- CORE.2: has_vendor_permission is typed for User only; AnonymousUser is untested.
+- CORE.2: the last-owner rule and the VendorAction matrix are not written into spec 02.
+- I18N.2: save(update_fields=...) can store a hash that does not match the stored texts, and a language change is not handled.
+- I18N.2: resolve_translation ignores a prefetch cache (N+1 queries on listings).
+- I18N.2: the vendor data migration imports runtime hash code instead of a frozen copy.
+- I18N.2: stale detection lives in Model.save(), with no dry_run and no AuditLog.
+- CORE.7: unknown /api/v1 paths answer a CSRF 403 page to POST instead of a 404 problem.
+- CORE.7: refused unauthenticated mutating calls without credentials are not logged.
+- CORE.7: no system check refuses an unscoped ApiKey on mutating routes.
+- CORE.7: the docs claim validation details never echo submitted values, but Django messages can.
+- CORE.7: a problem extension named request_id is overwritten, and problem() accepts non-error statuses.
+- CORE.7: a test literal mimics the API key format.
+- CORE.7: ApiMutationLog and the problem type convention are not documented in spec 02.
+- Integration: CORE.4's MFA middleware check is accounts.E002, because CORE.5 took accounts.E001.
 
 ## Coherence checks
 
