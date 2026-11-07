@@ -1,7 +1,8 @@
 """Staff admin for the shipping configuration (Wagtail admin and the SHP.6 editor replace it).
 
-Rates are prices, so every create, change and delete made here, inlines included, writes an
-AuditLog entry with before and after. Configuration versions are history: view only.
+Rates are prices, so every create, change and delete made here, inlines included, goes through
+the audited services in `apps.shipping.services` (dry-run capable, AuditLog with before and
+after); the admin never saves these rows itself. Configuration versions are history: view only.
 """
 
 from typing import Any
@@ -10,12 +11,10 @@ from django import forms
 from django.contrib import admin
 from django.db import models
 from django.db.models import QuerySet
-from django.forms.models import BaseInlineFormSet, model_to_dict
+from django.forms.models import BaseInlineFormSet
 from django.http import HttpRequest
 
-from apps.core.audit import audit_context, record
-from apps.core.changeset import diff
-from apps.core.models import AuditLog
+from apps.core.audit import audit_context
 
 from . import engine
 from .models import (
@@ -28,66 +27,33 @@ from .models import (
     VendorZoneRate,
     WeightBand,
 )
-
-
-def snapshot(obj: models.Model) -> dict[str, Any]:
-    """The editable fields of a row, as stored in the database."""
-    return model_to_dict(obj)
-
-
-def stored(obj: models.Model) -> dict[str, Any] | None:
-    """The row as the database has it now (before an in-memory edit is saved)."""
-    if obj.pk is None:
-        return None
-    row = type(obj)._default_manager.filter(pk=obj.pk).first()
-    return None if row is None else snapshot(row)
-
-
-def audit(
-    request: HttpRequest, obj: models.Model, op: str, before: Any, after: Any
-) -> AuditLog | None:
-    if op == "updated" and not diff(before or {}, after or {}):
-        return None  # saved without changes
-    meta = obj._meta
-    return record(
-        audit_context(request),
-        f"{meta.label_lower}.{op}",
-        meta.label_lower,
-        str(getattr(obj, "public_id", obj.pk)),
-        before,
-        after,
-    )
+from .services import CONFIG_MODELS, delete_config, save_config
 
 
 class AuditedAdmin[M: models.Model](admin.ModelAdmin[M]):
-    """Writes an AuditLog entry for every row it, or one of its inlines, creates, changes or
-    deletes. The admin runs each save in a transaction, so a failed save audits nothing."""
+    """Writes every row it, or one of its audited inlines, creates, changes or deletes through
+    the shipping services. The admin runs each save in a transaction, so a failed save audits
+    nothing."""
 
     def save_model(self, request: HttpRequest, obj: M, form: Any, change: bool) -> None:
-        before = stored(obj) if change else None
-        super().save_model(request, obj, form, change)
-        audit(request, obj, "updated" if change else "created", before, snapshot(obj))
+        save_config(obj, ctx=audit_context(request))  # type: ignore[arg-type]
 
     def delete_model(self, request: HttpRequest, obj: M) -> None:
-        before = snapshot(obj)
-        super().delete_model(request, obj)
-        audit(request, obj, "deleted", before, None)
+        delete_config([obj], ctx=audit_context(request))  # type: ignore[list-item]
 
     def delete_queryset(self, request: HttpRequest, queryset: QuerySet[M]) -> None:
-        rows = [(obj, snapshot(obj)) for obj in queryset]
-        super().delete_queryset(request, queryset)
-        for obj, before in rows:
-            audit(request, obj, "deleted", before, None)
+        delete_config(queryset, ctx=audit_context(request))  # type: ignore[arg-type]
 
     def save_formset(self, request: HttpRequest, form: Any, formset: Any, change: bool) -> None:
-        before = {id(f.instance): stored(f.instance) for f in formset.initial_forms}
-        super().save_formset(request, form, formset, change)
-        for obj in formset.new_objects:
-            audit(request, obj, "created", None, snapshot(obj))
-        for obj, _fields in formset.changed_objects:
-            audit(request, obj, "updated", before.get(id(obj)), snapshot(obj))
-        for obj in formset.deleted_objects:
-            audit(request, obj, "deleted", before.get(id(obj)), None)
+        if formset.model not in CONFIG_MODELS:  # translations: not audited
+            super().save_formset(request, form, formset, change)
+            return
+        ctx = audit_context(request)
+        rows = formset.save(commit=False)  # collects new, changed and deleted rows, writes none
+        delete_config(formset.deleted_objects, ctx=ctx)
+        for obj in rows:
+            save_config(obj, ctx=ctx)
+        formset.save_m2m()
 
 
 class CarrierTranslationInline(admin.TabularInline[CarrierTranslation, Carrier]):

@@ -5,9 +5,13 @@
 - The client IP settings (CORE.5): core.E001, core.E002 and the deploy warning core.W001.
 - The audit policy (SEC.4): every model of our apps and every model in the staff admin is
   audited or exempt with a reason, and the admin of an audited model never writes through
-  Django's default, unaudited methods (core.E201 to E203).
+  Django's default, unaudited methods, not even by calling them from an override
+  (core.E201 to E203).
 """
 
+import ast
+import inspect
+import textwrap
 from collections.abc import Iterable, Mapping
 from typing import Any
 
@@ -214,15 +218,53 @@ def _overrides(model_admin: Any, method: str) -> bool:
     return getattr(type(model_admin), method) is not getattr(admin.ModelAdmin, method)
 
 
+def _calls_super(function: Any, method: str) -> bool | None:
+    """Whether `function` calls `super().<method>(...)`; None when its source is unreadable."""
+    try:
+        tree = ast.parse(textwrap.dedent(inspect.getsource(function)))
+    except (OSError, TypeError, SyntaxError):
+        return None
+    return any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == method
+        and isinstance(node.func.value, ast.Call)
+        and isinstance(node.func.value.func, ast.Name)
+        and node.func.value.func.id == "super"
+        for node in ast.walk(tree)
+    )
+
+
+def _writes_directly(model_admin: Any, method: str) -> bool:
+    """Whether `method` reaches Django's default, unaudited implementation: not overridden, or
+    overridden by code that calls `super().<method>` down to Django's (coherence check 4)."""
+    for cls in type(model_admin).__mro__:
+        if method not in vars(cls):
+            continue
+        if cls.__module__.startswith("django."):
+            return True
+        if not _calls_super(vars(cls)[method], method):  # unreadable source: trust it
+            return False
+    return True
+
+
 def _missing_writes(model_admin: admin.ModelAdmin[Any], request: HttpRequest) -> list[str]:
+    """Write methods that reach Django's defaults. `save_model`, `delete_model` and
+    `delete_queryset` must not call the default at all; `save_related` (many-to-many) may, as
+    long as it is overridden to audit the change."""
     methods: list[str] = []
     if model_admin.has_add_permission(request) or model_admin.has_change_permission(request):
         methods += SAVE_METHODS
-        if model_admin.model._meta.many_to_many:
-            methods.append("save_related")
     if model_admin.has_delete_permission(request):
         methods += DELETE_METHODS
-    return [method for method in methods if not _overrides(model_admin, method)]
+    missing = [method for method in methods if _writes_directly(model_admin, method)]
+    if (
+        (model_admin.has_add_permission(request) or model_admin.has_change_permission(request))
+        and model_admin.model._meta.many_to_many
+        and not _overrides(model_admin, "save_related")
+    ):
+        missing.append("save_related")
+    return missing
 
 
 def _inline_models(model_admin: admin.ModelAdmin[Any]) -> list[type[models.Model]]:
@@ -284,8 +326,9 @@ def audit_policy_errors(
                     f"{model._meta.label_lower} through Django's unaudited "
                     f"{', '.join(missing)}.",
                     hint=(
-                        "Override them to call the app's audited services, or deny the "
-                        "permission (read-only admin)."
+                        "Override them to call the app's audited services (without calling "
+                        "the default through super()), or deny the permission (read-only "
+                        "admin)."
                     ),
                     obj=type(model_admin),
                     id="core.E203",

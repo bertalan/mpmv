@@ -37,7 +37,7 @@ vendor's change page links to its trail (`?vendor=<public id>`).
 | Vendors (VEN.1, CORE.2, VEN.12) | `vendor.created`, `.updated` (legal identity included, IBAN masked), `.deleted`, `.status_changed`, `.vat_checked`, `.member_added`, `.member_role_changed`, `.member_removed`; `vendor.legal_requirement_saved`, `.legal_requirement_deleted` |
 | Platform configuration (ARC.7) | `core.platform_operator.configured` |
 | Product prices (CAT.1) | `catalog.product.price_changed`, `catalog.variant.price_changed` |
-| Shipping configuration (SHP.1, admin) | `shipping.<model>.created`, `.updated`, `.deleted` for carriers, zones, vendor rates, weight bands and pickup options |
+| Shipping configuration (SHP.1) | `shipping.<model>.created`, `.updated`, `.deleted` for carriers, zones, vendor rates, weight bands and pickup options, through `shipping.services.save_config` and `delete_config`; deleting a rate also audits each of its bands |
 
 Deliberately not stored: password hashes (only `has_usable_password`), API key hashes, TOTP
 secrets, and the identifier typed in a failed login that matches no account (it may be a typo
@@ -61,7 +61,9 @@ Failures refused during a lockout are not audited one by one: the lockout entry 
 3. **Admins call those services.** The admin of an audited model overrides `save_model`,
    `delete_model` and `delete_queryset` (plus `save_related` for many-to-many fields and
    `save_formset` for audited inlines), or denies the permission. Otherwise the system check
-   fails with `core.E203`. Admin actions must call services too (see `vendors.admin`).
+   fails with `core.E203`. An override of `save_model`, `delete_model` or `delete_queryset`
+   that calls Django's default through `super()` counts as not overridden: it saves the row
+   directly, so it fails too. Admin actions must call services too (see `vendors.admin`).
    Site-level admin views are not ModelAdmins, so the check cannot see them: the staff site
    (`apps.accounts.admin_site.AuditedAdminSite`, installed as `admin.site`) audits the
    self-service password change, and any new site-level view that writes must do the same.
