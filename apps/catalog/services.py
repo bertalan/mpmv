@@ -540,7 +540,9 @@ def _product_errors(
 ) -> dict[str, list[str]]:
     """Every reason the payload cannot be created, by field (NON_FIELD_ERRORS: its shape)."""
     errors: dict[str, list[str]] = {}
-    _amount(errors, "price_net", data.price_net)
+    price = _amount(errors, "price_net", data.price_net)
+    if price is not None and price == 0:  # CAT.14, Q-31: never 0.00
+        _add_error(errors, "price_net", engine.ZERO_PRICE)
     _check_choice(errors, "kind", data.kind, list(ProductKind.values))
     _check_choice(errors, "sales_mode", data.sales_mode, list(SalesMode.values))
     _check_choice(errors, "fiscal_category", data.fiscal_category, list(FiscalCategory.values))
