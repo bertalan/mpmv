@@ -33,7 +33,7 @@ ACTION = "cms.legal_page_version.recorded"
 
 def _editor() -> User:
     user: User = UserFactory.create(
-        email="legal-editor@example.com", password=secrets.token_urlsafe(16), staff=True
+        email="legal-editor@example.com", password=secrets.token_urlsafe(16), superuser=True
     )
     return user
 
@@ -79,8 +79,9 @@ def test_each_recorded_version_is_audited(seeded: SeedReport) -> None:
     assert entry.target_model == "cms.legalpageversion"
     assert entry.target_key == f"{page.pk}/1"
     assert entry.before is None
-    assert entry.after["effective_date"] == "2027-01-01"
-    assert entry.after["language_code"] == "en"
+    after = entry.after or {}
+    assert after["effective_date"] == "2027-01-01"
+    assert after["language_code"] == "en"
 
 
 def test_republishing_the_same_text_records_no_new_version(seeded: SeedReport) -> None:
