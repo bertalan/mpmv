@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **142** in **17** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **1236 h** (P1 1029 h · P2 189 h · P3 18 h)
+- Micro-tasks: **143** in **17** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **1244 h** (P1 1045 h · P2 181 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **126 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CAT.1 → ORD.1 → ORD.2 → ORD.4 → PAY.1 → PAY.2 → PAY.3 → PAY.4 → ORD.8
 
 ## By macro area
@@ -23,7 +23,7 @@
 | ORD | Cart, orders, returns | 10 | 102 | 0 | 0 | 102 |
 | PAY | Payments (Stripe Connect) | 4 | 40 | 0 | 0 | 40 |
 | ING | Supplier import and pipelines | 13 | 92 | 26 | 0 | 118 |
-| I18N | Multilingual | 6 | 24 | 8 | 0 | 32 |
+| I18N | Multilingual | 7 | 40 | 0 | 0 | 40 |
 | CMS | Wagtail content | 7 | 66 | 10 | 0 | 76 |
 | SEO | SEO, feeds, analytics | 6 | 30 | 14 | 0 | 44 |
 | AI | AI channels (MCP, agents) | 4 | 0 | 22 | 18 | 40 |
@@ -31,7 +31,7 @@
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 4 | 16 | 11 | 0 | 27 |
 | MIG | Migration and cutover | 10 | 106 | 0 | 0 | 106 |
-| **Total** | | **142** | **1029** | **189** | **18** | **1236** |
+| **Total** | | **143** | **1045** | **181** | **18** | **1244** |
 
 ## By phase
 
@@ -66,7 +66,7 @@
 | OPS.1 | PITR backup + encrypted off-site dumps + restore test; least-privilege DB roles (app role without DDL or TRUNCATE, so the audit log stays append-only) | P1 | 8 | ARC.5 | Documented restore on an empty environment; app role cannot TRUNCATE `core_auditlog` |
 | OPS.2 | Observability: JSON logs, error tracking, healthchecks, alerts | P1 | 8 | ARC.5 | Alert on a simulated checkout error |
 
-### F1 — Catalog, import, base frontend (26 tasks, 252 h)
+### F1 — Catalog, import, base frontend (28 tasks, 268 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -92,8 +92,10 @@
 | I18N.1 | Language configuration, URL prefixes, middleware, language switcher | P1 | 4 | ARC.3 | `/it/` and `/de/` active on STAGE |
 | I18N.2 | Abstract base `TranslationModel` with status, `source_hash`, fallback | P1 | 6 | ARC.6 | Reused by catalog and vendor |
 | I18N.3 | wagtail-localize for CMS pages | P1 | 4 | CMS.1 | Translated page with sync |
+| I18N.4 | Translation queue in admin (by language, vendor, status) + AI draft translation | P1 | 8 | I18N.2, ING.5 | EN edit → IT and DE go back to "needs review" |
 | I18N.5 | gettext catalogs for templates and emails; tax wording as keys | P1 | 6 | ORD.9 | No hardcoded strings (lint) |
 | I18N.6 | hreflang, canonical, per-language sitemap with fallback excluded | P1 | 4 | SEO.1 | Validation on a sample of URLs |
+| I18N.7 | German content for go-live (D-18): AI draft DE for catalog, taxonomy terms, vendor storefronts and CMS pages; human review of legal pages, checkout and emails; coverage report | P1 | 8 | I18N.4, I18N.3, MIG.7 | DE coverage report: 100% of legal/checkout/email texts reviewed, catalog drafts complete |
 | CMS.1 | Wagtail: site, locales, base page types, per-language navigation and footer | P1 | 8 | ARC.3 | EN/IT home and static pages |
 | CMS.7 | Accessible frontend theme (WCAG 2.1 AA), components, design tokens | P1 | 24 | CMS.1 | Accessibility audit passed |
 
@@ -179,7 +181,7 @@
 | MIG.9 | Three dress rehearsals on STAGE + cutover and rollback runbook | P1 | 16 | MIG.5, MIG.6 | Third rehearsal with no blockers |
 | MIG.10 | Cutover and post-go-live monitoring | P1 | 12 | MIG.9, SEC.6 | Go-live, 72 h with no critical issues |
 
-### F6 — After go-live (P2) (26 tasks, 189 h)
+### F6 — After go-live (P2) (25 tasks, 181 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -200,7 +202,6 @@
 | ING.11 | Supplier review import | P2 | 4 | ING.1, CMS.6 | Reviews imported with original date |
 | ING.12 | `/api/v1` import API for external vendors (upsert, stock, prices, media) | P2 | 8 | CORE.7, CAT.10 | Sample client in dry-run |
 | ING.13 | Admin checklist and "new vendor from source" wizard | P2 | 8 | ING.9 | Demo vendor activated without code |
-| I18N.4 | Translation queue in admin (by language, vendor, status) + AI draft translation | P2 | 8 | I18N.2, ING.5 | EN edit → IT goes back to "needs review" |
 | CMS.6 | Reviews: model, purchase verification, supplier import, moderation, vendor reply | P2 | 10 | ORD.2 | AggregateRating schema only with valid reviews |
 | SEO.4 | Merchant API sync + Meta feed | P2 | 8 | SEO.3 | Daily delta report |
 | SEO.6 | Anonymous page cache, responsive renditions, CWV budget | P2 | 6 | CMS.7 | LCP < 2.5 s on product page |

@@ -31,7 +31,7 @@ package = false
 [tool.ruff]
 line-length = 100
 target-version = "py313"
-extend-exclude = ["build", "private", "**/migrations/*.py"]
+extend-exclude = ["build", "private", ".claude", "**/migrations/*.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "DJ", "S", "RUF", "PT"]
@@ -47,7 +47,7 @@ ignore = ["RUF012"]
 python_version = "3.13"
 strict = true
 plugins = ["mypy_django_plugin.main"]
-exclude = ["^build/", "^private/", "^tools/"]
+exclude = ["^build/", "^private/", "^tools/", "^\\.claude/"]
 
 [[tool.mypy.overrides]]
 module = ["dj_database_url"]
@@ -60,6 +60,7 @@ django_settings_module = "mpmv.settings.test"
 DJANGO_SETTINGS_MODULE = "mpmv.settings.test"
 addopts = "-ra --strict-markers"
 testpaths = ["tests", "apps"]
+norecursedirs = [".claude", "build", "private", ".venv", "node_modules"]
 python_files = ["test_*.py"]
 filterwarnings = [
   # Raised by pytest-base-url (a pytest-playwright dependency), not by our code.
