@@ -47,9 +47,11 @@ healthy() {
   return 1
 }
 
+# Point the local tag at a release and restart onto it. Callers test the result: a unit that fails to
+# start is handled like an unhealthy release, never left behind by `set -e`.
 activate() {
-  podman tag "$REGISTRY_IMAGE:$1" "$LOCAL_IMAGE"
-  systemctl --user restart mpmv-app.service mpmv-worker.service
+  podman tag "$REGISTRY_IMAGE:$1" "$LOCAL_IMAGE" &&
+    systemctl --user restart mpmv-app.service mpmv-worker.service
 }
 
 deploy() {
@@ -64,27 +66,30 @@ deploy() {
     if [ -n "$live" ]; then podman tag "$REGISTRY_IMAGE:$live" "$LOCAL_IMAGE"; fi
     die "migrations failed; $version not activated"
   fi
-  systemctl --user restart mpmv-app.service mpmv-worker.service
 
-  if healthy; then
+  if systemctl --user restart mpmv-app.service mpmv-worker.service && healthy; then
     record "$version" deploy
     log "release $version is live"
     return 0
   fi
   if [ -n "$live" ]; then
-    log "release $version is unhealthy; rolling back to $live"
-    activate "$live"
-    healthy || log "release $live is unhealthy too: check journalctl --user -u mpmv-app"
+    log "release $version failed to start or is unhealthy; rolling back to $live"
+    if ! { activate "$live" && healthy; }; then
+      log "release $live is unhealthy too: check journalctl --user -u mpmv-app"
+    fi
   fi
-  die "release $version failed its health check"
+  die "release $version failed to start or failed its health check"
 }
 
 rollback() {
   target="$(previous)"
   [ -n "$target" ] || die "no previous release to roll back to"
   from="$(current)"
-  activate "$target"
-  healthy || die "release $target is unhealthy: check journalctl --user -u mpmv-app"
+  if ! { activate "$target" && healthy; }; then
+    # Put the live release back so the tag, the services and the history agree again.
+    activate "$from" || log "could not restart $from either"
+    die "release $target is unhealthy: check journalctl --user -u mpmv-app; back on $from"
+  fi
   sed '$d' "$RELEASES" >"$RELEASES.tmp" && mv "$RELEASES.tmp" "$RELEASES"
   record "$target" "rollback-from-$from"
   log "rolled back from $from to $target"

@@ -4,7 +4,9 @@ The image must be multi-stage, built with uv, run as a non-root user, use pinned
 never bake secrets into its layers.
 """
 
+import os
 import re
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,6 +15,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 CONTAINERFILE = ROOT / "Containerfile"
 IGNORE_FILE = ROOT / ".dockerignore"
+ENTRYPOINT = ROOT / "deploy" / "container" / "entrypoint.sh"
 
 SECRET_LIKE = re.compile(r"SECRET|PASSW|TOKEN|CREDENTIAL|PRIVATE|(^|_)KEY($|_)", re.IGNORECASE)
 PINNED_IMAGE = re.compile(r"^[\w.\-/]+:[\w.\-]+@sha256:[0-9a-f]{64}$")
@@ -162,3 +165,20 @@ def test_build_context_excludes_secrets_and_local_state() -> None:
     }
     for required in (".env", ".env.*", ".git", ".venv", "private", "CLAUDE.local.md", ".claude"):
         assert required in patterns, f"{required} must be excluded from the build context"
+
+
+def test_worker_role_runs_the_procrastinate_worker(tmp_path: Path) -> None:
+    # ARC.9 is merged: the image's worker must process the queue, not idle as a placeholder.
+    fake = tmp_path / "python"
+    fake.write_text('#!/bin/sh\necho "python $*"\n')
+    fake.chmod(0o755)
+    result = subprocess.run(  # noqa: S603 (fixed script path, test-controlled arguments)
+        ["/bin/sh", str(ENTRYPOINT), "worker"],
+        env={"PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}"},
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "python manage.py procrastinate worker"

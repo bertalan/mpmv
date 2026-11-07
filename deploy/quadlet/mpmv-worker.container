@@ -1,5 +1,5 @@
 # MPMV background worker and scheduler on a STAGE/LIVE host (ARC.5, ADR-0004, ADR-0005).
-# Until ARC.9 lands the `worker` role idles (see deploy/container/entrypoint.sh).
+# The `worker` role runs the Procrastinate worker (ARC.9; see deploy/container/entrypoint.sh).
 [Unit]
 Description=MPMV worker
 Wants=network-online.target

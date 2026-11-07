@@ -21,11 +21,8 @@ case "$role" in
       "$@"
     ;;
   worker)
-    # Placeholder until ARC.9 (Procrastinate, ADR-0004) is merged. The container must stay up so
-    # the stack and the Quadlet units already have their final shape; ARC.9 replaces this line
-    # with the worker command (expected: `exec python manage.py procrastinate worker`).
-    echo "mpmv worker: no task queue yet (ARC.9); idling." >&2
-    exec sleep infinity
+    # Procrastinate worker (ARC.9, ADR-0004): queued jobs and periodic schedules.
+    exec python manage.py procrastinate worker "$@"
     ;;
   migrate)
     exec python manage.py migrate --noinput "$@"

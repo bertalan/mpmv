@@ -19,13 +19,13 @@ Configuration comes only from environment variables.
 
 - **Process types.** The entry point takes the role as its first argument:
   `web` (gunicorn on `MPMV_HTTP_PORT`, default 8000), `worker`, `migrate`, `manage <command>`.
-- **Worker placeholder.** Until ARC.9 (Procrastinate, ADR-0004) is merged, `worker` logs one line
-  and idles, so the stack and the units already have their final shape. ARC.9 replaces that branch
-  of `entrypoint.sh` with the real command.
+- **Worker.** `worker` runs `manage.py procrastinate worker` (ARC.9, ADR-0004): queued jobs and
+  periodic schedules.
 - **Static files** are collected at build time and served by WhiteNoise with hashed, compressed
   names (`mpmv/settings/live.py`). Media will live on object storage (spec 01 §1.2).
-- **Health.** `python -m mpmv.healthcheck` calls `/healthz` on the loopback interface; Podman runs
-  it as `HealthCmd`, the local stack and CI use it to wait for the app.
+- **Health.** `python -m mpmv.healthcheck` calls `/healthz` over plain HTTP on the loopback
+  interface; Podman runs it as `HealthCmd`, the local stack and CI use it to wait for the app. LIVE
+  exempts `/healthz` from the HTTPS redirect, so the probe never forges `X-Forwarded-Proto`.
 - **Hardening.** Code is owned by root and read-only for the app user; the containers run with a
   read-only root filesystem and `NoNewPrivileges`. No secret is baked in: the build generates a
   throwaway key only to run `collectstatic`.
@@ -114,8 +114,9 @@ mpmv-deploy rollback       # back to the previous release
 
 `deploy` pulls the release, tags it `localhost/mpmv-app:current`, runs `mpmv-migrate` and then
 restarts app and worker. If the migration fails, the tag goes back to the live release and nothing
-restarts. If the new release does not pass its health check, `deploy` switches back to the
-previous release by itself. Releases are recorded in `~/.local/state/mpmv/releases` (a stack) and
+restarts. If app or worker fail to restart on the new release, or it does not pass its health
+check, `deploy` switches back to the previous release by itself. If `rollback` cannot bring the
+previous release up, it puts the live one back. Releases are recorded in `~/.local/state/mpmv/releases` (a stack) and
 `deploy.log`.
 
 **Rollback does not revert migrations.** Migrations must be backward compatible with the previous

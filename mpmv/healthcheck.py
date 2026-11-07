@@ -1,8 +1,11 @@
 """Container health probe: `python -m mpmv.healthcheck` exits 0 when /healthz answers 200.
 
 Used by the Podman Quadlet `HealthCmd` and by the local stack. It runs inside the app container,
-so it calls the app server on the loopback interface with a Host header Django accepts, and marks
-the request as HTTPS so LIVE settings do not redirect it.
+so it calls the app server on the loopback interface with a Host header Django accepts.
+
+The probe speaks plain HTTP and does not forge `X-Forwarded-Proto`: only the TLS proxy sets that
+header. LIVE settings exempt `/healthz` from the HTTPS redirect instead (SECURE_REDIRECT_EXEMPT,
+SEC.1), so one mechanism covers both the container runtime and this probe.
 """
 
 import os
@@ -24,7 +27,7 @@ def probe_host(allowed_hosts: list[str]) -> str:
 def probe(url: str, host: str, timeout: float = 5.0) -> bool:
     """Return True when `url` answers 200 without a redirect."""
     request = urllib.request.Request(  # noqa: S310 (fixed http URL on the loopback interface)
-        url, headers={"Host": host, "X-Forwarded-Proto": "https"}
+        url, headers={"Host": host}
     )
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310

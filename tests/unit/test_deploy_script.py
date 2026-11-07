@@ -30,6 +30,11 @@ FAKE_SYSTEMCTL = """#!/bin/sh
 echo "systemctl $*" >> "$FAKE_DIR/log"
 case "$*" in
   *mpmv-migrate.service*) [ -f "$FAKE_DIR/migrate-fails" ] && exit 1 ;;
+  *" restart "*)
+    current=$(cat "$FAKE_DIR/current" 2>/dev/null || true)
+    if [ -f "$FAKE_DIR/restart-fails" ] && grep -qxF "$current" "$FAKE_DIR/restart-fails"; then
+      exit 1
+    fi ;;
 esac
 exit 0
 """
@@ -124,6 +129,54 @@ def test_unhealthy_release_is_rolled_back_automatically(host: Host) -> None:
         "podman healthcheck run mpmv-app",
     ]
     assert host.releases == ["1.0.0"]
+
+
+def test_failed_restart_is_rolled_back_like_an_unhealthy_release(host: Host) -> None:
+    # A unit that cannot start (bad image config, missing env file, start timeout) must not leave
+    # the new tag in place with the services restarting it forever.
+    assert host.run("deploy", "1.0.0").returncode == 0
+    (host.root / "restart-fails").write_text("1.1.0\n")
+
+    result = host.run("deploy", "1.1.0")
+
+    assert result.returncode != 0
+    assert "failed" in result.stderr
+    assert host.log[-3:] == [
+        f"podman tag {REGISTRY}:1.0.0 localhost/mpmv-app:current",
+        "systemctl --user restart mpmv-app.service mpmv-worker.service",
+        "podman healthcheck run mpmv-app",
+    ]
+    assert (host.root / "current").read_text().strip() == "1.0.0"
+    assert host.releases == ["1.0.0"]
+
+
+def test_failed_restart_during_auto_rollback_still_reports(host: Host) -> None:
+    assert host.run("deploy", "1.0.0").returncode == 0
+    (host.root / "restart-fails").write_text("1.0.0\n1.1.0\n")
+
+    result = host.run("deploy", "1.1.0")
+
+    assert result.returncode != 0
+    assert "release 1.0.0 is unhealthy too" in result.stderr
+    assert "release 1.1.0 failed" in result.stderr
+    assert host.releases == ["1.0.0"]
+
+
+def test_failed_restart_during_rollback_returns_to_the_live_release(host: Host) -> None:
+    assert host.run("deploy", "1.0.0").returncode == 0
+    assert host.run("deploy", "1.1.0").returncode == 0
+    (host.root / "restart-fails").write_text("1.0.0\n")
+
+    result = host.run("rollback")
+
+    assert result.returncode != 0
+    assert "release 1.0.0 is unhealthy" in result.stderr
+    assert host.log[-2:] == [
+        f"podman tag {REGISTRY}:1.1.0 localhost/mpmv-app:current",
+        "systemctl --user restart mpmv-app.service mpmv-worker.service",
+    ]
+    assert (host.root / "current").read_text().strip() == "1.1.0"
+    assert host.releases == ["1.0.0", "1.1.0"]
 
 
 def test_failed_migration_restores_the_current_tag_and_keeps_services(host: Host) -> None:
