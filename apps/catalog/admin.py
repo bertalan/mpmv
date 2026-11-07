@@ -1,8 +1,11 @@
 """Staff admin for products, variants and their translations (Wagtail admin replaces this in
 CAT.11).
 
-Price fields stay editable, but a change to them on an existing product or variant is saved
-through the audited price services, never as a plain model save.
+Products and variants are audited models (SEC.4, CAT.12): every create, change and delete made
+here, the variant inline included, goes through the audited catalog services, never a plain
+model save. Price fields stay editable, but a change to them on an existing product or variant
+is applied by the audited price services. The owning vendor is read-only once a product exists
+(owner decision Q-33), and so is a variant's product, which carries its vendor.
 """
 
 from collections.abc import Iterable
@@ -11,6 +14,7 @@ from typing import Any
 from django import forms
 from django.contrib import admin
 from django.db import models
+from django.db.models import QuerySet
 from django.forms.models import BaseInlineFormSet
 from django.http import HttpRequest
 from treebeard.forms import TreeNodeChoiceField
@@ -24,6 +28,12 @@ from .models import Category, Product, ProductTranslation, Term, Variant, Varian
 from .services import (
     PRODUCT_PRICE_FIELDS,
     VARIANT_PRICE_FIELDS,
+    delete_product,
+    delete_variant,
+    record_relations_change,
+    relations_snapshot,
+    save_product,
+    save_variant,
     set_product_price,
     set_variant_price,
 )
@@ -154,31 +164,53 @@ class ProductAdmin(admin.ModelAdmin[Product]):
             )
         return super().formfield_for_manytomany(db_field, request, **kwargs)
 
+    def get_readonly_fields(
+        self, request: HttpRequest, obj: Product | None = None
+    ) -> tuple[str, ...]:
+        readonly = tuple(super().get_readonly_fields(request, obj))
+        return readonly if obj is None else ("vendor", *readonly)
+
+    # --- Audited writes (SEC.4, CAT.12). The admin runs each request in one transaction.
+
     def save_model(
         self, request: HttpRequest, obj: Product, form: forms.ModelForm[Product], change: bool
     ) -> None:
+        ctx = audit_context(request)
         new_prices = take_price_change(obj, form.changed_data, PRODUCT_PRICE_FIELDS)
-        super().save_model(request, obj, form, change)
+        save_product(obj, ctx=ctx)
         if new_prices is not None:
-            set_product_price(obj, **new_prices, ctx=audit_context(request))
+            set_product_price(obj, **new_prices, ctx=ctx)
+
+    def save_related(self, request: HttpRequest, form: Any, formsets: Any, change: bool) -> None:
+        before = relations_snapshot(form.instance)
+        super().save_related(request, form, formsets, change)
+        record_relations_change(form.instance, before, ctx=audit_context(request))
+
+    def delete_model(self, request: HttpRequest, obj: Product) -> None:
+        delete_product(obj, ctx=audit_context(request))
+
+    def delete_queryset(self, request: HttpRequest, queryset: QuerySet[Product]) -> None:
+        ctx = audit_context(request)
+        for product in queryset:
+            delete_product(product, ctx=ctx)
 
     def save_formset(self, request: HttpRequest, form: Any, formset: Any, change: bool) -> None:
-        if formset.model is not Variant:
+        if formset.model is not Variant:  # translations: not audited
             super().save_formset(request, form, formset, change)
             return
-        # Existing variants whose override changed: save the rest, then reprice them audited.
-        repriced: list[tuple[Variant, dict[str, Any]]] = []
-        for variant_form in formset.forms:
-            if variant_form in formset.deleted_forms:
-                continue
-            variant = variant_form.instance
-            new_prices = take_price_change(variant, variant_form.changed_data, VARIANT_PRICE_FIELDS)
-            if new_prices is not None:
-                repriced.append((variant, new_prices))
-        super().save_formset(request, form, formset, change)
         ctx = audit_context(request)
-        for variant, prices in repriced:
-            set_variant_price(variant, **prices, ctx=ctx)
+        rows = formset.save(commit=False)  # collects new, changed and deleted rows, writes none
+        for variant in formset.deleted_objects:
+            delete_variant(variant, ctx=ctx)
+        changed = {id(f.instance): f.changed_data for f in formset.forms if f.has_changed()}
+        for variant in rows:
+            new_prices = take_price_change(
+                variant, changed.get(id(variant), ()), VARIANT_PRICE_FIELDS
+            )
+            save_variant(variant, ctx=ctx)
+            if new_prices is not None:
+                set_variant_price(variant, **new_prices, ctx=ctx)
+        formset.save_m2m()
 
 
 class VariantTranslationInline(admin.StackedInline[VariantTranslation, Variant]):
@@ -209,10 +241,33 @@ class VariantAdmin(admin.ModelAdmin[Variant]):
     )
     inlines = (VariantTranslationInline,)
 
+    def get_readonly_fields(
+        self, request: HttpRequest, obj: Variant | None = None
+    ) -> tuple[str, ...]:
+        readonly = tuple(super().get_readonly_fields(request, obj))
+        return readonly if obj is None else ("product", *readonly)
+
+    # --- Audited writes (SEC.4, CAT.12)
+
     def save_model(
         self, request: HttpRequest, obj: Variant, form: forms.ModelForm[Variant], change: bool
     ) -> None:
+        ctx = audit_context(request)
         new_prices = take_price_change(obj, form.changed_data, VARIANT_PRICE_FIELDS)
-        super().save_model(request, obj, form, change)
+        save_variant(obj, ctx=ctx)
         if new_prices is not None:
-            set_variant_price(obj, **new_prices, ctx=audit_context(request))
+            set_variant_price(obj, **new_prices, ctx=ctx)
+
+    def save_related(self, request: HttpRequest, form: Any, formsets: Any, change: bool) -> None:
+        # The form has no many-to-many field: a variant's options (CAT.3) are set by
+        # services.create_product, never here. Only the translation inlines are saved.
+        for formset in formsets:
+            self.save_formset(request, form, formset, change=change)
+
+    def delete_model(self, request: HttpRequest, obj: Variant) -> None:
+        delete_variant(obj, ctx=audit_context(request))
+
+    def delete_queryset(self, request: HttpRequest, queryset: QuerySet[Variant]) -> None:
+        ctx = audit_context(request)
+        for variant in queryset:
+            delete_variant(variant, ctx=ctx)

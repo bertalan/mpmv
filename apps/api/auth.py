@@ -16,7 +16,7 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 
 from apps.core.http import client_ip
 
-from .engine import bearer_challenge
+from .engine import bearer_challenge, is_write
 from .models import ApiClient
 from .problems import auth_problem
 from .responses import problem_response
@@ -27,8 +27,12 @@ _REQUEST_ATTR = "api_client"
 
 
 def authenticate_request(request: HttpRequest, required_scope: str | None) -> AuthResult:
+    """The method decides read or write: a suspended vendor's key only reads (CORE.14)."""
     return authenticate(
-        request.headers.get("Authorization"), ip=client_ip(request), required_scope=required_scope
+        request.headers.get("Authorization"),
+        ip=client_ip(request),
+        required_scope=required_scope,
+        write=request.method is None or is_write(request.method),
     )
 
 
