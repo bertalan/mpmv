@@ -82,17 +82,23 @@ def test_add_vendor_with_translations(staff_client: Client) -> None:
     data.update(
         {
             "translations-0-language": "en",
+            "translations-0-status": "published",
             "translations-0-tagline": "Outdoor gear",
             "translations-0-description": "Family business.",
             "translations-0-shipping_policy": "Ships in 2 days.",
             "translations-0-refund_policy": "Refunds within 14 days.",
             "translations-0-cancellation_policy": "Cancel before shipping.",
             "translations-1-language": "it",
+            "translations-1-status": "machine",
             "translations-1-tagline": "Attrezzatura outdoor",
         }
     )
     response = staff_client.post(reverse("admin:vendors_vendor_add"), data)
     assert response.status_code == 302, response.content.decode()
+    # I18N.2: staff set the workflow status; the IT draft falls back to the published EN texts.
+    resolved = Vendor.objects.get().translation("it")
+    assert resolved.language == "en"
+    assert resolved.is_fallback is True
 
     vendor = Vendor.objects.get()
     assert vendor.slug == "vendor-b-mountain-shop"

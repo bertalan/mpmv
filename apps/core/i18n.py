@@ -9,6 +9,15 @@ from django.urls import translate_url
 from django.utils import translation
 
 
+def language_choices() -> list[tuple[str, str]]:
+    """`choices` for language fields, read from settings when used (I18N.2).
+
+    Fields pass this callable, not the list: migrations then reference it by name, so adding a
+    language to settings.LANGUAGES needs no migration (`apps.core.fields.LanguageField`).
+    """
+    return [(str(code), str(name)) for code, name in settings.LANGUAGES]
+
+
 def configured_languages() -> list[str]:
     """Language codes in the configured order (primary first)."""
     return [code for code, _name in settings.LANGUAGES]

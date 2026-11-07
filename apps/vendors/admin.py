@@ -57,6 +57,7 @@ class VendorTranslationInline(admin.StackedInline[VendorTranslation, Vendor]):
     extra = 1
     fields = (
         "language",
+        "status",
         "tagline",
         "description",
         "shipping_policy",

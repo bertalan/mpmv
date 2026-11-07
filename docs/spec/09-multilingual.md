@@ -33,6 +33,13 @@ Rules:
 - **Translation workflow**: every `*Translation` has a status `machine` → `reviewed` → `published` and a
   `source_hash`; if the EN text changes, the other languages go back to "needs review". Admin queue per
   language and vendor.
+- **Shared base** (I18N.2): every `*Translation` table subclasses `apps.core.models.TranslationModel`
+  (language, status, `source_hash`; "needs review" is the `machine` status) and declares
+  `translation_of` (the FK to the translated entity) and `translated_fields`, with one row per entity
+  and language. Texts for visitors are read through `resolve_translation`, which returns the published
+  row or the EN row with a fallback flag. A system check enforces the contract, so catalog tables
+  (CAT tasks) reuse it as they are added. Language fields use `LanguageField`, whose choices are read
+  from settings at runtime, so a new language needs no migration.
 - Machine (AI) translation as a draft, with human review where required; editorial rule
   unchanged: titles in sentence case.
 - Emails and documents in the recipient's language (`Order.language`, `User.preferred_language`).
