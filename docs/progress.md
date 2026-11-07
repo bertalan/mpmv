@@ -105,3 +105,61 @@ Findings and actions:
    `make check` before committing, not only before the PR.
 4. **Parallel test runs collide on one test database.** Added `MPMV_TEST_DB_NAME`, used by
    parallel agents.
+
+### Check 2 (2026-11-07, after ARC.7, ARC.9, VEN.1, CORE.6, SEC.1)
+
+Scope: main at a807dbc. Code against spec chapters 01, 02, 04, 09 and 12 and ADRs 0003, 0004;
+spec against spec; repo hygiene.
+
+| Area | Result |
+|---|---|
+| Done-when criteria | Met for all five tasks: no platform country literal (guard test), heartbeat job scheduled and observable, vendor admin CRUD and status tests, 401/403 for expired, revoked and out-of-scope keys, header scan test. CI green on main |
+| Spec 01 conventions | Logic in `services.py` and `engine.py`; engines import no ORM. Mutating services (`configure_platform_operator`, `change_status`, issue, rotate and revoke key) take `dry_run` and return a `ChangeSet` through `run_mutation`, which writes `AuditLog`. No money fields yet |
+| ADRs | 0003 respected (nothing built that it delegates). 0004: Procrastinate only behind `apps.core.tasks`, wrapper offers `task`, `enqueue`, `periodic`, `locked` |
+| App dependency graph | import-linter 3/3 kept: layers now cover vendors and api, Procrastinate contract, tax and shipping independence |
+| Spec vs spec | `make docs-check` green. No open decision (D-xx) blocks a merged task or is decided by code |
+| Scope creep | None found. Fields owned by later tasks (plan, payout_account, dac7_complete, logo, ApiClient.vendor) are left out |
+| Anonymization | No real vendor names, legacy order numbers or hostnames; no credential-like literals (test keys and passwords are generated) |
+| Migrations | One leaf per app; `makemigrations --check` clean |
+| Gates | `make check` green; `make test` 316 passed; `make test-e2e` 5 passed |
+
+Findings and actions:
+
+1. Major. Language choices are frozen in migrations. `User.preferred_language` (CORE.1) and
+   `VendorTranslation.language` (VEN.1) use `choices=settings.LANGUAGES`, so adding a language
+   needs a new migration, while spec 09 says adding a language never needs code changes. Every
+   future `*Translation` model would copy this. Action: use a callable for the choices (Django
+   serializes the reference, not the list) before more translation tables exist; take it with
+   I18N.1 or I18N.2.
+2. Major. Spec 12 reuses task IDs for requirements. §12.3 numbers requirements SEC.1 to SEC.10,
+   while §12.6 numbers tasks SEC.0 to SEC.3 with other meanings (requirement SEC.1 is the access
+   model, task SEC.1 is HTTP hardening; requirement SEC.3 is HTTP hardening, task SEC.3 is
+   field-level encryption). "SEC.1 done" can be misread. `make docs-check` only reads task tables,
+   so it does not catch this. Not changed here: it is a spec table edit (owner question 5).
+3. Minor. Staff manage vendors and the platform operator through the Django admin, while spec 02
+   keeps the Django admin for the technical superuser on a restricted network and puts staff in
+   Wagtail ViewSets. Acceptable until CORE.8; CORE.8 should take these screens over, and the
+   restricted network rule needs an ARC.5 or OPS item.
+4. Minor. "engine.py has no ORM" is a convention only. Action: add an import-linter contract
+   that forbids `django.db` in `apps.*.engine` (a small ARC.4 follow-up).
+5. Minor. `ApiClient.vendor` (spec 02) is still missing although VEN.1 is merged. The wave 1
+   question on which task owns it stays open.
+6. Minor. The "test database still in use" teardown warning did not come back in four local runs
+   of `make test` on main. It appeared once on the ARC.9 branch before its review fixes. The likely
+   source is a Procrastinate worker connection left open by an interrupted run, but this is not
+   confirmed. `run_worker` and `defer_periodic` open and close their own pool. No action; reopen
+   if it shows up again.
+
+Owner questions:
+
+1. SEC.1: live settings send HSTS for one year with includeSubDomains and preload. Confirm that
+   every subdomain of the production domain will be HTTPS only before anyone submits the domain to
+   the preload list.
+2. CORE.6: a valid key used from an address outside its allow-list gets 403, not 401. Confirm.
+3. VEN.1: closed is terminal, and a rejected application becomes closed (no separate rejected
+   status, no reopening). Confirm.
+4. ARC.9: the default retry policy (5 retries, backoff from 30 s doubling up to 1 h) and the
+   heartbeat every 5 minutes without retries were chosen in code. Confirm, or tune them with the
+   OPS alerting tasks.
+5. Spec 12: may we rename the §12.3 requirement IDs (for example SR-1 to SR-10) so they no longer
+   collide with task IDs?
