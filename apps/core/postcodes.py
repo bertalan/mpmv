@@ -25,8 +25,8 @@ _TEXT = r"[A-Z0-9][A-Z0-9 -]*"
 _EXACT = re.compile(_TEXT, re.ASCII)
 _PREFIX = re.compile(rf"({_TEXT})\*", re.ASCII)
 _RANGE = re.compile(rf"({_TEXT})\.\.\s*({_TEXT})", re.ASCII)
-# Two numbers of the same length joined by a dash: the SHP.1 range syntax.
-_OLD_RANGE = re.compile(r"(\d+)-(\d+)", re.ASCII)
+# Two numbers of the same length joined by a dash, spaced or not: the SHP.1 range syntax.
+_OLD_RANGE = re.compile(r"(\d+)\s*-\s*(\d+)", re.ASCII)
 _IGNORED = re.compile(r"[\s-]+")
 
 Kind = Literal["exact", "prefix", "range"]
@@ -45,7 +45,10 @@ class PostcodePattern:
     high: str = ""
 
     def matches(self, postcode: str) -> bool:
-        code = normalize_postcode(postcode)
+        return self.matches_normalized(normalize_postcode(postcode))
+
+    def matches_normalized(self, code: str) -> bool:
+        """`matches` for a postcode already passed through `normalize_postcode`."""
         if not code:
             return False
         if self.kind == "exact":

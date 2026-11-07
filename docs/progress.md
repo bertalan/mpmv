@@ -46,7 +46,11 @@ part of the done-when still open) · `not started`.
 | CAT.2 | done | #53 | Category and term trees (treebeard), configurable taxonomies with typed term attributes, brands, per-language names, slugs and SEO texts; product links; admin CRUD with translations |
 | SHP.12 | done | #54 | Several shipping methods per vendor and zone (VendorZoneRate renamed in place), vendor zones overriding platform zones, country groups, shared postcode grammar in apps/core/postcodes.py, per-method free-shipping threshold and stored VAT treatment |
 | TAX.2 | done | #52 | Regime change workflow: owner request, staff approval or rejection with the review permission checked in the service, step-up, one transaction for the new profile version and fiscal regime, history. Tax code, flagged for careful human review |
-| CAT.14 | in review | #80 | Catalogue integrity: nullable price (required for `buy`, never 0.00) and `public_price`, `mpn`, vendor immutable (trigger) with audited staff `duplicate_product_to_vendor`, variants only on variable products, same-vendor companion (composite key), cross-vendor upsells gated by the versioned, append-only `CrossVendorConsent`. Price code, flagged for human review |
+| TAX.11 | done | #74 | Tax territory postcode patterns use the shared grammar in apps/core/postcodes.py; data migration rewrites old `a-b` ranges to `a..b`; `postcode_in_territory`. Tax code, flagged for careful human review |
+| SHP.2 | done | #73 | Legacy zone cases 1-7 as regression tests, destination aliases, ISO-validated `Destination`, postcode patterns parsed once per zone snapshot |
+| SHP.13 | done | #77 | Shipping configuration file format v1 (JSON and CSV), audited export/import with per-row report and all-or-nothing writes, `ShippingTemplate` with one standard template, `shipping_config` command |
+| CORE.14 | done | #75 | Vendor API keys limited to vendor-grantable scopes, suspended vendors read-only and closed vendors refused, per-key audit when a vendor is deleted. Security code, flagged for careful human review |
+| CAT.12 | done | #76 | Audited product and variant edit and delete services (fiscal category, sales mode, weight, dimensions), vendor and price rules enforced in the service, admin routed through them |
 
 ## Owner decisions 2026-11-07
 
@@ -403,6 +407,85 @@ SHP.12). 39 of the 41 consolidated items are fixed; items 7 and 22 were skipped 
   the OSS regime?) and Q-93 (bind encrypted values to their row, item 7).
 - Tests on the final main (`MPMV_TEST_DB_NAME=test_mpmv_cleanup_integration`): `make check` green,
   `make test` 2714 passed (unit and integration, e2e deselected), coverage 98%.
+
+## Follow-ups from wave 7
+
+Wave 7 is merged, in this order: TAX.11 (#74), SHP.2 (#73), SHP.13 (#77), CORE.14 (#75), CAT.12
+(#76).
+
+Integration notes:
+
+- Each branch was updated onto main and merged after its six required checks passed; no
+  conflicts. SHP.13 adds shipping migration 0007; SHP.2 and TAX.11 add no shipping migration.
+- Majors from review, fixed before merge and checked against the diff: SHP.13 (a method without
+  a band list in the file deleted its stored bands, partial rows were validated without their
+  stored values, and bands in the wrong order could overlap while being written; each fix has a
+  test in `test_config_io.py` or `test_config_format.py`).
+- Tests on the final main (`MPMV_TEST_DB_NAME=test_mpmv_wave7_integration`): `make check` green,
+  `make test` 2929 passed (unit and integration, e2e deselected), coverage 98%.
+
+Open questions for the owner (Q-94 to Q-96 in the private register):
+
+- CORE.14: is the initial list of vendor-grantable API scopes right?
+- SHP.13: protect CSV exports against formula injection (cells starting with `=`, `+`, `-`, `@`)?
+- CORE.14: refuse issuing an API key to a closed vendor?
+
+Deferred to other tasks:
+
+- SHP.13: D-03 and D-06 stay open; `tax_treatment` and `over_max_weight` are exported and imported
+  as stored data only.
+- SHP.13: SHP.14 special areas have only the reserved `special_areas` section; a non-empty list is
+  refused in format v1.
+- SHP.13: translated names (method and group names, pickup labels) are not in format v1; they stay
+  with the translation workflow.
+- SHP.13: no admin or vendor UI for templates or file upload; staff use the `shipping_config`
+  command until the SHP.6 editor. The standard template's zones and prices come from staff;
+  nothing is seeded.
+- SHP.13: import is merge-only (rows missing from the file are kept); a replace mode can come with
+  SHP.5 if needed.
+- SHP.2: no data migration rewrites a spaced dash range stored as an exact postcode
+  (`70000 - 74999`); such a row now fails when its zone snapshot is built. No LIVE data exists yet.
+- SHP.2: `Destination` raises `InvalidCountry` for codes outside ISO alpha-2; the SHP.3 and SHP.4
+  checkout callers must pass a validated country.
+- TAX.11: TAX.7 decides what a territory postcode match means for the tax decision; this wave adds
+  only the matching function.
+- TAX.11: ranges with letters in the old form (`AB1-AB9`) are not rewritten and become exact
+  postcodes; no territories are seeded yet.
+- CORE.14: scopes are checked only when a key is issued; a vendor key that already holds a
+  platform-only scope is not refused at request time (see the minor findings below).
+- CORE.14: a suspended vendor's key is refused on dry-runs too, since a dry-run is a POST to a
+  write operation.
+- CORE.14: applicant and onboarding vendors keep full key access; the spec restricts only
+  suspended and closed vendors.
+- CAT.12: the database-level vendor guarantee and `duplicate_product_to_vendor` stay with CAT.14;
+  the composite foreign key from catalog migration 0001 is unchanged.
+- CAT.12: kind, stock, GTIN and the classification foreign keys go through `save_product` but are
+  not audited; adding a field to `PRODUCT_EDIT_FIELDS` audits it.
+
+Review findings not fixed (all minor, 20):
+
+| Task | File | Finding and proposed fix |
+|---|---|---|
+| SHP.13 | `apps/shipping/config_format.py` | JSON floats for amounts and weights get a confusing "2 decimal places" error; refuse floats in `_add_row` with "write amounts and weights as decimal strings", with a unit test |
+| SHP.13 | `apps/shipping/config_format.py` | CSV export does not escape free text starting with `=`, `+`, `-`, `@` (formula injection); decide before a web download ships (Q-95) |
+| SHP.13 | `apps/shipping/config_format.py` | `_put_cell` turns an empty CSV number cell into None, so an empty `priority` or `surcharge_net` fails while JSON takes the model default; leave such cells out, or fix the docstring and spec |
+| SHP.2 | `apps/shipping/engine.py` | A stored spaced range (`70000 - 74999`) now raises in `ZoneSnap` and breaks zone resolution for every vendor on that zone; add a data migration or a spec 06 §6.2 note, and name the zone in the error |
+| SHP.2 | `apps/shipping/engine.py` | `Destination` raises on non-ISO codes such as XK; state in spec 06 §6.2 that checkout validates the country first and SHP.3 maps `InvalidCountry` to NeedsQuote or Blocked |
+| SHP.2 | `apps/shipping/tests/unit/test_legacy_cases.py` | The parse-once test monkeypatches our own `parse_postcode_pattern`; assert on `zone.parsed_patterns` identity instead, or comment that it is a spy |
+| TAX.11 | `apps/tax/migrations/0003_territory_postcode_ranges.py` | Inverted ranges (`22199-22100`) become `22199..22100`, which the grammar refuses at match time; swap or skip them, with a unit case, and tell TAX.7 |
+| TAX.11 | `apps/tax/engine.py` | `postcode_in_territory` lets `InvalidPostcodePattern` escape for one bad stored pattern; TAX.7 decides between skip-and-log and validation only |
+| TAX.11 | `apps/tax/migrations/0003_territory_postcode_ranges.py` | Old-form ranges that are not rewritten (`1-22`, `AB1-AB9`) silently become exact postcodes; log them when the migration runs |
+| CORE.14 | `apps/vendors/admin.py` | The admin refuses to delete a vendor with API keys (`ApiClientAdmin.has_delete_permission` is False); override `VendorAdmin.get_deleted_objects`, with an admin integration test |
+| CORE.14 | `apps/api/tests/integration/test_vendor_key_policy.py` | The implementation commit edited a test (type narrowing); keep test edits in the tests-first commit |
+| CORE.14 | `apps/api/engine.py` | Vendor-grantable scopes are not enforced at request time or on rotation; add a backlog row so `evaluate()` denies them and move the CORE.13 test endpoint to a vendor scope |
+| CORE.14 | `apps/vendors/services.py` | `VENDOR_DELETION_AUDIT_HOOKS` are imported only at deletion time; add a system check or test that imports each hook and checks it is callable |
+| CORE.14 | `apps/api/services.py` | A key can be issued for a closed vendor and is audited though it never works; refuse it after the owner confirms (Q-96) |
+| CAT.12 | `apps/catalog/admin.py` | `delete_queryset` deletes product by product without one transaction; wrap the loop in `transaction.atomic()` |
+| CAT.12 | `apps/catalog/services.py` | `delete_product` locks variants with `select_related` but no `of=("self",)`, so it also locks the product and vendor rows; add `of=("self",)` |
+| CAT.12 | `apps/catalog/services.py` | `save_product` and `save_variant` duplicate the `save_audited` flow; add a guard hook to `save_audited` or document the copy |
+| CAT.12 | `apps/catalog/admin.py` | A `ValidationError` from the services in `save_model`/`save_formset` gives a 500; move the checks to the ModelForm `clean` or document it |
+| CAT.12 | `apps/catalog/services.py` | Many-to-many changes are audited only after `save_m2m()`, with no dry-run service; track with CAT.14 |
+| CAT.12 | `apps/catalog/tests/integration/test_product_edits.py` | Two tests were added in the implementation commit; keep new tests in a tests-only commit first |
 
 ## Coherence checks
 

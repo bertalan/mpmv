@@ -7,12 +7,14 @@ import dataclasses
 import datetime as dt
 from typing import Any
 
+from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
 from django.db import connection, transaction
 from django.db.models import OuterRef, QuerySet, Subquery
 from django.utils import timezone
+from django.utils.module_loading import import_string
 
 from apps.accounts.models import User
 from apps.core.audit import AuditContext
@@ -105,13 +107,24 @@ def save_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> 
 
 def delete_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Delete `vendor` with its translations and memberships; the vendor and each membership
-    are audited (translations are storefront texts, not audited)."""
+    are audited (translations are storefront texts, not audited).
+
+    Apps above `vendors` cannot be imported here (spec 01 §1.3): each one whose rows the
+    deletion cascades to names a `hook(vendor, changes)` in
+    `settings.VENDOR_DELETION_AUDIT_HOOKS`, which adds one delete per row (the API keys,
+    CORE.14). The vendor row is locked first, so no row is added between the hooks and the
+    deletion.
+    """
     with transaction.atomic():
+        if not dry_run:
+            _lock_vendor(vendor)
         members = list(VendorMember.objects.select_related("vendor", "user").filter(vendor=vendor))
         changes = ChangeSet()
         changes.delete(MODEL_LABEL, str(vendor.public_id), vendor_snapshot(vendor))
         for member in members:
             changes.delete(MEMBER_MODEL, str(member.public_id), member_snapshot(member))
+        for path in settings.VENDOR_DELETION_AUDIT_HOOKS:
+            import_string(path)(vendor, changes)
         run_mutation(changes, vendor.delete, ctx=ctx, action=DELETED, dry_run=dry_run)
     return changes
 
