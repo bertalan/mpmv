@@ -4,6 +4,10 @@ import runpy
 from typing import Any
 
 from django.conf import settings
+from django.utils.module_loading import import_string
+from whitenoise.storage import CompressedManifestStaticFilesStorage
+
+from apps.cms.staticfiles import StaticFilesStorage
 
 
 def live_settings() -> dict[str, Any]:
@@ -18,9 +22,10 @@ def test_whitenoise_runs_right_after_the_security_middleware() -> None:
 
 def test_static_files_use_hashed_compressed_storage() -> None:
     storages = live_settings()["STORAGES"]
-    assert storages["staticfiles"]["BACKEND"] == (
-        "whitenoise.storage.CompressedManifestStaticFilesStorage"
-    )
+    backend = import_string(storages["staticfiles"]["BACKEND"])
+    # WhiteNoise's storage, tolerant of Wagtail's references to apps left out (CMS.1).
+    assert backend is StaticFilesStorage
+    assert issubclass(backend, CompressedManifestStaticFilesStorage)
     assert "default" in storages
 
 

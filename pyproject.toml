@@ -19,6 +19,7 @@ dependencies = [
   "webauthn>=3.0.1",
   "segno>=1.6.6",
   "cryptography>=50.0.2",
+  "wagtail>=8.1,<8.2",
 ]
 
 [dependency-groups]
@@ -63,8 +64,21 @@ exclude = ["^build/", "^private/", "^tools/", "^\\.claude/"]
 untyped_calls_exclude = ["factory"]
 
 [[tool.mypy.overrides]]
-module = ["dj_database_url", "croniter", "django_otp", "django_otp.*"]
+module = ["dj_database_url", "croniter", "django_otp", "django_otp.*", "whitenoise", "whitenoise.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Wagtail and its dependencies ship no type information (CMS.1).
+module = [
+  "wagtail", "wagtail.*", "modelcluster", "modelcluster.*", "modelsearch", "modelsearch.*",
+  "taggit", "taggit.*", "treebeard", "treebeard.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Generated migrations name Wagtail's swappable page model setting, which only Wagtail defines.
+module = ["apps.cms.migrations.*"]
+disable_error_code = ["misc"]
 
 [[tool.mypy.overrides]]
 module = ["factory", "factory.*"]

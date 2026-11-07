@@ -1,0 +1,10 @@
+{% load i18n cms_tags %}{% language_links as languages %}
+<nav class="language-switcher" aria-label="{% translate 'Language' %}">
+  {% for language in languages %}
+    <form action="{% url 'switch_language' %}" method="post">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ language.url }}">
+      <button type="submit" name="language" value="{{ language.code }}" lang="{{ language.code }}"{% if language.current %} aria-current="true" disabled{% endif %}>{{ language.name|capfirst }}</button>
+    </form>
+  {% endfor %}
+</nav>

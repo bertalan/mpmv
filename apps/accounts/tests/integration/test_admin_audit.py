@@ -65,7 +65,7 @@ def test_granting_staff_access_is_audited_with_before_and_after(staff_client: Cl
 
 def test_permission_and_group_changes_are_audited(staff_client: Client) -> None:
     user = UserFactory.create(email="editor@example.com", staff=True)
-    group = Group.objects.create(name="Editors")
+    group = Group.objects.create(name="Support")
     permission = _permission("vendors.change_vendor")
     staff_client.post(
         reverse("admin:accounts_user_change", args=[user.pk]),
@@ -74,7 +74,7 @@ def test_permission_and_group_changes_are_audited(staff_client: Client) -> None:
     entry = AuditLog.objects.get(action="accounts.user.access_changed")
     assert entry.target_key == str(user.public_id)
     assert entry.before == {"groups": [], "user_permissions": []}
-    assert entry.after == {"groups": ["Editors"], "user_permissions": ["vendors.change_vendor"]}
+    assert entry.after == {"groups": ["Support"], "user_permissions": ["vendors.change_vendor"]}
 
 
 def test_saving_a_user_without_changes_writes_no_audit_entry(staff_client: Client) -> None:
@@ -185,23 +185,23 @@ def test_deleting_a_user_is_audited(staff_client: Client) -> None:
 def test_group_permission_changes_are_audited(staff_client: Client) -> None:
     permission = _permission("vendors.change_vendor")
     staff_client.post(
-        reverse("admin:auth_group_add"), {"name": "Editors", "permissions": [permission.pk]}
+        reverse("admin:auth_group_add"), {"name": "Support", "permissions": [permission.pk]}
     )
-    assert Group.objects.filter(name="Editors").exists()
+    assert Group.objects.filter(name="Support").exists()
     created = AuditLog.objects.get(action="auth.group.created")
-    assert created.target_key == "Editors"  # groups have no public id; their name is unique
-    assert created.after == {"name": "Editors"}
+    assert created.target_key == "Support"  # groups have no public id; their name is unique
+    assert created.after == {"name": "Support"}
     access = AuditLog.objects.get(action="auth.group.access_changed")
-    assert access.target_key == "Editors"
+    assert access.target_key == "Support"
     assert access.before == {"permissions": []}
     assert access.after == {"permissions": ["vendors.change_vendor"]}
 
 
 def test_deleting_a_group_is_audited(staff_client: Client) -> None:
-    group = Group.objects.create(name="Editors")
+    group = Group.objects.create(name="Support")
     staff_client.post(reverse("admin:auth_group_delete", args=[group.pk]), {"post": "yes"})
     entry = AuditLog.objects.get(action="auth.group.deleted")
-    assert entry.before == {"name": "Editors", "permissions": []}
+    assert entry.before == {"name": "Support", "permissions": []}
 
 
 # --- Step-up on the staff audit view (CORE.4 `step_up_required`)

@@ -64,7 +64,8 @@ def test_browser_language_does_not_redirect_the_unprefixed_home(client: Client) 
     "path", ["/it/healthz", "/de/healthz", "/fr/healthz", "/es/healthz", "/it/django-admin/"]
 )
 def test_operational_routes_stay_outside_the_language_prefixes(client: Client, path: str) -> None:
-    assert client.get(path).status_code == 404
+    # Under a prefix the path is a CMS page lookup (CMS.1), after the trailing-slash redirect.
+    assert client.get(path, follow=True).status_code == 404
 
 
 def test_healthz_and_staff_admin_answer_without_prefix(client: Client) -> None:

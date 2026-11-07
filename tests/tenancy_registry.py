@@ -131,6 +131,16 @@ ENDPOINTS: dict[str, Access] = {
     "api/v1/": NoVendorData(
         "Unknown API paths: a 404 problem document.", path="/api/v1/no-such-operation"
     ),
+    # CMS (CMS.1): public pages and the editors' sign-in. The rest of /admin/ is CMS_ADMIN.
+    "wagtail_serve": NoVendorData(
+        "Public CMS pages (home, static pages); no vendor data until the CMS.4 landing pages.",
+        path="/no-such-page/",
+    ),
+    "wagtailcore_login": NoVendorData("Sign-in for password-protected pages."),
+    "wagtailcore_authenticate_with_password": NoVendorData("Password form of a private page."),
+    "wagtailadmin_login": NoVendorData("Editors' sign-in page."),
+    "wagtailadmin_sprite": NoVendorData("The admin's icon sprite, the same for everyone."),
+    "wagtailadmin_javascript_catalog": NoVendorData("Admin JavaScript translation catalog."),
 }
 
 ADMIN_NAMESPACE = "admin"
@@ -146,10 +156,19 @@ def _admin_model(endpoint: Endpoint) -> type[models.Model] | None:
     return None
 
 
+CMS_ADMIN_ROUTE = "admin/"
+CMS_ADMIN = StaffOnly(
+    "Wagtail admin: editors and staff holding `wagtailadmin.access_admin` only (CMS.1); "
+    "it shows pages and menus, no vendor-owned model yet."
+)
+
+
 def classify(endpoint: Endpoint) -> Access | None:
     """The declared access of a web endpoint; None when it is not declared."""
     if endpoint.key in ENDPOINTS:
         return ENDPOINTS[endpoint.key]
+    if endpoint.route.startswith(CMS_ADMIN_ROUTE):
+        return CMS_ADMIN
     if endpoint.namespace == ADMIN_NAMESPACE:
         model = _admin_model(endpoint)
         make = OWNED_OBJECTS.get(model) if model is not None else None
