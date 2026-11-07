@@ -7,7 +7,7 @@
 import pytest
 from django.test import override_settings
 
-from apps.core.i18n import translate_path
+from apps.core.i18n import language_choices, translate_path
 
 LANGUAGES_PLUS_FRENCH = [
     ("en", "English"),
@@ -54,3 +54,12 @@ def test_a_language_added_in_settings_is_routed_without_code_changes() -> None:
     assert translate_path("/", "fr") == "/fr/"
     assert translate_path("/fr/", "it") == "/it/"
     assert translate_path("/fr/", "en") == "/"
+
+
+def test_language_choices_are_read_from_settings_in_order() -> None:
+    assert language_choices() == [("en", "English"), ("it", "Italiano"), ("de", "Deutsch")]
+
+
+@override_settings(LANGUAGES=LANGUAGES_PLUS_FRENCH)
+def test_language_choices_follow_settings_at_runtime() -> None:
+    assert [code for code, _name in language_choices()] == ["en", "it", "de", "fr"]
