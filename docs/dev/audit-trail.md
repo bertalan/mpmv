@@ -34,7 +34,7 @@ vendor's change page links to its trail (`?vendor=<public id>`).
 | Second factors (CORE.4) | `accounts.mfa.enrolled`, `.verified`, `.verification_failed`, `.recovery_code_used`, `.recovery_codes_generated`, `.device_removed`, `.disabled` |
 | Users and permissions (admin) | `accounts.user.created`, `.updated`, `.deleted`, `.password_changed`, `.access_changed`; `auth.group.created`, `.updated`, `.deleted`, `.access_changed` |
 | API keys (CORE.6) | `api.client.issued`, `.rotated`, `.revoked` |
-| Vendors (VEN.1, CORE.2) | `vendor.created`, `.updated`, `.deleted`, `.status_changed`, `.member_added`, `.member_role_changed`, `.member_removed` |
+| Vendors (VEN.1, CORE.2, VEN.12) | `vendor.created`, `.updated` (legal identity included, IBAN masked), `.deleted`, `.status_changed`, `.vat_checked`, `.member_added`, `.member_role_changed`, `.member_removed`; `vendor.legal_requirement_saved`, `.legal_requirement_deleted` |
 | Platform configuration (ARC.7) | `core.platform_operator.configured` |
 | Product prices (CAT.1) | `catalog.product.price_changed`, `catalog.variant.price_changed` |
 | Shipping configuration (SHP.1, admin) | `shipping.<model>.created`, `.updated`, `.deleted` for carriers, zones, vendor rates, weight bands and pickup options |

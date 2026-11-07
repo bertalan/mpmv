@@ -31,24 +31,24 @@ def test_creating_a_vendor_is_audited_with_its_generated_slug() -> None:
 
 
 def test_a_field_change_is_audited_with_only_what_changed() -> None:
-    vendor = VendorFactory.create(vat_number="IT00000000001", contact_email="a@example.com")
-    vendor.vat_number = "IT00000000002"
+    vendor = VendorFactory.create(vat_number="IT00000010025", contact_email="a@example.com")
+    vendor.vat_number = "IT00000020032"
     changes = save_vendor(vendor, ctx=CTX)
 
     assert [change.fields for change in changes.changes] == [
-        {"vat_number": ("IT00000000001", "IT00000000002")}
+        {"vat_number": ("IT00000010025", "IT00000020032")}
     ]
     entry = AuditLog.objects.get()
     assert entry.action == "vendor.updated"
     assert entry.before is not None
     assert entry.after is not None
     assert (entry.before["vat_number"], entry.after["vat_number"]) == (
-        "IT00000000001",
-        "IT00000000002",
+        "IT00000010025",
+        "IT00000020032",
     )
     assert entry.vendor_key == str(vendor.public_id)
     vendor.refresh_from_db()
-    assert vendor.vat_number == "IT00000000002"
+    assert vendor.vat_number == "IT00000020032"
 
 
 def test_the_before_values_come_from_the_database_not_the_edited_instance() -> None:

@@ -22,12 +22,12 @@ def test_staff_see_a_vendor_change_with_before_and_after(
     password = secrets.token_urlsafe(16)  # generated: no credential literals in git
     user = UserFactory.create(email="staff@example.com", password=password, superuser=True)
     device = TOTPDeviceFactory.create(user=user)
-    vendor = VendorFactory.create(display_name="Vendor A", vat_number="IT00000000001")
+    vendor = VendorFactory.create(display_name="Vendor A", vat_number="IT00000010025")
     admin_login(page, live_server.url, "staff@example.com", password)
     verify_with_totp(page, totp_token(device))
 
     page.goto(f"{live_server.url}/django-admin/vendors/vendor/{vendor.pk}/change/")
-    page.get_by_label("Vat number").fill("IT00000000002")
+    page.locator("#id_vat_number").fill("IT00000020032")
     page.get_by_role("button", name="Save and continue editing").click()
     expect(page.locator(".messagelist")).to_contain_text("was changed successfully")
 
@@ -38,6 +38,6 @@ def test_staff_see_a_vendor_change_with_before_and_after(
     page.locator("#result_list tbody tr").first.locator("a").first.click()
     changes = page.locator("fieldset", has_text="Changes").first
     expect(changes).to_contain_text("vat_number")
-    expect(changes).to_contain_text("IT00000000001")
-    expect(changes).to_contain_text("IT00000000002")
+    expect(changes).to_contain_text("IT00000010025")
+    expect(changes).to_contain_text("IT00000020032")
     shot("entry")

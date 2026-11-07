@@ -6,7 +6,7 @@ class VendorsConfig(AppConfig):
     label = "vendors"
 
     # Audit policy (SEC.4, docs/dev/audit-trail.md).
-    audited_models = ("vendor", "vendormember")
+    audited_models = ("vendor", "vendormember", "legalfieldrequirement")
     unaudited_models = {
         "vendortranslation": "storefront texts under the translation workflow, no legal or "
         "financial data",

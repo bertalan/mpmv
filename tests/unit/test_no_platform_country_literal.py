@@ -4,9 +4,14 @@ The platform's country is configuration (`PlatformOperator`, read with
 `apps.core.services.current_operator()`), never a literal: a relocation of the operator must be a
 new configuration row, not a code change (spec 04 §4.4 case 7, spec 05). Tests and migrations
 are excluded: test data and data migrations may name any country.
+
+A line marked `# country-literal: <reason>` is allowed: it names a country as a *jurisdiction*
+whose rules the code implements (e.g. the Italian VAT and e-invoicing rules for vendors
+established in Italy, VEN.12), not as the platform's own country.
 """
 
 import ast
+import re
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -17,16 +22,19 @@ SCANNED = ("apps", "mpmv")
 EXCLUDED_DIRS = frozenset({"tests", "migrations"})
 # The current platform country. Language codes are lower case ("it") and are not flagged.
 FORBIDDEN = frozenset({"IT"})
+JURISDICTION_PRAGMA = re.compile(r"#\s*country-literal:\s*\S")
 
 
 def country_literals(source: str) -> list[int]:
     """Line numbers of string constants equal to a forbidden platform-country code."""
+    lines = source.splitlines()
     return [
         node.lineno
         for node in ast.walk(ast.parse(source))
         if isinstance(node, ast.Constant)
         and isinstance(node.value, str)
         and node.value.strip() in FORBIDDEN
+        and not JURISDICTION_PRAGMA.search(lines[node.lineno - 1])
     ]
 
 
@@ -44,6 +52,7 @@ def source_files() -> Iterator[Path]:
         "if vendor_country == 'IT':\n    pass",
         'rate = rates.get(country=" IT ")',
         'f"IT{suffix}"',
+        'COUNTRY = "IT"  # country-literal:',  # a pragma needs a reason
     ],
 )
 def test_scanner_flags_the_platform_country_as_a_literal(source: str) -> None:
@@ -57,6 +66,7 @@ def test_scanner_flags_the_platform_country_as_a_literal(source: str) -> None:
         'country = operator.country  # e.g. "IT" in a comment',
         '"""Docstring mentioning IT is fine."""',
         'territory = "IT-LIVIGNO"',
+        'ITALY = "IT"  # country-literal: Italian VAT rules for vendors established in Italy',
         "x = 1",
     ],
 )
