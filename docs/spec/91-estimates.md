@@ -14,13 +14,17 @@
 
 | Item | Hours | How it is calculated |
 |---|---:|---|
-| P1 micro-tasks | 1,172 | Sum from the generated backlog |
+| P1 micro-tasks | 1,221 | Sum from the generated backlog |
 | Integrated and end-to-end acceptance testing, exploratory tests | 100 | ~10% of P1 |
 | Mandatory human review of tax, payments, ledger, orders, security | 50 | ~15% of the hours for TAX, PAY, VEN, ORD, SEC |
 | Coordination, ADRs, meetings with tax advisor and legal counsel | 80 | ~8% of P1 |
-| **Subtotal** | **1,402** | |
-| Contingency for unforeseen issues (10–25% of P1) | 117–293 | Tax and payment domain, dirty legacy data |
-| **Go-live total** | **≈ 1,520–1,700** | |
+| **Subtotal** | **1,451** | |
+| Contingency for unforeseen issues (10–25% of P1) | 122–305 | Tax and payment domain, dirty legacy data |
+| **Go-live total** | **≈ 1,570–1,760** | |
+
+The theme system (2026-11-07, [14](14-frontend-themes.md)) replaced the 24 h CMS.7 row with
+THM.1 to THM.10 (70 h: framework, token pipeline, `base` theme, components, quality gates and the
+first vertical theme) and added CMP.9 (3 h, WCAG 2.2 accessible authentication): +49 h of P1.
 
 After go-live: P2 = 185 h and P3 = 18 h (MCP, advanced zone editor, OSS report, visitor content
 translation, reviews, advanced payouts…), about **220–260 h** including contingency.
@@ -30,7 +34,7 @@ translation, reviews, advanced payouts…), about **220–260 h** including cont
 | | August plan | This review |
 |---|---:|---:|
 | Scope | Full WCFM parity + P1 commercial modules | Parity **with what is actually used** + 2026 compliance |
-| Total hours (development, testing, migration) | 1,740–2,540 | 1,520–1,700 to go-live |
+| Total hours (development, testing, migration) | 1,740–2,540 | 1,570–1,760 to go-live |
 | With AI-assisted development | 1,450–2,100 | already included |
 
 Where the difference comes from:
@@ -42,7 +46,8 @@ Where the difference comes from:
 - **Agentic development** used systematically on the mechanical parts (models, CRUD, admin, parametric
   tests). The tax and payment parts remain under line-by-line human review.
 
-Additions compared with August: online withdrawal, EAA/accessibility, operational GPSR, MCP server.
+Additions compared with August: online withdrawal, EAA/accessibility (WCAG 2.2 AA), operational GPSR,
+MCP server, theme system with a first vertical theme.
 
 ## 91.4 Indicative schedule
 
@@ -60,10 +65,10 @@ the schedule depends on team capacity more than on dependencies.
 | Phase | Content | Verifiable milestone |
 |---|---|---|
 | F0 Foundations | Repo, CI, deploy, core, identity, baseline security | STAGE online with MFA login and admin |
-| F1 Catalog and import | Catalog, multilingual, pipelines for Vendor A and the other vendors, theme | LIVE-equivalent catalog browsable on STAGE, fed by the pipelines |
+| F1 Catalog and import | Catalog, multilingual, pipelines for Vendor A and the other vendors, theme system and `base` theme | LIVE-equivalent catalog browsable on STAGE, fed by the pipelines |
 | F2 Checkout | Tax, shipping, quotes, cart, orders, Stripe | Multi-vendor order paid in test mode with correct transfers |
 | F3 Vendors and compliance | Ledger, payouts, vendor dashboard, DAC7, GPSR, GDPR, withdrawal | Pilot vendor operates on their own on STAGE |
-| F4 Content and SEO | Wagtail pages, blog, taxonomy landing pages, JSON-LD, feeds | Rich Results and Merchant feeds validated |
+| F4 Content and SEO | Wagtail pages, blog, taxonomy landing pages, JSON-LD, feeds, first vertical theme pages | Rich Results and Merchant feeds validated |
 | F5 Go-live | Migration, parity, dress rehearsals, pentest, cutover | Third dress rehearsal with no blockers → go-live |
 
 A milestone is closed only with a working demo on STAGE and the domain regression tests green.
@@ -78,7 +83,8 @@ A milestone is closed only with a working demo on STAGE and the domain regressio
 - Translation of visitor content after go-live (I18N.8), with the method the owner chooses.
 - SDI intermediary for commission invoices; CMP for cookies; transactional email provider.
 - Hosting: Hetzner Cloud VPS (app and database per environment), Hetzner Object Storage for media and backups, CDN, error tracking.
-- Custom graphics and UX, if you want to go beyond a clean, accessible theme.
+- Custom graphics and UX beyond the `base` theme and the first vertical theme (spec 14), such as a
+  logo, illustrations or commissioned photography.
 
 In exchange, the recurring costs of premium WordPress licenses disappear (WCFM Ultimate, Membership,
 Affiliate, Groups & Staffs, Analytics, WPML, WPSSO Premium and add-ons) and, above all, so do the
@@ -103,11 +109,12 @@ Source: merged pull requests and their timestamps, the generated backlog, and th
 
 ### Forecast for the rest of P1
 
-97 P1 tasks remain, worth 947 estimated hours.
+97 P1 tasks remained, worth 947 estimated hours. The theme rows added the same day (THM.1 to
+THM.10 and CMP.9, replacing CMS.7) bring this to 107 tasks and 996 hours.
 
 | Part | Estimated hours | Done by | Forecast |
 |---|---:|---|---|
-| Code and tests (CAT, ORD, SHP, TAX, PAY, VEN, CMP, ING, SEO, CMS, …) | ~850 | agents | 40–50 h of agent runtime, including ~30% for integration, coherence checks and rework |
+| Code and tests (CAT, ORD, SHP, TAX, PAY, VEN, CMP, ING, SEO, CMS, THM, …) | ~900 | agents | 40–50 h of agent runtime, including ~30% for integration, coherence checks and rework |
 | Migration with real data, dress rehearsals, cutover (MIG.7, MIG.9, MIG.10) | ~45 | agents and people | included in the people hours below |
 
 That is at least two weekly budgets, so **3–4 calendar weeks for P1 code**, provided the open
@@ -128,7 +135,7 @@ Work that agents cannot speed up:
 | **Total** | **≈ 105–195** |
 
 **Result:** about **150–250 people hours** plus about two weekly agent budgets, against
-1,520–1,700 hours for a human team (§91.2). Realistic calendar to go-live: **2–3 months**. The
+1,570–1,760 hours for a human team (§91.2). Realistic calendar to go-live: **2–3 months**. The
 pace is set by external waits: legal counsel, Stripe Connect verification, the external
 penetration test (SEC.6) and the three dress rehearsals (MIG.9).
 

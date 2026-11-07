@@ -1,4 +1,4 @@
-/* Minimal layout for the CMS pages (CMS.1); the accessible theme and design tokens are CMS.7.
+/* Minimal layout for the CMS pages (CMS.1); themes and design tokens are THM.1 to THM.10 (spec 14).
    A static file, never inline styles: the CSP has no 'unsafe-inline' (SEC.1). */
 body {
   margin: 0 auto;

@@ -44,6 +44,7 @@ It also reviews the August 2026 rebuild plan.
 | 11 | [Compliance](11-compliance.md) | DAC7, GPSR, GDPR, DSA, online withdrawal, EAA |
 | 12 | [Security, infrastructure, operations](12-security-infra-operations.md) | Immediate actions, requirements, deploy, backups |
 | 13 | [Migration and cutover](13-migration-cutover.md) | ETL, parity, go-live and rollback runbook |
+| 14 | [Frontend themes](14-frontend-themes.md) | Theme system, design tokens, CSP, WCAG 2.2 AA, first vertical theme |
 | 90 | [Backlog](90-backlog.md) | All micro-tasks by phase (generated) |
 | 91 | [Estimates and plan](91-estimates.md) | Hours, schedule, phases, external costs, measured agent velocity |
 | 92 | [Open decisions](92-open-decisions.md) | 20 decisions to approve, with proposals |
@@ -55,7 +56,7 @@ It also reviews the August 2026 rebuild plan.
 - **Main simplifications**: a single entity per product (not two EN/IT posts), a single source for
   shipping, our own ledger and commissions, import pipelines in the same project, no operational
   scripts outside version control.
-- **Go-live scope**: 127 P1 micro-tasks, **≈ 1,520–1,700 h** including acceptance testing, review and contingency.
+- **Go-live scope**: 137 P1 micro-tasks, **≈ 1,570–1,760 h** including acceptance testing, review and contingency.
   The August plan estimated 1,740–2,540 h.
 - **Do immediately**, regardless of the rebuild: rotate the credentials found in plain text
   (see [12](12-security-infra-operations.md) §12.1).

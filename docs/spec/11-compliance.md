@@ -125,9 +125,17 @@ class GpsrInfo(Model):
 ### CMP.7 — European Accessibility Act `[P1]`
 - E-commerce services fall under the EAA. ⚖️ Service **microenterprises** (fewer than 10 employees
   and turnover or balance sheet ≤ €2M) are exempt: verify the platform's status.
-- Recommendation: design to **WCAG 2.1 AA** (EN 301 549) anyway. It costs little if done
+- Recommendation: design to **WCAG 2.2 AA (EN 301 549 V4.1.1)** anyway. It costs little if done
   from the start, it is a de facto requirement for growth, and vendors with more than 10 employees may
   ask for it. Published accessibility statement.
+- Standard version: EN 301 549 V4.1.1 (published 2026-09-02) moves to WCAG 2.2 A/AA and maps to
+  the EAA. It still awaits citation in the Official Journal (expected late 2026); until then V3.2.1
+  (WCAG 2.1 AA) is the legal reference. WCAG 2.2 AA covers 2.1 AA (except the removed 4.1.1
+  Parsing), so the 2.2 target meets both.
+- Automated audit: axe-core with the `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa` and `wcag22aa`
+  tags on the key pages, reusing the THM.5 harness; the manual review covers what axe cannot
+  check (focus not obscured, consistent help, redundant entry, accessible authentication). Theme
+  rules are in [14](14-frontend-themes.md) §14.6.
 
 ### CMP.8 — AI-generated content `[P3]`
 - Product descriptions are AI-generated and reviewed. ⚖️ Assess any AI Act transparency obligations
@@ -144,4 +152,5 @@ class GpsrInfo(Model):
 | CMP.4 | GDPR: customer export and anonymization, sub-processor register, retention job | P1 | 10 | ORD.2 | Erasure request on a seed order |
 | CMP.5 | DSA notice & action, notice of suspensions and ranking transparency page (vendor terms acceptance is VEN.5, VEN.13 to VEN.16) | P2 | 6 | VEN.5 | Notice with tracked outcome |
 | CMP.6 | Online withdrawal, 30-day price history (Omnibus), pre-contractual information | P1 | 8 | ORD.2, CAT.1 | Correct strikethrough price in tests |
-| CMP.7 | Automated accessibility audit in CI (axe) + manual review + statement | P1 | 8 | CMS.7 | Zero critical violations on key pages |
+| CMP.7 | Automated accessibility audit in CI (axe, WCAG 2.2 AA tags) + manual review + statement | P1 | 8 | THM.5 | Zero axe violations with the `wcag22aa` tag on key pages; manual review recorded; statement published |
+| CMP.9 | WCAG 2.2 SC 3.3.8 (accessible authentication) on the authentication templates of CORE.4 and CORE.5: paste allowed in every password and code field, `autocomplete` tokens (`current-password`, `new-password`, `one-time-code`, `username webauthn`), passkeys offered, Turnstile without a puzzle | P1 | 3 | CORE.4, CORE.5, THM.3 | e2e test pastes a password and a TOTP code; the template lint finds the `autocomplete` tokens; Turnstile runs in managed or invisible mode |

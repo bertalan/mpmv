@@ -101,6 +101,12 @@ def meta_catalog_feed(lang) -> Response          # Meta Commerce feed
 Anonymous page cache (invalidated on publish), responsive images (WebP/AVIF, `srcset`),
 minimal CSS and JS, Core Web Vitals budget defined before the frontend (LCP < 2.5 s on mobile 4G).
 
+### Frontend theme
+
+The public frontend is rendered by themes: a vertical-neutral `base` theme plus vertical themes,
+with design tokens, template overrides, CSP-safe components and WCAG 2.2 AA rules. See
+[14](14-frontend-themes.md); the former CMS.7 row is split into THM.1 to THM.10 there.
+
 ## 10.3 Tasks
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
@@ -111,13 +117,12 @@ minimal CSS and JS, Core Web Vitals budget defined before the frontend (LCP < 2.
 | CMS.4 | TermLandingPage and VendorLandingPage | P1 | 10 | CMS.2, CAT.8 | A term page with its products |
 | CMS.5 | Versioned LegalPage + VendorRecruitmentPage with application form | P1 | 6 | CMS.1, VEN.5 | Application arrives in admin |
 | CMS.6 | Reviews: model, purchase verification, supplier import, moderation, vendor reply | P2 | 10 | ORD.2 | AggregateRating schema only with valid reviews |
-| CMS.7 | Accessible frontend theme (WCAG 2.1 AA), components, design tokens | P1 | 24 | CMS.1 | Accessibility audit passed |
 | SEO.1 | JSON-LD Product/Offer/Breadcrumb/ReturnPolicy/ShippingDetails, robots, canonical | P1 | 10 | CAT.7, SHP.3 | Rich Results Test with no errors |
 | SEO.2 | Per-language and per-type sitemaps, generated `llms.txt` | P1 | 4 | I18N.6 | Valid sitemaps |
 | SEO.3 | Google feed (EN/IT) with legacy IDs, prices from the tax engine, shipping from tables | P1 | 8 | TAX.3, SHP.11 | Feed validated in STAGE Merchant Center |
 | SEO.4 | Merchant API sync + Meta feed | P2 | 8 | SEO.3 | Daily delta report |
 | SEO.5 | Cookie consent + Consent Mode v2 + e-commerce events | P1 | 8 | ORD.5 | No tags fire before consent |
-| SEO.6 | Anonymous page cache, responsive renditions, CWV budget | P2 | 6 | CMS.7 | LCP < 2.5 s on product page |
+| SEO.6 | Anonymous page cache, responsive renditions, CWV budget | P2 | 6 | THM.3 | LCP < 2.5 s on product page |
 | AI.1 | MCP server: auth, read tools (catalog, orders, quotes, simulations, reports) | P2 | 12 | CORE.7 | Tools usable from Claude Code with scopes |
 | AI.2 | Mutating MCP tools with dry-run, confirmation and audit | P2 | 10 | AI.1 | Every mutation has a diff and an audit entry |
 | AI.3 | Read-only public catalog API for agents | P3 | 6 | CAT.9 | Search by taxonomy term via API |

@@ -85,7 +85,8 @@ Other factual corrections to the August plan:
 
 ## 0.5 Out of scope (declared)
 
-- Custom graphics and UX beyond a clean, accessible theme (can be estimated separately).
+- Custom graphics and UX beyond the `base` theme and the first vertical theme of
+  [14](14-frontend-themes.md) (can be estimated separately).
 - Tax and legal advice: the open questions are collected in [92-open-decisions.md](92-open-decisions.md).
 - Retroactive tax reprocessing of historical orders: migrated read-only.
 - WCFM features not in use: Analytics, Groups&Staffs, Delivery, Product Hub, Elementor.

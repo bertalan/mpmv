@@ -49,6 +49,7 @@ MACRO = {
     "ING": "Supplier import and pipelines",
     "I18N": "Multilingual",
     "CMS": "Wagtail content",
+    "THM": "Frontend themes",
     "SEO": "SEO, feeds, analytics",
     "AI": "AI channels (MCP, agents)",
     "CMP": "Compliance",
@@ -83,11 +84,20 @@ PHASE_BY_PREFIX = {
     "VEN": "F3",
     "CMP": "F3",
     "CMS": "F4",
+    "THM": "F1",
     "SEO": "F4",
     "AI": "F4",
     "MIG": "F5",
 }
-PHASE_OVERRIDE = {"ARC.10": "F2", "CMS.7": "F1", "SEC.6": "F5", "CMS.1": "F1"}
+PHASE_OVERRIDE = {
+    "ARC.10": "F2",
+    "SEC.6": "F5",
+    "CMS.1": "F1",
+    "THM.7": "F4",
+    "THM.8": "F4",
+    "THM.9": "F4",
+    "THM.10": "F4",
+}
 
 ROW = re.compile(
     r"^\|\s*([A-Z0-9]+\.\d+)\s*\|\s*(.+?)\s*\|\s*(P[123])\s*\|\s*(\d+)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*$"
