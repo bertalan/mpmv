@@ -47,21 +47,32 @@ vendor's country.
 class TaxRate(Model):                          # rate table with validity periods
     country; territory (null, e.g. "ES-CN", "IT-LIVIGNO")
     category = CharField(choices=["standard", "reduced", "super_reduced", "zero", "books"])
-    rate = DecimalField(5,2); valid_from; valid_to; source ("EC TEDB", "manual")
+    rate = DecimalField(7,4)                   # percentage, 4 decimals: 25.5 → 25.5000
+    valid_from; valid_to; source ("ec_tedb", "manual")
 
-class Territory(Model):                        # territories outside the EU VAT area
-    code; country; postcode_patterns; vat_status ("outside_vat_area")
-    # Canary Islands, Ceuta/Melilla, Livigno, Campione, Åland, Mount Athos, Büsingen, Heligoland…
+class Territory(Model):                        # territories with a special VAT status
+    code; country; postcode_patterns
+    vat_status ("outside_vat_area", "own_rates", "special")  # "special": an explicit engine
+    # rule decides (e.g. XI, D-02). Canary Islands, Ceuta/Melilla, Livigno, Campione, Åland,
+    # Mount Athos, Büsingen, Heligoland…
 
 class VendorTaxProfile(Model):                 # versioned: new row on every approved change
     vendor; regime = CharField(choices=["oss", "domestic_only", "exempt"])
     exempt_reason = CharField(choices=["art74_publishing", "flat_rate_forfettario", "other"], null=True)
     legal_note (translated)                    # e.g. bilingual art. 74 wording
     oss_registered_since; valid_from; valid_to; approved_by; requested_by
+    # Consistent with Vendor.fiscal_regime (VEN.12), never duplicating it: RF19 (forfettario)
+    # if and only if exempt with reason flat_rate_forfettario.
 
-class VatValidation(Model):                    # cache of VIES results
-    vat_number; country; valid; name; address; checked_at; request_id
+class VatValidation(Model):                    # cache of VIES results, append-only
+    vat_number (without prefix); country (ISO, GR not EL)
+    result ("valid", "invalid", "unavailable")
+    name; address; checked_at; request_id      # VIES answers only, no staff-recorded rows
 ```
+
+Rates and vendor tax profiles are versioned like `PlatformOperator`: an exclusion constraint
+forbids overlapping periods of the same key, and a change is a new row through an audited
+service that closes the current one (TAX.1).
 
 ### Engine contract
 
