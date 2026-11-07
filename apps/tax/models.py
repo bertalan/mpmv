@@ -1,0 +1,402 @@
+"""Tax configuration (spec 05 §5.2, TAX.1): rates, special territories, vendor VAT regimes and
+the cache of VIES answers.
+
+Rates and vendor tax profiles are versioned configuration, like `PlatformOperator` (ARC.7):
+rows are history, a change is a new row valid from a date that closes the current one (through
+`apps.tax.services`), and only `valid_to` may be written on an existing row. Orders keep a
+snapshot of what they used (spec 07), so past documents stay explainable.
+"""
+
+from typing import Any, ClassVar
+
+from django.conf import settings
+from django.contrib.postgres.constraints import ExclusionConstraint
+from django.contrib.postgres.fields import ArrayField, RangeOperators
+from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models
+from django.db.models.functions import Coalesce
+
+from apps.core.fields import CountryField
+from apps.core.models import BaseModel, TranslationModel, TsTzRange
+from apps.vendors.models import Vendor
+from apps.vendors.scoping import VendorScopedManager
+
+from . import engine
+
+
+class Versioned(BaseModel):
+    """A row of versioned configuration: `[valid_from, valid_to)`, never edited in place."""
+
+    valid_from = models.DateTimeField()
+    valid_to = models.DateTimeField(null=True, blank=True, editable=False)
+
+    # The only fields an existing row may write: closing its validity period.
+    CLOSING_FIELDS = frozenset({"valid_to", "updated_at"})
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        update_fields = kwargs.get("update_fields")
+        if self.pk is not None and (
+            update_fields is None
+            or "valid_to" not in update_fields
+            or not self.CLOSING_FIELDS.issuperset(update_fields)
+        ):
+            raise PermissionError(
+                f"{type(self).__name__} rows are never edited in place; add a new row instead"
+            )
+        super().save(*args, **kwargs)
+
+
+def _valid_period(label: str) -> models.CheckConstraint:
+    return models.CheckConstraint(
+        condition=models.Q(valid_to__isnull=True) | models.Q(valid_to__gt=models.F("valid_from")),
+        name=f"tax_{label}_valid_to_after_valid_from",
+    )
+
+
+# --- Territories
+
+
+class TerritoryCodeField(models.CharField[Any, Any]):
+    """A territory code such as `ES-CN`, normalized to upper case."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("max_length", engine.TERRITORY_CODE_MAX_LENGTH)
+        super().__init__(*args, **kwargs)
+
+    def to_python(self, value: Any) -> Any:
+        value = super().to_python(value)
+        if not isinstance(value, str) or not value:
+            return value
+        try:
+            return engine.normalize_territory_code(value)
+        except engine.InvalidTerritoryCode as exc:
+            raise ValidationError(str(exc), code="invalid_territory_code") from exc
+
+
+class PostcodePatternsField(ArrayField[Any, Any]):
+    """Postcode patterns, each normalized on validation (exact, `35*` prefix or a range)."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        kwargs.setdefault("base_field", models.CharField(max_length=32))
+        super().__init__(**kwargs)
+
+    def to_python(self, value: Any) -> Any:
+        value = super().to_python(value)
+        if not isinstance(value, list):
+            return value
+        try:
+            return [
+                engine.normalize_postcode_pattern(item) if isinstance(item, str) else item
+                for item in value
+            ]
+        except engine.InvalidPostcodePattern as exc:
+            raise ValidationError(str(exc), code="invalid_postcode_pattern") from exc
+
+
+class TerritoryVatStatus(models.TextChoices):
+    OUTSIDE_VAT_AREA = engine.OUTSIDE_VAT_AREA, "Outside the EU VAT area"
+    OWN_RATES = engine.OWN_RATES, "Inside the VAT area, with rates of its own"
+    SPECIAL = engine.SPECIAL, "Special status, handled by an explicit tax engine rule"
+
+
+class Territory(BaseModel):
+    """A territory whose VAT treatment differs from its country's (Canary Islands, Livigno,
+    Åland, Northern Ireland…), recognised by postcode (TAX.7).
+
+    Data only: what each status means for a sale is the tax engine's job (TAX.3, TAX.7). The
+    `special` status stores territories whose rule is an open decision (D-02 for `XI`).
+    """
+
+    VatStatus = TerritoryVatStatus
+
+    code = TerritoryCodeField(unique=True, help_text="e.g. ES-CN, IT-LIVIGNO, XI.")
+    name = models.CharField(max_length=100)
+    country = CountryField(help_text="The country the territory belongs to (ISO 3166-1 alpha-2).")
+    vat_status = models.CharField("VAT status", max_length=24, choices=VatStatus.choices)
+    postcode_patterns = PostcodePatternsField(
+        default=list,
+        blank=True,
+        help_text='Exact postcode "23041", prefix "35*" or range "22100-22199", comma separated.',
+    )
+
+    class Meta:
+        ordering = ["country", "code"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(vat_status__in=engine.TERRITORY_STATUSES),
+                name="tax_territory_vat_status_valid",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.code} ({self.name})"
+
+
+# --- Tax rates
+
+
+class TaxRateCategory(models.TextChoices):
+    STANDARD = engine.STANDARD, "Standard"
+    REDUCED = engine.REDUCED, "Reduced"
+    SUPER_REDUCED = engine.SUPER_REDUCED, "Super-reduced"
+    ZERO = engine.ZERO, "Zero"
+    BOOKS = engine.BOOKS, "Books"
+
+
+class TaxRateSource(models.TextChoices):
+    EC_TEDB = engine.RATE_SOURCE_TEDB, "EC TEDB"
+    MANUAL = engine.RATE_SOURCE_MANUAL, "Manual"
+
+
+class TaxRate(Versioned):
+    """The VAT percentage of one category in a country (or one of its territories), valid for a
+    period. Periods of the same country, territory and category never overlap.
+
+    Read with `apps.tax.services.current_rate`, which fails loudly when no rate is configured:
+    a missing rate is a configuration error, never a silent 0% (spec 05 T6).
+    """
+
+    Category = TaxRateCategory
+    Source = TaxRateSource
+
+    country = CountryField(help_text="ISO 3166-1 alpha-2.")
+    territory = models.ForeignKey(
+        Territory,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="rates",
+        help_text="Empty for the country's own rate.",
+    )
+    category = models.CharField(max_length=16, choices=Category.choices)
+    rate = models.DecimalField(
+        max_digits=engine.RATE_MAX_DIGITS,
+        decimal_places=engine.RATE_DECIMAL_PLACES,
+        validators=[MinValueValidator(engine.MIN_RATE), MaxValueValidator(engine.MAX_RATE)],
+        help_text="Percentage, e.g. 25.5 for 25.5%.",
+    )
+    source = models.CharField(max_length=16, choices=Source.choices)
+
+    class Meta:
+        ordering = ["country", "territory_id", "category", "-valid_from"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(category__in=engine.CATEGORIES),
+                name="tax_taxrate_category_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(source__in=engine.RATE_SOURCES),
+                name="tax_taxrate_source_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(rate__gte=engine.MIN_RATE, rate__lte=engine.MAX_RATE),
+                name="tax_taxrate_rate_range",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(category=engine.ZERO) | models.Q(rate=0),
+                name="tax_taxrate_zero_category_is_zero",
+            ),
+            _valid_period("taxrate"),
+            ExclusionConstraint(
+                name="tax_taxrate_no_overlap",
+                expressions=[
+                    ("country", RangeOperators.EQUAL),
+                    (Coalesce("territory", models.Value(0)), RangeOperators.EQUAL),
+                    ("category", RangeOperators.EQUAL),
+                    (TsTzRange("valid_from", "valid_to"), RangeOperators.OVERLAPS),
+                ],
+                violation_error_message=(
+                    "Rates of the same country, territory and category must not overlap."
+                ),
+            ),
+        ]
+
+    def __str__(self) -> str:
+        where = self.territory.code if self.territory else self.country
+        return f"{where} {self.category} {self.rate}% from {self.valid_from:%Y-%m-%d}"
+
+    def clean(self) -> None:
+        errors: dict[str, str] = {}
+        if self.territory is not None and self.territory.country != self.country:
+            errors["territory"] = f"{self.territory.code} is not in {self.country}."
+        if self.rate is not None and self.category:
+            message = engine.rate_error(self.category, self.rate)
+            if message:
+                errors["rate"] = message
+            else:  # the same value the database will hold, for snapshots and audit entries
+                self.rate = engine.quantize_rate(self.rate)
+        if errors:
+            raise ValidationError(errors)
+
+
+# --- Vendor tax profiles
+
+
+class VatRegime(models.TextChoices):
+    OSS = engine.OSS, "OSS (destination-country VAT for EU consumers)"
+    DOMESTIC_ONLY = engine.DOMESTIC_ONLY, "Domestic only (vendor-country VAT)"
+    EXEMPT = engine.EXEMPT, "Exempt (no VAT charged)"
+
+
+class ExemptReason(models.TextChoices):
+    ART74_PUBLISHING = engine.ART74_PUBLISHING, "Publishing (IT art. 74)"
+    FLAT_RATE_FORFETTARIO = engine.FLAT_RATE_FORFETTARIO, "Flat-rate scheme (IT forfettario, RF19)"
+    OTHER = engine.OTHER_EXEMPTION, "Other"
+
+
+class VendorTaxProfile(Versioned):
+    """A vendor's VAT regime for a period: a new row on every approved change (TAX.2).
+
+    The fiscal regime declared on invoices (`Vendor.fiscal_regime`, VEN.12) stays on the vendor;
+    `clean()` keeps the two consistent (`engine.profile_errors`: RF19 ⇔ flat-rate exemption).
+    """
+
+    Regime = VatRegime
+    ExemptReason = ExemptReason
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
+
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="tax_profiles")
+    regime = models.CharField("VAT regime", max_length=16, choices=Regime.choices)
+    exempt_reason = models.CharField(
+        max_length=24, choices=ExemptReason.choices, blank=True, help_text="Exempt regime only."
+    )
+    oss_registered_since = models.DateField("OSS registered since", null=True, blank=True)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="Who asked for this regime (the vendor's member, TAX.2).",
+    )
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        editable=False,
+    )
+
+    class Meta:
+        ordering = ["vendor_id", "-valid_from"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(regime__in=engine.REGIMES), name="tax_profile_regime_valid"
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(regime=engine.EXEMPT, exempt_reason__in=engine.EXEMPT_REASONS)
+                    | (~models.Q(regime=engine.EXEMPT) & models.Q(exempt_reason=""))
+                ),
+                name="tax_profile_exempt_reason_iff_exempt",
+            ),
+            _valid_period("profile"),
+            ExclusionConstraint(
+                name="tax_profile_no_overlap",
+                expressions=[
+                    ("vendor", RangeOperators.EQUAL),
+                    (TsTzRange("valid_from", "valid_to"), RangeOperators.OVERLAPS),
+                ],
+                violation_error_message="Tax profiles of a vendor must not overlap.",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.vendor} {self.regime} from {self.valid_from:%Y-%m-%d}"
+
+    def clean(self) -> None:
+        if self.vendor_id is None or not self.regime:
+            return
+        errors = engine.profile_errors(
+            self.regime, self.exempt_reason, fiscal_regime=self.vendor.fiscal_regime
+        )
+        if errors:
+            raise ValidationError(errors)
+
+
+class VendorTaxProfileTranslation(TranslationModel):
+    """The legal note a profile version prints on order documents, per language (e.g. the
+    bilingual art. 74 wording). Texts follow the translation workflow (I18N.2)."""
+
+    translation_of = "profile"
+    translated_fields = ("legal_note",)
+
+    vendor_scope: ClassVar[str] = "profile__vendor"
+    objects = VendorScopedManager()
+
+    profile = models.ForeignKey(
+        VendorTaxProfile, on_delete=models.CASCADE, related_name="translations"
+    )
+    legal_note = models.TextField(blank=True)
+
+    class Meta(TranslationModel.Meta):
+        constraints = [
+            *TranslationModel.Meta.constraints,
+            models.UniqueConstraint(
+                fields=["profile", "language"], name="tax_profile_translation_unique"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.profile} [{self.language}]"
+
+
+# --- VIES answers
+
+
+class VatResult(models.TextChoices):
+    VALID = engine.VAT_VALID, "Valid"
+    INVALID = engine.VAT_INVALID, "Invalid"
+    UNAVAILABLE = engine.VAT_UNAVAILABLE, "VIES unavailable"
+
+
+class VatValidation(BaseModel):
+    """One answer about a VAT number (ADR-0003: the cached side of VIES). Append-only.
+
+    Written by `apps.tax.services.record_vat_validation`, e.g. from a `VatNumberValidator`
+    (VEN.12); the VIES client with cache policy, timeout and fail-closed handling is TAX.5. The
+    number is stored without its country prefix; `country` is ISO (GR, never EL). Every row is
+    a VIES answer: staff-recorded answers are out of scope until a task gives them an actor and
+    an audited service.
+    """
+
+    Result = VatResult
+
+    country = CountryField(help_text="ISO 3166-1 alpha-2 (GR for a VIES EL number).")
+    vat_number = models.CharField("VAT number", max_length=32, help_text="Without the prefix.")
+    result = models.CharField(max_length=16, choices=Result.choices)
+    name = models.CharField(max_length=200, blank=True)
+    address = models.TextField(blank=True)
+    request_id = models.CharField(
+        max_length=64, blank=True, help_text="VIES consultation number, when given."
+    )
+    checked_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["-checked_at", "-id"]
+        indexes = [
+            models.Index(
+                fields=["country", "vat_number", "-checked_at"], name="tax_vatvalidation_lookup"
+            )
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(result__in=engine.VAT_RESULTS),
+                name="tax_vatvalidation_result_valid",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.country}{self.vat_number} {self.result} at {self.checked_at:%Y-%m-%d %H:%M}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if self.pk is not None:
+            raise PermissionError("VatValidation is append-only")
+        super().save(*args, **kwargs)

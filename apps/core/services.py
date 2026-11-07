@@ -14,7 +14,7 @@ from .audit import AuditContext, record
 from .changeset import ChangeSet
 from .models import Heartbeat, PlatformOperator, Throttle
 from .throttling import BackoffPolicy, ThrottleState, after_failure
-from .validity import NoValidRow, OverlappingValidity, pick_valid
+from .validity import NoValidRow, OverlappingValidity, next_start_error, pick_valid
 
 
 def run_mutation(
@@ -123,14 +123,9 @@ def latest_operator() -> PlatformOperator | None:
 
 def check_operator_start(valid_from: dt.datetime, latest: PlatformOperator | None) -> None:
     """A new configuration starts after the latest one, and only an open-ended row is closed."""
-    if latest is None:
-        return
-    if valid_from <= latest.valid_from:
-        start = latest.valid_from.isoformat()
-        raise ValidationError({"valid_from": f"Must be after {start}, the latest start."})
-    if latest.valid_to is not None and latest.valid_to > valid_from:
-        end = latest.valid_to.isoformat()
-        raise ValidationError({"valid_from": f"Must not be before the latest end, {end}."})
+    error = next_start_error(valid_from, latest)
+    if error is not None:
+        raise ValidationError({"valid_from": error})
 
 
 def configure_platform_operator(

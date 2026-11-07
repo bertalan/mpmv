@@ -38,6 +38,7 @@ vendor's change page links to its trail (`?vendor=<public id>`).
 | Platform configuration (ARC.7) | `core.platform_operator.configured` |
 | Product prices (CAT.1) | `catalog.product.price_changed`, `catalog.variant.price_changed` |
 | Shipping configuration (SHP.1) | `shipping.<model>.created`, `.updated`, `.deleted` for carriers, zones, vendor rates, weight bands and pickup options, through `shipping.services.save_config` and `delete_config`; deleting a rate also audits each of its bands |
+| Tax configuration (TAX.1) | `tax.rate.configured`, `tax.vendor_tax_profile.configured` (versioned: the replaced row is `before`), `tax.territory.created`, `.updated`, `tax.legal_note.created`, `.updated`; VIES answers (`tax.vatvalidation`) are an append-only cache, not audited |
 
 Deliberately not stored: password hashes (only `has_usable_password`), API key hashes, TOTP
 secrets, and the identifier typed in a failed login that matches no account (it may be a typo
@@ -76,6 +77,7 @@ Failures refused during a lockout are not audited one by one: the lockout entry 
 
 ## Hooking in rate models (TAX, SHP, commissions)
 
+`apps.tax.services.configure_tax_rate` (TAX.1) is the reference implementation of this pattern.
 Rates, zones and commission rules are versioned configuration, like `PlatformOperator`: a
 change is a new row valid from a date, closing the current one, so orders and documents keep
 pointing at the version they were computed with. The audit entry of the new row carries the

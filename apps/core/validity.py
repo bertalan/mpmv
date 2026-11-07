@@ -40,3 +40,18 @@ def pick_valid[P: Period](rows: Iterable[P], at: dt.datetime, *, what: str) -> P
             "validity periods must not overlap."
         )
     return matches[0]
+
+
+def next_start_error(valid_from: dt.datetime, latest: Period | None) -> str | None:
+    """Why a new row starting at `valid_from` cannot follow `latest`; None when it can.
+
+    History only grows forward: the new row starts after the latest one, and only an open-ended
+    latest row is closed (an already closed row is never shortened).
+    """
+    if latest is None:
+        return None
+    if valid_from <= latest.valid_from:
+        return f"Must be after {latest.valid_from.isoformat()}, the latest start."
+    if latest.valid_to is not None and latest.valid_to > valid_from:
+        return f"Must not be before the latest end, {latest.valid_to.isoformat()}."
+    return None
