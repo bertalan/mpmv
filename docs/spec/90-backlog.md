@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **148** in **17** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **1273 h** (P1 1074 h · P2 181 h · P3 18 h)
+- Micro-tasks: **149** in **17** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **1285 h** (P1 1080 h · P2 187 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **126 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CAT.1 → ORD.1 → ORD.2 → ORD.4 → PAY.1 → PAY.2 → PAY.3 → PAY.4 → ORD.8
 
 ## By macro area
@@ -16,14 +16,14 @@
 |---|---|---:|---:|---:|---:|---:|
 | ARC | Architecture and foundations | 14 | 92 | 6 | 0 | 98 |
 | CORE | Identity, permissions, API, backoffice | 11 | 83 | 4 | 0 | 87 |
-| CAT | Product catalog | 11 | 104 | 10 | 0 | 114 |
+| CAT | Product catalog | 11 | 106 | 10 | 0 | 116 |
 | VEN | Vendors, commissions, ledger | 12 | 88 | 14 | 0 | 102 |
 | TAX | Tax engine | 10 | 42 | 28 | 0 | 70 |
 | SHP | Shipping and quotes | 11 | 64 | 28 | 0 | 92 |
 | ORD | Cart, orders, returns | 10 | 102 | 0 | 0 | 102 |
 | PAY | Payments (Stripe Connect) | 4 | 40 | 0 | 0 | 40 |
 | ING | Supplier import and pipelines | 13 | 92 | 26 | 0 | 118 |
-| I18N | Multilingual | 7 | 40 | 0 | 0 | 40 |
+| I18N | Multilingual | 8 | 44 | 6 | 0 | 50 |
 | CMS | Wagtail content | 7 | 66 | 10 | 0 | 76 |
 | SEO | SEO, feeds, analytics | 6 | 30 | 14 | 0 | 44 |
 | AI | AI channels (MCP, agents) | 4 | 0 | 22 | 18 | 40 |
@@ -31,7 +31,7 @@
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 4 | 16 | 11 | 0 | 27 |
 | MIG | Migration and cutover | 10 | 106 | 0 | 0 | 106 |
-| **Total** | | **148** | **1074** | **181** | **18** | **1273** |
+| **Total** | | **149** | **1080** | **187** | **18** | **1285** |
 
 ## By phase
 
@@ -49,7 +49,7 @@
 | ARC.9 | Task worker + cron scheduler on Postgres, with locks and retries | P1 | 8 | ARC.2 | Test job scheduled and observable |
 | ARC.11 | Test harness per ADR-0006: unit / integration / e2e suites, auto-markers, Playwright with screenshots, CI reports | P1 | 6 | ARC.3 | `make test-unit`, `make test`, `make test-e2e` green; e2e screenshots saved |
 | ARC.12 | Adopt factory_boy for test data: one DjangoModelFactory per model in `apps/<app>/tests/factories.py`, Faker with a fixed seed, synthetic data only; convert hand-written builders; document in ADR-0006 and CONTRIBUTING | P1 | 4 | ARC.6 | Every model has a factory used by the tests; no hand-written model builders left |
-| ARC.13 | STAGE environment on Hetzner: provision app and DB VPS, deploy from tag, rollback (including a deliberately unhealthy release), smoke tests; includes the STAGE checks of CORE.7 (OpenAPI published) and I18N.1 (`/it/` and `/de/` active) | P1 | 8 | ARC.5 | Tag deploy and automatic rollback proven on STAGE; CORE.7 and I18N.1 STAGE checks pass |
+| ARC.13 | STAGE environment on Hetzner: provision app and DB VPS, deploy from tag, rollback (including a deliberately unhealthy release), smoke tests; includes the STAGE checks of CORE.7 (OpenAPI published) and I18N.1 (`/it/`, `/de/`, `/fr/` and `/es/` active) | P1 | 8 | ARC.5 | Tag deploy and automatic rollback proven on STAGE; CORE.7 and I18N.1 STAGE checks pass |
 | ARC.15 | Media storage: S3-compatible Hetzner Object Storage (EU) behind the CDN, private buckets for documents, signed URLs, django-storages | P1 | 6 | ARC.5, ARC.13 | Uploads work on STAGE with a read-only container filesystem; private documents only via signed URLs |
 | CORE.1 | Custom `User`, login via email, preferred language | P1 | 6 | ARC.6 | Initial migration with custom User |
 | CORE.2 | `VendorMember` with owner/staff roles, per-role permissions | P1 | 6 | CORE.1, VEN.1 | Role matrix tested |
@@ -70,14 +70,14 @@
 | OPS.1 | Self-managed PITR with pgBackRest (continuous WAL archiving + base backups) to Hetzner Object Storage, encrypted, with retention + restore test; least-privilege DB roles (app role without DDL or TRUNCATE, so the audit log stays append-only) | P1 | 8 | ARC.13 | Documented point-in-time restore on an empty database VPS; app role cannot TRUNCATE `core_auditlog` |
 | OPS.2 | Observability: JSON logs, error tracking, healthchecks, alerts (including database disk space, WAL archiving and backup age) | P1 | 8 | ARC.5 | Alert on a simulated checkout error |
 
-### F1 — Catalog, import, base frontend (28 tasks, 268 h)
+### F1 — Catalog, import, base frontend (28 tasks, 274 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
 | CAT.1 | Product and Variant models, translations, `(vendor, sku)` constraints | P1 | 12 | ARC.6, VEN.1 | Migrations + constraint tests |
 | CAT.2 | Taxonomies: Category (tree), configurable Taxonomy/Term, Brand, translations and SEO texts | P1 | 10 | CAT.1 | Admin CRUD with translations |
 | CAT.3 | Typed attributes and translated values; variant axes with ordering | P1 | 10 | CAT.1 | Variable size×color product created via API |
-| CAT.4 | Media: ProductImage on Wagtail Images, WebP/AVIF renditions, dedup by hash, cover lock | P1 | 10 | CAT.1, ARC.15 | Upload → automatic renditions |
+| CAT.4 | Media: ProductImage on Wagtail Images, WebP/AVIF renditions, dedup by hash, cover lock; optional image language with the replacement rule, translatable alt text and captions (D-18) | P1 | 12 | CAT.1, ARC.15 | Upload → automatic renditions; a DE-dedicated image replaces the neutral gallery in DE only; alt text falls back to EN |
 | CAT.5 | `build_product_slug` + SlugHistory + 301 redirect middleware | P1 | 8 | CAT.1 | Test cases ported from legacy-sku-permalink |
 | CAT.6 | `Redirect` model + admin management + import of existing maps (retired SKUs, merged tags, discontinued categories) | P1 | 6 | CAT.5 | All rules from the 4 mu-plugins covered by tests |
 | CAT.7 | Product page: gallery, variants with default, companion box, related products, visible SKU, "on request" | P1 | 16 | CAT.3, CAT.4 | Visual and functional parity with LIVE |
@@ -93,13 +93,13 @@
 | ING.7 | `publish_drafts` via `catalog.services` with dry-run and scheduled publication | P1 | 8 | CAT.10 | Draft → EN/IT product in one step |
 | ING.8 | `plan_stock_actions` / `plan_price_actions` + jobs and ReviewItem | P1 | 10 | ING.2 | Supplier rules (404, stale, >15%, sales) green |
 | ING.9 | XLSX adapter (Vendor B), publisher feed (Vendor D), YAML light (Vendor E), generic CSV | P1 | 16 | ING.4 | One dry-run per vendor |
-| I18N.1 | Language configuration, URL prefixes, middleware, language switcher | P1 | 4 | ARC.3, ARC.13 | `/it/` and `/de/` active on STAGE |
+| I18N.1 | Language configuration, URL prefixes, middleware, language switcher | P1 | 4 | ARC.3, ARC.13 | `/it/`, `/de/`, `/fr/` and `/es/` active on STAGE |
 | I18N.2 | Abstract base `TranslationModel` with status, `source_hash`, fallback | P1 | 6 | ARC.6 | Reused by catalog and vendor |
-| I18N.3 | wagtail-localize for CMS pages | P1 | 4 | CMS.1 | Translated page with sync |
-| I18N.4 | Translation queue in admin (by language, vendor, status) + AI draft translation | P1 | 8 | I18N.2, ING.5 | EN edit → IT and DE go back to "needs review" |
+| I18N.3 | wagtail-localize for CMS pages: image fields and image blocks overridable per locale, alt text and captions as translatable segments, CMS gallery replacement rule (D-18) | P1 | 6 | CMS.1 | Translated page with sync; a translator replaces one image in one locale only |
+| I18N.4 | Translation queue in admin (by language, vendor, status) + AI draft translation | P1 | 8 | I18N.2, ING.5 | EN edit → every other language goes back to "needs review" |
 | I18N.5 | gettext catalogs for templates and emails; tax wording as keys | P1 | 6 | ORD.9 | No hardcoded strings (lint) |
-| I18N.6 | hreflang, canonical, per-language sitemap with fallback excluded | P1 | 4 | SEO.1 | Validation on a sample of URLs |
-| I18N.7 | German content for go-live (D-18): AI draft DE for catalog, taxonomy terms, vendor storefronts and CMS pages; human review of legal pages, checkout and emails; coverage report | P1 | 8 | I18N.4, I18N.3, MIG.7 | DE coverage report: 100% of legal/checkout/email texts reviewed, catalog drafts complete |
+| I18N.6 | hreflang, canonical, per-language sitemap with fallback excluded | P1 | 4 | SEO.1 | Validation on a sample of URLs: fallback copies have the EN canonical and are absent from hreflang and from the language sitemap |
+| I18N.7 | Interface strings in IT, DE, FR and ES for go-live (D-18): gettext catalogs for templates, emails, notifications, error and validation messages, MFA pages and tax/legal wording keys; AI draft, human review of checkout, emails and legal/tax wording; coverage report | P1 | 10 | I18N.5 | Coverage report: 100% of interface strings translated in IT, DE, FR and ES; checkout, email and legal/tax wording reviewed by a human |
 | CMS.1 | Wagtail: site, locales, base page types, per-language navigation and footer | P1 | 8 | ARC.3 | EN/IT home and static pages |
 | CMS.7 | Accessible frontend theme (WCAG 2.1 AA), components, design tokens | P1 | 24 | CMS.1 | Accessibility audit passed |
 
@@ -129,7 +129,7 @@
 | ORD.6 | Vendor fulfillment: accept, ship with tracking, delivered | P1 | 8 | ORD.2, CORE.9 | Vendor fulfills from its own panel |
 | ORD.7 | Customer area: orders, timeline, tracking, quotes | P1 | 10 | ORD.2 | Parity with My Account |
 | ORD.8 | Online withdrawal and returns flow | P1 | 12 | PAY.4, CMP.6 | Compliant withdrawal button, email receipt |
-| ORD.9 | Transactional emails per language (customer, vendor, staff) | P1 | 10 | ORD.2 | All emails in EN/IT/DE with snapshot tests |
+| ORD.9 | Transactional emails per language (customer, vendor, staff) | P1 | 10 | ORD.2 | All emails in EN, IT, DE, FR and ES with snapshot tests |
 | ORD.10 | Checkout and payments kill-switch, alert on payment without transfer | P1 | 4 | ARC.8, PAY.3 | Kill-switch verified on STAGE |
 | PAY.1 | `PaymentGateway` + Stripe implementation (PaymentIntent, transfer_group) | P1 | 12 | ORD.4 | End-to-end test payment |
 | PAY.2 | Signed, idempotent webhooks, `on_payment_succeeded` | P1 | 8 | PAY.1, VEN.4 | Duplicate event has no effect |
@@ -186,7 +186,7 @@
 | MIG.9 | Three dress rehearsals on STAGE + cutover and rollback runbook | P1 | 16 | MIG.5, MIG.6 | Third rehearsal with no blockers |
 | MIG.10 | Cutover and post-go-live monitoring | P1 | 12 | MIG.9, SEC.6 | Go-live, 72 h with no critical issues |
 
-### F6 — After go-live (P2) (25 tasks, 181 h)
+### F6 — After go-live (P2) (26 tasks, 187 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -207,6 +207,7 @@
 | ING.11 | Supplier review import | P2 | 4 | ING.1, CMS.6 | Reviews imported with original date |
 | ING.12 | `/api/v1` import API for external vendors (upsert, stock, prices, media) | P2 | 8 | CORE.7, CAT.10 | Sample client in dry-run |
 | ING.13 | Admin checklist and "new vendor from source" wizard | P2 | 8 | ING.9 | Demo vendor activated without code |
+| I18N.8 | Visitor content translation after go-live (D-18): products, categories, taxonomy terms, vendor storefronts, CMS pages, blog and landing pages, with the method the owner chooses (AI, professional or other) through the I18N.4 queue; per-language coverage report | P2 | 6 | I18N.4, I18N.3, I18N.6 | Per-language coverage report; only published translations appear in hreflang and sitemaps |
 | CMS.6 | Reviews: model, purchase verification, supplier import, moderation, vendor reply | P2 | 10 | ORD.2 | AggregateRating schema only with valid reviews |
 | SEO.4 | Merchant API sync + Meta feed | P2 | 8 | SEO.3 | Daily delta report |
 | SEO.6 | Anonymous page cache, responsive renditions, CWV budget | P2 | 6 | CMS.7 | LCP < 2.5 s on product page |

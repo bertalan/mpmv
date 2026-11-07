@@ -33,6 +33,16 @@
 Taxonomy and vendor pages combine editorial content with catalog data: they are the SEO strong point
 ("browse by taxonomy term") and today they are fragmented across tags, categories and articles.
 
+### Images per locale (D-18)
+
+Images are language neutral by default (spec 09 §9.2). With wagtail-localize (I18N.3), image fields
+on page models are declared overridable (`SynchronizedField(..., overridable=True)`) and image
+chooser blocks in StreamField stay overridable segments, so a translator can replace an image for
+one locale while the other locales keep the source image. Alt text and captions are translatable
+segments with EN fallback. A gallery block marks each image as neutral or dedicated to one language
+and applies the same replacement rule as product images: a language with at least one dedicated
+image shows only those, otherwise the neutral ones.
+
 ### Technical SEO (`seo` app)
 
 ```python

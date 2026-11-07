@@ -23,7 +23,7 @@ part of the done-when still open) · `not started`.
 | VEN.1 | done | #8 | Vendor models, translations, status machine, admin |
 | CORE.6 | done | #9 | ApiClient: hashed keys, scopes, expiry, rotation, revocation, IP allow-list |
 | SEC.1 | done | #7 | Strict CSP, Permissions-Policy, hardened cookies, security headers |
-| I18N.1 | partial: "/it/ and /de/ active on STAGE" pending STAGE | #12 | Language-prefix routing, language switcher, preferred language |
+| I18N.1 | partial: "/it/, /de/, /fr/ and /es/ active on STAGE" pending STAGE | #12 | Language-prefix routing, language switcher, preferred language |
 | ARC.5 | done | #13 | OCI image, Apple container local stack, Podman Quadlets, tag deploy and rollback tooling, Procrastinate worker role. Done-when narrowed by owner decision; the STAGE deploy moved to ARC.13 |
 | ARC.12 | done | #16 | factory_boy factories per model, hand-written test builders converted |
 | CORE.2 | done | #18 | VendorMember with owner and staff roles, role matrix, last-owner rule, audited membership services |
@@ -44,6 +44,7 @@ part of the done-when still open) · `not started`.
 - Media storage on Hetzner Object Storage with private buckets and signed URLs: new task [ARC.15](spec/01-stack-and-architecture.md), required by CAT.4 and SEC.2.
 - `platform_entity` on LedgerEntry and PayoutAccount points to the PlatformOperator version row; balances per company group versions by legal identity ([spec 04](spec/04-vendors-commissions-ledger.md)).
 - Vendor-scoped API keys: new task [CORE.13](spec/02-core-identity-permissions.md) (`ApiClient.vendor`).
+- Languages (D-18 revised): EN, IT, DE, FR and ES at go-live, in that order; interface text translated into all five (I18N.7), visitor content EN only until after go-live with the EN-canonical fallback (new P2 task I18N.8); images neutral unless dedicated to one language, translatable alt text and captions (CAT.4, I18N.3). Whether legal pages must be translated at go-live is still open. P1 +6 h, P2 +6 h ([spec 09](spec/09-multilingual.md)).
 - VEN.12 payout requirements: defaults confirmed; non-EU vendors need IBAN and foreign TIN; the DAC7 dataset (registered office address, country of tax residence, VAT number or TIN) and the FatturaPA party data are payout requirements for every vendor ([spec 04](spec/04-vendors-commissions-ledger.md), [spec 11](spec/11-compliance.md) CMP.1).
 
 ## Follow-ups from wave 1
@@ -117,7 +118,7 @@ Deferred to other tasks:
 - I18N.1: the staff admin is always in EN, because unprefixed paths use the primary language.
 - I18N.1: page strings are marked for translation, but .po/.mo catalogs come with I18N.5.
 - I18N.1: hreflang, canonical and sitemaps go to I18N.6; wagtail-localize goes to I18N.3.
-- I18N.1: the "/it/ and /de/ active on STAGE" check needs a smoke test once STAGE exists.
+- I18N.1: the "/it/, /de/, /fr/ and /es/ active on STAGE" check needs a smoke test once STAGE exists.
 
 Review findings not fixed (all minor):
 
