@@ -60,6 +60,35 @@ def test_invalid_territories_are_rejected(field: str, value: object) -> None:
     assert field in exc.value.message_dict
 
 
+def test_an_old_style_range_is_refused_with_the_dotdot_hint() -> None:
+    # TAX.11: "22100-22199" is ambiguous with PT/PL postcodes; the error shows the new form.
+    with pytest.raises(ValidationError) as exc:
+        TerritoryFactory.build(postcode_patterns=["22100-22199"]).full_clean()
+    assert "22100..22199" in " ".join(exc.value.message_dict["postcode_patterns"])
+
+
+def test_a_dotdot_range_is_accepted_and_matches() -> None:
+    territory = TerritoryFactory.build(code="PT-30", country="PT", postcode_patterns=["9000..9999"])
+    territory.full_clean()
+    territory.save()
+    stored = Territory.objects.get(pk=territory.pk)
+    assert stored.postcode_patterns == ["9000..9999"]
+    assert stored.matches_postcode("9500-100") is True
+    assert stored.matches_postcode("8999-999") is False
+
+
+def test_portuguese_and_polish_postcodes_with_a_dash_match_as_exact_postcodes() -> None:
+    territory = TerritoryFactory.build(postcode_patterns=[" 9000-001 ", "00-950"])
+    territory.full_clean()
+    territory.save()
+    stored = Territory.objects.get(pk=territory.pk)
+    assert stored.postcode_patterns == ["9000-001", "00-950"]
+    assert stored.matches_postcode("9000-001") is True
+    assert stored.matches_postcode("00-950") is True
+    assert stored.matches_postcode("9000-002") is False
+    assert stored.matches_postcode("00-951") is False
+
+
 def test_territory_codes_are_unique() -> None:
     TerritoryFactory.create(code="IT-LIVIGNO", country="IT")
     with pytest.raises(IntegrityError), transaction.atomic():
