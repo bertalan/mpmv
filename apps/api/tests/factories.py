@@ -10,14 +10,16 @@ from factory.django import DjangoModelFactory
 
 from apps.api.engine import generate_key, hash_key
 from apps.api.models import ApiClient, ApiMutationLog
+from apps.vendors.tests.factories import VendorFactory
 
 
 class ApiClientFactory(DjangoModelFactory[ApiClient]):
     """An active platform client with a fresh random key, as `issue_api_client` would store it.
 
     Only the prefix and the hash are stored. Use `create_with_key()` when the test needs the full
-    key; `expired=True` and `revoked=True` give refused clients. Tests about issuance itself call
-    the service, not this factory.
+    key; `expired=True` and `revoked=True` give refused clients; `vendor_key=True` binds the
+    client to a new vendor (or pass `vendor=`) (CORE.13). Tests about issuance itself call the
+    service, not this factory.
     """
 
     class Meta:
@@ -29,7 +31,9 @@ class ApiClientFactory(DjangoModelFactory[ApiClient]):
             expires_at=factory.LazyFunction(lambda: timezone.now() - dt.timedelta(minutes=1))
         )
         revoked = factory.Trait(is_active=False, revoked_at=factory.LazyFunction(timezone.now))
+        vendor_key = factory.Trait(vendor=factory.SubFactory(VendorFactory))
 
+    vendor = None
     name = factory.Sequence(lambda n: f"Pipeline {n}")
     scopes = factory.LazyFunction(lambda: ["catalog:write", "stock:write"])
     key_prefix = factory.SelfAttribute("generated.prefix")

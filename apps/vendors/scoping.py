@@ -13,9 +13,13 @@ and `get_vendor_object_or_404(Product, request.user, public_id=...)` answers 404
 another vendor's product, exactly as for a missing one, so callers cannot enumerate other
 tenants. `tests.integration.test_tenant_isolation` fails when a vendor-owned model or an endpoint
 is not covered.
+
+Machine credentials act too (CORE.13): an API key bound to a vendor reaches only that vendor's
+rows, a platform key (no vendor) every vendor's. API v1 operations and MCP tools pass the calling
+client as the actor: `get_for_actor_or_404(Product, api_client_of(request), sku=sku)`.
 """
 
-from typing import Any, Final, Self
+from typing import Any, Final, Protocol, Self
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
@@ -24,6 +28,20 @@ from django.db import models
 from django.http import Http404
 
 AnyUser = AbstractBaseUser | AnonymousUser
+
+
+class Credential(Protocol):
+    """A machine credential acting for itself, such as an API key (`apps.api.models.ApiClient`).
+
+    `credential_vendor_id` is the pk of the vendor it is bound to, or None for a platform
+    credential. Only active, authenticated credentials may be passed as actors.
+    """
+
+    @property
+    def credential_vendor_id(self) -> int | None: ...
+
+
+type Actor = AnyUser | Credential
 
 # Class attribute of a vendor-owned model: the ORM lookup path from the model to its Vendor.
 SCOPE_ATTRIBUTE: Final = "vendor_scope"
@@ -70,8 +88,11 @@ class VendorScopedQuerySet[M: models.Model](models.QuerySet[M]):
         """Only the rows of the vendors `user` is a member of (any role).
 
         Inactive and anonymous users get nothing. Platform staff are not members: staff pages use
-        `for_actor`, or the staff admin.
+        `for_actor`, or the staff admin. A credential is never a member: it goes through
+        `for_actor`.
         """
+        if not isinstance(user, AbstractBaseUser | AnonymousUser):
+            raise TypeError("for_member takes a user; scope a credential with for_actor")
         if not user.is_authenticated or not user.is_active:
             return self.none()
         from .models import VendorMember  # models import this module
@@ -79,11 +100,17 @@ class VendorScopedQuerySet[M: models.Model](models.QuerySet[M]):
         vendors = VendorMember.objects.filter(user_id=user.pk).values("vendor_id")
         return self.filter(**{f"{self._lookup()}__in": vendors})
 
-    def for_actor(self, user: AnyUser) -> Self:
-        """Spec 02 §2.2: platform staff see everything, members their own rows, others nothing."""
-        if _is_platform_staff(user):
+    def for_actor(self, actor: Actor) -> Self:
+        """Spec 02 §2.2: platform staff see everything, members their own rows, others nothing.
+
+        A credential (CORE.13) sees its vendor's rows, or every row when it is a platform one.
+        """
+        if not isinstance(actor, AbstractBaseUser | AnonymousUser):
+            vendor_id = actor.credential_vendor_id
+            return self.all() if vendor_id is None else self.filter(**{self._lookup(): vendor_id})
+        if _is_platform_staff(actor):
             return self.all()
-        return self.for_member(user)
+        return self.for_member(actor)
 
 
 # Default manager of every vendor-owned model; related managers (`vendor.members`) inherit it.
@@ -126,6 +153,10 @@ def get_vendor_object_or_404[M: models.Model](source: Source[M], user: AnyUser, 
     return _get_or_404(_scoped(source).for_member(user), lookup)
 
 
-def get_for_actor_or_404[M: models.Model](source: Source[M], user: AnyUser, **lookup: Any) -> M:
-    """Like `get_vendor_object_or_404`, but platform staff reach every vendor's objects."""
-    return _get_or_404(_scoped(source).for_actor(user), lookup)
+def get_for_actor_or_404[M: models.Model](source: Source[M], actor: Actor, **lookup: Any) -> M:
+    """Like `get_vendor_object_or_404`, but for any actor (`for_actor`).
+
+    Platform staff and platform credentials reach every vendor's objects; a vendor credential
+    (an API key bound to a vendor) only its own vendor's, with 404 for the others.
+    """
+    return _get_or_404(_scoped(source).for_actor(actor), lookup)

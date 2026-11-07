@@ -40,16 +40,21 @@ VENDOR_FIELDS = (
 )
 
 
+# Fields encrypted at rest (SEC.3) are masked in audit rows, or the log would hold them in clear.
+MASKED_FIELDS = {"iban": engine.mask_iban, "tax_code": engine.mask_tax_code}
+
+
 def vendor_snapshot(vendor: Vendor) -> dict[str, Any]:
-    """The audited fields of `vendor`, with the IBAN masked (it is sensitive, SEC.3)."""
+    """The audited fields of `vendor`, with the encrypted ones masked (SEC.3)."""
     snapshot = {name: getattr(vendor, name) for name in VENDOR_FIELDS}
-    snapshot["iban"] = engine.mask_iban(vendor.iban)
+    for name, mask in MASKED_FIELDS.items():
+        snapshot[name] = mask(getattr(vendor, name))
     return snapshot
 
 
 def save_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Validate, create or update `vendor`, auditing its data with before/after (keyed by public
-    id, IBAN masked). `before` is read from the database with the row locked.
+    id, IBAN and tax code masked). `before` is read from the database with the row locked.
 
     Incomplete legal data is always accepted: completeness is checked when a payout is
     requested (`assert_payout_allowed`), never here. A value that is present must be valid:
@@ -72,8 +77,9 @@ def save_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> 
             changes.create(MODEL_LABEL, key, after)
         else:
             before = vendor_snapshot(stored)
-            if stored.iban != vendor.iban and before["iban"] == after["iban"]:
-                after["iban"] += " (replaced)"  # same mask, different IBAN
+            for name in MASKED_FIELDS:  # same mask, different value
+                if getattr(stored, name) != getattr(vendor, name) and before[name] == after[name]:
+                    after[name] += " (replaced)"
             changes.update(MODEL_LABEL, key, before, after)
         if dry_run:
             return changes

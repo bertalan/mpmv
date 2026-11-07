@@ -35,12 +35,15 @@ print(networks[0]["ipv4Address"].split("/")[0])'
 }
 
 ensure_env_file() {
-  [ -f "$ENV_FILE" ] && return 0
   mkdir -p "$(dirname "$ENV_FILE")"
   (
     umask 077
-    printf 'DJANGO_SECRET_KEY=%s\n' \
+    [ -f "$ENV_FILE" ] || printf 'DJANGO_SECRET_KEY=%s\n' \
       "$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')" >"$ENV_FILE"
+    # Field encryption key (SEC.3), generated once: replacing it makes encrypted data unreadable.
+    grep -q '^MPMV_FIELD_ENCRYPTION_KEYS=' "$ENV_FILE" || printf 'MPMV_FIELD_ENCRYPTION_KEYS=local:%s\n' \
+      "$(python3 -c 'import base64, secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())')" \
+      >>"$ENV_FILE"
   )
 }
 

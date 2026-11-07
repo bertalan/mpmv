@@ -1,9 +1,13 @@
 """Environment helpers used by the settings modules."""
 
+import stat
+from pathlib import Path
+
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
-from mpmv.settings.env import env_bool, env_list, env_str
+from apps.core.crypto import parse_keys
+from mpmv.settings.env import ensure_key_file, env_bool, env_list, env_secret_list, env_str
 
 
 def test_env_str_returns_value(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -47,3 +51,42 @@ def test_env_bool_default_when_missing(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_env_list_splits_and_trims(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MPMV_TEST_LIST", " a, b ,,c ")
     assert env_list("MPMV_TEST_LIST") == ["a", "b", "c"]
+
+
+# --- SEC.3: field encryption keys come from the environment or from a file outside the database
+
+
+def test_env_secret_list_reads_the_variable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("MPMV_TEST_KEYS_FILE", raising=False)
+    monkeypatch.setenv("MPMV_TEST_KEYS", "a:1, b:2")
+    assert env_secret_list("MPMV_TEST_KEYS") == ["a:1", "b:2"]
+
+
+def test_env_secret_list_prefers_the_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    keys = tmp_path / "keys"
+    keys.write_text("# newest first\nb:2\n\n  a:1  \n")
+    monkeypatch.setenv("MPMV_TEST_KEYS", "ignored:0")
+    monkeypatch.setenv("MPMV_TEST_KEYS_FILE", str(keys))
+    assert env_secret_list("MPMV_TEST_KEYS") == ["b:2", "a:1"]
+
+
+def test_env_secret_list_with_an_unreadable_file_is_a_configuration_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("MPMV_TEST_KEYS_FILE", str(tmp_path / "missing"))
+    with pytest.raises(ImproperlyConfigured, match="MPMV_TEST_KEYS_FILE"):
+        env_secret_list("MPMV_TEST_KEYS")
+
+
+def test_ensure_key_file_creates_a_private_key_once(tmp_path: Path) -> None:
+    path = tmp_path / "config" / "field-keys"
+    ensure_key_file(path, key_id="dev")
+    first = path.read_text()
+    assert parse_keys(env_lines(first)).primary_id == "dev"
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    ensure_key_file(path, key_id="dev")
+    assert path.read_text() == first  # never replaced: that would lose the local data
+
+
+def env_lines(text: str) -> list[str]:
+    return [line for line in text.splitlines() if line and not line.startswith("#")]

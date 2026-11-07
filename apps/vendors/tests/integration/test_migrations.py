@@ -9,7 +9,7 @@ from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 
 from apps.core.translations import PUBLISHED, source_hash
-from apps.vendors.models import VendorTranslation
+from apps.vendors.models import Vendor, VendorTranslation
 
 BEFORE = [("vendors", "0002_vendormember")]
 
@@ -146,6 +146,55 @@ def test_json_addresses_move_to_structured_fields_and_back() -> None:
         "country": "IT",
     }
     assert reverted["vendor-c"] == {}
+
+    executor.loader.build_graph()
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+
+# --- SEC.3: existing IBANs and tax codes are encrypted in place, and decrypted on the way back
+
+BEFORE_ENCRYPTION = [("vendors", "0007_seed_dac7_requirements")]
+ENCRYPTED = [("vendors", "0008_encrypt_iban_and_tax_code")]
+CLEAR_IBAN = "IT60X0542811101000000123456"
+CLEAR_TAX_CODE = "RSSMRA85T10A562S"
+
+
+def raw_secrets() -> dict[str, tuple[str, str]]:
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT slug, iban, tax_code FROM vendors_vendor")
+        return {slug: (iban, tax_code) for slug, iban, tax_code in cursor.fetchall()}
+
+
+@pytest.mark.django_db(transaction=True)
+def test_existing_ibans_and_tax_codes_are_encrypted_and_back() -> None:
+    executor = MigrationExecutor(connection)
+    executor.migrate(BEFORE_ENCRYPTION)
+    old_apps = executor.loader.project_state(BEFORE_ENCRYPTION).apps
+    OldVendor = old_apps.get_model("vendors", "Vendor")
+    common = {"country": "IT", "legal_name": "Vendor S.r.l."}
+    OldVendor.objects.create(
+        display_name="Vendor A",
+        slug="vendor-a",
+        contact_email="vendor-a@example.com",
+        iban=CLEAR_IBAN,
+        tax_code=CLEAR_TAX_CODE,
+        **common,
+    )
+    OldVendor.objects.create(
+        display_name="Vendor B", slug="vendor-b", contact_email="vendor-b@example.com", **common
+    )
+
+    executor.loader.build_graph()
+    executor.migrate(ENCRYPTED)
+    encrypted = raw_secrets()
+    assert all(value.startswith("enc1:test:") for value in encrypted["vendor-a"])
+    assert encrypted["vendor-b"] == ("", "")
+    vendor_a = Vendor.objects.get(slug="vendor-a")
+    assert (vendor_a.iban, vendor_a.tax_code) == (CLEAR_IBAN, CLEAR_TAX_CODE)
+
+    executor.loader.build_graph()
+    executor.migrate(BEFORE_ENCRYPTION)  # reversible
+    assert raw_secrets() == {"vendor-a": (CLEAR_IBAN, CLEAR_TAX_CODE), "vendor-b": ("", "")}
 
     executor.loader.build_graph()
     executor.migrate(executor.loader.graph.leaf_nodes())

@@ -90,6 +90,7 @@ class VendorAction(StrEnum):
     BANK_ACCOUNT = "bank_account"  # IBAN / payout account
     TAX_REGIME = "tax_regime"  # tax regime change request
     MEMBERS = "members"  # add and remove members, change roles
+    API_KEYS = "api_keys"  # issue vendor-bound API keys, which act for the whole vendor (CORE.13)
 
 
 # The role matrix. Owner: everything about their own vendor, financial settings included.
@@ -956,6 +957,13 @@ def fatturapa_transmission(identity: LegalIdentity) -> dict[str, str]:
     if ident.sdi_recipient_code == SDI_PEC_CODE:
         transmission["PECDestinatario"] = ident.pec
     return transmission
+
+
+def mask_tax_code(tax_code: str) -> str:
+    """Last four characters only: for audit rows and screens (SEC.3)."""
+    if len(tax_code) <= 4:
+        return "*" * len(tax_code)
+    return "*" * (len(tax_code) - 4) + tax_code[-4:]
 
 
 def mask_iban(iban: str) -> str:

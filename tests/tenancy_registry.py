@@ -13,14 +13,18 @@ fails when an endpoint, an API operation or a vendor-owned model is missing here
   declare a list of vendor data `NoVendorData`: it is only checked against Vendor B's seeded
   objects, while `VendorScopedList` also proves that the caller's own objects are listed.
 
+API v1 operations are called with an API key bound to Vendor A that holds the operation's scope
+(CORE.13), so every operation on vendor data must scope it with `for_actor(api_client_of(request))`
+or `get_for_actor_or_404`.
+
 The Django admin is classified as a whole: staff only, with the object pages of vendor-owned
 models tested on Vendor B's objects.
 """
 
 from django.contrib import admin
 from django.db import models
-from django.test import Client
 
+from apps.api.models import ApiClient
 from apps.api.tests.factories import ApiClientFactory
 from apps.catalog.models import Product, ProductTranslation, Variant, VariantTranslation
 from apps.catalog.tests.factories import (
@@ -43,7 +47,6 @@ from apps.vendors.models import Vendor, VendorMember, VendorTranslation
 from apps.vendors.tests.factories import VendorMemberFactory, VendorTranslationFactory
 from tests.tenancy import (
     Access,
-    CrossTenant,
     Endpoint,
     NoVendorData,
     ObjectMaker,
@@ -54,6 +57,7 @@ from tests.tenancy import (
 
 OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     Vendor: lambda vendor: vendor,
+    ApiClient: lambda vendor: ApiClientFactory.create(vendor=vendor),
     VendorMember: lambda vendor: VendorMemberFactory.create(
         vendor=vendor, role=VendorMember.Role.STAFF
     ),
@@ -148,15 +152,9 @@ def classify(endpoint: Endpoint) -> Access | None:
     return None
 
 
-# --- API v1 operations ("METHOD /path" as in the OpenAPI description)
-
-
-def platform_api_key(client: Client, tenants: CrossTenant) -> dict[str, str]:
-    """A platform API client's key. Vendor-bound clients do not exist yet (ApiClient.vendor)."""
-    _, key = ApiClientFactory.create_with_key()
-    return {"Authorization": f"Bearer {key}"}
-
+# --- API v1 operations ("METHOD /path" as in the OpenAPI description), called with Vendor A's
+# API key (CORE.13)
 
 API_OPERATIONS: dict[str, Access] = {
-    "GET /api/v1/me": NoVendorData("The calling API client itself.", login=platform_api_key),
+    "GET /api/v1/me": NoVendorData("The calling API client itself, with its own vendor."),
 }

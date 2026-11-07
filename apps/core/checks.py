@@ -7,6 +7,10 @@
   audited or exempt with a reason, and the admin of an audited model never writes through
   Django's default, unaudited methods, not even by calling them from an override
   (core.E201 to E203).
+- Field-level encryption (SEC.3): a valid key is configured (core.E301, E302) and, when a
+  database is checked (`migrate`, `check --database default`), every stored value decrypts with
+  the configured keys (core.E303, E304); values in clear or on an older key are warnings
+  (core.W302, W301) that `manage.py rotate_field_keys` fixes.
 """
 
 import ast
@@ -19,10 +23,12 @@ from django.apps import AppConfig, apps
 from django.conf import settings
 from django.contrib import admin
 from django.core import checks
-from django.core.exceptions import FieldDoesNotExist
-from django.db import models
+from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
+from django.db import DatabaseError, connections, models, transaction
 from django.http import HttpRequest
 
+from . import encryption
+from .crypto import DecryptionError
 from .http import trusted_proxy_networks
 from .models import TranslationModel
 
@@ -349,3 +355,102 @@ def check_audit_policy(
         for model in config.get_models()
     ]
     return audit_policy_errors(local, admin.site._registry, audit_policy(configs))
+
+
+# --- Field-level encryption (SEC.3)
+
+
+def check_field_encryption_keys(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """A usable key must be configured: without one, encrypted fields can be neither written
+    nor read. Messages never show key material."""
+    if not getattr(settings, encryption.KEYS_SETTING, None):
+        return [
+            checks.Error(
+                "No field encryption key is configured.",
+                hint=encryption.KEYS_HELP,
+                id="core.E301",
+            )
+        ]
+    try:
+        encryption.configured_keyring()
+    except ImproperlyConfigured as exc:
+        return [checks.Error(str(exc), id="core.E302")]
+    return []
+
+
+def check_encrypted_data(
+    app_configs: Iterable[AppConfig] | None,
+    databases: Iterable[str] | None = None,
+    **kwargs: Any,
+) -> list[checks.CheckMessage]:
+    """Every encrypted column decrypts with the configured keys (one sample per key id).
+
+    Runs only when a database is checked: `migrate` does it before migrating, so a deploy with
+    a wrong or retired key stops there. Tables not created yet are skipped.
+    """
+    if not databases:
+        return []
+    try:
+        keyring = encryption.configured_keyring()
+    except ImproperlyConfigured:
+        return []  # reported by check_field_encryption_keys
+    messages: list[checks.CheckMessage] = []
+    for alias in databases:
+        connection = connections[alias]
+        for column in encryption.encrypted_columns():
+            try:
+                with transaction.atomic(using=alias):
+                    usage = encryption.key_usage(
+                        connection, column.model._meta.db_table, column.column
+                    )
+            except DatabaseError:
+                continue  # not migrated yet
+            messages += _column_messages(column, usage, keyring)
+    return messages
+
+
+def _column_messages(
+    column: encryption.EncryptedColumn, usage: Mapping[str, list[Any]], keyring: Any
+) -> list[checks.CheckMessage]:
+    label = column.context
+    rotate = "Run `manage.py rotate_field_keys`."
+    messages: list[checks.CheckMessage] = []
+    for key_id, (count, sample) in usage.items():
+        if key_id == encryption.CLEARTEXT:
+            messages.append(
+                checks.Warning(
+                    f"{count} value(s) of {label} are stored in clear.", hint=rotate, id="core.W302"
+                )
+            )
+        elif key_id not in keyring.key_ids:
+            messages.append(
+                checks.Error(
+                    f"{count} value(s) of {label} use key {key_id!r}, which is not configured.",
+                    hint="Restore that key (after the primary one) until the values are rotated.",
+                    id="core.E303",
+                )
+            )
+        else:
+            try:
+                keyring.decrypt(sample, context=label)
+            except DecryptionError:
+                messages.append(
+                    checks.Error(
+                        f"Key {key_id!r} does not decrypt {label}: it is not the key the data "
+                        "was encrypted with.",
+                        hint=encryption.KEYS_HELP,
+                        id="core.E304",
+                    )
+                )
+                continue
+            if key_id != keyring.primary_id:
+                messages.append(
+                    checks.Warning(
+                        f"{count} value(s) of {label} still use the older key {key_id!r}.",
+                        hint=rotate,
+                        id="core.W301",
+                    )
+                )
+    return messages

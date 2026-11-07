@@ -1,12 +1,14 @@
 """API keys for API v1 and MCP (CORE.6, spec 02 §2.2) and the API mutation log (CORE.7)."""
 
 import uuid
-from typing import Any
+from typing import Any, ClassVar
 
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
 from apps.core.models import BaseModel
+from apps.vendors.models import Vendor
+from apps.vendors.scoping import VendorScopedManager
 
 from .engine import PREFIX_LENGTH, ClientState
 
@@ -15,10 +17,25 @@ class ApiClient(BaseModel):
     """An API key holder: pipelines, MCP, integrations.
 
     Only the public prefix and the SHA-256 of the key are stored; the full key is shown once at
-    issuance or rotation. The vendor link (`vendor`, null = platform client) arrives with the
-    Vendor model (VEN.1).
+    issuance or rotation.
+
+    `vendor` (CORE.13): a vendor key acts for that vendor only; every API v1 operation scopes
+    vendor data with `for_actor(client)` (CORE.3), so another vendor's objects answer 404. Null
+    means a platform key, limited only by its scopes. The keys of a deleted vendor are deleted
+    with it: a vendor key never becomes a platform key.
     """
 
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
+
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="api_clients",
+        help_text="The vendor the key acts for; empty for a platform key.",
+    )
     name = models.CharField(max_length=100)
     scopes = ArrayField(models.CharField(max_length=64))
     key_prefix = models.CharField(max_length=PREFIX_LENGTH, unique=True)
@@ -40,6 +57,11 @@ class ApiClient(BaseModel):
     def __str__(self) -> str:
         return f"{self.name} ({self.key_prefix})"
 
+    @property
+    def credential_vendor_id(self) -> int | None:
+        """The actor scope of the key (`apps.vendors.scoping.Credential`): None = platform."""
+        return self.vendor_id
+
     def state(self) -> ClientState:
         return ClientState(
             is_active=self.is_active,
@@ -49,8 +71,9 @@ class ApiClient(BaseModel):
         )
 
     def snapshot(self) -> dict[str, Any]:
-        """Audit/ChangeSet view: everything but the key hash."""
+        """Audit/ChangeSet view: everything but the key hash; `vendor` is the vendor's public id."""
         return {
+            "vendor": None if self.vendor is None else str(self.vendor.public_id),
             "name": self.name,
             "scopes": list(self.scopes),
             "key_prefix": self.key_prefix,

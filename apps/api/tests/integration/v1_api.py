@@ -10,11 +10,11 @@ from django.core.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
 from django.http import Http404, HttpRequest
-from django.shortcuts import get_object_or_404
 from ninja import Router, Schema
 from ninja.throttling import AuthRateThrottle
 from pydantic import Field
 
+from apps.api.auth import api_client_of
 from apps.api.models import ApiClient
 from apps.api.services import revoke_api_client
 from apps.api.v1.api import create_api
@@ -22,6 +22,7 @@ from apps.api.v1.endpoints import router as v1_router
 from apps.api.v1.errors import ApiProblem
 from apps.api.v1.mutations import ChangeSetOut, DryRun, audit_context, changeset_out
 from apps.api.v1.security import ApiKey
+from apps.vendors.scoping import get_for_actor_or_404
 
 LEAKY_DETAIL = "internal detail that must never reach the client"
 
@@ -30,8 +31,12 @@ router = Router(tags=["test"])
 
 @router.post("/clients/{public_id}/revoke", response=ChangeSetOut, auth=ApiKey("clients:write"))
 def revoke_client(request: HttpRequest, public_id: uuid.UUID, dry_run: DryRun = False) -> object:
-    """A real mutating service behind a test-only route: proves dry-run, audit and call log."""
-    client = get_object_or_404(ApiClient, public_id=public_id)
+    """A real mutating service behind a test-only route: proves dry-run, audit and call log.
+
+    The target is found within the caller's actor scope, as in every API v1 operation on vendor
+    data (CORE.13): a vendor key reaches only its own vendor's clients.
+    """
+    client = get_for_actor_or_404(ApiClient, api_client_of(request), public_id=public_id)
     changeset = revoke_api_client(client, ctx=audit_context(request), dry_run=dry_run)
     return changeset_out(changeset, dry_run=dry_run)
 
