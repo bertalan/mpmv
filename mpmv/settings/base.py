@@ -244,7 +244,7 @@ VIES_CLIENT = "apps.tax.vies.HttpViesClient"
 VIES_API_URL = env_str(
     "MPMV_VIES_API_URL", "https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-number"
 )
-VIES_TIMEOUT_SECONDS = 8
+VIES_TIMEOUT_SECONDS = 8  # per socket operation (connect, each read), not for the whole check
 VIES_CACHE_SECONDS = 24 * 60 * 60
 VIES_UNAVAILABLE_CACHE_SECONDS = 5 * 60
 

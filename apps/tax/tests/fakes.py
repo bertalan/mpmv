@@ -1,8 +1,10 @@
 """Test doubles for the tax app's external boundary, VIES (ADR-0006: our own interfaces only).
 
 VIES is never called from tests: services take a `ViesClient`, and `settings.VIES_CLIENT` can
-name one of the no-argument fakes below.
+name one of the no-argument fakes below. The test settings default to `RefusingViesClient`.
 """
+
+import pytest
 
 from apps.tax import engine
 from apps.tax.engine import ViesAnswer, ViesQuery
@@ -46,3 +48,18 @@ class BrokenViesClient:
 
     def check(self, query: ViesQuery) -> ViesAnswer:
         raise RuntimeError("unexpected client failure")
+
+
+class RefusingViesClient:
+    """The test settings' `VIES_CLIENT`: a check that forgot its fake fails the test, loudly.
+
+    `pytest.fail` raises an exception that is not an `Exception`, so the services' fail-closed
+    `except Exception` cannot turn the refusal into a quiet "VIES unavailable". A test that
+    needs an answer passes `client=` or sets `settings.VIES_CLIENT` to one of the fakes above.
+    """
+
+    def check(self, query: ViesQuery) -> ViesAnswer:
+        pytest.fail(
+            f"a test asked VIES about {query.full_number} without a fake ViesClient: pass "
+            "client= or set settings.VIES_CLIENT (apps.tax.tests.fakes)"
+        )

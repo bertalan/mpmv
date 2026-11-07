@@ -7,6 +7,7 @@ in `detail`. It never retries; retries with backoff belong to the background job
 `apps.tax.services.verify_vat_number`. Tests use the fakes in `apps.tax.tests.fakes`.
 """
 
+import http.client
 import json
 import logging
 import urllib.error
@@ -81,11 +82,14 @@ def _failure_detail(exc: BaseException) -> str:
         return f"http_{exc.status}"
     if isinstance(exc, ValueError):
         return engine.DETAIL_BAD_RESPONSE
-    return engine.DETAIL_CONNECTION
+    return engine.DETAIL_CONNECTION  # OSError, or http.client.HTTPException (cut-off answer)
 
 
 class HttpViesClient:
     """The VIES REST API. One request per check, with a timeout; fails closed.
+
+    The timeout bounds each socket operation (connect, every read), as urllib does, not the
+    wall time of the whole check: a server dripping bytes, or a slow DNS lookup, can take longer.
 
     With a `requester` (the platform operator's own VAT number) VIES returns a consultation
     number (`requestIdentifier`), kept as the answer's `request_id`.
@@ -127,7 +131,7 @@ class HttpViesClient:
             body["requesterNumber"] = self.requester.number
         try:
             payload = self._transport(self.url, body, self.timeout)
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, http.client.HTTPException) as exc:
             detail = _failure_detail(exc)
             logger.warning("VIES check of %s failed: %s (%s)", query.prefix, detail, exc)
             return ViesAnswer(result=engine.VAT_UNAVAILABLE, detail=detail)

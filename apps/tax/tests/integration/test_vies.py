@@ -262,6 +262,14 @@ def test_the_configured_client_is_used_by_default(settings: SettingsWrapper) -> 
     assert services.verify_vat_number("DE", "123456789").verified is False
 
 
+def test_a_check_without_a_client_fails_the_test_instead_of_reaching_vies() -> None:
+    with pytest.raises(pytest.fail.Exception, match="VIES"):
+        services.verify_vat_number("DE", "123456789")
+    with pytest.raises(pytest.fail.Exception, match="VIES"):
+        ViesVatNumberValidator().check("DE", "123456789")
+    assert not VatValidation.objects.exists()
+
+
 def test_the_http_client_asks_as_the_platform_operator(settings: SettingsWrapper) -> None:
     settings.VIES_TIMEOUT_SECONDS = 3.5
     PlatformOperatorFactory.create(

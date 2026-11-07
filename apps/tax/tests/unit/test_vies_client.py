@@ -4,19 +4,24 @@ The transport is injected, so these tests never reach VIES. The last tests run t
 urllib transport against a stub server on 127.0.0.1 (no network): VIES down and VIES too slow.
 """
 
+import http.client
 import json
+import socket
 import threading
 import time
 import urllib.error
 from collections.abc import Iterator, Mapping
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
+from urllib.parse import urlsplit
 
 import pytest
+from django.conf import settings
 
 from apps.tax import engine
 from apps.tax.engine import ViesAnswer, ViesQuery
-from apps.tax.vies import VIES_API_URL, HttpViesClient, ViesClient, ViesHttpError
+from apps.tax.tests.fakes import RefusingViesClient
+from apps.tax.vies import VIES_API_URL, HttpViesClient, ViesClient, ViesHttpError, get_vies_client
 
 DE = ViesQuery("DE", "DE", "123456789")
 REQUESTER = ViesQuery("AT", "AT", "U12345678")
@@ -88,6 +93,8 @@ def test_the_greek_prefix_is_sent_as_el() -> None:
         (ConnectionResetError("reset"), engine.DETAIL_CONNECTION),
         (ViesHttpError(503), "http_503"),
         (ValueError("not JSON"), engine.DETAIL_BAD_RESPONSE),
+        (http.client.IncompleteRead(b"{"), engine.DETAIL_CONNECTION),
+        (http.client.BadStatusLine("garbage"), engine.DETAIL_CONNECTION),
     ],
 )
 def test_vies_down_or_too_slow_is_an_unavailable_answer_not_an_error(
@@ -191,3 +198,36 @@ def test_the_real_transport_gives_up_after_the_timeout(
     answer = HttpViesClient(url=url, timeout=0.2).check(DE)
     assert answer == ViesAnswer(result=engine.VAT_UNAVAILABLE, detail=engine.DETAIL_TIMEOUT)
     assert time.monotonic() - started < 1.0
+
+
+# --- The test settings never reach VIES
+
+
+def test_the_default_vies_client_in_tests_refuses_every_call_loudly() -> None:
+    client = get_vies_client()
+    assert isinstance(client, RefusingViesClient)
+    with pytest.raises(pytest.fail.Exception, match="VIES"):
+        client.check(DE)
+    # The services turn any Exception from a client into "VIES unavailable"; the refusal is
+    # not an Exception, so it fails the test instead of passing as a fail-closed check.
+    assert not issubclass(pytest.fail.Exception, Exception)
+
+
+def test_the_default_vies_client_in_tests_never_opens_a_socket(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    opened: list[object] = []
+
+    def refuse(_sock: socket.socket, address: object) -> None:
+        opened.append(address)
+        raise OSError("tests must not open sockets to VIES")
+
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    with pytest.raises(pytest.fail.Exception):
+        get_vies_client().check(DE)
+    assert opened == []
+
+
+def test_the_vies_url_in_tests_is_not_the_eu_service() -> None:
+    assert settings.VIES_API_URL != VIES_API_URL
+    assert urlsplit(settings.VIES_API_URL).hostname == "127.0.0.1"
