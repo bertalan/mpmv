@@ -1,4 +1,4 @@
-"""Smoke tests for the project skeleton (ARC.3)."""
+"""Smoke tests against the real runtime: Django + PostgreSQL (ARC.3)."""
 
 import pytest
 from django.apps import apps
