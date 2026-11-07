@@ -49,6 +49,11 @@ def test_filter_by_actor(staff_client: Client) -> None:
     assert listed(staff_client, actor="alice") == [alice]
 
 
+def test_text_filters_work_with_facet_counts(staff_client: Client) -> None:
+    alice = AuditLogFactory.create(actor_label="staff:alice@example.com")
+    assert listed(staff_client, actor="alice", _facets="True") == [alice]
+
+
 def test_filter_by_action(staff_client: Client) -> None:
     status = AuditLogFactory.create(action="vendor.status_changed")
     AuditLogFactory.create(action="vendor.updated")
@@ -62,14 +67,18 @@ def test_filter_by_object_type(staff_client: Client) -> None:
 
 
 def test_filter_by_date_range(staff_client: Client) -> None:
-    entry = AuditLogFactory.create()
+    entry = AuditLogFactory.create(action="test.dated")
     today = timezone.localdate()
     yesterday = (today - dt.timedelta(days=1)).isoformat()
     tomorrow = (today + dt.timedelta(days=1)).isoformat()
-    assert listed(staff_client, created_from=today.isoformat()) == [entry]
-    assert listed(staff_client, created_from=yesterday, created_to=today.isoformat()) == [entry]
-    assert listed(staff_client, created_to=yesterday) == []
-    assert listed(staff_client, created_from=tomorrow) == []
+
+    def dated(**params: str) -> list[AuditLog]:
+        return listed(staff_client, action="test.dated", **params)  # not the staff login
+
+    assert dated(created_from=today.isoformat()) == [entry]
+    assert dated(created_from=yesterday, created_to=today.isoformat()) == [entry]
+    assert dated(created_to=yesterday) == []
+    assert dated(created_from=tomorrow) == []
 
 
 def test_an_invalid_date_is_refused_with_the_admin_error_page(staff_client: Client) -> None:

@@ -151,6 +151,7 @@ def verify(request: HttpRequest) -> HttpResponse:
         if device is not None:
             complete_verification(request, device)
             return HttpResponseRedirect(next_url)
+        services.record_mfa_failure(user, str(method), ctx=audit_context(request))
         error = "Invalid code. Try again."
     return render(
         request,
@@ -252,6 +253,7 @@ def passkey_auth(request: HttpRequest) -> JsonResponse:
             challenge=engine.from_b64url(challenge),
         )
     except engine.PasskeyError:
+        services.record_mfa_failure(_user(request), services.PASSKEY, ctx=audit_context(request))
         return _bad_request("the passkey was not accepted")
     complete_verification(request, device)
     return JsonResponse({"redirect": safe_next(request)})

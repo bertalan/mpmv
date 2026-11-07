@@ -1,25 +1,32 @@
 """Request helpers shared by the MFA views, decorators and admin (CORE.4)."""
 
 from django.conf import settings
+from django.contrib.auth.base_user import AbstractBaseUser
+from django.contrib.auth.models import AnonymousUser
 from django.http import HttpRequest
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from apps.core.audit import AuditContext
+from apps.core.http import client_ip
 from apps.core.models import AuditLog
 
 from .engine import RelyingParty
 
 
-def audit_context(request: HttpRequest) -> AuditContext:
-    """Who acts on their own account, or on someone else's from the admin."""
-    user = request.user
+def user_context(user: AbstractBaseUser | AnonymousUser, ip: str | None) -> AuditContext:
+    """`user` acting on their own account, or on someone else's from the admin."""
     staff = bool(getattr(user, "is_staff", False))
     return AuditContext(
         actor_id=user.pk,
         actor_label=f"{'staff' if staff else 'user'}:{user.get_username()}",
         source=AuditLog.Source.ADMIN if staff else AuditLog.Source.SYSTEM,
-        ip=request.META.get("REMOTE_ADDR"),
+        ip=ip,
     )
+
+
+def audit_context(request: HttpRequest) -> AuditContext:
+    """Who acts, from the request: the signed-in user and the client IP (CORE.5 rules)."""
+    return user_context(request.user, client_ip(request))
 
 
 def safe_next(request: HttpRequest, default: str = "/") -> str:

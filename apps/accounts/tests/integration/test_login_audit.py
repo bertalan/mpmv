@@ -78,11 +78,12 @@ def test_a_failed_login_of_an_unknown_email_does_not_store_what_was_typed(
 def test_attempts_refused_during_a_lockout_are_not_audited_again(
     client: Client, staff: User, password: str
 ) -> None:
+    # The failure that reaches `free_attempts` starts the lock; the next ones are refused.
     for _ in range(ACCOUNT_LOCKOUT.free_attempts + 3):
         _login(client, "staff@example.com", secrets.token_urlsafe(16))
     assert (
         AuditLog.objects.filter(action="accounts.login.failed").count()
-        == ACCOUNT_LOCKOUT.free_attempts + 1
+        == ACCOUNT_LOCKOUT.free_attempts
     )
     assert AuditLog.objects.filter(action="accounts.login.locked_out").count() == 1
 

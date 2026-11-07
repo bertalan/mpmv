@@ -22,6 +22,7 @@ from apps.core.checks import check_audit_policy
 # Mutating services that are deliberately not audited, with the reason.
 NOT_SENSITIVE_SERVICES = {
     "apps.accounts.services.set_preferred_language": "a display preference, not a security fact",
+    "apps.api.services.record_mutation_call": "logs the API call itself; `dry_run` is a field",
 }
 
 

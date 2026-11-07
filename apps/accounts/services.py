@@ -1,14 +1,14 @@
 """Account services: business logic shared by views, API and commands."""
 
 import datetime as dt
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
 import django_otp
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.models import AnonymousUser, Group, Permission
 from django.db import transaction
 from django.db.models import Model
 from django.utils import timezone
@@ -19,7 +19,14 @@ from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog
-from apps.core.services import clear_throttle, record_throttle_failure, run_mutation, throttle_state
+from apps.core.services import (
+    audit_changes,
+    clear_throttle,
+    record_throttle_failure,
+    run_mutation,
+    save_audited,
+    throttle_state,
+)
 from apps.core.throttling import BackoffPolicy, ThrottleState, ip_bucket
 
 from . import engine
@@ -51,9 +58,13 @@ REGISTRATION_LIMIT = BackoffPolicy(
     forget_after=dt.timedelta(hours=24),
 )
 
+LOGIN_SUCCEEDED = "accounts.login.succeeded"
+LOGIN_FAILED = "accounts.login.failed"
 LOCKED_OUT = "accounts.login.locked_out"
 REGISTRATION_RATE_LIMITED = "accounts.registration.rate_limited"
 THROTTLE_MODEL = "core.throttle"
+USER_MODEL = "accounts.user"
+UNKNOWN_ACCOUNT = "unknown"  # target key of a failed login that named no account
 _EMAIL_MAX = 254
 
 
@@ -126,17 +137,33 @@ def record_failed_login(
     """
     now = now or timezone.now()
     keys = login_throttle_keys(identifier, ip)
-    if _retry_after(list(keys), now):
+    if not keys or _retry_after(list(keys), now):
         return
     for key, policy in keys.items():
         before, after = record_throttle_failure(key, policy, now=now)
         _audit_new_lock(key, before, after, action=LOCKED_OUT, ip=ip, now=now)
+    _audit_failed_login(identifier, ip)
 
 
-def record_successful_login(identifier: str | None) -> None:
-    """Reset the account counter. The IP counter only decays: resetting it would let one
-    valid account launder an IP that keeps guessing other accounts' passwords."""
-    if account := _account_key(identifier):
+def _audit_failed_login(identifier: str | None, ip: str | None) -> None:
+    """Audit a counted failure against the account it named, if any (SEC.4).
+
+    What was typed for an unknown account is not stored: it may be a typo of a real address,
+    or a password typed in the wrong field.
+    """
+    normalized = normalize_email_address(identifier or "")
+    user = User.objects.filter(email=normalized).only("public_id").first() if normalized else None
+    ctx = AuditContext(actor_label="anonymous", source=AuditLog.Source.SYSTEM, ip=ip)
+    key = str(user.public_id) if user is not None else UNKNOWN_ACCOUNT
+    record(ctx, LOGIN_FAILED, USER_MODEL, key, None, None)
+
+
+def record_successful_login(user: User, *, ctx: AuditContext) -> None:
+    """Audit the login and reset the account counter. The IP counter only decays: resetting
+    it would let one valid account launder an IP that keeps guessing other accounts' passwords.
+    """
+    record(ctx, LOGIN_SUCCEEDED, USER_MODEL, str(user.public_id), None, None)
+    if account := _account_key(user.get_username()):
         clear_throttle(account)
 
 
@@ -470,3 +497,157 @@ def reset_mfa(user: User, *, ctx: AuditContext, dry_run: bool = False) -> Change
             device.delete()
         record(ctx, DISABLED, "accounts.user", str(user.public_id), {"factors": factors}, None)
     return changeset
+
+
+VERIFIED = "accounts.mfa.verified"
+VERIFICATION_FAILED = "accounts.mfa.verification_failed"
+VERIFICATION_METHODS = frozenset({TOTP, PASSKEY, "recovery"})
+
+
+def record_mfa_verified(device: AnyDevice, *, ctx: AuditContext) -> None:
+    """Audit that `device` verified its user's session (login, step-up or enrolment)."""
+    record(ctx, VERIFIED, USER_MODEL, str(device.user.public_id), None, {"kind": kind_of(device)})
+
+
+def record_mfa_failure(user: User, method: str, *, ctx: AuditContext) -> None:
+    """Audit a refused second-factor code or passkey: the password was already right."""
+    after = {"method": method if method in VERIFICATION_METHODS else "unknown"}
+    record(ctx, VERIFICATION_FAILED, USER_MODEL, str(user.public_id), None, after)
+
+
+# --- Staff changes to users, groups and permissions (SEC.4)
+#
+# The admin saves these through the services below, so every change to an account's identity,
+# flags, credentials or permissions is audited with before/after. No password hash is stored.
+
+USER_CREATED = "accounts.user.created"
+USER_UPDATED = "accounts.user.updated"
+USER_DELETED = "accounts.user.deleted"
+CREDENTIAL_CHANGED = "accounts.user.password_changed"
+ACCESS_CHANGED = "accounts.user.access_changed"
+USER_FIELDS = (
+    "email",
+    "full_name",
+    "preferred_language",
+    "is_active",
+    "is_staff",
+    "is_superuser",
+)
+
+GROUP_MODEL = "auth.group"
+GROUP_CREATED = "auth.group.created"
+GROUP_UPDATED = "auth.group.updated"
+GROUP_DELETED = "auth.group.deleted"
+GROUP_ACCESS_CHANGED = "auth.group.access_changed"
+
+
+def _permission_labels(permissions: Iterable[Permission]) -> list[str]:
+    return sorted(f"{p.content_type.app_label}.{p.codename}" for p in permissions)
+
+
+def user_snapshot(user: User) -> dict[str, Any]:
+    return {
+        **{name: getattr(user, name) for name in USER_FIELDS},
+        "has_usable_password": user.has_usable_password(),
+    }
+
+
+def access_snapshot(user: User) -> dict[str, Any]:
+    """The user's groups and direct permissions, as stored."""
+    if user.pk is None:
+        return {"groups": [], "user_permissions": []}
+    return {
+        "groups": sorted(user.groups.values_list("name", flat=True)),
+        "user_permissions": _permission_labels(
+            user.user_permissions.select_related("content_type")
+        ),
+    }
+
+
+def save_user(user: User, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Create or update `user` (profile, active, staff and superuser flags), audited."""
+    return save_audited(
+        user,
+        user_snapshot,
+        key=str(user.public_id),
+        ctx=ctx,
+        created=USER_CREATED,
+        updated=USER_UPDATED,
+        dry_run=dry_run,
+    )
+
+
+def record_access_change(user: User, before: Mapping[str, Any], *, ctx: AuditContext) -> None:
+    """Audit group and permission changes a form has just saved (in the same transaction)."""
+    changeset = ChangeSet()
+    changeset.update(USER_MODEL, str(user.public_id), before, access_snapshot(user))
+    audit_changes(changeset, ctx=ctx, action=ACCESS_CHANGED)
+
+
+def record_password_change(user: User, *, had_usable_password: bool, ctx: AuditContext) -> None:
+    """Audit a password set by staff; only whether a usable password exists is stored."""
+    record(
+        ctx,
+        CREDENTIAL_CHANGED,
+        USER_MODEL,
+        str(user.public_id),
+        {"has_usable_password": had_usable_password},
+        {"has_usable_password": user.has_usable_password()},
+    )
+
+
+def delete_user(user: User, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Delete `user` with their second factors (cascade), audited with what they held."""
+    devices: list[AnyDevice] = [
+        *TOTPDevice.objects.filter(user=user),
+        *PasskeyDevice.objects.filter(user=user),
+        *RecoveryCodeDevice.objects.filter(user=user),
+    ]
+    before = {
+        **user_snapshot(user),
+        **access_snapshot(user),
+        "mfa_factors": sorted({kind_of(device) for device in devices}),
+    }
+    changeset = ChangeSet()
+    changeset.delete(USER_MODEL, str(user.public_id), before)
+    return run_mutation(changeset, user.delete, ctx=ctx, action=USER_DELETED, dry_run=dry_run)
+
+
+def group_snapshot(group: Group) -> dict[str, Any]:
+    return {"name": group.name}
+
+
+def group_access_snapshot(group: Group) -> dict[str, Any]:
+    if group.pk is None:
+        return {"permissions": []}
+    return {"permissions": _permission_labels(group.permissions.select_related("content_type"))}
+
+
+def save_group(group: Group, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Create or rename a group, audited. Groups have no public id: the key is the (unique)
+    name at the time of the change; a rename shows the old name in `before`."""
+    return save_audited(
+        group,
+        group_snapshot,
+        key=group.name,
+        ctx=ctx,
+        created=GROUP_CREATED,
+        updated=GROUP_UPDATED,
+        dry_run=dry_run,
+    )
+
+
+def record_group_access_change(
+    group: Group, before: Mapping[str, Any], *, ctx: AuditContext
+) -> None:
+    changeset = ChangeSet()
+    changeset.update(GROUP_MODEL, group.name, before, group_access_snapshot(group))
+    audit_changes(changeset, ctx=ctx, action=GROUP_ACCESS_CHANGED)
+
+
+def delete_group(group: Group, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    changeset = ChangeSet()
+    changeset.delete(
+        GROUP_MODEL, group.name, {**group_snapshot(group), **group_access_snapshot(group)}
+    )
+    return run_mutation(changeset, group.delete, ctx=ctx, action=GROUP_DELETED, dry_run=dry_run)

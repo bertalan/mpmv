@@ -59,8 +59,13 @@ class Change:
 class ChangeSet:
     changes: list[Change] = field(default_factory=list)
 
-    def create(self, model: str, key: str, after: Snapshot) -> None:
-        self.changes.append(Change("create", model, key, None, dict(after)))
+    def create(
+        self, model: str, key: str, after: Snapshot, *, supersedes: Snapshot | None = None
+    ) -> None:
+        """A new row. For versioned configuration (operator, rates), `supersedes` is the
+        version it replaces: it becomes the change's `before`, so the audit shows the diff."""
+        before = None if supersedes is None else dict(supersedes)
+        self.changes.append(Change("create", model, key, before, dict(after)))
 
     def update(self, model: str, key: str, before: Snapshot, after: Snapshot) -> None:
         change = Change("update", model, key, dict(before), dict(after))

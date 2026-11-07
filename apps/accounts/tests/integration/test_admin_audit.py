@@ -110,7 +110,7 @@ def test_a_password_change_in_the_admin_is_audited_without_the_hash(staff_client
     old_hash = user.password
     password = secrets.token_urlsafe(16)
     response = staff_client.post(
-        reverse("admin:accounts_user_password_change", args=[user.pk]),
+        reverse("admin:auth_user_password_change", args=[user.pk]),
         {"usable_password": "true", "password1": password, "password2": password},
     )
     assert response.status_code == 302, response.content.decode()

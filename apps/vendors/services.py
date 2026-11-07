@@ -1,4 +1,5 @@
-"""Vendor services: status changes (VEN.1) and memberships with their permissions (CORE.2)."""
+"""Vendor services: vendor data and status changes (VEN.1, SEC.4) and memberships with their
+permissions (CORE.2)."""
 
 from typing import Any
 
@@ -9,13 +10,67 @@ from django.db import transaction
 from apps.accounts.models import User
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
-from apps.core.services import run_mutation
+from apps.core.services import run_mutation, save_audited
 
 from . import engine
 from .models import Vendor, VendorMember
 
 STATUS_CHANGED = "vendor.status_changed"
+CREATED = "vendor.created"
+UPDATED = "vendor.updated"
+DELETED = "vendor.deleted"
 MODEL_LABEL = "vendors.vendor"
+
+# Everything staff can see about a vendor's identity, tax position and contacts (SEC.4).
+VENDOR_FIELDS = (
+    "legal_name",
+    "display_name",
+    "slug",
+    "status",
+    "country",
+    "vat_number",
+    "tax_code",
+    "registered_address",
+    "contact_email",
+    "phone",
+    "sales_mode_default",
+    "enquiries_enabled",
+    "legacy_wp_user_id",
+)
+
+
+def vendor_snapshot(vendor: Vendor) -> dict[str, Any]:
+    return {name: getattr(vendor, name) for name in VENDOR_FIELDS}
+
+
+def save_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Create or update `vendor`, auditing its data with before/after (keyed by public id).
+
+    The status is not changed here: it moves only through `change_status`.
+    """
+    vendor.normalize()
+    return save_audited(
+        vendor,
+        vendor_snapshot,
+        key=str(vendor.public_id),
+        ctx=ctx,
+        created=CREATED,
+        updated=UPDATED,
+        dry_run=dry_run,
+    )
+
+
+def delete_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Delete `vendor` with its translations and memberships; the vendor and each membership
+    are audited (translations are storefront texts, not audited)."""
+    with transaction.atomic():
+        members = list(VendorMember.objects.select_related("vendor", "user").filter(vendor=vendor))
+        changes = ChangeSet()
+        changes.delete(MODEL_LABEL, str(vendor.public_id), vendor_snapshot(vendor))
+        for member in members:
+            changes.delete(MEMBER_MODEL, str(member.public_id), member_snapshot(member))
+        run_mutation(changes, vendor.delete, ctx=ctx, action=DELETED, dry_run=dry_run)
+    return changes
 
 
 def change_status(
