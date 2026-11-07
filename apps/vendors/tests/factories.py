@@ -23,6 +23,7 @@ from apps.core.translations import source_hash
 from apps.vendors import engine
 from apps.vendors.models import (
     ContractAcceptance,
+    CrossVendorConsent,
     LegalFieldRequirement,
     Vendor,
     VendorContract,
@@ -322,3 +323,17 @@ class VendorFeatureFlagFactory(DjangoModelFactory[VendorFeatureFlag]):
     flag = factory.SubFactory(FeatureFlagFactory)
     enabled = False
     note = ""
+
+
+class CrossVendorConsentFactory(DjangoModelFactory[CrossVendorConsent]):
+    """A vendor opted in to other vendors' suggestions from yesterday (CAT.14). Production code
+    records versions with `services.set_cross_vendor_consent`, which audits them."""
+
+    class Meta:
+        model = CrossVendorConsent
+
+    vendor = factory.SubFactory(VendorFactory)
+    in_suggestions = True
+    in_bundles = False
+    valid_from = factory.LazyFunction(lambda: timezone.now() - dt.timedelta(days=1))
+    set_by = "staff:factory"
