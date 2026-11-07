@@ -1,8 +1,11 @@
 """Staff admin for products, variants and their translations (Wagtail admin replaces this in
 CAT.11).
 
-Price fields stay editable, but a change to them on an existing product or variant is saved
-through the audited price services, never as a plain model save.
+Products and variants are audited models (SEC.4, CAT.12): every create, change and delete made
+here, the variant inline included, goes through the audited catalog services, never a plain
+model save. Price fields stay editable, but a change to them on an existing product or variant
+is applied by the audited price services. The owning vendor is read-only once a product exists
+(owner decision Q-33), and so is a variant's product, which carries its vendor.
 
 The SKU is saved as typed (CAT.13); odd characters show a warning, never an error. A SKU change
 leaves a `SkuAlias` (database trigger). `staff_ref` is shown read-only.
@@ -13,7 +16,9 @@ from typing import Any
 
 from django import forms
 from django.contrib import admin, messages
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import QuerySet
 from django.forms.models import BaseInlineFormSet
 from django.http import HttpRequest
 from treebeard.forms import TreeNodeChoiceField
@@ -26,6 +31,13 @@ from .models import Category, Product, ProductTranslation, Term, Variant, Varian
 from .services import (
     PRODUCT_PRICE_FIELDS,
     VARIANT_PRICE_FIELDS,
+    check_upsells,
+    delete_product,
+    delete_variant,
+    record_relations_change,
+    relations_snapshot,
+    save_product,
+    save_variant,
     set_product_price,
     set_variant_price,
 )
@@ -112,8 +124,25 @@ class VariantInline(admin.TabularInline[Variant, Product]):
     )
 
 
+class ProductAdminForm(forms.ModelForm[Product]):
+    """Reports a suggestion refused by the cross-vendor consent rule (CAT.14) as a form error,
+    before the many-to-many save would refuse it."""
+
+    def clean(self) -> dict[str, Any] | None:
+        cleaned = super().clean()
+        upsells = self.cleaned_data.get("upsells")
+        vendor = self.cleaned_data.get("vendor") or getattr(self.instance, "vendor", None)
+        if upsells and vendor is not None:
+            try:
+                check_upsells({vendor.pk}, [product.pk for product in upsells])
+            except ValidationError as exc:
+                self.add_error("upsells", exc)
+        return cleaned
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin[Product]):
+    form = ProductAdminForm
     list_display = ("sku", "vendor", "kind", "status", "price_net", "stock_qty", "stock_status")
     list_filter = ("status", "kind", "sales_mode", "fiscal_category", "stock_status", "vendor")
     search_fields = ("sku", "staff_ref", "gtin", "translations__title")
@@ -142,7 +171,7 @@ class ProductAdmin(admin.ModelAdmin[Product]):
             "Classification",
             {"fields": ("category", "secondary_categories", "brand", "terms")},
         ),
-        ("Identifiers", {"fields": ("gtin", "google_category_id")}),
+        ("Identifiers", {"fields": ("gtin", "mpn", "google_category_id")}),
         ("Related products", {"fields": ("required_companion", "upsells")}),
         ("Migration", {"fields": ("legacy_wp_id_en", "legacy_wp_id_it")}),
         ("Dates", {"fields": ("created_at", "updated_at")}),
@@ -169,34 +198,56 @@ class ProductAdmin(admin.ModelAdmin[Product]):
             )
         return super().formfield_for_manytomany(db_field, request, **kwargs)
 
+    def get_readonly_fields(
+        self, request: HttpRequest, obj: Product | None = None
+    ) -> tuple[str, ...]:
+        readonly = tuple(super().get_readonly_fields(request, obj))
+        return readonly if obj is None else ("vendor", *readonly)
+
+    # --- Audited writes (SEC.4, CAT.12). The admin runs each request in one transaction.
+
     def save_model(
         self, request: HttpRequest, obj: Product, form: forms.ModelForm[Product], change: bool
     ) -> None:
+        ctx = audit_context(request)
         new_prices = take_price_change(obj, form.changed_data, PRODUCT_PRICE_FIELDS)
-        super().save_model(request, obj, form, change)
+        save_product(obj, ctx=ctx)
         if new_prices is not None:
-            set_product_price(obj, **new_prices, ctx=audit_context(request))
+            set_product_price(obj, **new_prices, ctx=ctx)
         warn_about_sku(self, request, obj.sku)
 
+    def save_related(self, request: HttpRequest, form: Any, formsets: Any, change: bool) -> None:
+        before = relations_snapshot(form.instance)
+        super().save_related(request, form, formsets, change)
+        record_relations_change(form.instance, before, ctx=audit_context(request))
+
+    def delete_model(self, request: HttpRequest, obj: Product) -> None:
+        delete_product(obj, ctx=audit_context(request))
+
+    def delete_queryset(self, request: HttpRequest, queryset: QuerySet[Product]) -> None:
+        ctx = audit_context(request)
+        for product in queryset:
+            delete_product(product, ctx=ctx)
+
     def save_formset(self, request: HttpRequest, form: Any, formset: Any, change: bool) -> None:
-        if formset.model is not Variant:
+        if formset.model is not Variant:  # translations: not audited
             super().save_formset(request, form, formset, change)
             return
-        # Existing variants whose override changed: save the rest, then reprice them audited.
-        repriced: list[tuple[Variant, dict[str, Any]]] = []
-        for variant_form in formset.forms:
-            if variant_form in formset.deleted_forms:
-                continue
-            variant = variant_form.instance
-            new_prices = take_price_change(variant, variant_form.changed_data, VARIANT_PRICE_FIELDS)
-            if new_prices is not None:
-                repriced.append((variant, new_prices))
-            if "sku" in variant_form.changed_data:
-                warn_about_sku(self, request, variant.sku)
-        super().save_formset(request, form, formset, change)
         ctx = audit_context(request)
-        for variant, prices in repriced:
-            set_variant_price(variant, **prices, ctx=ctx)
+        rows = formset.save(commit=False)  # collects new, changed and deleted rows, writes none
+        for variant in formset.deleted_objects:
+            delete_variant(variant, ctx=ctx)
+        changed = {id(f.instance): f.changed_data for f in formset.forms if f.has_changed()}
+        for variant in rows:
+            new_prices = take_price_change(
+                variant, changed.get(id(variant), ()), VARIANT_PRICE_FIELDS
+            )
+            save_variant(variant, ctx=ctx)
+            if new_prices is not None:
+                set_variant_price(variant, **new_prices, ctx=ctx)
+            if "sku" in changed.get(id(variant), ()):
+                warn_about_sku(self, request, variant.sku)
+        formset.save_m2m()
 
 
 class VariantTranslationInline(admin.StackedInline[VariantTranslation, Variant]):
@@ -228,11 +279,28 @@ class VariantAdmin(admin.ModelAdmin[Variant]):
     )
     inlines = (VariantTranslationInline,)
 
+    def get_readonly_fields(
+        self, request: HttpRequest, obj: Variant | None = None
+    ) -> tuple[str, ...]:
+        readonly = tuple(super().get_readonly_fields(request, obj))
+        return readonly if obj is None else ("product", *readonly)
+
+    # --- Audited writes (SEC.4, CAT.12)
+
     def save_model(
         self, request: HttpRequest, obj: Variant, form: forms.ModelForm[Variant], change: bool
     ) -> None:
+        ctx = audit_context(request)
         new_prices = take_price_change(obj, form.changed_data, VARIANT_PRICE_FIELDS)
-        super().save_model(request, obj, form, change)
+        save_variant(obj, ctx=ctx)
         if new_prices is not None:
-            set_variant_price(obj, **new_prices, ctx=audit_context(request))
+            set_variant_price(obj, **new_prices, ctx=ctx)
         warn_about_sku(self, request, obj.sku)
+
+    def delete_model(self, request: HttpRequest, obj: Variant) -> None:
+        delete_variant(obj, ctx=audit_context(request))
+
+    def delete_queryset(self, request: HttpRequest, queryset: QuerySet[Variant]) -> None:
+        ctx = audit_context(request)
+        for variant in queryset:
+            delete_variant(variant, ctx=ctx)

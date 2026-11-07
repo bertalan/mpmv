@@ -179,8 +179,8 @@ def test_legacy_ids_are_unique() -> None:
 
 def test_required_companion_and_upsells() -> None:
     companion = ProductFactory.create()
-    upsell = ProductFactory.create()
-    product = ProductFactory.create(required_companion=companion)
+    upsell = ProductFactory.create(vendor=companion.vendor)
+    product = ProductFactory.create(vendor=companion.vendor, required_companion=companion)
     product.upsells.add(upsell)
     assert list(companion.required_by.all()) == [product]
     assert list(product.upsells.all()) == [upsell]
@@ -195,7 +195,7 @@ def test_a_product_cannot_be_its_own_companion() -> None:
 
 def test_a_required_companion_cannot_be_deleted() -> None:
     companion = ProductFactory.create()
-    ProductFactory.create(required_companion=companion)
+    ProductFactory.create(vendor=companion.vendor, required_companion=companion)
     with pytest.raises(ProtectedError):
         companion.delete()
 
@@ -269,16 +269,6 @@ def test_a_variant_vendor_different_from_its_product_is_refused_by_the_database(
     other_vendor = VendorFactory.create()
     with pytest.raises(IntegrityError), transaction.atomic():
         Variant.objects.filter(pk=variant.pk).update(vendor=other_vendor)
-
-
-def test_moving_a_product_to_another_vendor_moves_its_variants() -> None:
-    variant = VariantFactory.create()
-    product = variant.product
-    other_vendor = VendorFactory.create()
-    product.vendor = other_vendor
-    product.save()
-    variant.refresh_from_db()
-    assert variant.vendor == other_vendor
 
 
 def test_only_one_default_variant_per_product() -> None:

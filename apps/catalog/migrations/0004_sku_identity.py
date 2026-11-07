@@ -142,7 +142,7 @@ DROP FUNCTION IF EXISTS catalog_sku_alias();
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("catalog", "0002_taxonomies"),
+        ("catalog", "0003_catalog_integrity"),
         ("vendors", "0012_vendorfeatureflag"),
     ]
 

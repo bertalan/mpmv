@@ -8,14 +8,19 @@ audit them; the status changes through the publishing services of CAT.10.
 
 Vendor scoping (CORE.3): every model here uses `VendorScopedManager`. `Variant.vendor` copies
 its product's vendor so that the database can enforce one SKU per vendor among variants; a
-composite foreign key (migration 0001) keeps the copy equal to the product's vendor, and moves
-it along when the product changes vendor.
+composite foreign key (migration 0001) keeps the copy equal to the product's vendor.
+
+Integrity rules (CAT.14, owner decisions Q-29, Q-31, Q-32, Q-33), enforced by the database
+(migration 0003) and reported by `clean()` for forms: a product never changes vendor (staff use
+`services.duplicate_product_to_vendor`); only a `buy` product needs a price, and a price is never
+0.00; variants exist only on variable products; a required companion has the same vendor.
+Suggestions across vendors are checked by `services.check_upsells` (signal in `signals.py`).
 
 Identity (CAT.13, owner decisions Q-30 and Q-33): the platform refers to products and variants
 by `public_id`, and staff by `staff_ref`, a prefixed sequence the vendor never sees. The vendor
 SKU is a label kept raw in `sku`; `sku_key` (`engine.sku_match_key`, set on save) is unique per
 vendor across products and variants together. Within a table a unique constraint enforces it,
-across the two tables a database trigger (migration 0003), which also writes a `SkuAlias` row
+across the two tables a database trigger (migration 0004), which also writes a `SkuAlias` row
 whenever a match key changes, so older import files still match. Change SKUs with `save()` or
 the rename services, never with `QuerySet.update()`, which skips the match key.
 """
@@ -237,7 +242,13 @@ class Product(BaseModel):
         max_length=16, choices=FiscalCategory.choices, default=FiscalCategory.STANDARD
     )
 
-    price_net = MoneyField("net price", help_text="EUR, VAT excluded.")
+    # Required only for `buy`; kept, never public, for the other modes (Q-31, engine.public_price).
+    price_net = MoneyField(
+        "net price",
+        null=True,
+        blank=True,
+        help_text="EUR, VAT excluded. Required to sell; never 0.00 (leave it empty instead).",
+    )
     sale_price_net = MoneyField("net sale price", null=True, blank=True)
     sale_from = models.DateTimeField(null=True, blank=True)
     sale_to = models.DateTimeField(null=True, blank=True)
@@ -275,6 +286,13 @@ class Product(BaseModel):
         blank=True,
         validators=[gtin_validator],
         help_text="EAN or ISBN; when empty the SKU is used as MPN.",
+    )
+    mpn = models.CharField(
+        "MPN",
+        max_length=70,
+        blank=True,
+        help_text="Manufacturer part number: with the brand it links the same article across "
+        "vendors.",
     )
     google_category_id = models.PositiveIntegerField(
         "Google product category", null=True, blank=True
@@ -337,11 +355,21 @@ class Product(BaseModel):
             _choice("fiscal_category", FiscalCategory, "catalog_product_fiscal_category_valid"),
             _choice("stock_policy", StockPolicy, "catalog_product_stock_policy_valid"),
             _choice("stock_status", StockStatus, "catalog_product_stock_status_valid"),
-            _not_negative("price_net", "price", "catalog_product_price_net_not_negative"),
+            models.CheckConstraint(
+                condition=models.Q(price_net__isnull=True) | models.Q(price_net__gt=0),
+                name="catalog_product_price_net_positive",
+                violation_error_message="The price must be above 0.00; leave it empty instead.",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(sales_mode=SalesMode.BUY) | models.Q(price_net__isnull=False),
+                name="catalog_product_price_required_to_buy",
+                violation_error_message="A product for sale needs a price.",
+            ),
             models.CheckConstraint(
                 condition=models.Q(sale_price_net__isnull=True)
                 | (
-                    models.Q(sale_price_net__gte=0)
+                    models.Q(price_net__isnull=False)
+                    & models.Q(sale_price_net__gte=0)
                     & models.Q(sale_price_net__lt=models.F("price_net"))
                 ),
                 name="catalog_product_sale_price_below_price",
@@ -382,11 +410,57 @@ class Product(BaseModel):
         return str(self.sku)
 
     def clean(self) -> None:
-        _check_sku(self)
+        super().clean()
+        errors: dict[str, Any] = {}
+        try:
+            _check_sku(self)
+        except ValidationError as exc:
+            errors = exc.update_error_dict(errors)
+        try:
+            self.clean_integrity()
+        except ValidationError as exc:
+            errors = exc.update_error_dict(errors)
+        if errors:
+            raise ValidationError(errors)
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         _with_sku_key(self, kwargs)
         super().save(*args, **kwargs)
+
+    def clean_integrity(self) -> None:
+        """The CAT.14 rules the database enforces, as form errors (Q-31, Q-32, Q-33)."""
+        errors: dict[str, str] = {}
+        stored = (
+            None
+            if self._state.adding or self.pk is None
+            else Product.objects.filter(pk=self.pk).values("vendor_id").first()
+        )
+        if stored is not None and stored["vendor_id"] != self.vendor_id:
+            errors["vendor"] = (
+                "A product never changes vendor: duplicate it to the new vendor instead."
+            )
+        if (
+            stored is not None
+            and self.kind != ProductKind.VARIABLE
+            and Variant.objects.filter(product_id=self.pk).exists()
+        ):
+            errors["kind"] = "Only a variable product has variants: remove them first."
+        if self.required_companion_id is not None and self.vendor_id is not None:
+            companion_vendor = (
+                Product.objects.filter(pk=self.required_companion_id)
+                .values_list("vendor_id", flat=True)
+                .first()
+            )
+            if companion_vendor is not None and companion_vendor != self.vendor_id:
+                errors["required_companion"] = (
+                    "A required companion must belong to the same vendor."
+                )
+        if "price_net" not in errors:
+            missing = engine.price_required_error(self.sales_mode, self.price_net)
+            if missing is not None:
+                errors["price_net"] = missing
+        if errors:
+            raise ValidationError(errors)
 
     def translation(self, language: str) -> "Resolved[ProductTranslation]":
         """Texts to show in `language`: published, or EN with a fallback flag."""
@@ -504,6 +578,10 @@ class Variant(BaseModel):
         super().clean_fields(exclude)
 
     def clean(self) -> None:
+        # Variants only on variable products (Q-29, Q-32; a database trigger enforces it too).
+        kind = Product.objects.filter(pk=self.product_id).values_list("kind", flat=True).first()
+        if kind is not None and kind != ProductKind.VARIABLE:
+            raise ValidationError({"product": "Only a variable product can have variants."})
         # `vendor` and `sku_key` are not form fields, so forms skip the (vendor, sku_key)
         # constraint, and no constraint spans products and variants: check here.
         _check_sku(self)
@@ -554,7 +632,7 @@ class VariantTranslation(TranslationModel):
 class SkuAlias(BaseModel):
     """A SKU match key a product or variant used before a rename (CAT.13).
 
-    Written by a database trigger whenever a match key changes (migration 0003), whatever made
+    Written by a database trigger whenever a match key changes (migration 0004), whatever made
     the change, so imports keep matching older files. Never edited by hand.
     """
 
