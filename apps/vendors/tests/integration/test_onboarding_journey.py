@@ -20,7 +20,7 @@ from apps.accounts.tests.mfa import password_login, verified_login
 from apps.core.audit import user_context
 from apps.core.models import AuditLog
 from apps.vendors.models import ContractAcceptance, Vendor
-from apps.vendors.services import accept_contract, submit_application
+from apps.vendors.services import accept_contract, contract_offer, submit_application
 from apps.vendors.tests.factories import VendorContractFactory
 
 pytestmark = pytest.mark.django_db
@@ -81,7 +81,15 @@ def test_a_test_vendor_is_activated_end_to_end(
     assert vendor.status == Vendor.Status.ONBOARDING
 
     # 5. The owner accepts the current contract, in Italian.
-    accept_contract(vendor, applicant, language="it", ctx=user_context(applicant, APPLICANT_IP))
+    offer = contract_offer("it")  # what the onboarding page shows
+    accept_contract(
+        vendor,
+        applicant,
+        contract=offer.contract,
+        language=offer.text.language,
+        text_hash=offer.text_hash,
+        ctx=user_context(applicant, APPLICANT_IP),
+    )
     acceptance = ContractAcceptance.objects.get(vendor=vendor)
     assert acceptance.contract == contract
     assert (acceptance.language, acceptance.ip) == ("it", APPLICANT_IP)

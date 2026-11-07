@@ -2,6 +2,7 @@
 permissions (CORE.2), the legal identity with its payout requirements (VEN.12) and onboarding:
 application, versioned contract, acceptance and the activation gate (VEN.5)."""
 
+import dataclasses
 import datetime as dt
 from typing import Any
 
@@ -15,10 +16,16 @@ from apps.accounts.models import User
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.services import audit_changes, run_mutation
-from apps.core.translations import source_hash
 
 from . import engine
-from .models import ContractAcceptance, LegalFieldRequirement, Vendor, VendorContract, VendorMember
+from .models import (
+    ContractAcceptance,
+    LegalFieldRequirement,
+    Vendor,
+    VendorContract,
+    VendorContractTranslation,
+    VendorMember,
+)
 from .vies import VatNumberValidator
 
 STATUS_CHANGED = "vendor.status_changed"
@@ -525,35 +532,84 @@ def acceptance_snapshot(acceptance: ContractAcceptance) -> dict[str, Any]:
     }
 
 
-def accept_contract(
-    vendor: Vendor, user: User, *, language: str, ctx: AuditContext, dry_run: bool = False
-) -> ChangeSet:
-    """Record that `user`, an owner, accepts the contract in force for `vendor`; audited.
+@dataclasses.dataclass(frozen=True)
+class ContractOffer:
+    """The contract an onboarding page shows: the version in force, the text in the visitor's
+    language (or English) and its hash. The page hands the version, `text.language` and
+    `text_hash` back to `accept_contract`, so the acceptance is tied to what was shown."""
 
-    The text accepted is the published one in `language`, or the English one; the acceptance
-    stores its language and hash, and the IP of `ctx` (`audit_context` takes it from the request
-    through the trusted proxy, `apps.core.http.client_ip`). Accepting a version again changes
-    nothing. Raises `engine.ContractNotAcceptable` (vendor status, not an owner) or
-    `engine.NoContract`, also on dry-run.
+    contract: VendorContract
+    text: VendorContractTranslation
+    text_hash: str
+
+
+def contract_offer(language: str) -> ContractOffer:
+    """The contract version in force with its published text in `language`, or the English one.
+
+    Raises `engine.NoContract` when no version is in force or it has no published text.
+    """
+    contract = current_contract()
+    if contract is None:
+        raise engine.NoContract("no vendor contract is in force")
+    text = contract.translation(language).translation
+    if text is None:
+        raise engine.NoContract(f"{contract} has no published text")
+    return ContractOffer(contract=contract, text=text, text_hash=text.text_hash())
+
+
+def accept_contract(
+    vendor: Vendor,
+    user: User,
+    *,
+    contract: VendorContract,
+    language: str,
+    text_hash: str,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Record that `user`, an owner, accepts for `vendor` the contract text they were shown.
+
+    `contract`, `language` and `text_hash` describe what the page showed (`contract_offer`): the
+    version, the language of its text and the hash of that text. They must still be the version
+    in force and its published text in that language, else `engine.ContractChanged` (show the
+    page again). The version row is locked for the whole check, like every write to the version
+    or its texts, so a concurrent edit either finishes first (and the hash no longer matches) or
+    waits and is refused (`engine.ContractLocked`).
+
+    The acceptance stores the language and hash, and the IP of `ctx` (`audit_context` takes it
+    from the request through the trusted proxy, `apps.core.http.client_ip`). Accepting a version
+    again changes nothing. Raises `engine.ContractNotAcceptable` (vendor status, not an owner),
+    `engine.NoContract` or `engine.ContractChanged`, also on dry-run.
     """
     with transaction.atomic():
         locked = Vendor.objects.select_for_update().only("status", "public_id").get(pk=vendor.pk)
         role = member_role(user, locked) if user.is_active else None
         engine.check_can_accept_contract(locked.status, role)
-        contract = current_contract()
-        if contract is None:
+        shown = VendorContract.objects.select_for_update().get(pk=contract.pk)
+        in_force = current_contract()
+        if in_force is None:
             raise engine.NoContract("no vendor contract is in force")
-        text = contract.translation(language).translation
-        if text is None:
-            raise engine.NoContract(f"{contract} has no published text")
-        if ContractAcceptance.objects.filter(vendor=locked, contract=contract).exists():
+        if in_force.pk != shown.pk:
+            raise engine.ContractChanged(
+                f"{shown} is no longer in force: {in_force} replaced it; show it to accept it"
+            )
+        text = shown.translation(language).translation
+        if text is None or text.language != language:
+            raise engine.ContractChanged(
+                f"the {language} text of {shown} is no longer published; show the text again"
+            )
+        if text.text_hash() != text_hash:
+            raise engine.ContractChanged(
+                f"the {language} text of {shown} changed after it was shown; show it again"
+            )
+        if ContractAcceptance.objects.filter(vendor=locked, contract=shown).exists():
             return ChangeSet()
         acceptance = ContractAcceptance(
             vendor=locked,
-            contract=contract,
+            contract=shown,
             user=user,
             language=text.language,
-            text_hash=source_hash(text.source_values()),
+            text_hash=text_hash,
             accepted_at=timezone.now(),
             ip=ctx.ip,
         )

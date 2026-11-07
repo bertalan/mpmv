@@ -1004,6 +1004,10 @@ class ContractLocked(ContractError):
     """The contract version has been accepted: it can no longer change. Publish a new version."""
 
 
+class ContractChanged(ContractError):
+    """The version or text the owner was shown is no longer the one to accept: show it again."""
+
+
 def check_can_accept_contract(status: str, role: str | None) -> None:
     """An owner of an approved vendor accepts the contract on the vendor's behalf."""
     if status not in ACCEPTING_STATUSES:

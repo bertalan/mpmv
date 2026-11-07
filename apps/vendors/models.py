@@ -13,11 +13,11 @@ from typing import Any, ClassVar
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 
 from apps.core.fields import CountryField, EncryptedCharField, LanguageField, MoneyField
 from apps.core.models import BaseModel, TranslationModel, resolve_translation
-from apps.core.translations import Resolved
+from apps.core.translations import Resolved, source_hash
 
 from . import engine
 from .scoping import VendorScopedManager
@@ -517,7 +517,11 @@ class VendorContract(BaseModel):
     Created and edited through `services.save_contract`, which numbers the versions and keeps
     their start dates in order. The version in force is the latest one already started
     (`services.current_contract`). Once a vendor has accepted a version, the version and its
-    texts can no longer change: new terms are a new version.
+    texts can no longer change or be deleted: new terms are a new version. `save` and `delete`
+    raise `engine.ContractLocked`; a database trigger (migration 0010) refuses any other write.
+
+    Writes to a version or its texts lock the version row, like `services.accept_contract`, so
+    an edit and an acceptance of the same version run one after the other.
     """
 
     version = models.PositiveIntegerField(unique=True, editable=False)
@@ -539,9 +543,28 @@ class VendorContract(BaseModel):
         return self.pk is not None and self.acceptances.exists()
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        if self.is_accepted:
-            raise engine.ContractLocked(f"{self} has been accepted; publish a new version")
-        super().save(*args, **kwargs)
+        with transaction.atomic():
+            if not self._state.adding:
+                _check_not_accepted(self.pk, f"{self} has been accepted; publish a new version")
+            super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
+        with transaction.atomic():
+            _check_not_accepted(self.pk, f"{self} has been accepted; it cannot be deleted")
+            return super().delete(*args, **kwargs)
+
+
+def _check_not_accepted(contract_id: int | None, message: str) -> None:
+    """Lock the contract version row, then raise `engine.ContractLocked` if it was accepted.
+
+    Call inside a transaction: the lock holds until it ends, so an acceptance of the version
+    (`services.accept_contract` takes the same lock) waits for the write, or the write for it.
+    """
+    if contract_id is None:
+        return
+    list(VendorContract.objects.select_for_update().filter(pk=contract_id).values_list("pk"))
+    if ContractAcceptance.objects.filter(contract_id=contract_id).exists():
+        raise engine.ContractLocked(message)
 
 
 class VendorContractTranslation(TranslationModel):
@@ -568,10 +591,28 @@ class VendorContractTranslation(TranslationModel):
     def __str__(self) -> str:
         return f"{self.contract} [{self.language}]"
 
+    def text_hash(self) -> str:
+        """The hash an acceptance of this text records (`ContractAcceptance.text_hash`)."""
+        return source_hash(self.source_values())
+
     def save(self, *args: Any, **kwargs: Any) -> None:
-        if self.contract.is_accepted:
-            raise engine.ContractLocked(f"{self.contract} has been accepted; its texts are final")
-        super().save(*args, **kwargs)
+        with transaction.atomic():
+            ids = {self.contract_id}
+            if not self._state.adding:  # moving a text away from its version changes it too
+                stored = type(self)._default_manager.filter(pk=self.pk)
+                ids.update(stored.values_list("contract_id", flat=True))
+            for contract_id in sorted(i for i in ids if i is not None):
+                _check_not_accepted(
+                    contract_id, f"{self.contract} has been accepted; its texts are final"
+                )
+            super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
+        with transaction.atomic():
+            _check_not_accepted(
+                self.contract_id, f"{self.contract} has been accepted; its texts are final"
+            )
+            return super().delete(*args, **kwargs)
 
 
 class ContractAcceptance(BaseModel):
