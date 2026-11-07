@@ -19,6 +19,7 @@ from pydantic import TypeAdapter
 from pydantic import ValidationError as PydanticValidationError
 
 from apps.api.auth import known_client_of
+from apps.api.engine import MUTATING_METHODS
 from apps.api.models import ApiClient
 from apps.api.responses import REQUEST_ID_HEADER, assign_request_id, request_id_of
 from apps.api.services import record_mutation_call
@@ -29,7 +30,6 @@ from apps.core.models import AuditLog
 
 logger = logging.getLogger("apps.api")
 
-MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 DRY_RUN_PARAM = "dry_run"
 
 DryRun = Annotated[

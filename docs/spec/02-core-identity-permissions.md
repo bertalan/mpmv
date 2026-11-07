@@ -106,6 +106,11 @@ The second factor is a TOTP authenticator app or a passkey. The confirmed parame
 - API: `Authorization: Bearer mpmv_<prefix>_<secret>` header, constant-time comparison,
   scope checked per route, rate limit per API key with counters in a cache shared by every app
   process (CORE.12, owner decision Q-18), logging of every mutating call.
+- Vendor key policy (CORE.14): a vendor key holds only the vendor-grantable scopes
+  (`VENDOR_GRANTABLE_SCOPES` in `apps/api/engine.py`, an allow-list checked at issuance); every
+  other scope is platform-only. The vendor's status is read on every call: a suspended vendor's
+  key only reads (403 on POST, PUT, PATCH and DELETE, dry-runs included), a closed vendor's key
+  gets 401. Deleting a vendor writes one AuditLog entry per key it deletes.
 - Impersonation for support (equivalent of Login as User), staff only, with audit.
 
 ### Secure action links (CORE.15)
