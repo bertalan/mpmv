@@ -9,6 +9,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError
 
 from apps.core.translations import PUBLISHED, Resolved
+from apps.shipping import engine
 from apps.shipping.models import (
     Carrier,
     ShippingConfigVersion,
@@ -150,7 +151,7 @@ def test_a_vendor_can_use_different_carriers_in_different_zones() -> None:
 
 def test_over_max_weight_policy_is_unset_until_d06_is_decided() -> None:
     rate = VendorZoneRateFactory.create()
-    assert rate.over_max_weight is None
+    assert rate.over_max_weight == engine.PLATFORM_DEFAULT == ""
 
 
 @pytest.mark.parametrize("policy", ["last_band", "quote", "block"])

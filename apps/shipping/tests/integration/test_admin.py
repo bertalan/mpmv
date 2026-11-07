@@ -9,7 +9,8 @@ from django.urls import reverse
 
 from apps.accounts.models import User
 from apps.core.models import AuditLog
-from apps.shipping.models import ShippingZone, VendorZoneRate, WeightBand
+from apps.shipping import engine
+from apps.shipping.models import Carrier, ShippingZone, VendorZoneRate, WeightBand
 from apps.shipping.tests.factories import (
     CarrierFactory,
     ShippingConfigVersionFactory,
@@ -17,6 +18,7 @@ from apps.shipping.tests.factories import (
     VendorZoneRateFactory,
     WeightBandFactory,
 )
+from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
@@ -58,6 +60,10 @@ def rate_form(vendor: Any, zone: Any, carrier: Any, *bands: tuple[str, str, str]
     }
 
 
+def rate_parts() -> tuple[Vendor, ShippingZone, Carrier]:
+    return VendorFactory.create(), ShippingZoneFactory.create(), CarrierFactory.create()
+
+
 @pytest.mark.parametrize(
     "model", ["carrier", "shippingzone", "vendorzonerate", "pickupoption", "shippingconfigversion"]
 )
@@ -88,16 +94,17 @@ def test_add_zone_normalizes_countries_and_is_audited(staff_client: Client) -> N
     assert entry.source == "admin"
     assert entry.actor_label == "staff:staff@example.com"
     assert entry.target_key == str(zone.public_id)
-    assert entry.after is not None and entry.after["countries"] == ["GR"]
+    assert entry.after is not None
+    assert entry.after["countries"] == ["GR"]
 
 
 def test_add_rate_with_adjacent_bands(staff_client: Client) -> None:
-    vendor, zone, carrier = VendorFactory.create(), ShippingZoneFactory.create(), CarrierFactory()
+    vendor, zone, carrier = rate_parts()
     data = rate_form(vendor, zone, carrier, ("0", "5", "9.90"), ("5", "", "14.90"))
     response = staff_client.post(reverse("admin:shipping_vendorzonerate_add"), data)
     assert response.status_code == 302, response.content.decode()
     rate = VendorZoneRate.objects.get()
-    assert rate.over_max_weight is None
+    assert rate.over_max_weight == engine.PLATFORM_DEFAULT == ""
     assert [(b.from_kg, b.to_kg) for b in rate.bands.order_by("from_kg")] == [
         (0, 5),
         (5, None),
@@ -109,7 +116,7 @@ def test_add_rate_with_adjacent_bands(staff_client: Client) -> None:
 def test_overlapping_bands_in_one_submission_are_refused_with_a_form_error(
     staff_client: Client,
 ) -> None:
-    vendor, zone, carrier = VendorFactory.create(), ShippingZoneFactory.create(), CarrierFactory()
+    vendor, zone, carrier = rate_parts()
     data = rate_form(vendor, zone, carrier, ("0", "5", "9.90"), ("4", "10", "14.90"))
     response = staff_client.post(reverse("admin:shipping_vendorzonerate_add"), data)
     assert response.status_code == 200
@@ -122,7 +129,7 @@ def test_a_second_carrier_for_the_same_vendor_and_zone_is_a_form_error(
     staff_client: Client,
 ) -> None:
     existing = VendorZoneRateFactory.create()
-    data = rate_form(existing.vendor, existing.zone, CarrierFactory())
+    data = rate_form(existing.vendor, existing.zone, CarrierFactory.create())
     response = staff_client.post(reverse("admin:shipping_vendorzonerate_add"), data)
     assert response.status_code == 200
     assert VendorZoneRate.objects.count() == 1
@@ -142,8 +149,10 @@ def test_changing_a_band_is_audited_with_before_and_after(staff_client: Client) 
     band.refresh_from_db()
     assert str(band.cost_net) == "11.50"
     entry = AuditLog.objects.get(action="shipping.weightband.updated")
-    assert entry.before is not None and entry.before["cost_net"] == "9.90"
-    assert entry.after is not None and entry.after["cost_net"] == "11.50"
+    assert entry.before is not None
+    assert entry.before["cost_net"] == "9.90"
+    assert entry.after is not None
+    assert entry.after["cost_net"] == "11.50"
     assert not AuditLog.objects.filter(action="shipping.vendorzonerate.updated").exists()
 
 
@@ -171,6 +180,18 @@ def test_deleting_a_band_inline_is_audited(staff_client: Client) -> None:
     assert response.status_code == 302, response.content.decode()
     assert not WeightBand.objects.exists()
     assert AuditLog.objects.filter(action="shipping.weightband.deleted").count() == 1
+
+
+def test_bulk_deleting_zones_audits_each_one(staff_client: Client) -> None:
+    zones = ShippingZoneFactory.create_batch(2)
+    response = staff_client.post(
+        reverse("admin:shipping_shippingzone_changelist"),
+        {"action": "delete_selected", "_selected_action": [z.pk for z in zones], "post": "yes"},
+    )
+    assert response.status_code == 302
+    assert not ShippingZone.objects.exists()
+    deleted = AuditLog.objects.filter(action="shipping.shippingzone.deleted")
+    assert sorted(e.target_key for e in deleted) == sorted(str(z.public_id) for z in zones)
 
 
 def test_config_versions_are_read_only_in_the_admin(staff_client: Client) -> None:

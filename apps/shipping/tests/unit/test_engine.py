@@ -62,5 +62,5 @@ def test_over_max_weight_policies_are_the_ones_listed_for_d06() -> None:
 def test_factories_build_a_band_and_a_zone_without_the_database() -> None:
     band = WeightBandFactory.build(from_kg=kg("0"), to_kg=None)
     assert band.to_kg is None
-    assert band.rate.over_max_weight is None  # D-06 hook: no policy chosen yet
+    assert band.rate.over_max_weight == engine.PLATFORM_DEFAULT  # D-06 hook: no policy yet
     assert ShippingZoneFactory.build().countries == ["IT"]
