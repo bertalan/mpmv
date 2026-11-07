@@ -156,6 +156,8 @@ jobs:
           printf 'DJANGO_SECRET_KEY=%s\n' \
             "$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')" > "$env_file"
           printf 'DATABASE_URL=%s\nDJANGO_ALLOWED_HOSTS=localhost\n' "$DATABASE_URL" >> "$env_file"
+          # CMS.1: `check --deploy` requires a public base URL (cms.E001).
+          printf 'MPMV_BASE_URL=https://mpmv.example.com\n' >> "$env_file"
           # SEC.3: a throwaway field encryption key, generated for this run only.
           printf 'MPMV_FIELD_ENCRYPTION_KEYS=ci:%s\n' \
             "$(python3 -c 'import base64, secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())')" \

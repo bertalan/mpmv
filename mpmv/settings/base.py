@@ -166,6 +166,8 @@ LOCALE_PATHS = [BASE_DIR / "locale"]
 WAGTAIL_SITE_NAME = "MPMV"
 WAGTAIL_I18N_ENABLED = True
 WAGTAIL_CONTENT_LANGUAGES = LANGUAGES
+# The public address of the site, in Wagtail's admin emails and previews. The localhost fallback
+# is for a developer machine: `check --deploy` fails on LIVE and STAGE without it (cms.E001).
 WAGTAILADMIN_BASE_URL = env_str("MPMV_BASE_URL", "") or "http://localhost:8000"
 WAGTAILSEARCH_BACKENDS = {"default": {"BACKEND": "wagtail.search.backends.database"}}
 # Passwords, email addresses, users and groups are managed where changes are audited (SEC.4),
