@@ -6,16 +6,16 @@
 
 ## Summary
 
-- Micro-tasks: **145** in **17** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **1256 h** (P1 1057 h · P2 181 h · P3 18 h)
+- Micro-tasks: **148** in **17** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **1273 h** (P1 1074 h · P2 181 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **126 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CAT.1 → ORD.1 → ORD.2 → ORD.4 → PAY.1 → PAY.2 → PAY.3 → PAY.4 → ORD.8
 
 ## By macro area
 
 | Macro | Area | Tasks | P1 h | P2 h | P3 h | Total h |
 |---|---|---:|---:|---:|---:|---:|
-| ARC | Architecture and foundations | 12 | 78 | 6 | 0 | 84 |
-| CORE | Identity, permissions, API, backoffice | 10 | 80 | 4 | 0 | 84 |
+| ARC | Architecture and foundations | 14 | 92 | 6 | 0 | 98 |
+| CORE | Identity, permissions, API, backoffice | 11 | 83 | 4 | 0 | 87 |
 | CAT | Product catalog | 11 | 104 | 10 | 0 | 114 |
 | VEN | Vendors, commissions, ledger | 12 | 88 | 14 | 0 | 102 |
 | TAX | Tax engine | 10 | 42 | 28 | 0 | 70 |
@@ -31,11 +31,11 @@
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 4 | 16 | 11 | 0 | 27 |
 | MIG | Migration and cutover | 10 | 106 | 0 | 0 | 106 |
-| **Total** | | **145** | **1057** | **181** | **18** | **1256** |
+| **Total** | | **148** | **1074** | **181** | **18** | **1273** |
 
 ## By phase
 
-### F0 — Foundations (27 tasks, 199 h)
+### F0 — Foundations (30 tasks, 216 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -43,29 +43,32 @@
 | ARC.2 | ADR-0003 boundaries of the custom commerce layer (what is not built in-house); ADR-0004 task queue (django-tasks vs Procrastinate) | P1 | 4 | ARC.1 | ADRs in the repo |
 | ARC.3 | Repo bootstrap: app structure, per-environment settings, env, pre-commit, Makefile | P1 | 8 | ARC.1 | `make check` and `make test` green locally |
 | ARC.4 | CI: ruff, mypy, pytest, coverage, import-linter (dependency graph), pip-audit, secret scan | P1 | 8 | ARC.3 | Pipeline green on PRs |
-| ARC.5 | Containers: OCI `Containerfile`, local stack with Apple `container` (network, volumes, app, worker, Postgres), Linux runtime for STAGE/LIVE, versioned images | P1 | 10 | ARC.3 | `make dev` with `container`; STAGE deploy from tag with rollback |
+| ARC.5 | Containers: OCI `Containerfile`, local stack with Apple `container` (network, volumes, app, worker, Postgres), Linux runtime for STAGE/LIVE, versioned images | P1 | 10 | ARC.3 | `make dev` with `container`; release image, Quadlet units, and deploy and rollback tooling tested locally and in CI |
 | ARC.6 | `core`: base model, `MoneyField`, Country, `ChangeSet`/dry-run, `AuditLog` | P1 | 12 | ARC.3 | Tests on rounding and audit |
 | ARC.7 | `PlatformOperator` (country, VAT number, regime, e-invoice channel, DAC7 authority) as configuration | P1 | 4 | ARC.6 | No "IT" constant in the tax code |
 | ARC.9 | Task worker + cron scheduler on Postgres, with locks and retries | P1 | 8 | ARC.2 | Test job scheduled and observable |
 | ARC.11 | Test harness per ADR-0006: unit / integration / e2e suites, auto-markers, Playwright with screenshots, CI reports | P1 | 6 | ARC.3 | `make test-unit`, `make test`, `make test-e2e` green; e2e screenshots saved |
 | ARC.12 | Adopt factory_boy for test data: one DjangoModelFactory per model in `apps/<app>/tests/factories.py`, Faker with a fixed seed, synthetic data only; convert hand-written builders; document in ADR-0006 and CONTRIBUTING | P1 | 4 | ARC.6 | Every model has a factory used by the tests; no hand-written model builders left |
+| ARC.13 | STAGE environment on Hetzner: provision app and DB VPS, deploy from tag, rollback (including a deliberately unhealthy release), smoke tests; includes the STAGE checks of CORE.7 (OpenAPI published) and I18N.1 (`/it/` and `/de/` active) | P1 | 8 | ARC.5 | Tag deploy and automatic rollback proven on STAGE; CORE.7 and I18N.1 STAGE checks pass |
+| ARC.15 | Media storage: S3-compatible Hetzner Object Storage (EU) behind the CDN, private buckets for documents, signed URLs, django-storages | P1 | 6 | ARC.5, ARC.13 | Uploads work on STAGE with a read-only container filesystem; private documents only via signed URLs |
 | CORE.1 | Custom `User`, login via email, preferred language | P1 | 6 | ARC.6 | Initial migration with custom User |
 | CORE.2 | `VendorMember` with owner/staff roles, per-role permissions | P1 | 6 | CORE.1, VEN.1 | Role matrix tested |
 | CORE.3 | `VendorScopedQuerySet` + 404 helper + reusable cross-tenant test fixture | P1 | 8 | CORE.2 | Negative tests generated for every endpoint |
 | CORE.4 | MFA (TOTP + passkey) mandatory for staff/owners, recovery codes, step-up | P1 | 12 | CORE.1 | Login without MFA impossible for required roles |
 | CORE.5 | Rate limiting and progressive lockout on login/registration, Turnstile | P1 | 6 | CORE.1 | Tests on failed attempts |
 | CORE.6 | `ApiClient`: issuance, hashing, scopes, expiry, rotation, revocation, IP allow-list | P1 | 10 | CORE.1 | Expired or out-of-scope key → 401/403 |
-| CORE.7 | Ninja API v1 skeleton: auth, dry-run, RFC 9457 errors, OpenAPI, mutation log | P1 | 10 | CORE.6 | OpenAPI spec published on STAGE |
+| CORE.7 | Ninja API v1 skeleton: auth, dry-run, RFC 9457 errors, OpenAPI, mutation log | P1 | 10 | CORE.6, ARC.13 | OpenAPI spec published on STAGE |
 | CORE.8 | Wagtail admin: staff menu, base ViewSet with tenant filters and bulk actions | P1 | 10 | CORE.3 | Staff manage vendors and products from the admin |
 | CORE.9 | Vendor area `/vendor/`: layout, navigation, essential KPI dashboard | P1 | 12 | CORE.3 | Vendor sees only their own data |
+| CORE.13 | `ApiClient.vendor`: optional vendor FK on API keys (empty = platform key), vendor-scoped API keys enforced through CORE.3 scoping, admin and tests | P1 | 3 | CORE.3, CORE.6 | A vendor key cannot read or change another vendor's data (negative tests) |
 | SEC.0 | Immediate actions from §12.1 on the current system | P1 | 3 | — | Credentials rotated, files cleaned up |
 | SEC.1 | HTTP hardening + CSP + cookies + headers (automated tests) | P1 | 6 | ARC.3 | Header scan passed |
-| SEC.2 | Secure uploads and image re-encoding | P1 | 4 | CAT.4 | Tests with malicious files |
+| SEC.2 | Secure uploads and image re-encoding | P1 | 4 | CAT.4, ARC.15 | Tests with malicious files |
 | SEC.3 | Field-level encryption (IBAN, KYC, DAC7) with key rotation | P1 | 8 | VEN.1 | DB dump with no cleartext data |
 | SEC.4 | AuditLog extended to all sensitive mutations + staff view with filters | P1 | 6 | ARC.6 | Rate change visible with before/after |
 | SEC.5 | Security tests in CI (permissions by role and tenant, unauthenticated endpoints) | P1 | 8 | CORE.3 | Undeclared public endpoint → CI red |
-| OPS.1 | PITR backup + encrypted off-site dumps + restore test; least-privilege DB roles (app role without DDL or TRUNCATE, so the audit log stays append-only) | P1 | 8 | ARC.5 | Documented restore on an empty environment; app role cannot TRUNCATE `core_auditlog` |
-| OPS.2 | Observability: JSON logs, error tracking, healthchecks, alerts | P1 | 8 | ARC.5 | Alert on a simulated checkout error |
+| OPS.1 | Self-managed PITR with pgBackRest (continuous WAL archiving + base backups) to Hetzner Object Storage, encrypted, with retention + restore test; least-privilege DB roles (app role without DDL or TRUNCATE, so the audit log stays append-only) | P1 | 8 | ARC.13 | Documented point-in-time restore on an empty database VPS; app role cannot TRUNCATE `core_auditlog` |
+| OPS.2 | Observability: JSON logs, error tracking, healthchecks, alerts (including database disk space, WAL archiving and backup age) | P1 | 8 | ARC.5 | Alert on a simulated checkout error |
 
 ### F1 — Catalog, import, base frontend (28 tasks, 268 h)
 
@@ -74,7 +77,7 @@
 | CAT.1 | Product and Variant models, translations, `(vendor, sku)` constraints | P1 | 12 | ARC.6, VEN.1 | Migrations + constraint tests |
 | CAT.2 | Taxonomies: Category (tree), configurable Taxonomy/Term, Brand, translations and SEO texts | P1 | 10 | CAT.1 | Admin CRUD with translations |
 | CAT.3 | Typed attributes and translated values; variant axes with ordering | P1 | 10 | CAT.1 | Variable size×color product created via API |
-| CAT.4 | Media: ProductImage on Wagtail Images, WebP/AVIF renditions, dedup by hash, cover lock | P1 | 10 | CAT.1 | Upload → automatic renditions |
+| CAT.4 | Media: ProductImage on Wagtail Images, WebP/AVIF renditions, dedup by hash, cover lock | P1 | 10 | CAT.1, ARC.15 | Upload → automatic renditions |
 | CAT.5 | `build_product_slug` + SlugHistory + 301 redirect middleware | P1 | 8 | CAT.1 | Test cases ported from legacy-sku-permalink |
 | CAT.6 | `Redirect` model + admin management + import of existing maps (retired SKUs, merged tags, discontinued categories) | P1 | 6 | CAT.5 | All rules from the 4 mu-plugins covered by tests |
 | CAT.7 | Product page: gallery, variants with default, companion box, related products, visible SKU, "on request" | P1 | 16 | CAT.3, CAT.4 | Visual and functional parity with LIVE |
@@ -90,7 +93,7 @@
 | ING.7 | `publish_drafts` via `catalog.services` with dry-run and scheduled publication | P1 | 8 | CAT.10 | Draft → EN/IT product in one step |
 | ING.8 | `plan_stock_actions` / `plan_price_actions` + jobs and ReviewItem | P1 | 10 | ING.2 | Supplier rules (404, stale, >15%, sales) green |
 | ING.9 | XLSX adapter (Vendor B), publisher feed (Vendor D), YAML light (Vendor E), generic CSV | P1 | 16 | ING.4 | One dry-run per vendor |
-| I18N.1 | Language configuration, URL prefixes, middleware, language switcher | P1 | 4 | ARC.3 | `/it/` and `/de/` active on STAGE |
+| I18N.1 | Language configuration, URL prefixes, middleware, language switcher | P1 | 4 | ARC.3, ARC.13 | `/it/` and `/de/` active on STAGE |
 | I18N.2 | Abstract base `TranslationModel` with status, `source_hash`, fallback | P1 | 6 | ARC.6 | Reused by catalog and vendor |
 | I18N.3 | wagtail-localize for CMS pages | P1 | 4 | CMS.1 | Translated page with sync |
 | I18N.4 | Translation queue in admin (by language, vendor, status) + AI draft translation | P1 | 8 | I18N.2, ING.5 | EN edit → IT and DE go back to "needs review" |

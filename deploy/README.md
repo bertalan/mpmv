@@ -1,7 +1,7 @@
 # Containers and deployment (ARC.5)
 
 One OCI image, `mpmv-app`, runs every process type in every environment
-([ADR-0002](../docs/adr/0002-local-containers-apple.md), [ADR-0005](../docs/adr/0005-hosting.md)).
+([ADR-0002](../docs/adr/0002-local-containers-apple.md), [ADR-0007](../docs/adr/0007-hosting-hetzner-self-managed-postgres.md), which supersedes ADR-0005).
 Configuration comes only from environment variables.
 
 | Path | What |
@@ -71,8 +71,9 @@ make dev-reset   # dev-down, then delete the mpmv-net network and the mpmv-media
 
 ## STAGE and LIVE (Podman Quadlets)
 
-Each environment is an EU VPS running rootless Podman under a dedicated user, with managed
-PostgreSQL 17 in the same region (ADR-0005). The units are in [`quadlet/`](quadlet/):
+Each environment is a Hetzner Cloud VPS (EU, x86) running rootless Podman under a dedicated
+user. PostgreSQL 17 runs self-managed on a separate database VPS, reachable only over the private
+network ([ADR-0007](../docs/adr/0007-hosting-hetzner-self-managed-postgres.md)). The units are in [`quadlet/`](quadlet/):
 
 | Unit | Runs |
 |---|---|

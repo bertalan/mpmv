@@ -10,7 +10,9 @@ import django_otp
 from django.conf import settings
 from django.http import HttpRequest
 
-from . import engine
+from apps.core.audit import audit_context
+
+from . import engine, services
 
 VERIFIED_AT_SESSION_KEY = "mfa_verified_at"
 
@@ -24,6 +26,7 @@ def complete_verification(request: HttpRequest, device: object) -> None:
     request.session.cycle_key()
     django_otp.login(request, device)
     request.session[VERIFIED_AT_SESSION_KEY] = time.time()
+    services.record_mfa_verified(device, ctx=audit_context(request))
 
 
 def is_verified(request: HttpRequest) -> bool:

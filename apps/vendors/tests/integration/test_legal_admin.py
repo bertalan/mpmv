@@ -118,7 +118,7 @@ def test_saving_an_iban_writes_a_masked_audit_row(staff_client: Client) -> None:
 
     vendor.refresh_from_db()
     assert vendor.iban == "IT60X0542811101000000123456"
-    entry = AuditLog.objects.get(action="vendor.legal_identity_changed")
+    entry = AuditLog.objects.get(action="vendor.updated")
     assert entry.source == "admin"
     assert entry.actor_label == "staff:staff@example.com"
     assert entry.after is not None

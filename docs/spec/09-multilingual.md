@@ -48,7 +48,7 @@ Rules:
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
-| I18N.1 | Language configuration, URL prefixes, middleware, language switcher | P1 | 4 | ARC.3 | `/it/` and `/de/` active on STAGE |
+| I18N.1 | Language configuration, URL prefixes, middleware, language switcher | P1 | 4 | ARC.3, ARC.13 | `/it/` and `/de/` active on STAGE |
 | I18N.2 | Abstract base `TranslationModel` with status, `source_hash`, fallback | P1 | 6 | ARC.6 | Reused by catalog and vendor |
 | I18N.3 | wagtail-localize for CMS pages | P1 | 4 | CMS.1 | Translated page with sync |
 | I18N.4 | Translation queue in admin (by language, vendor, status) + AI draft translation | P1 | 8 | I18N.2, ING.5 | EN edit → IT and DE go back to "needs review" |

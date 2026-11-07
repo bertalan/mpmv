@@ -6,6 +6,16 @@ class AccountsConfig(AppConfig):
     name = "apps.accounts"
     label = "accounts"
 
+    # Audit policy (SEC.4, docs/dev/audit-trail.md): users, credentials and permissions.
+    audited_models = (
+        "user",
+        "passkeydevice",
+        "recoverycodedevice",
+        "recoverycode",
+        "auth.group",  # managed in the user admin's audited GroupAdmin
+        "otp_totp.totpdevice",  # written only by the audited MFA services
+    )
+
     def ready(self) -> None:
         from django.contrib.auth.signals import user_logged_in, user_login_failed
 

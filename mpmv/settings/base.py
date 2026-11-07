@@ -38,7 +38,8 @@ LOCAL_APPS = [
 ]
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
+    # Django's admin with the self-service password change audited (SEC.4).
+    "apps.accounts.admin_apps.AuditedAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -90,6 +91,8 @@ MFA_REQUIRED_POLICIES: list[str] = [
     "apps.vendors.services.owns_a_vendor",  # vendor owners (CORE.2)
 ]
 MFA_STEP_UP_MAX_AGE = 300  # seconds a verification counts as fresh for sensitive actions
+# Step-up for sensitive views of apps that cannot import accounts (the core audit log view, SEC.4).
+STEP_UP_DECORATOR = "apps.accounts.decorators.step_up_required"
 MFA_LOGIN_URL = "admin:login"  # until the site and vendor login pages exist
 MFA_ISSUER = "MPMV"  # name shown in authenticator apps and passkey prompts
 OTP_TOTP_ISSUER = MFA_ISSUER

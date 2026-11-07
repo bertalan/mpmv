@@ -8,7 +8,7 @@ what, is data: `LegalFieldRequirement` (VEN.12).
 """
 
 import dataclasses
-from typing import Any
+from typing import Any, ClassVar
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -19,6 +19,7 @@ from apps.core.models import BaseModel, TranslationModel, resolve_translation
 from apps.core.translations import Resolved
 
 from . import engine
+from .scoping import VendorScopedManager
 
 
 def validate_registered_address(value: Any) -> None:
@@ -106,6 +107,10 @@ class Vendor(BaseModel):
     LegalForm = LegalForm
     FiscalRegime = FiscalRegime
     ViesStatus = ViesStatus
+
+    # Tenant isolation (CORE.3): a vendor is its own tenant.
+    vendor_scope: ClassVar[str] = "pk"
+    objects = VendorScopedManager()
 
     legal_name = models.CharField(max_length=200)
     display_name = models.CharField(max_length=150)
@@ -294,9 +299,13 @@ class Vendor(BaseModel):
         if errors:
             raise ValidationError(errors)
 
-    def save(self, *args: Any, **kwargs: Any) -> None:
+    def normalize(self) -> None:
+        """Fill what `save` would derive (the slug), so audits see stored values."""
         if not self.slug:
             self.slug = engine.unique_slug(self.display_name, taken=_TakenSlugs(self.pk))
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        self.normalize()
         update_fields = kwargs.get("update_fields")
         vat_saved = update_fields is None or "vat_number" in update_fields
         if (
@@ -331,6 +340,8 @@ class VendorTranslation(TranslationModel):
     """A vendor's storefront texts and policies in one language (explicit table, spec 09)."""
 
     translation_of = "vendor"
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
     translated_fields = (
         "tagline",
         "description",
@@ -373,6 +384,8 @@ class VendorMember(BaseModel):
     """
 
     Role = VendorMemberRole
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
 
     vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="members")
     # PROTECT: a membership disappears through `remove_member` (last-owner rule, audit), never as

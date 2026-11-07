@@ -123,7 +123,8 @@ admin reports or read-only MCP tools.
 | CORE.4 | MFA (TOTP + passkey) mandatory for staff/owners, recovery codes, step-up | P1 | 12 | CORE.1 | Login without MFA impossible for required roles |
 | CORE.5 | Rate limiting and progressive lockout on login/registration, Turnstile | P1 | 6 | CORE.1 | Tests on failed attempts |
 | CORE.6 | `ApiClient`: issuance, hashing, scopes, expiry, rotation, revocation, IP allow-list | P1 | 10 | CORE.1 | Expired or out-of-scope key → 401/403 |
-| CORE.7 | Ninja API v1 skeleton: auth, dry-run, RFC 9457 errors, OpenAPI, mutation log | P1 | 10 | CORE.6 | OpenAPI spec published on STAGE |
+| CORE.7 | Ninja API v1 skeleton: auth, dry-run, RFC 9457 errors, OpenAPI, mutation log | P1 | 10 | CORE.6, ARC.13 | OpenAPI spec published on STAGE |
 | CORE.8 | Wagtail admin: staff menu, base ViewSet with tenant filters and bulk actions | P1 | 10 | CORE.3 | Staff manage vendors and products from the admin |
 | CORE.9 | Vendor area `/vendor/`: layout, navigation, essential KPI dashboard | P1 | 12 | CORE.3 | Vendor sees only their own data |
 | CORE.10 | Support impersonation with audit | P2 | 4 | CORE.8 | Every impersonated session in AuditLog |
+| CORE.13 | `ApiClient.vendor`: optional vendor FK on API keys (empty = platform key), vendor-scoped API keys enforced through CORE.3 scoping, admin and tests | P1 | 3 | CORE.3, CORE.6 | A vendor key cannot read or change another vendor's data (negative tests) |

@@ -3,16 +3,21 @@
 - The TranslationModel reuse contract (I18N.2): `manage.py check` (and `make check`) fails when
   a `*Translation` table, e.g. a new catalog one, does not follow it (core.E101 to E104).
 - The client IP settings (CORE.5): core.E001, core.E002 and the deploy warning core.W001.
+- The audit policy (SEC.4): every model of our apps and every model in the staff admin is
+  audited or exempt with a reason, and the admin of an audited model never writes through
+  Django's default, unaudited methods (core.E201 to E203).
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from django.apps import AppConfig, apps
 from django.conf import settings
+from django.contrib import admin
 from django.core import checks
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models
+from django.http import HttpRequest
 
 from .http import trusted_proxy_networks
 from .models import TranslationModel
@@ -152,3 +157,152 @@ def check_trusted_proxy_for_deploy(
             id="core.W001",
         )
     ]
+
+
+# --- Audit policy (SEC.4, docs/dev/audit-trail.md)
+#
+# Each AppConfig declares `audited_models` (names whose writes are audited) and
+# `unaudited_models` ({name: reason}). Names are model names of the app, or full labels
+# ("auth.group") for models of other packages that the app manages in the admin.
+
+type AuditPolicy = Mapping[str, str | None]  # label -> None (audited) or the exemption reason
+type AdminRegistry = Mapping[type[models.Model], admin.ModelAdmin[Any]]
+
+LOCAL_APPS_PREFIX = "apps."
+SAVE_METHODS = ("save_model",)
+DELETE_METHODS = ("delete_model", "delete_queryset")
+
+
+def _policy_label(config: AppConfig, name: str) -> str:
+    return name.lower() if "." in name else f"{config.label}.{name.lower()}"
+
+
+def audit_policy(configs: Iterable[AppConfig]) -> dict[str, str | None]:
+    """The audit classification declared by the given apps."""
+    policy: dict[str, str | None] = {}
+    for config in configs:
+        for name in getattr(config, "audited_models", ()):
+            policy[_policy_label(config, name)] = None
+        for name, reason in getattr(config, "unaudited_models", {}).items():
+            policy[_policy_label(config, name)] = reason
+    return policy
+
+
+class _AnyPermission:
+    """A user who holds every permission: what could an admin let someone write?"""
+
+    is_active = is_staff = is_superuser = is_authenticated = True
+    pk = None
+
+    def has_perm(self, perm: str, obj: Any = None) -> bool:
+        return True
+
+    def has_perms(self, perms: Iterable[str], obj: Any = None) -> bool:
+        return True
+
+    def has_module_perms(self, app_label: str) -> bool:
+        return True
+
+
+def _request() -> HttpRequest:
+    request = HttpRequest()
+    request.user = _AnyPermission()  # type: ignore[assignment]
+    return request
+
+
+def _overrides(model_admin: Any, method: str) -> bool:
+    return getattr(type(model_admin), method) is not getattr(admin.ModelAdmin, method)
+
+
+def _missing_writes(model_admin: admin.ModelAdmin[Any], request: HttpRequest) -> list[str]:
+    methods: list[str] = []
+    if model_admin.has_add_permission(request) or model_admin.has_change_permission(request):
+        methods += SAVE_METHODS
+        if model_admin.model._meta.many_to_many:
+            methods.append("save_related")
+    if model_admin.has_delete_permission(request):
+        methods += DELETE_METHODS
+    return [method for method in methods if not _overrides(model_admin, method)]
+
+
+def _inline_models(model_admin: admin.ModelAdmin[Any]) -> list[type[models.Model]]:
+    return [inline.model for inline in model_admin.inlines]
+
+
+def audit_policy_errors(
+    local_models: Iterable[type[models.Model]],
+    registry: AdminRegistry,
+    policy: AuditPolicy,
+) -> list[checks.CheckMessage]:
+    """What breaks the audit policy among our models and the admin registrations."""
+    errors: list[checks.CheckMessage] = []
+    candidates = [
+        *local_models,
+        *registry,
+        *(model for model_admin in registry.values() for model in _inline_models(model_admin)),
+    ]
+    for model in dict.fromkeys(candidates):
+        label = model._meta.label_lower
+        if label not in policy:
+            errors.append(
+                checks.Error(
+                    f"{label} is not classified for the audit log.",
+                    hint=(
+                        "Add it to `audited_models` of its AppConfig (its writes go through "
+                        "audited services) or to `unaudited_models` with the reason it is not "
+                        "sensitive. See docs/dev/audit-trail.md."
+                    ),
+                    obj=model,
+                    id="core.E201",
+                )
+            )
+        elif policy[label] is not None and not str(policy[label]).strip():
+            errors.append(
+                checks.Error(
+                    f"{label} is exempt from the audit log without a reason.",
+                    obj=model,
+                    id="core.E202",
+                )
+            )
+
+    request = _request()
+    for model, model_admin in registry.items():
+        missing = (
+            _missing_writes(model_admin, request)
+            if policy.get(model._meta.label_lower, "") is None
+            else []
+        )
+        audited_inlines = [
+            m for m in _inline_models(model_admin) if policy.get(m._meta.label_lower, "") is None
+        ]
+        if audited_inlines and not _overrides(model_admin, "save_formset"):
+            missing.append("save_formset")
+        if missing:
+            errors.append(
+                checks.Error(
+                    f"{type(model_admin).__qualname__} writes the audited "
+                    f"{model._meta.label_lower} through Django's unaudited "
+                    f"{', '.join(missing)}.",
+                    hint=(
+                        "Override them to call the app's audited services, or deny the "
+                        "permission (read-only admin)."
+                    ),
+                    obj=type(model_admin),
+                    id="core.E203",
+                )
+            )
+    return errors
+
+
+def check_audit_policy(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """Every model of our apps and of the staff admin is classified; audited ones are audited."""
+    configs = list(apps.get_app_configs())
+    local = [
+        model
+        for config in configs
+        if config.name.startswith(LOCAL_APPS_PREFIX)
+        for model in config.get_models()
+    ]
+    return audit_policy_errors(local, admin.site._registry, audit_policy(configs))

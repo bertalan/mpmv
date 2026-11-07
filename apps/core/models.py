@@ -228,6 +228,8 @@ class AuditLog(models.Model):
     after = models.JSONField(null=True, blank=True)
     ip = models.GenericIPAddressField(null=True, blank=True)
     request_id = models.CharField(max_length=64, blank=True)
+    # Public id of the vendor the entry belongs to, empty for platform-level entries (SEC.4).
+    vendor_key = models.CharField(max_length=64, blank=True, default="", db_index=True)
 
     class Meta:
         indexes = [models.Index(fields=["target_model", "target_key"])]

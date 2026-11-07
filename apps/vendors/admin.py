@@ -1,5 +1,9 @@
-"""Staff admin for vendors, their translations and the legal field requirements (Wagtail
-admin replaces this in CORE.8)."""
+"""Staff admin for vendors, their translations and the legal field requirements
+(Wagtail admin replaces this in CORE.8).
+
+Vendor writes go through the audited services (SEC.4); the change page links to the vendor's
+audit trail.
+"""
 
 from collections.abc import Callable
 from typing import Any
@@ -7,9 +11,11 @@ from typing import Any
 from django.contrib import admin, messages
 from django.db.models import QuerySet
 from django.http import HttpRequest
+from django.urls import reverse
+from django.utils.html import format_html
+from django.utils.safestring import SafeString
 
-from apps.core.audit import AuditContext
-from apps.core.http import client_ip
+from apps.core.audit import audit_context
 
 from . import engine
 from .models import (
@@ -22,22 +28,13 @@ from .models import (
 from .services import (
     change_status,
     delete_requirement,
+    delete_vendor,
     legal_profile_completeness,
     save_requirement,
     save_vendor,
 )
 
 StatusAction = Callable[[admin.ModelAdmin[Vendor], HttpRequest, QuerySet[Vendor]], None]
-
-
-def audit_context(request: HttpRequest) -> AuditContext:
-    user = request.user
-    return AuditContext(
-        actor_id=user.pk,
-        actor_label=f"staff:{user.get_username()}",
-        source="admin",
-        ip=client_ip(request),
-    )
 
 
 def status_action(target: VendorStatus) -> StatusAction:
@@ -100,6 +97,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
     readonly_fields = (
         "status",
         "public_id",
+        "audit_trail",
         "missing_for_payout",
         "vies_status",
         "vies_checked_at",
@@ -107,7 +105,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         "updated_at",
     )
     fieldsets = (
-        (None, {"fields": ("display_name", "slug", "status", "public_id")}),
+        (None, {"fields": ("display_name", "slug", "status", "public_id", "audit_trail")}),
         ("Payout readiness", {"fields": ("missing_for_payout",)}),
         (
             "Legal identity",
@@ -182,8 +180,23 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
             parts.append("Invalid: " + _labels(result.invalid))
         return ". ".join(parts) + "."
 
+    @admin.display(description="Audit trail")
+    def audit_trail(self, obj: Vendor) -> SafeString | str:
+        if obj.pk is None:
+            return "-"
+        url = f"{reverse('admin:core_auditlog_changelist')}?vendor={obj.public_id}"
+        return format_html('<a href="{}">Changes to this vendor</a>', url)
+
     def save_model(self, request: HttpRequest, obj: Vendor, form: Any, change: bool) -> None:
         save_vendor(obj, ctx=audit_context(request))
+
+    def delete_model(self, request: HttpRequest, obj: Vendor) -> None:
+        delete_vendor(obj, ctx=audit_context(request))
+
+    def delete_queryset(self, request: HttpRequest, queryset: QuerySet[Vendor]) -> None:
+        ctx = audit_context(request)
+        for vendor in queryset:
+            delete_vendor(vendor, ctx=ctx)
 
 
 @admin.register(LegalFieldRequirement)

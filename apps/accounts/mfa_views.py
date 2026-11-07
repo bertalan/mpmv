@@ -21,9 +21,11 @@ from django.utils.http import urlencode
 from django.views.decorators.http import require_http_methods, require_POST
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
+from apps.core.audit import audit_context
+
 from . import engine, services
 from .decorators import mfa_exempt, mfa_redirect, step_up_required
-from .http import audit_context, relying_party, safe_next
+from .http import relying_party, safe_next
 from .mfa_session import complete_verification, is_recently_verified
 from .models import PasskeyDevice, User
 
@@ -151,6 +153,7 @@ def verify(request: HttpRequest) -> HttpResponse:
         if device is not None:
             complete_verification(request, device)
             return HttpResponseRedirect(next_url)
+        services.record_mfa_failure(user, str(method), ctx=audit_context(request))
         error = "Invalid code. Try again."
     return render(
         request,
@@ -252,6 +255,7 @@ def passkey_auth(request: HttpRequest) -> JsonResponse:
             challenge=engine.from_b64url(challenge),
         )
     except engine.PasskeyError:
+        services.record_mfa_failure(_user(request), services.PASSKEY, ctx=audit_context(request))
         return _bad_request("the passkey was not accepted")
     complete_verification(request, device)
     return JsonResponse({"redirect": safe_next(request)})

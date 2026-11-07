@@ -23,14 +23,22 @@ part of the done-when still open) · `not started`.
 | VEN.1 | done | #8 | Vendor models, translations, status machine, admin |
 | CORE.6 | done | #9 | ApiClient: hashed keys, scopes, expiry, rotation, revocation, IP allow-list |
 | SEC.1 | done | #7 | Strict CSP, Permissions-Policy, hardened cookies, security headers |
-| I18N.1 | done | #12 | Language-prefix routing, language switcher, preferred language |
+| I18N.1 | partial: "/it/ and /de/ active on STAGE" pending STAGE | #12 | Language-prefix routing, language switcher, preferred language |
 | ARC.5 | partial: STAGE deploy pending hosting decision | #13 | OCI image, Apple container local stack, Podman Quadlets, tag deploy and rollback tooling, Procrastinate worker role |
 | ARC.12 | done | #16 | factory_boy factories per model, hand-written test builders converted |
 | CORE.2 | done | #18 | VendorMember with owner and staff roles, role matrix, last-owner rule, audited membership services |
-| I18N.2 | done | #19 | Shared TranslationModel with status, source_hash, stale detection and EN fallback; language choices no longer frozen in migrations |
+| I18N.2 | partial: reused by vendor, catalog reuse pending CAT.1 | #19 | Shared TranslationModel with status, source_hash, stale detection and EN fallback; language choices no longer frozen in migrations |
 | CORE.7 | partial: OpenAPI proven locally and in CI, STAGE publication pending hosting | #20 | Ninja API v1 skeleton: API key auth, dry-run, RFC 9457 problem details, OpenAPI 3.1, mutation log |
 | CORE.5 | done | #21 | Progressive login lockout per account and IP, registration rate limit, Turnstile captcha, trusted-proxy client IP |
 | CORE.4 | done | #22 | Mandatory MFA for staff, superusers and vendor owners: TOTP, passkeys, recovery codes, step-up |
+
+## Owner decisions 2026-11-07
+
+- Hosting: Hetzner Cloud (EU, x86), app VPS with Podman Quadlets, self-managed PostgreSQL 17 on a dedicated database VPS, PITR with pgBackRest to Hetzner Object Storage ([ADR-0007](adr/0007-hosting-hetzner-self-managed-postgres.md), supersedes ADR-0005; OPS.1 updated).
+- ARC.5 done-when narrowed to what is proven locally and in CI; the STAGE deploy, rollback and the STAGE checks of CORE.7 and I18N.1 move to the new task [ARC.13](spec/01-stack-and-architecture.md).
+- Media storage on Hetzner Object Storage with private buckets and signed URLs: new task [ARC.15](spec/01-stack-and-architecture.md), required by CAT.4 and SEC.2.
+- `platform_entity` on LedgerEntry and PayoutAccount points to the PlatformOperator version row; balances per company group versions by legal identity ([spec 04](spec/04-vendors-commissions-ledger.md)).
+- Vendor-scoped API keys: new task [CORE.13](spec/02-core-identity-permissions.md) (`ApiClient.vendor`).
 
 ## Follow-ups from wave 1
 
@@ -137,7 +145,7 @@ Deferred to other tasks:
 - CORE.5: future login forms must render the captcha widget when the captcha is enabled.
 - CORE.5: the core.W001 trusted-proxy warning does not block deploys; Caddyfile and Quadlet subnet are tested statically only.
 - CORE.4: no site or vendor login page yet, so MFA pages send anonymous users to the admin login.
-- CORE.4: TOTP secrets are stored in plain text by django-otp; field-level encryption goes to SEC.6.
+- CORE.4: TOTP secrets are stored in plain text by django-otp; field-level encryption is task SEC.3 (requirement SEC.6 in spec 12 §12.3), whose scope lists IBAN, KYC and DAC7 but not TOTP secrets.
 - CORE.4: step-up must be applied to IBAN, payout, rate and export views when they exist.
 - CORE.4: passkeys are bound to the request host; MFA_WEBAUTHN_RP_ID and allowed origins settings are not added yet.
 - CORE.2: no admin or UI for memberships yet; CORE.8 and CORE.9 must call the membership services.
@@ -229,7 +237,7 @@ Findings and actions:
    serializes the reference, not the list) before more translation tables exist; take it with
    I18N.1 or I18N.2.
 2. Major. Spec 12 reuses task IDs for requirements. §12.3 numbers requirements SEC.1 to SEC.10,
-   while §12.6 numbers tasks SEC.0 to SEC.3 with other meanings (requirement SEC.1 is the access
+   while §12.6 numbers tasks SEC.0 to SEC.6 with other meanings (requirement SEC.1 is the access
    model, task SEC.1 is HTTP hardening; requirement SEC.3 is HTTP hardening, task SEC.3 is
    field-level encryption). "SEC.1 done" can be misread. `make docs-check` only reads task tables,
    so it does not catch this. Not changed here: it is a spec table edit (owner question 5).
@@ -260,3 +268,62 @@ Owner questions:
    OPS alerting tasks.
 5. Spec 12: may we rename the §12.3 requirement IDs (for example SR-1 to SR-10) so they no longer
    collide with task IDs?
+
+### Check 3 (2026-11-07, after ARC.12, I18N.1, ARC.5, CORE.2, I18N.2, CORE.7, CORE.5, CORE.4)
+
+Scope: main at 18bbe31. Code against spec chapters 01, 02, 09 and 12 and ADRs 0004, 0005, 0006;
+spec against spec; coherence check 2 findings; repo hygiene.
+
+| Area | Result |
+|---|---|
+| Done-when criteria | Met for ARC.12, CORE.2, CORE.5 and CORE.4 (role matrix, failed-attempt and MFA enforcement tests, vendor owner MFA through the real settings). ARC.5 and CORE.7 are partial and recorded as such. I18N.1 and I18N.2 were marked done but their done-when is not met yet (no STAGE; no catalog model): now partial |
+| Spec 01 conventions | Logic in `services.py` and `engine.py`; engines import no ORM. Mutating services of CORE.2 and CORE.4 take `dry_run` and return a `ChangeSet`, except `register_passkey` and `confirm_totp_device` (finding 4). MFA and membership changes write `AuditLog` |
+| App dependency graph | import-linter 3/3 kept. The layers contract lists whole packages, so `apps.api.v1`, the accounts MFA modules, `apps.core.http`, `apps.core.i18n` and `apps.core.translations` are covered. Vendor owner MFA reaches `apps.vendors` through the `MFA_REQUIRED_POLICIES` dotted path, not an import |
+| Check 2 findings | Finding 1 resolved: with an extra `("fr", ...)` entry in LANGUAGES, `makemigrations --check` reports no changes and both language fields offer the new code at runtime. Finding 2 still open (owner question 5 of check 2). Findings 3, 4 and 5 still open. Finding 6 did not recur |
+| Security | MFA required for staff, superusers and vendor owners, enforced by middleware (system check accounts.E002); step-up guards device removal and the admin MFA reset. Lockout per account and IP, trusted-proxy client IP in throttles, captcha, API auth, API mutation log and the core and vendor admin audit (not MFA audit, finding 1). CSP unchanged and strict; Turnstile sources only when the captcha is on; Swagger UI and the passkey script are served from our static files with the nonce |
+| Factories | One factory per model (14 models incl. TOTPDevice), guard tests for coverage and use, fixed Faker seed, pseudonymous names. Remaining `objects.create` calls are migration and constraint tests |
+| Spec vs spec | `make docs-check` green. No D-xx blocks a merged task or is decided by code |
+| Anonymization | No real vendor names, legacy order numbers or hostnames; legacy user ids in tests are synthetic |
+| Migrations | One leaf per app; `makemigrations --check` clean |
+| Gates | `make check` green; `make test` 889 passed; `make test-e2e` 14 passed |
+
+Findings and actions:
+
+1. Major. MFA audit rows record the proxy address. `apps.accounts.http.audit_context` takes
+   `REMOTE_ADDR`, so behind Caddy every enrolment, recovery code use, device removal and admin
+   MFA reset is logged with the proxy IP. CORE.4 and CORE.5 were built in the same wave and the
+   switch to `client_ip` missed this helper. Action: CORE.4 follow-up, use `client_ip` and test
+   it; then merge the three `audit_context` helpers (accounts, core admin, vendors admin) into one
+   in `apps.core`.
+2. Major. The spec 12 ID collision (check 2, finding 2) has caused a wrong pointer: the CORE.4
+   follow-up sent TOTP secret encryption to SEC.6, which is the penetration test task; the task
+   is SEC.3. The collision covers SEC.1 to SEC.6, not SEC.0 to SEC.3 as check 2 said. Both
+   fixed here; the rename is still an owner question.
+3. Minor. I18N.1 and I18N.2 were recorded as done without their done-when. Status set to partial
+   here. I18N.2 also implements the "EN edit sends IT and DE back to needs review" rule that is
+   the I18N.4 done-when; I18N.4 must reuse it.
+4. Minor. `register_passkey` has no `dry_run` or `ChangeSet` (confirmed; it is audited), and
+   `confirm_totp_device` has none because verifying consumes the code. Neither exception is in
+   spec 01. A duplicate credential race still ends in an IntegrityError.
+5. Minor. Spec 02 §2.2 asks for a check against compromised passwords; no backlog task covers it
+   (only Django's common password list is used).
+6. Minor. Spec 02 sketches `User.mfa_enabled` and `is_staff_member`; the code derives MFA state
+   from confirmed devices and uses `is_staff`. Update the sketch when spec 02 is next edited.
+7. Minor. Removing the `owns_a_vendor` entry from `MFA_REQUIRED_POLICIES` would drop owner MFA
+   silently; only the integration test guards it. A system check would make it a hard error.
+8. Minor. The passkey e2e test does not assert zero CSP violations, unlike the TOTP, admin and
+   API docs tests. MFA views run a few read-only device queries directly instead of through
+   services.
+9. Minor, carried. No import-linter contract forbids `django.db` in engines (check 2, finding 4);
+   `ApiClient.vendor` is still missing (check 2, finding 5; CORE.3 may take it); the
+   API-key-shaped test literal (CORE.7) is still in `test_problems.py`.
+
+Owner questions:
+
+1. CORE.7: `/api/v1/docs` and `/api/v1/openapi.json` are open without a key in every
+   environment, LIVE included. Keep them public, or require a key or staff login on LIVE?
+2. CORE.4: a verification counts as fresh for step-up for 5 minutes, and each user gets 10
+   recovery codes of 16 characters. Confirm.
+3. SEC.3: add TOTP secrets to the field-level encryption scope next to IBAN, KYC and DAC7?
+4. Spec 02: which task takes the compromised-password check (a CORE.1 follow-up or a new CORE
+   row)?

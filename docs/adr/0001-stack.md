@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-11-07
 - **Deciders:** project owner, tech lead
-- **Backlog:** ARC.1 · **Closes:** D-11 (Django version line); D-12 is closed by [ADR-0005](0005-hosting.md)
+- **Backlog:** ARC.1 · **Closes:** D-11 (Django version line); D-12 is closed by [ADR-0007](0007-hosting-hetzner-self-managed-postgres.md), which supersedes [ADR-0005](0005-hosting.md)
 
 ## Context
 

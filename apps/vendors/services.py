@@ -1,5 +1,5 @@
-"""Vendor services: status changes (VEN.1), memberships with their permissions (CORE.2) and
-the legal identity with its payout requirements (VEN.12)."""
+"""Vendor services: vendor data and status changes (VEN.1, SEC.4), memberships with their
+permissions (CORE.2) and the legal identity with its payout requirements (VEN.12)."""
 
 from typing import Any
 
@@ -11,14 +11,88 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
-from apps.core.services import run_mutation
+from apps.core.services import audit_changes, run_mutation
 
 from . import engine
 from .models import LegalFieldRequirement, Vendor, VendorMember
 from .vies import VatNumberValidator
 
 STATUS_CHANGED = "vendor.status_changed"
+CREATED = "vendor.created"
+UPDATED = "vendor.updated"
+DELETED = "vendor.deleted"
 MODEL_LABEL = "vendors.vendor"
+
+# Everything staff can see about a vendor's identity, tax position and contacts (SEC.4), the
+# whole legal identity included (VEN.12).
+VENDOR_FIELDS = (
+    "legal_name",
+    "display_name",
+    "slug",
+    "status",
+    "country",
+    *engine.LEGAL_FIELDS,
+    "contact_email",
+    "phone",
+    "sales_mode_default",
+    "enquiries_enabled",
+    "legacy_wp_user_id",
+)
+
+
+def vendor_snapshot(vendor: Vendor) -> dict[str, Any]:
+    """The audited fields of `vendor`, with the IBAN masked (it is sensitive, SEC.3)."""
+    snapshot = {name: getattr(vendor, name) for name in VENDOR_FIELDS}
+    snapshot["iban"] = engine.mask_iban(vendor.iban)
+    return snapshot
+
+
+def save_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Validate, create or update `vendor`, auditing its data with before/after (keyed by public
+    id, IBAN masked). `before` is read from the database with the row locked.
+
+    Incomplete legal data is always accepted: completeness is checked when a payout is
+    requested (`assert_payout_allowed`), never here. A value that is present must be valid:
+    `full_clean` (field rules plus `engine.identity_errors`) runs for every adapter, also on
+    dry-run, and raises `ValidationError`; it also stores identifiers compact. The status is
+    not changed here: it moves only through `change_status`.
+    """
+    vendor.normalize()
+    vendor.full_clean()
+    key = str(vendor.public_id)
+    with transaction.atomic():
+        stored = (
+            None
+            if vendor._state.adding
+            else Vendor.objects.select_for_update().filter(pk=vendor.pk).first()
+        )
+        after = vendor_snapshot(vendor)
+        changes = ChangeSet()
+        if stored is None:
+            changes.create(MODEL_LABEL, key, after)
+        else:
+            before = vendor_snapshot(stored)
+            if stored.iban != vendor.iban and before["iban"] == after["iban"]:
+                after["iban"] += " (replaced)"  # same mask, different IBAN
+            changes.update(MODEL_LABEL, key, before, after)
+        if dry_run:
+            return changes
+        vendor.save()
+        audit_changes(changes, ctx=ctx, action=UPDATED if stored else CREATED)
+    return changes
+
+
+def delete_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Delete `vendor` with its translations and memberships; the vendor and each membership
+    are audited (translations are storefront texts, not audited)."""
+    with transaction.atomic():
+        members = list(VendorMember.objects.select_related("vendor", "user").filter(vendor=vendor))
+        changes = ChangeSet()
+        changes.delete(MODEL_LABEL, str(vendor.public_id), vendor_snapshot(vendor))
+        for member in members:
+            changes.delete(MEMBER_MODEL, str(member.public_id), member_snapshot(member))
+        run_mutation(changes, vendor.delete, ctx=ctx, action=DELETED, dry_run=dry_run)
+    return changes
 
 
 def change_status(
@@ -192,49 +266,7 @@ def owns_a_vendor(user: AbstractBaseUser | AnonymousUser) -> bool:
 
 # --- Legal and e-invoicing identity (VEN.12)
 
-LEGAL_IDENTITY_CHANGED = "vendor.legal_identity_changed"
 VAT_CHECKED = "vendor.vat_checked"
-AUDITED_LEGAL_FIELDS = ("legal_name", "country", *engine.LEGAL_FIELDS)
-
-
-def legal_snapshot(vendor: Vendor) -> dict[str, Any]:
-    """The audited legal fields of `vendor`, with the IBAN masked (it is sensitive, SEC.3)."""
-    snapshot = {name: getattr(vendor, name) for name in AUDITED_LEGAL_FIELDS}
-    snapshot["iban"] = engine.mask_iban(vendor.iban)
-    return snapshot
-
-
-def save_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
-    """Validate and save `vendor`, and audit what changed in its legal identity (IBAN masked).
-
-    Incomplete legal data is always accepted: completeness is checked when a payout is
-    requested (`assert_payout_allowed`), never here. A value that is present must be valid:
-    `full_clean` (field rules plus `engine.identity_errors`) runs for every adapter, also on
-    dry-run, and raises `ValidationError`; it also stores identifiers compact. Changes to other
-    fields are saved without an audit row.
-    """
-    vendor.full_clean()
-    with transaction.atomic():
-        stored = (
-            Vendor.objects.select_for_update().filter(pk=vendor.pk).first() if vendor.pk else None
-        )
-        after = legal_snapshot(vendor)
-        changes = ChangeSet()
-        if stored is None:
-            changes.create(MODEL_LABEL, str(vendor.public_id), after)
-        else:
-            before = legal_snapshot(stored)
-            if stored.iban != vendor.iban and before["iban"] == after["iban"]:
-                after["iban"] += " (replaced)"  # same mask, different IBAN
-            changes.update(MODEL_LABEL, str(vendor.public_id), before, after)
-        if dry_run:
-            return changes
-        if changes.is_empty:
-            vendor.save()
-            return changes
-        return run_mutation(
-            changes, vendor.save, ctx=ctx, action=LEGAL_IDENTITY_CHANGED, dry_run=False
-        )
 
 
 def check_vat_number(

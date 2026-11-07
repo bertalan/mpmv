@@ -89,4 +89,4 @@ def test_staff_complete_an_incomplete_legal_profile(
 
     vendor.refresh_from_db()
     assert vendor.iban == "IT60X0542811101000000123456"
-    assert AuditLog.objects.filter(action="vendor.legal_identity_changed").count() == 2
+    assert AuditLog.objects.filter(action="vendor.updated").count() == 2

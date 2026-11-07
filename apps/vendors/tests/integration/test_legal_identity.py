@@ -426,7 +426,7 @@ def test_saving_legal_changes_writes_an_audit_row_with_the_iban_masked() -> None
     vendor.share_capital = Decimal("20000.00")
     save_vendor(vendor, ctx=CTX)
 
-    entry = AuditLog.objects.get(action="vendor.legal_identity_changed")
+    entry = AuditLog.objects.get(action="vendor.updated")
     assert entry.target_key == str(vendor.public_id)
     assert entry.before is not None
     assert entry.before["iban"] == engine.mask_iban(old_iban)
@@ -456,11 +456,9 @@ def test_saving_accepts_an_incomplete_profile_and_stores_identifiers_compact() -
     assert Vendor.objects.get(pk=vendor.pk).iban == "IT60X0542811101000000123456"
 
 
-def test_saving_other_fields_writes_no_audit_row() -> None:
+def test_saving_without_changes_writes_no_audit_row() -> None:
     vendor = VendorFactory.create(italian_company=True)
-    vendor.display_name = "Vendor A Renamed"
-    save_vendor(vendor, ctx=CTX)
-    assert Vendor.objects.get(pk=vendor.pk).display_name == "Vendor A Renamed"
+    save_vendor(Vendor.objects.get(pk=vendor.pk), ctx=CTX)
     assert AuditLog.objects.count() == 0
 
 
@@ -472,7 +470,7 @@ def test_an_iban_replaced_with_the_same_mask_is_still_audited() -> None:
     vendor.iban = "IT" + engine.iban_check_digits("IT", bban) + bban
     assert engine.mask_iban(vendor.iban) == engine.mask_iban(first)
     save_vendor(vendor, ctx=CTX)
-    entry = AuditLog.objects.get(action="vendor.legal_identity_changed")
+    entry = AuditLog.objects.get(action="vendor.updated")
     assert entry.after is not None
     assert entry.after["iban"].endswith("(replaced)")
 

@@ -1,10 +1,12 @@
-"""Signal receivers that count login attempts (CORE.5). Connected in `AccountsConfig.ready`."""
+"""Signal receivers that count and audit login attempts (CORE.5, SEC.4). Connected in
+`AccountsConfig.ready`."""
 
 from typing import Any
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.http import HttpRequest
 
+from apps.core.audit import user_context
 from apps.core.http import client_ip
 
 from .models import User
@@ -22,4 +24,7 @@ def count_failed_login(
 def reset_after_login(
     sender: Any, request: HttpRequest | None, user: AbstractBaseUser, **kwargs: Any
 ) -> None:
-    record_successful_login(user.get_username())
+    if not isinstance(user, User):
+        return
+    ip = client_ip(request) if request is not None else None
+    record_successful_login(user, ctx=user_context(user, ip))
