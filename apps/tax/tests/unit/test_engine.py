@@ -1,5 +1,6 @@
 """TAX.1: pure rules behind the tax models (spec 05 §5.2). No ORM, no tax decision."""
 
+import datetime as dt
 from decimal import Decimal
 
 import pytest
@@ -63,6 +64,26 @@ def test_a_flat_rate_vendor_is_exempt_as_flat_rate_only(regime: str, reason: str
 def test_unknown_values_are_reported() -> None:
     errors = engine.profile_errors("reverse", "charity", fiscal_regime="")
     assert set(errors) == {"regime", "exempt_reason"}
+
+
+OSS_DATE = dt.date(2026, 7, 1)
+
+
+def test_an_oss_profile_may_give_its_oss_registration_date() -> None:
+    assert (
+        engine.profile_errors("oss", "", fiscal_regime="RF01", oss_registered_since=OSS_DATE) == {}
+    )
+    assert engine.profile_errors("oss", "", fiscal_regime="RF01", oss_registered_since=None) == {}
+
+
+@pytest.mark.parametrize(
+    ("regime", "reason"), [("domestic_only", ""), ("exempt", "art74_publishing")]
+)
+def test_only_the_oss_regime_has_an_oss_registration_date(regime: str, reason: str) -> None:
+    errors = engine.profile_errors(
+        regime, reason, fiscal_regime="RF01", oss_registered_since=OSS_DATE
+    )
+    assert set(errors) == {"oss_registered_since"}
 
 
 # --- TaxRate
