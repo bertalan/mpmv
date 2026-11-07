@@ -7,7 +7,7 @@ import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 from apps.core.money import CENT, to_decimal
 
@@ -48,24 +48,58 @@ def to_price(value: object) -> Decimal:
 
 
 def price_errors(
-    price_net: Decimal,
+    price_net: Decimal | None,
     sale_price_net: Decimal | None,
     sale_from: dt.datetime | None,
     sale_to: dt.datetime | None,
 ) -> dict[str, str]:
     """Consistency of a regular price with its optional sale, by field name; empty when valid.
 
-    Same rules as the database check constraints on Product.
+    Same rules as the database check constraints on Product. No price (None) is consistent
+    here; whether the sales mode needs one is `price_required_error`'s rule.
     """
     errors: dict[str, str] = {}
+    if price_net is not None and price_net == 0:
+        errors["price_net"] = ZERO_PRICE
     if sale_price_net is None:
         if sale_from is not None or sale_to is not None:
             errors["sale_price_net"] = "A sale period needs a sale price."
+    elif price_net is None:
+        errors["sale_price_net"] = "A sale needs a regular price."
     elif sale_price_net >= price_net:
         errors["sale_price_net"] = "The sale price must be lower than the price."
     if sale_from is not None and sale_to is not None and sale_to <= sale_from:
         errors["sale_to"] = "The sale must end after it starts."
     return errors
+
+
+# --- Price visibility (CAT.14, owner decision Q-31)
+
+BUY = "buy"  # the only sales mode with a public price (models.SalesMode.BUY)
+ZERO_PRICE = "A price cannot be 0.00; leave it empty when there is no price."
+PRICE_REQUIRED = "A product for sale needs a price."
+
+
+class Priced(Protocol):
+    @property
+    def sales_mode(self) -> str: ...
+
+    @property
+    def price_net(self) -> Decimal | None: ...
+
+
+def price_required_error(sales_mode: str, price_net: Decimal | None) -> str | None:
+    """Only a product for sale (`buy`) needs a price; the others may keep none."""
+    return PRICE_REQUIRED if sales_mode == BUY and price_net is None else None
+
+
+def public_price(product: Priced) -> Decimal | None:
+    """The net price buyers may see: None ("Price on request") unless the product is for sale.
+
+    An `on_request` or `catalog_only` product keeps its last stored price for the vendor and
+    staff, but it is never public: not on pages, feeds or JSON-LD. Back to `buy`, it shows again.
+    """
+    return product.price_net if product.sales_mode == BUY else None
 
 
 # --- Trees (CAT.2): categories and terms use treebeard materialized paths.

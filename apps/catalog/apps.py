@@ -6,7 +6,8 @@ class CatalogConfig(AppConfig):
     label = "catalog"
 
     # Audit policy (SEC.4, docs/dev/audit-trail.md).
-    # Every write goes through the audited services: prices (CAT.1), edits (CAT.12).
+    # Every write goes through the audited services: prices (CAT.1), edits (CAT.12),
+    # duplicates to another vendor (CAT.14).
     audited_models = ("product", "variant")
     unaudited_models = {
         "producttranslation": "storefront texts under the translation workflow",
@@ -30,3 +31,6 @@ class CatalogConfig(AppConfig):
         "variantoption": "which value a variant takes on an axis; created and audited by "
         "services.create_product",
     }
+
+    def ready(self) -> None:
+        from . import signals  # noqa: F401  (connects the CAT.14 upsell guard)

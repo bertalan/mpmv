@@ -67,6 +67,7 @@ from apps.tax.tests.factories import (
 )
 from apps.vendors.models import (
     ContractAcceptance,
+    CrossVendorConsent,
     Vendor,
     VendorFeatureFlag,
     VendorMember,
@@ -74,6 +75,7 @@ from apps.vendors.models import (
 )
 from apps.vendors.tests.factories import (
     ContractAcceptanceFactory,
+    CrossVendorConsentFactory,
     VendorFeatureFlagFactory,
     VendorMemberFactory,
     VendorTranslationFactory,
@@ -98,6 +100,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     VendorTranslation: lambda vendor: VendorTranslationFactory.create(vendor=vendor, language="it"),
     ContractAcceptance: lambda vendor: ContractAcceptanceFactory.create(vendor=vendor),
     VendorFeatureFlag: lambda vendor: VendorFeatureFlagFactory.create(vendor=vendor),
+    CrossVendorConsent: lambda vendor: CrossVendorConsentFactory.create(vendor=vendor),
     Product: lambda vendor: ProductFactory.create(vendor=vendor),
     ProductTranslation: lambda vendor: ProductTranslationFactory.create(
         product=ProductFactory.create(vendor=vendor)
