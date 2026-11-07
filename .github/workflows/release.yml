@@ -1,6 +1,8 @@
 # Release images (ARC.5, ADR-0005). A git tag vX.Y.Z on main publishes the immutable image
 # ghcr.io/<owner>/mpmv-app:X.Y.Z (plus sha-<commit>). STAGE and LIVE deploy these tags with
 # deploy/server/mpmv-deploy; see deploy/README.md.
+# OPS.4: the GitHub release for the tag carries the CycloneDX SBOMs of the Python environment and
+# of the published image (docs/dev/dependency-updates.md).
 name: Release image
 
 on:
@@ -13,14 +15,20 @@ concurrency:
 
 permissions:
   contents: read
-  packages: write
+
+env:
+  UV_FROZEN: "1"
 
 jobs:
   image:
     name: Build and publish
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write # create the GitHub release and attach the SBOMs
+      packages: write # push the image to ghcr.io
     steps:
       - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
       - name: Image name and version
         run: |
           echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/mpmv-app" >> "$GITHUB_ENV"
@@ -39,7 +47,29 @@ jobs:
         run: >-
           docker build --file Containerfile --build-arg MPMV_VERSION="$VERSION"
           --tag "$IMAGE:$VERSION" --tag "$IMAGE:sha-${GITHUB_SHA::12}" .
+      - name: Python SBOM (CycloneDX)
+        run: make sbom
+      - name: Image SBOM (CycloneDX)
+        uses: anchore/sbom-action@v0.24.3
+        with:
+          image: ${{ env.IMAGE }}:${{ env.VERSION }}
+          format: cyclonedx-json
+          output-file: build/sbom/mpmv-image.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
       - name: Push
         run: |
           docker push "$IMAGE:$VERSION"
           docker push "$IMAGE:sha-${GITHUB_SHA::12}"
+      - name: Attach the SBOMs to the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" \
+              --generate-notes
+          fi
+          gh release upload "$GITHUB_REF_NAME" --clobber \
+            "build/sbom/mpmv-python.cdx.json#SBOM (CycloneDX): Python environment" \
+            "build/sbom/mpmv-image.cdx.json#SBOM (CycloneDX): container image"
