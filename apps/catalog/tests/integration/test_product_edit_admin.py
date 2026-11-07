@@ -233,3 +233,18 @@ def test_deleting_a_variant_in_the_admin_is_audited(staff_client: Client) -> Non
     )
     assert response.status_code == 302
     assert domain_entries().get().action == "catalog.variant.deleted"
+
+
+def test_the_variant_bulk_delete_action_is_audited(staff_client: Client) -> None:
+    variants = VariantFactory.create_batch(2)
+    response = staff_client.post(
+        reverse("admin:catalog_variant_changelist"),
+        {
+            "action": "delete_selected",
+            "_selected_action": [str(v.pk) for v in variants],
+            "post": "yes",
+        },
+    )
+    assert response.status_code == 302
+    assert Variant.objects.count() == 0
+    assert domain_entries().filter(action="catalog.variant.deleted").count() == 2

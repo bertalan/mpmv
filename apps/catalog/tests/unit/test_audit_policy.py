@@ -4,8 +4,11 @@ Their admins write through the audited catalog services, so the SEC.4 system che
 (`core.E203`) passes with both models in `audited_models`.
 """
 
+from typing import Any
+
 from django.apps import apps
 from django.contrib import admin
+from django.db import models
 
 from apps.catalog.admin import ProductAdmin, VariantAdmin
 from apps.catalog.models import Product, Variant
@@ -20,7 +23,7 @@ def test_products_and_variants_are_audited_without_an_exemption() -> None:
 
 def test_the_catalog_admins_pass_the_audit_policy_check() -> None:
     policy = audit_policy(apps.get_app_configs())
-    registry = {
+    registry: dict[type[models.Model], admin.ModelAdmin[Any]] = {
         Product: admin.site._registry[Product],
         Variant: admin.site._registry[Variant],
     }

@@ -242,3 +242,11 @@ def test_creating_and_deleting_a_variant_is_audited() -> None:
         "catalog.variant.created",
         "catalog.variant.deleted",
     ]
+
+
+def test_a_variant_delete_dry_run_writes_nothing() -> None:
+    variant = VariantFactory.create()
+    changes = delete_variant(variant, ctx=CTX, dry_run=True)
+    assert changes.summary()["delete"] == 1
+    assert Variant.objects.filter(pk=variant.pk).exists()
+    assert AuditLog.objects.count() == 0
