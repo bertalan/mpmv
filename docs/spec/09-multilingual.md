@@ -20,6 +20,7 @@
 | CMS pages, blog, landing pages, legal texts | **wagtail-localize** (per-locale trees, synchronization, translation status) | Native Wagtail tool |
 | Interface strings, emails, messages | **gettext** (`.po`/`.mo`) | Django standard; the `i18n/add_it_translations.py` scripts already exist |
 | Tax wording (art. 74, reverse charge, export) | gettext keys referenced by `legal_note_key` | The text follows the document language; it is not a free-text field to be duplicated |
+| Vendor legal documents (vendor contract, other vendor-facing terms) | Versioned documents with one text per language (`VendorContractTranslation`, vendor clauses and custom uploads, see [04](04-vendors-commissions-ledger.md)) | Not visitor content: the vendor accepts the exact text in its own language, with a prevailing language per version |
 
 Rules:
 
@@ -43,6 +44,12 @@ Rules:
 - Machine (AI) translation as a draft, with human review where required; editorial rule
   unchanged: titles in sentence case.
 - Emails and documents in the recipient's language (`Order.language`, `User.preferred_language`).
+- Vendor legal documents are an exception to the rule that content is English only until after
+  go-live (owner decision, 2026-11-07). They exist in every vendor language from the start (IT,
+  EN, DE, FR, ES), are never machine drafts, and are not part of the CMS translation workflow or
+  the visitor fallback: when the vendor's language has no text, the vendor accepts the English
+  text with an explicit acknowledgement (VEN.14). The legal translation of these texts is the
+  owner's business task, not a backlog task.
 
 ## 9.3 Tasks
 
