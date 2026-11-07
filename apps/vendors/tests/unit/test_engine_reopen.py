@@ -16,7 +16,7 @@ from apps.vendors.engine import (
     ReasonRequired,
     ReopenNotAllowed,
     allowed_transitions,
-    check_can_reopen,
+    check_reopen,
     check_transition,
 )
 
@@ -54,12 +54,26 @@ def test_other_transitions_need_no_reason(current: str, target: str) -> None:
     check_transition(current, target)
 
 
+REASON = "The owner asked to sell again"
+
+
+def test_a_closed_vendor_with_an_active_owner_and_a_reason_can_be_reopened() -> None:
+    check_reopen(CLOSED, reason=REASON, has_active_owner=True)
+
+
+@pytest.mark.parametrize("status", [APPLICANT, ONBOARDING, ACTIVE, SUSPENDED])
+def test_only_a_closed_vendor_is_reopened(status: str) -> None:
+    # applicant → onboarding is a valid transition, but it is an approval, not a reopen.
+    with pytest.raises(InvalidTransition, match=f"{status} → onboarding"):
+        check_reopen(status, reason=REASON, has_active_owner=True)
+
+
+def test_a_reopen_needs_a_reason() -> None:
+    with pytest.raises(ReasonRequired):
+        check_reopen(CLOSED, reason=" ", has_active_owner=True)
+
+
 def test_a_vendor_without_an_active_owner_cannot_be_reopened() -> None:
     with pytest.raises(ReopenNotAllowed, match="owner"):
-        check_can_reopen(has_active_owner=False)
-    with pytest.raises(InvalidTransition):
-        check_can_reopen(has_active_owner=False)
-
-
-def test_a_vendor_with_an_active_owner_can_be_reopened() -> None:
-    check_can_reopen(has_active_owner=True)
+        check_reopen(CLOSED, reason=REASON, has_active_owner=False)
+    assert issubclass(ReopenNotAllowed, InvalidTransition)  # every adapter reports it

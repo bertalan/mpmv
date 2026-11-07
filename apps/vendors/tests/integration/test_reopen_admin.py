@@ -57,6 +57,7 @@ def test_staff_reopen_a_closed_vendor_with_a_reason(staff_client: Client) -> Non
     vendor.refresh_from_db()
     assert vendor.status == Vendor.Status.ONBOARDING
     entry = AuditLog.objects.get(action="vendor.reopened")
+    assert entry.after is not None
     assert entry.after["reason"] == REASON
     assert entry.source == "admin"
     assert entry.actor_label == "staff:staff@example.com"
