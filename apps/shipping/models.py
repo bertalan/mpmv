@@ -21,6 +21,7 @@ from django.db import models
 from apps.core.fields import MoneyField
 from apps.core.models import BaseModel, TranslationModel, resolve_translation
 from apps.core.translations import Resolved
+from apps.vendors.scoping import VendorScopedManager
 
 from . import engine
 from .fields import ZoneCountriesField
@@ -142,6 +143,9 @@ class VendorZoneRate(BaseModel):
 
     OverMaxWeight = OverMaxWeight
 
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
+
     vendor = models.ForeignKey(
         "vendors.Vendor", on_delete=models.CASCADE, related_name="shipping_rates"
     )
@@ -189,6 +193,9 @@ class WeightBand(BaseModel):
     health check (SHP.8).
     """
 
+    vendor_scope: ClassVar[str] = "rate__vendor"
+    objects = VendorScopedManager()
+
     rate = models.ForeignKey(VendorZoneRate, on_delete=models.CASCADE, related_name="bands")
     from_kg = weight_field(default=0, help_text="Excluded: the band starts above this weight.")
     to_kg = weight_field(null=True, blank=True, help_text="Included. Empty: no upper limit.")
@@ -227,6 +234,9 @@ class WeightBand(BaseModel):
 class PickupOption(BaseModel):
     """Local pickup at a vendor's address, offered in addition to the carrier (spec 06 rule 5)."""
 
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
+
     vendor = models.ForeignKey(
         "vendors.Vendor", on_delete=models.CASCADE, related_name="pickup_options"
     )
@@ -253,6 +263,9 @@ class PickupOption(BaseModel):
 class PickupOptionTranslation(TranslationModel):
     translation_of = "pickup_option"
     translated_fields = ("label",)
+
+    vendor_scope: ClassVar[str] = "pickup_option__vendor"
+    objects = VendorScopedManager()
 
     pickup_option = models.ForeignKey(
         PickupOption, on_delete=models.CASCADE, related_name="translations"

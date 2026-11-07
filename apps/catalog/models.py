@@ -6,13 +6,13 @@ Fields owned by later tasks are added there: `category`, `brand` and `terms` (CA
 `services.set_variant_price`, which audit them; the status changes through the publishing
 services of CAT.10.
 
-Vendor scoping: `Product.vendor` is a plain foreign key until CORE.3 provides the
-`VendorScopedQuerySet`. `Variant.vendor` copies its product's vendor so that the database can
-enforce one SKU per vendor among variants; a composite foreign key (migration 0001) keeps the
-copy equal to the product's vendor, and moves it along when the product changes vendor.
+Vendor scoping (CORE.3): every model here uses `VendorScopedManager`. `Variant.vendor` copies
+its product's vendor so that the database can enforce one SKU per vendor among variants; a
+composite foreign key (migration 0001) keeps the copy equal to the product's vendor, and moves
+it along when the product changes vendor.
 """
 
-from typing import Any
+from typing import Any, ClassVar
 
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
@@ -23,6 +23,7 @@ from apps.core.fields import MoneyField
 from apps.core.models import BaseModel, TranslationModel, resolve_translation
 from apps.core.translations import Resolved
 from apps.vendors.models import Vendor
+from apps.vendors.scoping import VendorScopedManager
 
 from .fields import SkuField
 
@@ -91,6 +92,9 @@ class Product(BaseModel):
     FiscalCategory = FiscalCategory
     StockPolicy = StockPolicy
     StockStatus = StockStatus
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
 
     vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="products")
     sku = SkuField(help_text="Unique per vendor; stored upper case.")
@@ -246,6 +250,9 @@ class ProductTranslation(TranslationModel):
         "seo_description",
     )
 
+    vendor_scope: ClassVar[str] = "product__vendor"
+    objects = VendorScopedManager()
+
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="translations")
     title = models.CharField(max_length=255)
     short_description = models.TextField(blank=True)
@@ -278,6 +285,9 @@ class Variant(BaseModel):
     """A purchasable variant of a variable product; empty overrides use the product's values."""
 
     StockStatus = StockStatus
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="variants")
     # Always the product's vendor (set on save, enforced by the composite foreign key).
@@ -366,6 +376,9 @@ class VariantTranslation(TranslationModel):
 
     translation_of = "variant"
     translated_fields = ("label", "description")
+
+    vendor_scope: ClassVar[str] = "variant__vendor"
+    objects = VendorScopedManager()
 
     variant = models.ForeignKey(Variant, on_delete=models.CASCADE, related_name="translations")
     label = models.CharField(max_length=255)
