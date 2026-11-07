@@ -19,44 +19,11 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from apps.core.fields import CountryField
-from apps.core.models import BaseModel, TranslationModel, TsTzRange
+from apps.core.models import BaseModel, TranslationModel, TsTzRange, Versioned, valid_period_check
 from apps.vendors.models import FiscalRegime, Vendor
 from apps.vendors.scoping import VendorScopedManager
 
 from . import engine
-
-
-class Versioned(BaseModel):
-    """A row of versioned configuration: `[valid_from, valid_to)`, never edited in place."""
-
-    valid_from = models.DateTimeField()
-    valid_to = models.DateTimeField(null=True, blank=True, editable=False)
-
-    # The only fields an existing row may write: closing its validity period.
-    CLOSING_FIELDS = frozenset({"valid_to", "updated_at"})
-
-    class Meta:
-        abstract = True
-
-    def save(self, *args: Any, **kwargs: Any) -> None:
-        update_fields = kwargs.get("update_fields")
-        if self.pk is not None and (
-            update_fields is None
-            or "valid_to" not in update_fields
-            or not self.CLOSING_FIELDS.issuperset(update_fields)
-        ):
-            raise PermissionError(
-                f"{type(self).__name__} rows are never edited in place; add a new row instead"
-            )
-        super().save(*args, **kwargs)
-
-
-def _valid_period(label: str) -> models.CheckConstraint:
-    return models.CheckConstraint(
-        condition=models.Q(valid_to__isnull=True) | models.Q(valid_to__gt=models.F("valid_from")),
-        name=f"tax_{label}_valid_to_after_valid_from",
-    )
-
 
 # --- Territories
 
@@ -201,7 +168,7 @@ class TaxRate(Versioned):
                 condition=~models.Q(category=engine.ZERO) | models.Q(rate=0),
                 name="tax_taxrate_zero_category_is_zero",
             ),
-            _valid_period("taxrate"),
+            valid_period_check("tax_taxrate_valid_to_after_valid_from"),
             ExclusionConstraint(
                 name="tax_taxrate_no_overlap",
                 expressions=[
@@ -299,7 +266,7 @@ class VendorTaxProfile(Versioned):
                 ),
                 name="tax_profile_exempt_reason_iff_exempt",
             ),
-            _valid_period("profile"),
+            valid_period_check("tax_profile_valid_to_after_valid_from"),
             ExclusionConstraint(
                 name="tax_profile_no_overlap",
                 expressions=[
@@ -317,7 +284,10 @@ class VendorTaxProfile(Versioned):
         if self.vendor_id is None or not self.regime:
             return
         errors = engine.profile_errors(
-            self.regime, self.exempt_reason, fiscal_regime=self.vendor.fiscal_regime
+            self.regime,
+            self.exempt_reason,
+            fiscal_regime=self.vendor.fiscal_regime,
+            oss_registered_since=self.oss_registered_since,
         )
         if errors:
             raise ValidationError(errors)
@@ -492,6 +462,7 @@ class TaxRegimeChangeRequest(BaseModel):
             self.exempt_reason,
             requested_fiscal_regime=self.fiscal_regime,
             current_fiscal_regime=self.vendor.fiscal_regime,
+            oss_registered_since=self.oss_registered_since,
         )
         if errors:
             raise ValidationError(errors)

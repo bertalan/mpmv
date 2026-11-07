@@ -11,6 +11,7 @@ from django.urls import reverse
 
 from apps.accounts.models import User
 from apps.core.models import AuditLog
+from apps.core.tests.factories import utc
 from apps.tax.models import TaxRate, Territory, VendorTaxProfile, VendorTaxProfileTranslation
 from apps.tax.tests.factories import (
     TaxRateFactory,
@@ -213,6 +214,37 @@ def test_legal_notes_are_edited_with_an_audit_entry(staff_client: Client) -> Non
     entry = domain_entries().get()
     assert entry.action == "tax.legal_note.updated"
     assert entry.vendor_key == str(note.profile.vendor.public_id)
+
+
+def test_a_legal_note_cannot_be_moved_to_another_profile(staff_client: Client) -> None:
+    note = VendorTaxProfileTranslationFactory.create(language="it")
+    original = note.profile
+    other = VendorTaxProfileFactory.create(art74=True)
+    response = staff_client.post(
+        reverse("admin:tax_vendortaxprofiletranslation_change", args=[note.pk]),
+        {
+            "profile": str(other.pk),
+            "language": "it",
+            "status": "reviewed",
+            "legal_note": "IVA non applicabile: formula di esempio.",
+        },
+    )
+    assert response.status_code == 302, response.content
+    assert VendorTaxProfileTranslation.objects.get(pk=note.pk).profile == original
+
+
+def test_legal_notes_of_an_ended_profile_are_view_only(staff_client: Client) -> None:
+    profile = VendorTaxProfileFactory.create(art74=True, valid_from=utc(2025), valid_to=utc(2026))
+    note = VendorTaxProfileTranslationFactory.create(profile=profile, language="it")
+    change = reverse("admin:tax_vendortaxprofiletranslation_change", args=[note.pk])
+    assert staff_client.get(change).status_code == 200
+    response = staff_client.post(
+        change,
+        {"language": "it", "status": "reviewed", "legal_note": "Rewritten history."},
+    )
+    assert response.status_code == 403
+    assert VendorTaxProfileTranslation.objects.get(pk=note.pk).legal_note == note.legal_note
+    assert not domain_entries().exists()
 
 
 # --- VIES results

@@ -7,8 +7,6 @@ import pytest
 from apps.tax import engine
 from apps.vendors.engine import FLAT_RATE_REGIME
 
-NOW = dt.datetime(2027, 3, 1, 12, tzinfo=dt.UTC)
-
 # --- Statuses and transitions
 
 
@@ -99,15 +97,29 @@ def test_profile_rules_still_apply_to_requests() -> None:
 # --- When an approval may change the declared fiscal regime
 
 
-def test_a_fiscal_regime_change_due_now_or_earlier_can_be_approved() -> None:
-    assert engine.fiscal_regime_change_error(NOW, now=NOW) is None
-    assert engine.fiscal_regime_change_error(NOW - dt.timedelta(days=30), now=NOW) is None
+TODAY = dt.date(2027, 3, 1)  # business-time dates: the caller converts instants (TAX.2)
+
+
+def test_a_fiscal_regime_change_due_today_or_earlier_can_be_approved() -> None:
+    assert engine.fiscal_regime_change_error(TODAY, today=TODAY) is None
+    assert engine.fiscal_regime_change_error(TODAY - dt.timedelta(days=30), today=TODAY) is None
 
 
 def test_a_fiscal_regime_change_from_a_future_date_waits_for_that_date() -> None:
-    error = engine.fiscal_regime_change_error(NOW + dt.timedelta(days=1), now=NOW)
+    error = engine.fiscal_regime_change_error(TODAY + dt.timedelta(days=1), today=TODAY)
     assert error is not None
     assert "2027-03-02" in error
+
+
+def test_requests_follow_the_oss_registration_date_rule_of_profiles() -> None:
+    errors = engine.request_errors(
+        "domestic_only",
+        "",
+        requested_fiscal_regime="",
+        current_fiscal_regime="RF01",
+        oss_registered_since=dt.date(2026, 7, 1),
+    )
+    assert set(errors) == {"oss_registered_since"}
 
 
 # --- Who may review

@@ -4,8 +4,10 @@ fiscal regime (VEN.12) consistent with it, in one transaction, with a full audit
 
 import datetime as dt
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pytest
+from django.conf import settings
 from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -27,6 +29,7 @@ pytestmark = pytest.mark.django_db
 CTX = AuditContext(actor_id=1, actor_label="user:owner", source="vendor", ip="127.0.0.1")
 STAFF_CTX = AuditContext(actor_id=2, actor_label="staff:ops", source="admin", ip="127.0.0.1")
 PAST = utc(2026, 1)  # before the test clock: a fiscal regime change may apply at once
+BUSINESS_ZONE = ZoneInfo(settings.BUSINESS_TIME_ZONE)
 
 
 def owner_of(vendor: Vendor) -> User:
@@ -138,6 +141,36 @@ def test_a_request_for_the_current_regime_is_refused() -> None:
     assert "regime" in exc.value.message_dict
 
 
+def test_an_oss_registration_date_with_another_regime_is_refused() -> None:
+    vendor = VendorFactory.create(fiscal_regime="RF01")
+    request = new_request(vendor, regime="domestic_only", oss_registered_since=dt.date(2026, 7, 1))
+    with pytest.raises(ValidationError) as exc:
+        services.request_regime_change(request, ctx=CTX)
+    assert "oss_registered_since" in exc.value.message_dict
+
+
+def test_a_new_request_carries_no_review_set_by_the_caller() -> None:
+    vendor = VendorFactory.create(fiscal_regime="RF01")
+    request = new_request(
+        vendor,
+        reviewed_by=UserFactory.create(staff=True),
+        reviewed_at=timezone.now(),
+        review_reason="Approved in advance.",
+        profile=VendorTaxProfileFactory.create(),
+    )
+    services.request_regime_change(request, ctx=CTX)
+    stored = TaxRegimeChangeRequest.objects.get()
+    assert stored.status == engine.PENDING
+    assert stored.reviewed_by is None
+    assert stored.reviewed_at is None
+    assert stored.review_reason == ""
+    assert stored.profile is None
+    entry = AuditLog.objects.get()
+    assert entry.after is not None
+    assert entry.after["review_reason"] == ""
+    assert entry.after["reviewed_by"] is None
+
+
 # --- Staff approval
 
 
@@ -227,6 +260,40 @@ def test_a_fiscal_regime_change_cannot_be_approved_before_its_date() -> None:
     assert vendor.fiscal_regime == "RF01"
     assert VendorTaxProfile.objects.count() == 0
     assert TaxRegimeChangeRequest.objects.get().status == engine.PENDING
+
+
+def business_today() -> dt.date:
+    return timezone.localdate(timezone.now(), BUSINESS_ZONE)
+
+
+def test_a_fiscal_regime_change_is_approved_on_its_date_in_business_time() -> None:
+    vendor = VendorFactory.create(fiscal_regime="RF01")
+    later_today = dt.datetime.combine(business_today(), dt.time.max, tzinfo=BUSINESS_ZONE)
+    request = submitted(
+        vendor,
+        regime="exempt",
+        exempt_reason="flat_rate_forfettario",
+        oss_registered_since=None,
+        effective_from=later_today,
+    )
+    services.approve_regime_change(request, reviewer(), ctx=STAFF_CTX)
+    vendor.refresh_from_db()
+    assert vendor.fiscal_regime == FLAT_RATE_REGIME
+
+
+def test_a_refused_fiscal_regime_change_names_its_business_date() -> None:
+    vendor = VendorFactory.create(fiscal_regime="RF01")
+    tomorrow = business_today() + dt.timedelta(days=1)
+    just_after_midnight = dt.datetime.combine(tomorrow, dt.time(0, 30), tzinfo=BUSINESS_ZONE)
+    request = submitted(
+        vendor,
+        regime="exempt",
+        exempt_reason="flat_rate_forfettario",
+        oss_registered_since=None,
+        effective_from=just_after_midnight,
+    )
+    with pytest.raises(engine.FiscalRegimeChangeNotDue, match=tomorrow.isoformat()):
+        services.approve_regime_change(request, reviewer(), ctx=STAFF_CTX)
 
 
 def test_an_approval_that_fails_half_way_changes_nothing() -> None:
