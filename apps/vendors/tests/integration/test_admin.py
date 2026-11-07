@@ -1,5 +1,6 @@
 """VEN.1: staff CRUD for vendors and their translations in the Django admin."""
 
+from collections.abc import Callable
 from typing import Any
 
 import pytest
@@ -8,17 +9,19 @@ from django.urls import reverse
 
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
+from apps.accounts.tests.mfa import verified_login
 from apps.core.models import AuditLog
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
 
+MfaLogin = Callable[[Client, User], Client]
+
 
 @pytest.fixture
-def staff_client(client: Client, superuser: User) -> Client:
-    client.force_login(superuser)
-    return client
+def staff_client(client: Client, superuser: User, mfa_login: MfaLogin) -> Client:
+    return mfa_login(client, superuser)
 
 
 def staff_with(client: Client, *codenames: str) -> Client:
@@ -28,7 +31,7 @@ def staff_with(client: Client, *codenames: str) -> Client:
         staff=True,
         permissions=[f"vendors.{codename}" for codename in codenames],
     )
-    client.force_login(user)
+    verified_login(client, user)  # staff need a verified second factor (CORE.4)
     return client
 
 

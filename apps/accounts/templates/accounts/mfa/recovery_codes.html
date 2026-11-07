@@ -1,0 +1,12 @@
+{% extends "core/base.html" %}
+{% block title %}Recovery codes · MPMV{% endblock %}
+{% block content %}
+<h1>Recovery codes</h1>
+<p>You have {{ unused_codes }} unused recovery code{{ unused_codes|pluralize }}.</p>
+<form method="post">
+  {% csrf_token %}
+  <p>Generating new codes makes every previous code stop working.</p>
+  <button type="submit">Generate new codes</button>
+</form>
+<p><a href="{% url 'mfa:overview' %}">Back to two-factor settings</a></p>
+{% endblock %}

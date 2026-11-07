@@ -1,0 +1,40 @@
+{% extends "core/base.html" %}
+{% block title %}Verify it is you · MPMV{% endblock %}
+{% block content %}
+<h1>Verify it is you</h1>
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+
+{% if has_passkey %}
+<form data-passkey="authenticate" data-csrf-token="{{ csrf_token }}" data-options-url="{{ auth_options_url }}" data-finish-url="{{ auth_url }}">
+  <button type="button" data-passkey-start>Use a passkey</button>
+  <noscript><p>Passkeys need JavaScript.</p></noscript>
+  <p data-passkey-error role="alert" hidden></p>
+</form>
+{% include "accounts/mfa/_passkey_script.html" %}
+{% endif %}
+
+{% if has_totp %}
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="method" value="totp">
+  <input type="hidden" name="next" value="{{ next }}">
+  <p><label for="id_token">Authentication code</label>
+    <input id="id_token" name="token" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="8" required{% if not has_passkey %} autofocus{% endif %}></p>
+  <button type="submit">Verify</button>
+</form>
+{% endif %}
+
+{% if has_recovery %}
+<section>
+  <h2>Lost your device?</h2>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="method" value="recovery">
+    <input type="hidden" name="next" value="{{ next }}">
+    <p><label for="id_code">Recovery code</label>
+      <input id="id_code" name="code" autocomplete="off" spellcheck="false" required></p>
+    <button type="submit">Use recovery code</button>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

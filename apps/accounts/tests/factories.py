@@ -6,9 +6,11 @@ from typing import Any
 
 import factory
 from django.contrib.auth.models import Permission
+from django_otp.plugins.otp_totp.models import TOTPDevice
 from factory.django import DjangoModelFactory
 
-from apps.accounts.models import User
+from apps.accounts import engine
+from apps.accounts.models import PasskeyDevice, RecoveryCode, RecoveryCodeDevice, User
 
 
 class UserFactory(DjangoModelFactory[User]):
@@ -48,3 +50,52 @@ class UserFactory(DjangoModelFactory[User]):
             obj.user_permissions.add(
                 Permission.objects.get(content_type__app_label=app_label, codename=codename)
             )
+
+
+class TOTPDeviceFactory(DjangoModelFactory[TOTPDevice]):
+    """A confirmed authenticator-app device (django-otp). The key is random, from the model."""
+
+    class Meta:
+        model = TOTPDevice
+
+    user = factory.SubFactory(UserFactory)
+    name = "Authenticator app"
+    confirmed = True
+
+
+class PasskeyDeviceFactory(DjangoModelFactory[PasskeyDevice]):
+    """A confirmed passkey. The public key is random bytes: use FakeAuthenticator to sign in."""
+
+    class Meta:
+        model = PasskeyDevice
+
+    user = factory.SubFactory(UserFactory)
+    name = "Passkey"
+    confirmed = True
+    credential_id = factory.LazyFunction(lambda: secrets.token_urlsafe(32))
+    public_key = factory.LazyFunction(lambda: secrets.token_bytes(77))
+    sign_count = 0
+    transports = factory.LazyFunction(lambda: ["internal"])
+
+
+class RecoveryCodeDeviceFactory(DjangoModelFactory[RecoveryCodeDevice]):
+    """A user's set of recovery codes; add codes with RecoveryCodeFactory."""
+
+    class Meta:
+        model = RecoveryCodeDevice
+
+    user = factory.SubFactory(UserFactory)
+    name = "Recovery codes"
+    confirmed = True
+
+
+class RecoveryCodeFactory(DjangoModelFactory[RecoveryCode]):
+    """One unused recovery code. Pass `code=` to know the plain code; only its hash is stored."""
+
+    class Meta:
+        model = RecoveryCode
+        exclude = ("code",)
+
+    device = factory.SubFactory(RecoveryCodeDeviceFactory)
+    code = factory.LazyFunction(lambda: engine.generate_recovery_codes(1)[0])
+    code_hash = factory.LazyAttribute(lambda o: engine.hash_recovery_code(o.code))

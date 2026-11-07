@@ -1,7 +1,7 @@
 """Root URLconf.
 
-Operational routes (health check, staff admin, language switcher, API v1) have no language
-prefix.
+Operational routes (health check, staff admin, language switcher, API v1, MFA pages) have no
+language prefix.
 Public pages live in `i18n_patterns`: `/` is the primary language (EN), every other language in
 settings.LANGUAGES gets `/<code>/` (spec 09 §9.2, I18N.1).
 """
@@ -25,6 +25,7 @@ urlpatterns = [
     path("django-admin/", admin.site.urls),
     path("i18n/switch/", switch_language, name="switch_language"),
     path("api/v1/", include("apps.api.urls")),
+    path("account/mfa/", include("apps.accounts.urls")),
     *i18n_patterns(
         path("", home, name="home"),
         prefix_default_language=False,

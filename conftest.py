@@ -12,6 +12,10 @@ import factory.random
 import pytest
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from django.test import Client
+
     from apps.accounts.models import User
 
 # Fixed seed for Faker and factory_boy, so a failure replays with the same data.
@@ -69,3 +73,18 @@ def superuser(db: None) -> "User":
     from apps.accounts.tests.factories import UserFactory
 
     return UserFactory.create(email="staff@example.com", superuser=True)
+
+
+@pytest.fixture
+def mfa_login(db: None) -> "Callable[[Client, User], Client]":
+    """Log a user in with a verified second factor (CORE.4): staff need it for every page.
+
+    Like `superuser`, it lets apps below `accounts` (spec 01 §1.3) act as staff in the admin.
+    """
+    from apps.accounts.tests.mfa import verified_login
+
+    def login(client: "Client", user: "User") -> "Client":
+        verified_login(client, user)
+        return client
+
+    return login

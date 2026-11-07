@@ -1,17 +1,29 @@
 """Account services: business logic shared by views, API and commands."""
 
 import datetime as dt
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from typing import Any
 
+import django_otp
+from django.conf import settings
+from django.contrib.auth.base_user import AbstractBaseUser
+from django.contrib.auth.models import AnonymousUser
+from django.db import transaction
+from django.db.models import Model
 from django.utils import timezone
+from django.utils.module_loading import import_string
+from django_otp.plugins.otp_totp.models import TOTPDevice
 
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog
-from apps.core.services import clear_throttle, record_throttle_failure, throttle_state
+from apps.core.services import clear_throttle, record_throttle_failure, run_mutation, throttle_state
 from apps.core.throttling import BackoffPolicy, ThrottleState, ip_bucket
 
-from .models import User, normalize_email_address
+from . import engine
+from .models import PasskeyDevice, RecoveryCode, RecoveryCodeDevice, User, normalize_email_address
 
 # --- Login and registration protection (CORE.5, spec 02 "Authentication")
 #
@@ -159,4 +171,302 @@ def set_preferred_language(user: User, language: str, *, dry_run: bool = False) 
     if not dry_run and not changeset.is_empty:
         user.preferred_language = language
         user.save(update_fields=["preferred_language", "updated_at"])
+    return changeset
+
+
+# --- Multi-factor authentication (CORE.4, spec 02 §2.2)
+
+ENROLLED = "accounts.mfa.enrolled"
+DEVICE_REMOVED = "accounts.mfa.device_removed"
+DISABLED = "accounts.mfa.disabled"
+RECOVERY_CODES_GENERATED = "accounts.mfa.recovery_codes_generated"
+RECOVERY_CODE_USED = "accounts.mfa.recovery_code_used"
+
+TOTP = "totp"
+PASSKEY = "passkey"
+RECOVERY_CODES = "recovery_codes"
+DEVICE_KINDS: Mapping[str, type[Model]] = {
+    TOTP: TOTPDevice,
+    PASSKEY: PasskeyDevice,
+    RECOVERY_CODES: RecoveryCodeDevice,
+}
+
+type SecondFactor = TOTPDevice | PasskeyDevice
+type AnyDevice = TOTPDevice | PasskeyDevice | RecoveryCodeDevice
+
+
+class MfaError(ValueError):
+    """An MFA operation was refused (wrong code, already confirmed device, ...)."""
+
+
+class MfaPolicyError(MfaError):
+    """The operation would leave a user who must use MFA without a second factor."""
+
+
+def mfa_required(user: AbstractBaseUser | AnonymousUser) -> bool:
+    """Whether `user` must verify a second factor before using the site or the admin.
+
+    Staff and superusers always must. Each dotted path in `settings.MFA_REQUIRED_POLICIES`
+    names a `check(user) -> bool` that adds more roles (vendor owners: `owns_a_vendor`);
+    extra checks can only add requirements, never lift them.
+    """
+    if not user.is_authenticated:
+        return False
+    if getattr(user, "is_staff", False) or getattr(user, "is_superuser", False):
+        return True
+    return any(import_string(path)(user) for path in settings.MFA_REQUIRED_POLICIES)
+
+
+def kind_of(device: AnyDevice) -> str:
+    for kind, model in DEVICE_KINDS.items():
+        if isinstance(device, model):
+            return kind
+    raise TypeError(f"not an MFA device: {device!r}")
+
+
+def _label(device: Model) -> str:
+    return device._meta.label_lower
+
+
+def _key(device: AnyDevice) -> str:
+    public_id = getattr(device, "public_id", None)
+    return str(public_id if public_id is not None else device.pk)
+
+
+def _snapshot(device: AnyDevice) -> dict[str, Any]:
+    return {"kind": kind_of(device), "name": device.name, "user": str(device.user.public_id)}
+
+
+def second_factors(user: User) -> list[SecondFactor]:
+    """Confirmed factors that can verify a login (recovery codes are a fallback, not a factor)."""
+    totp: list[SecondFactor] = list(TOTPDevice.objects.filter(user=user, confirmed=True))
+    passkeys: list[SecondFactor] = list(PasskeyDevice.objects.filter(user=user, confirmed=True))
+    return totp + passkeys
+
+
+def has_second_factor(user: User) -> bool:
+    return (
+        TOTPDevice.objects.filter(user=user, confirmed=True).exists()
+        or PasskeyDevice.objects.filter(user=user, confirmed=True).exists()
+    )
+
+
+def unused_recovery_codes(user: User) -> int:
+    return RecoveryCode.objects.filter(device__user=user, used_at__isnull=True).count()
+
+
+@dataclass(frozen=True)
+class RecoveryCodes:
+    """The new plain codes are returned once, to be shown once; only their hashes are stored."""
+
+    changeset: ChangeSet
+    codes: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class Enrolment:
+    device: SecondFactor
+    recovery_codes: list[str]  # new codes when this enrolment created the user's first set
+
+
+def regenerate_recovery_codes(
+    user: User, *, ctx: AuditContext, dry_run: bool = False
+) -> RecoveryCodes:
+    """Replace every recovery code of `user` with a new set (the old ones stop working)."""
+    device = RecoveryCodeDevice.objects.filter(user=user).first()
+    now = timezone.now()
+    changeset = ChangeSet()
+    changeset.update(
+        _label(device) if device else "accounts.recoverycodedevice",
+        str(device.public_id) if device else str(user.public_id),
+        {
+            "unused_codes": unused_recovery_codes(user),
+            "issued_at": device.updated_at if device else None,
+        },
+        {"unused_codes": engine.RECOVERY_CODE_COUNT, "issued_at": now},
+    )
+    codes = [] if dry_run else engine.generate_recovery_codes()
+
+    def apply() -> None:
+        target, _ = RecoveryCodeDevice.objects.select_for_update().get_or_create(
+            user=user, defaults={"name": "Recovery codes", "confirmed": True}
+        )
+        target.codes.all().delete()
+        RecoveryCode.objects.bulk_create(
+            RecoveryCode(device=target, code_hash=engine.hash_recovery_code(code)) for code in codes
+        )
+        target.throttle_reset(commit=False)
+        target.save()
+
+    run_mutation(changeset, apply, ctx=ctx, action=RECOVERY_CODES_GENERATED, dry_run=dry_run)
+    return RecoveryCodes(changeset, codes)
+
+
+def _after_enrolment(device: SecondFactor, ctx: AuditContext) -> Enrolment:
+    """Audit a confirmed factor; give the user a first set of recovery codes if they have none."""
+    record(ctx, ENROLLED, _label(device), _key(device), None, _snapshot(device))
+    codes: list[str] = []
+    if not RecoveryCodeDevice.objects.filter(user=device.user).exists():
+        codes = regenerate_recovery_codes(device.user, ctx=ctx).codes
+    return Enrolment(device, codes)
+
+
+def start_totp_enrolment(user: User, pending_id: int | None = None) -> TOTPDevice:
+    """The pending (unconfirmed) authenticator-app device of one enrolment.
+
+    `pending_id` is the device this enrolment created earlier (the caller keeps it in the
+    session). Any other unconfirmed device of the user is deleted and a fresh one with a new
+    key is created, so a secret recorded in one session can never be confirmed from another.
+    """
+    with transaction.atomic():
+        pending = TOTPDevice.objects.select_for_update().filter(user=user, confirmed=False)
+        if pending_id is not None:
+            device = pending.filter(pk=pending_id).first()
+            if device is not None:
+                return device
+        pending.delete()
+        return TOTPDevice.objects.create(user=user, name="Authenticator app", confirmed=False)
+
+
+def confirm_totp_device(device: TOTPDevice, token: str, *, ctx: AuditContext) -> Enrolment:
+    """Confirm a pending device with a code from the app. Verifying consumes the code, so this
+    service has no dry-run."""
+    with transaction.atomic():
+        locked = TOTPDevice.objects.select_for_update().get(pk=device.pk)
+        if locked.confirmed:
+            raise MfaError("device already confirmed")
+        if not locked.verify_token(token):
+            raise MfaError("invalid code")
+        locked.confirmed = True
+        locked.save(update_fields=["confirmed"])
+        return _after_enrolment(locked, ctx)
+
+
+def verify_totp(user: User, token: str) -> TOTPDevice | None:
+    """The confirmed device of `user` that accepts `token` (throttled, no replay), if any."""
+    for device in TOTPDevice.objects.filter(user=user, confirmed=True).order_by("id"):
+        verified = django_otp.verify_token(user, device.persistent_id, token)
+        if verified is not None:
+            return verified
+    return None
+
+
+def use_recovery_code(user: User, code: str, *, ctx: AuditContext) -> RecoveryCodeDevice | None:
+    """Consume one recovery code of `user`; audited, since it bypasses the usual factor."""
+    with transaction.atomic():
+        device = (
+            RecoveryCodeDevice.objects.select_for_update().filter(user=user, confirmed=True).first()
+        )
+        if device is None:
+            return None
+        before = device.codes.filter(used_at__isnull=True).count()
+        if not device.verify_token(code):
+            return None
+        record(
+            ctx,
+            RECOVERY_CODE_USED,
+            _label(device),
+            _key(device),
+            {"unused_codes": before},
+            {"unused_codes": before - 1},
+        )
+    return device
+
+
+def register_passkey(
+    user: User, passkey: engine.RegisteredPasskey, *, name: str, ctx: AuditContext
+) -> Enrolment:
+    """Store a verified WebAuthn registration as a confirmed second factor."""
+    with transaction.atomic():
+        if PasskeyDevice.objects.filter(credential_id=passkey.credential_id).exists():
+            raise engine.PasskeyError("credential already registered")
+        device = PasskeyDevice.objects.create(
+            user=user,
+            name=(name.strip() or "Passkey")[:64],
+            confirmed=True,
+            credential_id=passkey.credential_id,
+            public_key=passkey.public_key,
+            sign_count=passkey.sign_count,
+            transports=passkey.transports,
+            aaguid=passkey.aaguid,
+            backed_up=passkey.backed_up,
+        )
+        return _after_enrolment(device, ctx)
+
+
+def authenticate_passkey(
+    user: User, rp: engine.RelyingParty, credential: Mapping[str, Any], *, challenge: bytes
+) -> PasskeyDevice:
+    """Verify an assertion from one of `user`'s passkeys and advance its counter."""
+    credential_id = engine.credential_id_from(credential)
+    with transaction.atomic():
+        device = (
+            PasskeyDevice.objects.select_for_update()
+            .filter(user=user, confirmed=True, credential_id=credential_id)
+            .first()
+        )
+        if device is None:
+            raise engine.PasskeyError("unknown credential")
+        device.sign_count = engine.verify_passkey_authentication(
+            rp,
+            credential,
+            challenge=challenge,
+            public_key=bytes(device.public_key),
+            sign_count=device.sign_count,
+        )
+        device.last_used_at = timezone.now()
+        device.save(update_fields=["sign_count", "last_used_at", "updated_at"])
+    return device
+
+
+def remove_device(device: AnyDevice, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Remove one factor. Removing the last one disables MFA, which required roles may not do."""
+    user = device.user
+    kind = kind_of(device)
+    others = [d for d in second_factors(user) if (type(d), d.pk) != (type(device), device.pk)]
+    disabling = kind != RECOVERY_CODES and not others
+    if disabling and mfa_required(user):
+        raise MfaPolicyError("a user who must use MFA cannot remove their last second factor")
+    recovery = RecoveryCodeDevice.objects.filter(user=user).first() if disabling else None
+
+    changeset = ChangeSet()
+    changeset.delete(_label(device), _key(device), _snapshot(device))
+    if recovery is not None:
+        changeset.delete(_label(recovery), _key(recovery), _snapshot(recovery))
+    if dry_run:
+        return changeset
+    with transaction.atomic():
+        before = _snapshot(device)
+        key = _key(device)
+        device.delete()
+        record(ctx, DEVICE_REMOVED, _label(device), key, before, None)
+        if disabling:
+            if recovery is not None:
+                recovery.delete()
+            factors = sorted({kind} | ({RECOVERY_CODES} if recovery else set()))
+            record(ctx, DISABLED, "accounts.user", str(user.public_id), {"factors": factors}, None)
+    return changeset
+
+
+def reset_mfa(user: User, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Delete every factor and recovery code of `user` (lost device, offboarding).
+
+    A required-role user is sent back to enrolment on their next request, and sessions that
+    were verified by a deleted device stop counting as verified.
+    """
+    devices: list[AnyDevice] = [
+        *TOTPDevice.objects.filter(user=user),
+        *PasskeyDevice.objects.filter(user=user),
+        *RecoveryCodeDevice.objects.filter(user=user),
+    ]
+    changeset = ChangeSet()
+    for device in devices:
+        changeset.delete(_label(device), _key(device), _snapshot(device))
+    if dry_run or changeset.is_empty:
+        return changeset
+    factors = sorted({kind_of(device) for device in devices})
+    with transaction.atomic():
+        for device in devices:
+            device.delete()
+        record(ctx, DISABLED, "accounts.user", str(user.public_id), {"factors": factors}, None)
     return changeset

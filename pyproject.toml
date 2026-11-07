@@ -15,6 +15,9 @@ dependencies = [
   "gunicorn>=26.0",
   "whitenoise>=6.12",
   "django-ninja>=1.7.3",
+  "django-otp>=1.7.5",
+  "webauthn>=3.0.1",
+  "segno>=1.6.6",
 ]
 
 [dependency-groups]
@@ -59,12 +62,17 @@ exclude = ["^build/", "^private/", "^tools/", "^\\.claude/"]
 untyped_calls_exclude = ["factory"]
 
 [[tool.mypy.overrides]]
-module = ["dj_database_url", "croniter"]
+module = ["dj_database_url", "croniter", "django_otp", "django_otp.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["factory", "factory.*"]
 implicit_reexport = true
+
+[[tool.mypy.overrides]]
+# MFA devices subclass django-otp's untyped Device, whose managers the plugin cannot resolve (CORE.4).
+module = ["apps.accounts.models"]
+disable_error_code = ["django-manager-missing"]
 
 [[tool.mypy.overrides]]
 module = ["apps.*.tests.factories"]

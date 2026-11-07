@@ -8,7 +8,9 @@ import pytest
 from playwright.sync_api import Page, expect
 from pytest_django.live_server_helper import LiveServer
 
-from apps.accounts.tests.factories import UserFactory
+from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
+from apps.accounts.tests.mfa import totp_token
+from tests.e2e.login import verify_with_totp
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -30,7 +32,8 @@ def test_admin_works_under_strict_csp(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
     password = secrets.token_urlsafe(16)  # generated: no credential literals in git
-    UserFactory.create(email="staff@example.com", password=password, superuser=True)
+    user = UserFactory.create(email="staff@example.com", password=password, superuser=True)
+    device = TOTPDeviceFactory.create(user=user)  # staff must verify a second factor (CORE.4)
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
     response = page.goto(f"{live_server.url}/django-admin/login/")
@@ -44,6 +47,7 @@ def test_admin_works_under_strict_csp(
     page.get_by_label("Email").fill("staff@example.com")
     page.get_by_label("Password").fill(password)
     page.get_by_role("button", name="Log in").click()
+    verify_with_totp(page, totp_token(device))
     expect(
         page.get_by_role("link", name="Log out").or_(page.get_by_role("button", name="Log out"))
     ).to_be_visible()

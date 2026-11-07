@@ -1,5 +1,6 @@
 """ARC.7: staff admin for PlatformOperator; history rows are viewable, never edited or deleted."""
 
+from collections.abc import Callable
 from typing import Any
 
 import pytest
@@ -13,10 +14,12 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def staff_client(client: Client, superuser: Any) -> Client:
-    # `superuser` comes from the root conftest: core must not import accounts (spec 01 §1.3).
-    client.force_login(superuser)
-    return client
+def staff_client(
+    client: Client, superuser: Any, mfa_login: Callable[[Client, Any], Client]
+) -> Client:
+    # `superuser` and `mfa_login` come from the root conftest: core must not import accounts
+    # (spec 01 §1.3). Staff need a verified second factor (CORE.4).
+    return mfa_login(client, superuser)
 
 
 def _form(**overrides: str) -> dict[str, str]:

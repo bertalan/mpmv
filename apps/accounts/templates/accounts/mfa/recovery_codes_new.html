@@ -1,0 +1,10 @@
+{% extends "core/base.html" %}
+{% block title %}Recovery codes · MPMV{% endblock %}
+{% block content %}
+<h1>{% if enrolled %}Two-factor authentication is on{% else %}New recovery codes{% endif %}</h1>
+{% if codes %}
+{% include "accounts/mfa/_recovery_codes_list.html" %}
+{% else %}
+<p><a href="{{ next }}">Continue</a></p>
+{% endif %}
+{% endblock %}

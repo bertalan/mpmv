@@ -1,0 +1,10 @@
+{% comment %}No method: passkey.js runs the ceremony. A native submit (before the script is
+ready, or without JavaScript) is a harmless GET of this page, never a POST.{% endcomment %}
+<form data-passkey="register" data-csrf-token="{{ csrf_token }}" data-options-url="{{ register_options_url }}" data-finish-url="{{ register_url }}">
+  <p><label for="id_passkey_name">Passkey name</label>
+    <input id="id_passkey_name" name="name" value="Passkey" maxlength="64"></p>
+  <button type="button" data-passkey-start>Register a passkey</button>
+  <noscript><p>Passkeys need JavaScript.</p></noscript>
+  <p data-passkey-error role="alert" hidden></p>
+</form>
+{% include "accounts/mfa/_recovery_codes_list.html" with codes=None %}
