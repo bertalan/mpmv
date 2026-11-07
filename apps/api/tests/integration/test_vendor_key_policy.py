@@ -203,6 +203,7 @@ def test_deleting_a_vendor_writes_one_audit_entry_per_key() -> None:
     for entry in entries:
         assert entry.action == DELETED
         assert entry.after is None
+        assert isinstance(entry.before, dict)
         assert entry.before["vendor"] == str(vendor.public_id)
         assert entry.vendor_key == str(vendor.public_id)
         assert entry.actor_label == SYSTEM.actor_label
