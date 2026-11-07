@@ -1,10 +1,12 @@
-"""Vendor services: status changes (VEN.1) and memberships with their permissions (CORE.2)."""
+"""Vendor services: status changes (VEN.1), memberships with their permissions (CORE.2) and
+the legal identity with its payout requirements (VEN.12)."""
 
 from typing import Any
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
 from django.db import transaction
+from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.core.audit import AuditContext
@@ -12,7 +14,8 @@ from apps.core.changeset import ChangeSet
 from apps.core.services import run_mutation
 
 from . import engine
-from .models import Vendor, VendorMember
+from .models import LegalFieldRequirement, Vendor, VendorMember
+from .vies import VatNumberValidator
 
 STATUS_CHANGED = "vendor.status_changed"
 MODEL_LABEL = "vendors.vendor"
@@ -185,3 +188,159 @@ def owns_a_vendor(user: AbstractBaseUser | AnonymousUser) -> bool:
     if not user.is_authenticated:
         return False
     return VendorMember.objects.filter(user_id=user.pk, role=engine.OWNER).exists()
+
+
+# --- Legal and e-invoicing identity (VEN.12)
+
+LEGAL_IDENTITY_CHANGED = "vendor.legal_identity_changed"
+VAT_CHECKED = "vendor.vat_checked"
+AUDITED_LEGAL_FIELDS = ("legal_name", "country", *engine.LEGAL_FIELDS)
+
+
+def legal_snapshot(vendor: Vendor) -> dict[str, Any]:
+    """The audited legal fields of `vendor`, with the IBAN masked (it is sensitive, SEC.3)."""
+    snapshot = {name: getattr(vendor, name) for name in AUDITED_LEGAL_FIELDS}
+    snapshot["iban"] = engine.mask_iban(vendor.iban)
+    return snapshot
+
+
+def save_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Save `vendor` and audit what changed in its legal identity (IBAN masked).
+
+    Incomplete legal data is always accepted: completeness is checked when a payout is
+    requested (`assert_payout_allowed`), never here. Changes to other fields are saved without
+    an audit row.
+    """
+    with transaction.atomic():
+        stored = (
+            Vendor.objects.select_for_update().filter(pk=vendor.pk).first() if vendor.pk else None
+        )
+        after = legal_snapshot(vendor)
+        changes = ChangeSet()
+        if stored is None:
+            changes.create(MODEL_LABEL, str(vendor.public_id), after)
+        else:
+            before = legal_snapshot(stored)
+            if stored.iban != vendor.iban and before["iban"] == after["iban"]:
+                after["iban"] += " (replaced)"  # same mask, different IBAN
+            changes.update(MODEL_LABEL, str(vendor.public_id), before, after)
+        if dry_run:
+            return changes
+        if changes.is_empty:
+            vendor.save()
+            return changes
+        return run_mutation(
+            changes, vendor.save, ctx=ctx, action=LEGAL_IDENTITY_CHANGED, dry_run=False
+        )
+
+
+def check_vat_number(
+    vendor: Vendor, validator: VatNumberValidator, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Ask VIES (through `validator`) about the vendor's VAT number; store and audit the answer.
+
+    Raises `ValueError` when the vendor has no VAT number or the validator answers something
+    that is not a VIES result.
+    """
+    if not vendor.vat_number:
+        raise ValueError(f"vendor {vendor.public_id} has no VAT number to check")
+    _, number = engine.split_vat_number(vendor.vat_number, vendor.country)
+    status = validator.check(engine.vat_prefix(vendor.country), number)
+    if status not in engine.VIES_RESULTS:
+        raise ValueError(f"unexpected VIES result {status!r}")
+    checked_at = timezone.now()
+
+    def state(vies_status: str, at: Any) -> dict[str, Any]:
+        return {"vat_number": vendor.vat_number, "vies_status": vies_status, "vies_checked_at": at}
+
+    changes = ChangeSet()
+    changes.update(
+        MODEL_LABEL,
+        str(vendor.public_id),
+        state(vendor.vies_status, vendor.vies_checked_at),
+        state(status, checked_at),
+    )
+
+    def apply() -> None:
+        Vendor.objects.filter(pk=vendor.pk).update(
+            vies_status=status, vies_checked_at=checked_at, updated_at=checked_at
+        )
+
+    run_mutation(changes, apply, ctx=ctx, action=VAT_CHECKED, dry_run=dry_run)
+    if not dry_run:
+        vendor.vies_status = status
+        vendor.vies_checked_at = checked_at
+    return changes
+
+
+def requirement_rules(purpose: str = engine.PAYOUT) -> list[engine.Requirement]:
+    """The active `LegalFieldRequirement` rows for `purpose`, as pure rules."""
+    rows = LegalFieldRequirement.objects.filter(active=True, purpose=purpose)
+    return [row.as_rule() for row in rows]
+
+
+def legal_profile_completeness(vendor: Vendor, purpose: str = engine.PAYOUT) -> engine.Completeness:
+    """Which fields required for `purpose` the vendor is missing, or holds invalid values for."""
+    return engine.completeness(vendor.legal_identity(), requirement_rules(purpose), purpose=purpose)
+
+
+def assert_payout_allowed(vendor: Vendor) -> None:
+    """Guard for payout requests (VEN.6, VEN.7): raise `engine.PayoutNotAllowed` listing the
+    required legal fields that are missing or invalid.
+
+    Checks the stored vendor, not unsaved changes on the instance.
+    """
+    stored = Vendor.objects.get(pk=vendor.pk)
+    result = legal_profile_completeness(stored, engine.PAYOUT)
+    if not result.complete:
+        raise engine.PayoutNotAllowed(str(stored), result)
+
+
+REQUIREMENT_MODEL = "vendors.legalfieldrequirement"
+REQUIREMENT_SAVED = "vendor.legal_requirement_saved"
+REQUIREMENT_DELETED = "vendor.legal_requirement_deleted"
+REQUIREMENT_FIELDS = ("country", "legal_form", "field_name", "purpose", "active", "note")
+
+
+def requirement_snapshot(requirement: LegalFieldRequirement) -> dict[str, Any]:
+    return {name: getattr(requirement, name) for name in REQUIREMENT_FIELDS}
+
+
+def save_requirement(
+    requirement: LegalFieldRequirement, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Create or change a requirement rule (validated, audited). Raises `ValidationError`."""
+    requirement.full_clean()
+    with transaction.atomic():
+        stored = (
+            LegalFieldRequirement.objects.select_for_update().filter(pk=requirement.pk).first()
+            if requirement.pk
+            else None
+        )
+        changes = ChangeSet()
+        key = str(requirement.public_id)
+        if stored is None:
+            changes.create(REQUIREMENT_MODEL, key, requirement_snapshot(requirement))
+        else:
+            changes.update(
+                REQUIREMENT_MODEL,
+                key,
+                requirement_snapshot(stored),
+                requirement_snapshot(requirement),
+            )
+        return run_mutation(
+            changes, requirement.save, ctx=ctx, action=REQUIREMENT_SAVED, dry_run=dry_run
+        )
+
+
+def delete_requirement(
+    requirement: LegalFieldRequirement, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Delete a requirement rule (audited). Deactivating it keeps the history visible."""
+    changes = ChangeSet()
+    changes.delete(REQUIREMENT_MODEL, str(requirement.public_id), requirement_snapshot(requirement))
+
+    def apply() -> None:
+        requirement.delete()
+
+    return run_mutation(changes, apply, ctx=ctx, action=REQUIREMENT_DELETED, dry_run=dry_run)

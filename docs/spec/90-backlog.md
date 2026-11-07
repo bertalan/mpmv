@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **144** in **17** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **1248 h** (P1 1049 h · P2 181 h · P3 18 h)
+- Micro-tasks: **145** in **17** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **1256 h** (P1 1057 h · P2 181 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **126 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CAT.1 → ORD.1 → ORD.2 → ORD.4 → PAY.1 → PAY.2 → PAY.3 → PAY.4 → ORD.8
 
 ## By macro area
@@ -17,7 +17,7 @@
 | ARC | Architecture and foundations | 12 | 78 | 6 | 0 | 84 |
 | CORE | Identity, permissions, API, backoffice | 10 | 80 | 4 | 0 | 84 |
 | CAT | Product catalog | 11 | 104 | 10 | 0 | 114 |
-| VEN | Vendors, commissions, ledger | 11 | 80 | 14 | 0 | 94 |
+| VEN | Vendors, commissions, ledger | 12 | 88 | 14 | 0 | 102 |
 | TAX | Tax engine | 10 | 42 | 28 | 0 | 70 |
 | SHP | Shipping and quotes | 11 | 64 | 28 | 0 | 92 |
 | ORD | Cart, orders, returns | 10 | 102 | 0 | 0 | 102 |
@@ -31,7 +31,7 @@
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 4 | 16 | 11 | 0 | 27 |
 | MIG | Migration and cutover | 10 | 106 | 0 | 0 | 106 |
-| **Total** | | **144** | **1049** | **181** | **18** | **1248** |
+| **Total** | | **145** | **1057** | **181** | **18** | **1256** |
 
 ## By phase
 
@@ -133,7 +133,7 @@
 | PAY.3 | Transfer per vendor, reverse transfer, reconciliation with the ledger | P1 | 10 | PAY.2 | 3 vendors in one order: 3 correct transfers |
 | PAY.4 | Full/partial refunds with VAT and commissions reversed | P1 | 10 | PAY.3 | Partial refund cases green |
 
-### F3 — Vendors, ledger, compliance (15 tasks, 138 h)
+### F3 — Vendors, ledger, compliance (16 tasks, 146 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -146,6 +146,7 @@
 | VEN.8 | Nightly ledger ↔ Stripe reconciliation with anomaly report | P1 | 10 | VEN.4, PAY.3 | Simulated discrepancy → alert |
 | VEN.9 | Vendor dashboard: balance, transactions, payouts, documents | P1 | 10 | CORE.9, VEN.4 | Vendor sees only their own transactions |
 | VEN.10 | Public vendor storefront per language (bio, policies, products, store categories) | P1 | 8 | CAT.8 | Category sidebar correct in IT too (WCFM bug solved by design) |
+| VEN.12 | Vendor legal and e-invoicing identity (EU + IT): legal form, structured address, VAT with VIES status, codice fiscale, fiscal regime RF01-RF19, REA, SDI recipient code, PEC, EORI, fiscal representative, permanent establishment, invoicing bank details; required fields per country and legal form defined in a staff-editable table, enforced when the vendor requests a payout | P1 | 8 | VEN.1 | A vendor's data fills a valid FatturaPA party block; a vendor missing a required field for its country cannot request a payout, but can open and edit its profile |
 | CMP.1 | DAC7 dataset on the vendor + completeness + quarterly aggregates + export | P1 | 12 | VEN.5, VEN.4 | Test export validated by the advisor |
 | CMP.2 | Commission document from the ledger + `EInvoiceChannel` interface + export per vendor | P1 | 12 | VEN.4 | Test document generated |
 | CMP.3 | `GpsrInfo` with per-vendor defaults, publication block, product page, recall procedure | P1 | 8 | CAT.1 | Product without GPSR cannot be published |
