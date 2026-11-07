@@ -23,8 +23,12 @@
 
 Rules:
 
-- Language-prefix routing (`/` = EN, `/it/`, `/de/`); automatic `hreflang` and canonical.
-- **Explicit fallback**: if the published translation is missing, the base language is shown with a notice, and the
+- **Language order** (owner decision, 2026-11-07): EN is the primary and source language, then IT, then
+  DE, then any later language. The order is configuration (`settings.LANGUAGES`): adding a language
+  means adding one entry plus its translations, never code changes.
+- Language-prefix routing (`/` = EN, `/it/`, `/de/`, `/<code>/` for later languages); automatic
+  `hreflang` and canonical.
+- **Explicit fallback**: if the published translation is missing, the base language (EN) is shown with a notice, and the
   page is not included in that language's sitemap (never empty or duplicate content indexed).
 - **Translation workflow**: every `*Translation` has a status `machine` → `reviewed` → `published` and a
   `source_hash`; if the EN text changes, the other languages go back to "needs review". Admin queue per

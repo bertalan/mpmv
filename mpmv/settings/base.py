@@ -97,7 +97,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# English is the base language, Italian second, German ready (spec 09).
+# Language order (spec 09): EN primary and source, then IT, then DE; more languages are added here.
 LANGUAGE_CODE = "en"
 LANGUAGES = [("en", "English"), ("it", "Italiano"), ("de", "Deutsch")]
 USE_I18N = True
