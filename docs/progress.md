@@ -41,6 +41,11 @@ part of the done-when still open) · `not started`.
 | SEC.3 | done | #36 | AES-256-GCM field encryption with versioned keys outside the database for Vendor.iban and Vendor.tax_code; raw SQL dump test finds no cleartext; key checks at migrate, `rotate_field_keys` with dry-run and audit. KYC files and the DAC7 date of birth get it when their models exist |
 | VEN.5 | done | #37 | Application, onboarding and activation flow; versioned contract with per-language texts locked by database triggers once accepted; append-only acceptances tied to the version, language and text hash shown; activation blocked until the contract is accepted |
 | CMS.1 | done | #40 | Wagtail 8.1 with one locale per configured language, home and About pages per language, per-language header and footer menus, editors' admin at /admin/ under MFA and strict CSP, repeatable `seed_cms` |
+| OPS.4 | done | #48, #59 | Weekly Dependabot update PRs for uv, GitHub Actions and Containerfile images (minor and patch grouped, majors and Django/Wagtail alone, cooldown), full CI on update PRs, CycloneDX SBOMs of the Python environment and the image in CI and attached to releases |
+| ARC.8 | done | #51 | Feature flag registry with code, environment, staff and per-vendor values; kill switches for checkout, import and payments seeded on; `flag_enabled` helper; audited services with dry-run; admins with step-up on kill switches |
+| CAT.2 | done | #53 | Category and term trees (treebeard), configurable taxonomies with typed term attributes, brands, per-language names, slugs and SEO texts; product links; admin CRUD with translations |
+| SHP.12 | done | #54 | Several shipping methods per vendor and zone (VendorZoneRate renamed in place), vendor zones overriding platform zones, country groups, shared postcode grammar in apps/core/postcodes.py, per-method free-shipping threshold and stored VAT treatment |
+| TAX.2 | done | #52 | Regime change workflow: owner request, staff approval or rejection with the review permission checked in the service, step-up, one transaction for the new profile version and fiscal regime, history. Tax code, flagged for careful human review |
 
 ## Owner decisions 2026-11-07
 
@@ -325,6 +330,128 @@ Review findings not fixed (all minor):
 - CMS.1: WAGTAILADMIN_BASE_URL falls back to localhost in every environment instead of being required on live.
 - CMS.1: locale sync after migrate always writes to the default database.
 - CMS.1: editors can create extra HomePages in a locale that already has one.
+
+## Follow-ups from wave 6
+
+Wave 6 is merged: OPS.4 (#48), ARC.8 (#51), CAT.2 (#53), SHP.12 (#54), TAX.2 (#52).
+
+Integration notes:
+
+- Merge order: OPS.4 (#48), ARC.8 (#51), CAT.2 (#53), SHP.12 (#54), TAX.2 (#52).
+- CMP.17 now depends on SHP.12 and SHP.14, which exist on main since #54.
+- Dependabot refused the merged `.github/dependabot.yml`: `semver-major-days` is not supported for
+  the github-actions and docker ecosystems. #59 keeps it on uv only, with a test.
+- Majors from review, all fixed before merge and checked against the diff: ARC.8 (an ordinary
+  vendor override could be turned into a kill-switch override without step-up; vendor and flag are
+  now read-only on change), TAX.2 (the review permission is now checked in the service, not only
+  in the admin), CAT.2 (saving a root term moved it to the front of the whole forest; placement is
+  now read and set within its taxonomy).
+- TAX.2 merged after SHP.12; `tests/tenancy_registry.py` combines the tax request, the vendor
+  feature flag and the shipping method entries.
+- Tests on the final main (`MPMV_TEST_DB_NAME=test_mpmv_wave6_integration`): `make check` green,
+  `make test` 2605 passed (unit and integration, e2e deselected), coverage 98%.
+
+Open questions for the owner (Q-77 to Q-83 in the private register):
+
+- TAX.2: a request that changes the declared fiscal regime is approved only on or after its date,
+  and a past effective date backdates the new profile. Choose the rule.
+- TAX.2: should an approval need two staff members (four eyes)?
+- CAT.2: brands are platform-owned (spec 03); the legacy system had brands per vendor.
+- SHP.12: may staff set a non-default shipping VAT treatment before D-03 is decided?
+- SHP.12: confirm the spec additions made in the implementation PR (SHP.13, SHP.14, the SHP.3
+  `IndicativeRates` outcome, regression case 19).
+- OPS.4: add backlog rows for the update gaps (pre-commit hooks, the Caddy and postgres images, an
+  image vulnerability scan and SBOM attestation)?
+- TAX.1/SHP.12: move tax territories to the shared postcode grammar in TAX.7 or in a new small row?
+
+Owner actions:
+
+- OPS.4: turn on the dependency graph, Dependabot alerts and security updates (Settings > Advanced
+  Security), and create the labels `dependencies`, `python`, `github-actions` and `docker`.
+
+Deferred to other tasks:
+
+- SHP.12: tax territories (TAX.1) still use the old `a-b` postcode range syntax. Proposal: switch
+  `Territory.postcode_patterns` to `apps/core/postcodes.py` in TAX.7 or a new small row, so tax
+  territories and SHP.14 special areas share one grammar.
+- SHP.12: match_postcode and resolve_zone are in SHP.12; SHP.2 still owns legacy cases 1-7.
+- SHP.12: the database allows at most one default method per vendor and zone; "exactly one" goes
+  to the SHP.8 health check and SHP.3, which falls back to the first method.
+- SHP.12: old audit entries keep the label shipping.vendorzonerate, new ones
+  shipping.shippingmethod; the public ids are unchanged.
+- SHP.12: D-03 (VAT on shipping) and D-06 (weight above the last band) stay open; only the fields
+  that will hold their outcome exist.
+- ARC.8: nothing calls the kill switches yet; ORD.10, PAY.* and ING.* must call
+  `flag_enabled(flags.CHECKOUT|IMPORT|PAYMENTS, vendor=...)`, and ORD.10 owns the STAGE check.
+- ARC.8: other processes can see a stale flag for up to FEATURE_FLAGS_CACHE_SECONDS (5 s); ORD.10
+  sets it to 0 if a switch must act at once.
+- ARC.8: the core flag admin page does not link to the vendor overrides (core cannot import the
+  vendors admin); CORE.8 can add it in the Wagtail admin.
+- CAT.2: no URL routing for taxonomy, term, brand and category pages while D-07 is open; reserved
+  first URL segments are checked with the routing in CAT.8.
+- CAT.2: no mutating taxonomy services (none of these changes is sensitive); product category,
+  brand and terms from imports or the API are CAT.10, redirects after a move are CAT.5 and CAT.6.
+- CAT.2: sibling slug uniqueness and term placement are checked in clean() and the admin form, not
+  by the database or `move()`.
+- CAT.2: changing a taxonomy's term_attributes does not re-check existing terms.
+- CAT.2: Category.google_category_id, legacy term ids and brand logos are not added (spec 10,
+  MIG.*, CAT.4).
+- TAX.2: the vendor request page, its step-up, the email notifications and withdrawing a pending
+  request go to VEN.11 (with the CORE.9 vendor area).
+- TAX.2: the profile inconsistency warning shows only in the tax admin and the nightly job log;
+  the vendor admin cannot show it without importing tax.
+- OPS.4: the Caddy Quadlet image, postgres:17 and the pre-commit hooks are bumped by hand.
+
+Review findings not fixed (all minor):
+
+- OPS.4: `.github/workflows/release.yml`: split the job so only a small attach job holds
+  `contents: write`, set `persist-credentials: false` and SHA-pin `anchore/sbom-action`.
+- OPS.4: `docs/dev/dependency-updates.md`: the Python SBOM has no hashes; drop "and hashes" or build
+  it from the hash-pinned requirements.
+- OPS.4: `.github/dependabot.yml`: exclude the uv image from the docker minor/patch group (0.x
+  minors break).
+- OPS.4: `docs/dev/dependency-updates.md`: the follow-ups listed there need backlog rows (see the
+  open question).
+- OPS.4: `tests/unit/test_dependency_updates.py`: assert open-pull-requests-limit explicitly and
+  that majors are never grouped.
+- ARC.8: `apps/core/tests/integration/test_feature_flags.py`: rename the TTL test; it bypasses the
+  cache instead of letting the TTL expire.
+- ARC.8: `apps/core/flags.py`: require flag registration in AppConfig.ready() and document it.
+- ARC.8: `apps/core/services.py`: `flag_enabled` accepts any model as vendor; take a vendor id or
+  check the model label.
+- ARC.8: `apps/vendors/admin.py`: refuse (or warn on) an enabled=True override of a kill switch,
+  which has no effect.
+- TAX.2: `apps/tax/services.py`: a past `effective_from` backdates the new profile; pick a rule
+  (see the open question).
+- TAX.2: `apps/tax/engine.py`: the "approve on or after" date is the UTC date; pass a local date.
+- TAX.2: `apps/tax/services.py`: `request_regime_change` keeps caller-set review fields; clear them.
+- TAX.2: `apps/tax/admin.py`: the change page runs `regime_history` twice; compute it once.
+- CAT.2: `apps/catalog/tests/integration/test_taxonomy_admin.py`: test moves under a sibling with
+  the same slug and moves inside a flat taxonomy.
+- CAT.2: `apps/catalog/taxonomy.py`: Term.clean raises KeyError on an invalid taxonomy schema;
+  validate the schema first.
+- CAT.2: `apps/catalog/taxonomy_admin.py`: the term reference dropdown and Product.terms widget do
+  not scale; use autocomplete and filter by taxonomy.
+- CAT.2: `apps/catalog/taxonomy.py`: descriptions are raw HTML; note that CAT.8 or CMS rendering
+  must sanitize them.
+- CAT.2: `apps/catalog/taxonomy.py`: a direct `Term.move()` skips the placement rules; override
+  move or document it.
+- CAT.2: `apps/catalog/tests/unit/test_taxonomy_engine.py`: move into test_engine.py (ADR-0006
+  naming).
+- SHP.12: `apps/core/postcodes.py`: `70000 - 74999` with spaces is accepted as an exact postcode;
+  check the old range form after collapsing spaces, also in migration 0004.
+- SHP.12: `apps/shipping/services.py`: zone_snaps counts zones served only by disabled carriers;
+  filter on active carriers.
+- SHP.12: `apps/shipping/models.py`: CountryGroup.code accepts capitals that zones cannot
+  reference; lower-case it.
+- SHP.12: `docs/spec/06-shipping-and-quotes.md`: note on D-03 and TAX.4 that
+  ShippingMethod.tax_treatment exists and its non-default values wait on D-03.
+- SHP.12: `apps/shipping/engine.py`: zone_match does not normalize the destination country (EL,
+  UK); normalize it and pre-parse postcode patterns.
+- SHP.12: `apps/shipping/models.py`: ShippingZone.vendor is PROTECT while methods CASCADE; align
+  them and test vendor deletion.
+- SHP.12: `docs/spec/06-shipping-and-quotes.md`: narrow the SHP.2 row to legacy cases 1-7 now that
+  resolve_zone is in SHP.12.
 
 ## Coherence checks
 
