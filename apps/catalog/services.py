@@ -23,7 +23,7 @@ from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.services import audit_changes, run_mutation
 from apps.vendors.models import Vendor
-from apps.vendors.services import vendors_in_suggestions
+from apps.vendors.services import ensure_vendor_can_write, vendors_in_suggestions
 
 from . import engine
 from .models import (
@@ -582,6 +582,7 @@ def create_product(
     *,
     ctx: AuditContext,
     dry_run: bool = False,
+    require_active_vendor: bool = False,
 ) -> ChangeSet:
     """Create `vendor`'s product with its texts, typed attributes, variant axes and variants.
 
@@ -591,6 +592,10 @@ def create_product(
     order they are given in, so the first axis given is the first axis shown; the variants are
     numbered in display order: by the first axis, then the next, each by the position of the
     value in its attribute (S, M, L). Raises ValidationError, also on dry-run.
+
+    `require_active_vendor` is for a write on behalf of the vendor's own API key (CORE.14): the
+    vendor's status is read again inside the write transaction (`ensure_vendor_can_write`), and
+    `VendorCannotWrite` is raised, nothing written, unless the vendor is still active.
     """
     catalogue = _attribute_catalogue({a.code for a in data.attributes})
     errors = _product_errors(vendor, data, catalogue)
@@ -718,6 +723,8 @@ def create_product(
             )
 
     def apply() -> None:
+        if require_active_vendor:
+            ensure_vendor_can_write(vendor)
         product.save()
         for text in texts:
             text.save()

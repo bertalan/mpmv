@@ -195,7 +195,13 @@ def create_product(
     variants. 201 with the ChangeSet when created; 200 with it on `?dry_run=true`."""
     vendor = _vendor(request, payload.vendor)
     changes = services.create_product(
-        vendor, payload.to_engine(), ctx=audit_context(request), dry_run=dry_run
+        vendor,
+        payload.to_engine(),
+        ctx=audit_context(request),
+        dry_run=dry_run,
+        # A vendor key writes only while its vendor is active: checked again in the write
+        # transaction, in case the vendor was suspended after the key was authenticated.
+        require_active_vendor=api_client_of(request).vendor is not None,
     )
     return Status(200 if dry_run else 201, changeset_out(changes, dry_run=dry_run))
 
