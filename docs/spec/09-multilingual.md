@@ -24,13 +24,33 @@
 
 Rules:
 
-- **Language order** (owner decision, 2026-11-07): EN is the primary and source language, then IT, then
-  DE, then any later language. The order is configuration (`settings.LANGUAGES`): adding a language
+- **Language order** (D-18, updated 2026-11-07): five languages at go-live, in this order: EN (primary
+  and source), IT, DE, FR, ES. The order is configuration (`settings.LANGUAGES`): adding a language
   means adding one entry plus its translations, never code changes.
-- Language-prefix routing (`/` = EN, `/it/`, `/de/`, `/<code>/` for later languages); automatic
-  `hreflang` and canonical.
+- Language-prefix routing (`/` = EN, `/it/`, `/de/`, `/fr/`, `/es/`, `/<code>/` for later languages),
+  language switcher and translation tables ready for all five languages; automatic `hreflang` and
+  canonical.
+- Interface text versus visitor content (D-18): every fixed interface string is translated into
+  all five languages at go-live: buttons, cart, checkout, account and MFA pages, error and validation
+  messages, emails, notifications, and the legal and tax wording keys used on documents
+  (`legal_note_key`). The process is an AI draft followed by human review of checkout, emails and
+  legal or tax wording (I18N.7). Content shown to visitors (products, categories and taxonomy terms,
+  vendor storefront texts, CMS pages, blog, landing pages) stays in EN only until after go-live; the
+  owner then decides whether and how to translate it (I18N.8). Whether legal pages (terms, privacy,
+  withdrawal) count as visitor content or must be translated at go-live is still an open owner
+  question.
 - **Explicit fallback**: if the published translation is missing, the base language (EN) is shown with a notice, and the
   page is not included in that language's sitemap (never empty or duplicate content indexed).
+  A fallback copy declares the EN page as its canonical URL (no `noindex`, so the two signals never
+  conflict), and `hreflang` lists only the languages that have a published translation. At go-live
+  this applies to all visitor content in IT, DE, FR and ES.
+- Images (D-18): an image is language neutral by default. An image can optionally be dedicated to
+  one language (for example packaging printed in German). Replacement rule: when a product, or a CMS
+  gallery, has at least one image dedicated to the requested language, that language shows only its
+  dedicated images; otherwise it shows the neutral images. Alt text and captions are always
+  translatable text (a `TranslationModel` with EN fallback), because they matter for SEO and
+  accessibility. On CMS pages, wagtail-localize lets a translator override an image for one locale
+  (spec 10, I18N.3).
 - **Translation workflow**: every `*Translation` has a status `machine` → `reviewed` → `published` and a
   `source_hash`; if the EN text changes, the other languages go back to "needs review". Admin queue per
   language and vendor.
@@ -55,10 +75,11 @@ Rules:
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
-| I18N.1 | Language configuration, URL prefixes, middleware, language switcher | P1 | 4 | ARC.3, ARC.13 | `/it/` and `/de/` active on STAGE |
+| I18N.1 | Language configuration, URL prefixes, middleware, language switcher | P1 | 4 | ARC.3, ARC.13 | `/it/`, `/de/`, `/fr/` and `/es/` active on STAGE |
 | I18N.2 | Abstract base `TranslationModel` with status, `source_hash`, fallback | P1 | 6 | ARC.6 | Reused by catalog and vendor |
-| I18N.3 | wagtail-localize for CMS pages | P1 | 4 | CMS.1 | Translated page with sync |
-| I18N.4 | Translation queue in admin (by language, vendor, status) + AI draft translation | P1 | 8 | I18N.2, ING.5 | EN edit → IT and DE go back to "needs review" |
+| I18N.3 | wagtail-localize for CMS pages: image fields and image blocks overridable per locale, alt text and captions as translatable segments, CMS gallery replacement rule (D-18) | P1 | 6 | CMS.1 | Translated page with sync; a translator replaces one image in one locale only |
+| I18N.4 | Translation queue in admin (by language, vendor, status) + AI draft translation | P1 | 8 | I18N.2, ING.5 | EN edit → every other language goes back to "needs review" |
 | I18N.5 | gettext catalogs for templates and emails; tax wording as keys | P1 | 6 | ORD.9 | No hardcoded strings (lint) |
-| I18N.6 | hreflang, canonical, per-language sitemap with fallback excluded | P1 | 4 | SEO.1 | Validation on a sample of URLs |
-| I18N.7 | German content for go-live (D-18): AI draft DE for catalog, taxonomy terms, vendor storefronts and CMS pages; human review of legal pages, checkout and emails; coverage report | P1 | 8 | I18N.4, I18N.3, MIG.7 | DE coverage report: 100% of legal/checkout/email texts reviewed, catalog drafts complete |
+| I18N.6 | hreflang, canonical, per-language sitemap with fallback excluded | P1 | 4 | SEO.1 | Validation on a sample of URLs: fallback copies have the EN canonical and are absent from hreflang and from the language sitemap |
+| I18N.7 | Interface strings in IT, DE, FR and ES for go-live (D-18): gettext catalogs for templates, emails, notifications, error and validation messages, MFA pages and tax/legal wording keys; AI draft, human review of checkout, emails and legal/tax wording; coverage report | P1 | 10 | I18N.5 | Coverage report: 100% of interface strings translated in IT, DE, FR and ES; checkout, email and legal/tax wording reviewed by a human |
+| I18N.8 | Visitor content translation after go-live (D-18): products, categories, taxonomy terms, vendor storefronts, CMS pages, blog and landing pages, with the method the owner chooses (AI, professional or other) through the I18N.4 queue; per-language coverage report | P2 | 6 | I18N.4, I18N.3, I18N.6 | Per-language coverage report; only published translations appear in hreflang and sitemaps |

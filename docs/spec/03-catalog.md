@@ -83,7 +83,9 @@ class Brand(Model):               # manufacturer; + translation
 
 class ProductImage(Model):
     product; variant (null); image = FK(wagtailimages.Image); position; is_cover; cover_locked
+    language = LanguageField(null=True)        # null = language neutral (default); set = dedicated to one language
     # cover_locked: a hand-picked cover is not overwritten by the pipelines (current rule)
+class ProductImageTranslation(TranslationModel):  # alt_text; caption (EN fallback, I18N.2 workflow)
 
 class SlugHistory(Model):  product; language; slug; replaced_at      # replaces _legacy_old_slugs (unlimited)
 class Redirect(Model):     source_path; target (path | product | term | search); code 301/410; expires_at
@@ -104,9 +106,13 @@ def related_products(product, limit=4) -> list[Product]      # match on shared t
 def default_variant(product) -> Variant | None     # default if purchasable, otherwise cheapest
 def resolve_legacy_path(path: str) -> Redirect | None         # retired SKUs, historical slugs, discontinued categories
 def search(query: str, lang: str, filters) -> QuerySet        # FTS + trigram + SKU prefix (≥4)
+
+# catalog/engine.py: pure function
+def images_for_language(images: list[ImageRow], lang: str) -> list[ImageRow]
+    # dedicated images of `lang` if there is at least one, otherwise the neutral images; by position
 ```
 
-### URLs (per language, prefix `/it/`, `/de/`)
+### URLs (per language, prefix `/it/`, `/de/`, `/fr/`, `/es/`)
 
 | Page | EN | IT |
 |---|---|---|
@@ -127,6 +133,12 @@ needed for most of the catalog. The `/tag-product/{slug}/` and
 - `retired`: the page stays online with "no longer available" and similar alternatives, never a 404
   (current SEO rule for retiring products).
 - Negative stock is impossible (DB constraint); backorders only if `stock_policy=always_open`.
+- Images (D-18, spec 09): an image is language neutral unless `language` is set. For each gallery
+  (the product's images, or a variant's own images), a language with at least one dedicated image
+  shows only its dedicated images; every other language shows the neutral images. The cover is
+  chosen within the set that is shown (its `is_cover` image, otherwise the first by position). Feeds
+  and JSON-LD use the set of the feed or page language. Alt text and captions live in
+  `ProductImageTranslation` and fall back to EN.
 
 ## 3.3 Tasks
 
@@ -135,7 +147,7 @@ needed for most of the catalog. The `/tag-product/{slug}/` and
 | CAT.1 | Product and Variant models, translations, `(vendor, sku)` constraints | P1 | 12 | ARC.6, VEN.1 | Migrations + constraint tests |
 | CAT.2 | Taxonomies: Category (tree), configurable Taxonomy/Term, Brand, translations and SEO texts | P1 | 10 | CAT.1 | Admin CRUD with translations |
 | CAT.3 | Typed attributes and translated values; variant axes with ordering | P1 | 10 | CAT.1 | Variable size×color product created via API |
-| CAT.4 | Media: ProductImage on Wagtail Images, WebP/AVIF renditions, dedup by hash, cover lock | P1 | 10 | CAT.1, ARC.15 | Upload → automatic renditions |
+| CAT.4 | Media: ProductImage on Wagtail Images, WebP/AVIF renditions, dedup by hash, cover lock; optional image language with the replacement rule, translatable alt text and captions (D-18) | P1 | 12 | CAT.1, ARC.15 | Upload → automatic renditions; a DE-dedicated image replaces the neutral gallery in DE only; alt text falls back to EN |
 | CAT.5 | `build_product_slug` + SlugHistory + 301 redirect middleware | P1 | 8 | CAT.1 | Test cases ported from legacy-sku-permalink |
 | CAT.6 | `Redirect` model + admin management + import of existing maps (retired SKUs, merged tags, discontinued categories) | P1 | 6 | CAT.5 | All rules from the 4 mu-plugins covered by tests |
 | CAT.7 | Product page: gallery, variants with default, companion box, related products, visible SKU, "on request" | P1 | 16 | CAT.3, CAT.4 | Visual and functional parity with LIVE |

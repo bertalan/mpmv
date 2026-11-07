@@ -112,7 +112,7 @@ flowchart TD
 | History | Configuration tables with `valid_from` / `valid_to`; orders store snapshots, not live references |
 | Dry-run | Every mutating service accepts `dry_run=True` and returns a `ChangeSet` (diff) |
 | Audit | Every sensitive mutation writes an `AuditLog` (who, what, before/after, from where) |
-| Languages | Order EN (primary, source) → IT → DE → later languages; EN, IT, DE at go-live (D-18); languages are configuration; no hardcoded text in templates |
+| Languages | Order EN (primary, source) → IT → DE → FR → ES → later languages; all five at go-live for interface text, visitor content in EN only until after go-live (D-18); languages are configuration; no hardcoded text in templates |
 | Time | UTC in the DB; Europe/Rome for cron jobs and documents |
 
 ## 1.4 Example of the service + pure function pattern
@@ -153,5 +153,5 @@ def tax_for_cart_line(line: CartLine, checkout: CheckoutData, on: date) -> TaxDe
 | ARC.10 | Synthetic data seed: vendors with all regimes, EN/IT products, zones, orders | P1 | 10 | CAT.1, TAX.1, SHP.1 | Reproducible `make seed`, used by the tests |
 | ARC.11 | Test harness per ADR-0006: unit / integration / e2e suites, auto-markers, Playwright with screenshots, CI reports | P1 | 6 | ARC.3 | `make test-unit`, `make test`, `make test-e2e` green; e2e screenshots saved |
 | ARC.12 | Adopt factory_boy for test data: one DjangoModelFactory per model in `apps/<app>/tests/factories.py`, Faker with a fixed seed, synthetic data only; convert hand-written builders; document in ADR-0006 and CONTRIBUTING | P1 | 4 | ARC.6 | Every model has a factory used by the tests; no hand-written model builders left |
-| ARC.13 | STAGE environment on Hetzner: provision app and DB VPS, deploy from tag, rollback (including a deliberately unhealthy release), smoke tests; includes the STAGE checks of CORE.7 (OpenAPI published) and I18N.1 (`/it/` and `/de/` active) | P1 | 8 | ARC.5 | Tag deploy and automatic rollback proven on STAGE; CORE.7 and I18N.1 STAGE checks pass |
+| ARC.13 | STAGE environment on Hetzner: provision app and DB VPS, deploy from tag, rollback (including a deliberately unhealthy release), smoke tests; includes the STAGE checks of CORE.7 (OpenAPI published) and I18N.1 (`/it/`, `/de/`, `/fr/` and `/es/` active) | P1 | 8 | ARC.5 | Tag deploy and automatic rollback proven on STAGE; CORE.7 and I18N.1 STAGE checks pass |
 | ARC.15 | Media storage: S3-compatible Hetzner Object Storage (EU) behind the CDN, private buckets for documents, signed URLs, django-storages | P1 | 6 | ARC.5, ARC.13 | Uploads work on STAGE with a read-only container filesystem; private documents only via signed URLs |
