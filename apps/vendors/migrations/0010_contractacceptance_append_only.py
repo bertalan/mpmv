@@ -26,6 +26,6 @@ DROP FUNCTION IF EXISTS vendors_contractacceptance_append_only();
 
 
 class Migration(migrations.Migration):
-    dependencies = [("vendors", "0008_onboarding_contract")]
+    dependencies = [("vendors", "0009_onboarding_contract")]
 
     operations = [migrations.RunSQL(FORBID, reverse_sql=ALLOW)]

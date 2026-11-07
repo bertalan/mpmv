@@ -518,7 +518,7 @@ class VendorContract(BaseModel):
     their start dates in order. The version in force is the latest one already started
     (`services.current_contract`). Once a vendor has accepted a version, the version and its
     texts can no longer change or be deleted: new terms are a new version. `save` and `delete`
-    raise `engine.ContractLocked`; a database trigger (migration 0010) refuses any other write.
+    raise `engine.ContractLocked`; a database trigger (migration 0011) refuses any other write.
 
     Writes to a version or its texts lock the version row, like `services.accept_contract`, so
     an edit and an acceptance of the same version run one after the other.

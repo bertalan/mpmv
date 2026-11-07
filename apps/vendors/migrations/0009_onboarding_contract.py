@@ -11,7 +11,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('vendors', '0007_seed_dac7_requirements'),
+        ('vendors', '0008_encrypt_iban_and_tax_code'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
