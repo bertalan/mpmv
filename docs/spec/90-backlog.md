@@ -6,9 +6,9 @@
 
 ## Summary
 
-- Micro-tasks: **175** in **18** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **1515 h** (P1 1298 h · P2 199 h · P3 18 h)
-- P1 critical path (schedule lower bound with full parallelism): **144 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
+- Micro-tasks: **186** in **18** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **1608 h** (P1 1322 h · P2 268 h · P3 18 h)
+- P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
 
@@ -28,11 +28,11 @@
 | THM | Frontend themes | 11 | 70 | 12 | 0 | 82 |
 | SEO | SEO, feeds, analytics | 6 | 30 | 14 | 0 | 44 |
 | AI | AI channels (MCP, agents) | 4 | 0 | 22 | 18 | 40 |
-| CMP | Compliance | 13 | 127 | 0 | 0 | 127 |
+| CMP | Compliance | 24 | 151 | 69 | 0 | 220 |
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 4 | 16 | 11 | 0 | 27 |
 | MIG | Migration and cutover | 10 | 106 | 0 | 0 | 106 |
-| **Total** | | **175** | **1298** | **199** | **18** | **1515** |
+| **Total** | | **186** | **1322** | **268** | **18** | **1608** |
 
 ## By phase
 
@@ -143,7 +143,7 @@
 | PAY.3 | Transfer per vendor, reverse transfer, reconciliation with the ledger | P1 | 10 | PAY.2 | 3 vendors in one order: 3 correct transfers |
 | PAY.4 | Full/partial refunds with VAT and commissions reversed | P1 | 10 | PAY.3 | Partial refund cases green |
 
-### F3 — Vendors, ledger, compliance (29 tasks, 301 h)
+### F3 — Vendors, ledger, compliance (32 tasks, 325 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -172,10 +172,13 @@
 | CMP.7 | Automated accessibility audit in CI (axe, WCAG 2.2 AA tags) + manual review + statement | P1 | 8 | THM.5 | Zero axe violations with the `wcag22aa` tag on key pages; manual review recorded; statement published |
 | CMP.8 | AI Act transparency: "AI generated" or "AI edited" label and metadata flag on AI-produced product images, origin tracking of AI text, staff AI literacy briefing | P1 | 4 | CAT.4, ING.5 | An AI-edited image shows its label on the product page and in its metadata; unreviewed machine text cannot be published as reviewed |
 | CMP.9 | WCAG 2.2 SC 3.3.8 (accessible authentication) on the authentication templates of CORE.4 and CORE.5: paste allowed in every password and code field, `autocomplete` tokens (`current-password`, `new-password`, `one-time-code`, `username webauthn`), passkeys offered, Turnstile without a puzzle | P1 | 3 | CORE.4, CORE.5, THM.3 | e2e test pastes a password and a TOTP code; the template lint finds the `autocomplete` tokens; Turnstile runs in managed or invisible mode |
-| CMP.10 | Vendor obligations checklist with self-attestation: versioned `VendorObligation` data with applicability rules, three answers (yes, no, in progress with date) as append-only attestations, date-based and "no" reminders with one-click links, staff flags after N unanswered reminders, optional VEN.16 consequence per obligation, staff view of open answers, seed obligations; email wording reviewed once by counsel (L) | P1 | 24 | VEN.12, VEN.16, ARC.16, ARC.9, CORE.9, SEC.4 | A seed vendor sees only the obligations that apply to it; an "in progress" answer without a date is refused; changing an answer adds a row and an AuditLog entry; a "no" answer sends reminders at the configured cadence that stop when the answer becomes "in progress" or "yes"; an overdue date and N unanswered reminders flag the vendor to staff; every reminder is in the audit log and the outbox; suspension is mentioned only when a consequence is configured |
-| CMP.11 | DSA articles 30–32 (trader data, display on offers, compliance by design, buyer notification) and EPR registration checks per vendor, stream and destination country (Batteries art. 62(6), PPWR art. 45(4), DE/FR/ES national checks), vendor identification on request for product liability | P1 | 16 | VEN.12, CMP.3, CMP.10, CAT.1 | An offer in a category mapped to an EPR stream is not sold into a country whose check is active without the vendor's registration number there; the trader data shows on the offer; an illegal-product decision produces the list of buyers of the last 6 months to inform |
+| CMP.10 | Vendor obligations checklist with self-attestation: versioned `VendorObligation` data with applicability rules, three answers (yes, no, in progress with date) as append-only attestations, date-based and "no" reminders with one-click links, staff flags after N unanswered reminders, optional VEN.16 consequence per obligation, staff view of open answers, seed obligations; email wording approved by counsel through CMP.24 (L) | P1 | 24 | VEN.12, VEN.16, ARC.16, ARC.9, CORE.9, SEC.4 | A seed vendor sees only the obligations that apply to it; an "in progress" answer without a date is refused; changing an answer adds a row and an AuditLog entry; a "no" answer sends reminders at the configured cadence that stop when the answer becomes "in progress" or "yes"; an overdue date and N unanswered reminders flag the vendor to staff; every reminder is in the audit log and the outbox; suspension is mentioned only when a consequence is configured |
+| CMP.11 | DSA articles 30–32 (trader data, display on offers, compliance by design, buyer notification) and EPR registration checks per vendor, stream and destination country (Batteries art. 62(6), PPWR art. 45(4), DE/FR/ES national checks), vendor identification on request for product liability; per-country activation off by default, proposed by staff and approved by a platform owner, both steps audited | P1 | 19 | VEN.12, CMP.3, CMP.10, CAT.1, CMP.13 | An offer in a category mapped to an EPR stream is not sold into a country whose check is active without the vendor's registration number there; every country's check is off until a platform owner approves a staff proposal, the proposer cannot approve it, both steps are in the audit log and the setting shows who approved it and when; the trader data shows on the offer; an illegal-product decision produces the list of buyers of the last 6 months to inform |
 | CMP.12 | VAT records of facilitated supplies (art. 242a VAT directive, art. 54c Reg. 282/2011): export per vendor and period, 10-year retention outside CMP.4 erasure | P1 | 4 | ORD.2, VEN.12 | The export of a seed period holds every field of article 54c(2) and an erasure request leaves the records in place |
-| CMP.13 | Deemed-supplier flow gate: `Vendor.established_in_eu`, checkout rules per D-21 for non-EU vendors, GB consignments and the Swiss threshold counter | P1 | 6 | VEN.12, ORD.3 | The D-21 rules hold in checkout tests: a refused flow is blocked with a clear message and an allowed one passes |
+| CMP.13 | Vendor establishment gate (D-21): `PlatformOperator.allowed_vendor_countries` seeded with the EU-27, changed only through an audited service with the platform owner permission; `vendor_establishment()` from the VEN.12 registered office and permanent establishment; VEN.5 activation refused outside the allowed set | P1 | 5 | VEN.5, VEN.12, ARC.7, SEC.4 | A vendor with its registered office in a non-EU country (RS, CN) and no permanent establishment in the allowed set cannot be activated and gets a clear message, while an IT vendor can; the default set is the EU-27; changing the set writes an AuditLog entry with before and after, a dry run writes nothing, and a user without the platform owner permission is refused |
+| CMP.14 | UK B2C consignments of £135 or less per vendor as lead-only `VendorLead` requests (D-21): checkout notice, no charge, no order, no ledger or commission, buyer contact passed to the vendor only after confirmation and logged, vendor email and vendor area entry, HMRC VAT number check for B2B, HMRC monthly rate as data, rule rows as data; DAP or DDP notice per shipping method for UK orders above £135; ⚖️ (L) tax advisor confirms the no-facilitation test before go-live | P1 | 12 | ORD.3, SHP.9, SHP.10, TAX.5 | A GB consumer cart with a £100 consignment from one vendor and a £200 one from another creates one lead and one paid order; the lead has no PaymentIntent, ledger row or commission; the vendor receives the request only after the buyer confirms the data transfer, and the transfer is in the audit log; a buyer with a valid UK VAT number pays normally; the £200 order shows the DAP notice |
+| CMP.15 | Swiss small-consignment counter: yearly turnover of consignments to Swiss consumers with import tax of CHF 5 or less, CHF rate as data, alerts to owner and staff at configurable levels (default 70% and 90% of CHF 100,000), levels changed through an audited service | P1 | 4 | ORD.2, ARC.9, ARC.16 | Seed orders above and below the CHF 5 import tax limit count correctly; crossing 70% and then 90% sends one alert each, once a year; the counter restarts on 1 January |
+| CMP.24 | Approval of (L) legal wording: per text and language a version hash, draft author (person or agent) and counsel approval (approver name or role, date, approved hash) for gettext keys with an `(L)` context and database texts; release check and production system check refuse unapproved texts; STAGE shows a pending marker; approvals audited | P1 | 6 | I18N.7, ARC.16, SEC.4 | Changing an approved (L) text in any language makes the release check fail until a new approval matches its hash; production refuses to start with an unapproved text; STAGE shows the marker; each approval is in the audit log |
 
 ### F4 — Content, SEO, feeds (14 tasks, 93 h)
 
@@ -212,7 +215,7 @@
 | MIG.9 | Three dress rehearsals on STAGE + cutover and rollback runbook | P1 | 16 | MIG.5, MIG.6 | Third rehearsal with no blockers |
 | MIG.10 | Cutover and post-go-live monitoring | P1 | 12 | MIG.9, SEC.6 | Go-live, 72 h with no critical issues |
 
-### F6 — After go-live (P2) (27 tasks, 199 h)
+### F6 — After go-live (P2) (35 tasks, 268 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -241,6 +244,14 @@
 | SEO.6 | Anonymous page cache, responsive renditions, CWV budget | P2 | 6 | THM.3 | LCP < 2.5 s on product page |
 | AI.1 | MCP server: auth, read tools (catalog, orders, quotes, simulations, reports) | P2 | 12 | CORE.7 | Tools usable from Claude Code with scopes |
 | AI.2 | Mutating MCP tools with dry-run, confirmation and audit | P2 | 10 | AI.1 | Every mutation has a diff and an audit entry |
+| CMP.16 | Swiss threshold response, ⚖️ (L) decided with the tax advisor: Swiss VAT registration as supplier, or a Swiss row in the CMP.14 lead-only rules | P2 | 3 | CMP.14, CMP.15 | With the Swiss rule active, a Swiss consumer's small consignment becomes a lead and a larger one stays a normal order; the customer terms mention Switzerland |
+| CMP.17 | Non-EU origin in shipping: ship-from country per shipping method or stock location passed to the tax and shipping engines, zones, indicative delivery times and customs extra days per origin, built on SHP.12 and SHP.14 | P2 | 6 | SHP.3, SHP.4, CMP.13 | A package shipped from RS to IT carries its origin to the tax context and shows the customs extra days; a method without a ship-from country is refused |
+| CMP.18 | Deemed-supplier VAT flows for non-EU vendors (art. 14a(1) and (2)): `deemed_supplier` tax outcome, two-supply snapshot (art. 136a exempt vendor supply, platform supply at the destination rate), VAT withheld from the vendor transfer as a `deemed_vat` ledger row, OSS union and IOSS return data per member state and period added to the CMP.12 records, no invoices; ⚖️ (L) switched on by the owner with the tax advisor | P2 | 20 | TAX.3, TAX.10, CMP.12, CMP.17, VEN.4, PAY.3 | With the flow on, a non-EU vendor's sale of goods in an IT warehouse to a DE consumer and a €100 import to an FR consumer get the `deemed_supplier` outcome; the transfer leaves out the VAT; the ledger, the CMP.12 export and the OSS and IOSS data agree to the cent; with the flow off such a checkout is blocked |
+| CMP.19 | Imports into the EU: buyer information on import VAT, duty, carrier clearance fee, the €3 low-value duty and €2 handling fee, DAP (default) or DDP per shipping method; IOSS number recorded per order for consignments of €150 or less and passed only to the carrier and vendor | P2 | 12 | CMP.18, CMP.14, CMP.6, ORD.3 | A €300 import shows the DAP charges before payment and a DDP method shows none; a €100 IOSS consignment stores the IOSS number on the order and the shipping data, and the number never appears on buyer pages or emails |
+| CMP.20 | GPSR for non-EU vendors: EU economic operator (GPSR art. 16, Market Surveillance Regulation art. 4) with type, EU country and mandate or contract evidence on `GpsrInfo`; a non-EU vendor cannot be its own importer; listing blocked without it, pipelines included | P2 | 6 | CMP.3, CMP.13 | A non-EU vendor's product of a non-EU manufacturer without a valid EU operator cannot be published or imported, with one it shows the operator on the product page |
+| CMP.21 | DSA art. 30 trader traceability for non-EU traders (identity document, third-country trade register, checks without VIES, documents in the original language) and EU consolidated financial sanctions screening of the vendor and its legal representative at activation and on each list update, matches to staff review | P2 | 8 | CMP.11, CMP.13, ARC.9 | A non-EU test vendor cannot be activated without its article 30 data; a name on a test sanctions list blocks activation and opens a staff review; a list update re-screens active vendors |
+| CMP.22 | Stripe Connect for non-EU vendor countries: supported connected-account and cross-border payout countries (recipient service agreement) as data, EUR charges and transfers, payout currency per account; an unsupported country keeps the vendor `on_request` | P2 | 6 | VEN.6, PAY.3, CMP.13 | A vendor from a country marked unsupported cannot sell online and shows as on request; a supported cross-border country gets a recipient account and its EUR transfers reconcile with the ledger |
+| CMP.23 | Non-fiscal order-data export per `VendorOrder` mapped to EN 16931 business terms, as CSV, JSON and optional UBL-like XML with its own document type, labelled not an invoice | P2 | 8 | ORD.2, VEN.12 | A seed order's export maps parties, lines, VAT category, rate and totals to the listed BT codes; every format carries the non-fiscal label and no invoice number; the XML is not accepted as an invoice by an EN 16931 validator |
 | OPS.3 | Runbooks: incidents (including 72 h data breach), payouts, rate updates, vendor onboarding | P2 | 8 | — | Runbooks in the repo |
 | OPS.4 | Automated dependency updates (PRs) + SBOM | P2 | 3 | ARC.4 | Weekly update PRs |
 

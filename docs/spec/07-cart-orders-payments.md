@@ -114,6 +114,9 @@ class PaymentGateway(Protocol):
   charges allow only one destination account per payment.
 - A single payment collection flow: no "non-split" gateway leaving orphaned vendor credits.
 - Vendor not connected (currently Vendor E) → products not purchasable (`on_request`) until the account is active.
+- Connected accounts are in EU countries at go-live, since only EU-established vendors are
+  admitted (D-21, [11](11-compliance.md) CMP.13). Vendor countries outside the EU and cross-border
+  payouts are CMP.22. UK consumer consignments of £135 or less create no charge at all (CMP.14).
 - Customer funds do not sit in the platform's accounts beyond the technical time needed for the
   transfer (PSD2 constraint, to be confirmed with the advisor: D-08).
 - Methods: cards, Apple Pay and Google Pay; other Stripe methods (SEPA, PayPal via Stripe) to be checked
