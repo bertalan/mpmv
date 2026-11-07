@@ -34,7 +34,7 @@ image management and staff backoffice.
 | Search | Postgres FTS + `pg_trgm` (SKU prefix, typos) | Wagtail search backend on Postgres |
 | Media | Hetzner Object Storage (S3 compatible, EU) + CDN (Cloudflare already in use); private buckets and signed URLs for documents | WebP/AVIF renditions generated in the platform |
 | Payments | Stripe Connect (Express), behind a `PaymentGateway` interface | See [07](07-cart-orders-payments.md) |
-| Email | EU transactional provider via API (SMTP as fallback) | Per-language templates |
+| Email | EU transactional provider via API (SMTP as fallback) behind an `EmailSender` interface, sent through an outbox on the task queue (ARC.16) | Per-language templates; provider choice pending |
 | Antibot | Cloudflare Turnstile | Already in use |
 | Container | OCI images from a `Containerfile`; locally **Apple `container`** (Containerization framework, macOS 26), no Docker Desktop | `container` 1.0 has no compose: local orchestration via scripts/Makefile |
 | Deploy | Same OCI images on a Hetzner Cloud VPS (EU, x86) under Podman Quadlets (app, worker, Caddy) + self-managed PostgreSQL 17 on a dedicated database VPS on the private network | Versioned images, rollback by tag. Decided in ADR-0007 (D-12), which supersedes ADR-0005 |
@@ -155,3 +155,4 @@ def tax_for_cart_line(line: CartLine, checkout: CheckoutData, on: date) -> TaxDe
 | ARC.12 | Adopt factory_boy for test data: one DjangoModelFactory per model in `apps/<app>/tests/factories.py`, Faker with a fixed seed, synthetic data only; convert hand-written builders; document in ADR-0006 and CONTRIBUTING | P1 | 4 | ARC.6 | Every model has a factory used by the tests; no hand-written model builders left |
 | ARC.13 | STAGE environment on Hetzner: provision app and DB VPS, deploy from tag, rollback (including a deliberately unhealthy release), smoke tests; includes the STAGE checks of CORE.7 (OpenAPI published) and I18N.1 (`/it/`, `/de/`, `/fr/` and `/es/` active) | P1 | 8 | ARC.5 | Tag deploy and automatic rollback proven on STAGE; CORE.7 and I18N.1 STAGE checks pass |
 | ARC.15 | Media storage: S3-compatible Hetzner Object Storage (EU) behind the CDN, private buckets for documents, signed URLs, django-storages | P1 | 6 | ARC.5, ARC.13 | Uploads work on STAGE with a read-only container filesystem; private documents only via signed URLs |
+| ARC.16 | Transactional email: provider behind an `EmailSender` interface (EU provider, choice pending), per-language templates (gettext), DKIM/SPF/DMARC, bounce and complaint handling, outbox with retries on the task queue, test backend | P1 | 8 | ARC.9, ARC.13 | OTP, reminder and order emails are sent through the outbox with retries and bounces recorded |

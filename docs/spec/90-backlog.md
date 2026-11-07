@@ -6,18 +6,18 @@
 
 ## Summary
 
-- Micro-tasks: **154** in **17** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **1351 h** (P1 1134 h · P2 199 h · P3 18 h)
+- Micro-tasks: **155** in **17** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **1375 h** (P1 1172 h · P2 185 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **126 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CAT.1 → ORD.1 → ORD.2 → ORD.4 → PAY.1 → PAY.2 → PAY.3 → PAY.4 → ORD.8
 
 ## By macro area
 
 | Macro | Area | Tasks | P1 h | P2 h | P3 h | Total h |
 |---|---|---:|---:|---:|---:|---:|
-| ARC | Architecture and foundations | 14 | 92 | 6 | 0 | 98 |
+| ARC | Architecture and foundations | 15 | 100 | 6 | 0 | 106 |
 | CORE | Identity, permissions, API, backoffice | 11 | 83 | 4 | 0 | 87 |
 | CAT | Product catalog | 11 | 106 | 10 | 0 | 116 |
-| VEN | Vendors, commissions, ledger | 17 | 142 | 28 | 0 | 170 |
+| VEN | Vendors, commissions, ledger | 17 | 172 | 14 | 0 | 186 |
 | TAX | Tax engine | 10 | 42 | 28 | 0 | 70 |
 | SHP | Shipping and quotes | 11 | 64 | 28 | 0 | 92 |
 | ORD | Cart, orders, returns | 10 | 102 | 0 | 0 | 102 |
@@ -31,11 +31,11 @@
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 4 | 16 | 11 | 0 | 27 |
 | MIG | Migration and cutover | 10 | 106 | 0 | 0 | 106 |
-| **Total** | | **154** | **1134** | **199** | **18** | **1351** |
+| **Total** | | **155** | **1172** | **185** | **18** | **1375** |
 
 ## By phase
 
-### F0 — Foundations (30 tasks, 216 h)
+### F0 — Foundations (31 tasks, 224 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -51,6 +51,7 @@
 | ARC.12 | Adopt factory_boy for test data: one DjangoModelFactory per model in `apps/<app>/tests/factories.py`, Faker with a fixed seed, synthetic data only; convert hand-written builders; document in ADR-0006 and CONTRIBUTING | P1 | 4 | ARC.6 | Every model has a factory used by the tests; no hand-written model builders left |
 | ARC.13 | STAGE environment on Hetzner: provision app and DB VPS, deploy from tag, rollback (including a deliberately unhealthy release), smoke tests; includes the STAGE checks of CORE.7 (OpenAPI published) and I18N.1 (`/it/`, `/de/`, `/fr/` and `/es/` active) | P1 | 8 | ARC.5 | Tag deploy and automatic rollback proven on STAGE; CORE.7 and I18N.1 STAGE checks pass |
 | ARC.15 | Media storage: S3-compatible Hetzner Object Storage (EU) behind the CDN, private buckets for documents, signed URLs, django-storages | P1 | 6 | ARC.5, ARC.13 | Uploads work on STAGE with a read-only container filesystem; private documents only via signed URLs |
+| ARC.16 | Transactional email: provider behind an `EmailSender` interface (EU provider, choice pending), per-language templates (gettext), DKIM/SPF/DMARC, bounce and complaint handling, outbox with retries on the task queue, test backend | P1 | 8 | ARC.9, ARC.13 | OTP, reminder and order emails are sent through the outbox with retries and bounces recorded |
 | CORE.1 | Custom `User`, login via email, preferred language | P1 | 6 | ARC.6 | Initial migration with custom User |
 | CORE.2 | `VendorMember` with owner/staff roles, per-role permissions | P1 | 6 | CORE.1, VEN.1 | Role matrix tested |
 | CORE.3 | `VendorScopedQuerySet` + 404 helper + reusable cross-tenant test fixture | P1 | 8 | CORE.2 | Negative tests generated for every endpoint |
@@ -120,7 +121,7 @@
 | SHP.4 | Cart integration: package per vendor, VAT via the tax engine | P1 | 6 | SHP.3, TAX.4, ORD.1 | Correct cart totals in mixed tests |
 | SHP.5 | Import of the LIVE v2 config (JSON) into the new models with a parity report | P1 | 6 | SHP.1 | Same rates on 200 sample combinations |
 | SHP.9 | Quotes: models, states, `submit_vendor_quote`, `send_quote`, token link, expiry | P1 | 16 | ORD.2, SHP.3 | End-to-end flow with 2 vendors |
-| SHP.10 | Quotes: vendor and staff UI, emails (customer, vendor, staff), rate limit and honeypot | P1 | 10 | SHP.9 | Parity with 2.4.0 |
+| SHP.10 | Quotes: vendor and staff UI, emails (customer, vendor, staff), rate limit and honeypot | P1 | 10 | SHP.9, ARC.16 | Parity with 2.4.0 |
 | ORD.1 | Cart, CartLine, guest/user session, merge on login | P1 | 8 | CAT.1 | Cart merge test |
 | ORD.2 | Order, VendorOrder, OrderLine with snapshots, numbering, FSM | P1 | 12 | ORD.1 | Illegal transitions impossible (test) |
 | ORD.3 | `build_checkout` (tax + shipping per vendor), preview and blocking messages | P1 | 12 | TAX.4, SHP.4 | Mixed 3-vendor cart correct |
@@ -128,15 +129,15 @@
 | ORD.5 | Cart and checkout UI (HTMX), conditional B2B fields, VIES, Turnstile | P1 | 16 | ORD.3, TAX.5 | Checkout keyboard-accessible |
 | ORD.6 | Vendor fulfillment: accept, ship with tracking, delivered | P1 | 8 | ORD.2, CORE.9 | Vendor fulfills from its own panel |
 | ORD.7 | Customer area: orders, timeline, tracking, quotes | P1 | 10 | ORD.2 | Parity with My Account |
-| ORD.8 | Online withdrawal and returns flow | P1 | 12 | PAY.4, CMP.6 | Compliant withdrawal button, email receipt |
-| ORD.9 | Transactional emails per language (customer, vendor, staff) | P1 | 10 | ORD.2 | All emails in EN, IT, DE, FR and ES with snapshot tests |
+| ORD.8 | Online withdrawal and returns flow | P1 | 12 | PAY.4, CMP.6, ARC.16 | Compliant withdrawal button, email receipt |
+| ORD.9 | Transactional emails per language (customer, vendor, staff) | P1 | 10 | ORD.2, ARC.16 | All emails in EN, IT, DE, FR and ES with snapshot tests |
 | ORD.10 | Checkout and payments kill-switch, alert on payment without transfer | P1 | 4 | ARC.8, PAY.3 | Kill-switch verified on STAGE |
 | PAY.1 | `PaymentGateway` + Stripe implementation (PaymentIntent, transfer_group) | P1 | 12 | ORD.4 | End-to-end test payment |
 | PAY.2 | Signed, idempotent webhooks, `on_payment_succeeded` | P1 | 8 | PAY.1, VEN.4 | Duplicate event has no effect |
 | PAY.3 | Transfer per vendor, reverse transfer, reconciliation with the ledger | P1 | 10 | PAY.2 | 3 vendors in one order: 3 correct transfers |
 | PAY.4 | Full/partial refunds with VAT and commissions reversed | P1 | 10 | PAY.3 | Partial refund cases green |
 
-### F3 — Vendors, ledger, compliance (20 tasks, 200 h)
+### F3 — Vendors, ledger, compliance (21 tasks, 230 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -150,10 +151,11 @@
 | VEN.9 | Vendor dashboard: balance, transactions, payouts, documents | P1 | 10 | CORE.9, VEN.4 | Vendor sees only their own transactions |
 | VEN.10 | Public vendor storefront per language (bio, policies, products, store categories) | P1 | 8 | CAT.8 | Category sidebar correct in IT too (WCFM bug solved by design) |
 | VEN.12 | Vendor legal and e-invoicing identity (EU + IT): legal form, structured address, VAT with VIES status, codice fiscale, fiscal regime RF01-RF19, REA, SDI recipient code, PEC, EORI, fiscal representative, permanent establishment, invoicing bank details; required fields per country, region (EU or non-EU) and legal form, including the DAC7 dataset for every vendor, defined in a staff-editable table, enforced when the vendor requests a payout | P1 | 8 | VEN.1 | A vendor's data fills a valid FatturaPA party block; a vendor missing a required field for its country cannot request a payout, but can open and edit its profile |
-| VEN.13 | Contract templates with merge fields, vendor-specific clauses with four-eyes approval, custom uploaded contracts: per-vendor `VendorContractDocument` rendered to PDF per language through a `DocumentRenderer` interface (WeasyPrint), prevailing language, legal representative field on the VEN.12 identity | P1 | 16 | VEN.5, VEN.2, VEN.12, ARC.15 | A test vendor's IT and EN PDFs carry its legal identity, commission rule and approved clauses; a missing merge field blocks issuing; a clause or custom upload approved by its own author is refused; a new template version or clause issues a new document for each vendor concerned |
-| VEN.14 | Vendor contract e-signature: email OTP simple electronic signature with MFA step-up, PDF of the exact version per language with SHA-256 hash and RFC 3161 timestamp behind a `TimestampAuthority` interface, evidence (user, member role, time, trusted-proxy IP, user agent, OTP id), evidence package by email, `SignatureProvider` interface | P1 | 18 | VEN.13, CORE.4, CORE.5, ARC.9 | A test vendor signs end to end; the stored PDF matches its hash and the timestamp token verifies against the evidence manifest (fake TSA in tests, a real TSA on STAGE); the evidence email arrives in the signer's language; without a text in its language the vendor can accept only after acknowledging English; a wrong, expired or reused code records no acceptance |
-| VEN.15 | Vendor document area: download accepted contracts and evidence (PDF, evidence package, timestamp token, uploaded signed file) through signed URLs, kept per the retention rules | P1 | 6 | VEN.14, CORE.9 | A vendor downloads all and only its own accepted documents; another vendor's file gives 404; files stay downloadable for staff after the vendor is closed |
-| VEN.16 | Contract updates: re-acceptance deadlines per vendor, reminders, automatic consequences, staff pending view | P1 | 14 | VEN.14, ARC.9, SEC.4 | A vendor that misses its deadline gets the configured consequence (warn, payouts blocked, sales blocked or suspended); staff can extend the deadline, change the consequence or exclude the vendor, all audited with a reason; accepting the document lifts the automatic restrictions but not a staff suspension |
+| VEN.13 | Contract templates with merge fields, vendor-specific clauses with four-eyes approval, custom uploaded contracts: per-vendor `VendorContractDocument` rendered to PDF per language through a `DocumentRenderer` interface (WeasyPrint), prevailing language, legal representative field on the VEN.12 identity; clausole vessatorie marked on templates and vendor clauses (number, title, text), two signature blocks with the art. 1341 and 1342 c.c. formula, the fixed clause on how to complete the specific approval, page footers with the short hash, one-page specific approval sheet | P1 | 18 | VEN.5, VEN.2, VEN.12, ARC.15 | A test vendor's IT and EN PDFs carry its legal identity, commission rule and approved clauses; a missing merge field blocks issuing; a clause or custom upload approved by its own author is refused; a new template version or clause issues a new document for each vendor concerned; a document with marked clauses renders two signature blocks whose formula lists exactly their numbers, and an approval sheet with their full texts and the main PDF hash |
+| VEN.14 | Vendor contract e-signature in two separate acts: acceptance of the whole contract (checkbox, email OTP, MFA step-up), then the specific approval of the marked clauses on a separate screen with a second, separate email OTP; email OTP simple electronic signature, PDF of the exact version per language with SHA-256 hash and RFC 3161 timestamp per act behind a `TimestampAuthority` interface, evidence per act (user, member role, time, trusted-proxy IP, user agent, OTP id), evidence package by email, completion route choice, `SignatureProvider` interface | P1 | 22 | VEN.13, CORE.4, CORE.5, ARC.9, ARC.16 | A test vendor signs end to end; the stored PDF matches its hash and both timestamp tokens verify against their evidence manifests (fake TSA in tests, a real TSA on STAGE); the evidence email arrives in the signer's language; without a text in its language the vendor can accept only after acknowledging English; a wrong, expired or reused code records no acceptance; the specific approval needs its own screen and its own code, the acceptance code is refused for it, and no single request records both acts |
+| VEN.15 | Vendor document area: download accepted contracts and evidence (PDF, approval sheet, evidence package, timestamp tokens, uploaded signed file, paper original scan) through signed URLs, kept per the retention rules | P1 | 6 | VEN.14, CORE.9 | A vendor downloads all and only its own accepted documents; another vendor's file gives 404; files stay downloadable for staff after the vendor is closed |
+| VEN.16 | Contract updates and specific approval completion: re-acceptance deadlines per vendor, reminders, automatic consequences, specific approval pending requirement with its own deadline and consequence, paper original route with staff moderation (receipt date, scan, archive location, approve or reject with reason), completion routes per version and per vendor, staff pending view with route and paper status | P1 | 20 | VEN.14, ARC.9, SEC.4, ARC.16 | A vendor that misses its deadline gets the configured consequence (warn, payouts blocked, sales blocked or suspended); staff can extend the deadline, change the consequence or exclude the vendor, all audited with a reason; accepting the document lifts the automatic restrictions but not a staff suspension; a vendor with both acts online but no completion gets the specific approval consequence at its deadline, and a staff-approved paper original lifts it; a rejected original stays pending and the vendor is emailed the reason |
+| VEN.17 | Qualified and advanced digital signature upload and verification (PAdES/CAdES) of the whole document or of the specific approval sheet, pyHanko, EU trusted lists for qualified and staff-listed trust anchors for advanced; completes the specific approval and is stored as a stronger acceptance | P1 | 18 | VEN.14, VEN.16 | A PAdES and a `.p7m` test file signed with a certificate from a test trusted list are accepted; a file that signs a different PDF, an altered file or an untrusted certificate is refused with the reason; a signed approval sheet satisfies the vendor's specific approval requirement |
 | CMP.1 | DAC7 quarterly aggregates + annual export, reading the dataset and completeness from VEN.12 | P1 | 12 | VEN.5, VEN.4, VEN.12 | Test export validated by the advisor |
 | CMP.2 | Commission document from the ledger (party block from VEN.12) + `EInvoiceChannel` interface + export per vendor | P1 | 12 | VEN.4, VEN.12 | Test document generated |
 | CMP.3 | `GpsrInfo` with per-vendor defaults, publication block, product page, recall procedure | P1 | 8 | CAT.1 | Product without GPSR cannot be published |
@@ -190,7 +192,7 @@
 | MIG.9 | Three dress rehearsals on STAGE + cutover and rollback runbook | P1 | 16 | MIG.5, MIG.6 | Third rehearsal with no blockers |
 | MIG.10 | Cutover and post-go-live monitoring | P1 | 12 | MIG.9, SEC.6 | Go-live, 72 h with no critical issues |
 
-### F6 — After go-live (P2) (27 tasks, 199 h)
+### F6 — After go-live (P2) (26 tasks, 185 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -198,17 +200,16 @@
 | CORE.10 | Support impersonation with audit | P2 | 4 | CORE.8 | Every impersonated session in AuditLog |
 | CAT.11 | Catalog admin (Wagtail ViewSet): filters, bulk actions, preview, translation status | P2 | 10 | CORE.8 | Staff edit products without the API |
 | VEN.7 | Payouts: eligibility, block if DAC7 incomplete (`assert_payout_allowed`), history | P2 | 8 | VEN.4, PAY.3, VEN.12 | Tests on every blocking condition |
-| VEN.11 | Tax regime change request by vendor with staff review and email | P2 | 6 | TAX.2 | Parity with VTO 2.4 |
-| VEN.17 | Qualified digital signature upload and verification (PAdES/CAdES), pyHanko, EU trusted lists, stored as a stronger acceptance | P2 | 14 | VEN.14 | A PAdES and a `.p7m` test file signed with a certificate from a test trusted list are accepted; a file that signs a different PDF, an altered file or an untrusted certificate is refused with the reason |
+| VEN.11 | Tax regime change request by vendor with staff review and email | P2 | 6 | TAX.2, ARC.16 | Parity with VTO 2.4 |
 | TAX.6 | Rate import from official source + staff review + validity periods | P2 | 8 | TAX.1 | Simulated update without touching past orders |
 | TAX.8 | `distance_sales_eu` + `suggest_regime` from the ledger | P2 | 6 | VEN.4 | T16 green |
 | TAX.9 | Cart tax simulator in admin and API (`/tax/simulate`) | P2 | 6 | TAX.4, SHP.4 | Staff simulate a mixed cart |
 | TAX.10 | Quarterly OSS report per country and per-vendor report | P2 | 8 | ORD.4 | CSV export verified on seed orders |
 | SHP.6 | Admin zone/rate editor with diff, impact and versions/rollback | P2 | 12 | SHP.1, CORE.8 | Rollback to a previous version works |
 | SHP.7 | Cart simulator (admin + `/shipping/simulate`) | P2 | 6 | SHP.4 | Parity with the current simulator on seed cases |
-| SHP.8 | Daily health check + report | P2 | 6 | SHP.1, ARC.9 | Email report with the 7 checks |
+| SHP.8 | Daily health check + report | P2 | 6 | SHP.1, ARC.9, ARC.16 | Email report with the 7 checks |
 | SHP.11 | Rate export for Google Merchant | P2 | 4 | SHP.1 | Feed without hardcoded rates |
-| ING.10 | Daily report (email + admin page) with identity anomalies | P2 | 6 | ING.8 | Parity with `daily_report.py` |
+| ING.10 | Daily report (email + admin page) with identity anomalies | P2 | 6 | ING.8, ARC.16 | Parity with `daily_report.py` |
 | ING.11 | Supplier review import | P2 | 4 | ING.1, CMS.6 | Reviews imported with original date |
 | ING.12 | `/api/v1` import API for external vendors (upsert, stock, prices, media) | P2 | 8 | CORE.7, CAT.10 | Sample client in dry-run |
 | ING.13 | Admin checklist and "new vendor from source" wizard | P2 | 8 | ING.9 | Demo vendor activated without code |

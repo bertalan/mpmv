@@ -76,18 +76,40 @@ class GpsrInfo(Model):
   and each version declares a prevailing language that wins in case of discrepancies; the clause
   is printed in every rendered PDF. Without a text in the vendor's language the vendor accepts the
   English text and explicitly acknowledges it. Details in [04](04-vendors-commissions-ledger.md).
-- Acceptance is a simple electronic signature under eIDAS (email one-time code plus MFA step-up),
-  with the exact personalized PDF, its SHA-256 hash and an RFC 3161 timestamp. A qualified
-  signature upload (VEN.17, P2) gives stronger evidence. ⚖️ Check with legal counsel which
-  clauses need specific written approval (Italian civil code, articles 1341 and 1342) and whether
-  a simple electronic signature is enough for them, or the qualified option is needed.
-- Retention: the PDF, the evidence package, the timestamp token and any signed upload are kept in
+- Acceptance online is a simple electronic signature under eIDAS (email one-time code plus MFA
+  step-up), with the exact personalized PDF, its SHA-256 hash and an RFC 3161 timestamp.
+- Double signature for onerous clauses (owner decision of 2026-11-07). Under articles 1341 comma
+  2 and 1342 of the Italian civil code, clausole vessatorie in standard terms drafted by one party
+  have no effect unless the other party approves them specifically in writing; this applies
+  between businesses, so to vendor contracts. Templates and vendor clauses mark them (VEN.13), the
+  PDF has a second signature block with the formula "Ai sensi e per gli effetti degli artt. 1341
+  e 1342 c.c. si approvano specificamente le clausole n. ..." and the vendor approves them online
+  in a second act, separate from the acceptance of the whole contract, with its own one-time
+  code (VEN.14). The evidence of both acts is stored and timestamped.
+- Completing the specific approval. The specific approval counts as completed only when the
+  vendor signs with a qualified or advanced electronic signature (VEN.17) or sends the paper
+  original signed by hand, checked and approved by staff on receipt (VEN.16). Until then a
+  pending requirement with a deadline and a consequence applies, and the contract text warns the
+  vendor about it. Staff can require a qualified signature per version or per vendor.
+- ⚖️ Legal risk, recorded as it is (not legal advice). A simple electronic signature such as the
+  email one-time code has an evidentiary value that the judge assesses freely (CAD, legislative
+  decree 82/2005, article 20 comma 1-bis), and case law is not uniform on whether it satisfies the
+  written specific approval of article 1341. A qualified or advanced electronic signature
+  satisfies the written form under the same article, and so does the paper original signed by
+  hand. The online record of both acts remains evidence of the vendor's intent, but until one of
+  the two routes is complete the marked clauses may be held ineffective while the rest of the
+  contract stands. The owner's legal counsel must confirm the approach, the list of marked
+  clauses, the text of the clause that warns the vendor, and whether to exclude the paper route
+  and make the qualified signature mandatory.
+- Retention: the PDF, the evidence package, the timestamp tokens, any signed upload and the scan
+  of a paper original are kept in
   the private bucket for the whole vendor relationship and then for the retention period (proposed
   default: 10 years after the relationship ends, the ordinary limitation period in Italy ⚖️). The
   signer's personal data in the evidence are kept on the basis of establishing and defending legal
   claims (GDPR article 17(3)(e)), so a CMP.4 erasure request does not delete them; the CMP.4
   retention job deletes the files when the period ends. Evidence files are append-only and are
-  never rewritten.
+  never rewritten. Paper originals are kept in the physical archive recorded by staff for the
+  same period.
 - Timestamps come from a TSA behind the `TimestampAuthority` interface; the choice between a free
   TSA and a qualified one is an owner decision.
 
