@@ -49,8 +49,9 @@ normalized value, under its own key, and query that. Do not decrypt whole tables
 
 A key is `<key id>:<base64url of 32 random bytes>`. The settings read
 `MPMV_FIELD_ENCRYPTION_KEYS` (comma-separated) or the file named by
-`MPMV_FIELD_ENCRYPTION_KEYS_FILE` (one key per line, `#` comments). Keys are listed **newest
-first**: the first one encrypts, all of them decrypt.
+`MPMV_FIELD_ENCRYPTION_KEYS_FILE` (one key per line, `#` comments), never both: with both
+set, the settings refuse to load. Keys are listed **newest first**: the first one encrypts, all
+of them decrypt.
 
 ```sh
 uv run python manage.py generate_field_key 2026-11     # prints "2026-11:<key>"
