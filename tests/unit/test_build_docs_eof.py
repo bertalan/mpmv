@@ -1,10 +1,17 @@
 """Generated docs end with exactly one newline (pre-commit end-of-file-fixer safe)."""
 
+import importlib.util
+import sys
 from pathlib import Path
 
 import pytest
 
-from tools import build_docs
+ROOT = Path(__file__).resolve().parents[2]
+_spec = importlib.util.spec_from_file_location("build_docs", ROOT / "tools" / "build_docs.py")
+assert _spec is not None and _spec.loader is not None
+build_docs = importlib.util.module_from_spec(_spec)
+sys.modules["build_docs"] = build_docs
+_spec.loader.exec_module(build_docs)
 
 
 def test_generated_text_ends_with_exactly_one_newline() -> None:
