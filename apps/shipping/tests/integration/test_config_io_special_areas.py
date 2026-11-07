@@ -202,7 +202,7 @@ def test_invalid_treatments_are_reported_per_row_and_change_nothing() -> None:
             "key": "standard",
             "area_treatments": [
                 {"area": "atlantis", "mode": engine.INDICATIVE},  # no such area
-                {"area": "it-sardinia", "mode": engine.SURCHARGE},  # a surcharge of what?
+                {"area": "pt-azores", "mode": engine.SURCHARGE},  # a surcharge of what?
                 {"area": "gr-crete", "mode": engine.BLOCKED, "extra_days": 3},
             ],
         }

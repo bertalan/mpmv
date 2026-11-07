@@ -1,5 +1,5 @@
 """Shipping configuration: carriers, country groups, zones, shipping methods, weight bands,
-pickup, versions (spec 06 §6.2, SHP.1, SHP.12).
+special areas and their treatments, pickup, versions (spec 06 §6.2, SHP.1, SHP.12, SHP.14).
 
 The integrity rules are database constraints, so imports (SHP.5, SHP.13), the admin editor
 (SHP.6) and the API cannot bypass them: at most one default method per vendor and zone, weight
@@ -35,7 +35,13 @@ from apps.core.translations import Resolved
 from apps.vendors.scoping import VendorScopedManager
 
 from . import engine
-from .fields import CountryGroupCodesField, PostcodePatternsField, StatesField, ZoneCountriesField
+from .fields import (
+    CountryGroupCodesField,
+    PostcodePatternsField,
+    StatesField,
+    TerritoryCodeField,
+    ZoneCountriesField,
+)
 
 MIN_PRIORITY = 1
 MAX_PRIORITY = 999
@@ -479,6 +485,203 @@ class WeightBand(BaseModel):
         return f"{self.from_kg}-{upper} kg: {self.cost_net}"
 
 
+class SpecialAreaKind(models.TextChoices):
+    ISLAND = engine.ISLAND, "Island"
+    REMOTE = engine.REMOTE, "Remote area"
+    EXTRA_VAT = engine.EXTRA_VAT, "Extra-VAT territory"
+
+
+class SpecialArea(BaseModel):
+    """An island, a remote area or an extra-VAT territory: a postcode or province list inside
+    its countries (SHP.14, spec 06 "Standard template and special areas").
+
+    Platform data, like country groups: seeded with the lists of the standard template, edited
+    by staff and written by platform files (a carrier's remote-area list is imported that way),
+    every change audited; vendor files name them and never change them. An extra-VAT area names
+    its TAX.1 territory by code (`territory_code`), never by a foreign key: tax and shipping are
+    independent apps. Each shipping method sets the treatment it gives an area
+    (`SpecialAreaTreatment`); without one, the default is an indicative cost subject to quote.
+    """
+
+    Kind = SpecialAreaKind
+
+    code = models.SlugField(max_length=50, unique=True, help_text="Lower case, e.g. it-sardinia.")
+    name = models.CharField(max_length=100)
+    kind = models.CharField(max_length=16, choices=SpecialAreaKind.choices)
+    countries = ZoneCountriesField(
+        help_text="ISO country codes, comma separated: where the postcodes and provinces apply."
+    )
+    postcode_patterns = PostcodePatternsField(
+        default=list,
+        blank=True,
+        help_text='Prefix "07*", range "90000..98999" or exact postcode, comma separated.',
+    )
+    states = StatesField(
+        default=list, blank=True, help_text="Province or state codes (SS, NU…), comma separated."
+    )
+    territory_code = TerritoryCodeField(
+        blank=True,
+        default="",
+        help_text="Extra-VAT areas only: the code of the tax territory, e.g. ES-CN.",
+    )
+
+    class Meta:
+        ordering = ["code"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(code=Lower("code")), name="shipping_area_code_lower_case"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(kind__in=engine.AREA_KINDS), name="shipping_area_kind_valid"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(countries__len__gte=1), name="shipping_area_has_countries"
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(countries__contains=[engine.WORLD]),
+                name="shipping_area_no_world_marker",
+                violation_error_message='A special area lies in named countries, never "*".',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(postcode_patterns__len__gte=1) | models.Q(states__len__gte=1),
+                name="shipping_area_has_list",
+                violation_error_message="A special area needs postcode patterns or provinces.",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(kind=engine.EXTRA_VAT) & ~models.Q(territory_code="")
+                    | ~models.Q(kind=engine.EXTRA_VAT) & models.Q(territory_code="")
+                ),
+                name="shipping_area_territory_iff_extra_vat",
+                violation_error_message=(
+                    "An extra-VAT area names its tax territory; other areas name none."
+                ),
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.code})"
+
+    def clean_fields(self, exclude: Collection[str] | None = None) -> None:
+        if isinstance(self.code, str):
+            self.code = self.code.strip().lower()
+        super().clean_fields(exclude=exclude)
+
+    def snap(self) -> engine.SpecialAreaSnap:
+        return engine.SpecialAreaSnap(
+            code=self.code,
+            kind=self.kind,
+            countries=frozenset(self.countries),
+            postcode_patterns=tuple(self.postcode_patterns),
+            states=tuple(self.states),
+            territory_code=self.territory_code,
+        )
+
+
+class AreaTreatmentMode(models.TextChoices):
+    INDICATIVE = engine.INDICATIVE, "Indicative cost subject to quote"
+    SURCHARGE = engine.SURCHARGE, "Rate with a surcharge"
+    QUOTE_ONLY = engine.QUOTE_ONLY, "Quote only"
+    UNAVAILABLE = engine.UNAVAILABLE, "Method not offered"
+    BLOCKED = engine.BLOCKED, "Blocked"
+
+
+class SurchargeType(models.TextChoices):
+    FIXED = engine.FIXED, "Fixed amount"
+    PERCENT = engine.PERCENT, "Percent of the cost"
+    PER_KG = engine.PER_KG, "Amount per kg"
+
+
+class SpecialAreaTreatment(BaseModel):
+    """What one shipping method does for addresses in one special area (SHP.14).
+
+    Without a row, the method gives the area the default: an indicative cost subject to quote.
+    A row sets a surcharge (fixed, percent of the method's cost, or per kg; also allowed on an
+    estimate), extra delivery days, quote only, unavailable (the method is not offered there) or
+    blocked. The rules are `engine.treatment_errors` and the same check constraints.
+    """
+
+    Mode = AreaTreatmentMode
+    SurchargeType = SurchargeType
+
+    vendor_scope: ClassVar[str] = "method__vendor"
+    objects = VendorScopedManager()
+
+    method = models.ForeignKey(
+        ShippingMethod, on_delete=models.CASCADE, related_name="area_treatments"
+    )
+    area = models.ForeignKey(SpecialArea, on_delete=models.PROTECT, related_name="treatments")
+    mode = models.CharField(
+        max_length=16, choices=AreaTreatmentMode.choices, default=engine.DEFAULT_TREATMENT_MODE
+    )
+    surcharge_type = models.CharField(
+        max_length=16, choices=SurchargeType.choices, blank=True, default=engine.NO_SURCHARGE
+    )
+    surcharge = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=engine.ZERO_AMOUNT,
+        help_text="Net of VAT: an amount (fixed, per kg) or a percentage.",
+    )
+    extra_days = models.PositiveSmallIntegerField(
+        default=0, help_text="Added to the method's indicative delivery time."
+    )
+
+    class Meta:
+        ordering = ["method", "area"]
+        constraints = [
+            models.UniqueConstraint(fields=["method", "area"], name="shipping_treatment_unique"),
+            models.CheckConstraint(
+                condition=models.Q(mode__in=engine.TREATMENT_MODES),
+                name="shipping_treatment_mode_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    surcharge_type__in=(engine.NO_SURCHARGE, *engine.SURCHARGE_TYPES)
+                ),
+                name="shipping_treatment_surcharge_type_valid",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(mode=engine.SURCHARGE, surcharge_type=engine.NO_SURCHARGE),
+                name="shipping_treatment_surcharge_has_type",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(surcharge_type=engine.NO_SURCHARGE)
+                | models.Q(mode__in=engine.PRICED_MODES),
+                name="shipping_treatment_surcharge_only_priced",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(surcharge__gte=0)
+                & (~models.Q(surcharge_type=engine.NO_SURCHARGE) | models.Q(surcharge=0)),
+                name="shipping_treatment_surcharge_amount",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(mode__in=engine.NO_DAYS_MODES) | models.Q(extra_days=0),
+                name="shipping_treatment_no_days_without_delivery",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.method} in {self.area.code}: {self.mode}"
+
+    def clean(self) -> None:
+        if self.surcharge is None or self.extra_days is None:
+            return
+        errors = engine.treatment_errors(
+            self.mode, self.surcharge_type, self.surcharge, self.extra_days
+        )
+        if errors:
+            raise ValidationError(errors)
+
+    def snap(self) -> engine.AreaTreatment:
+        return engine.AreaTreatment(
+            mode=self.mode,
+            surcharge_type=self.surcharge_type,
+            surcharge=self.surcharge,
+            extra_days=self.extra_days,
+        )
+
+
 class PickupOption(BaseModel):
     """Local pickup at a vendor's address, offered in addition to the carrier (spec 06 rule 5)."""
 
@@ -535,8 +738,8 @@ class PickupOptionTranslation(TranslationModel):
 
 class ShippingTemplate(BaseModel):
     """A shipping configuration the platform proposes to vendors (SHP.13): zones, the country
-    groups they use, methods with weight bands and VAT treatment, and later special areas
-    (SHP.14).
+    groups they use, methods with weight bands, VAT treatment and special-area treatments, and
+    the special areas they name (SHP.14).
 
     `document` is a file of the configuration format (`apps.shipping.config_format`) without a
     vendor. A vendor copies it into its own configuration (`config_io.copy_template`): the
@@ -550,7 +753,7 @@ class ShippingTemplate(BaseModel):
     is_standard = models.BooleanField(
         default=False, help_text="The template the platform proposes; at most one."
     )
-    document = models.JSONField(help_text="A shipping configuration file (format version 1).")
+    document = models.JSONField(help_text="A shipping configuration file.")
 
     class Meta:
         ordering = ["code"]

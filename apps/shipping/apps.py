@@ -14,6 +14,8 @@ class ShippingConfig(AppConfig):
         "weightband",
         "pickupoption",
         "shippingtemplate",
+        "specialarea",
+        "specialareatreatment",
     )
     unaudited_models = {
         "carriertranslation": "display labels under the translation workflow, no price data",

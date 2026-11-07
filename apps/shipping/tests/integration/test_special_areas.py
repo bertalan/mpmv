@@ -17,7 +17,7 @@ from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 from apps.shipping import engine
 from apps.shipping.engine import Destination
-from apps.shipping.models import SpecialArea, SpecialAreaTreatment, WeightBand
+from apps.shipping.models import ShippingMethod, SpecialArea, SpecialAreaTreatment, WeightBand
 from apps.shipping.services import (
     area_treatments,
     delete_config,
@@ -146,7 +146,7 @@ def test_a_special_area_is_normalized_on_validation() -> None:
     area = SpecialAreaFactory.build(
         code="Carrier-Remote",
         countries=["el"],
-        postcode_patterns=[" 846 * "],
+        postcode_patterns=[" 846* "],
         states=["ss"],
         kind=engine.EXTRA_VAT,
         territory_code="gr-x1",
@@ -240,7 +240,7 @@ def test_treatments_are_scoped_to_their_vendor() -> None:
 # --- Done when: Sardinia, indicative by default; a vendor's fixed surcharge applies
 
 
-def sardinia_method() -> tuple[object, Destination]:
+def sardinia_method() -> tuple[ShippingMethod, Destination]:
     method = ShippingMethodFactory.create(default=True)
     WeightBandFactory.create(method=method, from_kg=Decimal(0), to_kg=Decimal(5))  # 9.90
     return method, Destination("IT", "07100")
@@ -249,7 +249,7 @@ def sardinia_method() -> tuple[object, Destination]:
 def test_a_sardinia_address_gets_an_indicative_cost_with_a_request_quote_action() -> None:
     method, sassari = sardinia_method()
 
-    decision = special_area_decision(method, sassari)  # type: ignore[arg-type]
+    decision = special_area_decision(method, sassari)
 
     assert decision is not None
     assert decision.area.code == "it-sardinia"
@@ -272,7 +272,7 @@ def test_a_vendor_override_to_a_fixed_surcharge_applies() -> None:
     )
     save_config(treatment, ctx=CTX)
 
-    decision = special_area_decision(method, sassari)  # type: ignore[arg-type]
+    decision = special_area_decision(method, sassari)
 
     assert decision is not None
     assert not decision.is_default
@@ -280,7 +280,7 @@ def test_a_vendor_override_to_a_fixed_surcharge_applies() -> None:
     assert decision.cost(Decimal("9.90"), Decimal("2.000")) == Decimal("24.90")
     assert decision.delivery_days(2, 5) == (4, 7)
     entry = AuditLog.objects.get(action="shipping.specialareatreatment.created")
-    assert entry.vendor_key == str(method.vendor.public_id)  # type: ignore[attr-defined]
+    assert entry.vendor_key == str(method.vendor.public_id)
     assert entry.after is not None
     assert entry.after["surcharge_type"] == engine.FIXED
 
@@ -292,7 +292,7 @@ def test_another_vendor_at_the_same_address_keeps_the_default() -> None:
     )
     other, _ = sardinia_method()
 
-    decision = special_area_decision(other, sassari)  # type: ignore[arg-type]
+    decision = special_area_decision(other, sassari)
 
     assert decision is not None
     assert decision.is_default

@@ -105,3 +105,23 @@ class CountryGroupCodesField(NormalizedArrayField):
 
     def normalize(self, item: str) -> str:
         return item.strip().lower()
+
+
+class TerritoryCodeField(models.CharField[Any, Any]):
+    """The code of a TAX.1 tax territory (`ES-CN`, `IT-LIVIGNO`), upper case; empty allowed.
+
+    Shipping names the territory by code, never by a foreign key: the tax and shipping apps are
+    independent (import-linter), and territories are seeded later (TAX.7)."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("max_length", engine.TERRITORY_CODE_MAX_LENGTH)
+        super().__init__(*args, **kwargs)
+
+    def to_python(self, value: Any) -> Any:
+        value = super().to_python(value)
+        if not isinstance(value, str) or not value.strip():
+            return value
+        try:
+            return engine.normalize_territory_code(value)
+        except engine.InvalidTerritoryCode as exc:
+            raise ValidationError(str(exc), code="invalid_territory_code") from exc
