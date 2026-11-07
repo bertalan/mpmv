@@ -9,9 +9,8 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Final
 
-from django.utils.text import slugify
-
 from apps.core.countries import ISO_3166_ALPHA2, is_eu
+from apps.core.text import slugify
 
 # --- Status state machine (spec 04 §4.2)
 
