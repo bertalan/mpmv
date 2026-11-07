@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **171** in **18** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **1486 h** (P1 1289 h · P2 179 h · P3 18 h)
+- Micro-tasks: **175** in **18** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **1515 h** (P1 1298 h · P2 199 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **144 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -17,22 +17,22 @@
 | ARC | Architecture and foundations | 15 | 100 | 6 | 0 | 106 |
 | CORE | Identity, permissions, API, backoffice | 11 | 83 | 4 | 0 | 87 |
 | CAT | Product catalog | 11 | 106 | 10 | 0 | 116 |
-| VEN | Vendors, commissions, ledger | 18 | 174 | 14 | 0 | 188 |
+| VEN | Vendors, commissions, ledger | 19 | 174 | 22 | 0 | 196 |
 | TAX | Tax engine | 10 | 42 | 28 | 0 | 70 |
 | SHP | Shipping and quotes | 11 | 64 | 28 | 0 | 92 |
 | ORD | Cart, orders, returns | 10 | 102 | 0 | 0 | 102 |
 | PAY | Payments (Stripe Connect) | 4 | 40 | 0 | 0 | 40 |
 | ING | Supplier import and pipelines | 13 | 92 | 26 | 0 | 118 |
 | I18N | Multilingual | 8 | 44 | 6 | 0 | 50 |
-| CMS | Wagtail content | 6 | 42 | 10 | 0 | 52 |
-| THM | Frontend themes | 10 | 70 | 0 | 0 | 70 |
+| CMS | Wagtail content | 8 | 51 | 10 | 0 | 61 |
+| THM | Frontend themes | 11 | 70 | 12 | 0 | 82 |
 | SEO | SEO, feeds, analytics | 6 | 30 | 14 | 0 | 44 |
 | AI | AI channels (MCP, agents) | 4 | 0 | 22 | 18 | 40 |
 | CMP | Compliance | 13 | 127 | 0 | 0 | 127 |
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 4 | 16 | 11 | 0 | 27 |
 | MIG | Migration and cutover | 10 | 106 | 0 | 0 | 106 |
-| **Total** | | **171** | **1289** | **179** | **18** | **1486** |
+| **Total** | | **175** | **1298** | **199** | **18** | **1515** |
 
 ## By phase
 
@@ -79,7 +79,7 @@
 | CAT.1 | Product and Variant models, translations, `(vendor, sku)` constraints | P1 | 12 | ARC.6, VEN.1 | Migrations + constraint tests |
 | CAT.2 | Taxonomies: Category (tree), configurable Taxonomy/Term, Brand, translations and SEO texts | P1 | 10 | CAT.1 | Admin CRUD with translations |
 | CAT.3 | Typed attributes and translated values; variant axes with ordering | P1 | 10 | CAT.1 | Variable size×color product created via API |
-| CAT.4 | Media: ProductImage on Wagtail Images, WebP/AVIF renditions, dedup by hash, cover lock; optional image language with the replacement rule, translatable alt text and captions (D-18) | P1 | 12 | CAT.1, ARC.15 | Upload → automatic renditions; a DE-dedicated image replaces the neutral gallery in DE only; alt text falls back to EN |
+| CAT.4 | Media: ProductImage on Wagtail Images, WebP/AVIF renditions, dedup by hash, cover lock; optional image language with the replacement rule, translatable alt text and captions (D-18) | P1 | 12 | CAT.1, ARC.15, CMS.8 | Upload → automatic renditions; a DE-dedicated image replaces the neutral gallery in DE only; alt text falls back to EN |
 | CAT.5 | `build_product_slug` + SlugHistory + 301 redirect middleware | P1 | 8 | CAT.1 | Test cases ported from legacy-sku-permalink |
 | CAT.6 | `Redirect` model + admin management + import of existing maps (retired SKUs, merged tags, discontinued categories) | P1 | 6 | CAT.5 | All rules from the 4 mu-plugins covered by tests |
 | CAT.7 | Product page: gallery, variants with default, companion box, related products, visible SKU, "on request" | P1 | 16 | CAT.3, CAT.4 | Visual and functional parity with LIVE |
@@ -108,7 +108,7 @@
 | THM.3 | `base` theme: layouts, skip link, header with disclosure navigation, language switcher, consistent help link, footer, typography, form controls, buttons, alerts, focus and target-size rules, reduced motion; vendored htmx and Alpine CSP build with `VENDORED.toml`; CMS.1 and account templates moved onto the layouts | P1 | 10 | THM.2 | Home, standard page and login render with `base`; CSP lint and the hash check of vendored files pass; keyboard-only e2e reaches every control with a visible focus |
 | THM.4 | `base` component library (§14.9) and staff-only styleguide page | P1 | 12 | THM.3 | Every component renders in every state on `/_styleguide/` with no CSP violation; e2e screenshots saved |
 | THM.5 | Theme quality gates, parametrised over registered themes: CSP template lint, axe-core (`wcag22aa`) on the styleguide, visual comparison harness with CI-only baselines, size budgets, `LICENSES.toml` check | P1 | 6 | THM.4, ARC.11 | A theme with a 3:1 text pair, an inline style, an unlicensed font or a 50 KB CSS file fails CI; `base` passes |
-| THM.6 | First vertical theme `ride` (name pending owner confirmation): tokens from the reference template's visual language adjusted for contrast, self-hosted OFL fonts, SVG icon subset, header, hero and home block overrides, placeholder imagery, `LICENSES.toml` | P1 | 8 | THM.4, CMS.2 | Home page renders with `ride` and passes the THM.5 gates; no file derived from the reference template (PR checklist) |
+| THM.6 | First vertical theme `ride`: colour tokens from the operator palette (§14.4, §14.12), type scale, spacing and shapes from the reference template's visual language, self-hosted Barlow and Barlow Condensed (OFL 1.1, from upstream), SVG icon subset, header, hero and home block overrides, placeholder imagery, `LICENSES.toml` | P1 | 8 | THM.4, CMS.2 | Home page renders with `ride` and passes the THM.5 gates; no file derived from the reference template (PR checklist) |
 
 ### F2 — Checkout: tax, shipping, orders, payments (28 tasks, 258 h)
 
@@ -177,7 +177,7 @@
 | CMP.12 | VAT records of facilitated supplies (art. 242a VAT directive, art. 54c Reg. 282/2011): export per vendor and period, 10-year retention outside CMP.4 erasure | P1 | 4 | ORD.2, VEN.12 | The export of a seed period holds every field of article 54c(2) and an erasure request leaves the records in place |
 | CMP.13 | Deemed-supplier flow gate: `Vendor.established_in_eu`, checkout rules per D-21 for non-EU vendors, GB consignments and the Swiss threshold counter | P1 | 6 | VEN.12, ORD.3 | The D-21 rules hold in checkout tests: a refused flow is blocked with a clear message and an allowed one passes |
 
-### F4 — Content, SEO, feeds (12 tasks, 84 h)
+### F4 — Content, SEO, feeds (14 tasks, 93 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -185,6 +185,8 @@
 | CMS.3 | Blog with scheduling, author, product/term/vendor chooser | P1 | 8 | CMS.2 | Migrated article published |
 | CMS.4 | TermLandingPage and VendorLandingPage | P1 | 10 | CMS.2, CAT.8 | A term page with its products |
 | CMS.5 | Versioned LegalPage + VendorRecruitmentPage with application form | P1 | 6 | CMS.1, VEN.5 | Application arrives in admin |
+| CMS.8 | Image source, licence and credit: custom Wagtail image model `MediaImage` in `core` with licence, source, author, credit and permission fields, staff-editable `ImageLicence` allow list seeded per §10.2, upload validation in admin and services, `image_credit` component and per-page image credits disclosure, review list for migrated images without metadata | P1 | 5 | CMS.1, ARC.15 | An upload without licence or author is refused; an NC licence cannot be added to the allow list; a CC BY image shows its credit in the caption, a CC BY hero in the page credits disclosure; a CC0 image shows none; `WAGTAILIMAGES_IMAGE_MODEL` points to `MediaImage` before CAT.4 |
+| CMS.9 | Launch countdown StreamField block: fields per §10.2, `countdown_state` pure function, server-rendered absolute date and expired state, page cache capped at the target, CSP-safe ES module with visitor time zone, minute updates and pause button, single polite announcement at expiry | P1 | 4 | CMS.2, THM.4 | Without JavaScript the block shows the absolute date and the CTA; with it the remaining time updates once a minute in the visitor's time zone and the pause button stops it; after the target the server and the module both show the expired text and link; no `aria-live` on the counter; no CSP violation and no axe violation on a page with the block |
 | THM.7 | `ride` catalog pages: listings with filters, search results, product card, product page, vendor storefront | P1 | 6 | THM.6, CAT.7, CAT.8, VEN.10 | Catalog key pages pass the THM.5 gates at 360, 768 and 1280 px |
 | THM.8 | `ride` cart, checkout and account pages: cart, checkout steps, Payment Element appearance from tokens, order confirmation, customer area, sign in and up, MFA, password reset | P1 | 6 | THM.6, ORD.5, ORD.7 | A keyboard-only e2e checkout completes in test mode with `ride`; the Payment Element uses the theme's colours and fonts |
 | THM.9 | `ride` content and system pages: blog, standard, legal, contact, term and vendor landing, vendor recruitment, 404 and 500, consent banner styling | P1 | 4 | THM.6, CMS.3, CMS.4, CMS.5, SEO.5 | Content key pages and the consent banner pass the THM.5 gates; focus is never hidden by the banner or the sticky header |
@@ -210,7 +212,7 @@
 | MIG.9 | Three dress rehearsals on STAGE + cutover and rollback runbook | P1 | 16 | MIG.5, MIG.6 | Third rehearsal with no blockers |
 | MIG.10 | Cutover and post-go-live monitoring | P1 | 12 | MIG.9, SEC.6 | Go-live, 72 h with no critical issues |
 
-### F6 — After go-live (P2) (25 tasks, 179 h)
+### F6 — After go-live (P2) (27 tasks, 199 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -219,6 +221,7 @@
 | CAT.11 | Catalog admin (Wagtail ViewSet): filters, bulk actions, preview, translation status | P2 | 10 | CORE.8 | Staff edit products without the API |
 | VEN.7 | Payouts: eligibility, block if DAC7 incomplete (`assert_payout_allowed`), history | P2 | 8 | VEN.4, PAY.3, VEN.12 | Tests on every blocking condition |
 | VEN.11 | Tax regime change request by vendor with staff review and email | P2 | 6 | TAX.2, ARC.16 | Parity with VTO 2.4 |
+| VEN.19 | Plan entitlements and plan fees: `plan_allows(vendor, feature)` service over `VendorPlan.features`, plan change with effective date and audit; monthly `plan_fee` ledger debit by a scheduled idempotent job; non-fiscal statement PDF per charge in the vendor's language (no invoice issued by the marketplace; the operator invoices outside the platform) | P2 | 8 | VEN.2, VEN.4, VEN.15, ARC.9 | A vendor whose plan lacks a feature cannot use it and keeps its data; a plan with a monthly fee gets exactly one `plan_fee` entry per period even when the job runs twice; the statement PDF states that it is not a tax invoice and matches the ledger entry; no fiscal document or e-invoice is produced |
 | TAX.6 | Rate import from official source + staff review + validity periods | P2 | 8 | TAX.1 | Simulated update without touching past orders |
 | TAX.8 | `distance_sales_eu` + `suggest_regime` from the ledger | P2 | 6 | VEN.4 | T16 green |
 | TAX.9 | Cart tax simulator in admin and API (`/tax/simulate`) | P2 | 6 | TAX.4, SHP.4 | Staff simulate a mixed cart |
@@ -233,6 +236,7 @@
 | ING.13 | Admin checklist and "new vendor from source" wizard | P2 | 8 | ING.9 | Demo vendor activated without code |
 | I18N.8 | Visitor content translation after go-live (D-18): products, categories, taxonomy terms, vendor storefronts, CMS pages, blog and landing pages, with the method the owner chooses (AI, professional or other) through the I18N.4 queue; per-language coverage report | P2 | 6 | I18N.4, I18N.3, I18N.6 | Per-language coverage report; only published translations appear in hreflang and sitemaps |
 | CMS.6 | Reviews: model, purchase verification, supplier import, moderation, vendor reply | P2 | 10 | ORD.2 | AggregateRating schema only with valid reviews |
+| THM.11 | Vendor branding (paid plan option): `BrandPalette` and `VendorBranding` in `vendors` with explicit foreground per role, the nine presets (operator palette included) seeded by a data migration, every preset editable, `derive_palette`, `check_brand_palette` over every registered theme's surface, `nearest_compliant` and `suggest_foreground` offered in one click, logo and banner (CMS.8 images), `render_brand_css` to a hashed same-origin file, storefront and product page hooks gated by `plan_allows`, preview, audit | P2 | 12 | VEN.19, THM.4, VEN.10, CAT.7, CMS.8 | The §14.12 unit tests pass (nine presets valid, `#C65D00` fixed close to `#BE5900`, fixed point unchanged, white on `#FBA926` gives None and `#1A1A1A` as foreground); a custom palette with a 3:1 pair is rejected with its ratio and a one-click fix; a branded vendor's storefront and product pages load its stylesheet with no CSP violation and pass axe; listings and checkout never load it; a vendor whose plan loses the entitlement renders with the theme only and keeps its stored branding |
 | SEO.4 | Merchant API sync + Meta feed | P2 | 8 | SEO.3 | Daily delta report |
 | SEO.6 | Anonymous page cache, responsive renditions, CWV budget | P2 | 6 | THM.3 | LCP < 2.5 s on product page |
 | AI.1 | MCP server: auth, read tools (catalog, orders, quotes, simulations, reports) | P2 | 12 | CORE.7 | Tools usable from Claude Code with scopes |

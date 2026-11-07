@@ -77,6 +77,7 @@ flowchart TD
   core --> accounts
   core --> themes
   core --> vendors
+  themes -.pure palette functions, THM.11.-> vendors
   accounts --> vendors
   vendors --> catalog
   vendors --> tax
