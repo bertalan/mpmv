@@ -1,7 +1,7 @@
 """Catalog services: audited price changes (CAT.1), audited product and variant edits (CAT.12),
 taxonomy queries (CAT.2), the catalogue integrity rules (CAT.14), and products created with
-typed attributes, variant axes and variants (CAT.3), and product slugs with their history
-(CAT.5).
+typed attributes, variant axes and variants (CAT.3), product slugs with their history (CAT.5),
+and the listing query (CAT.8).
 
 Every price change goes through here, whatever the adapter (admin, API, import, MCP): it is
 validated, returned as a ChangeSet (dry-run) and written to the audit log. The 30-day price
@@ -9,7 +9,9 @@ history for the Omnibus rule (CMP.6) can be built from these audit rows.
 """
 
 import datetime as dt
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
@@ -25,13 +27,16 @@ from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.services import audit_changes, run_mutation
 from apps.vendors.models import Vendor
+from apps.vendors.scoping import VendorScopedQuerySet
 from apps.vendors.services import vendors_in_suggestions
 
-from . import engine, slugs
+from . import engine, listings, slugs
 from .models import (
     Attribute,
     AttributeValue,
+    Brand,
     Category,
+    CategoryTranslation,
     FiscalCategory,
     Product,
     ProductAttribute,
@@ -41,7 +46,10 @@ from .models import (
     SalesMode,
     SlugHistory,
     StockStatus,
+    Taxonomy,
+    TaxonomyTranslation,
     Term,
+    TermTranslation,
     Variant,
     VariantOption,
 )
@@ -1002,3 +1010,220 @@ def old_slug_redirect(language: str, slug: str) -> str | None:
     if current is None:
         return None
     return slugs.product_path(language, current, default_language=settings.LANGUAGE_CODE)
+
+
+# --- Listings (CAT.8): the query behind category, term, brand and vendor pages and the CMS
+# product grid (CMS.10). Parsing and URLs are pure (`listings`); slugs and querysets are here.
+
+LISTING_ORDER = ("-created_at", "-pk")  # newest first; the pk keeps pages stable
+LISTING_PER_PAGE = 24
+
+
+@dataclass(frozen=True)
+class ListingScope:
+    """The fixed context of a listing: the page it is on, or the CMS grid's selection.
+
+    Each given part narrows the listing; a category or term includes its subtree.
+    """
+
+    category: Category | None = None
+    term: Term | None = None
+    brand: Brand | None = None
+    vendor: Vendor | None = None
+
+
+@dataclass(frozen=True)
+class ListingFilter:
+    """Visitor filters resolved to tree paths and objects.
+
+    Categories are OR-ed; term groups are AND-ed, the terms of one group (one taxonomy) OR-ed,
+    each with its subtree. A price bound keeps only products with a public price (Q-31).
+    """
+
+    category_paths: tuple[str, ...] = ()
+    term_groups: tuple[tuple[str, ...], ...] = ()
+    vendor: Vendor | None = None
+    price_min: Decimal | None = None
+    price_max: Decimal | None = None
+    matches_nothing: bool = False
+
+
+@dataclass(frozen=True)
+class ResolvedFilter:
+    filters: ListingFilter
+    unknown: tuple[str, ...] = ()  # keys with a value that matched nothing (a stale link)
+
+
+@dataclass(frozen=True)
+class ListingPage:
+    params: listings.ListingParams
+    products: list[Product]
+    window: listings.PageWindow
+    unknown: tuple[str, ...]
+
+
+def listed_products() -> "VendorScopedQuerySet[Product]":
+    """Products a visitor may see in a listing: published, of an active vendor.
+
+    Retired products keep their page (spec 03 §3.2) but leave the listings. Products without a
+    public price are listed, showing "Price on request".
+    """
+    return Product.objects.filter(
+        status=ProductStatus.PUBLISHED, vendor__status=Vendor.Status.ACTIVE
+    )
+
+
+def _in_subtrees(field: str, paths: Iterable[str]) -> Q:
+    q = Q()
+    for path in paths:
+        q |= Q(**{f"{field}__path__startswith": path})
+    return q
+
+
+def _matching(products: "QuerySet[Product]", condition: Q) -> "QuerySet[Product]":
+    """Narrow through a subquery, so a to-many join never duplicates a product."""
+    return products.filter(pk__in=Product.objects.filter(condition).values("pk"))
+
+
+NO_SCOPE = ListingScope()
+NO_FILTER = ListingFilter()
+
+
+def listing_products(
+    scope: ListingScope = NO_SCOPE, filters: ListingFilter = NO_FILTER
+) -> "QuerySet[Product]":
+    """The listed products of `scope` matching `filters`, newest first. Slice it for a grid."""
+    scoped = listed_products()
+    if filters.matches_nothing:
+        return scoped.none()
+    for vendor in (scope.vendor, filters.vendor):
+        if vendor is not None:
+            scoped = scoped.for_vendor(vendor)  # the tenant scope (CORE.3)
+    products: QuerySet[Product] = scoped
+    if scope.brand is not None:
+        products = products.filter(brand=scope.brand)
+    category_paths = (scope.category.path,) if scope.category is not None else ()
+    for paths in (category_paths, filters.category_paths):
+        if paths:
+            in_tree = _in_subtrees("category", paths) | _in_subtrees("secondary_categories", paths)
+            products = _matching(products, in_tree)
+    scope_terms = ((scope.term.path,),) if scope.term is not None else ()
+    for group in (*scope_terms, *filters.term_groups):
+        products = _matching(products, _in_subtrees("terms", group))
+    if filters.price_min is not None or filters.price_max is not None:
+        products = products.filter(sales_mode=SalesMode.BUY, price_net__isnull=False)
+        if filters.price_min is not None:
+            products = products.filter(price_net__gte=filters.price_min)
+        if filters.price_max is not None:
+            products = products.filter(price_net__lte=filters.price_max)
+    return products.order_by(*LISTING_ORDER)
+
+
+def _owners_by_slug(
+    rows: "QuerySet[Any]", owner: str, slugs_: Iterable[str], language: str
+) -> dict[str, set[int]]:
+    """Owner ids per slug, in `language` or, for owners without a text in it, the source
+    language (explicit EN fallback, D-18)."""
+    source = translations.source_language()
+    found = rows.filter(slug__in=list(slugs_), language__in={language, source})
+    candidates = list(found.values_list(f"{owner}_id", "language", "slug"))
+    translated = set(
+        rows.filter(
+            language=language, **{f"{owner}_id__in": {c[0] for c in candidates}}
+        ).values_list(f"{owner}_id", flat=True)
+    )
+    owners: dict[str, set[int]] = {}
+    for owner_id, row_language, slug in candidates:
+        if row_language == language or owner_id not in translated:
+            owners.setdefault(slug, set()).add(owner_id)
+    return owners
+
+
+def listing_term_keys(language: str) -> dict[str, Taxonomy]:
+    """The filterable taxonomies by their slug in `language` (EN fallback): the query keys of
+    the term filters. A slug equal to a reserved listing parameter is left out."""
+    source = translations.source_language()
+    by_taxonomy: dict[int, TaxonomyTranslation] = {}
+    rows = TaxonomyTranslation.objects.filter(
+        taxonomy__filterable=True, language__in={language, source}
+    ).select_related("taxonomy")
+    for row in rows:
+        if row.taxonomy_id not in by_taxonomy or row.language == language:
+            by_taxonomy[row.taxonomy_id] = row
+    return {
+        row.slug: row.taxonomy
+        for row in by_taxonomy.values()
+        if row.slug and row.slug not in listings.RESERVED_KEYS
+    }
+
+
+def parse_listing_query(query: Mapping[str, Sequence[str]], language: str) -> listings.ParsedParams:
+    """`listings.parse_listing_params` with the taxonomy keys of `language`."""
+    return listings.parse_listing_params(query, term_keys=listing_term_keys(language).keys())
+
+
+def _paths(model: Any, ids: Iterable[int]) -> tuple[str, ...]:
+    return tuple(
+        model.objects.filter(pk__in=set(ids)).order_by("path").values_list("path", flat=True)
+    )
+
+
+def resolve_listing_filter(params: listings.ListingParams, language: str) -> ResolvedFilter:
+    """Turn the slugs of `params` into a filter. A value that matches nothing (a renamed term,
+    a closed vendor) is reported in `unknown`, and the filter then matches nothing: the
+    adapter answers 404 or redirects to the canonical URL without it."""
+    unknown: list[str] = []
+    category_paths: tuple[str, ...] = ()
+    if params.category:
+        owners = _owners_by_slug(
+            CategoryTranslation.objects.all(), "category", [params.category], language
+        )
+        category_paths = _paths(Category, owners.get(params.category, set()))
+        if not category_paths:
+            unknown.append(listings.CATEGORY)
+    taxonomies = listing_term_keys(language) if params.terms else {}
+    term_groups: list[tuple[str, ...]] = []
+    for key, term_slugs in params.terms:
+        taxonomy = taxonomies.get(key)
+        owners = {}
+        if taxonomy is not None:
+            rows = TermTranslation.objects.filter(term__taxonomy=taxonomy)
+            owners = _owners_by_slug(rows, "term", term_slugs, language)
+        if any(slug not in owners for slug in term_slugs):
+            unknown.append(key)
+        term_groups.append(_paths(Term, set().union(*owners.values())))
+    vendor = None
+    if params.vendor:
+        vendor = Vendor.objects.filter(slug=params.vendor, status=Vendor.Status.ACTIVE).first()
+        if vendor is None:
+            unknown.append(listings.VENDOR)
+    filters = ListingFilter(
+        category_paths=category_paths,
+        term_groups=tuple(term_groups),
+        vendor=vendor,
+        price_min=params.price_min,
+        price_max=params.price_max,
+        matches_nothing=bool(unknown),
+    )
+    return ResolvedFilter(filters=filters, unknown=tuple(sorted(unknown)))
+
+
+def listing_page(
+    scope: ListingScope,
+    params: listings.ListingParams,
+    language: str,
+    *,
+    per_page: int = LISTING_PER_PAGE,
+) -> ListingPage:
+    """One page of a listing: its products, the page window and the unknown filter keys.
+
+    A page past the end has no products and `window.out_of_range` (the adapter answers 404).
+    """
+    resolved = resolve_listing_filter(params, language)
+    products = listing_products(scope, resolved.filters)
+    window = listings.page_window(total=products.count(), page=params.page, per_page=per_page)
+    rows: list[Product] = []
+    if not window.out_of_range:
+        selected = products.select_related("vendor", "brand", "category")
+        rows = list(selected[window.offset : window.offset + window.limit])
+    return ListingPage(params=params, products=rows, window=window, unknown=resolved.unknown)
