@@ -67,8 +67,29 @@ class GpsrInfo(Model):
 - Form for reporting illegal content (notice & action) with tracking, a reasoned decision and
   notification to the vendor.
 - Vendor traceability (KYBC): identification data verified before activation (also covers D.1).
-- Versioned platform-vendor terms with tracked acceptance; advance notice of changes and
-  suspensions; transparency on the ranking criteria of results (dedicated page).
+- Versioned platform-vendor terms with tracked acceptance and advance notice of changes are built
+  in VEN.5 and VEN.13 to VEN.16 (see the vendor contract section below). CMP.5 keeps notice of
+  suspensions and the transparency on the ranking criteria of results (dedicated page).
+
+### Vendor contracts: language and acceptance evidence
+- The vendor contract follows the vendor's language (IT, EN, DE, FR, ES), one text per language,
+  and each version declares a prevailing language that wins in case of discrepancies; the clause
+  is printed in every rendered PDF. Without a text in the vendor's language the vendor accepts the
+  English text and explicitly acknowledges it. Details in [04](04-vendors-commissions-ledger.md).
+- Acceptance is a simple electronic signature under eIDAS (email one-time code plus MFA step-up),
+  with the exact personalized PDF, its SHA-256 hash and an RFC 3161 timestamp. A qualified
+  signature upload (VEN.17, P2) gives stronger evidence. ⚖️ Check with legal counsel which
+  clauses need specific written approval (Italian civil code, articles 1341 and 1342) and whether
+  a simple electronic signature is enough for them, or the qualified option is needed.
+- Retention: the PDF, the evidence package, the timestamp token and any signed upload are kept in
+  the private bucket for the whole vendor relationship and then for the retention period (proposed
+  default: 10 years after the relationship ends, the ordinary limitation period in Italy ⚖️). The
+  signer's personal data in the evidence are kept on the basis of establishing and defending legal
+  claims (GDPR article 17(3)(e)), so a CMP.4 erasure request does not delete them; the CMP.4
+  retention job deletes the files when the period ends. Evidence files are append-only and are
+  never rewritten.
+- Timestamps come from a TSA behind the `TimestampAuthority` interface; the choice between a free
+  TSA and a qualified one is an owner decision.
 
 ### CMP.6 — Consumer rights `[P1]`
 - **Online withdrawal function** (EU directive 2023/2673, amending directive 2011/83/EU):
@@ -99,6 +120,6 @@ class GpsrInfo(Model):
 | CMP.2 | Commission document from the ledger (party block from VEN.12) + `EInvoiceChannel` interface + export per vendor | P1 | 12 | VEN.4, VEN.12 | Test document generated |
 | CMP.3 | `GpsrInfo` with per-vendor defaults, publication block, product page, recall procedure | P1 | 8 | CAT.1 | Product without GPSR cannot be published |
 | CMP.4 | GDPR: customer export and anonymization, sub-processor register, retention job | P1 | 10 | ORD.2 | Erasure request on a seed order |
-| CMP.5 | DSA notice & action + versioned vendor terms with acceptance | P2 | 8 | VEN.5 | Notice with tracked outcome |
+| CMP.5 | DSA notice & action, notice of suspensions and ranking transparency page (vendor terms acceptance is VEN.5, VEN.13 to VEN.16) | P2 | 6 | VEN.5 | Notice with tracked outcome |
 | CMP.6 | Online withdrawal, 30-day price history (Omnibus), pre-contractual information | P1 | 8 | ORD.2, CAT.1 | Correct strikethrough price in tests |
 | CMP.7 | Automated accessibility audit in CI (axe) + manual review + statement | P1 | 8 | CMS.7 | Zero critical violations on key pages |
