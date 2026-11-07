@@ -14,13 +14,20 @@
 
 | Item | Hours | How it is calculated |
 |---|---:|---|
-| P1 micro-tasks | 1,479 | Sum from the generated backlog |
+| P1 micro-tasks | 1,494 | Sum from the generated backlog |
 | Integrated and end-to-end acceptance testing, exploratory tests | 100 | ~10% of P1 |
 | Mandatory human review of tax, payments, ledger, orders, security | 50 | ~15% of the hours for TAX, PAY, VEN, ORD, SEC |
 | Coordination, ADRs, meetings with tax advisor and legal counsel | 80 | ~8% of P1 |
-| **Subtotal** | **1,709** | |
-| Contingency for unforeseen issues (10–25% of P1) | 148–370 | Tax and payment domain, dirty legacy data |
-| **Go-live total** | **≈ 1,857–2,079** | |
+| **Subtotal** | **1,724** | |
+| Contingency for unforeseen issues (10–25% of P1) | 149–374 | Tax and payment domain, dirty legacy data |
+| **Go-live total** | **≈ 1,873–2,098** | |
+
+The SHP.12 implementation (#54) added the SHP.12 row it built and the SHP.13 and SHP.14 rows it
+found missing (+34 h of P1). Coherence check 5 (2026-11-07) added ARC.17 (1 h, e-invoicing
+leftovers), ARC.18 (2 h, architecture guards), CAT.12 (4 h, audited product edits), CORE.14 (3 h,
+vendor key policy), TAX.11 (2 h, shared postcode grammar for tax territories) and CMP.25 (4 h,
+activation gate for the DSA article 30 data), grew VEN.18 (2 → 3 h, RF20 in the tax request) and
+narrowed SHP.2 to the legacy cases (8 → 6 h): +15 h of P1.
 
 The events module (2026-11-07, [15](15-events.md)) adds EVT.1 to EVT.15 (113 h of P1: event
 pages and moderation, recurrence, vendor area and API, public pages, closure-aware dispatch date,
@@ -66,7 +73,7 @@ notifications, Google geocoder and map layer…), about **330–380 h** includin
 | | August plan | This review |
 |---|---:|---:|
 | Scope | Full WCFM parity + P1 commercial modules | Parity **with what is actually used** + 2026 compliance |
-| Total hours (development, testing, migration) | 1,740–2,540 | 1,857–2,079 to go-live |
+| Total hours (development, testing, migration) | 1,740–2,540 | 1,873–2,098 to go-live |
 | With AI-assisted development | 1,450–2,100 | already included |
 
 Where the difference comes from:
@@ -131,60 +138,65 @@ maintenance hours for updates, incompatibilities and fixes (STAGE, test matrices
 This section is a forecast, not a commitment. It does not replace the hours above, which stay the
 reference for a human team. It is refreshed at every coherence check.
 
-### Measurement of 2026-11-07
+### Measurement of 2026-11-07 (coherence check 5, after wave 6)
 
 Source: merged pull requests and their timestamps, the generated backlog, and the plan usage meter.
 
-- **Done:** 30 P1 tasks, worth **225 estimated hours**. They are waves 0–5: ARC, CORE, VEN.1/5/12,
-  SEC.1/3/4, I18N.1/2, SHP.1, CAT.1, TAX.1 and CMS.1.
-- **Throughput:** one wave of 5 tasks is worth 36–44 estimated hours. Implementation, independent
-  review, fixes, CI and merge take **80–95 minutes** of wall-clock time, about 25–30 times faster
-  than the estimate.
-- **Real limit:** the AI plan's weekly budget, not speed. At 35% of the weekly budget (spec writing
-  included) with work stopping at 80%, one week covers about **500 estimated hours** of agent work.
+- **Done:** 33 P1 tasks, worth **253 estimated hours** (waves 0–6; I18N.1 and CORE.7 are partial,
+  waiting for STAGE), plus the P2 tasks ARC.8 and OPS.4 (9 h).
+- **Wave 6** (CAT.2, SHP.12, TAX.2, ARC.8, OPS.4: 37 estimated hours): implementation, independent
+  review and fixes ran from 12:33 to 13:10 (37 minutes); integration (merges in order, CI on each
+  rebased branch, one Dependabot follow-up) ended with the last task merge at 13:57 and the progress
+  update at 14:04. That is **84 minutes** for 37 estimated hours, about 26 times faster than the
+  estimate, in line with waves 0–5 (one wave of 5 tasks, 36–44 hours, in 80–95 minutes).
+- **Integration is now half of the wall-clock time** (37 of 84 minutes in wave 6): five branches
+  touching migrations, the tenancy registry and spec tables merge one after the other.
+- **Real limit:** the AI plan's weekly budget, not speed. With work stopping at 80% of the weekly
+  budget, one week covers about **500 estimated hours** of agent work.
 
 ### Forecast for the rest of P1
 
-97 P1 tasks remained, worth 947 estimated hours. The theme rows added the same day (THM.1 to
-THM.10 and CMP.9, replacing CMS.7) bring this to 107 tasks and 996 hours, the regulatory check
-rows (CMP.5 moved to P1, CMP.8, CMP.10 to CMP.13, VEN.18) to 114 tasks and 1,064 hours, the
-owner's theme answers (CMS.8 and CMS.9) to 116 tasks and 1,073 hours, and the D-21 answers
-(CMP.11 grows, CMP.14, CMP.15 and CMP.24 added) to 119 tasks and 1,097 hours, and the events
-module (EVT.1 to EVT.15) to 134 tasks and 1,210 hours, and the owner's events answers (VEN.20
-added, EVT.7 smaller) to 135 tasks and 1,220 hours.
+**141 P1 tasks remain, worth 1,241 estimated hours.** At the previous measurement 134 tasks and
+1,210 hours remained; since then the owner's events answers added VEN.20 and shrank EVT.7 (+10 h),
+wave 6 closed 28 P1 hours, the SHP.12 implementation added SHP.12 to SHP.14 (+34 h) and coherence
+check 5 added six small rows and resized two (+15 h, §91.2).
 
 | Part | Estimated hours | Done by | Forecast |
 |---|---:|---|---|
-| Code and tests (CAT, ORD, SHP, TAX, PAY, VEN, CMP, ING, SEO, CMS, THM, EVT, …) | ~1,010 | agents | 40–50 h of agent runtime, including ~30% for integration, coherence checks and rework |
+| Code and tests (CAT, ORD, SHP, TAX, PAY, VEN, CMP, ING, SEO, CMS, THM, EVT, …) | ~1,040 | agents | 40–50 h of agent runtime, including ~30% for integration, coherence checks and rework |
 | Migration with real data, dress rehearsals, cutover (MIG.7, MIG.9, MIG.10) | ~45 | agents and people | included in the people hours below |
+| Minor review findings of waves 5 and 6 (41 items, [progress](../progress.md)) | ~20 | agents | one cleanup wave of 5 batches, about 1.5 h of wall-clock time |
 
 That is at least two weekly budgets, so **3–4 calendar weeks for P1 code**, provided the open
-decisions are answered in time.
+decisions are answered in time. The schedule is now gated more by decisions and accounts than by
+agent time: STAGE (ARC.13, which needs the Hetzner account) gates 51 P1 tasks worth 489 hours, and
+the open D-xx decisions gate most of the rest (D-07 29 tasks and 241 hours, D-04 20 tasks and 239
+hours, D-06 21 tasks and 173 hours, D-14 11 tasks and 124 hours, D-01 12 tasks and 106 hours).
 
 Work that agents cannot speed up:
 
 | Activity | People hours |
 |---|---:|
 | Owner decisions (question register and open D-xx) | 5–8 |
-| Tax advisor and legal counsel (D-01, D-02, D-03, D-08, the D-21 UK confirmation, double signature, CMP.24 approvals) | 5–10, plus 2–6 weeks of waiting |
+| Tax advisor and legal counsel (D-01, D-02, D-03 now covering the per-method shipping VAT treatment, D-08, the D-21 UK confirmation, the RF20 mapping of VEN.18, the Swiss threshold of CMP.16, double signature, the one-off review of the (L) wording with the CMP.24 approvals and the CMP.25 self-certification) | 8–14, plus 2–6 weeks of waiting |
 | Human review of tax, payments, ledger and orders code | 30–50 |
 | Hetzner, DNS, Stripe Connect and email provider accounts | 6–12 |
 | Migration checks and dress rehearsals | 15–25 |
 | Content, legal pages, semi-manual blog migration | 15–30 |
 | Acceptance testing with vendors A–E | 20–40 |
 | Go-live and monitoring | 10–20 |
-| **Total** | **≈ 105–195** |
+| **Total** | **≈ 109–199** |
 
 **Result:** about **150–250 people hours** plus about two weekly agent budgets, against
-1,857–2,079 hours for a human team (§91.2). Realistic calendar to go-live: **2–3 months**. The
-pace is set by external waits: legal counsel, Stripe Connect verification, the external
-penetration test (SEC.6) and the three dress rehearsals (MIG.9).
+1,873–2,098 hours for a human team (§91.2). Realistic calendar to go-live: **2–3 months**. The
+pace is set by external waits: legal counsel, the Hetzner account for STAGE, Stripe Connect
+verification, the external penetration test (SEC.6) and the three dress rehearsals (MIG.9).
 
 ### Limits of this forecast
 
-- The 30 tasks done so far are foundations with a very clear spec. Tax, payments and orders need
+- The 33 tasks done so far are foundations with a very clear spec. Tax, payments and orders need
   more integration, and agent speed may halve. Even then, P1 code stays within 4–6 weeks.
-- Minor review findings are still open (see [progress](../progress.md)). They are rework that the
-  measurement does not yet include.
+- The 41 open minor review findings (see [progress](../progress.md)) are counted above as a
+  cleanup wave; findings of later waves will add to it.
 - People hours assume one owner working with the agents. A separate senior reviewer changes who
   does the review, not the total.

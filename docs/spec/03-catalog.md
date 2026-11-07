@@ -156,3 +156,4 @@ needed for most of the catalog. The `/tag-product/{slug}/` and
 | CAT.9 | FTS + trigram + SKU prefix search (including variants) | P1 | 8 | CAT.1 | Tests on partial SKUs and typos |
 | CAT.10 | `upsert_products`/`publish`/`retire` services with dry-run and publishing rules | P1 | 10 | CAT.1, CMP.3 | ChangeSet verified in tests |
 | CAT.11 | Catalog admin (Wagtail ViewSet): filters, bulk actions, preview, translation status | P2 | 10 | CORE.8 | Staff edit products without the API |
+| CAT.12 | Audited product edit service (coherence check 5): changes to `fiscal_category`, `sales_mode`, weight and dimensions and the owning vendor go through a `catalog.services` function with dry-run, ChangeSet and AuditLog; the product and variant admins call it instead of saving directly | P1 | 4 | CAT.1, SEC.4 | A fiscal category change made in the admin shows in the audit view with before and after; a dry run writes nothing; `core.E203` passes without the price-only exemption |
