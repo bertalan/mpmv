@@ -62,7 +62,9 @@ class VendorTaxProfile(Model):                 # versioned: new row on every app
     legal_note (translated)                    # e.g. bilingual art. 74 wording
     oss_registered_since; valid_from; valid_to; approved_by; requested_by
     # Consistent with Vendor.fiscal_regime (VEN.12), never duplicating it: RF19 (forfettario)
-    # if and only if exempt with reason flat_rate_forfettario.
+    # if and only if exempt with reason flat_rate_forfettario. RF20 (cross-border franchise,
+    # VEN.18) takes any regime but that one, and the consistency check flags every RF20 profile
+    # for a manual review until the tax advisor gives its VAT mapping.
 
 class VatValidation(Model):                    # cache of VIES results, append-only
     vat_number (without prefix); country (ISO, GR not EL)

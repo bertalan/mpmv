@@ -619,7 +619,7 @@ def test_missing_mandatory_values_are_all_reported() -> None:
         fatturapa_party(identity, CEDENTE)
     assert excinfo.value.problems == (
         "vat_number: IdFiscaleIVA is mandatory for the CedentePrestatore",
-        "fiscal_regime: RegimeFiscale is mandatory (RF01-RF19)",
+        "fiscal_regime: RegimeFiscale is mandatory (RF01-RF20)",
         "registered_street: Indirizzo is mandatory",
         "registered_postal_code: CAP is mandatory",
         "registered_city: Comune is mandatory",
