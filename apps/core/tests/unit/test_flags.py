@@ -54,7 +54,8 @@ def test_a_flag_registered_after_the_apps_loaded_fails_the_registration_check() 
 
 
 def test_the_registration_check_runs_with_the_system_checks() -> None:
-    assert flags.check_flag_registration in checks.registry.registry.get_checks()
+    registered_checks: list[object] = list(checks.registry.registry.get_checks())
+    assert flags.check_flag_registration in registered_checks
 
 
 def test_a_registered_test_flag_is_gone_afterwards() -> None:

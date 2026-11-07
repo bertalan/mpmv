@@ -34,6 +34,10 @@ def test_a_public_base_url_passes() -> None:
         assert check_base_url(None) == []
 
 
+def _registered(*, deploy: bool) -> list[object]:
+    return list(checks.registry.registry.get_checks(include_deployment_checks=deploy))
+
+
 def test_the_base_url_is_checked_on_deploy_only() -> None:
-    assert check_base_url in checks.registry.registry.get_checks(include_deployment_checks=True)
-    assert check_base_url not in checks.registry.registry.get_checks()
+    assert check_base_url in _registered(deploy=True)
+    assert check_base_url not in _registered(deploy=False)
