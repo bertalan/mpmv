@@ -10,6 +10,7 @@ from apps.core.postcodes import (
     match_postcode,
     normalize_postcode,
     normalize_postcode_pattern,
+    parse_postcode_pattern,
 )
 
 
@@ -69,6 +70,30 @@ def test_malformed_patterns_are_refused(raw: str) -> None:
 def test_the_old_range_syntax_is_refused_with_a_hint() -> None:
     with pytest.raises(InvalidPostcodePattern, match=r"70000\.\.74999"):
         normalize_postcode_pattern("70000-74999")
+
+
+@pytest.mark.parametrize(
+    "raw", ["70000 - 74999", "70000 -74999", "70000- 74999", "70000  -  74999"]
+)
+def test_a_spaced_dash_range_is_refused_with_the_same_hint(raw: str) -> None:
+    # SHP.2: spaces around the dash must not turn the old range form into an exact postcode.
+    with pytest.raises(InvalidPostcodePattern, match=r"70000\.\.74999"):
+        normalize_postcode_pattern(raw)
+    with pytest.raises(InvalidPostcodePattern, match=r"70000\.\.74999"):
+        parse_postcode_pattern(raw)
+
+
+@pytest.mark.parametrize("raw", ["00-950", "9000-001", "1000 - 001", "846 00"])
+def test_postcodes_with_a_dash_of_unequal_parts_stay_exact_postcodes(raw: str) -> None:
+    assert parse_postcode_pattern(raw).kind == "exact"
+
+
+def test_a_parsed_pattern_matches_like_match_postcode() -> None:
+    parsed = parse_postcode_pattern("70000..74999")
+    assert parsed.matches("70 100")
+    assert parsed.matches_normalized("70100")
+    assert not parsed.matches_normalized("")
+    assert not parsed.matches_normalized("75000")
 
 
 @pytest.mark.parametrize(

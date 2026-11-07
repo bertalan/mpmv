@@ -9,9 +9,11 @@ and depends on open decisions D-01 (country of taxation), D-02 (Northern Ireland
 
 import datetime as dt
 import re
+from collections.abc import Iterable
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Final
 
+from apps.core.postcodes import match_postcode
 from apps.vendors import engine as vendors
 
 # --- Vendor VAT regime (VendorTaxProfile)
@@ -226,7 +228,7 @@ def rate_error(category: str, rate: Decimal) -> str | None:
     return None
 
 
-# --- Territories with a special VAT status (data only; TAX.7 matches postcodes)
+# --- Territories with a special VAT status (data only; TAX.7 decides what a match means)
 
 OUTSIDE_VAT_AREA: Final = "outside_vat_area"  # e.g. Canary Islands, Livigno, Åland
 OWN_RATES: Final = "own_rates"  # inside the VAT area with rates of its own (e.g. Madeira)
@@ -235,14 +237,9 @@ TERRITORY_STATUSES: Final = (OUTSIDE_VAT_AREA, OWN_RATES, SPECIAL)
 
 TERRITORY_CODE_MAX_LENGTH: Final = 16
 _TERRITORY_CODE = re.compile(r"[A-Z]{2}(-[A-Z0-9]{1,12})?", re.ASCII)
-_POSTCODE_PATTERN = re.compile(r"[A-Z0-9]+( [A-Z0-9]+)?\*?|[A-Z0-9]+-[A-Z0-9]+", re.ASCII)
 
 
 class InvalidTerritoryCode(ValueError):
-    pass
-
-
-class InvalidPostcodePattern(ValueError):
     pass
 
 
@@ -257,15 +254,13 @@ def normalize_territory_code(raw: str) -> str:
     return code
 
 
-def normalize_postcode_pattern(raw: str) -> str:
-    """An exact postcode (`23041`), a prefix ending in `*` (`35*`) or a range (`22100-22199`)."""
-    pattern = raw.strip().upper()
-    if not _POSTCODE_PATTERN.fullmatch(pattern):
-        raise InvalidPostcodePattern(
-            f"{raw!r} is not a postcode pattern: an exact postcode, a prefix ending in '*' or "
-            "a range like 22100-22199."
-        )
-    return pattern
+def postcode_in_territory(patterns: Iterable[str], postcode: str) -> bool:
+    """True when `postcode` matches one of a territory's postcode patterns.
+
+    The patterns follow the grammar shared with shipping zones (`apps.core.postcodes`, TAX.11):
+    exact `23041`, prefix `35*`, range `9000..9999`. An empty postcode matches nothing.
+    """
+    return any(match_postcode(pattern, postcode) for pattern in patterns)
 
 
 # --- VIES answers (VatValidation), the results of VEN.12's VatNumberValidator

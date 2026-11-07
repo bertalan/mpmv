@@ -1,4 +1,4 @@
-"""factory_boy factories for shipping (SHP.1, SHP.12). Synthetic values only.
+"""factory_boy factories for shipping (SHP.1, SHP.12, SHP.13). Synthetic values only.
 
 Codes and labels are generic ("carrier-0", "Zone 0", "group-0"); vendors come from the vendors
 factories (pseudonyms). Weight bands default to 0-5 kg; pass `from_kg`/`to_kg` explicitly in
@@ -12,6 +12,7 @@ import factory
 from factory.django import DjangoModelFactory
 
 from apps.shipping import engine
+from apps.shipping.config_format import empty_document
 from apps.shipping.models import (
     Carrier,
     CarrierTranslation,
@@ -22,6 +23,7 @@ from apps.shipping.models import (
     ShippingConfigVersion,
     ShippingMethod,
     ShippingMethodTranslation,
+    ShippingTemplate,
     ShippingZone,
     WeightBand,
 )
@@ -151,6 +153,18 @@ class PickupOptionTranslationFactory(DjangoModelFactory[PickupOptionTranslation]
     pickup_option = factory.SubFactory(PickupOptionFactory)
     language = "en"
     label = "Pick up at the shop"
+
+
+class ShippingTemplateFactory(DjangoModelFactory[ShippingTemplate]):
+    """An empty, non-standard template; pass a `document` of the configuration file format."""
+
+    class Meta:
+        model = ShippingTemplate
+
+    code = factory.Sequence(lambda n: f"template-{n}")
+    name = factory.Sequence(lambda n: f"Template {n}")
+    is_standard = False
+    document = factory.LazyFunction(empty_document)
 
 
 class ShippingConfigVersionFactory(DjangoModelFactory[ShippingConfigVersion]):
