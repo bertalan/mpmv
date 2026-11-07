@@ -1,5 +1,5 @@
 """Tax configuration (spec 05 §5.2, TAX.1): rates, special territories, vendor VAT regimes and
-the cache of VIES answers.
+the cache of VIES answers; the vendors' regime change requests (TAX.2).
 
 Rates and vendor tax profiles are versioned configuration, like `PlatformOperator` (ARC.7):
 rows are history, a change is a new row valid from a date that closes the current one (through
@@ -16,10 +16,11 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models.functions import Coalesce
+from django.utils import timezone
 
 from apps.core.fields import CountryField
 from apps.core.models import BaseModel, TranslationModel, TsTzRange
-from apps.vendors.models import Vendor
+from apps.vendors.models import FiscalRegime, Vendor
 from apps.vendors.scoping import VendorScopedManager
 
 from . import engine
@@ -249,7 +250,8 @@ class ExemptReason(models.TextChoices):
 
 
 class VendorTaxProfile(Versioned):
-    """A vendor's VAT regime for a period: a new row on every approved change (TAX.2).
+    """A vendor's VAT regime for a period: a new row on every approved change (TAX.2,
+    `TaxRegimeChangeRequest`).
 
     The fiscal regime declared on invoices (`Vendor.fiscal_regime`, VEN.12) stays on the vendor;
     `clean()` keeps the two consistent (`engine.profile_errors`: RF19 ⇔ flat-rate exemption).
@@ -346,6 +348,153 @@ class VendorTaxProfileTranslation(TranslationModel):
 
     def __str__(self) -> str:
         return f"{self.profile} [{self.language}]"
+
+
+# --- Regime change requests (TAX.2)
+
+
+class RegimeChangeStatus(models.TextChoices):
+    PENDING = engine.PENDING, "Pending review"
+    APPROVED = engine.APPROVED, "Approved"
+    REJECTED = engine.REJECTED, "Rejected"
+
+
+class TaxRegimeChangeRequest(BaseModel):
+    """A vendor owner asks for a new VAT regime from a date; staff approve or reject it.
+
+    Written only through `apps.tax.services` (`request_regime_change`, `approve_regime_change`,
+    `reject_regime_change`), which check who may act and audit every step. An approval creates
+    the new `VendorTaxProfile` version (`profile`) and, when the request moves it, the vendor's
+    declared fiscal regime (VEN.12), in one transaction. Reviews are final: the rows are the
+    history of the vendor's requests. A vendor has at most one pending request.
+    """
+
+    Status = RegimeChangeStatus
+    Regime = VatRegime
+    ExemptReason = ExemptReason
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
+
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="tax_regime_requests")
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.PENDING, editable=False
+    )
+    regime = models.CharField("VAT regime", max_length=16, choices=Regime.choices)
+    exempt_reason = models.CharField(
+        max_length=24, choices=ExemptReason.choices, blank=True, help_text="Exempt regime only."
+    )
+    oss_registered_since = models.DateField("OSS registered since", null=True, blank=True)
+    fiscal_regime = models.CharField(
+        max_length=4,
+        choices=FiscalRegime.choices,
+        blank=True,
+        help_text=(
+            "The fiscal regime the vendor will declare on invoices (FatturaPA RegimeFiscale). "
+            "Empty: unchanged, or RF19 for the flat-rate exemption."
+        ),
+    )
+    effective_from = models.DateTimeField(help_text="When the new regime applies.")
+    note = models.TextField(blank=True, help_text="The vendor's explanation for staff.")
+    document_reference = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Supporting document, e.g. an OSS registration or tax office reference.",
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+", editable=False
+    )
+    requested_at = models.DateTimeField(default=timezone.now, editable=False)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        editable=False,
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True, editable=False)
+    review_reason = models.TextField(blank=True, editable=False)
+    profile = models.OneToOneField(
+        VendorTaxProfile,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="request",
+        editable=False,
+        help_text="The profile version the approval created.",
+    )
+
+    class Meta:
+        ordering = ["-requested_at", "-id"]
+        permissions = [
+            ("review_taxregimechangerequest", "Can approve or reject tax regime change requests")
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(status__in=engine.REQUEST_STATUSES),
+                name="tax_regime_request_status_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(regime__in=engine.REGIMES),
+                name="tax_regime_request_regime_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(regime=engine.EXEMPT, exempt_reason__in=engine.EXEMPT_REASONS)
+                    | (~models.Q(regime=engine.EXEMPT) & models.Q(exempt_reason=""))
+                ),
+                name="tax_regime_request_exempt_reason_iff_exempt",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(fiscal_regime__in=["", *FiscalRegime.values]),
+                name="tax_regime_request_fiscal_regime_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        status=engine.PENDING, reviewed_by__isnull=True, reviewed_at__isnull=True
+                    )
+                    | (
+                        ~models.Q(status=engine.PENDING)
+                        & models.Q(reviewed_by__isnull=False, reviewed_at__isnull=False)
+                    )
+                ),
+                name="tax_regime_request_reviewed_iff_not_pending",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(status=engine.APPROVED, profile__isnull=False)
+                    | (~models.Q(status=engine.APPROVED) & models.Q(profile__isnull=True))
+                ),
+                name="tax_regime_request_profile_iff_approved",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(status=engine.REJECTED, review_reason=""),
+                name="tax_regime_request_rejection_has_reason",
+            ),
+            models.UniqueConstraint(
+                fields=["vendor"],
+                condition=models.Q(status=engine.PENDING),
+                name="tax_regime_request_one_pending_per_vendor",
+                violation_error_message="The vendor already has a request waiting for review.",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.vendor} {self.regime} from {self.effective_from:%Y-%m-%d} ({self.status})"
+
+    def clean(self) -> None:
+        if self.vendor_id is None or not self.regime:
+            return
+        errors = engine.request_errors(
+            self.regime,
+            self.exempt_reason,
+            requested_fiscal_regime=self.fiscal_regime,
+            current_fiscal_regime=self.vendor.fiscal_regime,
+        )
+        if errors:
+            raise ValidationError(errors)
 
 
 # --- VIES answers

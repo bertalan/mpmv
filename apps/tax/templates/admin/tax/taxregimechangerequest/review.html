@@ -1,0 +1,50 @@
+{% extends "admin/base_site.html" %}
+{% load admin_urls %}
+{% comment %}TAX.2: approve or reject a vendor's tax regime change request.{% endcomment %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Home</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; <a href="{{ change_url }}">{{ original }}</a>
+  &rsaquo; {{ action }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <div class="module">
+    <h2>Request</h2>
+    <table>
+      <tbody>
+        {% for label, value in summary %}
+          <tr><th scope="row">{{ label }}</th><td>{{ value }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <p class="errornote">The request could not be {% if action == "Approve" %}approved{% else %}rejected{% endif %}.</p>
+      {{ form.non_field_errors }}
+    {% endif %}
+    <fieldset class="module aligned">
+      <div class="form-row{% if form.reason.errors %} errors{% endif %}">
+        {{ form.reason.errors }}
+        <div class="flex-container">
+          <label for="{{ form.reason.id_for_label }}"{% if form.reason.field.required %} class="required"{% endif %}>{{ form.reason.label }}:</label>
+          {{ form.reason }}
+        </div>
+        <div class="help" id="{{ form.reason.id_for_label }}_helptext">{{ form.reason.help_text }}</div>
+      </div>
+    </fieldset>
+    <div class="submit-row">
+      <input type="submit" value="{{ action }}" class="default">
+      <a href="{{ change_url }}" class="closelink">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

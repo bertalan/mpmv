@@ -6,6 +6,7 @@ the versioning rules go through `apps.tax.services` with `.build()`, as the serv
 
 import datetime as dt
 from decimal import Decimal
+from typing import Any
 
 import factory
 from django.utils import timezone
@@ -121,13 +122,15 @@ class VatValidationFactory(DjangoModelFactory[VatValidation]):
 class TaxRegimeChangeRequestFactory(DjangoModelFactory[TaxRegimeChangeRequest]):
     """A pending request by an owner of a vendor declaring RF01, asking for OSS from mid-2027.
 
-    `requested_by` is a new owner membership of the vendor, so the vendor must be saved. Traits:
+    `create()` makes `requested_by` an owner of the vendor (pass `requester_is_owner=False` to
+    skip it); `build()` writes nothing, so tests that build a request pass an owner. Traits:
     `approved` (with the profile version it created) and `rejected` (with a reason). Tests of
     the workflow go through `apps.tax.services` with `.build()`.
     """
 
     class Meta:
         model = TaxRegimeChangeRequest
+        skip_postgeneration_save = True  # the hook adds a membership, not request fields
 
     class Params:
         approved = factory.Trait(
@@ -159,4 +162,10 @@ class TaxRegimeChangeRequestFactory(DjangoModelFactory[TaxRegimeChangeRequest]):
     effective_from = factory.LazyFunction(lambda: utc(2027, 7))
     note = "Registered for the One-Stop Shop."
     document_reference = factory.Sequence(lambda n: f"OSS-REG-{n:05d}")
-    requested_by = factory.LazyAttribute(lambda o: VendorMemberFactory.create(vendor=o.vendor).user)
+    requested_by = factory.SubFactory(UserFactory)
+
+    @factory.post_generation
+    def requester_is_owner(obj: TaxRegimeChangeRequest, create: bool, extracted: Any) -> None:
+        """A created request's requester is an owner of the vendor (role matrix, CORE.2)."""
+        if create and extracted is not False:
+            VendorMemberFactory.create(vendor=obj.vendor, user=obj.requested_by)

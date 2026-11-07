@@ -41,6 +41,7 @@ vendor's change page links to its trail (`?vendor=<public id>`).
 | Product prices (CAT.1) | `catalog.product.price_changed`, `catalog.variant.price_changed` |
 | Shipping configuration (SHP.1) | `shipping.<model>.created`, `.updated`, `.deleted` for carriers, zones, vendor rates, weight bands and pickup options, through `shipping.services.save_config` and `delete_config`; deleting a rate also audits each of its bands |
 | Tax configuration (TAX.1) | `tax.rate.configured`, `tax.vendor_tax_profile.configured` (versioned: the replaced row is `before`), `tax.territory.created`, `.updated`, `tax.legal_note.created`, `.updated`; VIES answers (`tax.vatvalidation`) are an append-only cache, not audited |
+| Tax regime changes (TAX.2) | `tax.regime_change.requested`, `.approved`, `.rejected` (who, the requested regime, the review reason); an approval also writes `tax.vendor_tax_profile.configured` and, when it moves the declared fiscal regime, `vendor.updated` |
 
 Deliberately not stored: password hashes (only `has_usable_password`), API key hashes, TOTP
 secrets, and the identifier typed in a failed login that matches no account (it may be a typo
