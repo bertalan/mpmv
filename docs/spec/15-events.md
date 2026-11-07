@@ -114,7 +114,7 @@ class EventSettings(BaseSiteSetting):          # Wagtail site setting, staff-edi
   translatable. Feeds, JSON-LD and listings read only the structured fields and the summary, never
   the body.
 - **Body.** A StreamField built from the site's block library (CMS.2): rich text, images and
-  galleries with the licence metadata of CMS.8, CTA, product grid, FAQ, the launch countdown block
+  galleries with the licence metadata of CMS.8, CTA, the product grid of CMS.10, FAQ, the launch countdown block
   of CMS.9 (promotions: its target defaults to the event start), and the embeds that the CSP and
   the consent rules allow (SEO.5). Staff get every block; vendors get the vendor-safe subset below.
 - **Status.** `live`, the Wagtail workflow state, `cancelled_at` and `hidden_at` are the source of
