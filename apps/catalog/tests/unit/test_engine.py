@@ -1,4 +1,4 @@
-"""CAT.1 and CAT.2: pure catalog rules (spec 03 §3.2): SKU normalization and price validation,
+"""CAT.1 and CAT.2: pure catalog rules (spec 03 §3.2): price validation,
 the rules of the category and term trees, and the term attributes a taxonomy declares.
 
 Taxonomies are data: their terms' extra fields are declared by the taxonomy (`term_attributes`)
@@ -15,20 +15,6 @@ from apps.catalog import engine
 
 JAN = dt.datetime(2027, 1, 1, tzinfo=dt.UTC)
 FEB = dt.datetime(2027, 2, 1, tzinfo=dt.UTC)
-
-
-@pytest.mark.parametrize(
-    ("raw", "normalized"),
-    [("abc-123", "ABC-123"), ("  Ab_12 ", "AB_12"), ("ABC", "ABC"), ("x9", "X9")],
-)
-def test_sku_is_stripped_and_upper_cased(raw: str, normalized: str) -> None:
-    assert engine.normalize_sku(raw) == normalized
-
-
-@pytest.mark.parametrize("raw", ["", "   ", "\t\n"])
-def test_an_empty_sku_is_refused(raw: str) -> None:
-    with pytest.raises(engine.InvalidSku):
-        engine.normalize_sku(raw)
 
 
 @pytest.mark.parametrize(

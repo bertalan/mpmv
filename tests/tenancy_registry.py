@@ -26,7 +26,13 @@ from django.db import models
 
 from apps.api.models import ApiClient
 from apps.api.tests.factories import ApiClientFactory
-from apps.catalog.models import Product, ProductTranslation, Variant, VariantTranslation
+from apps.catalog.models import (
+    Product,
+    ProductTranslation,
+    SkuAlias,
+    Variant,
+    VariantTranslation,
+)
 from apps.catalog.tests.factories import (
     ProductFactory,
     ProductTranslationFactory,
@@ -79,6 +85,15 @@ from tests.tenancy import (
 
 # --- Vendor-owned models: how to make one object owned by a given vendor
 
+
+def renamed_product_alias(vendor: Vendor) -> SkuAlias:
+    """The alias a SKU rename leaves behind (written by the database, CAT.13)."""
+    product = ProductFactory.create(vendor=vendor)
+    product.sku = f"{product.sku}-RENAMED"
+    product.save()
+    return SkuAlias.objects.get(product=product)
+
+
 OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     Vendor: lambda vendor: vendor,
     ApiClient: lambda vendor: ApiClientFactory.create(vendor=vendor),
@@ -100,6 +115,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
             product=ProductFactory.create(vendor=vendor, kind=Product.Kind.VARIABLE)
         )
     ),
+    SkuAlias: lambda vendor: renamed_product_alias(vendor),
     ShippingZone: lambda vendor: ShippingZoneFactory.create(vendor=vendor),  # a vendor zone
     ShippingMethod: lambda vendor: ShippingMethodFactory.create(vendor=vendor),
     ShippingMethodTranslation: lambda vendor: ShippingMethodTranslationFactory.create(
