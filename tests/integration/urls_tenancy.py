@@ -6,12 +6,12 @@ views make the classic mistakes, so the tests can prove that the harness catches
 
 import uuid
 
-from apps.vendors.scoping import get_vendor_object_or_404
-from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import user_passes_test
 from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.urls import path
 
 from apps.vendors.models import Vendor, VendorMember, VendorTranslation
+from apps.vendors.scoping import get_vendor_object_or_404
 
 
 def member_detail(request: HttpRequest, public_id: uuid.UUID) -> JsonResponse:
@@ -34,7 +34,7 @@ def leaky_member_detail(request: HttpRequest, public_id: uuid.UUID) -> JsonRespo
 
 def forbidden_member_detail(request: HttpRequest, public_id: uuid.UUID) -> HttpResponse:
     member = VendorMember.objects.get(public_id=public_id)
-    if not VendorMember.objects.filter(vendor=member.vendor, user_id=request.user.pk).exists():
+    if not member.vendor.members.filter(user__email=getattr(request.user, "email", "")).exists():
         return HttpResponse(status=403)  # tells the caller that the object exists
     return JsonResponse({"user": member.user.email})
 
@@ -51,7 +51,7 @@ def wrong_member_detail(request: HttpRequest, public_id: uuid.UUID) -> HttpRespo
     raise Http404  # never finds anything: a cross-tenant 404 from it proves nothing
 
 
-@staff_member_required
+@user_passes_test(lambda user: user.is_staff, login_url="/login/")
 def staff_vendor_detail(request: HttpRequest, object_id: str) -> HttpResponse:
     vendor = Vendor.objects.filter(pk=object_id).first()
     if vendor is None:

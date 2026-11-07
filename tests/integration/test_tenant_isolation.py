@@ -10,11 +10,11 @@ registry, and the guards fail when something new is not declared in `tests.tenan
 """
 
 import pytest
-from apps.vendors.scoping import get_vendor_object_or_404, is_vendor_scoped, scope_target
 from django.http import Http404
 from django.test import Client
 
 from apps.vendors.models import Vendor
+from apps.vendors.scoping import get_vendor_object_or_404, is_vendor_scoped, scope_target
 from tests.tenancy import (
     ApiOperation,
     CrossTenant,
