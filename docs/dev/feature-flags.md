@@ -74,11 +74,15 @@ Staff manage flags in the Django admin:
 - *Core → Feature flags* lists every flag row with its description, whether it is a kill
   switch, this environment's default and the effective platform value. The name is chosen from
   the registered flags when a row is added, and cannot be changed afterwards.
-- *Vendors → Vendor feature flags* holds the per-vendor overrides.
+- *Vendors → Vendor feature flags* holds the per-vendor overrides. The vendor and the flag are
+  chosen when an override is added and cannot be changed afterwards; to move an override,
+  delete it and add a new one.
 
 Every page that can change a kill switch asks for a fresh second factor (CORE.4 step-up,
 `settings.STEP_UP_DECORATOR`): the change page of a kill switch, the change and delete pages of
-a kill switch override, and both add pages, because the flag is chosen on them. The overrides
+a kill switch override, and both add pages, because the flag is chosen on them. The change
+page of an ordinary override skips the step-up, which is safe only because its flag is
+read-only there. The overrides
 have no bulk delete action, since it would bypass the step-up.
 
 ## How fast a change takes effect

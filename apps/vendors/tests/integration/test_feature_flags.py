@@ -220,6 +220,27 @@ def test_an_override_of_an_ordinary_flag_needs_no_step_up(
     assert stale_client.get(change).status_code == 200
 
 
+def test_an_ordinary_override_cannot_be_turned_into_a_kill_switch_without_step_up(
+    stale_client: Client, feature: FeatureFlag
+) -> None:
+    """The change page skips step-up for ordinary flags, so it must not let the flag (or the
+    vendor) be swapped: the identity of an override is fixed once it exists."""
+    override = VendorFeatureFlagFactory.create(flag=feature, enabled=True)
+    change = reverse("admin:vendors_vendorfeatureflag_change", args=[override.pk])
+    other = VendorFactory.create()
+    response = stale_client.post(
+        change,
+        {"vendor": other.pk, "flag": switch(flags.CHECKOUT).pk, "enabled": "", "note": ""},
+    )
+
+    assert response.status_code == 302, response.content
+    saved = VendorFeatureFlag.objects.get(pk=override.pk)
+    assert saved.flag_id == feature.pk
+    assert saved.vendor_id == override.vendor_id
+    assert flag_enabled(flags.CHECKOUT, vendor=override.vendor) is True
+    assert flag_enabled(flags.CHECKOUT, vendor=other) is True
+
+
 def test_the_kill_switch_on_the_flag_admin_asks_for_step_up(stale_client: Client) -> None:
     """The core admin uses the CORE.4 decorator named in settings (core cannot import it)."""
     url = reverse("admin:core_featureflag_change", args=[switch(flags.CHECKOUT).pk])

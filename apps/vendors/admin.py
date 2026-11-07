@@ -389,6 +389,15 @@ class VendorFeatureFlagAdmin(admin.ModelAdmin[VendorFeatureFlag]):
     def kill_switch(self, obj: VendorFeatureFlag) -> bool:
         return _overrides_kill_switch(obj)
 
+    def get_readonly_fields(
+        self, request: HttpRequest, obj: VendorFeatureFlag | None = None
+    ) -> tuple[str, ...]:
+        # The change page decides on step-up from the stored flag, so the identity of an
+        # existing override is fixed: swapping in a kill switch would skip the second factor.
+        if obj is not None:
+            return ("vendor", "flag")
+        return ()
+
     def save_model(
         self, request: HttpRequest, obj: VendorFeatureFlag, form: Any, change: bool
     ) -> None:
