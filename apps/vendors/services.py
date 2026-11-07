@@ -10,7 +10,7 @@ from typing import Any
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils import timezone
 
 from apps.accounts.models import User
@@ -431,14 +431,20 @@ def submit_application(
     """Create `vendor` (new, unsaved) as an applicant with `applicant` as its owner; audited.
 
     The application data is validated like any vendor profile (`full_clean`); legal data may be
-    incomplete. Being an owner, the applicant must enrol a second factor (CORE.4). Raises
-    `ValidationError`, or `ValueError` for a saved vendor or an inactive user, also on dry-run.
+    incomplete. The VIES result and the legacy user id are reset: only the VIES check and the
+    legacy migration set them. Being an owner, the applicant must enrol a second factor (CORE.4).
+    Raises `ValidationError`, or `ValueError` for a saved vendor or an inactive user, also on
+    dry-run.
     """
     if not vendor._state.adding:
         raise ValueError("submit_application takes a new vendor, not a saved one")
     if not applicant.is_active:
         raise ValueError("only an active user can apply as a vendor")
     vendor.status = engine.APPLICANT
+    # Set by the VIES check and the legacy migration, never by an applicant.
+    vendor.vies_status = Vendor.ViesStatus.UNCHECKED
+    vendor.vies_checked_at = None
+    vendor.legacy_wp_user_id = None
     vendor.normalize()
     vendor.full_clean()
     member = VendorMember(vendor=vendor, user=applicant, role=engine.OWNER)
@@ -489,6 +495,19 @@ def check_contract_start(contract: VendorContract) -> None:
         raise ValidationError({"valid_from": error})
 
 
+def _lock_new_versions() -> None:
+    """Serialize the creation of contract versions until the transaction ends.
+
+    Locking the latest row is not enough: there is none before the first version, and a second
+    creator waiting on it would still not see the row the first one inserted. Both would take
+    the same number and one would end in an IntegrityError. This lock mode conflicts with
+    itself and with writes, not with the row locks of an acceptance.
+    """
+    table = connection.ops.quote_name(VendorContract._meta.db_table)
+    with connection.cursor() as cursor:
+        cursor.execute(f"LOCK TABLE {table} IN SHARE ROW EXCLUSIVE MODE")
+
+
 def save_contract(
     contract: VendorContract, *, ctx: AuditContext, dry_run: bool = False
 ) -> ChangeSet:
@@ -502,7 +521,8 @@ def save_contract(
     changes = ChangeSet()
     with transaction.atomic():
         if contract._state.adding:
-            latest = VendorContract.objects.select_for_update().order_by("-version").first()
+            _lock_new_versions()
+            latest = VendorContract.objects.order_by("-version").first()
             check_contract_start(contract)
             contract.version = (latest.version if latest else 0) + 1
             changes.create(CONTRACT_MODEL, key, contract_snapshot(contract))

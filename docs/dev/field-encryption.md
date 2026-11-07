@@ -36,7 +36,8 @@ Planned users of the same fields: KYC data and payout accounts (VEN.6), DAC7 dat
   `apps.core.crypto.DecryptionError`. There is no silent fallback.
 - Only `field=""` and `field__isnull` work in queries. Anything else (`=value`, `icontains`,
   `in`, transforms) raises `FieldError`, because the ciphertext is randomized and a search would
-  silently match nothing. Ordering by an encrypted field is meaningless.
+  silently match nothing. Ordering by an encrypted field (`order_by`, `Meta.ordering`, an
+  admin column) raises `FieldError` too: the order of random ciphertexts means nothing.
 
 ### Searching (blind index)
 
@@ -48,8 +49,9 @@ normalized value, under its own key, and query that. Do not decrypt whole tables
 
 A key is `<key id>:<base64url of 32 random bytes>`. The settings read
 `MPMV_FIELD_ENCRYPTION_KEYS` (comma-separated) or the file named by
-`MPMV_FIELD_ENCRYPTION_KEYS_FILE` (one key per line, `#` comments). Keys are listed **newest
-first**: the first one encrypts, all of them decrypt.
+`MPMV_FIELD_ENCRYPTION_KEYS_FILE` (one key per line, `#` comments), never both: with both
+set, the settings refuse to load. Keys are listed **newest first**: the first one encrypts, all
+of them decrypt.
 
 ```sh
 uv run python manage.py generate_field_key 2026-11     # prints "2026-11:<key>"
@@ -79,6 +81,11 @@ its key in the same place protect nothing, and a lost key means lost data.
 
 A deploy with a wrong key therefore stops at the `migrate` step.
 
+One sample per key cannot see a single row that does not decrypt (altered, or a token moved from
+another column). `manage verify_encrypted_data` decrypts every value, read-only, and fails
+naming those rows by public id, never by value. Run it after restoring a backup and before
+retiring a key.
+
 ## Rotating a key
 
 1. `manage generate_field_key <new id>` and put the new key **first**, keeping the old one
@@ -93,8 +100,9 @@ A deploy with a wrong key therefore stops at the `migrate` step.
 
 1. Use `EncryptedCharField` (or `EncryptedTextField`) on the model.
 2. Mask it in the model's audit snapshot.
-3. For an existing column, write a migration: `AlterField`, then
-   `RunPython(encrypt, decrypt)` with `apps.core.encryption.encrypt_column` /
-   `decrypt_column` (see `apps/vendors/migrations/0008_encrypt_iban_and_tax_code.py`), and a
-   migration test.
+3. For an existing column, write a migration: `AlterField`, then `RunPython(encrypt, decrypt)`
+   that rewrites the values in place, and a migration test. Freeze the rewrite in the migration
+   (copy the `_rewrite` of `apps/vendors/migrations/0008_encrypt_iban_and_tax_code.py`, which
+   reads the primary key column from the historical model) instead of importing live helpers:
+   a later change to `apps.core.encryption` must not change what an applied migration does.
 4. Extend the database dump test (`apps/vendors/tests/integration/test_field_encryption.py`).

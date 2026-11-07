@@ -100,8 +100,10 @@ def publish_drafts(drafts, *, dry_run=True) -> ChangeSet                 # calls
 Rules: dry-run by default; switching to write mode requires a per-source flag (replacing the
 marker files of `execution_safety.py`); AI output is validated against schema and policy before
 becoming a draft; generated translations have status `machine` and require review if the vendor's
-policy says so; `(vendor, sku)` uniqueness is enforced by the DB (the 29 current duplicate SKUs are
-resolved during migration, see [13](13-migration-cutover.md)).
+policy says so; rows match an existing product by vendor plus SKU match key, then by the
+`SkuAlias` history, and an ambiguous match stops the run with a report, never a guess
+([03](03-catalog.md), CAT.13); uniqueness of the match key per vendor is enforced by the DB (the
+29 current duplicate SKUs are resolved during migration, see [13](13-migration-cutover.md)).
 
 ### Recurring jobs
 
@@ -135,7 +137,7 @@ Goal: a vendor with a WooCommerce website is activated **without writing code**.
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
-| ING.1 | `ingest` app: staging models, ImportRun, ReviewItem, MappingTable | P1 | 10 | CAT.1 | Migrations + admin |
+| ING.1 | `ingest` app: staging models, ImportRun, ReviewItem, MappingTable; staging rows keyed by vendor and SKU match key, products referenced by internal identity | P1 | 10 | CAT.1, CAT.13 | Migrations + admin; an ambiguous SKU match becomes a blocking ReviewItem |
 | ING.2 | Port of `state.py` (source state, change history, stock state) to Django models + existing tests | P1 | 12 | ING.1 | Current pytest suite passes on the new storage |
 | ING.3 | HTML adapter (Vendor A) + generic Store API adapter | P1 | 12 | ING.2 | Dry-run equivalent to the current one |
 | ING.4 | Port of extraction (step 5) and JSON mappings → MappingTable with FKs | P1 | 10 | ING.1, CAT.2 | Same output as step 5 on 50 sample products |

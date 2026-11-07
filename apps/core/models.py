@@ -1,5 +1,5 @@
-"""Core models: the abstract base and translation models, the append-only audit log, the
-platform operator, the feature flags."""
+"""Core models: the abstract base, translation and versioned-configuration models, the
+append-only audit log, the platform operator, the feature flags."""
 
 import uuid
 from typing import Any, ClassVar, Self
@@ -254,7 +254,46 @@ class TsTzRange(models.Func):
     output_field = DateTimeRangeField()
 
 
-class PlatformOperator(BaseModel):
+class Versioned(BaseModel):
+    """A row of versioned configuration: valid over `[valid_from, valid_to)`, never edited in
+    place (spec 01 "History", `apps.core.validity`).
+
+    A change is a new row valid from a date, and the service that adds it closes the current
+    open-ended row: `valid_to` (with `updated_at`) is the only thing an existing row may write.
+    Declare `valid_period_check(...)` among the subclass's constraints.
+    """
+
+    valid_from = models.DateTimeField()
+    valid_to = models.DateTimeField(null=True, blank=True, editable=False)
+
+    # The only fields an existing row may write: closing its validity period.
+    CLOSING_FIELDS: ClassVar[frozenset[str]] = frozenset({"valid_to", "updated_at"})
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        update_fields = kwargs.get("update_fields")
+        if self.pk is not None and (
+            update_fields is None
+            or "valid_to" not in update_fields
+            or not self.CLOSING_FIELDS.issuperset(update_fields)
+        ):
+            raise PermissionError(
+                f"{type(self).__name__} rows are never edited in place; add a new row instead"
+            )
+        super().save(*args, **kwargs)
+
+
+def valid_period_check(name: str) -> models.CheckConstraint:
+    """The database rule of a `Versioned` row: an end, when set, comes after the start."""
+    return models.CheckConstraint(
+        condition=models.Q(valid_to__isnull=True) | models.Q(valid_to__gt=models.F("valid_from")),
+        name=name,
+    )
+
+
+class PlatformOperator(Versioned):
     """The legal entity running the marketplace, as versioned configuration (ARC.7).
 
     Its country, VAT position, e-invoicing channel and DAC7 authority drive tax, invoicing and
@@ -291,20 +330,11 @@ class PlatformOperator(BaseModel):
         "DAC7 reporting authority country",
         help_text="Member state whose authority receives the DAC7 report.",
     )
-    valid_from = models.DateTimeField()
-    valid_to = models.DateTimeField(null=True, blank=True, editable=False)
-
-    # The only fields an existing row may write: closing its validity period.
-    CLOSING_FIELDS = frozenset({"valid_to", "updated_at"})
 
     class Meta:
         ordering = ["-valid_from"]
         constraints = [
-            models.CheckConstraint(
-                condition=models.Q(valid_to__isnull=True)
-                | models.Q(valid_to__gt=models.F("valid_from")),
-                name="core_platformoperator_valid_to_after_valid_from",
-            ),
+            valid_period_check("core_platformoperator_valid_to_after_valid_from"),
             ExclusionConstraint(
                 name="core_platformoperator_no_overlap",
                 expressions=[(TsTzRange("valid_from", "valid_to"), RangeOperators.OVERLAPS)],
@@ -313,18 +343,6 @@ class PlatformOperator(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.legal_name} ({self.country}) from {self.valid_from:%Y-%m-%d}"
-
-    def save(self, *args: Any, **kwargs: Any) -> None:
-        update_fields = kwargs.get("update_fields")
-        if self.pk is not None and (
-            update_fields is None
-            or "valid_to" not in update_fields
-            or not self.CLOSING_FIELDS.issuperset(update_fields)
-        ):
-            raise PermissionError(
-                "PlatformOperator rows are never edited in place; configure a new row instead"
-            )
-        super().save(*args, **kwargs)
 
 
 # Per-vendor overrides are vendor-owned rows (CORE.3) in apps.vendors, which core cannot import:

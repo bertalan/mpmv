@@ -960,10 +960,10 @@ def fatturapa_transmission(identity: LegalIdentity) -> dict[str, str]:
 
 
 def mask_tax_code(tax_code: str) -> str:
-    """Last four characters only: for audit rows and screens (SEC.3)."""
-    if len(tax_code) <= 4:
-        return "*" * len(tax_code)
-    return "*" * (len(tax_code) - 4) + tax_code[-4:]
+    """The last characters only, at most four and at most a third of the code, so a short TIN
+    is not half readable: for audit rows and screens (SEC.3)."""
+    shown = min(4, len(tax_code) // 3)
+    return "*" * (len(tax_code) - shown) + tax_code[len(tax_code) - shown :]
 
 
 def mask_iban(iban: str) -> str:
@@ -1036,6 +1036,7 @@ class ChecklistItem:
 @dataclasses.dataclass(frozen=True)
 class OnboardingChecklist:
     items: tuple[ChecklistItem, ...]
+    current_contract_version: int | None = None  # the version in force, if any
 
     @property
     def blocking_missing(self) -> tuple[str, ...]:
@@ -1072,7 +1073,8 @@ def onboarding_checklist(
             contract,
             ChecklistItem(DAC7, not dac7_missing, False, tuple(dac7_missing)),
             ChecklistItem(PAYOUT_DATA, payout.complete, False, payout.missing + payout.invalid),
-        )
+        ),
+        current_contract_version=current_contract_version,
     )
 
 
