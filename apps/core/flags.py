@@ -15,12 +15,21 @@ previous one when it says something:
 A kill switch is a flag that is on by default and is turned off to stop something in an
 emergency. A vendor override can turn it off for that vendor, but never back on when the
 platform value is off: pulling a kill switch stops the feature for everyone.
+
+Flags are registered while Django loads the apps (at import of a module that loading imports,
+or in `AppConfig.ready()`), so every process knows every flag from start-up. The core.E402
+system check reports a flag registered later.
 """
 
 import re
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
+from typing import Any
+
+from django.apps import AppConfig
+from django.apps import apps as app_registry
+from django.core import checks
 
 DEFAULT = "default"
 ON = "on"
@@ -51,18 +60,49 @@ class FlagSpec:
 
 
 _REGISTRY: dict[str, FlagSpec] = {}
+# Flags registered once the app registry was ready: unknown to a process that has not imported
+# their module yet (core.E402).
+_LATE: set[str] = set()
 
 
 def register(spec: FlagSpec) -> FlagSpec:
-    """Declare a flag. Apps call this at import time of their own module (or `ready()`)."""
+    """Declare a flag, while the apps load: at import time of a module that app loading
+    imports (e.g. the app's `models.py`), or in the app's `AppConfig.ready()`."""
     if spec.name in _REGISTRY:
         raise ValueError(f"Flag {spec.name!r} is already registered")
     _REGISTRY[spec.name] = spec
+    if app_registry.ready:
+        _LATE.add(spec.name)
     return spec
 
 
 def unregister(name: str) -> None:
     _REGISTRY.pop(name, None)
+    _LATE.discard(name)
+
+
+def check_flag_registration(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """Every flag was registered while the apps loaded, not on first use of its module."""
+    if not _LATE:
+        return []
+    return [
+        checks.Error(
+            f"Feature flags registered after the apps loaded: {', '.join(sorted(_LATE))}.",
+            hint=(
+                "Register flags at import time of a module that app loading imports, or in the "
+                "owning app's AppConfig.ready() (docs/dev/feature-flags.md). Otherwise a process "
+                "that has not imported the module treats the flag as unknown."
+            ),
+            id="core.E402",
+        )
+    ]
+
+
+# A module-level registration, like Django's own checks: this module is imported while the
+# apps load (apps.core.checks and apps.core.services import it).
+checks.register(check_flag_registration)
 
 
 def spec_of(name: str) -> FlagSpec:
