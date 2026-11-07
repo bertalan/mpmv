@@ -33,6 +33,64 @@
 Taxonomy and vendor pages combine editorial content with catalog data: they are the SEO strong point
 ("browse by taxonomy term") and today they are fragmented across tags, categories and articles.
 
+There are no page types for events, tours, trails or packages (owner decision Q-61): an event is
+a blog article, and tours, trails or packages are product categories (CAT.2) or article content.
+
+### Launch countdown block (CMS.9)
+
+A StreamField block that announces a product launch, available in `HomePage`, `StandardPage` and
+`BlogPostPage` bodies.
+
+| Field | Rule |
+|---|---|
+| `target` | Date and time of the launch, entered in the operator's time zone, stored in UTC |
+| `heading`, `body` | Translatable text |
+| `product` or `category` | Optional chooser, at most one of the two |
+| `cta_label`, `cta_link` | CTA before the launch; the link defaults to the chosen product or category |
+| `expired_text`, `expired_link` | Shown from the target on (default "Available now"); the link defaults to the product or category |
+
+- **Server-rendered fallback**: the block renders the absolute date as
+  `<time datetime="…">` text with the time zone name (for example "1 December 2026, 10:00 CET")
+  and the CTA. It is complete and readable without JavaScript. From the target on, the server
+  renders the expired state. A pure `countdown_state(target, now)` decides the state, and the
+  anonymous page cache (SEO.6) never keeps a page with an active countdown past its target.
+- **Progressive enhancement, CSP-safe**: the markup carries `data-countdown` and
+  `data-target="<ISO 8601 UTC>"`; an external ES module of the theme (§14.5 of
+  [14](14-frontend-themes.md)) adds the remaining days, hours and minutes and rewrites the absolute
+  date in the visitor's time zone with `Intl.DateTimeFormat` in the page language. No inline
+  script, no `style` attribute. The expired content is rendered server-side with `hidden` and
+  revealed by the module at the target.
+- **Accessibility (WCAG 2.2 AA)**: the counter is not an `aria-live` region and is never announced
+  on each update; only the switch to the expired state is announced once, through the page's
+  polite live region (4.1.3). Updates happen once a minute (no seconds), and a visible pause
+  button stops them (2.2.2). No animation under `prefers-reduced-motion: reduce` (2.3.3). The
+  remaining time is always shown next to the absolute date, so the information does not depend on
+  the update.
+
+### Image source, licence and credit (CMS.8)
+
+Every image comes from a free-licence source that allows commercial use or is self-produced
+(owner decision Q-63). Wagtail uses a custom image model, `MediaImage` (`AbstractImage`) in
+`apps/core`, set as `WAGTAILIMAGES_IMAGE_MODEL` before any image exists, so CMS pages, product
+images (CAT.4), vendor logos and banners share it:
+
+| Field | Rule |
+|---|---|
+| `licence` | Required, from the staff-editable `ImageLicence` allow list (audited). Seeded: `own-work` (operator), `vendor-supplied` (a vendor or its supplier feed, under the vendor contract), `written-permission`, `CC0-1.0`, `CC-BY-4.0`, `CC-BY-SA-4.0`. Each entry has a licence URL and an `attribution_required` flag; non-commercial (NC) and no-derivatives (ND) licences are never allowed |
+| `source_url` | Required except for `own-work` and `vendor-supplied` |
+| `author` | Required: the author or rights holder to credit |
+| `credit_text` | Optional override of the generated credit line |
+| `permission_ref` | Required for `written-permission`: reference to the stored permission document |
+
+- An upload, in the Wagtail admin, the vendor area or a service, without the required fields is
+  refused. Supplier imports (ING) set `vendor-supplied`, the vendor as author and the product URL
+  as source. Images migrated from the legacy site without known metadata get a staff review list
+  and cannot be chosen for new content until they are classified.
+- Where the licence requires attribution, the `image_credit` component renders the credit
+  (author, licence with link, source) in the image's `<figcaption>`. Images with no caption area
+  (hero, banners, product cards) are credited in an "Image credits" disclosure at the end of the
+  page.
+
 ### Images per locale (D-18)
 
 Images are language neutral by default (spec 09 §9.2). With wagtail-localize (I18N.3), image fields
@@ -111,15 +169,17 @@ with design tokens, template overrides, CSP-safe components and WCAG 2.2 AA rule
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
-| CMS.1 | Wagtail: site, locales, base page types, per-language navigation and footer | P1 | 8 | ARC.3 | EN/IT home and static pages |
+| CMS.1 | Wagtail: site, locales, base page types, per-language navigation and footer | P1 | 8 | ARC.3 | Home and static pages in every configured language |
 | CMS.2 | Reusable StreamField blocks (hero, product grid, CTA, FAQ, choosers) | P1 | 10 | CMS.1, CAT.8 | An editor builds the home page without code |
 | CMS.3 | Blog with scheduling, author, product/term/vendor chooser | P1 | 8 | CMS.2 | Migrated article published |
 | CMS.4 | TermLandingPage and VendorLandingPage | P1 | 10 | CMS.2, CAT.8 | A term page with its products |
 | CMS.5 | Versioned LegalPage + VendorRecruitmentPage with application form | P1 | 6 | CMS.1, VEN.5 | Application arrives in admin |
+| CMS.8 | Image source, licence and credit: custom Wagtail image model `MediaImage` in `core` with licence, source, author, credit and permission fields, staff-editable `ImageLicence` allow list seeded per §10.2, upload validation in admin and services, `image_credit` component and per-page image credits disclosure, review list for migrated images without metadata | P1 | 5 | CMS.1, ARC.15 | An upload without licence or author is refused; an NC licence cannot be added to the allow list; a CC BY image shows its credit in the caption, a CC BY hero in the page credits disclosure; a CC0 image shows none; `WAGTAILIMAGES_IMAGE_MODEL` points to `MediaImage` before CAT.4 |
+| CMS.9 | Launch countdown StreamField block: fields per §10.2, `countdown_state` pure function, server-rendered absolute date and expired state, page cache capped at the target, CSP-safe ES module with visitor time zone, minute updates and pause button, single polite announcement at expiry | P1 | 4 | CMS.2, THM.4 | Without JavaScript the block shows the absolute date and the CTA; with it the remaining time updates once a minute in the visitor's time zone and the pause button stops it; after the target the server and the module both show the expired text and link; no `aria-live` on the counter; no CSP violation and no axe violation on a page with the block |
 | CMS.6 | Reviews: model, purchase verification, supplier import, moderation, vendor reply | P2 | 10 | ORD.2 | AggregateRating schema only with valid reviews |
 | SEO.1 | JSON-LD Product/Offer/Breadcrumb/ReturnPolicy/ShippingDetails, robots, canonical | P1 | 10 | CAT.7, SHP.3 | Rich Results Test with no errors |
 | SEO.2 | Per-language and per-type sitemaps, generated `llms.txt` | P1 | 4 | I18N.6 | Valid sitemaps |
-| SEO.3 | Google feed (EN/IT) with legacy IDs, prices from the tax engine, shipping from tables | P1 | 8 | TAX.3, SHP.11 | Feed validated in STAGE Merchant Center |
+| SEO.3 | Google feed (EN for every product, IT for products with a published IT translation, D-18) with legacy IDs, prices from the tax engine, shipping from tables | P1 | 8 | TAX.3, SHP.11 | Feed validated in STAGE Merchant Center |
 | SEO.4 | Merchant API sync + Meta feed | P2 | 8 | SEO.3 | Daily delta report |
 | SEO.5 | Cookie consent + Consent Mode v2 + e-commerce events | P1 | 8 | ORD.5 | No tags fire before consent |
 | SEO.6 | Anonymous page cache, responsive renditions, CWV budget | P2 | 6 | THM.3 | LCP < 2.5 s on product page |

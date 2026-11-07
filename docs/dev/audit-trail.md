@@ -1,7 +1,7 @@
 # Audit trail
 
 Every sensitive mutation writes an append-only `AuditLog` entry: who, what, before/after and
-from where (spec 01 conventions, spec 12 SEC.7, backlog ARC.6 and SEC.4). This page lists what
+from where (spec 01 conventions, spec 12 §12.3 requirement SEC.7, backlog tasks ARC.6 and SEC.4). This page lists what
 is audited today, the rules new code must follow, and how rate models (TAX, SHP, VEN
 commissions) hook in.
 

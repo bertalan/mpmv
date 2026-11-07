@@ -119,9 +119,14 @@ flowchart TD
   E -- no --> F[OSS: destination country rate by category]
 ```
 
+The tree has no deemed-supplier branch: at go-live every vendor is established in the EU and
+ships from inside the EU (D-21, [11](11-compliance.md) CMP.13). UK consumer consignments of £135
+or less never reach the tax engine, because checkout turns them into vendor requests (CMP.14).
+CMP.18 adds a `deemed_supplier` outcome before non-EU vendors are admitted.
+
 Intended differences from today:
 
-- The rate is a **number** with a `reason`: OSS reports, invoices and legal wordings are generated without ambiguity.
+- The rate is a **number** with a `reason`: OSS reports, non-fiscal documents and legal wordings are generated without ambiguity (the platform issues no invoices, see [00](00-vision-and-review.md)).
 - The product's **fiscal category** (`standard`, `reduced`, `books`) selects the rate per country;
   no "below 15% = reduced" mapping.
 - **Special territories** handled by postcode; Northern Ireland (`XI`) follows EU goods rules (D-02).

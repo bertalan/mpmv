@@ -14,17 +14,20 @@
 
 | Item | Hours | How it is calculated |
 |---|---:|---|
-| P1 micro-tasks | 1,289 | Sum from the generated backlog |
+| P1 micro-tasks | 1,322 | Sum from the generated backlog |
 | Integrated and end-to-end acceptance testing, exploratory tests | 100 | ~10% of P1 |
 | Mandatory human review of tax, payments, ledger, orders, security | 50 | ~15% of the hours for TAX, PAY, VEN, ORD, SEC |
 | Coordination, ADRs, meetings with tax advisor and legal counsel | 80 | ~8% of P1 |
-| **Subtotal** | **1,519** | |
-| Contingency for unforeseen issues (10–25% of P1) | 129–322 | Tax and payment domain, dirty legacy data |
-| **Go-live total** | **≈ 1,650–1,840** | |
+| **Subtotal** | **1,552** | |
+| Contingency for unforeseen issues (10–25% of P1) | 132–331 | Tax and payment domain, dirty legacy data |
+| **Go-live total** | **≈ 1,685–1,885** | |
 
 The theme system (2026-11-07, [14](14-frontend-themes.md)) replaced the 24 h CMS.7 row with
 THM.1 to THM.10 (70 h: framework, token pipeline, `base` theme, components, quality gates and the
 first vertical theme) and added CMP.9 (3 h, WCAG 2.2 accessible authentication): +49 h of P1.
+The owner's answers on the themes (same day) added CMS.8 (5 h, image source, licence and credit)
+and CMS.9 (4 h, launch countdown block): +9 h of P1. Vendor branding (THM.11, 12 h) and plan
+entitlements and fees (VEN.19, 8 h) are P2.
 
 The regulatory check of 2026-11 ([report](../dev/regulatory-check-2026-11.md)) and the
 no-invoicing decision changed P1 by +68 h: CMP.2 becomes a non-fiscal statement (12 → 8 h), CMP.3
@@ -32,15 +35,22 @@ adds the GPSR marketplace duties (8 → 12 h), CMP.5 moves from P2 to P1 (6 → 
 (8 → 10 h), and the new rows CMP.8 (4 h), CMP.10 (24 h), CMP.11 (16 h), CMP.12 (4 h), CMP.13 (6 h)
 and VEN.18 (2 h) are added. P2 loses the 6 h of CMP.5.
 
-After go-live: P2 = 179 h and P3 = 18 h (MCP, advanced zone editor, OSS report, visitor content
-translation, reviews, advanced payouts…), about **220–260 h** including contingency.
+The owner answers on deemed-supplier VAT, EPR checks and legal wording (D-21, 2026-11-07)
+changed P1 by +24 h: CMP.13 becomes the vendor establishment gate (6 → 5 h), CMP.11 adds the
+owner-approved activation per country (16 → 19 h), and the new rows CMP.14 (12 h, UK lead-only
+requests), CMP.15 (4 h, Swiss counter) and CMP.24 (6 h, approval of legal wording) are added. P2
+gains 69 h: CMP.16 (3 h, Swiss threshold response), the opening to non-EU vendors CMP.17 to
+CMP.22 (58 h) and CMP.23 (8 h, EN 16931 order-data export).
+
+After go-live: P2 = 268 h and P3 = 18 h (MCP, advanced zone editor, OSS report, visitor content
+translation, reviews, advanced payouts, vendor branding…), about **315–360 h** including contingency.
 
 ## 91.3 Comparison with the August plan
 
 | | August plan | This review |
 |---|---:|---:|
 | Scope | Full WCFM parity + P1 commercial modules | Parity **with what is actually used** + 2026 compliance |
-| Total hours (development, testing, migration) | 1,740–2,540 | 1,570–1,760 to go-live |
+| Total hours (development, testing, migration) | 1,740–2,540 | 1,685–1,885 to go-live |
 | With AI-assisted development | 1,450–2,100 | already included |
 
 Where the difference comes from:
@@ -57,7 +67,7 @@ MCP server, theme system with a first vertical theme.
 
 ## 91.4 Indicative schedule
 
-The P1 critical path is short (~144 h: foundations → vendor onboarding → contract signature and
+The P1 critical path is short (~147 h: foundations → vendor onboarding → contract signature and
 updates → obligations checklist → marketplace verification duties; the orders and payments chain
 is ~126 h):
 the schedule depends on team capacity more than on dependencies.
@@ -120,8 +130,10 @@ Source: merged pull requests and their timestamps, the generated backlog, and th
 ### Forecast for the rest of P1
 
 97 P1 tasks remained, worth 947 estimated hours. The theme rows added the same day (THM.1 to
-THM.10 and CMP.9, replacing CMS.7) bring this to 107 tasks and 996 hours, and the regulatory
-check rows (CMP.5 moved to P1, CMP.8, CMP.10 to CMP.13, VEN.18) to 114 tasks and 1,064 hours.
+THM.10 and CMP.9, replacing CMS.7) bring this to 107 tasks and 996 hours, the regulatory check
+rows (CMP.5 moved to P1, CMP.8, CMP.10 to CMP.13, VEN.18) to 114 tasks and 1,064 hours, the
+owner's theme answers (CMS.8 and CMS.9) to 116 tasks and 1,073 hours, and the D-21 answers
+(CMP.11 grows, CMP.14, CMP.15 and CMP.24 added) to 119 tasks and 1,097 hours.
 
 | Part | Estimated hours | Done by | Forecast |
 |---|---:|---|---|
@@ -136,7 +148,7 @@ Work that agents cannot speed up:
 | Activity | People hours |
 |---|---:|
 | Owner decisions (question register and open D-xx) | 5–8 |
-| Tax advisor and legal counsel (D-01, D-02, D-03, D-08, double signature) | 5–10, plus 2–6 weeks of waiting |
+| Tax advisor and legal counsel (D-01, D-02, D-03, D-08, the D-21 UK confirmation, double signature, CMP.24 approvals) | 5–10, plus 2–6 weeks of waiting |
 | Human review of tax, payments, ledger and orders code | 30–50 |
 | Hetzner, DNS, Stripe Connect and email provider accounts | 6–12 |
 | Migration checks and dress rehearsals | 15–25 |
@@ -146,7 +158,7 @@ Work that agents cannot speed up:
 | **Total** | **≈ 105–195** |
 
 **Result:** about **150–250 people hours** plus about two weekly agent budgets, against
-1,570–1,760 hours for a human team (§91.2). Realistic calendar to go-live: **2–3 months**. The
+1,685–1,885 hours for a human team (§91.2). Realistic calendar to go-live: **2–3 months**. The
 pace is set by external waits: legal counsel, Stripe Connect verification, the external
 penetration test (SEC.6) and the three dress rehearsals (MIG.9).
 

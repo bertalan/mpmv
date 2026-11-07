@@ -5,7 +5,8 @@
 The current system is a curated, vertical multivendor marketplace. Customers also browse
 **by navigation taxonomies** (today a two-level taxonomy, such as brand → model). The site is
 bilingual EN/IT; the new system launches with EN, IT, DE, FR and ES for interface text, and
-visitor content in EN until the owner decides on its translation after go-live (D-18).
+visitor content in EN plus the existing IT texts migrated from the current site; new content and
+the other languages wait until the owner decides on their translation after go-live (D-18).
 
 Current operating model (to be kept):
 
@@ -17,7 +18,8 @@ Current operating model (to be kept):
 | Catalog | Thousands of products per language, mostly imported by **Python pipelines** (scraping, extraction, Gemini AI, images) |
 | Taxation | Per-vendor regimes: OSS, below threshold (`domestic_only`), exempt (art. 74 / flat-rate regime (forfettario)); B2B reverse charge; non-EU export |
 | Shipping | Zones per carrier × vendor × weight band (main carrier, a vendor's own carrier, aggregator, local pickup) + **quote** for countries not covered |
-| Markets | EU, UK and rest of the world |
+| Markets | EU, UK and rest of the world; UK consumer consignments of £135 or less become requests forwarded to the vendor, not platform sales (D-21) |
+| Vendors | Established in the EU at go-live (D-21, CMP.13); opening to non-EU vendors designed as P2 rows (CMP.17 to CMP.22) |
 | Expected growth | From a few vendors to dozens, with thousands of products |
 
 **No invoicing and no bookkeeping (owner decision of 2026-11-07).** The marketplace issues only

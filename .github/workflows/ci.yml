@@ -57,6 +57,14 @@ jobs:
           path: build/openapi-v1.json
       - name: Dependency audit (pip-audit)
         run: make audit
+      # OPS.4: CycloneDX SBOM of the production Python environment (no dev dependencies).
+      - name: Python SBOM (CycloneDX)
+        run: make sbom
+      - name: Store the Python SBOM
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom-python
+          path: build/sbom/mpmv-python.cdx.json
 
   secrets:
     name: Secret scan
@@ -126,6 +134,20 @@ jobs:
         run: >-
           docker build --file Containerfile --tag mpmv-app:ci
           --build-arg MPMV_VERSION=ci-${GITHUB_SHA::12} .
+      # OPS.4: CycloneDX SBOM of the built image (OS packages and the app virtualenv), via syft.
+      - run: mkdir -p build/sbom
+      - name: Image SBOM (CycloneDX)
+        uses: anchore/sbom-action@v0.24.3
+        with:
+          image: mpmv-app:ci
+          format: cyclonedx-json
+          output-file: build/sbom/mpmv-image.cdx.json
+          upload-artifact: false
+      - name: Store the image SBOM
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom-image
+          path: build/sbom/mpmv-image.cdx.json
       - name: Runs as a non-root user
         run: test "$(docker run --rm --entrypoint id mpmv-app:ci -u)" = "10001"
       - name: Migrate, serve and pass the health check

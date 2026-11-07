@@ -52,6 +52,7 @@ class ApiClient(Model):  # api — machine credential (pipelines, MCP, integrati
 | Vendor staff | Vendor dashboard | Orders, quotes, products; no payouts, IBAN or tax regime |
 | Editor | Wagtail admin | Pages, blog, SEO copy, translations |
 | Staff operator | Wagtail admin + commerce admin | Vendors, catalog, orders, quotes, zones, rates |
+| Platform owner | Commerce admin | Staff operator rights plus the owner-only settings: allowed vendor establishment countries (CMP.13) and approval of staff proposals to turn EPR checks on or off per country (CMP.11). A dedicated permission, never implied by staff or admin access; it never approves its own proposal |
 | Technical superuser | Django admin (restricted network) | Maintenance; exceptional, tracked use |
 
 ### Tenant (vendor) isolation
@@ -68,7 +69,7 @@ def get_for_actor_or_404(qs, actor, **lookup):  # 404 (not 403) to prevent enume
 
 - Every model with a `vendor` FK uses this manager.
 - **Mandatory negative tests** for every endpoint: "Vendor A requests Vendor B's object → 404".
-- Vendor documents (KYC, invoices) can be downloaded only from views that check permissions; never
+- Vendor documents (KYC, signed contracts, commission and payout statements) can be downloaded only from views that check permissions; never
   public URLs.
 
 ### Authentication
@@ -138,7 +139,7 @@ admin reports or read-only MCP tools.
 | CORE.1 | Custom `User`, login via email, preferred language | P1 | 6 | ARC.6 | Initial migration with custom User |
 | CORE.2 | `VendorMember` with owner/staff roles, per-role permissions | P1 | 6 | CORE.1, VEN.1 | Role matrix tested |
 | CORE.3 | `VendorScopedQuerySet` + 404 helper + reusable cross-tenant test fixture | P1 | 8 | CORE.2 | Negative tests generated for every endpoint |
-| CORE.4 | MFA (TOTP + passkey) mandatory for staff/owners, recovery codes, step-up | P1 | 12 | CORE.1 | Login without MFA impossible for required roles |
+| CORE.4 | MFA (TOTP + passkey) mandatory for staff and every vendor member, recovery codes, step-up | P1 | 12 | CORE.1 | Login without MFA impossible for required roles |
 | CORE.5 | Rate limiting and progressive lockout on login/registration, Turnstile | P1 | 6 | CORE.1 | Tests on failed attempts |
 | CORE.6 | `ApiClient`: issuance, hashing, scopes, expiry, rotation, revocation, IP allow-list | P1 | 10 | CORE.1 | Expired or out-of-scope key → 401/403 |
 | CORE.7 | Ninja API v1 skeleton: auth, dry-run, RFC 9457 errors, OpenAPI, mutation log | P1 | 10 | CORE.6, ARC.13 | OpenAPI spec published on STAGE |
