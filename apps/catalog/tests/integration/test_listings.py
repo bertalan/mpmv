@@ -225,6 +225,108 @@ def test_filter_slugs_resolve_in_the_page_language_with_the_english_fallback() -
     assert pks(services.listing_products(filters=resolved.filters)) == {on_party.pk, on_picnic.pk}
 
 
+def resolve(query: dict[str, list[str]], language: str = "en") -> services.ResolvedFilter:
+    params = services.parse_listing_query(query, language).params
+    return services.resolve_listing_filter(params, language)
+
+
+def category(slug_en: str, parent: Any = None, slug_it: str | None = None) -> Any:
+    node = CategoryFactory.create(parent=parent)
+    CategoryTranslationFactory.create(category=node, language="en", slug=slug_en)
+    if slug_it:
+        CategoryTranslationFactory.create(category=node, language="it", slug=slug_it)
+    return node
+
+
+def test_a_nested_category_value_is_its_slug_path_so_equal_slugs_never_widen_it() -> None:
+    # Slugs are unique among siblings only: /men/bags and /women/bags share "bags".
+    men, women = category("men"), category("women")
+    men_bags, women_bags = category("bags", parent=men), category("bags", parent=women)
+    in_men, in_women = listed(category=men_bags), listed(category=women_bags)
+
+    resolved = resolve({"category": ["men/bags"]})
+    assert resolved.unknown == ()
+    assert pks(services.listing_products(filters=resolved.filters)) == {in_men.pk}
+    women_only = resolve({"category": ["women/bags"]})
+    assert pks(services.listing_products(filters=women_only.filters)) == {in_women.pk}
+
+    not_top_level = resolve({"category": ["bags"]})
+    assert not_top_level.unknown == ("category",)
+    assert not services.listing_products(filters=not_top_level.filters).exists()
+
+
+def test_a_nested_term_value_is_its_slug_path_so_equal_slugs_never_widen_it() -> None:
+    compatibility = taxonomy_with_terms("compatibility")
+    maker_1, maker_2 = term(compatibility, "maker-1"), term(compatibility, "maker-2")
+    model_1 = term(compatibility, "model-x", parent=maker_1)
+    model_2 = term(compatibility, "model-x", parent=maker_2)
+    on_1, on_2 = listed(), listed()
+    on_1.terms.add(model_1)
+    on_2.terms.add(model_2)
+
+    resolved = resolve({"compatibility": ["maker-1/model-x"]})
+    assert resolved.unknown == ()
+    assert pks(services.listing_products(filters=resolved.filters)) == {on_1.pk}
+
+    both = resolve({"compatibility": ["maker-1/model-x,maker-2/model-x"]})
+    assert both.unknown == ()
+    assert pks(services.listing_products(filters=both.filters)) == {on_1.pk, on_2.pk}
+
+    assert resolve({"compatibility": ["model-x"]}).unknown == ("compatibility",)
+    assert resolve({"compatibility": ["maker-2/model-y"]}).unknown == ("compatibility",)
+
+
+def test_a_term_path_never_crosses_into_another_taxonomy() -> None:
+    compatibility = taxonomy_with_terms("compatibility")
+    other = taxonomy_with_terms("other")
+    term(other, "maker-1")
+    maker = term(compatibility, "maker-1")
+    term(compatibility, "model-x", parent=maker)
+    assert resolve({"other": ["maker-1/model-x"]}).unknown == ("other",)
+    assert resolve({"compatibility": ["maker-1/model-x"]}).unknown == ()
+
+
+def test_a_slug_path_resolves_each_level_in_the_page_language_with_the_english_fallback() -> None:
+    men = category("men", slug_it="uomo")
+    bags = category("bags", parent=men)  # no IT slug: EN fallback
+    product = listed(category=bags)
+    resolved = resolve({"category": ["uomo/bags"]}, "it")
+    assert resolved.unknown == ()
+    assert pks(services.listing_products(filters=resolved.filters)) == {product.pk}
+    # On the IT page a level is matched by its IT slug, never by the EN slug it overrides.
+    assert resolve({"category": ["men/bags"]}, "it").unknown == ("category",)
+
+
+def test_a_slug_two_siblings_answer_to_through_the_fallback_is_ambiguous() -> None:
+    # Sibling uniqueness is per language: one sibling's IT slug can equal another's EN slug.
+    shoes = category("shoes", slug_it="borse")
+    bags = category("borse")  # EN only: "borse" on the IT page too
+    listed(category=shoes)
+    listed(category=bags)
+    assert resolve({"category": ["borse"]}, "it").unknown == ("category",)
+    assert resolve({"category": ["borse"]}, "en").unknown == ()
+
+
+def test_a_taxonomy_key_prefers_the_page_language_over_another_taxonomys_fallback(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # The slug constraint is per language: X's IT slug can equal Y's EN slug when Y has no IT.
+    x = taxonomy_with_terms("colour", "colore")
+    y = taxonomy_with_terms("colore")
+    red = term(x, "red", "rosso")
+    product = listed()
+    product.terms.add(red)
+    with caplog.at_level("WARNING", logger="apps.catalog.services"):
+        keys = services.listing_term_keys("it")
+    assert keys["colore"] == x
+    assert y not in keys.values()
+    assert "colore" in caplog.text
+    resolved = resolve({"colore": ["rosso"]}, "it")
+    assert resolved.unknown == ()
+    assert pks(services.listing_products(filters=resolved.filters)) == {product.pk}
+    assert services.listing_term_keys("en") == {"colour": x, "colore": y}
+
+
 def test_the_vendor_filter_takes_an_active_vendor_slug() -> None:
     vendor = active_vendor(slug="vendor-one")
     own = listed(vendor=vendor)

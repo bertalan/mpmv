@@ -107,6 +107,36 @@ def test_an_invalid_page_falls_back_to_page_one_with_an_error(raw: str) -> None:
     assert parsed.errors
 
 
+def test_a_page_number_too_long_to_convert_is_an_error_not_an_exception() -> None:
+    # int() refuses strings above 4300 digits (Python 3.11+): never let that escape.
+    for raw in ["9" * 5000, "1" * 10]:
+        parsed = parse({"page": [raw]})
+        assert parsed.params.page == 1
+        assert parsed.errors
+
+
+def test_nested_category_and_term_values_are_slug_paths() -> None:
+    parsed = parse({"category": ["men/bags"], "colour": ["warm/red,blue"]})
+    assert parsed.params.category == "men/bags"
+    assert parsed.params.term_slugs("colour") == ("blue", "warm/red")
+    assert parsed.errors == ()
+    assert listings.canonical_query(parsed.params) == "category=men/bags&colour=blue,warm/red"
+
+
+@pytest.mark.parametrize("raw", ["/bags", "bags/", "men//bags", "men/../bags"])
+def test_a_malformed_slug_path_is_dropped_with_an_error(raw: str) -> None:
+    parsed = parse({"category": [raw], "colour": [raw]})
+    assert parsed.params.category is None
+    assert parsed.params.terms == ()
+    assert len(parsed.errors) == 2
+
+
+def test_the_vendor_is_a_plain_slug_never_a_path() -> None:
+    parsed = parse({"vendor": ["vendor-a/shop"]})
+    assert parsed.params.vendor is None
+    assert parsed.errors
+
+
 def test_unknown_keys_are_ignored_and_listed() -> None:
     parsed = parse({"utm_source": ["x"], "season": ["summer"], "colour": ["red"]})
     assert parsed.params.terms == (("colour", ("red",)),)
