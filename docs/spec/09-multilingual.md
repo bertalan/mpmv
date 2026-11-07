@@ -29,7 +29,7 @@ Rules:
 - Language-prefix routing (`/` = EN, `/it/`, `/de/`, `/fr/`, `/es/`, `/<code>/` for later languages),
   language switcher and translation tables ready for all five languages; automatic `hreflang` and
   canonical.
-- Interface text versus visitor content (D-18): Every fixed interface string is translated into
+- Interface text versus visitor content (D-18): every fixed interface string is translated into
   all five languages at go-live: buttons, cart, checkout, account and MFA pages, error and validation
   messages, emails, notifications, and the legal and tax wording keys used on documents
   (`legal_note_key`). The process is an AI draft followed by human review of checkout, emails and
