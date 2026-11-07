@@ -3,8 +3,7 @@
 ## 12.1 Immediate actions (independent of the rebuild)
 
 The analysis of the current repository surfaced some security actions to carry out immediately on the
-production system: credentials to rotate, debug files to remove, authentication of the PHP API
-to strengthen. The detailed list is **confidential** and is not part of the public repository.
+production system. The list is **confidential** and is not part of the public repository.
 
 ## 12.2 Current baseline to improve on
 
@@ -12,7 +11,7 @@ to strengthen. The detailed list is **confidential** and is not part of the publ
 |---|---|---|
 | Surface | WP core + WooCommerce + WCFM (7 add-ons) + WPML (4) + WPSSO (15) + ~20 mu-plugins + 132 routes | A single Python codebase, dependencies inventoried (SBOM) and scanned in CI |
 | Admin access | A single `/wp-admin` for all roles | Staff admin behind MFA and a restricted network or proxy; separate vendor area |
-| API | Authentication to be redone | `ApiClient` with hash, scopes, expiry, rotation, rate limiting |
+| API | Legacy PHP API, to be replaced | `ApiClient` with hash, scopes, expiry, rotation, rate limiting |
 | Executable code | Traditional PHP/WordPress model | No code in media directories; media on object storage |
 | Operational scripts | Ad hoc fix scripts outside version control | Versioned management commands with dry-run and audit, or MCP tools |
 | Data at rest | No field-level encryption | Field-level encryption for IBAN and KYC documents, keys outside the DB |
@@ -20,6 +19,10 @@ to strengthen. The detailed list is **confidential** and is not part of the publ
 | Environments | STAGE synced from LIVE | Synthetic or anonymized data |
 
 ## 12.3 Security requirements
+
+The IDs below are requirement IDs, not task IDs: the tasks are in §12.6 (SEC.0 to SEC.6), and
+the same number means different things in the two tables (requirement SEC.1 is the access model,
+task SEC.1 is HTTP hardening). Renaming the requirements is an open owner question.
 
 | ID | Requirement | Detail |
 |---|---|---|
@@ -83,7 +86,7 @@ flowchart LR
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
-| SEC.0 | Immediate actions from §12.1 on the current system | P1 | 3 | — | Credentials rotated, files cleaned up |
+| SEC.0 | Immediate actions from §12.1 on the current system | P1 | 3 | — | Confidential §12.1 checklist completed and recorded |
 | SEC.1 | HTTP hardening + CSP + cookies + headers (automated tests) | P1 | 6 | ARC.3 | Header scan passed |
 | SEC.2 | Secure uploads and image re-encoding | P1 | 4 | CAT.4, ARC.15 | Tests with malicious files |
 | SEC.3 | Field-level encryption (IBAN, KYC, DAC7) with key rotation | P1 | 8 | VEN.1 | DB dump with no cleartext data |

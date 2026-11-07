@@ -121,7 +121,7 @@ flowchart TD
 
 Intended differences from today:
 
-- The rate is a **number** with a `reason`: OSS reports, invoices and legal wordings are generated without ambiguity.
+- The rate is a **number** with a `reason`: OSS reports, non-fiscal documents and legal wordings are generated without ambiguity (the platform issues no invoices, see [00](00-vision-and-review.md)).
 - The product's **fiscal category** (`standard`, `reduced`, `books`) selects the rate per country;
   no "below 15% = reduced" mapping.
 - **Special territories** handled by postcode; Northern Ireland (`XI`) follows EU goods rules (D-02).
