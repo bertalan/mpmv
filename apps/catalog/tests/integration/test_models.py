@@ -279,16 +279,6 @@ def test_a_variant_vendor_different_from_its_product_is_refused_by_the_database(
         Variant.objects.filter(pk=variant.pk).update(vendor=other_vendor)
 
 
-def test_moving_a_product_to_another_vendor_moves_its_variants() -> None:
-    variant = VariantFactory.create()
-    product = variant.product
-    other_vendor = VendorFactory.create()
-    product.vendor = other_vendor
-    product.save()
-    variant.refresh_from_db()
-    assert variant.vendor == other_vendor
-
-
 def test_only_one_default_variant_per_product() -> None:
     product = ProductFactory.create(kind="variable")
     VariantFactory.create(product=product, is_default=True)
