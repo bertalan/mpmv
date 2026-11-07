@@ -13,16 +13,21 @@ from django.test import Client
 
 from apps.vendors.models import Vendor, VendorMember
 from apps.vendors.tests.factories import VendorMemberFactory, VendorTranslationFactory
+from apps.api.models import ApiClient
 from tests.tenancy import (
+    ApiOperation,
     CrossTenant,
     Endpoint,
     NoVendorData,
     StaffOnly,
     VendorScoped,
     VendorScopedList,
+    api_operations,
+    check_api_operation,
     check_endpoint,
     endpoints,
     public_id_of,
+    vendor_api_key,
 )
 from tests.tenancy_registry import OWNED_OBJECTS
 
@@ -200,3 +205,78 @@ def test_a_list_that_lists_nothing_fails_the_positive_control(
 ) -> None:
     with pytest.raises(AssertionError, match="own object"):
         check_endpoint(client, endpoint("empty-member-list"), MEMBERS, cross_tenant)
+
+
+# --- API v1 operations, called with Vendor A's API key (CORE.13)
+
+API_URLCONF_SCOPE = "members:read"
+
+
+def operation(key: str) -> ApiOperation:
+    from tests.integration.api_tenancy import tenancy_api
+
+    return {op.key: op for op in api_operations(URLCONF, api=tenancy_api)}[key]
+
+
+def test_api_operations_carry_the_scope_they_require() -> None:
+    assert operation("GET /api/members/{public_id}").scopes == (API_URLCONF_SCOPE,)
+
+
+def test_the_vendor_api_key_belongs_to_vendor_a_and_has_the_operations_scope(
+    client: Client, cross_tenant: CrossTenant
+) -> None:
+    headers = vendor_api_key((API_URLCONF_SCOPE,))(client, cross_tenant)
+    api_client = ApiClient.objects.get()
+    assert api_client.vendor == cross_tenant.a.vendor
+    assert api_client.scopes == [API_URLCONF_SCOPE]
+    assert headers["Authorization"].startswith(f"Bearer mpmv_{api_client.key_prefix}_")
+
+
+def test_an_isolated_api_operation_passes_with_a_vendor_key(
+    client: Client, cross_tenant: CrossTenant
+) -> None:
+    check_api_operation(client, operation("GET /api/members/{public_id}"), MEMBER, cross_tenant)
+
+
+def test_an_api_operation_without_tenant_filter_is_caught(
+    client: Client, cross_tenant: CrossTenant
+) -> None:
+    with pytest.raises(AssertionError, match="expected 404, got 200"):
+        check_api_operation(
+            client, operation("GET /api/leaky/members/{public_id}"), MEMBER, cross_tenant
+        )
+
+
+def test_a_403_from_an_api_operation_is_caught(client: Client, cross_tenant: CrossTenant) -> None:
+    with pytest.raises(AssertionError, match="expected 404, got 403"):
+        check_api_operation(
+            client, operation("GET /api/forbidden/members/{public_id}"), MEMBER, cross_tenant
+        )
+
+
+def test_an_isolated_api_list_passes_with_a_vendor_key(
+    client: Client, cross_tenant: CrossTenant
+) -> None:
+    check_api_operation(client, operation("GET /api/members"), MEMBERS, cross_tenant)
+
+
+def test_an_api_list_without_tenant_filter_is_caught(
+    client: Client, cross_tenant: CrossTenant
+) -> None:
+    with pytest.raises(AssertionError, match="another vendor's"):
+        check_api_operation(client, operation("GET /api/leaky/members"), MEMBERS, cross_tenant)
+
+
+def test_an_api_list_wrongly_declared_without_vendor_data_is_caught(
+    client: Client, cross_tenant: CrossTenant
+) -> None:
+    access = NoVendorData("Wrongly declared")
+    with pytest.raises(AssertionError, match="another vendor's data"):
+        check_api_operation(client, operation("GET /api/leaky/members"), access, cross_tenant)
+
+
+def test_staff_only_is_not_an_api_access_class(client: Client, cross_tenant: CrossTenant) -> None:
+    with pytest.raises(TypeError, match="StaffOnly"):
+        check_api_operation(
+            client, operation("GET /api/members"), StaffOnly("Platform only"), cross_tenant
+        )

@@ -1,8 +1,9 @@
 """CORE.3: negative cross-tenant tests, generated for every endpoint and vendor-owned model.
 
-Spec 02 §2.2: "Vendor A requests Vendor B's object → 404" is mandatory for every endpoint. The
-tests below are generated from the root URLconf, the API v1 OpenAPI description and the model
-registry, and the guards fail when something new is not declared in `tests.tenancy_registry`:
+Spec 02 §2.2: "Vendor A requests Vendor B's object → 404" is mandatory for every endpoint; for
+API v1 operations the caller is an API key bound to Vendor A (CORE.13). The tests below are
+generated from the root URLconf, the API v1 OpenAPI description and the model registry, and the
+guards fail when something new is not declared in `tests.tenancy_registry`:
 
 - a vendor-owned model (a ForeignKey chain to Vendor) without the scoped manager or an object
   maker;
@@ -20,6 +21,7 @@ from tests.tenancy import (
     CrossTenant,
     Endpoint,
     api_operations,
+    check_api_operation,
     check_endpoint,
     endpoints,
     vendor_owned_models,
@@ -127,9 +129,10 @@ def test_a_vendor_member_cannot_reach_another_vendors_data(
 
 
 @pytest.mark.parametrize("operation", OPERATIONS, ids=lambda op: op.key)
-def test_an_api_caller_cannot_reach_another_vendors_data(
+def test_a_vendor_api_key_cannot_reach_another_vendors_data(
     operation: ApiOperation, client: Client, cross_tenant: CrossTenant
 ) -> None:
+    """CORE.13: the caller is an API key bound to Vendor A, with the operation's scope."""
     access = API_OPERATIONS.get(operation.key)
     assert access is not None, f"{operation.key} is not declared in tests.tenancy_registry"
-    check_endpoint(client, operation.endpoint, access, cross_tenant, method=operation.method)
+    check_api_operation(client, operation, access, cross_tenant)

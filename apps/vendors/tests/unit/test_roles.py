@@ -21,7 +21,8 @@ from apps.vendors.engine import (
 )
 
 # Spec 02 §2.2: owner = everything about their own vendor, financial settings included;
-# staff = orders, quotes, products; no payouts, IBAN or tax regime.
+# staff = orders, quotes, products; no payouts, IBAN or tax regime. Vendor API keys act for the
+# whole vendor, so only owners issue them (CORE.13).
 EXPECTED: dict[str, dict[VendorAction, bool]] = {
     OWNER: {
         VendorAction.ORDERS: True,
@@ -32,6 +33,7 @@ EXPECTED: dict[str, dict[VendorAction, bool]] = {
         VendorAction.BANK_ACCOUNT: True,
         VendorAction.TAX_REGIME: True,
         VendorAction.MEMBERS: True,
+        VendorAction.API_KEYS: True,
     },
     STAFF: {
         VendorAction.ORDERS: True,
@@ -42,6 +44,7 @@ EXPECTED: dict[str, dict[VendorAction, bool]] = {
         VendorAction.BANK_ACCOUNT: False,
         VendorAction.TAX_REGIME: False,
         VendorAction.MEMBERS: False,
+        VendorAction.API_KEYS: False,
     },
 }
 
