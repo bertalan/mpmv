@@ -11,7 +11,7 @@ Current operating model (to be kept):
 
 | Aspect | How it works |
 |---|---|
-| Platform role | Facilitator: the **vendor invoices and ships**, the platform retains the commission and the payment fee |
+| Platform role | Facilitator: the **vendor invoices and ships**, the platform retains the commission and the payment fee and issues no invoices (see below) |
 | Payment collection | Stripe Connect (vendors' Express accounts), automatic split of funds |
 | Active vendors | 5 profiles, pseudonymized here as A–E: A (large catalog, pipeline from the supplier's site), B (XLSX price list), D (exempt regime), E (quote-only catalog), C (0 products) |
 | Catalog | Thousands of products per language, mostly imported by **Python pipelines** (scraping, extraction, Gemini AI, images) |
@@ -19,6 +19,27 @@ Current operating model (to be kept):
 | Shipping | Zones per carrier × vendor × weight band (main carrier, a vendor's own carrier, aggregator, local pickup) + **quote** for countries not covered |
 | Markets | EU, UK and rest of the world |
 | Expected growth | From a few vendors to dozens, with thousands of products |
+
+**No invoicing and no bookkeeping (owner decision of 2026-11-07).** The marketplace issues only
+non-fiscal documents, and whoever is legally responsible invoices afterwards with their own tools:
+
+- Customers get an order confirmation or order summary per vendor, labelled "non-fiscal
+  document". The vendor issues the invoice or receipt.
+- The operator and each vendor get a commission statement (CMP.2), labelled "non-fiscal document,
+  not an invoice". The operator's accountant invoices the commissions from it, outside the
+  platform.
+- Payout statements and ledger extracts are non-fiscal too.
+
+Every such document, as PDF and as data export, carries the label "Documento non fiscale /
+Non-fiscal document" in all five interface languages. It never uses an invoice numbering sequence,
+and it has a stable reference ID that the external invoice can point back to. The ledger
+([04](04-vendors-commissions-ledger.md)) is an operational record of balances and payouts,
+reconciled with Stripe; it is not accounting. The platform keeps its own legal duties, which are
+reporting and verification, not accounting: DAC7 reporting, DSA trader traceability, VAT records of
+facilitated supplies, and the marketplace checks of the Batteries Regulation, PPWR and national EPR
+laws ([11](11-compliance.md)). Obligations that belong to vendors (VAT, invoices and receipts, EPR
+registrations, product conformity) are listed to them in a checklist they confirm under their own
+responsibility (CMP.10).
 
 Value for the vendor (from the sales presentation): assisted catalog import, translations, SEO for
 taxonomy pages, editorial articles and featured vendors, cross-selling between partners. Today all of this
@@ -81,7 +102,7 @@ Other factual corrections to the August plan:
 - The Google feed `g:id` is the **WordPress post ID**: it must be preserved (`legacy_wp_id`), otherwise
   the history in Merchant Center is lost.
 - Some **immediate security actions** on the current system have emerged, independent of the
-  rebuild (restricted list, see [12](12-security-infra-operations.md) §12.1).
+  rebuild (restricted list, see [12](12-security-infra-operations.md) 12.1).
 
 ## 0.5 Out of scope (declared)
 

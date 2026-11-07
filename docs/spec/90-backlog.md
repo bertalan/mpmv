@@ -6,9 +6,9 @@
 
 ## Summary
 
-- Micro-tasks: **165** in **18** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **1424 h** (P1 1221 h · P2 185 h · P3 18 h)
-- P1 critical path (schedule lower bound with full parallelism): **126 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CAT.1 → ORD.1 → ORD.2 → ORD.4 → PAY.1 → PAY.2 → PAY.3 → PAY.4 → ORD.8
+- Micro-tasks: **171** in **18** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **1486 h** (P1 1289 h · P2 179 h · P3 18 h)
+- P1 critical path (schedule lower bound with full parallelism): **144 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
 
@@ -17,7 +17,7 @@
 | ARC | Architecture and foundations | 15 | 100 | 6 | 0 | 106 |
 | CORE | Identity, permissions, API, backoffice | 11 | 83 | 4 | 0 | 87 |
 | CAT | Product catalog | 11 | 106 | 10 | 0 | 116 |
-| VEN | Vendors, commissions, ledger | 17 | 172 | 14 | 0 | 186 |
+| VEN | Vendors, commissions, ledger | 18 | 174 | 14 | 0 | 188 |
 | TAX | Tax engine | 10 | 42 | 28 | 0 | 70 |
 | SHP | Shipping and quotes | 11 | 64 | 28 | 0 | 92 |
 | ORD | Cart, orders, returns | 10 | 102 | 0 | 0 | 102 |
@@ -28,11 +28,11 @@
 | THM | Frontend themes | 10 | 70 | 0 | 0 | 70 |
 | SEO | SEO, feeds, analytics | 6 | 30 | 14 | 0 | 44 |
 | AI | AI channels (MCP, agents) | 4 | 0 | 22 | 18 | 40 |
-| CMP | Compliance | 8 | 61 | 6 | 0 | 67 |
+| CMP | Compliance | 13 | 127 | 0 | 0 | 127 |
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 4 | 16 | 11 | 0 | 27 |
 | MIG | Migration and cutover | 10 | 106 | 0 | 0 | 106 |
-| **Total** | | **165** | **1221** | **185** | **18** | **1424** |
+| **Total** | | **171** | **1289** | **179** | **18** | **1486** |
 
 ## By phase
 
@@ -135,21 +135,21 @@
 | ORD.5 | Cart and checkout UI (HTMX), conditional B2B fields, VIES, Turnstile | P1 | 16 | ORD.3, TAX.5 | Checkout keyboard-accessible |
 | ORD.6 | Vendor fulfillment: accept, ship with tracking, delivered | P1 | 8 | ORD.2, CORE.9 | Vendor fulfills from its own panel |
 | ORD.7 | Customer area: orders, timeline, tracking, quotes | P1 | 10 | ORD.2 | Parity with My Account |
-| ORD.8 | Online withdrawal and returns flow | P1 | 12 | PAY.4, CMP.6, ARC.16 | Compliant withdrawal button, email receipt |
-| ORD.9 | Transactional emails per language (customer, vendor, staff) | P1 | 10 | ORD.2, ARC.16 | All emails in EN, IT, DE, FR and ES with snapshot tests |
+| ORD.8 | Online withdrawal and returns flow | P1 | 12 | PAY.4, CMP.6, ARC.16 | Withdrawal button "withdraw from contract here" (IT "recedere dal contratto qui") visible for the whole withdrawal period, confirmation "confirm withdrawal" (IT "conferma recesso"), acknowledgement email with content, date and time |
+| ORD.9 | Transactional emails per language (customer, vendor, staff); per-vendor order confirmation as a non-fiscal document | P1 | 10 | ORD.2, ARC.16 | All emails in EN, IT, DE, FR and ES with snapshot tests; the order confirmation (email and PDF) is per vendor, labelled "Documento non fiscale / Non-fiscal document" in all five languages, carries the order reference and never an invoice number, and no email or document calls itself an invoice or receipt |
 | ORD.10 | Checkout and payments kill-switch, alert on payment without transfer | P1 | 4 | ARC.8, PAY.3 | Kill-switch verified on STAGE |
 | PAY.1 | `PaymentGateway` + Stripe implementation (PaymentIntent, transfer_group) | P1 | 12 | ORD.4 | End-to-end test payment |
 | PAY.2 | Signed, idempotent webhooks, `on_payment_succeeded` | P1 | 8 | PAY.1, VEN.4 | Duplicate event has no effect |
 | PAY.3 | Transfer per vendor, reverse transfer, reconciliation with the ledger | P1 | 10 | PAY.2 | 3 vendors in one order: 3 correct transfers |
 | PAY.4 | Full/partial refunds with VAT and commissions reversed | P1 | 10 | PAY.3 | Partial refund cases green |
 
-### F3 — Vendors, ledger, compliance (22 tasks, 233 h)
+### F3 — Vendors, ledger, compliance (29 tasks, 301 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
 | VEN.1 | Vendor models, translations and policies, statuses, slug | P1 | 8 | ARC.6 | Admin CRUD + status tests |
 | VEN.2 | VendorPlan and versioned CommissionRule with constraints (no implicit zero rule) | P1 | 6 | VEN.1 | Tests on overlapping validity periods |
-| VEN.3 | `compute_commission` pure function + real-case suite (REGOLA-ZERO, PERC-CONGELATA, FEE-NETTO) | P1 | 8 | VEN.2 | All §4.4 cases green |
+| VEN.3 | `compute_commission` pure function + real-case suite (REGOLA-ZERO, PERC-CONGELATA, FEE-NETTO) | P1 | 8 | VEN.2 | All 4.4 cases green |
 | VEN.4 | Append-only LedgerEntry (DB constraint/trigger), balance, per-vendor report | P1 | 10 | VEN.3 | UPDATE/DELETE impossible; balance = sum |
 | VEN.5 | Application → onboarding → active flow, with versioned contract and DAC7 checklist | P1 | 12 | VEN.1 | Test vendor activated end-to-end |
 | VEN.6 | Stripe Express onboarding (account link, status, `account.updated` webhook) | P1 | 8 | PAY.1 | Account status synchronized |
@@ -158,17 +158,24 @@
 | VEN.10 | Public vendor storefront per language (bio, policies, products, store categories) | P1 | 8 | CAT.8 | Category sidebar correct in IT too (WCFM bug solved by design) |
 | VEN.12 | Vendor legal and e-invoicing identity (EU + IT): legal form, structured address, VAT with VIES status, codice fiscale, fiscal regime RF01-RF19, REA, SDI recipient code, PEC, EORI, fiscal representative, permanent establishment, invoicing bank details; required fields per country, region (EU or non-EU) and legal form, including the DAC7 dataset for every vendor, defined in a staff-editable table, enforced when the vendor requests a payout | P1 | 8 | VEN.1 | A vendor's data fills a valid FatturaPA party block; a vendor missing a required field for its country cannot request a payout, but can open and edit its profile |
 | VEN.13 | Contract templates with merge fields, vendor-specific clauses with four-eyes approval, custom uploaded contracts: per-vendor `VendorContractDocument` rendered to PDF per language through a `DocumentRenderer` interface (WeasyPrint), prevailing language, legal representative field on the VEN.12 identity; clausole vessatorie marked on templates and vendor clauses (number, title, text), two signature blocks with the art. 1341 and 1342 c.c. formula, the fixed clause on how to complete the specific approval, page footers with the short hash, one-page specific approval sheet | P1 | 18 | VEN.5, VEN.2, VEN.12, ARC.15 | A test vendor's IT and EN PDFs carry its legal identity, commission rule and approved clauses; a missing merge field blocks issuing; a clause or custom upload approved by its own author is refused; a new template version or clause issues a new document for each vendor concerned; a document with marked clauses renders two signature blocks whose formula lists exactly their numbers, and an approval sheet with their full texts and the main PDF hash |
-| VEN.14 | Vendor contract e-signature in two separate acts: acceptance of the whole contract (checkbox, email OTP, MFA step-up), then the specific approval of the marked clauses on a separate screen with a second, separate email OTP; email OTP simple electronic signature, PDF of the exact version per language with SHA-256 hash and RFC 3161 timestamp per act behind a `TimestampAuthority` interface, evidence per act (user, member role, time, trusted-proxy IP, user agent, OTP id), evidence package by email, completion route choice, `SignatureProvider` interface | P1 | 22 | VEN.13, CORE.4, CORE.5, ARC.9, ARC.16 | A test vendor signs end to end; the stored PDF matches its hash and both timestamp tokens verify against their evidence manifests (fake TSA in tests, a real TSA on STAGE); the evidence email arrives in the signer's language; without a text in its language the vendor can accept only after acknowledging English; a wrong, expired or reused code records no acceptance; the specific approval needs its own screen and its own code, the acceptance code is refused for it, and no single request records both acts; the OTP fields accept paste and carry `autocomplete="one-time-code"` (WCAG 2.2 SC 3.3.8, spec 14 §14.6) |
+| VEN.14 | Vendor contract e-signature in two separate acts: acceptance of the whole contract (checkbox, email OTP, MFA step-up), then the specific approval of the marked clauses on a separate screen with a second, separate email OTP; email OTP simple electronic signature, PDF of the exact version per language with SHA-256 hash and RFC 3161 timestamp per act behind a `TimestampAuthority` interface, evidence per act (user, member role, time, trusted-proxy IP, user agent, OTP id), evidence package by email, completion route choice, `SignatureProvider` interface | P1 | 22 | VEN.13, CORE.4, CORE.5, ARC.9, ARC.16 | A test vendor signs end to end; the stored PDF matches its hash and both timestamp tokens verify against their evidence manifests (fake TSA in tests, a real TSA on STAGE); the evidence email arrives in the signer's language; without a text in its language the vendor can accept only after acknowledging English; a wrong, expired or reused code records no acceptance; the specific approval needs its own screen and its own code, the acceptance code is refused for it, and no single request records both acts; the OTP fields accept paste and carry `autocomplete="one-time-code"` (WCAG 2.2 SC 3.3.8, spec 14 14.6) |
 | VEN.15 | Vendor document area: download accepted contracts and evidence (PDF, approval sheet, evidence package, timestamp tokens, uploaded signed file, paper original scan) through signed URLs, kept per the retention rules | P1 | 6 | VEN.14, CORE.9 | A vendor downloads all and only its own accepted documents; another vendor's file gives 404; files stay downloadable for staff after the vendor is closed |
 | VEN.16 | Contract updates and specific approval completion: re-acceptance deadlines per vendor, reminders, automatic consequences, specific approval pending requirement with its own deadline and consequence, paper original route with staff moderation (receipt date, scan, archive location, approve or reject with reason), completion routes per version and per vendor, staff pending view with route and paper status | P1 | 20 | VEN.14, ARC.9, SEC.4, ARC.16 | A vendor that misses its deadline gets the configured consequence (warn, payouts blocked, sales blocked or suspended); staff can extend the deadline, change the consequence or exclude the vendor, all audited with a reason; accepting the document lifts the automatic restrictions but not a staff suspension; a vendor with both acts online but no completion gets the specific approval consequence at its deadline, and a staff-approved paper original lifts it; a rejected original stays pending and the vendor is emailed the reason |
 | VEN.17 | Qualified and advanced digital signature upload and verification (PAdES/CAdES) of the whole document or of the specific approval sheet, pyHanko, EU trusted lists for qualified and staff-listed trust anchors for advanced; completes the specific approval and is stored as a stronger acceptance | P1 | 18 | VEN.14, VEN.16 | A PAdES and a `.p7m` test file signed with a certificate from a test trusted list are accepted; a file that signs a different PDF, an altered file or an untrusted certificate is refused with the reason; a signed approval sheet satisfies the vendor's specific approval requirement |
-| CMP.1 | DAC7 quarterly aggregates + annual export, reading the dataset and completeness from VEN.12 | P1 | 12 | VEN.5, VEN.4, VEN.12 | Test export validated by the advisor |
-| CMP.2 | Commission document from the ledger (party block from VEN.12) + `EInvoiceChannel` interface + export per vendor | P1 | 12 | VEN.4, VEN.12 | Test document generated |
-| CMP.3 | `GpsrInfo` with per-vendor defaults, publication block, product page, recall procedure | P1 | 8 | CAT.1 | Product without GPSR cannot be published |
+| VEN.18 | Fiscal regime RF20 (cross-border VAT franchise, Directive (EU) 2020/285, FatturaPA specification 1.9 from 2025-04-01): add the choice with its official SDI label, update the check constraint with a data migration, and record the FatturaPA specification version (1.9.1) the party block follows | P1 | 2 | VEN.12 | A vendor can save RF20; the constraint accepts RF01–RF20 except RF03; `fatturapa_party()` emits `RegimeFiscale` RF20; a test pins the label list to the specification version |
+| CMP.1 | DAC7 quarterly aggregates + annual export, reading the dataset and completeness from VEN.12 | P1 | 12 | VEN.5, VEN.4, VEN.12 | Test export validates against the Agenzia delle Entrate DPI XML schema and is checked by the advisor; excluded sellers (under 30 sales and €2,000 or less) are left out; each reported vendor gets its data |
+| CMP.2 | Non-fiscal commission statement (pro-forma) per vendor and period from the ledger, with VEN.12 party data, as PDF per language and CSV/JSON export mappable to FatturaPA fields; no invoice issuing, no e-invoicing channel | P1 | 8 | VEN.4, VEN.12 | A seed vendor's statement and export are labelled "Documento non fiscale / Non-fiscal document, not an invoice" in all five languages, carry a stable reference ID and no invoice number sequence, and their totals match the ledger |
+| CMP.3 | `GpsrInfo` with per-vendor defaults, publication block, product page with picture, recall procedure; GPSR article 22 marketplace duties: points of contact, authority orders within 2 working days, safety notices within 3 working days, Safety Gate checks, repeat-offender suspension | P1 | 12 | CAT.1 | Product without GPSR cannot be published; a safety notice and an authority order show their working-day deadline and an overdue one alerts staff |
 | CMP.4 | GDPR: customer export and anonymization, sub-processor register, retention job | P1 | 10 | ORD.2 | Erasure request on a seed order |
-| CMP.6 | Online withdrawal, 30-day price history (Omnibus), pre-contractual information | P1 | 8 | ORD.2, CAT.1 | Correct strikethrough price in tests |
+| CMP.5 | DSA duties of every platform (points of contact, terms, notice and action, statement of reasons, criminal offence notification) and P2B (reasons for restrictions, 30 days' notice of termination, ranking page, differentiated treatment and data access in the terms); vendor terms acceptance is VEN.5, VEN.13 to VEN.16 | P1 | 10 | VEN.5 | A notice gets a tracked outcome and the vendor a statement of reasons; a termination cannot take effect before 30 days from its notice |
+| CMP.6 | Online withdrawal, 30-day price history (Omnibus), pre-contractual information, marketplace information (art. 49-bis Codice del Consumo), harmonised legal guarantee notice | P1 | 10 | ORD.2, CAT.1 | Correct strikethrough price in tests; every offer shows the vendor's trader status and the split of obligations; checkout shows the harmonised legal guarantee notice |
 | CMP.7 | Automated accessibility audit in CI (axe, WCAG 2.2 AA tags) + manual review + statement | P1 | 8 | THM.5 | Zero axe violations with the `wcag22aa` tag on key pages; manual review recorded; statement published |
+| CMP.8 | AI Act transparency: "AI generated" or "AI edited" label and metadata flag on AI-produced product images, origin tracking of AI text, staff AI literacy briefing | P1 | 4 | CAT.4, ING.5 | An AI-edited image shows its label on the product page and in its metadata; unreviewed machine text cannot be published as reviewed |
 | CMP.9 | WCAG 2.2 SC 3.3.8 (accessible authentication) on the authentication templates of CORE.4 and CORE.5: paste allowed in every password and code field, `autocomplete` tokens (`current-password`, `new-password`, `one-time-code`, `username webauthn`), passkeys offered, Turnstile without a puzzle | P1 | 3 | CORE.4, CORE.5, THM.3 | e2e test pastes a password and a TOTP code; the template lint finds the `autocomplete` tokens; Turnstile runs in managed or invisible mode |
+| CMP.10 | Vendor obligations checklist with self-attestation: versioned `VendorObligation` data with applicability rules, three answers (yes, no, in progress with date) as append-only attestations, date-based and "no" reminders with one-click links, staff flags after N unanswered reminders, optional VEN.16 consequence per obligation, staff view of open answers, seed obligations; email wording reviewed once by counsel (L) | P1 | 24 | VEN.12, VEN.16, ARC.16, ARC.9, CORE.9, SEC.4 | A seed vendor sees only the obligations that apply to it; an "in progress" answer without a date is refused; changing an answer adds a row and an AuditLog entry; a "no" answer sends reminders at the configured cadence that stop when the answer becomes "in progress" or "yes"; an overdue date and N unanswered reminders flag the vendor to staff; every reminder is in the audit log and the outbox; suspension is mentioned only when a consequence is configured |
+| CMP.11 | DSA articles 30–32 (trader data, display on offers, compliance by design, buyer notification) and EPR registration checks per vendor, stream and destination country (Batteries art. 62(6), PPWR art. 45(4), DE/FR/ES national checks), vendor identification on request for product liability | P1 | 16 | VEN.12, CMP.3, CMP.10, CAT.1 | An offer in a category mapped to an EPR stream is not sold into a country whose check is active without the vendor's registration number there; the trader data shows on the offer; an illegal-product decision produces the list of buyers of the last 6 months to inform |
+| CMP.12 | VAT records of facilitated supplies (art. 242a VAT directive, art. 54c Reg. 282/2011): export per vendor and period, 10-year retention outside CMP.4 erasure | P1 | 4 | ORD.2, VEN.12 | The export of a seed period holds every field of article 54c(2) and an erasure request leaves the records in place |
+| CMP.13 | Deemed-supplier flow gate: `Vendor.established_in_eu`, checkout rules per D-21 for non-EU vendors, GB consignments and the Swiss threshold counter | P1 | 6 | VEN.12, ORD.3 | The D-21 rules hold in checkout tests: a refused flow is blocked with a clear message and an allowed one passes |
 
 ### F4 — Content, SEO, feeds (12 tasks, 84 h)
 
@@ -203,7 +210,7 @@
 | MIG.9 | Three dress rehearsals on STAGE + cutover and rollback runbook | P1 | 16 | MIG.5, MIG.6 | Third rehearsal with no blockers |
 | MIG.10 | Cutover and post-go-live monitoring | P1 | 12 | MIG.9, SEC.6 | Go-live, 72 h with no critical issues |
 
-### F6 — After go-live (P2) (26 tasks, 185 h)
+### F6 — After go-live (P2) (25 tasks, 179 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -230,7 +237,6 @@
 | SEO.6 | Anonymous page cache, responsive renditions, CWV budget | P2 | 6 | THM.3 | LCP < 2.5 s on product page |
 | AI.1 | MCP server: auth, read tools (catalog, orders, quotes, simulations, reports) | P2 | 12 | CORE.7 | Tools usable from Claude Code with scopes |
 | AI.2 | Mutating MCP tools with dry-run, confirmation and audit | P2 | 10 | AI.1 | Every mutation has a diff and an audit entry |
-| CMP.5 | DSA notice & action, notice of suspensions and ranking transparency page (vendor terms acceptance is VEN.5, VEN.13 to VEN.16) | P2 | 6 | VEN.5 | Notice with tracked outcome |
 | OPS.3 | Runbooks: incidents (including 72 h data breach), payouts, rate updates, vendor onboarding | P2 | 8 | — | Runbooks in the repo |
 | OPS.4 | Automated dependency updates (PRs) + SBOM | P2 | 3 | ARC.4 | Weekly update PRs |
 
