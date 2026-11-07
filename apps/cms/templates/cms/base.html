@@ -1,0 +1,38 @@
+{% load i18n static wagtailcore_tags cms_tags %}{% get_current_language as LANGUAGE_CODE %}{% wagtail_site as current_site %}<!doctype html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% firstof page.seo_title page.title %} · {{ current_site.site_name }}{% endblock %}</title>
+  {% if page.search_description %}<meta name="description" content="{{ page.search_description }}">{% endif %}
+  <link rel="stylesheet" href="{% static 'cms/site.css' %}">
+</head>
+<body>
+  <header class="site-header">
+    <a class="site-name" href="{% url 'home' %}">{{ current_site.site_name }}</a>
+    {% navigation_links "header" as header_links %}
+    {% if header_links %}
+      <nav class="site-nav" aria-label="{% translate 'Main' %}">
+        <ul>
+          {% for link in header_links %}<li><a href="{{ link.url }}">{{ link.label }}</a></li>{% endfor %}
+        </ul>
+      </nav>
+    {% endif %}
+    {% include "cms/includes/language_switcher.html" %}
+  </header>
+  <main class="site-main">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="site-footer">
+    {% navigation_links "footer" as footer_links %}
+    {% if footer_links %}
+      <nav aria-label="{% translate 'Footer' %}">
+        <ul>
+          {% for link in footer_links %}<li><a href="{{ link.url }}">{{ link.label }}</a></li>{% endfor %}
+        </ul>
+      </nav>
+    {% endif %}
+    <p>&copy; {% now "Y" %} {{ current_site.site_name }}</p>
+  </footer>
+</body>
+</html>

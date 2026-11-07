@@ -207,8 +207,13 @@ class Endpoint:
 
     @property
     def is_api_operation(self) -> bool:
-        """A django-ninja operation: covered per method through `api_operations()`."""
-        return getattr(self.callback, "__module__", "") == "ninja.operation"
+        """A django-ninja operation of API v1: covered per method through `api_operations()`.
+
+        Wagtail's admin also serves django-ninja views; they are admin pages (`admin/`).
+        """
+        return getattr(self.callback, "__module__", "") == "ninja.operation" and (
+            self.route.startswith("api/")
+        )
 
     def path(self, **kwargs: str) -> str:
         missing = [name for name in self.params if name not in kwargs]

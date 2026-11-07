@@ -54,6 +54,16 @@ INSTALLED_APPS = [
     # are accounts models. Listed before accounts so its admin can unregister the raw device admin.
     "django_otp",
     "django_otp.plugins.otp_totp",
+    # Wagtail (CMS.1, ADR-0001): pages, snippets and the editors' admin. No images, documents,
+    # embeds, forms or redirects yet: later CMS tasks add them when a page type needs them.
+    "wagtail.sites",
+    "wagtail.users",
+    "wagtail.snippets",
+    "wagtail.search",
+    "wagtail.admin",
+    "wagtail",
+    "modelcluster",
+    "taggit",
     *LOCAL_APPS,
 ]
 
@@ -63,6 +73,7 @@ PROCRASTINATE_ON_APP_READY = "apps.core.tasks.on_app_ready"
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
+    "apps.cms.middleware.WagtailAdminPickerNonceMiddleware",  # Wagtail's inline pickers (CMS.1)
     "apps.core.middleware.PermissionsPolicyMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
@@ -90,6 +101,7 @@ AUTHENTICATION_BACKENDS = [
 # staff, must use MFA (owner decision Q-09).
 MFA_REQUIRED_POLICIES: list[str] = [
     "apps.vendors.services.is_vendor_member",  # all vendor members (CORE.2)
+    "apps.cms.services.can_access_cms_admin",  # Wagtail editors, staff or not (CMS.1)
 ]
 MFA_STEP_UP_MAX_AGE = 300  # seconds a verification counts as fresh for sensitive actions
 # Step-up for sensitive views of apps that cannot import accounts (the core audit log view, SEC.4).
@@ -148,6 +160,23 @@ LANGUAGES = [
 ]
 USE_I18N = True
 LOCALE_PATHS = [BASE_DIR / "locale"]
+
+# Wagtail (CMS.1, spec 10). Page locales follow LANGUAGES: apps.cms creates a Locale row for each
+# language after every migrate. The editors' admin is at /admin/ (mpmv/urls.py).
+WAGTAIL_SITE_NAME = "MPMV"
+WAGTAIL_I18N_ENABLED = True
+WAGTAIL_CONTENT_LANGUAGES = LANGUAGES
+WAGTAILADMIN_BASE_URL = env_str("MPMV_BASE_URL", "") or "http://localhost:8000"
+WAGTAILSEARCH_BACKENDS = {"default": {"BACKEND": "wagtail.search.backends.database"}}
+# Passwords, email addresses, users and groups are managed where changes are audited (SEC.4),
+# not from Wagtail's account and user pages.
+WAGTAIL_PASSWORD_MANAGEMENT_ENABLED = False
+WAGTAIL_PASSWORD_RESET_ENABLED = False
+WAGTAIL_EMAIL_MANAGEMENT_ENABLED = False
+WAGTAILUSERS_PASSWORD_ENABLED = False
+# No third-party requests from the admin (CSP, privacy); upgrades come through uv.lock.
+WAGTAIL_GRAVATAR_PROVIDER_URL = None
+WAGTAIL_ENABLE_UPDATE_CHECK = False
 
 # UTC in the database; Europe/Rome for schedules and documents (spec 01 conventions).
 USE_TZ = True
