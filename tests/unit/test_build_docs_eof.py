@@ -8,7 +8,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 _spec = importlib.util.spec_from_file_location("build_docs", ROOT / "tools" / "build_docs.py")
-assert _spec is not None and _spec.loader is not None
+assert _spec is not None
+assert _spec.loader is not None
 build_docs = importlib.util.module_from_spec(_spec)
 sys.modules["build_docs"] = build_docs
 _spec.loader.exec_module(build_docs)
