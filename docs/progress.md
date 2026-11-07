@@ -32,6 +32,14 @@ part of the done-when still open) · `not started`.
 | CORE.5 | done | #21 | Progressive login lockout per account and IP, registration rate limit, Turnstile captcha, trusted-proxy client IP |
 | CORE.4 | done | #22 | Mandatory MFA for staff, superusers and vendor owners: TOTP, passkeys, recovery codes, step-up |
 
+## Owner decisions 2026-11-07
+
+- Hosting: Hetzner Cloud (EU, x86), app VPS with Podman Quadlets, self-managed PostgreSQL 17 on a dedicated database VPS, PITR with pgBackRest to Hetzner Object Storage ([ADR-0007](adr/0007-hosting-hetzner-self-managed-postgres.md), supersedes ADR-0005; OPS.1 updated).
+- ARC.5 done-when narrowed to what is proven locally and in CI; the STAGE deploy, rollback and the STAGE checks of CORE.7 and I18N.1 move to the new task [ARC.13](spec/01-stack-and-architecture.md).
+- Media storage on Hetzner Object Storage with private buckets and signed URLs: new task [ARC.15](spec/01-stack-and-architecture.md), required by CAT.4 and SEC.2.
+- `platform_entity` on LedgerEntry and PayoutAccount points to the PlatformOperator version row; balances per company group versions by legal identity ([spec 04](spec/04-vendors-commissions-ledger.md)).
+- Vendor-scoped API keys: new task [CORE.13](spec/02-core-identity-permissions.md) (`ApiClient.vendor`).
+
 ## Follow-ups from wave 1
 
 Open questions for the owner:

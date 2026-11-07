@@ -1,6 +1,6 @@
 # ADR-0005: Hosting model
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0007
 - **Date:** 2026-11-07
 - **Deciders:** project owner, tech lead
 - **Backlog:** ARC.5 · **Closes:** D-12

@@ -16,7 +16,7 @@ legal counsel. Once made, the decision is recorded as an ADR in the repository a
 | D-09 | Payments | Payment methods beyond cards, Apple Pay and Google Pay (SEPA, PayPal via Stripe, Klarna)? | Only cards and wallets at launch; others after checking compatibility with transfers | Owner | PAY.1 |
 | D-10 | Privacy | Consent management: certified external CMP or self-hosted solution? | Certified external CMP (less maintenance) | Owner | SEO.5 |
 | D-11 ✅ | Technical | Django 6.x moving to 6.2 LTS before go-live, or 5.2 LTS right away? | **Decided:** Django 6.1 now, 6.2 LTS before go-live ([ADR-0001](../adr/0001-stack.md)) | Tech lead | ARC.1 |
-| D-12 ✅ | Technical | Self-managed VPS or EU PaaS with managed Postgres? | **Decided:** EU VPS + managed PostgreSQL, Podman Quadlets ([ADR-0005](../adr/0005-hosting.md)) | Tech lead | ARC.5 |
+| D-12 ✅ | Technical | Self-managed VPS or EU PaaS with managed Postgres? | **Decided (2026-11-07):** Hetzner Cloud (EU, x86): app VPS with Podman Quadlets, self-managed PostgreSQL 17 on a dedicated database VPS on the private network, PITR with pgBackRest to Hetzner Object Storage ([ADR-0007](../adr/0007-hosting-hetzner-self-managed-postgres.md), supersedes ADR-0005) | Tech lead | ARC.5 |
 | D-13 | Technical | AI provider for enrichment: do we stay on Gemini? | Yes, behind `TextEnricher`; the provider is configurable | Tech lead | ING.5 |
 | D-14 | Product | Can pipeline-fed vendors edit products manually from the dashboard? | Only "local" fields (revised copy, cover); price and stock remain with the supplier | Owner | CORE.9 |
 | D-15 ⚖️ | Compliance | Is the platform a microenterprise for EAA purposes? | Design for WCAG 2.1 AA regardless | Legal counsel | CMP.7 |

@@ -135,7 +135,7 @@ needed for most of the catalog. The `/tag-product/{slug}/` and
 | CAT.1 | Product and Variant models, translations, `(vendor, sku)` constraints | P1 | 12 | ARC.6, VEN.1 | Migrations + constraint tests |
 | CAT.2 | Taxonomies: Category (tree), configurable Taxonomy/Term, Brand, translations and SEO texts | P1 | 10 | CAT.1 | Admin CRUD with translations |
 | CAT.3 | Typed attributes and translated values; variant axes with ordering | P1 | 10 | CAT.1 | Variable size×color product created via API |
-| CAT.4 | Media: ProductImage on Wagtail Images, WebP/AVIF renditions, dedup by hash, cover lock | P1 | 10 | CAT.1 | Upload → automatic renditions |
+| CAT.4 | Media: ProductImage on Wagtail Images, WebP/AVIF renditions, dedup by hash, cover lock | P1 | 10 | CAT.1, ARC.15 | Upload → automatic renditions |
 | CAT.5 | `build_product_slug` + SlugHistory + 301 redirect middleware | P1 | 8 | CAT.1 | Test cases ported from legacy-sku-permalink |
 | CAT.6 | `Redirect` model + admin management + import of existing maps (retired SKUs, merged tags, discontinued categories) | P1 | 6 | CAT.5 | All rules from the 4 mu-plugins covered by tests |
 | CAT.7 | Product page: gallery, variants with default, companion box, related products, visible SKU, "on request" | P1 | 16 | CAT.3, CAT.4 | Visual and functional parity with LIVE |

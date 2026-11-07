@@ -81,6 +81,15 @@ class LedgerEntry(Model):                      # append-only, never UPDATE/DELET
 class Payout(Model): vendor; amount; status; period; external_ref; ledger_entries M2M
 ```
 
+`platform_entity` on `LedgerEntry` and `PayoutAccount` points to the `PlatformOperator`
+configuration version row that was valid when the entry or account was created, not to a stable
+legal-entity key. Each row therefore records exactly how the platform was configured at that
+moment (country, VAT number, tax regime), which is what an auditor needs. A change of address or
+regime creates a new version, so one company can appear across several version rows: balances and
+reports per company are recomposed by grouping the versions that share the same legal identity
+(the VAT number of the platform operator). A relocation to a new company with a new VAT number
+starts a new group.
+
 ### Pure functions
 
 ```python
