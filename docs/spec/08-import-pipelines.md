@@ -144,7 +144,7 @@ Goal: a vendor with a WooCommerce website is activated **without writing code**.
 | ING.7 | `publish_drafts` via `catalog.services` with dry-run and scheduled publication | P1 | 8 | CAT.10 | Draft → EN/IT product in one step |
 | ING.8 | `plan_stock_actions` / `plan_price_actions` + jobs and ReviewItem | P1 | 10 | ING.2 | Supplier rules (404, stale, >15%, sales) green |
 | ING.9 | XLSX adapter (Vendor B), publisher feed (Vendor D), YAML light (Vendor E), generic CSV | P1 | 16 | ING.4 | One dry-run per vendor |
-| ING.10 | Daily report (email + admin page) with identity anomalies | P2 | 6 | ING.8 | Parity with `daily_report.py` |
+| ING.10 | Daily report (email + admin page) with identity anomalies | P2 | 6 | ING.8, ARC.16 | Parity with `daily_report.py` |
 | ING.11 | Supplier review import | P2 | 4 | ING.1, CMS.6 | Reviews imported with original date |
 | ING.12 | `/api/v1` import API for external vendors (upsert, stock, prices, media) | P2 | 8 | CORE.7, CAT.10 | Sample client in dry-run |
 | ING.13 | Admin checklist and "new vendor from source" wizard | P2 | 8 | ING.9 | Demo vendor activated without code |

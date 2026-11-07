@@ -155,6 +155,6 @@ webhooks, quotes about to expire).
 | PAY.4 | Full/partial refunds with VAT and commissions reversed | P1 | 10 | PAY.3 | Partial refund cases green |
 | ORD.6 | Vendor fulfillment: accept, ship with tracking, delivered | P1 | 8 | ORD.2, CORE.9 | Vendor fulfills from its own panel |
 | ORD.7 | Customer area: orders, timeline, tracking, quotes | P1 | 10 | ORD.2 | Parity with My Account |
-| ORD.8 | Online withdrawal and returns flow | P1 | 12 | PAY.4, CMP.6 | Compliant withdrawal button, email receipt |
-| ORD.9 | Transactional emails per language (customer, vendor, staff) | P1 | 10 | ORD.2 | All emails in EN, IT, DE, FR and ES with snapshot tests |
+| ORD.8 | Online withdrawal and returns flow | P1 | 12 | PAY.4, CMP.6, ARC.16 | Compliant withdrawal button, email receipt |
+| ORD.9 | Transactional emails per language (customer, vendor, staff) | P1 | 10 | ORD.2, ARC.16 | All emails in EN, IT, DE, FR and ES with snapshot tests |
 | ORD.10 | Checkout and payments kill-switch, alert on payment without transfer | P1 | 4 | ARC.8, PAY.3 | Kill-switch verified on STAGE |

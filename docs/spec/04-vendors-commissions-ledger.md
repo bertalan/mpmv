@@ -225,6 +225,30 @@ change to a vendor's clauses, issues a new document for each vendor concerned, w
 re-accepted under the deadline rules below. A change to the vendor's own merge-field data (for
 example a new address) does not issue a new document by itself; staff may issue one.
 
+Clauses that need specific approval (owner decision of 2026-11-07). Under articles 1341 comma 2
+and 1342 of the Italian civil code, onerous clauses ("clausole vessatorie") in standard terms
+drafted by one party have no effect unless the other party approves them specifically in
+writing. The rule applies between businesses too, so it covers vendor contracts. Each template
+version therefore marks its clausole vessatorie (VEN.13): a marked clause has a number, a title
+and a full text per language, and the template body places it with a clause tag, so the PDF and
+the approval screen show the same text. A staff-added vendor clause can be marked too, with its
+number, through the same four-eyes approval. Every rendered PDF of a document with marked
+clauses has:
+
+1. Two signature blocks: the first for the whole contract, the second with the formula "Ai sensi
+   e per gli effetti degli artt. 1341 e 1342 c.c. si approvano specificamente le clausole n. ..."
+   followed by the clause numbers (translated in the other languages, the Italian formula always
+   printed).
+2. A fixed clause, with text supplied by counsel, telling the vendor that the specific approval
+   is complete only when it signs with a qualified or advanced electronic signature or sends the
+   paper original signed by hand, within the deadline and with the consequence stated below.
+3. A footer on every page with the document number, language, page count and a short PDF hash,
+   so a printed and signed copy can be matched to the stored file.
+
+The renderer also produces a one-page specific approval sheet per language (the formula, the
+numbers, titles and full texts of the marked clauses, and the SHA-256 of the main PDF), which a
+vendor can sign alone with a qualified or advanced signature.
+
 Data model (VEN.5 has the first three models on its branch; the other tasks add the rest):
 
 ```python
@@ -234,15 +258,26 @@ class VendorContract(Model):            # VEN.5: a template version, locked once
     prevailing_language = LanguageField()                 # VEN.13: wins if the texts differ
     reacceptance_deadline_days = PositiveIntegerField()   # VEN.16: default 30 (owner question)
     default_consequence = CharField(choices=CONSEQUENCES) # VEN.16
+    specific_approval_deadline_days = PositiveIntegerField()    # VEN.16: owner question
+    specific_approval_consequence = CharField(choices=CONSEQUENCES)  # VEN.16: owner question
+    specific_approval_routes = ArrayField(choices=ROUTES)  # VEN.16: default all three
 
 class VendorContractTranslation(TranslationModel):   # VEN.5: one template text per language
     contract; language; title; body                   # body holds merge fields from VEN.13
+
+class MarkedClause(Model):              # VEN.13: a clausola vessatoria of a template version
+    contract; number (UNIQUE per contract); position
+    # MarkedClauseTranslation, one per language: title; text (placed in the body by a clause tag)
 
 class VendorContractClause(Model):      # VEN.13: negotiated terms for one vendor
     vendor; title and body per language (VendorContractClauseTranslation)
     status = CharField(choices=["draft", "approved", "withdrawn"])
     created_by; approved_by (never created_by); approved_at   # four-eyes, audited
+    needs_specific_approval: bool; number               # marked as a clausola vessatoria
     # an approved clause is never edited: a change is a new clause that supersedes it
+
+class VendorSignaturePolicy(Model):     # VEN.16: per-vendor override, audited with a reason
+    vendor (1:1); specific_approval_routes; set_by; reason
 
 class VendorContractDocument(Model):    # VEN.13: what one vendor accepts, numbered per vendor
     vendor; number (UNIQUE per vendor)
@@ -251,38 +286,59 @@ class VendorContractDocument(Model):    # VEN.13: what one vendor accepts, numbe
     source = CharField(choices=["template", "custom_upload"])
     prevailing_language
     reacceptance_deadline_days; default_consequence   # copied from the version, staff may change
+    specific_approval_deadline_days; specific_approval_consequence  # same rule
+    specific_approval_routes          # from VendorSignaturePolicy if set, else from the version
+    marked_clauses (JSON snapshot: number, title per language, text SHA-256)  # empty = no second act
     created_by; approved_by                           # four-eyes for clauses and custom uploads
     # VendorContractDocumentFile, one per language: pdf (private storage), pdf_sha256,
-    # merge_data (JSON snapshot of the merge fields), rendered_at
+    # approval_sheet_pdf, approval_sheet_sha256, merge_data (JSON snapshot), rendered_at
 
 class ContractAcceptance(Model):        # VEN.5: append-only, one per vendor and document
     vendor; contract; user; language; text_hash; accepted_at; ip
-    # VEN.14 adds, still written once at acceptance:
+    # VEN.14 adds, still written once at acceptance (the first act):
     document = FK(VendorContractDocument); pdf_sha256
-    method = CharField(choices=["email_otp", "qualified_signature"])
+    method = CharField(choices=["email_otp", "qualified_signature", "advanced_signature"])
     member_role                         # the signer's VendorMember role at that moment
     english_fallback_acknowledged: bool
     user_agent; otp = FK(SignatureOtp, null=True); mfa_step_up_at
 
+class SpecificApproval(Model):          # VEN.14: append-only, the second act, online record
+    acceptance (1:1); user; member_role; clause_numbers (JSON); clauses_sha256
+    approved_at; ip; user_agent; otp = FK(SignatureOtp)   # a second, separate code
+
 class SignatureOtp(Model):              # VEN.14: one-time code sent by email
     user; vendor; document; language; pdf_sha256; code_hash; sent_to
+    purpose = CharField(choices=["acceptance", "specific_approval"])  # a code serves one act
     created_at; expires_at; attempts; verified_at
 
-class AcceptanceEvidence(Model):        # VEN.14: append-only, one per acceptance
-    acceptance (1:1); manifest (JSON); manifest_sha256
+class AcceptanceEvidence(Model):        # VEN.14: append-only, one per act
+    acceptance; act = CharField(choices=["acceptance", "specific_approval"])  # UNIQUE together
+    manifest (JSON); manifest_sha256    # the second manifest includes the first one's hash
     tsa; timestamp_token (RFC 3161 response, DER); timestamped_at
-    package (private storage); package_sha256
+    package (private storage); package_sha256   # built once both acts are recorded
 
-class QualifiedSignature(Model):        # VEN.17 (P2): append-only, a stronger acceptance
+class DigitalSignature(Model):          # VEN.17: append-only, a verified signed upload
     acceptance; signed_file (private storage); file_sha256
     format = CharField(choices=["pades", "cades_p7m"])
+    level = CharField(choices=["qualified", "advanced"])
+    scope = CharField(choices=["whole_document", "approval_sheet"])
     signer_name; certificate (DER); issuer; trusted_list_status; verified_at; report (JSON)
 
-class VendorContractRequirement(Model): # VEN.16: a vendor must (re-)accept a document
+class PaperOriginal(Model):             # VEN.16: the hand-signed paper route, staff moderated
+    requirement; status = CharField(choices=["awaiting", "received", "approved", "rejected"])
+    scan (private storage, null); scan_sha256; received_on; archive_location
+    reviewed_by; reviewed_at; rejection_reason   # every transition audited
+
+class VendorContractRequirement(Model): # VEN.16: a vendor must (re-)accept or complete a document
     vendor; document; deadline; consequence (null = the document's default)
-    status = CharField(choices=["pending", "accepted", "overdue", "excluded"])
+    kind = CharField(choices=["acceptance", "specific_approval"])
+    route = CharField(choices=ROUTES, null=True)   # specific_approval only: the vendor's choice
+    status = CharField(choices=["pending", "satisfied", "overdue", "excluded"])
+    digital_signature = FK(DigitalSignature, null=True)   # or the approved PaperOriginal
     reminders_sent_at (JSON); consequence_applied_at; lifted_at; reason
 ```
+
+`ROUTES` are `qualified`, `advanced` and `paper`.
 
 `CONSEQUENCES` are `warn` (banner and email only), `block_payouts`, `block_sales` (listings
 hidden and new orders refused), `block_payouts_and_sales` and `suspend` (the VEN.1 status
@@ -306,27 +362,63 @@ one-time code and the existing MFA step-up.
 4. With the correct code, one transaction writes the `ContractAcceptance` with the evidence: user,
    VendorMember role, time, IP from the trusted-proxy client IP (CORE.5, `apps.core.http.client_ip`),
    user agent, OTP verification id, language, text and PDF hashes, and an AuditLog entry. A
-   wrong, expired or reused code writes nothing but the failed attempt.
-5. A job (ARC.9) builds the evidence manifest (JSON with the data above), requests an RFC 3161
-   timestamp on its SHA-256 through our own `TimestampAuthority` interface, and builds the
-   evidence package: a ZIP with the PDF, the manifest, the timestamp token and a readable summary
-   PDF. If the TSA is down the job retries and alerts staff after the last retry; the acceptance
-   stands and the timestamp follows. The package is emailed to the signer and the vendor's contact
-   address and stays in the vendor's document area (VEN.15).
+   wrong, expired or reused code writes nothing but the failed attempt. This is the first act.
+5. If the document has marked clauses, the second act follows on a separate screen, reachable
+   only after the first act is recorded. It lists only the marked clauses (number, title, full
+   text) and the formula of the second signature block, with its own checkbox, never pre-ticked,
+   and its own confirm button. Confirming sends a second, separate one-time code with purpose
+   `specific_approval`; the first act's code is refused here and the other way round. With the
+   correct code one transaction writes the `SpecificApproval` with the same evidence (user, role,
+   time, IP, user agent, OTP verification id, clause numbers and the hash of their texts). No
+   page, form or API call records both acts in one action, and the second act cannot be pre-filled
+   from the first. A signer who leaves before the second act finds it pending in the vendor area.
+6. A job (ARC.9) builds the evidence manifest of each act (JSON with the data above; the second
+   manifest includes the hash of the first), requests an RFC 3161 timestamp on its SHA-256
+   through our own `TimestampAuthority` interface, and, once both acts are recorded, builds the
+   evidence package: a ZIP with the PDF, the approval sheet, both manifests, both timestamp
+   tokens and a readable summary PDF. If the TSA is down the job retries and alerts staff after
+   the last retry; the act stands and the timestamp follows. The package is emailed to the signer
+   and the vendor's contact address and stays in the vendor's document area (VEN.15).
+
+Both acts online are enough for the vendor to start operating (VEN.5 activation) or to satisfy a
+re-acceptance requirement. They are the online record of the vendor's intent, but the specific
+approval counts as completed only after one of the two routes below; until then a
+`specific_approval` requirement is pending (VEN.16).
+
+Completing the specific approval (owner decision of 2026-11-07). After the second act the vendor
+chooses a route, and may change it while the requirement is pending:
+
+- Qualified or advanced electronic signature (VEN.17). The vendor signs the whole PDF, or only
+  the approval sheet, and uploads it. No paper is needed.
+- Paper original. The vendor prints the PDF, signs both signature blocks by hand (legal
+  representative or another authorized signer), and sends the original by post or courier to the
+  address shown on the page; it may upload a scan first. A staff moderator checks the original on
+  receipt against the stored PDF (document number, language, page footers with the short hash,
+  both blocks signed) and approves it, recording the date of receipt, the scan (uploaded by staff
+  if the vendor did not) and the physical archive location, or rejects it with a reason. Each
+  transition is audited; four-eyes is not required, since the moderator records a physical fact
+  and the scan stays as its evidence.
+
+Staff can narrow the allowed routes per contract version or per vendor (`VendorSignaturePolicy`,
+audited with a reason), for example to require a qualified signature and exclude paper.
 
 The email one-time code flow sits behind a `SignatureProvider` interface with only the built-in
 implementation, so a third-party e-signature provider (for example Yousign, Namirial or InfoCert)
 can be added later without changing the vendor pages. No provider is planned for go-live.
 
-Qualified digital signature (VEN.17, P2). A vendor with a qualified signature can download the
-PDF, sign it (PAdES, or CAdES as `.p7m`) and upload it. The upload is accepted only if it signs
-the exact stored PDF (same hash for CAdES, unchanged signed revision for PAdES) and the signature
-and certificate verify (pyHanko, with the EU trusted lists for the qualified status). It is stored
-as a stronger acceptance: next to an email one-time code acceptance, or as the acceptance itself
-with method `qualified_signature`.
+Qualified and advanced digital signature (VEN.17, P1 since it is one of the two completion
+routes). A vendor with a qualified or advanced signature can download the PDF or the approval
+sheet, sign it (PAdES, or CAdES as `.p7m`) and upload it. The upload is accepted only if it signs
+the exact stored file (same hash for CAdES, unchanged signed revision for PAdES) and the
+signature and certificate verify (pyHanko, with the EU trusted lists for the qualified status; an
+advanced signature only from a trust anchor staff have listed). It is stored as a
+`DigitalSignature` that completes the specific approval; a signed whole document is also a
+stronger acceptance of the first act, or the acceptance itself with method `qualified_signature`
+or `advanced_signature`.
 
 Vendor document area (VEN.15). Every vendor can download all its accepted documents: the PDF,
-the evidence package, the timestamp token and any uploaded signed file, through short-lived
+the approval sheet, the evidence package, the timestamp tokens, any uploaded signed file and the
+scan of an approved paper original, through short-lived
 signed URLs from the private bucket (ARC.15), scoped to the vendor (CORE.3). The files are kept
 for the retention period of [11](11-compliance.md), also after the vendor is closed; staff can
 export them.
@@ -344,7 +436,18 @@ staff with a reason. Staff have a view of the vendors pending acceptance with th
 left and the consequence that will apply, with actions to extend, change the consequence or
 exclude the vendor (a suspension or closing through VEN.1, with reason). Accepting the document
 later lifts the automatic restrictions, including an automatic suspension, but never a suspension
-decided by staff. ⚖️ P2B (regulation 2019/1150) requires at least 15 days' notice of changes to
+decided by staff.
+
+The same machinery handles the specific approval. When the second act is recorded, a
+`specific_approval` requirement is created with the document's `specific_approval_deadline_days`
+and `specific_approval_consequence` (proposed default 60 days, to leave time for the post, and
+`block_payouts`; the owner decides). It is satisfied by a verified `DigitalSignature` or an
+approved `PaperOriginal`; a rejected original leaves it pending, and the vendor is emailed the
+reason. The staff pending view shows, for each vendor, the requirement kind, the chosen route and
+the paper status (awaiting, received, approved, rejected with reason), with actions to record
+receipt, upload the scan, approve or reject.
+
+⚖️ P2B (regulation 2019/1150) requires at least 15 days' notice of changes to
 the terms, so a new version's `valid_from` is at least 15 days after it is issued unless a legal
 obligation requires otherwise.
 
@@ -369,13 +472,13 @@ tax regime change request (approved by staff, as today), store policies per lang
 | VEN.8 | Nightly ledger ↔ Stripe reconciliation with anomaly report | P1 | 10 | VEN.4, PAY.3 | Simulated discrepancy → alert |
 | VEN.9 | Vendor dashboard: balance, transactions, payouts, documents | P1 | 10 | CORE.9, VEN.4 | Vendor sees only their own transactions |
 | VEN.10 | Public vendor storefront per language (bio, policies, products, store categories) | P1 | 8 | CAT.8 | Category sidebar correct in IT too (WCFM bug solved by design) |
-| VEN.11 | Tax regime change request by vendor with staff review and email | P2 | 6 | TAX.2 | Parity with VTO 2.4 |
+| VEN.11 | Tax regime change request by vendor with staff review and email | P2 | 6 | TAX.2, ARC.16 | Parity with VTO 2.4 |
 | VEN.12 | Vendor legal and e-invoicing identity (EU + IT): legal form, structured address, VAT with VIES status, codice fiscale, fiscal regime RF01-RF19, REA, SDI recipient code, PEC, EORI, fiscal representative, permanent establishment, invoicing bank details; required fields per country, region (EU or non-EU) and legal form, including the DAC7 dataset for every vendor, defined in a staff-editable table, enforced when the vendor requests a payout | P1 | 8 | VEN.1 | A vendor's data fills a valid FatturaPA party block; a vendor missing a required field for its country cannot request a payout, but can open and edit its profile |
-| VEN.13 | Contract templates with merge fields, vendor-specific clauses with four-eyes approval, custom uploaded contracts: per-vendor `VendorContractDocument` rendered to PDF per language through a `DocumentRenderer` interface (WeasyPrint), prevailing language, legal representative field on the VEN.12 identity | P1 | 16 | VEN.5, VEN.2, VEN.12, ARC.15 | A test vendor's IT and EN PDFs carry its legal identity, commission rule and approved clauses; a missing merge field blocks issuing; a clause or custom upload approved by its own author is refused; a new template version or clause issues a new document for each vendor concerned |
-| VEN.14 | Vendor contract e-signature: email OTP simple electronic signature with MFA step-up, PDF of the exact version per language with SHA-256 hash and RFC 3161 timestamp behind a `TimestampAuthority` interface, evidence (user, member role, time, trusted-proxy IP, user agent, OTP id), evidence package by email, `SignatureProvider` interface | P1 | 18 | VEN.13, CORE.4, CORE.5, ARC.9 | A test vendor signs end to end; the stored PDF matches its hash and the timestamp token verifies against the evidence manifest (fake TSA in tests, a real TSA on STAGE); the evidence email arrives in the signer's language; without a text in its language the vendor can accept only after acknowledging English; a wrong, expired or reused code records no acceptance |
-| VEN.15 | Vendor document area: download accepted contracts and evidence (PDF, evidence package, timestamp token, uploaded signed file) through signed URLs, kept per the retention rules | P1 | 6 | VEN.14, CORE.9 | A vendor downloads all and only its own accepted documents; another vendor's file gives 404; files stay downloadable for staff after the vendor is closed |
-| VEN.16 | Contract updates: re-acceptance deadlines per vendor, reminders, automatic consequences, staff pending view | P1 | 14 | VEN.14, ARC.9, SEC.4 | A vendor that misses its deadline gets the configured consequence (warn, payouts blocked, sales blocked or suspended); staff can extend the deadline, change the consequence or exclude the vendor, all audited with a reason; accepting the document lifts the automatic restrictions but not a staff suspension |
-| VEN.17 | Qualified digital signature upload and verification (PAdES/CAdES), pyHanko, EU trusted lists, stored as a stronger acceptance | P2 | 14 | VEN.14 | A PAdES and a `.p7m` test file signed with a certificate from a test trusted list are accepted; a file that signs a different PDF, an altered file or an untrusted certificate is refused with the reason |
+| VEN.13 | Contract templates with merge fields, vendor-specific clauses with four-eyes approval, custom uploaded contracts: per-vendor `VendorContractDocument` rendered to PDF per language through a `DocumentRenderer` interface (WeasyPrint), prevailing language, legal representative field on the VEN.12 identity; clausole vessatorie marked on templates and vendor clauses (number, title, text), two signature blocks with the art. 1341 and 1342 c.c. formula, the fixed clause on how to complete the specific approval, page footers with the short hash, one-page specific approval sheet | P1 | 18 | VEN.5, VEN.2, VEN.12, ARC.15 | A test vendor's IT and EN PDFs carry its legal identity, commission rule and approved clauses; a missing merge field blocks issuing; a clause or custom upload approved by its own author is refused; a new template version or clause issues a new document for each vendor concerned; a document with marked clauses renders two signature blocks whose formula lists exactly their numbers, and an approval sheet with their full texts and the main PDF hash |
+| VEN.14 | Vendor contract e-signature in two separate acts: acceptance of the whole contract (checkbox, email OTP, MFA step-up), then the specific approval of the marked clauses on a separate screen with a second, separate email OTP; email OTP simple electronic signature, PDF of the exact version per language with SHA-256 hash and RFC 3161 timestamp per act behind a `TimestampAuthority` interface, evidence per act (user, member role, time, trusted-proxy IP, user agent, OTP id), evidence package by email, completion route choice, `SignatureProvider` interface | P1 | 22 | VEN.13, CORE.4, CORE.5, ARC.9, ARC.16 | A test vendor signs end to end; the stored PDF matches its hash and both timestamp tokens verify against their evidence manifests (fake TSA in tests, a real TSA on STAGE); the evidence email arrives in the signer's language; without a text in its language the vendor can accept only after acknowledging English; a wrong, expired or reused code records no acceptance; the specific approval needs its own screen and its own code, the acceptance code is refused for it, and no single request records both acts |
+| VEN.15 | Vendor document area: download accepted contracts and evidence (PDF, approval sheet, evidence package, timestamp tokens, uploaded signed file, paper original scan) through signed URLs, kept per the retention rules | P1 | 6 | VEN.14, CORE.9 | A vendor downloads all and only its own accepted documents; another vendor's file gives 404; files stay downloadable for staff after the vendor is closed |
+| VEN.16 | Contract updates and specific approval completion: re-acceptance deadlines per vendor, reminders, automatic consequences, specific approval pending requirement with its own deadline and consequence, paper original route with staff moderation (receipt date, scan, archive location, approve or reject with reason), completion routes per version and per vendor, staff pending view with route and paper status | P1 | 20 | VEN.14, ARC.9, SEC.4, ARC.16 | A vendor that misses its deadline gets the configured consequence (warn, payouts blocked, sales blocked or suspended); staff can extend the deadline, change the consequence or exclude the vendor, all audited with a reason; accepting the document lifts the automatic restrictions but not a staff suspension; a vendor with both acts online but no completion gets the specific approval consequence at its deadline, and a staff-approved paper original lifts it; a rejected original stays pending and the vendor is emailed the reason |
+| VEN.17 | Qualified and advanced digital signature upload and verification (PAdES/CAdES) of the whole document or of the specific approval sheet, pyHanko, EU trusted lists for qualified and staff-listed trust anchors for advanced; completes the specific approval and is stored as a stronger acceptance | P1 | 18 | VEN.14, VEN.16 | A PAdES and a `.p7m` test file signed with a certificate from a test trusted list are accepted; a file that signs a different PDF, an altered file or an untrusted certificate is refused with the reason; a signed approval sheet satisfies the vendor's specific approval requirement |
 
 ## 4.4 Mandatory regression cases
 
