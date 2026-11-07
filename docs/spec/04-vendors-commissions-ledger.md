@@ -138,7 +138,7 @@ only add a "profile row missing" state.
 | Company register (REA) | `rea_office` (province), `rea_number`, `share_capital`, `sole_shareholder` (SU/SM), `liquidation_status` (LS/LN) | FatturaPA `IscrizioneREA` |
 | E-invoicing | `sdi_recipient_code`, `pec` | 7 characters; `0000000` when invoices go to the PEC; `XXXXXXX` for foreign vendors only; 6-character codes belong to public administration offices and are refused |
 | Non-resident vendors | fiscal representative (`fiscal_representative_name`, `fiscal_representative_vat_number`), permanent establishment address (`establishment_*`) | FatturaPA `RappresentanteFiscale`, `StabileOrganizzazione` |
-| Invoicing bank details | `iban`, `bic`, `bank_name` | IBAN mod-97 and length per country, BIC format. The IBAN is encrypted at rest by SEC.3 and masked in the audit log. Payout accounts are VEN.6 |
+| Invoicing bank details | `iban`, `bic`, `bank_name` | IBAN mod-97 and length per country, BIC format. The IBAN (like `tax_code`) is encrypted at rest by SEC.3 and masked in the audit log. Payout accounts are VEN.6 |
 
 `fiscal_regime` is what the vendor declares on its invoices; the VAT computation regime stays in
 `VendorTaxProfile` ([05](05-tax.md)).

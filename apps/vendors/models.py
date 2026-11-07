@@ -14,7 +14,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
-from apps.core.fields import CountryField, MoneyField
+from apps.core.fields import CountryField, EncryptedCharField, MoneyField
 from apps.core.models import BaseModel, TranslationModel, resolve_translation
 from apps.core.translations import Resolved
 
@@ -155,7 +155,9 @@ class Vendor(BaseModel):
         editable=False,
     )
     vies_checked_at = models.DateTimeField("VIES checked at", null=True, blank=True, editable=False)
-    tax_code = models.CharField(
+    # SEC.3: encrypted at rest and masked in the audit log (for a sole proprietor it is a personal
+    # identifier). The VAT number is not: it is public in VIES and staff search it.
+    tax_code = EncryptedCharField(
         "tax code (codice fiscale) or TIN",
         max_length=32,
         blank=True,
@@ -223,8 +225,8 @@ class Vendor(BaseModel):
         "permanent establishment province", max_length=64, blank=True, help_text=PROVINCE_HELP
     )
     establishment_country = CountryField("permanent establishment country", blank=True)
-    # SEC.3: to be encrypted at rest (field-level encryption). Audit rows mask it already.
-    iban = models.CharField("IBAN", max_length=34, blank=True)
+    # SEC.3: encrypted at rest and masked in the audit log.
+    iban = EncryptedCharField("IBAN", max_length=34, blank=True)
     bic = models.CharField("BIC", max_length=11, blank=True)
     bank_name = models.CharField(max_length=100, blank=True)
 

@@ -6,7 +6,7 @@ import dj_database_url
 import django_stubs_ext
 from django.utils.csp import CSP
 
-from .env import env_bool, env_list, env_str
+from .env import env_bool, env_list, env_secret_list, env_str
 
 # Allows `models.DecimalField[Any]`-style generics at runtime (django-stubs).
 django_stubs_ext.monkeypatch()
@@ -190,6 +190,14 @@ if CAPTCHA_ENABLED:
         "script-src": [*SECURE_CSP["script-src"], _TURNSTILE_ORIGIN],  # type: ignore[misc]
         "frame-src": [_TURNSTILE_ORIGIN],
     }
+
+# Field-level encryption (SEC.3, docs/dev/field-encryption.md): keys live outside the database,
+# in the file named by MPMV_FIELD_ENCRYPTION_KEYS_FILE (one per line) or in
+# MPMV_FIELD_ENCRYPTION_KEYS (comma-separated). Each is "<id>:<base64url 32 bytes>", newest first:
+# the first encrypts, the others only decrypt until `rotate_field_keys` has moved every value.
+# System checks fail without a valid key (core.E301/E302) or when the stored data does not
+# decrypt with these keys (core.E303/E304, run by `migrate`).
+FIELD_ENCRYPTION_KEYS = env_secret_list("MPMV_FIELD_ENCRYPTION_KEYS")
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
