@@ -1,0 +1,7 @@
+{% extends "core/base.html" %}
+{% load i18n %}
+{% block content %}
+  {% get_current_language as current %}{% get_language_info for current as info %}
+  <h1>{% translate "Marketplace" %}</h1>
+  <p>{% translate "Language" %}: {{ info.name_local|capfirst }}</p>
+{% endblock %}
