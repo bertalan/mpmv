@@ -1,7 +1,8 @@
 """Test-only URLconf for the cross-tenant harness (CORE.3).
 
 Correct views reach vendor data through `get_vendor_object_or_404`; the `leaky_*` and `wrong_*`
-views make the classic mistakes, so the tests can prove that the harness catches each one.
+views make the classic mistakes, so the tests can prove that the harness catches each one. The
+API operations under `api/` do the same for API keys (`tests.integration.api_tenancy`).
 """
 
 import uuid
@@ -20,6 +21,8 @@ from django.urls import path
 
 from apps.vendors.models import Vendor, VendorMember, VendorTranslation
 from apps.vendors.scoping import get_vendor_object_or_404
+
+from .api_tenancy import tenancy_api
 
 
 def member_detail(request: HttpRequest, public_id: uuid.UUID) -> JsonResponse:
@@ -137,4 +140,5 @@ urlpatterns = [
     path("leaky/members.csv", leaky_member_export, name="leaky-member-export"),
     path("leaky/members/search/<str:term>/", leaky_member_search, name="leaky-member-search"),
     path("empty/members/", empty_member_list, name="empty-member-list"),
+    path("api/", tenancy_api.urls),  # API v1 operations, called with API keys (CORE.13)
 ]

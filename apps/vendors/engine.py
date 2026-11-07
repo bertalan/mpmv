@@ -90,6 +90,7 @@ class VendorAction(StrEnum):
     BANK_ACCOUNT = "bank_account"  # IBAN / payout account
     TAX_REGIME = "tax_regime"  # tax regime change request
     MEMBERS = "members"  # add and remove members, change roles
+    API_KEYS = "api_keys"  # issue vendor-bound API keys, which act for the whole vendor (CORE.13)
 
 
 # The role matrix. Owner: everything about their own vendor, financial settings included.
