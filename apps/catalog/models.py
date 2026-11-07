@@ -428,14 +428,18 @@ class Product(BaseModel):
         return str(self.sku)
 
     def clean(self) -> None:
+        # Report the SKU (CAT.13) and the integrity rules (CAT.14) together.
         super().clean()
         errors: dict[str, list[str]] = {}
-        for check in (lambda: _check_sku(self), self.clean_integrity):
-            try:
-                check()
-            except ValidationError as error:
-                for name, messages in error.message_dict.items():
-                    errors.setdefault(name, []).extend(messages)
+        try:
+            _check_sku(self)
+        except ValidationError as error:
+            errors.update(error.message_dict)
+        try:
+            self.clean_integrity()
+        except ValidationError as error:
+            for name, messages in error.message_dict.items():
+                errors.setdefault(name, []).extend(messages)
         if errors:
             raise ValidationError(errors)
 
