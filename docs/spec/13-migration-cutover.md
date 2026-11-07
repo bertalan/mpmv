@@ -16,11 +16,11 @@ cheapest solution is a **single cutover, rehearsed several times**, not a prolon
 | Data | WP source | Transformation | Notes |
 |---|---|---|---|
 | Vendors | WCFM user meta, VTO, Stripe | → `Vendor`, policy translations, `VendorTaxProfile`, `PayoutAccount`, `CommissionRule` | Stripe Connect accounts (`acct_…`) **are reused** if the same platform account is kept: no new KYC onboarding |
-| Products | EN + IT posts linked by `trid`, meta, `pa_*` attributes | → one `Product` + EN/IT `ProductTranslation`; variants; typed attributes | Key: SKU + `trid`; `legacy_wp_id_en/it` preserved |
-| Duplicate SKUs | 29 cases in the pipeline's PostgreSQL, `-2` and triplicates on WP | Report → manual decision (keep / merge / retire) before loading | The `(vendor, sku)` constraint allows no exceptions |
+| Products | EN + IT posts linked by `trid`, meta, `pa_*` attributes | → one `Product` + EN/IT `ProductTranslation`; variants; typed attributes | Key: vendor + SKU match key + `trid`; raw SKU kept as the vendor label; `legacy_wp_id_en/it` preserved |
+| Duplicate SKUs | 29 cases in the pipeline's PostgreSQL, `-2` and triplicates on WP | Report → manual decision (keep / merge / retire) before loading | The per-vendor SKU match key constraint (products and variants together) allows no exceptions |
 | Categories | `product_cat` EN/IT | → `Category` + translations; IT products on EN categories fixed by construction | |
 | Two-level tags | `product_tag` with `_legacy_tag_role` | → `Taxonomy` / `Term` + SEO texts | Tags without a role must be classified first |
-| Companion attribute | SKU of the companion product | → `Product.required_companion` (FK) | SKUs not found go into a report |
+| Companion attribute | SKU of the companion product | → `Product.required_companion` (FK) | Resolved by SKU match key within the same vendor (Q-32); SKUs not found or of another vendor go into a report |
 | Brands | `product_brand` | → `Brand` | |
 | Images | Media Library | → object storage, dedup by hash, cover and gallery, alt text per language | Renditions regenerated |
 | Historical slugs | `_legacy_old_slugs`, redirect mu-plugin maps | → `SlugHistory` + `Redirect` | |
@@ -59,8 +59,8 @@ cheapest solution is a **single cutover, rehearsed several times**, not a prolon
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
 | MIG.1 | Extractor from the WP DB (`kvsa_`) to an intermediate JSON format, with a meta inventory | P1 | 10 | — | Complete inventory of the fields in use |
-| MIG.2 | Report of duplicate SKUs, tags without a role, orphan companion products → decisions | P1 | 6 | MIG.1 | Decision list approved |
-| MIG.3 | Loader for vendors, catalog, taxonomies, images (idempotent, dry-run); existing IT texts loaded as published translations (D-18) | P1 | 16 | MIG.1, CAT.1, CAT.2, CAT.3, CAT.4 | Reload with no duplicates; IT texts present where the current site has them |
+| MIG.2 | Report of duplicate SKUs (same match key, products and variants together), tags without a role, orphan companion products → decisions | P1 | 6 | MIG.1 | Decision list approved |
+| MIG.3 | Loader for vendors, catalog, taxonomies, images (idempotent, dry-run); existing IT texts loaded as published translations (D-18) | P1 | 16 | MIG.1, CAT.1, CAT.2, CAT.3, CAT.4, CAT.13, CAT.14 | Reload with no duplicates; IT texts present where the current site has them |
 | MIG.4 | Loader for customers (WP password hasher) and read-only historical orders | P1 | 10 | MIG.1, ORD.2 | Migrated customer logs in with the old password |
 | MIG.5 | Automated parity reports (§13.3) | P1 | 10 | MIG.3 | Report generated on every run |
 | MIG.6 | Complete EN/IT redirect map + automated check of all WP sitemap URLs | P1 | 6 | CAT.6, MIG.3 | 100% of URLs 200/301; a migrated IT URL serves its IT text, not the EN fallback |

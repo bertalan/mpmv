@@ -28,7 +28,7 @@
 | `BlogIndexPage` / `BlogPostPage` | Bilingual articles, featured vendors | text, galleries, **product/term/vendor choosers** (no hand-typed URLs), author, scheduling |
 | `TermLandingPage` | Editorial page for a taxonomy term | SEO intro, the term's products by category, related articles |
 | `VendorLandingPage` | The vendor's story (heritage, workshop) beyond the standard vendor storefront | story, images, featured products |
-| `VendorRecruitmentPage` | "Become a seller" with plans and application form | plans (from `VendorPlan`), FAQ, form |
+| `VendorRecruitmentPage` | "Sell with us" with plans and the link to the application (VEN.22) | plans (from `VendorPlan`), FAQ, call to action |
 | `EventIndexPage` / `EventPage` | Events of vendors and of the platform: promotions, trade fairs and meetings, other events, in any enabled language, with RSS and ICS feeds and maps ([15](15-events.md), `events` app) | the block library above, the launch countdown, structured dates, recurrence, location and coordinates |
 
 Events have their own page type, `EventPage`, in the `events` app ([15](15-events.md)). This
@@ -109,6 +109,8 @@ image shows only those, otherwise the neutral ones.
 ```python
 def product_jsonld(product, lang) -> dict
     # Product + Offer (VAT-inclusive price for the default country) + brand + gtin/mpn
+    # gtin and mpn from the product fields, never the vendor SKU (Q-33); no price in the Offer
+    # for on_request and catalog_only products (Q-31)
     # + isRelatedTo (and sector-specific properties, if configured) + shippingDetails + hasMerchantReturnPolicy
     # + aggregateRating (verified reviews only)
 def breadcrumb_jsonld(obj, lang) -> dict
@@ -126,6 +128,9 @@ def merchant_items(lang, country) -> Iterable[MerchantItem]
     # VAT-inclusive price computed with the tax engine for the feed's country (not a fixed 22%)
     # shipping per country and band from the shipping tables (not hardcoded)
     # Google category: product → category → vendor → default
+    # g:gtin and g:mpn + g:brand from the product fields (Q-33), never the vendor SKU;
+    # identifier_exists = no when the product has neither
+    # on_request and catalog_only products are left out: their stored price is never public (Q-31)
 def sync_merchant(lang) -> SyncReport            # Merchant API, delta, no mass deletion
 def meta_catalog_feed(lang) -> Response          # Meta Commerce feed
 ```
@@ -177,13 +182,13 @@ with design tokens, template overrides, CSP-safe components and WCAG 2.2 AA rule
 | CMS.2 | Reusable StreamField blocks (hero, product grid, CTA, FAQ, choosers) | P1 | 10 | CMS.1, CAT.8 | An editor builds the home page without code |
 | CMS.3 | Blog with scheduling, author, product/term/vendor chooser | P1 | 8 | CMS.2 | Migrated article published |
 | CMS.4 | TermLandingPage and VendorLandingPage | P1 | 10 | CMS.2, CAT.8 | A term page with its products |
-| CMS.5 | Versioned LegalPage + VendorRecruitmentPage with application form | P1 | 6 | CMS.1, VEN.5 | Application arrives in admin |
+| CMS.5 | Versioned LegalPage + VendorRecruitmentPage (plans, FAQ) leading to the VEN.22 application form | P1 | 6 | CMS.1, VEN.5 | Legal page versions kept; the recruitment page shows the plans and links to the application |
 | CMS.8 | Image source, licence and credit: custom Wagtail image model `MediaImage` in `core` with licence, source, author, credit and permission fields, staff-editable `ImageLicence` allow list seeded per §10.2, upload validation in admin and services, `image_credit` component and per-page image credits disclosure, review list for migrated images without metadata | P1 | 5 | CMS.1, ARC.15 | An upload without licence or author is refused; an NC licence cannot be added to the allow list; a CC BY image shows its credit in the caption, a CC BY hero in the page credits disclosure; a CC0 image shows none; `WAGTAILIMAGES_IMAGE_MODEL` points to `MediaImage` before CAT.4 |
 | CMS.9 | Launch countdown StreamField block: fields per §10.2, `countdown_state` pure function, server-rendered absolute date and expired state, page cache capped at the target, CSP-safe ES module with visitor time zone, minute updates and pause button, single polite announcement at expiry | P1 | 4 | CMS.2, THM.4 | Without JavaScript the block shows the absolute date and the CTA; with it the remaining time updates once a minute in the visitor's time zone and the pause button stops it; after the target the server and the module both show the expired text and link; no `aria-live` on the counter; no CSP violation and no axe violation on a page with the block |
 | CMS.6 | Reviews: model, purchase verification, supplier import, moderation, vendor reply | P2 | 10 | ORD.2 | AggregateRating schema only with valid reviews |
-| SEO.1 | JSON-LD Product/Offer/Breadcrumb/ReturnPolicy/ShippingDetails, robots, canonical | P1 | 10 | CAT.7, SHP.3 | Rich Results Test with no errors |
+| SEO.1 | JSON-LD Product/Offer/Breadcrumb/ReturnPolicy/ShippingDetails, robots, canonical; GTIN and MPN from the product fields, no price for on-request and catalogue-only products (Q-31, Q-33) | P1 | 10 | CAT.7, SHP.3 | Rich Results Test with no errors; an on-request product's JSON-LD has no price |
 | SEO.2 | Per-language and per-type sitemaps, generated `llms.txt` | P1 | 4 | I18N.6 | Valid sitemaps |
-| SEO.3 | Google feed (EN for every product, IT for products with a published IT translation, D-18) with legacy IDs, prices from the tax engine, shipping from tables | P1 | 8 | TAX.3, SHP.11 | Feed validated in STAGE Merchant Center |
+| SEO.3 | Google feed (EN for every product, IT for products with a published IT translation, D-18) with legacy IDs, prices from the tax engine, shipping from tables; GTIN, brand and MPN from the product fields; on-request and catalogue-only products left out (Q-31, Q-33) | P1 | 8 | TAX.3, SHP.11 | Feed validated in STAGE Merchant Center; no item carries the vendor SKU as MPN; no on-request product is in the feed |
 | SEO.4 | Merchant API sync + Meta feed | P2 | 8 | SEO.3 | Daily delta report |
 | SEO.5 | Cookie consent + Consent Mode v2 + e-commerce events | P1 | 8 | ORD.5 | No tags fire before consent |
 | SEO.6 | Anonymous page cache, responsive renditions, CWV budget | P2 | 6 | THM.3 | LCP < 2.5 s on product page |

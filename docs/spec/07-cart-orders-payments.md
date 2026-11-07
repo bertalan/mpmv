@@ -45,7 +45,7 @@ class VendorOrder(Model):                      # explicit vendor sub-order
     tracking_number; carrier; shipped_at; delivered_at
 
 class OrderLine(Model):                        # immutable snapshot
-    vendor_order; product (null if deleted); sku; title; variant_label
+    vendor_order; product (null if deleted); sku; title; variant_label   # sku: display snapshot of the vendor label, never a reference
     unit_price_net; quantity; discount_net
     tax_rate; tax_reason; tax_amount; legal_note_key
 

@@ -47,8 +47,13 @@ class Vendor(Model):
     sales_mode_default = CharField(choices=["buy", "on_request"])
     enquiries_enabled: bool                    # formerly Vendor E's "catalog status" plugin
     payout_account = FK(PayoutAccount, null=True)
-    dac7_complete: bool (derived)              # blocks payouts if False
+    dac7_complete: bool (derived)              # blocks payouts if False, never activation (Q-56)
     legacy_wp_user_id
+
+class CrossVendorConsent(Model):               # versioned, append-only, audited; default: no row = opted out
+    vendor; in_suggestions: bool               # products may appear in other vendors' suggestions (Q-32, CAT.14)
+    in_bundles: bool                           # products may be part of others' bundles (CAT.16, P2)
+    valid_from; set_by
 
 class VendorTranslation(Model): vendor; language; tagline; description; shipping_policy; refund_policy; cancellation_policy
 
@@ -74,7 +79,9 @@ class LedgerEntry(Model):                      # append-only, never UPDATE/DELET
     vendor; vendor_order = FK(VendorOrder, null=True)
     kind = CharField(choices=["sale", "shipping", "commission", "payment_fee", "refund",
                               "commission_reversal", "adjustment", "payout", "transfer",
-                              "plan_fee"])        # plan_fee: VEN.19 (P2)
+                              "plan_fee", "bundle_discount_vendor_funded",
+                              "bundle_discount_platform_funded"])
+                              # plan_fee: VEN.19 (P2); bundle discounts: CAT.17 (P2, spec 03)
     amount = MoneyField()                      # sign: + vendor credit, − vendor debit
     platform_entity = FK(PlatformOperator)     # multi-entity (e.g. relocation to another EU country)
     gateway_account; external_ref (tr_…, po_…, re_…)
@@ -127,6 +134,10 @@ def payout_eligibility(vendor) -> Eligibility               # DAC7 complete, acc
    with the signature flow below, tax regime) → `active`. Activation is refused when neither the
    registered office nor a permanent establishment is in the allowed countries of the
    `PlatformOperator`, the EU-27 at go-live (CMP.13, D-21). Every step is recorded in `AuditLog`.
+   The public "Sell with us" page creates the applicant's account and the application (VEN.22).
+   Missing DAC7 or payout data never block activation: they block payouts only (owner decision
+   Q-56, confirming the current `onboarding_checklist` in `apps/vendors/engine.py` and
+   `assert_payout_allowed`, VEN.12).
 2. **Paid order**: for each `VendorOrder` the rule snapshot is frozen, `compute_commission` is
    computed, and the ledger rows are written (`sale`, `shipping`, `commission`, `payment_fee`).
 3. **Transfer**: with *separate charges and transfers* (see [07](07-cart-orders-payments.md)) a Stripe
@@ -134,6 +145,26 @@ def payout_eligibility(vendor) -> Eligibility               # DAC7 complete, acc
 4. **Refund**: proportional `refund` and `commission_reversal` rows; current business rule
    "on a full refund the platform returns the commission and the payment fee" (to be confirmed, D-05).
 5. **Nightly reconciliation**: ledger ↔ Stripe transfers and balance; discrepancies → alert and report.
+
+### Vendor statuses (owner decision Q-17)
+
+| From | To | Who and when |
+|---|---|---|
+| `applicant` | `onboarding`, `closed` | Staff approve the application, or reject it (a rejected application is `closed`) |
+| `onboarding` | `active`, `closed` | Activation after the checklist and the activation gates (CMP.13); closure |
+| `active` | `suspended`, `closed` | Staff suspend (for example expired documents, VEN.16 consequences) or close |
+| `suspended` | `active`, `closed` | Reinstatement once the cause is solved; closure |
+| `closed` | `onboarding` | Staff reopen a closed vendor, with a mandatory reason recorded in the `AuditLog` (VEN.21) |
+
+A reopened vendor goes back to `onboarding`, never straight to `active`. Time has passed since the
+closure: the contract in force may be a newer version than the one the vendor accepted, the DAC7
+and payout data may be out of date, and the activation gates (establishment, CMP.13, and the other
+platform duties of [11](11-compliance.md)) may have changed. Going through `onboarding` re-runs the checklist (contract
+re-acceptance, DAC7 data, payout data) and the activation gates with the code that already
+exists, instead of a second activation path. The data kept after closure (owner, ledger,
+contracts) are reused; a vendor whose owner asked for erasure (Q-16, [02](02-core-identity-permissions.md))
+is reopened only with a new owner. Until VEN.21 is done, `closed` is terminal in
+`apps/vendors/engine.py` (`TRANSITIONS`).
 
 ### Plan entitlements and plan fees (VEN.19, P2)
 
@@ -603,10 +634,12 @@ and closure schedule (VEN.20).
 | VEN.13 | Contract templates with merge fields, vendor-specific clauses with four-eyes approval, custom uploaded contracts: per-vendor `VendorContractDocument` rendered to PDF per language through a `DocumentRenderer` interface (WeasyPrint), prevailing language, legal representative field on the VEN.12 identity; clausole vessatorie marked on templates and vendor clauses (number, title, text), two signature blocks with the art. 1341 and 1342 c.c. formula, the fixed clause on how to complete the specific approval, page footers with the short hash, one-page specific approval sheet | P1 | 18 | VEN.5, VEN.2, VEN.12, ARC.15 | A test vendor's IT and EN PDFs carry its legal identity, commission rule and approved clauses; a missing merge field blocks issuing; a clause or custom upload approved by its own author is refused; a new template version or clause issues a new document for each vendor concerned; a document with marked clauses renders two signature blocks whose formula lists exactly their numbers, and an approval sheet with their full texts and the main PDF hash |
 | VEN.14 | Vendor contract e-signature in two separate acts: acceptance of the whole contract (checkbox, email OTP, MFA step-up), then the specific approval of the marked clauses on a separate screen with a second, separate email OTP; email OTP simple electronic signature, PDF of the exact version per language with SHA-256 hash and RFC 3161 timestamp per act behind a `TimestampAuthority` interface, evidence per act (user, member role, time, trusted-proxy IP, user agent, OTP id), evidence package by email, completion route choice, `SignatureProvider` interface | P1 | 22 | VEN.13, CORE.4, CORE.5, ARC.9, ARC.16 | A test vendor signs end to end; the stored PDF matches its hash and both timestamp tokens verify against their evidence manifests (fake TSA in tests, a real TSA on STAGE); the evidence email arrives in the signer's language; without a text in its language the vendor can accept only after acknowledging English; a wrong, expired or reused code records no acceptance; the specific approval needs its own screen and its own code, the acceptance code is refused for it, and no single request records both acts; the OTP fields accept paste and carry `autocomplete="one-time-code"` (WCAG 2.2 SC 3.3.8, spec 14 14.6) |
 | VEN.15 | Vendor document area: download accepted contracts and evidence (PDF, approval sheet, evidence package, timestamp tokens, uploaded signed file, paper original scan) through signed URLs, kept per the retention rules | P1 | 6 | VEN.14, CORE.9 | A vendor downloads all and only its own accepted documents; another vendor's file gives 404; files stay downloadable for staff after the vendor is closed |
-| VEN.16 | Contract updates and specific approval completion: re-acceptance deadlines per vendor, reminders, automatic consequences, specific approval pending requirement with its own deadline and consequence, paper original route with staff moderation (receipt date, scan, archive location, approve or reject with reason), completion routes per version and per vendor, staff pending view with route and paper status | P1 | 20 | VEN.14, ARC.9, SEC.4, ARC.16 | A vendor that misses its deadline gets the configured consequence (warn, payouts blocked, sales blocked or suspended); staff can extend the deadline, change the consequence or exclude the vendor, all audited with a reason; accepting the document lifts the automatic restrictions but not a staff suspension; a vendor with both acts online but no completion gets the specific approval consequence at its deadline, and a staff-approved paper original lifts it; a rejected original stays pending and the vendor is emailed the reason |
+| VEN.16 | Contract updates and specific approval completion: re-acceptance deadlines per vendor, reminders, automatic consequences, specific approval pending requirement with its own deadline and consequence, paper original route with staff moderation (receipt date, scan, archive location, approve or reject with reason), completion routes per version and per vendor, staff pending view with route and paper status; re-acceptance emails link through CORE.15 secure action links | P1 | 20 | VEN.14, ARC.9, SEC.4, ARC.16, CORE.15 | A vendor that misses its deadline gets the configured consequence (warn, payouts blocked, sales blocked or suspended); staff can extend the deadline, change the consequence or exclude the vendor, all audited with a reason; accepting the document lifts the automatic restrictions but not a staff suspension; a vendor with both acts online but no completion gets the specific approval consequence at its deadline, and a staff-approved paper original lifts it; a rejected original stays pending and the vendor is emailed the reason |
 | VEN.17 | Qualified and advanced digital signature upload and verification (PAdES/CAdES) of the whole document or of the specific approval sheet, pyHanko, EU trusted lists for qualified and staff-listed trust anchors for advanced; completes the specific approval and is stored as a stronger acceptance | P1 | 18 | VEN.14, VEN.16 | A PAdES and a `.p7m` test file signed with a certificate from a test trusted list are accepted; a file that signs a different PDF, an altered file or an untrusted certificate is refused with the reason; a signed approval sheet satisfies the vendor's specific approval requirement |
 | VEN.18 | Fiscal regime RF20 (cross-border VAT franchise, Directive (EU) 2020/285, FatturaPA specification 1.9 from 2025-04-01): add the choice with its official SDI label, update the check constraint with a data migration, and record the FatturaPA specification version (1.9.1) the party block follows; the TAX.2 regime-change request constraint accepts RF20 too, and the tax profile consistency check gets an RF20 rule (⚖️ tax advisor: VAT regime and exemption reason for the cross-border franchise) | P1 | 3 | VEN.12, TAX.2 | A vendor can save RF20; the vendor and tax request constraints accept RF01–RF20 except RF03; a regime-change request to RF20 is accepted; an RF20 profile with an inconsistent VAT regime is reported; `fatturapa_party()` emits `RegimeFiscale` RF20; a test pins the label list to the specification version |
 | VEN.19 | Plan entitlements and plan fees: `plan_allows(vendor, feature)` service over `VendorPlan.features`, plan change with effective date and audit; monthly `plan_fee` ledger debit by a scheduled idempotent job; non-fiscal statement PDF per charge in the vendor's language (no invoice issued by the marketplace; the operator invoices outside the platform) | P2 | 8 | VEN.2, VEN.4, VEN.15, ARC.9 | A vendor whose plan lacks a feature cannot use it and keeps its data; a plan with a monthly fee gets exactly one `plan_fee` entry per period even when the job runs twice; the statement PDF states that it is not a tax invoice and matches the ledger entry; no fiscal document or e-invoice is produced |
+| VEN.21 | Reopen a closed vendor (owner decision Q-17): `closed → onboarding` in `TRANSITIONS` (`apps/vendors/engine.py`), a staff-only service with a mandatory reason in the AuditLog and dry-run, admin action; the onboarding checklist and activation gates run again | P1 | 2 | VEN.5 | A closed vendor reopened by staff is `onboarding` and needs the contract in force accepted again before activation; a reopen without a reason is refused; vendor members cannot reopen; `closed → active` stays refused |
+| VEN.22 | Public "Sell with us" application (owner decision Q-55): account creation and vendor application in one form, Turnstile without a puzzle (WCAG 3.3.8, CMP.9), confirmation email through ARC.16, MFA enrolment at first login (CORE.4); the application lands as `applicant` for staff review (VEN.5); the CMS.5 recruitment page links to it | P1 | 8 | VEN.5, ARC.16, CORE.4 | A visitor applies from the public page, confirms the email, enrols MFA at first login and appears as an applicant in the admin; a bot submission without a valid Turnstile token is refused; the form passes the CMP.9 checks |
 | VEN.20 | Holiday and closure schedule (owner decision Q-73): `VendorClosure` in the vendor settings (date ranges, optional yearly recurrence, notice lead time, no free text, no moderation), audited services with dry-run, vendor-area and admin forms, API `/vendors/{id}/closures`; `ClosureRule`, `ClosedPeriod`, `expand_closures`, `earliest_dispatch_date` and `delivery_window` pure functions in `shipping/engine.py`, `vendor_closed_periods` and `closure_notice` shipping services; neutral notice on the storefront, product pages and cart through a `shipping` template tag; `build_checkout` shifts the dispatch date and the estimate; expected dispatch date in the order snapshot; page cache invalidation | P1 | 12 | CORE.9, CORE.13, VEN.10, CAT.7, SHP.3, ORD.2, ORD.3 | Regression cases 8–12 of §4.4 green; a checkout with a closed and an open vendor shows the notice only on the closed vendor's package and still places the order; import-linter stays green |
 
 ## 4.4 Mandatory regression cases
