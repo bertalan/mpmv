@@ -53,7 +53,7 @@ def test_a_vendor_with_no_legal_data_is_valid_and_saves() -> None:
     assert vendor.vies_status == Vendor.ViesStatus.UNCHECKED
 
 
-@pytest.mark.parametrize("trait", TRAITS)
+@pytest.mark.parametrize("trait", (*TRAITS, "non_eu_without_vat"))
 def test_factory_traits_build_valid_identities(trait: str) -> None:
     vendor = VendorFactory.create(**{trait: True})
     vendor.full_clean()
@@ -167,18 +167,32 @@ def test_changing_the_vat_number_resets_the_vies_status() -> None:
 def test_seeded_requirements_match_the_owner_decision(seeded: None) -> None:
     rows = set(
         LegalFieldRequirement.objects.filter(active=True, purpose="payout").values_list(
-            "country", "legal_form", "field_name"
+            "country", "region", "legal_form", "field_name"
         )
     )
-    italy = {("IT", "", field) for field in ("pec", "tax_code", "fiscal_regime")}
-    italy.add(("IT", "", "sdi_recipient_code"))
+    italy = {("IT", "", "", field) for field in ("pec", "tax_code", "fiscal_regime")}
+    italy |= {("IT", "", "", "sdi_recipient_code"), ("IT", "", "", "registered_province")}
     assert italy <= rows
     for form in ("partnership", "srl", "spa", "cooperative"):
-        assert {("IT", form, "rea_office"), ("IT", form, "rea_number")} <= rows
-    assert not any(form == "sole_proprietorship" for _, form, _ in rows)
+        assert {("IT", "", form, "rea_office"), ("IT", "", form, "rea_number")} <= rows
+    assert not any(form == "sole_proprietorship" for _, _, form, _ in rows)
     for country in ("IT", "DE", "FR", "GR", "SE"):
-        assert {(country, "", "vat_number"), (country, "", "iban")} <= rows
-    assert not any(country in ("CH", "US", "GB", "") for country, _, _ in rows)
+        assert {(country, "", "", "vat_number"), (country, "", "", "iban")} <= rows
+    # Non-EU vendors: IBAN and their foreign TIN, through one rule per field for the region.
+    assert {("", "non_eu", "", "iban"), ("", "non_eu", "", "tax_code")} <= rows
+    # DAC7 dataset, every vendor: registered office address and country of tax residence.
+    dac7 = {
+        ("", "", "", field)
+        for field in (
+            "registered_street",
+            "registered_postal_code",
+            "registered_city",
+            "registered_country",
+            "tax_residence_country",
+        )
+    }
+    assert dac7 <= rows
+    assert not any(country in ("CH", "US", "GB") for country, _, _, _ in rows)
 
 
 @pytest.mark.parametrize("trait", TRAITS)
@@ -203,7 +217,13 @@ def test_an_italian_vendor_without_legal_data_lists_every_requirement(seeded: No
     assert legal_profile_completeness(vendor).missing == (
         "vat_number",
         "tax_code",
+        "tax_residence_country",
         "fiscal_regime",
+        "registered_street",
+        "registered_postal_code",
+        "registered_city",
+        "registered_province",
+        "registered_country",
         "rea_office",
         "rea_number",
         "liquidation_status",
@@ -243,10 +263,84 @@ def test_the_guard_checks_stored_data_not_unsaved_edits(seeded: None) -> None:
         assert_payout_allowed(vendor)
 
 
-def test_the_seeded_rows_require_nothing_from_a_non_eu_vendor(seeded: None) -> None:
-    # Only the LegalFieldRequirement gate: DAC7 completeness of non-EU sellers is a separate
-    # payout precondition (`dac7_complete`, CMP.1 / VEN.7), not decided by these rows.
-    assert legal_profile_completeness(bare_vendor(country="US")).complete
+def test_a_non_eu_vendor_needs_its_iban_tin_and_the_dac7_dataset(seeded: None) -> None:
+    assert legal_profile_completeness(bare_vendor(country="US")).missing == (
+        "tax_code",
+        "tax_residence_country",
+        "registered_street",
+        "registered_postal_code",
+        "registered_city",
+        "registered_country",
+        "iban",
+    )
+
+
+def test_an_eu_vendor_needs_its_vat_number_iban_and_the_dac7_dataset(seeded: None) -> None:
+    assert legal_profile_completeness(bare_vendor(country="DE")).missing == (
+        "vat_number",
+        "tax_residence_country",
+        "registered_street",
+        "registered_postal_code",
+        "registered_city",
+        "registered_country",
+        "iban",
+    )
+
+
+DAC7_GATE_FIELDS = (
+    "tax_residence_country",
+    "registered_street",
+    "registered_postal_code",
+    "registered_city",
+    "registered_country",
+    "iban",
+)
+
+
+@pytest.mark.parametrize("field", DAC7_GATE_FIELDS)
+@pytest.mark.parametrize("trait", TRAITS)
+def test_a_vendor_without_a_dac7_field_cannot_request_a_payout(
+    seeded: None, trait: str, field: str
+) -> None:
+    vendor = VendorFactory.create(**{trait: True})
+    Vendor.objects.filter(pk=vendor.pk).update(**{field: ""})
+    with pytest.raises(engine.PayoutNotAllowed) as excinfo:
+        assert_payout_allowed(vendor)
+    assert field in excinfo.value.missing
+
+
+@pytest.mark.parametrize("trait", TRAITS)
+def test_a_vendor_without_vat_number_and_tin_cannot_request_a_payout(
+    seeded: None, trait: str
+) -> None:
+    vendor = VendorFactory.create(**{trait: True})
+    Vendor.objects.filter(pk=vendor.pk).update(vat_number="", tax_code="")
+    with pytest.raises(engine.PayoutNotAllowed):
+        assert_payout_allowed(vendor)
+
+
+def test_an_italian_vendor_without_the_province_cannot_request_a_payout(seeded: None) -> None:
+    vendor = VendorFactory.create(italian_company=True)
+    Vendor.objects.filter(pk=vendor.pk).update(registered_province="")
+    with pytest.raises(engine.PayoutNotAllowed) as excinfo:
+        assert_payout_allowed(vendor)
+    assert excinfo.value.missing == ("registered_province",)
+
+
+def payout_ready_vendors() -> list[Vendor]:
+    """Every factory trait, plus a non-EU vendor with a TIN and no VAT number."""
+    vendors = [VendorFactory.create(**{trait: True}) for trait in TRAITS]
+    vendors.append(VendorFactory.create(non_eu_without_vat=True))
+    return vendors
+
+
+def test_a_vendor_allowed_a_payout_has_the_dac7_dataset_and_a_party_block(seeded: None) -> None:
+    """Owner decision: the payout gate includes DAC7 and FatturaPA completeness for everyone."""
+    for vendor in payout_ready_vendors():
+        assert_payout_allowed(vendor)  # does not raise
+        identity = Vendor.objects.get(pk=vendor.pk).legal_identity()
+        assert engine.dac7_missing(identity) == (), vendor.country
+        engine.fatturapa_party(identity, engine.CESSIONARIO)
 
 
 def test_staff_rules_add_and_deactivated_rules_relax(seeded: None) -> None:
@@ -292,6 +386,7 @@ def test_requirement_changes_are_audited() -> None:
     created = AuditLog.objects.get(action="vendor.legal_requirement_saved")
     assert created.after == {
         "country": "FR",
+        "region": "",
         "legal_form": "",
         "field_name": "eori",
         "purpose": "payout",

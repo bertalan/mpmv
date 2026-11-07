@@ -374,6 +374,19 @@ def test_rules_are_additive_in_legal_field_order() -> None:
     assert missing_required_fields(sole, rules) == ["pec", "iban"]
 
 
+@pytest.mark.parametrize(
+    ("country", "expected"),
+    [("US", ["tax_code"]), ("CH", ["tax_code"]), ("DE", ["eori"]), ("IT", ["eori"])],
+)
+def test_region_rules_apply_inside_or_outside_the_eu(country: str, expected: list[str]) -> None:
+    """Owner decision: non-EU vendors need their TIN; a region rule covers every such country."""
+    rules = [
+        Requirement("tax_code", region=engine.NON_EU),
+        Requirement("eori", region=engine.EU),
+    ]
+    assert missing_required_fields({"country": country}, rules) == expected
+
+
 def test_a_form_specific_rule_needs_the_legal_form() -> None:
     rules = [Requirement("rea_number", country="IT", legal_form=engine.SRL)]
     assert missing_required_fields({"country": "IT", "legal_form": ""}, rules) == ["legal_form"]
@@ -584,6 +597,63 @@ def test_cessionario_block_has_no_regime_rea_or_contacts() -> None:
     party = fatturapa_party(italian_company(), CESSIONARIO)
     assert set(party) == {"DatiAnagrafici", "Sede"}
     assert "RegimeFiscale" not in party["DatiAnagrafici"]
+
+
+def non_eu_without_vat(**overrides: Any) -> LegalIdentity:
+    values: dict[str, Any] = {
+        "country": "US",
+        "legal_name": "Vendor E Inc.",
+        "legal_form": engine.OTHER_LEGAL_FORM,
+        "tax_code": "12-3456789",
+        "tax_residence_country": "US",
+        "registered_street": "Example Street",
+        "registered_street_number": "1",
+        "registered_postal_code": "94105",
+        "registered_city": "San Francisco",
+        "registered_country": "US",
+        "iban": GB_IBAN,
+    }
+    values.update(overrides)
+    return LegalIdentity(**values)
+
+
+def test_a_non_eu_cessionario_without_a_vat_number_is_identified_by_its_tin() -> None:
+    party = fatturapa_party(non_eu_without_vat(), CESSIONARIO)
+    assert party["DatiAnagrafici"]["IdFiscaleIVA"] == {"IdPaese": "US", "IdCodice": "12-3456789"}
+    assert "CodiceFiscale" not in party["DatiAnagrafici"]
+    assert party["Sede"]["CAP"] == engine.FOREIGN_POSTAL_CODE
+    assert party["Sede"]["Nazione"] == "US"
+
+
+# --- DAC7 dataset (spec 11 CMP.1): part of the payout requirements for every vendor
+
+
+def test_a_complete_identity_has_the_whole_dac7_dataset() -> None:
+    assert engine.dac7_missing(italian_company(tax_residence_country="IT")) == ()
+    assert engine.dac7_missing(non_eu_without_vat()) == ()
+
+
+def test_the_dac7_dataset_lists_what_is_missing() -> None:
+    assert engine.dac7_missing(LegalIdentity(country="US", legal_name="Vendor E Inc.")) == (
+        "vat_number or tax_code",
+        "tax_residence_country",
+        "registered_street",
+        "registered_postal_code",
+        "registered_city",
+        "registered_country",
+        "iban",
+    )
+
+
+def test_italian_dac7_addresses_need_the_province() -> None:
+    identity = italian_company(tax_residence_country="IT", registered_province="")
+    assert engine.dac7_missing(identity) == ("registered_province",)
+
+
+def test_dac7_needs_a_vat_number_or_a_tin() -> None:
+    assert engine.dac7_missing(italian_company(tax_residence_country="IT", vat_number="")) == ()
+    identity = italian_company(tax_residence_country="IT", vat_number="", tax_code="")
+    assert engine.dac7_missing(identity) == ("vat_number or tax_code",)
 
 
 def test_cessionario_needs_a_vat_number_or_a_codice_fiscale() -> None:

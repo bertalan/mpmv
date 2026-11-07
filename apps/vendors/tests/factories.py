@@ -54,7 +54,8 @@ class VendorFactory(DjangoModelFactory[Vendor]):
 
     `languages=["en", "it"]` also creates one translation per language. Traits fill a complete
     legal identity: `italian_company`, `italian_sole_proprietor`, `eu_company` (Germany) and
-    `non_eu_company` (Switzerland, with an Italian fiscal representative).
+    `non_eu_company` (Switzerland, with an Italian fiscal representative) and `non_eu_without_vat`
+(United States: a TIN and no VAT number).
     """
 
     class Meta:
@@ -67,6 +68,7 @@ class VendorFactory(DjangoModelFactory[Vendor]):
             legal_form=Vendor.LegalForm.SRL,
             vat_number=factory.Sequence(italian_vat),
             tax_code=factory.SelfAttribute("vat_number"),
+            tax_residence_country="IT",
             fiscal_regime=Vendor.FiscalRegime.RF01,
             registered_street="Via Example",
             registered_street_number=factory.Sequence(lambda n: str(n + 1)),
@@ -93,6 +95,7 @@ class VendorFactory(DjangoModelFactory[Vendor]):
             legal_name=factory.LazyAttribute(lambda o: f"{o.first_name} {o.last_name}"),
             vat_number=factory.Sequence(italian_vat),
             tax_code=factory.Sequence(codice_fiscale),
+            tax_residence_country="IT",
             fiscal_regime=Vendor.FiscalRegime.RF19,
             registered_street="Via Example",
             registered_street_number=factory.Sequence(lambda n: str(n + 1)),
@@ -109,6 +112,7 @@ class VendorFactory(DjangoModelFactory[Vendor]):
             legal_form=Vendor.LegalForm.OTHER,
             legal_name=factory.LazyAttribute(lambda o: f"{o.display_name} GmbH"),
             vat_number=factory.Sequence(lambda n: f"DE{n:09d}"),
+            tax_residence_country="DE",
             fiscal_regime=Vendor.FiscalRegime.RF18,
             eori=factory.Sequence(lambda n: f"DE{n:013d}"),
             registered_street="Example Strasse",
@@ -126,6 +130,8 @@ class VendorFactory(DjangoModelFactory[Vendor]):
             legal_form=Vendor.LegalForm.OTHER,
             legal_name=factory.LazyAttribute(lambda o: f"{o.display_name} AG"),
             vat_number=factory.Sequence(lambda n: f"CHE{n:09d}"),
+            tax_code=factory.SelfAttribute("vat_number"),  # the Swiss UID is also the TIN
+            tax_residence_country="CH",
             fiscal_regime=Vendor.FiscalRegime.RF18,
             registered_street="Example Strasse",
             registered_street_number="1",
@@ -138,6 +144,20 @@ class VendorFactory(DjangoModelFactory[Vendor]):
             iban=factory.Sequence(lambda n: iban("CH", f"00000{n:012d}")),
             bic="EXMPCHZZXXX",
             bank_name="Example Bank",
+        )
+        non_eu_without_vat = factory.Trait(
+            country="US",
+            legal_form=Vendor.LegalForm.OTHER,
+            legal_name=factory.LazyAttribute(lambda o: f"{o.display_name} Inc."),
+            vat_number="",
+            tax_code=factory.Sequence(lambda n: f"{n % 100:02d}-{n:07d}"),
+            tax_residence_country="US",
+            registered_street="Example Street",
+            registered_street_number="1",
+            registered_postal_code="94105",
+            registered_city="San Francisco",
+            registered_country="US",
+            iban=factory.Sequence(lambda n: iban("GB", f"EXMP{n:014d}")),
         )
 
     display_name = factory.Sequence(lambda n: f"Vendor {pseudonym(n)}")
