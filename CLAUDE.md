@@ -5,9 +5,8 @@ Guidance for AI agents working in this repository. Read [README.md](README.md) a
 
 ## Language
 
-- Talk to the project owner in **Italian**.
-- Write code, comments, docstrings, commit messages, ADRs and developer docs in **English**.
-- `docs/spec/` is in Italian (owner-approved spec). Keep edits there in Italian.
+- Talk to the project owner in **Italian** (chat only).
+- Write everything in the repository in **English**: spec, ADRs, docs, code, comments, commit messages.
 
 ## Ground rules
 
@@ -24,12 +23,12 @@ Guidance for AI agents working in this repository. Read [README.md](README.md) a
 - Every change maps to a backlog task ID (e.g. `TAX.3`). If no task covers it, propose a new row
   in the relevant spec table instead of doing unplanned work.
 - Never hand-edit `docs/spec/90-backlog.md` or `docs/spec/backlog.csv`. Run `make docs`.
-- Do not start a task whose blocking decision (D-xx in `docs/spec/92-decisioni-aperte.md`) is
+- Do not start a task whose blocking decision (D-xx in `docs/spec/92-open-decisions.md`) is
   still open. Ask instead.
 
 ## Architecture rules (from spec 01)
 
-- Modular monolith: one Django project (`piac/`) and one app per bounded context under `apps/`.
+- Modular monolith: one Django project (`mpmv/`) and one app per bounded context under `apps/`.
 - Business logic lives in `services.py` (I/O, ORM) and `engine.py` (pure functions, no ORM).
   Views, API, management commands and MCP are thin adapters.
 - Respect the app dependency graph (spec 01 §1.3). `tax` and `shipping` never import `orders`.
@@ -42,6 +41,11 @@ Guidance for AI agents working in this repository. Read [README.md](README.md) a
 ## Commands
 
 ```sh
-make docs         # regenerate backlog + HTML spec
-make docs-check   # verify generated backlog is up to date
+make db           # local PostgreSQL (Apple container, port 55432)
+make test         # pytest
+make check        # ruff + mypy --strict + import contracts + backlog freshness + Django checks
+make fmt          # auto-fix and format
+make docs         # regenerate backlog + HTML spec after editing spec task tables
 ```
+
+Run `make check` and `make test` before declaring a task done.

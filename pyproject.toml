@@ -1,0 +1,91 @@
+[project]
+name = "mpmv"
+version = "0.1.0"
+description = "Multivendor marketplace on Django + Wagtail"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.13"
+dependencies = [
+  "django>=6.1,<6.2",
+  "psycopg[binary]>=3.3",
+  "dj-database-url>=2.3",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.4",
+  "pytest-django>=4.11",
+  "pytest-cov>=6.2",
+  "ruff>=0.13",
+  "mypy>=1.18",
+  "django-stubs[compatible-mypy]>=5.2",
+  "import-linter>=2.5",
+  "pre-commit>=4.3",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+extend-exclude = ["build", "private"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "DJ", "S", "RUF", "PT"]
+ignore = ["RUF012"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101"]
+"tests/**" = ["S101"]
+"tools/**" = ["S", "E501", "RUF005"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+plugins = ["mypy_django_plugin.main"]
+exclude = ["^build/", "^private/", "^tools/"]
+
+[[tool.mypy.overrides]]
+module = ["dj_database_url"]
+ignore_missing_imports = true
+
+[tool.django-stubs]
+django_settings_module = "mpmv.settings.test"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "mpmv.settings.test"
+addopts = "-ra --strict-markers"
+testpaths = ["tests", "apps"]
+
+[tool.coverage.run]
+source = ["apps", "mpmv"]
+branch = true
+
+[tool.importlinter]
+root_packages = ["apps", "mpmv"]
+
+# App dependency graph from spec 01 §1.3: an arrow A → B means B may import A, never the reverse.
+[[tool.importlinter.contracts]]
+name = "Domain layers (lower layers never import higher ones)"
+type = "layers"
+layers = [
+  "apps.mcp",
+  "apps.api",
+  "apps.compliance | apps.seo | apps.ingest",
+  "apps.ledger",
+  "apps.payments",
+  "apps.orders",
+  "apps.cart",
+  "apps.catalog | apps.tax | apps.shipping | apps.cms",
+  "apps.vendors",
+  "apps.accounts",
+  "apps.core",
+]
+exhaustive = false
+
+[[tool.importlinter.contracts]]
+name = "Tax and shipping engines stay independent of orders and cart"
+type = "forbidden"
+source_modules = ["apps.tax", "apps.shipping"]
+forbidden_modules = ["apps.orders", "apps.cart", "apps.payments", "apps.ledger"]
