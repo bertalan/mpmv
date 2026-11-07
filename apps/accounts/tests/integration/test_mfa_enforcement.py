@@ -114,7 +114,7 @@ def test_the_mfa_pages_and_admin_logout_stay_reachable(client: Client) -> None:
 
 
 def test_an_unverified_editor_can_sign_out_of_the_wagtail_admin(client: Client) -> None:
-    password_login(client, UserFactory.create(staff=True))
+    password_login(client, UserFactory.create(superuser=True))  # may open the Wagtail admin
     response = client.post(reverse("wagtailadmin_logout"))
     assert response.status_code == 302
     assert _redirect_target(response)[0] == reverse("wagtailadmin_login")
