@@ -49,11 +49,13 @@ def test_base_model_is_abstract_with_public_id_and_timestamps() -> None:
 
 # --- Languages (I18N.2): choices come from settings at runtime, never frozen in migrations
 
-LANGUAGES_PLUS_FRENCH = [
+LANGUAGES_PLUS_PORTUGUESE = [
     ("en", "English"),
     ("it", "Italiano"),
     ("de", "Deutsch"),
     ("fr", "Français"),
+    ("es", "Español"),
+    ("pt", "Português"),
 ]
 
 
@@ -68,12 +70,12 @@ def test_language_field_accepts_only_configured_languages() -> None:
     field = LanguageField()
     assert field.clean("de", None) == "de"
     with pytest.raises(ValidationError):
-        field.clean("fr", None)
+        field.clean("pt", None)
 
 
-@override_settings(LANGUAGES=LANGUAGES_PLUS_FRENCH)
+@override_settings(LANGUAGES=LANGUAGES_PLUS_PORTUGUESE)
 def test_a_language_added_in_settings_is_valid_without_a_migration() -> None:
-    assert LanguageField().clean("fr", None) == "fr"
+    assert LanguageField().clean("pt", None) == "pt"
 
 
 def test_translation_model_is_abstract_with_language_status_and_source_hash() -> None:

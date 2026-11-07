@@ -132,8 +132,15 @@ def test_fallback_never_goes_to_a_language_other_than_en() -> None:
 
 
 @override_settings(
-    LANGUAGES=[("en", "English"), ("it", "Italiano"), ("de", "Deutsch"), ("fr", "Français")]
+    LANGUAGES=[
+        ("en", "English"),
+        ("it", "Italiano"),
+        ("de", "Deutsch"),
+        ("fr", "Français"),
+        ("es", "Español"),
+        ("pt", "Português"),
+    ]
 )
 def test_a_language_added_in_settings_resolves_without_code_changes() -> None:
-    fr = Row("fr", PUBLISHED)
-    assert resolve([Row("en", PUBLISHED), fr], "fr").translation is fr
+    pt = Row("pt", PUBLISHED)
+    assert resolve([Row("en", PUBLISHED), pt], "pt").translation is pt

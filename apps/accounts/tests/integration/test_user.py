@@ -60,11 +60,11 @@ def test_login_with_email_and_password() -> None:
     assert authenticate(username="luca@example.com", password=PASSWORD + "-wrong") is None
 
 
-@pytest.mark.parametrize("language", ["en", "it", "de"])
+@pytest.mark.parametrize("language", ["en", "it", "de", "fr", "es"])
 def test_preferred_language_accepts_configured_languages(language: str) -> None:
     UserFactory.build(preferred_language=language).full_clean()
 
 
 def test_preferred_language_rejects_unknown_languages() -> None:
     with pytest.raises(ValidationError):
-        UserFactory.build(preferred_language="fr").full_clean()
+        UserFactory.build(preferred_language="pt").full_clean()

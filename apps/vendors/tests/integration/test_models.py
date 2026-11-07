@@ -129,7 +129,7 @@ def test_same_language_is_allowed_for_different_vendors() -> None:
 
 
 def test_translation_language_must_be_a_configured_language() -> None:
-    translation = VendorTranslationFactory.build(vendor=VendorFactory.create(), language="fr")
+    translation = VendorTranslationFactory.build(vendor=VendorFactory.create(), language="pt")
     with pytest.raises(ValidationError) as excinfo:
         translation.full_clean()
     assert "language" in excinfo.value.message_dict

@@ -10,11 +10,13 @@ from apps.accounts.tests.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
 
-LANGUAGES_PLUS_FRENCH = [
+LANGUAGES_PLUS_PORTUGUESE = [
     ("en", "English"),
     ("it", "Italiano"),
     ("de", "Deutsch"),
     ("fr", "Français"),
+    ("es", "Español"),
+    ("pt", "Português"),
 ]
 
 
@@ -32,6 +34,9 @@ def _switch(client: Client, language: str, next_url: str) -> str:
         ("/it/", "de", "/de/"),
         ("/it/", "en", "/"),
         ("/de/", "it", "/it/"),
+        ("/", "fr", "/fr/"),
+        ("/fr/", "es", "/es/"),
+        ("/es/?page=2", "en", "/?page=2"),
         ("/de/?page=2", "en", "/?page=2"),
     ],
 )
@@ -57,9 +62,9 @@ def test_switcher_ignores_unconfigured_languages(client: Client) -> None:
     assert _switch(client, "xx", "/it/") == "/it/"
 
 
-@override_settings(LANGUAGES=LANGUAGES_PLUS_FRENCH)
+@override_settings(LANGUAGES=LANGUAGES_PLUS_PORTUGUESE)
 def test_switcher_offers_a_language_added_in_settings(client: Client) -> None:
-    assert _switch(client, "fr", "/de/") == "/fr/"
+    assert _switch(client, "pt", "/de/") == "/pt/"
 
 
 def test_switcher_only_accepts_post(client: Client) -> None:
