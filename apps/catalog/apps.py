@@ -9,7 +9,8 @@ class CatalogConfig(AppConfig):
     audited_models = ()
     unaudited_models = {
         "product": "catalog content; price changes are audited by services.set_product_price "
-        "(CAT.1), publishing by the CAT.10 services",
+        "(CAT.1), publishing by the CAT.10 services, duplicates to another vendor by "
+        "services.duplicate_product_to_vendor (CAT.14)",
         "producttranslation": "storefront texts under the translation workflow",
         "variant": "catalog content; price changes are audited by services.set_variant_price",
         "varianttranslation": "storefront texts under the translation workflow",
@@ -23,3 +24,6 @@ class CatalogConfig(AppConfig):
         "brand": "manufacturer names shown on product pages and feeds",
         "brandtranslation": "storefront texts under the translation workflow",
     }
+
+    def ready(self) -> None:
+        from . import signals  # noqa: F401  (connects the CAT.14 upsell guard)

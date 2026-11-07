@@ -46,6 +46,7 @@ part of the done-when still open) · `not started`.
 | CAT.2 | done | #53 | Category and term trees (treebeard), configurable taxonomies with typed term attributes, brands, per-language names, slugs and SEO texts; product links; admin CRUD with translations |
 | SHP.12 | done | #54 | Several shipping methods per vendor and zone (VendorZoneRate renamed in place), vendor zones overriding platform zones, country groups, shared postcode grammar in apps/core/postcodes.py, per-method free-shipping threshold and stored VAT treatment |
 | TAX.2 | done | #52 | Regime change workflow: owner request, staff approval or rejection with the review permission checked in the service, step-up, one transaction for the new profile version and fiscal regime, history. Tax code, flagged for careful human review |
+| CAT.14 | in review | #80 | Catalogue integrity: nullable price (required for `buy`, never 0.00) and `public_price`, `mpn`, vendor immutable (trigger) with audited staff `duplicate_product_to_vendor`, variants only on variable products, same-vendor companion (composite key), cross-vendor upsells gated by the versioned, append-only `CrossVendorConsent`. Price code, flagged for human review |
 
 ## Owner decisions 2026-11-07
 

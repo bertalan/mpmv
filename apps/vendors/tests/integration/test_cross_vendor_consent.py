@@ -23,7 +23,7 @@ from apps.vendors.services import (
     in_suggestions_allowed,
     set_cross_vendor_consent,
 )
-from apps.vendors.tests.factories import VendorFactory
+from apps.vendors.tests.factories import CrossVendorConsentFactory, VendorFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -157,3 +157,9 @@ def test_a_consent_version_cannot_be_edited_or_deleted_in_the_admin(
     assert staff_client.post(delete_url, {"post": "yes"}).status_code == 403
     consent.refresh_from_db()
     assert consent.in_suggestions is True
+
+
+def test_the_factory_makes_a_version_in_force() -> None:
+    consent = CrossVendorConsentFactory.create()
+    assert current_cross_vendor_consent(consent.vendor) == consent
+    assert in_suggestions_allowed(consent.vendor)

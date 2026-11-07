@@ -30,7 +30,7 @@ def test_the_vendor_of_an_existing_product_is_read_only(staff_client: Client) ->
     product = ProductFactory.create()
     original = product.vendor
     other = VendorFactory.create()
-    data = existing_product_form(product, vendor=str(other.pk))
+    data = {**existing_product_form(product), "vendor": str(other.pk)}
     response = staff_client.post(change_url(product), data)
     assert response.status_code == 302, response.content.decode()[:3000]
     product.refresh_from_db()

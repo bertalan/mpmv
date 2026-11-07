@@ -10,6 +10,7 @@ from typing import Any
 
 from django import forms
 from django.contrib import admin
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.forms.models import BaseInlineFormSet
 from django.http import HttpRequest
@@ -23,6 +24,7 @@ from .models import Category, Product, ProductTranslation, Term, Variant, Varian
 from .services import (
     PRODUCT_PRICE_FIELDS,
     VARIANT_PRICE_FIELDS,
+    check_upsells,
     set_product_price,
     set_variant_price,
 )
@@ -96,8 +98,25 @@ class VariantInline(admin.TabularInline[Variant, Product]):
     )
 
 
+class ProductAdminForm(forms.ModelForm[Product]):
+    """Reports a suggestion refused by the cross-vendor consent rule (CAT.14) as a form error,
+    before the many-to-many save would refuse it."""
+
+    def clean(self) -> dict[str, Any] | None:
+        cleaned = super().clean()
+        upsells = self.cleaned_data.get("upsells")
+        vendor = self.cleaned_data.get("vendor") or getattr(self.instance, "vendor", None)
+        if upsells and vendor is not None:
+            try:
+                check_upsells({vendor.pk}, [product.pk for product in upsells])
+            except ValidationError as exc:
+                self.add_error("upsells", exc)
+        return cleaned
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin[Product]):
+    form = ProductAdminForm
     list_display = ("sku", "vendor", "kind", "status", "price_net", "stock_qty", "stock_status")
     list_filter = ("status", "kind", "sales_mode", "fiscal_category", "stock_status", "vendor")
     search_fields = ("sku", "gtin", "translations__title")
@@ -126,12 +145,17 @@ class ProductAdmin(admin.ModelAdmin[Product]):
             "Classification",
             {"fields": ("category", "secondary_categories", "brand", "terms")},
         ),
-        ("Identifiers", {"fields": ("gtin", "google_category_id")}),
+        ("Identifiers", {"fields": ("gtin", "mpn", "google_category_id")}),
         ("Related products", {"fields": ("required_companion", "upsells")}),
         ("Migration", {"fields": ("legacy_wp_id_en", "legacy_wp_id_it")}),
         ("Dates", {"fields": ("created_at", "updated_at")}),
     )
     inlines = (ProductTranslationInline, VariantInline)
+
+    def get_readonly_fields(self, request: HttpRequest, obj: Product | None = None) -> Any:
+        """A product never changes vendor (Q-33, CAT.14): staff duplicate it instead."""
+        fields = tuple(super().get_readonly_fields(request, obj))
+        return fields if obj is None else (*fields, "vendor")
 
     def formfield_for_foreignkey(
         self, db_field: models.ForeignKey[Any, Any], request: HttpRequest, **kwargs: Any

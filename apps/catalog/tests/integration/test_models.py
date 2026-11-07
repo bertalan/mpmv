@@ -187,8 +187,8 @@ def test_legacy_ids_are_unique() -> None:
 
 def test_required_companion_and_upsells() -> None:
     companion = ProductFactory.create()
-    upsell = ProductFactory.create()
-    product = ProductFactory.create(required_companion=companion)
+    upsell = ProductFactory.create(vendor=companion.vendor)
+    product = ProductFactory.create(vendor=companion.vendor, required_companion=companion)
     product.upsells.add(upsell)
     assert list(companion.required_by.all()) == [product]
     assert list(product.upsells.all()) == [upsell]
@@ -203,7 +203,7 @@ def test_a_product_cannot_be_its_own_companion() -> None:
 
 def test_a_required_companion_cannot_be_deleted() -> None:
     companion = ProductFactory.create()
-    ProductFactory.create(required_companion=companion)
+    ProductFactory.create(vendor=companion.vendor, required_companion=companion)
     with pytest.raises(ProtectedError):
         companion.delete()
 

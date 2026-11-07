@@ -206,11 +206,11 @@ def test_an_upsell_of_the_same_vendor_needs_no_consent() -> None:
 def test_an_upsell_to_a_vendor_without_opt_in_is_refused() -> None:
     product = ProductFactory.create()
     foreign = ProductFactory.create()
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError), transaction.atomic():
         product.upsells.add(foreign)
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError), transaction.atomic():
         foreign.upsold_by.add(product)
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError), transaction.atomic():
         product.upsells.set([foreign])
     assert not product.upsells.exists()
 
@@ -220,7 +220,7 @@ def test_an_upsell_to_a_vendor_that_opted_out_is_refused() -> None:
     foreign = ProductFactory.create()
     opt_in(foreign.vendor, in_suggestions=True, days_ago=2)
     opt_in(foreign.vendor, in_suggestions=False, days_ago=1)
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError), transaction.atomic():
         product.upsells.add(foreign)
 
 
