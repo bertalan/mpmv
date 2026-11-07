@@ -169,18 +169,24 @@ def test_strict_csp_and_permissions_policy_apply_in_every_environment(client: Cl
     assert cookie["samesite"] == "Lax"
 
 
-@pytest.mark.parametrize("module", ["mpmv.settings.live", "mpmv.settings.stage"])
-def test_deploy_check_passes(module: str) -> None:
-    # A production-like environment: no DJANGO_* variables leaking from the test session
-    # (the e2e suite sets DJANGO_ALLOW_ASYNC_UNSAFE, which the deploy check rightly rejects).
+def _deploy_check(module: str, **extra: str) -> subprocess.CompletedProcess[str]:
+    # A production-like environment: no DJANGO_* or MPMV_TRUSTED_* variables leaking from the
+    # test session (the e2e suite sets DJANGO_ALLOW_ASYNC_UNSAFE, which the deploy check rightly
+    # rejects).
+    inherited = {
+        name: value
+        for name, value in os.environ.items()
+        if not name.startswith(("DJANGO_", "MPMV_TRUSTED_"))
+    }
     env = {
-        **{name: value for name, value in os.environ.items() if not name.startswith("DJANGO_")},
+        **inherited,
         "DJANGO_SETTINGS_MODULE": module,
         "DJANGO_SECRET_KEY": secrets.token_urlsafe(64),
         "DJANGO_ALLOWED_HOSTS": "shop.example.com",
         "DATABASE_URL": "postgres://mpmv@127.0.0.1:55432/mpmv",
+        **extra,
     }
-    result = subprocess.run(
+    return subprocess.run(
         [sys.executable, "manage.py", "check", "--deploy", "--fail-level", "WARNING"],
         cwd=BASE_DIR,
         env=env,
@@ -188,4 +194,19 @@ def test_deploy_check_passes(module: str) -> None:
         text=True,
         check=False,
     )
+
+
+@pytest.mark.parametrize("module", ["mpmv.settings.live", "mpmv.settings.stage"])
+def test_deploy_check_passes(module: str) -> None:
+    # Behind Caddy, as in deploy/server/mpmv.env.example (CORE.5).
+    result = _deploy_check(
+        module, MPMV_TRUSTED_PROXY_HEADER="X-Real-IP", MPMV_TRUSTED_PROXIES="10.89.250.0/24"
+    )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_deploy_check_warns_without_a_trusted_proxy_header() -> None:
+    """CORE.5: behind the proxy every client would share one IP throttle bucket."""
+    result = _deploy_check("mpmv.settings.live")
+    assert result.returncode != 0
+    assert "core.W001" in result.stdout + result.stderr

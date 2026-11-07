@@ -1,7 +1,10 @@
 # Private network for the MPMV containers on a STAGE/LIVE host (ARC.5, ADR-0005).
 # Podman's DNS resolves containers by name on it (Caddy reaches the app as mpmv-app:8000).
+# The subnet is fixed because the app trusts the client IP header only from it (CORE.5,
+# MPMV_TRUSTED_PROXIES in mpmv.env). Change both together if it collides with a host network.
 [Unit]
 Description=MPMV container network
 
 [Network]
 NetworkName=mpmv-net
+Subnet=10.89.250.0/24

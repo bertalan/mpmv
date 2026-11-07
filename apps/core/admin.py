@@ -12,6 +12,7 @@ from django.contrib import admin
 from django.http import HttpRequest
 
 from .audit import AuditContext
+from .http import client_ip
 from .models import AuditLog, PlatformOperator
 from .services import check_operator_start, configure_platform_operator, latest_operator
 
@@ -67,6 +68,6 @@ class PlatformOperatorAdmin(admin.ModelAdmin[PlatformOperator]):
             actor_id=request.user.pk,
             actor_label=f"staff:{request.user.get_username()}",
             source=AuditLog.Source.ADMIN,
-            ip=request.META.get("REMOTE_ADDR"),
+            ip=client_ip(request),
         )
         configure_platform_operator(obj, ctx=ctx)

@@ -4,8 +4,8 @@
 Django view and answers 401/403 itself, as RFC 9457 problem details. API v1 (django-ninja)
 uses the same functions through `apps.api.v1.security.ApiKey`.
 
-The client IP is `REMOTE_ADDR`. Behind the reverse proxy the deployment must set it from the
-trusted proxy header (OPS), otherwise the allow-list sees the proxy's address.
+The client IP comes from `apps.core.http.client_ip`: the trusted reverse proxy's header, or
+`REMOTE_ADDR` (CORE.5).
 """
 
 import functools
@@ -13,6 +13,8 @@ from collections.abc import Callable
 from typing import Concatenate
 
 from django.http import HttpRequest, HttpResponse, JsonResponse
+
+from apps.core.http import client_ip
 
 from .engine import bearer_challenge
 from .models import ApiClient
@@ -22,11 +24,6 @@ from .services import AuthResult, authenticate
 
 REALM = "api"
 _REQUEST_ATTR = "api_client"
-
-
-def client_ip(request: HttpRequest) -> str | None:
-    ip = request.META.get("REMOTE_ADDR")
-    return str(ip) if ip else None
 
 
 def authenticate_request(request: HttpRequest, required_scope: str | None) -> AuthResult:

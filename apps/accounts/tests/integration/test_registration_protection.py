@@ -55,6 +55,17 @@ def test_the_registration_limit_is_audited_once(client: Client) -> None:
     assert entry.ip == IP
 
 
+@override_settings(TRUSTED_PROXY_HEADER="X-Real-IP", TRUSTED_PROXIES=["10.89.250.0/24"])
+def test_behind_the_proxy_the_limit_applies_to_each_client(client: Client) -> None:
+    """Every request comes from the proxy's address; the limit must not be site-wide."""
+    proxy = "10.89.250.2"
+    for _ in range(REGISTRATION_LIMIT.free_attempts):
+        client.post(URL, {}, headers={"X-Real-IP": IP}, REMOTE_ADDR=proxy)
+    limited = client.post(URL, {}, headers={"X-Real-IP": IP}, REMOTE_ADDR=proxy)
+    other = client.post(URL, {}, headers={"X-Real-IP": "198.51.100.30"}, REMOTE_ADDR=proxy)
+    assert (limited.status_code, other.status_code) == (429, 200)
+
+
 @override_settings(
     CAPTCHA_ENABLED=True, CAPTCHA_VERIFIER="apps.accounts.tests.fakes.FakeCaptchaVerifier"
 )

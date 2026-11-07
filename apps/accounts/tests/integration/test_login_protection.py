@@ -54,11 +54,24 @@ def _reset_fake_captcha() -> Iterator[None]:
     FakeCaptchaVerifier.reset()
 
 
-def _login(client: Client, email: str, pwd: str, *, ip: str = IP, **extra: str) -> bool:
-    """POST the admin login form; True if the session is now authenticated."""
+def _login(
+    client: Client,
+    email: str,
+    pwd: str,
+    *,
+    ip: str = IP,
+    real_ip: str | None = None,
+    **extra: str,
+) -> bool:
+    """POST the admin login form from `ip` (with the proxy's X-Real-IP header when given).
+
+    True if the session is now authenticated.
+    """
+    headers = {"X-Real-IP": real_ip} if real_ip else {}
     response = client.post(
         LOGIN_URL,
         {"username": email, "password": pwd, "next": "/django-admin/", **extra},
+        headers=headers,
         REMOTE_ADDR=ip,
     )
     return response.status_code == 302 and "_auth_user_id" in client.session
@@ -70,9 +83,11 @@ def _error_page(client: Client, email: str, pwd: str, *, ip: str = IP) -> str:
     return response.content.decode()
 
 
-def _fail(client: Client, email: str, times: int, *, ip: str = IP) -> None:
+def _fail(
+    client: Client, email: str, times: int, *, ip: str = IP, real_ip: str | None = None
+) -> None:
     for _ in range(times):
-        assert not _login(client, email, secrets.token_urlsafe(16), ip=ip)
+        assert not _login(client, email, secrets.token_urlsafe(16), ip=ip, real_ip=real_ip)
 
 
 def _expire_locks() -> None:
@@ -181,6 +196,31 @@ def test_an_ipv6_client_is_locked_by_its_64_network(
         _fail(client, f"target{i}@example.com", 1, ip=f"2001:db8:1:2::{i + 1:x}")
     assert not _login(client, staff.email, password, ip="2001:db8:1:2::ffff")
     assert _login(client, staff.email, password, ip="2001:db8:1:3::1")
+
+
+# --- Behind the reverse proxy (STAGE/LIVE): every request comes from the proxy's address
+
+PROXY = "10.89.250.2"
+BEHIND_PROXY = {"TRUSTED_PROXY_HEADER": "X-Real-IP", "TRUSTED_PROXIES": ["10.89.250.0/24"]}
+
+
+@override_settings(**BEHIND_PROXY)
+def test_behind_the_proxy_one_client_spraying_does_not_lock_out_the_others(
+    client: Client, staff: User, password: str
+) -> None:
+    for i in range(IP_LOCKOUT.free_attempts):
+        _fail(client, f"target{i}@example.com", 1, ip=PROXY, real_ip=IP)
+    assert not _login(client, staff.email, password, ip=PROXY, real_ip=IP)
+    assert _login(client, staff.email, password, ip=PROXY, real_ip=OTHER_IP)
+    assert not Throttle.objects.filter(key=f"login:ip:{PROXY}").exists()
+
+
+@override_settings(**BEHIND_PROXY)
+def test_a_client_that_bypasses_the_proxy_cannot_choose_its_bucket(client: Client) -> None:
+    for i in range(IP_LOCKOUT.free_attempts):
+        fake = f"192.0.2.{i + 1}"
+        _fail(client, f"target{i}@example.com", 1, ip=IP, real_ip=fake)
+    assert login_retry_after(None, IP) > dt.timedelta(0)
 
 
 # --- Audit

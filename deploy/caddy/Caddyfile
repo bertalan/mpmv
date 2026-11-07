@@ -1,7 +1,17 @@
 # Reverse proxy for a STAGE/LIVE host (ARC.5). Copy to ~/.config/mpmv/Caddyfile on the server.
 # The site address comes from MPMV_SITE_ADDRESS in ~/.config/mpmv/caddy.env. Caddy sets
 # X-Forwarded-Proto, which Django trusts through SECURE_PROXY_SSL_HEADER (settings/live.py).
+#
+# Client IP (CORE.5): Caddy overwrites X-Real-IP with the client address, so a value sent by the
+# client never reaches the app. Django reads it only from the mpmv-net subnet
+# (MPMV_TRUSTED_PROXY_HEADER and MPMV_TRUSTED_PROXIES in mpmv.env). If a CDN proxies the site,
+# {client_ip} is the CDN's address unless Caddy trusts it: add a global options block such as
+#   { servers { trusted_proxies static <CDN ranges>
+#               client_ip_headers CF-Connecting-IP } }
+# with the CDN's published ranges, and allow only those ranges to reach ports 80 and 443.
 {$MPMV_SITE_ADDRESS} {
 	encode zstd gzip
-	reverse_proxy mpmv-app:8000
+	reverse_proxy mpmv-app:8000 {
+		header_up X-Real-IP {client_ip}
+	}
 }

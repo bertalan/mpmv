@@ -100,6 +100,13 @@ systemctl --user daemon-reload
 ```
 
 On STAGE set `DJANGO_SETTINGS_MODULE=mpmv.settings.stage`, on LIVE `mpmv.settings.live`.
+Keep `MPMV_TRUSTED_PROXY_HEADER` and `MPMV_TRUSTED_PROXIES` as in the example (CORE.5): the app
+sees every request coming from Caddy, so it takes the client IP from the `X-Real-IP` header that
+Caddy overwrites, and only from the `mpmv-net` subnet fixed in `mpmv.network`. Without them the
+per-IP login lockout and registration limit act on the whole site; when they are missing,
+`podman exec mpmv-app python manage.py check --deploy` warns (`core.W001`). A network created
+before the subnet was fixed must be removed (`podman network rm mpmv-net`) and recreated by its
+unit.
 STAGE holds synthetic data only (spec 12). Then run the first `mpmv-deploy deploy X.Y.Z` (below)
 and `systemctl --user start mpmv-caddy.service`. Afterwards every unit with an `[Install]` section
 starts at boot.
