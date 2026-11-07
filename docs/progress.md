@@ -4,7 +4,8 @@ Task status and coherence checks. The backlog itself is generated from the spec
 ([90-backlog.md](spec/90-backlog.md)); this file records what is done and verified.
 `make docs` validates that every task ID below exists in the spec.
 
-Statuses: `done` (merged, done-when met) · `in review` (PR open) · `in progress`.
+Statuses: `done` (merged, done-when met) · `in review` (PR open) · `in progress` · `partial` (merged,
+part of the done-when still open) · `not started`.
 
 ## Tasks
 
@@ -22,6 +23,11 @@ Statuses: `done` (merged, done-when met) · `in review` (PR open) · `in progres
 | VEN.1 | done | #8 | Vendor models, translations, status machine, admin |
 | CORE.6 | done | #9 | ApiClient: hashed keys, scopes, expiry, rotation, revocation, IP allow-list |
 | SEC.1 | done | #7 | Strict CSP, Permissions-Policy, hardened cookies, security headers |
+| I18N.1 | done | #12 | Language-prefix routing, language switcher, preferred language |
+| ARC.5 | partial: STAGE deploy pending hosting decision | #13 | OCI image, Apple container local stack, Podman Quadlets, tag deploy and rollback tooling, Procrastinate worker role |
+| ARC.12 | done | #16 | factory_boy factories per model, hand-written test builders converted |
+| CORE.4 | not started (rerun in wave 3) | none | |
+| CORE.5 | not started (rerun in wave 3) | none | |
 
 ## Follow-ups from wave 1
 
@@ -41,7 +47,7 @@ Deferred to other tasks:
 - ARC.7: the EUR 10,000 distance-sales threshold goes to TAX.2; the tax context snapshot dataclass goes to TAX.3.
 - ARC.7: no PlatformOperator row is seeded, so current_operator() fails until ARC.10 or the go-live checklist adds one.
 - ARC.9: job retention cleanup and alerts on queue depth and failed jobs go to the OPS monitoring tasks.
-- ARC.9: the worker container is ARC.5; Heartbeat has no admin page yet.
+- ARC.9: Heartbeat has no admin page yet. The worker container is resolved by ARC.5 (#13).
 - ARC.9: human review requested for _BusinessTimePeriodicTask and on_app_ready, which use undocumented Procrastinate attributes.
 - VEN.1: plan, payout_account, dac7_complete and logo fields wait for VEN.2, VEN.6, CMP.1 and the media stack.
 - VEN.1: translation workflow status and source_hash go to I18N.2.
@@ -66,7 +72,7 @@ Review findings not fixed (all minor):
 - VEN.1: admin create, edit and delete of vendor legal and tax data write no AuditLog.
 - VEN.1: bulk "move to closed" has no confirmation step.
 - VEN.1: VendorTranslation.language choices are frozen in the migration, so adding a language needs a migration.
-- VEN.1: the make_vendor test helper is copied into three test modules.
+- VEN.1: the make_vendor test helper copied into three test modules is resolved by ARC.12 (#16).
 - VEN.1: two concurrent vendor creates with the same name fail on the slug instead of getting a suffix.
 - CORE.6: allowed_ips is a CharField array, not InetAddress as in spec 02, and stored values are not validated.
 - CORE.6: the key format regex has no upper bound on secret length.
@@ -76,6 +82,35 @@ Review findings not fixed (all minor):
 - SEC.1: the strict CSP needs the Alpine.js CSP build and htmx without indicator styles or hx-on; note it for front-end tasks.
 - SEC.1: no test covers a view that sets its own Permissions-Policy.
 - SEC.1: a mixed Permissions-Policy allowlist such as ["*", "self"] emits an invalid quoted "*".
+
+## Follow-ups from wave 2
+
+Open questions for the owner:
+
+- ARC.5: choose the hosting provider (price, EU region, managed PostgreSQL 17 with PITR) and record it as ADR-0005 requires.
+- ARC.5: either provision STAGE and run a real tag deploy, rollback and unhealthy deploy, or narrow the done-when and add a new spec 01 row for the STAGE deploy.
+- I18N.1: should `/` redirect signed-in users to their preferred language prefix? Today it always serves EN.
+
+Deferred to other tasks:
+
+- ARC.5: there is no automatic deploy from CI to STAGE; deploys run by hand with mpmv-deploy until a host and SSH secrets exist.
+- ARC.5: release images are built only for linux/amd64; an arm64 server needs a multi-platform build.
+- ARC.5: rollback does not undo migrations, so migrations must stay compatible with the previous release (expand, then contract).
+- ARC.5: media has no writable location on STAGE/LIVE (read-only root, no volume); it needs an object storage backlog row before CAT.4 and SEC.2.
+- I18N.1: the staff admin is always in EN, because unprefixed paths use the primary language.
+- I18N.1: page strings are marked for translation, but .po/.mo catalogs come with I18N.5.
+- I18N.1: hreflang, canonical and sitemaps go to I18N.6; wagtail-localize goes to I18N.3.
+- I18N.1: the "/it/ and /de/ active on STAGE" check needs a smoke test once STAGE exists.
+
+Review findings not fixed (all minor):
+
+- I18N.1: User.preferred_language choices are frozen in the migration (coherence check 2, finding 1).
+- ARC.5: concurrent deploy or rollback runs are not locked and can corrupt the release history.
+- ARC.5: the release workflow publishes an image for any v*.*.* tag without checking that the commit is on main with green CI.
+- ARC.5: WhiteNoise runs before the CSP and Permissions-Policy middleware, so static responses carry neither header.
+- ARC.5: .dockerignore patterns for .env and key files match only at the root of the build context.
+- ARC.5: the Caddy unit does not drop capabilities, and Caddy has no trusted_proxies for Cloudflare, so the app sees Cloudflare IPs.
+- ARC.5: the implementation commit changed a parser in the test-only commit.
 
 ## Coherence checks
 
