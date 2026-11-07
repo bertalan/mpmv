@@ -20,6 +20,11 @@ go-live but ready for every language in settings.LANGUAGES. The slug is a URL se
 language: it is unique among a node's siblings in a language (checked by `clean()`, so by forms
 and the admin), and unique per language for taxonomies and brands (database constraints). The
 URLs of taxonomy pages wait for decision D-07 (CAT.8): only the data is here.
+
+Descriptions: the `description` texts of categories, terms and brands are HTML as staff (or an
+import) entered it, stored raw and never sanitized here. Whatever shows them to visitors (the
+category, taxonomy and brand pages of CAT.8, CMS rendering) must sanitize them with an allow-list
+first; never mark a stored description safe as it is.
 """
 
 from collections.abc import Iterable
