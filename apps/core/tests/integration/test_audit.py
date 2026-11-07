@@ -36,6 +36,18 @@ def test_record_writes_who_what_before_after_and_where() -> None:
     assert stored.public_id is not None
 
 
+def test_record_stores_the_vendor_an_entry_belongs_to() -> None:
+    vendor = "6f1c1f2e-0000-4000-8000-000000000001"
+    member = record(
+        CTX, "vendor.member_added", "vendors.vendormember", "m-1", None, {"vendor": vendor}
+    )
+    platform = record(
+        CTX, "core.platform_operator.configured", "core.platformoperator", "p", None, {}
+    )
+    assert AuditLog.objects.get(pk=member.pk).vendor_key == vendor
+    assert AuditLog.objects.get(pk=platform.pk).vendor_key == ""
+
+
 def test_audit_rows_cannot_be_updated_even_with_a_raw_queryset() -> None:
     entry = AuditLogFactory.create()
     with pytest.raises(DatabaseError, match="append-only"), transaction.atomic():

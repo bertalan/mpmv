@@ -141,6 +141,23 @@ def test_reconfiguration_closes_the_current_row_and_opens_a_new_one() -> None:
     assert AuditLog.objects.count() == 3  # first create + (close, create)
 
 
+def test_reconfiguration_audits_the_previous_configuration_as_before() -> None:
+    configure_platform_operator(PlatformOperatorFactory.build(valid_from=utc(2027)), ctx=CTX)
+    relocated = PlatformOperatorFactory.build(
+        country="DE", dac7_authority_country="DE", valid_from=utc(2029)
+    )
+    configure_platform_operator(relocated, ctx=CTX)
+
+    entry = AuditLog.objects.get(
+        action="core.platform_operator.configured", target_key=str(relocated.public_id)
+    )
+    assert entry.before is not None
+    assert entry.after is not None
+    assert (entry.before["country"], entry.after["country"]) == ("AT", "DE")
+    assert entry.before["valid_from"] == utc(2027).isoformat()
+    assert entry.after["valid_from"] == utc(2029).isoformat()
+
+
 def test_configuration_dry_run_writes_nothing() -> None:
     changeset = configure_platform_operator(PlatformOperatorFactory.build(), ctx=CTX, dry_run=True)
     assert changeset.summary()["create"] == 1

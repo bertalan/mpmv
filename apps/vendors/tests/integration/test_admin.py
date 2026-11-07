@@ -197,7 +197,7 @@ def test_status_action_moves_vendors_through_the_transition_service(staff_client
     assert response.status_code == 200
     vendor.refresh_from_db()
     assert vendor.status == Vendor.Status.ONBOARDING
-    entry = AuditLog.objects.get()
+    entry = AuditLog.objects.get(target_model="vendors.vendor")  # the login is audited too
     assert entry.action == "vendor.status_changed"
     assert entry.source == "admin"
     assert entry.actor_label == "staff:staff@example.com"
@@ -217,7 +217,7 @@ def test_status_action_reports_invalid_transitions_and_changes_nothing(
     assert any("applicant → active" in m for m in messages)
     vendor.refresh_from_db()
     assert vendor.status == Vendor.Status.APPLICANT
-    assert AuditLog.objects.count() == 0
+    assert not AuditLog.objects.filter(target_model="vendors.vendor").exists()
 
 
 def test_view_only_staff_get_no_status_actions(client: Client) -> None:
@@ -238,7 +238,7 @@ def test_view_only_staff_cannot_run_status_actions(client: Client, action: str) 
     )
     vendor.refresh_from_db()
     assert vendor.status == Vendor.Status.APPLICANT
-    assert AuditLog.objects.count() == 0
+    assert not AuditLog.objects.filter(target_model="vendors.vendor").exists()
 
 
 def test_staff_with_change_permission_can_run_status_actions(client: Client) -> None:
@@ -252,7 +252,76 @@ def test_staff_with_change_permission_can_run_status_actions(client: Client) -> 
     assert response.status_code == 200
     vendor.refresh_from_db()
     assert vendor.status == Vendor.Status.ONBOARDING
-    assert AuditLog.objects.get().actor_label == "staff:limited@example.com"
+    entry = AuditLog.objects.get(target_model="vendors.vendor")
+    assert entry.actor_label == "staff:limited@example.com"
+
+
+# --- SEC.4: staff edits are audited, and visible with before/after in the audit view
+
+
+def test_adding_a_vendor_in_the_admin_is_audited(staff_client: Client) -> None:
+    data = vendor_form()
+    data.update(management_form(0))
+    response = staff_client.post(reverse("admin:vendors_vendor_add"), data)
+    assert response.status_code == 302, response.content.decode()
+    vendor = Vendor.objects.get()
+    entry = AuditLog.objects.get(action="vendor.created")
+    assert entry.target_key == str(vendor.public_id)
+    assert entry.source == "admin"
+    assert entry.actor_label == "staff:staff@example.com"
+
+
+def test_a_vendor_field_change_is_visible_in_the_audit_view_with_before_and_after(
+    staff_client: Client,
+) -> None:
+    vendor = VendorFactory.create(
+        display_name="Vendor A", contact_email="vendor-a@example.com", vat_number="IT00000000001"
+    )
+    data = vendor_form(
+        display_name="Vendor A",
+        slug=vendor.slug,
+        legal_name=vendor.legal_name,
+        contact_email="vendor-a@example.com",
+        vat_number="IT00000000002",
+        registered_address="{}",
+    )
+    data.update(management_form(0))
+    response = staff_client.post(reverse("admin:vendors_vendor_change", args=[vendor.pk]), data)
+    assert response.status_code == 302, response.content.decode()
+
+    listing = staff_client.get(
+        reverse("admin:core_auditlog_changelist"),
+        {"vendor": str(vendor.public_id), "action": "vendor.updated"},
+    )
+    (entry,) = listing.context["cl"].result_list
+    detail = staff_client.get(reverse("admin:core_auditlog_change", args=[entry.pk]))
+    assert ("vat_number", "IT00000000001", "IT00000000002") in detail.context["audit_changes"]
+    assert entry.actor_label == "staff:staff@example.com"
+
+
+def test_deleting_a_vendor_in_the_admin_is_audited(staff_client: Client) -> None:
+    vendor = VendorFactory.create()
+    staff_client.post(reverse("admin:vendors_vendor_delete", args=[vendor.pk]), {"post": "yes"})
+    entry = AuditLog.objects.get(action="vendor.deleted")
+    assert entry.target_key == str(vendor.public_id)
+    assert entry.after is None
+
+
+def test_bulk_deleting_vendors_in_the_admin_is_audited(staff_client: Client) -> None:
+    vendors = VendorFactory.create_batch(2)
+    staff_client.post(
+        reverse("admin:vendors_vendor_changelist"),
+        {"action": "delete_selected", "_selected_action": [v.pk for v in vendors], "post": "yes"},
+    )
+    assert not Vendor.objects.exists()
+    assert AuditLog.objects.filter(action="vendor.deleted").count() == 2
+
+
+def test_the_vendor_page_links_to_its_audit_trail(staff_client: Client) -> None:
+    vendor = VendorFactory.create()
+    response = staff_client.get(reverse("admin:vendors_vendor_change", args=[vendor.pk]))
+    trail = f"{reverse('admin:core_auditlog_changelist')}?vendor={vendor.public_id}"
+    assert trail in response.content.decode()
 
 
 def test_anonymous_users_cannot_reach_the_vendor_admin(client: Client) -> None:
