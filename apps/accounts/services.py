@@ -311,12 +311,21 @@ def _after_enrolment(device: SecondFactor, ctx: AuditContext) -> Enrolment:
     return Enrolment(device, codes)
 
 
-def start_totp_enrolment(user: User) -> TOTPDevice:
-    """The user's pending (unconfirmed) authenticator-app device, created on first call."""
-    device = TOTPDevice.objects.filter(user=user, confirmed=False).order_by("id").first()
-    if device is None:
-        device = TOTPDevice.objects.create(user=user, name="Authenticator app", confirmed=False)
-    return device
+def start_totp_enrolment(user: User, pending_id: int | None = None) -> TOTPDevice:
+    """The pending (unconfirmed) authenticator-app device of one enrolment.
+
+    `pending_id` is the device this enrolment created earlier (the caller keeps it in the
+    session). Any other unconfirmed device of the user is deleted and a fresh one with a new
+    key is created, so a secret recorded in one session can never be confirmed from another.
+    """
+    with transaction.atomic():
+        pending = TOTPDevice.objects.select_for_update().filter(user=user, confirmed=False)
+        if pending_id is not None:
+            device = pending.filter(pk=pending_id).first()
+            if device is not None:
+                return device
+        pending.delete()
+        return TOTPDevice.objects.create(user=user, name="Authenticator app", confirmed=False)
 
 
 def confirm_totp_device(device: TOTPDevice, token: str, *, ctx: AuditContext) -> Enrolment:

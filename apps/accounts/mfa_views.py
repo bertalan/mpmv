@@ -29,6 +29,7 @@ from .models import PasskeyDevice, User
 
 REGISTRATION_CHALLENGE = "mfa_passkey_registration_challenge"
 AUTHENTICATION_CHALLENGE = "mfa_passkey_authentication_challenge"
+PENDING_TOTP_DEVICE = "mfa_pending_totp_device"  # the TOTP device this session is enrolling
 
 signed_in = login_required(login_url=settings.MFA_LOGIN_URL)
 
@@ -91,7 +92,11 @@ def totp(request: HttpRequest) -> HttpResponse:
         return mfa_redirect(request, "mfa:verify")
     user = _user(request)
     next_url = safe_next(request)
-    device = services.start_totp_enrolment(user)
+    pending_id = request.session.get(PENDING_TOTP_DEVICE)
+    device = services.start_totp_enrolment(
+        user, pending_id if isinstance(pending_id, int) else None
+    )
+    request.session[PENDING_TOTP_DEVICE] = device.pk
     error = ""
     if request.method == "POST":
         try:
@@ -101,6 +106,7 @@ def totp(request: HttpRequest) -> HttpResponse:
         except services.MfaError:
             error = "Invalid code. Check the time on your device and try again."
         else:
+            request.session.pop(PENDING_TOTP_DEVICE, None)
             complete_verification(request, enrolment.device)
             return render(
                 request,

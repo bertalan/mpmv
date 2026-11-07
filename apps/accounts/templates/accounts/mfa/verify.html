@@ -5,9 +5,9 @@
 {% if error %}<p role="alert">{{ error }}</p>{% endif %}
 
 {% if has_passkey %}
-<form method="post" data-passkey="authenticate" data-options-url="{{ auth_options_url }}" data-finish-url="{{ auth_url }}">
-  {% csrf_token %}
-  <button type="submit">Use a passkey</button>
+<form data-passkey="authenticate" data-csrf-token="{{ csrf_token }}" data-options-url="{{ auth_options_url }}" data-finish-url="{{ auth_url }}">
+  <button type="button" data-passkey-start>Use a passkey</button>
+  <noscript><p>Passkeys need JavaScript.</p></noscript>
   <p data-passkey-error role="alert" hidden></p>
 </form>
 {% include "accounts/mfa/_passkey_script.html" %}

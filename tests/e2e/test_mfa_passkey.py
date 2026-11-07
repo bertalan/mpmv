@@ -58,6 +58,7 @@ def test_staff_enrol_a_passkey_and_sign_in_with_it(
 
     admin_login(page, live_server.url, "staff@example.com", password)
     expect(page).to_have_url(re.compile(r"/account/mfa/setup/"))
+    expect(page.locator("form[data-passkey-ready]")).to_have_count(1)  # passkey.js is deferred
     page.get_by_role("button", name="Register a passkey").click()
     expect(page.locator("ol.recovery-codes li")).to_have_count(10)
     shot("passkey-registered")
@@ -70,6 +71,7 @@ def test_staff_enrol_a_passkey_and_sign_in_with_it(
     admin_login(page, live_server.url, "staff@example.com", password)
     expect(page).to_have_url(re.compile(r"/account/mfa/verify/"))
     shot("verify")
+    expect(page.locator("form[data-passkey-ready]")).to_have_count(1)
     page.get_by_role("button", name="Use a passkey").click()
     _logged_in(page)
     shot("signed-in-with-passkey")

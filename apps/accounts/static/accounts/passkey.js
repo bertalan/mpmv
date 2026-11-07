@@ -1,6 +1,8 @@
 // Passkey registration and authentication (CORE.4). Loaded as a static file under the strict
 // CSP: no inline code. Forms marked data-passkey="register|authenticate" carry the endpoint URLs
-// in data attributes; the server returns WebAuthn options as JSON with base64url byte fields.
+// and the CSRF token in data attributes; the server returns WebAuthn options as JSON with
+// base64url byte fields. The forms have no method and their buttons are type="button", so
+// nothing posts natively; once bound, a form gets data-passkey-ready.
 (() => {
   "use strict";
 
@@ -23,7 +25,7 @@
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
-        "X-CSRFToken": form.querySelector("input[name=csrfmiddlewaretoken]").value,
+        "X-CSRFToken": form.dataset.csrfToken,
       },
       body: JSON.stringify(body || {}),
     });
@@ -113,15 +115,25 @@
       error.hidden = false;
       continue;
     }
-    form.addEventListener("submit", async (event) => {
+    let running = false;
+    const start = async (event) => {
       event.preventDefault();
+      if (running) return;
+      running = true;
       error.hidden = true;
       try {
         await ceremonies[form.dataset.passkey](form);
       } catch (err) {
         error.textContent = err && err.message ? err.message : "The passkey did not work.";
         error.hidden = false;
+      } finally {
+        running = false;
       }
-    });
+    };
+    form.addEventListener("submit", start); // Enter in the name field
+    for (const button of form.querySelectorAll("[data-passkey-start]")) {
+      button.addEventListener("click", start);
+    }
+    form.dataset.passkeyReady = "1";
   }
 })();

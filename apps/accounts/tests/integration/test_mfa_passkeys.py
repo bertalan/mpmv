@@ -5,6 +5,7 @@ challenge kept in the session, py_webauthn verification, device storage and sess
 """
 
 import json
+import re
 from typing import Any
 
 import pytest
@@ -183,3 +184,34 @@ def test_passkey_endpoints_only_accept_post(client: Client) -> None:
         "mfa:passkey_auth",
     ):
         assert client.get(reverse(name)).status_code == 405
+
+
+PASSKEY_FORM_RE = re.compile(r"<form\b[^>]*\bdata-passkey=[^>]*>(.*?)</form>", re.DOTALL)
+
+
+@pytest.mark.parametrize(
+    ("name", "enrolled", "verified"),
+    [("mfa:setup", False, False), ("mfa:overview", True, True), ("mfa:verify", True, False)],
+)
+def test_passkey_forms_never_post_natively(
+    client: Client, name: str, enrolled: bool, verified: bool
+) -> None:
+    """The ceremony runs from passkey.js. A click before the script is ready (or without
+    JavaScript) must not POST to the page itself, which only accepts GET."""
+    user = UserFactory.create(staff=True)
+    if enrolled:
+        PasskeyDeviceFactory.create(user=user)
+    if verified:
+        verified_login(client, user)
+    else:
+        password_login(client, user)
+    content = client.get(reverse(name)).content.decode()
+    forms = [(match.group(0), match.group(1)) for match in PASSKEY_FORM_RE.finditer(content)]
+    assert forms
+    for form, body in forms:
+        opening = form.split(">", 1)[0]
+        assert 'method="post"' not in opening
+        assert "csrfmiddlewaretoken" not in body  # a native GET would put it in the URL
+        assert "data-csrf-token=" in opening
+        assert "<button" in body
+        assert all('type="button"' in button for button in re.findall(r"<button\b[^>]*>", body))

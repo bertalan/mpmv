@@ -48,6 +48,38 @@ def test_enrolment_shows_a_qr_code_and_the_secret_of_one_pending_device(
     assert TOTPDevice.objects.filter(user=staff).count() == 1
 
 
+def test_a_pending_secret_is_bound_to_the_session_that_started_the_enrolment(
+    client: Client, staff: User
+) -> None:
+    """Someone else holding the password must not be able to record a secret that the real
+    user later confirms without noticing."""
+    client.get(reverse("mfa:totp"))
+    attacker_device = TOTPDevice.objects.get(user=staff)
+    attacker_secret = engine.totp_secret(attacker_device.bin_key)
+
+    victim = Client()
+    password_login(victim, staff)
+    page = victim.get(reverse("mfa:totp")).content.decode()
+    assert attacker_secret not in page
+    assert not TOTPDevice.objects.filter(pk=attacker_device.pk).exists()
+
+    response = victim.post(reverse("mfa:totp"), {"token": totp_token(attacker_device)})
+    assert "Invalid code" in response.content.decode()
+    assert not TOTPDevice.objects.filter(user=staff, confirmed=True).exists()
+
+    stale = client.post(reverse("mfa:totp"), {"token": totp_token(attacker_device)})
+    assert "Invalid code" in stale.content.decode()
+    assert not TOTPDevice.objects.filter(user=staff, confirmed=True).exists()
+
+
+def test_an_unconfirmed_device_from_elsewhere_is_never_reused(client: Client, staff: User) -> None:
+    leftover = TOTPDeviceFactory.create(user=staff, confirmed=False)
+    page = client.get(reverse("mfa:totp")).content.decode()
+    assert engine.totp_secret(leftover.bin_key) not in page
+    assert not TOTPDevice.objects.filter(pk=leftover.pk).exists()
+    assert TOTPDevice.objects.filter(user=staff, confirmed=False).count() == 1
+
+
 def test_a_wrong_code_does_not_confirm_the_device(client: Client, staff: User) -> None:
     client.get(reverse("mfa:totp"))
     device = TOTPDevice.objects.get(user=staff)
