@@ -30,7 +30,7 @@ import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 from django.db import models
 from django.http.response import HttpResponseBase
@@ -371,6 +371,15 @@ def _assert_routes_to(endpoint: Endpoint, path: str) -> None:
     assert found == endpoint.key, f"{path} routes to {found}, not to {endpoint.key}"
 
 
+def echoed_in_path(marker: str, path: str) -> bool:
+    """`marker` is a whole segment of `path` (decoded): the caller sent it, so it may come back.
+
+    A marker that is only part of a segment (B's VAT number inside a longer code) was not sent
+    and must still be checked.
+    """
+    return bool(marker) and marker in {unquote(segment) for segment in path.split("/")}
+
+
 def _assert_no_markers(
     endpoint: Endpoint,
     response: HttpResponseBase,
@@ -387,7 +396,7 @@ def _assert_no_markers(
     """
     body = _body(response) if body is None else body
     for marker in tenants.markers(*objects):
-        if marker in known:
+        if echoed_in_path(marker, known):
             continue
         assert marker not in body, (
             f"{endpoint.key}: response shows another vendor's data ({marker})"

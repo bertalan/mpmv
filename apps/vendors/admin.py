@@ -35,7 +35,6 @@ from .models import (
 from .services import (
     change_status,
     check_contract_start,
-    current_contract,
     delete_requirement,
     delete_vendor,
     delete_vendor_flag,
@@ -212,14 +211,14 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         if obj is None or obj.pk is None:
             return "-"
         checklist = onboarding_checklist(obj)
-        contract = current_contract()
+        version = checklist.current_contract_version
         lines = []
         for item in checklist.items:
             if item.key == engine.CONTRACT:
                 text = (
                     "No contract in force"
-                    if contract is None
-                    else f"Contract version {contract.version}: "
+                    if version is None
+                    else f"Contract version {version}: "
                     + ("accepted" if item.done else "not accepted")
                 )
             else:

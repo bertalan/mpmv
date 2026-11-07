@@ -8,7 +8,7 @@ import pytest
 from django.core.exceptions import ValidationError
 from pytest_django.fixtures import Settings as SettingsWrapper
 
-from apps.core import flags
+from apps.core import flags, services
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog, FeatureFlag
 from apps.core.services import FLAG_CACHE, flag_enabled, save_flag
@@ -81,6 +81,12 @@ def test_an_unknown_name_is_an_error_not_a_silent_false() -> None:
         flag_enabled("chekout")
 
 
+def test_only_a_vendor_can_be_passed_as_the_vendor() -> None:
+    """Another model's primary key would silently pick up some vendor's override."""
+    with pytest.raises(TypeError, match=r"vendors\.vendor"):
+        flag_enabled(flags.CHECKOUT, vendor=kill_switch(flags.CHECKOUT))
+
+
 def test_pulling_a_kill_switch_is_audited_with_before_and_after() -> None:
     switch = kill_switch(flags.CHECKOUT)
     switch.state = flags.OFF
@@ -141,13 +147,26 @@ def test_with_a_cache_a_saved_change_is_seen_at_once_in_this_process(
     assert flag_enabled(flags.IMPORT) is False
 
 
+class FrozenClock:
+    """A monotonic clock that moves only when the test says so."""
+
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
 def test_with_a_cache_other_processes_see_a_change_after_the_ttl(
-    settings: SettingsWrapper,
+    settings: SettingsWrapper, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A change made elsewhere (another worker) is not seen before the TTL expires."""
+    """A change made elsewhere (another worker) is seen once the TTL has passed, not before."""
+    clock = FrozenClock()
+    monkeypatch.setattr(services, "FLAG_CACHE", flags.TtlCache(clock=clock))
     settings.FEATURE_FLAGS_CACHE_SECONDS = 60
-    assert flag_enabled(flags.IMPORT) is True
+    assert flag_enabled(flags.IMPORT) is True  # cached now
     FeatureFlag.objects.filter(name=flags.IMPORT).update(state=flags.OFF)
+    clock.now += 59.9
     assert flag_enabled(flags.IMPORT) is True  # still cached here
-    settings.FEATURE_FLAGS_CACHE_SECONDS = 0
+    clock.now += 0.1
     assert flag_enabled(flags.IMPORT) is False

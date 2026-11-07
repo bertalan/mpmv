@@ -6,6 +6,7 @@ the IT and DE homes are its translations (same `translation_key`), each with its
 
 import pytest
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.core.management.sql import emit_post_migrate_signal
 from django.test import override_settings
@@ -86,6 +87,17 @@ def test_seed_creates_a_header_and_a_footer_menu_per_language(seeded: SeedReport
         assert locations == {"header", "footer"}
 
 
+def test_seeded_menus_are_translations_of_the_primary_menus(seeded: SeedReport) -> None:
+    """Same `translation_key` per location, so editors see them as one menu in N languages."""
+    for location in NavigationMenu.Location.values:
+        menus = NavigationMenu.objects.filter(location=location)
+        assert {menu.locale.language_code for menu in menus} == set(_codes())
+        assert len({menu.translation_key for menu in menus}) == 1
+        primary = menus.get(locale=Locale.get_default())
+        it = Locale.objects.get(language_code="it")
+        assert primary.get_translation(it).location == location
+
+
 def test_seed_is_idempotent(seeded: SeedReport) -> None:
     assert seeded.created
     pages = Page.objects.count()
@@ -121,6 +133,24 @@ def test_home_pages_go_only_under_the_tree_root() -> None:
     assert not HomePage.can_create_at(home)
     assert StandardPage.can_create_at(home)
     assert not StandardPage.can_create_at(root)
+
+
+def test_a_language_has_one_home_page() -> None:
+    """A second root in the same language would never be served, only confuse editors."""
+    root = Page.get_first_root_node()
+    en = Locale.get_default()
+    with pytest.raises(ValidationError, match="already has a home page"):
+        root.add_child(instance=HomePage(title="Second home", slug="second-home", locale=en))
+    assert HomePage.objects.filter(locale=en).count() == 1
+
+
+def test_a_language_without_a_home_page_can_get_one() -> None:
+    root = Page.get_first_root_node()
+    it = Locale.objects.get(language_code="it")
+    home = root.add_child(instance=HomePage(title="Home", slug="home-it", locale=it))
+    home.title = "Pagina iniziale"
+    home.save()  # editing the one home of a language is fine
+    assert HomePage.objects.get(locale=it).title == "Pagina iniziale"
 
 
 def test_static_pages_can_nest() -> None:

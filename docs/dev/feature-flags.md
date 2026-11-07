@@ -15,19 +15,27 @@ if not flag_enabled(flags.CHECKOUT, vendor=vendor):
     raise CheckoutClosed  # the caller's own error and message
 ```
 
-`vendor` is optional. Leave it out for platform-wide features. A name nobody registered raises
+`vendor` is optional. Leave it out for platform-wide features. When given, it must be a
+`vendors.Vendor`; any other model raises `TypeError`. A name nobody registered raises
 `flags.UnknownFlag`, so a typo fails loudly and never reads as "off".
 
 ## Declaring a flag
 
 Flags are declared in code. The kill switches are in `apps/core/flags.py`. A new flag is
-registered once, at import time of the module that owns it, or in its `AppConfig.ready()`:
+registered once, while Django loads the apps: at import time of a module that app loading
+imports (the app's `models.py`, or a `flags.py` it imports), or in the app's
+`AppConfig.ready()`:
 
 ```python
 BETA_SEARCH = flags.register(
     flags.FlagSpec("beta_search", "Search with typo tolerance.", default=False)
 ).name
 ```
+
+Registering in a module that is imported only on first use (a view, a task) is not enough: a
+process that has not imported it yet treats the flag as unknown, and the admin does not offer
+it. `manage.py check` fails with `core.E402` when a flag was registered after the apps loaded
+(for example by a views module imported while the URLconf is checked).
 
 Names are lowercase identifiers, at most 64 characters. A kill switch is a flag with
 `default=True, kill_switch=True` that is turned off to stop something in an emergency.
@@ -45,7 +53,8 @@ Each step overrides the previous one when it says something:
 
 One exception for kill switches: a vendor override can turn one off for that vendor, but it
 never turns it back on when the platform value is off. When staff pull a kill switch, the feature
-stops for every vendor.
+stops for every vendor. An override that turns a kill switch on would never change anything,
+so it is refused.
 
 `manage.py check` fails with `core.E401` when `MPMV_FEATURE_FLAGS` names a flag that is not
 registered, so a misspelled kill switch is caught at start-up.

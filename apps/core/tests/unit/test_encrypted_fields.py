@@ -104,6 +104,49 @@ def test_empty_and_null_lookups_are_allowed() -> None:
 
 
 @isolate_apps("apps.core")
+@pytest.mark.parametrize("ordering", ["account", "-notes", "pk"])
+def test_ordering_by_an_encrypted_field_is_refused(ordering: str) -> None:
+    model = secret_model()
+    query = model.objects.order_by("pk", ordering).query
+    if ordering == "pk":
+        assert "ORDER BY" in str(query)
+        return
+    with pytest.raises(FieldError, match="encrypted"):
+        str(query)  # the ciphertext order is random: sorting by it would mislead
+
+
+@isolate_apps("apps.core")
+def test_an_encrypted_field_in_the_default_ordering_is_refused() -> None:
+    class Sorted(models.Model):  # noqa: DJ008
+        account = EncryptedCharField(max_length=34, blank=True)
+
+        class Meta:
+            app_label = "core"
+            ordering = ["account"]
+
+    with pytest.raises(FieldError, match="encrypted"):
+        str(Sorted._default_manager.all().query)
+
+
+@isolate_apps("apps.core")
+def test_empty_and_null_lookups_still_work_in_a_subquery() -> None:
+    model = secret_model()
+    inner = model.objects.filter(account="", notes__isnull=True).values("pk")
+    sql = str(model.objects.filter(models.Exists(inner)).query)
+    assert "EXISTS" in sql
+    assert "IS NULL" in sql
+    sql = str(model.objects.filter(pk__in=inner).query)
+    assert "IN (SELECT" in sql
+
+
+@isolate_apps("apps.core")
+def test_selecting_an_encrypted_field_still_works() -> None:
+    model = secret_model()
+    assert "account" in str(model.objects.values("account").query)
+    assert "account" in str(model.objects.only("account").query)
+
+
+@isolate_apps("apps.core")
 def test_the_field_deconstructs_for_migrations() -> None:
     field = secret_model()._meta.get_field("account")
     _, path, _, kwargs = field.deconstruct()

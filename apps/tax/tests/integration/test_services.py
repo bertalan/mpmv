@@ -11,7 +11,13 @@ from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 from apps.core.tests.factories import utc
 from apps.tax import engine, services
-from apps.tax.models import TaxRate, Territory, VatValidation, VendorTaxProfile
+from apps.tax.models import (
+    TaxRate,
+    Territory,
+    VatValidation,
+    VendorTaxProfile,
+    VendorTaxProfileTranslation,
+)
 from apps.tax.tests.factories import (
     TaxRateFactory,
     TerritoryFactory,
@@ -201,6 +207,16 @@ def test_a_profile_inconsistent_with_the_fiscal_regime_is_refused() -> None:
     assert VendorTaxProfile.objects.count() == 0
 
 
+def test_an_oss_registration_date_on_another_regime_is_refused() -> None:
+    profile = VendorTaxProfileFactory.build(
+        vendor=VendorFactory.create(), oss_registered_since=dt.date(2026, 7, 1)
+    )
+    with pytest.raises(ValidationError) as exc:
+        services.configure_vendor_tax_profile(profile, ctx=CTX)
+    assert "oss_registered_since" in exc.value.message_dict
+    assert VendorTaxProfile.objects.count() == 0
+
+
 def test_a_profile_change_dry_run_writes_nothing() -> None:
     changeset = services.configure_vendor_tax_profile(
         VendorTaxProfileFactory.build(vendor=VendorFactory.create()), ctx=CTX, dry_run=True
@@ -219,6 +235,50 @@ def test_legal_notes_are_saved_with_an_audit_entry_under_the_vendor() -> None:
     assert entry.vendor_key == str(profile.vendor.public_id)
     assert entry.after is not None
     assert entry.after["legal_note"] == note.legal_note
+
+
+def ended_profile() -> VendorTaxProfile:
+    profile: VendorTaxProfile = VendorTaxProfileFactory.create(
+        art74=True, valid_from=utc(2025), valid_to=utc(2026)
+    )
+    return profile
+
+
+def test_a_legal_note_of_an_ended_profile_cannot_be_changed() -> None:
+    note = VendorTaxProfileTranslationFactory.create(profile=ended_profile(), language="it")
+    note.legal_note = "Rewritten history."
+    with pytest.raises(ValidationError) as exc:
+        services.save_legal_note(note, ctx=CTX)
+    assert "profile" in exc.value.message_dict
+    assert VendorTaxProfileTranslation.objects.get(pk=note.pk).legal_note != "Rewritten history."
+    assert AuditLog.objects.count() == 0
+
+
+def test_a_legal_note_cannot_be_added_to_an_ended_profile() -> None:
+    note = VendorTaxProfileTranslationFactory.build(profile=ended_profile(), language="it")
+    with pytest.raises(ValidationError):
+        services.save_legal_note(note, ctx=CTX)
+    assert VendorTaxProfileTranslation.objects.count() == 0
+
+
+def test_a_legal_note_of_a_profile_that_ends_later_can_still_be_changed() -> None:
+    profile = VendorTaxProfileFactory.create(
+        art74=True, valid_from=utc(2025), valid_to=timezone.now() + dt.timedelta(days=30)
+    )
+    note = VendorTaxProfileTranslationFactory.create(profile=profile, language="it")
+    note.legal_note = "Corrected wording."
+    services.save_legal_note(note, ctx=CTX)
+    assert VendorTaxProfileTranslation.objects.get(pk=note.pk).legal_note == "Corrected wording."
+
+
+def test_a_legal_note_stays_with_its_profile() -> None:
+    note = VendorTaxProfileTranslationFactory.create(language="it")
+    original = note.profile
+    note.profile = VendorTaxProfileFactory.create(art74=True)
+    with pytest.raises(ValidationError) as exc:
+        services.save_legal_note(note, ctx=CTX)
+    assert "profile" in exc.value.message_dict
+    assert VendorTaxProfileTranslation.objects.get(pk=note.pk).profile == original
 
 
 # --- VIES result cache

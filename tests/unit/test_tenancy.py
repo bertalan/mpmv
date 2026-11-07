@@ -5,7 +5,14 @@ import uuid
 import pytest
 
 from apps.vendors.models import Vendor, VendorMember, VendorTranslation
-from tests.tenancy import Endpoint, NoVendorData, StaffOnly, endpoints, openapi_path
+from tests.tenancy import (
+    Endpoint,
+    NoVendorData,
+    StaffOnly,
+    echoed_in_path,
+    endpoints,
+    openapi_path,
+)
 from tests.tenancy_registry import classify
 
 URLCONF = "tests.unit.tenancy_urls"
@@ -52,6 +59,18 @@ def test_a_missing_parameter_is_an_error() -> None:
 def test_openapi_paths_come_from_routes() -> None:
     assert openapi_path("api/v1/me") == "/api/v1/me"
     assert openapi_path("api/v1/products/<str:sku>/variants") == "/api/v1/products/{sku}/variants"
+
+
+def test_only_a_whole_path_segment_counts_as_echoed() -> None:
+    item = str(uuid.UUID(int=7))
+    path = f"/shop/items/{item}/"
+    assert echoed_in_path(item, path)
+    assert echoed_in_path("Vendor B S.r.l.", "/shop/pages/Vendor%20B%20S.r.l./")
+    # A marker that is only part of a segment was not sent by the caller: it must be checked.
+    assert not echoed_in_path("items", "/shop/itemsx/")
+    assert not echoed_in_path("IT1", f"/shop/IT12345678901/{item}/")
+    assert not echoed_in_path(item[:8], path)
+    assert not echoed_in_path("", path)
 
 
 # --- The project registry

@@ -35,11 +35,25 @@ def test_the_snapshot_never_holds_an_encrypted_value_in_clear() -> None:
     assert vendor.tax_code not in str(snapshot)
 
 
-def test_mask_tax_code_keeps_the_last_four_characters() -> None:
+def test_mask_tax_code_keeps_the_last_four_characters_of_a_long_code() -> None:
     assert engine.mask_tax_code("RSSMRA85T10A562S") == "*" * 12 + "562S"
-    assert engine.mask_tax_code("12-3456789") == "******6789"
-    assert engine.mask_tax_code("1234") == "****"
+    assert engine.mask_tax_code("123456789012") == "********9012"
     assert engine.mask_tax_code("") == ""
+
+
+@pytest.mark.parametrize(
+    ("tax_code", "masked"),
+    [
+        ("12-3456789", "*******789"),  # a 9-digit TIN: four would show almost half of it
+        ("123456", "****56"),
+        ("1234", "***4"),
+        ("12", "**"),
+    ],
+)
+def test_mask_tax_code_shows_at_most_a_third_of_a_short_code(tax_code: str, masked: str) -> None:
+    assert engine.mask_tax_code(tax_code) == masked
+    shown = len(masked.lstrip("*"))
+    assert shown * 3 <= len(tax_code)
 
 
 def test_encrypted_vendor_fields_cannot_be_searched() -> None:
