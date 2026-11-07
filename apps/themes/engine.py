@@ -25,11 +25,19 @@ MANIFEST_FILE = "theme.toml"
 MISSING_BASE = f"themes/{BASE_THEME}: the {BASE_THEME!r} theme is missing or invalid"
 
 # The Wagtail admin and the Django admin are never themed (spec 14 §14.3): a theme cannot
-# override a template under these prefixes, whatever it ships.
+# override a template under these prefixes, nor any template in a directory whose name starts
+# with "admin" (`accounts/admin/login.html`, the admin's login_template; `otp/admin111/`;
+# `procrastinate/admin/`), whatever it ships.
 UNTHEMED_PREFIXES = (
     "admin/",
     "registration/",
+    "otp/",  # django-otp: admin login and device admin only
+    "otp_hotp/",
+    "otp_static/",
+    "otp_totp/",
+    "procrastinate/",  # job admin
     "wagtailadmin/",
+    "wagtailcore/shared/",  # StreamField block previews, rendered inside the editor
     "wagtaildocs/",
     "wagtailimages/",
     "wagtaillocales/",
@@ -39,6 +47,7 @@ UNTHEMED_PREFIXES = (
     "wagtailsnippets/",
     "wagtailusers/",
 )
+UNTHEMED_DIRECTORY_PREFIX = "admin"
 
 _REQUIRED = ("slug", "name", "version")
 _OPTIONAL = ("parent", "description", "direction")
@@ -179,7 +188,10 @@ def is_themable(name: str) -> bool:
     """Whether a theme may provide template `name`: a safe relative path outside the admins."""
     if not name or name.startswith(("/", "\\")) or "\\" in name:
         return False
-    if any(part in ("", ".", "..") for part in name.split("/")):
+    parts = name.split("/")
+    if any(part in ("", ".", "..") for part in parts):
+        return False
+    if any(part.startswith(UNTHEMED_DIRECTORY_PREFIX) for part in parts[:-1]):
         return False
     return not name.startswith(UNTHEMED_PREFIXES)
 

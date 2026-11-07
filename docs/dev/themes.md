@@ -54,11 +54,14 @@ A template name is looked up in the active theme, then each parent up to `base`,
 the same relative path under `themes/<slug>/templates/`. A theme template may extend its own name
 (`{% extends "cms/home_page.html" %}`) to wrap the parent's version.
 
-`ThemeLoader` caches compiled templates per `(theme, name)` and clears the cache on the dev
-autoreload. Never wrap it in Django's `cached.Loader`: that cache is keyed by name only and would
-serve one site's theme to another. The Wagtail and Django admin templates (`admin/`,
-`wagtailadmin/`, the other `wagtail*/` admin prefixes in `engine.UNTHEMED_PREFIXES`) are never
-themed.
+`ThemeLoader` caches compiled templates per `(theme, name)`. Its `get_dirs()` returns the themes
+directory, so the dev autoreloader watches it and clears the cache when a theme template
+changes. Never wrap it in Django's `cached.Loader`: that cache is keyed by name only and would
+serve one site's theme to another. The Wagtail and Django admin templates are never themed: the
+prefixes in `engine.UNTHEMED_PREFIXES` (`admin/`, `wagtailadmin/` and the other Wagtail admin
+apps, `wagtailcore/shared/`, `otp*/`, `procrastinate/`) and any template in a directory whose
+name starts with `admin` (`accounts/admin/login.html`, the Django admin's login page). Do not put
+public templates in such a directory.
 
 Outside a request (emails, management commands) templates render with `MPMV_THEME_DEFAULT`.
 Use `with use_theme("ride"):` to render with another theme, for example in a test.
