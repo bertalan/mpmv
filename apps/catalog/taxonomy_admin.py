@@ -74,9 +74,40 @@ class TreeNodeForm(MoveNodeForm):  # type: ignore[misc]  # treebeard is untyped
 
 
 class TermForm(TreeNodeForm):
+    """The root terms of every taxonomy are siblings in one forest, so a term's place is read and
+    set among the roots of its own taxonomy: "-- root --" means its first root, not the forest's.
+    """
+
     class Meta:
         model = Term
         fields = ("taxonomy", "attributes")
+
+    def _get_initial(self, instance: Term) -> dict[str, Any]:
+        if instance._state.adding or not instance.is_root():
+            initial: dict[str, Any] = super()._get_initial(instance)
+            return initial  # a child's siblings and parent are in its taxonomy
+        previous = self._taxonomy_roots(instance).filter(path__lt=instance.path).last()
+        if previous is None:
+            return {"treebeard_ref_node": None, "treebeard_position": "first-child"}
+        return {"treebeard_ref_node": previous, "treebeard_position": "right"}
+
+    @staticmethod
+    def _taxonomy_roots(term: Term) -> "models.QuerySet[Term]":
+        roots: models.QuerySet[Term] = Term.get_root_nodes()  # treebeard is untyped
+        return roots.filter(taxonomy_id=term.taxonomy_id)
+
+    def save(self, commit: bool = True) -> Any:
+        moved = set(self.changed_data) & set(TREE_FIELDS)
+        if self.instance._state.adding or not moved or self.cleaned_data.get("treebeard_ref_node"):
+            return super().save(commit=commit)
+        # To the front of its taxonomy (treebeard would move it to the front of the forest).
+        del self.cleaned_data["treebeard_ref_node"], self.cleaned_data["treebeard_position"]
+        self.instance.save()
+        first = self._taxonomy_roots(self.instance).first()
+        if first is not None and first.pk != self.instance.pk:
+            self.instance.move(first, "left")
+            self.instance.refresh_from_db()
+        return forms.ModelForm.save(self, commit=commit)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

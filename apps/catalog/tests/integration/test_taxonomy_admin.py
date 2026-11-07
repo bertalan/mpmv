@@ -3,6 +3,7 @@ configurable taxonomies and their terms, and brands, with their texts in every l
 link products to them."""
 
 from collections.abc import Callable
+from html.parser import HTMLParser
 from typing import Any
 
 import pytest
@@ -378,6 +379,77 @@ def test_change_a_term_keeps_its_taxonomy(staff_client: Client) -> None:
     changed = Term.objects.get(pk=term.pk)
     assert changed.taxonomy == term.taxonomy
     assert changed.translations.get().name == "Summer time"
+
+
+class SelectedOptions(HTMLParser):
+    """The value a browser submits for each `<select>`: its selected option, else its first."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.first: dict[str, str] = {}
+        self.selected: dict[str, str] = {}
+        self._select: str | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attributes = dict(attrs)
+        if tag == "select":
+            self._select = attributes.get("name")
+        elif tag == "option" and self._select is not None:
+            value = attributes.get("value") or ""
+            self.first.setdefault(self._select, value)
+            if "selected" in attributes:
+                self.selected[self._select] = value
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "select":
+            self._select = None
+
+    def submitted(self, name: str) -> str:
+        return self.selected.get(name, self.first[name])
+
+
+def rendered_placement(response: Any) -> dict[str, str]:
+    """The placement a browser posts back from a change form left untouched."""
+    parser = SelectedOptions()
+    parser.feed(response.content.decode())
+    return {name: parser.submitted(name) for name in ("treebeard_position", "treebeard_ref_node")}
+
+
+def term_of(taxonomy: Taxonomy, name: str) -> tuple[Term, TermTranslation]:
+    term = TermFactory.create(taxonomy=taxonomy)
+    return term, TermTranslationFactory.create(term=term, name=name, slug=name.lower())
+
+
+def test_saving_a_root_term_unchanged_keeps_its_place(staff_client: Client) -> None:
+    occasion = TaxonomyFactory.create(code="occasion")
+    season = TaxonomyFactory.create(code="season")
+    o1, _ = term_of(occasion, "O1")
+    s1, _ = term_of(season, "S1")
+    o2, english = term_of(occasion, "O2")  # roots: O1, S1, O2
+    url = reverse("admin:catalog_term_change", args=[o2.pk])
+    form = staff_client.get(url)
+    assert form.status_code == 200
+    data = term_form(None, **rendered_placement(form))
+    data.update(
+        translation_rows([{**texts("en", "O2 renamed", "o2"), "id": str(english.pk)}], initial=1)
+    )
+    response = staff_client.post(url, data)
+    assert response.status_code == 302, errors_of(response)
+    assert list(Term.get_root_nodes()) == [o1, s1, o2]
+    assert list(Term.get_root_nodes().filter(taxonomy=occasion)) == [o1, o2]
+    assert Term.objects.get(pk=o2.pk).translations.get().name == "O2 renamed"
+
+
+def test_the_root_option_moves_a_term_first_within_its_taxonomy(staff_client: Client) -> None:
+    occasion = TaxonomyFactory.create(code="occasion")
+    s1, _ = term_of(TaxonomyFactory.create(code="season"), "S1")
+    o1, _ = term_of(occasion, "O1")
+    o2, english = term_of(occasion, "O2")  # roots: S1, O1, O2
+    data = term_form(None, **placement())
+    data.update(translation_rows([{**texts("en", "O2", "o2"), "id": str(english.pk)}], initial=1))
+    response = staff_client.post(reverse("admin:catalog_term_change", args=[o2.pk]), data)
+    assert response.status_code == 302, errors_of(response)
+    assert list(Term.get_root_nodes()) == [s1, o2, o1]  # the season terms are not passed over
 
 
 def test_term_changelist_filters_by_taxonomy(staff_client: Client) -> None:
