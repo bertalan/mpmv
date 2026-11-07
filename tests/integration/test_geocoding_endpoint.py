@@ -4,13 +4,13 @@ per-user limit. The chain is made of `FakeGeocoder`s: no test reaches the networ
 from typing import Any
 
 import pytest
-from apps.core.geocoding import services as geo
-from apps.core.geocoding.fakes import FakeGeocoder, fake_result
 from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
+from apps.core.geocoding import services as geo
+from apps.core.geocoding.fakes import FakeGeocoder, fake_result
 from apps.vendors.tests.factories import VendorMemberFactory
 
 pytestmark = pytest.mark.django_db
