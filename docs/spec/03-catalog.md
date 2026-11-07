@@ -141,7 +141,8 @@ def images_for_language(images: list[ImageRow], lang: str) -> list[ImageRow]
 
 Category URLs **stay identical** to the current ones. Product slugs no longer carry the SKU
 (owner decision on the vendor SKU, Q-30 and Q-33): every current `{title}-{lang}-{sku}` slug is
-loaded into `SlugHistory` and answers with a 301 to the new slug (CAT.5, MIG.6). The `/tag-product/{slug}/` and
+loaded into `SlugHistory` and answers with a single 301 to the new slug (CAT.5, MIG.6, owner
+decision Q-91; map, checks and accepted ranking risk in [13](13-migration-cutover.md)). The `/tag-product/{slug}/` and
 `/it/tag-product-it/{slug}-it/` tags are redirected with a 301 to the new taxonomy pages (proposed default of the open decision D-07).
 
 ### Rules
