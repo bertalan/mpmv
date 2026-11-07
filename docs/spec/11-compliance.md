@@ -94,7 +94,7 @@ class GpsrInfo(Model):
 ### CMP.4 — Operational GDPR `[P1]`
 - Customer data export (JSON/PDF) and erasure as **anonymization** (orders are kept
   for accounting obligations).
-- Record of processing activities and sub-processors (Stripe, carriers, email provider, AI provider, hosting),
+- Record of processing activities and sub-processors (Stripe, carriers, email provider, AI provider, hosting, geocoding providers and map tile upstream of [15](15-events.md)),
   retention per data type, DPA.
 - No tracking pixels in emails without consent (Garante privacy, provision 284 of 2026-04-17,
   compliance from about 2026-10-29): transactional and service emails (ARC.16, CMP.10 reminders)
@@ -108,7 +108,8 @@ class GpsrInfo(Model):
   terms with the content moderation rules (article 14), a form for reporting illegal content and
   unsafe products (notice and action, article 16) with tracking, a statement of reasons to the
   vendor for every restriction (article 17), and notification of suspected criminal offences
-  (article 18).
+  (article 18). Notices can target products, vendor storefronts and event pages; hiding an event
+  after a notice unpublishes it through the events service ([15](15-events.md), EVT.11).
 - Micro and small platforms are exempt from DSA articles 19–32 (articles 19 and 29) and from the
   transparency report (article 15(2)), until 12 months after they stop being small. The marketplace
   duties of articles 30–32 are still built at go-live (CMP.11), because GPSR article 22 and the
