@@ -1,4 +1,7 @@
-"""VEN.1: pure vendor rules — status state machine, slug generation, address shape."""
+"""VEN.1: pure vendor rules — status state machine and slug generation.
+
+The registered address is structured fields since VEN.12 (test_engine_legal_identity.py).
+"""
 
 import pytest
 
@@ -11,7 +14,6 @@ from apps.vendors.engine import (
     STATUSES,
     SUSPENDED,
     InvalidTransition,
-    address_errors,
     allowed_transitions,
     check_transition,
     unique_slug,
@@ -105,37 +107,3 @@ def test_slug_respects_the_maximum_length_including_the_suffix() -> None:
     second = unique_slug(name, taken={first}, max_length=20)
     assert second == "x" * 18 + "-2"
     assert len(second) == 20
-
-
-# --- Registered address (structured JSON)
-
-
-def test_a_complete_address_is_valid() -> None:
-    address = {
-        "line1": "Via Example 1",
-        "line2": "",
-        "postal_code": "00100",
-        "city": "Rome",
-        "region": "RM",
-        "country": "IT",
-    }
-    assert address_errors(address) == []
-
-
-def test_an_empty_address_is_valid() -> None:
-    assert address_errors({}) == []
-
-
-def test_address_must_be_an_object() -> None:
-    assert address_errors(["Via Example 1"]) == ["The address must be an object."]
-
-
-def test_address_refuses_unknown_keys_and_non_string_values() -> None:
-    errors = address_errors({"street": "Via Example 1", "city": 42})
-    assert "Unknown address field: street." in errors
-    assert "Address field city must be text." in errors
-
-
-def test_address_country_must_be_iso_3166() -> None:
-    assert address_errors({"country": "XX"}) == ["Address country: 'XX' is not an ISO code."]
-    assert address_errors({"country": "IT"}) == []

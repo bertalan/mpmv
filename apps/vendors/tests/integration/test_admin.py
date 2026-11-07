@@ -50,9 +50,12 @@ def vendor_form(**overrides: Any) -> dict[str, Any]:
         "display_name": "Vendor B Mountain Shop",
         "slug": "",
         "country": "it",
-        "vat_number": "IT00000000000",
+        "vat_number": "IT01234567897",
         "tax_code": "",
-        "registered_address": '{"line1": "Via Example 1", "city": "Rome", "country": "IT"}',
+        "registered_street": "Via Example",
+        "registered_street_number": "1",
+        "registered_city": "Rome",
+        "registered_country": "IT",
         "contact_email": "vendor-b@example.com",
         "phone": "",
         "sales_mode_default": "buy",
@@ -107,7 +110,7 @@ def test_add_vendor_with_translations(staff_client: Client) -> None:
     assert vendor.slug == "vendor-b-mountain-shop"
     assert vendor.status == Vendor.Status.APPLICANT
     assert vendor.country == "IT"
-    assert vendor.registered_address["city"] == "Rome"
+    assert vendor.registered_city == "Rome"
     assert vendor.translations.get(language="en").refund_policy == "Refunds within 14 days."
     assert vendor.translations.get(language="it").tagline == "Attrezzatura outdoor"
 
@@ -122,42 +125,26 @@ def test_add_vendor_rejects_duplicate_translation_languages(staff_client: Client
     assert VendorTranslation.objects.count() == 0
 
 
-def test_add_vendor_rejects_an_invalid_address(staff_client: Client) -> None:
-    data = vendor_form(registered_address='{"street": "Via Example 1"}')
+def test_add_vendor_rejects_an_invalid_italian_address(staff_client: Client) -> None:
+    data = vendor_form(registered_postal_code="0010", registered_province="Lazio")
     data.update(management_form(0))
     response = staff_client.post(reverse("admin:vendors_vendor_add"), data)
     assert response.status_code == 200
-    assert "Unknown address field: street." in response.content.decode()
+    content = response.content.decode()
+    assert "An Italian postal code (CAP) has 5 digits." in content
+    assert "is not an Italian province code" in content
     assert Vendor.objects.count() == 0
 
 
-def test_add_vendor_with_an_empty_address_stores_an_empty_object(staff_client: Client) -> None:
-    data = vendor_form(registered_address="")
+def test_add_vendor_with_no_address_saves_empty_fields(staff_client: Client) -> None:
+    data = vendor_form(
+        registered_street="", registered_street_number="", registered_city="", registered_country=""
+    )
     data.update(management_form(0))
     response = staff_client.post(reverse("admin:vendors_vendor_add"), data)
     assert response.status_code == 302, response.content.decode()
-    assert Vendor.objects.get().registered_address == {}
-
-
-def test_clearing_the_address_of_an_existing_vendor_stores_an_empty_object(
-    staff_client: Client,
-) -> None:
-    vendor = VendorFactory.create(
-        display_name="Vendor A",
-        contact_email="vendor-a@example.com",
-        registered_address={"city": "Rome"},
-    )
-    data = vendor_form(
-        display_name="Vendor A",
-        slug="vendor-a",
-        contact_email="vendor-a@example.com",
-        registered_address="",
-    )
-    data.update(management_form(0))
-    response = staff_client.post(reverse("admin:vendors_vendor_change", args=[vendor.pk]), data)
-    assert response.status_code == 302, response.content.decode()
-    vendor.refresh_from_db()
-    assert vendor.registered_address == {}
+    vendor = Vendor.objects.get()
+    assert (vendor.registered_street, vendor.registered_city) == ("", "")
 
 
 def test_change_vendor_does_not_let_staff_edit_the_status_directly(staff_client: Client) -> None:

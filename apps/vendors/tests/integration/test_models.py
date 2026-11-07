@@ -22,7 +22,10 @@ def test_new_vendor_defaults() -> None:
     assert vendor.sales_mode_default == Vendor.SalesMode.BUY
     assert vendor.enquiries_enabled is False
     assert vendor.legacy_wp_user_id is None
-    assert vendor.registered_address == {}
+    assert vendor.registered_street == ""
+    assert vendor.legal_form == ""
+    assert vendor.vies_status == Vendor.ViesStatus.UNCHECKED
+    assert vendor.share_capital is None
     assert vendor.public_id is not None
     assert str(vendor) == "Vendor A"
 
@@ -79,10 +82,10 @@ def test_country_is_normalized_to_iso_alpha2() -> None:
 
 
 def test_invalid_registered_address_fails_validation() -> None:
-    vendor = VendorFactory.build(registered_address={"street": "Via Example 1"})
+    vendor = VendorFactory.build(registered_country="XX")
     with pytest.raises(ValidationError) as excinfo:
         vendor.full_clean()
-    assert "registered_address" in excinfo.value.message_dict
+    assert "registered_country" in excinfo.value.message_dict
 
 
 def test_legacy_wp_user_id_is_optional_but_unique() -> None:
