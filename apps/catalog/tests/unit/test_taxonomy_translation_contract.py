@@ -4,6 +4,8 @@ Content is English only at go-live, but every table already holds one row per la
 language is new rows, not a migration.
 """
 
+from typing import Any
+
 import pytest
 
 from apps.catalog.models import (
@@ -47,7 +49,7 @@ def test_translation_tables_follow_the_translation_contract(
 
 @pytest.mark.parametrize("model", [c[0] for c in CONTRACTS], ids=lambda m: m.__name__)
 def test_the_slug_is_a_url_key_per_language_not_a_translated_text(
-    model: type[TranslationModel],
+    model: Any,
 ) -> None:
     # Editing the EN slug must not send the other languages back to review.
     assert "slug" not in model.translated_fields

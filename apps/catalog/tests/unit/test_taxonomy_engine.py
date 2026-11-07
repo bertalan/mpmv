@@ -4,6 +4,8 @@ Taxonomies are data: their terms' extra fields are declared by the taxonomy (`te
 and validated here, without the database.
 """
 
+from typing import Any
+
 import pytest
 
 from apps.catalog import engine
@@ -79,7 +81,7 @@ def test_malformed_schemas_are_rejected(schema: object, message: str) -> None:
     assert any(message in error for error in errors), errors
 
 
-SCHEMA = [
+SCHEMA: list[dict[str, Any]] = [
     {"code": "model_year", "kind": "number", "required": True},
     {"code": "maker", "kind": "text"},
     {"code": "discontinued", "kind": "boolean"},

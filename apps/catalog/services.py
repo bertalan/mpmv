@@ -1,4 +1,4 @@
-"""Catalog services: audited price changes (CAT.1).
+"""Catalog services: audited price changes (CAT.1) and taxonomy queries (CAT.2).
 
 Every price change goes through here, whatever the adapter (admin, API, import, MCP): it is
 validated, returned as a ChangeSet (dry-run) and written to the audit log. The 30-day price
@@ -10,13 +10,14 @@ from typing import Any
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q, QuerySet
 
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.services import run_mutation
 
 from . import engine
-from .models import Product, Variant
+from .models import Category, Product, Term, Variant
 
 PRODUCT_MODEL = "catalog.product"
 VARIANT_MODEL = "catalog.variant"
@@ -130,3 +131,29 @@ def set_variant_price(
     if not dry_run:
         variant.price_net_override = prices["price_net_override"]
     return changes
+
+
+# --- Taxonomies (CAT.2): a lower level implies the upper ones (spec 03 §3.2).
+
+
+def effective_terms(product: Product) -> "QuerySet[Term]":
+    """The product's terms with all their ancestors: tagging a model implies its maker."""
+    paths: set[str] = set()
+    for path in product.terms.values_list("path", flat=True):
+        paths.update((path, *engine.ancestor_paths(path, Term.steplen)))
+    return Term.objects.filter(path__in=paths)
+
+
+def products_with_term(term: Term) -> "QuerySet[Product]":
+    """Products tagged with `term` or any term below it."""
+    return Product.objects.filter(terms__path__startswith=term.path).distinct()
+
+
+def products_in_category(
+    category: Category, *, include_secondary: bool = True
+) -> "QuerySet[Product]":
+    """Products whose main category, or optionally a secondary one, is in `category`'s subtree."""
+    in_tree = Q(category__path__startswith=category.path)
+    if include_secondary:
+        in_tree |= Q(secondary_categories__path__startswith=category.path)
+    return Product.objects.filter(in_tree).distinct()
