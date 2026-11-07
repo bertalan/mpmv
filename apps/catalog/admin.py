@@ -195,8 +195,14 @@ class ProductAdmin(admin.ModelAdmin[Product]):
     ) -> None:
         ctx = audit_context(request)
         new_prices = take_price_change(obj, form.changed_data, PRODUCT_PRICE_FIELDS)
+        # A sales mode that needs a price (Q-31) is checked against the stored one: a new price
+        # goes in before the product is saved (on request -> buy with a first price), a cleared
+        # price after it (buy -> on request without a price).
+        price_first = new_prices is not None and new_prices["price_net"] is not None
+        if new_prices is not None and price_first:
+            set_product_price(obj, **new_prices, ctx=ctx)
         save_product(obj, ctx=ctx)
-        if new_prices is not None:
+        if new_prices is not None and not price_first:
             set_product_price(obj, **new_prices, ctx=ctx)
 
     def save_related(self, request: HttpRequest, form: Any, formsets: Any, change: bool) -> None:
