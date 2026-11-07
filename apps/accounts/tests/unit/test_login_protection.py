@@ -64,7 +64,7 @@ def test_captcha_is_enabled_only_explicitly_and_then_allowed_by_csp(
     monkeypatch: pytest.MonkeyPatch, flag: str, enabled: bool
 ) -> None:
     monkeypatch.setenv("MPMV_CAPTCHA_ENABLED", flag)
-    settings = runpy.run_module("mpmv.settings.test")
+    settings = runpy.run_module("mpmv.settings.base")  # re-read: the cached module is not
     assert settings["CAPTCHA_ENABLED"] is enabled
     csp = settings["SECURE_CSP"]
     origin = "https://challenges.cloudflare.com"
@@ -73,7 +73,7 @@ def test_captcha_is_enabled_only_explicitly_and_then_allowed_by_csp(
 
 
 def test_the_lockout_backend_runs_before_any_password_check() -> None:
-    settings = runpy.run_module("mpmv.settings.test")
+    settings = runpy.run_module("mpmv.settings.base")
     backends = settings["AUTHENTICATION_BACKENDS"]
     assert backends[0] == "apps.accounts.backends.LoginProtectionBackend"
     assert "django.contrib.auth.backends.ModelBackend" in backends

@@ -195,6 +195,7 @@ def test_a_lockout_is_audited_once_with_the_ip(client: Client, staff: User) -> N
     assert entry.target_key == f"login:account:{staff.email}"
     assert entry.ip == IP
     assert entry.source == AuditLog.Source.SYSTEM
+    assert entry.after is not None
     assert entry.after["failures"] == ACCOUNT_LOCKOUT.free_attempts
     assert entry.after["locked_until"]
 
