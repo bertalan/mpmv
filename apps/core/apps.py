@@ -21,6 +21,8 @@ class CoreConfig(AppConfig):
         from .checks import (
             check_audit_policy,
             check_client_ip_settings,
+            check_encrypted_data,
+            check_field_encryption_keys,
             check_trusted_proxy_for_deploy,
             translation_models,
         )
@@ -29,3 +31,5 @@ class CoreConfig(AppConfig):
         checks.register(check_audit_policy, checks.Tags.security)
         checks.register(check_client_ip_settings, checks.Tags.security)
         checks.register(check_trusted_proxy_for_deploy, checks.Tags.security, deploy=True)
+        checks.register(check_field_encryption_keys, checks.Tags.security)
+        checks.register(check_encrypted_data, checks.Tags.database)
