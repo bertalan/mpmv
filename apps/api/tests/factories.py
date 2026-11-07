@@ -8,8 +8,8 @@ import factory
 from django.utils import timezone
 from factory.django import DjangoModelFactory
 
-from apps.api.engine import generate_key, hash_key
-from apps.api.models import ApiClient, ApiMutationLog
+from apps.api.engine import KEY_WIDE_BUCKET, generate_key, hash_key
+from apps.api.models import ApiClient, ApiMutationLog, ApiRateCounter
 from apps.vendors.tests.factories import VendorFactory
 
 
@@ -66,3 +66,15 @@ class ApiMutationLogFactory(DjangoModelFactory[ApiMutationLog]):
     status_code = 201
     ip = "203.0.113.7"
     duration_ms = 12
+
+
+class ApiRateCounterFactory(DjangoModelFactory[ApiRateCounter]):
+    """The request counter of one key in its current window (CORE.12), key-wide by default."""
+
+    class Meta:
+        model = ApiRateCounter
+
+    client = factory.SubFactory(ApiClientFactory)
+    bucket = KEY_WIDE_BUCKET
+    window_start = factory.LazyFunction(lambda: timezone.now().replace(second=0, microsecond=0))
+    hits = 1
