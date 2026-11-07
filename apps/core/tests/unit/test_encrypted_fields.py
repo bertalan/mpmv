@@ -125,7 +125,7 @@ def test_an_encrypted_field_in_the_default_ordering_is_refused() -> None:
             ordering = ["account"]
 
     with pytest.raises(FieldError, match="encrypted"):
-        str(Sorted.objects.all().query)
+        str(Sorted._default_manager.all().query)
 
 
 @isolate_apps("apps.core")

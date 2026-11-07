@@ -141,14 +141,10 @@ class EncryptedFieldMixin(models.Field[Any, Any]):
     def get_transform(self, lookup_name: str) -> Any:
         return None
 
-    def get_col(self, alias: str | None, output_field: Any = None) -> Col:
+    def get_col(self, alias: str, output_field: Any = None) -> Col:
         if output_field is None or output_field == self:
             return _EncryptedCol(alias, self)
         return super().get_col(alias, output_field)
-
-    @property
-    def cached_col(self) -> Col:  # type: ignore[override]
-        return _EncryptedCol(self.model._meta.db_table, self)
 
 
 class EncryptedCharField(EncryptedFieldMixin, models.CharField[Any, Any]):

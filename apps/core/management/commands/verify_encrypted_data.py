@@ -7,6 +7,7 @@ from django.db import DEFAULT_DB_ALIAS, connections
 
 from apps.core import encryption
 
+ROTATE = "Run `manage.py rotate_field_keys` to move them to the primary key."
 SHOWN_ROWS = 20  # row keys listed per problem; the count is always complete
 
 
@@ -60,6 +61,6 @@ class Command(BaseCommand):
             errors += _errors(report)
             rotate = rotate or bool(report.cleartext or report.older_key)
         if rotate:
-            self.stdout.write("Run `manage.py rotate_field_keys` to re-encrypt with the primary key.")
+            self.stdout.write(ROTATE)
         if errors:
             raise CommandError("\n".join(errors))
