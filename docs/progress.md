@@ -24,13 +24,18 @@ part of the done-when still open) · `not started`.
 | CORE.6 | done | #9 | ApiClient: hashed keys, scopes, expiry, rotation, revocation, IP allow-list |
 | SEC.1 | done | #7 | Strict CSP, Permissions-Policy, hardened cookies, security headers |
 | I18N.1 | partial: "/it/ and /de/ active on STAGE" pending STAGE | #12 | Language-prefix routing, language switcher, preferred language |
-| ARC.5 | partial: STAGE deploy pending hosting decision | #13 | OCI image, Apple container local stack, Podman Quadlets, tag deploy and rollback tooling, Procrastinate worker role |
+| ARC.5 | done | #13 | OCI image, Apple container local stack, Podman Quadlets, tag deploy and rollback tooling, Procrastinate worker role. Done-when narrowed by owner decision; the STAGE deploy moved to ARC.13 |
 | ARC.12 | done | #16 | factory_boy factories per model, hand-written test builders converted |
 | CORE.2 | done | #18 | VendorMember with owner and staff roles, role matrix, last-owner rule, audited membership services |
-| I18N.2 | partial: reused by vendor, catalog reuse pending CAT.1 | #19 | Shared TranslationModel with status, source_hash, stale detection and EN fallback; language choices no longer frozen in migrations |
+| I18N.2 | done | #19 | Shared TranslationModel with status, source_hash, stale detection and EN fallback; language choices no longer frozen in migrations. Reused by vendor and catalog (CAT.1, #27) |
 | CORE.7 | partial: OpenAPI proven locally and in CI, STAGE publication pending hosting | #20 | Ninja API v1 skeleton: API key auth, dry-run, RFC 9457 problem details, OpenAPI 3.1, mutation log |
 | CORE.5 | done | #21 | Progressive login lockout per account and IP, registration rate limit, Turnstile captcha, trusted-proxy client IP |
 | CORE.4 | done | #22 | Mandatory MFA for staff, superusers and vendor owners: TOTP, passkeys, recovery codes, step-up |
+| SHP.1 | done | #25 | Carrier, zones, vendor rates, weight bands (exclusion constraint), pickup options, config versions; audited admin |
+| CAT.1 | done | #27 | Product, Variant and translations, per-vendor SKU constraints, audited price services, admin |
+| CORE.3 | done | #26 | VendorScopedQuerySet, 404 helpers, cross-tenant harness with negative tests generated for every endpoint, API operation and vendor-owned model (catalog and shipping included) |
+| SEC.4 | done | #28 | AuditLog on logins, MFA, users, groups, vendors and shipping rates with before/after; read-only staff audit view with filters and step-up; audit policy system check; one request audit context |
+| VEN.12 | done | #29 | Vendor legal and e-invoicing identity, staff-editable payout requirements by country, region and legal form including the DAC7 dataset, FatturaPA party block |
 
 ## Owner decisions 2026-11-07
 
@@ -39,6 +44,7 @@ part of the done-when still open) · `not started`.
 - Media storage on Hetzner Object Storage with private buckets and signed URLs: new task [ARC.15](spec/01-stack-and-architecture.md), required by CAT.4 and SEC.2.
 - `platform_entity` on LedgerEntry and PayoutAccount points to the PlatformOperator version row; balances per company group versions by legal identity ([spec 04](spec/04-vendors-commissions-ledger.md)).
 - Vendor-scoped API keys: new task [CORE.13](spec/02-core-identity-permissions.md) (`ApiClient.vendor`).
+- VEN.12 payout requirements: defaults confirmed; non-EU vendors need IBAN and foreign TIN; the DAC7 dataset (registered office address, country of tax residence, VAT number or TIN) and the FatturaPA party data are payout requirements for every vendor ([spec 04](spec/04-vendors-commissions-ledger.md), [spec 11](spec/11-compliance.md) CMP.1).
 
 ## Follow-ups from wave 1
 
@@ -181,6 +187,62 @@ Review findings not fixed (all minor):
 - CORE.7: a test literal mimics the API key format.
 - CORE.7: ApiMutationLog and the problem type convention are not documented in spec 02.
 - Integration: CORE.4's MFA middleware check is accounts.E002, because CORE.5 took accounts.E001.
+
+## Follow-ups from wave 4
+
+Integration notes:
+
+- CORE.3 merged after CAT.1 and SHP.1, so their product, variant, rate, band and pickup models were moved to VendorScopedManager during integration.
+- SEC.4 merged after them: catalog and shipping models are classified in the audit policy, and catalog and shipping admin tests ignore the login entry that staff sign-in now writes.
+- Coherence check 3, finding 1 resolved in SEC.4: every view and admin builds its audit context with `apps.core.audit.audit_context`, which uses the trusted-proxy client IP; a guard test refuses new copies.
+- VEN.12 merged with SEC.4: one `save_vendor` validates the record and audits the whole vendor, legal identity included and IBAN masked, as `vendor.updated`.
+
+Open questions for the owner:
+
+- CAT.1: simple products hold stock on Product itself; confirm, or should they get one implicit variant?
+- CAT.1: product and variant SKUs are unique per vendor in separate namespaces; should one shared namespace be enforced (it matters for CAT.9)?
+- CAT.1: on-request and catalog-only products store a net price of 0.00; acceptable, or should the price be nullable?
+- CAT.1: may variants exist only on variable products, and must companions and upsells belong to the same vendor?
+- CAT.1: may a product change vendor after creation? Today the variants follow, and a SKU clash ends in a 500.
+- CORE.3: `for_actor` lets every active `is_staff` user see all vendors; decide which flag or permission means platform staff before Wagtail editors get `is_staff` (CORE.8).
+- SEC.4: lockout audit entries still store the typed identifier for unknown accounts; treat them like failed logins?
+- SEC.4: should vendor refund and shipping policy texts be audited (VendorTranslation is exempt today)?
+- VEN.12: the payout gate requires a postal code from every vendor; how should vendors in countries without postal codes fill it?
+- VEN.12: Greece uses GR as FatturaPA IdPaese and EL in VIES; confirm with the SDI intermediary (CMP.2).
+- VEN.12: accept the `# country-literal:` pragma added to the ARC.7 scanner, or restrict it to named constants?
+
+Deferred to other tasks:
+
+- SHP.1: the over-max-weight policy (D-06) and the per-vendor free-shipping threshold go to SHP.3; the SHP.6 editor replaces the admin.
+- SHP.1: shipping audit snapshots carry the vendor pk, not its public id, so the audit view's vendor filter misses shipping rows.
+- CORE.3: no vendor-facing endpoint exists yet; CORE.9 and the catalog API add the first VendorScoped and VendorScopedList entries.
+- CAT.1: category, brand and terms (CAT.2), options (CAT.3), images (CAT.4), slugs (CAT.5), GPSR (CMP.3), publishing (CAT.10), rich text (CAT.11).
+- SEC.4: commissions, IBAN, payouts and data exports get audited when their models exist (pattern in docs/dev/audit-trail.md).
+- SEC.4: product deletion and non-price product edits are classified as unaudited catalog content.
+- SEC.4: anonymous failed-login entries grow the append-only table; retention or partitioning is an OPS item.
+- VEN.12: a real VIES client and periodic re-check need a backlog row (could reuse the TAX VatValidation cache).
+- VEN.12: the IBAN and DAC7 values are stored in clear and kept in append-only audit rows until SEC.3 adds field-level encryption.
+- VEN.12: there is no vendor-facing profile form yet (VEN.9, CORE.9).
+- VEN.12: fiscal_regime is not checked against VendorTaxProfile.exempt_reason (TAX.2, CMP.2).
+
+Review findings not fixed (all minor):
+
+- SHP.1: the admin bulk delete is not wrapped in a transaction, and cascaded band prices are not in the rate's delete snapshot.
+- SHP.1: ShippingConfigVersion is immutable only through save(), and migration 0001 references NumRange in the live models module.
+- SHP.1: no test for the pickup translation unique constraint; a band form with a field error can add a spurious overlap error.
+- CORE.3: StaffOnly and NoVendorData always use GET, so POST-only endpoints are not exercised with POST.
+- CORE.3: ownership through ManyToMany or GenericForeignKey is not detected, and the markers leave out Vendor B's display name and slug.
+- CORE.3: a unit test patches `VendorMember.vendor_scope` instead of using a test-only model.
+- CAT.1: to_price lets decimal.InvalidOperation escape and does not check the 10 integer digits of MoneyField.
+- CAT.1: the admin price change check reads stored prices without a row lock.
+- CAT.1: normalize_sku is used only by tests, SKUs have no character set limit, and naive sale datetimes are accepted.
+- SEC.4: save_vendor does not refuse a status change made outside change_status.
+- SEC.4: step_up() does nothing when STEP_UP_DECORATOR is unset, with no system check.
+- SEC.4: group audit entries are keyed by the group name, so a rename splits the trail.
+- VEN.12: check_vat_number does not lock the row or compare the stored number, and sends non-EU numbers to VIES.
+- VEN.12: a sole proprietor without first and last name falls back to the legal name without a problem being reported.
+- VEN.12: the address data migration does not check field lengths before copying legacy values.
+- VEN.12: seed_legal_requirements lives in tests/fakes.py, which is meant for doubles of external boundaries.
 
 ## Coherence checks
 
