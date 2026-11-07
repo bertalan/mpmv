@@ -195,3 +195,12 @@ def test_term_attributes_must_be_an_object() -> None:
     assert engine.term_attribute_errors(SCHEMA, ["model_year"]) == [
         "The attributes must be an object of attribute codes and values."
     ]
+
+
+@pytest.mark.parametrize(
+    "schema", [{"code": "x"}, ["model_year"], [{"kind": "text"}], [{"code": "x", "kind": "date"}]]
+)
+def test_term_attributes_against_an_invalid_schema_are_refused(schema: object) -> None:
+    assert engine.term_attribute_errors(schema, {"x": 1}) == [
+        "The taxonomy declares its term attributes wrongly: correct the taxonomy first."
+    ]

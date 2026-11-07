@@ -179,6 +179,22 @@ def test_change_texts_and_move_a_category_under_another(staff_client: Client) ->
     assert hats.translations.get().name == "Caps and hats"
 
 
+def test_moving_a_category_next_to_a_same_slug_sibling_is_refused(staff_client: Client) -> None:
+    bags = CategoryFactory.create()
+    CategoryTranslationFactory.create(category=CategoryFactory.create(parent=bags), slug="hats")
+    hats = CategoryFactory.create()
+    english = CategoryTranslationFactory.create(category=hats, name="Hats", slug="hats")
+    data = placement(bags, "first-child")
+    data.update(
+        translation_rows([{**texts("en", "Hats", "hats"), "id": str(english.pk)}], initial=1)
+    )
+    response = staff_client.post(reverse("admin:catalog_category_change", args=[hats.pk]), data)
+    assert response.status_code == 200
+    assert "already uses this slug" in response.content.decode()
+    hats.refresh_from_db()
+    assert hats.is_root()  # the move was rolled back
+
+
 def test_delete_a_leaf_category_with_its_translations(staff_client: Client) -> None:
     category = CategoryFactory.create(languages=["en", "it"])
     response = staff_client.post(
@@ -353,6 +369,35 @@ def test_a_term_cannot_be_placed_under_another_taxonomy(staff_client: Client) ->
     assert response.status_code == 200
     assert "same taxonomy" in response.content.decode()
     assert Term.objects.count() == 1
+
+
+def test_moving_a_term_under_another_in_a_flat_taxonomy_is_refused(staff_client: Client) -> None:
+    taxonomy = TaxonomyFactory.create(hierarchical=False)
+    first, _ = term_of(taxonomy, "Beach")
+    second, english = term_of(taxonomy, "Snow")
+    data = term_form(None, **placement(first, "first-child"))
+    data.update(
+        translation_rows([{**texts("en", "Snow", "snow"), "id": str(english.pk)}], initial=1)
+    )
+    response = staff_client.post(reverse("admin:catalog_term_change", args=[second.pk]), data)
+    assert response.status_code == 200
+    assert "This taxonomy is flat" in response.content.decode()
+    assert Term.objects.get(pk=second.pk).is_root()
+
+
+def test_moving_a_term_next_to_a_same_slug_sibling_is_refused(staff_client: Client) -> None:
+    taxonomy = TaxonomyFactory.create(hierarchical=True)
+    maker, _ = term_of(taxonomy, "Maker")
+    TermTranslationFactory.create(term=TermFactory.create(parent=maker), slug="model")
+    model, english = term_of(taxonomy, "Model")
+    data = term_form(None, **placement(maker, "first-child"))
+    data.update(
+        translation_rows([{**texts("en", "Model", "model"), "id": str(english.pk)}], initial=1)
+    )
+    response = staff_client.post(reverse("admin:catalog_term_change", args=[model.pk]), data)
+    assert response.status_code == 200
+    assert "already uses this slug" in response.content.decode()
+    assert Term.objects.get(pk=model.pk).is_root()  # the move was rolled back
 
 
 def test_term_attributes_outside_the_schema_are_refused(staff_client: Client) -> None:
@@ -585,3 +630,94 @@ def test_the_product_form_shows_categories_as_an_indented_tree(staff_client: Cli
     response = staff_client.get(reverse("admin:catalog_product_change", args=[product.pk]))
     assert response.status_code == 200
     assert "&nbsp;&nbsp;&nbsp;&nbsp;Backpacks" in response.content.decode()
+
+
+# --- Widgets that scale: terms are looked up by autocomplete, not listed in full
+
+
+class SelectOptions(HTMLParser):
+    """The option values a page renders for the `<select>` named `name`, and its attributes."""
+
+    def __init__(self, name: str) -> None:
+        super().__init__()
+        self.name = name
+        self.values: list[str] = []
+        self.attributes: dict[str, str | None] = {}
+        self._inside = False
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attributes = dict(attrs)
+        if tag == "select" and attributes.get("name") == self.name:
+            self._inside = True
+            self.attributes = attributes
+        elif tag == "option" and self._inside:
+            self.values.append(attributes.get("value") or "")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "select":
+            self._inside = False
+
+
+def select_of(response: Any, name: str) -> SelectOptions:
+    parser = SelectOptions(name)
+    parser.feed(response.content.decode())
+    return parser
+
+
+def test_the_product_form_renders_only_the_chosen_terms(staff_client: Client) -> None:
+    product = ProductFactory.create()
+    chosen = TermFactory.create()
+    TermFactory.create()  # not rendered: found by autocomplete
+    product.terms.add(chosen)
+    response = staff_client.get(reverse("admin:catalog_product_change", args=[product.pk]))
+    assert response.status_code == 200
+    select = select_of(response, "terms")
+    assert select.values == [str(chosen.pk)]
+    assert "admin-autocomplete" in (select.attributes.get("class") or "")
+
+
+def test_the_term_reference_renders_only_the_current_one(staff_client: Client) -> None:
+    taxonomy = TaxonomyFactory.create()
+    first, _ = term_of(taxonomy, "First")
+    second, _ = term_of(taxonomy, "Second")  # after First
+    term_of(TaxonomyFactory.create(), "Other")
+    response = staff_client.get(reverse("admin:catalog_term_change", args=[second.pk]))
+    assert response.status_code == 200
+    select = select_of(response, "treebeard_ref_node")
+    assert select.values == ["", str(first.pk)]  # "" is the top level
+    assert "admin-autocomplete" in (select.attributes.get("class") or "")
+    assert f"taxonomy={taxonomy.pk}" in (select.attributes.get("data-ajax--url") or "")
+
+
+def test_a_new_term_reference_follows_the_taxonomy_given_in_the_url(
+    staff_client: Client,
+) -> None:
+    taxonomy = TaxonomyFactory.create()
+    response = staff_client.get(reverse("admin:catalog_term_add"), {"taxonomy": taxonomy.pk})
+    assert response.status_code == 200
+    select = select_of(response, "treebeard_ref_node")
+    assert "admin-autocomplete" in (select.attributes.get("class") or "")
+    assert f"taxonomy={taxonomy.pk}" in (select.attributes.get("data-ajax--url") or "")
+
+
+def autocomplete(client: Client, **params: Any) -> list[str]:
+    query = {"app_label": "catalog", "model_name": "product", "field_name": "terms", **params}
+    response = client.get(reverse("admin:autocomplete"), query)
+    assert response.status_code == 200
+    return [row["id"] for row in response.json()["results"]]
+
+
+def test_term_autocomplete_searches_names_and_taxonomy_codes(staff_client: Client) -> None:
+    season = TaxonomyFactory.create(code="season")
+    summer, _ = term_of(season, "Summer")
+    summit, _ = term_of(TaxonomyFactory.create(code="peak"), "Summit")
+    assert set(autocomplete(staff_client, term="sum")) == {str(summer.pk), str(summit.pk)}
+    assert autocomplete(staff_client, term="season") == [str(summer.pk)]
+
+
+def test_term_autocomplete_is_narrowed_to_one_taxonomy(staff_client: Client) -> None:
+    season = TaxonomyFactory.create()
+    summer, _ = term_of(season, "Summer")
+    term_of(TaxonomyFactory.create(), "Summit")
+    assert autocomplete(staff_client, term="sum", taxonomy=season.pk) == [str(summer.pk)]
+    assert autocomplete(staff_client, term="sum", taxonomy="not-a-number") == []
