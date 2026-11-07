@@ -27,7 +27,7 @@ image management and staff backoffice.
 | Language | Python 3.13+ | The current pipelines run on 3.11: easy alignment |
 | Framework | **Django 6.1**, upgrading to **6.2 LTS** (expected April 2027) before go-live | Decided in ADR-0001 (D-11). From 6.0 the task framework and CSP are built in |
 | CMS and backoffice | **Wagtail** (latest LTS) | Pages, blog, images, snippets; ViewSets for the staff admin |
-| DB | **PostgreSQL 16+** | Single datastore: data, queues, full-text and trigram search, session cache |
+| DB | **PostgreSQL 17** | Single datastore: data, queues, full-text and trigram search, session cache |
 | API | **django-ninja** (Pydantic schemas) | The pipelines already use Pydantic: shared contracts |
 | Async tasks and cron | **Procrastinate** (PostgreSQL queue, periodic tasks, locks) behind `apps.core.tasks` | No Redis or Celery. Decided in ADR-0004 |
 | Frontend | Django templates + **HTMX** + minimal Alpine.js; CSS with a lightweight build | No SPA; accessible (EAA) and fast |

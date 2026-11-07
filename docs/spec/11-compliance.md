@@ -20,19 +20,18 @@
 ## 11.2 Requirements
 
 ### CMP.1 — DAC7 `[P1]`
-- Dataset collected at vendor onboarding: legal name, VAT number/tax code, registered office address,
-  country of tax residence, IBAN, permanent establishment. Completeness = precondition for payouts.
-  The staff-editable `LegalFieldRequirement` rows (VEN.12, see [04](04-vendors-commissions-ledger.md))
-  are the payout gate and include this dataset for every vendor, non-EU sellers included: registered
-  office address, country of tax residence, VAT number or TIN, IBAN (the legal name is always
-  present; the permanent establishment only when there is one). A vendor that passes
-  `assert_payout_allowed` is DAC7-complete and has enough data for a FatturaPA party block.
+- Dataset: owned by VEN.12 (see [04](04-vendors-commissions-ledger.md)). The vendor's legal
+  identity holds the DAC7 fields, the seeded `LegalFieldRequirement` rows require them for a
+  payout for every vendor, non-EU sellers included, and `engine.dac7_missing()` reports what is
+  missing. CMP.1 does not collect or validate them again; it reads them.
 - Aggregation per vendor and quarter from the ledger (consideration, commissions, number of transactions).
 - Annual export in the format of the authority of the **platform's country of establishment**
   (`PlatformOperator`). ⚖️ Verify the exclusion thresholds (e.g. vendors with fewer than 30 sales and less than €2,000).
 
 ### CMP.2 — Commission invoicing `[P1]`
-- Platform → vendor commission document per period, generated from the ledger.
+- Platform → vendor commission document per period, generated from the ledger. The vendor's party
+  block comes from VEN.12 (`engine.fatturapa_party()`); CMP.2 writes the XML and validates it
+  against the official schema.
 - Channel depends on the `PlatformOperator`: for an Italian platform it is SDI (FatturaPA), with the
   wording of the platform's tax regime ⚖️; abstract `EInvoiceChannel` interface (SDI via an intermediary
   today, other channels in the future, ready for ViDA).
@@ -96,8 +95,8 @@ class GpsrInfo(Model):
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
-| CMP.1 | DAC7 dataset on the vendor + completeness + quarterly aggregates + export | P1 | 12 | VEN.5, VEN.4 | Test export validated by the advisor |
-| CMP.2 | Commission document from the ledger + `EInvoiceChannel` interface + export per vendor | P1 | 12 | VEN.4 | Test document generated |
+| CMP.1 | DAC7 quarterly aggregates + annual export, reading the dataset and completeness from VEN.12 | P1 | 12 | VEN.5, VEN.4, VEN.12 | Test export validated by the advisor |
+| CMP.2 | Commission document from the ledger (party block from VEN.12) + `EInvoiceChannel` interface + export per vendor | P1 | 12 | VEN.4, VEN.12 | Test document generated |
 | CMP.3 | `GpsrInfo` with per-vendor defaults, publication block, product page, recall procedure | P1 | 8 | CAT.1 | Product without GPSR cannot be published |
 | CMP.4 | GDPR: customer export and anonymization, sub-processor register, retention job | P1 | 10 | ORD.2 | Erasure request on a seed order |
 | CMP.5 | DSA notice & action + versioned vendor terms with acceptance | P2 | 8 | VEN.5 | Notice with tracked outcome |
