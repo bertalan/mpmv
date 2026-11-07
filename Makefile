@@ -1,6 +1,6 @@
 # MPMV task runner. Local containers use Apple `container` (ADR-0002); no Docker, no compose.
 .DEFAULT_GOAL := help
-.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell migrate run test check lint fmt typecheck imports
+.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell migrate run test test-unit test-e2e test-all check lint fmt typecheck imports
 
 DB_NAME      := mpmv-db
 DB_IMAGE     := docker.io/library/postgres:17
@@ -11,8 +11,9 @@ MANAGE       := uv run python manage.py
 help: ## List available targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*## "}{printf "  %-12s %s\n", $$1, $$2}'
 
-install: ## Install Python deps (uv) and git hooks
+install: ## Install Python deps (uv), the Playwright browser and git hooks
 	uv sync
+	uv run playwright install chromium
 	uv run pre-commit install
 
 # --- Spec and backlog
@@ -61,8 +62,20 @@ run: migrate ## Run the development server
 	$(MANAGE) runserver
 
 # --- Quality gates
-test: db ## Run the test suite (needs the local database)
-	uv run pytest
+# Test suites (ADR-0006): unit = no database; integration = real PostgreSQL; e2e = Playwright.
+REPORTS := build/reports
+
+test-unit: ## Unit suite only (no database, no container)
+	uv run pytest -m unit
+
+test: db ## Unit + integration suites
+	uv run pytest -m "unit or integration" --junitxml=$(REPORTS)/junit.xml \
+		--cov --cov-report=term-missing:skip-covered --cov-report=html:$(REPORTS)/coverage
+
+test-e2e: db ## E2E suite in headless Chromium; screenshots in build/e2e/screenshots/
+	uv run pytest -m e2e --junitxml=$(REPORTS)/junit-e2e.xml
+
+test-all: test test-e2e ## All three suites
 
 lint: ## Lint with ruff
 	uv run ruff check .

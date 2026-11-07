@@ -1,0 +1,13 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.debugpy",
+    "charliermarsh.ruff",
+    "ms-python.mypy-type-checker",
+    "ms-playwright.playwright",
+    "editorconfig.editorconfig",
+    "tamasfe.even-better-toml",
+    "bierner.markdown-mermaid"
+  ]
+}
