@@ -5,18 +5,30 @@ real vendor data. Legal identifiers (VAT numbers, codici fiscali, IBANs) are syn
 checksum-valid, generated at runtime from the factory sequence (VEN.12).
 """
 
+import datetime as dt
 import string
 from collections.abc import Iterable
 from decimal import Decimal
 from typing import Any
 
 import factory
+from django.db.models import Max
+from django.utils import timezone
 from django.utils.text import slugify
 from factory.django import DjangoModelFactory
 
 from apps.accounts.tests.factories import UserFactory
+from apps.core.translations import source_hash
 from apps.vendors import engine
-from apps.vendors.models import LegalFieldRequirement, Vendor, VendorMember, VendorTranslation
+from apps.vendors.models import (
+    ContractAcceptance,
+    LegalFieldRequirement,
+    Vendor,
+    VendorContract,
+    VendorContractTranslation,
+    VendorMember,
+    VendorTranslation,
+)
 
 
 def pseudonym(n: int) -> str:
@@ -218,3 +230,62 @@ class LegalFieldRequirementFactory(DjangoModelFactory[LegalFieldRequirement]):
     field_name = factory.Sequence(lambda n: engine.LEGAL_FIELDS[n % len(engine.LEGAL_FIELDS)])
     purpose = LegalFieldRequirement.Purpose.PAYOUT
     active = True
+
+
+def next_contract_version() -> int:
+    """The version after the latest one, as `services.save_contract` numbers them."""
+    latest: int | None = VendorContract.objects.aggregate(latest=Max("version"))["latest"]
+    return (latest or 0) + 1
+
+
+class VendorContractFactory(DjangoModelFactory[VendorContract]):
+    """A contract version in force since yesterday, with a published English text.
+
+    `languages=[...]` chooses the published texts (`[]`: none). Factories write rows directly:
+    the start-date rule is tested through `services.save_contract`.
+    """
+
+    class Meta:
+        model = VendorContract
+        skip_postgeneration_save = True
+
+    version = factory.LazyFunction(next_contract_version)
+    valid_from = factory.LazyFunction(lambda: timezone.now() - dt.timedelta(days=1))
+
+    @factory.post_generation
+    def languages(
+        obj: VendorContract, create: bool, extracted: Iterable[str] | None, **kwargs: Any
+    ) -> None:
+        if create:
+            for language in ("en",) if extracted is None else extracted:
+                VendorContractTranslationFactory.create(contract=obj, language=language)
+
+
+class VendorContractTranslationFactory(DjangoModelFactory[VendorContractTranslation]):
+    class Meta:
+        model = VendorContractTranslation
+
+    contract = factory.SubFactory(VendorContractFactory, languages=[])
+    language = "en"
+    status = VendorContractTranslation.Status.PUBLISHED
+    title = factory.LazyAttribute(lambda o: f"Vendor agreement [{o.language}]")
+    body = factory.Faker("paragraph")
+
+
+class ContractAcceptanceFactory(DjangoModelFactory[ContractAcceptance]):
+    """The owner of an onboarding vendor accepted the English text of a contract in force."""
+
+    class Meta:
+        model = ContractAcceptance
+
+    vendor = factory.SubFactory(VendorFactory, status=Vendor.Status.ONBOARDING)
+    contract = factory.SubFactory(VendorContractFactory)
+    user = factory.LazyAttribute(
+        lambda o: VendorMemberFactory.create(vendor=o.vendor, role=VendorMember.Role.OWNER).user
+    )
+    language = "en"
+    text_hash = factory.LazyAttribute(
+        lambda o: source_hash(o.contract.translations.get(language=o.language).source_values())
+    )
+    accepted_at = factory.LazyFunction(timezone.now)
+    ip = "198.51.100.1"

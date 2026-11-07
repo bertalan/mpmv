@@ -7,7 +7,7 @@ from apps.core.models import AuditLog
 from apps.vendors.engine import InvalidTransition
 from apps.vendors.models import Vendor
 from apps.vendors.services import change_status
-from apps.vendors.tests.factories import VendorFactory
+from apps.vendors.tests.factories import ContractAcceptanceFactory, VendorFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -35,6 +35,7 @@ def test_valid_transition_updates_the_status_and_writes_the_audit_log() -> None:
 
 def test_full_lifecycle_writes_one_audit_row_per_step() -> None:
     vendor = VendorFactory.create()
+    ContractAcceptanceFactory.create(vendor=vendor)  # activation needs the contract (VEN.5)
     for target in ("onboarding", "active", "suspended", "active", "closed"):
         change_status(vendor, target, ctx=CTX)
     vendor.refresh_from_db()
@@ -44,6 +45,7 @@ def test_full_lifecycle_writes_one_audit_row_per_step() -> None:
 
 def test_audit_key_survives_a_slug_change_and_is_not_inherited_by_a_slug_reuse() -> None:
     vendor = VendorFactory.create(display_name="Vendor A")
+    ContractAcceptanceFactory.create(vendor=vendor)  # activation needs the contract (VEN.5)
     change_status(vendor, Vendor.Status.ONBOARDING, ctx=CTX)
     vendor.slug = "vendor-a-renamed"
     vendor.save()
