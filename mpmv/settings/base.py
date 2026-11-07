@@ -38,7 +38,8 @@ LOCAL_APPS = [
 ]
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
+    # Django's admin with the self-service password change audited (SEC.4).
+    "apps.accounts.admin_apps.AuditedAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",

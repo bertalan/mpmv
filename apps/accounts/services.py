@@ -585,7 +585,10 @@ def record_access_change(user: User, before: Mapping[str, Any], *, ctx: AuditCon
 
 
 def record_password_change(user: User, *, had_usable_password: bool, ctx: AuditContext) -> None:
-    """Audit a password set by staff; only whether a usable password exists is stored."""
+    """Audit a password set by staff, for someone else or themselves.
+
+    Only whether a usable password exists is stored, never the hash.
+    """
     record(
         ctx,
         CREDENTIAL_CHANGED,

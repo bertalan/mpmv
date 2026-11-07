@@ -1,7 +1,8 @@
 """Staff admin for users and groups (Wagtail admin replaces this in CORE.8).
 
 Every write goes through the audited services (SEC.4): profile and flags, groups and
-permissions, passwords set by staff, deletions.
+permissions, passwords set by staff, deletions. A staff member's own password change is
+audited by the site itself (`admin_site.AuditedAdminSite`).
 """
 
 from typing import Any, ClassVar

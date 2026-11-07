@@ -125,6 +125,52 @@ def test_a_password_change_in_the_admin_is_audited_without_the_hash(staff_client
     assert password not in stored
 
 
+def test_changing_ones_own_password_in_the_admin_is_audited_without_the_hash(
+    client: Client,
+) -> None:
+    old_password = secrets.token_urlsafe(16)
+    staff = UserFactory.create(email="staff@example.com", superuser=True, password=old_password)
+    verified_login(client, staff)
+    old_hash = staff.password
+    new_password = secrets.token_urlsafe(16)
+    response = client.post(
+        reverse("admin:password_change"),
+        {
+            "old_password": old_password,
+            "new_password1": new_password,
+            "new_password2": new_password,
+        },
+    )
+    assert response.status_code == 302, response.content.decode()
+    staff.refresh_from_db()
+    assert staff.check_password(new_password)
+    entry = AuditLog.objects.get(action="accounts.user.password_changed")
+    assert entry.target_key == str(staff.public_id)
+    assert entry.actor_label == "staff:staff@example.com"
+    assert entry.source == "admin"
+    assert entry.before == {"has_usable_password": True}
+    assert entry.after == {"has_usable_password": True}
+    stored = str(entry.before) + str(entry.after)
+    for secret in (old_hash, staff.password, old_password, new_password):
+        assert secret not in stored
+
+
+def test_a_rejected_own_password_change_writes_no_audit_entry(client: Client) -> None:
+    staff = UserFactory.create(email="staff@example.com", superuser=True)
+    verified_login(client, staff)
+    new_password = secrets.token_urlsafe(16)
+    response = client.post(
+        reverse("admin:password_change"),
+        {
+            "old_password": secrets.token_urlsafe(16),
+            "new_password1": new_password,
+            "new_password2": new_password,
+        },
+    )
+    assert response.status_code == 200
+    assert not AuditLog.objects.filter(action="accounts.user.password_changed").exists()
+
+
 def test_deleting_a_user_is_audited(staff_client: Client) -> None:
     user = UserFactory.create(email="leaver@example.com")
     staff_client.post(reverse("admin:accounts_user_delete", args=[user.pk]), {"post": "yes"})

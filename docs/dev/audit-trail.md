@@ -57,6 +57,9 @@ Failures refused during a lockout are not audited one by one: the lockout entry 
    `delete_model` and `delete_queryset` (plus `save_related` for many-to-many fields and
    `save_formset` for audited inlines), or denies the permission. Otherwise the system check
    fails with `core.E203`. Admin actions must call services too (see `vendors.admin`).
+   Site-level admin views are not ModelAdmins, so the check cannot see them: the staff site
+   (`apps.accounts.admin_site.AuditedAdminSite`, installed as `admin.site`) audits the
+   self-service password change, and any new site-level view that writes must do the same.
 4. **Snapshots** are plain values: public ids instead of foreign keys, no secrets or hashes,
    `Decimal` kept exact (stored as strings). Objects owned by a vendor include
    `"vendor": <vendor public id>`, which fills the entry's `vendor_key` for the vendor filter.
