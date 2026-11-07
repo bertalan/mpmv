@@ -156,8 +156,16 @@ def zones_available_to(vendor: Vendor) -> "models.QuerySet[ShippingZone]":
 
 
 def zone_snaps(vendor: Vendor) -> list[ZoneSnap]:
-    """Snapshots of the zones `vendor` ships to (it has a method there), groups expanded."""
-    zones = list(zones_available_to(vendor).filter(methods__vendor=vendor).distinct())
+    """Snapshots of the zones `vendor` ships to, groups expanded.
+
+    A zone is a candidate only when the vendor has a method there with an active carrier: an
+    inactive carrier offers no rates (spec 06 §6.3 case 10), so its zone must not win the
+    resolution over one the vendor can ship to.
+    """
+    served = zones_available_to(vendor).filter(
+        methods__vendor=vendor, methods__carrier__is_active=True
+    )  # one filter call: the same method has both
+    zones = list(served.distinct())
     codes = {code for zone in zones for code in zone.country_groups}
     members = {
         group.code: frozenset(group.countries)
