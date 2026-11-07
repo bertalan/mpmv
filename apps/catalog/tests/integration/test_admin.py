@@ -152,7 +152,11 @@ def test_add_product_with_translations_and_a_variant(staff_client: Client) -> No
     variant = product.variants.get()
     assert (variant.sku, variant.vendor, variant.is_default) == ("BAG-01-RED", vendor, True)
     assert variant.price_net_override == Decimal("27.00")
-    assert not domain_entries().exists()  # a first price is not a price change
+    # CAT.12: creations are audited; a first price is not a price change.
+    assert sorted(domain_entries().values_list("action", flat=True)) == [
+        "catalog.product.created",
+        "catalog.variant.created",
+    ]
 
 
 def test_add_product_rejects_a_duplicate_sku_of_the_same_vendor(staff_client: Client) -> None:
