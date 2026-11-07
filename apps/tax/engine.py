@@ -1,4 +1,5 @@
-"""Pure tax rules behind the TAX.1 models (spec 05 §5.2). No ORM.
+"""Pure tax rules behind the TAX.1 models (spec 05 §5.2) and the TAX.2 regime change
+workflow. No ORM.
 
 This module holds the vocabulary of the tax configuration and the consistency rules of its
 rows. The tax decision itself (`resolve_goods_tax`, `resolve_shipping_tax`) is TAX.3 and TAX.4,
@@ -6,6 +7,7 @@ and depends on open decisions D-01 (country of taxation), D-02 (Northern Ireland
 (carrier `force_vat`): nothing here decides them.
 """
 
+import datetime as dt
 import re
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Final
@@ -58,6 +60,120 @@ def profile_errors(regime: str, exempt_reason: str, *, fiscal_regime: str) -> di
             f"which charges no VAT: use the exempt regime with reason {FLAT_RATE_FORFETTARIO}."
         )
     return errors
+
+
+# --- Regime change workflow (TAX.2): a vendor owner requests, staff approve or reject
+
+PENDING: Final = "pending"
+APPROVED: Final = "approved"
+REJECTED: Final = "rejected"
+REQUEST_STATUSES: Final = (PENDING, APPROVED, REJECTED)
+
+
+class RegimeChangeError(Exception):
+    """A regime change step that the workflow refuses."""
+
+
+class RegimeChangeNotAllowed(RegimeChangeError):
+    """The user may not take this step: not an owner of the vendor, or not a valid reviewer."""
+
+
+class PendingRequestExists(RegimeChangeError):
+    """The vendor already has a request waiting for review."""
+
+
+class RequestNotPending(RegimeChangeError):
+    """The request was already approved or rejected."""
+
+
+class FiscalRegimeChangeNotDue(RegimeChangeError):
+    """The approval would change the declared fiscal regime before the request's date."""
+
+
+def check_reviewable(status: str) -> None:
+    """Only a pending request can be approved or rejected; reviews are final."""
+    if status != PENDING:
+        raise RequestNotPending(f"the request is {status}, not pending: reviews are final")
+
+
+def resulting_fiscal_regime(
+    regime: str, exempt_reason: str, *, requested: str, current: str
+) -> str:
+    """The fiscal regime (VEN.12) the vendor declares once the requested regime applies.
+
+    A requested fiscal regime wins; otherwise the flat-rate exemption implies RF19
+    (forfettario), and any other regime keeps the vendor's current one.
+    """
+    if requested:
+        return requested
+    if (regime, exempt_reason) == (EXEMPT, FLAT_RATE_FORFETTARIO):
+        return vendors.FLAT_RATE_REGIME
+    return current
+
+
+def request_errors(
+    regime: str,
+    exempt_reason: str,
+    *,
+    requested_fiscal_regime: str,
+    current_fiscal_regime: str,
+) -> dict[str, str]:
+    """What is wrong with a requested regime for a vendor declaring `current_fiscal_regime`.
+
+    The request must leave the vendor consistent (`profile_errors`) with the fiscal regime it
+    will declare. Leaving the flat-rate scheme needs the new fiscal regime: nothing else says
+    what the vendor declares once it charges VAT.
+    """
+    if requested_fiscal_regime and requested_fiscal_regime not in vendors.FISCAL_REGIMES:
+        return {"fiscal_regime": f"Unknown fiscal regime {requested_fiscal_regime!r}."}
+    flat_rate = (regime, exempt_reason) == (EXEMPT, FLAT_RATE_FORFETTARIO)
+    if (
+        current_fiscal_regime == vendors.FLAT_RATE_REGIME
+        and not requested_fiscal_regime
+        and not flat_rate
+    ):
+        return {
+            "fiscal_regime": (
+                f"The vendor declares fiscal regime {vendors.FLAT_RATE_REGIME} (forfettario): "
+                "leaving the flat-rate scheme needs the fiscal regime it will declare."
+            )
+        }
+    resulting = resulting_fiscal_regime(
+        regime, exempt_reason, requested=requested_fiscal_regime, current=current_fiscal_regime
+    )
+    return profile_errors(regime, exempt_reason, fiscal_regime=resulting)
+
+
+def fiscal_regime_change_error(effective_from: dt.datetime, *, now: dt.datetime) -> str | None:
+    """Why an approval cannot change the declared fiscal regime yet; None when it can.
+
+    The fiscal regime is not versioned (VEN.12): it is what invoices declare from now on. So a
+    change that moves it is approved on or after its date, never ahead, or invoices issued
+    before the date would declare the new regime.
+    """
+    if effective_from > now:
+        return (
+            f"The request changes the declared fiscal regime from "
+            f"{effective_from.date().isoformat()}: approve it on or after that date."
+        )
+    return None
+
+
+def reviewer_error(
+    *, is_staff: bool, is_active: bool, has_permission: bool, is_requester: bool
+) -> str | None:
+    """Why a user may not review a request; None when they may.
+
+    Reviews are for active platform staff holding the review permission (being staff, i.e.
+    admin login, is not enough), and never by the person who asked for the change.
+    """
+    if not (is_staff and is_active):
+        return "Only active platform staff review tax regime change requests."
+    if not has_permission:
+        return "Reviewing tax regime change requests needs the review permission."
+    if is_requester:
+        return "A request is reviewed by someone other than the person who made it."
+    return None
 
 
 # --- Tax rates

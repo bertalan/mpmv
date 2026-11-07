@@ -50,8 +50,12 @@ from apps.shipping.tests.factories import (
     ShippingZoneFactory,
     WeightBandFactory,
 )
-from apps.tax.models import VendorTaxProfile, VendorTaxProfileTranslation
-from apps.tax.tests.factories import VendorTaxProfileFactory, VendorTaxProfileTranslationFactory
+from apps.tax.models import TaxRegimeChangeRequest, VendorTaxProfile, VendorTaxProfileTranslation
+from apps.tax.tests.factories import (
+    TaxRegimeChangeRequestFactory,
+    VendorTaxProfileFactory,
+    VendorTaxProfileTranslationFactory,
+)
 from apps.vendors.models import (
     ContractAcceptance,
     Vendor,
@@ -114,6 +118,11 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         profile=VendorTaxProfileFactory.create(
             vendor=vendor, valid_from=utc(2025), valid_to=utc(2026)
         )
+    ),
+    TaxRegimeChangeRequest: lambda vendor: TaxRegimeChangeRequestFactory.create(
+        # A reviewed request: the vendor may already have its one pending request.
+        vendor=vendor,
+        rejected=True,
     ),
 }
 

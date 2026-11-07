@@ -1,4 +1,4 @@
-"""factory_boy factories for the tax models (TAX.1). Synthetic values only.
+"""factory_boy factories for the tax models (TAX.1, TAX.2). Synthetic values only.
 
 Versioned rows (rates, vendor tax profiles) are written directly by these factories; tests of
 the versioning rules go through `apps.tax.services` with `.build()`, as the services save.
@@ -6,22 +6,25 @@ the versioning rules go through `apps.tax.services` with `.build()`, as the serv
 
 import datetime as dt
 from decimal import Decimal
+from typing import Any
 
 import factory
 from django.utils import timezone
 from factory.django import DjangoModelFactory
 
+from apps.accounts.tests.factories import UserFactory
 from apps.core.tests.factories import utc
 from apps.tax import engine
 from apps.tax.models import (
     TaxRate,
+    TaxRegimeChangeRequest,
     Territory,
     VatValidation,
     VendorTaxProfile,
     VendorTaxProfileTranslation,
 )
 from apps.vendors.engine import FLAT_RATE_REGIME
-from apps.vendors.tests.factories import VendorFactory
+from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 
 
 def _one_year_later(start: dt.datetime) -> dt.datetime:
@@ -114,3 +117,55 @@ class VatValidationFactory(DjangoModelFactory[VatValidation]):
     address = "Example Strasse 1, 10115 Berlin"
     request_id = factory.Sequence(lambda n: f"REQ{n:08d}")
     checked_at = factory.LazyFunction(timezone.now)
+
+
+class TaxRegimeChangeRequestFactory(DjangoModelFactory[TaxRegimeChangeRequest]):
+    """A pending request by an owner of a vendor declaring RF01, asking for OSS from mid-2027.
+
+    `create()` makes `requested_by` an owner of the vendor (pass `requester_is_owner=False` to
+    skip it); `build()` writes nothing, so tests that build a request pass an owner. Traits:
+    `approved` (with the profile version it created) and `rejected` (with a reason). Tests of
+    the workflow go through `apps.tax.services` with `.build()`.
+    """
+
+    class Meta:
+        model = TaxRegimeChangeRequest
+        skip_postgeneration_save = True  # the hook adds a membership, not request fields
+
+    class Params:
+        approved = factory.Trait(
+            status=engine.APPROVED,
+            reviewed_by=factory.SubFactory(UserFactory, staff=True),
+            reviewed_at=factory.LazyFunction(timezone.now),
+            profile=factory.SubFactory(
+                VendorTaxProfileFactory,
+                vendor=factory.SelfAttribute("..vendor"),
+                regime=factory.SelfAttribute("..regime"),
+                exempt_reason=factory.SelfAttribute("..exempt_reason"),
+                oss_registered_since=factory.SelfAttribute("..oss_registered_since"),
+                valid_from=factory.SelfAttribute("..effective_from"),
+            ),
+        )
+        rejected = factory.Trait(
+            status=engine.REJECTED,
+            reviewed_by=factory.SubFactory(UserFactory, staff=True),
+            reviewed_at=factory.LazyFunction(timezone.now),
+            review_reason="The OSS registration document is missing.",
+        )
+
+    vendor = factory.SubFactory(VendorFactory, fiscal_regime="RF01")
+    status = engine.PENDING
+    regime = engine.OSS
+    exempt_reason = ""
+    oss_registered_since = factory.LazyFunction(lambda: dt.date(2027, 7, 1))
+    fiscal_regime = ""
+    effective_from = factory.LazyFunction(lambda: utc(2027, 7))
+    note = "Registered for the One-Stop Shop."
+    document_reference = factory.Sequence(lambda n: f"OSS-REG-{n:05d}")
+    requested_by = factory.SubFactory(UserFactory)
+
+    @factory.post_generation
+    def requester_is_owner(obj: TaxRegimeChangeRequest, create: bool, extracted: Any) -> None:
+        """A created request's requester is an owner of the vendor (role matrix, CORE.2)."""
+        if create and extracted is not False:
+            VendorMemberFactory.create(vendor=obj.vendor, user=obj.requested_by)
