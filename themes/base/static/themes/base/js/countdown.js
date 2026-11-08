@@ -13,6 +13,9 @@
 // No inline script or style attribute, so the strict CSP holds; no animation at all.
 
 const MINUTE = 60_000;
+// Browsers keep a timer's delay as a signed 32-bit integer: a longer one (about 24.8 days)
+// overflows and fires at once. Longer waits are cut into steps of at most this.
+const MAX_DELAY = 2 ** 31 - 1;
 const language = document.documentElement.lang || undefined;
 
 function formatDate(date) {
@@ -95,7 +98,7 @@ function startCountdown(block) {
     }
     if (paused) {
       // Paused, the counter stands still; the launch itself still switches the block.
-      timer = setTimeout(tick, left);
+      timer = setTimeout(tick, Math.min(left, MAX_DELAY));
       return;
     }
     if (remaining) {

@@ -9,9 +9,9 @@ its admin editor needs no inline script, so it works under the strict CSP (SEC.1
 
 Bodies are StreamFields with rich-text paragraphs, images and galleries (I18N.3), heroes, calls to
 action, FAQs and "featured links" cards to pages, catalog terms and vendors (CMS.2) and launch
-countdowns (CMS.9); the product grid comes with CMS.10. A page with a running countdown caps its
-Cache-Control `max-age` at the target (`CountdownCacheMixin`), so no cache serves the countdown
-after the launch.
+countdowns (CMS.9); the product grid comes with CMS.10. A page with a running countdown caps the
+Cache-Control `max-age` and `s-maxage` set upstream at the target (`CountdownCacheMixin`), so no
+cache serves the countdown after the launch; it never adds a lifetime.
 
 Translation (I18N.3, spec 09 §9.2): wagtail-localize copies a page into another locale and keeps
 it in sync with its source. Texts, alt texts and captions are translated; images are synchronised
@@ -75,26 +75,31 @@ def body_field(verbose_name: Any = None, *, countdown: bool = False) -> StreamFi
 
 
 class CountdownCacheMixin:
-    """Caps the response's `max-age` (and `s-maxage`) at the nearest running countdown target
+    """Caps the response's `max-age` and `s-maxage` at the nearest running countdown target
     of the page's body (CMS.9, spec 10 §10.2): a cache, the SEO.6 page cache included, never
-    serves an active countdown after its launch. A signed-in visitor's page is marked `private`
-    too. A response that must not be stored (`no-store`) is left alone."""
+    serves an active countdown after its launch. The cap only shortens a lifetime already set
+    upstream: a response without `max-age` (or `s-maxage`) gets none, so a page that was not
+    cacheable never becomes so. When it caps, a signed-in visitor's page is marked `private` too.
+    A response that must not be stored (`no-store`) is left alone."""
 
     body: Any
 
     def serve(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
         response: HttpResponseBase = super().serve(request, *args, **kwargs)  # type: ignore[misc]
+        if "no-store" in response.get("Cache-Control", ""):
+            return response
+        current = {"max_age": get_max_age(response), "s_maxage": _directive(response, "s-maxage")}
+        if all(value is None for value in current.values()):
+            return response
         targets = countdown_targets(self.body)
-        if not targets or "no-store" in response.get("Cache-Control", ""):
+        if not targets:
             return response
         now = timezone.now()
-        max_age = engine.capped_max_age(targets, now, get_max_age(response))
-        if max_age is None:
-            return response
-        directives: dict[str, Any] = {"max_age": max_age}
-        shared = _directive(response, "s-maxage")
-        if shared is not None:
-            directives["s_maxage"] = engine.capped_max_age(targets, now, shared)
+        directives: dict[str, Any] = {
+            name: engine.capped_max_age(targets, now, value)
+            for name, value in current.items()
+            if value is not None
+        }
         if request.user.is_authenticated:
             directives["private"] = True
         patch_cache_control(response, **directives)

@@ -50,7 +50,9 @@ from apps.cms.blocks import (
     FaqBlock,
     FigureBlock,
     GalleryBlock,
+    LaunchCountdownBlock,
 )
+from apps.cms.models import CountdownCacheMixin
 from apps.core.fields import CountryField
 from apps.core.geocoding import GeocodeResult
 from apps.core.models import BaseModel
@@ -97,8 +99,9 @@ def default_timezone() -> str:
 def event_blocks() -> list[tuple[str, blocks.Block]]:
     """The body blocks of an event, from the CMS.2 library (spec 15 "Body").
 
-    The CMS.10 product grid and the CMS.9 countdown join when those tasks add them; embeds only
-    with the SEO.5 consent rules. EVT.3 restricts vendors to the vendor-safe subset.
+    The CMS.9 launch countdown is offered (spec 10 §10.2; `EventPage` caps its cache at the
+    target). The CMS.10 product grid joins when that task adds it; embeds only with the SEO.5
+    consent rules. EVT.3 restricts vendors to the vendor-safe subset.
     """
     return [
         ("paragraph", blocks.RichTextBlock(features=RICH_TEXT_FEATURES, label=_("Rich text"))),
@@ -106,6 +109,7 @@ def event_blocks() -> list[tuple[str, blocks.Block]]:
         ("gallery", GalleryBlock()),
         ("cta", CallToActionBlock()),
         ("faq", FaqBlock()),
+        ("countdown", LaunchCountdownBlock()),
     ]
 
 
@@ -278,7 +282,7 @@ def _constraints() -> list[models.BaseConstraint]:
     ]
 
 
-class EventPage(Page):  # type: ignore[misc]  # Wagtail is untyped
+class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is untyped
     """One event in one language (spec 15 "Page models"); its translations share the
     `translation_key`. Written by vendors through the EVT.3 services and by staff in the admin."""
 

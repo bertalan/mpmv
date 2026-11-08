@@ -159,12 +159,15 @@ def capped_max_age(
     targets: Iterable[dt.datetime], now: dt.datetime, max_age: int | None
 ) -> int | None:
     """The `max-age` (seconds) a page may carry so no cache keeps it past its nearest active
-    countdown target: `max_age` itself, or the whole seconds left when fewer. Targets already
-    reached do not count; with none left, `max_age` is returned unchanged (None: not set)."""
+    countdown target: `max_age` itself, or the whole seconds left when fewer. The cap only ever
+    shortens a lifetime: with no `max_age` (None) the result is None, so a response that was not
+    cacheable never becomes so. Targets already reached do not count; with none left, `max_age`
+    is returned unchanged."""
     _require_aware(now)
+    if max_age is None:
+        return None
     now = now.astimezone(dt.UTC)
     ahead = [target.astimezone(dt.UTC) - now for target in targets if target > now]
     if not ahead:
         return max_age
-    left = math.floor(min(ahead).total_seconds())
-    return left if max_age is None else min(max_age, left)
+    return min(max_age, math.floor(min(ahead).total_seconds()))
