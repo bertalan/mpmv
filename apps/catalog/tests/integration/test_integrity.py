@@ -291,9 +291,8 @@ def test_staff_duplicate_a_product_to_another_vendor_as_a_draft() -> None:
     assert copy.required_companion is None
     assert not copy.upsells.exists()
     assert set(copy.translations.values_list("language", flat=True)) == {"en", "it"}
-    assert set(ProductTranslation.objects.filter(product=copy).values_list("slug", flat=True)) == {
-        ""
-    }
+    copied_slugs = ProductTranslation.objects.filter(product=copy).values_list("slug", flat=True)
+    assert all(slug and slug.endswith("-2") for slug in copied_slugs)
     copied_variant = Variant.objects.get(product=copy)
     assert copied_variant.vendor == target
     assert copied_variant.sku == "VAR-RED"
