@@ -30,9 +30,10 @@ sets the backup targets (RPO ≤ 15 min, RTO ≤ 4 h, to be confirmed).
 
 Option 3:
 
-- Provider: Hetzner Cloud, EU region, x86 (amd64) servers, so the existing amd64 release image
-  needs no ARM build.
-- STAGE and LIVE each have two VPS: an app VPS and a dedicated database VPS.
+- Provider: Hetzner Cloud, EU region, Arm64 (aarch64) servers for STAGE and LIVE
+  (amended 2026-11-08; the release image is multi-arch).
+- LIVE has two VPS: an app VPS and a dedicated database VPS. STAGE has one VPS holding app,
+  worker, Caddy and PostgreSQL (amended 2026-11-08).
 - The app VPS runs app, worker and Caddy as rootless Podman Quadlet units, as built in ARC.5.
   Releases are image tags, and rollback means switching back to the previous tag.
 - The database VPS runs PostgreSQL 17, self-managed. It is reachable only over the Hetzner
@@ -67,3 +68,22 @@ Option 3:
   rollback move to ARC.13.
 - We revisit this decision if database operations take more time than the managed price
   difference is worth, or if the RTO must drop below what a restore can achieve.
+
+## Amendment 2026-11-08
+
+- **STAGE on one VPS (owner decision).** STAGE holds only synthetic data, so it runs app, worker,
+  Caddy and PostgreSQL 17 on a single Hetzner Cloud VPS, at lower cost. PostgreSQL listens only
+  on the loopback interface, and the app still connects with TLS `sslmode=verify-full` using the
+  internal-CA certificate (owner decision MQ-11), so the LIVE connection path is exercised. LIVE
+  keeps two VPS (app VPS and a dedicated database VPS on the Hetzner private network), unchanged.
+  STAGE and LIVE never share a machine, keys or database: STAGE runs untested releases and
+  destructive tests, LIVE holds personal and payment data, and each environment has its own
+  secrets. App-to-database network failures cannot be tested on one VPS, so they are repeated on
+  LIVE-equivalent servers before cutover (MIG.9).
+- **Arm64 servers (lane-a technical decision, delegated by the owner).** STAGE and LIVE use
+  Hetzner Arm64 (aarch64) servers instead of x86, so STAGE mirrors LIVE. The release image
+  becomes multi-arch (linux/amd64 and linux/arm64), with the arm64 variant built on a native
+  GitHub arm64 runner, without QEMU emulation; this CI change is part of ARC.13. Reasons: Arm
+  servers cost less at the same size, the development Macs are arm64, and all Python
+  dependencies ship arm64 wheels.
+- STAGE abuse tests before go-live are tracked as ARC.21.

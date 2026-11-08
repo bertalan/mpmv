@@ -36,6 +36,10 @@ STAGE and LIVE once owner question Q-48 picks it, with DKIM, SPF and DMARC, the 
 a deliverability check: +1 task, 0 h of P1. Eleven P1 tasks (94 h) that waited for STAGE only
 through ARC.16 no longer do.
 
+STAGE moves to a single Arm64 VPS and gains the abuse-test row ARC.21 (2026-11-08): +1 task,
++8 h of P1. The multi-arch image build stays inside ARC.13 at 11 h. The forecast below still
+counts the earlier totals.
+
 The owner's decision D-07 (2026-11-07: descriptive `/{taxonomy}/{term}/` URLs, legacy tag URLs
 moved with the staggered product URL mechanism) widens CAT.8, MIG.6 and MIG.11 at the same hours.
 The product grid block leaves CMS.2 (10 → 8 h, now depending on CMS.1 only) for the new row CMS.10
@@ -156,7 +160,7 @@ A milestone is closed only with a working demo on STAGE and the domain regressio
 - CMP for cookies; transactional email provider. No SDI intermediary: the platform issues no
   invoices, and the operator's accountant invoices commissions with its own tool from the CMP.2
   statement.
-- Hosting: Hetzner Cloud VPS (app and database per environment), Hetzner Object Storage for media and backups, CDN, error tracking.
+- Hosting: Hetzner Cloud Arm64 VPS (LIVE: app VPS and database VPS; STAGE: one VPS for both), Hetzner Object Storage for media and backups, CDN, error tracking.
 - Custom graphics and UX beyond the `base` theme and the first vertical theme (spec 14), such as a
   logo, illustrations or commissioned photography.
 
