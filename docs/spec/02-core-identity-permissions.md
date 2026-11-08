@@ -109,12 +109,20 @@ The second factor is a TOTP authenticator app or a passkey. The confirmed parame
   process (CORE.12, owner decision Q-18), logging of every mutating call.
 - API rate limit (CORE.12): fixed windows per key, counted in PostgreSQL (`ApiRateCounter`, one
   atomic upsert per call), so every app process shares one counter and no Redis is needed.
-  `API_RATE_LIMIT` is the key-wide limit of every key, set per environment, default
-  `120/minute` (owner decision MQ-4; CORE.12 shipped `600/minute`, CORE.16 lowers it);
+  `API_RATE_LIMIT` is the key-wide limit of every key, set per environment with
+  `MPMV_API_RATE_LIMIT`, default `120/minute` (owner decision MQ-4; CORE.12 shipped
+  `600/minute`, CORE.16 lowered it);
   `API_RATE_LIMIT_SCOPES` gives a costly scope its own counter and limit for every key;
   `API_RATE_LIMIT_CLIENTS` replaces the key-wide limit of one key, by `ApiClient` public id.
-  Staff can raise the limit of one key from the admin, audited and behind an MFA step-up
-  (CORE.16); that override wins over the settings. Only
+  Staff can raise or lower the limit of one key from the admin (`ApiClient.rate_limit`), with
+  the change permission, audited (`api.client.rate_limit_changed`) and behind an MFA step-up
+  (CORE.16). Precedence of a key's key-wide limit: that override, then
+  `API_RATE_LIMIT_CLIENTS`, then `API_RATE_LIMIT`. A scope with its own limit keeps it for every
+  key, a raised one included. A key whose own limit (override or `API_RATE_LIMIT_CLIENTS`) is
+  below `API_RATE_LIMIT` (compared as calls per second) is also capped on such scopes, because
+  those calls count on its key-wide counter too. A key on the default limit, or one raised to or
+  above it, keeps separate budgets, so a raise never leaves a key fewer calls than a default key
+  (pending owner confirmation of this precedence). Only
   calls of an accepted key count (401/403 refusals do not). Over the limit the answer is a 429
   `rate_limited` problem with `Retry-After` (seconds to the end of the window); a mutating call
   refused this way is in the mutation log.

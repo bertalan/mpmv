@@ -15,7 +15,13 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 
-from apps.core.fields import CountryField, EncryptedCharField, LanguageField, MoneyField
+from apps.core.fields import (
+    CountryField,
+    EncryptedCharField,
+    EncryptedDateField,
+    LanguageField,
+    MoneyField,
+)
 from apps.core.models import (
     VENDOR_OVERRIDES,
     BaseModel,
@@ -160,6 +166,16 @@ class Vendor(BaseModel):
     last_name = models.CharField(
         max_length=60, blank=True, help_text="Sole proprietors: last name (FatturaPA Cognome)."
     )
+    # DAC7 (VEN.23), sole proprietors: personal data, encrypted at rest and masked in the audit
+    # log (SEC.3).
+    date_of_birth = EncryptedDateField(
+        null=True, blank=True, help_text="DAC7, sole proprietors: date of birth."
+    )
+    place_of_birth = EncryptedCharField(
+        max_length=100,
+        blank=True,
+        help_text="DAC7, sole proprietors whose TIN country issues no TIN: city and country.",
+    )
     vat_number = models.CharField("VAT number", max_length=32, blank=True)
     # Written by `services.check_vat_number` only; reset when the VAT number changes.
     vies_status = models.CharField(
@@ -178,8 +194,21 @@ class Vendor(BaseModel):
         blank=True,
         help_text="Italy: 16 characters, or 11 digits for entities. Elsewhere: the national TIN.",
     )
+    tin_country = CountryField(
+        "TIN issuing country",
+        blank=True,
+        help_text="DAC7: the country that issued the TIN (format checked for that country).",
+    )
+    tin_same_as_vat = models.BooleanField(
+        "TIN same as the VAT number",
+        default=False,
+        help_text=(
+            "Entities whose TIN is their VAT number: the TIN is filled from the VAT number once "
+            "VIES says it is valid."
+        ),
+    )
     tax_residence_country = CountryField(
-        "country of tax residence", blank=True, help_text="DAC7: the country that issued the TIN."
+        "country of tax residence", blank=True, help_text="DAC7: the Member State of residence."
     )
     fiscal_regime = models.CharField(
         max_length=4,
@@ -187,8 +216,23 @@ class Vendor(BaseModel):
         blank=True,
         help_text="The regime declared on invoices (FatturaPA RegimeFiscale; RF19 = forfettario).",
     )
+    cross_border_franchise_number = models.CharField(
+        "cross-border franchise number",
+        max_length=20,
+        blank=True,
+        help_text=(
+            "RF20 only: the number with the suffix EX issued by the member state of "
+            "establishment for the cross-border VAT franchise (e.g. DE123456789EX)."
+        ),
+    )
     ateco_code = models.CharField("ATECO code", max_length=8, blank=True)
     eori = models.CharField("EORI number", max_length=17, blank=True)
+    business_registration_number = models.CharField(
+        "business registration number",
+        max_length=40,
+        blank=True,
+        help_text="DAC7, entities: the company register number (in Italy, the REA number).",
+    )
     registered_street = models.CharField("registered office street", max_length=200, blank=True)
     registered_street_number = models.CharField(
         "registered office street number", max_length=16, blank=True
@@ -244,6 +288,12 @@ class Vendor(BaseModel):
     iban = EncryptedCharField("IBAN", max_length=34, blank=True)
     bic = models.CharField("BIC", max_length=11, blank=True)
     bank_name = models.CharField(max_length=100, blank=True)
+    account_holder_name = models.CharField(
+        "account holder name",
+        max_length=140,
+        blank=True,
+        help_text="DAC7: only when the account holder is not the vendor.",
+    )
 
     _stored_vat_number: str | None = None  # VAT number as loaded, to reset the VIES status
 
@@ -287,8 +337,25 @@ class Vendor(BaseModel):
 
     def legal_identity(self) -> engine.LegalIdentity:
         """The legal identity as plain values, for the pure rules in `engine`."""
-        names = ("country", "legal_name", "contact_email", "phone", *engine.LEGAL_FIELDS)
+        names = (
+            "country",
+            "legal_name",
+            "contact_email",
+            "phone",
+            "tin_same_as_vat",
+            "vies_status",
+            *engine.LEGAL_FIELDS,
+        )
         return engine.LegalIdentity(**{name: getattr(self, name) for name in names})
+
+    def fill_tin_from_vat(self) -> None:
+        """ "Same as the VAT number": derive the TIN from the VAT number, which counts as VIES
+        valid only while it is the number VIES checked (a new one is checked again)."""
+        identity = self.legal_identity()
+        if self._state.adding or self.vat_number != self._stored_vat_number:
+            identity = dataclasses.replace(identity, vies_status=engine.VIES_UNCHECKED)
+        filled = engine.tin_from_vat(identity)
+        self.tax_code, self.tin_country = filled.tax_code, filled.tin_country
 
     def clean_fields(self, exclude: Any = None) -> None:
         """Field validation, then the legal identity rules on the values that are present."""

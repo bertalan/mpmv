@@ -9,7 +9,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("vendors", "0015_reopen_onboarding_round"),
+        ("vendors", "0019_backfill_dac7_seller_dataset"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

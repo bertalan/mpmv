@@ -1,0 +1,12 @@
+# Third-party JavaScript used only by the e2e suite (THM.5, spec 14 §14.11): never served by the
+# site, never loaded from a CDN. Same format and checks as apps/themes/static/vendor/VENDORED.toml;
+# tests/unit/test_e2e_vendored.py fails on a hash mismatch or a file without an entry.
+# To update: download the new version from the pinned URL, replace the file, update the entry.
+
+[[file]]
+path = "axe.min.js"
+name = "axe-core"
+version = "4.10.2"
+source = "https://unpkg.com/axe-core@4.10.2/axe.min.js"
+sha256 = "b511cd9dec01c76f4b2ad1723b66b6db37d4c2eb4ed199076e1829d9ee7b75e3"
+license = "MPL-2.0"

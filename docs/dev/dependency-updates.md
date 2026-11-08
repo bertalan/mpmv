@@ -90,23 +90,25 @@ Three things report known vulnerabilities:
   yet, an ignore (`--ignore-vuln <ID>` in the `audit` target) needs a task, a justification and a
   date to look again, all in the PR.
 - **The SBOMs** below can be scanned at any time, for example
-  `grype sbom:build/sbom/mpmv-image.cdx.json` for the image's OS packages.
+  `grype sbom:build/sbom/mpmv-image-arm64.cdx.json` for the image's OS packages.
 
 Repository settings (owner, *Settings → Advanced Security*, formerly *Code security*): dependency graph, Dependabot alerts
 and Dependabot security updates must be on. Version updates need only this config file.
 
 ## SBOM
 
-Every CI run and every release produce two [CycloneDX](https://cyclonedx.org/) 1.6 JSON SBOMs:
+Every CI run and every release produce [CycloneDX](https://cyclonedx.org/) 1.6 JSON SBOMs: one of
+the Python environment and one of the image for each architecture (ARC.13):
 
 | SBOM | Produced by | Content |
 |---|---|---|
 | `mpmv-python.cdx.json` | `make sbom` (`cyclonedx-py`) | The production Python environment from `uv.lock`, no dev group, with licenses |
-| `mpmv-image.cdx.json` | syft (`anchore/sbom-action`) | The built image: Debian packages, Python and every package in the virtualenv |
+| `mpmv-image-amd64.cdx.json`, `mpmv-image-arm64.cdx.json` | syft (`anchore/sbom-action`) | The built image for that architecture: Debian packages, Python and every package in the virtualenv |
 
 Where to find them:
 
-- **CI**: the `sbom-python` and `sbom-image` artifacts of each run (*Actions → run → Artifacts*).
+- **CI**: the `sbom-python`, `sbom-image-amd64` and `sbom-image-arm64` artifacts of each run
+  (*Actions → run → Artifacts*).
 - **Releases**: attached to the GitHub release of each `vX.Y.Z` tag by `release.yml`, next to
   the image `ghcr.io/<owner>/mpmv-app:X.Y.Z` they describe.
 - **Locally**: `make sbom` writes `build/sbom/mpmv-python.cdx.json`; with syft installed,
