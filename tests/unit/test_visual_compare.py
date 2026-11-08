@@ -2,8 +2,9 @@
 
 Screenshots are compared with baselines under `tests/e2e/baselines/<theme>/<page>-<width>.png`
 with a small tolerance, and a diff image is saved on failure. Baselines come only from the CI
-image (Linux Chromium): the comparison runs in CI (or with `MPMV_VISUAL=compare` in the same
-container), is skipped elsewhere, and `MPMV_VISUAL=update` (`make e2e-baselines`) rewrites them.
+runner (Linux Chromium): the comparison runs in CI (or with `MPMV_VISUAL=compare` on the same
+platform), is skipped elsewhere, and `MPMV_VISUAL=update` (`make e2e-baselines`) rewrites them.
+On a mismatch the screenshot is kept as a candidate baseline next to the diff image.
 """
 
 from pathlib import Path
@@ -14,6 +15,7 @@ from PIL import Image
 from tests.e2e.visual import (
     BASELINE_DIR,
     baseline_path,
+    check_screenshot,
     compare_png,
     visual_mode,
 )
@@ -88,3 +90,59 @@ def test_the_mode_comes_from_the_environment(env: dict[str, str], mode: str) -> 
 def test_an_unknown_mode_is_an_error() -> None:
     with pytest.raises(ValueError, match="MPMV_VISUAL"):
         visual_mode({"MPMV_VISUAL": "sometimes"})
+
+
+def red_square(path: Path) -> Path:
+    image = Image.new("RGB", (100, 100), WHITE)
+    for x in range(30):
+        for y in range(30):
+            image.putpixel((x, y), (200, 0, 0))
+    image.save(path)
+    return path
+
+
+def test_update_mode_writes_the_screenshot_as_the_baseline(tmp_path: Path) -> None:
+    actual = png(tmp_path / "actual.png")
+    baseline = tmp_path / "baselines" / "base" / "styleguide-360.png"
+    outcome = check_screenshot(
+        actual, baseline, tmp_path / "candidate.png", tmp_path / "diff.png", mode="update"
+    )
+    assert outcome.status == "updated"
+    assert baseline.read_bytes() == actual.read_bytes()
+
+
+def test_a_page_without_a_baseline_saves_a_candidate(tmp_path: Path) -> None:
+    actual = png(tmp_path / "actual.png")
+    candidate = tmp_path / "candidates" / "base" / "styleguide-360.png"
+    outcome = check_screenshot(
+        actual, tmp_path / "missing.png", candidate, tmp_path / "diff.png", mode="compare"
+    )
+    assert outcome.status == "missing"
+    assert candidate.read_bytes() == actual.read_bytes()
+
+
+def test_a_matching_screenshot_saves_no_candidate(tmp_path: Path) -> None:
+    candidate = tmp_path / "candidate.png"
+    outcome = check_screenshot(
+        png(tmp_path / "actual.png"),
+        png(tmp_path / "baseline.png"),
+        candidate,
+        tmp_path / "diff.png",
+        mode="compare",
+    )
+    assert outcome.status == "match"
+    assert not candidate.exists()
+
+
+def test_a_mismatch_saves_the_actual_screenshot_as_a_candidate_baseline(tmp_path: Path) -> None:
+    """An intentional change needs a CI-rendered PNG to commit, not only the magenta diff."""
+    actual = red_square(tmp_path / "actual.png")
+    candidate = tmp_path / "candidates" / "base" / "styleguide-360.png"
+    diff = tmp_path / "diffs" / "base" / "styleguide-360.png"
+    baseline = png(tmp_path / "baseline.png")
+    outcome = check_screenshot(actual, baseline, candidate, diff, mode="compare")
+    assert outcome.status == "mismatch"
+    assert outcome.comparison is not None
+    assert not outcome.comparison.ok
+    assert candidate.read_bytes() == actual.read_bytes()
+    assert diff.is_file()

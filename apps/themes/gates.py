@@ -52,8 +52,14 @@ MAX_FONT_FILES = 4
 MAX_FONT_FAMILIES = 2
 FONT_SUFFIX = ".woff2"
 LICENCES_FILE = "LICENSES.toml"
-ALLOWED_ASSET_LICENCES = frozenset({"OFL-1.1", "Apache-2.0", "MIT", "ISC", "CC0-1.0"})
-ASSET_KINDS = frozenset({"font", "icons", "image"})
+# §14.8: fonts OFL 1.1 or Apache 2.0, icon sets MIT or ISC, placeholder images CC0 (own work).
+ALLOWED_LICENCES_BY_KIND: Mapping[str, frozenset[str]] = {
+    "font": frozenset({"OFL-1.1", "Apache-2.0"}),
+    "icons": frozenset({"MIT", "ISC"}),
+    "image": frozenset({"CC0-1.0"}),
+}
+ALLOWED_ASSET_LICENCES = frozenset().union(*ALLOWED_LICENCES_BY_KIND.values())
+ASSET_KINDS = frozenset(ALLOWED_LICENCES_BY_KIND)
 # Files under static/themes/<slug>/ that are code, not assets needing a licence entry.
 SOURCE_SUFFIXES = frozenset({".css", ".js"})
 
@@ -123,9 +129,17 @@ def _entry_problems(entry: Mapping[str, object]) -> list[str]:
     if isinstance(source, str) and source and not source.startswith("https://"):
         problems.append("source must be an https URL")
     licence = entry.get("license")
+    kind = entry.get("kind")
     if isinstance(licence, str) and licence and licence not in ALLOWED_ASSET_LICENCES:
         problems.append(f"licence {licence!r} is not allowed")
-    if entry.get("kind") not in ASSET_KINDS:
+    elif isinstance(licence, str) and isinstance(kind, str) and kind in ASSET_KINDS:
+        allowed = ALLOWED_LICENCES_BY_KIND[kind]
+        if licence not in allowed:
+            problems.append(
+                f"licence {licence!r} is not allowed for kind {kind!r} "
+                f"(only {', '.join(sorted(allowed))})"
+            )
+    if kind not in ASSET_KINDS:
         problems.append(f"kind must be one of {', '.join(sorted(ASSET_KINDS))}")
     files = entry.get("files")
     if not isinstance(files, list) or not files or not all(isinstance(f, str) for f in files):

@@ -106,8 +106,9 @@ test: db ## Unit + integration suites
 test-e2e: db ## E2E suite in headless Chromium; screenshots in build/e2e/screenshots/
 	uv run pytest -m e2e --junitxml=$(REPORTS)/junit-e2e.xml
 
-# THM.5, spec 14 §14.10: baselines come from the CI image only (Linux Chromium); run this there.
-e2e-baselines: db ## Rewrite the visual baselines in tests/e2e/baselines/ (run in the CI image)
+# THM.5, spec 14 §14.10: baselines come from the CI runner only (Linux Chromium); the manual
+# "Visual baselines" workflow runs this target there and uploads the PNGs.
+e2e-baselines: db ## Rewrite the visual baselines in tests/e2e/baselines/ (CI: the Visual baselines workflow)
 	MPMV_VISUAL=update uv run pytest -m e2e -k visual_baseline
 
 test-all: test test-e2e ## All three suites

@@ -221,7 +221,7 @@ jobs:
           name: e2e-screenshots
           path: build/e2e/screenshots/
           if-no-files-found: ignore
-      # THM.5, spec 14 §14.10: candidate baselines for pages without one, and diff images.
+      # THM.5, spec 14 §14.10: candidate baselines (pages without one or that differ) and diffs.
       - name: Store visual baselines and diffs
         if: always()
         uses: actions/upload-artifact@v7

@@ -1,7 +1,7 @@
 """Visual comparison harness of the e2e suite (THM.5, spec 14 §14.10).
 
 Baselines are `tests/e2e/baselines/<theme>/<page>-<width>.png`. Font rendering differs between
-platforms, so baselines are produced only in the CI image (Linux Chromium) and the comparison
+platforms, so baselines are produced only on the CI runner (Linux Chromium) and the comparison
 runs only there. `MPMV_VISUAL` selects the mode:
 
 - unset: `compare` in CI (`CI` is set by GitHub Actions), `off` elsewhere (the test is skipped
@@ -13,7 +13,9 @@ runs only there. `MPMV_VISUAL` selects the mode:
 
 In `compare` mode a page without a baseline is skipped, and its screenshot is saved under
 `build/e2e/baselines/` so CI uploads it as an artifact: THM.10 reviews and commits the first
-baselines. On a mismatch a diff image is saved under `build/e2e/diffs/`.
+baselines. On a mismatch the screenshot is saved there too (the candidate new baseline for an
+intentional change) and a diff image is saved under `build/e2e/diffs/`. The `Visual baselines`
+workflow (manual dispatch) runs `MPMV_VISUAL=update` on the CI runner and uploads every PNG.
 """
 
 import os
@@ -59,7 +61,7 @@ def require_visual_mode() -> Mode:
     if mode == "off":
         pytest.skip(
             "Visual comparison runs only in CI (Linux Chromium baselines, spec 14 §14.10). "
-            "Set MPMV_VISUAL=compare to run it inside the CI image."
+            "Set MPMV_VISUAL=compare to run it on a Linux Chromium like the CI runner."
         )
     return mode
 
@@ -112,6 +114,45 @@ def compare_png(
     return result
 
 
+Status = Literal["updated", "missing", "match", "mismatch"]
+
+
+@dataclass(frozen=True)
+class Outcome:
+    status: Status
+    comparison: Comparison | None = None
+
+    def describe(self) -> str:
+        return self.comparison.describe() if self.comparison else self.status
+
+
+def _copy(source: Path, target: Path) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, target)
+
+
+def check_screenshot(
+    actual: Path, baseline: Path, candidate: Path, diff: Path, *, mode: Mode
+) -> Outcome:
+    """Settle a screenshot against its baseline.
+
+    `update` copies it over the baseline. In `compare` mode a missing baseline or a mismatch
+    copies the screenshot to `candidate` (uploaded by CI), so a reviewed change can commit the
+    CI-rendered PNG as the new baseline; a mismatch also writes the diff image.
+    """
+    if mode == "update":
+        _copy(actual, baseline)
+        return Outcome("updated")
+    if not baseline.is_file():
+        _copy(actual, candidate)
+        return Outcome("missing")
+    result = compare_png(actual, baseline, diff)
+    if result.ok:
+        return Outcome("match", result)
+    _copy(actual, candidate)
+    return Outcome("mismatch", result)
+
+
 def assert_matches_baseline(page: Page, *, theme: str, name: str, width: int) -> None:
     """Screenshot the full page at `width` and compare it with its baseline (see the module)."""
     mode = require_visual_mode()
@@ -129,21 +170,16 @@ def assert_matches_baseline(page: Page, *, theme: str, name: str, width: int) ->
         mask=[page.locator("[data-countdown]")],
     )
     baseline = baseline_path(theme, name, width)
-    if mode == "update":
-        baseline.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(actual, baseline)
-        return
-    if not baseline.is_file():
-        candidate = CANDIDATE_DIR / theme / baseline.name
-        candidate.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(actual, candidate)
+    candidate = CANDIDATE_DIR / theme / baseline.name
+    diff = DIFF_DIR / theme / baseline.name
+    outcome = check_screenshot(actual, baseline, candidate, diff, mode=mode)
+    if outcome.status == "missing":
         pytest.skip(
             f"No baseline {baseline.relative_to(ROOT)} yet; the CI screenshot is saved as "
             f"{candidate.relative_to(ROOT)} (CI artifact) for review (THM.10)."
         )
-    diff = DIFF_DIR / theme / f"{name}-{width}.png"
-    result = compare_png(actual, baseline, diff)
-    assert result.ok, (
-        f"{theme}/{name} at {width} px differs from its baseline: {result.describe()}; "
-        f"diff image: {diff.relative_to(ROOT)}"
+    assert outcome.status != "mismatch", (
+        f"{theme}/{name} at {width} px differs from its baseline: {outcome.describe()}; "
+        f"diff image: {diff.relative_to(ROOT)}; if the change is intended, the new baseline "
+        f"is {candidate.relative_to(ROOT)} (CI artifact)"
     )

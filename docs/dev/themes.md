@@ -230,7 +230,7 @@ and CI.
 | `csp` | same | A CSP lint finding in the theme's own templates (an inline style) |
 | `size` | same | `theme.css` over 45 KB or the page's JavaScript (vendored htmx and Alpine plus the chain's modules) over 40 KB, compressed |
 | `fonts` | same | A font file that is not woff2, more than 4 font files, more than 2 families |
-| `licences` | same | A font, icon or image under `static/themes/<slug>/` without an entry in the theme's `LICENSES.toml`, an entry for a missing file, a licence outside `OFL-1.1`, `Apache-2.0`, `MIT`, `ISC`, `CC0-1.0`, or an entry without name, kind, https source or author |
+| `licences` | same | A font, icon or image under `static/themes/<slug>/` without an entry in the theme's `LICENSES.toml`, an entry for a missing file, a licence its kind does not allow (`font`: `OFL-1.1` or `Apache-2.0`; `icons`: `MIT` or `ISC`; `image`: `CC0-1.0`), or an entry without name, kind, https source or author |
 | axe-core | `tests/e2e/test_theme_quality_gates.py` | Any violation with the tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa` on `/_styleguide/` rendered with each theme |
 | visual | same, through `tests/e2e/visual.py` | A styleguide screenshot at 360, 768 or 1280 px that differs from its baseline |
 
@@ -249,22 +249,31 @@ never loaded from a CDN). axe-core is MPL-2.0, which is allowed for test tooling
 ### Visual baselines
 
 Baselines live in `tests/e2e/baselines/<theme>/<page>-<width>.png`. Fonts render differently on
-each platform, so baselines come only from the CI image (Linux Chromium), and the comparison runs
-only there. `MPMV_VISUAL` sets the mode:
+each platform, so baselines come only from the CI runner (`ubuntu-24.04` with Playwright's
+Chromium), and the comparison runs only there. `MPMV_VISUAL` sets the mode:
 
 | Value | Effect |
 |---|---|
 | unset | `compare` in CI, `off` elsewhere (the tests are skipped with a message) |
-| `compare` | Compare with the baselines; run it inside the CI image |
-| `update` | Write the screenshots as the new baselines (`make e2e-baselines`, inside the CI image) |
+| `compare` | Compare with the baselines; meaningful only on the same platform as the CI runner |
+| `update` | Write the screenshots as the new baselines (`make e2e-baselines`) |
 | `off` | Skip |
 
 A page without a baseline is skipped in CI, and its screenshot is uploaded as the `e2e-visual`
-artifact (`build/e2e/baselines/`). On a mismatch the diff image (changed pixels in magenta) is in
-the same artifact (`build/e2e/diffs/`). The tolerance is 0.1% of the pixels, with a per-channel
-threshold for anti-aliasing. To add or update baselines, take the PNGs from the artifact (or run
-`make e2e-baselines` in the CI image), commit them under `tests/e2e/baselines/`, and review them in
-the pull request like code. The first baselines for `base` and `ride` are committed by THM.10.
+artifact (`build/e2e/baselines/`). On a mismatch the screenshot goes to the same place (the
+candidate new baseline) and the diff image (changed pixels in magenta) to `build/e2e/diffs/`, in
+the same artifact. The tolerance is 0.1% of the pixels, with a per-channel threshold for
+anti-aliasing.
+
+To add or update baselines after a reviewed, intentional change:
+
+1. Take the PNGs from the `e2e-visual` artifact of the failing CI run (`build/e2e/baselines/`),
+   or run the **Visual baselines** workflow on your branch
+   (`gh workflow run visual-baselines.yml --ref <branch>`): it runs `make e2e-baselines`'s
+   command on the CI runner and uploads every baseline as the `visual-baselines` artifact.
+2. Commit them under `tests/e2e/baselines/<theme>/` and review them in the pull request like code.
+
+The first baselines for `base` and `ride` are committed by THM.10.
 
 ## System checks
 

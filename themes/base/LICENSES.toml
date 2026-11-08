@@ -1,7 +1,8 @@
 # Licences of the theme's assets (spec 14 §14.8, checked by `python -m apps.themes.gates`, THM.5).
 #
 # Every file under static/themes/<slug>/ that is not CSS or JavaScript (fonts, icons, images)
-# needs exactly one entry here. Allowed licences: OFL-1.1, Apache-2.0, MIT, ISC, CC0-1.0.
+# needs exactly one entry here. Allowed licences by kind: font OFL-1.1 or Apache-2.0,
+# icons MIT or ISC, image CC0-1.0.
 # Fonts: woff2 only, at most 4 files and 2 families per theme (spec 14 §14.7).
 #
 # [[asset]]

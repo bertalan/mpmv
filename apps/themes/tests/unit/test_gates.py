@@ -18,6 +18,7 @@ from apps.themes.build import read_manifest_sources
 from apps.themes.engine import build_registry
 from apps.themes.gates import (
     ALLOWED_ASSET_LICENCES,
+    ALLOWED_LICENCES_BY_KIND,
     CSS_BUDGET,
     JS_BUDGET,
     LICENCES_FILE,
@@ -253,6 +254,62 @@ def test_icons_and_images_need_a_licence_entry_too(themes: Path, relative: str) 
 
 def test_the_allowed_licences_are_the_spec_list() -> None:
     assert frozenset({"OFL-1.1", "Apache-2.0", "MIT", "ISC", "CC0-1.0"}) == ALLOWED_ASSET_LICENCES
+
+
+def test_each_asset_kind_has_its_own_spec_licences() -> None:
+    assert {
+        "font": frozenset({"OFL-1.1", "Apache-2.0"}),
+        "icons": frozenset({"MIT", "ISC"}),
+        "image": frozenset({"CC0-1.0"}),
+    } == ALLOWED_LICENCES_BY_KIND
+
+
+def asset_licence(kind: str, licence: str, relative: str) -> str:
+    return (
+        FONT_LICENCE.replace('kind = "font"', f'kind = "{kind}"')
+        .replace('license = "OFL-1.1"', f'license = "{licence}"')
+        .replace("fonts/display.woff2", relative)
+    )
+
+
+KIND_FILES = {"font": "fonts/display.woff2", "icons": "icons/sprite.svg", "image": "img/hero.webp"}
+
+
+@pytest.mark.parametrize(
+    ("kind", "licence"),
+    [
+        ("font", "MIT"),
+        ("font", "CC0-1.0"),
+        ("icons", "OFL-1.1"),
+        ("icons", "CC0-1.0"),
+        ("image", "MIT"),
+        ("image", "Apache-2.0"),
+    ],
+)
+def test_a_licence_allowed_only_for_another_kind_fails(
+    themes: Path, kind: str, licence: str
+) -> None:
+    """§14.8: fonts OFL 1.1 or Apache 2.0, icons MIT or ISC, placeholder images CC0."""
+    theme_dir = write_theme(themes, "mixed")
+    add_asset(theme_dir, KIND_FILES[kind])
+    (theme_dir / LICENCES_FILE).write_text(
+        asset_licence(kind, licence, KIND_FILES[kind]), encoding="utf-8"
+    )
+    failures = failures_of(themes, "mixed")
+    assert any("[licences]" in f and licence in f and kind in f for f in failures), failures
+
+
+@pytest.mark.parametrize(
+    ("kind", "licence"),
+    [("font", "Apache-2.0"), ("icons", "MIT"), ("icons", "ISC"), ("image", "CC0-1.0")],
+)
+def test_a_licence_allowed_for_its_kind_passes(themes: Path, kind: str, licence: str) -> None:
+    theme_dir = write_theme(themes, "matched")
+    add_asset(theme_dir, KIND_FILES[kind])
+    (theme_dir / LICENCES_FILE).write_text(
+        asset_licence(kind, licence, KIND_FILES[kind]), encoding="utf-8"
+    )
+    assert failures_of(themes, "matched") == []
 
 
 def test_css_and_js_sources_are_not_assets(themes: Path) -> None:
