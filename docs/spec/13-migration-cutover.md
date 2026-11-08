@@ -74,6 +74,20 @@ is **staggered after go-live**:
   engines process the 301s. The owner accepts it; small low-traffic batches first and the gate
   limit the exposure.
 
+### Tag and taxonomy URLs (owner decision D-07)
+
+Tag and taxonomy pages get new descriptive URLs `/{taxonomy}/{term}/` ([03](03-catalog.md)), and
+they follow the same staggered switch as product URLs:
+
+- **At cutover** every migrated term keeps answering 200 on its legacy tag URL
+  (`/tag-product/{slug}/`, `/it/tag-product-it/{slug}-it/`) with a self-canonical. The frozen
+  legacy path is stored per term translation, with a per-term `url_mode`.
+- **The redirect map** (MIG.6) covers every legacy tag URL in every language, including tags
+  merged by the existing redirect rules (CAT.6), each mapped to its term with exactly one hop.
+- **Batches by traffic** (MIG.11): terms go in the same kind of batches, ordered by traffic, with
+  the same switch command, gate and rollback as products. A switched legacy tag URL is a single
+  301 to the new term URL, never a chain through another tag or product redirect.
+
 ## 13.4 Cutover runbook
 
 1. T−7 days: DNS TTL lowered; open quotes closed or scheduled; communication to vendors.
@@ -82,14 +96,14 @@ is **staggered after go-live**:
 4. DNS switch; smoke test: EN/IT browsing, search, multi-vendor cart, small real payment
    with refund, quote, vendor dashboard, feeds.
 5. Reopening; intensive monitoring for 72 h (404s, errors, conversions, webhooks). Daily 404
-   report with any legacy product URL missing from the map fixed the same day (Q-91). Migrated
-   products still answer 200 on their legacy URLs.
+   report with any legacy product or tag URL missing from the map fixed the same day (Q-91,
+   D-07). Migrated products and taxonomy terms still answer 200 on their legacy URLs.
 6. Rollback: DNS back to WordPress (left intact) if a no-go criterion occurs within the first 24 h;
    orders collected on the new system in the meantime are handled manually.
 7. T+14/28: Merchant Center and Search Console verified (indexing, redirect and 404 errors,
    ranking review against the pre-cutover baseline), WordPress shut down and archived.
-8. From T+14, product URL batches (MIG.11): one batch a week, lowest traffic first (default 15–20%
-   of products); before each batch the gate checks the previous batch's 404 rate, Search
+8. From T+14, product and tag URL batches (MIG.11, D-07): one batch a week, lowest traffic first
+   (default 15–20% of products or terms); before each batch the gate checks the previous batch's 404 rate, Search
    Console impressions and clicks against baseline, and errors; a batch over threshold is
    rolled back to legacy mode and the schedule pauses until staff review it.
 
@@ -102,9 +116,9 @@ is **staggered after go-live**:
 | MIG.3 | Loader for vendors, catalog, taxonomies, images (idempotent, dry-run); existing IT texts loaded as published translations (D-18) | P1 | 16 | MIG.1, CAT.1, CAT.2, CAT.3, CAT.4, CAT.13, CAT.14 | Reload with no duplicates; IT texts present where the current site has them |
 | MIG.4 | Loader for customers (WP password hasher) and read-only historical orders | P1 | 10 | MIG.1, ORD.2 | Migrated customer logs in with the old password |
 | MIG.5 | Automated parity reports (§13.3) | P1 | 10 | MIG.3 | Report generated on every run |
-| MIG.6 | Complete redirect map in every language + automated check of all WP sitemap URLs; every legacy product URL (SKU permalinks, plain and historical slugs, variant URLs, legacy query-string forms) mapped to the product with its frozen legacy path per language, answering 200 in legacy mode and a single 301 to the SKU-free URL in new mode (Q-91, §13.3) | P1 | 8 | CAT.6, MIG.3 | 100% of URLs 200/301; a migrated IT URL serves its IT text, not the EN fallback; on the migration dataset every legacy URL resolves to a 200 page in at most one 301 hop (no chains, no loops), a legacy-mode product answers 200 on its old URL with a self-canonical, and the number of legacy product URLs equals the number of mapped URLs |
+| MIG.6 | Complete redirect map in every language + automated check of all WP sitemap URLs; every legacy product URL (SKU permalinks, plain and historical slugs, variant URLs, legacy query-string forms) mapped to the product with its frozen legacy path per language, answering 200 in legacy mode and a single 301 to the SKU-free URL in new mode (Q-91, §13.3); every legacy tag URL (`/tag-product/{slug}/`, `/it/tag-product-it/{slug}-it/`) mapped the same way to its taxonomy term, with a single 301 to `/{taxonomy}/{term}/` in new mode (D-07) | P1 | 8 | CAT.6, MIG.3 | 100% of URLs 200/301; a migrated IT URL serves its IT text, not the EN fallback; on the migration dataset every legacy URL resolves to a 200 page in at most one 301 hop (no chains, no loops), a legacy-mode product or term answers 200 on its old URL with a self-canonical, and the number of legacy product and tag URLs equals the number of mapped URLs |
 | MIG.7 | Pages and blog migration (semi-manual) with StreamField; existing IT versions as published wagtail-localize translations (D-18) | P1 | 16 | CMS.2, I18N.3 | All public pages present, in IT too where the current site has them |
 | MIG.8 | Vendor ledger opening balances + verification against Stripe | P1 | 4 | VEN.4, MIG.3 | Balance = expected for every vendor |
 | MIG.9 | Three dress rehearsals on STAGE + cutover and rollback runbook | P1 | 16 | MIG.5, MIG.6 | Third rehearsal with no blockers |
 | MIG.10 | Cutover and post-go-live monitoring, including the daily 404 report, the Search Console review and the product URL batch schedule and gates of the runbook (Q-91) | P1 | 12 | MIG.9, SEC.6 | Go-live, 72 h with no critical issues; 404 report and Search Console review recorded at T+14 and T+28 |
-| MIG.11 | Staggered product URL switch (owner decision Q-91): per-product `url_mode` and frozen legacy paths, traffic ranking from analytics (SEO.5) or the MIG.1 legacy access-log counts, configurable batch size and cadence, batch switch and rollback as a management command and staff action with dry-run and audit, sitemap, canonical and hreflang by mode, gate on 404 rate, Search Console impressions and clicks against baseline, and errors with configurable thresholds | P1 | 6 | MIG.6, CAT.5 | A batch switch gives a single 301 hop and an updated sitemap; a rollback leaves no redirect loop; a legacy-mode page is 200 with a self-canonical; the next batch is refused when a gate metric is over threshold; the MIG.6 "no URL lost" count still holds after a switch and a rollback; products created after go-live start in new mode |
+| MIG.11 | Staggered product and tag URL switch (owner decisions Q-91 and D-07): per-product and per-term `url_mode` and frozen legacy paths, traffic ranking from analytics (SEO.5) or the MIG.1 legacy access-log counts, configurable batch size and cadence, batch switch and rollback as a management command and staff action with dry-run and audit, sitemap, canonical and hreflang by mode, gate on 404 rate, Search Console impressions and clicks against baseline, and errors with configurable thresholds | P1 | 6 | MIG.6, CAT.5, CAT.8 | A batch switch gives a single 301 hop and an updated sitemap; a rollback leaves no redirect loop; a legacy-mode page is 200 with a self-canonical; a switched legacy tag URL is a single 301 to `/{taxonomy}/{term}/`; the next batch is refused when a gate metric is over threshold; the MIG.6 "no URL lost" count still holds after a switch and a rollback; products and terms created after go-live start in new mode |

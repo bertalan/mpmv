@@ -17,8 +17,11 @@ from ninja.errors import HttpError
 from ninja.errors import ValidationError as NinjaValidationError
 
 from apps.api.auth import denial_response
+from apps.api.engine import Reason, deny, vendor_write_refusal
 from apps.api.problems import Problem, problem, validation_problem
 from apps.api.responses import problem_response
+from apps.api.services import AuthResult
+from apps.vendors.engine import VendorCannotWrite
 
 from .security import ApiAuthError
 
@@ -82,6 +85,13 @@ def _on_not_found(request: HttpRequest, exc: Exception) -> HttpResponse:
     return _respond(request, problem(404, detail="The resource does not exist."))
 
 
+def _on_vendor_cannot_write(request: HttpRequest, exc: VendorCannotWrite) -> HttpResponse:
+    """The vendor stopped being active between authentication and the write (CORE.14): the
+    same refusal the key would get on its next request."""
+    refusal = vendor_write_refusal(exc.status) or Reason.VENDOR_NOT_ACTIVE
+    return denial_response(request, AuthResult(deny(refusal), None), None)
+
+
 def _on_permission_denied(request: HttpRequest, exc: Exception) -> HttpResponse:
     return _respond(request, problem(403, detail="This operation is not allowed."))
 
@@ -108,6 +118,7 @@ _HANDLERS: tuple[tuple[type[Exception], Callable[[HttpRequest, Any], HttpRespons
     (DjangoValidationError, _on_django_validation),
     (Http404, _on_not_found),
     (ObjectDoesNotExist, _on_not_found),
+    (VendorCannotWrite, _on_vendor_cannot_write),
     (PermissionDenied, _on_permission_denied),
     (IntegrityError, _on_integrity),
     (ApiProblem, _on_problem),

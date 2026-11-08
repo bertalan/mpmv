@@ -279,7 +279,7 @@ override; they do not add features.
 
 | MPMV page | `base` provides | First vertical theme (THM.6 to THM.9) |
 |---|---|---|
-| Home (`HomePage` + CMS.2 blocks) | Block templates: hero, product grid, featured terms and vendors, CTA, blog teaser | Full-width hero with large condensed headings, section titles, brand/vendor strip |
+| Home (`HomePage` + CMS.2 and CMS.10 blocks) | Block templates: hero, product grid, featured terms and vendors, CTA, blog teaser | Full-width hero with large condensed headings, section titles, brand/vendor strip |
 | Listings: category, term, brand, vendor storefront, search | Filter panel (form, no drag), product grid, sort, pagination | Product card variant |
 | Product page | Gallery (`<dialog>` zoom), variant selector, price with Omnibus strikethrough, GPSR block, related products | Visual restyle |
 | Cart, checkout, order confirmation | Per-vendor packages, step indicator, error summary, Payment Element container | Visual restyle, Payment Element appearance |

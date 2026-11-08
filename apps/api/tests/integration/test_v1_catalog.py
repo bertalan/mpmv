@@ -31,7 +31,7 @@ def attributes() -> dict[str, Attribute]:
 
 @pytest.fixture
 def vendor() -> Vendor:
-    return VendorFactory.create()
+    return VendorFactory.create(status=Vendor.Status.ACTIVE)  # only an active vendor's key writes
 
 
 def _headers(vendor: Vendor | None, scopes: list[str] = SCOPES) -> dict[str, str]:
@@ -155,6 +155,49 @@ def test_a_simple_product_with_variants_is_a_validation_problem(
     assert response["Content-Type"] == "application/problem+json"
     messages = [error["msg"] for error in response.json()["errors"]]
     assert "Only a variable product has variants." in messages
+    assert not Product.objects.exists()
+
+
+def _with_variant(**fields: Any) -> dict[str, Any]:
+    payload = t_shirt()
+    payload["variants"][0].update(fields)
+    return payload
+
+
+def _with_width(number: str) -> dict[str, Any]:
+    payload = t_shirt()
+    payload["attributes"][3]["number"] = number
+    return payload
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        (
+            _with_width("10000000000"),
+            "bag_width has more than 9 digits before the decimal point.",
+        ),
+        (_with_width("30.5555"), "bag_width has more than 3 decimals."),
+        # The schema refuses a bad weight override; the service does too for other callers.
+        (_with_variant(weight_kg_override="123456"), "no more than 5 digits before"),
+        (_with_variant(weight_kg_override="-1"), "greater than or equal to 0"),
+        (t_shirt(sku="   "), "A SKU cannot be empty."),
+        (_with_variant(sku=" "), "A variant SKU cannot be empty."),
+    ],
+)
+def test_values_the_database_would_refuse_are_validation_problems(
+    client: Client,
+    attributes: dict[str, Attribute],
+    vendor: Vendor,
+    payload: dict[str, Any],
+    message: str,
+) -> None:
+    headers = _headers(vendor)
+    for query in ("?dry_run=true", ""):
+        response = _post(client, payload, headers, query)
+        assert response.status_code == 422, response.json()
+        messages = [error["msg"] for error in response.json()["errors"]]
+        assert any(message in msg for msg in messages), messages
     assert not Product.objects.exists()
 
 
