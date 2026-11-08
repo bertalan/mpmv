@@ -363,3 +363,47 @@ def test_the_same_address_on_a_country_wide_zone_gets_the_default() -> None:
     assert decision is not None
     assert decision.is_default
     assert decision.requests_quote
+
+
+@pytest.mark.parametrize(
+    ("zone_kwargs", "dest"),
+    [
+        # a regional zone by province (Campania): Capri is a minor island by postcode
+        ({"countries": ["IT"], "states": ["NA", "SA"]}, Destination("IT", "80073", "NA")),
+        # Livigno is an extra-VAT territory inside the province of Sondrio
+        ({"countries": ["IT"], "states": ["SO", "MI"]}, Destination("IT", "23041", "SO")),
+        # the whole country through broad prefixes
+        (
+            {"countries": ["IT"], "postcode_patterns": [f"{d}*" for d in range(10)]},
+            Destination("IT", "07100"),
+        ),
+    ],
+)
+def test_a_zone_wider_than_the_area_keeps_the_default(
+    zone_kwargs: dict[str, list[str]], dest: Destination
+) -> None:
+    zone = ShippingZoneFactory.create(**zone_kwargs)
+    method = ShippingMethodFactory.create(zone=zone, default=True)
+
+    decision = special_area_decision(method, dest)
+
+    assert decision is not None
+    assert decision.is_default
+    assert decision.is_indicative
+    assert decision.requests_quote
+
+
+def test_a_country_qualified_area_matches_in_its_own_country_only() -> None:
+    area = SpecialAreaFactory.create(
+        code="pt-es-remote",
+        kind=engine.REMOTE,
+        countries=["PT", "ES"],
+        postcode_patterns=["PT:9000..9999"],
+        states=["ES:IB"],
+    )
+    snaps = {snap.code: snap for snap in special_area_snaps()}
+
+    assert engine.area_match(snaps[area.code], Destination("PT", "9000-001")) is not None
+    assert engine.area_match(snaps[area.code], Destination("ES", "90000")) is None
+    assert engine.area_match(snaps[area.code], Destination("ES", "", "IB")) is not None
+    assert engine.area_match(snaps[area.code], Destination("PT", "", "IB")) is None

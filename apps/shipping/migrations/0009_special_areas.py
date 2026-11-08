@@ -11,7 +11,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('shipping', '0007_shipping_template'),
+        ('shipping', '0008_country_qualified_entries'),
     ]
 
     operations = [
@@ -31,8 +31,8 @@ class Migration(migrations.Migration):
                 ('name', models.CharField(max_length=100)),
                 ('kind', models.CharField(choices=[('island', 'Island'), ('remote', 'Remote area'), ('extra_vat', 'Extra-VAT territory')], max_length=16)),
                 ('countries', apps.shipping.fields.ZoneCountriesField(base_field=apps.shipping.fields.ZoneCountryField(max_length=2), help_text='ISO country codes, comma separated: where the postcodes and provinces apply.')),
-                ('postcode_patterns', apps.shipping.fields.PostcodePatternsField(base_field=models.CharField(max_length=32), blank=True, default=list, help_text='Prefix "07*", range "90000..98999" or exact postcode, comma separated.')),
-                ('states', apps.shipping.fields.StatesField(base_field=models.CharField(max_length=32), blank=True, default=list, help_text='Province or state codes (SS, NU…), comma separated.')),
+                ('postcode_patterns', apps.shipping.fields.PostcodePatternsField(base_field=models.CharField(max_length=35), blank=True, default=list, help_text='Prefix "07*", range "90000..98999" or exact postcode, comma separated.')),
+                ('states', apps.shipping.fields.StatesField(base_field=models.CharField(max_length=35), blank=True, default=list, help_text='Province or state codes (SS, NU…), comma separated.')),
                 ('territory_code', apps.shipping.fields.TerritoryCodeField(blank=True, default='', help_text='Extra-VAT areas only: the code of the tax territory, e.g. ES-CN.', max_length=16)),
             ],
             options={

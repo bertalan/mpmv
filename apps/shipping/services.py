@@ -25,7 +25,6 @@ from .engine import (
     SpecialAreaDecision,
     SpecialAreaSnap,
     ZoneSnap,
-    zone_match,
 )
 from .engine import special_area_treatment as resolve_area_treatment
 from .models import (
@@ -242,9 +241,7 @@ def special_area_decision(method: ShippingMethod, dest: Destination) -> SpecialA
     in no special area. SHP.3 turns the decision into its outcome: IndicativeRates for an
     estimate, a surcharged rate, NeedsQuote, or Blocked.
 
-    A method whose zone is narrowed by postcode or province to the area keeps its normal rate
-    unless it sets a treatment of its own."""
+    A method whose zone reaches `dest` only through postcodes or provinces inside the area keeps
+    its normal rate unless it sets a treatment of its own (`engine.zone_within_area`)."""
     (zone,) = _snapshots([method.zone])
-    return resolve_area_treatment(
-        special_area_snaps(), area_treatments(method), dest, zone_match(zone, dest)
-    )
+    return resolve_area_treatment(special_area_snaps(), area_treatments(method), dest, zone)

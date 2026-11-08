@@ -93,6 +93,25 @@ def test_the_result_does_not_depend_on_the_order_of_the_areas() -> None:
     )
 
 
+def test_a_qualified_province_matches_in_its_own_country() -> None:
+    area = SpecialAreaSnap(
+        code="it-ss", kind=engine.ISLAND, countries=frozenset({"IT", "SM"}), states=("IT:SS",)
+    )
+    assert engine.area_match(area, Destination("IT", "", "SS")) is engine.Specificity.PROVINCE
+    assert engine.area_match(area, Destination("SM", "", "SS")) is None
+
+
+def test_a_qualified_postcode_pattern_matches_in_its_own_country_only() -> None:
+    area = SpecialAreaSnap(
+        code="pt-islands",
+        kind=engine.ISLAND,
+        countries=frozenset({"PT", "ES"}),
+        postcode_patterns=("PT:9000..9999",),
+    )
+    assert engine.area_match(area, Destination("PT", "9000-001")) is engine.Specificity.POSTCODE
+    assert engine.area_match(area, Destination("ES", "90000")) is None
+
+
 def test_a_malformed_area_pattern_is_refused_when_the_snapshot_is_built() -> None:
     with pytest.raises(ValueError, match=r"\.\."):
         SpecialAreaSnap(
@@ -259,11 +278,47 @@ def test_malformed_territory_codes_are_refused(raw: str) -> None:
 
 # --- A zone narrowed to the area already prices it (spec 06 cases 2 and 4)
 
+MINOR_ISLANDS = SpecialAreaSnap(
+    code="it-minor-islands",
+    kind=engine.ISLAND,
+    countries=frozenset({"IT"}),
+    postcode_patterns=("80071", "80073", "57031"),
+)
+CRETE = SpecialAreaSnap(
+    code="gr-crete", kind=engine.ISLAND, countries=frozenset({"GR"}), postcode_patterns=("70..74",)
+)
+NARROWED_AREAS = (*AREAS, MINOR_ISLANDS, CRETE)
 
-def test_a_method_of_a_zone_narrowed_to_the_area_keeps_its_normal_rate() -> None:
-    decision = engine.special_area_treatment(
-        AREAS, {}, Destination("IT", "07100"), zone_specificity=engine.Specificity.POSTCODE
+
+def zone(
+    *countries: str, postcodes: tuple[str, ...] = (), states: tuple[str, ...] = ()
+) -> engine.ZoneSnap:
+    return engine.ZoneSnap(
+        code="vendor-zone",
+        priority=10,
+        countries=frozenset(countries),
+        postcode_patterns=postcodes,
+        states=states,
+        vendor_id=1,
     )
+
+
+@pytest.mark.parametrize(
+    ("narrowed", "dest"),
+    [
+        (zone("IT", postcodes=("07*",)), Destination("IT", "07100")),
+        (zone("IT", postcodes=("07000..09999",)), Destination("IT", "07100")),  # 07*, 08*, 09*
+        (zone("IT", postcodes=("07100",)), Destination("IT", "07100")),
+        (zone("IT", states=("SS",)), Destination("IT", "", "SS")),  # Sardinia lists SS
+        (zone("IT", postcodes=("07*",), states=("SS",)), Destination("IT", "07100", "SS")),
+        (zone("GR", postcodes=("70*",)), Destination("GR", "70100")),  # regression case 2
+        (zone("IT", postcodes=("80073",)), Destination("IT", "80073", "NA")),  # Capri itself
+    ],
+)
+def test_a_zone_narrowed_inside_the_area_keeps_its_normal_rate(
+    narrowed: engine.ZoneSnap, dest: Destination
+) -> None:
+    decision = engine.special_area_treatment(NARROWED_AREAS, {}, dest, zone=narrowed)
 
     assert decision is not None
     assert not decision.is_default
@@ -272,20 +327,73 @@ def test_a_method_of_a_zone_narrowed_to_the_area_keeps_its_normal_rate() -> None
     assert decision.cost(Decimal("9.90"), Decimal("2.000")) == Decimal("9.90")
 
 
-def test_a_province_narrowed_zone_keeps_its_rate_and_a_wide_zone_gets_the_default() -> None:
-    dest = Destination("IT", "", "SS")
-    narrowed = engine.special_area_treatment(
-        AREAS, {}, dest, zone_specificity=engine.Specificity.PROVINCE
-    )
-    wide = engine.special_area_treatment(
-        AREAS, {}, dest, zone_specificity=engine.Specificity.COUNTRY
+@pytest.mark.parametrize(
+    ("wide", "dest"),
+    [
+        # a regional zone by province over a postcode-defined island (Capri is in NA)
+        (zone("IT", states=("NA", "SA")), Destination("IT", "80073", "NA")),
+        # a broad prefix over a postcode-defined island
+        (zone("IT", postcodes=("8*",)), Destination("IT", "80073")),
+        # the whole country through broad prefixes
+        (zone("IT", postcodes=tuple(f"{d}*" for d in range(10))), Destination("IT", "07100")),
+        (zone("IT", postcodes=("00000..99999",)), Destination("IT", "07100")),
+        (zone("GR", postcodes=("7*",)), Destination("GR", "70100")),
+        # one entry inside the area, another wider one that also matches the address
+        (zone("IT", postcodes=("07*",), states=("SS", "NA")), Destination("IT", "07100", "NA")),
+        # country-wide zones and a zone that does not even match the address
+        (zone("IT"), Destination("IT", "07100")),
+        (zone("IT", postcodes=("20*",)), Destination("IT", "07100")),
+    ],
+)
+def test_a_zone_wider_than_the_area_gets_the_default(
+    wide: engine.ZoneSnap, dest: Destination
+) -> None:
+    decision = engine.special_area_treatment(NARROWED_AREAS, {}, dest, zone=wide)
+
+    assert decision is not None
+    assert decision.is_default
+    assert decision.is_indicative
+    assert decision.requests_quote
+
+
+@pytest.mark.parametrize(
+    "narrowed",
+    [
+        zone("IT", states=("SO", "MI")),  # province-wide, Livigno is in SO
+        zone("IT", postcodes=("23041",)),  # exactly the territory
+    ],
+)
+def test_an_extra_vat_area_always_gets_the_default_without_a_treatment(
+    narrowed: engine.ZoneSnap,
+) -> None:
+    decision = engine.special_area_treatment(
+        NARROWED_AREAS, {}, Destination("IT", "23041", "SO"), zone=narrowed
     )
 
-    assert narrowed is not None
+    assert decision is not None
+    assert decision.area == LIVIGNO
+    assert decision.is_default
+    assert decision.requests_quote
+
+
+def test_a_qualified_zone_entry_is_compared_in_its_own_country() -> None:
+    madeira = SpecialAreaSnap(
+        code="pt-madeira",
+        kind=engine.ISLAND,
+        countries=frozenset({"PT", "ES"}),
+        postcode_patterns=("PT:9000..9499",),
+    )
+    narrowed = zone("PT", "ES", postcodes=("PT:90*",))  # 9000..9099, inside 9000..9499
+    wider = zone("PT", "ES", postcodes=("PT:9*",))  # 9000..9999, Azores included
+    dest = Destination("PT", "9000-001")
+
+    decision = engine.special_area_treatment((madeira,), {}, dest, zone=narrowed)
+    wide = engine.special_area_treatment((madeira,), {}, dest, zone=wider)
+
+    assert decision is not None
+    assert not decision.is_default
     assert wide is not None
-    assert not narrowed.requests_quote
     assert wide.is_default
-    assert wide.requests_quote
 
 
 def test_a_treatment_of_its_own_wins_over_the_narrowed_zone() -> None:
@@ -293,7 +401,7 @@ def test_a_treatment_of_its_own_wins_over_the_narrowed_zone() -> None:
         AREAS,
         {"it-sardinia": FIXED_15},
         Destination("IT", "07100"),
-        zone_specificity=engine.Specificity.POSTCODE,
+        zone=zone("IT", postcodes=("07*",)),
     )
 
     assert decision is not None

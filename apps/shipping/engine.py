@@ -349,12 +349,15 @@ class SpecialAreaSnap:
     postcode_patterns: tuple[str, ...] = ()
     states: tuple[str, ...] = ()
     territory_code: str = ""
-    # Parsed once when the snapshot is built (InvalidPostcodePattern otherwise).
+    # Parsed once when the snapshot is built (InvalidPostcodePattern, InvalidState otherwise).
+    # Each pattern and province keeps the country it was written for (`PT:9000..9999`, `IT:SS`).
     parsed_patterns: tuple[PostcodePattern, ...] = field(init=False, repr=False, compare=False)
+    parsed_states: tuple[tuple[str, str], ...] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         parsed = tuple(parse_postcode_pattern(raw) for raw in self.postcode_patterns)
         object.__setattr__(self, "parsed_patterns", parsed)
+        object.__setattr__(self, "parsed_states", tuple(split_state(raw) for raw in self.states))
 
 
 @dataclass(frozen=True)
@@ -368,7 +371,7 @@ class AreaTreatment:
 
 
 DEFAULT_AREA_TREATMENT: Final = AreaTreatment()
-# The method's own zone is narrowed to the area, so its rate already includes it: a surcharge of 0.
+# The method's own zone lies inside the area, so its rate already includes it: a surcharge of 0.
 PRICED_BY_ZONE_TREATMENT: Final = AreaTreatment(mode=SURCHARGE, surcharge_type=FIXED)
 
 
@@ -444,16 +447,120 @@ class SpecialAreaDecision:
 
 
 def area_match(area: SpecialAreaSnap, dest: Destination) -> Specificity | None:
-    """POSTCODE or PROVINCE when `dest` is in `area`, None otherwise (same rule as a narrowed
-    zone: an address without a postcode matches only by its province)."""
+    """POSTCODE or PROVINCE when `dest` is in `area`, None otherwise. Same rule as a narrowed
+    zone (`zone_match`): an address without a postcode matches only by its province, and a
+    qualified entry (`PT:9000..9999`, `IT:SS`) applies to its own country only."""
     if dest.country not in area.countries:
         return None
     code = normalize_postcode(dest.postcode)
-    if code and any(pattern.matches_normalized(code) for pattern in area.parsed_patterns):
+    if code and any(
+        pattern.matches_normalized(code) for pattern in _patterns_for(area.parsed_patterns, dest)
+    ):
         return Specificity.POSTCODE
-    if dest.state and dest.state in area.states:
+    if dest.state and dest.state in _states_for(area.parsed_states, dest):
         return Specificity.PROVINCE
     return None
+
+
+def _patterns_for(patterns: Iterable[PostcodePattern], dest: Destination) -> list[PostcodePattern]:
+    """The patterns that apply in `dest`'s country: its own and the unqualified ones."""
+    return [pattern for pattern in patterns if pattern.country in ("", dest.country)]
+
+
+def _states_for(states: Iterable[tuple[str, str]], dest: Destination) -> set[str]:
+    """The province codes that apply in `dest`'s country: its own and the unqualified ones."""
+    return {code for country, code in states if country in ("", dest.country)}
+
+
+def _all_digits(*texts: str) -> bool:
+    return all(text.isascii() and text.isdigit() for text in texts)
+
+
+def _digit_blocks(low: str, high: str) -> list[str] | None:
+    """The prefixes that cover exactly the heads LOW..HIGH of a digit range (`07000..09999` ->
+    `07`, `08`, `09`), or None when a bound is not all digits."""
+    if not _all_digits(low, high):
+        return None
+    width, start, stop = len(low), int(low), int(high)
+    blocks: list[str] = []
+    while start <= stop:
+        size = 0
+        while (
+            size < width and start % 10 ** (size + 1) == 0 and start + 10 ** (size + 1) - 1 <= stop
+        ):
+            size += 1
+        blocks.append(str(start).zfill(width)[: width - size])
+        start += 10**size
+    return blocks
+
+
+def _prefix_within(prefix: str, outer: PostcodePattern) -> bool:
+    """True when every postcode starting with `prefix` matches `outer`."""
+    if outer.kind == "prefix":
+        return prefix.startswith(outer.low)
+    if outer.kind == "range":
+        width = len(outer.low)
+        if len(prefix) >= width:
+            return outer.low <= prefix[:width] <= outer.high
+        # A shorter digit prefix (`90` in `9000..9499`): all its digit heads, 9000..9099.
+        pad = width - len(prefix)
+        return (
+            _all_digits(prefix, outer.low, outer.high)
+            and outer.low <= prefix + "0" * pad
+            and prefix + "9" * pad <= outer.high
+        )
+    return False  # an exact postcode never holds a whole prefix
+
+
+def _pattern_within(inner: PostcodePattern, outers: Sequence[PostcodePattern]) -> bool:
+    """True when every postcode `inner` matches is matched by one of `outers`."""
+    if inner.kind == "exact":
+        return any(outer.matches_normalized(inner.low) for outer in outers)
+    if inner.kind == "prefix":
+        return any(_prefix_within(inner.low, outer) for outer in outers)
+    blocks = _digit_blocks(inner.low, inner.high)
+    if blocks is not None:
+        return all(any(_prefix_within(block, outer) for outer in outers) for block in blocks)
+    # A range with letters: proven only when one outer pattern holds both bounds' heads.
+    return any(
+        (
+            outer.kind == "prefix"
+            and inner.low.startswith(outer.low)
+            and inner.high.startswith(outer.low)
+        )
+        or (
+            outer.kind == "range"
+            and len(outer.low) <= len(inner.low)
+            and outer.low <= inner.low[: len(outer.low)]
+            and inner.high[: len(outer.low)] <= outer.high
+        )
+        for outer in outers
+    )
+
+
+def zone_within_area(zone: ZoneSnap, area: SpecialAreaSnap, dest: Destination) -> bool:
+    """True when the entries through which `zone` matches `dest` all lie inside `area`.
+
+    The zone then prices the area itself (spec 06 cases 2 and 4: a vendor's own islands zone with
+    weight bands). A zone that is not narrowed, or that reaches `dest` through a province or a
+    prefix wider than the area (a regional zone by province around a postcode-defined island, the
+    whole country through `0*`..`9*`), proves nothing: the area keeps its default.
+    """
+    code = normalize_postcode(dest.postcode)
+    matched_patterns = [
+        pattern
+        for pattern in _patterns_for(zone.parsed_patterns, dest)
+        if code and pattern.matches_normalized(code)
+    ]
+    matched_states = (
+        {dest.state} & _states_for(zone.parsed_states, dest) if dest.state else set[str]()
+    )
+    if not matched_patterns and not matched_states:
+        return False
+    area_patterns = _patterns_for(area.parsed_patterns, dest)
+    return all(_pattern_within(pattern, area_patterns) for pattern in matched_patterns) and (
+        matched_states <= _states_for(area.parsed_states, dest)
+    )
 
 
 def resolve_special_area(
@@ -484,23 +591,23 @@ def special_area_treatment(
     areas: Iterable[SpecialAreaSnap],
     treatments: Mapping[str, AreaTreatment],
     dest: Destination,
-    zone_specificity: Specificity | None = None,
+    zone: ZoneSnap | None = None,
 ) -> SpecialAreaDecision | None:
     """Which special area `dest` is in and the treatment a method gives it (`treatments` by area
     code), or None when `dest` is in no special area. Without a treatment of its own, the method
     gives the default: an indicative cost subject to quote.
 
-    `zone_specificity` is how the method's zone matches `dest`. A zone narrowed by postcode or
-    province already prices the area (spec 06 cases 2 and 4: a vendor's own islands zone with
-    weight bands), so without a treatment of its own the method keeps its normal rate: no
-    surcharge, not indicative, no quote.
+    `zone` is the method's zone. When it reaches `dest` only through entries inside the area
+    (`zone_within_area`), it already prices the area, so without a treatment of its own the
+    method keeps its normal rate: no surcharge, not indicative, no quote. An extra-VAT territory
+    always keeps the default: a method that prices one sets a treatment of its own.
     """
     area = resolve_special_area(areas, dest)
     if area is None:
         return None
     treatment = treatments.get(area.code)
-    if treatment is None:
-        if zone_specificity in (Specificity.POSTCODE, Specificity.PROVINCE):
-            return SpecialAreaDecision(area, PRICED_BY_ZONE_TREATMENT, is_default=False)
-        return SpecialAreaDecision(area, DEFAULT_AREA_TREATMENT, is_default=True)
-    return SpecialAreaDecision(area, treatment, is_default=False)
+    if treatment is not None:
+        return SpecialAreaDecision(area, treatment, is_default=False)
+    if zone is not None and area.kind != EXTRA_VAT and zone_within_area(zone, area, dest):
+        return SpecialAreaDecision(area, PRICED_BY_ZONE_TREATMENT, is_default=False)
+    return SpecialAreaDecision(area, DEFAULT_AREA_TREATMENT, is_default=True)

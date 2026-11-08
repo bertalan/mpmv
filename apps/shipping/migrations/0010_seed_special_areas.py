@@ -159,7 +159,7 @@ def unseed(apps: Any, schema_editor: Any) -> None:
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('shipping', '0008_special_areas'),
+        ('shipping', '0009_special_areas'),
     ]
 
     operations = [
