@@ -160,6 +160,7 @@ its own prefix so ids never repeat on the page; `products`
     {% include "components/alert.html" with level="info" id="sg-alert-dismissible" dismissible=True message=_("We updated the terms of sale.") only %}
     {% include "components/alert.html" with level="success" live="polite" message=_("Cart updated.") only %}
     {% include "components/alert.html" with level="danger" live="assertive" message=_("The session expired. Sign in again to continue.") only %}
+    <div id="sg-alert-feed"></div>
   </section>
 </div>
 {% endblock %}

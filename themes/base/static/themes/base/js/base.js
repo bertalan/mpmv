@@ -52,15 +52,19 @@ if (siteHeader && "ResizeObserver" in window) {
 // Dismissible alerts (THM.4, components/alert.html): the "Dismiss" button is rendered `hidden`,
 // so it shows only once this script runs; a click removes its alert and moves the focus to the
 // main content, never leaving it on a removed element. Delegated: alerts swapped in by htmx work
-// too. No inline handler, so the strict CSP holds.
-for (const button of document.querySelectorAll("[data-dismiss]")) {
-  button.hidden = false;
-}
-document.addEventListener("htmx:afterSwap", (event) => {
-  for (const button of event.target.querySelectorAll("[data-dismiss]")) {
+// too. htmx 2 fires htmx:load on every element it adds, in-band or out of band (an out-of-band
+// swap fires no htmx:afterSwap), so the buttons inside the new element are revealed there. No
+// inline handler, so the strict CSP holds.
+function revealDismissButtons(root) {
+  if (root.matches?.("[data-dismiss]")) {
+    root.hidden = false;
+  }
+  for (const button of root.querySelectorAll?.("[data-dismiss]") ?? []) {
     button.hidden = false;
   }
-});
+}
+revealDismissButtons(document);
+document.addEventListener("htmx:load", (event) => revealDismissButtons(event.target));
 document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-dismiss]");
   const alert = button && button.closest(".alert");

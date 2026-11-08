@@ -164,6 +164,16 @@ def test_a_tile_without_a_price_says_price_on_request() -> None:
     assert re.search(r'class="product-tile__price"[^>]*>\s*Price on request\s*<', html), html
 
 
+def test_an_on_request_tile_never_shows_a_price_even_when_given_one() -> None:
+    # Review of #122: the "on request" badge wins over a stray price from the caller.
+    html = tile(price="€ 149.00", price_before="€ 189.00", badges=["on_request"])
+    assert re.search(r'class="product-tile__price"[^>]*>\s*Price on request\s*<', html), html
+    assert "€ 149.00" not in html
+    assert "€ 189.00" not in html
+    assert "<del>" not in html
+    assert "badge--on-request" in html
+
+
 def test_a_sale_tile_shows_the_previous_price_struck_through_and_in_words() -> None:
     html = tile(price="€ 149.00", price_before="€ 189.00", badges=["sale"])
     assert re.search(r'<del><span class="visually-hidden">\s*Was\s*</span>\s*€ 189.00</del>', html)
@@ -246,3 +256,11 @@ def test_a_dismissible_alert_has_a_named_button_hidden_until_the_script_runs() -
 def test_the_theme_script_dismisses_alerts_without_inline_handlers() -> None:
     module = render_themes(SHIPPED_THEMES)["themes/base/js/base.js"]
     assert "[data-dismiss]" in module
+
+
+def test_the_theme_script_reveals_dismiss_buttons_of_every_new_htmx_element() -> None:
+    # Review of #122: htmx 2 fires only htmx:oobAfterSwap for out-of-band swaps, while
+    # htmx:load fires for every element htmx adds, in-band or out of band.
+    module = render_themes(SHIPPED_THEMES)["themes/base/js/base.js"]
+    assert '"htmx:load"' in module
+    assert '"htmx:afterSwap"' not in module

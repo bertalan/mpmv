@@ -12,7 +12,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from django.template.loader import render_to_string
 from playwright.sync_api import Page, expect
+from pytest_django.fixtures import Settings as SettingsWrapper
 from pytest_django.live_server_helper import LiveServer
 
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
@@ -150,6 +152,37 @@ def test_a_dismissible_alert_closes_and_the_focus_moves_on(
     page.keyboard.press("Enter")
     expect(alert).to_have_count(0)
     assert page.evaluate("document.activeElement.id") == "main"
+    assert csp_violations(page) == []
+
+
+def test_an_out_of_band_alert_from_htmx_can_be_dismissed(
+    page: Page, live_server: LiveServer, settings: SettingsWrapper
+) -> None:
+    # Review of #122: htmx 2 fires no htmx:afterSwap for an out-of-band swap; the theme script
+    # reveals the Dismiss button on htmx:load, which fires for every element htmx adds.
+    settings.MPMV_THEME_DEFAULT = "base"
+    alert = render_to_string(
+        "components/alert.html",
+        {"level": "info", "id": "sg-alert-oob", "dismissible": True, "message": "Cart updated."},
+    )
+    body = f'<div hx-swap-oob="beforeend:#sg-alert-feed">{alert}</div>'
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    page.route(
+        f"{live_server.url}/_styleguide/oob-alert/",
+        lambda route: route.fulfill(status=200, content_type="text/html", body=body),
+    )
+    # The request targets another element (the heading of the buttons): only the out-of-band
+    # swap puts the alert into the feed, as when a cart action updates a message elsewhere.
+    page.evaluate(
+        "() => htmx.ajax('GET', '/_styleguide/oob-alert/', {target: '#sg-buttons', swap: 'none'})"
+    )
+    swapped = page.locator("#sg-alert-feed #sg-alert-oob")
+    expect(swapped).to_have_count(1)
+    button = swapped.get_by_role("button", name="Dismiss")
+    expect(button).to_be_visible()
+    button.click()
+    expect(page.locator("#sg-alert-oob")).to_have_count(0)
     assert csp_violations(page) == []
 
 
