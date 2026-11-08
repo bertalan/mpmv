@@ -259,6 +259,14 @@ def latest_tax_profile(vendor: Vendor) -> VendorTaxProfile | None:
     return VendorTaxProfile.objects.filter(vendor=vendor).order_by("-valid_from").first()
 
 
+def has_tax_profile(vendor: Vendor) -> bool:
+    """Whether the vendor has a tax profile, current or scheduled (VEN.18 review M2).
+
+    From then on its declared fiscal regime changes only through a TAX.2 regime-change request.
+    """
+    return VendorTaxProfile.objects.filter(vendor=vendor).exists()
+
+
 def check_profile_start(new: VendorTaxProfile) -> None:
     """A new profile starts after the vendor's latest one; for forms, before the service runs."""
     _check_start(new, latest_tax_profile(new.vendor))
