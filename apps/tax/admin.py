@@ -31,6 +31,8 @@ from apps.accounts.decorators import step_up_required
 from apps.accounts.models import User
 from apps.core.admin import step_up
 from apps.core.audit import audit_context
+from apps.vendors.admin import VendorAdmin
+from apps.vendors.models import Vendor
 
 from . import engine, services
 from .models import (
@@ -502,3 +504,25 @@ class TaxRegimeChangeRequestAdmin(HistoryAdmin[TaxRegimeChangeRequest]):
             ],
         }
         return TemplateResponse(request, REVIEW_TEMPLATE, context)
+
+
+# VEN.18 (review M2): `vendors` may not import `tax` (spec 01 §1.3), so the tax app replaces
+# the vendor admin with a subclass. Importing `apps.vendors.admin` registers it first.
+admin.site.unregister(Vendor)
+
+
+@admin.register(Vendor)
+class TaxAwareVendorAdmin(VendorAdmin):
+    """The vendor admin, with the fiscal regime read-only once the vendor has a tax profile.
+
+    From then on the regime changes only through a TAX.2 request: vendor request, approval by
+    staff with the review permission and a fresh second factor, requester other than approver.
+    A read-only field is left out of the form, so a forged POST that sends it is ignored, for
+    superusers too.
+    """
+
+    def get_readonly_fields(self, request: HttpRequest, obj: Vendor | None = None) -> Any:
+        fields = tuple(super().get_readonly_fields(request, obj))
+        if obj is not None and obj.pk is not None and services.has_tax_profile(obj):
+            fields += ("fiscal_regime",)
+        return fields

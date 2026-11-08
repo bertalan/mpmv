@@ -10,10 +10,14 @@ deploy scripts).
 Vendor key policy (CORE.14): a vendor key is issued only for an active vendor and holds only
 `engine.VENDOR_GRANTABLE_SCOPES`, checked again on every request; only a key of an active vendor
 writes (403 for applicant, onboarding and suspended vendors, which only read); a key of a closed
-vendor is refused (401); deleting a vendor audits each of its keys (`vendor_key_deletions`).
+vendor is refused (401); closing a vendor revokes each of its keys (`revoke_vendor_keys`), so a
+reopened vendor gets none back and issues new ones once active again; deleting a vendor audits
+each of its keys (`vendor_key_deletions`).
 
 Rate limit (CORE.12): `count_api_call` counts each authenticated call on a PostgreSQL counter
-shared by every app process (`ApiRateCounter`); limits come from the `API_RATE_LIMIT*` settings.
+shared by every app process (`ApiRateCounter`); limits come from the `API_RATE_LIMIT*` settings
+and, for one key, from the override staff set with `set_api_client_rate_limit` (CORE.16), which
+wins over them (precedence in `engine.limits_for`).
 """
 
 import datetime as dt
@@ -42,17 +46,21 @@ from .engine import (
     Decision,
     GeneratedKey,
     InvalidApiClient,
+    InvalidRateLimit,
+    Rate,
     RateDecision,
     RatePolicy,
     Reason,
+    combine_decisions,
     deny,
     evaluate,
     generate_key,
     hash_key,
     key_matches,
-    limit_for,
+    limits_for,
     normalize_allowed_ips,
     parse_authorization,
+    parse_rate,
     platform_only_scopes,
     rate_decision,
     rate_policy,
@@ -274,7 +282,21 @@ def authenticate(
     return AuthResult(decision, client)
 
 
-# --- Vendor deletion (CORE.14)
+# --- Vendor closure and deletion (CORE.14)
+
+
+def revoke_vendor_keys(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Revoke every active key of `vendor`, one `api.client.revoked` audit entry per key.
+
+    Named in `settings.VENDOR_CLOSURE_HOOKS` and called by `apps.vendors.services` when the
+    vendor is closed or reopened (`vendors` cannot import this app): keys work only for active
+    vendors, and a revoked key is never restored, so a reopened vendor issues new keys.
+    """
+    changes = ChangeSet()
+    clients = ApiClient.objects.select_related("vendor").filter(vendor=vendor, is_active=True)
+    for client in clients.order_by("pk"):
+        changes.changes.extend(revoke_api_client(client, ctx=ctx, dry_run=dry_run).changes)
+    return changes
 
 
 def vendor_key_deletions(vendor: Vendor, changes: ChangeSet) -> None:
@@ -373,27 +395,77 @@ def rate_policy_from_settings() -> RatePolicy:
     )
 
 
+def set_api_client_rate_limit(
+    client: ApiClient, rate_limit: str, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Store (or, with "", clear) the key-wide rate limit override of one key (CORE.16).
+
+    It raises or lowers that key only and wins over `API_RATE_LIMIT_CLIENTS` and
+    `API_RATE_LIMIT`. Audited; the admin asks for a fresh second factor before calling it.
+    `InvalidRateLimit` for a value that is not a rate such as `1200/minute`.
+    """
+    cleaned = rate_limit.strip()
+    if cleaned:
+        parse_rate(cleaned)
+    changeset = ChangeSet()
+    before = client.snapshot()
+    changeset.update(MODEL, str(client.public_id), before, {**before, "rate_limit": cleaned})
+
+    def apply() -> None:
+        client.rate_limit = cleaned
+        client.save(update_fields=["rate_limit", "updated_at"])
+
+    return run_mutation(
+        changeset, apply, ctx=ctx, action="api.client.rate_limit_changed", dry_run=dry_run
+    )
+
+
+def rate_limit_override(client: ApiClient) -> Rate | None:
+    """The key's stored override, or None. A stored value that cannot be read (written around
+    the service) is ignored and logged, so the settings still limit the key."""
+    if not client.rate_limit:
+        return None
+    try:
+        return parse_rate(client.rate_limit)
+    except InvalidRateLimit:
+        logger.error(
+            "Ignoring the unreadable rate limit override of API key prefix=%s",
+            client.key_prefix,
+        )
+        return None
+
+
 def count_api_call(
     client: ApiClient, scope: str | None, *, now: dt.datetime | None = None
 ) -> RateDecision:
     """Count one call of `client` to an operation requiring `scope`; say whether it may run.
 
-    Call it outside a transaction (API requests are not atomic): the increment commits at once,
-    so other processes see it, and the row lock is not held for the rest of the request.
+    The call counts on every counter `engine.limits_for` names (refused calls included) and runs
+    only if each of them allows it. Call it outside a transaction (API requests are not atomic):
+    each increment commits at once, so other processes see it, and no row lock is held for the
+    rest of the request.
     """
     now = now or timezone.now()
     policy = rate_policy_from_settings()
-    bucket, rate = limit_for(policy, scope=scope, client_id=str(client.public_id))
+    limits = limits_for(
+        policy,
+        scope=scope,
+        client_id=str(client.public_id),
+        override=rate_limit_override(client),
+    )
+    decisions: list[RateDecision] = []
     with connection.cursor() as cursor:
-        cursor.execute(_COUNT_SQL, [client.pk, bucket, window_start(now, rate)])
-        hits, current_start = cursor.fetchone()
-    decision = rate_decision(hits=hits, window_start=current_start, rate=rate, now=now)
-    if not decision.allowed:
-        logger.info(
-            "API key rate limited: prefix=%s bucket=%s limit=%d/%ds",
-            client.key_prefix,
-            bucket,
-            rate.limit,
-            rate.period,
-        )
-    return decision
+        for bucket, rate in limits:
+            cursor.execute(_COUNT_SQL, [client.pk, bucket, window_start(now, rate)])
+            hits, current_start = cursor.fetchone()
+            decision = rate_decision(hits=hits, window_start=current_start, rate=rate, now=now)
+            if not decision.allowed:
+                logger.info(
+                    "API key rate limited: prefix=%s bucket=%s limit=%d/%ds",
+                    client.key_prefix,
+                    bucket,
+                    rate.limit,
+                    rate.period,
+                )
+            decisions.append(decision)
+    return combine_decisions(decisions)

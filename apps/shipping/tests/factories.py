@@ -1,4 +1,4 @@
-"""factory_boy factories for shipping (SHP.1, SHP.12, SHP.13). Synthetic values only.
+"""factory_boy factories for shipping (SHP.1, SHP.12, SHP.13, SHP.14). Synthetic values only.
 
 Codes and labels are generic ("carrier-0", "Zone 0", "group-0"); vendors come from the vendors
 factories (pseudonyms). Weight bands default to 0-5 kg; pass `from_kg`/`to_kg` explicitly in
@@ -25,6 +25,8 @@ from apps.shipping.models import (
     ShippingMethodTranslation,
     ShippingTemplate,
     ShippingZone,
+    SpecialArea,
+    SpecialAreaTreatment,
     WeightBand,
 )
 from apps.vendors.tests.factories import VendorFactory
@@ -174,3 +176,39 @@ class ShippingConfigVersionFactory(DjangoModelFactory[ShippingConfigVersion]):
     snapshot = factory.LazyFunction(lambda: {"zones": [], "methods": []})
     created_by = None
     note = factory.Faker("sentence")
+
+
+class SpecialAreaFactory(DjangoModelFactory[SpecialArea]):
+    """A remote area of one made-up postcode; codes never collide with the seeded areas. Pass
+    `kind=engine.EXTRA_VAT` with a `territory_code` for an extra-VAT area."""
+
+    class Meta:
+        model = SpecialArea
+
+    code = factory.Sequence(lambda n: f"area-{n}")
+    name = factory.Sequence(lambda n: f"Area {n}")
+    kind = engine.REMOTE
+    countries = factory.LazyFunction(lambda: ["IT"])
+    postcode_patterns = factory.LazyFunction(lambda: ["12345"])
+    states = factory.LazyFunction(list)
+    territory_code = ""
+
+
+class SpecialAreaTreatmentFactory(DjangoModelFactory[SpecialAreaTreatment]):
+    """The default treatment (an indicative cost subject to quote) of a method for an area.
+    Trait `fixed_surcharge`: a fixed surcharge of 15.00."""
+
+    class Meta:
+        model = SpecialAreaTreatment
+
+    class Params:
+        fixed_surcharge = factory.Trait(
+            mode=engine.SURCHARGE, surcharge_type=engine.FIXED, surcharge=Decimal("15.00")
+        )
+
+    method = factory.SubFactory(ShippingMethodFactory)
+    area = factory.SubFactory(SpecialAreaFactory)
+    mode = engine.INDICATIVE
+    surcharge_type = ""
+    surcharge = Decimal("0.00")
+    extra_days = 0

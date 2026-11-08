@@ -140,12 +140,27 @@ jobs:
       # OPS.4: CycloneDX SBOM of the built image (OS packages and the app virtualenv), via syft.
       - run: mkdir -p build/sbom
       - name: Image SBOM (CycloneDX)
+        id: sbom
+        # The action downloads syft from GitHub release assets; when those downloads fail
+        # (HTTP 504 on 2026-11-08), the fallback below runs the official syft image instead.
+        continue-on-error: true
         uses: anchore/sbom-action@v0.24.3
         with:
           image: mpmv-app:ci
           format: cyclonedx-json
           output-file: build/sbom/mpmv-image.cdx.json
           upload-artifact: false
+      - name: Image SBOM fallback (syft container)
+        if: steps.sbom.outcome == 'failure'
+        run: |
+          chmod 0777 build/sbom
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/build/sbom:/out" \
+            anchore/syft:v1.54.0 mpmv-app:ci -o cyclonedx-json=/out/mpmv-image.cdx.json
+      # Fails the job when neither step produced the SBOM: never a silently missing SBOM.
+      - name: Image SBOM present
+        run: test -s build/sbom/mpmv-image.cdx.json
       - name: Store the image SBOM
         uses: actions/upload-artifact@v7
         with:

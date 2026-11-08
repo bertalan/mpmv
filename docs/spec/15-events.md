@@ -111,7 +111,10 @@ class EventSettings(BaseSiteSetting):          # Wagtail site setting, staff-edi
 - **Structured fields versus body.** Type, dates, time zone, recurrence, location and coordinates,
   vendor, original locale, links, cancellation and hiding are page fields, identical in every
   translation of the event (`SynchronizedField`, see "Languages" below); title, summary, body and venue name are
-  translatable. Feeds, JSON-LD and listings read only the structured fields and the summary, never
+  translatable. wagtail-localize does not synchronise many-to-many fields, so the product and
+  category links reach the translations through the EVT.8 publish-time copy. The denormalised
+  `status` is not synchronised: each translation's comes from its own `live` and workflow state,
+  so a new translation of a live event is a draft. Feeds, JSON-LD and listings read only the structured fields and the summary, never
   the body.
 - **Body.** A StreamField built from the site's block library (CMS.2): rich text, images and
   galleries with the licence metadata of CMS.8, CTA, the product grid of CMS.10, FAQ, the launch countdown block
@@ -180,7 +183,8 @@ by the same `translation_key`. Staff-authored platform events follow the same ru
   In the vendor area and the API, "Add translation" creates the page in the target locale with
   Wagtail's `copy_for_translation()` (same `translation_key`) and the author writes the title,
   summary, body and venue name. The service copies the structured fields from the original page
-  to every translation on each publish, so dates, location, links and status never diverge. Staff
+  to every translation on each publish, so dates, location, links, cancellation and hiding never
+  diverge. Staff
   can also use wagtail-localize's translation editor in the admin. Vendors get no machine
   translation at go-live.
 - **Moderation** covers every language: a translation's first publication follows the same
@@ -298,17 +302,20 @@ every year at the end of August", "every Monday", "first Saturday of the month")
 | `INTERVAL` | 1–12 |
 | `COUNT` or `UNTIL` | at most one of them; `UNTIL` in UTC for timed events, a date for all-day events (RFC 5545 §3.3.10) |
 | `BYDAY` | weekdays, with an ordinal (`1SA`, `-1FR`) only for `MONTHLY` and `YEARLY` |
-| `BYMONTHDAY` | 1–31 and -1 |
+| `BYMONTHDAY` | 1–31 and -1; not with `FREQ=WEEKLY` (RFC 5545 §3.3.10) |
 | `BYMONTH` | 1–12 |
 | `WKST` | accepted, passed through |
+
+Numbers are ASCII digits only; a sign is allowed only where RFC 5545 allows one (`BYMONTHDAY`
+and the `BYDAY` ordinal).
 
 Everything else (`SECONDLY`, `MINUTELY`, `HOURLY`, `BYSETPOS`, `BYYEARDAY`, `BYWEEKNO`,
 `BYHOUR`, `BYMINUTE`, `BYSECOND`, `RDATE`) is refused with a field error. The vendor area offers
 presets (every year on these dates, every week on these days, every month on this day) and writes
 the RRULE; the API and the admin accept the RRULE text.
 
-Expansion is a pure function in `apps/events/engine.py`, built on `dateutil.rrule` (python-dateutil
-as a direct dependency):
+Expansion is a pure function in `apps/events/engine.py`. The subset is small, so the engine
+expands it directly with `datetime` and `zoneinfo` and needs no rule library:
 
 ```python
 @dataclass(frozen=True)
@@ -320,13 +327,20 @@ def expand(spec: RecurrenceSpec, window_start: datetime, window_end: datetime,
 def validate_rrule(text: str, all_day: bool) -> RRuleSubset      # raises RecurrenceError
 ```
 
+`RecurrenceError.errors` lists every refused part as a `RuleError(part, message)`, so the API and
+the forms can name the field. `DTSTART` is always the first occurrence and counts towards `COUNT`
+(an `UNTIL` before it bounds only the later occurrences);
+exdates (instants for timed events, first days for all-day events) are removed after `COUNT` and
+`UNTIL` apply. An occurrence is returned when it overlaps the window.
+
 - Timed occurrences are computed in **local time of the event's zone** and converted to UTC
   afterwards, so a weekly 10:00 meeting stays at 10:00 local across daylight saving changes.
 - A local time that does not exist (spring forward) moves forward by the gap, and an ambiguous
   one (fall back) takes the first instance, as RFC 5545 §3.3.5 requires.
 - The duration of each occurrence is the duration of the first one; for all-day events it is the
   number of days.
-- Listings and the month view expand up to 18 months ahead. `limit` caps runaway rules. The ICS feed does not expand: it passes the RRULE through.
+- Listings and the month view expand up to 18 months ahead: `expand` caps the window at 18 months
+  after its start (`horizon_end`). `limit` caps runaway rules. The ICS feed does not expand: it passes the RRULE through.
 
 ### Location, coordinates and geocoding
 
