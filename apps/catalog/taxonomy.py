@@ -19,7 +19,7 @@ Texts: one `*Translation` row per language (`apps.core.models.TranslationModel`)
 go-live but ready for every language in settings.LANGUAGES. The slug is a URL segment per
 language: it is unique among a node's siblings in a language (checked by `clean()`, so by forms
 and the admin), and unique per language for taxonomies and brands (database constraints). The
-URLs of taxonomy pages wait for decision D-07 (CAT.8): only the data is here.
+pages and their URLs (`/{taxonomy}/{term}/`, decision D-07) are in `views` and `urls` (CAT.8).
 
 Descriptions: the `description` texts of categories, terms and brands are HTML as staff (or an
 import) entered it, stored raw and never sanitized here. Whatever shows them to visitors (the
@@ -30,17 +30,19 @@ first; never mark a stored description safe as it is.
 from collections.abc import Iterable
 from typing import Any, ClassVar
 
+from django.conf import settings
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models.functions import Lower
 from treebeard.mp_tree import MP_Node
+from wagtail.models import Page
 
 from apps.core import translations
 from apps.core.models import BaseModel, TranslationModel, resolve_translation
 from apps.core.translations import Resolved
 
-from . import engine
+from . import engine, slugs
 
 url_slug_validator = RegexValidator(
     r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
@@ -207,6 +209,24 @@ class TaxonomyTranslation(TranslationModel):
 
     def __str__(self) -> str:
         return f"{self.name} [{self.language}]"
+
+    def clean(self) -> None:
+        """The slug is the first segment of the term pages (`/{taxonomy}/{term}/`, D-07): it
+        cannot be a language prefix, a catalog segment or the slug of a top-level CMS page."""
+        super().clean()
+        if not self.slug:
+            return
+        languages = [str(code) for code, _name in settings.LANGUAGES]
+        error = slugs.taxonomy_slug_error(self.slug, languages=languages)
+        top_level_pages = Page.objects.filter(depth=CMS_TOP_LEVEL_DEPTH, slug=self.slug)
+        if error is None and top_level_pages.exists():
+            error = "A CMS page already uses this slug at the top of the site."
+        if error is not None:
+            raise ValidationError({"slug": error})
+
+
+# Wagtail's tree root is depth 1 and each language's home page depth 2: top-level pages are 3.
+CMS_TOP_LEVEL_DEPTH = 3
 
 
 class Term(MP_Node, BaseModel):  # type: ignore[misc,django-manager-missing]  # untyped

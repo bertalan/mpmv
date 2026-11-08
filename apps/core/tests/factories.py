@@ -13,7 +13,10 @@ from apps.core.models import (
     AuditLog,
     EmailSuppression,
     FeatureFlag,
+    GeocodeCacheEntry,
+    GeocoderState,
     Heartbeat,
+    ImageLicence,
     MediaImage,
     MediaImageRendition,
     OutboxEmail,
@@ -128,8 +131,67 @@ class FeatureFlagFactory(DjangoModelFactory[FeatureFlag]):
     note = ""
 
 
+class ImageLicenceFactory(DjangoModelFactory[ImageLicence]):
+    """An allow-list entry (CMS.8), looked up by code: the seeded rows are reused. Services
+    validate entries; use `.build()` with `save_image_licence`."""
+
+    class Meta:
+        model = ImageLicence
+        django_get_or_create = ("code",)
+
+    code = factory.Sequence(lambda n: f"licence-{n}")
+    name = factory.LazyAttribute(lambda o: o.code)
+    url = ""
+    attribution_required = False
+    source_required = True
+    permission_required = False
+
+
+class GeocodeCacheEntryFactory(DjangoModelFactory[GeocodeCacheEntry]):
+    """A cached lookup with one candidate, valid for 180 days (EVT.12).
+
+    The chain writes the real ones through `apps.core.geocoding.services.geocode_address`.
+    """
+
+    class Meta:
+        model = GeocodeCacheEntry
+
+    key = factory.Sequence(lambda n: f"{n:064x}")
+    language = "en"
+    normalised_address = factory.Sequence(lambda n: f"it|20121|milano|via roma {n}")
+    provider = "nominatim"
+    candidates = factory.LazyFunction(
+        lambda: [
+            {
+                "latitude": "45.464270",
+                "longitude": "9.189510",
+                "label": "Milano",
+                "precision": "locality",
+                "confidence": None,
+                "provider": "nominatim",
+            }
+        ]
+    )
+    expires_at = factory.LazyFunction(lambda: timezone.now() + dt.timedelta(days=180))
+
+
+class GeocoderStateFactory(DjangoModelFactory[GeocoderState]):
+    """A provider with a closed circuit and no reserved slot (EVT.12)."""
+
+    class Meta:
+        model = GeocoderState
+
+    provider = factory.Sequence(lambda n: f"provider{n}")
+    next_slot_at = None
+    failures = 0
+    open_until = None
+
+
 class MediaImageFactory(DjangoModelFactory[MediaImage]):
     """A small generated PNG (I18N.3). Pass `file__filename` to recognise it in rendered HTML.
+
+    It is the operator's own work by a test author (CMS.8), so it needs no source or credit;
+    pass `licence=None, author=""` for a migrated image still to classify.
 
     Saving writes the file to MEDIA_ROOT, a temporary directory under the test settings. The
     image goes into Wagtail's root collection; `.build()` leaves the collection empty, because
@@ -142,6 +204,10 @@ class MediaImageFactory(DjangoModelFactory[MediaImage]):
     title = factory.Sequence(lambda n: f"Image {n}")
     file = factory.django.ImageField(width=64, height=48, color="teal", filename="image.png")
     collection = None
+    licence = factory.SubFactory(
+        ImageLicenceFactory, code="own-work", name="Own work", source_required=False
+    )
+    author = "Test author"
 
     @classmethod
     def _create(cls, model_class: type[MediaImage], *args: Any, **kwargs: Any) -> MediaImage:
