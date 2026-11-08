@@ -24,3 +24,7 @@ PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]  # fast has
 
 # Parallel runs (several agents or worktrees) each get their own test database.
 DATABASES["default"]["TEST"] = {"NAME": os.environ.get("MPMV_TEST_DB_NAME", "test_mpmv")}  # noqa: F405
+
+# Transactional email (ARC.16): the in-memory backend, and the templates of the outbox tests.
+EMAIL_SENDER = "apps.core.mail.MemoryEmailSender"
+TEMPLATES[0]["DIRS"] = [*TEMPLATES[0]["DIRS"], BASE_DIR / "apps" / "core" / "tests" / "templates"]  # noqa: F405

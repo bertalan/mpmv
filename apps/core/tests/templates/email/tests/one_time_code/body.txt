@@ -1,0 +1,3 @@
+{% load i18n %}{% blocktranslate %}Your verification code is {{ code }}. It expires in {{ minutes }} minutes.{% endblocktranslate %}
+
+{% translate "If you did not ask for it, ignore this email." %}
