@@ -259,6 +259,17 @@ if CAPTCHA_ENABLED:
         "frame-src": [_TURNSTILE_ORIGIN],
     }
 
+# VIES VAT number checks (TAX.5): the EU REST API behind apps.tax.vies.ViesClient, asked once per
+# check with a timeout (retries only in the tax.recheck_vat_number job). Valid and invalid answers
+# are reused for VIES_CACHE_SECONDS, "VIES down" only for VIES_UNAVAILABLE_CACHE_SECONDS.
+VIES_CLIENT = "apps.tax.vies.HttpViesClient"
+VIES_API_URL = env_str(
+    "MPMV_VIES_API_URL", "https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-number"
+)
+VIES_TIMEOUT_SECONDS = 8  # per socket operation (connect, each read), not for the whole check
+VIES_CACHE_SECONDS = 24 * 60 * 60
+VIES_UNAVAILABLE_CACHE_SECONDS = 5 * 60
+
 # Field-level encryption (SEC.3, docs/dev/field-encryption.md): keys live outside the database,
 # in the file named by MPMV_FIELD_ENCRYPTION_KEYS_FILE (one per line) or in
 # MPMV_FIELD_ENCRYPTION_KEYS (comma-separated). Each is "<id>:<base64url 32 bytes>", newest first:

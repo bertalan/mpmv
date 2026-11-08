@@ -1,7 +1,8 @@
 """Catalog services: audited price changes (CAT.1), audited product and variant edits (CAT.12),
-taxonomy queries (CAT.2), the catalogue integrity rules (CAT.14), and products created with
-typed attributes, variant axes and variants (CAT.3), product slugs with their history (CAT.5),
-and the listing query (CAT.8).
+taxonomy queries (CAT.2), the catalogue integrity rules (CAT.14), products created with typed
+attributes, variant axes and variants (CAT.3), product slugs with their history (CAT.5), the
+vendor SKU: audited renames and matching by match key and alias history (CAT.13), and the listing
+query (CAT.8).
 
 Every price change goes through here, whatever the adapter (admin, API, import, MCP): it is
 validated, returned as a ChangeSet (dry-run) and written to the audit log. The 30-day price
@@ -11,7 +12,7 @@ history for the Omnibus rule (CMP.6) can be built from these audit rows.
 import datetime as dt
 import logging
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
@@ -29,7 +30,7 @@ from apps.core.changeset import ChangeSet
 from apps.core.services import audit_changes, run_mutation
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedQuerySet
-from apps.vendors.services import vendors_in_suggestions
+from apps.vendors.services import ensure_vendor_can_write, vendors_in_suggestions
 
 from . import engine, listings, slugs
 from .models import (
@@ -45,6 +46,7 @@ from .models import (
     ProductStatus,
     ProductTranslation,
     SalesMode,
+    SkuAlias,
     SlugHistory,
     StockStatus,
     Taxonomy,
@@ -53,6 +55,8 @@ from .models import (
     TermTranslation,
     Variant,
     VariantOption,
+    sku_owner,
+    sku_taken_message,
 )
 
 logger = logging.getLogger(__name__)
@@ -390,13 +394,210 @@ def products_in_category(
     return Product.objects.filter(in_tree).distinct()
 
 
+# --- The vendor SKU (CAT.13, owner decisions Q-30 and Q-33)
+
+SKU_ALIAS_MODEL = "catalog.skualias"
+PRODUCT_SKU_RENAMED = "catalog.product.sku_renamed"
+VARIANT_SKU_RENAMED = "catalog.variant.sku_renamed"
+SKU_ROWS_UPDATED = "catalog.sku_rows_updated"
+
+# Fields an update by SKU may write: stock only. Prices, weights and the rest go through their
+# own audited services; creating products belongs to the import pipelines (ING).
+SKU_ROW_FIELDS = frozenset({"stock_qty", "stock_status"})
+
+type SkuItem = Product | Variant
+
+
+def _label(item: SkuItem) -> str:
+    """How a report names an item to the vendor: never the staff-only `staff_ref`."""
+    kind = "product" if isinstance(item, Product) else "variant"
+    return f"{kind} {item.sku!r} ({item.public_id})"
+
+
+class AmbiguousSkuMatch(ValidationError):
+    """Some SKUs match more than one item of the vendor (a current SKU and another item's old
+    alias): the run stops, the importer never guesses. `candidates` maps each such SKU, as
+    given, to the items it matches."""
+
+    def __init__(self, candidates: Mapping[str, Sequence[SkuItem]]) -> None:
+        self.candidates = {raw: list(items) for raw, items in candidates.items()}
+        lines = [
+            f"SKU {raw!r} matches " + " and ".join(_label(item) for item in items)
+            for raw, items in self.candidates.items()
+        ]
+        super().__init__("Ambiguous SKU match, nothing written: " + "; ".join(lines) + ".")
+
+
+def sku_snapshot(item: SkuItem) -> dict[str, Any]:
+    return {"sku": item.sku, "sku_key": item.sku_key, "vendor": str(item.vendor.public_id)}
+
+
+def _lock(item: SkuItem) -> SkuItem:
+    if isinstance(item, Product):
+        return (
+            Product.objects.select_for_update(of=("self",)).select_related("vendor").get(pk=item.pk)
+        )
+    return Variant.objects.select_for_update(of=("self",)).select_related("vendor").get(pk=item.pk)
+
+
+def _rename(
+    item: SkuItem, sku: str, *, model: str, action: str, ctx: AuditContext, dry_run: bool
+) -> ChangeSet:
+    errors = engine.sku_errors(sku)
+    if errors:
+        raise ValidationError({"sku": errors})
+    new_key = engine.sku_match_key(sku)
+    with transaction.atomic():
+        current = _lock(item)
+        owner = sku_owner(
+            current.vendor_id,
+            new_key,
+            product_pk=current.pk if isinstance(current, Product) else None,
+            variant_pk=current.pk if isinstance(current, Variant) else None,
+        )
+        if owner is not None:
+            raise ValidationError({"sku": sku_taken_message(owner)})
+        before = sku_snapshot(current)
+        changes = ChangeSet()
+        changes.update(
+            model, str(current.public_id), before, {**before, "sku": sku, "sku_key": new_key}
+        )
+        if new_key != current.sku_key:  # the database trigger writes the alias row
+            changes.create(
+                SKU_ALIAS_MODEL,
+                f"{current.vendor.public_id}:{current.sku_key}",
+                {
+                    "sku": current.sku,
+                    "sku_key": current.sku_key,
+                    model.split(".")[1]: str(current.public_id),
+                },
+            )
+
+        def apply() -> None:
+            current.sku = sku
+            current.save(update_fields=["sku", "updated_at"])
+
+        run_mutation(changes, apply, ctx=ctx, action=action, dry_run=dry_run)
+
+    if not dry_run:
+        item.sku, item.sku_key = sku, new_key
+    return changes
+
+
+def rename_product_sku(
+    product: Product, sku: str, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Give `product` a new vendor SKU, kept raw. The old match key stays as a `SkuAlias`, so
+    older import files still match. Odd characters are allowed (`engine.sku_warnings`); an
+    empty SKU or a match key the vendor already uses is a ValidationError."""
+    return _rename(
+        product, sku, model=PRODUCT_MODEL, action=PRODUCT_SKU_RENAMED, ctx=ctx, dry_run=dry_run
+    )
+
+
+def rename_variant_sku(
+    variant: Variant, sku: str, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """`rename_product_sku` for a variant: the namespace is shared with products."""
+    return _rename(
+        variant, sku, model=VARIANT_MODEL, action=VARIANT_SKU_RENAMED, ctx=ctx, dry_run=dry_run
+    )
+
+
+def match_skus(vendor: Vendor, skus: Iterable[str]) -> dict[str, SkuItem | None]:
+    """The product or variant of `vendor` each SKU (as given) refers to, or None.
+
+    Matches the current match key, then the `SkuAlias` history. A SKU matching more than one
+    item raises AmbiguousSkuMatch naming every candidate, before anything is written.
+    """
+    raw_skus = list(dict.fromkeys(skus))
+    keys = {raw: engine.sku_match_key(raw) for raw in raw_skus}
+    wanted = set(keys.values())
+    found: dict[str, dict[tuple[str, int], SkuItem]] = {key: {} for key in wanted}
+    for product in Product.objects.filter(vendor=vendor, sku_key__in=wanted):
+        found[product.sku_key][("product", product.pk)] = product
+    for variant in Variant.objects.filter(vendor=vendor, sku_key__in=wanted):
+        found[variant.sku_key][("variant", variant.pk)] = variant
+    aliases = SkuAlias.objects.filter(vendor=vendor, sku_key__in=wanted).select_related(
+        "product", "variant"
+    )
+    for alias in aliases:
+        if alias.product is not None:
+            found[alias.sku_key].setdefault(("product", alias.product.pk), alias.product)
+        elif alias.variant is not None:
+            found[alias.sku_key].setdefault(("variant", alias.variant.pk), alias.variant)
+
+    result: dict[str, SkuItem | None] = {}
+    ambiguous: dict[str, list[SkuItem]] = {}
+    for raw in raw_skus:
+        items = list(found[keys[raw]].values())
+        if len(items) > 1:
+            ambiguous[raw] = items
+        result[raw] = items[0] if len(items) == 1 else None
+    if ambiguous:
+        raise AmbiguousSkuMatch(ambiguous)
+    return result
+
+
+@dataclass(frozen=True)
+class SkuRow:
+    """One row of a vendor file: a SKU and the values to set (`SKU_ROW_FIELDS` only)."""
+
+    sku: str
+    values: Mapping[str, Any] = field(default_factory=dict)
+
+
+def update_by_sku(
+    vendor: Vendor, rows: Sequence[SkuRow], *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Update the vendor's products and variants named by SKU (match key, then aliases).
+
+    All or nothing: an ambiguous SKU (AmbiguousSkuMatch), an unknown SKU or a field outside
+    `SKU_ROW_FIELDS` (ValidationError) stops the run before anything is written. Another
+    vendor's items are never matched.
+    """
+    outside = sorted({name for row in rows for name in row.values} - SKU_ROW_FIELDS)
+    if outside:
+        raise ValidationError(f"These fields cannot be updated by SKU: {', '.join(outside)}.")
+    matches = match_skus(vendor, (row.sku for row in rows))
+    unknown = [raw for raw, item in matches.items() if item is None]
+    if unknown:
+        raise ValidationError(
+            "No product or variant of this vendor has these SKUs: "
+            + ", ".join(repr(raw) for raw in unknown)
+            + "."
+        )
+
+    changes = ChangeSet()
+    updates: list[tuple[SkuItem, dict[str, Any]]] = []
+    for row in rows:
+        item = matches[row.sku]
+        if item is None:  # pragma: no cover - refused above
+            continue
+        before = {"sku": item.sku, **{name: getattr(item, name) for name in row.values}}
+        model = PRODUCT_MODEL if isinstance(item, Product) else VARIANT_MODEL
+        changes.update(model, str(item.public_id), before, {**before, **row.values})
+        updates.append((item, dict(row.values)))
+
+    def apply() -> None:
+        for item, values in updates:
+            for name, value in values.items():
+                setattr(item, name, value)
+            item.save(update_fields=[*values, "updated_at"])
+
+    return run_mutation(changes, apply, ctx=ctx, action=SKU_ROWS_UPDATED, dry_run=dry_run)
+
+
 # --- Catalogue integrity (CAT.14, owner decisions Q-32 and Q-33)
 
 PRODUCT_DUPLICATED = "catalog.product.duplicated_to_vendor"
 UPSELL_NOT_ALLOWED = "{sku}: its vendor has not opted in to other vendors' suggestions."
 
-# A copy gets its own identity and timestamps.
-DUPLICATE_SKIPPED = frozenset({"id", "public_id", "created_at", "updated_at"})
+# A copy gets its own identity and timestamps: a new staff_ref from the database sequence and a
+# match key set on save from its SKU (CAT.13).
+DUPLICATE_SKIPPED = frozenset(
+    {"id", "public_id", "created_at", "updated_at", "staff_ref", "sku_key"}
+)
 
 
 def _copy[M: models.Model](instance: M, **overrides: Any) -> M:
@@ -455,10 +656,20 @@ def duplicate_product_to_vendor(
         )
         copy.full_clean()
         variants = list(original.variants.prefetch_related("translations"))
-        taken = Variant.objects.filter(vendor=vendor, sku__in=[v.sku for v in variants])
-        if taken.exists():
-            skus = ", ".join(sorted(taken.values_list("sku", flat=True)))
-            raise ValidationError({"sku": f"The vendor already has variants with SKU {skus}."})
+        # The copy's own SKU was checked by full_clean; its variants share the target vendor's
+        # namespace with products and variants alike, by match key (CAT.13).
+        keys = {variant.sku_key: variant.sku for variant in variants}
+        taken = {
+            *Product.objects.filter(vendor=vendor, sku_key__in=keys).values_list(
+                "sku_key", flat=True
+            ),
+            *Variant.objects.filter(vendor=vendor, sku_key__in=keys).values_list(
+                "sku_key", flat=True
+            ),
+        }
+        if taken:
+            skus = ", ".join(sorted(keys[key] for key in taken))
+            raise ValidationError({"sku": f"The vendor already uses these SKUs: {skus}."})
 
         changes = ChangeSet()
         changes.create(
@@ -562,10 +773,6 @@ def _product_errors(
 ) -> dict[str, list[str]]:
     """Every reason the payload cannot be created, by field (NON_FIELD_ERRORS: its shape)."""
     errors: dict[str, list[str]] = {}
-    try:
-        engine.normalize_sku(data.sku)
-    except engine.InvalidSku as exc:
-        _add_error(errors, "sku", str(exc))
     price = _amount(errors, "price_net", data.price_net)
     if price is not None and price == 0:  # CAT.14, Q-31: never 0.00
         _add_error(errors, "price_net", engine.ZERO_PRICE)
@@ -592,8 +799,6 @@ def _product_errors(
     ):
         _add_error(errors, NON_FIELD_ERRORS, message)
     for variant in data.variants:
-        if not engine.canonical_sku(variant.sku):
-            _add_error(errors, "variants", "A variant SKU cannot be empty.")
         _amount(errors, "variants", variant.price_net_override)
         weight_error = engine.weight_error(variant.weight_kg_override)
         if weight_error is not None:
@@ -601,13 +806,46 @@ def _product_errors(
         if variant.stock_qty < 0:
             _add_error(errors, "variants", f"{variant.sku}: the stock cannot be negative.")
 
-    if Product.objects.filter(vendor=vendor, sku=engine.canonical_sku(data.sku)).exists():
-        _add_error(errors, "sku", "This vendor already has a product with this SKU.")
-    skus = [engine.canonical_sku(v.sku) for v in data.variants]
-    taken = Variant.objects.filter(vendor=vendor, sku__in=skus).values_list("sku", flat=True)
-    for sku in sorted(taken):
-        _add_error(errors, "variants", f"This vendor already has a variant with this SKU: {sku}.")
+    _sku_namespace_errors(errors, vendor, data)
     return errors
+
+
+def _sku_namespace_errors(
+    errors: dict[str, list[str]], vendor: Vendor, data: engine.ProductIn
+) -> None:
+    """The SKUs are usable and free in the vendor's namespace: one per match key, across
+    products and variants together (CAT.13, Q-30); the database would refuse them."""
+    for message in engine.sku_errors(data.sku):
+        _add_error(errors, "sku", message)
+    product_key = engine.sku_match_key(data.sku)
+    if product_key:
+        owner = sku_owner(vendor.pk, product_key)
+        if owner is not None:
+            _add_error(errors, "sku", sku_taken_message(owner))
+    given: dict[str, str] = {}  # match key -> the variant SKU as first given
+    for variant in data.variants:
+        key = engine.sku_match_key(variant.sku)
+        if not key:
+            _add_error(errors, "variants", "A variant SKU cannot be empty.")
+        else:
+            for message in engine.sku_errors(variant.sku):
+                _add_error(errors, "variants", f"{variant.sku!r}: {message}")
+        if key:
+            given.setdefault(key, variant.sku)
+    if product_key in given:
+        _add_error(
+            errors,
+            "variants",
+            f"A variant cannot have the SKU of its product: {given[product_key]}.",
+        )
+    for model, label in ((Product, "product"), (Variant, "variant")):
+        taken = model.objects.filter(vendor=vendor, sku_key__in=given).values_list(
+            "sku_key", flat=True
+        )
+        for sku in sorted(given[key] for key in taken):
+            _add_error(
+                errors, "variants", f"This vendor already has a {label} with this SKU: {sku}."
+            )
 
 
 def create_product(
@@ -616,6 +854,7 @@ def create_product(
     *,
     ctx: AuditContext,
     dry_run: bool = False,
+    require_active_vendor: bool = False,
 ) -> ChangeSet:
     """Create `vendor`'s product with its texts, typed attributes, variant axes and variants.
 
@@ -625,6 +864,10 @@ def create_product(
     order they are given in, so the first axis given is the first axis shown; the variants are
     numbered in display order: by the first axis, then the next, each by the position of the
     value in its attribute (S, M, L). Raises ValidationError, also on dry-run.
+
+    `require_active_vendor` is for a write on behalf of the vendor's own API key (CORE.14): the
+    vendor's status is read again inside the write transaction (`ensure_vendor_can_write`), and
+    `VendorCannotWrite` is raised, nothing written, unless the vendor is still active.
     """
     catalogue = _attribute_catalogue({a.code for a in data.attributes})
     errors = _product_errors(vendor, data, catalogue)
@@ -634,7 +877,7 @@ def create_product(
     vendor_key = str(vendor.public_id)
     product = Product(
         vendor=vendor,
-        sku=engine.canonical_sku(data.sku),
+        sku=data.sku,
         kind=data.kind,
         sales_mode=data.sales_mode,
         fiscal_category=data.fiscal_category,
@@ -715,7 +958,7 @@ def create_product(
         variant = Variant(
             product=product,
             vendor=vendor,
-            sku=engine.canonical_sku(given_variant.sku),
+            sku=given_variant.sku,
             price_net_override=_amount({}, "variants", given_variant.price_net_override),
             weight_kg_override=_stored(given_variant.weight_kg_override, engine.WEIGHT_DECIMALS),
             stock_qty=given_variant.stock_qty,
@@ -752,6 +995,8 @@ def create_product(
             )
 
     def apply() -> None:
+        if require_active_vendor:
+            ensure_vendor_can_write(vendor)
         product.save()
         for text in texts:
             text.save()

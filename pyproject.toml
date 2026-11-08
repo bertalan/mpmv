@@ -206,3 +206,13 @@ name = "Tax and shipping engines stay independent of orders and cart"
 type = "forbidden"
 source_modules = ["apps.tax", "apps.shipping"]
 forbidden_modules = ["apps.orders", "apps.cart", "apps.payments", "apps.ledger"]
+
+# ARC.18 (spec 01 §1.3): engines are pure functions, with no database or ORM access.
+# import-linter forbids an external package only as a whole (`django`, not `django.db`), so
+# engines import no Django at all; the pure `slugify` helper comes through apps.core.text.
+[[tool.importlinter.contracts]]
+name = "Engines are pure: no Django, models or services in apps.*.engine (ARC.18)"
+type = "forbidden"
+source_modules = ["apps.*.engine"]
+forbidden_modules = ["django", "apps.*.models", "apps.*.services"]
+ignore_imports = ["apps.core.text -> django"]
