@@ -487,6 +487,61 @@ def record_legal_review(
     )
 
 
+LEGAL_DATE_SET = "cms.legal_page.effective_date_set"
+
+
+def set_legal_effective_date(
+    page: LegalPage,
+    effective_date: dt.date,
+    *,
+    ctx: AuditContext,
+    user: AbstractBaseUser | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Give one language's legal page its own effective date, keeping its wagtail-localize sync.
+
+    The way a translator sets a translation's date (I18N.9): the localize editor cannot show the
+    field. The page's live text is saved with the new date as a revision, published when the
+    page is live (which records the version, `record_legal_version`). Audited. Raises
+    ValidationError for a date before the source text it translates or before its own last
+    version. An unchanged date changes nothing.
+    """
+    page = LegalPage.objects.select_related("locale").get(pk=page.pk)  # the live text
+    latest = page.versions.order_by("-number").first()
+    problem = engine.translation_date_problem(
+        effective_date,
+        source=page.synced_source_date(),
+        latest=latest and latest.effective_date,
+    )
+    if problem == "source":
+        raise ValidationError(
+            {"effective_date": "A translation cannot take effect before the text it translates."}
+        )
+    if problem == "latest":
+        raise ValidationError(
+            {"effective_date": "A new version cannot take effect before the previous one."}
+        )
+    changeset = ChangeSet()
+    if effective_date == page.effective_date:
+        return changeset
+    key = f"{page.pk}"
+    language = page.locale.language_code
+    changeset.update(
+        "cms.legalpage",
+        key,
+        {"language_code": language, "effective_date": page.effective_date.isoformat()},
+        {"language_code": language, "effective_date": effective_date.isoformat()},
+    )
+
+    def apply() -> None:
+        page.effective_date = effective_date
+        revision = page.save_revision(user=user, log_action=True)
+        if page.live:
+            revision.publish(user=user)
+
+    return run_mutation(changeset, apply, ctx=ctx, action=LEGAL_DATE_SET, dry_run=dry_run)
+
+
 def legal_readiness(languages: Sequence[str] | None = None) -> list[engine.ReadinessProblem]:
     """What stops go-live on the customer legal and checkout pages, in every go-live language
     (all of settings.LANGUAGES unless `languages` is given): a page without a published

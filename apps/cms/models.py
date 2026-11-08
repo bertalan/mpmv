@@ -22,6 +22,7 @@ native-speaker review, legal counsel check) are recorded on its versions (I18N.9
 with us" page shows the plans and a FAQ and leads to the VEN.22 application form.
 """
 
+import datetime as dt
 from typing import Any, ClassVar
 
 from django.core.exceptions import ValidationError
@@ -37,6 +38,7 @@ from wagtail.fields import StreamField
 from wagtail.images import get_image_model_string
 from wagtail.models import Page, TranslatableMixin
 from wagtail_localize.fields import BaseTranslatableField, SynchronizedField
+from wagtail_localize.models import Translation
 
 from . import engine
 from .blocks import (
@@ -199,7 +201,9 @@ def stream_data(stream: Any) -> list[list[Any]]:
 class LanguageOwnField(BaseTranslatableField):  # type: ignore[misc]  # untyped
     """A field each translation keeps for itself: wagtail-localize neither copies it from the
     source page on a sync nor offers it as a segment. A new translation starts from the
-    source's value (Wagtail's copy); the translator then sets its own in the page editor."""
+    source's value (Wagtail's copy). The wagtail-localize editor cannot show it, so the
+    translator sets it with `services.set_legal_effective_date` (`manage.py
+    set_legal_effective_date`) and the sync stays on."""
 
     def __repr__(self) -> str:
         return f"<LanguageOwnField {self.field_name}>"
@@ -211,8 +215,10 @@ class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
     Every publish that changes the title, the text or the effective date records a
     `LegalPageVersion` (`services.record_legal_version`, on Wagtail's `page_published`). A
     translation is its own page, so each language has its own versions and dates (Q-42): a
-    wagtail-localize sync brings the source's text, never its effective date (I18N.9). The
-    archive is served at `versions/<number>/`.
+    wagtail-localize sync brings the source's text, not its effective date (I18N.9), except
+    that a text newer than the translation's date takes effect from the source's date
+    (`engine.synced_translation_date`, applied in `clean`, which every save runs). The archive
+    is served at `versions/<number>/`.
 
     No EN fallback (Q-42): a language without its own published page has no such page, so the
     URL is not found; nothing serves the EN text in its place (`language_fallback`).
@@ -257,6 +263,12 @@ class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
         if self.pk is None or self.effective_date is None:
             return
         latest = self.versions.order_by("-number").first()
+        # A sync never publishes a newer source text under the translation's older date.
+        self.effective_date = engine.synced_translation_date(
+            own=self.effective_date,
+            source=self.synced_source_date(),
+            text_changed=latest is None or self.text() != latest.text(),
+        )
         if engine.is_backdated(latest and latest.effective_date, self.effective_date):
             raise ValidationError(
                 {
@@ -269,11 +281,27 @@ class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
 
     def content(self) -> dict[str, Any]:
         """What a version records: compared with the last version on every publish."""
-        return {
-            "title": self.title,
-            "effective_date": self.effective_date.isoformat(),
-            "body": stream_data(self.body),
-        }
+        return {**self.text(), "effective_date": self.effective_date.isoformat()}
+
+    def text(self) -> dict[str, Any]:
+        return {"title": self.title, "body": stream_data(self.body)}
+
+    def synced_source_date(self) -> dt.date | None:
+        """The effective date of the source text this page last synced from, when it is a
+        wagtail-localize translation with the sync on (None otherwise)."""
+        translation = (
+            Translation.objects.filter(
+                source__object_id=self.translation_key,
+                target_locale_id=self.locale_id,
+                enabled=True,
+            )
+            .select_related("source")
+            .first()
+        )
+        if translation is None:
+            return None
+        source: dt.date | None = translation.source.as_instance().effective_date
+        return source
 
     def version_url(self, number: int, request: HttpRequest | None = None) -> str:
         base: str = self.get_url(request) or ""
@@ -340,11 +368,10 @@ class LegalPageVersion(models.Model):
         super().save(*args, **kwargs)
 
     def content(self) -> dict[str, Any]:
-        return {
-            "title": self.title,
-            "effective_date": self.effective_date.isoformat(),
-            "body": stream_data(self.body),
-        }
+        return {**self.text(), "effective_date": self.effective_date.isoformat()}
+
+    def text(self) -> dict[str, Any]:
+        return {"title": self.title, "body": stream_data(self.body)}
 
 
 class LegalPageReview(models.Model):

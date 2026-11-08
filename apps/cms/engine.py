@@ -86,6 +86,36 @@ def content_changed(latest: Mapping[str, Any] | None, current: Mapping[str, Any]
     return latest is None or dict(latest) != dict(current)
 
 
+# --- Effective date of a synced legal translation (I18N.9, Q-42)
+
+
+def synced_translation_date(*, own: dt.date, source: dt.date | None, text_changed: bool) -> dt.date:
+    """The effective date a synced translation publishes with.
+
+    A translation keeps its own date, except when a sync brings it a text newer than that date:
+    the source text then takes effect from the source's date, never before (otherwise CMS.5
+    would treat the new text as a correction, in force since the translation's old date).
+    """
+    if text_changed and source is not None and source > own:
+        return source
+    return own
+
+
+def translation_date_problem(
+    new: dt.date, *, source: dt.date | None, latest: dt.date | None
+) -> str | None:
+    """Why a translator cannot give a translation `new` as its own date, or None.
+
+    "source": before the date of the source text it translates; "latest": before its own last
+    recorded version (a new version never takes effect before the previous one, CMS.5).
+    """
+    if source is not None and new < source:
+        return "source"
+    if is_backdated(latest, new):
+        return "latest"
+    return None
+
+
 # --- Go-live readiness of the customer legal and checkout pages (I18N.9)
 
 GO_LIVE_LEGAL_KINDS: tuple[str, ...] = ("terms", "privacy", "withdrawal", "shipping", "returns")
