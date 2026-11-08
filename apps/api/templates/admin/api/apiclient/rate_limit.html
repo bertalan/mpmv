@@ -1,0 +1,36 @@
+{% extends "admin/base_site.html" %}
+{% load admin_urls %}
+{% comment %}CORE.16: staff raise or lower the rate limit of one API key.{% endcomment %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Home</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; <a href="{{ change_url }}">{{ original }}</a>
+  &rsaquo; Rate limit
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <p>Effective now: {{ effective }}.</p>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <fieldset class="module aligned">
+      <div class="form-row{% if form.rate_limit.errors %} errors{% endif %}">
+        {{ form.rate_limit.errors }}
+        <div class="flex-container">
+          <label for="{{ form.rate_limit.id_for_label }}">{{ form.rate_limit.label }}:</label>
+          {{ form.rate_limit }}
+        </div>
+        <div class="help" id="{{ form.rate_limit.id_for_label }}_helptext">{{ form.rate_limit.help_text }}</div>
+      </div>
+    </fieldset>
+    <div class="submit-row">
+      <input type="submit" value="Save" class="default">
+      <a href="{{ change_url }}" class="closelink">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
