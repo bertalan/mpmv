@@ -3,12 +3,16 @@
 Styleguide (THM.4, spec 14 §14.9): every component of the active theme in every state, for
 staff and for the accessibility and visual tests. Never indexed nor cached (the view also sends
 `X-Robots-Tag`). Part 1/3: buttons and form controls; part 2/3: cards, product tiles, badges
-and alerts; part 3 adds its own sections.
+and alerts; part 3/3: the page frame, breadcrumbs, pagination, tabs, in-page navigation and
+the rest of the library (commerce, content and feedback components, image credits).
+apps.themes.styleguide.COMPONENTS maps every §14.9 component shown here to its section.
 
-Context: `forms` (apps.themes.styleguide.sample_forms): the sample forms by state, each with
-its own prefix so ids never repeat on the page; `products`
-(apps.themes.styleguide.sample_products): the product tiles by state; `focus_errors`
-(`?focus=errors`): the first error summary takes the focus on load.
+Context (samples from apps.themes.styleguide): `forms`, the sample forms by state, each with
+its own prefix so ids never repeat on the page; `products`, the product tiles by state;
+`breadcrumbs` (`deep`, `short`); `pages`, numbered page links; `tabs`, short panels;
+`skip_links` and `page_links`, the in-page navigation; `library`, the samples of the rest of the
+library (apps.themes.styleguide.sample_library); `focus_errors` (`?focus=errors`): the
+first error summary takes the focus on load.
 {% endcomment %}
 {% block title %}{% translate "Styleguide" %} · {{ site_name }}{% endblock %}
 {% block description %}<meta name="robots" content="noindex, nofollow">{% endblock %}
@@ -133,9 +137,7 @@ its own prefix so ids never repeat on the page; `products`
   <section aria-labelledby="sg-tiles">
     <h2 id="sg-tiles">{% translate "Product tiles" %}</h2>
     <p>{% translate "New, on sale, out of stock, and price on request without an image." %}</p>
-    <ul class="product-grid" role="list">
-      {% for product in products %}<li>{% include "components/product_tile.html" with name=product.name url="#sg-tiles" image_url=product.image_url image_alt=product.image_alt price=product.price price_before=product.price_before vendor=product.vendor badges=product.badges only %}</li>{% endfor %}
-    </ul>
+    {% include "components/product_grid.html" with products=products only %}
   </section>
 
   <section aria-labelledby="sg-badges">
@@ -160,6 +162,214 @@ its own prefix so ids never repeat on the page; `products`
     {% include "components/alert.html" with level="info" id="sg-alert-dismissible" dismissible=True message=_("We updated the terms of sale.") only %}
     {% include "components/alert.html" with level="success" live="polite" message=_("Cart updated.") only %}
     {% include "components/alert.html" with level="danger" live="assertive" message=_("The session expired. Sign in again to continue.") only %}
+    <div id="sg-alert-feed"></div>
+  </section>
+
+  <section aria-labelledby="sg-frame">
+    <h2 id="sg-frame">{% translate "Page frame" %}</h2>
+    <p>{% translate "These components frame every page, this one included, so they are shown in place rather than repeated here:" %}</p>
+    <ul>
+      <li>{% translate "Skip link: the first Tab stop of the page, shown on focus; it moves the focus to the main content." %}</li>
+      <li>{% translate "Header and disclosure navigation: on narrow screens the main menu folds behind a Menu button (Enter or Space opens it, Escape closes it); without JavaScript the links are always shown." %}</li>
+      <li>{% translate "Language switcher: in the header, the current language marked and disabled." %}</li>
+      <li>{% translate "Footer: the help link first, then the footer and legal menus." %}</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="sg-breadcrumbs">
+    <h2 id="sg-breadcrumbs">{% translate "Breadcrumbs" %}</h2>
+    <p>{% translate "A deep trail and a short one; the current page is the last item, not a link." %}</p>
+    {% include "components/breadcrumb.html" with items=breadcrumbs.deep only %}
+    {% include "components/breadcrumb.html" with items=breadcrumbs.short label=_("Breadcrumb, short trail") only %}
+  </section>
+
+  <section aria-labelledby="sg-pagination">
+    <h2 id="sg-pagination">{% translate "Pagination" %}</h2>
+    <p>{% translate "The listing pagination on the first, a middle and the last page, then with numbered pages. A single page shows no pagination." %}</p>
+    <h3>{% translate "First page" %}</h3>
+    {% include "components/pagination.html" with page=1 page_count=9 next_url="?page=2#sg-pagination" label=_("Pagination, first page") only %}
+    <h3>{% translate "Middle page" %}</h3>
+    {% include "components/pagination.html" with page=5 page_count=9 previous_url="?page=4#sg-pagination" next_url="?page=6#sg-pagination" label=_("Pagination, middle page") only %}
+    <h3>{% translate "Last page" %}</h3>
+    {% include "components/pagination.html" with page=9 page_count=9 previous_url="?page=8#sg-pagination" label=_("Pagination, last page") only %}
+    <h3>{% translate "Numbered pages" %}</h3>
+    {% include "components/pagination.html" with page=5 page_count=9 previous_url="?page=4#sg-pagination" next_url="?page=6#sg-pagination" pages=pages label=_("Pagination, numbered") only %}
+  </section>
+
+  <section aria-labelledby="sg-tabs">
+    <h2 id="sg-tabs">{% translate "Tabs" %}</h2>
+    <p>{% translate "For short content only. Arrow keys move between the tabs, Home and End jump to the ends, Tab moves into the open panel. Without JavaScript every panel shows under its heading." %}</p>
+    <h3>{% translate "First tab selected" %}</h3>
+    {% include "components/tabs.html" with id="sg-tabs-product" label=_("Product details") tabs=tabs heading_level=4 only %}
+    <h3>{% translate "Another tab selected on load" %}</h3>
+    {% include "components/tabs.html" with id="sg-tabs-other" label=_("Product details, second example") tabs=tabs selected=2 heading_level=4 only %}
+  </section>
+
+  <section aria-labelledby="sg-in-page">
+    <h2 id="sg-in-page">{% translate "In-page navigation" %}</h2>
+    <p>{% translate "A skip link to the filters, shown only on focus (press Tab from the start of this section), and an “On this page” list of anchors." %}</p>
+    {% include "components/in_page_nav.html" with label=_("Skip links") links=skip_links variant="skip" only %}
+    {% include "components/in_page_nav.html" with label=_("On this page") links=page_links only %}
+    <div id="sg-filters" class="card" tabindex="-1">
+      <h3>{% translate "Filters" %}</h3>
+      <p>{% translate "The target of the skip link: the filter panel of a listing." %}</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="sg-search">
+    <h2 id="sg-search">{% translate "Search form" %}</h2>
+    <p>{% translate "With a visible label and empty, then compact (label for screen readers only) with a query." %}</p>
+    <div class="styleguide__forms">
+      {% include "components/search_form.html" with id="sg-search-full" action="#sg-search" only %}
+      {% include "components/search_form.html" with id="sg-search-compact" action="#sg-search" query=_("winter gloves") compact=True only %}
+    </div>
+  </section>
+
+  <section aria-labelledby="sg-mini-cart">
+    <h2 id="sg-mini-cart">{% translate "Mini-cart status" %}</h2>
+    <div class="styleguide__examples">
+      <div class="styleguide__example">{% include "components/mini_cart.html" with url="#sg-mini-cart" count=0 only %}<span class="styleguide__state">{% translate "empty" %}</span></div>
+      <div class="styleguide__example">{% include "components/mini_cart.html" with url="#sg-mini-cart" count=1 only %}<span class="styleguide__state">{% translate "one item" %}</span></div>
+      <div class="styleguide__example">{% include "components/mini_cart.html" with url="#sg-mini-cart" count=12 only %}<span class="styleguide__state">{% translate "many items" %}</span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="sg-price">
+    <h2 id="sg-price">{% translate "Price" %}</h2>
+    <div class="styleguide__examples">
+      <div class="styleguide__example">{% include "components/price.html" with amount="€ 189.00" note=_("VAT included") only %}<span class="styleguide__state">{% translate "regular, with a note" %}</span></div>
+      <div class="styleguide__example">{% include "components/price.html" with amount="€ 39.00" lowest_30_days="€ 45.00" only %}<span class="styleguide__state">{% translate "reduced, with the 30-day reference" %}</span></div>
+      <div class="styleguide__example">{% include "components/price.html" with amount="€ 29.00" from_price=True only %}<span class="styleguide__state">{% translate "from, several variants" %}</span></div>
+      <div class="styleguide__example">{% include "components/price.html" with on_request=True only %}<span class="styleguide__state">{% translate "on request" %}</span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="sg-rating">
+    <h2 id="sg-rating">{% translate "Rating" %}</h2>
+    <div class="styleguide__examples">
+      <div class="styleguide__example">{% include "components/rating.html" with value=4.5 count=12 url="#sg-rating" only %}<span class="styleguide__state">{% translate "with a link to the reviews" %}</span></div>
+      <div class="styleguide__example">{% include "components/rating.html" with value=5 count=1 only %}<span class="styleguide__state">{% translate "one review" %}</span></div>
+      <div class="styleguide__example">{% include "components/rating.html" with value=None count=0 only %}<span class="styleguide__state">{% translate "no reviews" %}</span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="sg-accordion">
+    <h2 id="sg-accordion">{% translate "Accordion" %}</h2>
+    <p>{% translate "Native disclosures: Enter or Space opens an item. The first accordion opens one item on load; in the second, opening an item closes the others." %}</p>
+    {% include "components/accordion.html" with items=library.accordion only %}
+    {% include "components/accordion.html" with items=library.accordion name="sg-exclusive" only %}
+  </section>
+
+  <section aria-labelledby="sg-dialog">
+    <h2 id="sg-dialog">{% translate "Dialog" %}</h2>
+    <p>{% translate "A modal dialog: the focus moves inside and stays there, Escape or the close button closes it and the focus returns to the button that opened it." %}</p>
+    {% include "components/dialog.html" with id="sg-dialog-size" title=_("Size guide") body=_("Measure your chest at its widest point and pick the next size up.") open_label=_("Open the size guide") only %}
+  </section>
+
+  <section aria-labelledby="sg-carousel">
+    <h2 id="sg-carousel">{% translate "Carousel" %}</h2>
+    <p>{% translate "Scrolls and snaps by itself; the Previous and Next buttons scroll by one view. The track takes the focus, so the arrow keys scroll it too. Nothing moves on its own." %}</p>
+    {% include "components/carousel.html" with id="sg-carousel-featured" label=_("Featured products") slides=library.slides only %}
+  </section>
+
+  <section aria-labelledby="sg-gallery">
+    <h2 id="sg-gallery">{% translate "Gallery" %}</h2>
+    <p>{% translate "Product images; Enlarge opens one in a dialog. Then a gallery with no images." %}</p>
+    {% include "components/gallery.html" with id="sg-gallery-jacket" label=_("Images of the touring jacket") images=library.images only %}
+    {% include "components/gallery.html" with id="sg-gallery-empty" label=_("Images of a product with no photos") images=None only %}
+  </section>
+
+  <section aria-labelledby="sg-quantity">
+    <h2 id="sg-quantity">{% translate "Quantity stepper" %}</h2>
+    <div class="styleguide__examples">
+      <div class="styleguide__example">{% include "components/quantity_stepper.html" with id="sg-qty-default" value=2 max=5 only %}<span class="styleguide__state">{% translate "default" %}</span></div>
+      <div class="styleguide__example">{% include "components/quantity_stepper.html" with id="sg-qty-min" label=_("Quantity, at the minimum") value=1 max=5 only %}<span class="styleguide__state">{% translate "at the minimum" %}</span></div>
+      <div class="styleguide__example">{% include "components/quantity_stepper.html" with id="sg-qty-max" label=_("Quantity, at the maximum") value=5 max=5 only %}<span class="styleguide__state">{% translate "at the maximum" %}</span></div>
+      <div class="styleguide__example">{% include "components/quantity_stepper.html" with id="sg-qty-disabled" label=_("Quantity, disabled") value=1 disabled=True only %}<span class="styleguide__state">{% translate "disabled" %}</span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="sg-cart">
+    <h2 id="sg-cart">{% translate "Cart lines and order summary" %}</h2>
+    <p>{% translate "A package of two lines, one with a stock problem, then the summary with every line and with shipping still to calculate." %}</p>
+    <form method="get" action="#sg-cart" novalidate>
+      <ul class="cart-lines" role="list">
+        {% include "components/cart_line.html" with id="sg-line-1" name=_("Touring jacket") url="#sg-cart" image_url=library.image variant=_("Size M, grey") vendor="Vendor A" unit_price="€ 189.00" quantity=1 max=4 total="€ 189.00" only %}
+        {% include "components/cart_line.html" with id="sg-line-2" name=_("Rain cover") url="#sg-cart" vendor="Vendor A" unit_price="€ 39.00" quantity=2 max=2 total="€ 78.00" problem=_("Only two left: the quantity was lowered.") only %}
+      </ul>
+    </form>
+    <div class="styleguide__forms">
+      {% include "components/order_summary.html" with id="sg-summary" lines=library.summary total="€ 227.00" note=_("VAT included") heading_level=3 only %}
+      {% include "components/order_summary.html" with id="sg-summary-pending" title=_("Order summary, before shipping") lines=library.summary_pending total="€ 39.00" total_label=_("Total so far") heading_level=3 only %}
+    </div>
+  </section>
+
+  <section aria-labelledby="sg-steps">
+    <h2 id="sg-steps">{% translate "Step indicator" %}</h2>
+    <h3>{% translate "First step" %}</h3>
+    {% include "components/step_indicator.html" with steps=library.steps current=1 label=_("Checkout steps, first") only %}
+    <h3>{% translate "A middle step" %}</h3>
+    {% include "components/step_indicator.html" with steps=library.steps current=3 only %}
+  </section>
+
+  <section aria-labelledby="sg-empty">
+    <h2 id="sg-empty">{% translate "Empty state" %}</h2>
+    {% include "components/empty_state.html" with title=_("Your cart is empty") text=_("Find something you like in the catalog.") url="#sg-empty" action=_("Start shopping") heading_level=3 only %}
+    {% include "components/empty_state.html" with title=_("No orders yet") heading_level=3 only %}
+  </section>
+
+  <section aria-labelledby="sg-toasts">
+    <h2 id="sg-toasts">{% translate "Toasts" %}</h2>
+    <p>{% translate "A polite live region present from the start; toasts stay until dismissed. The button adds one." %}</p>
+    <p><button type="button" class="button button--secondary" data-toast="{% translate 'Added to the cart.' %}" data-toast-region="sg-toast-region" hidden>{% translate "Show a toast" %}</button></p>
+    {% include "components/toast.html" with id="sg-toast-region" messages=library.toasts only %}
+  </section>
+
+  <section aria-labelledby="sg-tables">
+    <h2 id="sg-tables">{% translate "Responsive table" %}</h2>
+    <p>{% translate "On narrow screens the table scrolls inside its own region, which takes the focus." %}</p>
+    {% include "components/table.html" with id="sg-table-orders" caption=_("Your orders") columns=library.columns rows=library.rows only %}
+    {% include "components/table.html" with id="sg-table-empty" caption=_("Your returns") columns=library.columns rows=None empty=_("No returns yet.") only %}
+  </section>
+
+  <section aria-labelledby="sg-hero">
+    <h2 id="sg-hero">{% translate "Hero" %}</h2>
+    {% include "components/hero.html" with title=_("Ride further this spring") text=_("Gear from independent workshops, shipped from the people who make it.") url="#sg-hero" action=_("Shop now") secondary_url="#sg-hero" secondary_action=_("Meet the vendors") image_url=library.image heading_level=3 only %}
+    {% include "components/hero.html" with title=_("Free returns for 30 days") text=_("Text only, without an image.") url="#sg-hero" action=_("Read the terms") heading_level=3 only %}
+  </section>
+
+  <section aria-labelledby="sg-cta">
+    <h2 id="sg-cta">{% translate "CTA band" %}</h2>
+    {% include "components/cta_band.html" with title=_("Sell with us") text=_("Open your shop in a day.") url="#sg-cta" action=_("Apply now") heading_level=3 only %}
+    {% include "components/cta_band.html" with title=_("Get the newsletter") text=_("One email a month, no tracking.") url="#sg-cta" action=_("Subscribe") variant="accent" heading_level=3 only %}
+  </section>
+
+  <section aria-labelledby="sg-logos">
+    <h2 id="sg-logos">{% translate "Logo strip" %}</h2>
+    {% include "components/logo_strip.html" with label=_("Our vendors") logos=library.logos only %}
+  </section>
+
+  <section aria-labelledby="sg-faq">
+    <h2 id="sg-faq">{% translate "FAQ" %}</h2>
+    {% include "components/faq.html" with id="sg-faq-shipping" title=_("Shipping questions") questions=library.faq heading_level=3 only %}
+  </section>
+
+  <section aria-labelledby="sg-countdown">
+    <h2 id="sg-countdown">{% translate "Launch countdown" %}</h2>
+    <p>{% translate "As the server renders it: the absolute date before the launch, the expired text after. The live counter and its pause button are CMS.9's module." %}</p>
+    {% include "components/launch_countdown.html" with title=_("The new touring jacket") target=library.launch url="#sg-countdown" action=_("Get a reminder") heading_level=3 only %}
+    {% include "components/launch_countdown.html" with title=_("The rain cover") target=library.launched expired=True expired_text=_("Now available.") expired_url="#sg-countdown" heading_level=3 only %}
+  </section>
+
+  <section aria-labelledby="sg-credits">
+    <h2 id="sg-credits">{% translate "Image credits" %}</h2>
+    <p>{% translate "Under an image (CMS.8): with an author, a licence link and the source, then plain; and the disclosure that lists every credit of a page." %}</p>
+    <figure>
+      <img src="{{ library.image }}" alt="" width="200" height="200" loading="lazy">
+      <figcaption>{% translate "A placeholder image" %} {% include "core/components/image_credit.html" with credit=library.credit_full only %}</figcaption>
+    </figure>
+    <p>{% include "core/components/image_credit.html" with credit=library.credit_plain only %}</p>
+    {% include "core/components/image_credits_disclosure.html" with credits=library.credits only %}
   </section>
 </div>
 {% endblock %}

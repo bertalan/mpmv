@@ -432,6 +432,171 @@
     flex-shrink: 0;
   }
 
+  /* --- Breadcrumb (components/breadcrumb.html): one line that wraps; the separators are
+     generated content with empty alternative text, so screen readers skip them. */
+
+  .breadcrumb ol {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 var(--space-xs);
+    margin: 0 0 var(--space-m);
+    padding: 0;
+    list-style: none;
+    font-size: 0.875em;
+  }
+
+  .breadcrumb li {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+
+  .breadcrumb li + li::before {
+    content: "/" / "";
+    color: var(--color-text-muted);
+  }
+
+  .breadcrumb a {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--target-min);
+  }
+
+  .breadcrumb [aria-current="page"] {
+    color: var(--color-text-muted);
+  }
+
+  /* --- Pagination (components/pagination.html): links at least 24 x 24 px (WCAG 2.5.8); the
+     current page is filled, the missing step and the gaps are muted text. */
+
+  .pagination ul {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-xs) var(--space-s);
+    margin: 0 0 var(--space-m);
+    padding: 0;
+    list-style: none;
+  }
+
+  .pagination__step,
+  .pagination__page {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-block-size: var(--target-primary);
+    min-inline-size: var(--target-primary);
+    padding-inline: var(--space-s);
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-control);
+  }
+
+  .pagination__page[aria-current="page"] {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+    border-color: var(--color-accent);
+    font-weight: 600;
+  }
+
+  .pagination__step--none {
+    color: var(--color-text-muted);
+    border-style: dashed;
+  }
+
+  .pagination__gap,
+  .pagination__status {
+    color: var(--color-text-muted);
+  }
+
+  /* --- Tabs (components/tabs.html): the selected tab carries a bar and bold text, never
+     colour alone. Before the script runs the list is hidden and the panel headings show. */
+
+  .tabs {
+    margin-block-end: var(--space-l);
+  }
+
+  .tabs__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    border-block-end: 1px solid var(--color-border);
+  }
+
+  .tabs__list [role="tab"] {
+    --button-bg: transparent;
+    --button-fg: var(--color-text-muted);
+    --button-bg-hover: var(--color-accent-tint);
+
+    border: 0;
+    border-block-end: 3px solid transparent;
+    border-radius: var(--radius-control) var(--radius-control) 0 0;
+    font-weight: 400;
+  }
+
+  .tabs__list [role="tab"]:hover {
+    color: var(--color-link);
+  }
+
+  .tabs__list [role="tab"][aria-selected="true"] {
+    --button-fg: var(--color-link);
+
+    border-block-end-color: var(--color-accent);
+    font-weight: 600;
+  }
+
+  .tabs__panel {
+    padding-block: var(--space-m);
+  }
+
+  .tabs.is-enhanced .tabs__heading {
+    display: none;
+  }
+
+  .tabs__panel > :last-child {
+    margin-block-end: 0;
+  }
+
+  /* --- In-page navigation (components/in_page_nav.html). The skip variant keeps its links
+     out of sight, still in the accessibility tree, until one takes the focus. */
+
+  .in-page-nav ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs) var(--space-m);
+    margin: 0 0 var(--space-m);
+    padding: 0;
+    list-style: none;
+  }
+
+  .in-page-nav a {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--target-min);
+  }
+
+  .in-page-nav--skip ul {
+    margin: 0;
+  }
+
+  .in-page-nav--skip a:not(:focus) {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    min-block-size: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .in-page-nav--skip a:focus {
+    min-block-size: var(--target-primary);
+    padding-inline: var(--space-m);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-control);
+  }
+
   /* --- Styleguide page (/_styleguide/, staff only): examples in rows with a state caption. */
 
   .styleguide section {

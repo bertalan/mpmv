@@ -5,8 +5,10 @@ Public page layout of the base theme (THM.3, spec 14 §14.3, §14.6). Pages exte
 skip link target, the disclosure navigation, the help link and the language switcher; the help
 link repeats in the footer, in the same place on every page (WCAG 3.2.6).
 
-Outside the `header` and `footer` blocks nothing here queries the database: without a request
-in the context (the 500 page) `wagtail_site` is None and `site_name` comes from the context.
+Outside the `header`, `footer` and `image_credits` blocks nothing here queries the database:
+without a request in the context (the 500 page) `wagtail_site` is None and `site_name` comes
+from the context. `image_credits` (CMS.8) lists the credits of a CMS page's images after its
+content; pages without a `page` skip it.
 
 Strict CSP: no inline script or style. The theme module registers its Alpine components before
 the vendored Alpine CSP build starts (both are deferred and run in document order); htmx reads
@@ -34,7 +36,7 @@ its configuration from the meta tag.
   {% endblock %}
   <main id="main" class="site-main" tabindex="-1">
     {% block content %}{% endblock %}
-    {% if page %}{% page_image_credits page as image_credits %}{% image_credits_disclosure image_credits %}{% endif %}
+    {% block image_credits %}{% if page %}{% page_image_credits page as image_credits %}{% image_credits_disclosure image_credits %}{% endif %}{% endblock %}
   </main>
   {% block footer %}
     {% navigation_links "footer" as footer_links %}

@@ -73,6 +73,9 @@ PAIRS = (
     ContrastPair("color.success", "color.surface-raised", UI),
     ContrastPair("color.warning", "color.surface-raised", UI),
     ContrastPair("color.danger", "color.surface-raised", UI),
+    # The library's indicator bars on the plain surface: a cart line's problem, a toast (THM.4).
+    ContrastPair("color.warning", "color.surface", UI),
+    ContrastPair("color.success", "color.surface", UI),
 )
 
 TOKEN_CONTRACT = TokenContract(required=(*COLOURS, *OTHER), pairs=PAIRS)
