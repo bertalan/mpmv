@@ -251,7 +251,9 @@ http_ok() { # http_ok <site> <path>: 200 from Caddy on this host, by the site's 
 app_restarts() { systemctl --user show -p NRestarts --value mpmv-app.service 2>/dev/null || echo 0; }
 
 media_path() {
-  path="$(podman exec mpmv-app find /app/media -type f -name '*.webp' -print -quit 2>/dev/null || true)"
+  # An image from a folder Caddy serves publicly (deploy/caddy/Caddyfile, @public_media).
+  path="$(podman exec mpmv-app find /app/media/original_images /app/media/images -maxdepth 1 \
+    -type f -name '*.webp' -print -quit 2>/dev/null || true)"
   case "$path" in
     /app/media/*) ;;
     *) return 0 ;;

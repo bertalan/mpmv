@@ -226,7 +226,9 @@ from apps.catalog.slugs import CATEGORY_SEGMENTS
 from apps.seed.data import CATEGORIES
 print("/%s/%s/" % (CATEGORY_SEGMENTS["en"], CATEGORIES[0].slugs["en"]))')"
 expect_status "$category" 200
-media="$(podman exec mpmv-app find /app/media -type f -name '*.webp' -print -quit)"
+# A seeded image in one of the folders Caddy serves publicly (deploy/caddy/Caddyfile).
+media="$(podman exec mpmv-app find /app/media/original_images /app/media/images -maxdepth 1 \
+  -type f -name '*.webp' -print -quit 2>/dev/null || true)"
 [ -n "$media" ] || fail "the seed wrote no .webp file to the media volume"
 media_url="/media/${media#/app/media/}"
 headers="$(curl_site -D - -o /dev/null "https://$site$media_url" | tr -d '\r')"
@@ -236,11 +238,19 @@ grep -qix 'content-type: image/webp' <<<"$headers" || fail "media not served as 
 grep -qix 'x-content-type-options: nosniff' <<<"$headers" || fail "media without nosniff"
 grep -qix "content-security-policy: default-src 'none'; sandbox" <<<"$headers" || fail "media without the sandbox CSP"
 grep -qix 'x-robots-tag: noindex, nofollow' <<<"$headers" || fail "MPMV_NOINDEX did not add X-Robots-Tag"
+grep -qi '^cache-control: public' <<<"$headers" || fail "media without its Cache-Control"
 for listing in /media/ "$(dirname "$media_url")/"; do
   got="$(status_of "$listing")"
   [ "$got" != 200 ] || fail "GET $listing lists a media directory"
   echo "GET $listing -> $got (no listing)"
 done
+# Only images in the image folders are public: a document, or a non-image in an image folder,
+# is a 404 even though the file exists in the volume.
+podman exec mpmv-app sh -c 'mkdir -p /app/media/documents /app/media/images &&
+  echo x > /app/media/documents/parity.pdf && echo x > /app/media/images/parity.html'
+expect_status /media/documents/parity.pdf 404
+expect_status /media/images/parity.html 404
+podman exec mpmv-app rm /app/media/documents/parity.pdf /app/media/images/parity.html
 "$deployer" check || fail "mpmv-deploy check failed on a good release"
 "$deployer" doctor || fail "mpmv-deploy doctor failed on a good release"
 endgroup
