@@ -45,6 +45,10 @@ the new URLs with single-hop 301s in traffic-ordered batches (MIG.11).
 The product grid block (CMS.10) lists products by category, taxonomy term, brand or vendor with
 the CAT.8 listing query, so a grid and the matching listing page show the same products. It is a
 separate row from the base block library (CMS.2), which does not wait for the catalog listings.
+The editor picks one category, term, brand or vendor in a chooser and a limit from 1 to 24 (one
+listing page); the grid shows the newest products as the listing's product cards and, unless the
+editor turns it off, a "See all" link to the canonical listing page in the page's language. It is
+offered in `HomePage` and `StandardPage` bodies; a grid with no public product is left out.
 
 ### Launch countdown block (CMS.9)
 
