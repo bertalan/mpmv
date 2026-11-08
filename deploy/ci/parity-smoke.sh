@@ -225,7 +225,9 @@ if "$deployer" deploy "$bad"; then fail "the bad release went live"; fi
 took=$((SECONDS - t0))
 echo "bad release detected and rolled back in $took s"
 [ "$took" -lt 60 ] || fail "rollback took $took s (limit 60 s)"
-"$deployer" status | grep -qx "current: $good" || fail "the good release is not current after the rollback"
+# Read the whole status first: `grep -q` closing the pipe early would fail the writer (pipefail).
+release_status="$("$deployer" status)"
+grep -qx "current: $good" <<<"$release_status" || fail "the good release is not current after the rollback"
 if grep -q "parity bad release" "$units/mpmv-app.container"; then fail "the bad release's units stayed installed"; fi
 "$deployer" check || fail "the good release does not pass its check after the rollback"
 endgroup
