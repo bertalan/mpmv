@@ -6,6 +6,9 @@ from .base import SECURE_CSP
 from .env import env_bool
 
 # TLS terminates at the proxy (spec 12.4), which forwards the original scheme.
+# Real customers and vendors: the demo seed (ARC.10) never runs here, even if allowed.
+LIVE_DATA = True
+
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", default=True)
 # The container runtime probes the app directly over HTTP (mpmv.healthcheck, ARC.5); a redirect
