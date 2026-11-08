@@ -23,3 +23,29 @@ def test_catalog_migrations_are_reversible() -> None:
     executor.migrate(executor.loader.graph.leaf_nodes())
     assert "catalog_product" in connection.introspection.table_names()
     assert ("product_id", "vendor_id") in variant_foreign_keys()
+
+
+@pytest.mark.django_db
+def test_the_zero_price_migration_lists_the_rows_it_would_refuse() -> None:
+    import importlib
+
+    from django.apps import apps
+
+    from apps.catalog.tests.factories import ProductFactory, VariantFactory
+
+    migration = importlib.import_module(
+        "apps.catalog.migrations.0006_variant_override_sale_positive"
+    )
+    with connection.cursor() as cursor:  # rolled back with the test transaction
+        cursor.execute(
+            "ALTER TABLE catalog_variant DROP CONSTRAINT catalog_variant_price_override_positive"
+        )
+        cursor.execute(
+            "ALTER TABLE catalog_product DROP CONSTRAINT catalog_product_sale_price_below_price"
+        )
+    variant = VariantFactory.create(price_net_override=0)
+    product = ProductFactory.create(sale_price_net=0)
+    with pytest.raises(RuntimeError) as error:
+        migration.refuse_zero_prices(apps, None)
+    assert variant.sku in str(error.value)
+    assert product.sku in str(error.value)

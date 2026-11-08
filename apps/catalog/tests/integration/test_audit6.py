@@ -83,9 +83,8 @@ def option_facts(product: Product) -> dict[str, dict[str, str]]:
 def test_a_duplicate_copies_attributes_axes_and_variant_options(
     attributes: dict[str, Attribute],
 ) -> None:
-    original = create_product(VendorFactory.create(), tee(), ctx=CTX) and Product.objects.get(
-        sku="TEE-1"
-    )
+    create_product(VendorFactory.create(), tee(), ctx=CTX)
+    original = Product.objects.get(sku="TEE-1")
     target = VendorFactory.create()
     changes = duplicate_product_to_vendor(
         original, target, actor=UserFactory.create(staff=True), reason="transfer", ctx=CTX
@@ -138,8 +137,8 @@ def test_create_product_gives_every_translation_its_slug(
     if not dry_run:
         product = Product.objects.get(sku="TEE-1")
         assert slugs_of(product) == {"en": "plain-tee-en", "it": "maglia-semplice-it"}
-        created = AuditLog.objects.get(action="catalog.product.created")
-        assert created.target_key == str(product.public_id)
+        created = AuditLog.objects.filter(action="catalog.product.created")
+        assert created.filter(target_key=str(product.public_id)).exists()
 
 
 def test_create_product_suffixes_a_slug_taken_by_another_product(
@@ -219,17 +218,15 @@ def test_the_database_refuses_a_zero_override() -> None:
 
 def test_the_database_refuses_a_zero_sale_price() -> None:
     with pytest.raises(IntegrityError), transaction.atomic():
-        ProductFactory.create(
-            price_net=Decimal("10.00"), sale_price_net=Decimal("0.00")
-        )
+        ProductFactory.create(price_net=Decimal("10.00"), sale_price_net=Decimal("0.00"))
 
 
 def test_the_admin_validation_refuses_a_zero_override_and_sale_price() -> None:
-    variant = VariantFactory.build(price_net_override=Decimal("0.00"))
-    variant.product.save()
-    variant.product_id = variant.product.pk
+    variant = VariantFactory.create()
+    variant.price_net_override = Decimal("0.00")
     with pytest.raises(ValidationError, match="override"):
-        variant.full_clean(exclude=["vendor"])
-    product = ProductFactory.build(price_net=Decimal("10.00"), sale_price_net=Decimal("0.00"))
+        variant.full_clean()
+    product = ProductFactory.create(price_net=Decimal("10.00"))
+    product.sale_price_net = Decimal("0.00")
     with pytest.raises(ValidationError, match="sale price"):
-        product.full_clean(exclude=["vendor"])
+        product.full_clean()

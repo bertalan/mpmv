@@ -61,7 +61,9 @@ def price_errors(
     errors: dict[str, str] = {}
     if price_net is not None and price_net == 0:
         errors["price_net"] = ZERO_PRICE
-    if sale_price_net is None:
+    if sale_price_net is not None and sale_price_net == 0:
+        errors["sale_price_net"] = ZERO_SALE_PRICE
+    elif sale_price_net is None:
         if sale_from is not None or sale_to is not None:
             errors["sale_price_net"] = "A sale period needs a sale price."
     elif price_net is None:
@@ -78,6 +80,15 @@ def price_errors(
 BUY = "buy"  # the only sales mode with a public price (models.SalesMode.BUY)
 ZERO_PRICE = "A price cannot be 0.00; leave it empty when there is no price."
 PRICE_REQUIRED = "A product for sale needs a price."
+# A sale or an override at 0.00 would sell for nothing. Owner to confirm for the sale price
+# (a 100% sale would need this rule relaxed).
+ZERO_SALE_PRICE = "A sale price must be above 0.00."
+ZERO_OVERRIDE = "A price override must be above 0.00; leave it empty to use the product's price."
+
+
+def override_error(price_net_override: Decimal | None) -> str | None:
+    """A variant override is empty (the product's price) or above 0.00."""
+    return ZERO_OVERRIDE if price_net_override is not None and price_net_override == 0 else None
 
 
 class Priced(Protocol):
@@ -100,6 +111,22 @@ def public_price(product: Priced) -> Decimal | None:
     staff, but it is never public: not on pages, feeds or JSON-LD. Back to `buy`, it shows again.
     """
     return product.price_net if product.sales_mode == BUY else None
+
+
+class Overriding(Protocol):
+    @property
+    def price_net_override(self) -> Decimal | None: ...
+
+
+def public_variant_price(product: Priced, variant: Overriding) -> Decimal | None:
+    """The net price buyers may see for `variant`: its override, else the product's price.
+
+    None ("Price on request") unless the product is for sale: an override of an `on_request` or
+    `catalog_only` product is never public, like the product's own price.
+    """
+    if public_price(product) is None:
+        return None
+    return product.price_net if variant.price_net_override is None else variant.price_net_override
 
 
 # --- Trees (CAT.2): categories and terms use treebeard materialized paths.

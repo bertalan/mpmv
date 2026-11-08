@@ -97,6 +97,14 @@ def _not_negative(field: str, label: str, name: str) -> models.CheckConstraint:
     )
 
 
+def _above_zero(field: str, label: str, name: str) -> models.CheckConstraint:
+    return models.CheckConstraint(
+        condition=models.Q(**{f"{field}__isnull": True}) | models.Q(**{f"{field}__gt": 0}),
+        name=name,
+        violation_error_message=f"The {label} must be above 0.00; leave it empty instead.",
+    )
+
+
 def _sku_normalized(name: str) -> models.CheckConstraint:
     return models.CheckConstraint(
         condition=models.Q(sku=Upper(Trim("sku"))) & ~models.Q(sku=""),
@@ -294,11 +302,11 @@ class Product(BaseModel):
                 condition=models.Q(sale_price_net__isnull=True)
                 | (
                     models.Q(price_net__isnull=False)
-                    & models.Q(sale_price_net__gte=0)
+                    & models.Q(sale_price_net__gt=0)
                     & models.Q(sale_price_net__lt=models.F("price_net"))
                 ),
                 name="catalog_product_sale_price_below_price",
-                violation_error_message="The sale price must be lower than the price.",
+                violation_error_message="The sale price must be above 0.00, below the price.",
             ),
             models.CheckConstraint(
                 condition=models.Q(sale_price_net__isnull=False)
@@ -366,6 +374,8 @@ class Product(BaseModel):
                 errors["required_companion"] = (
                     "A required companion must belong to the same vendor."
                 )
+        if self.sale_price_net is not None and self.sale_price_net == 0:
+            errors["sale_price_net"] = engine.ZERO_SALE_PRICE
         if "price_net" not in errors:
             missing = engine.price_required_error(self.sales_mode, self.price_net)
             if missing is not None:
@@ -502,8 +512,8 @@ class Variant(BaseModel):
             ),
             _sku_normalized("catalog_variant_sku_normalized"),
             _choice("stock_status", StockStatus, "catalog_variant_stock_status_valid"),
-            _not_negative(
-                "price_net_override", "price override", "catalog_variant_price_not_negative"
+            _above_zero(
+                "price_net_override", "price override", "catalog_variant_price_override_positive"
             ),
             _not_negative(
                 "weight_kg_override", "weight override", "catalog_variant_weight_not_negative"
@@ -526,6 +536,9 @@ class Variant(BaseModel):
         super().clean_fields(exclude)
 
     def clean(self) -> None:
+        override = engine.override_error(self.price_net_override)
+        if override is not None:
+            raise ValidationError({"price_net_override": override})
         # Variants only on variable products (Q-29, Q-32; a database trigger enforces it too).
         kind = Product.objects.filter(pk=self.product_id).values_list("kind", flat=True).first()
         if kind is not None and kind != ProductKind.VARIABLE:
