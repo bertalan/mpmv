@@ -516,6 +516,27 @@ class GeocoderState(BaseModel):
         return f"{self.provider} ({self.failures} failures)"
 
 
+class SvgCollection(BaseModel):
+    """A Wagtail collection that accepts SVG uploads, with its sub-collections (THM.12).
+
+    SVG is for logos and icons only. The collection is identified by this row, not by its
+    display name: Wagtail lets editors rename collections and give two the same name, so a
+    name match would let an SVG into any collection called "Logos and icons" and would stop
+    SVG uploads when the real one is renamed. The row is written by the 0015 data migration
+    only: no admin, no service.
+    """
+
+    collection = models.OneToOneField(
+        Collection, on_delete=models.CASCADE, related_name="svg_policy"
+    )
+
+    class Meta:
+        verbose_name = "SVG collection"
+
+    def __str__(self) -> str:
+        return f"SVG allowed in {self.collection}"
+
+
 class MediaImage(AbstractImage):  # type: ignore[misc]  # Wagtail is untyped
     """The site's image model (`WAGTAILIMAGES_IMAGE_MODEL`, spec 10 §10.2).
 
@@ -593,20 +614,20 @@ class MediaImage(AbstractImage):  # type: ignore[misc]  # Wagtail is untyped
         return head.startswith(b"<")
 
     def _clean_svg(self) -> str | None:
-        """THM.12: an SVG must sit in the logos collection and pass `apps.core.svg`; a new
-        upload is replaced by its re-serialisation. The reason it is refused, or None."""
+        """THM.12: an SVG must sit in an `SvgCollection` (the logos collection, or one below
+        it) and pass `apps.core.svg`; a new upload is replaced by its re-serialisation. The
+        reason it is refused, or None."""
         file: Any = self.file
         if not file or not self._looks_like_svg():
             return None
         if self.collection_id is None or not (
             Collection.objects.ancestor_of(self.collection, inclusive=True)
-            .filter(name=LOGO_COLLECTION_NAME)
+            .filter(svg_policy__isnull=False)
             .exists()
         ):
-            return (
-                "SVG is for logos and icons only: upload it to the "
-                f"{LOGO_COLLECTION_NAME!r} collection."
-            )
+            allowed = Collection.objects.filter(svg_policy__isnull=False).order_by("path")
+            names = ", ".join(repr(c.name) for c in allowed) or repr(LOGO_COLLECTION_NAME)
+            return f"SVG is for logos and icons only: upload it to the {names} collection."
         if file._committed:
             return None  # checked and re-serialised when it was uploaded
         file.open("rb")

@@ -24,7 +24,7 @@ from apps.cms.services import SeedReport, seed_site
 from apps.cms.tests.factories import StandardPageFactory
 from apps.core.models import MediaImage
 from apps.core.svg import LOGO_COLLECTION_NAME
-from apps.core.tests.factories import MediaImageFactory
+from apps.core.tests.factories import MediaImageFactory, SvgCollectionFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -46,7 +46,8 @@ def _photo(name: str = "lake", width: int = 2000, height: int = 1500) -> MediaIm
 
 
 def _logos() -> Collection:
-    collection: Collection = Collection.objects.get(name=LOGO_COLLECTION_NAME)
+    collection: Collection = Collection.objects.get(svg_policy__isnull=False)
+    assert collection.name == LOGO_COLLECTION_NAME
     return collection
 
 
@@ -171,9 +172,30 @@ def test_a_cms_page_serves_pictures_for_its_lead_image_hero_figure_and_gallery(
     assert len(pictures) == 4
     for picture in pictures:
         assert list(_sources(picture)) == ["image/avif", "image/webp"]
+    lead = pictures[0]
+    assert "lead" in lead
+    assert 'fetchpriority="high"' in lead
+    # Only the LCP image (the lead image) has high priority; the hero below it is lazy.
+    assert sum('fetchpriority="high"' in p for p in pictures) == 1
     hero = next(p for p in pictures if "hero" in p)
-    assert 'fetchpriority="high"' in hero
-    assert sum('fetchpriority="high"' in p for p in pictures) <= 2  # lead image and hero only
+    assert 'loading="lazy"' in hero
+
+
+def test_without_a_lead_image_only_the_first_hero_has_high_priority(
+    seeded: SeedReport, client: Client
+) -> None:
+    def hero(name: str) -> tuple[str, dict[str, Any]]:
+        return ("hero", {"heading": name, "image": _photo(name), "alt_text": "", "links": []})
+
+    page = _published(slug="heroes", body=[hero("first"), hero("second"), hero("third")])
+
+    html = client.get(page.url).content.decode()
+
+    pictures = re.findall(r"<picture>.*?</picture>", html, flags=re.S)
+    assert len(pictures) == 3
+    assert [p for p in pictures if 'fetchpriority="high"' in p] == [pictures[0]]
+    assert "first" in pictures[0]
+    assert all('loading="lazy"' in p for p in pictures[1:])
 
 
 def test_a_product_card_with_an_image_renders_a_picture() -> None:
@@ -226,6 +248,38 @@ def test_an_svg_outside_the_logos_collection_is_refused() -> None:
         image.full_clean()
 
     assert LOGO_COLLECTION_NAME in " ".join(error.value.message_dict["file"])
+
+
+def test_an_svg_in_another_collection_named_like_the_logos_one_is_refused() -> None:
+    products = Collection.get_first_root_node().add_child(name="Products")
+    lookalike = products.add_child(name=LOGO_COLLECTION_NAME)
+    image = _svg_image(SAFE_SVG, collection=lookalike)
+
+    with pytest.raises(ValidationError) as error:
+        image.full_clean()
+
+    assert "file" in error.value.message_dict
+
+
+def test_the_logos_collection_still_accepts_svg_after_a_rename() -> None:
+    logos = _logos()
+    logos.name = "Brand marks"
+    logos.save()
+    image = _svg_image(SAFE_SVG, collection=logos)
+
+    image.full_clean()  # no error: the collection is identified by its key, not its name
+
+
+def test_a_sub_collection_of_the_logos_collection_accepts_svg() -> None:
+    vendors = _logos().add_child(name="Vendor logos")
+
+    _svg_image(SAFE_SVG, collection=vendors).full_clean()
+
+
+def test_another_collection_accepts_svg_once_it_has_an_svg_collection_row() -> None:
+    marked = SvgCollectionFactory.create().collection
+
+    _svg_image(SAFE_SVG, collection=marked).full_clean()
 
 
 def test_a_clean_svg_logo_is_stored_re_serialised() -> None:
@@ -316,6 +370,18 @@ def test_a_raster_rendition_is_served_with_its_type(client: Client) -> None:
         "/media/other/file.png",
         "/media/original_images/page.html",
         "/media/original_images/missing.png",
+        # Traversal that stays inside MEDIA_ROOT but leaves the image folders, for example to
+        # Wagtail documents in privacy-restricted collections.
+        "/media/images/../documents/secret.png",
+        "/media/images/%2e%2e/documents/secret.png",
+        "/media/images/%2E%2E/documents/secret.png",
+        "/media/original_images/..%2fdocuments/secret.png",
+        "/media/original_images/%2e%2e%2fdocuments%2fsecret.png",
+        "/media/images/./../documents/secret.png",
+        "/media/images/sub/../../documents/secret.png",
+        "/media/images/..%5cdocuments/secret.png",
+        "/media/images//documents/secret.png",
+        "/media/documents/secret.png",
     ],
 )
 def test_only_existing_images_under_the_image_folders_are_served(
@@ -323,5 +389,7 @@ def test_only_existing_images_under_the_image_folders_are_served(
 ) -> None:
     (settings.MEDIA_ROOT / "original_images").mkdir(parents=True, exist_ok=True)
     (settings.MEDIA_ROOT / "original_images" / "page.html").write_text("<script>x</script>")
+    (settings.MEDIA_ROOT / "documents").mkdir(parents=True, exist_ok=True)
+    (settings.MEDIA_ROOT / "documents" / "secret.png").write_bytes(b"\x89PNG private")
 
     assert client.get(path).status_code == 404

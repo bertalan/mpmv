@@ -11,7 +11,8 @@ Refused: a DTD, entities or external references (defusedxml), processing instruc
 `script`, `foreignObject`, `a`, `image`, `feImage`, animation elements), any attribute outside
 the attribute allow-list (so no `on*` event handlers), an `href` that is not a same-document
 fragment, a `url()` to anything but a fragment, and in CSS `@import`, `@font-face`, escapes,
-`image-set()` and `expression()`.
+`image-set()`, `image()`, `src()`, `cross-fade()`, `element()`, `expression()` and any quoted
+string that looks like a URL (a scheme or `//`).
 
 Pure Python, no Django: unit-tested on a corpus of malicious documents.
 """
@@ -22,7 +23,8 @@ import xml.etree.ElementTree as ET
 from defusedxml import DefusedXmlException
 from defusedxml.ElementTree import XMLParser
 
-# The collection SVG uploads must go to (created by a data migration).
+# The name the data migrations give the collection SVG uploads must go to. Uploads are checked
+# against `apps.core.models.SvgCollection`, never against this name.
 LOGO_COLLECTION_NAME = "Logos and icons"
 
 MAX_SVG_BYTES = 512 * 1024
@@ -82,9 +84,14 @@ NAMESPACED_ATTRIBUTES = frozenset(
 _FRAGMENT = re.compile(r"#[A-Za-z_][\w.:-]*")
 _URL = re.compile(r"url\(\s*(['\"]?)(.*?)\1\s*\)", re.IGNORECASE | re.DOTALL)
 _CSS_FORBIDDEN = re.compile(
-    r"@import|@font-face|@namespace|image-set|expression\s*\(|javascript:|behavior\s*:|\\",
+    r"@import|@font-face|@namespace|image-set|expression\s*\(|javascript:|behavior\s*:|\\"
+    # Functions that load a resource from a URL given as a string, or paint another element.
+    r"|(?<!\w)(?:image|src|cross-fade|element)\s*\(",
     re.IGNORECASE,
 )
+# A quoted CSS string: a URL in one (a scheme or `//`) is refused whatever function takes it.
+_CSS_STRING = re.compile(r"(['\"])(.*?)\1", re.DOTALL)
+_URL_LIKE = re.compile(r"//|^\s*[a-z][a-z0-9+.-]*:", re.IGNORECASE)
 
 
 class UnsafeSvgError(ValueError):
@@ -124,6 +131,9 @@ def _check_css(css: str, where: str) -> None:
     forbidden = _CSS_FORBIDDEN.search(css)
     if forbidden:
         raise UnsafeSvgError(f"{where} uses {forbidden.group(0)!r}, which is not allowed.")
+    for match in _CSS_STRING.finditer(css):
+        if _URL_LIKE.search(match.group(2)):
+            raise UnsafeSvgError(f"{where} has the string {match.group(0)!r}, a URL.")
     _check_urls(css, where)
 
 

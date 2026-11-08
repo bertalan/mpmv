@@ -33,19 +33,38 @@ SVG_CSP = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
 RASTER_CSP = "default-src 'none'; sandbox"
 
 
+def _image_file(path: str) -> Path:
+    """The file `path` names, if it is inside one of the image folders; 404 otherwise.
+
+    `path` is already percent-decoded, so `%2e%2e` and `%2f` arrive as `..` and `/`. Any `.` or
+    `..` segment (or a backslash) is refused before the folder is looked at, and the resolved
+    file must still lie inside that folder: `images/../documents/x.png` stays inside MEDIA_ROOT
+    but reaches Wagtail documents, which only their permission-checked view may serve.
+    """
+    segments = path.split("/")
+    if "\\" in path or any(segment in ("", ".", "..") for segment in segments):
+        raise Http404("not an image")
+    folder = segments[0] + "/"
+    if folder not in MEDIA_FOLDERS or len(segments) < 2:
+        raise Http404("not an image")
+    media_root = Path(settings.MEDIA_ROOT).resolve()
+    try:
+        full_path = Path(safe_join(media_root, path)).resolve()
+    except SuspiciousFileOperation as error:
+        raise Http404("not an image") from error
+    if not full_path.is_relative_to((media_root / folder).resolve()) or not full_path.is_file():
+        raise Http404("not an image")
+    return full_path
+
+
 @require_GET
 def serve_media(request: HttpRequest, path: str) -> FileResponse:
     """An uploaded image or rendition, as an image and never as HTML."""
     extension = posixpath.splitext(path)[1].lower()
     content_type = MEDIA_TYPES.get(extension)
-    if content_type is None or not path.startswith(MEDIA_FOLDERS):
+    if content_type is None:
         raise Http404("not an image")
-    try:
-        full_path = Path(safe_join(settings.MEDIA_ROOT, path))
-    except SuspiciousFileOperation as error:
-        raise Http404("not an image") from error
-    if not full_path.is_file():
-        raise Http404("not an image")
+    full_path = _image_file(path)
     response = FileResponse(full_path.open("rb"), content_type=content_type)
     response["Content-Disposition"] = "inline"
     response["X-Content-Type-Options"] = "nosniff"

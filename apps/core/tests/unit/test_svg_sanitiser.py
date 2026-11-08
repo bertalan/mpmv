@@ -73,6 +73,16 @@ MALICIOUS: list[tuple[str, str]] = [
     ("style font-face", f"<svg {SVG}><style>@font-face {{ src: local(x) }}</style></svg>"),
     ("style escape", f"<svg {SVG}><style>rect {{ fill: u\\72l(http://x.test) }}</style></svg>"),
     ("style image-set", f'<svg {SVG}><style>rect {{ fill: image-set("x.png" 1x) }}</style></svg>'),
+    ("style image()", f'<svg {SVG}><style>rect{{fill:image("http://e")}}</style></svg>'),
+    ("style src()", f'<svg {SVG}><style>rect{{fill:src("http://e")}}</style></svg>'),
+    ("style cross-fade()", f"<svg {SVG}><style>rect{{fill:cross-fade(red, blue)}}</style></svg>"),
+    ("style element()", f"<svg {SVG}><style>rect{{fill:element(#a)}}</style></svg>"),
+    ("style string with scheme", f"<svg {SVG}><style>rect{{fill:foo('data:x')}}</style></svg>"),
+    ("style string protocol-relative", f'<svg {SVG}><style>rect{{fill:x("//e/a")}}</style></svg>'),
+    (
+        "style attribute image()",
+        f'<svg {SVG}><rect style="fill: image(&quot;http://e&quot;)" width="1"/></svg>',
+    ),
     (
         "style attribute url",
         f'<svg {SVG}><rect style="fill: url(https://x.test/p)" width="1"/></svg>',
