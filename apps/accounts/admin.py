@@ -3,22 +3,30 @@
 Every write goes through the audited services (SEC.4): profile and flags, groups and
 permissions, passwords set by staff, deletions. A staff member's own password change is
 audited by the site itself (`admin_site.AuditedAdminSite`).
+
+Privilege rules (audit #98 chunk 3 M1; strict reading until CORE.8, spec 02 keeps this admin
+for the technical superuser): only a superuser grants superuser or staff status, groups or
+permissions, sets the password of or resets MFA for a staff or superuser account, and uses the
+group admin. The user change form and the password form need a fresh step-up (CORE.4).
 """
 
 from typing import Any, ClassVar
 
 from django.contrib import admin, messages
+from django.contrib.admin.utils import unquote
 from django.contrib.auth.admin import GroupAdmin as DjangoGroupAdmin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.forms import AdminPasswordChangeForm
 from django.contrib.auth.models import Group
-from django.db.models import QuerySet
-from django.http import HttpRequest
+from django.core.exceptions import PermissionDenied
+from django.db.models import Q, QuerySet
+from django.http import HttpRequest, HttpResponse
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
 from apps.core.audit import audit_context
 
 from . import services
+from .decorators import step_up_required
 from .mfa_session import is_recently_verified
 from .models import User
 from .services import has_second_factor, reset_mfa
@@ -39,6 +47,26 @@ class AuditedPasswordChangeForm(AdminPasswordChangeForm[User]):
     def __init__(self, user: User, *args: Any, **kwargs: Any) -> None:
         self.had_usable_password = user.has_usable_password()
         super().__init__(user, *args, **kwargs)
+
+
+# Fields that grant access: only a superuser may change them.
+ACCESS_FIELDS = ("is_staff", "is_superuser", "groups", "user_permissions")
+
+PRIVILEGED = Q(is_staff=True) | Q(is_superuser=True)
+
+
+def _is_superuser(request: HttpRequest) -> bool:
+    return bool(getattr(request.user, "is_superuser", False))
+
+
+def may_manage_credentials(request: HttpRequest, target: User) -> bool:
+    """Whether the actor may set the password of, or reset MFA for, `target`.
+
+    Staff and superuser accounts are managed by superusers only (the actor's own one too: they
+    change their own password through the site's password-change form, which asks for the old
+    one).
+    """
+    return _is_superuser(request) or not (target.is_staff or target.is_superuser)
 
 
 # The admin login renders the Turnstile widget when the captcha is enabled (CORE.5).
@@ -80,10 +108,52 @@ class UserAdmin(DjangoUserAdmin[User]):
                 messages.ERROR,
             )
             return
+        if not _is_superuser(request) and queryset.filter(PRIVILEGED).exists():
+            self.message_user(
+                request,
+                "Only a superuser can reset two-factor authentication for staff accounts.",
+                messages.ERROR,
+            )
+            return
         ctx = audit_context(request)
         for user in queryset:
             reset_mfa(user, ctx=ctx)
         self.message_user(request, f"Two-factor authentication reset for {queryset.count()}.")
+
+    # --- Privilege rules (audit #98 chunk 3 M1)
+
+    def get_readonly_fields(self, request: HttpRequest, obj: User | None = None) -> Any:
+        fields = tuple(super().get_readonly_fields(request, obj))
+        if _is_superuser(request):
+            return fields
+        return fields + tuple(name for name in ACCESS_FIELDS if name not in fields)
+
+    def change_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+        form_url: str = "",
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        parent = super().change_view
+
+        def view(req: HttpRequest) -> HttpResponse:
+            return parent(req, object_id, form_url, extra_context)
+
+        return step_up_required()(view)(request)
+
+    def user_change_password(
+        self, request: HttpRequest, id: str, form_url: str = ""
+    ) -> HttpResponse:
+        parent = super().user_change_password
+
+        def view(req: HttpRequest) -> HttpResponse:
+            target = self.get_object(req, unquote(id))
+            if target is not None and not may_manage_credentials(req, target):
+                raise PermissionDenied
+            return parent(req, id, form_url)
+
+        return step_up_required()(view)(request)
 
     # --- Audited writes (SEC.4)
 
@@ -119,7 +189,29 @@ class UserAdmin(DjangoUserAdmin[User]):
 
 @admin.register(Group)
 class GroupAdmin(DjangoGroupAdmin):
-    """Django's group admin, with every write audited (a group grants permissions)."""
+    """Django's group admin, with every write audited (a group grants permissions).
+
+    Superusers only, whatever model permissions the actor holds: `change_group` would otherwise
+    let staff add any permission to a group they belong to. Letting staff grant only the
+    permissions they already hold would also need rules for removals, for every other member of
+    the group and for permissions that change later; superuser-only is the smaller and safer
+    rule until CORE.8.
+    """
+
+    def has_module_permission(self, request: HttpRequest) -> bool:
+        return _is_superuser(request)
+
+    def has_view_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return _is_superuser(request)
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return _is_superuser(request)
+
+    def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return _is_superuser(request)
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return _is_superuser(request)
 
     def save_model(self, request: HttpRequest, obj: Group, form: Any, change: bool) -> None:
         services.save_group(obj, ctx=audit_context(request))
