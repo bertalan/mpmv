@@ -5,6 +5,7 @@ violation, the keyboard focus stays visible, and full-page screenshots are saved
 and a phone width for review (build/e2e/screenshots).
 """
 
+import re
 import secrets
 from collections.abc import Callable
 from pathlib import Path
@@ -22,7 +23,16 @@ from tests.e2e.test_base_theme_keyboard import FOCUSED, assert_visible_focus
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
-SECTIONS = ("Buttons", "Text fields", "Choices", "Error summary")
+SECTIONS = (
+    "Buttons",
+    "Text fields",
+    "Choices",
+    "Error summary",
+    "Cards",
+    "Product tiles",
+    "Badges",
+    "Alerts",
+)
 
 
 def open_styleguide(page: Page, live_server: LiveServer) -> None:
@@ -81,3 +91,100 @@ def test_an_error_summary_link_leads_to_its_field(page: Page, live_server: LiveS
     control = page.locator(f"#{target}")
     expect(control).to_be_in_viewport()
     expect(control).to_have_attribute("aria-invalid", "true")
+
+
+# --- Part 2/3: cards, product tiles, badges and alerts
+
+IMAGES_LOADED = "() => [...document.images].every((img) => img.complete && img.naturalWidth > 0)"
+
+
+def test_cards_tiles_badges_and_alerts_render_without_a_csp_violation(
+    page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    tiles = page.locator(".product-tile")
+    expect(tiles.first).to_be_visible()
+    assert tiles.count() >= 4
+    # The images load lazily: bring each one on screen, then wait for all of them.
+    page.evaluate("() => [...document.images].forEach((img) => img.scrollIntoView())")
+    page.wait_for_function(IMAGES_LOADED, timeout=5000)
+    for kind in ("Sale", "New", "Out of stock", "On request"):
+        expect(page.locator(".badge", has_text=kind).first).to_be_visible()
+    expect(page.get_by_role("status").first).to_be_attached()
+    page.locator("#sg-tiles").scroll_into_view_if_needed()
+    shot("components-desktop")
+    page.set_viewport_size({"width": 375, "height": 800})
+    page.wait_for_timeout(100)  # the layout settles after the resize
+    shot("components-phone")
+    assert csp_violations(page) == [], "\n".join(csp_violations(page))
+
+
+def test_a_click_anywhere_on_a_tile_follows_its_one_link(
+    page: Page, live_server: LiveServer
+) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    tile = page.locator(".product-tile").first
+    link = tile.locator("a")
+    assert link.count() == 1
+    href = link.get_attribute("href") or ""
+    assert href.startswith("#")
+    # A mouse click on the image: the stretched link sits above it, so the link takes the click.
+    tile.scroll_into_view_if_needed()
+    box = tile.locator(".product-tile__media").bounding_box()
+    assert box is not None
+    page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    expect(page).to_have_url(re.compile(re.escape(href) + "$"))
+
+
+def test_a_dismissible_alert_closes_and_the_focus_moves_on(
+    page: Page, live_server: LiveServer
+) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    alert = page.locator("#sg-alert-dismissible")
+    button = alert.get_by_role("button", name="Dismiss")
+    expect(button).to_be_visible()
+    button.focus()
+    page.keyboard.press("Enter")
+    expect(alert).to_have_count(0)
+    assert page.evaluate("document.activeElement.id") == "main"
+    assert csp_violations(page) == []
+
+
+# --- Review fixes of part 1/3: autofocus of the error summary, busy buttons never act
+
+
+def test_an_error_summary_marked_for_autofocus_takes_the_focus_on_load(
+    page: Page, live_server: LiveServer
+) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    page.goto(f"{live_server.url}/_styleguide/?focus=errors")
+    page.wait_for_load_state("load")
+    expect(page.locator(".error-summary[data-autofocus]")).to_be_focused()
+    assert page.evaluate("document.activeElement.id") == "text-errors"
+    assert page.evaluate("document.activeElement.getAttribute('role')") == "region"
+
+
+def test_a_busy_button_neither_clicks_nor_submits(page: Page, live_server: LiveServer) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    url = page.url
+    form = page.locator("#sg-busy-form")
+    submit = form.locator('button[type="submit"]')
+    expect(submit).to_have_attribute("aria-disabled", "true")
+    # Playwright waits for aria-disabled controls to become enabled: force the real click.
+    submit.click(force=True)
+    submit.focus()
+    page.keyboard.press("Enter")
+    form.locator('button[type="submit"]').evaluate("(b) => b.form.requestSubmit(b)")
+    page.wait_for_timeout(300)
+    assert page.url == url
+    assert "submitted" not in page.url
+    icon = form.get_by_role("button", name="Refresh, Refreshing")
+    expect(icon).to_be_visible()
+    icon.click(force=True)
+    page.wait_for_timeout(300)
+    assert page.url == url

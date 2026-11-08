@@ -2,13 +2,15 @@
 
 The page shows every component of the active theme in every state. These forms carry one field
 of each control; the view renders them unbound, disabled and bound with invalid data, each with
-its own prefix so that the ids on the page never repeat. Later parts of THM.4 add the samples of
-the other components here.
+its own prefix so that the ids on the page never repeat. The product tiles come in every state:
+with and without an image, on sale, new, out of stock and with no price. Later parts of THM.4
+add the samples of the other components here.
 """
 
 from typing import Any
 
 from django import forms
+from django.templatetags.static import static
 from django.utils.translation import gettext_lazy as _
 
 COUNTRIES = [("", _("Choose a country")), ("at", _("Austria")), ("it", _("Italy"))]
@@ -87,3 +89,42 @@ def sample_forms() -> dict[str, forms.Form]:
         ),
         "choices_invalid": invalid_choices,
     }
+
+
+def sample_products() -> list[dict[str, Any]]:
+    """Product tiles in every state. The image is a same-origin static file (CSP img-src)."""
+    image = static("styleguide/sample-product.svg")
+    return [
+        {
+            "name": _("Touring jacket"),
+            "image_url": image,
+            "image_alt": _("Grey placeholder shape"),
+            "price": "€ 189.00",
+            "vendor": "Vendor A",
+            "badges": ["new"],
+        },
+        {
+            "name": _("Rain cover"),
+            "image_url": image,
+            "image_alt": "",
+            "price": "€ 39.00",
+            "price_before": "€ 49.00",
+            "vendor": "Vendor B",
+            "badges": ["sale"],
+        },
+        {
+            "name": _("Winter gloves"),
+            "image_url": image,
+            "image_alt": "",
+            "price": "€ 59.00",
+            "vendor": "Vendor C",
+            "badges": ["out_of_stock"],
+        },
+        {
+            "name": _("Made-to-measure seat"),
+            "image_url": "",
+            "price": "",
+            "vendor": "Vendor D",
+            "badges": ["on_request"],
+        },
+    ]

@@ -200,7 +200,7 @@ Rules built into `base` and enforced for every theme:
 | Structure | `<header>`, `<nav>` with labels, one `<main>`, `<footer>`; one `<h1>` per page, no skipped levels; skip link to `<main>` as first focusable element | 1.3.1, 2.4.1, 2.4.6 |
 | Language | `lang` on `<html>`; EN fallback blocks inside another language carry `lang="en"` (spec 09 fallback) | 3.1.1, 3.1.2 |
 | Focus | `:focus-visible` outline of at least 2 px in `--color-focus` (≥ 3:1), never removed | 2.4.7 |
-| Focus not obscured | `scroll-padding-top: var(--header-height)` for the sticky header; the consent banner never covers the focused element (it is either the first thing in the focus order and a non-modal region that reserves its own space at the bottom, or a modal dialog that traps focus) | 2.4.11 |
+| Focus not obscured | `scroll-padding-top: var(--header-offset)` for the sticky header, the header's real height that the theme script keeps up to date (falling back to `--header-height`, its minimum); the consent banner never covers the focused element (it is either the first thing in the focus order and a non-modal region that reserves its own space at the bottom, or a modal dialog that traps focus) | 2.4.11 |
 | Target size | Every pointer target at least 24×24 CSS px, or spaced so a 24 px circle fits; primary controls 44 px high | 2.5.8 |
 | Dragging | Carousels, galleries and the price filter work with buttons and inputs; no drag-only interaction | 2.5.7 |
 | Consistent help | The help/contact link sits in the same place in the header and footer on every page, including checkout | 3.2.6 |

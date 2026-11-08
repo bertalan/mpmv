@@ -1,0 +1,11 @@
+{% load i18n %}{% comment %}
+Badge (THM.4, spec 14 §14.9): a short status next to a product, always in words so the meaning
+never rests on colour alone (WCAG 1.4.1).
+
+  {% include "components/badge.html" with kind="sale" only %}
+
+Context:
+- `kind` (required): "sale", "new", "out_of_stock" or "on_request".
+- `label`: replaces the default text ("Sale", "New", "Out of stock", "On request"), for example
+  "-20%"; keep it meaningful out of context.
+{% endcomment %}<span class="badge badge--{% if kind == 'out_of_stock' %}out-of-stock{% elif kind == 'on_request' %}on-request{% else %}{{ kind }}{% endif %}">{% if label %}{{ label }}{% elif kind == "sale" %}{% translate "Sale" %}{% elif kind == "new" %}{% translate "New" %}{% elif kind == "out_of_stock" %}{% translate "Out of stock" %}{% elif kind == "on_request" %}{% translate "On request" %}{% endif %}</span>

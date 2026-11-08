@@ -2,14 +2,16 @@
 Error summary (THM.4, spec 14 §14.6): at the top of a form that failed validation, a titled box
 listing every error. A field error links to its control (the first option of a radio or
 checkbox group); an error of the whole form, or of a hidden field, is plain text (WCAG 3.3.1,
-3.3.3). Nothing renders for an unbound or valid form. The box has `tabindex="-1"` so a page can
-move the focus to it.
+3.3.3). Nothing renders for an unbound or valid form. The box is a region named by its title;
+it has `tabindex="-1"` so a page can move the focus to it, and with `autofocus` the theme script
+(base.js) does so when the page loads, so a screen reader starts on the list of errors.
 
   {% include "components/error_summary.html" with form=form only %}
 
 Context: `form`, a bound form; `summary_id` (default "error-summary") when a page shows more
-than one form; `title` to replace "There is a problem".
-{% endcomment %}{% if form.errors %}{% firstof summary_id "error-summary" as box_id %}<div class="error-summary" id="{{ box_id }}" tabindex="-1" aria-labelledby="{{ box_id }}-title">
+than one form; `title` to replace "There is a problem"; `autofocus` to focus the box on load
+(one per page, on the form the visitor just sent).
+{% endcomment %}{% if form.errors %}{% firstof summary_id "error-summary" as box_id %}<div class="error-summary" id="{{ box_id }}" tabindex="-1" role="region" aria-labelledby="{{ box_id }}-title"{% if autofocus %} data-autofocus{% endif %}>
   <h2 id="{{ box_id }}-title">{% firstof title _("There is a problem") %}</h2>
   <ul>
     {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}

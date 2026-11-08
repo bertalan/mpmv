@@ -1,11 +1,14 @@
-{% extends "layouts/base.html" %}{% load i18n %}
+{% extends "layouts/base.html" %}{% load i18n static %}
 {% comment %}
 Styleguide (THM.4, spec 14 §14.9): every component of the active theme in every state, for
 staff and for the accessibility and visual tests. Never indexed nor cached (the view also sends
-`X-Robots-Tag`). Part 1/3: buttons and form controls; later parts add their own sections.
+`X-Robots-Tag`). Part 1/3: buttons and form controls; part 2/3: cards, product tiles, badges
+and alerts; part 3 adds its own sections.
 
 Context: `forms` (apps.themes.styleguide.sample_forms): the sample forms by state, each with
-its own prefix so ids never repeat on the page.
+its own prefix so ids never repeat on the page; `products`
+(apps.themes.styleguide.sample_products): the product tiles by state; `focus_errors`
+(`?focus=errors`): the first error summary takes the focus on load.
 {% endcomment %}
 {% block title %}{% translate "Styleguide" %} · {{ site_name }}{% endblock %}
 {% block description %}<meta name="robots" content="noindex, nofollow">{% endblock %}
@@ -43,6 +46,14 @@ its own prefix so ids never repeat on the page.
       <div class="styleguide__example">{% include "components/button.html" with label=_("Pay now") loading=True loading_label=_("Paying, please wait") only %}<span class="styleguide__state">{% translate "loading" %}</span></div>
       <div class="styleguide__example">{% include "components/button.html" with label=_("Refresh") variant="ghost" loading=True only %}<span class="styleguide__state">{% translate "ghost, loading" %}</span></div>
     </div>
+
+    <h3>{% translate "Busy inside a form" %}</h3>
+    <p>{% translate "A loading submit button and a loading icon button: neither clicks nor submits the form." %}</p>
+    <form method="get" id="sg-busy-form" class="styleguide__examples">
+      <input type="hidden" name="submitted" value="yes">
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Place order") type="submit" loading=True loading_label=_("Placing the order") only %}<span class="styleguide__state">{% translate "submit, loading" %}</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Refresh") icon="search" icon_only=True loading=True loading_label=_("Refreshing") variant="secondary" only %}<span class="styleguide__state">{% translate "icon only, loading" %}</span></div>
+    </form>
 
     <h3>{% translate "Icons" %}</h3>
     <div class="styleguide__examples">
@@ -93,7 +104,7 @@ its own prefix so ids never repeat on the page.
       <div>
         <h3>{% translate "Text fields, invalid" %}</h3>
         <form novalidate>
-          {% include "components/error_summary.html" with form=forms.text_invalid summary_id="text-errors" only %}
+          {% include "components/error_summary.html" with form=forms.text_invalid summary_id="text-errors" autofocus=focus_errors only %}
           {% for field in forms.text_invalid %}{% include "components/field.html" with field=field only %}{% endfor %}
           {% include "components/button.html" with label=_("Send") type="submit" only %}
         </form>
@@ -107,6 +118,48 @@ its own prefix so ids never repeat on the page.
         </form>
       </div>
     </div>
+  </section>
+
+  <section aria-labelledby="sg-cards">
+    <h2 id="sg-cards">{% translate "Cards" %}</h2>
+    <p>{% translate "A plain card, a linked card (the title link covers the card) and a linked card with an image." %}</p>
+    {% static "styleguide/sample-product.svg" as sample_image %}<ul class="card-grid" role="list">
+      <li>{% include "components/card.html" with title=_("Opening hours") text=_("Monday to Friday, 9 to 18.") heading_level=3 only %}</li>
+      <li>{% include "components/card.html" with title=_("Spring service checklist") url="#sg-cards" meta=_("Guide") text=_("Five checks before the first ride of the season.") only %}</li>
+      <li>{% include "components/card.html" with title=_("Visit the workshop") url="#sg-cards" image_url=sample_image image_alt="" text=_("Book a slot and meet the team.") only %}</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="sg-tiles">
+    <h2 id="sg-tiles">{% translate "Product tiles" %}</h2>
+    <p>{% translate "New, on sale, out of stock, and price on request without an image." %}</p>
+    <ul class="product-grid" role="list">
+      {% for product in products %}<li>{% include "components/product_tile.html" with name=product.name url="#sg-tiles" image_url=product.image_url image_alt=product.image_alt price=product.price price_before=product.price_before vendor=product.vendor badges=product.badges only %}</li>{% endfor %}
+    </ul>
+  </section>
+
+  <section aria-labelledby="sg-badges">
+    <h2 id="sg-badges">{% translate "Badges" %}</h2>
+    <div class="styleguide__examples">
+      <div class="styleguide__example">{% include "components/badge.html" with kind="sale" only %}<span class="styleguide__state">sale</span></div>
+      <div class="styleguide__example">{% include "components/badge.html" with kind="sale" label="-20%" only %}<span class="styleguide__state">{% translate "sale, custom label" %}</span></div>
+      <div class="styleguide__example">{% include "components/badge.html" with kind="new" only %}<span class="styleguide__state">new</span></div>
+      <div class="styleguide__example">{% include "components/badge.html" with kind="out_of_stock" only %}<span class="styleguide__state">out_of_stock</span></div>
+      <div class="styleguide__example">{% include "components/badge.html" with kind="on_request" only %}<span class="styleguide__state">on_request</span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="sg-alerts">
+    <h2 id="sg-alerts">{% translate "Alerts" %}</h2>
+    <p>{% translate "Every level, a custom title, a dismissible alert and two live regions." %}</p>
+    {% include "components/alert.html" with level="info" message=_("Orders placed after 14:00 ship the next working day.") only %}
+    {% include "components/alert.html" with level="success" message=_("Your address was saved.") only %}
+    {% include "components/alert.html" with level="warning" message=_("Only two left in stock.") only %}
+    {% include "components/alert.html" with level="danger" message=_("The payment was declined. No money was taken.") only %}
+    {% include "components/alert.html" with level="success" title=_("Order placed") message=_("A confirmation is on its way to your inbox.") only %}
+    {% include "components/alert.html" with level="info" id="sg-alert-dismissible" dismissible=True message=_("We updated the terms of sale.") only %}
+    {% include "components/alert.html" with level="success" live="polite" message=_("Cart updated.") only %}
+    {% include "components/alert.html" with level="danger" live="assertive" message=_("The session expired. Sign in again to continue.") only %}
   </section>
 </div>
 {% endblock %}
