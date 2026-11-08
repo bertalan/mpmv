@@ -17,7 +17,7 @@ import re
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, replace
 from decimal import Decimal
-from urllib.parse import parse_qs, quote, urlencode
+from urllib.parse import parse_qs, parse_qsl, quote, urlencode
 
 from .engine import to_price
 
@@ -204,7 +204,7 @@ def canonical_pairs(params: ListingParams) -> list[tuple[str, str]]:
 
 def canonical_query(params: ListingParams) -> str:
     """The canonical query string, without the "?"; empty for an unfiltered first page."""
-    return urlencode(canonical_pairs(params), safe=",/", quote_via=quote)
+    return _encode(canonical_pairs(params))
 
 
 def listing_url(base_path: str, params: ListingParams) -> str:
@@ -216,6 +216,43 @@ def listing_url(base_path: str, params: ListingParams) -> str:
 def query_to_lists(query: str) -> dict[str, list[str]]:
     """A query string as `parse_listing_params` takes it (the shape of `QueryDict.lists()`)."""
     return parse_qs(query, keep_blank_values=True)
+
+
+def _encode(pairs: Sequence[tuple[str, str]]) -> str:
+    return urlencode(pairs, safe=",/", quote_via=quote)
+
+
+def split_query(query: str, *, term_keys: Collection[str]) -> tuple[str, str]:
+    """A raw query string as (its listing part, everything else), each re-encoded in the order
+    given. The listing part equals `canonical_query` exactly when the request is canonical; the
+    rest (tracking parameters) is kept on a redirect but never enters the canonical URL."""
+    keys = RESERVED_KEYS.union(term_keys)
+    pairs = parse_qsl(query, keep_blank_values=True)
+    listing = [(key, value) for key, value in pairs if key in keys]
+    other = [(key, value) for key, value in pairs if key not in keys]
+    return _encode(listing), _encode(other)
+
+
+def join_query(path: str, *queries: str) -> str:
+    query = "&".join(q for q in queries if q)
+    return f"{path}?{query}" if query else path
+
+
+# --- Robots (spec 10: noindex on pagination beyond a threshold and on empty results)
+
+ROBOTS_INDEX = "index, follow"
+ROBOTS_NOINDEX = "noindex, follow"
+# Pages past this one stay reachable and followed but are not indexed.
+INDEXED_PAGES = 10
+
+
+def listing_robots(params: ListingParams, *, total: int, indexed_pages: int = INDEXED_PAGES) -> str:
+    """`noindex, follow` for a page past `indexed_pages` and for a filtered listing with no
+    products (like an internal search with no results); `index, follow` otherwise. Filtered
+    listings with products are indexable on their canonical URL (CAT.8)."""
+    if params.page > indexed_pages or (params.has_filters and total == 0):
+        return ROBOTS_NOINDEX
+    return ROBOTS_INDEX
 
 
 # --- Pagination
