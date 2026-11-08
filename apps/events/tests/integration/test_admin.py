@@ -19,6 +19,7 @@ from django.urls import reverse
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
+from apps.catalog.models import Product, ProductStatus
 from apps.catalog.tests.factories import ProductFactory
 from apps.events.models import EventPage
 from apps.events.tests.factories import EventPageFactory, primary_index
@@ -214,19 +215,109 @@ def test_a_vendor_member_cannot_open_the_admin(client: Client) -> None:
     assert "/login/" in response["Location"]
 
 
-def test_a_vendor_member_with_wagtail_access_is_refused_on_event_pages(client: Client) -> None:
+def test_a_vendor_member_with_wagtail_access_still_cannot_open_the_admin(client: Client) -> None:
+    """Vendors do not get the Wagtail admin (spec 15): an editor group changes nothing.
+
+    The explorer, search, revisions, history, unpublish, copy, move and bulk actions are not
+    tenant-scoped, so a vendor member is kept out of every admin view, not only the event ones.
+    """
     member = VendorMemberFactory.create()
     member.user.groups.add(Group.objects.get(name="Editors"))
     verified_login(client, member.user)
     own = EventPageFactory.create(vendor=member.vendor)
+    other = EventPageFactory.create(title="Competitor draft")
+    revision = other.save_revision()
+    live = EventPageFactory.create()
+    live.save_revision().publish()
     index = primary_index()
-    # Wagtail turns the refusal into a redirect to the admin home with an error message.
-    refused = reverse("wagtailadmin_home")
+    bulk = reverse("wagtail_bulk_action", args=("wagtailcore", "page", "unpublish"))
     for url in (
+        reverse("wagtailadmin_home"),
         _edit_url(own),
         reverse("wagtailadmin_pages:add", args=("events", "eventpage", index.pk)),
         reverse("wagtailadmin_pages:delete", args=(own.pk,)),
+        reverse("wagtailadmin_explore", args=(index.pk,)),
+        reverse("wagtailadmin_pages:search") + "?q=Competitor",
+        reverse("wagtailadmin_pages:revisions_view", args=(other.pk, revision.pk)),
+        reverse("wagtailadmin_pages:history", args=(other.pk,)),
+        reverse("wagtailadmin_pages:unpublish", args=(live.pk,)),
+        reverse("wagtailadmin_pages:copy", args=(other.pk,)),
+        reverse("wagtailadmin_pages:move", args=(other.pk,)),
+        f"{bulk}?id={live.pk}",
     ):
         response = client.get(url)
         assert response.status_code == 302, url
-        assert response["Location"] == refused, url
+        assert "/login/" in response["Location"], url
+        assert b"Competitor draft" not in response.content, url
+    response = client.post(reverse("wagtailadmin_pages:unpublish", args=(live.pk,)))
+    assert response.status_code == 302
+    assert "/login/" in response["Location"]
+    response = client.post(f"{bulk}?id={live.pk}")
+    assert "/login/" in response["Location"]
+    live.refresh_from_db()
+    assert live.live
+
+
+def test_the_admin_permission_is_refused_to_vendor_members_only() -> None:
+    editor = _editor()
+    member = VendorMemberFactory.create()
+    member.user.groups.add(Group.objects.get(name="Editors"))
+    staff_member = VendorMemberFactory.create()
+    staff_member.user.is_staff = True
+    staff_member.user.save(update_fields=["is_staff"])
+    staff_member.user.groups.add(Group.objects.get(name="Editors"))
+    assert editor.has_perm("wagtailadmin.access_admin")
+    assert not User.objects.get(pk=member.user.pk).has_perm("wagtailadmin.access_admin")
+    assert User.objects.get(pk=staff_member.user.pk).has_perm("wagtailadmin.access_admin")
+
+
+# --- Platform events are created by staff only (spec 15 "Permissions")
+
+
+def test_a_non_staff_editor_cannot_create_an_event(client: Client) -> None:
+    verified_login(client, _editor())
+    index = primary_index()
+    url = reverse("wagtailadmin_pages:add", args=("events", "eventpage", index.pk))
+    response = client.get(url)
+    assert response.status_code == 302
+    assert response["Location"] == reverse("wagtailadmin_home")
+    response = client.post(url, {"title": "Editor fair", "slug": "editor-fair"})
+    assert response.status_code == 302
+    assert not EventPage.objects.filter(slug="editor-fair").exists()
+
+
+def test_a_non_staff_editor_cannot_copy_an_event(client: Client) -> None:
+    verified_login(client, _editor())
+    page = EventPageFactory.create(platform=True)
+    response = client.get(reverse("wagtailadmin_pages:copy", args=(page.pk,)))
+    assert response.status_code == 302
+    assert response["Location"] == reverse("wagtailadmin_home")
+
+
+# --- Product chooser size
+
+
+def test_a_new_event_offers_no_retired_products() -> None:
+    staff = UserFactory.create(superuser=True)
+    index = primary_index()
+    page = EventPage(locale=index.locale)
+    form_class = EventPage.get_edit_handler().get_form_class()
+    form = form_class(instance=page, parent_page=index, for_user=staff)
+    current = ProductFactory.create()
+    retired = ProductFactory.create(status=ProductStatus.RETIRED)
+    choices = set(form.fields["products"].queryset)
+    assert current in choices
+    assert retired not in choices
+
+
+def test_an_event_keeps_offering_a_linked_product_that_was_retired() -> None:
+    staff = UserFactory.create(superuser=True)
+    page = EventPageFactory.create()
+    linked = ProductFactory.create(vendor=page.vendor)
+    retired = ProductFactory.create(vendor=page.vendor, status=ProductStatus.RETIRED)
+    page.products.set([linked])
+    page.save()
+    Product.objects.filter(pk=linked.pk).update(status=ProductStatus.RETIRED)
+    choices = set(_form(page, staff).fields["products"].queryset)
+    assert linked in choices
+    assert retired not in choices

@@ -9,7 +9,9 @@ The authoring, moderation, hiding and cancelling services (`save_event_draft`, `
   `translation_key`: they are translations of each other, which wagtail-localize needs to place
   a translated event under the index of its language.
 - `sync_event_status` writes the denormalised `status` from the Wagtail state.
-- `may_edit_events_in_admin` keeps vendors out of event pages in the Wagtail admin.
+- `may_edit_events_in_admin` keeps vendors out of event pages in the Wagtail admin (the
+  `apps.vendors.backends` backend already keeps them out of the whole admin), and
+  `may_create_events_in_admin` lets only platform staff create events there.
 """
 
 import logging
@@ -124,3 +126,14 @@ def may_edit_events_in_admin(user: AbstractBaseUser | AnonymousUser) -> bool:
     if getattr(user, "is_staff", False):
         return True
     return not VendorMember.objects.filter(user_id=user.pk).exists()
+
+
+def may_create_events_in_admin(user: AbstractBaseUser | AnonymousUser) -> bool:
+    """Whether `user` may create (or copy) an event page in the Wagtail admin.
+
+    Only platform staff (`is_staff`, the same definition as the staff-only moderation panel)
+    create events there: an event created in the admin without a vendor is a platform event, and
+    only platform staff create platform events (spec 15 "Permissions"). Other Wagtail editors
+    keep editing existing events under Wagtail's own page permissions.
+    """
+    return bool(user.is_authenticated and user.is_active and getattr(user, "is_staff", False))

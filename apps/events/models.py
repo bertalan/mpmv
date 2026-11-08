@@ -37,7 +37,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, Q
-from django.http import HttpRequest
+from django.http import Http404, HttpRequest
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalManyToManyField
 from wagtail import blocks
@@ -135,7 +135,8 @@ class EventIndexPage(Page):  # type: ignore[misc]  # Wagtail is untyped
         verbose_name = _("events index")
 
     def events(self) -> list["EventPage"]:
-        """The live, public, not hidden events of this index's language, soonest first.
+        """The live, public, not hidden events of an active vendor (or of the platform) in this
+        index's language, soonest first (spec 15 §Status).
 
         A minimal list: the EVT.6 listing rules (upcoming only, filters, months, pagination,
         the original-language fallback) replace it.
@@ -145,6 +146,7 @@ class EventIndexPage(Page):  # type: ignore[misc]  # Wagtail is untyped
             .live()
             .public()
             .filter(hidden_at__isnull=True)
+            .filter(Q(vendor__isnull=True) | Q(vendor__status=Vendor.Status.ACTIVE))
             .select_related("vendor")
         )
         return sorted(pages, key=lambda page: page.sort_key())
@@ -442,6 +444,26 @@ class EventPage(Page):  # type: ignore[misc]  # Wagtail is untyped
     class Meta:
         verbose_name = _("event")
         constraints = _constraints()
+
+    # --- Public routing (spec 15 §Status)
+
+    def is_publicly_visible(self) -> bool:
+        """Not hidden, and the vendor (if any) active: the rest of the public query is Wagtail's
+        own (`live`, view restrictions)."""
+        if self.hidden_at is not None:
+            return False
+        vendor = self.vendor
+        return vendor is None or vendor.status == Vendor.Status.ACTIVE
+
+    def route(self, request: HttpRequest, path_components: list[str]) -> Any:
+        """A hidden event, or one of a suspended or closed vendor, is a 404 to visitors.
+
+        `route` serves public URLs only: Wagtail's admin and vendor-area previews call `serve`
+        directly, so staff and the vendor still preview such a page.
+        """
+        if not path_components and not self.is_publicly_visible():
+            raise Http404
+        return super().route(request, path_components)
 
     # --- Display (templates)
 

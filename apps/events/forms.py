@@ -4,8 +4,8 @@
   time zone (the user's profile, UTC by default) would shift it. The form shows `starts_at` and
   `ends_at` in the event's zone and reads what is typed in the zone chosen on the form.
 - **Vendor.** Only staff choose the vendor, and only when the event is created: the owner of an
-  existing event never changes here (the same rule as a product's vendor, Q-33). A non-staff
-  editor writes platform events only.
+  existing event never changes here (the same rule as a product's vendor, Q-33). Only staff
+  create events in the admin (`wagtail_hooks`); a non-staff editor edits existing ones only.
 - **Language.** A new event's original language is the language of its tree.
 - **Products.** The chooser offers only the event vendor's products; a crafted request for
   another vendor's product is a field error (spec 15: a vendor event links only to its own
@@ -16,11 +16,12 @@ import datetime as dt
 import zoneinfo
 from typing import Any
 
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from wagtail.admin.forms import WagtailAdminPageForm
 
-from apps.catalog.models import Product
+from apps.catalog.models import Product, ProductStatus
 
 LOCAL_TIME_FIELDS = ("starts_at", "ends_at")
 
@@ -46,7 +47,10 @@ class EventPageForm(WagtailAdminPageForm):  # type: ignore[misc]  # Wagtail is u
             elif instance.pk is not None:
                 self.fields["vendor"].disabled = True
         if "products" in self.fields:
-            products = Product.objects.all()
+            offered = ~Q(status=ProductStatus.RETIRED)
+            if instance.pk is not None:
+                offered |= Q(pk__in=instance.products.values("pk"))
+            products = Product.objects.filter(offered)
             if instance.pk is not None and instance.vendor_id is not None:
                 products = products.filter(vendor_id=instance.vendor_id)
             self.fields["products"].queryset = products
