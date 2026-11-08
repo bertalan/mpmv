@@ -7,15 +7,15 @@ class CoreConfig(AppConfig):
     label = "core"
 
     # Audit policy (SEC.4, docs/dev/audit-trail.md), enforced by the core.E2xx system check.
-    audited_models = ("platformoperator", "featureflag", "emailsuppression")
+    audited_models = ("platformoperator", "featureflag", "emailsuppression", "imagelicence")
     unaudited_models = {
         "auditlog": "the audit log itself (append-only)",
         "heartbeat": "worker telemetry, not a domain change",
         "throttle": "login counters; the lockouts they cause are audited by accounts",
         "geocodecacheentry": "cache of public geocoding answers, not a domain change",
         "geocoderstate": "provider rate limiter and circuit breaker, operational state",
-        "mediaimage": "Wagtail image: editor upload, logged in Wagtail's action log (CMS.8 adds "
-        "the licence fields)",
+        "mediaimage": "Wagtail image: editor upload, logged in Wagtail's action log; its licence "
+        "metadata is validated by the model (CMS.8)",
         "mediaimagerendition": "a resized copy of an image, made by templates",
         "outboxemail": "delivery queue of transactional email; its history is outboxemailevent",
         "outboxemailevent": "append-only delivery history of the outbox",

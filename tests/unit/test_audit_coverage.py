@@ -27,6 +27,8 @@ NOT_SENSITIVE_SERVICES = {
     "apps.cms.services.translate_page": "CMS content, in Wagtail revisions and log",
     "apps.cms.services.sync_page_translations": "CMS content, in Wagtail revisions and log",
     "apps.cms.services.override_image": "CMS content, in Wagtail revisions and log",
+    # CMS.8: images are CMS content; admin uploads are in Wagtail's action log.
+    "apps.core.services.save_image": "image upload outside the admin, validated, CMS content",
     "apps.core.services.enqueue_email": "the outbox is a delivery queue with its own history",
     "apps.core.services.deliver_email": "a delivery attempt, kept in the outbox history",
     # ORD.1: a cart holds display prices only; the order placed from it is audited.

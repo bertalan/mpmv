@@ -1,5 +1,5 @@
-"""Staff admin for the platform operator, the audit log and the feature flags (Wagtail admin
-replaces this in CORE.8).
+"""Staff admin for the platform operator, the audit log, the feature flags and the image
+licence allow list (Wagtail admin replaces this in CORE.8).
 
 Configuration rows are history: staff add a new row (closing the current one through the audited
 service) and can view earlier rows, but never edit or delete them.
@@ -26,13 +26,14 @@ from django.utils.module_loading import import_string
 from . import flags
 from .audit import audit_context
 from .changeset import diff
-from .models import AuditLog, FeatureFlag, PlatformOperator
+from .models import AuditLog, FeatureFlag, ImageLicence, PlatformOperator
 from .services import (
     check_operator_start,
     configure_platform_operator,
     environment_default,
     latest_operator,
     save_flag,
+    save_image_licence,
 )
 
 
@@ -394,6 +395,39 @@ class FeatureFlagAdmin(admin.ModelAdmin[FeatureFlag]):
         if _is_kill_switch(self.get_object(request, object_id)):
             return step_up(view)(request)
         return view(request)
+
+
+# --- Image licence allow list (CMS.8, spec 10 §10.2)
+
+
+@admin.register(ImageLicence)
+class ImageLicenceAdmin(admin.ModelAdmin[ImageLicence]):
+    """Staff add and edit the licences images may use; NC and ND licences are refused by the
+    model. Entries are never deleted: images keep a reference to their licence."""
+
+    list_display = (
+        "code",
+        "name",
+        "url",
+        "attribution_required",
+        "source_required",
+        "permission_required",
+    )
+    search_fields = ("code", "name")
+    fields = (
+        "code",
+        "name",
+        "url",
+        "attribution_required",
+        "source_required",
+        "permission_required",
+    )
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+    def save_model(self, request: HttpRequest, obj: ImageLicence, form: Any, change: bool) -> None:
+        save_image_licence(obj, ctx=audit_context(request))
 
 
 def changed_fields(entry: AuditLog) -> list[tuple[str, Any, Any]]:
