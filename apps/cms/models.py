@@ -16,8 +16,10 @@ it in sync with its source. Texts, alt texts and captions are translated; images
 from the source, and a translator may override one for a single locale (D-18).
 
 Legal pages (CMS.5) keep an append-only archive of every published text: one history per page,
-and so per language, since a translation is its own page (Q-42). The "Sell with us" page shows
-the plans and a FAQ and leads to the VEN.22 application form.
+and so per language, since a translation is its own page (Q-42). A translation keeps its own
+effective date through wagtail-localize syncs, and the reviews of each language's text (AI draft,
+native-speaker review, legal counsel check) are recorded on its versions (I18N.9). The "Sell
+with us" page shows the plans and a FAQ and leads to the VEN.22 application form.
 """
 
 from typing import Any, ClassVar
@@ -34,7 +36,7 @@ from wagtail.contrib.routable_page.models import RoutablePageMixin, path
 from wagtail.fields import StreamField
 from wagtail.images import get_image_model_string
 from wagtail.models import Page, TranslatableMixin
-from wagtail_localize.fields import SynchronizedField
+from wagtail_localize.fields import BaseTranslatableField, SynchronizedField
 
 from . import engine
 from .blocks import (
@@ -194,13 +196,26 @@ def stream_data(stream: Any) -> list[list[Any]]:
     return [[block["type"], block["value"]] for block in stream.get_prep_value()]
 
 
+class LanguageOwnField(BaseTranslatableField):  # type: ignore[misc]  # untyped
+    """A field each translation keeps for itself: wagtail-localize neither copies it from the
+    source page on a sync nor offers it as a segment. A new translation starts from the
+    source's value (Wagtail's copy); the translator then sets its own in the page editor."""
+
+    def __repr__(self) -> str:
+        return f"<LanguageOwnField {self.field_name}>"
+
+
 class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
-    """Terms, privacy, cookies, withdrawal, returns: a text with its effective date.
+    """Terms, privacy, cookies, withdrawal, shipping, returns: a text with its effective date.
 
     Every publish that changes the title, the text or the effective date records a
     `LegalPageVersion` (`services.record_legal_version`, on Wagtail's `page_published`). A
-    translation is its own page, so each language has its own versions and dates (Q-42). The
+    translation is its own page, so each language has its own versions and dates (Q-42): a
+    wagtail-localize sync brings the source's text, never its effective date (I18N.9). The
     archive is served at `versions/<number>/`.
+
+    No EN fallback (Q-42): a language without its own published page has no such page, so the
+    URL is not found; nothing serves the EN text in its place (`language_fallback`).
     """
 
     class Kind(models.TextChoices):
@@ -208,7 +223,11 @@ class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
         PRIVACY = "privacy", _("Privacy policy")
         COOKIES = "cookies", _("Cookie policy")
         WITHDRAWAL = "withdrawal", _("Right of withdrawal")
-        RETURNS = "returns", _("Shipping and returns")
+        SHIPPING = "shipping", _("Shipping")
+        RETURNS = "returns", _("Returns")
+
+    # Read by the visitor-content fallback (spec 09 §9.2) when it comes: legal pages opt out.
+    language_fallback: ClassVar[bool] = False
 
     kind = models.CharField(_("kind"), max_length=16, choices=Kind.choices)
     effective_date = models.DateField(
@@ -222,6 +241,9 @@ class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
         FieldPanel("kind"),
         FieldPanel("effective_date"),
         FieldPanel("body"),
+    ]
+    override_translatable_fields: ClassVar[list[BaseTranslatableField]] = [
+        LanguageOwnField("effective_date")
     ]
     parent_page_types: ClassVar[list[str]] = ["cms.HomePage"]
     subpage_types: ClassVar[list[str]] = []
@@ -265,6 +287,10 @@ class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
         stamps = [engine.VersionStamp(v.number, v.effective_date) for v in versions]
         in_force = engine.version_in_force(stamps, timezone.localdate())
         context["current_version"] = versions[0] if versions else None
+        # A text is a draft until legal counsel has checked it (I18N.9), placeholders included.
+        context["counsel_checked"] = bool(versions) and (
+            versions[0].reviews.filter(stage=LegalPageReview.Stage.COUNSEL_CHECK).exists()
+        )
         context["in_force"] = in_force
         context["in_force_url"] = in_force and self.version_url(in_force.number, request)
         context["archive"] = [(v, self.version_url(v.number, request)) for v in versions[1:]]
@@ -319,6 +345,50 @@ class LegalPageVersion(models.Model):
             "effective_date": self.effective_date.isoformat(),
             "body": stream_data(self.body),
         }
+
+
+class LegalPageReview(models.Model):
+    """A review of one language's published text (I18N.9, Q-42): the AI draft it started from,
+    the native-speaker review or the legal counsel check, with who did it and when.
+
+    Recorded on the version reviewed: a new version needs its own reviews. Append-only (DB
+    trigger + guard), like the versions; written by `services.record_legal_review`, audited.
+    """
+
+    class Stage(models.TextChoices):
+        AI_DRAFT = "ai_draft", _("AI draft")
+        NATIVE_REVIEW = "native_review", _("Native-speaker review")
+        COUNSEL_CHECK = "counsel_check", _("Legal counsel check")
+
+    version = models.ForeignKey(
+        LegalPageVersion,
+        on_delete=models.PROTECT,
+        related_name="reviews",
+        verbose_name=_("version"),
+    )
+    stage = models.CharField(_("stage"), max_length=16, choices=Stage.choices)
+    reviewer = models.CharField(
+        _("reviewer"), max_length=150, help_text=_("Who did it: a person, a firm or a tool.")
+    )
+    reviewed_on = models.DateField(_("reviewed on"))
+    note = models.TextField(_("note"), blank=True)
+    recorded_at = models.DateTimeField(_("recorded at"))
+    recorded_by = models.CharField(_("recorded by"), max_length=150)
+
+    class Meta:
+        verbose_name = _("legal page review")
+        ordering: ClassVar[list[str]] = ["version", "stage"]
+        constraints: ClassVar[list[models.BaseConstraint]] = [
+            models.UniqueConstraint(fields=["version", "stage"], name="cms_legal_review_stage"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.get_stage_display()} of {self.version}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if self.pk is not None:
+            raise PermissionError("LegalPageReview is append-only")
+        super().save(*args, **kwargs)
 
 
 # --- Vendor recruitment (CMS.5)

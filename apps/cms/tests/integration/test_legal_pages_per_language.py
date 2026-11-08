@@ -338,3 +338,26 @@ def test_a_legal_page_has_no_english_fallback(client: Client, seeded: SeedReport
     assert response.status_code == 404
     assert "Sample terms." not in response.content.decode()
     assert LegalPage.language_fallback is False
+
+
+def test_staff_record_a_review_from_the_command_line(seeded: SeedReport) -> None:
+    page = _publish(LegalPageFactory.create(live=False))
+    out = io.StringIO()
+    args = [str(page.pk), "counsel_check", "--reviewer", "Counsel", "--date", "2026-10-01"]
+
+    call_command("record_legal_review", *args, "--dry-run", stdout=out)
+    assert not LegalPageReview.objects.exists()
+
+    call_command("record_legal_review", *args, stdout=out)
+    review = LegalPageReview.objects.get()
+    assert (review.stage, review.reviewer, review.recorded_by) == (
+        "counsel_check",
+        "Counsel",
+        "command:record_legal_review",
+    )
+    with pytest.raises(CommandError, match="already recorded"):
+        call_command("record_legal_review", *args, stdout=out)
+    with pytest.raises(CommandError, match="No published version"):
+        call_command(
+            "record_legal_review", "999999", "ai_draft", "--reviewer", "X", "--date", "2026-10-01"
+        )
