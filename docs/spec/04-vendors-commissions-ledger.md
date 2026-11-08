@@ -243,11 +243,13 @@ These rows are the payout gate, and the seeded rows include the DAC7 dataset of
 
 | Vendors | Required for a payout |
 |---|---|
-| Every vendor | registered office street, postal code, city and country; country of tax residence |
+| Every vendor | registered office street, postal code, city and country; country of tax residence; TIN issuing country (VEN.23) |
+| Sole proprietors | date of birth (DAC7, VEN.23) |
+| Every other legal form | business registration number (DAC7, VEN.23) |
 | Italy | PEC, codice fiscale, fiscal regime, delivery channel, registered office province |
 | Italian companies (not sole proprietors) | REA office, REA number, liquidation status |
 | EU member states, Italy included | VAT number, IBAN |
-| Outside the EU | IBAN, foreign TIN (`tax_code`) |
+| Outside the EU | IBAN (the TIN, or a place of birth where none is issued, comes from the DAC7 check, VEN.23) |
 
 The "Outside the EU" rows stay at go-live: a vendor with its registered office outside the EU
 and a permanent establishment in the EU can be activated (CMP.13), and the rows are ready for the
@@ -257,16 +259,27 @@ later opening to non-EU vendors (CMP.17 to CMP.22).
 Annex V, section III.B, for individual and entity sellers alike, and a test pins the list. The TIN
 is always asked, together with the country that issued it. The VAT number is asked only when the
 vendor has one, and it is checked with VIES (TAX.5). A "same as the VAT number" option covers
-companies whose TIN is their VAT number. Formats are checked per issuing country. When the
-issuing country does not issue TINs, the vendor gives the place of birth instead. Staff can
-correct or complete the dataset from the admin, behind an MFA step-up and with an AuditLog entry
-for each change.
+companies whose TIN is their VAT number; it is offered only in the Member States where the VAT
+number without its prefix is the TIN (`engine.SAME_AS_VAT_COUNTRIES`), and the TIN follows a
+definite VIES answer (an unavailable VIES keeps the TIN already derived). Formats are checked
+per issuing country. When the issuing country does not issue TINs, an individual gives the place
+of birth instead; an entity always gives a TIN (or the identifier its country uses as one).
+Staff can correct or complete the dataset from the admin, and create a vendor with DAC7 data,
+behind an MFA step-up and with an AuditLog entry for each change (`vendor.dac7_corrected`, or
+`vendor.created` for a new vendor). Migration 0016 fills the TIN issuing country of existing
+vendors (where the stored TIN is valid for the vendor's country) and an Italian entity's
+business registration number from its REA data; any other DAC7 field an existing vendor lacks
+blocks its payouts until staff complete it. The DAC7 check (`engine.dac7_check`) is not a requirement row: the payout gate
+applies it on top of the active rows, so deactivating a row never lets a vendor with an
+incomplete DAC7 dataset through. The rows mirror the dataset for staff.
 
-So every vendor that passes the gate has a VAT number or a TIN, and the legal name is always
-present. Payout code (VEN.6, VEN.7) calls `assert_payout_allowed(vendor)`, which refuses with
+So every vendor that passes the gate has a VAT number or a TIN, except an individual whose TIN
+country issues no TIN and who has no VAT number (identified by the place of birth, MQ-6); the
+legal name is always present. Payout code (VEN.6, VEN.7) calls `assert_payout_allowed(vendor)`, which refuses with
 the list of missing or invalid fields (and, from VEN.16, with an overdue contract acceptance). A vendor that passes it has the complete DAC7 dataset
 (`engine.dac7_missing()` is empty; a permanent establishment is reported only when there is one)
-and enough data for a FatturaPA `CessionarioCommittente` block; tests pin both. Saving a
+and, with that one exception, enough data for a FatturaPA `CessionarioCommittente` block;
+tests pin both. Saving a
 profile (`save_vendor`, every adapter) runs the model validation, so present values are always
 valid.
 

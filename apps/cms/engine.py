@@ -18,6 +18,8 @@ check recorded. An AI draft is recorded when one was used, but is not required.
 FAQ block (CMS.2, spec 10 §10.2): the FAQPage structured data.
 
 Featured cards (CMS.2, spec 10 §10.2, spec 03 "URLs"): the URLs of the term and vendor cards.
+
+Product grid (CMS.10, spec 10 §10.2): how many products a grid shows.
 """
 
 import datetime as dt
@@ -206,3 +208,17 @@ def link_language(requested: str, primary: str, available: Sequence[Collection[s
         if all(candidate in languages for languages in available):
             return candidate
     return None
+
+
+# --- Product grid (CMS.10)
+
+PRODUCT_GRID_DEFAULT = 8
+PRODUCT_GRID_MAX = 24  # one CAT.8 listing page
+
+
+def grid_limit(limit: int | None) -> int:
+    """The number of products a grid shows: its limit within 1..PRODUCT_GRID_MAX. The block
+    validates the bounds; a value stored before a bound changed is clamped here."""
+    if limit is None:
+        return PRODUCT_GRID_DEFAULT
+    return max(1, min(PRODUCT_GRID_MAX, limit))

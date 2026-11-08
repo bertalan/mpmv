@@ -11,6 +11,7 @@ check is audited by `apps.vendors.services.check_vat_number`). `verify_vat_numbe
 puts the cache, the VIES client and the fail-closed policy together.
 """
 
+import dataclasses
 import datetime as dt
 import logging
 from dataclasses import dataclass, field
@@ -30,6 +31,7 @@ from apps.core.countries import normalize_country
 from apps.core.models import Versioned
 from apps.core.services import run_mutation, save_audited
 from apps.core.validity import NoValidRow, next_start_error, pick_valid
+from apps.vendors import engine as vendors_engine
 from apps.vendors.engine import VendorAction, split_vat_number
 from apps.vendors.models import Vendor
 from apps.vendors.services import has_vendor_permission, save_vendor
@@ -42,6 +44,7 @@ from .models import (
     VatValidation,
     VendorTaxProfile,
     VendorTaxProfileTranslation,
+    vat_registration_country,
 )
 from .vies import ViesClient, get_vies_client
 
@@ -54,6 +57,7 @@ PROFILE_CONFIGURED = "tax.vendor_tax_profile.configured"
 PROFILE_FIELDS = (
     "regime",
     "exempt_reason",
+    "exempt_country",
     "oss_registered_since",
     "valid_from",
     "valid_to",
@@ -385,6 +389,7 @@ REQUEST_FIELDS = (
     "status",
     "regime",
     "exempt_reason",
+    "exempt_country",
     "oss_registered_since",
     "fiscal_regime",
     "effective_from",
@@ -418,8 +423,14 @@ def _same_regime(request: TaxRegimeChangeRequest, profile: VendorTaxProfile | No
     return profile is not None and (
         profile.regime,
         profile.exempt_reason,
+        profile.exempt_country,
         profile.oss_registered_since,
-    ) == (request.regime, request.exempt_reason, request.oss_registered_since)
+    ) == (
+        request.regime,
+        request.exempt_reason,
+        request.exempt_country,
+        request.oss_registered_since,
+    )
 
 
 def _clear_review(request: TaxRegimeChangeRequest) -> None:
@@ -427,6 +438,20 @@ def _clear_review(request: TaxRegimeChangeRequest) -> None:
     request.reviewed_at = None
     request.review_reason = ""
     request.profile = None
+
+
+def check_fiscal_regime_eligibility(vendor: Vendor, fiscal_regime: str) -> None:
+    """Refuse a fiscal regime the vendor may not declare: RF20 needs the registered office in an EU
+    member state and the EX number issued there (VEN.25, MQ-5; interim MQ-17). Raises
+    `ValidationError` on the request's `fiscal_regime` with every reason."""
+    if fiscal_regime != vendors_engine.CROSS_BORDER_FRANCHISE_REGIME:
+        return
+    identity = dataclasses.replace(vendor.legal_identity(), fiscal_regime=fiscal_regime)
+    errors = vendors_engine.cross_border_franchise_errors(identity)
+    if errors:
+        raise ValidationError(
+            {"fiscal_regime": [m for messages in errors.values() for m in messages]}
+        )
 
 
 def request_regime_change(
@@ -438,7 +463,8 @@ def request_regime_change(
     staff cannot change the tax regime). The status and review fields are reset: a new request
     is pending and unreviewed. The request must be consistent with the fiscal regime
     the vendor will declare (`engine.request_errors`), start after the vendor's latest profile
-    and change something. Raises `engine.RegimeChangeNotAllowed`,
+    and change something; a move to RF20 needs the vendor's eligibility
+    (`check_fiscal_regime_eligibility`, VEN.25). Raises `engine.RegimeChangeNotAllowed`,
     `engine.PendingRequestExists` or `ValidationError`, also on dry-run.
     """
     if not request._state.adding:
@@ -469,6 +495,8 @@ def request_regime_change(
             requested=request.fiscal_regime,
             current=vendor.fiscal_regime,
         )
+        if resulting != vendor.fiscal_regime:
+            check_fiscal_regime_eligibility(vendor, resulting)
         if _same_regime(request, latest) and resulting == vendor.fiscal_regime:
             raise ValidationError({"regime": "This is already the vendor's VAT regime."})
 
@@ -546,7 +574,8 @@ def approve_regime_change(
     regime may have changed since the request, and the requester must still hold the
     `TAX_REGIME` permission (an owner removed or demoted since asking cannot have the request
     approved; it can still be rejected). A change of the declared fiscal regime is
-    approved on or after its business-time date only (`engine.fiscal_regime_change_error`).
+    approved on or after its business-time date only (`engine.fiscal_regime_change_error`),
+    and a move to RF20 only for an eligible vendor as stored now (VEN.25).
     Each write is
     audited by its own service (`vendor.updated`, `tax.vendor_tax_profile.configured`) plus
     `tax.regime_change.approved`; the returned ChangeSet holds them all. Raises
@@ -569,6 +598,8 @@ def approve_regime_change(
             requested_fiscal_regime=current.fiscal_regime,
             current_fiscal_regime=vendor.fiscal_regime,
             oss_registered_since=current.oss_registered_since,
+            exempt_country=current.exempt_country,
+            vat_country=vat_registration_country(vendor),
         )
         if errors:
             raise ValidationError(errors)
@@ -579,6 +610,7 @@ def approve_regime_change(
             current=vendor.fiscal_regime,
         )
         if fiscal_regime != vendor.fiscal_regime:
+            check_fiscal_regime_eligibility(vendor, fiscal_regime)
             error = engine.fiscal_regime_change_error(
                 business_date(current.effective_from), today=business_date(timezone.now())
             )
@@ -591,6 +623,7 @@ def approve_regime_change(
             vendor=vendor,
             regime=current.regime,
             exempt_reason=current.exempt_reason,
+            exempt_country=current.exempt_country,
             oss_registered_since=current.oss_registered_since,
             valid_from=current.effective_from,
             requested_by=requester,
@@ -678,8 +711,9 @@ def pending_regime_changes() -> "QuerySet[TaxRegimeChangeRequest]":
 
 @dataclass(frozen=True)
 class ProfileInconsistency:
-    """A current profile that disagrees with its vendor's declared fiscal regime (`errors`), or
-    that staff must check by hand against it (`review`, `engine.profile_review_notes`)."""
+    """A current profile that disagrees with its vendor's declared fiscal regime or with the
+    country of its VAT number (`errors`, TAX.13), or that staff must check by hand against the
+    regime (`review`, `engine.profile_review_notes`)."""
 
     profile: VendorTaxProfile
     errors: dict[str, str]
@@ -688,7 +722,10 @@ class ProfileInconsistency:
     def describe(self) -> str:
         problems = " ".join([*self.errors.values(), *self.review.values()])
         finding = "does not match" if self.errors else "needs a manual review against"
-        return f"{self.profile.vendor}: the tax profile {finding} the fiscal regime. {problems}"
+        return (
+            f"{self.profile.vendor}: the tax profile {finding} the fiscal regime or the VAT "
+            f"number. {problems}"
+        )
 
 
 def inconsistent_tax_profiles(at: dt.datetime | None = None) -> list[ProfileInconsistency]:
@@ -713,6 +750,8 @@ def inconsistent_tax_profiles(at: dt.datetime | None = None) -> list[ProfileInco
             profile.exempt_reason,
             fiscal_regime=profile.vendor.fiscal_regime,
             oss_registered_since=profile.oss_registered_since,
+            exempt_country=profile.exempt_country,
+            vat_country=vat_registration_country(profile.vendor),
         )
         review = engine.profile_review_notes(
             profile.regime, profile.exempt_reason, fiscal_regime=profile.vendor.fiscal_regime
@@ -722,22 +761,56 @@ def inconsistent_tax_profiles(at: dt.datetime | None = None) -> list[ProfileInco
     return found
 
 
+def _log_inconsistency(item: ProfileInconsistency) -> None:
+    logger.warning(
+        "tax profile %s of vendor %s %s fiscal regime %r or VAT number: %s",
+        item.profile.public_id,
+        item.profile.vendor.public_id,
+        "disagrees with its" if item.errors else "needs a manual review against its",
+        item.profile.vendor.fiscal_regime,
+        "; ".join(
+            f"{name}: {message}" for name, message in [*item.errors.items(), *item.review.items()]
+        ),
+    )
+
+
 def report_inconsistent_tax_profiles(at: dt.datetime | None = None) -> int:
     """Log a warning for each inconsistent current profile; return how many there are."""
     found = inconsistent_tax_profiles(at)
     for item in found:
-        logger.warning(
-            "tax profile %s of vendor %s %s fiscal regime %r: %s",
-            item.profile.public_id,
-            item.profile.vendor.public_id,
-            "disagrees with" if item.errors else "needs a manual review against",
-            item.profile.vendor.fiscal_regime,
-            "; ".join(
-                f"{name}: {message}"
-                for name, message in [*item.errors.items(), *item.review.items()]
-            ),
-        )
+        _log_inconsistency(item)
     return len(found)
+
+
+def report_vendor_tax_profile(vendor: Vendor) -> ProfileInconsistency | None:
+    """Check the vendor's current profile now and log a warning when it is inconsistent.
+
+    Runs when the vendor's VAT number changes (TAX.13): moving an exempt vendor's VAT number to
+    another country leaves an exemption reason of the wrong country. The vendor app cannot
+    import tax, so the change is reported here; staff fix it with a new profile.
+    """
+    now = timezone.now()
+    profile = (
+        VendorTaxProfile.objects.filter(vendor=vendor, valid_from__lte=now)
+        .filter(Q(valid_to__isnull=True) | Q(valid_to__gt=now))
+        .first()
+    )
+    if profile is None:
+        return None
+    profile.vendor = vendor
+    errors = engine.profile_errors(
+        profile.regime,
+        profile.exempt_reason,
+        fiscal_regime=vendor.fiscal_regime,
+        oss_registered_since=profile.oss_registered_since,
+        exempt_country=profile.exempt_country,
+        vat_country=vat_registration_country(vendor),
+    )
+    if not errors:
+        return None
+    item = ProfileInconsistency(profile=profile, errors=errors)
+    _log_inconsistency(item)
+    return item
 
 
 # --- VIES answers
