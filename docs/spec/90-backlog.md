@@ -6,15 +6,15 @@
 
 ## Summary
 
-- Micro-tasks: **238** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **1971 h** (P1 1597 h · P2 356 h · P3 18 h)
+- Micro-tasks: **239** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **1977 h** (P1 1603 h · P2 356 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
 
 | Macro | Area | Tasks | P1 h | P2 h | P3 h | Total h |
 |---|---|---:|---:|---:|---:|---:|
-| ARC | Architecture and foundations | 19 | 114 | 6 | 0 | 120 |
+| ARC | Architecture and foundations | 20 | 120 | 6 | 0 | 126 |
 | CORE | Identity, permissions, API, backoffice | 15 | 108 | 4 | 0 | 112 |
 | CAT | Product catalog | 18 | 126 | 60 | 0 | 186 |
 | VEN | Vendors, commissions, ledger | 25 | 212 | 22 | 0 | 234 |
@@ -33,11 +33,11 @@
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 6 | 19 | 23 | 0 | 42 |
 | MIG | Migration and cutover | 11 | 114 | 0 | 0 | 114 |
-| **Total** | | **238** | **1597** | **356** | **18** | **1971** |
+| **Total** | | **239** | **1603** | **356** | **18** | **1977** |
 
 ## By phase
 
-### F0 — Foundations (40 tasks, 266 h)
+### F0 — Foundations (41 tasks, 272 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -58,6 +58,7 @@
 | ARC.18 | Architecture guards (coherence checks 2 and 5, owner decision Q-18): an import-linter contract that forbids `django.db` and any `services` or `models` module in `apps.*.engine`; the accepted exceptions to the dry-run rule (telemetry, throttle counters, one-time code consumption, migration hooks) listed in the §1.3 conventions with a guard test that names them | P1 | 2 | ARC.4, ARC.6 | `lint-imports` fails when an engine imports `django.db`; a new mutating service without `dry_run` that is not on the list fails the guard test |
 | ARC.19 | Transactional email on STAGE/LIVE: EU provider adapter behind `EmailSender` (provider choice pending, owner question Q-48), DKIM/SPF/DMARC DNS, provider webhook endpoint registration, deliverability check | P1 | 3 | ARC.16, ARC.13 | STAGE sends an OTP email through the provider with DKIM, SPF and DMARC passing; a test bounce reaches the webhook and suppresses the address |
 | ARC.21 | STAGE abuse tests: deliberately stress and break STAGE before go-live. Scenarios: load test of storefront, API and admin with a scripted tool chosen in the task (record the choice in the PR); kill the app and worker containers mid-request and check systemd restarts them; restart PostgreSQL under load; fill the disk until the alerts fire; expire or swap the database certificate and check the app refuses to connect; deploy a deliberately unhealthy release and check the automatic rollback; restore the database from backup to an empty server (with OPS.1). App-to-database network failures need a two-VPS setup, so they are repeated on LIVE-equivalent servers before cutover (MIG.9) | P1 | 8 | ARC.13, OPS.2 | Each scenario has a scripted run, a short report with numbers (requests per second, p95 latency, time to recover), and every finding is fixed or becomes a new backlog row |
+| ARC.22 | Public STAGE demo mode (owner decision 2026-11-08): once STAGE is up it becomes a public demo that anyone can reach, with published demo passwords, data reset every 60 minutes and no search engine indexing. A `MPMV_DEMO_MODE` setting, off by default; a Django system check refuses to start when it is on in the LIVE settings. Demo accounts: a customer, a vendor owner and a staff member with limited rights; never a superuser, and no account can manage users, permissions, groups or API keys; the technical Django admin stays restricted (OPS.5). Demo passwords come from server environment configuration (never the repo) and are shown in a demo panel on the STAGE login page. Demo accounts are exempt from MFA and from account lockout (otherwise anyone could lock them for everyone); a per-IP rate limit applies instead. No outbound email: messages land in an in-app demo mailbox; payments use the provider's test mode only. Hourly reset: the database is restored from a snapshot of the synthetic seed (ARC.10) and uploaded media are wiped; a site-wide banner shows "Demo: data resets at HH:MM, do not enter real data"; uploads accept images only, with a size cap. Not indexable: an `X-Robots-Tag: noindex, nofollow` header on every response, a robots meta tag in the base layout and a `robots.txt` that disallows crawling. ARC.21 abuse tests run with demo mode off, in a maintenance window | P1 | 6 | ARC.13, ARC.10, CORE.5, ARC.16 | On STAGE with demo mode on, each demo login works from the login-page panel; a demo account cannot reach user, permission or key management; no email leaves the server; a reset restores the seed and wipes uploads within the hour, and the banner shows the next reset time; every response carries the noindex header; LIVE settings with demo mode on fail the system check |
 | CORE.1 | Custom `User`, login via email, preferred language | P1 | 6 | ARC.6 | Initial migration with custom User |
 | CORE.2 | `VendorMember` with owner/staff roles, per-role permissions | P1 | 6 | CORE.1, VEN.1 | Role matrix tested |
 | CORE.3 | `VendorScopedQuerySet` + 404 helper + reusable cross-tenant test fixture | P1 | 8 | CORE.2 | Negative tests generated for every endpoint |
