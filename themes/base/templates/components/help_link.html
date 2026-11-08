@@ -1,0 +1,5 @@
+{% load i18n %}{% comment %}
+Help link (THM.3, WCAG 3.2.6 consistent help): in the header and the footer, in the same place
+on every page. Context: `help_url` (from the `theme` context processor, `MPMV_HELP_URL`); nothing
+is rendered without one.
+{% endcomment %}{% if help_url %}<a class="help-link" href="{{ help_url }}">{% translate "Help" %}</a>{% endif %}

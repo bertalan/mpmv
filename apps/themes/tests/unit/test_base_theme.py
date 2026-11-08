@@ -100,8 +100,8 @@ def test_the_theme_js_module_is_built_next_to_the_css() -> None:
 def test_layouts_link_the_built_theme_css_and_vendored_scripts() -> None:
     layout = (BASE / "templates" / "layouts" / "base.html").read_text(encoding="utf-8")
     assert "theme.css" in layout
-    assert '"vendor/htmx.min.js"' in layout
-    assert '"vendor/alpine-csp.min.js"' in layout
+    assert "'vendor/htmx.min.js'" in layout
+    assert "'vendor/alpine-csp.min.js'" in layout
     assert "htmx-config" in layout
     assert "cdn" not in layout.lower()
 
