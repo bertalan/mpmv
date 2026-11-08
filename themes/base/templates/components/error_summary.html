@@ -1,0 +1,19 @@
+{% load i18n %}{% comment %}
+Error summary (THM.4, spec 14 §14.6): at the top of a form that failed validation, a titled box
+listing every error. A field error links to its control (the first option of a radio or
+checkbox group); an error of the whole form, or of a hidden field, is plain text (WCAG 3.3.1,
+3.3.3). Nothing renders for an unbound or valid form. The box has `tabindex="-1"` so a page can
+move the focus to it.
+
+  {% include "components/error_summary.html" with form=form only %}
+
+Context: `form`, a bound form; `summary_id` (default "error-summary") when a page shows more
+than one form; `title` to replace "There is a problem".
+{% endcomment %}{% if form.errors %}{% firstof summary_id "error-summary" as box_id %}<div class="error-summary" id="{{ box_id }}" tabindex="-1" aria-labelledby="{{ box_id }}-title">
+  <h2 id="{{ box_id }}-title">{% firstof title _("There is a problem") %}</h2>
+  <ul>
+    {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+    {% for field in form.hidden_fields %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}
+    {% for field in form.visible_fields %}{% for error in field.errors %}<li><a href="#{% if field.use_fieldset %}{{ field.auto_id }}_0{% else %}{{ field.id_for_label }}{% endif %}">{{ field.label }}: {{ error }}</a></li>{% endfor %}{% endfor %}
+  </ul>
+</div>{% endif %}

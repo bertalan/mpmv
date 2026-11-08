@@ -35,6 +35,8 @@ urlpatterns = [
     path("i18n/switch/", switch_language, name="switch_language"),
     path("api/v1/", include("apps.api.urls")),
     path("account/mfa/", include("apps.accounts.urls")),
+    # Staff-only styleguide of the active theme (THM.4); a string, as no app imports themes.
+    path("_styleguide/", include("apps.themes.urls")),
     *i18n_patterns(
         path("", include("apps.cms.urls")),
         prefix_default_language=False,

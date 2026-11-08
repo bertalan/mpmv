@@ -178,6 +178,7 @@ ENDPOINTS: dict[str, Access] = {
     "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
     "home": NoVendorData("Public home page."),
     "switch_language": NoVendorData("Stores the visitor's language choice."),
+    "themes:styleguide": StaffOnly("Component samples of the active theme (THM.4), staff only."),
     "mfa:overview": NoVendorData(OWN_ACCOUNT),
     "mfa:setup": NoVendorData(OWN_ACCOUNT),
     "mfa:totp": NoVendorData(OWN_ACCOUNT),

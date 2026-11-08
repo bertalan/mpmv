@@ -1,4 +1,6 @@
-"""Error page handlers that never need the database (THM.3, spec 14 §14.6, §14.9).
+"""Error page handlers that never need the database (THM.3), and the styleguide page (THM.4).
+
+Spec 14 §14.6, §14.9.
 
 Django renders 403, 404 and the CSRF failure page with the request context, so the theme's
 `403.html`, `404.html` and `403_csrf.html` get the full header and footer. The 400 and 500
@@ -12,10 +14,14 @@ import logging
 from typing import Any
 
 from django.conf import settings
+from django.contrib.admin.views.decorators import staff_member_required
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, HttpResponseServerError
+from django.shortcuts import render
 from django.template import loader
+from django.views.decorators.cache import never_cache
 
 from .services import resolved_theme, use_theme
+from .styleguide import sample_forms
 
 logger = logging.getLogger(__name__)
 
@@ -50,3 +56,17 @@ def bad_request(request: HttpRequest, exception: Exception) -> HttpResponse:
         logger.exception("the 400 page could not be rendered")
         return HttpResponseBadRequest("<h1>Bad Request (400)</h1>")
     return HttpResponseBadRequest(body)
+
+
+@never_cache
+@staff_member_required
+def styleguide(request: HttpRequest) -> HttpResponse:
+    """`/_styleguide/` (THM.4, spec 14 §14.9): every component in every state, staff only.
+
+    Staff only (the MFA middleware has already asked staff for their second factor), never
+    indexed (meta tag and `X-Robots-Tag`) nor cached. It is not a CMS page, so no sitemap lists
+    it. Accessibility and visual tests run against it.
+    """
+    response = render(request, "styleguide.html", {"forms": sample_forms()})
+    response["X-Robots-Tag"] = "noindex, nofollow"
+    return response
