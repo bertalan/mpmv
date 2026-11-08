@@ -83,6 +83,7 @@ class FiscalRegime(models.TextChoices):
     RF17 = _regime("RF17")
     RF18 = _regime("RF18")
     RF19 = _regime("RF19")
+    RF20 = _regime("RF20")
 
 
 class SoleShareholder(models.TextChoices):
