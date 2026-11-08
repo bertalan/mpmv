@@ -195,6 +195,9 @@ ENDPOINTS: dict[str, Access] = {
         OWN_ACCOUNT + " The factor is looked up among the user's own.",
         kwargs={"kind": "totp", "public_id": "0"},
     ),
+    "geocoding_find": NoVendorData(
+        "Find coordinates (EVT.12): geocodes the typed address; reads no vendor data."
+    ),
     "admin:login": NoVendorData("Staff sign-in page."),
     "admin:logout": NoVendorData("Staff sign-out."),
     "admin:jsi18n": NoVendorData("Admin JavaScript translation catalog."),
