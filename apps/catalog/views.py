@@ -9,6 +9,7 @@ shows the fallback, with the source-language page as canonical and `hreflang` li
 published languages (spec 09).
 """
 
+from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
@@ -20,6 +21,7 @@ from django.views.decorators.http import require_safe
 from wagtail.views import serve
 
 from apps.core import translations
+from apps.core.money import CURRENCY
 
 from . import listings, services, slugs
 
@@ -141,8 +143,27 @@ def _listing(
         source_params = in_language(source) or listings.ListingParams(page=params.page)
         canonical_url = absolute(source, source_params)
 
+    groups = services.listing_filter_groups(anchor.scope, params, language)
+    vendors = services.listing_vendor_options(anchor.scope, params)
+    labels = {
+        (group.key, option.value): option.label for group in groups for option in group.options
+    }
+    labels.update({(listings.VENDOR, option.value): option.label for option in vendors})
+
     context: dict[str, Any] = {
         "anchor": anchor,
+        "location": location,
+        "cards": services.product_cards(page.products, language),
+        "currency": CURRENCY,
+        "filter_groups": groups,
+        "vendor_options": vendors,
+        "price_min": _amount(params.price_min),
+        "price_max": _amount(params.price_max),
+        "chips": listings.filter_chips(params, location, labels),
+        "clear_url": location,
+        "page_links": listings.page_links(params, location, window)
+        if window.page_count > 1
+        else [],
         "scope": anchor.scope,
         "name": anchor.name,
         "products": page.products,
@@ -165,6 +186,10 @@ def _listing(
     }
     response: HttpResponse = render(request, TEMPLATE, context)
     return response
+
+
+def _amount(amount: Decimal | None) -> str:
+    return listings.format_amount(amount) if amount is not None else ""
 
 
 _safe_listing = require_safe(_listing)

@@ -300,3 +300,101 @@ def page_window(*, total: int, page: int, per_page: int) -> PageWindow:
         raise ValueError("total must be >= 0, page and per_page must be >= 1")
     page_count = max(1, -(-total // per_page))
     return PageWindow(page=page, per_page=per_page, total=total, page_count=page_count)
+
+
+# --- Navigation on a listing page (CAT.8 part 3/3): every link builds on the page's current URL
+# with the canonical query, so the templates never assemble a query themselves.
+
+
+@dataclass(frozen=True)
+class FilterChip:
+    """One applied filter value and the canonical URL of the listing without it."""
+
+    key: str
+    value: str
+    label: str
+    url: str
+
+
+def without(params: ListingParams, key: str, value: str | None = None) -> ListingParams:
+    """`params` without the filter `key` (one `value` of a taxonomy key), back on page 1."""
+    if key == PAGE:
+        raise ValueError("The page is not a filter.")
+    if key == CATEGORY:
+        return replace(params, category=None, page=1)
+    if key == VENDOR:
+        return replace(params, vendor=None, page=1)
+    if key == PRICE_MIN:
+        return replace(params, price_min=None, page=1)
+    if key == PRICE_MAX:
+        return replace(params, price_max=None, page=1)
+    terms = tuple(
+        (k, kept)
+        for k, slugs in params.terms
+        if (kept := tuple(s for s in slugs if k != key or (value is not None and s != value)))
+    )
+    return replace(params, terms=terms, page=1)
+
+
+def filter_chips(
+    params: ListingParams, base_path: str, labels: Mapping[tuple[str, str], str]
+) -> list[FilterChip]:
+    """The applied filters in canonical order; `labels` names a (key, value), else the value
+    is shown. A taxonomy key gives one chip per selected term."""
+    chips: list[FilterChip] = []
+
+    def add(key: str, value: str, remaining: ListingParams) -> None:
+        url = listing_url(base_path, remaining)
+        chips.append(FilterChip(key, value, labels.get((key, value), value), url))
+
+    if params.category:
+        add(CATEGORY, params.category, without(params, CATEGORY))
+    for key, slugs in params.terms:
+        for slug in slugs:
+            add(key, slug, without(params, key, slug))
+    if params.vendor:
+        add(VENDOR, params.vendor, without(params, VENDOR))
+    if params.price_min is not None:
+        add(PRICE_MIN, format_amount(params.price_min), without(params, PRICE_MIN))
+    if params.price_max is not None:
+        add(PRICE_MAX, format_amount(params.price_max), without(params, PRICE_MAX))
+    return chips
+
+
+def page_numbers(window: PageWindow, *, around: int = 2) -> list[int | None]:
+    """The page numbers a pagination shows: the first, the last and `around` pages on each
+    side of the current one; None marks a gap of two pages or more (a single missing page is
+    shown instead, a gap would take as much room)."""
+    last = window.page_count
+    shown = {1, last, *range(max(1, window.page - around), min(last, window.page + around) + 1)}
+    numbers: list[int | None] = []
+    previous = 0
+    for number in sorted(shown):
+        if number - previous == 2:
+            numbers.append(previous + 1)
+        elif number - previous > 2:
+            numbers.append(None)
+        numbers.append(number)
+        previous = number
+    return numbers
+
+
+@dataclass(frozen=True)
+class PageLink:
+    number: int | None  # None: a gap
+    url: str | None
+    current: bool = False
+
+
+def page_links(params: ListingParams, base_path: str, window: PageWindow) -> list[PageLink]:
+    """The pagination links of the listing at `base_path` with the filters of `params`."""
+    return [
+        PageLink(None, None)
+        if number is None
+        else PageLink(
+            number,
+            listing_url(base_path, params.with_page(number)),
+            current=number == window.page,
+        )
+        for number in page_numbers(window)
+    ]

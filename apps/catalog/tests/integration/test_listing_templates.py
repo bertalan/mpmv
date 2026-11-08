@@ -163,8 +163,8 @@ def test_applied_filter_chips_link_to_the_canonical_url_without_them(
     chips = page.find(attrs={"aria-label": "Applied filters"})
     links = {a.get_text(" ", strip=True): a["href"] for a in chips.find_all("a")}
     assert links == {
-        "Remove filter: Red": "/compatibility/maker/?vendor=acme",
-        "Remove filter: Acme": "/compatibility/maker/?colour=red",
+        "Red (remove filter)": "/compatibility/maker/?vendor=acme",
+        "Acme (remove filter)": "/compatibility/maker/?colour=red",
         "Clear all filters": "/compatibility/maker/",
     }
 
@@ -174,7 +174,7 @@ def test_product_cards_show_title_link_and_public_price(
 ) -> None:
     page = soup(client, "/compatibility/maker/")
     cards = page.find_all("article", class_="product-card")
-    by_title = {card.find("h2").get_text(strip=True): card for card in cards}
+    by_title = {card.find("h3").get_text(strip=True): card for card in cards}
     assert set(by_title) == {"Steel bag", "Custom bag"}
     priced = by_title["Steel bag"]
     assert priced.find("a")["href"] == "/product/steel-bag-en/"
@@ -182,6 +182,8 @@ def test_product_cards_show_title_link_and_public_price(
     assert it_page.find("a", string=re.compile("Steel bag IT"))["href"] == (
         "/it/prodotto/steel-bag-it/"
     )
+    # The machine-readable price is never localised (the IT page shows "12,50").
+    assert it_page.find("data")["value"] == "12.50"
     assert "12.50" in priced.get_text()
     assert "Price on request" in by_title["Custom bag"].get_text()
 

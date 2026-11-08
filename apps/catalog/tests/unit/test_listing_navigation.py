@@ -2,7 +2,7 @@
 
 Every link a listing page shows builds on the page's current URL with the canonical query: a
 chip's remove link drops one value and goes back to the first page; the pagination shows the
-first and last page, a window around the current one, and a gap (None) between them.
+first and last page, a window around the current one, and a gap (None) for two pages or more.
 """
 
 from decimal import Decimal
@@ -81,7 +81,8 @@ def window(page: int, page_count: int) -> listings.PageWindow:
         (1, 1, [1]),
         (1, 5, [1, 2, 3, 4, 5]),
         (1, 10, [1, 2, 3, None, 10]),
-        (5, 10, [1, None, 3, 4, 5, 6, 7, None, 10]),
+        (5, 10, [1, 2, 3, 4, 5, 6, 7, None, 10]),  # a one-page gap shows the page
+        (6, 12, [1, None, 4, 5, 6, 7, 8, None, 12]),
         (10, 10, [1, None, 8, 9, 10]),
         (4, 10, [1, 2, 3, 4, 5, 6, None, 10]),
     ],

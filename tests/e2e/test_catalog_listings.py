@@ -110,14 +110,15 @@ def test_filtering_and_paginating_stay_on_the_term_url(
 ) -> None:
     page.add_init_script(RECORD_CSP_VIOLATIONS)
     page.goto(f"{live_server.url}/it/compatibilita/marca/")
+    # Interface strings may carry another app's Italian catalogue: locate by structure here.
     page.get_by_label("Rosso").check()
-    page.get_by_role("button", name="Apply filters").click()
+    page.locator('form[role="search"] button[type="submit"]').click()
     expect(page).to_have_url(f"{live_server.url}/it/compatibilita/marca/?colore=rosso")
-    expect(page.get_by_role("region", name="Applied filters")).to_contain_text("Rosso")
+    expect(page.locator(".filter-chips")).to_contain_text("Rosso")
     shot("filtered")
 
-    pagination = page.get_by_role("navigation", name="Pagination")
-    pagination.get_by_role("link", name="Next").click()
+    pagination = page.locator("nav.pagination")
+    pagination.locator('a[rel="next"]').click()
     expect(page).to_have_url(f"{live_server.url}/it/compatibilita/marca/?colore=rosso&page=2")
     expect(pagination.locator('[aria-current="page"]')).to_have_text("2")
     shot("page-2")
@@ -137,7 +138,7 @@ def test_the_filter_form_works_without_javascript(
     page.get_by_label("Minimum price").fill("15")
     page.get_by_role("button", name="Apply filters").click()
     expect(page).to_have_url(f"{live_server.url}/compatibility/maker/?colour=red&price_min=15")
-    expect(page.locator("article.product-card h2")).to_have_text(["Bag 3"])
+    expect(page.locator("article.product-card h3")).to_have_text(["Bag 3"])
 
 
 def _tab_to(page: Page, selector: str, *, limit: int = 60) -> None:
