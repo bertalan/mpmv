@@ -1,7 +1,8 @@
 """Our interface to the EU VIES VAT number check (VEN.12, ADR-0003).
 
-Vendor code depends on this protocol only. A real client and the periodic re-check are a
-follow-up; tests use a fake (`apps.vendors.tests.fakes`). VIES is never called from tests.
+Vendor code depends on this protocol only. The real implementation is
+`apps.tax.vies.ViesVatNumberValidator` (TAX.5), which the tax app hands in, since vendors never
+import tax; tests use a fake (`apps.vendors.tests.fakes`). VIES is never called from tests.
 """
 
 from typing import Protocol
