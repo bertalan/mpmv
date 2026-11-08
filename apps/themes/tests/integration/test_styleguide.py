@@ -109,3 +109,34 @@ def test_every_error_summary_link_points_to_a_control_on_the_page(staff_client: 
         assert re.search(rf'<(?:input|select|textarea)[^>]*\sid="{re.escape(target)}"', html), (
             target
         )
+
+
+# --- Part 2/3: cards, product tiles, badges and alerts
+
+
+def test_every_card_and_product_tile_state_is_shown(staff_client: Client) -> None:
+    html = staff_client.get(URL).content.decode()
+    assert 'class="card"' in html
+    assert "card--linked" in html
+    assert html.count('class="product-tile') >= 4
+    assert "product-tile--unavailable" in html
+    assert "product-tile__placeholder" in html
+    assert "Price on request" in html
+    assert "<del>" in html
+    # The sample image is a same-origin static file (CSP img-src 'self').
+    assert re.search(r'<img[^>]*src="/static/[^"]+"', html)
+
+
+def test_every_badge_is_shown(staff_client: Client) -> None:
+    html = staff_client.get(URL).content.decode()
+    for kind in ("sale", "new", "out-of-stock", "on-request"):
+        assert f"badge--{kind}" in html
+
+
+def test_every_alert_level_and_variant_is_shown(staff_client: Client) -> None:
+    html = staff_client.get(URL).content.decode()
+    for level in ("info", "success", "warning", "danger"):
+        assert f"alert--{level}" in html
+    assert "alert--dismissible" in html
+    assert 'role="status"' in html
+    assert re.search(r'class="alert[^"]*"[^>]*role="alert"', html)
