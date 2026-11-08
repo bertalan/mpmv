@@ -12,7 +12,7 @@ from wagtail_localize.fields import SynchronizedField, TranslatableField, get_tr
 
 from apps.cms.blocks import FigureBlock, GalleryBlock, GalleryImageBlock, language_choices
 from apps.cms.engine import NEUTRAL
-from apps.cms.models import StandardPage
+from apps.cms.models import LegalPage, StandardPage
 from apps.core.models import MediaImage
 
 
@@ -66,3 +66,17 @@ def test_page_bodies_offer_the_figure_and_gallery_blocks() -> None:
     body = StandardPage._meta.get_field("body").stream_block.child_blocks
     assert isinstance(body["figure"], FigureBlock)
     assert isinstance(body["gallery"], GalleryBlock)
+
+
+def test_a_legal_translation_keeps_its_own_effective_date() -> None:
+    """I18N.9 (Q-42): each language has its own version and effective date, so a sync from the
+    source page neither copies the date nor offers it as a segment to translate."""
+    date = _fields(LegalPage)["effective_date"]
+    page = LegalPage()
+    assert not date.is_synchronized(page)
+    assert not date.is_translated(page)
+    assert not date.is_overridable(page)
+
+
+def test_the_legal_page_kind_follows_the_source_page() -> None:
+    assert isinstance(_fields(LegalPage)["kind"], SynchronizedField)
