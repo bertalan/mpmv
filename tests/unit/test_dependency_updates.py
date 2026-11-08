@@ -298,3 +298,28 @@ def test_review_guide_is_documented() -> None:
     text = GUIDE.read_text()
     for topic in ("Dependabot", "major", "security", "SBOM", "pip-audit"):
         assert topic in text, topic
+
+
+@pytest.mark.parametrize(("path", "job"), [(CI, "image"), (RELEASE, "image")])
+def test_image_sbom_falls_back_to_the_syft_container_and_never_goes_missing(
+    path: Path, job: str
+) -> None:
+    """GitHub release downloads can fail (HTTP 504): the action may fail, the SBOM may not."""
+    job_steps = steps(load(path), job)
+    names = [step.get("name") for step in job_steps]
+    action = job_steps[names.index("Image SBOM (CycloneDX)")]
+    fallback = job_steps[names.index("Image SBOM fallback (syft container)")]
+    present = job_steps[names.index("Image SBOM present")]
+    assert action["id"] == "sbom"
+    assert action["continue-on-error"] is True
+    assert fallback["if"] == "steps.sbom.outcome == 'failure'"
+    assert re.search(r"anchore/syft:v\d+\.\d+\.\d+ ", fallback["run"])
+    assert "cyclonedx-json=/out/mpmv-image.cdx.json" in fallback["run"]
+    assert "if" not in present
+    assert "continue-on-error" not in present
+    assert present["run"] == "test -s build/sbom/mpmv-image.cdx.json"
+    assert (
+        names.index("Image SBOM (CycloneDX)")
+        < names.index("Image SBOM fallback (syft container)")
+        < names.index("Image SBOM present")
+    )
