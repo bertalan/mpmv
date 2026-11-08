@@ -3,3 +3,7 @@
 # later (spec 12 §12.4); until then it is part of the host backup.
 [Volume]
 VolumeName=mpmv-media
+# Owned by the image's non-root user (Containerfile, uid/gid 10001) from creation: `:U` on the
+# mounts alone left a fresh volume owned by root on STAGE.
+User=10001
+Group=10001

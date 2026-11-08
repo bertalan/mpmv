@@ -216,6 +216,8 @@ def test_media_volume_is_named_and_prefixed() -> None:
     """ARC.13: uploads and renditions survive container replacement, until object storage."""
     unit = load("mpmv-media.volume")
     assert values(unit, "Volume", "VolumeName") == ["mpmv-media"]
+    assert values(unit, "Volume", "User") == ["10001"], "the image user (Containerfile)"
+    assert values(unit, "Volume", "Group") == ["10001"]
 
 
 @pytest.mark.parametrize("name", MEDIA_UNITS)
