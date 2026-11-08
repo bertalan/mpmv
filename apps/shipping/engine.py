@@ -314,6 +314,8 @@ class AreaTreatment:
 
 
 DEFAULT_AREA_TREATMENT: Final = AreaTreatment()
+# The method's own zone is narrowed to the area, so its rate already includes it: a surcharge of 0.
+PRICED_BY_ZONE_TREATMENT: Final = AreaTreatment(mode=SURCHARGE, surcharge_type=FIXED)
 
 
 def surcharged_cost(base_net: Decimal, weight_kg: Decimal, treatment: AreaTreatment) -> Decimal:
@@ -428,14 +430,23 @@ def special_area_treatment(
     areas: Iterable[SpecialAreaSnap],
     treatments: Mapping[str, AreaTreatment],
     dest: Destination,
+    zone_specificity: Specificity | None = None,
 ) -> SpecialAreaDecision | None:
     """Which special area `dest` is in and the treatment a method gives it (`treatments` by area
     code), or None when `dest` is in no special area. Without a treatment of its own, the method
-    gives the default: an indicative cost subject to quote."""
+    gives the default: an indicative cost subject to quote.
+
+    `zone_specificity` is how the method's zone matches `dest`. A zone narrowed by postcode or
+    province already prices the area (spec 06 cases 2 and 4: a vendor's own islands zone with
+    weight bands), so without a treatment of its own the method keeps its normal rate: no
+    surcharge, not indicative, no quote.
+    """
     area = resolve_special_area(areas, dest)
     if area is None:
         return None
     treatment = treatments.get(area.code)
     if treatment is None:
+        if zone_specificity in (Specificity.POSTCODE, Specificity.PROVINCE):
+            return SpecialAreaDecision(area, PRICED_BY_ZONE_TREATMENT, is_default=False)
         return SpecialAreaDecision(area, DEFAULT_AREA_TREATMENT, is_default=True)
     return SpecialAreaDecision(area, treatment, is_default=False)

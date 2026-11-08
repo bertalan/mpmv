@@ -27,6 +27,7 @@ from apps.shipping.services import (
 )
 from apps.shipping.tests.factories import (
     ShippingMethodFactory,
+    ShippingZoneFactory,
     SpecialAreaFactory,
     SpecialAreaTreatmentFactory,
     WeightBandFactory,

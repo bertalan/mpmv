@@ -182,6 +182,10 @@ dest)` tells SHP.3 which area an address is in (postcode before province, then e
 island before remote) and which treatment the method gives it; `services.special_area_decision`
 builds it from the stored rows. A surcharge is added to the method's net cost and rounded half up
 to cents once; extra days lengthen the indicative delivery time.
+A method whose zone is narrowed to the area by postcode or province (a vendor's own islands zone
+priced by weight bands, legacy cases 2 and 4) already prices it: without a treatment of its own it
+keeps its normal rate (surcharge 0, not indicative, no quote). Only a method on a country-wide zone
+gets the default; a treatment row always wins.
 
 ### Configuration file format (SHP.13)
 

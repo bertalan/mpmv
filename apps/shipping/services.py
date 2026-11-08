@@ -19,7 +19,14 @@ from apps.core.changeset import ChangeSet
 from apps.core.services import run_mutation, save_audited
 from apps.vendors.models import Vendor
 
-from .engine import AreaTreatment, Destination, SpecialAreaDecision, SpecialAreaSnap, ZoneSnap
+from .engine import (
+    AreaTreatment,
+    Destination,
+    SpecialAreaDecision,
+    SpecialAreaSnap,
+    ZoneSnap,
+    zone_match,
+)
 from .engine import special_area_treatment as resolve_area_treatment
 from .models import (
     Carrier,
@@ -189,7 +196,11 @@ def zone_snaps(vendor: Vendor) -> list[ZoneSnap]:
     served = zones_available_to(vendor).filter(
         methods__vendor=vendor, methods__carrier__is_active=True
     )  # one filter call: the same method has both
-    zones = list(served.distinct())
+    return _snapshots(list(served.distinct()))
+
+
+def _snapshots(zones: list[ShippingZone]) -> list[ZoneSnap]:
+    """Snapshots of `zones`, country groups expanded."""
     codes = {code for zone in zones for code in zone.country_groups}
     members = {
         group.code: frozenset(group.countries)
@@ -229,5 +240,11 @@ def area_treatments(method: ShippingMethod) -> dict[str, AreaTreatment]:
 def special_area_decision(method: ShippingMethod, dest: Destination) -> SpecialAreaDecision | None:
     """The special area `dest` is in and the treatment `method` gives it, or None when `dest` is
     in no special area. SHP.3 turns the decision into its outcome: IndicativeRates for an
-    estimate, a surcharged rate, NeedsQuote, or Blocked."""
-    return resolve_area_treatment(special_area_snaps(), area_treatments(method), dest)
+    estimate, a surcharged rate, NeedsQuote, or Blocked.
+
+    A method whose zone is narrowed by postcode or province to the area keeps its normal rate
+    unless it sets a treatment of its own."""
+    (zone,) = _snapshots([method.zone])
+    return resolve_area_treatment(
+        special_area_snaps(), area_treatments(method), dest, zone_match(zone, dest)
+    )
