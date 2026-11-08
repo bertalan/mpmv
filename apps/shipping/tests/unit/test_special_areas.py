@@ -255,3 +255,46 @@ def test_territory_codes_are_normalized(raw: str, code: str) -> None:
 def test_malformed_territory_codes_are_refused(raw: str) -> None:
     with pytest.raises(engine.InvalidTerritoryCode):
         engine.normalize_territory_code(raw)
+
+
+# --- A zone narrowed to the area already prices it (spec 06 cases 2 and 4)
+
+
+def test_a_method_of_a_zone_narrowed_to_the_area_keeps_its_normal_rate() -> None:
+    decision = engine.special_area_treatment(
+        AREAS, {}, Destination("IT", "07100"), zone_specificity=engine.Specificity.POSTCODE
+    )
+
+    assert decision is not None
+    assert not decision.is_default
+    assert not decision.is_indicative
+    assert not decision.requests_quote
+    assert decision.cost(Decimal("9.90"), Decimal("2.000")) == Decimal("9.90")
+
+
+def test_a_province_narrowed_zone_keeps_its_rate_and_a_wide_zone_gets_the_default() -> None:
+    dest = Destination("IT", "", "SS")
+    narrowed = engine.special_area_treatment(
+        AREAS, {}, dest, zone_specificity=engine.Specificity.PROVINCE
+    )
+    wide = engine.special_area_treatment(
+        AREAS, {}, dest, zone_specificity=engine.Specificity.COUNTRY
+    )
+
+    assert narrowed is not None
+    assert wide is not None
+    assert not narrowed.requests_quote
+    assert wide.is_default
+    assert wide.requests_quote
+
+
+def test_a_treatment_of_its_own_wins_over_the_narrowed_zone() -> None:
+    decision = engine.special_area_treatment(
+        AREAS,
+        {"it-sardinia": FIXED_15},
+        Destination("IT", "07100"),
+        zone_specificity=engine.Specificity.POSTCODE,
+    )
+
+    assert decision is not None
+    assert decision.cost(Decimal("9.90"), Decimal("2.000")) == Decimal("24.90")

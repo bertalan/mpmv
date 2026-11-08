@@ -336,3 +336,29 @@ def test_an_area_a_method_treats_cannot_be_deleted() -> None:
     with pytest.raises(ProtectedError):
         delete_config([treatment.area], ctx=CTX)
     assert SpecialArea.objects.filter(pk=treatment.area.pk).exists()
+
+
+def test_gr_70100_on_a_postcode_narrowed_island_zone_gets_a_priced_rate() -> None:
+    # regression case 2: a vendor's own "remote islands" zone, priced by weight bands
+    zone = ShippingZoneFactory.create(countries=["GR"], postcode_patterns=["70*"])
+    method = ShippingMethodFactory.create(zone=zone, default=True)
+    WeightBandFactory.create(method=method, from_kg=Decimal(0), to_kg=Decimal(5))
+
+    decision = special_area_decision(method, Destination("GR", "70100"))
+
+    assert decision is not None
+    assert decision.area.code == "gr-crete"
+    assert not decision.requests_quote
+    assert not decision.is_indicative
+    assert decision.cost(Decimal("9.90"), Decimal("2.000")) == Decimal("9.90")
+
+
+def test_the_same_address_on_a_country_wide_zone_gets_the_default() -> None:
+    zone = ShippingZoneFactory.create(countries=["GR"])
+    method = ShippingMethodFactory.create(zone=zone, default=True)
+
+    decision = special_area_decision(method, Destination("GR", "70100"))
+
+    assert decision is not None
+    assert decision.is_default
+    assert decision.requests_quote
