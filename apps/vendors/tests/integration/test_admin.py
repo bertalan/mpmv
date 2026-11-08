@@ -277,7 +277,8 @@ def test_a_vendor_field_change_is_visible_in_the_audit_view_with_before_and_afte
 
     listing = staff_client.get(
         reverse("admin:core_auditlog_changelist"),
-        {"vendor": str(vendor.public_id), "action": "vendor.updated"},
+        # The VAT number is part of the DAC7 dataset: a staff change is a DAC7 correction.
+        {"vendor": str(vendor.public_id), "action": "vendor.dac7_corrected"},
     )
     (entry,) = listing.context["cl"].result_list
     detail = staff_client.get(reverse("admin:core_auditlog_change", args=[entry.pk]))

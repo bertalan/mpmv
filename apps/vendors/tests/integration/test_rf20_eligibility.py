@@ -140,7 +140,8 @@ def change_form(vendor: Vendor, **overrides: Any) -> dict[str, Any]:
     """The POST data of the vendor change form, as the browser would send it unchanged."""
     names = ("display_name", "slug", "legal_name", "country", "contact_email", "phone")
     data: dict[str, Any] = {
-        name: getattr(vendor, name) for name in (*names, "sales_mode_default", *engine.LEGAL_FIELDS)
+        name: "" if getattr(vendor, name) is None else getattr(vendor, name)
+        for name in (*names, "sales_mode_default", *engine.LEGAL_FIELDS)
     }
     data["share_capital"] = "" if vendor.share_capital is None else str(vendor.share_capital)
     data["legacy_wp_user_id"] = ""
