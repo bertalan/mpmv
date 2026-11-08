@@ -7,21 +7,22 @@ also applies the D-18 replacement rule (`engine.gallery_for_language`).
 
 CMS.2 adds the hero, the call to action and the FAQ. Their templates are minimal, semantic and
 CSP-safe (no inline script or style); the `base` theme restyles them (THM.3, THM.4). A link
-points to a page of the site, followed into the reader's language, or to an external URL.
+points to a live page of the site, followed into the reader's language, or to an external
+URL. The FAQs of a page give one FAQPage (`cms_tags.faq_jsonld`).
 """
 
 from typing import Any
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.utils.safestring import mark_safe
 from django.utils.translation import get_language
 from django.utils.translation import gettext_lazy as _
 from wagtail import blocks
 from wagtail.blocks import StructBlockValidationError
 from wagtail.images.blocks import ImageChooserBlock
+from wagtail.models import Page
 
-from .engine import NEUTRAL, faq_page_jsonld, gallery_for_language, jsonld_text
+from .engine import NEUTRAL, gallery_for_language
 
 # Editors may use headings, emphasis, lists and links; no raw HTML, images or embeds yet.
 RICH_TEXT_FEATURES = ["h2", "h3", "bold", "italic", "ol", "ul", "link"]
@@ -75,12 +76,21 @@ class GalleryBlock(blocks.StructBlock):  # type: ignore[misc]
         return context
 
 
+def live_page(page: Page | None) -> Page | None:
+    """`page` in the active language when that translation is live, else `page` itself when it
+    is live, else None: a link to a draft, unpublished or expired page is dropped."""
+    if page is None:
+        return None
+    target: Page = page.specific.localized
+    return target if target.live else None
+
+
 class LinkValue(blocks.StructValue):  # type: ignore[misc]
     def href(self) -> str:
-        """The page in the active language when it has a translation, otherwise the URL."""
-        page = self.get("page")
-        if page is not None:
-            url: str | None = page.specific.localized.url
+        """The live page in the active language (or its source), or the URL; "" for no link."""
+        if self.get("page") is not None:
+            page = live_page(self.get("page"))
+            url: str | None = page.url if page is not None else None
             return url or ""
         return str(self.get("url") or "")
 
@@ -156,7 +166,8 @@ class FaqItemBlock(blocks.StructBlock):  # type: ignore[misc]
 
 
 class FaqBlock(blocks.StructBlock):  # type: ignore[misc]
-    """Questions shown as disclosures (`<details>`), with FAQPage structured data (spec 10)."""
+    """Questions shown as disclosures (`<details>`). The page template emits one FAQPage for all
+    the FAQ blocks of the page (`cms_tags.faq_jsonld`, spec 10)."""
 
     heading = blocks.CharBlock(required=False, max_length=120)
     items = blocks.ListBlock(FaqItemBlock(), min_num=1, label=_("Questions"))
@@ -165,10 +176,3 @@ class FaqBlock(blocks.StructBlock):  # type: ignore[misc]
         icon = "help"
         label = _("FAQ")
         template = "cms/blocks/faq.html"
-
-    def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
-        context = super().get_context(value, parent_context=parent_context)
-        questions = [(item["question"], str(item["answer"])) for item in value["items"]]
-        # JSON with <, > and & escaped: it cannot leave its script element (`jsonld_text`).
-        context["jsonld"] = mark_safe(jsonld_text(faq_page_jsonld(questions)))  # noqa: S308
-        return context
