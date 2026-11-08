@@ -3,8 +3,9 @@
 @layer base {
   html {
     color-scheme: light;
-    /* The sticky header never covers the focused element (WCAG 2.4.11). */
-    scroll-padding-top: var(--header-height);
+    /* The sticky header never covers the focused element (WCAG 2.4.11): --header-offset is its
+       measured height (base.js), the token the fallback without JavaScript. */
+    scroll-padding-top: var(--header-offset, var(--header-height));
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }

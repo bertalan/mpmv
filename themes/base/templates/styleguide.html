@@ -1,0 +1,112 @@
+{% extends "layouts/base.html" %}{% load i18n %}
+{% comment %}
+Styleguide (THM.4, spec 14 §14.9): every component of the active theme in every state, for
+staff and for the accessibility and visual tests. Never indexed nor cached (the view also sends
+`X-Robots-Tag`). Part 1/3: buttons and form controls; later parts add their own sections.
+
+Context: `forms` (apps.themes.styleguide.sample_forms): the sample forms by state, each with
+its own prefix so ids never repeat on the page.
+{% endcomment %}
+{% block title %}{% translate "Styleguide" %} · {{ site_name }}{% endblock %}
+{% block description %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block content %}
+<div class="styleguide">
+  <h1>{% translate "Styleguide" %}</h1>
+  <p>{% blocktranslate with theme=theme.name %}Every component of the {{ theme }} theme, in every state. Staff only; never indexed.{% endblocktranslate %}</p>
+
+  <section aria-labelledby="sg-buttons">
+    <h2 id="sg-buttons">{% translate "Buttons" %}</h2>
+
+    <h3>{% translate "Variants" %}</h3>
+    <div class="styleguide__examples">
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Add to cart") type="submit" only %}<span class="styleguide__state">primary</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Save for later") variant="secondary" only %}<span class="styleguide__state">secondary</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Compare") variant="ghost" only %}<span class="styleguide__state">ghost</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Show details") variant="link" only %}<span class="styleguide__state">link</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Delete address") variant="danger" only %}<span class="styleguide__state">danger</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Go to checkout") url="#sg-buttons" only %}<span class="styleguide__state">{% translate "link styled as a button" %}</span></div>
+    </div>
+
+    <h3>{% translate "Sizes" %}</h3>
+    <div class="styleguide__examples">
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Apply") size="small" only %}<span class="styleguide__state">small</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Apply") only %}<span class="styleguide__state">{% translate "default" %}</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Apply") size="large" only %}<span class="styleguide__state">large</span></div>
+    </div>
+
+    <h3>{% translate "States" %}</h3>
+    <div class="styleguide__examples">
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Pay now") disabled=True only %}<span class="styleguide__state">{% translate "disabled" %}</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Keep shopping") variant="secondary" disabled=True only %}<span class="styleguide__state">{% translate "secondary, disabled" %}</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Remove") variant="danger" disabled=True only %}<span class="styleguide__state">{% translate "danger, disabled" %}</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Track parcel") url="#sg-buttons" disabled=True only %}<span class="styleguide__state">{% translate "link, disabled" %}</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Pay now") loading=True loading_label=_("Paying, please wait") only %}<span class="styleguide__state">{% translate "loading" %}</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Refresh") variant="ghost" loading=True only %}<span class="styleguide__state">{% translate "ghost, loading" %}</span></div>
+    </div>
+
+    <h3>{% translate "Icons" %}</h3>
+    <div class="styleguide__examples">
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Search") icon="search" only %}<span class="styleguide__state">{% translate "icon and text" %}</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Close") icon="close" icon_only=True variant="ghost" only %}<span class="styleguide__state">{% translate "icon only" %}</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Open the menu") icon="menu" icon_only=True variant="secondary" only %}<span class="styleguide__state">{% translate "icon only, secondary" %}</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Decrease quantity") icon="minus" icon_only=True size="small" variant="ghost" only %}<span class="styleguide__state">{% translate "icon only, small" %}</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Increase quantity") icon="plus" icon_only=True size="small" variant="ghost" only %}<span class="styleguide__state">{% translate "icon only, small" %}</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Confirm") icon="check" variant="secondary" only %}<span class="styleguide__state">{% translate "icon and text, secondary" %}</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Clear filters") icon="close" icon_only=True disabled=True only %}<span class="styleguide__state">{% translate "icon only, disabled" %}</span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="sg-text">
+    <h2 id="sg-text">{% translate "Text fields" %}</h2>
+    <p>{% translate "Text, email, select, textarea and file inputs: required marker, help text, then the disabled state." %}</p>
+    <div class="styleguide__forms">
+      <div>
+        <h3>{% translate "Default" %}</h3>
+        <form novalidate>{% for field in forms.text %}{% include "components/field.html" with field=field only %}{% endfor %}</form>
+      </div>
+      <div>
+        <h3>{% translate "Disabled" %}</h3>
+        <form novalidate>{% for field in forms.text_disabled %}{% include "components/field.html" with field=field only %}{% endfor %}</form>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="sg-choices">
+    <h2 id="sg-choices">{% translate "Choices" %}</h2>
+    <p>{% translate "A radio group and a checkbox group in a fieldset with a legend, and a single checkbox." %}</p>
+    <div class="styleguide__forms">
+      <div>
+        <h3>{% translate "Default" %}</h3>
+        <form novalidate>{% for field in forms.choices %}{% include "components/field.html" with field=field only %}{% endfor %}</form>
+      </div>
+      <div>
+        <h3>{% translate "Disabled" %}</h3>
+        <form novalidate>{% for field in forms.choices_disabled %}{% include "components/field.html" with field=field only %}{% endfor %}</form>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="sg-errors">
+    <h2 id="sg-errors">{% translate "Error summary" %}</h2>
+    <p>{% translate "Forms that failed validation: the summary at the top links to each field, and every field shows its own error." %}</p>
+    <div class="styleguide__forms">
+      <div>
+        <h3>{% translate "Text fields, invalid" %}</h3>
+        <form novalidate>
+          {% include "components/error_summary.html" with form=forms.text_invalid summary_id="text-errors" only %}
+          {% for field in forms.text_invalid %}{% include "components/field.html" with field=field only %}{% endfor %}
+          {% include "components/button.html" with label=_("Send") type="submit" only %}
+        </form>
+      </div>
+      <div>
+        <h3>{% translate "Choices, invalid" %}</h3>
+        <form novalidate>
+          {% include "components/error_summary.html" with form=forms.choices_invalid summary_id="choices-errors" only %}
+          {% for field in forms.choices_invalid %}{% include "components/field.html" with field=field only %}{% endfor %}
+          {% include "components/button.html" with label=_("Continue") type="submit" only %}
+        </form>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

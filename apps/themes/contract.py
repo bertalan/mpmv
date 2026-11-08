@@ -15,6 +15,7 @@ COLOURS = (
     "color.text-muted",
     "color.text-inverse",
     "color.surface",
+    "color.surface-raised",
     "color.surface-inverse",
     "color.accent",
     "color.on-accent",
@@ -27,6 +28,9 @@ COLOURS = (
     "color.link",
     "color.focus",
     "color.danger",
+    "color.info",
+    "color.success",
+    "color.warning",
     "color.border-control",
 )
 
@@ -54,10 +58,21 @@ PAIRS = (
     ContrastPair("color.secondary-text", "color.surface", TEXT),
     ContrastPair("color.text-inverse", "color.surface-inverse", TEXT),
     ContrastPair("color.danger", "color.surface", TEXT),
+    # The raised surface (alerts, footer) carries body text and links (THM.4).
+    ContrastPair("color.text", "color.surface-raised", TEXT),
+    ContrastPair("color.text-muted", "color.surface-raised", TEXT),
+    ContrastPair("color.link", "color.surface-raised", TEXT),
+    # Ghost buttons and the language switcher show link text on the accent tint when hovered.
+    ContrastPair("color.link", "color.accent-tint", TEXT),
     ContrastPair("color.focus", "color.surface", UI),
     ContrastPair("color.focus", "color.surface-inverse", UI),
     ContrastPair("color.border-control", "color.surface", UI),
     ContrastPair("color.accent", "color.surface", UI),
+    # The level bar of an alert: a UI component on the raised surface (THM.4).
+    ContrastPair("color.info", "color.surface-raised", UI),
+    ContrastPair("color.success", "color.surface-raised", UI),
+    ContrastPair("color.warning", "color.surface-raised", UI),
+    ContrastPair("color.danger", "color.surface-raised", UI),
 )
 
 TOKEN_CONTRACT = TokenContract(required=(*COLOURS, *OTHER), pairs=PAIRS)
