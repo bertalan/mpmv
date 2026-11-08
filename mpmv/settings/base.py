@@ -31,6 +31,7 @@ LOCAL_APPS = [
     "apps.ledger",
     "apps.ingest",
     "apps.cms",
+    "apps.themes",  # frontend themes (THM.1, spec 14): imports only core and Wagtail
     "apps.seo",
     "apps.compliance",
     "apps.api",
@@ -65,6 +66,7 @@ INSTALLED_APPS = [
     "wagtail.documents",
     "wagtail.search",
     "wagtail.admin",
+    "wagtail.contrib.settings",  # BaseSiteSetting for the per-site theme (THM.1)
     "wagtail",
     "modelcluster",
     "taggit",
@@ -82,6 +84,7 @@ MIDDLEWARE = [
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "apps.cms.middleware.WagtailAdminPickerNonceMiddleware",  # Wagtail's inline pickers (CMS.1)
     "apps.core.middleware.PermissionsPolicyMiddleware",
+    "apps.themes.middleware.ThemeMiddleware",  # the site's theme for the template loader (THM.1)
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -131,21 +134,40 @@ ROOT_URLCONF = "mpmv.urls"
 WSGI_APPLICATION = "mpmv.wsgi.application"
 ASGI_APPLICATION = "mpmv.asgi.application"
 
+# Templates (spec 14 §14.3): the active theme and its parents up to `base` first, then the
+# project and app directories. The theme loader caches per (theme, name) itself; Django's
+# cached.Loader (keyed by name only) wraps only the theme-independent loaders.
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
         "DIRS": [BASE_DIR / "templates"],
-        "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "django.template.context_processors.csp",
+                "apps.themes.context_processors.theme",
+            ],
+            "loaders": [
+                "apps.themes.loaders.ThemeLoader",
+                (
+                    "django.template.loaders.cached.Loader",
+                    [
+                        "django.template.loaders.filesystem.Loader",
+                        "django.template.loaders.app_directories.Loader",
+                    ],
+                ),
             ],
         },
     },
 ]
+
+# Frontend themes (THM.1, spec 14): one directory per theme, each with a theme.toml manifest.
+# A Wagtail Site's ThemeSettings picks its theme; MPMV_THEME_DEFAULT is the fallback (system
+# check themes.E002 fails when it names no registered theme), then `base`.
+MPMV_THEMES_DIR = BASE_DIR / "themes"
+MPMV_THEME_DEFAULT = env_str("MPMV_THEME_DEFAULT", "") or "base"
 
 # PostgreSQL is the only datastore (ADR-0001).
 DATABASES = {
@@ -176,6 +198,15 @@ LANGUAGES = [
 ]
 USE_I18N = True
 LOCALE_PATHS = [BASE_DIR / "locale"]
+
+# Transactional email (ARC.16, docs/dev/transactional-email.md). Every email goes through the
+# outbox (`apps.core.services.enqueue_email`) and the `EmailSender` named here: the console
+# backend until ARC.19 adds the EU provider's adapter (provider choice pending, Q-48). The
+# provider webhook (`/webhooks/email/`) is off while MPMV_EMAIL_WEBHOOK_SECRET is empty.
+EMAIL_SENDER = env_str("MPMV_EMAIL_SENDER", "apps.core.mail.ConsoleEmailSender")
+DEFAULT_FROM_EMAIL = env_str("MPMV_EMAIL_FROM", "no-reply@localhost")
+EMAIL_WEBHOOK_SECRET = env_str("MPMV_EMAIL_WEBHOOK_SECRET", "")
+EMAIL_FEEDBACK_PARSER = env_str("MPMV_EMAIL_FEEDBACK_PARSER", "apps.core.mail.SignedJsonFeedback")
 
 # Wagtail (CMS.1, spec 10). Page locales follow LANGUAGES: apps.cms creates a Locale row for each
 # language after every migrate. The editors' admin is at /admin/ (mpmv/urls.py).
@@ -250,6 +281,17 @@ if CAPTCHA_ENABLED:
         "frame-src": [_TURNSTILE_ORIGIN],
     }
 
+# VIES VAT number checks (TAX.5): the EU REST API behind apps.tax.vies.ViesClient, asked once per
+# check with a timeout (retries only in the tax.recheck_vat_number job). Valid and invalid answers
+# are reused for VIES_CACHE_SECONDS, "VIES down" only for VIES_UNAVAILABLE_CACHE_SECONDS.
+VIES_CLIENT = "apps.tax.vies.HttpViesClient"
+VIES_API_URL = env_str(
+    "MPMV_VIES_API_URL", "https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-number"
+)
+VIES_TIMEOUT_SECONDS = 8  # per socket operation (connect, each read), not for the whole check
+VIES_CACHE_SECONDS = 24 * 60 * 60
+VIES_UNAVAILABLE_CACHE_SECONDS = 5 * 60
+
 # Field-level encryption (SEC.3, docs/dev/field-encryption.md): keys live outside the database,
 # in the file named by MPMV_FIELD_ENCRYPTION_KEYS_FILE (one per line) or in
 # MPMV_FIELD_ENCRYPTION_KEYS (comma-separated). Each is "<id>:<base64url 32 bytes>", newest first:
@@ -264,6 +306,15 @@ FIELD_ENCRYPTION_KEYS = env_secret_list("MPMV_FIELD_ENCRYPTION_KEYS")
 # everywhere within that time (at once in the process that saved it).
 FEATURE_FLAGS = env_flags("MPMV_FEATURE_FLAGS")
 FEATURE_FLAGS_CACHE_SECONDS = 5
+
+# Per-API-key rate limit (CORE.12, apps.api.engine): fixed windows counted in PostgreSQL, so every
+# app process shares one counter per key. API_RATE_LIMIT is the key-wide limit of every key;
+# API_RATE_LIMIT_SCOPES gives a costly scope its own counter and limit for every key, e.g.
+# {"catalog:write": "120/minute"}; API_RATE_LIMIT_CLIENTS replaces the key-wide limit of one key,
+# by ApiClient public id. Rates read "<calls>/<second|minute|hour|day>" (system check api.E003).
+API_RATE_LIMIT = "600/minute"
+API_RATE_LIMIT_SCOPES: dict[str, str] = {}
+API_RATE_LIMIT_CLIENTS: dict[str, str] = {}
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"

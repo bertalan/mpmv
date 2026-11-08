@@ -8,8 +8,9 @@ import factory
 from django.utils import timezone
 from factory.django import DjangoModelFactory
 
-from apps.api.engine import generate_key, hash_key
-from apps.api.models import ApiClient, ApiMutationLog
+from apps.api.engine import KEY_WIDE_BUCKET, generate_key, hash_key
+from apps.api.models import ApiClient, ApiMutationLog, ApiRateCounter
+from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
 
@@ -18,8 +19,8 @@ class ApiClientFactory(DjangoModelFactory[ApiClient]):
 
     Only the prefix and the hash are stored. Use `create_with_key()` when the test needs the full
     key; `expired=True` and `revoked=True` give refused clients; `vendor_key=True` binds the
-    client to a new vendor (or pass `vendor=`) (CORE.13). Tests about issuance itself call the
-    service, not this factory.
+    client to a new active vendor (or pass `vendor=`) (CORE.13). Tests about issuance itself call
+    the service, not this factory.
     """
 
     class Meta:
@@ -31,7 +32,10 @@ class ApiClientFactory(DjangoModelFactory[ApiClient]):
             expires_at=factory.LazyFunction(lambda: timezone.now() - dt.timedelta(minutes=1))
         )
         revoked = factory.Trait(is_active=False, revoked_at=factory.LazyFunction(timezone.now))
-        vendor_key = factory.Trait(vendor=factory.SubFactory(VendorFactory))
+        # An active vendor: only an active vendor's keys write (CORE.14).
+        vendor_key = factory.Trait(
+            vendor=factory.SubFactory(VendorFactory, status=Vendor.Status.ACTIVE)
+        )
 
     vendor = None
     name = factory.Sequence(lambda n: f"Pipeline {n}")
@@ -66,3 +70,15 @@ class ApiMutationLogFactory(DjangoModelFactory[ApiMutationLog]):
     status_code = 201
     ip = "203.0.113.7"
     duration_ms = 12
+
+
+class ApiRateCounterFactory(DjangoModelFactory[ApiRateCounter]):
+    """The request counter of one key in its current window (CORE.12), key-wide by default."""
+
+    class Meta:
+        model = ApiRateCounter
+
+    client = factory.SubFactory(ApiClientFactory)
+    bucket = KEY_WIDE_BUCKET
+    window_start = factory.LazyFunction(lambda: timezone.now().replace(second=0, microsecond=0))
+    hits = 1

@@ -1,13 +1,17 @@
-"""CMS services (CMS.1): locales from settings, the editors' MFA policy, seed pages and menus;
-page translation with wagtail-localize (I18N.3).
+"""CMS services: locales from settings, the editors' MFA policy, seed pages and menus (CMS.1);
+page translation with wagtail-localize (I18N.3); legal page versions and the link to the vendor
+application (CMS.5).
 
 Pages and menus are edited in the Wagtail admin, which keeps their revisions and its own log of
-every edit, so nothing here is audited: `seed_site` only adds sample content where it is
+every edit, so they are not audited here: `seed_site` only adds sample content where it is
 missing (local development, STAGE and the e2e suite). Translators work in wagtail-localize's
 editor; the translation services below do the same steps for scripts and migrations (MIG.7),
-each with a dry run that rolls everything back and reports the pages it would change.
+each with a dry run that rolls everything back and reports the pages it would change. Legal
+page versions are the exception to auditing: they are the record of which text applied when,
+so each one is audited.
 """
 
+import hashlib
 import json
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
@@ -16,6 +20,8 @@ from typing import Any
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser, PermissionsMixin
 from django.db import DEFAULT_DB_ALIAS, transaction
+from django.urls import NoReverseMatch, reverse
+from django.utils import timezone
 from django.utils.text import slugify
 from wagtail.models import Locale, Page, Site
 from wagtail_localize.models import (
@@ -26,10 +32,13 @@ from wagtail_localize.models import (
 )
 from wagtail_localize.operations import TranslationCreator
 
+from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.i18n import configured_languages
+from apps.core.services import run_mutation
 
-from .models import HomePage, NavigationMenu, StandardPage
+from . import engine
+from .models import HomePage, LegalPage, LegalPageVersion, NavigationMenu, StandardPage
 from .seed import PageText, seed_text
 
 CMS_ADMIN_PERMISSION = "wagtailadmin.access_admin"
@@ -341,3 +350,66 @@ def override_image(
         changes.update(PAGE, _key(page, translation.target_locale), before, after)
 
     return _in_savepoint(dry_run, work)
+
+
+# --- Legal pages and vendor recruitment (CMS.5)
+
+LEGAL_VERSION_RECORDED = "cms.legal_page_version.recorded"
+# The public vendor application form of VEN.22 (owner decision Q-55), not built yet.
+APPLICATION_URL_NAME = "vendors:apply"
+
+
+def legal_version_snapshot(version: LegalPageVersion) -> dict[str, Any]:
+    body = json.dumps(version.content()["body"], sort_keys=True, default=str)
+    return {
+        "page": version.page_id,
+        "translation_key": str(version.page.translation_key),
+        "language_code": version.language_code,
+        "number": version.number,
+        "title": version.title,
+        "effective_date": version.effective_date.isoformat(),
+        "body_sha256": hashlib.sha256(body.encode()).hexdigest(),
+        "published_by": version.published_by,
+    }
+
+
+def record_legal_version(page: LegalPage, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Record the page's published content as its next version, unless it is unchanged.
+
+    Called when a legal page is published. Versions belong to the page, so to one language: a
+    translation keeps its own numbering and effective dates (Q-42).
+    """
+    with transaction.atomic():
+        # Lock the page row so two publishes cannot take the same version number.
+        LegalPage.objects.select_for_update().filter(pk=page.pk).exists()
+        latest = page.versions.order_by("-number").first()
+        current = page.content()
+        changeset = ChangeSet()
+        if not engine.content_changed(latest and latest.content(), current):
+            return changeset
+        version = LegalPageVersion(
+            page=page,
+            number=latest.number + 1 if latest else 1,
+            language_code=page.locale.language_code,
+            title=page.title,
+            effective_date=page.effective_date,
+            body=page.body.get_prep_value(),
+            published_at=timezone.now(),
+            published_by=ctx.actor_label,
+        )
+        changeset.create(
+            "cms.legalpageversion",
+            f"{page.pk}/{version.number}",
+            legal_version_snapshot(version),
+        )
+        return run_mutation(
+            changeset, version.save, ctx=ctx, action=LEGAL_VERSION_RECORDED, dry_run=dry_run
+        )
+
+
+def vendor_application_url(urlconf: str | None = None) -> str | None:
+    """The VEN.22 application form's URL, or None while that route does not exist."""
+    try:
+        return reverse(APPLICATION_URL_NAME, urlconf=urlconf)
+    except NoReverseMatch:
+        return None

@@ -126,3 +126,32 @@ def test_match_postcode(pattern: str, postcode: str, matches: bool) -> None:
 def test_matching_refuses_a_malformed_pattern() -> None:
     with pytest.raises(InvalidPostcodePattern):
         match_postcode("74999..70000", "70100")
+
+
+# --- Country-qualified patterns (SHP audit chunk 5, M1): `PT:9000..9999`, `GR:84*`
+
+
+@pytest.mark.parametrize(
+    ("raw", "country", "stored"),
+    [
+        ("PT:9000..9999", "PT", "PT:9000..9999"),
+        (" gr : 84* ", "GR", "GR:84*"),
+        ("EL:84600", "GR", "GR:84600"),
+        ("uk:bt*", "GB", "GB:BT*"),
+        ("84*", "", "84*"),
+    ],
+)
+def test_a_pattern_may_be_qualified_by_a_country(raw: str, country: str, stored: str) -> None:
+    assert parse_postcode_pattern(raw).country == country
+    assert normalize_postcode_pattern(raw) == stored
+
+
+@pytest.mark.parametrize("raw", ["XX:84*", "P:84*", "PRT:84*", ":84*", "PT:", "PT:PT:84*"])
+def test_a_qualifier_must_be_an_iso_country_followed_by_a_pattern(raw: str) -> None:
+    with pytest.raises(InvalidPostcodePattern):
+        parse_postcode_pattern(raw)
+
+
+def test_a_qualified_pattern_matches_the_postcode_like_the_plain_one() -> None:
+    assert match_postcode("PT:9000..9999", "9000-001")
+    assert not match_postcode("PT:9000..9999", "1000-001")

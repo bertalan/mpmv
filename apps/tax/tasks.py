@@ -2,11 +2,26 @@
 
 import logging
 
-from apps.core.tasks import NO_RETRY, locked, periodic, task
+from apps.core.tasks import NO_RETRY, Retry, locked, periodic, task
 
 from . import services
 
 logger = logging.getLogger(__name__)
+
+#: VIES outages usually last minutes to hours: retry from 1 minute, doubling up to 1 hour.
+VIES_RETRY = Retry(max_attempts=8, base_delay=60, max_delay=3600)
+
+
+@task("tax.recheck_vat_number", retry=VIES_RETRY)
+def recheck_vat_number(country: str, vat_number: str) -> None:
+    """Ask VIES again about a VAT number and store the answer (TAX.5).
+
+    The only place where a VIES check is retried: while VIES gives no answer the job raises
+    `ViesUnavailable` and is retried with backoff. Checkout and other requests ask VIES once.
+    A number VIES cannot be asked about is logged and dropped.
+    """
+    check = services.recheck_vat_number(country, vat_number)
+    logger.info("tax.recheck_vat_number %s: %s", country, check.reason)
 
 
 @periodic("41 5 * * *")

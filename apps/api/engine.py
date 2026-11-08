@@ -1,4 +1,5 @@
-"""API keys: format, hashing and the authorization decision (CORE.6). Pure functions, no ORM.
+"""API keys: format, hashing, the authorization decision (CORE.6) and the per-key rate limit
+(CORE.12). Pure functions, no ORM.
 
 Key format: `mpmv_<prefix>_<secret>`.
 
@@ -14,9 +15,11 @@ import datetime as dt
 import hashlib
 import hmac
 import ipaddress
+import math
 import re
 import secrets
-from collections.abc import Iterable, Sequence
+import uuid
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Final
@@ -47,13 +50,18 @@ VENDOR_GRANTABLE_SCOPES: Final = frozenset(
     }
 )
 
-# HTTP methods that change state. A key of a suspended vendor may not use them (CORE.14), dry-runs
+# HTTP methods that change state. Only a key of an active vendor may use them (CORE.14), dry-runs
 # included; API v1 also requires `?dry_run=` on each of them (CORE.7).
 MUTATING_METHODS: Final = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
 def is_write(method: str) -> bool:
     return method.upper() in MUTATING_METHODS
+
+
+def platform_only_scopes(scopes: Iterable[str]) -> list[str]:
+    """The scopes in `scopes` that a vendor key may not hold (outside `VENDOR_GRANTABLE_SCOPES`)."""
+    return sorted({scope for scope in scopes if scope not in VENDOR_GRANTABLE_SCOPES})
 
 
 class InvalidApiClient(ValueError):
@@ -82,10 +90,16 @@ class Reason(StrEnum):
     INSUFFICIENT_SCOPE = "insufficient_scope"
     VENDOR_CLOSED = "vendor_closed"  # CORE.14: the key's vendor is closed
     VENDOR_SUSPENDED = "vendor_suspended"  # CORE.14: a write by a suspended vendor's key
+    VENDOR_NOT_ACTIVE = "vendor_not_active"  # CORE.14: a write by a not yet active vendor's key
 
 
 _FORBIDDEN_REASONS: Final = frozenset(
-    {Reason.IP_NOT_ALLOWED, Reason.INSUFFICIENT_SCOPE, Reason.VENDOR_SUSPENDED}
+    {
+        Reason.IP_NOT_ALLOWED,
+        Reason.INSUFFICIENT_SCOPE,
+        Reason.VENDOR_SUSPENDED,
+        Reason.VENDOR_NOT_ACTIVE,
+    }
 )
 
 
@@ -177,6 +191,21 @@ def ip_allowed(ip: str | None, allowed: Sequence[str] | None) -> bool:
     return any(address in ipaddress.ip_network(network) for network in allowed)
 
 
+def vendor_write_refusal(vendor_status: str) -> Reason | None:
+    """Why a vendor key may not write while its vendor has `vendor_status`; None when it may.
+
+    Only an active vendor's key writes (CORE.14): a closed vendor's key is refused outright (401),
+    a suspended one's and a not yet active one's (applicant, onboarding) only read (403).
+    """
+    if vendor_status == vendor_engine.ACTIVE:
+        return None
+    if vendor_status == vendor_engine.CLOSED:
+        return Reason.VENDOR_CLOSED
+    if vendor_status == vendor_engine.SUSPENDED:
+        return Reason.VENDOR_SUSPENDED
+    return Reason.VENDOR_NOT_ACTIVE
+
+
 def evaluate(
     state: ClientState,
     *,
@@ -185,13 +214,17 @@ def evaluate(
     required_scope: str | None,
     write: bool = True,
 ) -> Decision:
-    """Order: revoked → expired → closed vendor (401), then IP allow-list → scope → suspended
-    vendor writing (403).
+    """Order: revoked → expired → closed vendor (401), then IP allow-list → scope → a write by a
+    vendor that is not active (403).
 
     `required_scope=None` is for operations open to any valid key (e.g. `GET /api/v1/me`).
-    `write` says whether the call changes state (`is_write(method)`); it defaults to True so a
-    caller that does not say is refused like a write (CORE.14: a suspended vendor's key reads only).
+    A vendor key never passes the scope check for a platform-only scope, even if it holds it (a
+    key issued before the scope was classed platform-only): the allow-list is enforced here too,
+    not only at issuance. `write` says whether the call changes state (`is_write(method)`); it
+    defaults to True so a caller that does not say is refused like a write (CORE.14: only an
+    active vendor's key writes).
     """
+    vendor_key = state.vendor_status is not None
     if not state.is_active:
         return deny(Reason.REVOKED)
     if state.expires_at <= now:
@@ -200,10 +233,15 @@ def evaluate(
         return deny(Reason.VENDOR_CLOSED)
     if not ip_allowed(ip, state.allowed_ips):
         return deny(Reason.IP_NOT_ALLOWED)
-    if required_scope is not None and required_scope not in state.scopes:
+    if required_scope is not None and (
+        required_scope not in state.scopes
+        or (vendor_key and required_scope not in VENDOR_GRANTABLE_SCOPES)
+    ):
         return deny(Reason.INSUFFICIENT_SCOPE)
-    if write and state.vendor_status == vendor_engine.SUSPENDED:
-        return deny(Reason.VENDOR_SUSPENDED)
+    if write and state.vendor_status is not None:
+        refusal = vendor_write_refusal(state.vendor_status)
+        if refusal is not None:
+            return deny(refusal)
     return ALLOWED
 
 
@@ -238,7 +276,7 @@ def validate_scopes(scopes: Iterable[str], *, vendor_key: bool = False) -> list[
     if invalid:
         raise InvalidApiClient(f"invalid scopes: {invalid!r} (expected resource:action)")
     if vendor_key:
-        platform_only = [scope for scope in cleaned if scope not in VENDOR_GRANTABLE_SCOPES]
+        platform_only = platform_only_scopes(cleaned)
         if platform_only:
             raise InvalidApiClient(
                 f"platform-only scopes cannot be granted to a vendor key: {platform_only!r}"
@@ -262,3 +300,116 @@ def normalize_allowed_ips(entries: Iterable[str] | None) -> list[str] | None:
     if not networks:
         raise InvalidApiClient("allowed_ips must be None (any address) or a non-empty list")
     return networks
+
+
+# --- Rate limit (CORE.12)
+#
+# Fixed windows aligned on the epoch: a key may make `limit` calls per `period` seconds, counted
+# from 12:00:00, 12:01:00… for a per-minute rate. Every call of an accepted key counts, those
+# refused for the limit included, so hammering past the limit never shortens the wait. A key has one
+# key-wide counter (`KEY_WIDE_BUCKET`), plus one per scope that has a limit of its own.
+#
+# A fixed window lets a client make up to twice its limit across a boundary; that is accepted
+# for protecting the platform from runaway pipelines, which is what this limit is for.
+
+KEY_WIDE_BUCKET: Final = "*"
+
+_PERIODS: Final[Mapping[str, int]] = {
+    "s": 1,
+    "sec": 1,
+    "second": 1,
+    "m": 60,
+    "min": 60,
+    "minute": 60,
+    "h": 3600,
+    "hour": 3600,
+    "d": 86400,
+    "day": 86400,
+}
+_RATE_RE: Final = re.compile(r"^\s*(?P<limit>\d+)\s*/\s*(?P<period>[a-z]+)\s*$")
+
+
+class InvalidRateLimit(ValueError):
+    """Raised for a rate limit setting that cannot be read."""
+
+
+@dataclass(frozen=True)
+class Rate:
+    limit: int  # calls allowed per window
+    period: int  # window length in seconds
+
+
+def parse_rate(text: str) -> Rate:
+    """`"600/minute"` → `Rate(600, 60)`; units: s/sec/second, m/min/minute, h/hour, d/day."""
+    match = _RATE_RE.match(text)
+    if match is None or match["period"] not in _PERIODS:
+        raise InvalidRateLimit(f"{text!r} is not a rate such as '600/minute'")
+    limit = int(match["limit"])
+    if limit < 1:
+        raise InvalidRateLimit(f"{text!r}: the limit must be at least 1")
+    return Rate(limit=limit, period=_PERIODS[match["period"]])
+
+
+@dataclass(frozen=True)
+class RatePolicy:
+    default: Rate  # the key-wide limit of every key
+    scopes: Mapping[str, Rate]  # scope → its own limit, with its own counter per key
+    clients: Mapping[str, Rate]  # ApiClient public id → its key-wide limit instead of `default`
+
+
+def rate_policy(default: str, scopes: Mapping[str, str], clients: Mapping[str, str]) -> RatePolicy:
+    """Read the settings' rate limits; `InvalidRateLimit` names the first bad entry."""
+    for scope in scopes:
+        if not _SCOPE_RE.match(scope):
+            raise InvalidRateLimit(f"{scope!r} is not a scope (expected resource:action)")
+    parsed_clients: dict[str, Rate] = {}
+    for client_id, text in clients.items():
+        try:
+            canonical = str(uuid.UUID(client_id))
+        except ValueError as exc:
+            raise InvalidRateLimit(f"{client_id!r} is not an API client public id") from exc
+        parsed_clients[canonical] = parse_rate(text)
+    return RatePolicy(
+        default=parse_rate(default),
+        scopes={scope: parse_rate(text) for scope, text in scopes.items()},
+        clients=parsed_clients,
+    )
+
+
+def limit_for(policy: RatePolicy, *, scope: str | None, client_id: str) -> tuple[str, Rate]:
+    """The counter a call of `client_id` to an operation needing `scope` goes to, and its rate.
+
+    A scope with its own limit counts on its own, for every key: it protects a costly
+    operation. Any other call counts on the key-wide counter, whose limit a key listed in
+    `policy.clients` replaces.
+    """
+    if scope is not None and scope in policy.scopes:
+        return scope, policy.scopes[scope]
+    return KEY_WIDE_BUCKET, policy.clients.get(client_id, policy.default)
+
+
+def window_start(now: dt.datetime, rate: Rate) -> dt.datetime:
+    """The start of the window `now` falls in, in UTC (windows are aligned on the epoch)."""
+    seconds = math.floor(now.timestamp())
+    return dt.datetime.fromtimestamp(seconds - seconds % rate.period, tz=dt.UTC)
+
+
+@dataclass(frozen=True)
+class RateDecision:
+    allowed: bool
+    limit: int
+    remaining: int  # calls left in the window after this one
+    retry_after: int  # whole seconds until the window ends when refused; 0 when allowed
+
+
+def rate_decision(
+    *, hits: int, window_start: dt.datetime, rate: Rate, now: dt.datetime
+) -> RateDecision:
+    """`hits` is the count in the current window, this call included."""
+    if hits <= rate.limit:
+        return RateDecision(
+            allowed=True, limit=rate.limit, remaining=rate.limit - hits, retry_after=0
+        )
+    left = window_start + dt.timedelta(seconds=rate.period) - now
+    retry_after = max(1, math.ceil(left.total_seconds()))
+    return RateDecision(allowed=False, limit=rate.limit, remaining=0, retry_after=retry_after)
