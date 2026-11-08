@@ -3,7 +3,9 @@
 # web (gunicorn), worker, migrate, manage. Built locally with `container build`, on CI with
 # BuildKit, and run on STAGE/LIVE by Podman. Configuration comes only from the environment.
 #
-# Base images are pinned by tag and digest; bump both together (see deploy/README.md).
+# Base images are pinned by tag and digest; bump both together (see deploy/README.md). Each digest
+# is that of the multi-arch image index, so the same file builds every release architecture
+# (ARC.13); nothing below downloads an architecture-specific binary.
 
 FROM ghcr.io/astral-sh/uv:0.10.11@sha256:3472e43b4e738cf911c99d41bb34331280efad54c73b1def654a6227bb59b2b4 AS uv
 
