@@ -1,10 +1,14 @@
 # Release images (ARC.5, ADR-0005). A git tag vX.Y.Z on main publishes the immutable image
 # ghcr.io/<owner>/mpmv-app:X.Y.Z (plus sha-<commit>). STAGE and LIVE deploy these tags with
 # deploy/server/mpmv-deploy; see deploy/README.md.
+# ARC.13 (ADR-0007 amendment 2026-11-08): the image is multi-arch. Each architecture is built on a
+# native runner (no QEMU) and pushed by digest only, with no tag of its own; the publish job then
+# tags one manifest list holding both, so a release tag never points to half a release.
 # OPS.4: the GitHub release for the tag carries the CycloneDX SBOMs of the Python environment and
-# of the published image (docs/dev/dependency-updates.md). Only the small attach job, which runs no
-# third-party action, can write to the repository; the image job builds and pushes with a
-# read-only repository token. Third-party actions in a job with a write token are pinned by commit.
+# of the published image, one per architecture (docs/dev/dependency-updates.md). Only the small
+# attach job, which runs no third-party action, can write to the repository; the image and publish
+# jobs push to the registry with a read-only repository token. Third-party actions in a job with a
+# write token are pinned by commit.
 name: Release image
 
 on:
@@ -23,16 +27,121 @@ env:
 
 jobs:
   image:
-    name: Build and publish
-    runs-on: ubuntu-24.04
+    name: Build (${{ matrix.arch }})
+    strategy:
+      # A release needs both architectures: stop the other leg as soon as one fails.
+      fail-fast: true
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write # push the image to ghcr.io
+    env:
+      ARCH: ${{ matrix.arch }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        if: matrix.arch == 'amd64'
+      - name: Image name and version
+        run: |
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/mpmv-app" >> "$GITHUB_ENV"
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          # The same image timestamp in the build and the push step below.
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+      - name: Log in to the registry
+        run: echo "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Refuse to overwrite an existing release
+        run: |
+          if docker manifest inspect "$IMAGE:$VERSION" > /dev/null 2>&1; then
+            echo "$IMAGE:$VERSION already exists; release tags are immutable" >&2
+            exit 1
+          fi
+      # A BuildKit container builder can push by digest; the build and push steps share its cache.
+      - name: Set up the builder
+        run: docker buildx create --name mpmv-release --driver docker-container --bootstrap --use
+      - name: Build
+        run: >-
+          docker buildx build --file Containerfile --platform "linux/$ARCH"
+          --build-arg MPMV_VERSION="$VERSION" --provenance=false --sbom=false
+          --load --tag mpmv-app:release .
+      - name: Built for the runner's architecture
+        run: test "$(docker image inspect --format '{{.Architecture}}' mpmv-app:release)" = "$ARCH"
+      - run: mkdir -p build/sbom
+      - name: Python SBOM (CycloneDX)
+        if: matrix.arch == 'amd64'
+        run: make sbom
+      - name: Image SBOM (CycloneDX)
+        id: sbom
+        # Fallback below when syft cannot be downloaded from GitHub release assets.
+        continue-on-error: true
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: mpmv-app:release
+          format: cyclonedx-json
+          output-file: build/sbom/mpmv-image-${{ matrix.arch }}.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Image SBOM fallback (syft container)
+        if: steps.sbom.outcome == 'failure'
+        run: |
+          chmod 0777 build/sbom
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/build/sbom:/out" \
+            anchore/syft:v1.54.0 mpmv-app:release \
+            -o cyclonedx-json=/out/mpmv-image-${{ matrix.arch }}.cdx.json
+      - name: Image SBOM present
+        run: test -s build/sbom/mpmv-image-${{ matrix.arch }}.cdx.json
+      # Same arguments as the build, so every layer comes from the builder cache. The image gets
+      # no tag here: the publish job tags the manifest list once both architectures are pushed.
+      - name: Push by digest
+        run: |
+          mkdir -p build/digests
+          docker buildx build --file Containerfile --platform "linux/$ARCH" \
+            --build-arg MPMV_VERSION="$VERSION" --provenance=false --sbom=false \
+            --output "type=image,name=$IMAGE,push-by-digest=true,name-canonical=true,push=true" \
+            --metadata-file "$RUNNER_TEMP/push-metadata.json" .
+          digest="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["containerimage.digest"])' \
+            "$RUNNER_TEMP/push-metadata.json")"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          echo "$digest" > "build/digests/$ARCH"
+      - name: Store the digest for the publish job
+        uses: actions/upload-artifact@v7
+        with:
+          name: digest-${{ matrix.arch }}
+          path: build/digests/${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 7
+      - name: Store the SBOMs for the attach job
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-sboms-${{ matrix.arch }}
+          path: build/sbom/*.cdx.json
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish the multi-arch manifest
+    needs: image
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write # push the manifest list to ghcr.io
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: digest-*
+          path: build/digests
+          merge-multiple: true
       - name: Image name and version
         run: |
           echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/mpmv-app" >> "$GITHUB_ENV"
@@ -47,56 +156,33 @@ jobs:
             echo "$IMAGE:$VERSION already exists; release tags are immutable" >&2
             exit 1
           fi
-      - name: Build
-        run: >-
-          docker build --file Containerfile --build-arg MPMV_VERSION="$VERSION"
-          --tag "$IMAGE:$VERSION" --tag "$IMAGE:sha-${GITHUB_SHA::12}" .
-      - name: Python SBOM (CycloneDX)
-        run: make sbom
-      - name: Image SBOM (CycloneDX)
-        id: sbom
-        # Fallback below when syft cannot be downloaded from GitHub release assets.
-        continue-on-error: true
-        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
-        with:
-          image: ${{ env.IMAGE }}:${{ env.VERSION }}
-          format: cyclonedx-json
-          output-file: build/sbom/mpmv-image.cdx.json
-          upload-artifact: false
-          upload-release-assets: false
-      - name: Image SBOM fallback (syft container)
-        if: steps.sbom.outcome == 'failure'
+      - name: Tag one manifest list for both architectures
         run: |
-          mkdir -p build/sbom && chmod 0777 build/sbom
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v "$PWD/build/sbom:/out" \
-            anchore/syft:v1.54.0 "$IMAGE:$VERSION" -o cyclonedx-json=/out/mpmv-image.cdx.json
-      - name: Image SBOM present
-        run: test -s build/sbom/mpmv-image.cdx.json
-      - name: Push
+          docker buildx imagetools create \
+            --tag "$IMAGE:$VERSION" --tag "$IMAGE:sha-${GITHUB_SHA::12}" \
+            "$IMAGE@$(cat build/digests/amd64)" "$IMAGE@$(cat build/digests/arm64)"
+      - name: The release holds linux/amd64 and linux/arm64
         run: |
-          docker push "$IMAGE:$VERSION"
-          docker push "$IMAGE:sha-${GITHUB_SHA::12}"
-      - name: Store the SBOMs for the attach job
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-sboms
-          path: build/sbom/*.cdx.json
-          if-no-files-found: error
-          retention-days: 7
+          platforms="$(docker manifest inspect "$IMAGE:$VERSION" | python3 -c '
+          import json, sys
+          entries = json.load(sys.stdin)["manifests"]
+          print(" ".join(sorted("%s/%s" % (m["platform"]["os"], m["platform"]["architecture"]) for m in entries)))
+          ')"
+          echo "$platforms"
+          test "$platforms" = "linux/amd64 linux/arm64"
 
   attach:
     name: Attach the SBOMs to the GitHub release
-    needs: image
+    needs: publish
     runs-on: ubuntu-24.04
     permissions:
       contents: write # create the GitHub release and attach the SBOMs
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: release-sboms
+          pattern: release-sboms-*
           path: build/sbom
+          merge-multiple: true
       - name: Create the release and upload the SBOMs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -108,4 +194,5 @@ jobs:
           fi
           gh release upload "$GITHUB_REF_NAME" --clobber \
             "build/sbom/mpmv-python.cdx.json#SBOM (CycloneDX): Python environment" \
-            "build/sbom/mpmv-image.cdx.json#SBOM (CycloneDX): container image"
+            "build/sbom/mpmv-image-amd64.cdx.json#SBOM (CycloneDX): container image, linux/amd64" \
+            "build/sbom/mpmv-image-arm64.cdx.json#SBOM (CycloneDX): container image, linux/arm64"
