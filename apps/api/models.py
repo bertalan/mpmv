@@ -51,6 +51,15 @@ class ApiClient(BaseModel):
     )
     is_active = models.BooleanField(default=True)
     revoked_at = models.DateTimeField(null=True, blank=True)
+    rate_limit = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        help_text=(
+            "Key-wide rate limit of this key, e.g. 1200/minute, set by staff (CORE.16); it wins "
+            "over API_RATE_LIMIT_CLIENTS and API_RATE_LIMIT. Empty means the settings decide."
+        ),
+    )
 
     class Meta:
         ordering = ["name", "id"]
@@ -84,6 +93,7 @@ class ApiClient(BaseModel):
             "allowed_ips": None if self.allowed_ips is None else list(self.allowed_ips),
             "is_active": self.is_active,
             "revoked_at": self.revoked_at,
+            "rate_limit": self.rate_limit,
         }
 
 

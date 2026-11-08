@@ -376,16 +376,42 @@ def rate_policy(default: str, scopes: Mapping[str, str], clients: Mapping[str, s
     )
 
 
-def limit_for(policy: RatePolicy, *, scope: str | None, client_id: str) -> tuple[str, Rate]:
-    """The counter a call of `client_id` to an operation needing `scope` goes to, and its rate.
+def key_wide_rate(policy: RatePolicy, *, client_id: str, override: Rate | None = None) -> Rate:
+    """The key-wide limit of one key. Precedence (CORE.16): the override staff stored on the
+    `ApiClient`, then `policy.clients` (`API_RATE_LIMIT_CLIENTS`), then `policy.default`."""
+    if override is not None:
+        return override
+    return policy.clients.get(client_id, policy.default)
 
-    A scope with its own limit counts on its own, for every key: it protects a costly
-    operation. Any other call counts on the key-wide counter, whose limit a key listed in
-    `policy.clients` replaces.
+
+def limits_for(
+    policy: RatePolicy, *, scope: str | None, client_id: str, override: Rate | None = None
+) -> tuple[tuple[str, Rate], ...]:
+    """The counters a call of `client_id` to an operation needing `scope` counts on, with their
+    rates; the call runs only if every one of them allows it.
+
+    - A call to a scope without its own limit counts on the key-wide counter, at
+      `key_wide_rate`.
+    - A scope with its own limit counts on its own counter, for every key: it protects a costly
+      operation, and a key's own limit never lifts it.
+    - A key whose key-wide limit is below the default (`rate_is_below`) is capped on every
+      call: its calls to a scope with its own limit count on the key-wide counter too (CORE.16;
+      before, a capped key was not capped on such scopes).
+    - Any other key (default limit, or one raised or equal to it) keeps the CORE.12 behaviour:
+      those calls do not use up its key-wide budget, so a raise never cuts a key's unscoped
+      budget below what a default key gets.
     """
+    own = key_wide_rate(policy, client_id=client_id, override=override)
+    key_wide = (KEY_WIDE_BUCKET, own)
     if scope is not None and scope in policy.scopes:
-        return scope, policy.scopes[scope]
-    return KEY_WIDE_BUCKET, policy.clients.get(client_id, policy.default)
+        scoped = (scope, policy.scopes[scope])
+        return (scoped, key_wide) if rate_is_below(own, policy.default) else (scoped,)
+    return (key_wide,)
+
+
+def rate_is_below(rate: Rate, other: Rate) -> bool:
+    """Whether `rate` allows fewer calls per second than `other` (exact, no floats)."""
+    return rate.limit * other.period < other.limit * rate.period
 
 
 def window_start(now: dt.datetime, rate: Rate) -> dt.datetime:
@@ -413,3 +439,14 @@ def rate_decision(
     left = window_start + dt.timedelta(seconds=rate.period) - now
     retry_after = max(1, math.ceil(left.total_seconds()))
     return RateDecision(allowed=False, limit=rate.limit, remaining=0, retry_after=retry_after)
+
+
+def combine_decisions(decisions: Sequence[RateDecision]) -> RateDecision:
+    """One decision for a call counted on several counters: refused if any counter refuses (the
+    one that frees up last sets `Retry-After`), otherwise the counter with the fewest calls left."""
+    if not decisions:
+        raise ValueError("a call counts on at least one counter")
+    refused = [decision for decision in decisions if not decision.allowed]
+    if refused:
+        return max(refused, key=lambda decision: decision.retry_after)
+    return min(decisions, key=lambda decision: decision.remaining)
