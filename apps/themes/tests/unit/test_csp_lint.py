@@ -47,9 +47,6 @@ def test_the_lint_finds_each_forbidden_pattern(source: str, finding: str) -> Non
     [
         '<script src="{% static "vendor/htmx.min.js" %}" defer></script>',
         '<script type="module" src="/static/themes/base/js/base.js"></script>',
-        # Data blocks are never executed, so the CSP does not govern them (CMS.2 FAQ JSON-LD).
-        '<script type="application/ld+json">{{ jsonld }}</script>',
-        "<script type='application/json'>{}</script>",
         '<div x-data="disclosure" @keydown.escape="close">',
         '<button x-on:click="toggle" :aria-expanded="expanded" x-bind:hidden="toggleHidden">',
         '<nav :class="navClass" aria-label="Main">',
@@ -93,6 +90,35 @@ def test_alpine_expressions_are_found_whatever_the_quoting(source: str) -> None:
 )
 def test_alpine_names_pass_whatever_the_quoting(source: str) -> None:
     assert lint_template(source) == []
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        '<script type="application/ld+json">{"@type": "FAQPage"}</script>',
+        "<script type='application/ld+json'>{}</script>",
+        "<script type=application/ld+json>{}</script>",
+        '<script TYPE="Application/LD+JSON">{}</script>',
+    ],
+)
+def test_a_json_ld_data_block_is_not_an_inline_script(source: str) -> None:
+    assert lint_template(source) == []
+
+
+@pytest.mark.parametrize(
+    ("source", "finding"),
+    [
+        ('<script type="application/ld+json" onload="go()">{}</script>', "on… handler attribute"),
+        ('<script type="module">go()</script>', "inline <script>"),
+        ('<script type="text/javascript">go()</script>', "inline <script>"),
+        ("<script>go()</script>", "inline <script>"),
+        ('<script type="application/ld+jsonp">go()</script>', "inline <script>"),
+        ('<script data-type="application/ld+json">go()</script>', "inline <script>"),
+    ],
+)
+def test_any_other_inline_script_stays_forbidden(source: str, finding: str) -> None:
+    findings = lint_template(source)
+    assert any(finding in f for f in findings), findings
 
 
 def test_findings_carry_the_line_number() -> None:
