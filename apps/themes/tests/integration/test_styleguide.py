@@ -140,3 +140,17 @@ def test_every_alert_level_and_variant_is_shown(staff_client: Client) -> None:
     assert "alert--dismissible" in html
     assert 'role="status"' in html
     assert re.search(r'class="alert[^"]*"[^>]*role="alert"', html)
+
+
+def test_the_styleguide_can_focus_an_error_summary_on_load(staff_client: Client) -> None:
+    assert "data-autofocus" not in staff_client.get(URL).content.decode()
+    focused = staff_client.get(URL, {"focus": "errors"}).content.decode()
+    assert focused.count("data-autofocus") == 1
+
+
+def test_the_styleguide_shows_busy_buttons_inside_a_form(staff_client: Client) -> None:
+    html = staff_client.get(URL).content.decode()
+    form = re.search(r'<form[^>]*id="sg-busy-form".*?</form>', html, re.DOTALL)
+    assert form is not None
+    assert re.search(r'<button type="submit"[^>]*aria-disabled="true"', form.group(0))
+    assert re.search(r'aria-label="[^"]+, [^"]+"', form.group(0))

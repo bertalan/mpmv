@@ -70,3 +70,32 @@ document.addEventListener("click", (event) => {
   alert.remove();
   document.getElementById("main")?.focus();
 });
+
+// Busy and disabled-but-focusable controls (THM.4, components/button.html): a loading button
+// carries aria-disabled="true" and keeps the focus, but it must not act. Capture phase, so no
+// other listener (htmx included) sees the click or the submit.
+document.addEventListener(
+  "click",
+  (event) => {
+    if (event.target.closest('[aria-disabled="true"]')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  },
+  true,
+);
+document.addEventListener(
+  "submit",
+  (event) => {
+    if (event.submitter?.getAttribute("aria-disabled") === "true") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  },
+  true,
+);
+
+// Error summary (THM.4, components/error_summary.html): after a failed submit, the summary
+// marked data-autofocus takes the focus, so the visitor starts on the list of errors (WCAG
+// 3.3.1). A module runs once the document is parsed, so the box is already there.
+document.querySelector(".error-summary[data-autofocus]")?.focus();

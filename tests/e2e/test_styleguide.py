@@ -106,7 +106,9 @@ def test_cards_tiles_badges_and_alerts_render_without_a_csp_violation(
     tiles = page.locator(".product-tile")
     expect(tiles.first).to_be_visible()
     assert tiles.count() >= 4
-    assert page.evaluate(IMAGES_LOADED), "a sample image did not load"
+    # The images load lazily: bring each one on screen, then wait for all of them.
+    page.evaluate("() => [...document.images].forEach((img) => img.scrollIntoView())")
+    page.wait_for_function(IMAGES_LOADED, timeout=5000)
     for kind in ("Sale", "New", "Out of stock", "On request"):
         expect(page.locator(".badge", has_text=kind).first).to_be_visible()
     expect(page.get_by_role("status").first).to_be_attached()
@@ -149,3 +151,40 @@ def test_a_dismissible_alert_closes_and_the_focus_moves_on(
     expect(alert).to_have_count(0)
     assert page.evaluate("document.activeElement.id") == "main"
     assert csp_violations(page) == []
+
+
+# --- Review fixes of part 1/3: autofocus of the error summary, busy buttons never act
+
+
+def test_an_error_summary_marked_for_autofocus_takes_the_focus_on_load(
+    page: Page, live_server: LiveServer
+) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    page.goto(f"{live_server.url}/_styleguide/?focus=errors")
+    page.wait_for_load_state("load")
+    expect(page.locator(".error-summary[data-autofocus]")).to_be_focused()
+    assert page.evaluate("document.activeElement.id") == "text-errors"
+    assert page.evaluate("document.activeElement.getAttribute('role')") == "region"
+
+
+def test_a_busy_button_neither_clicks_nor_submits(page: Page, live_server: LiveServer) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    url = page.url
+    form = page.locator("#sg-busy-form")
+    submit = form.locator('button[type="submit"]')
+    expect(submit).to_have_attribute("aria-disabled", "true")
+    # Playwright waits for aria-disabled controls to become enabled: force the real click.
+    submit.click(force=True)
+    submit.focus()
+    page.keyboard.press("Enter")
+    form.locator('button[type="submit"]').evaluate("(b) => b.form.requestSubmit(b)")
+    page.wait_for_timeout(300)
+    assert page.url == url
+    assert "submitted" not in page.url
+    icon = form.get_by_role("button", name="Refresh, Refreshing")
+    expect(icon).to_be_visible()
+    icon.click(force=True)
+    page.wait_for_timeout(300)
+    assert page.url == url

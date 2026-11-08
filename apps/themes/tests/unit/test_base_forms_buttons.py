@@ -18,6 +18,9 @@ from django import forms
 from django.template.loader import render_to_string
 from pytest_django.fixtures import Settings as SettingsWrapper
 
+from apps.themes.build import render_themes
+from apps.themes.tests.builders import SHIPPED_THEMES
+
 
 @pytest.fixture(autouse=True)
 def _base(settings: SettingsWrapper) -> None:
@@ -108,6 +111,22 @@ def test_a_button_with_an_icon_and_text_keeps_the_text() -> None:
 @pytest.mark.parametrize("icon", ["close", "search", "plus", "minus", "menu", "check"])
 def test_every_listed_icon_draws_a_path(icon: str) -> None:
     assert re.search(r"<svg[^>]*>\s*<path d=\"[^\"]+\"", button(icon=icon))
+
+
+def test_an_icon_button_that_is_loading_says_so_in_its_accessible_name() -> None:
+    # aria-label replaces the content, so the hidden loading text would never be read.
+    html = button(label="Refresh", icon="close", icon_only=True, loading=True, loading_label="Busy")
+    assert 'aria-label="Refresh, Busy"' in html
+    assert 'class="visually-hidden"' not in html
+    assert 'aria-label="Close, Loading"' in button(
+        label="Close", icon="close", icon_only=True, loading=True
+    )
+
+
+def test_the_theme_script_stops_busy_and_disabled_buttons_from_acting() -> None:
+    module = render_themes(SHIPPED_THEMES)["themes/base/js/base.js"]
+    assert '[aria-disabled="true"]' in module
+    assert "event.submitter" in module
 
 
 def test_the_button_never_uses_inline_styles_or_handlers() -> None:
@@ -233,7 +252,10 @@ def test_the_summary_links_every_field_error_to_its_control() -> None:
     assert not form.is_valid()
     html = summary(form)
     assert re.search(r'<div class="error-summary" id="error-summary" tabindex="-1"', html)
+    # A named region: aria-labelledby alone gives a plain div no role to name (ARIA 1.2).
+    assert re.search(r'<div class="error-summary"[^>]*\srole="region"', html)
     assert re.search(r'aria-labelledby="error-summary-title"', html)
+    assert "data-autofocus" not in html
     assert re.search(r'<h2 id="error-summary-title">[^<]+</h2>', html)
     assert re.search(r'<a href="#id_email">Email: [^<]+</a>', html)
 
@@ -242,6 +264,15 @@ def test_a_group_error_links_to_the_first_option() -> None:
     form = Signup(data={"email": "a@example.com"})
     assert not form.is_valid()
     assert re.search(r'<a href="#id_plan_0">Plan: [^<]+</a>', summary(form))
+
+
+def test_the_summary_can_ask_for_the_focus_on_load() -> None:
+    form = Signup(data={"email": "nope"})
+    assert not form.is_valid()
+    html = summary(form, autofocus=True)
+    assert re.search(r'<div class="error-summary"[^>]*\sdata-autofocus[\s>]', html)
+    module = render_themes(SHIPPED_THEMES)["themes/base/js/base.js"]
+    assert ".error-summary[data-autofocus]" in module
 
 
 def test_form_level_errors_are_listed_as_text() -> None:

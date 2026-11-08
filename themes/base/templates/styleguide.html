@@ -7,7 +7,8 @@ and alerts; part 3 adds its own sections.
 
 Context: `forms` (apps.themes.styleguide.sample_forms): the sample forms by state, each with
 its own prefix so ids never repeat on the page; `products`
-(apps.themes.styleguide.sample_products): the product tiles by state.
+(apps.themes.styleguide.sample_products): the product tiles by state; `focus_errors`
+(`?focus=errors`): the first error summary takes the focus on load.
 {% endcomment %}
 {% block title %}{% translate "Styleguide" %} · {{ site_name }}{% endblock %}
 {% block description %}<meta name="robots" content="noindex, nofollow">{% endblock %}
@@ -45,6 +46,14 @@ its own prefix so ids never repeat on the page; `products`
       <div class="styleguide__example">{% include "components/button.html" with label=_("Pay now") loading=True loading_label=_("Paying, please wait") only %}<span class="styleguide__state">{% translate "loading" %}</span></div>
       <div class="styleguide__example">{% include "components/button.html" with label=_("Refresh") variant="ghost" loading=True only %}<span class="styleguide__state">{% translate "ghost, loading" %}</span></div>
     </div>
+
+    <h3>{% translate "Busy inside a form" %}</h3>
+    <p>{% translate "A loading submit button and a loading icon button: neither clicks nor submits the form." %}</p>
+    <form method="get" id="sg-busy-form" class="styleguide__examples">
+      <input type="hidden" name="submitted" value="yes">
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Place order") type="submit" loading=True loading_label=_("Placing the order") only %}<span class="styleguide__state">{% translate "submit, loading" %}</span></div>
+      <div class="styleguide__example">{% include "components/button.html" with label=_("Refresh") icon="search" icon_only=True loading=True loading_label=_("Refreshing") variant="secondary" only %}<span class="styleguide__state">{% translate "icon only, loading" %}</span></div>
+    </form>
 
     <h3>{% translate "Icons" %}</h3>
     <div class="styleguide__examples">
@@ -95,7 +104,7 @@ its own prefix so ids never repeat on the page; `products`
       <div>
         <h3>{% translate "Text fields, invalid" %}</h3>
         <form novalidate>
-          {% include "components/error_summary.html" with form=forms.text_invalid summary_id="text-errors" only %}
+          {% include "components/error_summary.html" with form=forms.text_invalid summary_id="text-errors" autofocus=focus_errors only %}
           {% for field in forms.text_invalid %}{% include "components/field.html" with field=field only %}{% endfor %}
           {% include "components/button.html" with label=_("Send") type="submit" only %}
         </form>

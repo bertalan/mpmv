@@ -70,7 +70,12 @@ def styleguide(request: HttpRequest) -> HttpResponse:
     response = render(
         request,
         "styleguide.html",
-        {"forms": sample_forms(), "products": sample_products()},
+        {
+            "forms": sample_forms(),
+            "products": sample_products(),
+            # ?focus=errors: the first error summary takes the focus on load (e2e tests).
+            "focus_errors": request.GET.get("focus") == "errors",
+        },
     )
     response["X-Robots-Tag"] = "noindex, nofollow"
     return response
