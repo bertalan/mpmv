@@ -37,16 +37,19 @@ Configuration comes only from environment variables.
 | Where | Tag | Made by |
 |---|---|---|
 | Developer machine | `mpmv-app:dev` (or `make image VERSION=...`) | `make image` |
-| CI on every PR | `mpmv-app:ci` (not published) | job *Container image* in `ci.yml` |
-| Release | `ghcr.io/<owner>/mpmv-app:X.Y.Z` and `:sha-<commit>` | `release.yml` on git tag `vX.Y.Z` |
+| CI on every PR | `mpmv-app:ci` for amd64 and arm64 (not published) | jobs *Container image (amd64)* and *(arm64)*, gate *Container image*, in `ci.yml` |
+| Release | `ghcr.io/<owner>/mpmv-app:X.Y.Z` and `:sha-<commit>`, multi-arch | `release.yml` on git tag `vX.Y.Z` |
 | Server, live release | `localhost/mpmv-app:current` | `mpmv-deploy` |
 
 - Releases follow `vMAJOR.MINOR.PATCH` git tags on `main`. A release tag is immutable: the release
   workflow refuses to overwrite an existing image tag. `latest` is never used.
 - The version is baked into the image as `MPMV_VERSION` and the OCI label
   `org.opencontainers.image.version`.
-- Release images are built on GitHub's `ubuntu-24.04` runners, so they are `linux/amd64`. An
-  arm64 server would need a multi-platform build.
+- Release images are multi-arch (ARC.13, ADR-0007 amendment 2026-11-08): one manifest list
+  with `linux/amd64` and `linux/arm64`. Each architecture is built on a native GitHub runner
+  (`ubuntu-24.04` and `ubuntu-24.04-arm`, no QEMU emulation) and pushed by digest; only the
+  manifest list gets the release tags, after both builds pass. `podman pull` on the server picks
+  the server's architecture. Each pull request builds and checks both architectures too.
 
 ## Local stack (Apple `container`)
 
