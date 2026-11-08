@@ -222,26 +222,72 @@ def test_media_volume_is_named_and_prefixed() -> None:
 
 @pytest.mark.parametrize("name", MEDIA_UNITS)
 def test_app_and_worker_write_media_only_to_the_media_volume(name: str) -> None:
-    """The root file system stays read-only; MEDIA_ROOT is the one writable mount."""
+    """The root file system stays read-only; MEDIA_ROOT is the one writable mount, no exec."""
     media = [m for m in mounts_of(name) if m[0] == "mpmv-media.volume"]
     assert len(media) == 1, mounts_of(name)
     assert media[0][1] == "/app/media"
-    options = media[0][2].split(",") if len(media[0]) == 3 else []
+    options = set(media[0][2].split(",")) if len(media[0]) == 3 else set()
     assert "ro" not in options
-    assert "U" in options, "owned by the image's non-root user"
+    assert {"noexec", "nosuid", "nodev"} <= options
+    assert "U" not in options, "ownership comes from the volume unit, no chown on every start"
 
 
 def test_caddy_mounts_media_read_only() -> None:
     media = [m for m in mounts_of("mpmv-caddy.container") if m[0] == "mpmv-media.volume"]
-    assert media == [["mpmv-media.volume", "/srv/media", "ro"]]
+    assert len(media) == 1
+    assert media[0][1] == "/srv/media"
+    assert set(media[0][2].split(",")) == {"ro", "noexec", "nosuid", "nodev"}
+
+
+PUBLIC_MEDIA = re.compile(r"^\t@public_media path_regexp public_media (\S+)$", re.M)
+
+
+def public_media_regex() -> re.Pattern[str]:
+    found = PUBLIC_MEDIA.search(CADDYFILE.read_text())
+    assert found, "public media must be an explicit allow-list"
+    # Caddy uses Go RE2; this pattern is also valid Python syntax.
+    return re.compile(found.group(1))
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/media/images/demo-home-hero.width-1600.webp",
+        "/media/images/logo.svg",
+        "/media/original_images/photo.JPG",
+        "/media/original_images/photo.avif",
+    ],
+)
+def test_caddy_serves_image_files_from_the_image_folders(path: str) -> None:
+    assert public_media_regex().match(path)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/media/documents/contract.pdf",
+        "/media/documents/image.png",
+        "/media/images/page.html",
+        "/media/images/noext",
+        "/media/images/a.webp.html",
+        "/media/images/sub/dir.webp",
+        "/media/images/",
+        "/media/kyc/id.jpg",
+        "/media/original_images/../documents/x.png",
+    ],
+)
+def test_caddy_never_serves_other_media_paths(path: str) -> None:
+    """lane-b review of #152: documents and private uploads must not become public by path."""
+    assert not public_media_regex().match(path)
 
 
 def test_caddy_serves_media_as_inert_static_files() -> None:
     """SEC.4: nothing under /media/ is executed, sniffed or able to run scripts."""
     text = CADDYFILE.read_text()
-    block = re.search(r"^\thandle_path /media/\* \{\n(.*?)\n\t\}$", text, re.M | re.S)
-    assert block, "media must be served by Caddy from the volume"
+    block = re.search(r"^\thandle @public_media \{\n(.*?)\n\t\}$", text, re.M | re.S)
+    assert block, "allowed media must be served by Caddy from the volume"
     body = block.group(1)
+    assert re.search(r"^\t\turi strip_prefix /media$", body, re.M)
     assert re.search(r"^\t\troot \* /srv/media$", body, re.M)
     assert re.search(r"^\t\tfile_server$", body, re.M), "no browse, no templates"
     for directive in ("browse", "templates", "php"):
@@ -249,4 +295,8 @@ def test_caddy_serves_media_as_inert_static_files() -> None:
     assert re.search(r"^\t\theader X-Content-Type-Options nosniff$", body, re.M)
     csp = r"^\t\theader Content-Security-Policy \"default-src 'none'; sandbox\"$"
     assert re.search(csp, body, re.M)
+    assert re.search(r"^\t\theader Cache-Control \"public, max-age=86400\"$", body, re.M)
+    assert re.search(r"^\thandle /media/\* \{\n\t\trespond 404\n\t\}$", text, re.M), (
+        "every other media path must be a 404, never the app or file_server"
+    )
     assert re.search(r"^\thandle \{\n\t\treverse_proxy mpmv-app:8000 \{$", text, re.M)
