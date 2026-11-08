@@ -1,0 +1,6 @@
+{% load i18n l10n %}{# A product card (CAT.8); CMS.10's product grid and THM.7 reuse it. Needs `card` and `currency`. #}
+<article class="product-card">
+  {% if card.image_url %}<img src="{{ card.image_url }}" alt="{{ card.image_alt }}" loading="lazy">{% endif %}
+  <h3 class="product-card-title">{% if card.url %}<a href="{{ card.url }}">{{ card.title }}</a>{% else %}{{ card.title }}{% endif %}</h3>
+  <p class="product-card-price">{% if card.price is not None %}<data value="{{ card.price|unlocalize }}">{{ currency }} {{ card.price }}</data> <small>{% translate "excl. VAT" %}</small>{% else %}{% translate "Price on request" %}{% endif %}</p>
+</article>
