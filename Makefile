@@ -1,6 +1,6 @@
 # MPMV task runner. Local containers use Apple `container` (ADR-0002); no Docker, no compose.
 .DEFAULT_GOAL := help
-.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell image dev dev-down dev-reset dev-status dev-logs migrate run assets worker test test-unit test-e2e e2e-baselines test-all check lint fmt typecheck imports theme-gates audit sbom
+.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell image dev dev-down dev-reset dev-status dev-logs migrate seed run assets worker test test-unit test-e2e e2e-baselines test-all check lint fmt typecheck imports theme-gates audit sbom
 
 DB_NAME      := mpmv-db
 DB_IMAGE     := docker.io/library/postgres:17
@@ -82,6 +82,9 @@ dev-logs: ## Follow the app logs (WHAT=worker for the worker)
 # --- Application
 migrate: db ## Apply migrations to the local database
 	$(MANAGE) migrate
+
+seed: migrate ## Seed the synthetic demo data (ARC.10); RESET=1 takes it out, docs/dev/demo-seed.md
+	$(MANAGE) seed $(if $(RESET),--reset)
 
 run: migrate assets ## Run the development server
 	$(MANAGE) runserver

@@ -37,7 +37,14 @@ LOCAL_APPS = [
     "apps.compliance",
     "apps.api",
     "apps.mcp",
+    "apps.seed",  # demo data seed (ARC.10): above every app, imported by none
 ]
+
+# Demo data seed (ARC.10, docs/dev/demo-seed.md): off unless allowed. Dev and test allow it;
+# STAGE opts in with MPMV_ALLOW_SEED=1. LIVE_DATA marks an environment holding real data
+# (live.py): the seed never runs there, and the `seed.E001` check fails if it is allowed.
+ALLOW_SEED = env_bool("MPMV_ALLOW_SEED", default=False)
+LIVE_DATA = False
 
 INSTALLED_APPS = [
     # Django's admin with the self-service password change audited (SEC.4).

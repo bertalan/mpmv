@@ -132,6 +132,7 @@ include_external_packages = true  # needed to forbid third-party imports (procra
 name = "Domain layers (lower layers never import higher ones)"
 type = "layers"
 layers = [
+  "apps.seed",  # the demo seed (ARC.10) writes every app's data through its services
   "apps.mcp",
   "apps.api",
   "apps.compliance | apps.seo | apps.ingest",
@@ -188,6 +189,7 @@ forbidden_modules = [
   "apps.seo",
   "apps.compliance",
   "apps.api",
+  "apps.seed",  # the demo seed (ARC.10) writes every app's data through its services
   "apps.mcp",
 ]
 
@@ -211,6 +213,7 @@ source_modules = [
   "apps.seo",
   "apps.compliance",
   "apps.api",
+  "apps.seed",  # the demo seed (ARC.10) writes every app's data through its services
   "apps.mcp",
   "mpmv",
 ]
