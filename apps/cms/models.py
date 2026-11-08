@@ -8,7 +8,8 @@ Their links are a StreamField (page or external link): unlike inline panels and 
 its admin editor needs no inline script, so it works under the strict CSP (SEC.1).
 
 Bodies are StreamFields with rich-text paragraphs, images and galleries (I18N.3), heroes, calls to
-action and FAQs (CMS.2); the choosers and the product grid come with CMS.2 part 2 and CMS.10.
+action, FAQs and "featured links" cards to pages, catalog terms and vendors (CMS.2); the product
+grid comes with CMS.10.
 
 Translation (I18N.3, spec 09 §9.2): wagtail-localize copies a page into another locale and keeps
 it in sync with its source. Texts, alt texts and captions are translated; images are synchronised
@@ -40,6 +41,7 @@ from .blocks import (
     RICH_TEXT_FEATURES,
     CallToActionBlock,
     FaqBlock,
+    FeaturedLinksBlock,
     FigureBlock,
     GalleryBlock,
     HeroBlock,
@@ -55,6 +57,7 @@ def body_field(verbose_name: Any = None) -> StreamField:
             ("gallery", GalleryBlock()),
             ("cta", CallToActionBlock()),
             ("faq", FaqBlock()),
+            ("featured", FeaturedLinksBlock()),
         ],
         blank=True,
         verbose_name=verbose_name or _("body"),
