@@ -37,6 +37,7 @@ urlpatterns = [
     path("i18n/switch/", switch_language, name="switch_language"),
     path("api/v1/", include("apps.api.urls")),
     path("account/mfa/", include("apps.accounts.urls")),
+    path("account/link/", include("apps.accounts.action_link_urls")),  # CORE.15
     path("geocoding/", include("apps.core.geocoding.urls")),  # "Find coordinates" (EVT.12)
     # Staff-only styleguide of the active theme (THM.4); a string, as no app imports themes.
     path("_styleguide/", include("apps.themes.urls")),

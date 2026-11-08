@@ -17,6 +17,7 @@ case "$role" in
       --workers "${WEB_CONCURRENCY:-3}" \
       --worker-tmp-dir /dev/shm \
       --access-logfile - \
+      --logger-class mpmv.gunicorn_logging.RedactingLogger \
       --error-logfile - \
       "$@"
     ;;
