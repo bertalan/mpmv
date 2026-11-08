@@ -624,35 +624,7 @@ def test_a_non_eu_cessionario_without_a_vat_number_is_identified_by_its_tin() ->
     assert party["Sede"]["Nazione"] == "US"
 
 
-# --- DAC7 dataset (spec 11 CMP.1): part of the payout requirements for every vendor
-
-
-def test_a_complete_identity_has_the_whole_dac7_dataset() -> None:
-    assert engine.dac7_missing(italian_company(tax_residence_country="IT")) == ()
-    assert engine.dac7_missing(non_eu_without_vat()) == ()
-
-
-def test_the_dac7_dataset_lists_what_is_missing() -> None:
-    assert engine.dac7_missing(LegalIdentity(country="US", legal_name="Vendor E Inc.")) == (
-        "vat_number or tax_code",
-        "tax_residence_country",
-        "registered_street",
-        "registered_postal_code",
-        "registered_city",
-        "registered_country",
-        "iban",
-    )
-
-
-def test_italian_dac7_addresses_need_the_province() -> None:
-    identity = italian_company(tax_residence_country="IT", registered_province="")
-    assert engine.dac7_missing(identity) == ("registered_province",)
-
-
-def test_dac7_needs_a_vat_number_or_a_tin() -> None:
-    assert engine.dac7_missing(italian_company(tax_residence_country="IT", vat_number="")) == ()
-    identity = italian_company(tax_residence_country="IT", vat_number="", tax_code="")
-    assert engine.dac7_missing(identity) == ("vat_number or tax_code",)
+# The DAC7 dataset (VEN.23) is tested in test_engine_dac7.py.
 
 
 def test_cessionario_needs_a_vat_number_or_a_codice_fiscale() -> None:
