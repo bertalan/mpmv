@@ -7,7 +7,11 @@ class ApiConfig(AppConfig):
 
     # Audit policy (SEC.4, docs/dev/audit-trail.md).
     audited_models = ("apiclient",)
-    unaudited_models = {"apimutationlog": "the API call log itself (append-only)"}
+    unaudited_models = {
+        "apimutationlog": "the API call log itself (append-only)",
+        "apiratecounter": "per-key request counters of the rate limit, not a domain change",
+    }
 
     def ready(self) -> None:
-        from .v1 import checks  # noqa: F401  (registers the API contract system checks)
+        from . import checks  # noqa: F401  (registers the rate limit settings check)
+        from .v1 import checks as v1_checks  # noqa: F401  (registers the API contract checks)

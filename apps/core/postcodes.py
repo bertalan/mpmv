@@ -8,14 +8,20 @@ A pattern is one of:
   have N characters and LOW <= HIGH (`70000..74999`, `9000..9999`, `1000-001..1999-999`);
 - `POSTCODE`: that postcode exactly (`84600`, `9000-001`).
 
+Any of them may start with an ISO country code and a colon (`PT:9000..9999`, `GR:84*`): the
+pattern then applies to that country only. A zone that covers several countries must qualify
+every entry, because the same digits mean different places in different countries.
+
 Postcodes and bounds are compared upper case with spaces and dashes removed (`846 00` = `84600`).
 The range separator is `..` because postcodes of some countries contain a dash (PT `1000-001`,
 PL `00-950`), which made the SHP.1 form `70000-74999` ambiguous; that form is refused.
 """
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Final, Literal
+
+from apps.core.countries import InvalidCountry, normalize_country
 
 RANGE_SEPARATOR: Final = ".."
 WILDCARD: Final = "*"
@@ -27,6 +33,7 @@ _PREFIX = re.compile(rf"({_TEXT})\*", re.ASCII)
 _RANGE = re.compile(rf"({_TEXT})\.\.\s*({_TEXT})", re.ASCII)
 # Two numbers of the same length joined by a dash, spaced or not: the SHP.1 range syntax.
 _OLD_RANGE = re.compile(r"(\d+)\s*-\s*(\d+)", re.ASCII)
+_QUALIFIER = re.compile(r"\s*([A-Za-z]{2})\s*:(.*)", re.ASCII | re.DOTALL)
 _IGNORED = re.compile(r"[\s-]+")
 
 Kind = Literal["exact", "prefix", "range"]
@@ -43,6 +50,7 @@ class PostcodePattern:
     kind: Kind
     low: str
     high: str = ""
+    country: str = ""  # empty: not qualified, applies to any country of its zone
 
     def matches(self, postcode: str) -> bool:
         return self.matches_normalized(normalize_postcode(postcode))
@@ -75,8 +83,27 @@ def _refuse(raw: str, reason: str) -> InvalidPostcodePattern:
     )
 
 
+def split_country_qualifier(raw: str) -> tuple[str, str]:
+    """`("PT", "9000..9999")` for `PT:9000..9999`; `("", raw)` when there is no `CC:` prefix.
+    The country is normalised (`EL` -> `GR`); raises InvalidPostcodePattern for an unknown one.
+    Shared with the province codes of a zone."""
+    match = _QUALIFIER.fullmatch(raw)
+    if match is None:
+        return "", raw
+    try:
+        return normalize_country(match.group(1)), match.group(2).strip()
+    except InvalidCountry as exc:
+        raise InvalidPostcodePattern(f"{raw!r}: {exc}.") from exc
+
+
 def parse_postcode_pattern(raw: str) -> PostcodePattern:
     """Parse and validate one pattern; raises InvalidPostcodePattern."""
+    country, body = split_country_qualifier(raw)
+    pattern = _parse_unqualified(body)
+    return replace(pattern, country=country) if country else pattern
+
+
+def _parse_unqualified(raw: str) -> PostcodePattern:
     text = _canonical(raw)
     if not text:
         raise _refuse(raw, "it is empty")
@@ -113,11 +140,12 @@ def parse_postcode_pattern(raw: str) -> PostcodePattern:
 def normalize_postcode_pattern(raw: str) -> str:
     """The pattern as stored: validated, upper case, single spaces, no spaces around `..`."""
     parse_postcode_pattern(raw)
-    text = _canonical(raw)
+    country, body = split_country_qualifier(raw)
+    text = _canonical(body)
     if RANGE_SEPARATOR in text:
         low, high = text.split(RANGE_SEPARATOR)
-        return f"{low.strip()}{RANGE_SEPARATOR}{high.strip()}"
-    return text
+        text = f"{low.strip()}{RANGE_SEPARATOR}{high.strip()}"
+    return f"{country}:{text}" if country else text
 
 
 def match_postcode(pattern: str, postcode: str) -> bool:

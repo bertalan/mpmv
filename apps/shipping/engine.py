@@ -16,7 +16,13 @@ from enum import IntEnum
 from typing import Final
 
 from apps.core.countries import normalize_country
-from apps.core.postcodes import PostcodePattern, normalize_postcode, parse_postcode_pattern
+from apps.core.postcodes import (
+    InvalidPostcodePattern,
+    PostcodePattern,
+    normalize_postcode,
+    parse_postcode_pattern,
+    split_country_qualifier,
+)
 
 # "Rest of the world" in `ShippingZone.countries`: only alone, and only as a last resort.
 WORLD: Final = "*"
@@ -58,6 +64,11 @@ class InvalidState(ValueError):
     """Raised for a province / state code with characters other than letters, digits and '-'."""
 
 
+class UnqualifiedEntry(ValueError):
+    """Raised for a postcode pattern or province without a `CC:` prefix in a zone that does not
+    cover exactly one country."""
+
+
 def normalize_zone_country(raw: str) -> str:
     """ISO 3166-1 alpha-2 code (EL → GR, UK → GB), or WORLD; raises InvalidCountry otherwise."""
     if raw.strip() == WORLD:
@@ -65,8 +76,23 @@ def normalize_zone_country(raw: str) -> str:
     return normalize_country(raw)
 
 
+def split_state(raw: str) -> tuple[str, str]:
+    """`(country, code)` of a province entry: `IT:SS` -> ("IT", "SS"), `SS` -> ("", "SS")."""
+    try:
+        country, body = split_country_qualifier(raw)
+    except InvalidPostcodePattern as exc:
+        raise InvalidState(str(exc)) from exc
+    return country, _state_code(body)
+
+
 def normalize_state(raw: str) -> str:
-    """A province / state code as the checkout collects it (`SS`, `CA`, `IT-SS`), upper case."""
+    """A province / state code as the checkout collects it (`SS`, `CA`, `IT-SS`), upper case,
+    optionally qualified by its country (`IT:SS`)."""
+    country, code = split_state(raw)
+    return f"{country}:{code}" if country else code
+
+
+def _state_code(raw: str) -> str:
     code = raw.strip().upper()
     if not code or len(code) > STATE_MAX_LENGTH or not _STATE.fullmatch(code):
         raise InvalidState(
@@ -74,6 +100,17 @@ def normalize_state(raw: str) -> str:
             f"by '-', at most {STATE_MAX_LENGTH} characters (e.g. SS, CA, IT-SS)."
         )
     return code
+
+
+def unqualified_entries(patterns: Iterable[str], states: Iterable[str]) -> list[str]:
+    """The postcode patterns and provinces that carry no `CC:` prefix, in order."""
+    return [entry for entry in (*patterns, *states) if not split_country_qualifier(entry)[0]]
+
+
+def single_country(countries: Iterable[str]) -> str:
+    """The one country of `countries`, or "" when there are none, several, or the world."""
+    found = set(countries)
+    return next(iter(found)) if len(found) == 1 and WORLD not in found else ""
 
 
 def bands_overlap(a: Band, b: Band) -> bool:
@@ -133,12 +170,22 @@ class ZoneSnap:
     states: tuple[str, ...] = ()
     vendor_id: int | None = None
     # Parsed once when the snapshot is built, never per address; a malformed pattern is refused
-    # here (InvalidPostcodePattern). Derived from `postcode_patterns`, so not compared.
+    # here (InvalidPostcodePattern). Derived from `postcode_patterns` and `states`, so not
+    # compared. Each pattern and province keeps the country it was written for.
     parsed_patterns: tuple[PostcodePattern, ...] = field(init=False, repr=False, compare=False)
+    parsed_states: tuple[tuple[str, str], ...] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         parsed = tuple(parse_postcode_pattern(raw) for raw in self.postcode_patterns)
+        parsed_states = tuple(split_state(raw) for raw in self.states)
         object.__setattr__(self, "parsed_patterns", parsed)
+        object.__setattr__(self, "parsed_states", parsed_states)
+        loose = unqualified_entries(self.postcode_patterns, self.states)
+        if loose and not single_country(self.countries | self.group_countries):
+            raise UnqualifiedEntry(
+                f"Zone {self.code!r} covers no single country, so {', '.join(map(repr, loose))} "
+                "must start with a country code (PT:9000..9999)."
+            )
 
     @property
     def is_world(self) -> bool:
@@ -149,8 +196,9 @@ def zone_match(zone: ZoneSnap, dest: Destination) -> Specificity | None:
     """How specifically `zone` matches `dest`, or None when it does not.
 
     Postcode patterns and provinces narrow a zone inside its countries (spec 06 case 6): the
-    address matches when its postcode matches a pattern or its province is listed. An address
-    without a postcode never matches a postcode-only zone (case 5).
+    address matches when its postcode matches a pattern or its province is listed. A qualified
+    entry (`PT:9000..9999`) applies to its own country only (case 20). An address without a
+    postcode never matches a postcode-only zone (case 5).
     """
     in_countries = dest.country in zone.countries
     in_groups = dest.country in zone.group_countries
@@ -158,9 +206,15 @@ def zone_match(zone: ZoneSnap, dest: Destination) -> Specificity | None:
         return None
     if zone.parsed_patterns or zone.states:
         code = normalize_postcode(dest.postcode)
-        if code and any(pattern.matches_normalized(code) for pattern in zone.parsed_patterns):
+        if code and any(
+            pattern.country in ("", dest.country) and pattern.matches_normalized(code)
+            for pattern in zone.parsed_patterns
+        ):
             return Specificity.POSTCODE
-        if dest.state and dest.state in zone.states:
+        if dest.state and any(
+            country in ("", dest.country) and state == dest.state
+            for country, state in zone.parsed_states
+        ):
             return Specificity.PROVINCE
         return None
     if in_countries:

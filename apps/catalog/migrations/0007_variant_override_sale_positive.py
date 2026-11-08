@@ -24,7 +24,7 @@ def refuse_zero_prices(apps: Any, schema_editor: Any) -> None:
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('catalog', '0005_slug_history'),
+        ('catalog', '0006_sku_identity'),
         ('vendors', '0013_crossvendorconsent'),
     ]
 

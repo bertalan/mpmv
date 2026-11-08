@@ -50,6 +50,24 @@ def check_transition(current: str, target: str) -> None:
         raise InvalidTransition(f"vendor status change {current} → {target} is not allowed")
 
 
+class VendorCannotWrite(Exception):
+    """Raised when a write on behalf of a vendor's API key finds the vendor not active (CORE.14).
+
+    `status` is the vendor's stored status at the time of the write. Not a Django
+    `PermissionDenied`: engines import no Django (ARC.18); the API maps it to its refusal.
+    """
+
+    def __init__(self, status: str) -> None:
+        super().__init__(f"the vendor is {status}: only an active vendor's API keys write")
+        self.status = status
+
+
+def check_can_write(status: str) -> None:
+    """Raise VendorCannotWrite unless a vendor with `status` may write through its API keys."""
+    if status != ACTIVE:
+        raise VendorCannotWrite(status)
+
+
 # --- Slug
 
 SLUG_MAX_LENGTH: Final = 80
