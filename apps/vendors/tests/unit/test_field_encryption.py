@@ -1,7 +1,8 @@
 """SEC.3: which vendor fields are encrypted at rest, and how the audit log masks them.
 
-Encrypted: the IBAN (VEN.12) and the tax code / TIN (DAC7; for sole proprietors it is a personal
-identifier). Not encrypted: the VAT number, which is public in VIES and searched by staff.
+Encrypted: the IBAN (VEN.12), the tax code / TIN (DAC7; for sole proprietors it is a personal
+identifier) and the date and place of birth of sole proprietors (DAC7, VEN.23). Not encrypted:
+the VAT number, which is public in VIES and searched by staff.
 """
 
 import pytest
@@ -18,8 +19,8 @@ def encrypted_field_names() -> set[str]:
     return {f.name for f in Vendor._meta.get_fields() if isinstance(f, EncryptedFieldMixin)}
 
 
-def test_the_iban_and_the_tax_code_are_encrypted_at_rest() -> None:
-    assert encrypted_field_names() == {"iban", "tax_code"}
+def test_the_iban_the_tax_code_and_the_birth_data_are_encrypted_at_rest() -> None:
+    assert encrypted_field_names() == {"iban", "tax_code", "date_of_birth", "place_of_birth"}
 
 
 def test_every_encrypted_field_is_masked_in_the_audit_log() -> None:

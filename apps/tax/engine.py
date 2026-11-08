@@ -31,6 +31,67 @@ FLAT_RATE_FORFETTARIO: Final = "flat_rate_forfettario"  # IT forfettario (fiscal
 OTHER_EXEMPTION: Final = "other"
 EXEMPT_REASONS: Final = (ART74_PUBLISHING, FLAT_RATE_FORFETTARIO, OTHER_EXEMPTION)
 
+# The country of the law that defines each exemption reason (TAX.13, owner decision MQ-3).
+# `other` has none here: each profile stores the country of the law its legal note cites.
+EXEMPTION_LAW_COUNTRIES: Final[Mapping[str, str]] = {
+    ART74_PUBLISHING: vendors.ITALY,
+    FLAT_RATE_FORFETTARIO: vendors.ITALY,
+}
+
+
+def exemption_law_country(exempt_reason: str, exempt_country: str) -> str:
+    """The country of the law behind `exempt_reason`; for `other`, the stored `exempt_country`.
+
+    Empty when there is no reason, or `other` has no valid country yet.
+    """
+    if exempt_reason == OTHER_EXEMPTION:
+        try:
+            return normalize_country(exempt_country) if exempt_country else ""
+        except InvalidCountry:
+            return ""
+    return EXEMPTION_LAW_COUNTRIES.get(exempt_reason, "")
+
+
+def vat_registration_country(vat_number: str, country: str) -> str:
+    """The country that registered `vat_number`: its prefix when it has one (EL is Greece),
+    otherwise `country`, the vendor's country of establishment (numbers stored without one)."""
+    code = vendors.compact(vat_number)
+    prefix = code[:2]
+    if len(code) > 2 and prefix.isalpha() and prefix.isascii():
+        try:
+            return normalize_country(prefix)  # EL -> GR, the VAT prefix of Greece
+        except InvalidCountry:
+            pass
+    return country
+
+
+def _exemption_country_errors(
+    regime: str, exempt_reason: str, *, exempt_country: str, vat_country: str
+) -> dict[str, str]:
+    """TAX.13: the reason's law must be the law of the country of the vendor's VAT number."""
+    if exempt_reason != OTHER_EXEMPTION:
+        if exempt_country:
+            return {"exempt_country": "Only the 'other' exemption stores the country of its law."}
+    elif not exempt_country:
+        return {
+            "exempt_country": (
+                "Required for the 'other' exemption: the country of the law its legal note cites."
+            )
+        }
+    elif not exemption_law_country(exempt_reason, exempt_country):
+        return {"exempt_country": f"Unknown country {exempt_country!r}."}
+    law_country = exemption_law_country(exempt_reason, exempt_country)
+    if regime != EXEMPT or not law_country or not vat_country or law_country == vat_country:
+        return {}
+    field = "exempt_country" if exempt_reason == OTHER_EXEMPTION else "exempt_reason"
+    return {
+        field: (
+            f"The exemption {exempt_reason!r} is defined by the law of {law_country}: it is for "
+            f"VAT numbers of {law_country} only, and the vendor's VAT number is from "
+            f"{vat_country}."
+        )
+    }
+
 
 def profile_errors(
     regime: str,
@@ -38,8 +99,11 @@ def profile_errors(
     *,
     fiscal_regime: str,
     oss_registered_since: dt.date | None = None,
+    exempt_country: str = "",
+    vat_country: str = "",
 ) -> dict[str, str]:
-    """What is wrong with a VAT regime for a vendor declaring `fiscal_regime` (VEN.12).
+    """What is wrong with a VAT regime for a vendor declaring `fiscal_regime` (VEN.12) whose
+    VAT number is registered in `vat_country` (`vat_registration_country`).
 
     The fiscal regime (FatturaPA RegimeFiscale) is what the vendor declares on its invoices and
     stays on the vendor; the VAT regime lives here. They are never duplicated, only kept
@@ -47,6 +111,10 @@ def profile_errors(
     (forfettario), which never charges VAT. A blank fiscal regime (identity not complete yet)
     allows every regime except the flat-rate exemption. Only the OSS regime has an OSS
     registration date (optional there).
+
+    An exemption reason is for VAT numbers of the country whose law defines it (TAX.13, MQ-3):
+    `EXEMPTION_LAW_COUNTRIES`, or `exempt_country` for `other`, which needs one. An empty
+    `vat_country` (unknown) skips only the comparison.
     """
     errors: dict[str, str] = {}
     if oss_registered_since is not None and regime in REGIMES and regime != OSS:
@@ -72,6 +140,12 @@ def profile_errors(
         errors["regime"] = (
             f"The vendor declares fiscal regime {vendors.FLAT_RATE_REGIME} (forfettario), "
             f"which charges no VAT: use the exempt regime with reason {FLAT_RATE_FORFETTARIO}."
+        )
+    if "exempt_reason" not in errors and "regime" not in errors:
+        errors.update(
+            _exemption_country_errors(
+                regime, exempt_reason, exempt_country=exempt_country, vat_country=vat_country
+            )
         )
     return errors
 
@@ -154,12 +228,14 @@ def request_errors(
     requested_fiscal_regime: str,
     current_fiscal_regime: str,
     oss_registered_since: dt.date | None = None,
+    exempt_country: str = "",
+    vat_country: str = "",
 ) -> dict[str, str]:
     """What is wrong with a requested regime for a vendor declaring `current_fiscal_regime`.
 
-    The request must leave the vendor consistent (`profile_errors`) with the fiscal regime it
-    will declare. Leaving the flat-rate scheme needs the new fiscal regime: nothing else says
-    what the vendor declares once it charges VAT.
+    The request must leave the vendor consistent (`profile_errors`, the exemption country rule
+    included) with the fiscal regime it will declare. Leaving the flat-rate scheme needs the
+    new fiscal regime: nothing else says what the vendor declares once it charges VAT.
     """
     if requested_fiscal_regime and requested_fiscal_regime not in vendors.FISCAL_REGIMES:
         return {"fiscal_regime": f"Unknown fiscal regime {requested_fiscal_regime!r}."}
@@ -179,7 +255,12 @@ def request_errors(
         regime, exempt_reason, requested=requested_fiscal_regime, current=current_fiscal_regime
     )
     return profile_errors(
-        regime, exempt_reason, fiscal_regime=resulting, oss_registered_since=oss_registered_since
+        regime,
+        exempt_reason,
+        fiscal_regime=resulting,
+        oss_registered_since=oss_registered_since,
+        exempt_country=exempt_country,
+        vat_country=vat_country,
     )
 
 

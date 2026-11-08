@@ -180,11 +180,16 @@ def test_seeded_requirements_match_the_owner_decision(seeded: None) -> None:
     assert italy <= rows
     for form in ("partnership", "srl", "spa", "cooperative"):
         assert {("IT", "", form, "rea_office"), ("IT", "", form, "rea_number")} <= rows
-    assert not any(form == "sole_proprietorship" for _, _, form, _ in rows)
+    # Sole proprietors: only the DAC7 date of birth (VEN.23).
+    assert {(c, r, f, n) for c, r, f, n in rows if f == "sole_proprietorship"} == {
+        ("", "", "sole_proprietorship", "date_of_birth")
+    }
     for country in ("IT", "DE", "FR", "GR", "SE"):
         assert {(country, "", "", "vat_number"), (country, "", "", "iban")} <= rows
-    # Non-EU vendors: IBAN and their foreign TIN, through one rule per field for the region.
-    assert {("", "non_eu", "", "iban"), ("", "non_eu", "", "tax_code")} <= rows
+    # Non-EU vendors: IBAN through a rule for the region. Their TIN (or, where none is issued,
+    # the place of birth) is enforced by the DAC7 check (VEN.23), not by a row.
+    assert ("", "non_eu", "", "iban") in rows
+    assert ("", "non_eu", "", "tax_code") not in rows
     # DAC7 dataset, every vendor: registered office address and country of tax residence.
     dac7 = {
         ("", "", "", field)
@@ -194,6 +199,7 @@ def test_seeded_requirements_match_the_owner_decision(seeded: None) -> None:
             "registered_city",
             "registered_country",
             "tax_residence_country",
+            "tin_country",
         )
     }
     assert dac7 <= rows
@@ -222,8 +228,10 @@ def test_an_italian_vendor_without_legal_data_lists_every_requirement(seeded: No
     assert legal_profile_completeness(vendor).missing == (
         "vat_number",
         "tax_code",
+        "tin_country",
         "tax_residence_country",
         "fiscal_regime",
+        "business_registration_number",
         "registered_street",
         "registered_postal_code",
         "registered_city",
@@ -270,7 +278,9 @@ def test_the_guard_checks_stored_data_not_unsaved_edits(seeded: None) -> None:
 
 def test_a_non_eu_vendor_needs_its_iban_tin_and_the_dac7_dataset(seeded: None) -> None:
     assert legal_profile_completeness(bare_vendor(country="US")).missing == (
+        "legal_form",
         "tax_code",
+        "tin_country",
         "tax_residence_country",
         "registered_street",
         "registered_postal_code",
@@ -282,7 +292,10 @@ def test_a_non_eu_vendor_needs_its_iban_tin_and_the_dac7_dataset(seeded: None) -
 
 def test_an_eu_vendor_needs_its_vat_number_iban_and_the_dac7_dataset(seeded: None) -> None:
     assert legal_profile_completeness(bare_vendor(country="DE")).missing == (
+        "legal_form",
         "vat_number",
+        "tax_code",
+        "tin_country",
         "tax_residence_country",
         "registered_street",
         "registered_postal_code",
