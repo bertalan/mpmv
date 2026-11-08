@@ -150,6 +150,8 @@ class HeroBlock(blocks.StructBlock):  # type: ignore[misc]
         icon = "pick"
         label = _("Hero")
         template = "cms/blocks/hero.html"
+        # No caption area: a credited image goes to the page's "Image credits" (CMS.8).
+        credit_in_disclosure = True
 
     def clean(self, value: blocks.StructValue) -> blocks.StructValue:
         value = super().clean(value)

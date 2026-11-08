@@ -8,17 +8,26 @@ they get no URL, no menu item and no admin link.
 The term and vendor choosers of the page cards (CMS.2) are admin viewsets (`choosers`).
 
 Documents are installed only for wagtail-localize (I18N.3): their menu item is hidden.
+
+Images (CMS.8): the chooser offers only images with their licence and author; the others are
+listed under "Images to classify" until staff classify them.
 """
 
 from collections.abc import Callable
 from typing import Any
 
+from django.http import HttpRequest
+from django.urls import URLPattern, path, reverse
 from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
+from wagtail.admin.menu import MenuItem
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet
 from wagtail.users import wagtail_hooks as wagtail_users_hooks
 
+from apps.core.services import classified
+
+from .admin_views import can_classify_images, image_review
 from .choosers import term_chooser, vendor_chooser
 from .models import NavigationMenu
 
@@ -55,6 +64,29 @@ _withdraw("register_bulk_action", _from_wagtail_users)
 @hooks.register("construct_main_menu")  # type: ignore[untyped-decorator]
 def hide_documents_menu(request: Any, menu_items: list[Any]) -> None:
     menu_items[:] = [item for item in menu_items if item.name != "documents"]
+
+
+@hooks.register("construct_image_chooser_queryset")  # type: ignore[untyped-decorator]
+def only_classified_images(images: Any, request: Any) -> Any:
+    """Images migrated without licence or author cannot be chosen for new content (CMS.8)."""
+    return classified(images)
+
+
+@hooks.register("register_admin_urls")  # type: ignore[untyped-decorator]
+def image_review_urls() -> list[URLPattern]:
+    return [path("images/review/", image_review, name="cms_image_review")]
+
+
+class ImageReviewMenuItem(MenuItem):  # type: ignore[misc]  # Wagtail is untyped
+    def is_shown(self, request: HttpRequest) -> bool:
+        return can_classify_images(request)
+
+
+@hooks.register("register_admin_menu_item")  # type: ignore[untyped-decorator]
+def image_review_menu_item() -> MenuItem:
+    return ImageReviewMenuItem(
+        _("Images to classify"), reverse("cms_image_review"), icon_name="image", order=310
+    )
 
 
 @hooks.register("register_admin_viewset")  # type: ignore[untyped-decorator]
