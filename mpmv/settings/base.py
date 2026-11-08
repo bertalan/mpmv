@@ -198,6 +198,15 @@ LANGUAGES = [
 USE_I18N = True
 LOCALE_PATHS = [BASE_DIR / "locale"]
 
+# Transactional email (ARC.16, docs/dev/transactional-email.md). Every email goes through the
+# outbox (`apps.core.services.enqueue_email`) and the `EmailSender` named here: the console
+# backend until ARC.19 adds the EU provider's adapter (provider choice pending, Q-48). The
+# provider webhook (`/webhooks/email/`) is off while MPMV_EMAIL_WEBHOOK_SECRET is empty.
+EMAIL_SENDER = env_str("MPMV_EMAIL_SENDER", "apps.core.mail.ConsoleEmailSender")
+DEFAULT_FROM_EMAIL = env_str("MPMV_EMAIL_FROM", "no-reply@localhost")
+EMAIL_WEBHOOK_SECRET = env_str("MPMV_EMAIL_WEBHOOK_SECRET", "")
+EMAIL_FEEDBACK_PARSER = env_str("MPMV_EMAIL_FEEDBACK_PARSER", "apps.core.mail.SignedJsonFeedback")
+
 # Wagtail (CMS.1, spec 10). Page locales follow LANGUAGES: apps.cms creates a Locale row for each
 # language after every migrate. The editors' admin is at /admin/ (mpmv/urls.py).
 WAGTAIL_SITE_NAME = "MPMV"
@@ -270,6 +279,17 @@ if CAPTCHA_ENABLED:
         "frame-src": [_TURNSTILE_ORIGIN],
     }
 
+# VIES VAT number checks (TAX.5): the EU REST API behind apps.tax.vies.ViesClient, asked once per
+# check with a timeout (retries only in the tax.recheck_vat_number job). Valid and invalid answers
+# are reused for VIES_CACHE_SECONDS, "VIES down" only for VIES_UNAVAILABLE_CACHE_SECONDS.
+VIES_CLIENT = "apps.tax.vies.HttpViesClient"
+VIES_API_URL = env_str(
+    "MPMV_VIES_API_URL", "https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-number"
+)
+VIES_TIMEOUT_SECONDS = 8  # per socket operation (connect, each read), not for the whole check
+VIES_CACHE_SECONDS = 24 * 60 * 60
+VIES_UNAVAILABLE_CACHE_SECONDS = 5 * 60
+
 # Field-level encryption (SEC.3, docs/dev/field-encryption.md): keys live outside the database,
 # in the file named by MPMV_FIELD_ENCRYPTION_KEYS_FILE (one per line) or in
 # MPMV_FIELD_ENCRYPTION_KEYS (comma-separated). Each is "<id>:<base64url 32 bytes>", newest first:
@@ -284,6 +304,15 @@ FIELD_ENCRYPTION_KEYS = env_secret_list("MPMV_FIELD_ENCRYPTION_KEYS")
 # everywhere within that time (at once in the process that saved it).
 FEATURE_FLAGS = env_flags("MPMV_FEATURE_FLAGS")
 FEATURE_FLAGS_CACHE_SECONDS = 5
+
+# Per-API-key rate limit (CORE.12, apps.api.engine): fixed windows counted in PostgreSQL, so every
+# app process shares one counter per key. API_RATE_LIMIT is the key-wide limit of every key;
+# API_RATE_LIMIT_SCOPES gives a costly scope its own counter and limit for every key, e.g.
+# {"catalog:write": "120/minute"}; API_RATE_LIMIT_CLIENTS replaces the key-wide limit of one key,
+# by ApiClient public id. Rates read "<calls>/<second|minute|hour|day>" (system check api.E003).
+API_RATE_LIMIT = "600/minute"
+API_RATE_LIMIT_SCOPES: dict[str, str] = {}
+API_RATE_LIMIT_CLIENTS: dict[str, str] = {}
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"

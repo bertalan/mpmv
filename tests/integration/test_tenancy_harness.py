@@ -209,7 +209,7 @@ def test_a_list_that_lists_nothing_fails_the_positive_control(
 
 # --- API v1 operations, called with Vendor A's API key (CORE.13)
 
-API_URLCONF_SCOPE = "members:read"
+API_URLCONF_SCOPE = "catalog:read"  # vendor-grantable (CORE.14)
 
 
 def operation(key: str) -> ApiOperation:

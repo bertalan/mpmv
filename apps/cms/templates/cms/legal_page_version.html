@@ -1,0 +1,13 @@
+{% extends "layouts/base.html" %}
+{% load i18n wagtailcore_tags %}
+{% block content %}
+  <article class="legal-page">
+    <h1>{{ version.title }}</h1>
+    {% include "cms/includes/legal_version_meta.html" %}
+    <p class="legal-notice">
+      {% translate "This is an archived version." %}
+      <a href="{% pageurl page %}">{% translate "Read the current version" %}</a>
+    </p>
+    {% for block in version.body %}{% include_block block %}{% endfor %}
+  </article>
+{% endblock %}
