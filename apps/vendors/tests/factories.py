@@ -299,6 +299,7 @@ class ContractAcceptanceFactory(DjangoModelFactory[ContractAcceptance]):
     text_hash = ""
     accepted_at = factory.LazyFunction(timezone.now)
     ip = "198.51.100.1"
+    onboarding_round = factory.SelfAttribute("vendor.onboarding_round")  # VEN.21
 
     @classmethod
     def _create(cls, model_class: type[ContractAcceptance], *args: Any, **kwargs: Any) -> Any:
