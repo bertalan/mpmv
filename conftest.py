@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from django.test import Client
 
     from apps.accounts.models import User
+    from apps.core.changeset import ChangeSet
     from tests.tenancy import CrossTenant
 
 # Fixed seed for Faker and factory_boy, so a failure replays with the same data.
@@ -103,3 +104,12 @@ def cross_tenant(db: None) -> "CrossTenant":
     from tests.tenancy_registry import OWNED_OBJECTS
 
     return make_cross_tenant(OWNED_OBJECTS.values())
+
+
+@pytest.fixture
+def demo_seed(db: None) -> "ChangeSet":
+    """The ARC.10 demo data set: vendors A-E with every VAT regime, 50 EN/IT products, shipping,
+    CMS pages and events, built through the services (`apps.seed`, docs/dev/demo-seed.md)."""
+    from apps.seed.services import TEST_CONTEXT, seed
+
+    return seed(ctx=TEST_CONTEXT)

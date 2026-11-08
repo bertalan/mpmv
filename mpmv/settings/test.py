@@ -16,6 +16,7 @@ from .base import *  # noqa: F403
 
 # Feature flags: the code defaults, whatever the shell exports, read from the database on every
 # check (tests roll back their writes, so a cached value could leak into the next test).
+ALLOW_SEED = True  # the `demo_seed` fixture (ARC.10)
 FEATURE_FLAGS = {}
 FEATURE_FLAGS_CACHE_SECONDS = 0
 # VIES (TAX.5): the suite never leaves the machine. A check without a fake fails the test, and the

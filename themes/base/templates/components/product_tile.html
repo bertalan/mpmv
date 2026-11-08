@@ -7,8 +7,9 @@ arrive formatted by the caller (catalog services); the tile only shows them.
   {% include "components/product_tile.html" with name=p.name url=p.url price=p.price_display vendor=p.vendor_name only %}
 
 Context:
-- `name` (required), `url` (required): the product name and its page. Only http(s) and
-  relative URLs ("/", "#", "?") are linked; any other value leaves the name unlinked.
+- `name` (required), `url`: the product name and its page. Only http(s) and relative URLs
+  ("/", "#", "?") are linked; without `url` (a product with no page yet) or with any other value
+  the name shows without a link.
 - `heading_level`: 2 to 6 (default 3), to fit the page's outline; out of range is clamped.
 - `image`: the product's Wagtail image, rendered as AVIF/WebP/JPEG renditions with `srcset`
   and `sizes` (THM.12); it wins over `image_url`.
