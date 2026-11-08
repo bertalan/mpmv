@@ -117,7 +117,7 @@ colour values outside token files.
 | Tier | Examples | Who sets it |
 |---|---|---|
 | Primitive | `color.red.700`, `color.slate.900`, `font.family.display`, `space.4`, `radius.2` | Theme |
-| Semantic | `--color-text`, `--color-text-muted`, `--color-surface`, `--color-surface-inverse`, `--color-accent`, `--color-on-accent`, `--color-accent-hover`, `--color-accent-tint`, `--color-secondary`, `--color-on-secondary`, `--color-secondary-hover`, `--color-secondary-text`, `--color-link`, `--color-focus`, `--color-danger`, `--font-body`, `--font-display`, `--step-0` … `--step-5` (fluid type with `clamp()`), `--space-xs` … `--space-3xl`, `--radius-control`, `--radius-card`, `--shadow-raised`, `--duration-fast`, `--header-height` | Theme (required set = token contract) |
+| Semantic | `--color-text`, `--color-text-muted`, `--color-surface`, `--color-surface-raised`, `--color-surface-inverse`, `--color-accent`, `--color-on-accent`, `--color-accent-hover`, `--color-accent-tint`, `--color-secondary`, `--color-on-secondary`, `--color-secondary-hover`, `--color-secondary-text`, `--color-link`, `--color-focus`, `--color-danger`, `--color-info`, `--color-success`, `--color-warning`, `--font-body`, `--font-display`, `--step-0` … `--step-5` (fluid type with `clamp()`), `--space-xs` … `--space-3xl`, `--radius-control`, `--radius-card`, `--shadow-raised`, `--duration-fast`, `--header-height` | Theme (required set = token contract) |
 | Component | `--button-bg`, `--card-padding`, `--price-sale-color` | `base` derives them from semantic tokens; a theme may override |
 
 The **token contract** (`apps/themes/contract.py`) lists the required semantic tokens and the
@@ -125,8 +125,8 @@ contrast pairs that every theme must satisfy:
 
 | Pair | Minimum |
 |---|---|
-| `text` / `surface`, `text-muted` / `surface`, `link` / `surface`, `on-accent` / `accent`, `on-accent` / `accent-hover`, `accent` / `accent-tint`, `on-secondary` / `secondary`, `on-secondary` / `secondary-hover`, `secondary-text` / `surface`, `text-inverse` / `surface-inverse`, `danger` / `surface` | 4.5:1 |
-| `focus` / `surface`, `focus` / `surface-inverse`, `border-control` / `surface`, `accent` / `surface` (as a UI component) | 3:1 |
+| `text` / `surface`, `text-muted` / `surface`, `link` / `surface`, `on-accent` / `accent`, `on-accent` / `accent-hover`, `accent` / `accent-tint`, `on-secondary` / `secondary`, `on-secondary` / `secondary-hover`, `secondary-text` / `surface`, `text-inverse` / `surface-inverse`, `danger` / `surface`, `text` / `surface-raised`, `text-muted` / `surface-raised`, `link` / `surface-raised`, `link` / `accent-tint` | 4.5:1 |
+| `focus` / `surface`, `focus` / `surface-inverse`, `border-control` / `surface`, `accent` / `surface` (as a UI component), `info` / `surface-raised`, `success` / `surface-raised`, `warning` / `surface-raised`, `danger` / `surface-raised` (the alert level bar) | 3:1 |
 
 Every background role has its own foreground token (`on-accent`, `on-secondary`), so a light
 secondary such as an orange can carry dark text; the vendor palettes of §14.12 use the same roles.

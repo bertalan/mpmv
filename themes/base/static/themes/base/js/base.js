@@ -35,3 +35,16 @@ document.addEventListener("alpine:init", () => {
     },
   }));
 });
+
+// Focus not obscured (WCAG 2.4.11): from 48rem up the header is sticky, and a long menu can wrap
+// it to a second row, taller than the --header-height token. The scroll padding reads
+// --header-offset, the header's real height, kept up to date here. Setting a custom property
+// through the CSSOM is allowed by the CSP. The token itself is not touched: it is the header's
+// minimum height, so writing the measure back would make the header grow on every resize.
+const siteHeader = document.querySelector(".site-header");
+if (siteHeader && "ResizeObserver" in window) {
+  new ResizeObserver(() => {
+    const height = Math.ceil(siteHeader.getBoundingClientRect().height);
+    document.documentElement.style.setProperty("--header-offset", `${height}px`);
+  }).observe(siteHeader);
+}

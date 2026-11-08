@@ -93,8 +93,12 @@ def test_every_shipped_theme_meets_the_token_contract(slug: str) -> None:
 def test_the_contract_rejects_a_base_with_a_weak_pair() -> None:
     tokens = resolve_tokens(["base"], {"base": read_tokens(SHIPPED_THEMES / "base")})
     weak = {**tokens, "color.text-muted": "#999999"}  # 2.85:1 on white
-    (violation,) = check_tokens(weak, TOKEN_CONTRACT)
-    assert violation.token == "color.text-muted/color.surface"
+    violations = check_tokens(weak, TOKEN_CONTRACT)
+    # Too light on the surface and on the raised surface (THM.4) alike.
+    assert [v.token for v in violations] == [
+        "color.text-muted/color.surface",
+        "color.text-muted/color.surface-raised",
+    ]
     assert isinstance(TOKEN_CONTRACT.pairs[0], ContrastPair)
 
 
