@@ -14,7 +14,6 @@ vendor is refused (401); closing a vendor revokes each of its keys (`revoke_vend
 reopened vendor gets none back and issues new ones once active again; deleting a vendor audits
 each of its keys (`vendor_key_deletions`).
 
-
 Rate limit (CORE.12): `count_api_call` counts each authenticated call on a PostgreSQL counter
 shared by every app process (`ApiRateCounter`); limits come from the `API_RATE_LIMIT*` settings.
 """

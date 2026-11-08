@@ -11,7 +11,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('vendors', '0013_crossvendorconsent'),
+        ('vendors', '0014_fiscal_regime_rf20'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
