@@ -9,17 +9,21 @@ The authoring, moderation, hiding and cancelling services (`save_event_draft`, `
   `translation_key`: they are translations of each other, which wagtail-localize needs to place
   a translated event under the index of its language.
 - `sync_event_status` writes the denormalised `status` from the Wagtail state.
+- `may_edit_events_in_admin` keeps vendors out of event pages in the Wagtail admin.
 """
 
 import logging
 import uuid
 
+from django.contrib.auth.base_user import AbstractBaseUser
+from django.contrib.auth.models import AnonymousUser
 from django.db import transaction
 from wagtail.models import Page
 
 from apps.cms.models import HomePage
 from apps.core.changeset import ChangeSet
 from apps.core.i18n import configured_languages
+from apps.vendors.models import VendorMember
 
 from . import engine
 from .models import EventIndexPage, EventPage
@@ -105,3 +109,18 @@ def sync_event_status(page: EventPage, changes: ChangeSet | None = None) -> str:
             changes.update(EVENT, str(page.pk), {"status": current.status}, {"status": status})
     page.status = status
     return status
+
+
+def may_edit_events_in_admin(user: AbstractBaseUser | AnonymousUser) -> bool:
+    """Whether `user` may create, edit or delete event pages in the Wagtail admin.
+
+    Vendors author events in the vendor area, never in the Wagtail admin (spec 15 "How vendors
+    author an `EventPage`"): its explorer, image library and reports are not tenant-scoped. A
+    vendor member who is not platform staff is refused even when an editor group gave them
+    Wagtail access. Staff and other editors keep Wagtail's own page permissions.
+    """
+    if not user.is_authenticated:
+        return False
+    if getattr(user, "is_staff", False):
+        return True
+    return not VendorMember.objects.filter(user_id=user.pk).exists()

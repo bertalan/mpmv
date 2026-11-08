@@ -180,7 +180,7 @@ def test_a_crafted_post_cannot_link_another_vendors_product() -> None:
     staff = UserFactory.create(superuser=True)
     page = EventPageFactory.create()
     other = ProductFactory.create()
-    form = _form(page, staff, {"title": page.title, "products": [str(other.pk)]})
+    form = _form(page, staff, {"title": page.title, "products": [str(other.pk)], "body-count": "0"})
     assert not form.is_valid()
     assert "products" in form.errors
 
@@ -220,7 +220,13 @@ def test_a_vendor_member_with_wagtail_access_is_refused_on_event_pages(client: C
     verified_login(client, member.user)
     own = EventPageFactory.create(vendor=member.vendor)
     index = primary_index()
-    assert client.get(_edit_url(own)).status_code == 403
-    add = reverse("wagtailadmin_pages:add", args=("events", "eventpage", index.pk))
-    assert client.get(add).status_code == 403
-    assert client.get(reverse("wagtailadmin_pages:delete", args=(own.pk,))).status_code == 403
+    # Wagtail turns the refusal into a redirect to the admin home with an error message.
+    refused = reverse("wagtailadmin_home")
+    for url in (
+        _edit_url(own),
+        reverse("wagtailadmin_pages:add", args=("events", "eventpage", index.pk)),
+        reverse("wagtailadmin_pages:delete", args=(own.pk,)),
+    ):
+        response = client.get(url)
+        assert response.status_code == 302, url
+        assert response["Location"] == refused, url

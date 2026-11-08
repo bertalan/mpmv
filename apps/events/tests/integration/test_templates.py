@@ -92,7 +92,7 @@ def test_dates_are_written_in_the_page_language(client: Client) -> None:
     page = _publish(EventPageFactory.create(parent=italian, title="Fiera di primavera"))
     html = _html(client, page.url)
     assert '<html lang="it"' in html
-    assert "marzo" in html  # 10 March 2027, in Italian
+    assert "marzo" in html.lower()  # 10 March 2027, in Italian
     assert "Fiera di primavera" in html
 
 
