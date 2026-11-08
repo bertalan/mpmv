@@ -267,7 +267,7 @@ def md_backlog(tasks: list[Task]) -> str:
             deps = ", ".join(t.deps) or "—"
             out.append(f"| {t.id} | {t.title} | {t.priority} | {t.hours} | {deps} | {t.done} |")
         out.append("")
-    return "\n".join(out) + "\n"
+    return "\n".join(out).rstrip("\n") + "\n"
 
 
 def csv_text(tasks: list[Task]) -> str:
@@ -395,7 +395,7 @@ def build_html(files: list[Path], out: Path) -> None:
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>mermaid.initialize({{startOnLoad:true,theme:window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'default'}});</script>
 <script>{JS}</script></body></html>"""
-    out.write_text(page, encoding="utf-8")
+    out.write_text(page.rstrip("\n") + "\n", encoding="utf-8")
 
 
 def validate_progress(tasks: list[Task]) -> list[str]:

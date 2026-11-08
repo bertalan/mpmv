@@ -10,7 +10,9 @@ from typing import Any
 from django.core.checks import CheckMessage, Error, Tags, register
 from ninja import NinjaAPI
 
-from .mutations import DRY_RUN_PARAM, MUTATING_METHODS
+from apps.api.engine import MUTATING_METHODS
+
+from .mutations import DRY_RUN_PARAM
 
 
 def check_api(api: NinjaAPI) -> list[CheckMessage]:

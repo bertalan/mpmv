@@ -56,19 +56,13 @@ def test_new_product_defaults() -> None:
     assert str(product) == "SKU-1"
 
 
-def test_sku_is_stored_upper_case_and_stripped() -> None:
+def test_sku_is_stored_raw_with_its_match_key() -> None:
     product = ProductFactory.create(sku="  abc-123 ")
-    assert product.sku == "ABC-123"
     product.refresh_from_db()
-    assert product.sku == "ABC-123"
+    assert (product.sku, product.sku_key) == ("  abc-123 ", "abc-123")
 
 
-def test_sku_lookups_ignore_case() -> None:
-    product = ProductFactory.create(sku="ABC-123")
-    assert Product.objects.get(sku="abc-123") == product
-
-
-def test_same_sku_twice_for_one_vendor_is_refused_by_the_database() -> None:
+def test_same_match_key_twice_for_one_vendor_is_refused_by_the_database() -> None:
     vendor = VendorFactory.create()
     ProductFactory.create(vendor=vendor, sku="ABC-123")
     refused_by_the_database(vendor=vendor, sku="abc-123")
@@ -77,7 +71,7 @@ def test_same_sku_twice_for_one_vendor_is_refused_by_the_database() -> None:
 def test_same_sku_for_two_vendors_is_allowed() -> None:
     ProductFactory.create(vendor=VendorFactory.create(), sku="ABC-123")
     ProductFactory.create(vendor=VendorFactory.create(), sku="ABC-123")
-    assert Product.objects.filter(sku="ABC-123").count() == 2
+    assert Product.objects.filter(sku_key="abc-123").count() == 2
 
 
 def test_validation_reports_a_duplicate_sku_before_saving() -> None:
@@ -89,18 +83,16 @@ def test_validation_reports_a_duplicate_sku_before_saving() -> None:
     assert "This vendor already has a product with this SKU." in str(exc.value)
 
 
-def test_queryset_updates_normalize_the_sku_too() -> None:
-    product = ProductFactory.create()
-    Product.objects.filter(pk=product.pk).update(sku=" abc-9 ")
-    product.refresh_from_db()
-    assert product.sku == "ABC-9"
+def test_validation_refuses_a_blank_sku() -> None:
+    with pytest.raises(ValidationError) as exc:
+        ProductFactory.build(vendor=VendorFactory.create(), sku="   ").full_clean()
+    assert "sku" in exc.value.message_dict
 
 
-@pytest.mark.parametrize("sku", ["lower-case", "", " PADDED"])
-def test_unnormalized_skus_are_refused_by_the_database(sku: str) -> None:
+def test_an_empty_match_key_is_refused_by_the_database() -> None:
     product = ProductFactory.create()
     with pytest.raises(IntegrityError), transaction.atomic(), connection.cursor() as cursor:
-        cursor.execute("UPDATE catalog_product SET sku = %s WHERE id = %s", [sku, product.pk])
+        cursor.execute("UPDATE catalog_product SET sku_key = '' WHERE id = %s", [product.pk])
 
 
 # --- Product choices and amounts
@@ -187,8 +179,8 @@ def test_legacy_ids_are_unique() -> None:
 
 def test_required_companion_and_upsells() -> None:
     companion = ProductFactory.create()
-    upsell = ProductFactory.create()
-    product = ProductFactory.create(required_companion=companion)
+    upsell = ProductFactory.create(vendor=companion.vendor)
+    product = ProductFactory.create(vendor=companion.vendor, required_companion=companion)
     product.upsells.add(upsell)
     assert list(companion.required_by.all()) == [product]
     assert list(product.upsells.all()) == [upsell]
@@ -203,7 +195,7 @@ def test_a_product_cannot_be_its_own_companion() -> None:
 
 def test_a_required_companion_cannot_be_deleted() -> None:
     companion = ProductFactory.create()
-    ProductFactory.create(required_companion=companion)
+    ProductFactory.create(vendor=companion.vendor, required_companion=companion)
     with pytest.raises(ProtectedError):
         companion.delete()
 
@@ -228,7 +220,7 @@ def test_deleting_a_product_deletes_its_translations_and_variants() -> None:
 
 def test_new_variant_defaults() -> None:
     product = ProductFactory.create(kind="variable")
-    variant = Variant.objects.create(product=product, sku="var-1")
+    variant = Variant.objects.create(product=product, sku="VAR-1")
     assert variant.sku == "VAR-1"
     assert variant.vendor == product.vendor
     assert variant.price_net_override is None
@@ -279,16 +271,6 @@ def test_a_variant_vendor_different_from_its_product_is_refused_by_the_database(
         Variant.objects.filter(pk=variant.pk).update(vendor=other_vendor)
 
 
-def test_moving_a_product_to_another_vendor_moves_its_variants() -> None:
-    variant = VariantFactory.create()
-    product = variant.product
-    other_vendor = VendorFactory.create()
-    product.vendor = other_vendor
-    product.save()
-    variant.refresh_from_db()
-    assert variant.vendor == other_vendor
-
-
 def test_only_one_default_variant_per_product() -> None:
     product = ProductFactory.create(kind="variable")
     VariantFactory.create(product=product, is_default=True)
@@ -312,10 +294,10 @@ def test_invalid_variant_values_are_refused_by_the_database(field: str, value: o
         VariantFactory.create(**{field: value})
 
 
-def test_unnormalized_variant_skus_are_refused_by_the_database() -> None:
+def test_an_empty_variant_match_key_is_refused_by_the_database() -> None:
     variant = VariantFactory.create()
     with pytest.raises(IntegrityError), transaction.atomic(), connection.cursor() as cursor:
-        cursor.execute("UPDATE catalog_variant SET sku = 'lower' WHERE id = %s", [variant.pk])
+        cursor.execute("UPDATE catalog_variant SET sku_key = '' WHERE id = %s", [variant.pk])
 
 
 def test_variants_are_ordered_by_position() -> None:

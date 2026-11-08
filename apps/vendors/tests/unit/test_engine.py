@@ -107,3 +107,24 @@ def test_slug_respects_the_maximum_length_including_the_suffix() -> None:
     second = unique_slug(name, taken={first}, max_length=20)
     assert second == "x" * 18 + "-2"
     assert len(second) == 20
+
+
+# --- Writes through a vendor's API keys (CORE.14)
+
+
+def test_an_active_vendor_can_write() -> None:
+    engine.check_can_write(engine.ACTIVE)
+
+
+@pytest.mark.parametrize(
+    "status", [engine.APPLICANT, engine.ONBOARDING, engine.SUSPENDED, engine.CLOSED]
+)
+def test_a_vendor_that_is_not_active_cannot_write(status: str) -> None:
+    with pytest.raises(engine.VendorCannotWrite) as refused:
+        engine.check_can_write(status)
+    assert refused.value.status == status
+
+
+def test_a_refused_vendor_write_needs_no_django_exception() -> None:
+    # Engines import no Django (ARC.18); the API maps the exception to its refusal.
+    assert issubclass(engine.VendorCannotWrite, Exception)

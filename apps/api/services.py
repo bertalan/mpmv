@@ -6,6 +6,11 @@ commits (no grace period). A pipeline rotates by deploying the new key right aft
 A vendor key (CORE.13) is issued only by platform staff holding `api.add_apiclient` or an owner
 of that vendor; a platform key only by such staff, or by trusted code without an issuer (shell,
 deploy scripts).
+
+Vendor key policy (CORE.14): a vendor key is issued only for an active vendor and holds only
+`engine.VENDOR_GRANTABLE_SCOPES`, checked again on every request; only a key of an active vendor
+writes (403 for applicant, onboarding and suspended vendors, which only read); a key of a closed
+vendor is refused (401); deleting a vendor audits each of its keys (`vendor_key_deletions`).
 """
 
 import datetime as dt
@@ -22,6 +27,7 @@ from apps.accounts.models import User
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.services import run_mutation
+from apps.vendors import engine as vendor_engine
 from apps.vendors.engine import VendorAction
 from apps.vendors.models import Vendor
 from apps.vendors.services import has_vendor_permission
@@ -39,6 +45,7 @@ from .engine import (
     key_matches,
     normalize_allowed_ips,
     parse_authorization,
+    platform_only_scopes,
     validate_scopes,
 )
 from .models import ApiClient, ApiMutationLog
@@ -123,6 +130,15 @@ def check_issuer(issuer: AbstractBaseUser | AnonymousUser | None, vendor: Vendor
         raise PermissionDenied("only platform staff or an owner of the vendor issue its API keys")
 
 
+def _check_vendor_active(vendor: Vendor) -> None:
+    """Vendor keys are issued only while the vendor is active (CORE.14), as stored."""
+    status = Vendor.objects.filter(pk=vendor.pk).values_list("status", flat=True).first()
+    if status != vendor_engine.ACTIVE:
+        raise InvalidApiClient(
+            f"API keys are issued only for an active vendor; this vendor is {status or 'missing'}"
+        )
+
+
 def issue_api_client(
     *,
     name: str,
@@ -137,15 +153,18 @@ def issue_api_client(
     """Issue a key: for `vendor` (a vendor key) or, without one, a platform key.
 
     `issuer` is the user asking for it (see `check_issuer`); the audit entry names the vendor.
+    A vendor key needs an active vendor (CORE.14): InvalidApiClient otherwise, also on dry-run.
     """
     check_issuer(issuer, vendor)
+    if vendor is not None:
+        _check_vendor_active(vendor)
     if not name.strip():
         raise InvalidApiClient("name is required")
     generated = _new_key()
     client = ApiClient(
         vendor=vendor,
         name=name.strip(),
-        scopes=validate_scopes(scopes),
+        scopes=validate_scopes(scopes, vendor_key=vendor is not None),
         key_prefix=generated.prefix,
         key_hash=hash_key(generated.key),
         expires_at=_future(expires_at),
@@ -212,9 +231,17 @@ def authenticate(
     *,
     ip: str | None,
     required_scope: str | None,
+    write: bool = True,
     now: dt.datetime | None = None,
 ) -> AuthResult:
-    """Check an `Authorization` header: 401 for bad/expired/revoked keys, 403 for IP or scope."""
+    """Check an `Authorization` header: 401 for bad/expired/revoked keys and closed vendors,
+    403 for IP, scope, or a write by the key of a vendor that is not active (CORE.14).
+
+    `write` says whether the call changes state; a caller that does not say is treated as
+    writing, so a key of a vendor that is not active is refused unless the call is a read.
+    The vendor status is read with the key on every call: suspending, reinstating or closing a
+    vendor takes effect on its keys at once.
+    """
     now = now or timezone.now()
     parsed = parse_authorization(authorization)
     if isinstance(parsed, Decision):
@@ -224,7 +251,7 @@ def authenticate(
     if client is None or not matches:
         logger.info("API key refused: prefix=%s reason=%s", parsed.prefix, Reason.INVALID)
         return AuthResult(deny(Reason.INVALID), None)
-    decision = evaluate(client.state(), now=now, ip=ip, required_scope=required_scope)
+    decision = evaluate(client.state(), now=now, ip=ip, required_scope=required_scope, write=write)
     if decision.status is AuthStatus.UNAUTHENTICATED:
         logger.info("API key refused: prefix=%s reason=%s", parsed.prefix, decision.reason)
         return AuthResult(decision, None)
@@ -234,6 +261,44 @@ def authenticate(
     ApiClient.objects.filter(pk=client.pk).update(last_used_at=now)
     client.last_used_at = now
     return AuthResult(decision, client)
+
+
+# --- Vendor deletion (CORE.14)
+
+
+def vendor_key_deletions(vendor: Vendor, changes: ChangeSet) -> None:
+    """Add a delete per key of `vendor` to its deletion's ChangeSet: one audit entry per key.
+
+    Named in `settings.VENDOR_DELETION_AUDIT_HOOKS` and called by
+    `apps.vendors.services.delete_vendor`, which cannot import this app. The keys themselves go
+    with the vendor (`on_delete=CASCADE`); revoked keys are listed too.
+    """
+    for client in ApiClient.objects.select_related("vendor").filter(vendor=vendor).order_by("pk"):
+        changes.delete(MODEL, str(client.public_id), client.snapshot())
+
+
+# --- Vendor keys holding platform-only scopes (CORE.14)
+
+
+@dataclass(frozen=True)
+class ScopeViolation:
+    client: ApiClient
+    platform_only: list[str]
+
+
+def vendor_keys_with_platform_scopes() -> list[ScopeViolation]:
+    """Active vendor keys that hold platform-only scopes, e.g. issued before CORE.14 classed a
+    scope platform-only. Read-only: such a scope is refused at request time anyway; revoke or
+    reissue the key to clean it up."""
+    violations: list[ScopeViolation] = []
+    clients = ApiClient.objects.select_related("vendor").filter(
+        vendor__isnull=False, is_active=True
+    )
+    for client in clients.order_by("pk"):
+        platform_only = platform_only_scopes(client.scopes)
+        if platform_only:
+            violations.append(ScopeViolation(client, platform_only))
+    return violations
 
 
 # --- Mutation log (CORE.7)

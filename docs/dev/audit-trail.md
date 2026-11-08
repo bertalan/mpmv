@@ -33,15 +33,17 @@ vendor's change page links to its trail (`?vendor=<public id>`).
 | Logins (CORE.5) | `accounts.login.succeeded`, `accounts.login.failed`, `accounts.login.locked_out`, `accounts.registration.rate_limited` |
 | Second factors (CORE.4) | `accounts.mfa.enrolled`, `.verified`, `.verification_failed`, `.recovery_code_used`, `.recovery_codes_generated`, `.device_removed`, `.disabled` |
 | Users and permissions (admin) | `accounts.user.created`, `.updated`, `.deleted`, `.password_changed`, `.access_changed`; `auth.group.created`, `.updated`, `.deleted`, `.access_changed` |
-| API keys (CORE.6) | `api.client.issued`, `.rotated`, `.revoked` |
+| API keys (CORE.6) | `api.client.issued`, `.rotated`, `.revoked`; deleting a vendor writes one `vendor.deleted` entry per key it drops (CORE.14, through `settings.VENDOR_DELETION_AUDIT_HOOKS`) |
 | Vendors (VEN.1, CORE.2, VEN.12) | `vendor.created`, `.updated` (legal identity included, IBAN and tax code masked: they are encrypted at rest, SEC.3), `.deleted`, `.status_changed`, `.vat_checked`, `.member_added`, `.member_role_changed`, `.member_removed`; `vendor.legal_requirement_saved`, `.legal_requirement_deleted` |
 | Vendor onboarding (VEN.5) | `vendor.application_submitted` (the applicant vendor and its owner membership), `vendor.contract_saved` (contract versions), `vendor.contract_accepted` (who, which version, language, text hash, IP; the acceptance rows are append-only too, and once a version is accepted the database refuses any change to it or its texts) |
 | Platform configuration (ARC.7) | `core.platform_operator.configured` |
 | Feature flags (ARC.8) | `core.feature_flag.created`, `.updated` (staff switches, kill switches included); `vendor.feature_flag_saved`, `.feature_flag_deleted` (per-vendor overrides, under the vendor's key); see [feature-flags.md](feature-flags.md) |
 | Field encryption keys (SEC.3) | `core.field_keys.rotated` (one per object, key ids only; see [field-encryption.md](field-encryption.md)) |
 | Product prices (CAT.1) | `catalog.product.price_changed`, `catalog.variant.price_changed` |
+| Products and variants (CAT.12) | `catalog.product.created`, `.updated`, `.deleted`, `.relations_changed` (categories, terms, upsells); `catalog.variant.created`, `.updated`, `.deleted`, through `catalog.services.save_product`, `delete_product`, `save_variant` and `delete_variant`. Entries show the sales mode, fiscal category, weight and dimensions (variants: weight override) with SKU and vendor; other fields are saved but not audited. Prices are refused there (price services only) and the owning vendor never changes (Q-33) |
 | Shipping configuration (SHP.1) | `shipping.<model>.created`, `.updated`, `.deleted` for carriers, zones, vendor rates, weight bands and pickup options, through `shipping.services.save_config` and `delete_config`; deleting a rate also audits each of its bands |
 | Tax configuration (TAX.1) | `tax.rate.configured`, `tax.vendor_tax_profile.configured` (versioned: the replaced row is `before`), `tax.territory.created`, `.updated`, `tax.legal_note.created`, `.updated`; VIES answers (`tax.vatvalidation`) are an append-only cache, not audited |
+| Site themes (THM.1) | `themes.theme_settings.configured` (the site's hostname and theme, before and after; see [themes.md](themes.md)) |
 | Tax regime changes (TAX.2) | `tax.regime_change.requested`, `.approved`, `.rejected` (who, the requested regime, the review reason); an approval also writes `tax.vendor_tax_profile.configured` and, when it moves the declared fiscal regime, `vendor.updated` |
 
 Deliberately not stored: password hashes (only `has_usable_password`), API key hashes, TOTP
