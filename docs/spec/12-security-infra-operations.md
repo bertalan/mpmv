@@ -54,7 +54,7 @@ flowchart LR
 ```
 
 - **Environments**: local (Apple `container`, same OCI images), STAGE, LIVE; differences only via env; STAGE with synthetic data.
-  STAGE and LIVE run on Hetzner Cloud, EU region, Arm64 (aarch64) servers
+  STAGE and LIVE run on Hetzner Cloud, EU region, servers (Arm64 recommended)
   ([ADR-0007](../adr/0007-hosting-hetzner-self-managed-postgres.md)). LIVE has an app VPS (app,
   worker and Caddy as Podman Quadlets) and a dedicated database VPS running self-managed
   PostgreSQL 17, reachable only over the Hetzner private network. STAGE (synthetic data only) runs

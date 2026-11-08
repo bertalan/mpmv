@@ -30,8 +30,8 @@ sets the backup targets (RPO ≤ 15 min, RTO ≤ 4 h, to be confirmed).
 
 Option 3:
 
-- Provider: Hetzner Cloud, EU region, Arm64 (aarch64) servers for STAGE and LIVE
-  (amended 2026-11-08; the release image is multi-arch).
+- Provider: Hetzner Cloud, EU region. Arm64 is the recommended server type for STAGE and LIVE
+  (amended 2026-11-08); the release image is multi-arch, so x86 works too.
 - LIVE has two VPS: an app VPS and a dedicated database VPS. STAGE has one VPS holding app,
   worker, Caddy and PostgreSQL (amended 2026-11-08).
 - The app VPS runs app, worker and Caddy as rootless Podman Quadlet units, as built in ARC.5.
@@ -72,7 +72,7 @@ Option 3:
 ## Amendment 2026-11-08
 
 - **STAGE on one VPS (owner decision).** STAGE holds only synthetic data, so it runs app, worker,
-  Caddy and PostgreSQL 17 on a single Hetzner Cloud VPS, at lower cost. PostgreSQL listens only
+  Caddy and PostgreSQL on a single Hetzner Cloud VPS, at lower cost. PostgreSQL listens only
   on the loopback interface, and the app still connects with TLS `sslmode=verify-full` using the
   internal-CA certificate (owner decision MQ-11), so the LIVE connection path is exercised. LIVE
   keeps two VPS (app VPS and a dedicated database VPS on the Hetzner private network), unchanged.
@@ -80,8 +80,8 @@ Option 3:
   destructive tests, LIVE holds personal and payment data, and each environment has its own
   secrets. App-to-database network failures cannot be tested on one VPS, so they are repeated on
   LIVE-equivalent servers before cutover (MIG.9).
-- **Arm64 servers (lane-a technical decision, delegated by the owner).** STAGE and LIVE use
-  Hetzner Arm64 (aarch64) servers instead of x86, so STAGE mirrors LIVE. The release image
+- **Multi-arch image (lane-a technical decision, delegated by the owner).** Arm64 is the
+  recommended server type, and STAGE uses the same type as LIVE so it mirrors LIVE. The release image
   becomes multi-arch (linux/amd64 and linux/arm64), with the arm64 variant built on a native
   GitHub arm64 runner, without QEMU emulation; this CI change is part of ARC.13. Reasons: Arm
   servers cost less at the same size, the development Macs are arm64, and all Python
