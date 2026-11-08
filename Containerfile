@@ -27,6 +27,10 @@ COPY . .
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
+# Theme CSS (THM.2, ADR-0008): resolve and check each theme's tokens and write
+# build/themes/themes/<slug>/theme.css; collectstatic then hashes it. Needs no Django settings.
+RUN /app/.venv/bin/python -m apps.themes.build
+
 # collectstatic needs importable settings, not real configuration: a throwaway key generated in
 # this step only (never stored in a layer) and a database URL that is never connected to.
 RUN DJANGO_SECRET_KEY="$(/app/.venv/bin/python -c 'import secrets; print(secrets.token_urlsafe(50))')" \

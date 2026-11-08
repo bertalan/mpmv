@@ -1,0 +1,27 @@
+{% extends "layouts/content.html" %}
+{% load i18n tz wagtailcore_tags %}
+{% comment %}
+Events index (EVT.1 part 2/2): the live events of this language, soonest first, one `<article>`
+per event. EVT.6 replaces the list with the full listing (upcoming only, filters, months,
+pagination, calendar and the original-language fallback); EVT.15 adds the map.
+{% endcomment %}
+{% block page_content %}
+  <h1>{{ page.title }}</h1>
+  {% if page.intro %}{{ page.intro|richtext }}{% endif %}
+  {% for event in events %}
+    <article class="event-summary">
+      <h2><a href="{% pageurl event %}">{{ event.title }}</a></h2>
+      <p>
+        {% if event.all_day %}
+          <time datetime="{{ event.start_date|date:'Y-m-d' }}">{{ event.start_date|date:"DATE_FORMAT" }}</time>
+        {% else %}
+          {% timezone event.timezone %}<time datetime="{{ event.starts_at|date:'c' }}">{{ event.starts_at|date:"DATETIME_FORMAT" }}</time>{% endtimezone %}
+        {% endif %}
+        · {{ event.get_event_type_display }}{% if event.vendor %} · {{ event.vendor.display_name }}{% endif %}{% if event.cancelled_at %} · <strong>{% translate "Cancelled" %}</strong>{% endif %}
+      </p>
+      <p>{{ event.summary }}</p>
+    </article>
+  {% empty %}
+    <p>{% translate "No events are planned at the moment." %}</p>
+  {% endfor %}
+{% endblock %}

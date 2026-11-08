@@ -20,6 +20,7 @@ dependencies = [
   "segno>=1.6.6",
   "cryptography>=50.0.2",
   "wagtail>=8.1,<8.2",
+  "wagtail-localize>=1.14.5,<1.15",
 ]
 
 [dependency-groups]
@@ -76,13 +77,14 @@ ignore_missing_imports = true
 # Wagtail and its dependencies ship no type information (CMS.1).
 module = [
   "wagtail", "wagtail.*", "modelcluster", "modelcluster.*", "modelsearch", "modelsearch.*",
-  "taggit", "taggit.*", "treebeard", "treebeard.*",
+  "taggit", "taggit.*", "treebeard", "treebeard.*", "wagtail_localize", "wagtail_localize.*",
+  "willow", "willow.*",
 ]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # Generated migrations name Wagtail's swappable page model setting, which only Wagtail defines.
-module = ["apps.cms.migrations.*"]
+module = ["apps.cms.migrations.*", "apps.core.migrations.*", "apps.events.migrations.*"]
 disable_error_code = ["misc"]
 
 [[tool.mypy.overrides]]
@@ -137,12 +139,23 @@ layers = [
   "apps.payments",
   "apps.orders",
   "apps.cart",
-  "apps.catalog | apps.tax | apps.shipping | apps.cms",
+  "apps.events",  # event pages link products and categories and use the CMS blocks (spec 15)
+  "apps.cms",  # reads catalog terms and vendor storefronts (CMS.2 cards)
+  "apps.catalog | apps.tax | apps.shipping",
   "apps.vendors",
   "apps.accounts",
   "apps.core",
 ]
 exhaustive = false
+
+# The layer above lets cms import catalog and vendors (spec 01: catalog --> cms). It sits above
+# tax and shipping only because import-linter layers are a total order: the graph has no
+# tax --> cms or shipping --> cms edge, so this contract keeps cms off them.
+[[tool.importlinter.contracts]]
+name = "CMS reads catalog and vendors, never tax or shipping (spec 01 graph)"
+type = "forbidden"
+source_modules = ["apps.cms"]
+forbidden_modules = ["apps.tax", "apps.shipping"]
 
 [[tool.importlinter.contracts]]
 name = "Procrastinate is used only through apps.core.tasks (ADR-0004)"
@@ -152,8 +165,77 @@ forbidden_modules = ["procrastinate"]
 ignore_imports = ["apps.core.tasks -> procrastinate"]
 allow_indirect_imports = true
 
+# Spec 14 §14.3: `themes` imports only core (and Wagtail), and no domain app imports it: apps
+# only use its templates and context. THM.11 will let `apps.vendors` import the pure palette
+# functions of `apps.themes.engine` (vendor branding) with an `ignore_imports` entry here.
+[[tool.importlinter.contracts]]
+name = "Themes depend only on core"
+type = "forbidden"
+source_modules = ["apps.themes"]
+forbidden_modules = [
+  "apps.accounts",
+  "apps.vendors",
+  "apps.catalog",
+  "apps.tax",
+  "apps.shipping",
+  "apps.cart",
+  "apps.orders",
+  "apps.payments",
+  "apps.ledger",
+  "apps.ingest",
+  "apps.cms",
+  "apps.events",
+  "apps.seo",
+  "apps.compliance",
+  "apps.api",
+  "apps.mcp",
+]
+
+[[tool.importlinter.contracts]]
+name = "No app imports themes"
+type = "forbidden"
+source_modules = [
+  "apps.core",
+  "apps.accounts",
+  "apps.vendors",
+  "apps.catalog",
+  "apps.tax",
+  "apps.shipping",
+  "apps.cart",
+  "apps.orders",
+  "apps.payments",
+  "apps.ledger",
+  "apps.ingest",
+  "apps.cms",
+  "apps.events",
+  "apps.seo",
+  "apps.compliance",
+  "apps.api",
+  "apps.mcp",
+  "mpmv",
+]
+forbidden_modules = ["apps.themes"]
+
 [[tool.importlinter.contracts]]
 name = "Tax and shipping engines stay independent of orders and cart"
 type = "forbidden"
 source_modules = ["apps.tax", "apps.shipping"]
-forbidden_modules = ["apps.orders", "apps.cart", "apps.payments", "apps.ledger"]
+forbidden_modules = ["apps.orders", "apps.cart", "apps.payments", "apps.ledger", "apps.events"]
+
+# Spec 15: nothing in the checkout reads events. cart and orders sit above events in the
+# layers, so this contract keeps them off it.
+[[tool.importlinter.contracts]]
+name = "The checkout never imports events (spec 15)"
+type = "forbidden"
+source_modules = ["apps.cart", "apps.orders"]
+forbidden_modules = ["apps.events"]
+
+# ARC.18 (spec 01 §1.3): engines are pure functions, with no database or ORM access.
+# import-linter forbids an external package only as a whole (`django`, not `django.db`), so
+# engines import no Django at all; the pure `slugify` helper comes through apps.core.text.
+[[tool.importlinter.contracts]]
+name = "Engines are pure: no Django, models or services in apps.*.engine (ARC.18)"
+type = "forbidden"
+source_modules = ["apps.*.engine"]
+forbidden_modules = ["django", "apps.*.models", "apps.*.services"]
+ignore_imports = ["apps.core.text -> django"]

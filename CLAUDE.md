@@ -25,6 +25,9 @@ Guidance for AI agents working in this repository. Read [README.md](README.md) a
 - Never hand-edit `docs/spec/90-backlog.md` or `docs/spec/backlog.csv`. Run `make docs`.
 - Do not start a task whose blocking decision (D-xx in `docs/spec/92-open-decisions.md`) is
   still open. Ask instead.
+- Two Claude sessions may work in parallel ("lane-a" integrates and merges, "lane-b" implements).
+  Follow [docs/dev/parallel-lanes.md](docs/dev/parallel-lanes.md): area split, claims on the Lane
+  board issue, PR labels, and who merges.
 
 ## Architecture rules (from spec 01)
 

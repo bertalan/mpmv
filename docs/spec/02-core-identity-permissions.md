@@ -84,7 +84,8 @@ def get_for_actor_or_404(qs, actor, **lookup):  # 404 (not 403) to prevent enume
   MFA** for everyone who reaches a management area, progressive lockout per account and IP.
 - Unlocking (owner decision Q-18): staff can unlock a locked account from the admin, with an
   `AuditLog` entry, and a completed password reset clears the account's lockout (CORE.8).
-- Step-up (re-authentication) for: IBAN change, payout, rate changes, customer data export.
+- Step-up (re-authentication) for: IBAN change, payout, rate changes (commission rates and VAT
+  rates alike, owner decision MQ-2), customer data export.
 
 ### Multi-factor authentication
 
@@ -106,11 +107,27 @@ The second factor is a TOTP authenticator app or a passkey. The confirmed parame
 - API: `Authorization: Bearer mpmv_<prefix>_<secret>` header, constant-time comparison,
   scope checked per route, rate limit per API key with counters in a cache shared by every app
   process (CORE.12, owner decision Q-18), logging of every mutating call.
-- Vendor key policy (CORE.14): a vendor key holds only the vendor-grantable scopes
-  (`VENDOR_GRANTABLE_SCOPES` in `apps/api/engine.py`, an allow-list checked at issuance); every
-  other scope is platform-only. The vendor's status is read on every call: a suspended vendor's
-  key only reads (403 on POST, PUT, PATCH and DELETE, dry-runs included), a closed vendor's key
-  gets 401. Deleting a vendor writes one AuditLog entry per key it deletes.
+- API rate limit (CORE.12): fixed windows per key, counted in PostgreSQL (`ApiRateCounter`, one
+  atomic upsert per call), so every app process shares one counter and no Redis is needed.
+  `API_RATE_LIMIT` is the key-wide limit of every key, set per environment, default
+  `120/minute` (owner decision MQ-4; CORE.12 shipped `600/minute`, CORE.16 lowers it);
+  `API_RATE_LIMIT_SCOPES` gives a costly scope its own counter and limit for every key;
+  `API_RATE_LIMIT_CLIENTS` replaces the key-wide limit of one key, by `ApiClient` public id.
+  Staff can raise the limit of one key from the admin, audited and behind an MFA step-up
+  (CORE.16); that override wins over the settings. Only
+  calls of an accepted key count (401/403 refusals do not). Over the limit the answer is a 429
+  `rate_limited` problem with `Retry-After` (seconds to the end of the window); a mutating call
+  refused this way is in the mutation log.
+- Vendor key policy (CORE.14): a vendor key is issued only while its vendor is active, and holds
+  only the vendor-grantable scopes (`VENDOR_GRANTABLE_SCOPES` in `apps/api/engine.py`, an
+  allow-list checked at issuance and again on every request, so a key issued before a scope
+  became platform-only cannot use it; `manage.py vendor_key_scopes` lists such keys). Every
+  other scope is platform-only. The vendor's status is read on every call: only an active
+  vendor's key writes; an applicant, onboarding or suspended vendor's key only reads (403 on
+  POST, PUT, PATCH and DELETE, dry-runs included); a closed vendor's key gets 401. Vendor-scoped
+  write services reached by API v1 read the status again inside the write transaction (row
+  read `FOR SHARE`), so a vendor suspended after its key was authenticated gets that write
+  refused. Deleting a vendor writes one AuditLog entry per key it deletes.
 - Impersonation for support (equivalent of Login as User), staff only, with audit.
 
 ### Secure action links (CORE.15)
@@ -133,6 +150,12 @@ reusable mechanism: a service in `accounts` plus an email helper on top of the A
 - **Approval** is always a POST with CSRF from the action page, never a GET.
 - **Misuse.** An expired, used or mismatched token (another user, an old version) sends the user
   to the normal login and then to the same action page; the attempt is written to the AuditLog.
+- **Vendor claim (VEN.24, owner decision MQ-1).** A vendor imported without an account holder is
+  claimed through the same kind of link, bound to the vendor and to a claim version instead of a
+  recipient user, and sent only to the vendor's legal email of record. There is no account yet,
+  so the claimant sets a password and enrols their own MFA before anything else; the link never
+  signs anyone in to an existing account. Regenerating the claim bumps its version, so the old
+  link stops working.
 
 ### API v1 (replaces `api.php`)
 
@@ -162,13 +185,19 @@ admin reports or read-only MCP tools.
 ### Backoffice
 
 - **Wagtail admin** for staff and editors: pages, images, snippets; `ModelViewSet` for vendors,
-  products, zones, rates, orders and quotes, with filters and bulk actions.
+  products, zones, rates, orders and quotes, with filters and bulk actions. Editors get our own
+  roles, each limited to its part of the page tree (for example blog editors, legal pages, event
+  moderators), instead of Wagtail's default Editors and Moderators groups (owner, 2026-11-07,
+  Q-58; CORE.8).
 - **Vendor dashboard** as a separate area (`/vendor/`), HTMX templates, tenant-filtered views:
   orders, quote entry, products (limited editing), payouts, tax regime change
   request, holiday and closure schedule (VEN.20), events. Vendors never get the Wagtail admin: their event pages are created and edited
   as revisions through the events services ([15](15-events.md)).
 - **Django admin** only for the technical superuser, reachable from a restricted network (OPS.5,
-  owner decision Q-18). Staff work in the Wagtail admin (CORE.8).
+  owner decision Q-18). Staff work in the Wagtail admin (CORE.8). Until CORE.8 the rule is strict
+  (owner decision MQ-7): only a superuser manages users and groups; a staff member without the
+  superuser flag cannot grant staff or superuser status, groups or permissions, cannot set a
+  staff password or reset a staff member's MFA, and cannot open the group admin.
 - **MCP server** (see [10](10-content-seo-ai.md)): tools on top of the same services.
 
 ### Vendor membership, storefront profile and erasure (owner decision Q-16)
@@ -213,10 +242,11 @@ staff can revert a change to an earlier version. This is part of CORE.9.
 | CORE.5 | Rate limiting and progressive lockout on login/registration, Turnstile | P1 | 6 | CORE.1 | Tests on failed attempts |
 | CORE.6 | `ApiClient`: issuance, hashing, scopes, expiry, rotation, revocation, IP allow-list | P1 | 10 | CORE.1 | Expired or out-of-scope key → 401/403 |
 | CORE.7 | Ninja API v1 skeleton: auth, dry-run, RFC 9457 errors, OpenAPI, mutation log | P1 | 10 | CORE.6, ARC.13 | OpenAPI spec published on STAGE |
-| CORE.8 | Wagtail admin: staff menu, base ViewSet with tenant filters and bulk actions; platform staff as a dedicated permission instead of `is_staff` in `for_actor` (Q-34); staff unlock of a locked account with audit, and automatic unlock after a completed password reset (Q-18) | P1 | 13 | CORE.3 | Staff manage vendors and products from the admin; a user with Wagtail admin access but without the platform staff permission sees no vendor's data (negative test); staff unlock a locked account and the unlock is in the AuditLog; a completed password reset clears the lockout |
+| CORE.8 | Wagtail admin: staff menu, base ViewSet with tenant filters and bulk actions; platform staff as a dedicated permission instead of `is_staff` in `for_actor` (Q-34); staff unlock of a locked account with audit, and automatic unlock after a completed password reset (Q-18); our own editor roles (for example blog editors, legal pages, event moderators) replacing Wagtail's default Editors and Moderators groups, which stay until then (Q-58) | P1 | 15 | CORE.3 | Staff manage vendors and products from the admin; a blog editor cannot edit the About page or a legal page; Wagtail's default Editors and Moderators groups no longer exist after the data migration; a user with Wagtail admin access but without the platform staff permission sees no vendor's data (negative test); staff unlock a locked account and the unlock is in the AuditLog; a completed password reset clears the lockout |
 | CORE.9 | Vendor area `/vendor/`: layout, navigation, essential KPI dashboard; storefront profile editing (texts, logo, return and shipping policies) for the owner only, with post-moderation notice to the moderators, audit and staff revert (Q-16); new applicants arrive from the VEN.22 public application | P1 | 16 | CORE.3 | Vendor sees only their own data; vendor staff cannot edit the storefront profile; an owner's profile change notifies the moderators, is in the AuditLog with before and after, and staff revert it to the previous version |
 | CORE.10 | Support impersonation with audit | P2 | 4 | CORE.8 | Every impersonated session in AuditLog |
-| CORE.12 | Per-API-key rate limit (Q-18): limits per `ApiClient` from settings, counters in a cache shared by every app process (PostgreSQL-backed, spec 01), 429 response in RFC 9457 format with `Retry-After` | P1 | 4 | CORE.7 | Two app processes share one counter; the request over the limit gets 429 with `Retry-After`; another key is not affected |
+| CORE.12 | Per-API-key rate limit (Q-18): limits per `ApiClient` from settings (default `120/minute` per key and per environment, staff-adjustable per key from CORE.16, owner decision MQ-4), counters in a cache shared by every app process (PostgreSQL-backed, spec 01), 429 response in RFC 9457 format with `Retry-After` | P1 | 4 | CORE.7 | Two app processes share one counter; the request over the limit gets 429 with `Retry-After`; another key is not affected |
 | CORE.15 | Secure action links: signed token bound to object ID, recipient and version, configurable expiry (72 h default), single-use sign-in consumed only by the POST of an intermediate "Continue" page, magic sign-in without password but MFA step-up before the action POST, misuse to normal login with audit; service in `accounts` and email helper on ARC.16 | P1 | 6 | CORE.4, ARC.16 | A GET or HEAD neither consumes the token nor changes state; a valid token without a session leads to the step-up and then to the page; a token for user X cannot open user Y's object; an old-version token is refused; an action without step-up is refused |
+| CORE.16 | API rate limit defaults (owner decision MQ-4): `API_RATE_LIMIT` default lowered from `600/minute` to `120/minute`, configured per environment; a per-key override stored on the `ApiClient` that staff set from the admin (raise or lower), behind an MFA step-up and in the AuditLog, winning over `API_RATE_LIMIT_CLIENTS` | P1 | 3 | CORE.12, CORE.4 | Without configuration a key gets 429 on its 121st call in a minute; an environment setting changes the default; a staff override raises one key's limit without affecting another key; the override change is refused without step-up and is in the AuditLog |
 | CORE.13 | `ApiClient.vendor`: optional vendor FK on API keys (empty = platform key), vendor-scoped API keys enforced through CORE.3 scoping, admin and tests | P1 | 3 | CORE.3, CORE.6 | A vendor key cannot read or change another vendor's data (negative tests) |
 | CORE.14 | Vendor API key policy (coherence check 5): a vendor-grantable scope set apart from platform-only scopes, keys of a suspended vendor limited to reads and keys of a closed vendor refused, one AuditLog entry per key when a vendor and its keys are deleted; needed before EVT.5 exposes vendor event scopes | P1 | 3 | CORE.13 | A vendor key cannot be issued with a platform-only scope; a suspended vendor's key gets 403 on writes and succeeds on reads; a closed vendor's key gets 401; deleting a vendor writes one audit entry per key |

@@ -1,0 +1,7 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% translate "Your verification code is" %} <strong>{{ code }}</strong>.</p>
+<p>{% translate "If you did not ask for it, ignore this email." %}</p>
+</body>
+</html>

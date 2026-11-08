@@ -36,7 +36,7 @@ from procrastinate.jobs import Job as _QueueRow
 from procrastinate.periodic import PeriodicDeferrer, PeriodicTask
 from procrastinate.tasks import Task
 
-from . import services
+from . import mail, services
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -404,3 +404,25 @@ def purge_throttles(timestamp: int) -> None:
     """Every night: delete throttle counters whose lock and quiet period are over (CORE.5)."""
     deleted = services.purge_expired_throttles()
     logger.info("core.purge_throttles deleted %d expired rows", deleted)
+
+
+@periodic("27 4 * * *")
+@locked()
+@task("core.purge_geocode_cache", retry=NO_RETRY)
+def purge_geocode_cache(timestamp: int) -> None:
+    """Every night: delete geocoding cache entries past their 180 days (EVT.12)."""
+    from .geocoding.services import purge_expired_geocode_cache
+
+    deleted = purge_expired_geocode_cache()
+    logger.info("core.purge_geocode_cache deleted %d expired rows", deleted)
+
+
+@task(
+    "core.send_email",
+    retry=Retry(
+        max_attempts=mail.MAX_RETRIES, base_delay=mail.BASE_DELAY, max_delay=mail.MAX_DELAY
+    ),
+)
+def send_email(email_id: str) -> None:
+    """Send one outbox email (ARC.16); a transient failure raises, so the queue retries it."""
+    services.deliver_email(email_id)

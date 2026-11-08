@@ -18,7 +18,8 @@ from apps.api.v1.security import ApiKey
 from apps.vendors.models import VendorMember
 from apps.vendors.scoping import get_for_actor_or_404
 
-SCOPE = "members:read"
+# A vendor-grantable scope: a vendor key is refused any other at request time (CORE.14).
+SCOPE = "catalog:read"
 
 router = Router(tags=["tenancy"])
 

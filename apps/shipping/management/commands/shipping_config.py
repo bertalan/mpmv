@@ -108,6 +108,8 @@ class Command(BaseCommand):
 
 def _read(path: str) -> fmt.ParsedConfig:
     try:
+        if Path(path).stat().st_size > fmt.MAX_FILE_BYTES:
+            raise CommandError(f"{path} is larger than {fmt.MAX_FILE_BYTES // 1024} KiB.")
         text = Path(path).read_text(encoding="utf-8")
     except OSError as exc:
         raise CommandError(f"Cannot read {path}: {exc}") from exc

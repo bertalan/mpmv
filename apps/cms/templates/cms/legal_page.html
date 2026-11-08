@@ -1,0 +1,34 @@
+{% extends "layouts/content.html" %}
+{% load i18n wagtailcore_tags %}
+{% block page_content %}
+  <article class="legal-page">
+    <h1>{{ page.title }}</h1>
+    {% if current_version %}
+      {% include "cms/includes/legal_version_meta.html" with version=current_version %}
+      {% if not in_force or in_force.number != current_version.number %}
+        <p class="legal-notice">
+          {% blocktranslate trimmed with date=current_version.effective_date|date:"DATE_FORMAT" %}
+            This version comes into effect on {{ date }}.
+          {% endblocktranslate %}
+          {% if in_force %}
+            <a href="{{ in_force_url }}">{% blocktranslate trimmed with number=in_force.number %}Version {{ number }} applies until then.{% endblocktranslate %}</a>
+          {% endif %}
+        </p>
+      {% endif %}
+    {% else %}
+      {# A preview before the first publish: no version recorded yet. #}
+      <p class="legal-meta">{% translate "Effective from" %} <time datetime="{{ page.effective_date|date:'Y-m-d' }}">{{ page.effective_date|date:"DATE_FORMAT" }}</time></p>
+    {% endif %}
+    {% for block in page.body %}{% include_block block %}{% endfor %}
+    {% if archive %}
+      <section class="legal-archive" aria-labelledby="legal-archive-heading">
+        <h2 id="legal-archive-heading">{% translate "Previous versions" %}</h2>
+        <ul>
+          {% for version, url in archive %}
+            <li><a href="{{ url }}">{% blocktranslate trimmed with number=version.number %}Version {{ number }}{% endblocktranslate %}</a>, {% translate "effective from" %} <time datetime="{{ version.effective_date|date:'Y-m-d' }}">{{ version.effective_date|date:"DATE_FORMAT" }}</time></li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+  </article>
+{% endblock %}

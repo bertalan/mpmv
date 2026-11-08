@@ -1,0 +1,32 @@
+{% load i18n %}{% comment %}
+Site header (THM.3, spec 14 §14.6): site name, the main navigation as a disclosure, the help
+link and the language switcher.
+
+Disclosure navigation: without JavaScript the links are simply shown and the menu button stays
+`hidden`. The `disclosure` Alpine component (themes/base/js/base.js) shows the button, which
+collapses the list on narrow screens only (CSS); Enter or Space toggles it, Escape closes it
+and returns focus to the button. Only property and method names appear in the directives, as
+the Alpine CSP build requires.
+
+Context: `site_name`, `links` (label and url), `languages` (see language_switcher.html), and
+the context of the help link. Without `links` or `languages` (the 500 page) the menu or the
+switcher is left out.
+{% endcomment %}<header class="site-header">
+  <div class="site-header__inner">
+    {% url 'home' as home_url %}<a class="site-name" href="{% firstof home_url '/' %}">{{ site_name }}</a>
+    {% if links %}
+      <div class="site-nav" x-data="disclosure" :class="classes" @keydown.escape="close">
+        <button type="button" class="nav-toggle" aria-controls="site-nav" aria-expanded="false" hidden x-ref="toggle" x-bind:hidden="toggleHidden" :aria-expanded="expanded" @click="toggle">{% translate "Menu" %}</button>
+        <nav id="site-nav" aria-label="{% translate 'Main' %}">
+          <ul>
+            {% for link in links %}<li><a href="{{ link.url }}">{{ link.label }}</a></li>{% endfor %}
+          </ul>
+        </nav>
+      </div>
+    {% endif %}
+    <div class="site-header__tools">
+      {% include "components/help_link.html" %}
+      {% if languages %}{% include "components/language_switcher.html" %}{% endif %}
+    </div>
+  </div>
+</header>

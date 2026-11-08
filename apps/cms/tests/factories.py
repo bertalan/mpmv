@@ -9,17 +9,27 @@ configured language without one unless `locale` is given, and goes under the tre
 time, and CMS.1 installs neither app.
 """
 
+import datetime as dt
 from typing import Any
 from unittest import mock
 
 import factory
+from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Model
+from django.utils import timezone
 from django.utils.text import slugify
 from factory.django import DjangoModelFactory
 from wagtail.models import Locale, Page
 
-from apps.cms.models import HomePage, NavigationMenu, StandardPage
+from apps.cms.models import (
+    HomePage,
+    LegalPage,
+    LegalPageVersion,
+    NavigationMenu,
+    StandardPage,
+    VendorRecruitmentPage,
+)
 from apps.core.i18n import configured_languages
 
 
@@ -90,6 +100,9 @@ class StandardPageFactory(_InTree, DjangoModelFactory[StandardPage]):
     slug = factory.LazyAttribute(lambda page: slugify(page.title))
     parent = None
     body = factory.LazyFunction(lambda: [("paragraph", "<p>Sample text.</p>")])
+    image = None
+    image_alt_text = ""
+    image_caption = ""
 
     @classmethod
     def _default_parent(cls) -> Page:
@@ -115,3 +128,101 @@ class NavigationMenuFactory(DjangoModelFactory[NavigationMenu]):
     def _create(cls, model_class: type[NavigationMenu], *args: Any, **kwargs: Any) -> Any:
         kwargs.setdefault("locale", Locale.get_default())
         return model_class._default_manager.create(*args, **kwargs)
+
+
+class LegalPageFactory(_InTree, DjangoModelFactory[LegalPage]):
+    """A legal page under the primary language's home. Creating it records no version: a
+    version is recorded when the page is published (`page.save_revision().publish()`)."""
+
+    class Meta:
+        model = LegalPage
+
+    title = factory.Sequence(lambda n: f"Terms {n}")
+    slug = factory.LazyAttribute(lambda page: slugify(page.title))
+    parent = None
+    kind = LegalPage.Kind.TERMS
+    effective_date = dt.date(2027, 1, 1)
+    body = factory.LazyFunction(lambda: [("paragraph", "<p>Sample terms.</p>")])
+
+    @classmethod
+    def _default_parent(cls) -> Page:
+        return _primary_home()
+
+
+class LegalPageVersionFactory(DjangoModelFactory[LegalPageVersion]):
+    """A recorded version, numbered after the page's last one (normally `record_legal_version`
+    writes these when a page is published)."""
+
+    class Meta:
+        model = LegalPageVersion
+
+    page = factory.SubFactory(LegalPageFactory)
+    title = factory.LazyAttribute(lambda version: version.page.title)
+    # A built page has no locale yet (`.build()` stays off the database).
+    language_code = factory.LazyAttribute(
+        lambda version: (
+            version.page.locale.language_code if version.page.locale_id else settings.LANGUAGE_CODE
+        )
+    )
+    effective_date = factory.LazyAttribute(lambda version: version.page.effective_date)
+    body = factory.LazyFunction(lambda: [("paragraph", "<p>Sample terms.</p>")])
+    published_at = factory.LazyFunction(timezone.now)
+    published_by = "system"
+
+    @classmethod
+    def _create(cls, model_class: type[LegalPageVersion], *args: Any, **kwargs: Any) -> Any:
+        if "number" not in kwargs:
+            kwargs["number"] = kwargs["page"].versions.count() + 1
+        return model_class._default_manager.create(*args, **kwargs)
+
+
+class VendorRecruitmentPageFactory(_InTree, DjangoModelFactory[VendorRecruitmentPage]):
+    """A recruitment page under the primary language's home, with two plans and a FAQ.
+
+    Titles are numbered so two pages fit under one home: pass `title="Sell with us"` for the
+    page at `/sell-with-us/`."""
+
+    class Meta:
+        model = VendorRecruitmentPage
+
+    title = factory.Sequence(lambda n: f"Sell with us {n}")
+    slug = factory.LazyAttribute(lambda page: slugify(page.title))
+    parent = None
+    intro = factory.LazyFunction(lambda: [("paragraph", "<p>Open your shop.</p>")])
+    plans = factory.LazyFunction(
+        lambda: [
+            (
+                "plan",
+                {
+                    "name": "Starter",
+                    "price": "No monthly fee",
+                    "summary": "For makers who are starting out.",
+                    "features": ["Up to 50 products", "Standard commission"],
+                    "highlighted": False,
+                },
+            ),
+            (
+                "plan",
+                {
+                    "name": "Workshop",
+                    "price": "Monthly fee",
+                    "summary": "For established workshops.",
+                    "features": ["Unlimited products", "Reduced commission"],
+                    "highlighted": True,
+                },
+            ),
+        ]
+    )
+    faq = factory.LazyFunction(
+        lambda: [
+            (
+                "question",
+                {"question": "Who can sell?", "answer": "<p>Independent makers.</p>"},
+            )
+        ]
+    )
+    cta_label = "Apply now"
+
+    @classmethod
+    def _default_parent(cls) -> Page:
+        return _primary_home()

@@ -2,8 +2,15 @@
 """TAX.11 data migration: territory postcode ranges move to the shared grammar (SHP.12).
 
 Ranges move from `22100-22199` to `22100..22199`: only two numbers of the same length joined by
-a dash were ranges; anything else (PT `9000-001`, PL `00-950`) stays an exact postcode. The
-rewrite is idempotent, and the reverse turns `..` between two such numbers back into `-`.
+a dash were ranges; anything else (PT `9000-001`, PL `00-950`) stays an exact postcode. The old
+grammar accepted a reversed range (`22199-22100`), which the shared one refuses: its bounds are
+put in order (`22100..22199`). The rewrite is idempotent.
+
+The reverse turns `..` between two such numbers back into `-`. Patterns written after this
+migration that the old grammar cannot hold (`BT1..BT9`, `1000-001..1999-999`, `AB-1*`) have no
+old form: the reverse step refuses to run, naming the territories, instead of leaving rows the
+old code would refuse. Fix or remove those patterns first. A reversed old range does not come
+back reversed; it covers the same postcodes in order.
 """
 
 import re
@@ -12,17 +19,22 @@ from typing import Any
 
 import apps.tax.models
 from django.db import migrations, models
+from django.db.migrations.exceptions import IrreversibleError
 
 # Frozen copies of the range syntaxes at the time of this migration.
 OLD_RANGE = re.compile(r'(\d+)-(\d+)', re.ASCII)
 NEW_RANGE = re.compile(r'(\d+)\.\.(\d+)', re.ASCII)
+# Frozen copy of the territory pattern grammar before this migration.
+OLD_GRAMMAR = re.compile(r'[A-Z0-9]+( [A-Z0-9]+)?\*?|[A-Z0-9]+-[A-Z0-9]+', re.ASCII)
 
 
 def _numeric_bounds(pattern: str, syntax: re.Pattern[str]) -> tuple[str, str] | None:
     match = syntax.fullmatch(pattern.strip())
     if match is None or len(match.group(1)) != len(match.group(2)):
         return None
-    return match.group(1), match.group(2)
+    # Same-length digit strings: text order is numeric order.
+    low, high = sorted((match.group(1), match.group(2)))
+    return low, high
 
 
 def upgrade(pattern: str) -> str:
@@ -31,13 +43,31 @@ def upgrade(pattern: str) -> str:
 
 
 def downgrade(pattern: str) -> str:
+    """The old form of `pattern`; raises IrreversibleError when the old grammar refuses it."""
     bounds = _numeric_bounds(pattern, NEW_RANGE)
-    return pattern if bounds is None else f'{bounds[0]}-{bounds[1]}'
+    old = pattern if bounds is None else f'{bounds[0]}-{bounds[1]}'
+    if OLD_GRAMMAR.fullmatch(old.strip().upper()) is None:
+        raise IrreversibleError(f'{pattern!r} has no form in the old grammar')
+    return old
 
 
 def _rewrite(apps: Any, convert: Callable[[str], str]) -> None:
     Territory = apps.get_model('tax', 'Territory')
-    for territory in Territory.objects.exclude(postcode_patterns=[]):
+    territories = list(Territory.objects.exclude(postcode_patterns=[]).order_by('code'))
+    refused = []
+    for territory in territories:
+        for pattern in territory.postcode_patterns:
+            try:
+                convert(pattern)
+            except IrreversibleError as exc:
+                refused.append(f'{territory.code}: {exc}')
+    if refused:
+        # Checked before any write: the step changes nothing or everything.
+        raise IrreversibleError(
+            'Cannot reverse tax.0003: these territory postcode patterns have no form in the old '
+            'grammar; change or remove them first. ' + '; '.join(refused)
+        )
+    for territory in territories:
         patterns = [convert(p) for p in territory.postcode_patterns]
         if patterns != territory.postcode_patterns:
             territory.postcode_patterns = patterns

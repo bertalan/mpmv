@@ -9,9 +9,8 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Final
 
-from django.utils.text import slugify
-
 from apps.core.countries import ISO_3166_ALPHA2, is_eu
+from apps.core.text import slugify
 
 # --- Status state machine (spec 04 §4.2)
 
@@ -49,6 +48,24 @@ def check_transition(current: str, target: str) -> None:
         raise InvalidTransition(f"unknown vendor status {target!r}")
     if target not in allowed_transitions(current):
         raise InvalidTransition(f"vendor status change {current} → {target} is not allowed")
+
+
+class VendorCannotWrite(Exception):
+    """Raised when a write on behalf of a vendor's API key finds the vendor not active (CORE.14).
+
+    `status` is the vendor's stored status at the time of the write. Not a Django
+    `PermissionDenied`: engines import no Django (ARC.18); the API maps it to its refusal.
+    """
+
+    def __init__(self, status: str) -> None:
+        super().__init__(f"the vendor is {status}: only an active vendor's API keys write")
+        self.status = status
+
+
+def check_can_write(status: str) -> None:
+    """Raise VendorCannotWrite unless a vendor with `status` may write through its API keys."""
+    if status != ACTIVE:
+        raise VendorCannotWrite(status)
 
 
 # --- Slug
@@ -176,7 +193,12 @@ LEGAL_FORMS: Final = (SOLE_PROPRIETORSHIP, PARTNERSHIP, SRL, SPA, COOPERATIVE, O
 # Forms registered in the company register as companies (FatturaPA `IscrizioneREA`).
 COMPANY_FORMS: Final = frozenset({PARTNERSHIP, SRL, SPA, COOPERATIVE})
 
-# FatturaPA 1.2.x `RegimeFiscale`, with the official labels of the SDI specification.
+# The Agenzia delle Entrate FatturaPA technical specification (Specifiche tecniche) that the
+# regime list and the party blocks follow (schema FPR12 1.2.x). Version 1.9 added RF20 from
+# 2025-04-01; a new version updates this constant and the pinned list in the tests (VEN.18).
+FATTURAPA_SPECIFICATION_VERSION: Final = "1.9.1"
+
+# FatturaPA `RegimeFiscale`, with the official labels of the SDI specification.
 # There is no RF03 (it was removed from the specification).
 FISCAL_REGIMES: Final[Mapping[str, str]] = {
     "RF01": "Ordinario",
@@ -205,8 +227,10 @@ FISCAL_REGIMES: Final[Mapping[str, str]] = {
     "RF17": "IVA per cassa (art. 32-bis, DL 83/2012)",
     "RF18": "Altro",
     "RF19": "Regime forfettario (art.1, c.54-89, L. 190/2014)",
+    "RF20": "Regime transfrontaliero di Franchigia IVA (Direttiva UE 2020/285)",
 }
 FLAT_RATE_REGIME: Final = "RF19"  # forfettario
+CROSS_BORDER_FRANCHISE_REGIME: Final = "RF20"  # Directive (EU) 2020/285, per member state
 
 SOLE_SHAREHOLDER: Final = "SU"
 SEVERAL_SHAREHOLDERS: Final = "SM"
@@ -720,7 +744,8 @@ class PayoutNotAllowed(ValueError):
         )
 
 
-# --- FatturaPA 1.2.x party blocks (data only: CMP.2 writes the XML)
+# --- FatturaPA 1.2.x party blocks, specification `FATTURAPA_SPECIFICATION_VERSION` (data only:
+# CMP.2 writes the XML)
 
 CEDENTE: Final = "CedentePrestatore"  # the vendor invoices (its customers)
 CESSIONARIO: Final = "CessionarioCommittente"  # the vendor is invoiced (platform commissions)
@@ -859,7 +884,8 @@ def _contatti(ident: LegalIdentity) -> dict[str, str]:
 def fatturapa_party(identity: LegalIdentity, role: str = CEDENTE) -> dict[str, Any]:
     """The FatturaPA 1.2.x `CedentePrestatore` or `CessionarioCommittente` block, as a dict.
 
-    Keys follow the FatturaPA element names and order. Raises `PartyBlockError` listing every
+    Keys follow the FatturaPA element names and order of technical specification
+    `FATTURAPA_SPECIFICATION_VERSION`. Raises `PartyBlockError` listing every
     missing or invalid value (presence and length, plus the `identity_errors` of the emitted
     identifiers: VAT and codice fiscale checksums, EORI, province and REA codes, the fiscal
     representative's VAT number); nothing is truncated or guessed.
@@ -895,7 +921,7 @@ def fatturapa_party(identity: LegalIdentity, role: str = CEDENTE) -> dict[str, A
     dati["Anagrafica"] = _anagrafica(block, ident)
     if role == CEDENTE:
         if ident.fiscal_regime not in FISCAL_REGIMES:
-            block.problems.append("fiscal_regime: RegimeFiscale is mandatory (RF01-RF19)")
+            block.problems.append("fiscal_regime: RegimeFiscale is mandatory (RF01-RF20)")
         dati["RegimeFiscale"] = ident.fiscal_regime
 
     party: dict[str, Any] = {"DatiAnagrafici": dati, "Sede": _sede(block, ident, "registered")}

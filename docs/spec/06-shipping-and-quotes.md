@@ -86,7 +86,11 @@ is open: SHP.12 only stores the choice.
   mixes with countries or groups.
 - `postcode_patterns` and `states` narrow a zone inside its countries: an address in those countries
   matches when its postcode matches a pattern or its province / state is listed. An address without
-  a postcode never matches a postcode-only zone (case 5).
+  a postcode never matches a postcode-only zone (case 5). Each entry belongs to one country: it is
+  written `CC:entry` (`PT:9000..9999`, `GR:84*`, `IT:SS`) and applies to that country only. An
+  entry without `CC:` is allowed only when the zone covers exactly one country (explicit or through
+  its groups); the model validator, `ZoneSnap` and the migration refuse it otherwise. `*` takes no
+  patterns and no provinces.
 
 Postcode pattern grammar (shared validator, `apps.core.postcodes`, used by the models, SHP.2 and the
 SHP.13 import). Postcodes are compared upper case with spaces and dashes removed, so `846 00` =
@@ -170,6 +174,9 @@ Checkout rules:
   quote only, or blocked. The default is an indicative cost subject to quote (`IndicativeRates`).
 
 ### Configuration file format (SHP.13)
+
+A file is refused with a file-level issue above 1 MiB (`config_format.MAX_FILE_BYTES`), when the
+JSON nests too deeply or when a CSV cell exceeds the CSV field limit; the upload adapter reuses the cap.
 
 One versioned format carries a shipping configuration in and out: vendor and platform exports and
 imports, the standard template, and the SHP.5 legacy import (which converts the legacy option into
@@ -332,6 +339,13 @@ and `apps.shipping` from importing `apps.events` (VEN.20, EVT.1).
 19. Sardinia (SHP.14): an indicative cost with a request-quote action; a vendor override to a fixed
     surcharge applies.
 
+20. Entries of a multi-country zone apply to their own country: with `GR:28*`, `GR:85*`,
+    `GR:70000..74999` and `PT:9000..9999` in one zone, PT `2800-001`, `7000-001` and `8500-001`
+    resolve to the PT zone and PT `9000-001` to the zone with the patterns. Unqualified entries in
+    a multi-country zone are refused. SHP.5 does not carry the legacy cross-country match over
+    (owner decision MQ-8, 2026-11-08): the migration fixes mis-zoned postcodes instead of
+    reproducing the legacy error.
+
 ## 6.4 Tasks
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
@@ -340,7 +354,7 @@ and `apps.shipping` from importing `apps.events` (VEN.20, EVT.1).
 | SHP.2 | Legacy cases 1–7 against the `match_postcode` and `resolve_zone` pure functions that SHP.12 built; destination country normalised before matching (`EL` → `GR`, `UK` → `GB`), postcode patterns parsed once per zone, a spaced dash range (`70000 - 74999`) refused like the old range form | P1 | 6 | SHP.12 | Cases 1–7 green; an `EL` destination matches a `GR` zone; `70000 - 74999` is refused with the `..` hint |
 | SHP.3 | `quote_shipping` with Rates/IndicativeRates/NeedsQuote/Blocked outcomes, over-band policy, pickup, free-shipping threshold per method | P1 | 8 | SHP.2, SHP.12, SHP.14 | Cases 8–13 green |
 | SHP.4 | Cart integration: package per vendor, VAT via the tax engine | P1 | 6 | SHP.3, TAX.4, ORD.1 | Correct cart totals in mixed tests |
-| SHP.5 | Import of the LIVE v2 config (JSON) into the new models with a parity report | P1 | 6 | SHP.1 | Same rates on 200 sample combinations |
+| SHP.5 | Import of the LIVE v2 config (JSON) into the new models with a parity report; the legacy rate tables are mapped onto country-qualified zones (`CC:` patterns), without the legacy cross-country postcode match (owner decision MQ-8) | P1 | 6 | SHP.1 | Same rates on 200 sample combinations, except the addresses the legacy system mis-zoned; the parity report lists every address whose rate changes, with the old and the new rate |
 | SHP.6 | Admin zone/rate editor with diff, impact and versions/rollback | P2 | 12 | SHP.12, CORE.8 | Rollback to a previous version works |
 | SHP.7 | Cart simulator (admin + `/shipping/simulate`) | P2 | 6 | SHP.4 | Parity with the current simulator on seed cases |
 | SHP.8 | Daily health check + report | P2 | 6 | SHP.1, ARC.9, ARC.16 | Email report with the 7 checks |

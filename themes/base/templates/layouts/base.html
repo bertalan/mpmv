@@ -1,0 +1,46 @@
+{% load i18n static wagtailcore_tags cms_tags image_credits %}{% get_current_language as LANGUAGE_CODE %}{% wagtail_site as current_site %}{% firstof current_site.site_name site_name "MPMV" as site_name %}<!doctype html>
+{% comment %}
+Public page layout of the base theme (THM.3, spec 14 §14.3, §14.6). Pages extend it and fill
+`content`; `title` and `description` default to the CMS page's SEO fields. The header holds the
+skip link target, the disclosure navigation, the help link and the language switcher; the help
+link repeats in the footer, in the same place on every page (WCAG 3.2.6).
+
+Outside the `header`, `footer` and `image_credits` blocks nothing here queries the database:
+without a request in the context (the 500 page) `wagtail_site` is None and `site_name` comes
+from the context. `image_credits` (CMS.8) lists the credits of a CMS page's images after its
+content; pages without a `page` skip it.
+
+Strict CSP: no inline script or style. The theme module registers its Alpine components before
+the vendored Alpine CSP build starts (both are deferred and run in document order); htmx reads
+its configuration from the meta tag.
+{% endcomment %}
+<html lang="{{ LANGUAGE_CODE }}" data-theme="{{ theme.slug }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% firstof page.seo_title page.title %} · {{ site_name }}{% endblock %}</title>
+  {% block description %}{% if page.search_description %}<meta name="description" content="{{ page.search_description }}">{% endif %}{% endblock %}
+  <meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false,"selfRequestsOnly":true}'>
+  {% with "themes/"|add:theme.slug|add:"/theme.css" as theme_css %}<link rel="stylesheet" href="{% static theme_css %}">{% endwith %}
+  <script type="module" src="{% static 'themes/base/js/base.js' %}"></script>
+  <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
+  <script src="{% static 'vendor/alpine-csp.min.js' %}" defer></script>
+  {% if page %}{% faq_jsonld page %}{% endif %}
+  {% block head %}{% endblock %}
+</head>
+<body>
+  {% include "components/skip_link.html" only %}
+  {% block header %}
+    {% navigation_links "header" as header_links %}{% language_links as languages %}
+    {% include "components/header.html" with site_name=site_name links=header_links languages=languages %}
+  {% endblock %}
+  <main id="main" class="site-main" tabindex="-1">
+    {% block content %}{% endblock %}
+    {% block image_credits %}{% if page %}{% page_image_credits page as image_credits %}{% image_credits_disclosure image_credits %}{% endif %}{% endblock %}
+  </main>
+  {% block footer %}
+    {% navigation_links "footer" as footer_links %}
+    {% include "components/footer.html" with site_name=site_name links=footer_links %}
+  {% endblock %}
+</body>
+</html>

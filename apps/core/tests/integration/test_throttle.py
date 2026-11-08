@@ -69,3 +69,19 @@ def test_the_nightly_job_purges_expired_rows() -> None:
     ThrottleFactory.create(key="fresh", expires_at=now + dt.timedelta(hours=1))
     purge_throttles.func(timestamp=int(now.timestamp()))
     assert list(Throttle.objects.values_list("key", flat=True)) == ["fresh"]
+
+
+def test_a_rate_limit_counts_uses_in_a_fixed_window() -> None:
+    from apps.core.services import consume_rate_limit
+
+    window = dt.timedelta(minutes=1)
+    for _ in range(3):
+        assert consume_rate_limit("geo:user:1", limit=3, window=window, now=T0) == dt.timedelta(0)
+    later = T0 + dt.timedelta(seconds=20)
+    assert consume_rate_limit("geo:user:1", limit=3, window=window, now=later) == (
+        dt.timedelta(seconds=40)
+    )
+    assert consume_rate_limit("geo:user:2", limit=3, window=window, now=later) == dt.timedelta(0)
+    after = T0 + window
+    assert consume_rate_limit("geo:user:1", limit=3, window=window, now=after) == dt.timedelta(0)
+    assert Throttle.objects.get(key="geo:user:1").failures == 1

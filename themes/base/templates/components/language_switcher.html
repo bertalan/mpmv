@@ -1,0 +1,21 @@
+{% load i18n %}{% comment %}
+Language switcher (THM.3): one button per language, each in its own small form that posts to
+`switch_language`, so it works without JavaScript. The current language is marked
+`aria-current` and disabled.
+
+Context: `languages`, either the CMS `LanguageLink`s (`code`, `name`, `url`, `current`) or
+Django's language info dicts (`code`, `name_local`) together with `current_language` and
+`next_url` (pages without a translated URL, such as the account area).
+{% endcomment %}<nav class="language-switcher" aria-label="{% translate 'Language' %}">
+  <ul>
+    {% for language in languages %}
+      <li>
+        <form action="{% url 'switch_language' %}" method="post">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{% firstof language.url next_url %}">
+          {% firstof language.name_local language.name as label %}<button type="submit" name="language" value="{{ language.code }}" lang="{{ language.code }}"{% if language.current or language.code == current_language %} aria-current="true" disabled{% endif %}>{{ label|capfirst }}</button>
+        </form>
+      </li>
+    {% endfor %}
+  </ul>
+</nav>

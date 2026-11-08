@@ -1,0 +1,21 @@
+# Third-party JavaScript served from 'self' (THM.3, spec 14 §14.5): no CDN at runtime.
+# Every file in this directory has one entry. `sha256` is the hash of the file exactly as
+# downloaded from `source`; apps/themes/tests/unit/test_vendored.py fails on any mismatch, on a
+# file without an entry and on a version that is not an exact x.y.z.
+# To update: download the new version from the pinned URL, replace the file, update the entry.
+
+[[file]]
+path = "htmx.min.js"
+name = "htmx"
+version = "2.0.4"
+source = "https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"
+sha256 = "e209dda5c8235479f3166defc7750e1dbcd5a5c1808b7792fc2e6733768fb447"
+license = "0BSD"
+
+[[file]]
+path = "alpine-csp.min.js"
+name = "alpinejs-csp"
+version = "3.14.8"
+source = "https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.14.8/dist/cdn.min.js"
+sha256 = "c98f46291087f0f93c9cdefb682d120fe1d2b3dcb649de83cfc1ad5b1fac58e4"
+license = "MIT"
