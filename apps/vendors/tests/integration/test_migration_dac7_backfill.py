@@ -11,8 +11,8 @@ from django.db.migrations.executor import MigrationExecutor
 
 from apps.vendors.tests.factories import codice_fiscale, italian_vat
 
-BEFORE = [("vendors", "0015_seed_dac7_seller_dataset")]
-AFTER = [("vendors", "0016_backfill_dac7_seller_dataset")]
+BEFORE = [("vendors", "0017_seed_dac7_seller_dataset")]
+AFTER = [("vendors", "0018_backfill_dac7_seller_dataset")]
 
 
 @pytest.mark.django_db(transaction=True)

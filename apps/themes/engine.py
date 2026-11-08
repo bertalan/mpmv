@@ -499,3 +499,48 @@ def build_theme_css(
     for slug in reversed(chain):
         parts.extend(sources.get(slug, ()))
     return minify_css("\n".join(parts)) + "\n"
+
+
+# --- Component helpers (THM.4, spec 14 §14.9)
+
+HEADING_LEVELS = (2, 6)
+_SAFE_SCHEME_RE = re.compile(r"^https?://", re.IGNORECASE)
+# A browser drops tabs and newlines from a URL and reads "\" as "/", so "java\tscript:" or
+# "/\evil.example" would turn into a script URL or a protocol-relative one.
+_UNSAFE_HREF_CHARS_RE = re.compile(r"[\\\x00-\x1f\x7f]")
+
+
+def safe_href(value: object) -> str:
+    """`value` when a component may use it as a link target, else "" (render no link).
+
+    Kept: http(s) URLs, and relative URLs starting with "/", "#" or "?". Dropped: every other
+    scheme (javascript:, data:, vbscript:, mailto:, ...), protocol-relative "//host" URLs,
+    bare relative paths, and values with a backslash or a control character.
+    """
+    if not isinstance(value, str):
+        return ""
+    href = value.strip()
+    if not href or _UNSAFE_HREF_CHARS_RE.search(href):
+        return ""
+    if href.startswith("//"):
+        return ""
+    if href.startswith(("/", "#", "?")) or _SAFE_SCHEME_RE.match(href):
+        return href
+    return ""
+
+
+def heading_level(value: object, default: int = 3) -> int:
+    """A component heading level between 2 and 6.
+
+    A missing or unreadable `value` gives `default`; an out-of-range one is clamped.
+    """
+    low, high = HEADING_LEVELS
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, int):
+        level = value
+    elif isinstance(value, str) and re.fullmatch(r"\s*-?\d+\s*", value):
+        level = int(value)
+    else:
+        return default
+    return min(max(level, low), high)

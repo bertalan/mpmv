@@ -189,7 +189,7 @@ def test_existing_ibans_and_tax_codes_are_encrypted_and_back() -> None:
     encrypted = raw_secrets()
     assert all(value.startswith("enc1:test:") for value in encrypted["vendor-a"])
     assert encrypted["vendor-b"] == ("", "")
-    # Only the columns that exist at this migration state (later ones add vendor fields).
+    # Only the columns of 0008: the current model has fields added by later migrations.
     vendor_a = Vendor.objects.only("iban", "tax_code").get(slug="vendor-a")
     assert (vendor_a.iban, vendor_a.tax_code) == (CLEAR_IBAN, CLEAR_TAX_CODE)
 

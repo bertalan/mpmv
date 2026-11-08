@@ -89,6 +89,7 @@ class FiscalRegime(models.TextChoices):
     RF17 = _regime("RF17")
     RF18 = _regime("RF18")
     RF19 = _regime("RF19")
+    RF20 = _regime("RF20")
 
 
 class SoleShareholder(models.TextChoices):
@@ -136,6 +137,13 @@ class Vendor(BaseModel):
     # Changed only through `services.change_status`, which checks the state machine and audits.
     status = models.CharField(
         max_length=16, choices=Status.choices, default=Status.APPLICANT, editable=False
+    )
+    # Raised by `services.reopen_vendor` (VEN.21): contract acceptances count for the current
+    # round only, so a reopened vendor accepts the contract in force again.
+    onboarding_round = models.PositiveIntegerField(
+        default=1,
+        editable=False,
+        help_text="1 for the first onboarding, one more each time staff reopen the closed vendor.",
     )
     country = CountryField(help_text="Country of establishment (ISO 3166-1 alpha-2).")
     contact_email = models.EmailField()
@@ -683,7 +691,8 @@ class ContractAcceptance(BaseModel):
     """An owner accepted a contract version for a vendor (VEN.5). Append-only (DB trigger).
 
     Records who, when, from which IP and which text: the language shown and the hash of its
-    title and body (`apps.core.translations.source_hash`). Written by `services.accept_contract`.
+    title and body (`apps.core.translations.source_hash`), and in which onboarding round of the
+    vendor (VEN.21). Written by `services.accept_contract`.
     """
 
     vendor_scope: ClassVar[str] = "vendor"
@@ -702,12 +711,16 @@ class ContractAcceptance(BaseModel):
     text_hash = models.CharField(max_length=64, help_text="SHA-256 of the accepted text.")
     accepted_at = models.DateTimeField()
     ip = models.GenericIPAddressField("IP address", null=True, blank=True)
+    # The vendor's `onboarding_round` when accepted: after a reopen (VEN.21) the same version is
+    # accepted again, in the new round.
+    onboarding_round = models.PositiveIntegerField(default=1, editable=False)
 
     class Meta:
         ordering = ["-accepted_at", "-id"]
         constraints = [
             models.UniqueConstraint(
-                fields=["vendor", "contract"], name="vendors_acceptance_vendor_contract_unique"
+                fields=["vendor", "contract", "onboarding_round"],
+                name="vendors_acceptance_vendor_contract_round_unique",
             ),
         ]
 

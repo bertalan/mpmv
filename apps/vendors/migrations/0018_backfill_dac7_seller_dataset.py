@@ -1,6 +1,6 @@
 """VEN.23: fill the new DAC7 fields from what existing vendors already hold.
 
-Without it every vendor that could be paid before 0014 would be blocked from payouts until
+Without it every vendor that could be paid before 0016 would be blocked from payouts until
 staff completed it behind the step-up. Only values that follow from stored data are filled:
 - the TIN issuing country is the vendor's country, where the stored TIN is valid there;
 - an Italian entity's business registration number is its REA registration ("RM-1234567").
@@ -45,7 +45,7 @@ def backfill(apps: Any, schema_editor: Any) -> None:
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("vendors", "0015_seed_dac7_seller_dataset"),
+        ("vendors", "0017_seed_dac7_seller_dataset"),
     ]
 
     operations = [

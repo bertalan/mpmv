@@ -7,7 +7,7 @@ import apps.core.fields
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("vendors", "0013_crossvendorconsent"),
+        ("vendors", "0015_reopen_onboarding_round"),
     ]
 
     operations = [

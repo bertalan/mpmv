@@ -1,17 +1,19 @@
 """Vendor services: vendor data and status changes (VEN.1, SEC.4), memberships with their
 permissions (CORE.2), the legal identity with its payout requirements (VEN.12) and onboarding:
-application, versioned contract, acceptance and the activation gate (VEN.5); per-vendor feature
+application, versioned contract, acceptance and the activation gates (VEN.5, the establishment
+gate of CMP.13); per-vendor feature
 flag overrides (ARC.8)."""
 
 import dataclasses
 import datetime as dt
-from collections.abc import Callable
+import logging
+from collections.abc import Callable, Collection, Mapping
 from typing import Any
 
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection, transaction
 from django.db.models import OuterRef, QuerySet, Subquery
 from django.utils import timezone
@@ -19,8 +21,14 @@ from django.utils.module_loading import import_string
 
 from apps.accounts.models import User
 from apps.core.audit import AuditContext
-from apps.core.changeset import ChangeSet
-from apps.core.services import audit_changes, flags_changed, run_mutation, save_audited
+from apps.core.changeset import Change, ChangeSet
+from apps.core.services import (
+    allowed_vendor_countries,
+    audit_changes,
+    flags_changed,
+    run_mutation,
+    save_audited,
+)
 
 from . import engine
 from .models import (
@@ -34,6 +42,8 @@ from .models import (
     VendorMember,
 )
 from .vies import VatNumberValidator
+
+logger = logging.getLogger(__name__)
 
 STATUS_CHANGED = "vendor.status_changed"
 CREATED = "vendor.created"
@@ -114,6 +124,8 @@ def _save_vendor(
             if vendor._state.adding
             else Vendor.objects.select_for_update().filter(pk=vendor.pk).first()
         )
+        if stored is not None:  # a stale instance never undoes a status change or a reopen
+            vendor.status, vendor.onboarding_round = stored.status, stored.onboarding_round
         after = vendor_snapshot(vendor)
         changes = ChangeSet()
         if stored is None:
@@ -124,11 +136,17 @@ def _save_vendor(
                 if getattr(stored, name) != getattr(vendor, name) and before[name] == after[name]:
                     after[name] += " (replaced)"
             changes.update(MODEL_LABEL, key, before, after)
+        flags = ChangeSet() if stored is None else establishment_review(stored, vendor)
+        result = ChangeSet([*changes.changes, *flags.changes])
         if dry_run:
-            return changes
+            return result
         vendor.save()
         audit_changes(changes, ctx=ctx, action=action or (UPDATED if stored else CREATED))
-    return changes
+        audit_changes(flags, ctx=ctx, action=ESTABLISHMENT_FLAGGED)
+        for flag in flags.changes:
+            warning = establishment_warning(flag.after or {}, str(vendor.status))
+            logger.warning("vendor %s: %s", vendor.public_id, warning)
+    return result
 
 
 def delete_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
@@ -155,23 +173,42 @@ def delete_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -
     return changes
 
 
+def _run_closure_hooks(
+    vendor: Vendor, changes: ChangeSet, *, ctx: AuditContext, dry_run: bool
+) -> None:
+    """Revoke, audited, what only an active vendor may hold (its API keys, CORE.14): each hook
+    in `settings.VENDOR_CLOSURE_HOOKS` returns its changes, added to `changes`."""
+    for path in settings.VENDOR_CLOSURE_HOOKS:
+        changes.changes.extend(import_string(path)(vendor, ctx=ctx, dry_run=dry_run).changes)
+
+
 def change_status(
     vendor: Vendor, target: str, *, ctx: AuditContext, dry_run: bool = False
 ) -> ChangeSet:
     """Move `vendor` to `target` if the state machine allows it; audit the change.
 
     The check runs against the stored status (row locked), never a possibly stale instance.
-    Activating an onboarding vendor also needs its onboarding checklist (VEN.5): the contract in
-    force must be accepted. Raises `engine.InvalidTransition` (`engine.ActivationNotAllowed`
-    for the checklist), also on dry-run.
+    Activating an onboarding vendor needs an establishment in an allowed country (CMP.13) and
+    its onboarding checklist (VEN.5): the contract in force must be accepted. Closing a vendor
+    revokes its API keys (`VENDOR_CLOSURE_HOOKS`, CORE.14), listed in the returned ChangeSet.
+    Raises `engine.InvalidTransition` (`engine.EstablishmentNotAllowed` for the establishment,
+    `engine.ActivationNotAllowed` for the checklist), also on dry-run. Reinstating a suspended
+    vendor is a staff decision and is not gated. Every move to active records the
+    establishment and whether it is allowed (`establishment_snapshot`) in the audit entry.
     """
     with transaction.atomic():
         current = (
-            Vendor.objects.select_for_update().only("status", "slug", "public_id").get(pk=vendor.pk)
+            Vendor.objects.select_for_update()
+            .only("status", "slug", "public_id", *ESTABLISHMENT_FIELDS)
+            .get(pk=vendor.pk)
         )
         engine.check_transition(current.status, target)
-        if current.status == engine.ONBOARDING and target == engine.ACTIVE:
-            engine.check_activation(onboarding_checklist(current))
+        establishment: dict[str, Any] = {}
+        if target == engine.ACTIVE:
+            if current.status == engine.ONBOARDING:
+                assert_establishment_allowed(current)
+                engine.check_activation(onboarding_checklist(current))
+            establishment = establishment_snapshot(current, allowed_vendor_countries())
 
         # Keyed by public_id: the slug is editable and can be reused by another vendor, so it
         # would not identify the vendor across its audit history. The slug is kept for reading.
@@ -180,7 +217,7 @@ def change_status(
             MODEL_LABEL,
             str(current.public_id),
             before={"status": current.status, "slug": current.slug},
-            after={"status": str(target), "slug": current.slug},
+            after={"status": str(target), "slug": current.slug, **establishment},
         )
 
         def apply() -> None:
@@ -188,10 +225,116 @@ def change_status(
             current.save(update_fields=["status", "updated_at"])
 
         run_mutation(changes, apply, ctx=ctx, action=STATUS_CHANGED, dry_run=dry_run)
+        if target == engine.CLOSED:
+            _run_closure_hooks(current, changes, ctx=ctx, dry_run=dry_run)
 
     if not dry_run:
         vendor.status = target
     return changes
+
+
+# --- Establishment gate (D-21, CMP.13)
+
+# The identity fields `engine.vendor_establishment` reads.
+ESTABLISHMENT_FIELDS = ("country", "registered_country", "establishment_country")
+
+
+def vendor_establishment(vendor: Vendor) -> engine.Establishment:
+    """Where `vendor` is established, from its VEN.12 registered office and establishment."""
+    return engine.vendor_establishment(
+        engine.LegalIdentity(**{name: getattr(vendor, name) for name in ESTABLISHMENT_FIELDS})
+    )
+
+
+def assert_establishment_allowed(vendor: Vendor) -> None:
+    """Raise `engine.EstablishmentNotAllowed`, naming the countries, unless `vendor` is
+    established in a country of `PlatformOperator.allowed_vendor_countries` now."""
+    engine.check_establishment(vendor_establishment(vendor), allowed_vendor_countries())
+
+
+ESTABLISHMENT_FLAGGED = "vendor.establishment_outside_allowed"
+
+#: Vendors the activation gate already admitted: a later move out of the set is flagged.
+ADMITTED_STATUSES = frozenset({engine.ACTIVE, engine.SUSPENDED})
+
+
+def establishment_snapshot(vendor: Vendor, allowed: Collection[str]) -> dict[str, Any]:
+    """Where `vendor` is established, and whether that is in the `allowed` countries."""
+    place = vendor_establishment(vendor)
+    return {
+        "registered_office": place.registered_office,
+        "permanent_establishment": place.permanent_establishment,
+        "establishment_allowed": engine.establishment_error(place, allowed) is None,
+    }
+
+
+def establishment_review(stored: Vendor, vendor: Vendor) -> ChangeSet:
+    """The staff flag for an identity change (spec 11 CMP.13): one change when `stored` is an
+    admitted vendor and the edited `vendor` is established elsewhere, outside the allowed set.
+
+    Nobody is suspended: staff decide, as when the owner shrinks the set.
+    """
+    flags = ChangeSet()
+    if stored.status not in ADMITTED_STATUSES:
+        return flags
+    allowed = allowed_vendor_countries()
+    before, after = establishment_snapshot(stored, allowed), establishment_snapshot(vendor, allowed)
+    if not after["establishment_allowed"] and vendor_establishment(stored) != vendor_establishment(
+        vendor
+    ):
+        flags.update(MODEL_LABEL, str(vendor.public_id), before, after)
+    return flags
+
+
+def establishment_flags(changes: ChangeSet) -> list[Change]:
+    """The changes of `changes` that leave an admitted vendor outside the allowed set."""
+    return [c for c in changes.changes if (c.after or {}).get("establishment_allowed") is False]
+
+
+def establishment_warning(place: Mapping[str, Any], status: str) -> str:
+    """The staff message for a vendor flagged by `establishment_review` or reinstated outside
+    the allowed set; `place` is an `establishment_snapshot`."""
+    establishment = place.get("permanent_establishment") or "none"
+    return (
+        "the vendor is established outside the allowed vendor countries "
+        f"(registered office {place.get('registered_office')}, permanent establishment "
+        f"{establishment}). It stays {status}: staff must review it."
+    )
+
+
+def report_vendors_outside_allowed() -> int:
+    """Log a warning for each active vendor established outside the allowed set; return how
+    many there are. Run every night (`vendors.check_establishments`)."""
+    rows = active_vendors_outside(allowed_vendor_countries())
+    for row in rows:
+        logger.warning(
+            "vendor %s: %s", row["vendor"], establishment_warning(row, str(engine.ACTIVE))
+        )
+    return len(rows)
+
+
+def active_vendors_outside(countries: Collection[str]) -> list[dict[str, str]]:
+    """The active vendors established outside `countries`, for staff to decide on.
+
+    Named by `settings.VENDORS_OUTSIDE_COUNTRIES_HOOK`: `core.set_allowed_vendor_countries`
+    lists them in its ChangeSet.
+    """
+    vendors = Vendor.objects.filter(status=engine.ACTIVE).only(
+        "public_id", "display_name", *ESTABLISHMENT_FIELDS
+    )
+    rows = []
+    for vendor in vendors.order_by("display_name", "id"):
+        place = vendor_establishment(vendor)
+        if engine.establishment_error(place, countries) is not None:
+            rows.append(
+                {
+                    "vendor": str(vendor.public_id),
+                    "name": vendor.display_name,
+                    "registered_office": place.registered_office,
+                    "permanent_establishment": place.permanent_establishment,
+                }
+            )
+    return rows
 
 
 def ensure_vendor_can_write(vendor: Vendor) -> str:
@@ -662,6 +805,7 @@ def acceptance_snapshot(acceptance: ContractAcceptance) -> dict[str, Any]:
         "text_hash": acceptance.text_hash,
         "accepted_at": acceptance.accepted_at,
         "ip": acceptance.ip,
+        "onboarding_round": acceptance.onboarding_round,
     }
 
 
@@ -711,11 +855,16 @@ def accept_contract(
 
     The acceptance stores the language and hash, and the IP of `ctx` (`audit_context` takes it
     from the request through the trusted proxy, `apps.core.http.client_ip`). Accepting a version
-    again changes nothing. Raises `engine.ContractNotAcceptable` (vendor status, not an owner),
+    again in the same onboarding round changes nothing; after a reopen (VEN.21) it is accepted
+    again. Raises `engine.ContractNotAcceptable` (vendor status, not an owner),
     `engine.NoContract` or `engine.ContractChanged`, also on dry-run.
     """
     with transaction.atomic():
-        locked = Vendor.objects.select_for_update().only("status", "public_id").get(pk=vendor.pk)
+        locked = (
+            Vendor.objects.select_for_update()
+            .only("status", "public_id", "onboarding_round")
+            .get(pk=vendor.pk)
+        )
         role = member_role(user, locked) if user.is_active else None
         engine.check_can_accept_contract(locked.status, role)
         shown = VendorContract.objects.select_for_update().get(pk=contract.pk)
@@ -735,7 +884,10 @@ def accept_contract(
             raise engine.ContractChanged(
                 f"the {language} text of {shown} changed after it was shown; show it again"
             )
-        if ContractAcceptance.objects.filter(vendor=locked, contract=shown).exists():
+        round_ = locked.onboarding_round
+        if ContractAcceptance.objects.filter(
+            vendor=locked, contract=shown, onboarding_round=round_
+        ).exists():
             return ChangeSet()
         acceptance = ContractAcceptance(
             vendor=locked,
@@ -745,6 +897,7 @@ def accept_contract(
             text_hash=text_hash,
             accepted_at=timezone.now(),
             ip=ctx.ip,
+            onboarding_round=round_,
         )
         changes = ChangeSet()
         changes.create(ACCEPTANCE_MODEL, str(acceptance.public_id), acceptance_snapshot(acceptance))
@@ -755,12 +908,15 @@ def accept_contract(
 
 def onboarding_checklist(vendor: Vendor) -> engine.OnboardingChecklist:
     """The stored vendor's onboarding checklist: contract in force accepted (blocks activation),
-    DAC7 dataset and payout data (listed only: VEN.12 gates payouts with them)."""
+    DAC7 dataset and payout data (listed only: VEN.12 gates payouts with them). Only an
+    acceptance of the vendor's current onboarding round counts (VEN.21)."""
     stored = Vendor.objects.get(pk=vendor.pk)
     contract = current_contract()
     accepted = (
         contract is not None
-        and ContractAcceptance.objects.filter(vendor=stored, contract=contract).exists()
+        and ContractAcceptance.objects.filter(
+            vendor=stored, contract=contract, onboarding_round=stored.onboarding_round
+        ).exists()
     )
     return engine.onboarding_checklist(
         contract_version=contract.version if contract is not None and accepted else None,
@@ -768,6 +924,84 @@ def onboarding_checklist(vendor: Vendor) -> engine.OnboardingChecklist:
         dac7_missing=engine.dac7_missing(stored.legal_identity()),
         payout=legal_profile_completeness(stored),
     )
+
+
+# --- Reopening a closed vendor (VEN.21, owner decision Q-17)
+
+REOPENED = "vendor.reopened"
+# Checked here, not only in the admin, so every adapter (admin, API, MCP, shell) is staff-only.
+REOPEN_PERMISSION = "vendors.change_vendor"
+
+
+def can_reopen(actor: User | AnonymousUser) -> bool:
+    """Active platform staff with the vendor change permission; never a vendor member as such."""
+    return bool(actor.is_active and actor.is_staff and actor.has_perm(REOPEN_PERMISSION))
+
+
+def reopen_vendor(
+    vendor: Vendor,
+    *,
+    actor: User | AnonymousUser,
+    reason: str,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Staff move a closed `vendor` back to onboarding, saying why; audited with the reason.
+
+    The vendor's onboarding round goes up, so an acceptance from before the closure no longer
+    counts: an owner accepts the contract in force again, and activation re-runs the checklist
+    and gates through `change_status`. The kept data (owner, ledger, contracts) are reused.
+    No API key comes back: closing revoked them, and a key a closure from before CORE.14 left
+    active is revoked here (`VENDOR_CLOSURE_HOOKS`); an owner issues new keys once the vendor is
+    active again. Checked against the stored vendor (row locked). Raises `PermissionDenied` (see
+    `can_reopen`), `engine.ReasonRequired` (blank reason), `engine.InvalidTransition` (not
+    closed) or `engine.ReopenNotAllowed` (no active owner), also on dry-run.
+    """
+    if not can_reopen(actor):
+        raise PermissionDenied("Only platform staff can reopen a closed vendor.")
+    reason = reason.strip()
+    with transaction.atomic():
+        current = (
+            Vendor.objects.select_for_update()
+            .only("status", "slug", "public_id", "onboarding_round")
+            .get(pk=vendor.pk)
+        )
+        engine.check_reopen(
+            current.status,
+            reason=reason,
+            has_active_owner=VendorMember.objects.filter(
+                vendor=current, role=engine.OWNER, user__is_active=True
+            ).exists(),
+        )
+        round_ = current.onboarding_round + 1
+        changes = ChangeSet()
+        changes.update(
+            MODEL_LABEL,
+            str(current.public_id),
+            before={
+                "status": current.status,
+                "slug": current.slug,
+                "onboarding_round": current.onboarding_round,
+            },
+            after={
+                "status": engine.ONBOARDING,
+                "slug": current.slug,
+                "onboarding_round": round_,
+                "reason": reason,
+            },
+        )
+
+        def apply() -> None:
+            current.status = engine.ONBOARDING
+            current.onboarding_round = round_
+            current.save(update_fields=["status", "onboarding_round", "updated_at"])
+
+        run_mutation(changes, apply, ctx=ctx, action=REOPENED, dry_run=dry_run)
+        _run_closure_hooks(current, changes, ctx=ctx, dry_run=dry_run)
+
+    if not dry_run:
+        vendor.status, vendor.onboarding_round = engine.ONBOARDING, round_
+    return changes
 
 
 # --- Per-vendor feature flag overrides (ARC.8, docs/dev/feature-flags.md)

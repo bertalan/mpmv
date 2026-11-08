@@ -29,6 +29,6 @@ def seed_legal_requirements() -> None:
     for name in (
         "0005_seed_legal_requirements",
         "0007_seed_dac7_requirements",
-        "0015_seed_dac7_seller_dataset",
+        "0017_seed_dac7_seller_dataset",
     ):
         importlib.import_module(f"apps.vendors.migrations.{name}").seed(apps, None)
