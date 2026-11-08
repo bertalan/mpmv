@@ -6,6 +6,7 @@ A GET or HEAD only shows a "Continue" page; the Continue POST signs the recipien
 """
 
 import json
+import logging
 import time
 from collections.abc import Iterator
 from typing import Any
@@ -122,6 +123,7 @@ def test_an_invalid_token_on_get_changes_nothing_either(client: Client) -> None:
 
 def test_a_prefetch_does_not_spend_the_link(client: Client) -> None:
     user = UserFactory.create()
+    TOTPDeviceFactory.create(user=user)
     token = token_for(user, owned_document(user))
     Client().get(services.action_link_path(token))  # a mail scanner
     Client().head(services.action_link_path(token))
@@ -174,11 +176,42 @@ def test_a_valid_token_without_session_leads_to_the_step_up_and_then_to_the_page
     assert [("doc-1", user.pk)] == APPROVED
 
 
-def test_a_user_without_a_second_factor_must_enrol_before_the_page(client: Client) -> None:
+def test_a_recipient_without_a_second_factor_gets_no_passwordless_sign_in(
+    client: Client,
+) -> None:
+    # Enrolling a first factor needs no other proof (CORE.4), so a magic sign-in here would let
+    # whoever holds only the mailbox or the link bind their own authenticator and approve.
     user = UserFactory.create()
+    token = token_for(user, owned_document(user))
+
+    response = press_continue(client, token)
+
+    assert_sent_to_login(response, reverse("test-approve", args=["doc-1"]))
+    assert signed_in_user(client) is None
+    assert not ActionLinkUse.objects.exists()
+    assert not AuditLog.objects.filter(action=services.ACTION_LINK_SIGNED_IN).exists()
+    [entry] = refusals()
+    assert entry["reason"] == "no_second_factor"
+    assert entry["target_key"] == str(user.public_id)
+
+
+def test_an_unconfirmed_factor_does_not_count_for_the_magic_sign_in(client: Client) -> None:
+    user = UserFactory.create()
+    TOTPDeviceFactory.create(user=user, confirmed=False)
     press_continue(client, token_for(user, owned_document(user)))
-    page = client.get(reverse("test-approve", args=["doc-1"]))
-    assert urlsplit(page["Location"]).path == reverse("mfa:setup")
+    assert signed_in_user(client) is None
+    assert refusals()[0]["reason"] == "no_second_factor"
+
+
+def test_a_signed_in_recipient_without_a_factor_still_goes_on_to_the_page(
+    client: Client,
+) -> None:
+    # Signed in with a password already: the link adds no sign-in, the page asks for enrolment.
+    user = UserFactory.create()
+    client.force_login(user)
+    response = press_continue(client, token_for(user, owned_document(user)))
+    assert response["Location"] == reverse("test-approve", args=["doc-1"])
+    assert not refusals()
 
 
 def test_an_action_without_step_up_is_refused(client: Client) -> None:
@@ -216,11 +249,30 @@ def test_the_continue_url_answers_only_post(client: Client) -> None:
     assert client.get(reverse("action_link:continue")).status_code == 405
 
 
+@pytest.mark.parametrize("method", ["post", "put", "delete", "options"])
+def test_the_token_never_reaches_the_request_log(
+    client: Client, caplog: pytest.LogCaptureFixture, method: str
+) -> None:
+    user = UserFactory.create()
+    token = token_for(user, owned_document(user))
+    caplog.set_level(logging.DEBUG)
+
+    response = open_link(client, token, method)
+
+    assert response.status_code == 405
+    request_records = [r for r in caplog.records if r.name == "django.request"]
+    assert request_records, "the 405 is logged"
+    assert all("/account/link/[redacted]/" in r.getMessage() for r in request_records)
+    assert token not in caplog.text
+    assert token.split(":")[-1] not in caplog.text
+
+
 # --- Single use and misuse: normal login, then the same action page, with audit
 
 
 def test_the_sign_in_use_is_single(client: Client) -> None:
     user = UserFactory.create()
+    TOTPDeviceFactory.create(user=user)
     token = token_for(user, owned_document(user))
     press_continue(Client(), token)
 
@@ -367,6 +419,7 @@ def test_the_continue_post_is_rate_limited_per_ip(
 
 def test_tokens_never_reach_the_audit_log(client: Client) -> None:
     user = UserFactory.create()
+    TOTPDeviceFactory.create(user=user)
     token = token_for(user, owned_document(user))
     press_continue(client, token)
     press_continue(Client(), token)

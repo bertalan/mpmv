@@ -390,9 +390,15 @@ PERMISSIONS_POLICY: dict[str, list[str]] = {
     "usb": [],
 }
 
+# A secure action link holds its token in the URL path (CORE.15): request logs redact it. The
+# filter on `django.request` runs before propagation, so Django's own handlers get it too.
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "filters": {"redact_secret_paths": {"()": "mpmv.log_redaction.RedactSecretPaths"}},
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "filters": ["redact_secret_paths"]},
+    },
+    "loggers": {"django.request": {"filters": ["redact_secret_paths"]}},
     "root": {"handlers": ["console"], "level": "INFO"},
 }

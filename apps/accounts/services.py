@@ -856,13 +856,18 @@ def redeem_action_token(
     - Signed in as someone else: refused.
     - No session: the single use is recorded (`ActionLinkUse`) and audited; the caller then
       signs the recipient in, without MFA: the action page asks for the step-up.
+    - No session and no confirmed second factor: refused, nothing spent. The first factor can
+      be enrolled without other proof (CORE.4), so a passwordless sign-in would let whoever
+      holds only the mailbox bind their own authenticator, pass the step-up and approve.
 
     Every refusal is audited (reason, purpose and object; never the token). The caller sends a
     refused visitor to the normal login, then on to `action_url` when it is known.
     """
     check = check_action_token(token, now=now)
     if check.refusal is None:
-        if session_user is None:
+        if session_user is None and (check.user is None or not has_second_factor(check.user)):
+            check = replace(check, refusal=engine.NO_SECOND_FACTOR)
+        elif session_user is None:
             check = _spend(check, ctx)
         elif check.user is None or session_user.pk != check.user.pk:
             check = replace(check, refusal=engine.WRONG_RECIPIENT)

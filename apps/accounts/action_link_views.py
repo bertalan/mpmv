@@ -5,13 +5,16 @@
   "Continue" page, or sends the recipient who is already signed in straight to the action page.
 - The Continue POST (CSRF, rate limited per IP) carries the token in its body, not its URL. It
   spends the token's single sign-in use and signs the recipient in without a password; the
-  action page then asks for the MFA step-up before its own POST.
-- A refused link (expired, used, another user's, an old version) leads to the normal login, then
-  to the same action page; the service audits the attempt.
+  action page then asks for the MFA step-up before its own POST. A recipient with no confirmed
+  second factor gets no passwordless sign-in.
+- A refused link (expired, used, another user's, an old version, no second factor) leads to the
+  normal login, then to the same action page; the service audits the attempt.
 
 Every response carries `Referrer-Policy: strict-origin` (a Referer is only ever the bare origin,
 never the path with the token) and is never cached, so the token does not leak to another site,
-to our own Referer logs or to a shared cache. Nothing here logs the token.
+to our own Referer logs or to a shared cache. The token is in the link's path, so the request
+logs redact it: `django.request` through `mpmv.log_redaction`, gunicorn's access log through
+`mpmv.gunicorn_logging`. Nothing here logs the token itself.
 """
 
 import math

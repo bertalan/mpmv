@@ -159,7 +159,11 @@ reusable mechanism: a service in `accounts` plus an email helper on top of the A
   limited per IP and records the single use as a unique row (`ActionLinkUse`, nonce digest
   only). Link pages send `Referrer-Policy: strict-origin` (never the path, which holds the token;
   `no-referrer` would make browsers send `Origin: null` and fail the CSRF check) and are never
-  cached. A user signed in as someone else is refused, never switched.
+  cached. A user signed in as someone else is refused, never switched. A recipient with no
+  confirmed second factor gets no passwordless sign-in (the first factor can be enrolled without
+  other proof, so the link alone would be enough to bind an attacker's authenticator): the link
+  sends them to the normal login. Request logs (`django.request`, gunicorn's access log) redact
+  the token segment of the link path.
 - **Vendor claim (VEN.24, owner decision MQ-1).** A vendor imported without an account holder is
   claimed through the same kind of link, bound to the vendor and to a claim version instead of a
   recipient user, and sent only to the vendor's legal email of record. There is no account yet,

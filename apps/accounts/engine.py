@@ -239,6 +239,9 @@ OLD_VERSION: Final = "old_version"
 WRONG_RECIPIENT: Final = "wrong_recipient"
 INACTIVE: Final = "inactive"
 USED: Final = "used"
+# No confirmed second factor: no passwordless sign-in, or whoever holds the link could enrol
+# their own first factor (CORE.4 needs no other proof for it) and pass the step-up.
+NO_SECOND_FACTOR: Final = "no_second_factor"
 ACTION_NONCE_BYTES: Final = 16  # 128 bits: the single-use key of a link
 
 
