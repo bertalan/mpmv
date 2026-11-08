@@ -1,0 +1,6 @@
+{% extends "layouts/error.html" %}
+{% load i18n %}
+{% comment %}CSRF failure (THM.3): rendered by Django's csrf_failure with the request context.{% endcomment %}
+{% block title %}{% translate "Form expired" %} · {{ site_name }}{% endblock %}
+{% block heading %}{% translate "Form expired" %}{% endblock %}
+{% block message %}<p>{% translate "The form was sent from an old or expired page. Go back, reload the page and send it again." %}</p>{% endblock %}

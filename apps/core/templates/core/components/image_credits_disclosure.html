@@ -1,0 +1,6 @@
+{% load i18n %}{% if credits %}<details class="image-credits">
+  <summary>{% translate "Image credits" %}</summary>
+  <ul>
+    {% for credit in credits %}<li>{% include "core/components/image_credit.html" %}</li>{% endfor %}
+  </ul>
+</details>{% endif %}

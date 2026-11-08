@@ -1,0 +1,18 @@
+{% comment %}
+Accordion (THM.4, spec 14 §14.9): a stack of native disclosures (`<details>` and `<summary>`),
+so it opens with Enter or Space and works without JavaScript; the browser exposes the expanded
+state. With `name`, opening one item closes the others (exclusive accordion, where supported;
+elsewhere every item opens on its own, which is still usable).
+
+  {% include "components/accordion.html" with items=sections name="product-info" only %}
+
+Context:
+- `items`: a list of `title`, `content` and optional `open` (shown open on load); the content
+  is escaped unless the caller marks it safe.
+- `name`: the group name of an exclusive accordion.
+{% endcomment %}<div class="accordion">
+  {% for item in items %}<details class="accordion__item"{% if name %} name="{{ name }}"{% endif %}{% if item.open %} open{% endif %}>
+    <summary class="accordion__summary">{{ item.title }}</summary>
+    <div class="accordion__content">{{ item.content }}</div>
+  </details>{% endfor %}
+</div>

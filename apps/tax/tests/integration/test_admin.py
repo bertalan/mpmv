@@ -1,8 +1,10 @@
 """TAX.1: staff admin for the tax models. Versioned rows are added through the audited services
 and never edited or deleted; every write shows up in the audit log."""
 
+import time
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import urlsplit
 
 import pytest
 from django.db.models import QuerySet
@@ -10,8 +12,11 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.models import User
+from apps.accounts.tests.factories import UserFactory
+from apps.accounts.tests.mfa import verified_login
 from apps.core.models import AuditLog
 from apps.core.tests.factories import utc
+from apps.tax import services
 from apps.tax.models import TaxRate, Territory, VendorTaxProfile, VendorTaxProfileTranslation
 from apps.tax.tests.factories import (
     TaxRateFactory,
@@ -58,7 +63,6 @@ def profile_form(vendor: Any, **overrides: str) -> dict[str, str]:
         "regime": "domestic_only",
         "exempt_reason": "",
         "oss_registered_since": "",
-        "requested_by": "",
         "valid_from_0": "2027-01-01",
         "valid_from_1": "00:00:00",
     }
@@ -122,6 +126,22 @@ def test_the_add_form_reports_a_start_that_is_not_after_the_current_rate(
     assert TaxRate.objects.count() == 1
 
 
+def asks_for_the_second_factor(response: Any) -> bool:
+    return bool(
+        response.status_code == 302 and urlsplit(response["Location"]).path == reverse("mfa:verify")
+    )
+
+
+def test_adding_a_rate_asks_for_the_second_factor_again_after_a_while(
+    client: Client, superuser: User
+) -> None:
+    verified_login(client, superuser, verified_at=time.time() - 3600)
+    assert asks_for_the_second_factor(client.get(reverse("admin:tax_taxrate_add")))
+    assert asks_for_the_second_factor(client.post(reverse("admin:tax_taxrate_add"), rate_form()))
+    assert not TaxRate.objects.exists()
+    assert not domain_entries().exists()
+
+
 def test_rates_cannot_be_changed_or_deleted_from_the_admin(staff_client: Client) -> None:
     rate = TaxRateFactory.create()
     change = reverse("admin:tax_taxrate_change", args=[rate.pk])
@@ -172,6 +192,25 @@ def test_the_admin_refuses_an_old_style_range_with_the_dotdot_hint(
     assert not Territory.objects.exists()
 
 
+def test_a_territory_with_rates_keeps_its_country_and_code_in_the_admin(
+    staff_client: Client,
+) -> None:
+    territory = TerritoryFactory.create(code="ES-CN", country="ES", name="Canarias")
+    TaxRateFactory.create(country="ES", territory=territory)
+    change = reverse("admin:tax_territory_change", args=[territory.pk])
+    form = {
+        "code": "PT-30",
+        "name": "Canary Islands",
+        "country": "PT",
+        "vat_status": territory.vat_status,
+        "postcode_patterns": ",".join(territory.postcode_patterns),
+    }
+    response = staff_client.post(change, form)
+    assert response.status_code == 302, response.content
+    territory.refresh_from_db()
+    assert (territory.country, territory.code, territory.name) == ("ES", "ES-CN", "Canary Islands")
+
+
 def test_territories_cannot_be_deleted_from_the_admin(staff_client: Client) -> None:
     territory = TerritoryFactory.create()
     delete = reverse("admin:tax_territory_delete", args=[territory.pk])
@@ -195,6 +234,66 @@ def test_a_profile_added_in_the_admin_is_approved_by_the_staff_member(
     entry = domain_entries().get()
     assert entry.action == "tax.vendor_tax_profile.configured"
     assert entry.vendor_key == str(vendor.public_id)
+
+
+def test_a_profile_added_in_the_admin_is_staff_initiated(
+    staff_client: Client, superuser: User
+) -> None:
+    """`requested_by` is not a form field: staff cannot attribute a regime to anyone."""
+    vendor = VendorFactory.create()
+    someone = UserFactory.create()
+    response = staff_client.post(
+        reverse("admin:tax_vendortaxprofile_add"),
+        {**profile_form(vendor), "requested_by": str(someone.pk)},
+    )
+    assert response.status_code == 302, response.content
+    profile = VendorTaxProfile.objects.get()
+    assert (profile.requested_by, profile.approved_by) == (None, superuser)
+    add = staff_client.get(reverse("admin:tax_vendortaxprofile_add"))
+    assert "requested_by" not in add.context["adminform"].form.fields
+
+
+def test_adding_a_profile_needs_the_review_permission(client: Client) -> None:
+    clerk = UserFactory.create(
+        staff=True, permissions=["tax.add_vendortaxprofile", "tax.view_vendortaxprofile"]
+    )
+    verified_login(client, clerk)
+    vendor = VendorFactory.create()
+    add = reverse("admin:tax_vendortaxprofile_add")
+    assert client.get(add).status_code == 403
+    response = client.post(add, profile_form(vendor, regime="exempt", exempt_reason="other"))
+    assert response.status_code == 403
+    assert not VendorTaxProfile.objects.exists()
+    assert not domain_entries().exists()
+
+
+def test_adding_a_profile_asks_for_the_second_factor_again_after_a_while(
+    client: Client, superuser: User
+) -> None:
+    verified_login(client, superuser, verified_at=time.time() - 3600)
+    vendor = VendorFactory.create()
+    add = reverse("admin:tax_vendortaxprofile_add")
+    assert asks_for_the_second_factor(client.get(add))
+    form = profile_form(vendor, regime="exempt", exempt_reason="other")
+    assert asks_for_the_second_factor(client.post(add, form))
+    assert not VendorTaxProfile.objects.exists()
+    assert not domain_entries().exists()
+
+
+def test_reviewers_add_profiles_with_a_fresh_second_factor(client: Client) -> None:
+    reviewer = UserFactory.create(
+        staff=True,
+        permissions=[
+            "tax.add_vendortaxprofile",
+            "tax.view_vendortaxprofile",
+            services.REVIEW_PERMISSION,
+        ],
+    )
+    verified_login(client, reviewer)
+    vendor = VendorFactory.create()
+    response = client.post(reverse("admin:tax_vendortaxprofile_add"), profile_form(vendor))
+    assert response.status_code == 302, response.content
+    assert VendorTaxProfile.objects.get().approved_by == reviewer
 
 
 def test_the_profile_form_reports_an_inconsistent_fiscal_regime(staff_client: Client) -> None:

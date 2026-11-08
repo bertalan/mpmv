@@ -1,4 +1,4 @@
-"""CAT.1 and CAT.2: pure catalog rules (spec 03 §3.2): SKU normalization and price validation,
+"""CAT.1 and CAT.2: pure catalog rules (spec 03 §3.2): price validation,
 the rules of the category and term trees, and the term attributes a taxonomy declares.
 
 Taxonomies are data: their terms' extra fields are declared by the taxonomy (`term_attributes`)
@@ -15,20 +15,6 @@ from apps.catalog import engine
 
 JAN = dt.datetime(2027, 1, 1, tzinfo=dt.UTC)
 FEB = dt.datetime(2027, 2, 1, tzinfo=dt.UTC)
-
-
-@pytest.mark.parametrize(
-    ("raw", "normalized"),
-    [("abc-123", "ABC-123"), ("  Ab_12 ", "AB_12"), ("ABC", "ABC"), ("x9", "X9")],
-)
-def test_sku_is_stripped_and_upper_cased(raw: str, normalized: str) -> None:
-    assert engine.normalize_sku(raw) == normalized
-
-
-@pytest.mark.parametrize("raw", ["", "   ", "\t\n"])
-def test_an_empty_sku_is_refused(raw: str) -> None:
-    with pytest.raises(engine.InvalidSku):
-        engine.normalize_sku(raw)
 
 
 @pytest.mark.parametrize(
@@ -343,6 +329,17 @@ def test_two_variants_cannot_share_a_combination_or_a_sku() -> None:
     errors = engine.product_structure_errors("variable", SIZE_COLOR, AXES, variants)
     assert "Variants T-S-RED and T-OTHER have the same options." in errors
     assert "The variant SKU T-S-RED is given twice." in errors
+
+
+def test_variant_skus_given_twice_compare_by_match_key() -> None:
+    """CAT.13: two variant SKUs that differ only in case and spaces are the same SKU."""
+    variants = (
+        _variant("T-S  RED", size="s", color="red"),
+        _variant("t-s red", size="s", color="blue"),
+        *_grid()[2:],
+    )
+    errors = engine.product_structure_errors("variable", SIZE_COLOR, AXES, variants)
+    assert errors == ["The variant SKU T-S  RED is given twice."]
 
 
 def test_at_most_one_default_variant() -> None:

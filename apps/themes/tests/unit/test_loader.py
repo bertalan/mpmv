@@ -140,3 +140,10 @@ def test_the_project_engine_puts_the_theme_loader_first_and_uncached() -> None:
     assert loaders[0] == LOADER
     # Django's cached.Loader keys by name only: it must never wrap the theme loader.
     assert LOADER not in repr(loaders[1:])
+
+
+def test_the_dev_autoreloader_watches_the_themes_directory(themes: Path) -> None:
+    """THM.1 review: without `get_dirs` a theme template edit never resets the loader cache."""
+    from django.template.autoreload import get_template_directories
+
+    assert themes.resolve() in {path.resolve() for path in get_template_directories()}

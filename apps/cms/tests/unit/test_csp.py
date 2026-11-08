@@ -10,6 +10,9 @@ PICKERS = [
     '<script>initDateChooser("id_from", {"dayOfWeekStart": 0, "format": "Y-m-d"});</script>',
     '<script>initTimeChooser("id_at", {"format": "H:i"});</script>',
     '<script>initDateTimeChooser("id_go_live_at", {"format": "Y-m-d H:i"});</script>',
+    # I18N.3: the main image field of a page (Wagtail's image chooser widget).
+    '<script>new ImageChooser("id_image", {"modalUrl": "/admin/images/chooser/"});</script>',
+    '<script>new DocumentChooser("id_file", {"modalUrl": "/admin/documents/chooser/"});</script>',
 ]
 
 
@@ -30,6 +33,9 @@ def test_picker_initialisers_get_the_nonce(script: str) -> None:
         '<script>initDateChooser("a"+alert(1)+"", {});</script>',
         '<script src="/x.js"></script><script>alert(1)</script>',
         "<script>new InlinePanel({});</script>",
+        '<script>new ImageChooser("a", {"x": alert(1)});</script>',
+        '<script>new ImageChooser("a", {});alert(1);</script>',
+        '<script>new Function("a", {});</script>',
     ],
 )
 def test_any_other_inline_script_stays_without_nonce(script: str) -> None:

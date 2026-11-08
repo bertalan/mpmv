@@ -1,0 +1,18 @@
+{% extends "layouts/base.html" %}
+{% comment %}
+Layout of the customer and vendor areas and the sign-in steps (THM.3, spec 14 §14.3). These
+pages have no language prefix and no CMS page, so the language switcher returns to the same
+path instead of a translated page. Pages fill `account_content` and set `title`.
+{% endcomment %}
+{% load i18n cms_tags %}
+{% block title %}{{ site_name }}{% endblock %}
+{% block header %}
+  {% navigation_links "header" as header_links %}
+  {% get_current_language as current_language %}{% get_available_languages as available %}{% get_language_info_list for available as languages %}
+  {% include "components/header.html" with site_name=site_name links=header_links languages=languages current_language=current_language next_url=request.get_full_path %}
+{% endblock %}
+{% block content %}
+  <div class="account-page">
+    {% block account_content %}{% endblock %}
+  </div>
+{% endblock %}

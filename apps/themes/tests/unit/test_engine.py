@@ -174,6 +174,14 @@ def test_candidates_use_the_given_root() -> None:
         "wagtailadmin/base.html",
         "wagtailusers/users/index.html",
         "wagtailsnippets/snippets/index.html",
+        # Admin templates of apps outside the admin prefixes (THM.1 review).
+        "accounts/admin/login.html",
+        "otp_totp/admin/config.html",
+        "otp_hotp/admin/config.html",
+        "otp/admin111/login.html",
+        "procrastinate/admin/job_detail.html",
+        "wagtailcore/shared/block_preview.html",
+        "catalog/admin/product_form.html",
     ],
 )
 def test_admin_templates_and_unsafe_names_are_never_themed(name: str) -> None:
@@ -181,7 +189,17 @@ def test_admin_templates_and_unsafe_names_are_never_themed(name: str) -> None:
     assert template_candidates(name, ["ride", "base"]) == []
 
 
-@pytest.mark.parametrize("name", ["cms/home_page.html", "layouts/base.html", "core/base.html"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "cms/home_page.html",
+        "layouts/base.html",
+        "core/base.html",
+        "components/admin_badge.html",
+        "accounts/mfa/verify.html",
+        "wagtailcore/password_required.html",
+    ],
+)
 def test_public_templates_are_themed(name: str) -> None:
     assert is_themable(name)
 

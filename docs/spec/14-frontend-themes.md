@@ -117,7 +117,7 @@ colour values outside token files.
 | Tier | Examples | Who sets it |
 |---|---|---|
 | Primitive | `color.red.700`, `color.slate.900`, `font.family.display`, `space.4`, `radius.2` | Theme |
-| Semantic | `--color-text`, `--color-text-muted`, `--color-surface`, `--color-surface-inverse`, `--color-accent`, `--color-on-accent`, `--color-accent-hover`, `--color-accent-tint`, `--color-secondary`, `--color-on-secondary`, `--color-secondary-hover`, `--color-secondary-text`, `--color-link`, `--color-focus`, `--color-danger`, `--font-body`, `--font-display`, `--step-0` … `--step-5` (fluid type with `clamp()`), `--space-xs` … `--space-3xl`, `--radius-control`, `--radius-card`, `--shadow-raised`, `--duration-fast`, `--header-height` | Theme (required set = token contract) |
+| Semantic | `--color-text`, `--color-text-muted`, `--color-surface`, `--color-surface-raised`, `--color-surface-inverse`, `--color-accent`, `--color-on-accent`, `--color-accent-hover`, `--color-accent-tint`, `--color-secondary`, `--color-on-secondary`, `--color-secondary-hover`, `--color-secondary-text`, `--color-link`, `--color-focus`, `--color-danger`, `--color-info`, `--color-success`, `--color-warning`, `--font-body`, `--font-display`, `--step-0` … `--step-5` (fluid type with `clamp()`), `--space-xs` … `--space-3xl`, `--radius-control`, `--radius-card`, `--shadow-raised`, `--duration-fast`, `--header-height` | Theme (required set = token contract) |
 | Component | `--button-bg`, `--card-padding`, `--price-sale-color` | `base` derives them from semantic tokens; a theme may override |
 
 The **token contract** (`apps/themes/contract.py`) lists the required semantic tokens and the
@@ -125,8 +125,8 @@ contrast pairs that every theme must satisfy:
 
 | Pair | Minimum |
 |---|---|
-| `text` / `surface`, `text-muted` / `surface`, `link` / `surface`, `on-accent` / `accent`, `on-accent` / `accent-hover`, `accent` / `accent-tint`, `on-secondary` / `secondary`, `on-secondary` / `secondary-hover`, `secondary-text` / `surface`, `text-inverse` / `surface-inverse`, `danger` / `surface` | 4.5:1 |
-| `focus` / `surface`, `focus` / `surface-inverse`, `border-control` / `surface`, `accent` / `surface` (as a UI component) | 3:1 |
+| `text` / `surface`, `text-muted` / `surface`, `link` / `surface`, `on-accent` / `accent`, `on-accent` / `accent-hover`, `accent` / `accent-tint`, `on-secondary` / `secondary`, `on-secondary` / `secondary-hover`, `secondary-text` / `surface`, `text-inverse` / `surface-inverse`, `danger` / `surface`, `text` / `surface-raised`, `text-muted` / `surface-raised`, `link` / `surface-raised`, `link` / `accent-tint` | 4.5:1 |
+| `focus` / `surface`, `focus` / `surface-inverse`, `border-control` / `surface`, `accent` / `surface` (as a UI component), `info` / `surface-raised`, `success` / `surface-raised`, `warning` / `surface-raised`, `danger` / `surface-raised` (the alert level bar) | 3:1 |
 
 Every background role has its own foreground token (`on-accent`, `on-secondary`), so a light
 secondary such as an orange can carry dark text; the vendor palettes of §14.12 use the same roles.
@@ -149,10 +149,12 @@ Alpine.js, CSS with a lightweight build). Recorded in an ADR in THM.1.
   layers (`@layer reset, tokens, base, layout, components, utilities, overrides`), native nesting,
   logical properties, container queries, `clamp()`. Target: browsers in Baseline "widely
   available".
-- `tools/build_theme.py` (`make assets`): resolves tokens for each theme chain, writes
-  `tokens.css`, concatenates the CSS sources of the chain in layer order, minifies, and writes one
-  `theme.css` per theme. It runs in the Containerfile build stage before `collectstatic`; the
-  output is git-ignored. `CompressedManifestStaticFilesStorage` hashes and compresses it.
+- `python -m apps.themes.build` (`make assets`; a module of the app rather than a `tools/` script,
+  because the image build context leaves `tools/` out): resolves tokens for each theme chain,
+  checks them against the token contract, writes `tokens.css`, concatenates the CSS sources of
+  the chain in layer order, minifies, and writes one `theme.css` per theme under
+  `build/themes/`. It runs in the Containerfile build stage before `collectstatic`; the output is
+  git-ignored. `CompressedManifestStaticFilesStorage` hashes and compresses it.
 - JavaScript: htmx 2 and the **CSP build** of Alpine.js, self-hosted under `static/vendor/`,
   listed in `static/vendor/VENDORED.toml` (version, source URL, SHA-256, licence); a unit test
   checks the hashes. Theme behaviour (disclosure menu, dialog, carousel buttons, quantity stepper,
@@ -198,7 +200,7 @@ Rules built into `base` and enforced for every theme:
 | Structure | `<header>`, `<nav>` with labels, one `<main>`, `<footer>`; one `<h1>` per page, no skipped levels; skip link to `<main>` as first focusable element | 1.3.1, 2.4.1, 2.4.6 |
 | Language | `lang` on `<html>`; EN fallback blocks inside another language carry `lang="en"` (spec 09 fallback) | 3.1.1, 3.1.2 |
 | Focus | `:focus-visible` outline of at least 2 px in `--color-focus` (≥ 3:1), never removed | 2.4.7 |
-| Focus not obscured | `scroll-padding-top: var(--header-height)` for the sticky header; the consent banner never covers the focused element (it is either the first thing in the focus order and a non-modal region that reserves its own space at the bottom, or a modal dialog that traps focus) | 2.4.11 |
+| Focus not obscured | `scroll-padding-top: var(--header-offset)` for the sticky header, the header's real height that the theme script keeps up to date (falling back to `--header-height`, its minimum); the consent banner never covers the focused element (it is either the first thing in the focus order and a non-modal region that reserves its own space at the bottom, or a modal dialog that traps focus) | 2.4.11 |
 | Target size | Every pointer target at least 24×24 CSS px, or spaced so a 24 px circle fits; primary controls 44 px high | 2.5.8 |
 | Dragging | Carousels, galleries and the price filter work with buttons and inputs; no drag-only interaction | 2.5.7 |
 | Consistent help | The help/contact link sits in the same place in the header and footer on every page, including checkout | 3.2.6 |
@@ -498,12 +500,12 @@ is vendor branding. Both `base` and `ride` ship at go-live (Q-60), so THM.6 to T
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
 | THM.1 | Theme framework: `apps/themes` registry and manifest, theme-aware template loader with parent fallback and `(theme, name)` cache, `ThemeSettings` per Wagtail Site with audit, `MPMV_THEME_DEFAULT`, system checks, import-linter rule, ADR for the frontend toolchain | P1 | 8 | CMS.1 | Two sites render different themes in an integration test; a template missing in the child comes from `base`; an unknown theme fails the system check |
-| THM.2 | Design-token pipeline: `tokens.toml` resolution and inheritance, token contract with contrast pairs, `tokens.css` rendering, `tools/build_theme.py` and `make assets`, Containerfile build step | P1 | 6 | THM.1 | Unit tests on `resolve_tokens`, `contrast_ratio` and `check_tokens` (a pair below 4.5:1 fails); the image build produces hashed `theme.css` for every theme |
+| THM.2 | Design-token pipeline: `tokens.toml` resolution and inheritance, token contract with contrast pairs, `tokens.css` rendering, `python -m apps.themes.build` (`make assets`), Containerfile build step | P1 | 6 | THM.1 | Unit tests on `resolve_tokens`, `contrast_ratio` and `check_tokens` (a pair below 4.5:1 fails); the image build produces hashed `theme.css` for every theme |
 | THM.3 | `base` theme: layouts, skip link, header with disclosure navigation, language switcher, consistent help link, footer, typography, form controls, buttons, alerts, focus and target-size rules, reduced motion; vendored htmx and Alpine CSP build with `VENDORED.toml`; CMS.1 and account templates moved onto the layouts | P1 | 10 | THM.2 | Home, standard page and login render with `base`; CSP lint and the hash check of vendored files pass; keyboard-only e2e reaches every control with a visible focus |
 | THM.4 | `base` component library (§14.9) and staff-only styleguide page | P1 | 12 | THM.3 | Every component renders in every state on `/_styleguide/` with no CSP violation; e2e screenshots saved |
 | THM.5 | Theme quality gates, parametrised over registered themes: CSP template lint, axe-core (`wcag22aa`) on the styleguide, visual comparison harness with CI-only baselines, size budgets, `LICENSES.toml` check | P1 | 6 | THM.4, ARC.11 | A theme with a 3:1 text pair, an inline style, an unlicensed font or a 50 KB CSS file fails CI; `base` passes |
 | THM.6 | First vertical theme `ride`: colour tokens from the operator palette (§14.4, §14.12), type scale, spacing and shapes from the reference template's visual language, self-hosted Barlow and Barlow Condensed (OFL 1.1, from upstream), SVG icon subset, header, hero and home block overrides, placeholder imagery, `LICENSES.toml` | P1 | 8 | THM.4, CMS.2 | Home page renders with `ride` and passes the THM.5 gates; no file derived from the reference template (PR checklist) |
-| THM.7 | `ride` catalog pages: listings with filters, search results, product card, product page, vendor storefront | P1 | 6 | THM.6, CAT.7, CAT.8, VEN.10 | Catalog key pages pass the THM.5 gates at 360, 768 and 1280 px |
+| THM.7 | `ride` catalog pages: listings with filters, search results, product card, product page, vendor storefront | P1 | 6 | THM.6, CAT.7, CAT.8, VEN.10, TAX.12 | Catalog key pages pass the THM.5 gates at 360, 768 and 1280 px |
 | THM.8 | `ride` cart, checkout and account pages: cart, checkout steps, Payment Element appearance from tokens, order confirmation, customer area, sign in and up, MFA, password reset | P1 | 6 | THM.6, ORD.5, ORD.7 | A keyboard-only e2e checkout completes in test mode with `ride`; the Payment Element uses the theme's colours and fonts |
 | THM.9 | `ride` content and system pages: blog, standard, legal, contact, term and vendor landing, vendor recruitment, 404 and 500, consent banner styling | P1 | 4 | THM.6, CMS.3, CMS.4, CMS.5, SEO.5 | Content key pages and the consent banner pass the THM.5 gates; focus is never hidden by the banner or the sticky header |
 | THM.10 | Visual regression baselines for `base` and `ride`: styleguide and key pages at three widths, CI job, update procedure in the developer docs | P1 | 4 | THM.5, THM.7, THM.8, THM.9 | CI compares every key page with its baseline; an intentional change needs a reviewed baseline update |

@@ -1,0 +1,5 @@
+{% load wagtailimages_tags image_credits %}{% image_credit_of value.image as credit %}
+<figure>
+  {% image value.image width-1200 alt=value.alt_text %}
+  {% if value.caption or credit %}<figcaption>{{ value.caption }}{% if credit %} {% include "core/components/image_credit.html" %}{% endif %}</figcaption>{% endif %}
+</figure>
