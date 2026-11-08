@@ -27,7 +27,7 @@ DROP FUNCTION IF EXISTS cms_legalpagereview_append_only();
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("cms", "0007_featured_links"),
+        ("cms", "0008_product_grid"),
     ]
 
     operations = [
