@@ -711,7 +711,12 @@ def cancel_event(
 
 
 def record_review_decision(
-    state: WorkflowState, user: Any, *, approved: bool, dry_run: bool = False
+    state: WorkflowState,
+    user: Any,
+    *,
+    approved: bool,
+    ctx: AuditContext | None = None,
+    dry_run: bool = False,
 ) -> EventChangeSet:
     """Audit a moderator's decision on "Event review" (Wagtail's workflow signals) and sync
     the page's status. Pages of other types are left alone (an empty ChangeSet)."""
@@ -734,7 +739,8 @@ def record_review_decision(
         }
         changes.page = current
         changes.update(EVENT, _key(current), before, after)
-        ctx = user_context(user, ip=None) if user is not None else SYSTEM
+        if ctx is None:
+            ctx = user_context(user, ip=None) if user is not None else SYSTEM
         action = "events.event_approved" if approved else "events.event_changes_requested"
         _record(ctx, action, current, before, after)
     return changes
