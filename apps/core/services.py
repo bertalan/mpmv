@@ -15,7 +15,7 @@ from typing import Any, cast
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
-from django.db.models import F, Model, Q
+from django.db.models import F, Model, Q, QuerySet
 from django.template import Context, TemplateDoesNotExist
 from django.template.loader import select_template
 from django.utils import timezone, translation
@@ -29,6 +29,8 @@ from .models import (
     EmailSuppression,
     FeatureFlag,
     Heartbeat,
+    ImageLicence,
+    MediaImage,
     OutboxEmail,
     OutboxEmailEvent,
     PlatformOperator,
@@ -273,6 +275,88 @@ def save_flag(flag: FeatureFlag, *, ctx: AuditContext, dry_run: bool = False) ->
     return changeset
 
 
+# --- Images: licence allow list and metadata (CMS.8, spec 10 §10.2)
+
+
+LICENCE_CREATED = "core.image_licence.created"
+LICENCE_UPDATED = "core.image_licence.updated"
+LICENCE_FIELDS = (
+    "code",
+    "name",
+    "url",
+    "attribution_required",
+    "source_required",
+    "permission_required",
+)
+
+
+def licence_snapshot(licence: ImageLicence) -> dict[str, Any]:
+    return {name: getattr(licence, name) for name in LICENCE_FIELDS}
+
+
+def save_image_licence(
+    licence: ImageLicence, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Add or change an allow-list entry (validated, audited).
+
+    Raises `ValidationError` for a non-commercial or no-derivatives licence.
+    """
+    licence.full_clean()
+    return save_audited(
+        licence,
+        licence_snapshot,
+        key=str(licence.public_id),
+        ctx=ctx,
+        created=LICENCE_CREATED,
+        updated=LICENCE_UPDATED,
+        dry_run=dry_run,
+    )
+
+
+def image_snapshot(image: MediaImage) -> dict[str, Any]:
+    return {
+        "title": image.title,
+        "licence": image.licence.code if image.licence is not None else None,
+        **{name: getattr(image, name) for name in MediaImage.METADATA_FIELDS[1:]},
+    }
+
+
+def save_image(image: MediaImage, *, dry_run: bool = False) -> ChangeSet:
+    """Save an image uploaded outside the Wagtail admin (imports, vendor area).
+
+    Raises `ValidationError` when the licence, author or a field the licence requires is
+    missing. Not audited: images are CMS content, like the admin uploads in Wagtail's log.
+    """
+    image.full_clean()
+    key = str(image.pk) if image.pk is not None else image.title
+    changeset = ChangeSet()
+    if image.pk is None:
+        changeset.create(MediaImage._meta.label_lower, key, image_snapshot(image))
+    else:
+        stored = MediaImage.objects.get(pk=image.pk)
+        changeset.update(
+            MediaImage._meta.label_lower, key, image_snapshot(stored), image_snapshot(image)
+        )
+    if not dry_run:
+        image.save()
+    return changeset
+
+
+def unclassified(images: QuerySet[MediaImage]) -> QuerySet[MediaImage]:
+    """Images missing their licence or author (migrated without known metadata)."""
+    return images.filter(Q(licence__isnull=True) | Q(author__regex=r"^\s*$"))
+
+
+def classified(images: QuerySet[MediaImage]) -> QuerySet[MediaImage]:
+    """Images with their licence and author: the only ones offered for new content."""
+    return images.exclude(pk__in=unclassified(images).values("pk"))
+
+
+def images_needing_review() -> QuerySet[MediaImage]:
+    """The staff review list: unclassified images, oldest first."""
+    return unclassified(MediaImage.objects.all()).order_by("created_at", "pk")
+
+
 # --- Worker heartbeat (ARC.9)
 
 
@@ -331,6 +415,29 @@ def record_throttle_failure(
 def clear_throttle(key: str) -> None:
     """Forget every failure of `key` (e.g. after a successful login)."""
     Throttle.objects.filter(key=key).delete()
+
+
+def consume_rate_limit(
+    key: str, *, limit: int, window: dt.timedelta, now: dt.datetime | None = None
+) -> dt.timedelta:
+    """Count one use of `key` in a fixed window of `limit` uses; zero when allowed.
+
+    When the window is full the use is not counted and the result is the time until the window
+    ends (for `Retry-After`). Shares the `Throttle` table: `failures` is the count of uses and
+    `expires_at` the end of the window, so the nightly purge forgets old windows.
+    """
+    now = now or timezone.now()
+    with transaction.atomic():
+        row, _ = Throttle.objects.select_for_update().get_or_create(
+            key=key, defaults={"expires_at": now}
+        )
+        if row.expires_at <= now:
+            row.failures, row.expires_at = 0, now + window
+        if row.failures >= limit:
+            return row.expires_at - now
+        row.failures += 1
+        row.save(update_fields=["failures", "expires_at", "updated_at"])
+    return dt.timedelta(0)
 
 
 def purge_expired_throttles(*, now: dt.datetime | None = None) -> int:

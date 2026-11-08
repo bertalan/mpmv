@@ -1,0 +1,1 @@
+{% load i18n %}<small class="image-credit">{{ credit.text }}{% if credit.licence_url %}, <a href="{{ credit.licence_url }}" rel="license">{{ credit.licence_name }}</a>{% else %}, {{ credit.licence_name }}{% endif %}{% if credit.source_url %}, <a href="{{ credit.source_url }}">{% translate "source" %}</a>{% endif %}</small>

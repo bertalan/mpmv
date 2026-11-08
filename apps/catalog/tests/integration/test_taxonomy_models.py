@@ -393,3 +393,24 @@ def test_a_category_lists_the_products_of_its_subtree_main_or_secondary() -> Non
     ProductFactory.create(category=CategoryFactory.create())
     assert list(services.products_in_category(bags).order_by("sku")) == [in_child, secondary]
     assert list(services.products_in_category(bags, include_secondary=False)) == [in_child]
+
+
+@pytest.mark.parametrize("slug", ["de", "it", "brand", "shop", "product-category", "prodotto"])
+def test_a_taxonomy_slug_cannot_be_a_language_code_or_a_catalog_segment(slug: str) -> None:
+    text = TaxonomyTranslationFactory.build(taxonomy=TaxonomyFactory.create(), slug=slug)
+    with pytest.raises(ValidationError) as excinfo:
+        text.full_clean()
+    assert "slug" in excinfo.value.message_dict
+
+
+def test_a_taxonomy_slug_cannot_be_a_top_level_cms_page_slug() -> None:
+    from django.apps import apps
+    from wagtail.models import Site
+
+    home = Site.objects.get(is_default_site=True).root_page
+    home.add_child(instance=apps.get_model("cms", "StandardPage")(title="Guide", slug="guide"))
+    text = TaxonomyTranslationFactory.build(taxonomy=TaxonomyFactory.create(), slug="guide")
+    with pytest.raises(ValidationError) as excinfo:
+        text.full_clean()
+    assert "slug" in excinfo.value.message_dict
+    TaxonomyTranslationFactory.build(taxonomy=TaxonomyFactory.create(), slug="guides").full_clean()

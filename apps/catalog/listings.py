@@ -17,7 +17,7 @@ import re
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, replace
 from decimal import Decimal
-from urllib.parse import parse_qs, quote, urlencode
+from urllib.parse import parse_qs, parse_qsl, quote, urlencode
 
 from .engine import to_price
 
@@ -204,7 +204,7 @@ def canonical_pairs(params: ListingParams) -> list[tuple[str, str]]:
 
 def canonical_query(params: ListingParams) -> str:
     """The canonical query string, without the "?"; empty for an unfiltered first page."""
-    return urlencode(canonical_pairs(params), safe=",/", quote_via=quote)
+    return _encode(canonical_pairs(params))
 
 
 def listing_url(base_path: str, params: ListingParams) -> str:
@@ -216,6 +216,43 @@ def listing_url(base_path: str, params: ListingParams) -> str:
 def query_to_lists(query: str) -> dict[str, list[str]]:
     """A query string as `parse_listing_params` takes it (the shape of `QueryDict.lists()`)."""
     return parse_qs(query, keep_blank_values=True)
+
+
+def _encode(pairs: Sequence[tuple[str, str]]) -> str:
+    return urlencode(pairs, safe=",/", quote_via=quote)
+
+
+def split_query(query: str, *, term_keys: Collection[str]) -> tuple[str, str]:
+    """A raw query string as (its listing part, everything else), each re-encoded in the order
+    given. The listing part equals `canonical_query` exactly when the request is canonical; the
+    rest (tracking parameters) is kept on a redirect but never enters the canonical URL."""
+    keys = RESERVED_KEYS.union(term_keys)
+    pairs = parse_qsl(query, keep_blank_values=True)
+    listing = [(key, value) for key, value in pairs if key in keys]
+    other = [(key, value) for key, value in pairs if key not in keys]
+    return _encode(listing), _encode(other)
+
+
+def join_query(path: str, *queries: str) -> str:
+    query = "&".join(q for q in queries if q)
+    return f"{path}?{query}" if query else path
+
+
+# --- Robots (spec 10: noindex on pagination beyond a threshold and on empty results)
+
+ROBOTS_INDEX = "index, follow"
+ROBOTS_NOINDEX = "noindex, follow"
+# Pages past this one stay reachable and followed but are not indexed.
+INDEXED_PAGES = 10
+
+
+def listing_robots(params: ListingParams, *, total: int, indexed_pages: int = INDEXED_PAGES) -> str:
+    """`noindex, follow` for a page past `indexed_pages` and for a filtered listing with no
+    products (like an internal search with no results); `index, follow` otherwise. Filtered
+    listings with products are indexable on their canonical URL (CAT.8)."""
+    if params.page > indexed_pages or (params.has_filters and total == 0):
+        return ROBOTS_NOINDEX
+    return ROBOTS_INDEX
 
 
 # --- Pagination
@@ -263,3 +300,116 @@ def page_window(*, total: int, page: int, per_page: int) -> PageWindow:
         raise ValueError("total must be >= 0, page and per_page must be >= 1")
     page_count = max(1, -(-total // per_page))
     return PageWindow(page=page, per_page=per_page, total=total, page_count=page_count)
+
+
+# --- Navigation on a listing page (CAT.8 part 3/3): every link builds on the page's current URL
+# with the canonical query, so the templates never assemble a query themselves.
+
+
+@dataclass(frozen=True)
+class FilterChip:
+    """One applied filter value and the canonical URL of the listing without it."""
+
+    key: str
+    value: str
+    label: str
+    url: str
+
+
+def without(params: ListingParams, key: str, value: str | None = None) -> ListingParams:
+    """`params` without the filter `key` (one `value` of a taxonomy key), back on page 1."""
+    if key == PAGE:
+        raise ValueError("The page is not a filter.")
+    if key == CATEGORY:
+        return replace(params, category=None, page=1)
+    if key == VENDOR:
+        return replace(params, vendor=None, page=1)
+    if key == PRICE_MIN:
+        return replace(params, price_min=None, page=1)
+    if key == PRICE_MAX:
+        return replace(params, price_max=None, page=1)
+    terms = tuple(
+        (k, kept)
+        for k, slugs in params.terms
+        if (kept := tuple(s for s in slugs if k != key or (value is not None and s != value)))
+    )
+    return replace(params, terms=terms, page=1)
+
+
+def filter_chips(
+    params: ListingParams, base_path: str, labels: Mapping[tuple[str, str], str]
+) -> list[FilterChip]:
+    """The applied filters in canonical order; `labels` names a (key, value), else the value
+    is shown. A taxonomy key gives one chip per selected term."""
+    chips: list[FilterChip] = []
+
+    def add(key: str, value: str, remaining: ListingParams) -> None:
+        url = listing_url(base_path, remaining)
+        chips.append(FilterChip(key, value, labels.get((key, value), value), url))
+
+    if params.category:
+        add(CATEGORY, params.category, without(params, CATEGORY))
+    for key, slugs in params.terms:
+        for slug in slugs:
+            add(key, slug, without(params, key, slug))
+    if params.vendor:
+        add(VENDOR, params.vendor, without(params, VENDOR))
+    if params.price_min is not None:
+        add(PRICE_MIN, format_amount(params.price_min), without(params, PRICE_MIN))
+    if params.price_max is not None:
+        add(PRICE_MAX, format_amount(params.price_max), without(params, PRICE_MAX))
+    return chips
+
+
+def carried_filters(
+    params: ListingParams, offered: Collection[tuple[str, str]]
+) -> list[tuple[str, str]]:
+    """The applied filters the filter form has no control for, as (name, value) hidden fields:
+    the category, and each selected term that is not among the `offered` (key, value) boxes.
+    A GET form replaces the whole query, so without them submitting it would drop them."""
+    carried: list[tuple[str, str]] = []
+    if params.category:
+        carried.append((CATEGORY, params.category))
+    carried.extend(
+        (key, slug) for key, slugs in params.terms for slug in slugs if (key, slug) not in offered
+    )
+    return carried
+
+
+def page_numbers(window: PageWindow, *, around: int = 2) -> list[int | None]:
+    """The page numbers a pagination shows: the first, the last and `around` pages on each
+    side of the current one; None marks a gap of two pages or more (a single missing page is
+    shown instead, a gap would take as much room)."""
+    last = window.page_count
+    shown = {1, last, *range(max(1, window.page - around), min(last, window.page + around) + 1)}
+    numbers: list[int | None] = []
+    previous = 0
+    for number in sorted(shown):
+        if number - previous == 2:
+            numbers.append(previous + 1)
+        elif number - previous > 2:
+            numbers.append(None)
+        numbers.append(number)
+        previous = number
+    return numbers
+
+
+@dataclass(frozen=True)
+class PageLink:
+    number: int | None  # None: a gap
+    url: str | None
+    current: bool = False
+
+
+def page_links(params: ListingParams, base_path: str, window: PageWindow) -> list[PageLink]:
+    """The pagination links of the listing at `base_path` with the filters of `params`."""
+    return [
+        PageLink(None, None)
+        if number is None
+        else PageLink(
+            number,
+            listing_url(base_path, params.with_page(number)),
+            current=number == window.page,
+        )
+        for number in page_numbers(window)
+    ]

@@ -1,4 +1,4 @@
-{% load i18n static wagtailcore_tags cms_tags %}{% get_current_language as LANGUAGE_CODE %}{% wagtail_site as current_site %}{% firstof current_site.site_name site_name "MPMV" as site_name %}<!doctype html>
+{% load i18n static wagtailcore_tags cms_tags image_credits %}{% get_current_language as LANGUAGE_CODE %}{% wagtail_site as current_site %}{% firstof current_site.site_name site_name "MPMV" as site_name %}<!doctype html>
 {% comment %}
 Public page layout of the base theme (THM.3, spec 14 §14.3, §14.6). Pages extend it and fill
 `content`; `title` and `description` default to the CMS page's SEO fields. The header holds the
@@ -34,6 +34,7 @@ its configuration from the meta tag.
   {% endblock %}
   <main id="main" class="site-main" tabindex="-1">
     {% block content %}{% endblock %}
+    {% if page %}{% page_image_credits page as image_credits %}{% image_credits_disclosure image_credits %}{% endif %}
   </main>
   {% block footer %}
     {% navigation_links "footer" as footer_links %}
