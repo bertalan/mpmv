@@ -458,7 +458,9 @@ def page_image_credits(page: Page) -> list[Credit]:
     Only images whose licence requires attribution have one; captioned images are credited
     in their `<figcaption>` instead.
     """
-    page = page.specific
+    # An unsaved preview (CMS.5) is already its specific class and has no content type yet.
+    if type(page) is Page:
+        page = page.specific
     images: list[Any] = [getattr(page, name, None) for name in getattr(page, DISCLOSURE_FIELDS, ())]
     for model_field in page._meta.get_fields():
         if isinstance(model_field, StreamField):
