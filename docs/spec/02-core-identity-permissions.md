@@ -106,11 +106,16 @@ The second factor is a TOTP authenticator app or a passkey. The confirmed parame
 - API: `Authorization: Bearer mpmv_<prefix>_<secret>` header, constant-time comparison,
   scope checked per route, rate limit per API key with counters in a cache shared by every app
   process (CORE.12, owner decision Q-18), logging of every mutating call.
-- Vendor key policy (CORE.14): a vendor key holds only the vendor-grantable scopes
-  (`VENDOR_GRANTABLE_SCOPES` in `apps/api/engine.py`, an allow-list checked at issuance); every
-  other scope is platform-only. The vendor's status is read on every call: a suspended vendor's
-  key only reads (403 on POST, PUT, PATCH and DELETE, dry-runs included), a closed vendor's key
-  gets 401. Deleting a vendor writes one AuditLog entry per key it deletes.
+- Vendor key policy (CORE.14): a vendor key is issued only while its vendor is active, and holds
+  only the vendor-grantable scopes (`VENDOR_GRANTABLE_SCOPES` in `apps/api/engine.py`, an
+  allow-list checked at issuance and again on every request, so a key issued before a scope
+  became platform-only cannot use it; `manage.py vendor_key_scopes` lists such keys). Every
+  other scope is platform-only. The vendor's status is read on every call: only an active
+  vendor's key writes; an applicant, onboarding or suspended vendor's key only reads (403 on
+  POST, PUT, PATCH and DELETE, dry-runs included); a closed vendor's key gets 401. Vendor-scoped
+  write services reached by API v1 read the status again inside the write transaction (row
+  read `FOR SHARE`), so a vendor suspended after its key was authenticated gets that write
+  refused. Deleting a vendor writes one AuditLog entry per key it deletes.
 - Impersonation for support (equivalent of Login as User), staff only, with audit.
 
 ### Secure action links (CORE.15)
