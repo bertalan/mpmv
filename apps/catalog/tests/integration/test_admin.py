@@ -175,7 +175,7 @@ def test_add_product_rejects_a_sale_price_above_the_price(staff_client: Client) 
         product_form(VendorFactory.create(), price_net="10.00", sale_price_net="12.00"),
     )
     assert response.status_code == 200
-    assert "The sale price must be lower than the price." in response.content.decode()
+    assert "The sale price must be above 0.00, below the price." in response.content.decode()
     assert Product.objects.count() == 0
 
 

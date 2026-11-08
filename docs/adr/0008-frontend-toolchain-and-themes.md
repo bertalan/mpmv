@@ -39,8 +39,8 @@ Option 2.
 - **No Node, no npm.** CSS is plain modern CSS in the layers
   `reset, tokens, base, layout, components, utilities, overrides`. Component CSS uses only
   `var(--…)` tokens; raw colours live only in `tokens.toml`.
-- **Build:** `tools/build_theme.py` (`make assets`, THM.2) resolves each theme's tokens through
-  its chain, writes `tokens.css`, concatenates and minifies the chain's CSS into one `theme.css`
+- **Build:** `python -m apps.themes.build` (`make assets`, THM.2; an app module because the image
+  build context leaves `tools/` out) resolves each theme's tokens through its chain, writes `tokens.css`, concatenates and minifies the chain's CSS into one `theme.css`
   per theme. It runs in the Containerfile build stage before `collectstatic`; the output is
   git-ignored and hashed by `CompressedManifestStaticFilesStorage`.
 - **JavaScript:** htmx 2 and the CSP build of Alpine.js, self-hosted under `static/vendor/` and

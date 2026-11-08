@@ -8,11 +8,13 @@ app's) version is found next, as with any loader.
 
 It caches compiled templates under `(themes dir, theme slug, name, skipped origins)`. Django's
 `cached.Loader` must never wrap it: that cache is keyed by name only and would serve one theme's
-template to a site using another. `reset()` (called by the dev autoreloader) clears the cache.
+template to a site using another. `get_dirs()` lets the dev autoreloader watch the themes
+directory, and `reset()` (which it calls on a template change) clears the cache.
 Admin templates are never themed (`engine.is_themable`).
 """
 
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 from django.template import Origin, Template, TemplateDoesNotExist
@@ -33,6 +35,10 @@ class ThemeLoader(Loader):
     def __init__(self, engine: Any) -> None:
         super().__init__(engine)
         self.template_cache: dict[CacheKey, Template | TemplateDoesNotExist] = {}
+
+    def get_dirs(self) -> list[Path]:
+        """What `django.template.autoreload` watches: an edit there resets this loader."""
+        return [themes_dir()]
 
     def get_template_sources(self, template_name: str) -> Iterator[Origin]:
         root = str(themes_dir())

@@ -1,6 +1,8 @@
 """Core models: the abstract base, translation and versioned-configuration models, the
-append-only audit log, the platform operator, the feature flags."""
+append-only audit log, the platform operator, the feature flags, the shared image model and its
+licence allow list, the transactional email outbox."""
 
+import json
 import uuid
 from typing import Any, ClassVar, Self
 
@@ -9,9 +11,17 @@ from django.contrib.postgres.fields import DateTimeRangeField, RangeOperators
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils import timezone
+from wagtail.images.models import AbstractImage, AbstractRendition, Image
 
 from . import flags, translations
-from .fields import CountryField, LanguageField
+from .fields import CountryField, EncryptedTextField, LanguageField
+from .image_licences import (
+    Credit,
+    LicenceTerms,
+    credit_for,
+    metadata_errors,
+    restricted_licence_error,
+)
 
 
 class BaseModel(models.Model):
@@ -390,3 +400,297 @@ class FeatureFlag(BaseModel):
     def spec(self) -> flags.FlagSpec | None:
         """The flag's declaration in code; None for a row left by removed code."""
         return flags.spec_of(self.name) if flags.is_registered(self.name) else None
+
+
+class ImageLicence(BaseModel):
+    """An entry of the image licence allow list (CMS.8, spec 10 §10.2), edited by staff.
+
+    Written through `services.save_image_licence` (audited). Non-commercial and
+    no-derivatives licences are refused. Entries are never deleted while an image uses them.
+    """
+
+    code = models.CharField(max_length=40, unique=True, help_text="For example CC-BY-4.0.")
+    name = models.CharField(max_length=100, help_text="Shown in credits, e.g. CC BY 4.0.")
+    url = models.URLField("licence URL", blank=True)
+    attribution_required = models.BooleanField(
+        default=False, help_text="Images under this licence show a credit."
+    )
+    source_required = models.BooleanField(
+        default=True, help_text="Images under this licence need the URL they come from."
+    )
+    permission_required = models.BooleanField(
+        default=False, help_text="Images need a reference to a stored written permission."
+    )
+
+    class Meta:
+        ordering = ("code",)
+        verbose_name = "image licence"
+
+    def __str__(self) -> str:
+        return self.name
+
+    def clean(self) -> None:
+        error = restricted_licence_error(self.code, self.name, self.url)
+        if error is not None:
+            raise ValidationError({"code": error})
+
+    @property
+    def terms(self) -> LicenceTerms:
+        return LicenceTerms(
+            code=self.code,
+            name=self.name,
+            url=self.url,
+            attribution_required=self.attribution_required,
+            source_required=self.source_required,
+            permission_required=self.permission_required,
+        )
+
+
+class GeocodeCacheEntry(BaseModel):
+    """The candidates of one geocoding lookup, by normalised address and language (EVT.12).
+
+    `key` is the SHA-256 of the normalised address (country, postcode, city, street, case folded,
+    whitespace collapsed); `normalised_address` keeps the text it was made from. Only the venue
+    address typed in an event form is ever looked up, never a member's address. Written by
+    `apps.core.geocoding.services.geocode_address`; expired rows are purged nightly.
+    """
+
+    key = models.CharField(max_length=64)
+    language = models.CharField(max_length=16)
+    normalised_address = models.TextField()
+    provider = models.CharField(max_length=32)
+    candidates = models.JSONField(default=list)
+    expires_at = models.DateTimeField(db_index=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["key", "language"], name="core_geocode_cache_unique"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.normalised_address} [{self.language}] via {self.provider}"
+
+
+class GeocoderState(BaseModel):
+    """Shared state of one geocoding provider (EVT.12): the limiter's next free slot and the
+    circuit breaker. In PostgreSQL so that every process sees the same budget (no Redis, spec
+    01); `select_for_update` serialises the slot reservations."""
+
+    provider = models.CharField(max_length=32, unique=True)
+    next_slot_at = models.DateTimeField(null=True, blank=True)
+    failures = models.PositiveIntegerField(default=0)  # consecutive failures or rate limits
+    open_until = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self) -> str:
+        return f"{self.provider} ({self.failures} failures)"
+
+
+class MediaImage(AbstractImage):  # type: ignore[misc]  # Wagtail is untyped
+    """The site's image model (`WAGTAILIMAGES_IMAGE_MODEL`, spec 10 §10.2).
+
+    Shared by CMS pages, products (CAT.4), vendor logos and banners. It is the image model from
+    the first image on (I18N.3), so no image ever has to move between models.
+
+    CMS.8: every image names its licence (from the `ImageLicence` allow list) and author, plus
+    the source URL or permission reference its licence requires; `clean` refuses an image
+    without them, in the Wagtail admin and in `services.save_image`. The columns accept empty
+    values so that images migrated without known metadata can exist: they are listed for
+    review and cannot be chosen for new content until classified.
+    """
+
+    licence = models.ForeignKey(
+        ImageLicence,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="From the allow list: only licences that allow commercial use.",
+    )
+    author = models.CharField(
+        max_length=200, blank=True, help_text="The author or rights holder to credit."
+    )
+    source_url = models.URLField(
+        "source URL",
+        max_length=500,
+        blank=True,
+        help_text="Where the image comes from; not needed for own work or vendor images.",
+    )
+    credit_text = models.CharField(
+        max_length=250, blank=True, help_text="Optional: replaces the generated credit line."
+    )
+    permission_ref = models.CharField(
+        "permission reference",
+        max_length=200,
+        blank=True,
+        help_text="Written permission: reference of the stored permission document.",
+    )
+
+    METADATA_FIELDS = ("licence", "author", "source_url", "credit_text", "permission_ref")
+    admin_form_fields = (*Image.admin_form_fields, *METADATA_FIELDS)
+
+    class Meta(AbstractImage.Meta):  # type: ignore[misc]
+        verbose_name = "image"
+        verbose_name_plural = "images"
+
+    def _terms(self) -> LicenceTerms | None:
+        licence = self.licence if self.licence_id is not None else None
+        return None if licence is None else licence.terms
+
+    def clean(self) -> None:
+        super().clean()
+        errors = metadata_errors(
+            self._terms(),
+            author=self.author,
+            source_url=self.source_url,
+            permission_ref=self.permission_ref,
+        )
+        if errors:
+            raise ValidationError(errors)
+
+    @property
+    def needs_review(self) -> bool:
+        """Migrated without its licence or author: to classify before any new use."""
+        return self.licence_id is None or not self.author.strip()
+
+    @property
+    def credit(self) -> Credit | None:
+        """The credit to show with the image; None when its licence needs no attribution."""
+        return credit_for(
+            self._terms(),
+            author=self.author,
+            source_url=self.source_url,
+            credit_text=self.credit_text,
+        )
+
+
+class MediaImageRendition(AbstractRendition):  # type: ignore[misc]
+    """A resized copy of a `MediaImage`, made on first use by templates."""
+
+    image = models.ForeignKey(MediaImage, on_delete=models.CASCADE, related_name="renditions")
+
+    class Meta:
+        constraints: ClassVar[list[models.BaseConstraint]] = [
+            models.UniqueConstraint(
+                fields=["image", "filter_spec", "focal_point_key"],
+                name="core_one_rendition_per_filter",
+            ),
+        ]
+
+
+# --- Transactional email (ARC.16)
+
+
+class OutboxEmail(BaseModel):
+    """One transactional email, from the request to send it until the provider accepts it.
+
+    Written by `apps.core.services.enqueue_email` (which queues the `core.send_email` job in the
+    same transaction) and `deliver_email`; every status change adds an `OutboxEmailEvent`. The
+    context is a snapshot of the values the templates need, encrypted at rest: it can hold a
+    one-time code or personal data. `idempotency_key` (optional, chosen by the caller, e.g.
+    `order:<public id>:confirmation`) makes a repeated request a no-op.
+    """
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        RETRYING = "retrying", "Waiting for a retry"
+        SENT = "sent", "Accepted by the provider"
+        FAILED = "failed", "Failed"
+        SUPPRESSED = "suppressed", "Not sent: address suppressed"
+
+    #: No further send attempt for these.
+    FINAL: ClassVar[frozenset[str]] = frozenset({Status.SENT, Status.FAILED, Status.SUPPRESSED})
+
+    recipient = models.EmailField(max_length=254)
+    template_key = models.CharField(max_length=100)
+    language = LanguageField()
+    context = EncryptedTextField(blank=True, help_text="JSON snapshot of the template context.")
+    idempotency_key = models.CharField(max_length=200, unique=True, null=True, blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.QUEUED)
+    attempts = models.PositiveIntegerField(default=0)
+    next_attempt_at = models.DateTimeField(null=True, blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    provider_message_id = models.CharField(max_length=200, blank=True, db_index=True)
+    last_error = models.TextField(blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["status", "next_attempt_at"])]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(
+                    status__in=["queued", "retrying", "sent", "failed", "suppressed"]
+                ),
+                name="core_outboxemail_status_valid",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.template_key} to {self.recipient} ({self.status})"
+
+    @property
+    def context_data(self) -> dict[str, Any]:
+        data = json.loads(self.context or "{}")
+        return data if isinstance(data, dict) else {}
+
+
+class OutboxEmailEvent(models.Model):
+    """Append-only history of an outbox email: each status change and provider feedback.
+
+    The database refuses updates and deletes (trigger), like the audit log.
+    """
+
+    class Kind(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        RETRYING = "retrying", "Transient failure, retry scheduled"
+        SENT = "sent", "Accepted by the provider"
+        FAILED = "failed", "Failed"
+        SUPPRESSED = "suppressed", "Not sent: address suppressed"
+        BOUNCED = "bounced", "Hard bounce reported"
+        SOFT_BOUNCED = "soft_bounced", "Soft bounce reported"
+        COMPLAINED = "complained", "Complaint reported"
+
+    email = models.ForeignKey(OutboxEmail, on_delete=models.PROTECT, related_name="events")
+    status = models.CharField(max_length=16, choices=Kind.choices)
+    attempt = models.PositiveIntegerField(default=0)
+    detail = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["pk"]
+
+    def __str__(self) -> str:
+        return f"{self.status} (attempt {self.attempt})"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if self.pk is not None:
+            raise PermissionError("OutboxEmailEvent is append-only")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
+        raise PermissionError("OutboxEmailEvent is append-only")
+
+
+class EmailSuppression(BaseModel):
+    """An address that receives no more email: it hard-bounced or its owner complained.
+
+    Written by `apps.core.services.record_email_feedback` (audited). The address is stored
+    normalised (`apps.core.mail.normalise_address`).
+    """
+
+    class Reason(models.TextChoices):
+        HARD_BOUNCE = "hard_bounce", "Hard bounce"
+        COMPLAINT = "complaint", "Complaint"
+
+    address = models.CharField(max_length=254, unique=True)
+    reason = models.CharField(max_length=16, choices=Reason.choices)
+    detail = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(reason__in=["hard_bounce", "complaint"]),
+                name="core_emailsuppression_reason_valid",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.address} ({self.reason})"

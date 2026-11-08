@@ -1,0 +1,22 @@
+{% extends "wagtailadmin/generic/base.html" %}
+{% load i18n wagtailimages_tags %}
+{% block main_content %}
+  <p>{% blocktranslate count counter=total %}{{ counter }} image has no licence or author yet. It cannot be chosen for new content until it is classified.{% plural %}{{ counter }} images have no licence or author yet. They cannot be chosen for new content until they are classified.{% endblocktranslate %}</p>
+  {% if images %}
+    <table class="listing">
+      <thead>
+        <tr><th>{% translate "Image" %}</th><th>{% translate "Title" %}</th><th>{% translate "Licence" %}</th><th>{% translate "Author" %}</th></tr>
+      </thead>
+      <tbody>
+        {% for image in images %}
+          <tr>
+            <td>{% image image max-80x80 %}</td>
+            <td><a href="{% url 'wagtailimages:edit' image.pk %}">{{ image.title }}</a></td>
+            <td>{{ image.licence|default:"-" }}</td>
+            <td>{{ image.author|default:"-" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+{% endblock %}

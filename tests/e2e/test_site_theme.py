@@ -16,12 +16,12 @@ from pytest_django.live_server_helper import LiveServer
 
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
-from apps.themes.tests.builders import write_theme
+from apps.themes.tests.builders import shipped_templates, write_theme
 from tests.e2e.login import admin_login, verify_with_totp
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
-ALT_HOME = """{% extends "cms/base.html" %}
+ALT_HOME = """{% extends "layouts/base.html" %}
 {% block content %}<h1>Alt theme: {{ page.title }}</h1>{% endblock %}
 """
 
@@ -29,7 +29,7 @@ ALT_HOME = """{% extends "cms/base.html" %}
 @pytest.fixture
 def themes(tmp_path: Path, settings: SettingsWrapper) -> Path:
     root = tmp_path / "themes"
-    write_theme(root, "base")
+    write_theme(root, "base", templates=shipped_templates())
     write_theme(root, "alt", templates={"cms/home_page.html": ALT_HOME})
     settings.MPMV_THEMES_DIR = root
     settings.MPMV_THEME_DEFAULT = "base"

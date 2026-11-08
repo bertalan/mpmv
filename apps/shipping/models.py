@@ -31,6 +31,7 @@ from django.db.models.functions import Lower
 
 from apps.core.fields import MoneyField
 from apps.core.models import BaseModel, TranslationModel, resolve_translation
+from apps.core.postcodes import split_country_qualifier
 from apps.core.translations import Resolved
 from apps.vendors.scoping import VendorScopedManager
 
@@ -240,7 +241,12 @@ class ShippingZone(BaseModel):
             ),
             models.CheckConstraint(
                 condition=~models.Q(countries__contains=[engine.WORLD])
-                | models.Q(countries=[engine.WORLD], country_groups=[]),
+                | models.Q(
+                    countries=[engine.WORLD],
+                    country_groups=[],
+                    postcode_patterns=[],
+                    states=[],
+                ),
                 name="shipping_zone_world_alone",
             ),
         ]
@@ -263,8 +269,36 @@ class ShippingZone(BaseModel):
             and self.methods.exclude(vendor_id=self.vendor_id).exists()
         ):
             errors["vendor"] = "Other vendors ship to this zone: it must stay a platform zone."
+        errors.update(self._entry_errors())
         if errors:
             raise ValidationError(errors)
+
+    def _entry_errors(self) -> dict[str, str]:
+        """Patterns and provinces belong to one country: in a zone that covers several (or the
+        world) each must start with `CC:`, and that country must be one the zone covers."""
+        covered = self.effective_countries()
+        single = engine.single_country(covered)
+        errors: dict[str, str] = {}
+        for name in ("postcode_patterns", "states"):
+            entries: list[str] = getattr(self, name)
+            try:
+                countries = [split_country_qualifier(entry)[0] for entry in entries]
+            except ValueError:
+                continue  # a malformed entry is reported by the field itself
+            loose = [e for e, country in zip(entries, countries, strict=True) if not country]
+            outside = sorted({c for c in countries if c and c not in covered})
+            if loose and not single:
+                errors[name] = self._unqualified_message(loose, covered)
+            elif outside:
+                errors[name] = f"The zone does not cover {', '.join(outside)}."
+        return errors
+
+    @staticmethod
+    def _unqualified_message(loose: list[str], covered: frozenset[str]) -> str:
+        if engine.WORLD in covered:
+            return "The rest of the world takes no postcode patterns or provinces."
+        example = f" (for example {sorted(covered)[0]}:{loose[0]})" if covered else ""
+        return f"{', '.join(loose)}: a zone with several countries needs a country on every entry{example}."  # noqa: E501
 
     def effective_countries(self) -> frozenset[str]:
         """Its explicit countries plus the members of its country groups."""
