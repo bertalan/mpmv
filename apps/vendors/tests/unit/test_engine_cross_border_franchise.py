@@ -2,10 +2,13 @@
 franchise for small enterprises (art. 284 of the VAT directive as amended by Directive (EU)
 2020/285). No ORM.
 
-RF20 is only for vendors established in an EU member state, with the individual identification
-number (suffix `EX`, art. 284(3)) issued by their member state of establishment. Identifiers are
+RF20 is only for vendors whose registered office (seat) is in an EU member state, with the
+individual identification number (suffix `EX`, art. 284(3)) issued by that member state; a
+permanent establishment alone does not qualify (owner interim decision MQ-17). Identifiers are
 synthetic: national parts follow each member state's VAT number format, never a real number.
 """
+
+import dataclasses
 
 import pytest
 
@@ -90,22 +93,24 @@ def test_a_malformed_number_has_no_issuer(number: str) -> None:
     assert engine.franchise_number_issuer(number) is None
 
 
-# --- Establishment in the EU (registered office or permanent establishment, as CMP.13)
+# --- Establishment in the EU: the registered office (seat) only, owner interim decision MQ-17
+#
+# Until the tax advisor answers, a permanent establishment alone does not qualify for RF20.
+# Revisit when MQ-17 is answered.
 
 
-def test_the_registered_office_counts_and_defaults_to_the_vendor_country() -> None:
-    assert engine.eu_establishment_countries(vendor("DE")) == ("DE",)
-    assert engine.eu_establishment_countries(vendor("DE", registered_country="AT")) == ("AT",)
+def test_the_seat_is_the_registered_office_and_defaults_to_the_vendor_country() -> None:
+    assert engine.rf20_seat_country(vendor("DE")) == "DE"
+    assert engine.rf20_seat_country(vendor("DE", registered_country="AT")) == "AT"
 
 
-def test_a_permanent_establishment_in_the_eu_counts() -> None:
-    identity = vendor("CH", establishment_country="IT")
-    assert engine.eu_establishment_countries(identity) == ("IT",)
+def test_a_permanent_establishment_does_not_change_the_seat() -> None:
+    assert engine.rf20_seat_country(vendor("IT", establishment_country="DE")) == "IT"
 
 
-def test_a_vendor_established_only_outside_the_eu_has_no_eu_establishment() -> None:
-    assert engine.eu_establishment_countries(vendor("US")) == ()
-    assert engine.eu_establishment_countries(vendor("CH", establishment_country="RS")) == ()
+def test_a_seat_outside_the_eu_has_no_rf20_seat() -> None:
+    assert engine.rf20_seat_country(vendor("US")) == ""
+    assert engine.rf20_seat_country(vendor("CH", establishment_country="IT")) == ""
 
 
 # --- Who may declare RF20
@@ -156,14 +161,33 @@ def test_an_eu_vendor_with_its_own_member_states_number_may_declare_rf20(
     assert identity_errors(identity) == {}
 
 
-def test_a_number_from_the_member_state_of_a_permanent_establishment_is_accepted() -> None:
+def test_a_non_eu_seat_with_an_eu_permanent_establishment_is_refused() -> None:
+    """MQ-17 interim: a permanent establishment alone does not qualify."""
     identity = vendor(
         "CH",
         establishment_country="IT",
         fiscal_regime=RF20,
         cross_border_franchise_number=VALID["IT"],
     )
-    assert identity_errors(identity) == {}
+    errors = identity_errors(identity)
+    assert "EU member state" in errors["fiscal_regime"][0]
+    assert NUMBER in errors
+
+
+def test_an_it_seat_with_a_de_permanent_establishment_needs_an_it_number() -> None:
+    """MQ-17 interim: the EX number must be issued by the seat's member state."""
+    refused = vendor(
+        "IT",
+        establishment_country="DE",
+        fiscal_regime=RF20,
+        cross_border_franchise_number=VALID["DE"],
+    )
+    errors = identity_errors(refused)
+    assert set(errors) == {NUMBER}
+    assert "DE" in errors[NUMBER][0]
+    assert "IT" in errors[NUMBER][0]
+    accepted = dataclasses.replace(refused, cross_border_franchise_number=VALID["IT"])
+    assert identity_errors(accepted) == {}
 
 
 def test_the_number_is_stored_compact() -> None:
