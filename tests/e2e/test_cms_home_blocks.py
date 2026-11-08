@@ -37,17 +37,15 @@ def _label(text: str) -> re.Pattern[str]:
 def _add_block(page: Page, label: str) -> Locator:
     """Append a block of type `label` to the body and return its form."""
     body = page.locator("#panel-child-content-body-section")
+    count = page.locator("input[name=body-count]")
+    index = int(count.input_value())  # the new block is the last top-level one
     body.get_by_role("button", name="Insert a block").last.click()
     page.get_by_role("option", name=label, exact=True).click()
-    # The new block is the last top-level one; its fields are named `body-<index>-value-…`.
-    index = int(page.locator("input[name=body-count]").input_value()) - 1
-    block = (
-        body.locator("[data-streamfield-child]")
-        .filter(has=page.locator(f'[name^="body-{index}-value-"]'))
-        .first
-    )
-    expect(block).to_be_visible()
-    return block
+    expect(count).to_have_value(str(index + 1))
+    # Its fields are named `body-<index>-value-…`; nested list items are inside it.
+    fields = page.locator(f'[name^="body-{index}-value-"]')
+    expect(fields.first).to_be_attached()
+    return body.locator("[data-streamfield-child]").filter(has=fields).first
 
 
 def test_an_editor_builds_the_home_page_with_hero_cta_and_faq(
