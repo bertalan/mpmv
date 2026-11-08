@@ -304,4 +304,3 @@
 |---|---|---|---:|---|---|
 | AI.3 | Read-only public catalog API for agents | P3 | 6 | CAT.9 | Search by taxonomy term via API |
 | AI.4 | Evaluation of agentic commerce protocols (ACP, WebMCP) and prototype | P3 | 12 | PAY.1, AI.3 | ADR with recommendation |
-

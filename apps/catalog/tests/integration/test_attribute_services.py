@@ -15,6 +15,7 @@ from apps.catalog.services import create_product, variant_axes, variant_label
 from apps.catalog.tests.factories import ProductFactory, VariantFactory, clothing_attributes
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
+from apps.vendors.engine import VendorCannotWrite
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -256,6 +257,89 @@ def test_a_vendor_cannot_reuse_a_variant_sku(
     assert Product.objects.count() == 1
 
 
+# --- The vendor SKU namespace (CAT.13): match key, products and variants together
+
+
+def test_create_product_keeps_the_sku_raw_and_sets_the_match_key(
+    attributes: dict[str, Attribute], vendor: Vendor
+) -> None:
+    create_product(vendor, t_shirt(sku="Tee 1"), ctx=CTX)
+    product = Product.objects.get(vendor=vendor)
+    assert (product.sku, product.sku_key) == ("Tee 1", "tee 1")
+    assert product.staff_ref.startswith("P-")
+
+
+def test_create_product_refuses_a_product_sku_matching_by_key(
+    attributes: dict[str, Attribute], vendor: Vendor
+) -> None:
+    ProductFactory.create(vendor=vendor, sku="tee-1")
+    with pytest.raises(ValidationError, match="already has a product with this SKU"):
+        create_product(vendor, t_shirt(), ctx=CTX)
+    assert Product.objects.count() == 1
+
+
+def test_create_product_refuses_a_product_sku_a_variant_holds(
+    attributes: dict[str, Attribute], vendor: Vendor
+) -> None:
+    VariantFactory.create(product__vendor=vendor, sku="Tee-1")
+    with pytest.raises(ValidationError, match="already has a variant with this SKU"):
+        create_product(vendor, t_shirt(), ctx=CTX)
+    assert Product.objects.count() == 1
+
+
+def test_create_product_refuses_a_variant_sku_a_product_holds(
+    attributes: dict[str, Attribute], vendor: Vendor
+) -> None:
+    ProductFactory.create(vendor=vendor, sku="tee-1-s-red ")
+    with pytest.raises(ValidationError, match="already has a product with this SKU: TEE-1-S-RED"):
+        create_product(vendor, t_shirt(), ctx=CTX)
+    assert Product.objects.count() == 1
+
+
+def test_create_product_refuses_a_variant_sku_matching_another_variant_by_key(
+    attributes: dict[str, Attribute], vendor: Vendor
+) -> None:
+    VariantFactory.create(product__vendor=vendor, sku="tee-1  s-red")
+    data = t_shirt(
+        variants=(
+            _variant("TEE-1-M-BLUE", "m", "blue"),
+            _variant("TEE-1 S-RED", "s", "red"),
+            _variant("TEE-1-M-RED", "m", "red"),
+            _variant("TEE-1-S-BLUE", "s", "blue"),
+        )
+    )
+    with pytest.raises(ValidationError, match="already has a variant with this SKU: TEE-1 S-RED"):
+        create_product(vendor, data, ctx=CTX)
+    assert Product.objects.count() == 1
+
+
+def test_create_product_refuses_a_variant_with_the_product_sku(
+    attributes: dict[str, Attribute], vendor: Vendor
+) -> None:
+    data = t_shirt(
+        variants=(
+            _variant("tee-1", "m", "blue"),
+            _variant("TEE-1-S-RED", "s", "red"),
+            _variant("TEE-1-M-RED", "m", "red"),
+            _variant("TEE-1-S-BLUE", "s", "blue"),
+        )
+    )
+    with pytest.raises(ValidationError, match="cannot have the SKU of its product"):
+        create_product(vendor, data, ctx=CTX)
+    assert not Product.objects.exists()
+
+
+@pytest.mark.parametrize("sku", ["   ", "X" * 64 + "\u00e9"])
+def test_create_product_refuses_an_unusable_sku(
+    attributes: dict[str, Attribute], vendor: Vendor, sku: str
+) -> None:
+    with pytest.raises(ValidationError, match="A SKU cannot be"):
+        create_product(vendor, t_shirt(sku=sku), ctx=CTX)
+    with pytest.raises(ValidationError, match="A SKU cannot be"):
+        create_product(vendor, t_shirt(sku=sku), ctx=CTX, dry_run=True)
+    assert not Product.objects.exists()
+
+
 def test_variant_labels_use_the_translated_values_in_axis_order(
     attributes: dict[str, Attribute], vendor: Vendor
 ) -> None:
@@ -265,3 +349,31 @@ def test_variant_labels_use_the_translated_values_in_axis_order(
     # Colors are translated; sizes fall back to EN.
     assert variant_label(variant, "it") == "M / Rosso"
     assert VariantOption.objects.filter(variant=variant).count() == 2
+
+
+# --- Writes on behalf of a vendor's API key (CORE.14)
+
+
+def test_a_write_for_a_vendor_key_needs_the_vendor_active_at_write_time(
+    attributes: dict[str, Attribute],
+) -> None:
+    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    Vendor.objects.filter(pk=vendor.pk).update(status=Vendor.Status.SUSPENDED)  # after auth
+    with pytest.raises(VendorCannotWrite):
+        create_product(vendor, t_shirt(), ctx=CTX, require_active_vendor=True)
+    assert not Product.objects.exists()
+    assert not AuditLog.objects.exists()
+
+
+def test_a_write_for_an_active_vendors_key_goes_through(attributes: dict[str, Attribute]) -> None:
+    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    create_product(vendor, t_shirt(), ctx=CTX, require_active_vendor=True)
+    assert Product.objects.filter(vendor=vendor).count() == 1
+
+
+def test_other_writes_do_not_check_the_vendor_status(
+    attributes: dict[str, Attribute], vendor: Vendor
+) -> None:
+    assert vendor.status == Vendor.Status.APPLICANT
+    create_product(vendor, t_shirt(), ctx=CTX)
+    assert Product.objects.filter(vendor=vendor).count() == 1
