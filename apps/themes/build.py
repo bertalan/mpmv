@@ -5,6 +5,7 @@ contract, and write under the build directory (`MPMV_THEME_BUILD_DIR`, default `
 
     themes/<slug>/tokens.css   the resolved tokens in `@layer tokens`
     themes/<slug>/theme.css    layer order + tokens + the chain's CSS sources, minified
+    themes/<slug>/js/...       the theme's ES modules (THM.3), copied as they are
 
 CSS sources are `themes/<slug>/static/themes/<slug>/css/*.css`, in file-name order. Any invalid
 manifest, invalid `tokens.toml` or contract violation stops the build before anything is
@@ -90,6 +91,17 @@ def read_css_sources(theme_dir: Path, slug: str) -> list[str]:
     return [path.read_text(encoding="utf-8") for path in sorted(css_dir.glob("*.css"))]
 
 
+def read_js_modules(theme_dir: Path, slug: str) -> dict[str, str]:
+    """The theme's ES modules under `static/themes/<slug>/js/`, by path relative to `js/`."""
+    js_dir = theme_dir / "static" / OUTPUT_PREFIX / slug / "js"
+    if not js_dir.is_dir():
+        return {}
+    return {
+        path.relative_to(js_dir).as_posix(): path.read_text(encoding="utf-8")
+        for path in sorted(js_dir.rglob("*.js"))
+    }
+
+
 def render_themes(themes_root: Path, contract: TokenContract = TOKEN_CONTRACT) -> dict[str, str]:
     """Every output file (relative path -> CSS) of every theme; BuildError on any problem."""
     registry = build_registry(read_manifest_sources(themes_root))
@@ -117,6 +129,8 @@ def render_themes(themes_root: Path, contract: TokenContract = TOKEN_CONTRACT) -
         outputs[f"{OUTPUT_PREFIX}/{slug}/theme.css"] = build_theme_css(
             chain, tokens_css=tokens_css, sources=sources
         )
+        for relative, module in read_js_modules(themes_root / slug, slug).items():
+            outputs[f"{OUTPUT_PREFIX}/{slug}/js/{relative}"] = module
     if errors:
         raise BuildError(errors)
     return outputs
@@ -125,7 +139,7 @@ def render_themes(themes_root: Path, contract: TokenContract = TOKEN_CONTRACT) -
 def build_themes(
     themes_root: Path, out_root: Path, contract: TokenContract = TOKEN_CONTRACT
 ) -> list[str]:
-    """Write every theme's `tokens.css` and `theme.css`; return the built theme slugs.
+    """Write every theme's `tokens.css`, `theme.css` and JS modules; return the built slugs.
 
     Replaces `out_root/themes/` as a whole, so a removed theme leaves no stale CSS; nothing is
     written when the build fails.

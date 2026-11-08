@@ -16,6 +16,19 @@ def shipped_tokens(slug: str = BASE) -> str:
     return (SHIPPED_THEMES / slug / "tokens.toml").read_text(encoding="utf-8")
 
 
+def shipped_templates(slug: str = BASE) -> dict[str, str]:
+    """Every template of a theme shipped in `themes/` (relative name -> source).
+
+    A test `base` that renders real pages needs the layouts (THM.3):
+    `write_theme(root, "base", templates={**shipped_templates(), ...})`.
+    """
+    root = SHIPPED_THEMES / slug / "templates"
+    return {
+        path.relative_to(root).as_posix(): path.read_text(encoding="utf-8")
+        for path in sorted(root.rglob("*.html"))
+    }
+
+
 def write_theme(
     root: Path,
     slug: str,

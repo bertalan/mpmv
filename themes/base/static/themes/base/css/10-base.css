@@ -1,0 +1,296 @@
+/* Base theme, base layer (THM.3, spec 14 §14.6): typography, links, focus, target sizes,
+   form controls and buttons, reduced motion. Colours only through tokens. */
+@layer base {
+  html {
+    color-scheme: light;
+    /* The sticky header never covers the focused element (WCAG 2.4.11). */
+    scroll-padding-top: var(--header-height);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    min-block-size: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-family: var(--font-body);
+    font-size: var(--step-0);
+    line-height: 1.6;
+  }
+
+  /* --- Typography */
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    line-height: 1.2;
+    margin-block: var(--space-l) var(--space-s);
+    text-wrap: balance;
+  }
+
+  h1 {
+    font-size: var(--step-4);
+  }
+
+  h2 {
+    font-size: var(--step-3);
+  }
+
+  h3 {
+    font-size: var(--step-2);
+  }
+
+  h4 {
+    font-size: var(--step-1);
+  }
+
+  p,
+  ul,
+  ol,
+  dl,
+  blockquote {
+    margin-block: 0 var(--space-m);
+  }
+
+  p,
+  li,
+  dd,
+  blockquote {
+    max-inline-size: var(--measure-text);
+  }
+
+  small {
+    font-size: 0.875em;
+  }
+
+  code,
+  kbd,
+  pre {
+    font-family: var(--font-mono);
+  }
+
+  /* --- Links */
+
+  a {
+    color: var(--color-link);
+    text-decoration-thickness: 0.08em;
+    text-underline-offset: 0.18em;
+  }
+
+  a:hover {
+    text-decoration-thickness: 0.14em;
+  }
+
+  /* --- Focus: a visible outline in the focus colour, never removed (WCAG 2.4.7). */
+
+  :focus-visible {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: var(--focus-offset);
+  }
+
+  /* --- Skip link: off screen until focused, then shown above the header (WCAG 2.4.1). */
+
+  .skip-link {
+    position: absolute;
+    inset-block-start: var(--space-s);
+    inset-inline-start: var(--space-s);
+    z-index: 100;
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--target-primary);
+    padding-inline: var(--space-m);
+    background: var(--color-surface);
+    color: var(--color-link);
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-control);
+    transform: translateY(calc(-100% - var(--space-l)));
+  }
+
+  .skip-link:focus {
+    transform: none;
+  }
+
+  /* --- Form controls and buttons: visible labels, 44 px primary targets (WCAG 2.5.8). */
+
+  label {
+    display: block;
+    font-weight: 600;
+    margin-block-end: var(--space-xs);
+  }
+
+  input:not([type="checkbox"], [type="radio"], [type="hidden"]),
+  select,
+  textarea {
+    display: block;
+    inline-size: 100%;
+    max-inline-size: 30rem;
+    min-block-size: var(--target-primary);
+    padding: var(--space-xs) var(--space-s);
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-control);
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    inline-size: var(--target-min);
+    block-size: var(--target-min);
+    accent-color: var(--color-accent);
+  }
+
+  button,
+  .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+    min-block-size: var(--target-primary);
+    min-inline-size: var(--target-primary);
+    padding: var(--space-xs) var(--space-m);
+    background: var(--button-bg);
+    color: var(--button-fg);
+    border: 1px solid transparent;
+    border-radius: var(--button-radius);
+    font-weight: 600;
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  button:hover,
+  .button:hover {
+    background: var(--button-bg-hover);
+  }
+
+  button:disabled {
+    cursor: default;
+  }
+
+  .button--secondary {
+    --button-bg: var(--color-secondary);
+    --button-fg: var(--color-on-secondary);
+    --button-bg-hover: var(--color-secondary-hover);
+  }
+
+  .button--ghost {
+    --button-bg: transparent;
+    --button-fg: var(--color-link);
+    --button-bg-hover: var(--color-accent-tint);
+
+    border-color: var(--color-border-control);
+  }
+
+  /* --- Form fields (components/field.html): label, required marker, help, inline errors
+     tied with aria-describedby (WCAG 1.3.1, 3.3.1, 3.3.2). */
+
+  .field {
+    margin-block: 0 var(--space-m);
+  }
+
+  .field fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .field legend {
+    margin-block-end: var(--space-xs);
+    padding: 0;
+    font-weight: 600;
+  }
+
+  .field__required {
+    color: var(--color-text-muted);
+    font-weight: 400;
+  }
+
+  .helptext {
+    margin-block: 0 var(--space-xs);
+    color: var(--color-text-muted);
+    font-size: 0.875em;
+  }
+
+  .errorlist {
+    margin-block: 0 var(--space-xs);
+    padding: 0;
+    list-style: none;
+    color: var(--color-danger);
+    font-weight: 600;
+  }
+
+  [aria-invalid="true"] {
+    border-color: var(--color-danger);
+    border-width: 2px;
+  }
+
+  [role="alert"] {
+    color: var(--color-danger);
+    font-weight: 600;
+  }
+
+  /* --- Alerts: a level bar in colour and the level in words (never colour alone, 1.4.1). */
+
+  .alert {
+    max-inline-size: var(--measure-text);
+    margin-block: 0 var(--space-m);
+    padding: var(--space-s) var(--space-m);
+    background: var(--color-surface-raised);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-inline-start: 0.375rem solid var(--alert-accent, var(--color-info));
+    border-radius: var(--radius-control);
+    font-weight: 400;
+  }
+
+  .alert > :last-child {
+    margin-block-end: 0;
+  }
+
+  .alert__title {
+    margin-block: 0 var(--space-xs);
+    font-weight: 700;
+  }
+
+  .alert--info {
+    --alert-accent: var(--color-info);
+  }
+
+  .alert--success {
+    --alert-accent: var(--color-success);
+  }
+
+  .alert--warning {
+    --alert-accent: var(--color-warning);
+  }
+
+  .alert--error {
+    --alert-accent: var(--color-danger);
+  }
+
+  /* --- Motion: only when the visitor has not asked for less (WCAG 2.3.3). */
+
+  @media (prefers-reduced-motion: no-preference) {
+    a,
+    button,
+    .button {
+      transition: background-color var(--duration-fast) ease-out,
+        text-decoration-thickness var(--duration-fast) ease-out;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0s !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

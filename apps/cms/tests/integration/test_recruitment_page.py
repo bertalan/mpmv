@@ -5,6 +5,8 @@ form is VEN.22 (URL name `vendors:apply`); until it exists the page shows a noti
 broken link. The page is served under the strict CSP: no inline scripts or styles.
 """
 
+import re
+
 import pytest
 from django.test import Client
 
@@ -71,7 +73,9 @@ def test_with_the_application_form_the_page_links_to_it(
 def test_the_page_has_no_inline_scripts_or_styles(client: Client, seeded: SeedReport) -> None:
     VendorRecruitmentPageFactory.create(title="Sell with us")
     html = client.get("/sell-with-us/").content.decode()
-    assert "<script" not in html
+    # The base layout loads same-origin script files (THM.3); none is inline.
+    assert not re.search(r"<script\b(?![^>]*\ssrc=)", html)
+    assert "<style" not in html
     assert "style=" not in html
 
 

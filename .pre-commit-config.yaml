@@ -2,9 +2,12 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
+      # Vendored files stay byte-identical to upstream: VENDORED.toml records their SHA-256.
       - id: end-of-file-fixer
+        exclude: ^apps/themes/static/vendor/
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
+        exclude: ^apps/themes/static/vendor/
       - id: check-toml
       - id: check-yaml
       - id: check-added-large-files
