@@ -12,6 +12,8 @@ class CoreConfig(AppConfig):
         "auditlog": "the audit log itself (append-only)",
         "heartbeat": "worker telemetry, not a domain change",
         "throttle": "login counters; the lockouts they cause are audited by accounts",
+        "geocodecacheentry": "cache of public geocoding answers, not a domain change",
+        "geocoderstate": "provider rate limiter and circuit breaker, operational state",
         "mediaimage": "Wagtail image: editor upload, logged in Wagtail's action log (CMS.8 adds "
         "the licence fields)",
         "mediaimagerendition": "a resized copy of an image, made by templates",

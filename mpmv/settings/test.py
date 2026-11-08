@@ -27,6 +27,12 @@ PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]  # fast has
 # Parallel runs (several agents or worktrees) each get their own test database.
 DATABASES["default"]["TEST"] = {"NAME": os.environ.get("MPMV_TEST_DB_NAME", "test_mpmv")}  # noqa: F405
 
+# EVT.12: no test reaches a geocoding provider. Adapters built without an explicit transport get
+# one that refuses; tests use FakeGeocoder or a recording transport.
+GEOCODING_TRANSPORT = "apps.core.geocoding.adapters.refuse_network"
+GEOCODING_LOCATIONIQ_KEY = ""
+GEOCODING_OPENCAGE_KEY = ""
+
 # Uploaded images and their renditions (I18N.3) go to a directory of this test process only.
 MEDIA_ROOT = Path(tempfile.mkdtemp(prefix="mpmv-test-media-"))
 

@@ -13,6 +13,8 @@ from apps.core.models import (
     AuditLog,
     EmailSuppression,
     FeatureFlag,
+    GeocodeCacheEntry,
+    GeocoderState,
     Heartbeat,
     MediaImage,
     MediaImageRendition,
@@ -126,6 +128,46 @@ class FeatureFlagFactory(DjangoModelFactory[FeatureFlag]):
     name = factory.Sequence(_registered_flag)
     state = FeatureFlag.State.DEFAULT
     note = ""
+
+
+class GeocodeCacheEntryFactory(DjangoModelFactory[GeocodeCacheEntry]):
+    """A cached lookup with one candidate, valid for 180 days (EVT.12).
+
+    The chain writes the real ones through `apps.core.geocoding.services.geocode_address`.
+    """
+
+    class Meta:
+        model = GeocodeCacheEntry
+
+    key = factory.Sequence(lambda n: f"{n:064x}")
+    language = "en"
+    normalised_address = factory.Sequence(lambda n: f"it|20121|milano|via roma {n}")
+    provider = "nominatim"
+    candidates = factory.LazyFunction(
+        lambda: [
+            {
+                "latitude": "45.464270",
+                "longitude": "9.189510",
+                "label": "Milano",
+                "precision": "locality",
+                "confidence": None,
+                "provider": "nominatim",
+            }
+        ]
+    )
+    expires_at = factory.LazyFunction(lambda: timezone.now() + dt.timedelta(days=180))
+
+
+class GeocoderStateFactory(DjangoModelFactory[GeocoderState]):
+    """A provider with a closed circuit and no reserved slot (EVT.12)."""
+
+    class Meta:
+        model = GeocoderState
+
+    provider = factory.Sequence(lambda n: f"provider{n}")
+    next_slot_at = None
+    failures = 0
+    open_until = None
 
 
 class MediaImageFactory(DjangoModelFactory[MediaImage]):
