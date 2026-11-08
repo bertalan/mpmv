@@ -487,6 +487,79 @@ Review findings not fixed (all minor, 20):
 | CAT.12 | `apps/catalog/services.py` | Many-to-many changes are audited only after `save_m2m()`, with no dry-run service; track with CAT.14 |
 | CAT.12 | `apps/catalog/tests/integration/test_product_edits.py` | Two tests were added in the implementation commit; keep new tests in a tests-only commit first |
 
+## Follow-ups from wave 8 (lane merge queue)
+
+Merged, in this order, each after its six required checks and with main green before the next:
+#85 (parallel lanes protocol), #79 (owner answers Q-58 and Q-42), #80 (CAT.14), #84 (CAT.3),
+#81 (CAT.5), #95 (D-07 decided), #97 (TAX.11 review fixes), #94 (CAT.14 review fixes), #96
+(CAT.3 review fixes) and #88 (THM.1); then #105 (build_docs newline fix), #106 (ARC.18), #92
+(TAX.5), #99 (CORE.14 fixes), #83 (CAT.13), #104 (TAX.2 review controls), #102 (CORE.12), #100
+(ORD.1), #87 (CMS.5), #112 (ARC.16), #115 (SHP.2 and SHP.13 zone patterns), #103 (CAT.8 1/3) and
+#116 (CAT.14, CAT.5 and CAT.3 audit majors).
+
+Integration notes:
+
+- The ARC.18 dry-run guard (#106) failed the branches that were already open. #92 needed its two
+  VIES checks (`verify_vat_number`, `recheck_vat_number`) listed as telemetry exceptions (spec 01
+  §1.3 and the guard); #100 needed `dry_run` on `get_or_create_cart`. ARC.18 also made the
+  engines Django-free, so `VendorCannotWrite` (#99) no longer extends `PermissionDenied`.
+- Merge conflicts were resolved by keeping both sides: #99 (engine imports), #102 (rate limit
+  and vendor key policy in `apps/api`), #100 (tenancy registry and audit coverage lists).
+- Not merged: #91 (CMP.13) has a major in its cross-review (`is_platform_owner()` was true for any
+  superuser; fixed on the branch, awaiting lane-b's re-check), #93 (SHP.14, design fix pending),
+  #101 (VEN.21, lane-b fixing a major) and #107 (VEN.18, fix pending).
+
+Follow-ups:
+
+| Task | Where | Follow-up |
+|---|---|---|
+| CMP.13 | `docs/spec/11-compliance.md` | An active vendor that moves its seat outside the allowed countries or loses its EU establishment stays active with no staff flag (spec 11). Add a backlog row for the re-check (cross-review major, tracked here) |
+| CMP.13 | `apps/vendors/services.py` | `suspended -> active` is not gated; a vendor outside a shrunk set can be reinstated without the establishment check |
+| CMP.13 | `apps/core/services.py` | `allowed_vendor_countries()` falls back to the EU-27 with no PlatformOperator; owner to confirm |
+| CMP.13 | `apps/core/tests/integration/test_allowed_vendor_countries.py` | The check constraint `core_platformoperator_allowed_vendor_countries_not_empty` has no test; two admin tests were added in the implementation commit |
+| TAX.5 | `mpmv/settings/test.py` | Test settings keep `VIES_CLIENT = HttpViesClient`; point them at a fake so no test can reach the real VIES |
+| TAX.5 | `apps/tax/vies.py` | `HttpViesClient.check()` does not catch `http.client.HTTPException` subclasses (`IncompleteRead`, `BadStatusLine`) |
+| TAX.5 | `apps/tax/vies.py` | The `urlopen` timeout applies per socket operation, not to the whole request or DNS; use a total deadline |
+| TAX.5 | `apps/tax/tests/integration/test_vies.py` | The implementation commit added tests and cases; keep new tests in the tests-only commit |
+| TAX.5 | `apps/tax/vies.py` | `ViesVatNumberValidator` maps malformed and prefix-mismatch numbers to `invalid`, so `Vendor.vies_status` records an answer VIES never gave, with no `VatValidation` row |
+| TAX.5 | `apps/tax/engine.py` | `INVALID_REQUESTER_INFO` and every other VIES error code map to `unavailable`; a wrong operator VAT number fails every B2B check with a generic message |
+| TAX.5 | `apps/tax/services.py` | `verify_vat_number` logs the full VAT number at warning level; a sole trader's number can be personal data |
+| SHP.14 | `apps/shipping/config_io.py` | Area codes in a method's `area_treatments` are stripped but not lower-cased, unlike special-area and country-group rows |
+| SHP.14 | `tests/integration/test_special_area_territories.py` | The guard checks only the country of a linked territory, not that its postcode list agrees with the area's |
+| SHP.14 | `apps/shipping/migrations/0009_seed_special_areas.py` | The seed covers less than the task row (UK Highlands and Islands, Ionian islands, Mount Athos, Saint-Barthélemy and Saint-Martin) |
+| SHP.14 | `apps/shipping/migrations/0009_seed_special_areas.py` | Sardinia's list leaves out OG, OT, CI and VS, so an address with no postcode and one of these provinces is not resolved |
+| SHP.14 | `apps/shipping/services.py` | `delete_config(dry_run=True)` on a treated `SpecialArea` previews a success; `ProtectedError` comes only on the real run |
+| CAT.13 | `apps/catalog/migrations/0006_sku_identity.py` | The migration does not reverse once raw SKUs exist (the CAT.1 normalized checks come back) |
+| CAT.13 | `apps/catalog/migrations/0006_sku_identity.py` | `fill_sku_keys` reports only product-vs-variant clashes, not two rows of one table getting the same match key |
+| CAT.13 | `apps/catalog/tests/integration/test_sku_identity.py` | The SKU-SLASH regression test cannot fail: a slug never holds `/`; assert on the product URL |
+| CAT.13 | `apps/catalog/services.py` | `update_by_sku` does not validate values before the ChangeSet, so a dry run can succeed where the real run raises `IntegrityError` |
+| CAT.13 | `apps/api/v1/catalog.py` | Spec 03 §3.2 wants a warning for troublesome SKUs; it shows only in the staff admin, not on the API create path |
+| CAT.5 | `apps/catalog/admin.py` | A language-only change on a translation never calls `sync_product_slug` |
+| CAT.5 | `apps/catalog/services.py` | Reclaiming one of the product's own `SlugHistory` rows deletes it with no AuditLog entry |
+| CAT.5 | `apps/catalog/services.py` | `sync_product_slug` moves the current slug to `SlugHistory` without checking that another product holds it as history |
+| CORE.14 | `apps/api/v1/catalog.py` | The write re-check (`require_active_vendor=True`) is opt-in per service and route and nothing guards it; add a guard test for vendor-scoped write routes |
+| CORE.14 | `apps/api/v1/endpoints.py` | `GET /api/v1/me` reports scopes the key can no longer use |
+| ORD.1 | `apps/cart/session.py` | A failed merge orphans the guest cart: the session key is popped before `merge_carts`; pop it after |
+| ORD.1 | `apps/cart/services.py` | Two concurrent first sign-ins of one user conflict |
+| ORD.1 | `apps/cart/services.py` | Inconsistent locking can lose line updates in `set_line_quantity` and `remove_line` |
+| ORD.1 | `apps/cart/session.py` | The guest cart key is the live session key |
+| CORE.12 | `apps/api/engine.py` | The per-client override in `limit_for` does not apply to scoped buckets, so a runaway key keeps its scope limits |
+| CORE.12 | `apps/api/services.py` | The window comes from the app clock, not the database clock |
+| CORE.12 | `apps/api/services.py` | Behaviour when the counter table is unavailable is not specified or tested |
+| TAX.2 | `apps/tax/services.py` | `configure_vendor_tax_profile` accepts any `requested_by` from a direct caller with no `TaxRegimeChangeRequest` behind it |
+| CORE.2 | `apps/vendors/services.py` | Audit chunk 4 m1: the last-owner rule counts inactive owners and `add_member` accepts an inactive user |
+| CORE.2 | `apps/vendors/services.py` | Audit chunk 4 m2: the membership services check no actor, so the MEMBERS permission is enforced nowhere |
+| CORE.13 | `apps/api/services.py` | Audit chunk 4 m3: removing an owner leaves the keys they issued working, and a key does not record who issued it |
+| CORE.13 | `apps/api/services.py` | Audit chunk 4 m4: an applicant vendor's owner may issue a key with write scopes |
+| CORE.3 | `tests/tenancy_registry.py` | Audit chunk 4 m5: no test of a vendor key creating for another vendor; `POST /api/v1/catalog/products` is declared `NoVendorData` |
+| THM.2 | `apps/themes/engine.py` | THM.2 adds the token functions to the engine |
+| THM.3 | `themes/base/templates/layouts/` | THM.3 fills the root manifest and moves the CMS.1 and account templates onto layouts; `data-theme` moves with them |
+| THM.11 | `pyproject.toml` | An `ignore_imports` entry for `apps.vendors -> apps.themes.engine` in the "No app imports themes" contract |
+| CAT.3 | `apps/api/v1/catalog.py` | There is no API path for a product without a price |
+| CAT.3 | `apps/catalog/models.py` | The `VariantOption` docstring says the composite foreign key is in "migration 0003"; it is in `0004_attributes.py` |
+
+Audit chunk 4 (#98): 0 blocker, 0 major, 5 minor (the five rows marked above).
+
 ## Coherence checks
 
 Run at least every 5 completed tasks: code vs spec and ADRs, done-when criteria, docs drift,

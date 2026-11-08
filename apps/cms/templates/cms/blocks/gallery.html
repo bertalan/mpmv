@@ -1,0 +1,11 @@
+{% load wagtailimages_tags %}
+<ul class="gallery">
+  {% for item in images %}
+    <li>
+      <figure>
+        {% image item.image fill-480x360 alt=item.alt_text %}
+        {% if item.caption %}<figcaption>{{ item.caption }}</figcaption>{% endif %}
+      </figure>
+    </li>
+  {% endfor %}
+</ul>

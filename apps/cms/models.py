@@ -7,8 +7,12 @@ and one footer menu per locale, falling back to the primary language when a loca
 Their links are a StreamField (page or external link): unlike inline panels and FK choosers,
 its admin editor needs no inline script, so it works under the strict CSP (SEC.1).
 
-Bodies are StreamFields with a rich-text paragraph only; the reusable blocks (hero, product
-grid, CTA, FAQ) are CMS.2.
+Bodies are StreamFields with rich-text paragraphs, images and galleries (I18N.3); the other
+reusable blocks (hero, product grid, CTA, FAQ) are CMS.2.
+
+Translation (I18N.3, spec 09 §9.2): wagtail-localize copies a page into another locale and keeps
+it in sync with its source. Texts, alt texts and captions are translated; images are synchronised
+from the source, and a translator may override one for a single locale (D-18).
 
 Legal pages (CMS.5) keep an append-only archive of every published text: one history per page,
 and so per language, since a translation is its own page (Q-42). The "Sell with us" page shows
@@ -27,9 +31,12 @@ from wagtail import blocks
 from wagtail.admin.panels import FieldPanel
 from wagtail.contrib.routable_page.models import RoutablePageMixin, path
 from wagtail.fields import StreamField
+from wagtail.images import get_image_model_string
 from wagtail.models import Page, TranslatableMixin
+from wagtail_localize.fields import SynchronizedField
 
 from . import engine
+from .blocks import FigureBlock, GalleryBlock
 
 # Editors may use headings, emphasis, lists and links; no raw HTML, images or embeds yet.
 RICH_TEXT_FEATURES = ["h2", "h3", "bold", "italic", "ol", "ul", "link"]
@@ -37,7 +44,11 @@ RICH_TEXT_FEATURES = ["h2", "h3", "bold", "italic", "ol", "ul", "link"]
 
 def body_field(verbose_name: Any = None) -> StreamField:
     return StreamField(
-        [("paragraph", blocks.RichTextBlock(features=RICH_TEXT_FEATURES))],
+        [
+            ("paragraph", blocks.RichTextBlock(features=RICH_TEXT_FEATURES)),
+            ("figure", FigureBlock()),
+            ("gallery", GalleryBlock()),
+        ],
         blank=True,
         verbose_name=verbose_name or _("body"),
     )
@@ -72,17 +83,47 @@ class HomePage(Page):  # type: ignore[misc]  # Wagtail is untyped
 
 
 class StandardPage(Page):  # type: ignore[misc]
-    """A static page: about us, contact, FAQ (spec 10 §10.2)."""
+    """A static page: about us, contact, FAQ (spec 10 §10.2), with an optional main image."""
 
+    image = models.ForeignKey(
+        get_image_model_string(),
+        verbose_name=_("main image"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    image_alt_text = models.CharField(
+        _("alt text"),
+        max_length=250,
+        blank=True,
+        help_text=_("Describes the main image for people who cannot see it."),
+    )
+    image_caption = models.CharField(_("caption"), max_length=250, blank=True)
     body = body_field()
 
-    content_panels: ClassVar[list[Any]] = [*Page.content_panels, FieldPanel("body")]
+    content_panels: ClassVar[list[Any]] = [
+        *Page.content_panels,
+        FieldPanel("image"),
+        FieldPanel("image_alt_text"),
+        FieldPanel("image_caption"),
+        FieldPanel("body"),
+    ]
+    # Spec 10 "Images per locale": the source image until a translator replaces it.
+    override_translatable_fields: ClassVar[list[Any]] = [
+        SynchronizedField("image", overridable=True)
+    ]
     parent_page_types: ClassVar[list[str]] = ["cms.HomePage", "cms.StandardPage"]
     subpage_types: ClassVar[list[str]] = ["cms.StandardPage"]
     template = "cms/standard_page.html"
 
     class Meta:
         verbose_name = _("standard page")
+
+    def clean(self) -> None:
+        super().clean()
+        if self.image_id is not None and not self.image_alt_text.strip():
+            raise ValidationError({"image_alt_text": _("Describe the main image.")})
 
 
 class PageLinkBlock(blocks.StructBlock):  # type: ignore[misc]
