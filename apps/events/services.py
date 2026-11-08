@@ -16,6 +16,9 @@ moderation (EVT.3, spec 15 "Services").
   Wagtail's revisions and log entries. A dry-run runs in a transaction that is rolled back, so
   it writes no revision and no audit entry. Approval and requested changes are Wagtail workflow
   actions: `record_review_decision` audits them from the workflow signals.
+- The Wagtail admin's moderation UI (`admin_views`, `wagtail_hooks`) asks `may_moderate_events`,
+  `may_review_events`, `admin_edit_refused` and `admin_publish_refused`, and lists
+  `events_awaiting_review` and `vendor_event_policies`.
 - Moderation: `EventPage.get_workflow()` returns "Event review" (`ensure_event_review_workflow`)
   while the vendor needs review (`engine.needs_review`), and `EventPage.publish` bumps the ICS
   `sequence` (`engine.next_sequence`) on every publish, whoever publishes.
@@ -31,7 +34,8 @@ from decimal import Decimal
 from typing import Any, TypedDict
 
 from django.contrib.auth.base_user import AbstractBaseUser
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.models import AnonymousUser, Group
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import F
@@ -64,6 +68,7 @@ from apps.vendors.services import has_vendor_permission
 
 from . import engine
 from .models import (
+    EVENT_MODERATORS,
     EventIndexPage,
     EventPage,
     EventSettings,
@@ -179,6 +184,66 @@ def may_create_events_in_admin(user: AbstractBaseUser | AnonymousUser) -> bool:
     keep editing existing events under Wagtail's own page permissions.
     """
     return bool(user.is_authenticated and user.is_active and getattr(user, "is_staff", False))
+
+
+# --- The Wagtail admin's moderation UI (EVT.3 part 2/2, spec 15 "Staff admin")
+
+
+def may_moderate_events(user: AbstractBaseUser | AnonymousUser) -> bool:
+    """Whether `user` may hide, restore and cancel events and change the moderation policy and
+    settings in the admin: platform staff only (spec 15 "Permissions")."""
+    return _is_staff(user)
+
+
+def may_review_events(user: AbstractBaseUser | AnonymousUser) -> bool:
+    """Whether `user` sees the events awaiting "Event review": staff and the "Event moderators"
+    group, whose members take the workflow's task."""
+    if _is_staff(user):
+        return True
+    if not (user.is_authenticated and user.is_active):
+        return False
+    return Group.objects.filter(name=EVENT_MODERATORS, user=user.pk).exists()
+
+
+def admin_edit_refused(user: AbstractBaseUser | AnonymousUser, page: EventPage) -> bool:
+    """A hidden event is edited (and so resubmitted or republished) in the admin by staff only:
+    only staff restore it (spec 15 "Hiding")."""
+    return page.hidden_at is not None and not _is_staff(user)
+
+
+def admin_publish_refused(user: AbstractBaseUser | AnonymousUser, page: EventPage) -> bool:
+    """A non-staff editor cannot publish an event without review while its vendor needs review:
+    the submission goes through "Event review" (`EventPage.get_workflow`)."""
+    if _is_staff(user):
+        return False
+    return page.hidden_at is not None or page.review_needed()
+
+
+def events_awaiting_review() -> list[tuple[EventPage, WorkflowState]]:
+    """The events in "Event review" now, oldest submission first, with their workflow state."""
+    states = (
+        WorkflowState.objects.active()
+        .filter(
+            workflow=event_review_workflow(),
+            status=WorkflowState.STATUS_IN_PROGRESS,
+            base_content_type=ContentType.objects.get_for_model(Page),
+        )
+        .select_related("requested_by")
+        .order_by("created_at", "pk")
+    )
+    by_page = {int(state.object_id): state for state in states}
+    pages = EventPage.objects.filter(pk__in=list(by_page)).select_related("vendor", "locale")
+    found = {page.pk: page for page in pages}
+    return [(found[pk], state) for pk, state in by_page.items() if pk in found]
+
+
+def vendor_event_policies() -> list[VendorEventPolicy]:
+    """Every vendor's moderation override, by vendor name (staff list)."""
+    return list(
+        VendorEventPolicy.objects.select_related("vendor").order_by(
+            "vendor__display_name", "vendor_id"
+        )
+    )
 
 
 # --- Authoring and moderation (EVT.3, spec 15 "Services")

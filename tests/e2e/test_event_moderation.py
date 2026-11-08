@@ -13,6 +13,7 @@ from django.contrib.auth.models import Group
 from playwright.sync_api import Page, expect
 from pytest_django.live_server_helper import LiveServer
 
+from apps.accounts.models import User
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from apps.core.models import AuditLog
@@ -41,9 +42,9 @@ def _admin_violations(page: Page) -> list[str]:
     return [v for v in csp_violations(page) if not _axe_helper_style(v)]
 
 
-def _submitted_event() -> tuple[EventPage, object]:
+def _submitted_event() -> tuple[EventPage, User]:
     vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
-    owner = VendorMemberFactory.create(vendor=vendor).user
+    owner: User = VendorMemberFactory.create(vendor=vendor).user
     data = {
         "title": "Spring trade fair",
         "summary": "Meet the makers at the spring trade fair.",

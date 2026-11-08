@@ -78,6 +78,7 @@ def _submitted(owner: User | None = None, **changes: Any) -> EventPage:
 def _live(**changes: Any) -> EventPage:
     owner = _owner()
     page = _draft(owner, **changes)
+    assert page.vendor is not None
     VendorEventPolicy.objects.create(vendor=page.vendor, mode=VendorEventPolicy.Mode.TRUSTED)
     submit_event(owner, page)
     fresh = _fresh(page)
@@ -120,6 +121,14 @@ def _url(name: str, page: EventPage) -> str:
 
 def _edit_url(page: EventPage) -> str:
     return reverse("wagtailadmin_pages:edit", args=(page.pk,))
+
+
+def _refused(response: Any) -> bool:
+    """Wagtail's admin answers a PermissionDenied with a redirect to its dashboard."""
+    if response.status_code == 403:
+        return True
+    location: str = response.get("Location", "")
+    return bool(response.status_code == 302 and location == reverse("wagtailadmin_home"))
 
 
 # --- Hide
@@ -179,8 +188,8 @@ def test_a_hide_records_the_dsa_notice_reference(client: Client) -> None:
 def test_a_non_staff_editor_cannot_hide(client: Client) -> None:
     verified_login(client, _editor())
     page = _live()
-    assert client.get(_url("hide", page)).status_code == 403
-    assert client.post(_url("hide", page), {"reason": "No."}).status_code == 403
+    assert _refused(client.get(_url("hide", page)))
+    assert _refused(client.post(_url("hide", page), {"reason": "No."}))
     assert _fresh(page).hidden_at is None
 
 
@@ -224,8 +233,8 @@ def test_staff_cancel_a_live_event(client: Client) -> None:
 def test_a_non_staff_editor_cannot_restore_or_cancel(client: Client) -> None:
     verified_login(client, _editor())
     page = _live()
-    assert client.post(_url("cancel", page)).status_code == 403
-    assert client.post(_url("restore", page)).status_code == 403
+    assert _refused(client.post(_url("cancel", page)))
+    assert _refused(client.post(_url("restore", page)))
     assert _fresh(page).cancelled_at is None
 
 
@@ -298,7 +307,7 @@ def test_the_review_list_says_when_nothing_waits(client: Client) -> None:
 
 def test_a_non_moderator_editor_cannot_open_the_review_list(client: Client) -> None:
     verified_login(client, _editor())
-    assert client.get(reverse("events_admin:review")).status_code == 403
+    assert _refused(client.get(reverse("events_admin:review")))
 
 
 def test_a_moderator_approves_through_the_wagtail_workflow(client: Client) -> None:
@@ -364,12 +373,12 @@ def test_an_invalid_policy_mode_shows_an_error(client: Client) -> None:
 def test_a_non_staff_editor_cannot_change_policies(client: Client) -> None:
     verified_login(client, _editor())
     vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
-    assert client.get(reverse("events_admin:policies")).status_code == 403
+    assert _refused(client.get(reverse("events_admin:policies")))
     response = client.post(
         reverse("events_admin:policy_set"),
         {"vendor": str(vendor.public_id), "mode": VendorEventPolicy.Mode.TRUSTED},
     )
-    assert response.status_code == 403
+    assert _refused(response)
     assert not VendorEventPolicy.objects.filter(vendor=vendor).exists()
 
 
@@ -407,7 +416,7 @@ def test_an_invalid_threshold_is_refused(client: Client) -> None:
 
 def test_a_non_staff_editor_cannot_change_the_settings(client: Client) -> None:
     verified_login(client, _editor())
-    assert client.get(reverse("events_admin:settings")).status_code == 403
+    assert _refused(client.get(reverse("events_admin:settings")))
 
 
 # --- The vendor-facing guard in the Wagtail admin
@@ -437,9 +446,9 @@ def test_a_non_staff_editor_cannot_edit_a_hidden_page(client: Client) -> None:
     page = _live()
     hide_event(UserFactory.create(superuser=True), page, "Misleading offer.")
     verified_login(client, editor)
-    assert client.get(_edit_url(page)).status_code == 403
+    assert _refused(client.get(_edit_url(page)))
     response = client.post(_edit_url(page), {"title": page.title, "action-publish": "Publish"})
-    assert response.status_code == 403
+    assert _refused(response)
     assert not _fresh(page).live
 
 
@@ -451,7 +460,7 @@ def test_a_non_staff_editor_cannot_publish_without_review(client: Client) -> Non
     html = client.get(_edit_url(page)).content.decode()
     assert 'name="action-publish"' not in html
     response = client.post(_edit_url(page), {"title": page.title, "action-publish": "Publish"})
-    assert response.status_code == 403
+    assert _refused(response)
     assert not _fresh(page).live
 
 
@@ -461,7 +470,7 @@ def test_a_non_staff_editor_cannot_bulk_publish_an_event_needing_review(client: 
     verified_login(client, editor)
     url = reverse("wagtail_bulk_action", args=("wagtailcore", "page", "publish")) + f"?id={page.pk}"
     response = client.post(url, {"include_descendants": ""})
-    assert response.status_code == 403
+    assert _refused(response)
     assert not _fresh(page).live
 
 

@@ -1,0 +1,13 @@
+{% extends "wagtailadmin/generic/base.html" %}
+{% load i18n wagtailadmin_tags %}
+{% block main_content %}
+  {% include "events/admin/_errors.html" %}
+  <form action="{{ request.get_full_path }}" method="post">
+    {% csrf_token %}
+    {% for field in form %}{% formattedfield field %}{% endfor %}
+    <div>
+      <button class="button" type="submit">{{ submit_label }}</button>
+      {% if back_url %}<a href="{{ back_url }}" class="button button-secondary">{% translate "Back" %}</a>{% endif %}
+    </div>
+  </form>
+{% endblock %}
