@@ -14,6 +14,9 @@ Configuration comes only from environment variables.
 | [`caddy/Caddyfile`](caddy/Caddyfile) | TLS reverse proxy in front of the app |
 | [`server/mpmv-deploy`](server/mpmv-deploy) | Deploy and rollback by image tag on a server |
 | [`server/*.env.example`](server/) | Variables the server needs, without values |
+| [`ci/parity-smoke.sh`](ci/parity-smoke.sh) | CI and release gate: runs the image as the server does (ARC.23) |
+
+Release rules (tagging, STAGE, LIVE, no hand edits): [docs/dev/release.md](../docs/dev/release.md).
 
 ## The image
 
@@ -29,6 +32,9 @@ Configuration comes only from environment variables.
 - **Hardening.** Code is owned by root and read-only for the app user; the containers run with a
   read-only root filesystem and `NoNewPrivileges`. No secret is baked in: the build generates a
   throwaway key only to run `collectstatic`.
+- **Deploy units inside (ARC.23).** `/app/deploy` holds the release's `quadlet/` units,
+  `caddy/Caddyfile`, `server/mpmv-deploy` and the env examples (no env file, no certificate).
+  `mpmv-deploy` installs them from the tag it deploys, so a server runs the units of its release.
 - **Base images** are pinned by tag and digest. To update one, take the new digest from the
   registry, change tag and digest together, and run `make image` and the CI image job.
 
@@ -109,22 +115,26 @@ header that differs from the TLS server name gets 421.
 
 ### First-time host setup
 
-As the deploy user, on a host with Podman 5 or later:
+As the deploy user, on a host with the recommended Podman (5 or later, with its quadlet generator):
 
 ```sh
 loginctl enable-linger "$USER"                     # user services start at boot (needs root once)
 sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80   # persist it in /etc/sysctl.d/
 mkdir -p ~/.config/containers/systemd ~/.config/mpmv ~/.local/bin
-cp deploy/quadlet/* ~/.config/containers/systemd/
-cp deploy/caddy/Caddyfile ~/.config/mpmv/Caddyfile
 cp deploy/server/mpmv.env.example ~/.config/mpmv/mpmv.env    # fill in, then chmod 600
 cp deploy/server/database.env.example ~/.config/mpmv/database.env  # unless the DB setup wrote it; chmod 600
 cp <internal CA root certificate> ~/.config/mpmv/pg-root-ca.crt
 cp deploy/server/caddy.env.example ~/.config/mpmv/caddy.env  # fill in
-install -m 755 deploy/server/mpmv-deploy ~/.local/bin/mpmv-deploy
 podman login ghcr.io                               # only if the package is private
-systemctl --user daemon-reload
+# mpmv-deploy itself, from the release image; later deploys keep it in step with the release.
+podman pull ghcr.io/<owner>/mpmv-app:X.Y.Z
+podman run --rm --network none --entrypoint cat ghcr.io/<owner>/mpmv-app:X.Y.Z \
+  /app/deploy/server/mpmv-deploy > ~/.local/bin/mpmv-deploy && chmod 755 ~/.local/bin/mpmv-deploy
 ```
+
+The units and the Caddyfile are not copied by hand: `deploy` installs those of the release.
+`~/.local/bin` is not on `PATH` in a non-interactive ssh session, so the script is always called
+by its absolute path, `~/.local/bin/mpmv-deploy`.
 
 On STAGE set `DJANGO_SETTINGS_MODULE=mpmv.settings.stage`, on LIVE `mpmv.settings.live`.
 Keep `MPMV_TRUSTED_PROXY_HEADER` and `MPMV_TRUSTED_PROXIES` as in the example (CORE.5): the app
@@ -134,25 +144,44 @@ per-IP login lockout and registration limit act on the whole site; when they are
 `podman exec mpmv-app python manage.py check --deploy` warns (`core.W001`). A network created
 before the subnet was fixed must be removed (`podman network rm mpmv-net`) and recreated by its
 unit.
-STAGE holds synthetic data only (spec 12). Then run the first `mpmv-deploy deploy X.Y.Z` (below)
-and `systemctl --user start mpmv-caddy.service`. Afterwards every unit with an `[Install]` section
-starts at boot.
+STAGE holds synthetic data only (spec 12). Then run the first deploy (below); it starts Caddy
+too. Afterwards every unit with an `[Install]` section starts at boot.
 
 ### Deploy and rollback
 
 ```sh
-mpmv-deploy deploy 0.2.0   # pull ghcr.io/<owner>/mpmv-app:0.2.0, migrate, restart, health check
-mpmv-deploy status         # current and previous release
-mpmv-deploy rollback       # back to the previous release
+~/.local/bin/mpmv-deploy deploy 0.2.0   # doctor, pull, units of 0.2.0, migrate, restart, check
+~/.local/bin/mpmv-deploy status         # current and previous release
+~/.local/bin/mpmv-deploy rollback       # back to the previous release and its units
+~/.local/bin/mpmv-deploy doctor         # can this host run the live release?
+~/.local/bin/mpmv-deploy check          # the post-deploy check, on demand
 ```
 
-`deploy` pulls the release (an image already in local storage is reused: release tags are
-immutable), tags it `localhost/mpmv-app:current`, runs `mpmv-migrate` and then
-restarts app and worker. If the migration fails, the tag goes back to the live release and nothing
-restarts. If app or worker fail to restart on the new release, or it does not pass its health
-check, `deploy` switches back to the previous release by itself. If `rollback` cannot bring the
-previous release up, it puts the live one back. Releases are recorded in `~/.local/state/mpmv/releases` (a stack) and
-`deploy.log`.
+`deploy` first runs the doctor: Podman and its quadlet generator present with every subcommand the
+script uses, every variable name of the release's `*.env.example` present in the env files (names
+only, values are never printed), `pg-root-ca.crt` readable, the `mpmv-media` volume owned by the
+image user (uid 10001), free disk above `MPMV_MIN_FREE_MB` (2048), and the installed and the new
+units converting with `quadlet -dryrun`. Any failure stops the deploy before anything changes.
+
+Then it pulls the release (an image already in local storage is reused: release tags are
+immutable), copies the release's units, Caddyfile and script out of the image into
+`~/.local/state/mpmv/units/<version>/`, installs them (`~/.config/containers/systemd/`,
+`~/.config/mpmv/Caddyfile`, `~/.local/bin/mpmv-deploy`; stale `mpmv*` units are removed),
+reloads systemd, tags the image `localhost/mpmv-app:current`, runs `mpmv-migrate`, and restarts
+app and worker, plus Caddy when its Caddyfile or unit changed. If the migration fails, the live
+units and tag come back and nothing restarts.
+
+The check then polls, for at most `MPMV_CHECK_BUDGET` seconds (40), the app's health check and,
+through Caddy on this host (`curl --resolve <site>:443:127.0.0.1`, the site name read from
+`caddy.env`), `/healthz`, the home page and one `.webp` file of the media volume. If the app
+container restarts on its own, the release fails at once. A failed check, or a unit that fails to
+restart, rolls back by itself to the previous release: its units, its image, restarted and checked.
+If `rollback` cannot bring the previous release up, it puts the live one back. Releases are
+recorded in `~/.local/state/mpmv/releases` (a stack) and `deploy.log`; the unit sets of the last
+five releases are kept. A release deployed before ARC.23 has no units in its image: the first
+deploy saves the installed units as its set, so rolling back to it restores them.
+
+Env files and `pg-root-ca.crt` are host configuration: deploys and rollbacks never touch them.
 
 **Rollback does not revert migrations.** Migrations must be backward compatible with the previous
 release (expand, then contract in a later release), so the previous image keeps working on the
