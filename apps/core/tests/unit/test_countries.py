@@ -2,7 +2,14 @@
 
 import pytest
 
-from apps.core.countries import EU_MEMBER_STATES, InvalidCountry, is_eu, normalize_country
+from apps.core.countries import (
+    EU_MEMBER_STATES,
+    InvalidCountry,
+    default_allowed_vendor_countries,
+    is_eu,
+    normalize_countries,
+    normalize_country,
+)
 
 
 @pytest.mark.parametrize(
@@ -30,3 +37,21 @@ def test_eu_has_27_member_states_with_iso_codes() -> None:
 )
 def test_is_eu(code: str, expected: bool) -> None:
     assert is_eu(code) is expected
+
+
+# --- Allowed vendor establishment countries (CMP.13)
+
+
+def test_the_default_allowed_vendor_countries_are_the_eu_27_sorted() -> None:
+    default = default_allowed_vendor_countries()
+    assert default == sorted(EU_MEMBER_STATES)
+    assert len(default) == 27
+
+
+def test_a_country_set_is_normalized_sorted_and_without_duplicates() -> None:
+    assert normalize_countries(["it", " DE", "EL", "IT"]) == ["DE", "GR", "IT"]
+
+
+def test_a_country_set_with_a_non_iso_code_is_refused() -> None:
+    with pytest.raises(InvalidCountry, match="ZZ"):
+        normalize_countries(["IT", "ZZ"])

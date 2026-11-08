@@ -1,4 +1,4 @@
-{% load i18n %}{% comment %}
+{% load i18n theme_tags %}{% comment %}
 Site header (THM.3, spec 14 §14.6): site name, the main navigation as a disclosure, the help
 link and the language switcher.
 
@@ -19,7 +19,7 @@ switcher is left out.
         <button type="button" class="nav-toggle" aria-controls="site-nav" aria-expanded="false" hidden x-ref="toggle" x-bind:hidden="toggleHidden" :aria-expanded="expanded" @click="toggle">{% translate "Menu" %}</button>
         <nav id="site-nav" aria-label="{% translate 'Main' %}">
           <ul>
-            {% for link in links %}<li><a href="{{ link.url }}">{{ link.label }}</a></li>{% endfor %}
+            {% for link in links %}<li>{% with href=link.url|safe_href %}{% if href %}<a href="{{ href }}">{{ link.label }}</a>{% else %}{{ link.label }}{% endif %}{% endwith %}</li>{% endfor %}
           </ul>
         </nav>
       </div>

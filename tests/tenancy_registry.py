@@ -60,6 +60,7 @@ from apps.shipping.models import (
     ShippingMethod,
     ShippingMethodTranslation,
     ShippingZone,
+    SpecialAreaTreatment,
     WeightBand,
 )
 from apps.shipping.tests.factories import (
@@ -68,6 +69,7 @@ from apps.shipping.tests.factories import (
     ShippingMethodFactory,
     ShippingMethodTranslationFactory,
     ShippingZoneFactory,
+    SpecialAreaTreatmentFactory,
     WeightBandFactory,
 )
 from apps.tax.models import TaxRegimeChangeRequest, VendorTaxProfile, VendorTaxProfileTranslation
@@ -154,6 +156,9 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         method=ShippingMethodFactory.create(vendor=vendor)
     ),
     WeightBand: lambda vendor: WeightBandFactory.create(
+        method=ShippingMethodFactory.create(vendor=vendor)
+    ),
+    SpecialAreaTreatment: lambda vendor: SpecialAreaTreatmentFactory.create(
         method=ShippingMethodFactory.create(vendor=vendor)
     ),
     PickupOption: lambda vendor: PickupOptionFactory.create(vendor=vendor),
