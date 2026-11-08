@@ -54,7 +54,7 @@ def vendor_editor_client(client: Client, mfa_login: Any) -> Client:
 def change_form(vendor: Vendor, **overrides: Any) -> dict[str, Any]:
     """The POST data of the vendor change form, as the browser would send it unchanged."""
     data: dict[str, Any] = {
-        name: getattr(vendor, name)
+        name: "" if getattr(vendor, name) is None else getattr(vendor, name)
         for name in (
             "display_name",
             "slug",
