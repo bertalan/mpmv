@@ -40,6 +40,8 @@ STAGE moves to a single VPS and gains the abuse-test row ARC.21 (2026-11-08): +1
 +8 h of P1. The multi-arch image build stays inside ARC.13 at 11 h. The forecast below still
 counts the earlier totals.
 
+The public STAGE demo mode (owner decision 2026-11-08) adds the row ARC.22: +1 task, +6 h of P1.
+
 The owner's decision D-07 (2026-11-07: descriptive `/{taxonomy}/{term}/` URLs, legacy tag URLs
 moved with the staggered product URL mechanism) widens CAT.8, MIG.6 and MIG.11 at the same hours.
 The product grid block leaves CMS.2 (10 → 8 h, now depending on CMS.1 only) for the new row CMS.10
