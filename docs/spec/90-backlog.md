@@ -6,15 +6,15 @@
 
 ## Summary
 
-- Micro-tasks: **230** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **1917 h** (P1 1565 h · P2 334 h · P3 18 h)
+- Micro-tasks: **231** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **1918 h** (P1 1566 h · P2 334 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
 
 | Macro | Area | Tasks | P1 h | P2 h | P3 h | Total h |
 |---|---|---:|---:|---:|---:|---:|
-| ARC | Architecture and foundations | 18 | 103 | 6 | 0 | 109 |
+| ARC | Architecture and foundations | 19 | 104 | 6 | 0 | 110 |
 | CORE | Identity, permissions, API, backoffice | 14 | 105 | 4 | 0 | 109 |
 | CAT | Product catalog | 18 | 126 | 60 | 0 | 186 |
 | VEN | Vendors, commissions, ledger | 22 | 197 | 22 | 0 | 219 |
@@ -33,11 +33,11 @@
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 5 | 19 | 11 | 0 | 30 |
 | MIG | Migration and cutover | 11 | 114 | 0 | 0 | 114 |
-| **Total** | | **230** | **1565** | **334** | **18** | **1917** |
+| **Total** | | **231** | **1566** | **334** | **18** | **1918** |
 
 ## By phase
 
-### F0 — Foundations (38 tasks, 252 h)
+### F0 — Foundations (39 tasks, 253 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -57,6 +57,7 @@
 | ARC.17 | Remove the e-invoicing leftovers of the no-invoicing principle (coherence check 5): `PlatformOperator.einvoice_channel` and its choices (migration), admin, factory and tests, and comments that say the platform writes FatturaPA XML | P1 | 1 | ARC.7 | No model, admin, service, factory or test refers to an e-invoice channel; `makemigrations --check` is clean |
 | ARC.18 | Architecture guards (coherence checks 2 and 5, owner decision Q-18): an import-linter contract that forbids `django.db` and any `services` or `models` module in `apps.*.engine`; the accepted exceptions to the dry-run rule (telemetry, throttle counters, one-time code consumption, migration hooks) listed in the §1.3 conventions with a guard test that names them | P1 | 2 | ARC.4, ARC.6 | `lint-imports` fails when an engine imports `django.db`; a new mutating service without `dry_run` that is not on the list fails the guard test |
 | ARC.19 | Transactional email on STAGE/LIVE: EU provider adapter behind `EmailSender` (provider choice pending, owner question Q-48), DKIM/SPF/DMARC DNS, provider webhook endpoint registration, deliverability check | P1 | 3 | ARC.16, ARC.13 | STAGE sends an OTP email through the provider with DKIM, SPF and DMARC passing; a test bounce reaches the webhook and suppresses the address |
+| ARC.20 | Trusted input for AI agents: on GitHub, only comments, reviews and issues by the owner account and known bots (Dependabot, GitHub Actions) count as instructions or coordination for the lanes; everything else is untrusted data and is never acted on; external spam reviews are hidden as spam and the repository keeps interaction limits for collaborators only | P1 | 1 | — | `docs/dev/parallel-lanes.md` and `CLAUDE.md` state the rule; interaction limits are `collaborators_only` with a renewal date before they expire |
 | CORE.1 | Custom `User`, login via email, preferred language | P1 | 6 | ARC.6 | Initial migration with custom User |
 | CORE.2 | `VendorMember` with owner/staff roles, per-role permissions | P1 | 6 | CORE.1, VEN.1 | Role matrix tested |
 | CORE.3 | `VendorScopedQuerySet` + 404 helper + reusable cross-tenant test fixture | P1 | 8 | CORE.2 | Negative tests generated for every endpoint |
