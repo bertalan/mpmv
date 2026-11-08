@@ -5,6 +5,8 @@ Users and groups are managed in the staff admin (`/django-admin/`), which audits
 on users would change them without an audit entry, so their registrations are withdrawn here:
 they get no URL, no menu item and no admin link.
 
+The term and vendor choosers of the page cards (CMS.2) are admin viewsets (`choosers`).
+
 Documents are installed only for wagtail-localize (I18N.3): their menu item is hidden.
 
 Images (CMS.8): the chooser offers only images with their licence and author; the others are
@@ -26,6 +28,7 @@ from wagtail.users import wagtail_hooks as wagtail_users_hooks
 from apps.core.services import classified
 
 from .admin_views import can_classify_images, image_review
+from .choosers import term_chooser, vendor_chooser
 from .models import NavigationMenu
 
 
@@ -84,3 +87,13 @@ def image_review_menu_item() -> MenuItem:
     return ImageReviewMenuItem(
         _("Images to classify"), reverse("cms_image_review"), icon_name="image", order=310
     )
+
+
+@hooks.register("register_admin_viewset")  # type: ignore[untyped-decorator]
+def register_term_chooser() -> Any:
+    return term_chooser
+
+
+@hooks.register("register_admin_viewset")  # type: ignore[untyped-decorator]
+def register_vendor_chooser() -> Any:
+    return vendor_chooser

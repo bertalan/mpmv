@@ -49,6 +49,6 @@ def seed(apps: Any, schema_editor: Any) -> None:
 
 
 class Migration(migrations.Migration):
-    dependencies = [("core", "0011_image_licence")]
+    dependencies = [("core", "0012_image_licence")]
 
     operations = [migrations.RunPython(seed, migrations.RunPython.noop)]

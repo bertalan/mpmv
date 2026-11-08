@@ -446,6 +446,45 @@ class ImageLicence(BaseModel):
         )
 
 
+class GeocodeCacheEntry(BaseModel):
+    """The candidates of one geocoding lookup, by normalised address and language (EVT.12).
+
+    `key` is the SHA-256 of the normalised address (country, postcode, city, street, case folded,
+    whitespace collapsed); `normalised_address` keeps the text it was made from. Only the venue
+    address typed in an event form is ever looked up, never a member's address. Written by
+    `apps.core.geocoding.services.geocode_address`; expired rows are purged nightly.
+    """
+
+    key = models.CharField(max_length=64)
+    language = models.CharField(max_length=16)
+    normalised_address = models.TextField()
+    provider = models.CharField(max_length=32)
+    candidates = models.JSONField(default=list)
+    expires_at = models.DateTimeField(db_index=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["key", "language"], name="core_geocode_cache_unique"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.normalised_address} [{self.language}] via {self.provider}"
+
+
+class GeocoderState(BaseModel):
+    """Shared state of one geocoding provider (EVT.12): the limiter's next free slot and the
+    circuit breaker. In PostgreSQL so that every process sees the same budget (no Redis, spec
+    01); `select_for_update` serialises the slot reservations."""
+
+    provider = models.CharField(max_length=32, unique=True)
+    next_slot_at = models.DateTimeField(null=True, blank=True)
+    failures = models.PositiveIntegerField(default=0)  # consecutive failures or rate limits
+    open_until = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self) -> str:
+        return f"{self.provider} ({self.failures} failures)"
+
+
 class MediaImage(AbstractImage):  # type: ignore[misc]  # Wagtail is untyped
     """The site's image model (`WAGTAILIMAGES_IMAGE_MODEL`, spec 10 §10.2).
 

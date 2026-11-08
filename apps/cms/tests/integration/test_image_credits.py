@@ -16,6 +16,7 @@ from wagtail.images.blocks import ImageChooserBlock
 
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
+from apps.cms.blocks import FigureBlock, HeroBlock
 from apps.cms.models import StandardPage
 from apps.cms.services import SeedReport, disclosure_images_in_stream, page_image_credits
 from apps.cms.tests.factories import StandardPageFactory
@@ -123,6 +124,20 @@ def test_blocks_marked_for_the_disclosure_are_collected_from_streamfields(
         ]
     )
     value = StreamValue(stream, [("hero", {"image": hero}), ("figure", {"image": figure})])
+
+    assert list(disclosure_images_in_stream(value)) == [hero]
+
+
+def test_the_cms2_hero_block_is_credited_in_the_disclosure(seeded: SeedReport) -> None:
+    hero, figure = _cc_by("Ada", "hero"), _cc_by("Grace", "figure")
+    stream = blocks.StreamBlock([("hero", HeroBlock()), ("figure", FigureBlock())])
+    value = StreamValue(
+        stream,
+        [
+            ("hero", {"heading": "Welcome", "image": hero, "alt_text": "A hero"}),
+            ("figure", {"image": figure, "alt_text": "A figure"}),
+        ],
+    )
 
     assert list(disclosure_images_in_stream(value)) == [hero]
 

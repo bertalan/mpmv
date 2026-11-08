@@ -417,6 +417,29 @@ def clear_throttle(key: str) -> None:
     Throttle.objects.filter(key=key).delete()
 
 
+def consume_rate_limit(
+    key: str, *, limit: int, window: dt.timedelta, now: dt.datetime | None = None
+) -> dt.timedelta:
+    """Count one use of `key` in a fixed window of `limit` uses; zero when allowed.
+
+    When the window is full the use is not counted and the result is the time until the window
+    ends (for `Retry-After`). Shares the `Throttle` table: `failures` is the count of uses and
+    `expires_at` the end of the window, so the nightly purge forgets old windows.
+    """
+    now = now or timezone.now()
+    with transaction.atomic():
+        row, _ = Throttle.objects.select_for_update().get_or_create(
+            key=key, defaults={"expires_at": now}
+        )
+        if row.expires_at <= now:
+            row.failures, row.expires_at = 0, now + window
+        if row.failures >= limit:
+            return row.expires_at - now
+        row.failures += 1
+        row.save(update_fields=["failures", "expires_at", "updated_at"])
+    return dt.timedelta(0)
+
+
 def purge_expired_throttles(*, now: dt.datetime | None = None) -> int:
     """Delete the rows nobody needs any more; return how many were deleted."""
     deleted, _ = Throttle.objects.filter(expires_at__lte=now or timezone.now()).delete()

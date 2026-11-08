@@ -1,0 +1,9 @@
+<section class="block block-faq">
+  {% if value.heading %}<h2>{{ value.heading }}</h2>{% endif %}
+  {% for item in value.items %}
+    <details>
+      <summary>{{ item.question }}</summary>
+      <div class="faq-answer">{{ item.answer }}</div>
+    </details>
+  {% endfor %}
+</section>
