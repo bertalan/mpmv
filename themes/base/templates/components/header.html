@@ -13,7 +13,7 @@ the context of the help link. Without `links` or `languages` (the 500 page) the 
 switcher is left out.
 {% endcomment %}<header class="site-header">
   <div class="site-header__inner">
-    <a class="site-name" href="{% url 'home' %}">{{ site_name }}</a>
+    {% url 'home' as home_url %}<a class="site-name" href="{% firstof home_url '/' %}">{{ site_name }}</a>
     {% if links %}
       <div class="site-nav" x-data="disclosure" :class="classes" @keydown.escape="close">
         <button type="button" class="nav-toggle" aria-controls="site-nav" aria-expanded="false" hidden x-ref="toggle" x-bind:hidden="toggleHidden" :aria-expanded="expanded" @click="toggle">{% translate "Menu" %}</button>
