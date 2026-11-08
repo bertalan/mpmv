@@ -171,9 +171,105 @@
     cursor: default;
   }
 
+  .button--secondary {
+    --button-bg: var(--color-secondary);
+    --button-fg: var(--color-on-secondary);
+    --button-bg-hover: var(--color-secondary-hover);
+  }
+
+  .button--ghost {
+    --button-bg: transparent;
+    --button-fg: var(--color-link);
+    --button-bg-hover: var(--color-accent-tint);
+
+    border-color: var(--color-border-control);
+  }
+
+  /* --- Form fields (components/field.html): label, required marker, help, inline errors
+     tied with aria-describedby (WCAG 1.3.1, 3.3.1, 3.3.2). */
+
+  .field {
+    margin-block: 0 var(--space-m);
+  }
+
+  .field fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .field legend {
+    margin-block-end: var(--space-xs);
+    padding: 0;
+    font-weight: 600;
+  }
+
+  .field__required {
+    color: var(--color-text-muted);
+    font-weight: 400;
+  }
+
+  .helptext {
+    margin-block: 0 var(--space-xs);
+    color: var(--color-text-muted);
+    font-size: 0.875em;
+  }
+
+  .errorlist {
+    margin-block: 0 var(--space-xs);
+    padding: 0;
+    list-style: none;
+    color: var(--color-danger);
+    font-weight: 600;
+  }
+
+  [aria-invalid="true"] {
+    border-color: var(--color-danger);
+    border-width: 2px;
+  }
+
   [role="alert"] {
     color: var(--color-danger);
     font-weight: 600;
+  }
+
+  /* --- Alerts: a level bar in colour and the level in words (never colour alone, 1.4.1). */
+
+  .alert {
+    max-inline-size: var(--measure-text);
+    margin-block: 0 var(--space-m);
+    padding: var(--space-s) var(--space-m);
+    background: var(--color-surface-raised);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-inline-start: 0.375rem solid var(--alert-accent, var(--color-info));
+    border-radius: var(--radius-control);
+    font-weight: 400;
+  }
+
+  .alert > :last-child {
+    margin-block-end: 0;
+  }
+
+  .alert__title {
+    margin-block: 0 var(--space-xs);
+    font-weight: 700;
+  }
+
+  .alert--info {
+    --alert-accent: var(--color-info);
+  }
+
+  .alert--success {
+    --alert-accent: var(--color-success);
+  }
+
+  .alert--warning {
+    --alert-accent: var(--color-warning);
+  }
+
+  .alert--error {
+    --alert-accent: var(--color-danger);
   }
 
   /* --- Motion: only when the visitor has not asked for less (WCAG 2.3.3). */

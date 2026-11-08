@@ -1,0 +1,6 @@
+{% extends "layouts/error.html" %}
+{% load i18n %}
+{% comment %}Server error (THM.3): rendered without the database by apps.themes.views.server_error.{% endcomment %}
+{% block title %}{% translate "Something went wrong" %} · {{ site_name }}{% endblock %}
+{% block heading %}{% translate "Something went wrong" %}{% endblock %}
+{% block message %}<p>{% translate "We could not complete your request. Please try again in a few minutes." %}</p>{% endblock %}

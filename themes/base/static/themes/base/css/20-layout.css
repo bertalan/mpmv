@@ -1,5 +1,5 @@
 /* Base theme, layout layer (THM.3, spec 14 §14.6): page shell, sticky header with the
-   disclosure navigation, help link, language switcher, footer. */
+   disclosure navigation, help link, language switcher, content shell, footer. */
 @layer layout {
   .site-header__inner,
   .site-main,
@@ -13,6 +13,12 @@
   .site-main {
     flex: 1 0 auto;
     padding-block: var(--space-l) var(--space-2xl);
+  }
+
+  /* --- Page shells: content pages read at the standard text width (layouts/content.html). */
+
+  .page-content {
+    max-inline-size: var(--measure-text);
   }
 
   /* --- Legal pages and the vendor recruitment page (CMS.5), moved from cms/site.css. */
@@ -133,7 +139,18 @@
     background: var(--color-accent-tint);
   }
 
+  /* Below 48rem the header wraps to two rows or more (about 90 px), taller than the
+     --header-height scroll padding: a sticky header there could hide the focused element
+     (WCAG 2.4.11). It scrolls away with the page instead, and needs no scroll padding. */
   @media (width < 48rem) {
+    html {
+      scroll-padding-top: 0;
+    }
+
+    .site-header {
+      position: static;
+    }
+
     .site-nav {
       flex-basis: 100%;
       order: 3;
