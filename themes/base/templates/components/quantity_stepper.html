@@ -1,0 +1,27 @@
+{% load i18n %}{% comment %}
+Quantity stepper (THM.4, spec 14 §14.9): a labelled number field, usable on its own (typing, or
+the arrow keys), with minus and plus buttons that the theme script (base.js) reveals. The
+buttons call `stepUp()`/`stepDown()`, so the field's `min`, `max` and `step` hold, fire `input`
+and `change` (htmx can update the cart on change), and are marked `aria-disabled` at the
+limits, so a focused button keeps the focus (a `disabled` one would drop it to the page).
+
+  {% include "components/quantity_stepper.html" with id="qty-"|add:line.id label=_("Quantity") value=line.quantity max=line.stock only %}
+
+Context:
+- `id` (required): the id of the field, unique on the page.
+- `label`: the visible label (default "Quantity").
+- `name`: the field name (default "quantity").
+- `value`: the current quantity (default 1; 0 is kept).
+- `min` (default 1), `max`: the limits; 0 is a limit too (`max=0`: out of stock), only a
+  missing `max` leaves the field unlimited.
+- `disabled`: the field and its buttons are disabled.
+- `hide_label`: keep the label for screen readers only (a cart line, where the product name is
+  next to it; `label` should then say which product, such as "Quantity, Touring jacket").
+{% endcomment %}<div class="quantity">
+  <label for="{{ id }}"{% if hide_label %} class="visually-hidden"{% endif %}>{% firstof label _("Quantity") %}</label>
+  <div class="quantity__row">
+    <button type="button" class="button button--secondary button--icon quantity__step" data-step="-1" aria-controls="{{ id }}" aria-label="{% translate 'Decrease quantity' %}"{% if disabled %} disabled{% endif %} hidden>{% include "components/icon.html" with name="minus" only %}</button>
+    <input type="number" id="{{ id }}" name="{{ name|default:'quantity' }}" value="{% if value is None %}1{% else %}{{ value }}{% endif %}" min="{% if min is None %}1{% else %}{{ min }}{% endif %}"{% if max is not None %} max="{{ max }}"{% endif %} step="1" inputmode="numeric"{% if disabled %} disabled{% endif %}>
+    <button type="button" class="button button--secondary button--icon quantity__step" data-step="1" aria-controls="{{ id }}" aria-label="{% translate 'Increase quantity' %}"{% if disabled %} disabled{% endif %} hidden>{% include "components/icon.html" with name="plus" only %}</button>
+  </div>
+</div>

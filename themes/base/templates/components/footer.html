@@ -1,0 +1,27 @@
+{% load i18n %}{% comment %}
+Site footer (THM.3, spec 14 §14.6): the help link first, in the same place on every page
+(WCAG 3.2.6), the footer menu (CMS.1), the legal links and the copyright line. Each list is a
+labelled `<nav>`, left out when empty.
+
+Context: `site_name`, `links` (the footer menu: `label` and `url`), `legal_links` (same shape;
+a slot for the legal pages of CMS.5, empty until then), and the context of the help link.
+{% endcomment %}<footer class="site-footer">
+  <div class="site-footer__inner">
+    {% include "components/help_link.html" %}
+    {% if links %}
+      <nav aria-label="{% translate 'Footer' %}">
+        <ul>
+          {% for link in links %}<li><a href="{{ link.url }}">{{ link.label }}</a></li>{% endfor %}
+        </ul>
+      </nav>
+    {% endif %}
+    {% if legal_links %}
+      <nav aria-label="{% translate 'Legal' %}">
+        <ul>
+          {% for link in legal_links %}<li><a href="{{ link.url }}">{{ link.label }}</a></li>{% endfor %}
+        </ul>
+      </nav>
+    {% endif %}
+    <p>&copy; {% now "Y" %} {{ site_name }}</p>
+  </div>
+</footer>

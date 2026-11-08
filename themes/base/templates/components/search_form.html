@@ -1,0 +1,21 @@
+{% load i18n %}{% comment %}
+Search form (THM.4, spec 14 §14.9): a GET form in a search landmark, a labelled search field
+and a submit button. Works without JavaScript; CAT.9 adds suggestions on top.
+
+  {% include "components/search_form.html" with id="site-search" action=search_url query=request.GET.q only %}
+
+Context:
+- `id` (required): the id of the field, unique on the page.
+- `action` (required): the results page.
+- `query`: the current search, shown in the field.
+- `label`: the visible label (default "Search products").
+- `name`: the query parameter (default "q").
+- `compact`: the label is kept for screen readers only (in the header, where the button and the
+  field's purpose are clear); the button always says "Search" to assistive technology.
+{% endcomment %}<form class="search-form{% if compact %} search-form--compact{% endif %}" role="search" action="{{ action }}" method="get">
+  <label for="{{ id }}"{% if compact %} class="visually-hidden"{% endif %}>{% firstof label _("Search products") %}</label>
+  <div class="search-form__row">
+    <input type="search" name="{{ name|default:'q' }}" id="{{ id }}" value="{{ query|default:'' }}" autocomplete="off" enterkeyhint="search">
+    {% include "components/button.html" with label=_("Search") icon="search" icon_only=True type="submit" only %}
+  </div>
+</form>

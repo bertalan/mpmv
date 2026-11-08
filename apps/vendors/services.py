@@ -57,6 +57,17 @@ VENDOR_FIELDS = (
 )
 
 
+def storefront_vendors() -> QuerySet[Vendor]:
+    """Vendors whose storefront is public: the active ones (spec 04). A storefront is public data,
+    so this read needs no actor; the CMS vendor cards and their chooser use it (CMS.2)."""
+    return Vendor.objects.filter(status=Vendor.Status.ACTIVE)
+
+
+def has_public_storefront(vendor: Vendor) -> bool:
+    """The same rule as `storefront_vendors`, on a vendor already loaded."""
+    return bool(vendor.status == Vendor.Status.ACTIVE)
+
+
 # Fields encrypted at rest (SEC.3) are masked in audit rows, or the log would hold them in clear.
 MASKED_FIELDS = {"iban": engine.mask_iban, "tax_code": engine.mask_tax_code}
 

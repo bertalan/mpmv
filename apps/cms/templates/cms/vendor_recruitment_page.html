@@ -1,0 +1,43 @@
+{% extends "layouts/base.html" %}
+{% load i18n wagtailcore_tags %}
+{% block content %}
+  <article class="recruitment">
+    <h1>{{ page.title }}</h1>
+    {% for block in page.intro %}{% include_block block %}{% endfor %}
+    {% if page.plans %}
+      <section class="plans" aria-labelledby="plans-heading">
+        <h2 id="plans-heading">{% translate "Plans" %}</h2>
+        <div class="plan-list">
+          {% for block in page.plans %}
+            {% with plan=block.value %}
+              <article class="plan{% if plan.highlighted %} plan--highlighted{% endif %}">
+                <h3>{{ plan.name }}</h3>
+                {% if plan.price %}<p class="plan-price">{{ plan.price }}</p>{% endif %}
+                {% if plan.summary %}<p>{{ plan.summary }}</p>{% endif %}
+                {% if plan.features %}
+                  <ul>{% for feature in plan.features %}<li>{{ feature }}</li>{% endfor %}</ul>
+                {% endif %}
+              </article>
+            {% endwith %}
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+    {% if page.faq %}
+      <section class="faq" aria-labelledby="faq-heading">
+        <h2 id="faq-heading">{% translate "Frequently asked questions" %}</h2>
+        {% for block in page.faq %}
+          <h3>{{ block.value.question }}</h3>
+          {{ block.value.answer|richtext }}
+        {% endfor %}
+      </section>
+    {% endif %}
+    <div class="recruitment-cta">
+      {% if application_url %}
+        <a class="button" href="{{ application_url }}">{% firstof page.cta_label _("Apply now") %}</a>
+      {% else %}
+        <p>{% translate "Applications open soon." %}</p>
+      {% endif %}
+    </div>
+  </article>
+{% endblock %}

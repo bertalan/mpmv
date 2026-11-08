@@ -1,0 +1,6 @@
+{% extends "layouts/error.html" %}
+{% load i18n %}
+{% comment %}Bad request (THM.3): rendered without the database by apps.themes.views.bad_request.{% endcomment %}
+{% block title %}{% translate "Bad request" %} · {{ site_name }}{% endblock %}
+{% block heading %}{% translate "Bad request" %}{% endblock %}
+{% block message %}<p>{% translate "The request could not be understood. Check the address and try again." %}</p>{% endblock %}

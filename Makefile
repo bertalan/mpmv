@@ -1,6 +1,6 @@
 # MPMV task runner. Local containers use Apple `container` (ADR-0002); no Docker, no compose.
 .DEFAULT_GOAL := help
-.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell image dev dev-down dev-reset dev-status dev-logs migrate run worker test test-unit test-e2e test-all check lint fmt typecheck imports audit sbom
+.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell image dev dev-down dev-reset dev-status dev-logs migrate run assets worker test test-unit test-e2e test-all check lint fmt typecheck imports audit sbom
 
 DB_NAME      := mpmv-db
 DB_IMAGE     := docker.io/library/postgres:17
@@ -83,8 +83,11 @@ dev-logs: ## Follow the app logs (WHAT=worker for the worker)
 migrate: db ## Apply migrations to the local database
 	$(MANAGE) migrate
 
-run: migrate ## Run the development server
+run: migrate assets ## Run the development server
 	$(MANAGE) runserver
+
+assets: ## Build every theme's tokens.css and theme.css into build/themes/ (THM.2, ADR-0008)
+	uv run python -m apps.themes.build
 
 worker: migrate ## Run the background worker: queued jobs and periodic schedules (ADR-0004)
 	$(MANAGE) procrastinate worker

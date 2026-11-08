@@ -1,0 +1,37 @@
+{% load i18n %}{% comment %}
+Form field (THM.3, THM.4, spec 14 §14.6): a visible label tied to the control (never
+placeholder-only), a visible "required" marker next to the `required` attribute, the help text
+and the inline errors. Django sets `aria-describedby` on the control to the help text
+(`<id>_helptext`) and error list (`<id>_error`) ids, and `aria-invalid="true"` when there are
+errors (WCAG 1.3.1, 3.3.1, 3.3.2).
+
+One template for every control, chosen by the widget:
+- text-like inputs, textarea, select and file: label, help, errors, control;
+- a single checkbox: the box first, then its label (`field--check`);
+- radio and checkbox groups: a fieldset whose legend is the label (`field--group`);
+- a disabled field (`field.field.disabled`) is marked `field--disabled` on the wrapper.
+The form's error summary (components/error_summary.html) links to these controls.
+
+Context: `field`, a bound form field.
+{% endcomment %}{% with widget=field.widget_type %}<div class="field{% if widget == 'checkbox' %} field--check{% elif field.use_fieldset %} field--group{% endif %}{% if field.field.disabled %} field--disabled{% endif %}{% if field.errors %} field--invalid{% endif %}">
+  {% if widget == "checkbox" %}
+  {{ field.errors }}
+  <div class="field__check">
+    {{ field }}
+    <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="field__required">({% translate "required" %})</span>{% endif %}</label>
+  </div>
+  {% if field.help_text %}<p class="helptext" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>{% endif %}
+  {% elif field.use_fieldset %}
+  <fieldset{% if field.aria_describedby %} aria-describedby="{{ field.aria_describedby }}"{% endif %}>
+    <legend>{{ field.label }}{% if field.field.required %} <span class="field__required">({% translate "required" %})</span>{% endif %}</legend>
+    {% if field.help_text %}<p class="helptext" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>{% endif %}
+    {{ field.errors }}
+    {{ field }}
+  </fieldset>
+  {% else %}
+  <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="field__required">({% translate "required" %})</span>{% endif %}</label>
+  {% if field.help_text %}<p class="helptext" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>{% endif %}
+  {{ field.errors }}
+  {{ field }}
+  {% endif %}
+</div>{% endwith %}

@@ -1,0 +1,27 @@
+{% load i18n %}{% comment %}
+Dialog (THM.4, spec 14 §14.9): a native modal `<dialog>` named by its title. The theme script
+(base.js) opens it with `showModal()` from any button with `data-dialog="<id>"`: the browser
+then traps the focus inside, makes the page behind inert, closes on Escape and returns the focus
+to the opener. The close button sits in a `<form method="dialog">`, so closing needs no script.
+The opener this component renders is `hidden` until the script runs, so without JavaScript
+there is no button that does nothing; content a visitor needs without JavaScript belongs on
+the page, not only in a dialog.
+
+  {% include "components/dialog.html" with id="size-guide" title=_("Size guide") body=guide open_label=_("Size guide") only %}
+
+Context:
+- `id` (required): the dialog's id, unique on the page.
+- `title` (required): the heading that names the dialog.
+- `body`: the content, escaped unless the caller marks it safe.
+- `open_label`: the text of the opener; without it no opener is rendered (another control
+  with `data-dialog="<id>"` opens it).
+- `open_variant`: the opener's button variant (default "secondary").
+- `close_label`: the text of the close button (default "Close").
+{% endcomment %}{% if open_label %}<button type="button" class="button button--{{ open_variant|default:'secondary' }}" data-dialog="{{ id }}" aria-haspopup="dialog" hidden>{{ open_label }}</button>
+{% endif %}<dialog class="dialog" id="{{ id }}" aria-labelledby="{{ id }}-title">
+  <div class="dialog__header">
+    <h2 id="{{ id }}-title" class="dialog__title">{{ title }}</h2>
+    <form method="dialog"><button type="submit" class="button button--ghost button--icon dialog__close" aria-label="{% firstof close_label _('Close') %}">{% include "components/icon.html" with name="close" only %}</button></form>
+  </div>
+  <div class="dialog__body">{{ body }}</div>
+</dialog>

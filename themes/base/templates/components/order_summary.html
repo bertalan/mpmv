@@ -1,0 +1,22 @@
+{% load i18n %}{% comment %}
+Order summary (THM.4, spec 14 §14.9): the amounts of a cart, a checkout step or an order, as a
+description list in a titled section; the total comes last and stands out. Amounts arrive
+formatted by the caller (ORD.5 computes them); the component never calculates.
+
+  {% include "components/order_summary.html" with id="order-summary" lines=summary.lines total=summary.total note=_("VAT included") only %}
+
+Context:
+- `id` (required): the id of the heading, which names the section.
+- `title`: the heading (default "Order summary").
+- `heading_level`: 2 to 6 (default 2).
+- `lines`: a list of `label` and `amount` (subtotals, shipping per package, discounts).
+- `total` (required): the amount to pay; `total_label` (default "Total").
+- `note`: a line under the total, such as "VAT included".
+{% endcomment %}<section class="order-summary" aria-labelledby="{{ id }}">
+  <h{{ heading_level|default:2 }} id="{{ id }}">{% firstof title _("Order summary") %}</h{{ heading_level|default:2 }}>
+  <dl class="order-summary__list">
+    {% for line in lines %}<div class="order-summary__line"><dt>{{ line.label }}</dt><dd>{{ line.amount }}</dd></div>{% endfor %}
+    <div class="order-summary__line order-summary__line--total"><dt class="order-summary__total">{% firstof total_label _("Total") %}</dt><dd>{{ total }}</dd></div>
+  </dl>
+  {% if note %}<p class="order-summary__note">{{ note }}</p>{% endif %}
+</section>

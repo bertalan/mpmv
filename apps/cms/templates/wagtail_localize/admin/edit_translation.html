@@ -1,0 +1,77 @@
+{% extends "wagtailadmin/generic/edit.html" %}
+{% load i18n wagtailadmin_tags %}
+{% comment %}
+  Copy of wagtail-localize 1.14.5's template (BSD-3-Clause), changed for the strict CSP (I18N.3,
+  SEC.1): the chooser URLs come from data attributes read by a
+  static script instead of an inline one, and that script gives the editor's style elements the
+  request's nonce (see cms/js/localize-editor.js). Update it with wagtail-localize.
+{% endcomment %}
+
+{% block bodyclass %}page-editor{% endblock %}
+
+{% block titletag %}{% blocktrans with instance=translation.source.as_instance locale=translation.target_locale %}Translation of {{ instance }} into {{ locale }}{% endblocktrans %}{% endblock %}
+
+{% block content %}
+    {% if is_page %}
+        <div class="w-sticky w-top-0 w-z-header">
+            {% include 'wagtailadmin/shared/headers/page_edit_header.html' with page=instance page_for_status=instance page_perms=page_perms content_type=instance.content_type %}
+            {% include "wagtailadmin/shared/side_panels.html" with page=instance page_for_status=instance page_perms=page_perms content_type=instance.content_type in_explorer=True %}
+        </div>
+    {% else %}
+        <div class="w-sticky w-top-0 w-z-header">
+            {% include 'wagtail_localize/admin/includes/generic_header.html' %}
+        </div>
+        {% include "wagtailadmin/shared/header.html" with title=instance icon="snippet" merged=1 only %}
+    {% endif %}
+
+    <header class="w-flex w-flex-col sm:w-flex-row w-items-center w-justify-between w-bg-surface-header w-border-b w-border-border-furniture w-px-0 w-py-0 w-mb-0 w-relative w-top-0 w-min-h-slim-header">
+        <div class="w-pl-slim-header sm:w-pl-5 w-min-h-slim-header sm:w-pr-2 w-w-full w-flex-1 w-overflow-x-auto w-box-border">
+            <div class="w-flex w-flex-1 w-items-center w-overflow-hidden w-p-4 header-meta--locales">
+                {% if source_translation.editUrl %}
+                    <a href="{{ source_translation.editUrl }}">{{ source_translation.locale.displayName }}</a>
+                {% else %}
+                    {{ source_translation.locale.displayName }}
+                {% endif %}
+                <svg aria-hidden="true" class="icon icon-arrow-right w-w-4 w-h-4">
+                    <use href="#icon-arrow-right"></use>
+                </svg>
+                {{ target_locale.get_display_name }}
+                {% if translations %}
+                    {% dropdown toggle_icon="dots-horizontal" toggle_aria_label=_("Translations") %}
+                        {% for label, url in translations %}
+                            <a href="{{ url }}">{{ label }}</a>
+                        {% endfor %}
+                    {% enddropdown %}
+                {% endif %}
+            </div>
+        </div>
+    </header>
+    <div class="js-translation-editor" data-props="{{ props }}">
+        {# Generates the CSRF token hidden input. This is read by the JavaScript. #}
+        {% csrf_token %}
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    {% hook_output 'insert_editor_js' %}
+    <div id="localize-editor-settings" hidden
+         data-style-nonce="{{ csp_nonce }}"
+         data-image-chooser="{% url "wagtailimages_chooser:choose" %}"
+         data-document-chooser="{% url "wagtaildocs_chooser:choose" %}"
+         data-page-chooser="{% url "wagtailadmin_choose_page" %}"></div>
+    <script src="{% versioned_static 'cms/js/localize-editor.js' %}"></script>
+    <script src="{% url 'wagtail_localize:javascript_catalog' %}"></script>
+    <script src="{% versioned_static 'wagtailadmin/js/page-chooser-modal.js' %}"></script>
+    <script src="{% versioned_static 'wagtailadmin/js/page-chooser.js' %}"></script>
+    <script src="{% versioned_static 'wagtailimages/js/image-chooser-modal.js' %}"></script>
+    <script src="{% versioned_static 'wagtailimages/js/image-chooser.js' %}"></script>
+    <script src="{% versioned_static 'wagtaildocs/js/document-chooser-modal.js' %}"></script>
+    <script src="{% versioned_static 'wagtaildocs/js/document-chooser.js' %}"></script>
+    <script src="{% versioned_static 'wagtailadmin/js/chooser-modal.js' %}"></script>
+    <script src="{% versioned_static 'wagtailsnippets/js/snippet-chooser.js' %}"></script>
+    <script src="{% versioned_static 'wagtail_localize/js/wagtail-localize.js' %}"></script>
+{% endblock %}
+
+{% block extra_css_ %}
+    <link rel="stylesheet" href="{% versioned_static 'wagtail_localize/css/wagtail-localize-editor-form.css' %}" />
+{% endblock %}

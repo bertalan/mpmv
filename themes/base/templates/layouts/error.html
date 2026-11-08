@@ -1,0 +1,36 @@
+{% extends "layouts/content.html" %}
+{% load i18n %}
+{% comment %}
+Error page layout (THM.3, spec 14 §14.9): the content shell with a heading, a message and a
+link to the home page. `400.html`, `403.html`, `403_csrf.html`, `404.html` and `500.html` fill
+`title`, `heading` and `message`.
+
+403, 404 and the CSRF failure are rendered with the request context and keep the full header
+and footer. The 400 and 500 handlers (apps/themes/views.py) set `minimal_chrome`: the header
+and footer then leave out the CMS menus and the language switcher, so nothing here needs the
+database, the session or a CSRF token. The same minimal header serves a 404 raised under a
+URLconf without the public routes (test URLconfs), where the switcher could not be reversed.
+{% endcomment %}
+{% block description %}<meta name="robots" content="noindex">{% endblock %}
+{% block header %}
+  {% url 'switch_language' as switch_url %}
+  {% if minimal_chrome or not switch_url %}
+    {% include "components/header.html" with site_name=site_name links=None languages=None %}
+  {% else %}
+    {{ block.super }}
+  {% endif %}
+{% endblock %}
+{% block page_content %}
+  <div class="error-page">
+    <h1>{% block heading %}{% endblock %}</h1>
+    {% block message %}{% endblock %}
+    {% url 'home' as home_url %}<p><a href="{% firstof home_url '/' %}">{% translate "Go to the home page" %}</a></p>
+  </div>
+{% endblock %}
+{% block footer %}
+  {% if minimal_chrome %}
+    {% include "components/footer.html" with site_name=site_name links=None %}
+  {% else %}
+    {{ block.super }}
+  {% endif %}
+{% endblock %}

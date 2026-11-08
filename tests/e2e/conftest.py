@@ -15,6 +15,16 @@ os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
 SCREENSHOT_DIR = Path(__file__).resolve().parents[2] / "build" / "e2e" / "screenshots"
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _built_themes() -> None:
+    """The theme CSS and JS the layouts link (THM.2, THM.3), as `make assets` builds them."""
+    from django.conf import settings
+
+    from apps.themes.build import build_themes
+
+    build_themes(Path(settings.MPMV_THEMES_DIR), Path(settings.MPMV_THEME_BUILD_DIR))
+
+
 @pytest.fixture(autouse=True)
 def _cms_site(request: pytest.FixtureRequest) -> None:
     """The site's pages for every test that runs a live server (CMS.1).

@@ -1,0 +1,36 @@
+{% load i18n %}{# The filter form of a listing (CAT.8): a GET form on the page's own URL, no JavaScript. #}
+<section class="listing-filters" aria-labelledby="listing-filters-heading">
+  <h2 id="listing-filters-heading">{% translate "Filters" %}</h2>
+  <form method="get" action="{{ location }}" role="search" aria-labelledby="listing-filters-heading">
+    {# Applied filters with no control below (the category, a term not offered): a GET form replaces the whole query. #}
+    {% for name, value in carried_filters %}<input type="hidden" name="{{ name }}" value="{{ value }}">
+    {% endfor %}{% for group in filter_groups %}
+      <fieldset>
+        <legend>{{ group.label }}</legend>
+        <ul>
+          {% for option in group.options %}
+            <li class="filter-depth-{{ option.depth }}">
+              <input type="checkbox" id="filter-{{ group.key }}-{{ forloop.counter }}" name="{{ group.key }}" value="{{ option.value }}"{% if option.selected %} checked{% endif %}>
+              <label for="filter-{{ group.key }}-{{ forloop.counter }}">{{ option.label }}</label>
+            </li>
+          {% endfor %}
+        </ul>
+      </fieldset>
+    {% endfor %}
+    <fieldset>
+      <legend>{% blocktranslate %}Price ({{ currency }}){% endblocktranslate %}</legend>
+      <label for="filter-price-min">{% translate "Minimum price" %}</label>
+      <input type="number" id="filter-price-min" name="price_min" min="0" step="0.01" inputmode="decimal" value="{{ price_min }}">
+      <label for="filter-price-max">{% translate "Maximum price" %}</label>
+      <input type="number" id="filter-price-max" name="price_max" min="0" step="0.01" inputmode="decimal" value="{{ price_max }}">
+    </fieldset>
+    {% if vendor_options %}
+      <label for="filter-vendor">{% translate "Vendor" %}</label>
+      <select id="filter-vendor" name="vendor">
+        <option value="">{% translate "All vendors" %}</option>
+        {% for option in vendor_options %}<option value="{{ option.value }}"{% if option.selected %} selected{% endif %}>{{ option.label }}</option>{% endfor %}
+      </select>
+    {% endif %}
+    <button type="submit">{% translate "Apply filters" %}</button>
+  </form>
+</section>

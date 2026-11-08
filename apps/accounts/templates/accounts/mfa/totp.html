@@ -1,6 +1,6 @@
-{% extends "core/base.html" %}
+{% extends "layouts/account.html" %}
 {% block title %}Authenticator app · MPMV{% endblock %}
-{% block content %}
+{% block account_content %}
 <h1>Set up an authenticator app</h1>
 <p>Scan this QR code with your authenticator app, then enter the 6-digit code it shows.</p>
 <figure>{{ qr_svg|safe }}</figure>
