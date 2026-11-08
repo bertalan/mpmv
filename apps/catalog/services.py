@@ -1862,3 +1862,146 @@ def listing_params_in(
             return None
         terms.append((new_key, tuple(sorted({written[trees[value]] for value in values}))))
     return replace(params, category=category, terms=tuple(sorted(terms)))
+
+
+# --- What a listing page shows (CAT.8 part 3/3): product cards and the filter form's options.
+
+
+@dataclass(frozen=True)
+class ProductCard:
+    """A product in a listing grid, in the page language (EN fallback, spec 09)."""
+
+    title: str
+    url: str | None  # None until the product has a slug in the shown language
+    price: Decimal | None  # the public net price; None shows "Price on request" (Q-31)
+    image_url: str | None = None  # product images come with CAT.4
+    image_alt: str = ""
+
+
+def product_cards(products: Sequence[Product], language: str) -> list[ProductCard]:
+    """The cards of `products`, in order; their texts in one query. A card whose product has
+    no published text in `language` links to its URL in the language of the text it shows."""
+    rows = list(products)
+    models.prefetch_related_objects(rows, "translations")
+    cards: list[ProductCard] = []
+    for product in rows:
+        # Resolved in Python from the prefetched rows: `product.translation()` filters the
+        # manager, which skips the prefetch cache and costs a query per card.
+        resolved = translations.resolve(product.translations.all(), language)
+        text = resolved.translation
+        title = text.title if text is not None else product.sku
+        url = None
+        if text is not None and text.slug and resolved.language is not None:
+            url = slugs.product_path(
+                resolved.language, text.slug, default_language=settings.LANGUAGE_CODE
+            )
+        cards.append(
+            ProductCard(title=title, url=url, price=engine.public_price(product), image_alt=title)
+        )
+    return cards
+
+
+@dataclass(frozen=True)
+class FilterOption:
+    value: str  # the query value: a term's slug path, a vendor slug
+    label: str
+    selected: bool = False
+    depth: int = 1  # a term's level in its tree
+
+
+@dataclass(frozen=True)
+class FilterGroup:
+    """One taxonomy of the filter form: its query key, its name and its terms."""
+
+    key: str
+    label: str
+    options: tuple[FilterOption, ...]
+
+
+def _shown_text(rows: Iterable[Any], owner: str, language: str) -> dict[int, Any]:
+    """The published text of each owner in `language`, else in the source language."""
+    source = translations.source_language()
+    found: dict[int, Any] = {}
+    for row in rows:
+        owner_id = getattr(row, f"{owner}_id")
+        if row.language == language or (row.language == source and owner_id not in found):
+            found[owner_id] = row
+    return found
+
+
+def listing_filter_groups(
+    scope: ListingScope, params: listings.ListingParams, language: str
+) -> list[FilterGroup]:
+    """The term filters of a listing: each filterable taxonomy with the terms (and their upper
+    levels) of the products in `scope`, plus the selected ones. A term is offered with a
+    published name in `language` or the source language; its value is the slug path that
+    `resolve_listing_filter` reads back. A bounded number of queries, whatever the selection."""
+    keys = listing_term_keys(language)
+    if not keys:
+        return []
+    in_scope = listing_products(scope).order_by().values("pk")
+    used = Term.objects.filter(taxonomy__in=keys.values(), products__in=in_scope)
+    paths = set(used.values_list("path", flat=True).distinct())
+    term_rows = TermTranslation.objects.all()
+    selected_paths: set[str] = set()
+    for key, chosen in params.terms:
+        taxonomy = keys.get(key)
+        if taxonomy is not None:
+            rows = term_rows.filter(term__taxonomy=taxonomy)
+            selected_paths.update(_paths_by_slug_path(rows, "term", chosen, language).values())
+    paths |= selected_paths
+    paths |= {up for path in paths for up in engine.ancestor_paths(path, Term.steplen)}
+    values = _filter_slug_paths(term_rows, "term", paths, Term.steplen, language)
+    source = translations.source_language()
+    named = term_rows.filter(
+        term__path__in=paths, language__in={language, source}, status=translations.PUBLISHED
+    ).select_related("term")
+    texts = _shown_text(named, "term", language)
+    taxonomy_texts = _shown_text(
+        TaxonomyTranslation.objects.filter(
+            taxonomy__in=keys.values(),
+            language__in={language, source},
+            status=translations.PUBLISHED,
+        ),
+        "taxonomy",
+        language,
+    )
+    options: dict[int, list[tuple[str, FilterOption]]] = {}
+    for text in texts.values():
+        term = text.term
+        value = values.get(term.path)
+        if value is None:
+            continue
+        option = FilterOption(
+            value=value,
+            label=str(text.name),
+            selected=term.path in selected_paths,
+            depth=len(term.path) // Term.steplen,
+        )
+        options.setdefault(term.taxonomy_id, []).append((term.path, option))
+    groups: list[FilterGroup] = []
+    for key, taxonomy in keys.items():
+        found = options.get(taxonomy.pk)
+        if not found:
+            continue
+        name = taxonomy_texts.get(taxonomy.pk)
+        label = str(name.name) if name is not None else key
+        groups.append(FilterGroup(key, label, tuple(option for _, option in sorted(found))))
+    return groups
+
+
+def listing_vendor_options(
+    scope: ListingScope, params: listings.ListingParams
+) -> list[FilterOption]:
+    """The vendors a listing can be narrowed to: the active vendors of its products, plus the
+    selected one. None on a vendor storefront, which is one vendor already."""
+    if scope.vendor is not None:
+        return []
+    in_scope = listing_products(scope).order_by().values("vendor_id")
+    vendors = Vendor.objects.filter(status=Vendor.Status.ACTIVE).filter(
+        Q(pk__in=in_scope) | Q(slug=params.vendor or "")
+    )
+    return [
+        FilterOption(value=v.slug, label=v.display_name, selected=v.slug == params.vendor)
+        for v in vendors.order_by("display_name", "pk")
+    ]
