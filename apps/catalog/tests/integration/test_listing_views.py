@@ -14,8 +14,12 @@ the last one and an unknown filter value answer 404.
 from typing import Any
 
 import pytest
+from django.apps import apps
 from django.conf import settings
+from django.db import connection
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
+from wagtail.models import Page, Site
 
 from apps.catalog import listings
 from apps.catalog.models import Product
@@ -72,6 +76,18 @@ def compat() -> dict[str, Any]:
     product = listed()
     product.terms.add(model)
     return {"taxonomy": taxonomy, "maker": maker, "model": model, "product": product}
+
+
+def cms_page(parent: Page, slug: str) -> Page:
+    """A live CMS standard page under `parent` (no import of the cms app: same layer)."""
+    standard_page = apps.get_model("cms", "StandardPage")
+    page: Page = parent.add_child(instance=standard_page(title=slug.title(), slug=slug))
+    return page
+
+
+def cms_home() -> Page:
+    home: Page = Site.objects.get(is_default_site=True).root_page
+    return home
 
 
 def assert_redirect(response: Any, location: str) -> None:
@@ -380,3 +396,82 @@ def test_a_taxonomy_slug_never_shadows_the_catalog_segments(client: Client) -> N
     response = client.get("/brand/acme/")
     assert response.status_code == 200
     assert response.context["scope"].brand == brand
+
+
+@pytest.mark.parametrize("status", [PUBLISHED, TranslationStatus.MACHINE])
+def test_a_cms_page_sharing_its_first_segment_with_a_taxonomy_slug_stays_reachable(
+    client: Client, status: str
+) -> None:
+    guide = cms_page(cms_home(), "guide")
+    cms_page(guide, "intro")
+    assert client.get("/guide/intro/").status_code == 200
+    taxonomy = TaxonomyFactory.create(has_landing=True)
+    TaxonomyTranslationFactory.create(taxonomy=taxonomy, slug="guide", status=status)
+    assert client.get("/guide/intro/").status_code == 200
+
+
+def test_a_draft_slug_in_another_language_never_shadows_a_cms_page(client: Client) -> None:
+    guida = cms_page(cms_home(), "guida")
+    cms_page(guida, "intro")
+    taxonomy = TaxonomyFactory.create(has_landing=True)
+    TaxonomyTranslationFactory.create(
+        taxonomy=taxonomy, language="it", slug="guida", status=TranslationStatus.MACHINE
+    )
+    assert client.get("/guida/intro/").status_code == 200
+
+
+def test_an_unknown_term_under_a_taxonomy_slug_falls_back_to_the_cms(
+    client: Client, compat: dict[str, Any]
+) -> None:
+    # The term page still wins where it exists.
+    compatibility = cms_page(cms_home(), "compatibility")
+    cms_page(compatibility, "notes")
+    assert client.get("/compatibility/notes/").status_code == 200
+    assert client.get("/compatibility/maker/").context["scope"].term == compat["maker"]
+
+
+# --- Other-language redirects keep the filter
+
+
+def test_an_other_language_redirect_re_expresses_the_filter(
+    client: Client, compat: dict[str, Any]
+) -> None:
+    assert_redirect(
+        client.get("/it/compatibility/maker/?compatibility=maker/model&utm_source=x"),
+        "/it/compatibilita/marca/?compatibilita=marca/modello&utm_source=x",
+    )
+    assert_redirect(
+        client.get("/compatibilita/marca/?compatibilita=marca/modello"),
+        "/compatibility/maker/?compatibility=maker/model",
+    )
+
+
+# --- Query count
+
+
+def _filter_values(compat: dict[str, Any], first: int, count: int) -> str:
+    values = []
+    for number in range(first, first + count):
+        term = TermFactory.create(taxonomy=compat["taxonomy"])
+        TermTranslationFactory.create(
+            term=term, language="en", slug=f"value-{number}", status=PUBLISHED
+        )
+        TermTranslationFactory.create(
+            term=term, language="it", slug=f"valore-{number}", status=PUBLISHED
+        )
+        values.append(f"value-{number}")
+    return ",".join(sorted(values))
+
+
+def _queries(client: Client, path: str) -> int:
+    with CaptureQueriesContext(connection) as queries:
+        assert client.get(path).status_code == 200
+    return len(queries)
+
+
+def test_a_filtered_term_page_runs_a_bounded_number_of_queries(
+    client: Client, compat: dict[str, Any]
+) -> None:
+    one = _queries(client, f"/compatibility/maker/?compatibility={_filter_values(compat, 0, 1)}")
+    many = _queries(client, f"/compatibility/maker/?compatibility={_filter_values(compat, 1, 12)}")
+    assert many == one

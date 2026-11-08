@@ -2,8 +2,10 @@
 
 Each fixed segment answers in every spelling (`/it/brand/…` finds the brand page, which then
 redirects to `/it/marchio/…`). A taxonomy page has no fixed segment: its first segment matches
-only the slug of a taxonomy with term pages, in some language, so every other path still
-reaches the CMS page lookup. The catalog segments come first and can never be a taxonomy slug.
+only the published slug of a taxonomy with term pages, in some language, so every other path
+still reaches the CMS page lookup; a path under such a slug that names no term page is handed
+to the CMS by the view. The catalog segments come first and can never be a taxonomy slug
+(`TaxonomyTranslation.clean` also refuses language codes and top-level CMS page slugs).
 """
 
 import re
@@ -14,7 +16,7 @@ from . import services, slugs, views
 
 
 class LandingTaxonomyConverter:
-    """A path segment that is the slug of a taxonomy with term pages (otherwise no match)."""
+    """A path segment that is the published slug of a taxonomy with term pages (else no match)."""
 
     regex = r"[a-z0-9]+(?:-[a-z0-9]+)*"
 

@@ -1388,14 +1388,22 @@ def category_anchor(slug_path: str, language: str) -> ListingAnchor | None:
     )
 
 
+def _landing_taxonomy_texts() -> "QuerySet[TaxonomyTranslation]":
+    return TaxonomyTranslation.objects.filter(
+        taxonomy__has_landing=True, status=translations.PUBLISHED
+    )
+
+
 def landing_taxonomy_slug_exists(slug: str) -> bool:
-    """Whether `slug` is, in some language, the slug of a taxonomy with term pages."""
-    return TaxonomyTranslation.objects.filter(slug=slug, taxonomy__has_landing=True).exists()
+    """Whether `slug` is the published slug, in some language, of a taxonomy with term pages
+    (an unreviewed text never claims a path)."""
+    return _landing_taxonomy_texts().filter(slug=slug).exists()
 
 
 def term_anchor(taxonomy_slug: str, slug_path: str, language: str) -> ListingAnchor | None:
-    """The term page at `/{taxonomy}/{term}/…` (D-07); None when there is none."""
-    taxonomy_rows = TaxonomyTranslation.objects.filter(taxonomy__has_landing=True)
+    """The term page at `/{taxonomy}/{term}/…` (D-07); None when there is none. The taxonomy
+    segment is a published slug; the views hand any path that names no term page to the CMS."""
+    taxonomy_rows = _landing_taxonomy_texts()
     found = _by_slug(taxonomy_rows.select_related("taxonomy"), taxonomy_slug, language)
     if found is None:
         return None
@@ -1470,12 +1478,19 @@ def vendor_anchor(slug: str, language: str) -> ListingAnchor | None:
     )
 
 
-def _filter_slug_path(
-    rows: "QuerySet[Any]", owner: str, tree_path: str, steplen: int, language: str
-) -> str | None:
-    """The slug path naming the node at `tree_path` in a `language` filter: each level's slug
-    in that language, else in the source language (the rule of `_paths_by_slug_path`)."""
-    prefixes = [tree_path[:end] for end in range(steplen, len(tree_path) + 1, steplen)]
+def _filter_slug_paths(
+    rows: "QuerySet[Any]", owner: str, tree_paths: Iterable[str], steplen: int, language: str
+) -> dict[str, str]:
+    """The slug path naming each node of `tree_paths` in a `language` filter: each level's slug
+    in that language, else in the source language (the rule of `_paths_by_slug_path`). One
+    query for all of them; a node with a level that has no such slug is left out."""
+    trees = set(tree_paths)
+    levels = {
+        tree: [tree[:end] for end in range(steplen, len(tree) + 1, steplen)] for tree in trees
+    }
+    prefixes = {prefix for chain in levels.values() for prefix in chain}
+    if not prefixes:
+        return {}
     source = translations.source_language()
     found: dict[str, str] = {}
     matching = rows.filter(
@@ -1484,9 +1499,11 @@ def _filter_slug_path(
     for path, row_language, slug in matching:
         if row_language == language or path not in found:
             found[path] = slug
-    if any(prefix not in found for prefix in prefixes):
-        return None
-    return listings.PATH_SEPARATOR.join(found[prefix] for prefix in prefixes)
+    return {
+        tree: listings.PATH_SEPARATOR.join(found[prefix] for prefix in chain)
+        for tree, chain in levels.items()
+        if all(prefix in found for prefix in chain)
+    }
 
 
 def listing_params_in(
@@ -1503,7 +1520,8 @@ def listing_params_in(
         tree = _paths_by_slug_path(rows, "category", [category], from_language).get(category)
         if tree is None:
             return None
-        category = _filter_slug_path(rows, "category", tree, Category.steplen, to_language)
+        written = _filter_slug_paths(rows, "category", [tree], Category.steplen, to_language)
+        category = written.get(tree)
         if category is None:
             return None
     from_keys = listing_term_keys(from_language)
@@ -1516,12 +1534,10 @@ def listing_params_in(
             return None
         term_rows = TermTranslation.objects.filter(term__taxonomy=taxonomy)
         trees = _paths_by_slug_path(term_rows, "term", values, from_language)
-        new_values: set[str] = set()
-        for value in values:
-            tree = trees.get(value)
-            new = tree and _filter_slug_path(term_rows, "term", tree, Term.steplen, to_language)
-            if not new:
-                return None
-            new_values.add(new)
-        terms.append((new_key, tuple(sorted(new_values))))
+        if any(value not in trees for value in values):
+            return None
+        written = _filter_slug_paths(term_rows, "term", trees.values(), Term.steplen, to_language)
+        if any(tree not in written for tree in trees.values()):
+            return None
+        terms.append((new_key, tuple(sorted({written[trees[value]] for value in values}))))
     return replace(params, category=category, terms=tuple(sorted(terms)))

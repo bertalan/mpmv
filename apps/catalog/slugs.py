@@ -102,6 +102,16 @@ RESERVED_SEGMENTS = frozenset(
 )
 
 
+def taxonomy_slug_error(slug: str, *, languages: Iterable[str]) -> str | None:
+    """Why `slug` cannot be a taxonomy's URL segment: a language prefix (`/de/…` is the German
+    site) or a fixed catalog segment would hide its term pages. None when it can."""
+    if slug in languages:
+        return "This slug is a language code of the site: the term pages would be unreachable."
+    if slug in RESERVED_SEGMENTS:
+        return "This slug is a catalog page segment: the term pages would be unreachable."
+    return None
+
+
 def language_prefix(lang: str, *, default_language: str) -> str:
     """`""` for the primary language, `/it` and so on for the others (I18N.1)."""
     return "" if lang == default_language else f"/{lang}"
