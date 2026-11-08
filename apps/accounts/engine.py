@@ -6,9 +6,12 @@
 - Step-up: a verification is fresh while it is younger than a max age.
 - Passkeys: thin wrappers around py_webauthn for the registration and authentication
   ceremonies, as a second factor (user verification preferred, "none" attestation).
+- Secure action links (CORE.15): the claims a link token carries and the checks on them.
+  Signing the token is Django's job and lives in `services`.
 """
 
 import hashlib
+import hmac
 import json
 import secrets
 from base64 import b32encode, urlsafe_b64decode, urlsafe_b64encode
@@ -223,3 +226,112 @@ def verify_passkey_authentication(
     except (WebAuthnException, ValueError, KeyError, TypeError, AttributeError) as exc:
         raise PasskeyError(str(exc)) from exc
     return verified.new_sign_count
+
+
+# --- Secure action links (CORE.15)
+
+# Why a link is refused; stored in the audit entry, never shown to the visitor.
+BAD_SIGNATURE: Final = "bad_signature"
+UNKNOWN_PURPOSE: Final = "unknown_purpose"
+EXPIRED: Final = "expired"
+OBJECT_GONE: Final = "object_gone"
+OLD_VERSION: Final = "old_version"
+WRONG_RECIPIENT: Final = "wrong_recipient"
+INACTIVE: Final = "inactive"
+USED: Final = "used"
+ACTION_NONCE_BYTES: Final = 16  # 128 bits: the single-use key of a link
+
+
+@dataclass(frozen=True)
+class ActionClaims:
+    """What a secure action link proves once its signature checks out."""
+
+    purpose: str
+    object_key: str
+    recipient: str  # the recipient user's public id
+    version: str
+    nonce: str
+    expires_at: int  # Unix time
+
+
+_CLAIM_FIELDS: Final = {
+    "p": "purpose",
+    "o": "object_key",
+    "r": "recipient",
+    "v": "version",
+    "n": "nonce",
+}
+
+
+def new_action_claims(
+    *,
+    purpose: str,
+    object_key: str,
+    recipient: str,
+    version: object,
+    now: float,
+    max_age: int,
+) -> ActionClaims:
+    """Claims for a new link, valid for `max_age` seconds from `now`, with a fresh nonce."""
+    return ActionClaims(
+        purpose=purpose,
+        object_key=object_key,
+        recipient=recipient,
+        version=str(version),
+        nonce=secrets.token_urlsafe(ACTION_NONCE_BYTES),
+        expires_at=int(now) + max_age,
+    )
+
+
+def action_claims_payload(claims: ActionClaims) -> dict[str, str | int]:
+    """The compact JSON object the signed token carries."""
+    payload: dict[str, str | int] = {
+        short: getattr(claims, name) for short, name in _CLAIM_FIELDS.items()
+    }
+    payload["e"] = claims.expires_at
+    return payload
+
+
+def action_claims_from_payload(payload: object) -> ActionClaims | None:
+    """Claims from a verified token payload; None when the payload is not well formed."""
+    if not isinstance(payload, dict):
+        return None
+    values = {name: payload.get(short) for short, name in _CLAIM_FIELDS.items()}
+    expires_at = payload.get("e")
+    if not all(isinstance(value, str) for value in values.values()):
+        return None
+    if not isinstance(expires_at, int) or isinstance(expires_at, bool):
+        return None
+    return ActionClaims(expires_at=expires_at, **values)  # type: ignore[arg-type]
+
+
+def _same(left: str, right: str) -> bool:
+    return hmac.compare_digest(left.encode(), right.encode())
+
+
+def action_link_refusal(
+    claims: ActionClaims,
+    *,
+    now: float,
+    current_version: str | None,
+    recipient: str | None = None,
+) -> str | None:
+    """Why the link cannot be used now, or None when it can.
+
+    `current_version` is the object's version now (None: the object is gone); `recipient`, when
+    given, is the public id of the user the link must belong to. Comparisons run in constant time.
+    """
+    if now > claims.expires_at:
+        return EXPIRED
+    if current_version is None:
+        return OBJECT_GONE
+    if not _same(claims.version, current_version):
+        return OLD_VERSION
+    if recipient is not None and not _same(claims.recipient, recipient):
+        return WRONG_RECIPIENT
+    return None
+
+
+def action_nonce_digest(nonce: str) -> str:
+    """SHA-256 of a link nonce: the key of its single-use record."""
+    return hashlib.sha256(nonce.encode()).hexdigest()

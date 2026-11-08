@@ -1,0 +1,13 @@
+{% extends "layouts/account.html" %}
+{% block title %}Continue · MPMV{% endblock %}
+{% block account_content %}
+<h1>Continue to your request</h1>
+<p>This link was sent to you by email. Press Continue to open the page it leads to.</p>
+<p>If you are not signed in, Continue signs you in once with this link; you will still confirm
+it is you with your second factor before approving or declining anything.</p>
+<form method="post" action="{% url 'action_link:continue' %}">
+  {% csrf_token %}
+  <input type="hidden" name="token" value="{{ token }}">
+  <button type="submit">Continue</button>
+</form>
+{% endblock %}

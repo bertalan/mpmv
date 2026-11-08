@@ -1,16 +1,20 @@
 """Account services: business logic shared by views, API and commands."""
 
 import datetime as dt
-from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, field
+import time
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import django_otp
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser, Group, Permission
-from django.db import transaction
+from django.core import signing
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.db.models import Model
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.module_loading import import_string
 from django_otp.plugins.otp_totp.models import TOTPDevice
@@ -22,6 +26,8 @@ from apps.core.models import AuditLog
 from apps.core.services import (
     audit_changes,
     clear_throttle,
+    consume_rate_limit,
+    enqueue_email,
     record_throttle_failure,
     run_mutation,
     save_audited,
@@ -30,7 +36,14 @@ from apps.core.services import (
 from apps.core.throttling import BackoffPolicy, ThrottleState, ip_bucket
 
 from . import engine
-from .models import PasskeyDevice, RecoveryCode, RecoveryCodeDevice, User, normalize_email_address
+from .models import (
+    ActionLinkUse,
+    PasskeyDevice,
+    RecoveryCode,
+    RecoveryCodeDevice,
+    User,
+    normalize_email_address,
+)
 
 # --- Login and registration protection (CORE.5, spec 02 "Authentication")
 #
@@ -654,3 +667,261 @@ def delete_group(group: Group, *, ctx: AuditContext, dry_run: bool = False) -> C
         GROUP_MODEL, group.name, {**group_snapshot(group), **group_access_snapshot(group)}
     )
     return run_mutation(changeset, group.delete, ctx=ctx, action=GROUP_DELETED, dry_run=dry_run)
+
+
+# --- Secure action links (CORE.15, spec 02 "Secure action links")
+#
+# An email asks a user to act on one object (approve a proposal, answer a reminder). Its link
+# carries a token signed with Django's signing (HMAC with SECRET_KEY, a salt of its own,
+# constant-time signature check) and bound to a purpose, the object, the recipient and the
+# object version. The app that owns the object registers its purpose (`register_action_purpose`)
+# in its AppConfig.ready, so accounts never imports it. A GET only shows a "Continue" page; the
+# Continue POST spends the token's single sign-in use; the action page itself needs a step-up.
+
+ACTION_LINK_SALT = "mpmv.accounts.action-link"
+ACTION_LINK_SIGNED_IN = "accounts.action_link.signed_in"
+ACTION_LINK_REFUSED = "accounts.action_link.refused"
+ACTION_LINK_SENT = "accounts.action_link.sent"
+ACTION_LINK_RATE_WINDOW = dt.timedelta(minutes=15)
+_ACTION_TOKEN_MAX_LENGTH = 2048
+
+
+@dataclass(frozen=True)
+class ActionPurpose:
+    """What one kind of action link opens, told by the app that owns the object.
+
+    - `version_of(object_key)`: the object's current version (None when it is gone); a link
+      issued for another version is refused.
+    - `url_of(object_key)`: the path of the action page (which needs `step_up_required`).
+    - `may_act(object_key, user)`: whether the recipient may still act on the object.
+    - `max_age`: seconds a link stays valid; None for `settings.ACTION_LINK_MAX_AGE`.
+    """
+
+    name: str
+    version_of: Callable[[str], object | None]
+    url_of: Callable[[str], str]
+    may_act: Callable[[str, User], bool]
+    max_age: int | None = None
+
+
+_ACTION_PURPOSES: dict[str, ActionPurpose] = {}
+
+
+def register_action_purpose(purpose: ActionPurpose) -> None:
+    """Make links of `purpose.name` usable; registering a name again replaces it."""
+    _ACTION_PURPOSES[purpose.name] = purpose
+
+
+@dataclass(frozen=True)
+class ActionLinkCheck:
+    """The outcome of checking a link: `refusal` is None when it can be used now."""
+
+    refusal: str | None
+    claims: engine.ActionClaims | None = None
+    user: User | None = None
+    action_url: str | None = None
+
+
+def _issue_action_claims(
+    *,
+    purpose: str,
+    object_key: str,
+    recipient: User,
+    version: object,
+    expires_in: int | None,
+    now: float | None,
+) -> tuple[str, engine.ActionClaims]:
+    registered = _ACTION_PURPOSES.get(purpose)
+    if registered is None:
+        raise ValueError(f"unknown action link purpose {purpose!r}")
+    claims = engine.new_action_claims(
+        purpose=purpose,
+        object_key=object_key,
+        recipient=str(recipient.public_id),
+        version=version,
+        now=time.time() if now is None else now,
+        max_age=expires_in or registered.max_age or settings.ACTION_LINK_MAX_AGE,
+    )
+    payload = engine.action_claims_payload(claims)
+    return signing.dumps(payload, salt=ACTION_LINK_SALT, compress=True), claims
+
+
+def issue_action_token(
+    *,
+    purpose: str,
+    object_key: str,
+    recipient: User,
+    version: object,
+    expires_in: int | None = None,
+    now: float | None = None,
+) -> str:
+    """A signed token for `recipient` to act on `object_key` at `version` (CORE.15).
+
+    It expires after `expires_in` seconds (default: the purpose's, then
+    `settings.ACTION_LINK_MAX_AGE`, 72 h). Raises ValueError for an unregistered purpose. The
+    token is a credential: never log it; email it with `send_action_link_email`.
+    """
+    token, _ = _issue_action_claims(
+        purpose=purpose,
+        object_key=object_key,
+        recipient=recipient,
+        version=version,
+        expires_in=expires_in,
+        now=now,
+    )
+    return token
+
+
+def action_link_path(token: str) -> str:
+    """The path of the link's "Continue" page."""
+    return reverse("action_link:open", args=[token])
+
+
+def _recipient(public_id: str) -> User | None:
+    try:
+        return User.objects.filter(public_id=public_id).first()
+    except ValidationError:  # not a UUID: cannot come from a token we signed
+        return None
+
+
+def check_action_token(token: str, *, now: float | None = None) -> ActionLinkCheck:
+    """Check a token without using it: signature, purpose, expiry, version and recipient.
+
+    Read-only, so safe for GET and HEAD. Single use is checked only when the token is redeemed.
+    """
+    try:
+        if len(token) > _ACTION_TOKEN_MAX_LENGTH:
+            raise signing.BadSignature("token too long")
+        payload = signing.loads(token, salt=ACTION_LINK_SALT)
+    except signing.BadSignature:
+        return ActionLinkCheck(engine.BAD_SIGNATURE)
+    claims = engine.action_claims_from_payload(payload)
+    if claims is None:
+        return ActionLinkCheck(engine.BAD_SIGNATURE)
+    purpose = _ACTION_PURPOSES.get(claims.purpose)
+    user = _recipient(claims.recipient)
+    if purpose is None:
+        return ActionLinkCheck(engine.UNKNOWN_PURPOSE, claims, user)
+    version = purpose.version_of(claims.object_key)
+    refusal = engine.action_link_refusal(
+        claims,
+        now=time.time() if now is None else now,
+        current_version=None if version is None else str(version),
+    )
+    if refusal is None and (user is None or not purpose.may_act(claims.object_key, user)):
+        refusal = engine.WRONG_RECIPIENT
+    if refusal is None and user is not None and not user.is_active:
+        refusal = engine.INACTIVE
+    return ActionLinkCheck(refusal, claims, user, purpose.url_of(claims.object_key))
+
+
+def _link_snapshot(claims: engine.ActionClaims) -> dict[str, str]:
+    return {"purpose": claims.purpose, "object": claims.object_key, "version": claims.version}
+
+
+def _audit_refused_link(check: ActionLinkCheck, ctx: AuditContext) -> None:
+    after: dict[str, str] = {"reason": check.refusal or ""}
+    if check.claims is not None:
+        after |= {"purpose": check.claims.purpose, "object": check.claims.object_key}
+    key = str(check.user.public_id) if check.user is not None else UNKNOWN_ACCOUNT
+    record(ctx, ACTION_LINK_REFUSED, USER_MODEL, key, None, after)
+
+
+def _spend(check: ActionLinkCheck, ctx: AuditContext) -> ActionLinkCheck:
+    """Record the single sign-in use with a unique insert: of two concurrent POSTs one wins."""
+    claims, user = check.claims, check.user
+    if claims is None or user is None:  # never for a valid check; refuse rather than assume
+        return replace(check, refusal=engine.WRONG_RECIPIENT)
+    try:
+        with transaction.atomic():
+            ActionLinkUse.objects.create(
+                nonce_digest=engine.action_nonce_digest(claims.nonce),
+                purpose=claims.purpose,
+                object_key=claims.object_key,
+                user=user,
+            )
+            snapshot = _link_snapshot(claims)
+            record(ctx, ACTION_LINK_SIGNED_IN, USER_MODEL, str(user.public_id), None, snapshot)
+    except IntegrityError:
+        return replace(check, refusal=engine.USED)
+    return check
+
+
+def redeem_action_token(
+    token: str, *, session_user: User | None, ctx: AuditContext, now: float | None = None
+) -> ActionLinkCheck:
+    """The Continue POST: check the token and, without a session, spend its sign-in use.
+
+    - Signed in as the recipient: nothing is spent, the user goes on to the action page.
+    - Signed in as someone else: refused.
+    - No session: the single use is recorded (`ActionLinkUse`) and audited; the caller then
+      signs the recipient in, without MFA: the action page asks for the step-up.
+
+    Every refusal is audited (reason, purpose and object; never the token). The caller sends a
+    refused visitor to the normal login, then on to `action_url` when it is known.
+    """
+    check = check_action_token(token, now=now)
+    if check.refusal is None:
+        if session_user is None:
+            check = _spend(check, ctx)
+        elif check.user is None or session_user.pk != check.user.pk:
+            check = replace(check, refusal=engine.WRONG_RECIPIENT)
+    if check.refusal is not None:
+        _audit_refused_link(check, ctx)
+    return check
+
+
+def action_link_retry_after(ip: str | None) -> dt.timedelta:
+    """Count one Continue POST from `ip`; zero when allowed, else the wait (Retry-After)."""
+    return consume_rate_limit(
+        f"action-link:ip:{ip_bucket(ip) or 'unknown'}",
+        limit=settings.ACTION_LINK_RATE_LIMIT,
+        window=ACTION_LINK_RATE_WINDOW,
+    )
+
+
+def send_action_link_email(
+    *,
+    purpose: str,
+    object_key: str,
+    recipient: User,
+    version: object,
+    template_key: str,
+    context: Mapping[str, Any],
+    ctx: AuditContext,
+    expires_in: int | None = None,
+    idempotency_key: str | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Email `recipient` a secure action link through the ARC.16 outbox, in their language.
+
+    The template gets `action_url` (absolute, on `settings.SITE_BASE_URL`) and
+    `action_link_expires_at` on top of `context`. The outbox stores the context encrypted; the
+    audit entry names the purpose, object and version, never the token.
+    """
+    token, claims = _issue_action_claims(
+        purpose=purpose,
+        object_key=object_key,
+        recipient=recipient,
+        version=version,
+        expires_in=expires_in,
+        now=None,
+    )
+    values = {
+        **context,
+        "action_url": settings.SITE_BASE_URL.rstrip("/") + action_link_path(token),
+        "action_link_expires_at": dt.datetime.fromtimestamp(claims.expires_at, tz=dt.UTC),
+    }
+    with transaction.atomic():
+        changes = enqueue_email(
+            recipient=recipient.email,
+            template_key=template_key,
+            language=recipient.preferred_language,
+            context=values,
+            idempotency_key=idempotency_key,
+            dry_run=dry_run,
+        )
+        if not dry_run and not changes.is_empty:
+            snapshot = _link_snapshot(claims)
+            record(ctx, ACTION_LINK_SENT, USER_MODEL, str(recipient.public_id), None, snapshot)
+    return changes

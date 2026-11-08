@@ -8,6 +8,7 @@ A GET or HEAD only shows a "Continue" page; the Continue POST signs the recipien
 import json
 import time
 from collections.abc import Iterator
+from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -18,7 +19,7 @@ from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.accounts import services
 from apps.accounts.models import ActionLinkUse, User
-from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
+from apps.accounts.tests.factories import ActionLinkUseFactory, TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.integration.urls import APPROVE_PURPOSE, APPROVED, DOCUMENTS, Document
 from apps.accounts.tests.mfa import totp_token, verified_login
 from apps.core.audit import AuditContext
@@ -54,11 +55,11 @@ def token_for(user: User, key: str = "doc-1", **kwargs: object) -> str:
     )
 
 
-def open_link(client: Client, token: str, method: str = "get") -> object:
+def open_link(client: Client, token: str, method: str = "get") -> Any:
     return getattr(client, method)(services.action_link_path(token))
 
 
-def press_continue(client: Client, token: str) -> object:
+def press_continue(client: Client, token: str) -> Any:
     return client.post(reverse("action_link:continue"), {"token": token})
 
 
@@ -67,15 +68,19 @@ def signed_in_user(client: Client) -> int | None:
     return int(value) if value is not None else None
 
 
-def assert_sent_to_login(response: object, next_path: str) -> None:
-    assert response.status_code == 302  # type: ignore[attr-defined]
-    parts = urlsplit(response["Location"])  # type: ignore[index]
+def assert_sent_to_login(response: Any, next_path: str) -> None:
+    assert response.status_code == 302
+    parts = urlsplit(response["Location"])
     assert parts.path == LOGIN_PATH
     assert parse_qs(parts.query)["next"] == [next_path]
 
 
-def refusals() -> list[AuditLog]:
-    return list(AuditLog.objects.filter(action=services.ACTION_LINK_REFUSED))
+def refusals() -> list[dict[str, Any]]:
+    """The refused-link audit entries: their `after` snapshot plus the target key."""
+    return [
+        {**(entry.after or {}), "target_key": entry.target_key}
+        for entry in AuditLog.objects.filter(action=services.ACTION_LINK_REFUSED)
+    ]
 
 
 # --- GET and HEAD never consume the token nor change state
@@ -90,9 +95,9 @@ def test_get_and_head_show_the_continue_page_without_changing_state(
 
     response = open_link(client, token, method)
 
-    assert response.status_code == 200  # type: ignore[attr-defined]
-    assert response["Referrer-Policy"] == "no-referrer"  # type: ignore[index]
-    assert "no-store" in response["Cache-Control"]  # type: ignore[index]
+    assert response.status_code == 200
+    assert response["Referrer-Policy"] == "strict-origin"
+    assert "no-store" in response["Cache-Control"]
     assert signed_in_user(client) is None
     assert not ActionLinkUse.objects.exists()
     assert not AuditLog.objects.exists()
@@ -101,7 +106,7 @@ def test_get_and_head_show_the_continue_page_without_changing_state(
 def test_the_continue_page_posts_the_token_to_a_url_without_it(client: Client) -> None:
     user = UserFactory.create()
     token = token_for(user, owned_document(user))
-    html = open_link(client, token).content.decode()  # type: ignore[attr-defined]
+    html = open_link(client, token).content.decode()
     assert f'action="{reverse("action_link:continue")}"' in html
     assert 'method="post"' in html
     assert "csrfmiddlewaretoken" in html
@@ -130,8 +135,8 @@ def test_a_signed_in_recipient_lands_directly_on_the_action_page(client: Client)
     verified_login(client, user)
     token = token_for(user, owned_document(user))
     response = open_link(client, token)
-    assert response.status_code == 302  # type: ignore[attr-defined]
-    assert response["Location"] == reverse("test-approve", args=["doc-1"])  # type: ignore[index]
+    assert response.status_code == 302
+    assert response["Location"] == reverse("test-approve", args=["doc-1"])
     assert not ActionLinkUse.objects.exists()
 
 
@@ -149,7 +154,7 @@ def test_a_valid_token_without_session_leads_to_the_step_up_and_then_to_the_page
     response = press_continue(client, token)
     assert response.status_code == 302
     assert response["Location"] == action_url
-    assert response["Referrer-Policy"] == "no-referrer"
+    assert response["Referrer-Policy"] == "strict-origin"
     assert signed_in_user(client) == user.pk
     assert ActionLinkUse.objects.count() == 1
     entry = AuditLog.objects.get(action=services.ACTION_LINK_SIGNED_IN)
@@ -224,15 +229,14 @@ def test_the_sign_in_use_is_single(client: Client) -> None:
     assert_sent_to_login(response, reverse("test-approve", args=["doc-1"]))
     assert signed_in_user(client) is None
     [entry] = refusals()
-    assert entry.after["reason"] == "used"
-    assert entry.target_key == str(user.public_id)
+    assert entry["reason"] == "used"
+    assert entry["target_key"] == str(user.public_id)
 
 
 def test_the_used_token_record_is_unique() -> None:
-    user = UserFactory.create()
-    ActionLinkUse.objects.create(nonce_digest="a" * 64, purpose="p", object_key="o", user=user)
+    spent = ActionLinkUseFactory.create()
     with pytest.raises(IntegrityError), transaction.atomic():
-        ActionLinkUse.objects.create(nonce_digest="a" * 64, purpose="p", object_key="o", user=user)
+        ActionLinkUseFactory.create(nonce_digest=spent.nonce_digest)
 
 
 def test_a_token_for_user_x_cannot_open_user_y_object(client: Client) -> None:
@@ -244,7 +248,7 @@ def test_a_token_for_user_x_cannot_open_user_y_object(client: Client) -> None:
 
     assert_sent_to_login(response, reverse("test-approve", args=["doc-y"]))
     assert signed_in_user(client) is None
-    assert refusals()[0].after["reason"] == "wrong_recipient"
+    assert refusals()[0]["reason"] == "wrong_recipient"
 
 
 def test_a_token_for_user_x_is_refused_in_user_y_session(client: Client) -> None:
@@ -253,12 +257,12 @@ def test_a_token_for_user_x_is_refused_in_user_y_session(client: Client) -> None
     verified_login(client, y)
 
     get = open_link(client, token)
-    assert get.status_code == 200  # type: ignore[attr-defined]  # no shortcut for Y
+    assert get.status_code == 200  # no shortcut for Y
     response = press_continue(client, token)
 
     assert_sent_to_login(response, reverse("test-approve", args=["doc-1"]))
     assert signed_in_user(client) == y.pk  # never switched to X
-    assert refusals()[0].after["reason"] == "wrong_recipient"
+    assert refusals()[0]["reason"] == "wrong_recipient"
     assert not ActionLinkUse.objects.exists()
 
 
@@ -271,7 +275,7 @@ def test_an_old_version_token_is_refused(client: Client) -> None:
 
     assert_sent_to_login(response, reverse("test-approve", args=["doc-1"]))
     assert signed_in_user(client) is None
-    assert refusals()[0].after["reason"] == "old_version"
+    assert refusals()[0]["reason"] == "old_version"
 
 
 def test_an_old_version_token_gives_no_shortcut_to_a_signed_in_user(client: Client) -> None:
@@ -279,7 +283,7 @@ def test_an_old_version_token_gives_no_shortcut_to_a_signed_in_user(client: Clie
     token = token_for(user, owned_document(user))
     DOCUMENTS["doc-1"].version = "2"
     verified_login(client, user)
-    assert open_link(client, token).status_code == 200  # type: ignore[attr-defined]
+    assert open_link(client, token).status_code == 200
 
 
 def test_an_expired_token_is_refused(client: Client) -> None:
@@ -290,7 +294,7 @@ def test_an_expired_token_is_refused(client: Client) -> None:
     response = press_continue(client, token)
 
     assert_sent_to_login(response, reverse("test-approve", args=["doc-1"]))
-    assert refusals()[0].after["reason"] == "expired"
+    assert refusals()[0]["reason"] == "expired"
 
 
 def test_the_expiry_defaults_to_72_hours_and_is_configurable(
@@ -317,8 +321,8 @@ def test_a_tampered_token_is_refused_and_sent_to_plain_login(client: Client) -> 
 
     assert_sent_to_login(response, "/")
     [entry] = refusals()
-    assert entry.after["reason"] == "bad_signature"
-    assert entry.target_key == services.UNKNOWN_ACCOUNT
+    assert entry["reason"] == "bad_signature"
+    assert entry["target_key"] == services.UNKNOWN_ACCOUNT
 
 
 def test_a_token_signed_for_another_purpose_salt_is_refused() -> None:
@@ -338,7 +342,7 @@ def test_an_inactive_recipient_is_refused(client: Client) -> None:
 
     assert_sent_to_login(press_continue(client, token), reverse("test-approve", args=["doc-1"]))
     assert signed_in_user(client) is None
-    assert refusals()[0].after["reason"] == "inactive"
+    assert refusals()[0]["reason"] == "inactive"
 
 
 def test_unknown_purposes_cannot_be_issued() -> None:
@@ -413,6 +417,6 @@ def test_the_email_helper_dry_run_queues_nothing() -> None:
         ctx=SYSTEM,
         dry_run=True,
     )
-    assert changes
+    assert not changes.is_empty
     assert not OutboxEmail.objects.exists()
     assert not AuditLog.objects.exists()

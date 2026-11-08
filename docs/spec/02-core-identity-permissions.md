@@ -152,6 +152,14 @@ reusable mechanism: a service in `accounts` plus an email helper on top of the A
 - **Approval** is always a POST with CSRF from the action page, never a GET.
 - **Misuse.** An expired, used or mismatched token (another user, an old version) sends the user
   to the normal login and then to the same action page; the attempt is written to the AuditLog.
+- **Implementation (CORE.15).** The app that owns the action object registers a purpose in
+  `accounts` (`register_action_purpose`: current version, action page URL, who may act) and
+  emails links with `send_action_link_email` through the ARC.16 outbox. The token is signed with
+  Django signing under its own salt; the Continue POST carries it in the form body, is rate
+  limited per IP and records the single use as a unique row (`ActionLinkUse`, nonce digest
+  only). Link pages send `Referrer-Policy: strict-origin` (never the path, which holds the token;
+  `no-referrer` would make browsers send `Origin: null` and fail the CSRF check) and are never
+  cached. A user signed in as someone else is refused, never switched.
 - **Vendor claim (VEN.24, owner decision MQ-1).** A vendor imported without an account holder is
   claimed through the same kind of link, bound to the vendor and to a claim version instead of a
   recipient user, and sent only to the vendor's legal email of record. There is no account yet,

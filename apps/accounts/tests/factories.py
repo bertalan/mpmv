@@ -10,7 +10,13 @@ from django_otp.plugins.otp_totp.models import TOTPDevice
 from factory.django import DjangoModelFactory
 
 from apps.accounts import engine
-from apps.accounts.models import PasskeyDevice, RecoveryCode, RecoveryCodeDevice, User
+from apps.accounts.models import (
+    ActionLinkUse,
+    PasskeyDevice,
+    RecoveryCode,
+    RecoveryCodeDevice,
+    User,
+)
 
 
 class UserFactory(DjangoModelFactory[User]):
@@ -99,3 +105,17 @@ class RecoveryCodeFactory(DjangoModelFactory[RecoveryCode]):
     device = factory.SubFactory(RecoveryCodeDeviceFactory)
     code = factory.LazyFunction(lambda: engine.generate_recovery_codes(1)[0])
     code_hash = factory.LazyAttribute(lambda o: engine.hash_recovery_code(o.code))
+
+
+class ActionLinkUseFactory(DjangoModelFactory[ActionLinkUse]):
+    """A spent secure action link (CORE.15): the digest of a random nonce."""
+
+    class Meta:
+        model = ActionLinkUse
+
+    nonce_digest = factory.LazyFunction(
+        lambda: engine.action_nonce_digest(secrets.token_urlsafe(16))
+    )
+    purpose = "tests.approve"
+    object_key = factory.Sequence(lambda n: f"doc-{n}")
+    user = factory.SubFactory(UserFactory)
