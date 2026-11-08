@@ -219,31 +219,126 @@ def test_the_admin_approval_page_shows_the_refusal(staff_client: Client) -> None
 # --- Consistency check: nightly, and when the VAT number changes
 
 
+def warnings_logged(caplog: pytest.LogCaptureFixture) -> list[str]:
+    return [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+
+
 def test_moving_an_exempt_italian_vendors_vat_number_abroad_is_reported(
-    caplog: pytest.LogCaptureFixture,
+    caplog: pytest.LogCaptureFixture, django_capture_on_commit_callbacks: Any
 ) -> None:
     profile = VendorTaxProfileFactory.create(
         vendor=italian_vendor(), art74=True, valid_from=utc(2025)
     )
-    vendor = profile.vendor
+    vendor = Vendor.objects.get(pk=profile.vendor.pk)
     vendor.vat_number = GERMAN_VAT
-    with caplog.at_level(logging.WARNING, logger="apps.tax"):
+    with (
+        caplog.at_level(logging.WARNING, logger="apps.tax"),
+        django_capture_on_commit_callbacks(execute=True),
+    ):
         vendor.save()
 
-    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
-    assert any(str(vendor.public_id) in message for message in warnings)
+    assert any(str(vendor.public_id) in message for message in warnings_logged(caplog))
     found = services.inconsistent_tax_profiles()
     assert [item.profile.pk for item in found] == [profile.pk]
     assert "exempt_reason" in found[0].errors
 
 
-def test_an_unrelated_vendor_change_reports_nothing(caplog: pytest.LogCaptureFixture) -> None:
+def test_the_vat_number_check_waits_for_the_commit(
+    caplog: pytest.LogCaptureFixture, django_capture_on_commit_callbacks: Any
+) -> None:
     profile = VendorTaxProfileFactory.create(
         vendor=italian_vendor(), art74=True, valid_from=utc(2025)
     )
-    vendor = profile.vendor
-    vendor.display_name = "Renamed"
-    with caplog.at_level(logging.WARNING, logger="apps.tax"):
+    vendor = Vendor.objects.get(pk=profile.vendor.pk)
+    vendor.vat_number = GERMAN_VAT
+    with (
+        caplog.at_level(logging.WARNING, logger="apps.tax"),
+        django_capture_on_commit_callbacks() as callbacks,
+    ):
         vendor.save()
-    assert not [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert not warnings_logged(caplog)
+    assert len(callbacks) == 1
+
+
+def test_an_unrelated_vendor_change_reports_nothing(
+    caplog: pytest.LogCaptureFixture, django_capture_on_commit_callbacks: Any
+) -> None:
+    profile = VendorTaxProfileFactory.create(
+        vendor=italian_vendor(), art74=True, valid_from=utc(2025)
+    )
+    vendor = Vendor.objects.get(pk=profile.vendor.pk)
+    vendor.display_name = "Renamed"
+    with (
+        caplog.at_level(logging.WARNING, logger="apps.tax"),
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        vendor.save()
+    assert not warnings_logged(caplog)
     assert services.inconsistent_tax_profiles() == []
+
+
+def test_a_display_name_save_of_an_inconsistent_vendor_reports_nothing_again(
+    caplog: pytest.LogCaptureFixture, django_capture_on_commit_callbacks: Any
+) -> None:
+    """Already flagged (nightly job, tax admin): saving another field does not log it again."""
+    profile = VendorTaxProfileFactory.create(
+        vendor=italian_vendor(), art74=True, valid_from=utc(2025)
+    )
+    Vendor.objects.filter(pk=profile.vendor.pk).update(vat_number=GERMAN_VAT)
+    vendor = Vendor.objects.get(pk=profile.vendor.pk)
+    vendor.display_name = "Renamed"
+    with (
+        caplog.at_level(logging.WARNING, logger="apps.tax"),
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        vendor.save()
+    assert not warnings_logged(caplog)
+    assert len(services.inconsistent_tax_profiles()) == 1
+
+
+def test_a_flat_rate_approval_reports_nothing(
+    caplog: pytest.LogCaptureFixture, django_capture_on_commit_callbacks: Any
+) -> None:
+    """The approval saves the vendor (RF19) before adding the flat-rate profile: the check must
+    not compare the new fiscal regime with the profile being replaced."""
+    VendorTaxProfileFactory.create(
+        vendor=italian_vendor(fiscal_regime="RF01"),
+        regime=engine.DOMESTIC_ONLY,
+        oss_registered_since=None,
+        valid_from=utc(2025),
+    )
+    vendor = Vendor.objects.get()
+    request = TaxRegimeChangeRequestFactory.create(
+        vendor=vendor,
+        regime=engine.EXEMPT,
+        exempt_reason=engine.FLAT_RATE_FORFETTARIO,
+        oss_registered_since=None,
+        effective_from=utc(2026, 1),
+    )
+    with (
+        caplog.at_level(logging.WARNING, logger="apps.tax"),
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        services.approve_regime_change(request, reviewer(), ctx=CTX)
+    vendor.refresh_from_db()
+    assert vendor.fiscal_regime == FLAT_RATE_REGIME
+    assert not warnings_logged(caplog)
+    assert services.inconsistent_tax_profiles() == []
+
+
+def test_moving_the_country_of_a_vat_number_without_prefix_is_reported(
+    caplog: pytest.LogCaptureFixture, django_capture_on_commit_callbacks: Any
+) -> None:
+    """A VAT number stored without its prefix belongs to the vendor's country."""
+    profile = VendorTaxProfileFactory.create(
+        vendor=italian_vendor(), art74=True, valid_from=utc(2025)
+    )
+    Vendor.objects.filter(pk=profile.vendor.pk).update(vat_number="123456789")
+    vendor = Vendor.objects.get(pk=profile.vendor.pk)
+    vendor.country = "DE"
+    with (
+        caplog.at_level(logging.WARNING, logger="apps.tax"),
+        django_capture_on_commit_callbacks(execute=True),
+    ):
+        vendor.save()
+    assert any(str(vendor.public_id) in message for message in warnings_logged(caplog))
