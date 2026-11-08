@@ -32,6 +32,15 @@ def base_css() -> str:
         "components/header.html",
         "components/language_switcher.html",
         "components/help_link.html",
+        "components/footer.html",
+        "components/field.html",
+        "layouts/content.html",
+        "layouts/error.html",
+        "400.html",
+        "403.html",
+        "403_csrf.html",
+        "404.html",
+        "500.html",
     ],
 )
 def test_base_ships_the_layouts_and_shell_components(name: str) -> None:
@@ -55,6 +64,27 @@ def test_the_focus_width_token_is_at_least_two_pixels(base_css: str) -> None:
 
 def test_the_sticky_header_never_hides_the_focused_element(base_css: str) -> None:
     assert "scroll-padding-top:var(--header-height)" in base_css
+
+
+def test_form_fields_mark_required_and_invalid_states(base_css: str) -> None:
+    assert ".field__required" in base_css
+    assert '[aria-invalid="true"]' in base_css or "[aria-invalid=true]" in base_css
+    assert ".errorlist" in base_css
+    assert ".helptext" in base_css
+
+
+@pytest.mark.parametrize("variant", ["info", "success", "warning", "error"])
+def test_alerts_have_a_style_per_level(base_css: str, variant: str) -> None:
+    assert f".alert--{variant}" in base_css
+
+
+@pytest.mark.parametrize("variant", ["secondary", "ghost"])
+def test_buttons_have_secondary_and_ghost_variants(base_css: str, variant: str) -> None:
+    assert f".button--{variant}" in base_css
+
+
+def test_the_content_shell_limits_the_text_width(base_css: str) -> None:
+    assert re.search(r"\.page-content\{[^}]*max-inline-size:var\(--measure-text\)", base_css)
 
 
 def test_the_skip_link_is_styled_to_appear_on_focus(base_css: str) -> None:
