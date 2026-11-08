@@ -10,6 +10,7 @@ history for the Omnibus rule (CMP.6) can be built from these audit rows.
 
 import datetime as dt
 from collections.abc import Iterable
+from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
@@ -461,7 +462,10 @@ def duplicate_product_to_vendor(
                 "reason": reason,
             },
         )
-        copies = [_copy(variant, vendor_id=vendor.pk, stock_qty=0) for variant in variants]
+        copies = [
+            _copy(variant, vendor_id=vendor.pk, stock_qty=0, stock_status=StockStatus.OUT_OF_STOCK)
+            for variant in variants
+        ]
         for variant, variant_copy in zip(variants, copies, strict=True):
             changes.create(
                 VARIANT_MODEL,
@@ -533,6 +537,11 @@ def _amount(errors: dict[str, list[str]], field: str, value: object) -> Any:
         return None
 
 
+def _stored(value: Decimal | None, decimal_places: int) -> Decimal | None:
+    """A validated decimal as its column stores it, so the ChangeSet records the stored value."""
+    return None if value is None else value.quantize(Decimal(1).scaleb(-decimal_places))
+
+
 def _attribute_catalogue(codes: set[str]) -> Catalogue:
     rows = Attribute.objects.filter(code__in=codes).prefetch_related("values")
     return {a.code: (a, {v.value: v for v in a.values.all()}) for a in rows}
@@ -543,9 +552,16 @@ def _product_errors(
 ) -> dict[str, list[str]]:
     """Every reason the payload cannot be created, by field (NON_FIELD_ERRORS: its shape)."""
     errors: dict[str, list[str]] = {}
+    try:
+        engine.normalize_sku(data.sku)
+    except engine.InvalidSku as exc:
+        _add_error(errors, "sku", str(exc))
     price = _amount(errors, "price_net", data.price_net)
     if price is not None and price == 0:  # CAT.14, Q-31: never 0.00
         _add_error(errors, "price_net", engine.ZERO_PRICE)
+    weight_error = engine.weight_error(data.weight_kg)
+    if weight_error is not None:
+        _add_error(errors, "weight_kg", f"The weight {weight_error}")
     _check_choice(errors, "kind", data.kind, list(ProductKind.values))
     _check_choice(errors, "sales_mode", data.sales_mode, list(SalesMode.values))
     _check_choice(errors, "fiscal_category", data.fiscal_category, list(FiscalCategory.values))
@@ -566,7 +582,12 @@ def _product_errors(
     ):
         _add_error(errors, NON_FIELD_ERRORS, message)
     for variant in data.variants:
+        if not engine.canonical_sku(variant.sku):
+            _add_error(errors, "variants", "A variant SKU cannot be empty.")
         _amount(errors, "variants", variant.price_net_override)
+        weight_error = engine.weight_error(variant.weight_kg_override)
+        if weight_error is not None:
+            _add_error(errors, "variants", f"{variant.sku}: the weight override {weight_error}")
         if variant.stock_qty < 0:
             _add_error(errors, "variants", f"{variant.sku}: the stock cannot be negative.")
 
@@ -608,7 +629,7 @@ def create_product(
         sales_mode=data.sales_mode,
         fiscal_category=data.fiscal_category,
         price_net=engine.to_price(data.price_net),
-        weight_kg=data.weight_kg,
+        weight_kg=_stored(data.weight_kg, engine.WEIGHT_DECIMALS),
     )
     product_key = str(product.public_id)
     changes = ChangeSet()
@@ -654,7 +675,7 @@ def create_product(
         row = ProductAttribute(
             product=product,
             attribute=attribute,
-            numeric_value=given.number,
+            numeric_value=_stored(given.number, engine.NUMBER_DECIMALS),
             text_value=given.text,
             is_variant_axis=given.axis,
             position=position,
@@ -668,7 +689,7 @@ def create_product(
                 "product": product_key,
                 "attribute": given.code,
                 "values": list(given.values),
-                "numeric_value": given.number,
+                "numeric_value": row.numeric_value,
                 "text_value": given.text,
                 "is_variant_axis": given.axis,
                 "position": position,
@@ -686,7 +707,7 @@ def create_product(
             vendor=vendor,
             sku=engine.canonical_sku(given_variant.sku),
             price_net_override=_amount({}, "variants", given_variant.price_net_override),
-            weight_kg_override=given_variant.weight_kg_override,
+            weight_kg_override=_stored(given_variant.weight_kg_override, engine.WEIGHT_DECIMALS),
             stock_qty=given_variant.stock_qty,
             is_default=given_variant.is_default,
             position=position,

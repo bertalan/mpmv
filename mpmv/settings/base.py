@@ -31,6 +31,7 @@ LOCAL_APPS = [
     "apps.ledger",
     "apps.ingest",
     "apps.cms",
+    "apps.themes",  # frontend themes (THM.1, spec 14): imports only core and Wagtail
     "apps.seo",
     "apps.compliance",
     "apps.api",
@@ -61,6 +62,7 @@ INSTALLED_APPS = [
     "wagtail.snippets",
     "wagtail.search",
     "wagtail.admin",
+    "wagtail.contrib.settings",  # BaseSiteSetting for the per-site theme (THM.1)
     "wagtail",
     "modelcluster",
     "taggit",
@@ -75,6 +77,7 @@ MIDDLEWARE = [
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "apps.cms.middleware.WagtailAdminPickerNonceMiddleware",  # Wagtail's inline pickers (CMS.1)
     "apps.core.middleware.PermissionsPolicyMiddleware",
+    "apps.themes.middleware.ThemeMiddleware",  # the site's theme for the template loader (THM.1)
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -124,21 +127,40 @@ ROOT_URLCONF = "mpmv.urls"
 WSGI_APPLICATION = "mpmv.wsgi.application"
 ASGI_APPLICATION = "mpmv.asgi.application"
 
+# Templates (spec 14 §14.3): the active theme and its parents up to `base` first, then the
+# project and app directories. The theme loader caches per (theme, name) itself; Django's
+# cached.Loader (keyed by name only) wraps only the theme-independent loaders.
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
         "DIRS": [BASE_DIR / "templates"],
-        "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "django.template.context_processors.csp",
+                "apps.themes.context_processors.theme",
+            ],
+            "loaders": [
+                "apps.themes.loaders.ThemeLoader",
+                (
+                    "django.template.loaders.cached.Loader",
+                    [
+                        "django.template.loaders.filesystem.Loader",
+                        "django.template.loaders.app_directories.Loader",
+                    ],
+                ),
             ],
         },
     },
 ]
+
+# Frontend themes (THM.1, spec 14): one directory per theme, each with a theme.toml manifest.
+# A Wagtail Site's ThemeSettings picks its theme; MPMV_THEME_DEFAULT is the fallback (system
+# check themes.E002 fails when it names no registered theme), then `base`.
+MPMV_THEMES_DIR = BASE_DIR / "themes"
+MPMV_THEME_DEFAULT = env_str("MPMV_THEME_DEFAULT", "") or "base"
 
 # PostgreSQL is the only datastore (ADR-0001).
 DATABASES = {

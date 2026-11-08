@@ -1,0 +1,7 @@
+# The root theme (spec 14 §14.2): vertical-neutral, accessible, complete on its own.
+# THM.2 adds tokens.toml, THM.3 the layouts and THM.4 the components.
+slug = "base"
+name = "Base"
+version = "0.1.0"
+description = "Neutral, accessible root theme of every MPMV theme."
+direction = "ltr"
