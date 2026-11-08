@@ -1,0 +1,59 @@
+{% extends "layouts/content.html" %}
+{% load i18n tz wagtailcore_tags %}
+{% comment %}
+Event page (EVT.1 part 2/2, spec 15 "Public pages"): a minimal page on the base theme layout.
+Dates are in the page's language and the event's own time zone, with machine-readable
+`<time datetime>` values; the type is text. No inline script or style (CSP, spec 14 §14.5).
+EVT.6 adds the ICS and report links, robots rules and the linked products; EVT.15 the map.
+{% endcomment %}
+{% block page_content %}
+  <article class="event">
+    <header>
+      <h1>{{ page.title }}</h1>
+      {% if page.cancelled_at %}<p role="status"><strong>{% translate "Cancelled" %}</strong></p>{% endif %}
+      <p>{{ page.summary }}</p>
+    </header>
+    <dl>
+      <dt>{% translate "When" %}</dt>
+      <dd>
+        {% if page.all_day %}
+          <time datetime="{{ page.start_date|date:'Y-m-d' }}">{{ page.start_date|date:"DATE_FORMAT" }}</time>
+          {% if page.end_date != page.start_date %}– <time datetime="{{ page.end_date|date:'Y-m-d' }}">{{ page.end_date|date:"DATE_FORMAT" }}</time>{% endif %}
+        {% else %}
+          {% timezone page.timezone %}{% with start=page.starts_at end=page.ends_at %}
+            <time datetime="{{ start|date:'c' }}">{{ start|date:"DATETIME_FORMAT" }}</time>
+            – <time datetime="{{ end|date:'c' }}">{% if end|date:'Y-m-d' == start|date:'Y-m-d' %}{{ end|time:"TIME_FORMAT" }}{% else %}{{ end|date:"DATETIME_FORMAT" }}{% endif %}</time>
+            ({{ page.timezone }})
+          {% endwith %}{% endtimezone %}
+        {% endif %}
+      </dd>
+      <dt>{% translate "Type" %}</dt>
+      <dd>{{ page.get_event_type_display }}</dd>
+      {% if page.vendor %}
+        <dt>{% translate "Vendor" %}</dt>
+        <dd>{{ page.vendor.display_name }}</dd>
+      {% endif %}
+      {% if page.attendance %}
+        <dt>{% translate "Attendance" %}</dt>
+        <dd>{{ page.get_attendance_display }}</dd>
+      {% endif %}
+      {% if page.has_address %}
+        <dt>{% translate "Where" %}</dt>
+        <dd>
+          <address>
+            {% if page.venue_name %}{{ page.venue_name }}<br>{% endif %}
+            {% if page.street %}{{ page.street }}<br>{% endif %}
+            {% if page.postcode or page.city %}{{ page.postcode }} {{ page.city }}{% if page.region %} ({{ page.region }}){% endif %}<br>{% endif %}
+            {% if page.country %}{{ page.country }}{% endif %}
+          </address>
+          {% if page.booth %}<p>{% blocktranslate with booth=page.booth %}Booth {{ booth }}{% endblocktranslate %}</p>{% endif %}
+        </dd>
+      {% endif %}
+      {% if page.online_url %}
+        <dt>{% translate "Online" %}</dt>
+        <dd><a href="{{ page.online_url }}" rel="noopener">{% translate "Join online" %}</a></dd>
+      {% endif %}
+    </dl>
+    {% for block in page.body %}{% include_block block %}{% endfor %}
+  </article>
+{% endblock %}
