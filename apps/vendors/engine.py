@@ -1180,13 +1180,53 @@ class ClaimError(ValueError):
     """A claim step the rules refuse (the message is safe to show to staff)."""
 
 
-def check_claim_link_can_be_sent(status: str | None) -> None:
+# Where the link goes (decision on PR #141): the legal email of record, or, when the vendor
+# has one on file, the PEC address staff pick instead. No other address can be chosen.
+CLAIM_CHANNEL_EMAIL: Final = "email"
+CLAIM_CHANNEL_PEC: Final = "pec"
+CLAIM_CHANNELS: Final = (CLAIM_CHANNEL_EMAIL, CLAIM_CHANNEL_PEC)
+
+
+def check_claim_link_can_be_sent(status: str | None, *, by_staff: bool) -> None:
     """A link is sent for a new claim, or regenerated while no claim waits for staff and none
-    was approved (a pending claim is decided first)."""
+    was approved (a pending claim is decided first). After a reject only staff start a new
+    claim (decision on PR #141): nobody else, the claimant included, re-triggers it."""
     if status == CLAIM_SUBMITTED:
         raise ClaimError("a claim is waiting for approval: approve or reject it first")
     if status == CLAIM_APPROVED:
         raise ClaimError("the vendor was already claimed")
+    if status == CLAIM_REJECTED and not by_staff:
+        raise ClaimError("the claim was rejected: only staff can start a new one")
+
+
+def claim_channels(*, contact_email: str, pec: str) -> tuple[str, ...]:
+    """The destinations staff may pick: the legal email of record, and the PEC when on file."""
+    channels: tuple[str, ...] = (CLAIM_CHANNEL_EMAIL,) if contact_email.strip() else ()
+    return (*channels, CLAIM_CHANNEL_PEC) if pec.strip() else channels
+
+
+def check_claim_channel(channel: str, *, contact_email: str, pec: str) -> None:
+    """Refuse a destination other than the legal email of record or the PEC on file."""
+    if channel not in claim_channels(contact_email=contact_email, pec=pec):
+        if channel == CLAIM_CHANNEL_PEC:
+            raise ClaimError("the vendor has no PEC address on file")
+        if channel == CLAIM_CHANNEL_EMAIL:
+            raise ClaimError("the vendor has no legal email of record")
+        raise ClaimError("the link goes to the legal email of record or the PEC address only")
+
+
+def claim_address(channel: str, *, contact_email: str, pec: str) -> str:
+    """The address of `channel`: the PEC for the PEC channel, else the legal email."""
+    return (pec if channel == CLAIM_CHANNEL_PEC else contact_email).strip()
+
+
+def mask_email(address: str) -> str:
+    """The first character of the local part and the domain only: for audit rows (SEC.3)."""
+    local, at, domain = address.partition("@")
+    if not at:
+        return "*" * len(address)
+    shown = local[:1] if len(local) > 1 else ""
+    return shown + "*" * (len(local) - len(shown)) + "@" + domain
 
 
 def claim_locks_after(failed_attempts: int, *, max_failures: int) -> bool:

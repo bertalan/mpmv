@@ -138,3 +138,101 @@ def test_the_changelist_itself_needs_no_fresh_second_factor(
 ) -> None:
     settings.MFA_STEP_UP_MAX_AGE = -1
     assert staff_client.get(reverse(CHANGELIST)).status_code == 200
+
+
+def test_sending_a_claim_link_needs_a_fresh_second_factor(
+    staff_client: Client, settings: SettingsWrapper
+) -> None:
+    settings.MFA_STEP_UP_MAX_AGE = -1
+    vendor = VendorFactory.create(italian_company=True)
+    response = staff_client.post(
+        reverse(CHANGELIST), {"action": "send_claim_link", "_selected_action": [vendor.pk]}
+    )
+    assert response.status_code == 302
+    assert urlsplit(response["Location"]).path == reverse("mfa:verify")
+    assert not OutboxEmail.objects.exists()
+
+
+# --- The send / regenerate dialog: legal email of record, or the PEC on file
+
+
+def dialog_url(vendor: Vendor) -> str:
+    return reverse("admin:vendors_vendor_claim_link", args=[vendor.pk])
+
+
+def test_the_change_page_links_to_the_send_dialog(staff_client: Client) -> None:
+    vendor = VendorFactory.create(italian_company=True)
+    page = staff_client.get(reverse("admin:vendors_vendor_change", args=[vendor.pk]))
+    assert dialog_url(vendor) in page.content.decode()
+
+
+def test_the_dialog_offers_the_legal_email_and_the_pec_only(staff_client: Client) -> None:
+    vendor = VendorFactory.create(italian_company=True)
+    page = staff_client.get(dialog_url(vendor))
+    assert page.status_code == 200
+    choices = [value for value, _label in page.context["form"].fields["channel"].choices]
+    assert choices == [engine.CLAIM_CHANNEL_EMAIL, engine.CLAIM_CHANNEL_PEC]
+    html = page.content.decode()
+    assert vendor.contact_email in html
+    assert vendor.pec in html
+
+
+def test_without_a_pec_the_dialog_offers_the_legal_email_only(staff_client: Client) -> None:
+    vendor = VendorFactory.create(italian_company=True, pec="")
+    page = staff_client.get(dialog_url(vendor))
+    choices = [value for value, _label in page.context["form"].fields["channel"].choices]
+    assert choices == [engine.CLAIM_CHANNEL_EMAIL]
+    response = staff_client.post(dialog_url(vendor), {"channel": engine.CLAIM_CHANNEL_PEC})
+    assert response.status_code == 200
+    assert not OutboxEmail.objects.exists()
+
+
+def test_staff_send_the_link_to_the_pec_from_the_dialog(staff_client: Client) -> None:
+    vendor = VendorFactory.create(italian_company=True)
+    response = staff_client.post(dialog_url(vendor), {"channel": engine.CLAIM_CHANNEL_PEC})
+    assert response.status_code == 302
+    assert OutboxEmail.objects.get().recipient == vendor.pec
+    entry = AuditLog.objects.get(action=services.CLAIM_LINK_SENT)
+    assert (entry.after or {})["channel"] == engine.CLAIM_CHANNEL_PEC
+    assert entry.source == AuditLog.Source.ADMIN
+
+
+def test_the_dialog_takes_no_other_address(staff_client: Client) -> None:
+    vendor = VendorFactory.create(italian_company=True)
+    response = staff_client.post(
+        dialog_url(vendor), {"channel": "attacker@example.com", "email": "attacker@example.com"}
+    )
+    assert response.status_code == 200
+    assert not OutboxEmail.objects.exists()
+
+
+def test_the_dialog_needs_a_fresh_second_factor(
+    staff_client: Client, settings: SettingsWrapper
+) -> None:
+    settings.MFA_STEP_UP_MAX_AGE = -1
+    vendor = VendorFactory.create(italian_company=True)
+    response = staff_client.post(dialog_url(vendor), {"channel": engine.CLAIM_CHANNEL_EMAIL})
+    assert response.status_code == 302
+    assert urlsplit(response["Location"]).path == reverse("mfa:verify")
+    assert not OutboxEmail.objects.exists()
+
+
+def test_staff_restart_a_rejected_claim_from_the_dialog(staff_client: Client) -> None:
+    vendor = VendorFactory.create(italian_company=True)
+    claim = submitted_claim(vendor)
+    run_action(staff_client, "reject_claim", vendor)
+    response = staff_client.post(dialog_url(vendor), {"channel": engine.CLAIM_CHANNEL_EMAIL})
+    assert response.status_code == 302
+    claim.refresh_from_db()
+    assert claim.status == VendorClaim.Status.OPEN
+    entry = AuditLog.objects.get(action=services.CLAIM_LINK_REGENERATED)
+    assert (entry.after or {})["after_reject"]["claim"] == str(claim.public_id)
+
+
+def test_a_dialog_error_is_shown_not_raised(staff_client: Client) -> None:
+    vendor = VendorFactory.create(italian_company=True)
+    VendorMemberFactory.create(vendor=vendor)
+    response = staff_client.post(dialog_url(vendor), {"channel": engine.CLAIM_CHANNEL_EMAIL})
+    assert response.status_code == 200
+    assert "account holder" in response.content.decode()
+    assert not OutboxEmail.objects.exists()

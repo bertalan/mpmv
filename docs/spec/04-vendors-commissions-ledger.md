@@ -161,9 +161,17 @@ def payout_eligibility(vendor) -> Eligibility               # DAC7 complete, acc
    captcha apply) and a code from its own authenticator app instead, then submits the claim for
    it. The link alone never signs anyone in. The claimant gets no membership until staff approve
    the claim (`VendorClaim`, admin actions on the vendor list), so before approval they reach no
-   vendor data at all. Approving or rejecting needs a fresh second factor (step-up), and
-   approval is refused when the vendor meanwhile got a member or the claimant's email is no
-   longer the legal email of record.
+   vendor data at all. Sending or regenerating a link, approving and rejecting need a fresh
+   second factor (step-up), and approval is refused when the vendor meanwhile got a member or
+   the claimant's email is no longer the address the link went to.
+   Destination (decision by lane A, delegated by the owner, on PR #141): when the vendor has a
+   PEC address on file, the staff send / regenerate dialog may pick it instead of the legal
+   email; no other address can be chosen. The link is then bound to the PEC, the claimant's
+   account uses it, and the AuditLog entry names the channel and the masked address.
+   After a reject: rejecting a claim invalidates every open claim link of the vendor (audited
+   `vendor.claim_link_invalidated`, reason `rejected`). Only staff start a new claim afterwards,
+   through the regenerate action behind step-up; its audit entry references the reject (claim,
+   time and audit entry). The claimant has no self-service resend.
 2. **Paid order**: for each `VendorOrder` the rule snapshot is frozen, `compute_commission` is
    computed, and the ledger rows are written (`sale`, `shipping`, `commission`, `payment_fee`).
 3. **Transfer**: with *separate charges and transfers* (see [07](07-cart-orders-payments.md)) a Stripe

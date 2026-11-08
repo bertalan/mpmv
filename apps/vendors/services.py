@@ -39,6 +39,7 @@ from apps.accounts.services import (
 )
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import Change, ChangeSet
+from apps.core.models import AuditLog
 from apps.core.services import (
     allowed_vendor_countries,
     audit_changes,
@@ -1145,6 +1146,7 @@ def claim_snapshot(claim: VendorClaim) -> dict[str, Any]:
         "vendor": str(claim.vendor.public_id),
         "status": claim.status,
         "version": claim.version,
+        "channel": claim.channel,
         "failed_attempts": claim.failed_attempts,
         "claimant": str(claim.claimant.public_id) if claim.claimant else None,
     }
@@ -1167,13 +1169,22 @@ def _claim_version(object_key: str) -> str | None:
     return None if claim is None else str(claim.version)
 
 
-def _legal_email(object_key: str) -> str | None:
-    """The vendor's legal email of record: the only address a claim link goes to."""
+def claim_email(vendor: Vendor) -> str:
+    """Where the vendor's claim link goes: its legal email of record, or the PEC address when
+    staff picked it for the current link. Claim links are bound to it, and the claimant's
+    account uses it."""
+    claim = VendorClaim.objects.filter(vendor=vendor).only("channel").first()
+    channel = claim.channel if claim else engine.CLAIM_CHANNEL_EMAIL
+    return engine.claim_address(channel, contact_email=vendor.contact_email, pec=vendor.pec)
+
+
+def _claim_email_of(object_key: str) -> str | None:
+    """The address claim links of the vendor `object_key` are bound to (`claim_email`)."""
     try:
-        vendor = Vendor.objects.filter(public_id=object_key).only("contact_email").first()
+        vendor = Vendor.objects.filter(public_id=object_key).only("contact_email", "pec").first()
     except ValidationError:
         return None
-    return vendor.contact_email if vendor else None
+    return claim_email(vendor) if vendor else None
 
 
 def claim_path(object_key: str) -> str:
@@ -1187,7 +1198,7 @@ def register_claim_purpose() -> None:
             name=CLAIM_PURPOSE,
             version_of=_claim_version,
             url_of=claim_path,
-            email_of=_legal_email,
+            email_of=_claim_email_of,
         )
     )
 
@@ -1206,12 +1217,39 @@ def claim_retry_after(ip: str | None) -> dt.timedelta:
     )
 
 
-def send_claim_link(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+def _reject_reference(claim: VendorClaim) -> dict[str, Any]:
+    """What a new claim after a reject points back to: the rejected claim, when it was
+    rejected and the audit entry of the reject."""
+    entry = (
+        AuditLog.objects.filter(action=CLAIM_REJECTED, target_key=str(claim.public_id))
+        .order_by("-id")
+        .first()
+    )
+    return {
+        "claim": str(claim.public_id),
+        "rejected_at": claim.decided_at.isoformat() if claim.decided_at else None,
+        "audit_entry": str(entry.public_id) if entry else None,
+    }
+
+
+def send_claim_link(
+    vendor: Vendor,
+    *,
+    ctx: AuditContext,
+    channel: str = engine.CLAIM_CHANNEL_EMAIL,
+    dry_run: bool = False,
+) -> ChangeSet:
     """Send the claim link of `vendor` to its legal email of record, or a new one (resend /
     regenerate) that invalidates the link sent before; every step audited.
 
+    `channel` is where it goes: the legal email of record, or the PEC address on file when
+    staff pick it instead; the audit entry names the channel and the masked address. After a
+    reject only staff (`ctx.source` admin, behind step-up) start a new claim, and its audit
+    entry references the reject.
+
     Raises `engine.ClaimError` when the vendor already has an account holder, has no legal
-    email or no VAT number or TIN to confirm, or a claim waits for approval or was approved.
+    email (or no PEC for the PEC channel) or no VAT number or TIN to confirm, a claim waits for
+    approval or was approved, or a rejected claim is restarted by anyone but staff.
     """
     with transaction.atomic():
         locked = Vendor.objects.select_for_update().get(pk=vendor.pk)
@@ -1219,21 +1257,32 @@ def send_claim_link(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False)
             raise engine.ClaimError(f"{locked} already has an account holder")
         if not locked.contact_email.strip():
             raise engine.ClaimError(f"{locked} has no legal email of record")
+        engine.check_claim_channel(channel, contact_email=locked.contact_email, pec=locked.pec)
         if not (locked.vat_number.strip() or locked.tax_code.strip()):
             raise engine.ClaimError(f"{locked} has no VAT number or TIN to confirm")
         claim = VendorClaim.objects.select_for_update().filter(vendor=locked).first()
-        engine.check_claim_link_can_be_sent(claim.status if claim else None)
+        engine.check_claim_link_can_be_sent(
+            claim.status if claim else None, by_staff=ctx.source == AuditLog.Source.ADMIN
+        )
+        destination: dict[str, Any] = {
+            "address": engine.mask_email(
+                engine.claim_address(channel, contact_email=locked.contact_email, pec=locked.pec)
+            )
+        }
 
         changes = ChangeSet()
         audits: list[tuple[str, dict[str, Any] | None, dict[str, Any] | None]] = []
         if claim is None:
-            claim = VendorClaim(vendor=locked)
+            claim = VendorClaim(vendor=locked, channel=channel)
             after = claim_snapshot(claim)
             changes.create(CLAIM_MODEL, str(claim.public_id), after)
-            audits.append((CLAIM_LINK_SENT, None, after))
+            audits.append((CLAIM_LINK_SENT, None, {**after, **destination}))
         else:
             before = claim_snapshot(claim)
+            if claim.status == VendorClaim.Status.REJECTED:
+                destination["after_reject"] = _reject_reference(claim)
             claim.version += 1
+            claim.channel = channel
             claim.status = VendorClaim.Status.OPEN
             claim.failed_attempts = 0
             claim.confirmed_link = ""
@@ -1242,16 +1291,15 @@ def send_claim_link(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False)
             claim.decided_at = None
             after = claim_snapshot(claim)
             changes.update(CLAIM_MODEL, str(claim.public_id), before, after)
-            audits.append((CLAIM_LINK_INVALIDATED, before, {"version": before["version"]}))
-            audits.append((CLAIM_LINK_REGENERATED, before, after))
+            invalidated = _invalidated(locked, before["version"], "regenerated")
+            audits.append((CLAIM_LINK_INVALIDATED, before, invalidated))
+            audits.append((CLAIM_LINK_REGENERATED, before, {**after, **destination}))
         if dry_run:
             return changes
 
         claim.link_sent_at = timezone.now()
         claim.save()
         for action, before_snapshot, after_snapshot in audits:
-            if action == CLAIM_LINK_INVALIDATED:
-                after_snapshot = {"vendor": str(locked.public_id), **(after_snapshot or {})}
             record(ctx, action, CLAIM_MODEL, str(claim.public_id), before_snapshot, after_snapshot)
         send_action_link_email(
             purpose=CLAIM_PURPOSE,
@@ -1263,6 +1311,11 @@ def send_claim_link(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False)
             ctx=ctx,
         )
     return changes
+
+
+def _invalidated(vendor: Vendor, version: int, reason: str) -> dict[str, Any]:
+    """The audit `after` of `CLAIM_LINK_INVALIDATED`: links of `version` no longer work."""
+    return {"vendor": str(vendor.public_id), "version": version, "reason": reason}
 
 
 def claim_link_digest(link: ActionLinkCheck) -> str:
@@ -1358,7 +1411,8 @@ def submit_claim(
     """Create the claimant's account with its password and authenticator app, spend the link
     and submit the claim for staff approval, all or nothing.
 
-    The account's email is the legal email of record (the link proved control of it). The
+    The account's email is the address the link went to (`claim_email`: the legal email of
+    record, or the PEC staff picked), whose control the link proved. The
     claimant gets no membership: staff approve first (`approve_claim`). Raises
     `engine.ClaimError` (link not valid, identity not confirmed with this link),
     `ClaimCodeInvalid`, `ClaimAccountExists`, or `ValidationError` for a weak password. Spends
@@ -1369,7 +1423,7 @@ def submit_claim(
         nonce_digest = claim_link_digest(link)
         if not claim.confirmed_link or claim.confirmed_link != nonce_digest:
             raise engine.ClaimError("confirm the VAT number or TIN first")
-        email = normalize_email_address(claim.vendor.contact_email)
+        email = normalize_email_address(claim_email(claim.vendor))
         if User.objects.filter(email=email).exists():
             raise ClaimAccountExists("an account already uses this email address")
         user = User(email=email, full_name=full_name.strip(), preferred_language=language)
@@ -1398,8 +1452,8 @@ def submit_claim(
 
 
 def claim_account(vendor: Vendor) -> User | None:
-    """The account that already uses the legal email of record of `vendor`, if any."""
-    email = normalize_email_address(vendor.contact_email)
+    """The account that already uses the claim address of `vendor` (`claim_email`), if any."""
+    email = normalize_email_address(claim_email(vendor))
     return User.objects.filter(email=email).first() if email else None
 
 
@@ -1418,7 +1472,7 @@ def submit_claim_as_account(link: ActionLinkCheck, user: User, *, ctx: AuditCont
             raise engine.ClaimError("confirm the VAT number or TIN first")
         if (
             not user.is_active
-            or user.email != normalize_email_address(claim.vendor.contact_email)
+            or user.email != normalize_email_address(claim_email(claim.vendor))
             or not has_second_factor(user)
         ):
             raise engine.ClaimError("this account cannot claim the vendor")
@@ -1453,6 +1507,9 @@ def _decide(
             _check_claim_still_approvable(locked.vendor, locked.claimant)
         before = claim_snapshot(locked)
         locked.status = status
+        if status == VendorClaim.Status.REJECTED:
+            # Every open claim link of the vendor stops working (decision on PR #141).
+            locked.version += 1
         changes = ChangeSet()
         changes.update(CLAIM_MODEL, str(locked.public_id), before, claim_snapshot(locked))
         if dry_run:
@@ -1460,9 +1517,15 @@ def _decide(
         if status == VendorClaim.Status.APPROVED:
             add_member(locked.vendor, locked.claimant, engine.OWNER, ctx=ctx)
         locked.decided_at = timezone.now()
-        locked.save(update_fields=["status", "decided_at", "updated_at"])
+        locked.save(update_fields=["status", "version", "decided_at", "updated_at"])
         audit_changes(changes, ctx=ctx, action=action)
-    claim.status, claim.decided_at = locked.status, locked.decided_at
+        if status == VendorClaim.Status.REJECTED:
+            invalidated = _invalidated(locked.vendor, before["version"], "rejected")
+            record(
+                ctx, CLAIM_LINK_INVALIDATED, CLAIM_MODEL, str(locked.public_id), before, invalidated
+            )
+    claim.status, claim.version = locked.status, locked.version
+    claim.decided_at = locked.decided_at
     return changes
 
 
@@ -1471,9 +1534,9 @@ def _check_claim_still_approvable(vendor: Vendor, claimant: User) -> None:
     the claimant's email is still the legal email of record (staff may have changed it)."""
     if VendorMember.objects.filter(vendor=vendor).exists():
         raise engine.ClaimError(f"{vendor} already has an account holder: reject the claim")
-    if not claimant.is_active or claimant.email != normalize_email_address(vendor.contact_email):
+    if not claimant.is_active or claimant.email != normalize_email_address(claim_email(vendor)):
         raise engine.ClaimError(
-            f"{vendor}: the claimant's email is no longer the legal email of record"
+            f"{vendor}: the claimant's email is no longer the address the claim link went to"
         )
 
 
@@ -1486,8 +1549,10 @@ def approve_claim(claim: VendorClaim, *, ctx: AuditContext, dry_run: bool = Fals
 
 
 def reject_claim(claim: VendorClaim, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
-    """Staff reject a submitted claim: nothing is granted; staff may send a new link later.
+    """Staff reject a submitted claim: nothing is granted, and every open claim link of the
+    vendor stops working (audited `CLAIM_LINK_INVALIDATED`, reason "rejected").
 
-    The claimant's account stays. With a new link it claims again by signing in with its own
-    password and second factor (`submit_claim_as_account`)."""
+    Only staff start a new claim afterwards (`send_claim_link` from the admin, behind step-up);
+    the claimant cannot re-trigger one. The claimant's account stays: with a new link it claims
+    again by signing in with its own password and second factor (`submit_claim_as_account`)."""
     return _decide(claim, VendorClaim.Status.REJECTED, CLAIM_REJECTED, ctx=ctx, dry_run=dry_run)

@@ -26,12 +26,14 @@ from apps.accounts.tests.mfa import totp_token
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog, OutboxEmail
 from apps.vendors import engine, services, views
+from apps.vendors import urls as claim_urls
 from apps.vendors.models import Vendor, VendorClaim, VendorMember
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 
 pytestmark = pytest.mark.django_db
 
 SYSTEM = AuditContext(actor_label="system:test", source=AuditLog.Source.SYSTEM)
+STAFF = AuditContext(actor_label="staff:test", source=AuditLog.Source.ADMIN)
 FISCAL_ACTIONS = (
     engine.VendorAction.BANK_ACCOUNT,
     engine.VendorAction.TAX_REGIME,
@@ -52,9 +54,11 @@ def link_path(email: OutboxEmail) -> str:
     return "/" + url.split("/", 3)[3]
 
 
-def send_link(vendor: Vendor) -> str:
+def send_link(
+    vendor: Vendor, *, ctx: AuditContext = SYSTEM, channel: str = engine.CLAIM_CHANNEL_EMAIL
+) -> str:
     """Send (or regenerate) the claim link and return the path of the link in the email."""
-    services.send_claim_link(vendor, ctx=SYSTEM)
+    services.send_claim_link(vendor, channel=channel, ctx=ctx)
     return link_path(OutboxEmail.objects.order_by("-id").first())  # type: ignore[arg-type]
 
 
@@ -439,8 +443,8 @@ def test_a_rejected_claimant_claims_again_with_a_new_link(client: Client) -> Non
     full_claim(client, vendor)
     first = VendorClaim.objects.get(vendor=vendor)
     claimant = first.claimant
-    services.reject_claim(first, ctx=SYSTEM)
-    path = send_link(vendor)
+    services.reject_claim(first, ctx=STAFF)
+    path = send_link(vendor, ctx=STAFF)
 
     again = Client()
     _user, password, device = returning_claimant(vendor.contact_email)
@@ -558,7 +562,7 @@ def test_a_rejected_claim_grants_nothing_and_can_be_sent_again(client: Client) -
     assert claim.status == VendorClaim.Status.REJECTED
     assert not VendorMember.objects.filter(vendor=vendor).exists()
     assert len(actions(services.CLAIM_REJECTED)) == 1
-    services.send_claim_link(vendor, ctx=SYSTEM)
+    services.send_claim_link(vendor, ctx=STAFF)
     assert VendorClaim.objects.get(vendor=vendor).status == VendorClaim.Status.OPEN
 
 
@@ -618,3 +622,160 @@ def test_a_pending_claim_cannot_be_regenerated(client: Client) -> None:
     full_claim(client, vendor)
     with pytest.raises(engine.ClaimError):
         services.send_claim_link(vendor, ctx=SYSTEM)
+
+
+# --- Destination: the legal email of record, or the PEC staff pick instead (PR #141 decision)
+
+
+def test_staff_may_send_the_link_to_the_pec_instead() -> None:
+    vendor = imported_vendor()
+    services.send_claim_link(vendor, channel=engine.CLAIM_CHANNEL_PEC, ctx=STAFF)
+    email = OutboxEmail.objects.get()
+    assert email.recipient == vendor.pec
+    claim = VendorClaim.objects.get(vendor=vendor)
+    assert claim.channel == engine.CLAIM_CHANNEL_PEC
+    (sent,) = actions(services.CLAIM_LINK_SENT)
+    after = sent.after or {}
+    assert after["channel"] == engine.CLAIM_CHANNEL_PEC
+    assert after["address"] == engine.mask_email(vendor.pec)
+    assert vendor.pec not in json.dumps([sent.before, sent.after])
+
+
+def test_the_audit_names_the_legal_email_channel_masked() -> None:
+    vendor = imported_vendor()
+    services.send_claim_link(vendor, ctx=STAFF)
+    (sent,) = actions(services.CLAIM_LINK_SENT)
+    after = sent.after or {}
+    assert after["channel"] == engine.CLAIM_CHANNEL_EMAIL
+    assert after["address"] == engine.mask_email(vendor.contact_email)
+    assert vendor.contact_email not in json.dumps([sent.before, sent.after])
+
+
+def test_the_pec_cannot_be_chosen_when_none_is_on_file() -> None:
+    vendor = imported_vendor(pec="")
+    with pytest.raises(engine.ClaimError):
+        services.send_claim_link(vendor, channel=engine.CLAIM_CHANNEL_PEC, ctx=STAFF)
+    with pytest.raises(engine.ClaimError):
+        services.send_claim_link(vendor, channel="phone", ctx=STAFF)
+    assert not OutboxEmail.objects.exists()
+    assert not VendorClaim.objects.exists()
+
+
+def test_a_claim_through_the_pec_creates_the_account_on_the_pec(client: Client) -> None:
+    vendor = imported_vendor()
+    open_link(client, send_link(vendor, ctx=STAFF, channel=engine.CLAIM_CHANNEL_PEC))
+    confirm_identity(client, vendor, vendor.vat_number)
+    response = create_account(client, vendor)
+    assert "waiting for approval" in response.content.decode()
+    claim = VendorClaim.objects.get(vendor=vendor)
+    assert claim.claimant is not None
+    assert claim.claimant.email == vendor.pec
+    services.approve_claim(claim, ctx=STAFF)
+    assert services.member_role(claim.claimant, vendor) == engine.OWNER
+
+
+def test_a_new_pec_invalidates_a_pec_link(client: Client) -> None:
+    vendor = imported_vendor()
+    path = send_link(vendor, ctx=STAFF, channel=engine.CLAIM_CHANNEL_PEC)
+    Vendor.objects.filter(pk=vendor.pk).update(pec="other@pec.example.com")
+    open_link(client, path)
+    assert client.get(claim_url(vendor)).status_code == 403
+
+
+def test_a_regenerated_link_goes_where_staff_choose_now() -> None:
+    vendor = imported_vendor()
+    send_link(vendor, ctx=STAFF, channel=engine.CLAIM_CHANNEL_PEC)
+    send_link(vendor, ctx=STAFF)
+    first, second = OutboxEmail.objects.order_by("id")
+    assert (first.recipient, second.recipient) == (vendor.pec, vendor.contact_email)
+    (regenerated,) = actions(services.CLAIM_LINK_REGENERATED)
+    assert (regenerated.after or {})["channel"] == engine.CLAIM_CHANNEL_EMAIL
+
+
+# --- After a reject (PR #141 decision): links invalidated, only staff start again
+
+
+def test_rejecting_invalidates_every_open_claim_link(client: Client) -> None:
+    vendor = imported_vendor()
+    path = send_link(vendor)
+    open_link(client, path)
+    confirm_identity(client, vendor, vendor.vat_number)
+    create_account(client, vendor)
+    claim = VendorClaim.objects.get(vendor=vendor)
+    services.reject_claim(claim, ctx=STAFF)
+    claim.refresh_from_db()
+    assert claim.version == 2
+    (invalidated,) = actions(services.CLAIM_LINK_INVALIDATED)
+    after = invalidated.after or {}
+    assert after["reason"] == "rejected"
+    assert after["version"] == 1
+    assert invalidated.vendor_key == str(vendor.public_id)
+    other = Client()
+    open_link(other, path)
+    assert other.get(claim_url(vendor)).status_code == 403
+
+
+def test_a_rejected_claim_dry_run_invalidates_nothing(client: Client) -> None:
+    vendor = imported_vendor()
+    full_claim(client, vendor)
+    services.reject_claim(VendorClaim.objects.get(vendor=vendor), ctx=STAFF, dry_run=True)
+    assert VendorClaim.objects.get(vendor=vendor).version == 1
+    assert not actions(services.CLAIM_LINK_INVALIDATED)
+
+
+@pytest.mark.parametrize(
+    "source", [AuditLog.Source.SYSTEM, AuditLog.Source.VENDOR, AuditLog.Source.API]
+)
+def test_after_a_reject_only_staff_can_start_a_new_claim(client: Client, source: str) -> None:
+    vendor = imported_vendor()
+    full_claim(client, vendor)
+    services.reject_claim(VendorClaim.objects.get(vendor=vendor), ctx=STAFF)
+    sent = OutboxEmail.objects.count()
+    with pytest.raises(engine.ClaimError):
+        services.send_claim_link(vendor, ctx=AuditContext(actor_label="someone", source=source))
+    assert OutboxEmail.objects.count() == sent
+    assert VendorClaim.objects.get(vendor=vendor).status == VendorClaim.Status.REJECTED
+
+
+def test_the_new_claim_after_a_reject_references_the_reject(client: Client) -> None:
+    vendor = imported_vendor()
+    full_claim(client, vendor)
+    claim = VendorClaim.objects.get(vendor=vendor)
+    services.reject_claim(claim, ctx=STAFF)
+    claim.refresh_from_db()
+    rejected_at = claim.decided_at
+    assert rejected_at is not None
+    services.send_claim_link(vendor, ctx=STAFF)
+    (rejected,) = actions(services.CLAIM_REJECTED)
+    (regenerated,) = actions(services.CLAIM_LINK_REGENERATED)
+    reference = (regenerated.after or {})["after_reject"]
+    assert reference == {
+        "claim": str(claim.public_id),
+        "rejected_at": rejected_at.isoformat(),
+        "audit_entry": str(rejected.public_id),
+    }
+
+
+def test_a_regenerated_link_without_a_reject_references_none() -> None:
+    vendor = imported_vendor()
+    send_link(vendor)
+    send_link(vendor)
+    (regenerated,) = actions(services.CLAIM_LINK_REGENERATED)
+    assert "after_reject" not in (regenerated.after or {})
+    (invalidated,) = actions(services.CLAIM_LINK_INVALIDATED)
+    assert (invalidated.after or {})["reason"] == "regenerated"
+
+
+def test_the_claimant_has_no_way_to_resend_a_link(client: Client) -> None:
+    vendor = imported_vendor()
+    path = send_link(vendor)
+    open_link(client, path)
+    confirm_identity(client, vendor, vendor.vat_number)
+    create_account(client, vendor)
+    services.reject_claim(VendorClaim.objects.get(vendor=vendor), ctx=STAFF)
+    sent = OutboxEmail.objects.count()
+    for step in ("resend", "identity", "account", "sign_in"):
+        response = client.post(claim_url(vendor), {"step": step})
+        assert response.status_code == 403
+    assert OutboxEmail.objects.count() == sent
+    assert {pattern.name for pattern in claim_urls.urlpatterns} == {"claim"}

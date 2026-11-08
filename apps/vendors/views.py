@@ -97,7 +97,7 @@ def _forget(request: HttpRequest, vendor_key: str) -> None:
 
 def _sign_in_page(request: HttpRequest, vendor: Vendor, error: str = "") -> HttpResponse:
     """An account already uses the legal email: it signs in with its own factors instead."""
-    context = {"vendor": vendor, "email": vendor.contact_email, "error": error}
+    context = {"vendor": vendor, "email": services.claim_email(vendor), "error": error}
     return _page(request, "sign_in", context)
 
 
@@ -110,11 +110,12 @@ def _account_page(
     if services.claim_account(vendor) is not None:
         return _sign_in_page(request, vendor)
     key = _pending_key(request, str(vendor.public_id), link)
-    device = pending_totp_device(key, vendor.contact_email)
+    email = services.claim_email(vendor)
+    device = pending_totp_device(key, email)
     qr = segno.make(device.config_url, error="m")
     context = {
         "vendor": vendor,
-        "email": vendor.contact_email,
+        "email": email,
         "qr_svg": qr.svg_inline(scale=4, dark="#000", light="#fff"),
         "secret": accounts_engine.totp_secret(device.bin_key),
         "errors": errors or [],

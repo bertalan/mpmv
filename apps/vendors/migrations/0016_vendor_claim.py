@@ -43,6 +43,15 @@ class Migration(migrations.Migration):
                 ),
                 ("version", models.PositiveIntegerField(default=1, editable=False)),
                 (
+                    "channel",
+                    models.CharField(
+                        choices=[("email", "Legal email of record"), ("pec", "PEC address")],
+                        default="email",
+                        editable=False,
+                        max_length=8,
+                    ),
+                ),
+                (
                     "failed_attempts",
                     models.PositiveIntegerField(
                         default=0,
@@ -81,7 +90,11 @@ class Migration(migrations.Migration):
                             ("status__in", ["open", "locked", "submitted", "approved", "rejected"])
                         ),
                         name="vendors_claim_status_valid",
-                    )
+                    ),
+                    models.CheckConstraint(
+                        condition=models.Q(("channel__in", ["email", "pec"])),
+                        name="vendors_claim_channel_valid",
+                    ),
                 ],
             },
         ),

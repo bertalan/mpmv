@@ -436,6 +436,11 @@ class ClaimStatus(models.TextChoices):
     REJECTED = engine.CLAIM_REJECTED, "Rejected"
 
 
+class ClaimChannel(models.TextChoices):
+    EMAIL = engine.CLAIM_CHANNEL_EMAIL, "Legal email of record"
+    PEC = engine.CLAIM_CHANNEL_PEC, "PEC address"
+
+
 class VendorClaim(BaseModel):
     """The claim of a vendor imported without an account holder (VEN.24, owner decision MQ-1).
 
@@ -445,6 +450,7 @@ class VendorClaim(BaseModel):
     """
 
     Status = ClaimStatus
+    Channel = ClaimChannel
     vendor_scope: ClassVar[str] = "vendor"
     objects = VendorScopedManager()
 
@@ -453,6 +459,11 @@ class VendorClaim(BaseModel):
         max_length=16, choices=Status.choices, default=Status.OPEN, editable=False
     )
     version = models.PositiveIntegerField(default=1, editable=False)
+    # Where the current link went: the legal email of record, or the PEC staff picked instead.
+    # The link stays bound to that address, and the claimant's account uses it.
+    channel = models.CharField(
+        max_length=8, choices=Channel.choices, default=Channel.EMAIL, editable=False
+    )
     failed_attempts = models.PositiveIntegerField(
         default=0, editable=False, help_text="Wrong VAT numbers or TINs typed with this link."
     )
@@ -477,6 +488,10 @@ class VendorClaim(BaseModel):
             models.CheckConstraint(
                 condition=models.Q(status__in=ClaimStatus.values),
                 name="vendors_claim_status_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(channel__in=ClaimChannel.values),
+                name="vendors_claim_channel_valid",
             ),
         ]
 

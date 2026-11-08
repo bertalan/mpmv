@@ -195,7 +195,28 @@ CLAIM_ACTIONS = (
     claim_action("approve_claim", "Approve the submitted claim"),
     claim_action("reject_claim", "Reject the submitted claim"),
 )
-STEP_UP_CLAIM_ACTIONS = frozenset({"approve_claim", "reject_claim"})
+# Sending a link restarts a claim (after a reject only staff may), deciding one grants or
+# refuses the owner role: all behind a fresh second factor.
+STEP_UP_CLAIM_ACTIONS = frozenset({"send_claim_link", "approve_claim", "reject_claim"})
+CLAIM_LINK_TEMPLATE = "admin/vendors/vendor/claim_link.html"
+
+
+class ClaimLinkForm(forms.Form):
+    """Where the claim link goes: the legal email of record, or the PEC address on file. No
+    other address can be typed or chosen (decision on PR #141)."""
+
+    channel = forms.ChoiceField(label="Send the link to", widget=forms.RadioSelect)
+
+    def __init__(self, vendor: Vendor, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        labels = {
+            engine.CLAIM_CHANNEL_EMAIL: f"Legal email of record ({vendor.contact_email})",
+            engine.CLAIM_CHANNEL_PEC: f"PEC address ({vendor.pec})",
+        }
+        channels = engine.claim_channels(contact_email=vendor.contact_email, pec=vendor.pec)
+        field = cast(forms.ChoiceField, self.fields["channel"])
+        field.choices = [(channel, labels[channel]) for channel in channels]
+        field.initial = engine.CLAIM_CHANNEL_EMAIL
 
 
 @admin.register(Vendor)
@@ -327,17 +348,23 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         )
 
     @admin.display(description="Claim")
-    def claim_status(self, obj: Vendor | None) -> str:
+    def claim_status(self, obj: Vendor | None) -> SafeString | str:
         """VEN.24: the claim of an imported vendor; the list actions send, approve or reject."""
         if obj is None or obj.pk is None:
             return "-"
         claim = VendorClaim.objects.filter(vendor=obj).select_related("claimant").first()
         if claim is None:
-            return "No claim link sent."
-        text = f"{claim.get_status_display()} (link version {claim.version})"
-        if claim.claimant is not None:
-            text += f", claimant {claim.claimant.email}"
-        return text
+            text = "No claim link sent."
+        else:
+            text = f"{claim.get_status_display()} (link version {claim.version})"
+            text += f", sent to the {claim.get_channel_display().lower()}"
+            if claim.claimant is not None:
+                text += f", claimant {claim.claimant.email}"
+        return format_html(
+            '{} <a class="button" href="{}">Send or regenerate the claim link</a>',
+            text,
+            reverse("admin:vendors_vendor_claim_link", args=[obj.pk]),
+        )
 
     @admin.display(description="Reopen")
     def reopen(self, obj: Vendor | None) -> SafeString | str:
@@ -364,12 +391,58 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
             # A fresh second factor, like the other sensitive staff pages (CORE.4).
             return step_up(lambda req: self.reopen_view(req, object_id))(request)
 
-        url = path(
-            "<path:object_id>/reopen/",
-            self.admin_site.admin_view(reopen),
-            name=f"{self.opts.app_label}_{self.opts.model_name}_reopen",
-        )
-        return [url, *super().get_urls()]
+        def claim_link(request: HttpRequest, object_id: str) -> HttpResponse:
+            # Sending restarts a claim, also after a reject: a fresh second factor (CORE.4).
+            return step_up(lambda req: self.claim_link_view(req, object_id))(request)
+
+        prefix = f"{self.opts.app_label}_{self.opts.model_name}"
+        urls = [
+            path(
+                "<path:object_id>/reopen/",
+                self.admin_site.admin_view(reopen),
+                name=f"{prefix}_reopen",
+            ),
+            path(
+                "<path:object_id>/claim-link/",
+                self.admin_site.admin_view(claim_link),
+                name=f"{prefix}_claim_link",
+            ),
+        ]
+        return [*urls, *super().get_urls()]
+
+    def claim_link_view(self, request: HttpRequest, object_id: str) -> HttpResponse:
+        """Send or regenerate the claim link (VEN.24), to the legal email of record or to the
+        PEC address on file; `send_claim_link` audits the channel and the masked address."""
+        obj = self.get_object(request, unquote(object_id))
+        if obj is None:
+            raise Http404("No such vendor.")
+        if not self.has_change_permission(request, obj):
+            raise PermissionDenied
+        change_url = reverse("admin:vendors_vendor_change", args=[obj.pk])
+        form = ClaimLinkForm(obj, request.POST or None)
+        if request.method == "POST" and form.is_valid():
+            resent = VendorClaim.objects.filter(vendor=obj).exists()
+            channel = form.cleaned_data["channel"]
+            try:
+                send_claim_link(obj, channel=channel, ctx=audit_context(request))
+            except engine.ClaimError as exc:
+                form.add_error(None, str(exc))
+            else:
+                done = "a new claim link was sent; the previous link no longer works."
+                if not resent:
+                    done = "the claim link was sent."
+                self.message_user(request, f"{obj}: {done}", messages.SUCCESS)
+                return redirect(change_url)
+
+        context = {
+            **self.admin_site.each_context(request),
+            "opts": self.opts,
+            "original": obj,
+            "title": f"Send the claim link of {obj}",
+            "form": form,
+            "change_url": change_url,
+        }
+        return TemplateResponse(request, CLAIM_LINK_TEMPLATE, context)
 
     def reopen_view(self, request: HttpRequest, object_id: str) -> HttpResponse:
         """Move a closed vendor back to onboarding (`reopen_vendor`), with a mandatory reason."""
