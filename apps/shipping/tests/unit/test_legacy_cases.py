@@ -6,6 +6,8 @@ GR, GB and PT; Vendor D with its own carrier and zones, `*` (World) included. Th
 patterns deliberately share their digits with mainland Italian postcodes (case 1).
 """
 
+from typing import Any
+
 import pytest
 
 from apps.core.countries import EU_MEMBER_STATES, InvalidCountry
@@ -248,11 +250,11 @@ def test_parsed_patterns_do_not_change_zone_equality() -> None:
     assert "parsed_patterns" not in repr(a)
 
 
-# --- Case 19: a pattern of a multi-country zone applies only to its own country
+# --- Case 20: a pattern of a multi-country zone applies only to its own country
 
 
 @pytest.mark.parametrize("postcode", ["2800-001", "7000-001", "8500-001"])
-def test_case_19_mainland_portuguese_postcodes_with_a_greek_island_prefix_stay_in_zone_3(
+def test_case_20_mainland_portuguese_postcodes_with_a_greek_island_prefix_stay_in_zone_3(
     postcode: str,
 ) -> None:
     # 28*, 70000..74999 and 85* are Greek island patterns; PT 2800-001 is Almada.
@@ -269,13 +271,13 @@ def test_case_19_mainland_portuguese_postcodes_with_a_greek_island_prefix_stay_i
         ("GB", "9000 1AA", "zone-4"),
     ],
 )
-def test_case_19_each_pattern_applies_to_its_own_country_only(
+def test_case_20_each_pattern_applies_to_its_own_country_only(
     country: str, postcode: str, expected: str
 ) -> None:
     assert zone_for(Destination(country, postcode=postcode)) == expected
 
 
-def test_case_19_provinces_are_qualified_by_country_too() -> None:
+def test_case_20_provinces_are_qualified_by_country_too() -> None:
     zone = ZoneSnap(
         code="islands",
         priority=10,
@@ -290,8 +292,15 @@ def test_case_19_provinces_are_qualified_by_country_too() -> None:
 @pytest.mark.parametrize("field", ["postcode_patterns", "states"])
 def test_an_unqualified_entry_needs_a_zone_with_exactly_one_country(field: str) -> None:
     entry = ("84*",) if field == "postcode_patterns" else ("SS",)
+    fields: dict[str, Any] = {field: entry}
     with pytest.raises(engine.UnqualifiedEntry, match="country"):
-        ZoneSnap(code="z", priority=1, countries=frozenset({"GR", "PT"}), **{field: entry})
+        ZoneSnap(code="z", priority=1, countries=frozenset({"GR", "PT"}), **fields)
     with pytest.raises(engine.UnqualifiedEntry):
-        ZoneSnap(code="z", priority=1, countries=frozenset({"GR"}), group_countries=frozenset({"PT"}), **{field: entry})  # noqa: E501
-    ZoneSnap(code="z", priority=1, countries=frozenset({"GR"}), **{field: entry})
+        ZoneSnap(
+            code="z",
+            priority=1,
+            countries=frozenset({"GR"}),
+            group_countries=frozenset({"PT"}),
+            **fields,
+        )
+    ZoneSnap(code="z", priority=1, countries=frozenset({"GR"}), **fields)
