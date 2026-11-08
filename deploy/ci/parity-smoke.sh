@@ -175,6 +175,8 @@ for c in mpmv-app mpmv-worker; do
 done
 [ "$(podman exec mpmv-app stat -c %u:%g /app/media)" = 10001:10001 ] || fail "media volume not owned by the image user"
 podman exec mpmv-app python manage.py check --deploy --fail-level ERROR
+# Nothing in the app may try to write to the read-only root (e.g. a server control socket).
+if podman logs mpmv-app 2>&1 | grep -F "Read-only file system"; then fail "the app writes to its read-only root"; fi
 endgroup
 
 group "Demo seed (STAGE settings, MPMV_ALLOW_SEED=1)"
