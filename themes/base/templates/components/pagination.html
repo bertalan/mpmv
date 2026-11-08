@@ -1,0 +1,24 @@
+{% load i18n theme_tags %}{% comment %}
+Pagination (THM.4, spec 14 §14.9): the listing pagination of CAT.8 (previous and next links with
+`rel`, "Page N of M") in a labelled `<nav>`, with optional numbered page links. The current page
+is marked `aria-current="page"`; a gap is an ellipsis, never a link. On the first page there is
+no "Previous" link and on the last no "Next" link (plain text keeps the layout, out of the tab
+order). A single page needs no pagination: nothing is rendered.
+
+  {% include "components/pagination.html" with page=window.page page_count=window.page_count previous_url=previous_url next_url=next_url only %}
+
+Context:
+- `page`, `page_count`: the current page and the number of pages (1-based).
+- `previous_url`, `next_url`: the neighbouring pages, empty at either end (CAT.8 views build
+  them with `listing_url`, so the canonical query is kept).
+- `pages` (optional): the numbered links to show, each `number` and `url`; `None` stands for a
+  gap. Without it only "Previous", "Page N of M" and "Next" are shown.
+- `label` (optional): replaces the accessible name "Pagination" when a page has two of them.
+{% endcomment %}{% with previous_url=previous_url|safe_href next_url=next_url|safe_href %}{% if page_count > 1 %}<nav class="pagination" aria-label="{% if label %}{{ label }}{% else %}{% translate 'Pagination' %}{% endif %}">
+  <ul>
+    <li>{% if previous_url %}<a class="pagination__step" href="{{ previous_url }}" rel="prev">{% translate "Previous" %}</a>{% else %}<span class="pagination__step pagination__step--none">{% translate "Previous" %}</span>{% endif %}</li>
+    {% if pages %}{% for item in pages %}<li>{% if item is None %}<span class="pagination__gap">…</span>{% elif item.number == page %}<a class="pagination__page"{% with href=item.url|safe_href %}{% if href %} href="{{ href }}"{% endif %}{% endwith %} aria-label="{% blocktranslate with number=item.number %}Page {{ number }}{% endblocktranslate %}" aria-current="page">{{ item.number }}</a>{% else %}<a class="pagination__page"{% with href=item.url|safe_href %}{% if href %} href="{{ href }}"{% endif %}{% endwith %} aria-label="{% blocktranslate with number=item.number %}Page {{ number }}{% endblocktranslate %}">{{ item.number }}</a>{% endif %}</li>{% endfor %}{% endif %}
+    <li class="pagination__status">{% blocktranslate with page=page count=page_count %}Page {{ page }} of {{ count }}{% endblocktranslate %}</li>
+    <li>{% if next_url %}<a class="pagination__step" href="{{ next_url }}" rel="next">{% translate "Next" %}</a>{% else %}<span class="pagination__step pagination__step--none">{% translate "Next" %}</span>{% endif %}</li>
+  </ul>
+</nav>{% endif %}{% endwith %}

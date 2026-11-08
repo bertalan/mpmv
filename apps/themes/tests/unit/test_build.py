@@ -72,7 +72,7 @@ def test_the_contract_holds_the_spec_pairs() -> None:
     assert pairs[("color.focus", "color.surface-inverse")] == 3.0
     assert pairs[("color.border-control", "color.surface")] == 3.0
     assert pairs[("color.accent", "color.surface")] == 3.0
-    assert len(TOKEN_CONTRACT.pairs) == 23
+    assert len(TOKEN_CONTRACT.pairs) == 25
     for pair in TOKEN_CONTRACT.pairs:
         assert pair.foreground in TOKEN_CONTRACT.required
         assert pair.background in TOKEN_CONTRACT.required

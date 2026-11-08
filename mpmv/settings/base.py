@@ -31,6 +31,7 @@ LOCAL_APPS = [
     "apps.ledger",
     "apps.ingest",
     "apps.cms",
+    "apps.events",  # event pages (EVT.1, spec 15): after cms, whose locales its indexes need
     "apps.themes",  # frontend themes (THM.1, spec 14): imports only core and Wagtail
     "apps.seo",
     "apps.compliance",
@@ -104,6 +105,8 @@ AUTH_USER_MODEL = "accounts.User"
 # Lockout and captcha checks run first, before any password is checked (CORE.5).
 AUTHENTICATION_BACKENDS = [
     "apps.accounts.backends.LoginProtectionBackend",
+    # Vendors do not get the Wagtail admin (spec 15): before ModelBackend, whose groups grant it.
+    "apps.vendors.backends.VendorAdminRefusalBackend",
     "django.contrib.auth.backends.ModelBackend",
 ]
 
@@ -129,6 +132,17 @@ OTP_ADMIN_HIDE_SENSITIVE_DATA = True
 VENDOR_DELETION_AUDIT_HOOKS: list[str] = [
     "apps.api.services.vendor_key_deletions",  # the vendor's API keys (CORE.13)
 ]
+# Vendor closure (CORE.14, VEN.21): each dotted path names a `hook(vendor, *, ctx, dry_run) ->
+# ChangeSet` that revokes, audited, what only an active vendor may hold. Run when a vendor is
+# closed, and again when it is reopened (rows a closure left behind); its changes join the
+# closure's or reopen's ChangeSet.
+VENDOR_CLOSURE_HOOKS: list[str] = [
+    "apps.api.services.revoke_vendor_keys",  # the vendor's API keys
+]
+
+# Allowed vendor countries (CMP.13): `core` cannot import `vendors`, so this names the function
+# that lists the active vendors established outside a new allowed set.
+VENDORS_OUTSIDE_COUNTRIES_HOOK = "apps.vendors.services.active_vendors_outside"
 
 ROOT_URLCONF = "mpmv.urls"
 WSGI_APPLICATION = "mpmv.wsgi.application"

@@ -13,6 +13,9 @@ from django.contrib.auth import get_user_model
 from django.test import Client
 from pytest_django.fixtures import Settings as SettingsWrapper
 
+from apps.themes.styleguide import COMPONENTS
+from apps.themes.tests.builders import SHIPPED_THEMES
+
 # `themes` imports only core (spec 14 §14.3): users come from the shared root fixtures.
 MfaLogin = Callable[[Client, Any], Client]
 
@@ -154,3 +157,119 @@ def test_the_styleguide_shows_busy_buttons_inside_a_form(staff_client: Client) -
     assert form is not None
     assert re.search(r'<button type="submit"[^>]*aria-disabled="true"', form.group(0))
     assert re.search(r'aria-label="[^"]+, [^"]+"', form.group(0))
+
+
+# --- Part 3/3: navigation components, and every §14.9 component on the page
+
+
+def section_html(html: str, section: str) -> str:
+    """The HTML of one top-level styleguide section, up to the next one."""
+    start = html.index(f'<section aria-labelledby="{section}">')
+    end = html.find('<section aria-labelledby="sg-', start + 1)
+    return html[start : end if end >= 0 else len(html)]
+
+
+def test_every_shown_component_is_rendered_in_its_section(staff_client: Client) -> None:
+    html = staff_client.get(URL).content.decode()
+    for name, shown in COMPONENTS.items():
+        assert re.search(rf'<h2 id="{shown.section}"', html), (name, shown.section)
+        # The page frame (skip link, header, language switcher, footer) wraps the page itself.
+        where = html if shown.section == "sg-frame" else section_html(html, shown.section)
+        assert shown.marker in where, (name, shown.section, shown.marker)
+
+
+def test_every_shown_component_is_included_from_its_own_template() -> None:
+    # A marker alone could come from hand-written markup: each component must be rendered by
+    # including its own file in its section of the styleguide, directly or through a component
+    # the section includes (a grid includes its tiles); the page frame through the base layout.
+    sources = SHIPPED_THEMES / "base/templates"
+    styleguide = (sources / "styleguide.html").read_text(encoding="utf-8")
+
+    def with_includes(source: str) -> str:
+        nested = [
+            (sources / name).read_text(encoding="utf-8")
+            for name in re.findall(r'{% include "(components/[a-z_]+\.html)"', source)
+            if (sources / name).is_file()
+        ]
+        return source + "".join(nested)
+
+    for name, shown in COMPONENTS.items():
+        if shown.section == "sg-frame":
+            where = with_includes((sources / "layouts/base.html").read_text(encoding="utf-8"))
+        else:
+            where = with_includes(section_html(styleguide, shown.section))
+        assert f'{{% include "{shown.template}"' in where, (name, shown.template)
+
+
+def test_every_breadcrumb_and_pagination_state_is_shown(staff_client: Client) -> None:
+    html = staff_client.get(URL).content.decode()
+    assert html.count('class="breadcrumb"') >= 2
+    pages = re.findall(r'<nav class="pagination".*?</nav>', html, re.DOTALL)
+    # First, middle and last page, and the numbered variant.
+    assert len(pages) >= 4
+    assert any('rel="prev"' not in nav for nav in pages)
+    assert any('rel="next"' not in nav for nav in pages)
+    assert any("…" in nav for nav in pages)
+
+
+def test_the_tabs_and_in_page_navigation_are_shown(staff_client: Client) -> None:
+    html = staff_client.get(URL).content.decode()
+    assert html.count('x-data="tabs"') >= 2
+    assert "in-page-nav--skip" in html
+    assert re.search(r'<nav class="in-page-nav" aria-label="[^"]+">', html)
+    # The skip link's target is on the page.
+    skip = re.search(r'class="in-page-nav in-page-nav--skip".*?href="#([^"]+)"', html, re.DOTALL)
+    assert skip is not None
+    assert f'id="{skip.group(1)}"' in html
+
+
+def test_the_commerce_components_are_shown_in_every_state(staff_client: Client) -> None:
+    html = staff_client.get(URL).content.decode()
+    price = section_html(html, "sg-price")
+    assert "<del>" in price
+    assert "Lowest price in the last 30 days" in price
+    assert "Price on request" in price
+    rating = section_html(html, "sg-rating")
+    assert "out of 5" in rating
+    assert "No reviews yet" in rating
+    quantity = section_html(html, "sg-quantity")
+    assert re.search(r'<input type="number"[^>]*\sdisabled', quantity)
+    cart = section_html(html, "sg-cart")
+    assert "cart-line--problem" in cart
+    assert cart.count('class="order-summary"') == 2
+    assert section_html(html, "sg-steps").count('aria-current="step"') == 2
+    assert section_html(html, "sg-mini-cart").count('class="mini-cart"') == 3
+
+
+def test_the_interactive_components_work_without_javascript(staff_client: Client) -> None:
+    html = staff_client.get(URL).content.decode()
+    # Every script-only control is hidden in the HTML; base.js reveals it.
+    for attribute in ("data-dialog", "data-carousel", "data-step", "data-toast"):
+        controls = re.findall(rf"<button[^>]*\s{attribute}=[^>]*>", html)
+        assert controls, attribute
+        assert all(re.search(r"\shidden[\s>]", button) for button in controls), attribute
+    assert re.search(r'<form method="dialog"', section_html(html, "sg-dialog"))
+    assert section_html(html, "sg-accordion").count("<details") == 6
+    assert 'role="status" aria-live="polite"' in section_html(html, "sg-toasts")
+
+
+def test_the_content_components_are_shown_in_every_state(staff_client: Client) -> None:
+    html = staff_client.get(URL).content.decode()
+    assert "gallery__placeholder" in section_html(html, "sg-gallery")
+    tables = section_html(html, "sg-tables")
+    assert "No returns yet." in tables
+    assert tables.count('tabindex="0"') == 2
+    assert "hero--image" in section_html(html, "sg-hero")
+    assert "cta-band--accent" in section_html(html, "sg-cta")
+    countdown = section_html(html, "sg-countdown")
+    assert "<time datetime=" in countdown
+    assert "launch-countdown--expired" in countdown
+    assert section_html(html, "sg-empty").count('class="empty-state"') == 2
+
+
+def test_the_image_credit_is_shown_with_and_without_links(staff_client: Client) -> None:
+    credits = section_html(staff_client.get(URL).content.decode(), "sg-credits")
+    assert credits.count('class="image-credit"') >= 3
+    assert 'rel="license"' in credits
+    assert "CC0 1.0" in credits
+    assert '<details class="image-credits">' in credits

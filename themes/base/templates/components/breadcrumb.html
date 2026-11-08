@@ -1,0 +1,16 @@
+{% load i18n theme_tags %}{% comment %}
+Breadcrumb (THM.4, spec 14 §14.9): where the page sits in the site, from the home page down.
+A labelled `<nav>` with an ordered list; every item but the last is a link, the last is the
+current page (`aria-current="page"`, plain text). The separators are drawn by the CSS and hidden
+from assistive technology. The BreadcrumbList JSON-LD is SEO.1's job (spec 10), not this
+component's.
+
+  {% include "components/breadcrumb.html" with items=trail only %}
+
+Context: `items`, a list of `label` and `url`, the current page last. No items, no output.
+`label` replaces the accessible name "Breadcrumb" when a page shows more than one trail.
+{% endcomment %}{% if items %}<nav class="breadcrumb" aria-label="{% if label %}{{ label }}{% else %}{% translate 'Breadcrumb' %}{% endif %}">
+  <ol>
+    {% for item in items %}<li>{% if forloop.last %}<span aria-current="page">{{ item.label }}</span>{% else %}{% with href=item.url|safe_href %}{% if href %}<a href="{{ href }}">{{ item.label }}</a>{% else %}{{ item.label }}{% endif %}{% endwith %}{% endif %}</li>{% endfor %}
+  </ol>
+</nav>{% endif %}

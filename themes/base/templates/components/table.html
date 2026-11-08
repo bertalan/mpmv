@@ -1,0 +1,25 @@
+{% comment %}
+Responsive table (THM.4, spec 14 §14.9): a real data table with a caption and column headers,
+in a scroll container for narrow screens. The container is a named region with `tabindex="0"`,
+so keyboard users can scroll it too (WCAG 2.1.1); the page itself never scrolls sideways
+(1.4.10 allows two-dimensional scrolling for data tables). Numeric columns align right.
+
+  {% include "components/table.html" with id="orders" caption=_("Your orders") columns=columns rows=rows empty=_("No orders yet.") only %}
+
+Context:
+- `id` (required): a prefix for the caption id, unique on the page.
+- `caption` (required): the table's caption, which also names the scroll region.
+- `columns`: a list of `label` and optional `numeric`.
+- `rows`: a list of rows, each a list of cell values in column order; the first cell of a row
+  is its header (`<th scope="row">`).
+- `empty`: the text shown in one cell when there are no rows.
+{% endcomment %}<div class="table-scroll" role="region" aria-labelledby="{{ id }}-caption" tabindex="0">
+  <table class="table">
+    <caption id="{{ id }}-caption">{{ caption }}</caption>
+    <thead><tr>{% for column in columns %}<th scope="col"{% if column.numeric %} class="numeric"{% endif %}>{{ column.label }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      {% for row in rows %}<tr>{% for cell in row %}{% with column=columns|slice:forloop.counter|last %}{% if forloop.first %}<th scope="row">{{ cell }}</th>{% else %}<td{% if column.numeric %} class="numeric"{% endif %}>{{ cell }}</td>{% endif %}{% endwith %}{% endfor %}</tr>
+      {% empty %}<tr><td colspan="{{ columns|length }}">{{ empty }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>

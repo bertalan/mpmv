@@ -1,0 +1,33 @@
+{% load i18n theme_tags %}{% comment %}
+Cart line (THM.4, spec 14 §14.9): one product in the cart, as a list item of a per-vendor
+package (ORD.5). The product name is a link; the quantity stepper and the remove button belong
+to the cart form that wraps the list (the remove button submits `remove=<id>`). Prices arrive
+formatted by the caller. A problem (stock dropped, product withdrawn) is said in words next to
+the line, never by colour alone.
+
+  <ul class="cart-lines" role="list">{% for line in package.lines %}{% include "components/cart_line.html" with id=line.id name=line.name url=line.url vendor=line.vendor unit_price=line.unit_price quantity=line.quantity total=line.total only %}{% endfor %}</ul>
+
+Context:
+- `id` (required): the line id, also the prefix of the quantity field id.
+- `name` (required), `url`: the product and its page.
+- `image_url`, `image_alt`: the product image (alt empty when it only repeats the name).
+- `variant`: the chosen variant, such as "Size M, grey".
+- `vendor`: the vendor's name.
+- `unit_price`, `total` (required): the formatted unit price and line total.
+- `quantity` (required), `max`: the quantity and its limit.
+- `problem`: a message about the line, shown as a warning.
+{% endcomment %}{% with url=url|safe_href %}<li class="cart-line{% if problem %} cart-line--problem{% endif %}">
+  <div class="cart-line__media">{% if image_url %}<img src="{{ image_url }}" alt="{{ image_alt|default:'' }}" width="96" height="96" loading="lazy">{% else %}<div class="cart-line__placeholder" aria-hidden="true"></div>{% endif %}</div>
+  <div class="cart-line__details">
+    <p class="cart-line__name">{% if url %}<a href="{{ url }}">{{ name }}</a>{% else %}{{ name }}{% endif %}</p>
+    {% if variant %}<p class="cart-line__variant">{{ variant }}</p>{% endif %}
+    {% if vendor %}<p class="cart-line__vendor">{% blocktranslate %}Sold by {{ vendor }}{% endblocktranslate %}</p>{% endif %}
+    <p class="cart-line__unit">{% blocktranslate %}{{ unit_price }} each{% endblocktranslate %}</p>
+    {% if problem %}<p class="cart-line__problem"><strong>{% translate "Warning" %}:</strong> {{ problem }}</p>{% endif %}
+  </div>
+  <div class="cart-line__actions">
+    {% blocktranslate asvar quantity_label %}Quantity, {{ name }}{% endblocktranslate %}{% include "components/quantity_stepper.html" with id=id|add:"-quantity" label=quantity_label value=quantity max=max hide_label=True only %}
+    {% blocktranslate asvar remove_label %}Remove {{ name }}{% endblocktranslate %}<button type="submit" class="button button--link button--small cart-line__remove" name="remove" value="{{ id }}" aria-label="{{ remove_label }}">{% translate "Remove" %}</button>
+  </div>
+  <p class="cart-line__total"><span class="visually-hidden">{% translate "Line total" %}: </span>{{ total }}</p>
+</li>{% endwith %}

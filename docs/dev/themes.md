@@ -174,6 +174,15 @@ adds the component library.
   The `theme` context processor exposes it as `help_url`.
 - **Language switcher**: `components/language_switcher.html`, one POST form per language to
   `switch_language`; works without JavaScript.
+- **Component library** (THM.4, spec 14 §14.9): one file per component in
+  `templates/components/`, its context documented in the comment at its top, included with
+  `only`. `apps/themes/styleguide.py` `COMPONENTS` maps every §14.9 component to its styleguide
+  section, template and a marker of its markup; a unit test compares the names with the spec and
+  an integration test checks each marker is rendered in its section. Controls that need
+  JavaScript (dialog openers, carousel buttons, quantity buttons, toast buttons) are rendered
+  `hidden` and revealed by `js/base.js`, so without JavaScript no button does nothing; dialogs
+  are native `<dialog>` elements opened with `showModal()` and closed by a
+  `<form method="dialog">`. The image credit is CMS.8's `core/components/image_credit.html`.
 - **Accessibility rules in `theme.css`**: `:focus-visible` outline of `--focus-width` (3 px) in
   `--color-focus`, never removed; `scroll-padding-top: var(--header-height)` for the sticky
   header, which below 48rem (where it wraps taller than that) is not sticky; header and footer

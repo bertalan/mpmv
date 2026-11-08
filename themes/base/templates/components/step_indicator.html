@@ -1,0 +1,17 @@
+{% load i18n theme_tags %}{% comment %}
+Step indicator (THM.4, spec 14 §14.9): where the visitor is in the checkout. A labelled `<nav>`
+with an ordered list: done steps are links back and say "completed" to screen readers, the
+current step is marked `aria-current="step"`, later steps are plain text. The state is shown by
+a number, a mark and the text, never by colour alone.
+
+  {% include "components/step_indicator.html" with steps=checkout_steps current=2 only %}
+
+Context:
+- `steps`: a list of `label` and `url`.
+- `current` (required): the current step, 1-based.
+- `label`: the accessible name (default "Checkout steps").
+{% endcomment %}<nav class="steps" aria-label="{% firstof label _('Checkout steps') %}">
+  <ol class="steps__list">
+    {% for step in steps %}{% if forloop.counter < current %}<li class="steps__step steps__step--done">{% with href=step.url|safe_href %}{% if href %}<a href="{{ href }}">{% else %}<span>{% endif %}<span class="steps__number" aria-hidden="true">{% include "components/icon.html" with name="check" only %}</span>{{ step.label }}<span class="visually-hidden"> ({% translate "completed" %})</span>{% if href %}</a>{% else %}</span>{% endif %}{% endwith %}</li>{% elif forloop.counter == current %}<li class="steps__step steps__step--current" aria-current="step"><span class="steps__number" aria-hidden="true">{{ forloop.counter }}</span>{{ step.label }}</li>{% else %}<li class="steps__step"><span class="steps__number" aria-hidden="true">{{ forloop.counter }}</span>{{ step.label }}</li>{% endif %}{% endfor %}
+  </ol>
+</nav>

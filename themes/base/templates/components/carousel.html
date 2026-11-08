@@ -1,0 +1,29 @@
+{% load i18n theme_tags %}{% comment %}
+Scroll-snap carousel with buttons (THM.4, spec 14 §14.9): a horizontal list that scrolls and
+snaps with CSS alone (touch, trackpad, Shift + wheel, and the arrow keys once the focusable track
+has the focus). The theme script (base.js) reveals the Previous and Next buttons, which scroll by
+one view, honour `prefers-reduced-motion` and are marked `aria-disabled` at the start and the
+end of the track. Nothing moves on its own, so there is no pause
+control to provide (WCAG 2.2.2); every slide stays in the accessibility tree.
+
+  {% include "components/carousel.html" with id="featured" label=_("Featured products") slides=products only %}
+
+Context:
+- `id` (required): a prefix for the track id, unique on the page.
+- `label` (required): the accessible name of the carousel; its track is named "<label>, list".
+- `slides`: a list of `title`, optional `text`, `url`, `image_url` and `image_alt`; each slide
+  is a small card whose title is its only link.
+- `heading_level`: the level of the slide titles, 2 to 6 (default 3).
+{% endcomment %}<section class="carousel" aria-roledescription="carousel" aria-label="{{ label }}">
+  <div class="carousel__controls">
+    <button type="button" class="button button--secondary button--icon button--small" data-carousel="previous" aria-controls="{{ id }}-track" aria-label="{% translate 'Previous items' %}" hidden>{% include "components/icon.html" with name="chevron-left" only %}</button>
+    <button type="button" class="button button--secondary button--icon button--small" data-carousel="next" aria-controls="{{ id }}-track" aria-label="{% translate 'Next items' %}" hidden>{% include "components/icon.html" with name="chevron-right" only %}</button>
+  </div>
+  <ul class="carousel__track" id="{{ id }}-track" tabindex="0" role="list" aria-label="{% blocktranslate %}{{ label }}, list{% endblocktranslate %}">
+    {% for slide in slides %}<li class="carousel__slide">
+      {% if slide.image_url %}<img src="{{ slide.image_url }}" alt="{{ slide.image_alt|default:'' }}" width="400" height="400" loading="lazy">{% endif %}
+      <h{{ heading_level|default:3 }} class="carousel__title">{% with href=slide.url|safe_href %}{% if href %}<a href="{{ href }}">{{ slide.title }}</a>{% else %}{{ slide.title }}{% endif %}{% endwith %}</h{{ heading_level|default:3 }}>
+      {% if slide.text %}<p>{{ slide.text }}</p>{% endif %}
+    </li>{% endfor %}
+  </ul>
+</section>

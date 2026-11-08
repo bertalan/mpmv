@@ -27,6 +27,8 @@ NOT_SENSITIVE_SERVICES = {
     "apps.cms.services.translate_page": "CMS content, in Wagtail revisions and log",
     "apps.cms.services.sync_page_translations": "CMS content, in Wagtail revisions and log",
     "apps.cms.services.override_image": "CMS content, in Wagtail revisions and log",
+    # EVT.1: creates the missing events index pages; CMS content, like the seed.
+    "apps.events.services.ensure_event_indexes": "CMS content, in Wagtail revisions and log",
     # CMS.8: images are CMS content; admin uploads are in Wagtail's action log.
     "apps.core.services.save_image": "image upload outside the admin, validated, CMS content",
     "apps.core.services.enqueue_email": "the outbox is a delivery queue with its own history",

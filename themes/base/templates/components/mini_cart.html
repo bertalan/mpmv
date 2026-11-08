@@ -1,0 +1,16 @@
+{% load i18n theme_tags %}{% comment %}
+Mini-cart status (THM.4, spec 14 §14.9): the cart link in the header with the number of items.
+The count is said in words ("Cart, 3 items"); the icon and the visual count are hidden from
+assistive technology so it is not read twice. ORD.5 swaps it with htmx (`id`, out of band) and
+announces the change through the toast region, not through this link.
+
+  {% include "components/mini_cart.html" with id="mini-cart" url=cart_url count=cart.count only %}
+
+Context:
+- `url` (required): the cart page.
+- `count`: the number of items (default 0); 0 says "Cart, empty".
+- `id`: an id for the link, to swap it with htmx.
+{% endcomment %}{% with url=url|safe_href %}<a class="mini-cart"{% if url %} href="{{ url }}"{% endif %}{% if id %} id="{{ id }}"{% endif %}>
+  <span class="mini-cart__icon" aria-hidden="true">{% include "components/icon.html" with name="cart" only %}{% if count %}<span class="mini-cart__count">{{ count }}</span>{% endif %}</span>
+  <span class="mini-cart__label">{% translate "Cart" %}<span class="visually-hidden">, {% if count %}{% blocktranslate count counter=count %}{{ counter }} item{% plural %}{{ counter }} items{% endblocktranslate %}{% else %}{% translate "empty" %}{% endif %}</span></span>
+</a>{% endwith %}

@@ -1,0 +1,16 @@
+{% load theme_tags %}{% comment %}
+In-page navigation (THM.4, spec 14 §14.9): links to sections of the same page in a labelled
+`<nav>`, for example "On this page" on a long content page. The "skip" variant is a bypass block
+(WCAG 2.4.1) such as "Skip to filters" before a long product grid: its links stay out of sight
+until they take the keyboard focus, like the page's skip link. The targets need an `id` and,
+when they are not focusable themselves, `tabindex="-1"`, so the focus follows the link.
+
+  {% include "components/in_page_nav.html" with label=_("Skip links") links=skips variant="skip" only %}
+
+Context: `label` (the nav's accessible name), `links` (a list of `label` and `url`, the url an
+`#anchor`), `variant` ("skip", optional). No links, no output.
+{% endcomment %}{% if links %}<nav class="in-page-nav{% if variant == 'skip' %} in-page-nav--skip{% endif %}" aria-label="{{ label }}">
+  <ul>
+    {% for link in links %}<li>{% with href=link.url|safe_href %}{% if href %}<a href="{{ href }}">{{ link.label }}</a>{% else %}{{ link.label }}{% endif %}{% endwith %}</li>{% endfor %}
+  </ul>
+</nav>{% endif %}

@@ -192,6 +192,21 @@ def test_product_cards_show_title_link_and_public_price(
     assert "Price on request" in by_title["Custom bag"].get_text()
 
 
+@pytest.mark.xfail(strict=True, reason="TAX.12: consumer prices must be VAT-inclusive")
+def test_a_consumer_card_shows_a_vat_inclusive_price(client: Client, shop: dict[str, Any]) -> None:
+    """Go-live marker (TAX.12, Directive 98/6/EC): CAT.8 cards show the net price "excl. VAT"
+    as an interim. When TAX.12 makes consumer cards VAT-inclusive this test passes, strict xfail
+    fails the suite, and the marker must be removed."""
+    card = next(
+        card
+        for card in soup(client, "/compatibility/maker/").find_all("article", class_="product-card")
+        if card.find("h3").get_text(strip=True) == "Steel bag"
+    )
+    text = card.get_text(" ", strip=True)
+    assert "excl. VAT" not in text
+    assert "VAT included" in text
+
+
 def test_the_pagination_nav(
     client: Client, shop: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:

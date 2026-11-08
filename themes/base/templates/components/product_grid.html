@@ -1,0 +1,14 @@
+{% comment %}
+Product grid (THM.4, spec 14 §14.9): a responsive grid of product tiles
+(components/product_tile.html), as a plain list so screen readers say how many products it
+holds. The columns come from the CSS (`auto-fill`, at least 13rem each), never from the caller.
+
+  {% include "components/product_grid.html" with products=tiles heading_level=2 only %}
+
+Context:
+- `products`: a list of tiles, each with the context of components/product_tile.html (`name`,
+  `url`, `image_url`, `image_alt`, `price`, `price_before`, `vendor`, `badges`).
+- `heading_level`: the level of the tile names, 2 to 6 (default 3).
+{% endcomment %}<ul class="product-grid" role="list">
+  {% for product in products %}<li>{% include "components/product_tile.html" with name=product.name url=product.url heading_level=heading_level image_url=product.image_url image_alt=product.image_alt image_width=product.image_width image_height=product.image_height price=product.price price_before=product.price_before vendor=product.vendor badges=product.badges only %}</li>{% endfor %}
+</ul>

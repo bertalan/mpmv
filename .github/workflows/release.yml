@@ -54,6 +54,9 @@ jobs:
       - name: Python SBOM (CycloneDX)
         run: make sbom
       - name: Image SBOM (CycloneDX)
+        id: sbom
+        # Fallback below when syft cannot be downloaded from GitHub release assets.
+        continue-on-error: true
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: ${{ env.IMAGE }}:${{ env.VERSION }}
@@ -61,6 +64,16 @@ jobs:
           output-file: build/sbom/mpmv-image.cdx.json
           upload-artifact: false
           upload-release-assets: false
+      - name: Image SBOM fallback (syft container)
+        if: steps.sbom.outcome == 'failure'
+        run: |
+          mkdir -p build/sbom && chmod 0777 build/sbom
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/build/sbom:/out" \
+            anchore/syft:v1.54.0 "$IMAGE:$VERSION" -o cyclonedx-json=/out/mpmv-image.cdx.json
+      - name: Image SBOM present
+        run: test -s build/sbom/mpmv-image.cdx.json
       - name: Push
         run: |
           docker push "$IMAGE:$VERSION"

@@ -1,17 +1,19 @@
-"""Pure shipping rules (no ORM) behind the models and constraints (SHP.1, SHP.12).
+"""Pure shipping rules (no ORM) behind the models and constraints (SHP.1, SHP.12, SHP.14).
 
 Zone matching and precedence live here (spec 06 §6.2): a vendor's own zone wins over platform
 zones for that vendor, then the lowest priority, then the most specific match (postcode >
 province > explicit country > country group), and the rest of the world (`*`) only as a last
 resort. SHP.2 checks the legacy regression cases 1-7 against these functions, normalises the
 destination country once (`EL` -> `GR`, `UK` -> `GB`) and parses a zone's postcode patterns once,
-when its snapshot is built. The quote calculation (SHP.3) also lives here when that task adds it.
+when its snapshot is built. Special areas (SHP.14) are resolved here too: which area an address
+is in and which treatment a method gives it. The quote calculation (SHP.3) also lives here when
+that task adds it.
 """
 
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from enum import IntEnum
 from typing import Final
 
@@ -250,3 +252,362 @@ def resolve_zone(zones: Iterable[ZoneSnap], vendor_id: int, dest: Destination) -
         ),
     )
     return best
+
+
+# --- Special areas (SHP.14)
+#
+# Islands, remote areas and extra-VAT territories are postcode or province lists (platform data,
+# `SpecialArea`). Each shipping method sets the treatment it gives an area; without one, the
+# default applies: an indicative cost subject to quote (the buyer sees the estimate and requests a
+# quote for the exact price, SHP.3 `IndicativeRates`). This module tells SHP.3 which area an
+# address is in and which treatment applies; the quote itself is SHP.3.
+
+ISLAND: Final = "island"
+REMOTE: Final = "remote"
+EXTRA_VAT: Final = "extra_vat"
+# In the order an address in two areas is resolved: the extra-VAT territory first.
+AREA_KINDS: Final = (EXTRA_VAT, ISLAND, REMOTE)
+
+INDICATIVE: Final = "indicative"  # an estimate, then a quote for the exact price (the default)
+SURCHARGE: Final = "surcharge"  # a rate with a surcharge
+QUOTE_ONLY: Final = "quote_only"  # no estimate: the vendor quotes the price
+UNAVAILABLE: Final = "unavailable"  # the method is not offered there; others may be
+BLOCKED: Final = "blocked"  # the method refuses the area: SHP.3 returns Blocked
+TREATMENT_MODES: Final = (INDICATIVE, SURCHARGE, QUOTE_ONLY, UNAVAILABLE, BLOCKED)
+DEFAULT_TREATMENT_MODE: Final = INDICATIVE
+PRICED_MODES: Final = (INDICATIVE, SURCHARGE)  # the buyer sees a cost
+QUOTE_MODES: Final = (INDICATIVE, QUOTE_ONLY)  # the buyer requests a quote
+NO_DAYS_MODES: Final = (UNAVAILABLE, BLOCKED)  # nothing is delivered: no extra days
+
+NO_SURCHARGE: Final = ""
+FIXED: Final = "fixed"  # a net amount per package
+PERCENT: Final = "percent"  # a percentage of the method's cost
+PER_KG: Final = "per_kg"  # a net amount per kg of the package
+SURCHARGE_TYPES: Final = (FIXED, PERCENT, PER_KG)
+
+ZERO_AMOUNT: Final = Decimal("0.00")
+_CENT: Final = Decimal("0.01")
+_HUNDRED: Final = Decimal(100)
+
+# A tax territory code (TAX.1 `Territory.code`): two letters, optionally a dash and a subdivision
+# code. Shipping cannot import the tax app (independent siblings), so it keeps its own copy of
+# the format; `tests/unit/test_special_area_territory_codes.py` keeps the two identical.
+TERRITORY_CODE_MAX_LENGTH: Final = 16
+_TERRITORY_CODE = re.compile(r"[A-Z]{2}(-[A-Z0-9]{1,12})?", re.ASCII)
+
+
+class InvalidTerritoryCode(ValueError):
+    """Raised for text that is not a tax territory code."""
+
+
+def normalize_territory_code(raw: str) -> str:
+    """`ES-CN`, `IT-LIVIGNO`, `FI-01`: the code of the TAX.1 territory, upper case."""
+    code = raw.strip().upper()
+    if not _TERRITORY_CODE.fullmatch(code):
+        raise InvalidTerritoryCode(
+            f"{raw!r} is not a territory code: two letters, optionally '-' and up to 12 "
+            "letters or digits (e.g. ES-CN, IT-LIVIGNO, FI-01)."
+        )
+    return code
+
+
+def treatment_errors(
+    mode: str, surcharge_type: str, surcharge: Decimal, extra_days: int
+) -> dict[str, str]:
+    """What is wrong with a treatment, by field (the database constraints say the same).
+
+    A surcharge has a type and an amount; an estimate may carry one too; the other modes show no
+    cost. Extra days lengthen a delivery, so a method that does not deliver there has none.
+    """
+    errors: dict[str, str] = {}
+    if mode not in TREATMENT_MODES:
+        errors["mode"] = f"Must be one of {', '.join(TREATMENT_MODES)}."
+    if surcharge_type not in (NO_SURCHARGE, *SURCHARGE_TYPES):
+        errors["surcharge_type"] = f"Must be empty or one of {', '.join(SURCHARGE_TYPES)}."
+    elif mode == SURCHARGE and surcharge_type == NO_SURCHARGE:
+        errors["surcharge_type"] = "A surcharge needs its type: fixed, percent or per kg."
+    elif surcharge_type != NO_SURCHARGE and mode in TREATMENT_MODES and mode not in PRICED_MODES:
+        errors["surcharge_type"] = "Only an indicative cost or a surcharge carries a surcharge."
+    if surcharge < 0:
+        errors["surcharge"] = "Must not be negative."
+    elif surcharge_type == NO_SURCHARGE and surcharge != 0 and "surcharge_type" not in errors:
+        errors["surcharge"] = "An amount needs a surcharge type."
+    if mode in NO_DAYS_MODES and extra_days:
+        errors["extra_days"] = "A method that does not deliver to the area has no extra days."
+    return errors
+
+
+@dataclass(frozen=True)
+class SpecialAreaSnap:
+    """A special area as the pure functions see it: the countries it lies in, narrowed by
+    postcode patterns or provinces; `territory_code` names the TAX.1 territory of an extra-VAT
+    area."""
+
+    code: str
+    kind: str
+    countries: frozenset[str]
+    postcode_patterns: tuple[str, ...] = ()
+    states: tuple[str, ...] = ()
+    territory_code: str = ""
+    # Parsed once when the snapshot is built (InvalidPostcodePattern, InvalidState otherwise).
+    # Each pattern and province keeps the country it was written for (`PT:9000..9999`, `IT:SS`).
+    parsed_patterns: tuple[PostcodePattern, ...] = field(init=False, repr=False, compare=False)
+    parsed_states: tuple[tuple[str, str], ...] = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        parsed = tuple(parse_postcode_pattern(raw) for raw in self.postcode_patterns)
+        object.__setattr__(self, "parsed_patterns", parsed)
+        object.__setattr__(self, "parsed_states", tuple(split_state(raw) for raw in self.states))
+
+
+@dataclass(frozen=True)
+class AreaTreatment:
+    """What a method does for an address in a special area."""
+
+    mode: str = DEFAULT_TREATMENT_MODE
+    surcharge_type: str = NO_SURCHARGE
+    surcharge: Decimal = ZERO_AMOUNT
+    extra_days: int = 0
+
+
+DEFAULT_AREA_TREATMENT: Final = AreaTreatment()
+# The method's own zone lies inside the area, so its rate already includes it: a surcharge of 0.
+PRICED_BY_ZONE_TREATMENT: Final = AreaTreatment(mode=SURCHARGE, surcharge_type=FIXED)
+
+
+def surcharged_cost(base_net: Decimal, weight_kg: Decimal, treatment: AreaTreatment) -> Decimal:
+    """The method's net cost with the treatment's surcharge, rounded half up to cents once.
+
+    Fixed: plus the amount. Percent: plus that share of the method's cost. Per kg: plus the
+    amount times the package weight.
+    """
+    extra = ZERO_AMOUNT
+    if treatment.surcharge_type == FIXED:
+        extra = treatment.surcharge
+    elif treatment.surcharge_type == PERCENT:
+        extra = base_net * treatment.surcharge / _HUNDRED
+    elif treatment.surcharge_type == PER_KG:
+        extra = treatment.surcharge * weight_kg
+    return (base_net + extra).quantize(_CENT, rounding=ROUND_HALF_UP)
+
+
+@dataclass(frozen=True)
+class SpecialAreaDecision:
+    """The special area of an address and the treatment one method gives it, for SHP.3.
+
+    `is_default` is true when the method sets no treatment of its own for the area.
+    """
+
+    area: SpecialAreaSnap
+    treatment: AreaTreatment
+    is_default: bool
+
+    @property
+    def mode(self) -> str:
+        return self.treatment.mode
+
+    @property
+    def offers_rate(self) -> bool:
+        """The buyer sees a cost: the estimate or the surcharged rate."""
+        return self.mode in PRICED_MODES
+
+    @property
+    def is_indicative(self) -> bool:
+        """The cost is an estimate (SHP.3 `IndicativeRates`)."""
+        return self.mode == INDICATIVE
+
+    @property
+    def requests_quote(self) -> bool:
+        """The buyer requests a quote for the exact price (SHP.9 quote flow)."""
+        return self.mode in QUOTE_MODES
+
+    @property
+    def is_unavailable(self) -> bool:
+        return self.mode == UNAVAILABLE
+
+    @property
+    def is_blocked(self) -> bool:
+        return self.mode == BLOCKED
+
+    def cost(self, base_net: Decimal, weight_kg: Decimal) -> Decimal | None:
+        """The net cost shown for the method's `base_net` cost, or None when none is shown."""
+        if not self.offers_rate:
+            return None
+        return surcharged_cost(base_net, weight_kg, self.treatment)
+
+    def delivery_days(
+        self, min_days: int | None, max_days: int | None
+    ) -> tuple[int | None, int | None]:
+        """The method's indicative delivery time with the area's extra days."""
+        extra = self.treatment.extra_days
+        return (
+            None if min_days is None else min_days + extra,
+            None if max_days is None else max_days + extra,
+        )
+
+
+def area_match(area: SpecialAreaSnap, dest: Destination) -> Specificity | None:
+    """POSTCODE or PROVINCE when `dest` is in `area`, None otherwise. Same rule as a narrowed
+    zone (`zone_match`): an address without a postcode matches only by its province, and a
+    qualified entry (`PT:9000..9999`, `IT:SS`) applies to its own country only."""
+    if dest.country not in area.countries:
+        return None
+    code = normalize_postcode(dest.postcode)
+    if code and any(
+        pattern.matches_normalized(code) for pattern in _patterns_for(area.parsed_patterns, dest)
+    ):
+        return Specificity.POSTCODE
+    if dest.state and dest.state in _states_for(area.parsed_states, dest):
+        return Specificity.PROVINCE
+    return None
+
+
+def _patterns_for(patterns: Iterable[PostcodePattern], dest: Destination) -> list[PostcodePattern]:
+    """The patterns that apply in `dest`'s country: its own and the unqualified ones."""
+    return [pattern for pattern in patterns if pattern.country in ("", dest.country)]
+
+
+def _states_for(states: Iterable[tuple[str, str]], dest: Destination) -> set[str]:
+    """The province codes that apply in `dest`'s country: its own and the unqualified ones."""
+    return {code for country, code in states if country in ("", dest.country)}
+
+
+def _all_digits(*texts: str) -> bool:
+    return all(text.isascii() and text.isdigit() for text in texts)
+
+
+def _digit_blocks(low: str, high: str) -> list[str] | None:
+    """The prefixes that cover exactly the heads LOW..HIGH of a digit range (`07000..09999` ->
+    `07`, `08`, `09`), or None when a bound is not all digits."""
+    if not _all_digits(low, high):
+        return None
+    width, start, stop = len(low), int(low), int(high)
+    blocks: list[str] = []
+    while start <= stop:
+        size = 0
+        while (
+            size < width and start % 10 ** (size + 1) == 0 and start + 10 ** (size + 1) - 1 <= stop
+        ):
+            size += 1
+        blocks.append(str(start).zfill(width)[: width - size])
+        start += 10**size
+    return blocks
+
+
+def _prefix_within(prefix: str, outer: PostcodePattern) -> bool:
+    """True when every postcode starting with `prefix` matches `outer`."""
+    if outer.kind == "prefix":
+        return prefix.startswith(outer.low)
+    if outer.kind == "range":
+        width = len(outer.low)
+        if len(prefix) >= width:
+            return outer.low <= prefix[:width] <= outer.high
+        # A shorter digit prefix (`90` in `9000..9499`): all its digit heads, 9000..9099.
+        pad = width - len(prefix)
+        return (
+            _all_digits(prefix, outer.low, outer.high)
+            and outer.low <= prefix + "0" * pad
+            and prefix + "9" * pad <= outer.high
+        )
+    return False  # an exact postcode never holds a whole prefix
+
+
+def _pattern_within(inner: PostcodePattern, outers: Sequence[PostcodePattern]) -> bool:
+    """True when every postcode `inner` matches is matched by one of `outers`."""
+    if inner.kind == "exact":
+        return any(outer.matches_normalized(inner.low) for outer in outers)
+    if inner.kind == "prefix":
+        return any(_prefix_within(inner.low, outer) for outer in outers)
+    blocks = _digit_blocks(inner.low, inner.high)
+    if blocks is not None:
+        return all(any(_prefix_within(block, outer) for outer in outers) for block in blocks)
+    # A range with letters: proven only when one outer pattern holds both bounds' heads.
+    return any(
+        (
+            outer.kind == "prefix"
+            and inner.low.startswith(outer.low)
+            and inner.high.startswith(outer.low)
+        )
+        or (
+            outer.kind == "range"
+            and len(outer.low) <= len(inner.low)
+            and outer.low <= inner.low[: len(outer.low)]
+            and inner.high[: len(outer.low)] <= outer.high
+        )
+        for outer in outers
+    )
+
+
+def zone_within_area(zone: ZoneSnap, area: SpecialAreaSnap, dest: Destination) -> bool:
+    """True when the entries through which `zone` matches `dest` all lie inside `area`.
+
+    The zone then prices the area itself (spec 06 cases 2 and 4: a vendor's own islands zone with
+    weight bands). A zone that is not narrowed, or that reaches `dest` through a province or a
+    prefix wider than the area (a regional zone by province around a postcode-defined island, the
+    whole country through `0*`..`9*`), proves nothing: the area keeps its default.
+    """
+    code = normalize_postcode(dest.postcode)
+    matched_patterns = [
+        pattern
+        for pattern in _patterns_for(zone.parsed_patterns, dest)
+        if code and pattern.matches_normalized(code)
+    ]
+    matched_states = (
+        {dest.state} & _states_for(zone.parsed_states, dest) if dest.state else set[str]()
+    )
+    if not matched_patterns and not matched_states:
+        return False
+    area_patterns = _patterns_for(area.parsed_patterns, dest)
+    return all(_pattern_within(pattern, area_patterns) for pattern in matched_patterns) and (
+        matched_states <= _states_for(area.parsed_states, dest)
+    )
+
+
+def resolve_special_area(
+    areas: Iterable[SpecialAreaSnap], dest: Destination
+) -> SpecialAreaSnap | None:
+    """The special area `dest` is in, or None.
+
+    When several match: a postcode match before a province match, then extra-VAT before island
+    before remote, then the code, so the result never depends on the order of `areas`.
+    """
+    candidates = [
+        (area, specificity) for area in areas if (specificity := area_match(area, dest)) is not None
+    ]
+    if not candidates:
+        return None
+    best, _ = min(
+        candidates,
+        key=lambda item: (
+            item[1],
+            AREA_KINDS.index(item[0].kind) if item[0].kind in AREA_KINDS else len(AREA_KINDS),
+            item[0].code,
+        ),
+    )
+    return best
+
+
+def special_area_treatment(
+    areas: Iterable[SpecialAreaSnap],
+    treatments: Mapping[str, AreaTreatment],
+    dest: Destination,
+    zone: ZoneSnap | None = None,
+) -> SpecialAreaDecision | None:
+    """Which special area `dest` is in and the treatment a method gives it (`treatments` by area
+    code), or None when `dest` is in no special area. Without a treatment of its own, the method
+    gives the default: an indicative cost subject to quote.
+
+    `zone` is the method's zone. When it reaches `dest` only through entries inside the area
+    (`zone_within_area`), it already prices the area, so without a treatment of its own the
+    method keeps its normal rate: no surcharge, not indicative, no quote. An extra-VAT territory
+    always keeps the default: a method that prices one sets a treatment of its own.
+    """
+    area = resolve_special_area(areas, dest)
+    if area is None:
+        return None
+    treatment = treatments.get(area.code)
+    if treatment is not None:
+        return SpecialAreaDecision(area, treatment, is_default=False)
+    if zone is not None and area.kind != EXTRA_VAT and zone_within_area(zone, area, dest):
+        return SpecialAreaDecision(area, PRICED_BY_ZONE_TREATMENT, is_default=False)
+    return SpecialAreaDecision(area, DEFAULT_AREA_TREATMENT, is_default=True)

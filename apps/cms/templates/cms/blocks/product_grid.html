@@ -2,6 +2,8 @@
 The product grid (CMS.10): the CAT.8 listing's products as base theme product tiles (THM.4);
 left out when no product is public. The heading falls back to the listing's name (block
 context), and "See all" names its listing for screen readers.
+TODO(TAX.12): interim net price "excl. VAT", like catalog/includes/product_card.html; TAX.12
+replaces it with the gross amount for B2C buyers. This net display must not reach LIVE.
 {% endcomment %}
 {% if cards %}
 <section class="block block-product-grid">
