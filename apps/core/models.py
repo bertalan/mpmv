@@ -1,5 +1,6 @@
 """Core models: the abstract base, translation and versioned-configuration models, the
-append-only audit log, the platform operator, the feature flags, the shared image model."""
+append-only audit log, the platform operator, the feature flags, the shared image model and its
+licence allow list."""
 
 import uuid
 from typing import Any, ClassVar, Self
@@ -13,6 +14,13 @@ from wagtail.images.models import AbstractImage, AbstractRendition, Image
 
 from . import flags, translations
 from .fields import CountryField, LanguageField
+from .image_licences import (
+    Credit,
+    LicenceTerms,
+    credit_for,
+    metadata_errors,
+    restricted_licence_error,
+)
 
 
 class BaseModel(models.Model):
@@ -393,19 +401,126 @@ class FeatureFlag(BaseModel):
         return flags.spec_of(self.name) if flags.is_registered(self.name) else None
 
 
+class ImageLicence(BaseModel):
+    """An entry of the image licence allow list (CMS.8, spec 10 §10.2), edited by staff.
+
+    Written through `services.save_image_licence` (audited). Non-commercial and
+    no-derivatives licences are refused. Entries are never deleted while an image uses them.
+    """
+
+    code = models.CharField(max_length=40, unique=True, help_text="For example CC-BY-4.0.")
+    name = models.CharField(max_length=100, help_text="Shown in credits, e.g. CC BY 4.0.")
+    url = models.URLField("licence URL", blank=True)
+    attribution_required = models.BooleanField(
+        default=False, help_text="Images under this licence show a credit."
+    )
+    source_required = models.BooleanField(
+        default=True, help_text="Images under this licence need the URL they come from."
+    )
+    permission_required = models.BooleanField(
+        default=False, help_text="Images need a reference to a stored written permission."
+    )
+
+    class Meta:
+        ordering = ("code",)
+        verbose_name = "image licence"
+
+    def __str__(self) -> str:
+        return self.name
+
+    def clean(self) -> None:
+        error = restricted_licence_error(self.code, self.name, self.url)
+        if error is not None:
+            raise ValidationError({"code": error})
+
+    @property
+    def terms(self) -> LicenceTerms:
+        return LicenceTerms(
+            code=self.code,
+            name=self.name,
+            url=self.url,
+            attribution_required=self.attribution_required,
+            source_required=self.source_required,
+            permission_required=self.permission_required,
+        )
+
+
 class MediaImage(AbstractImage):  # type: ignore[misc]  # Wagtail is untyped
     """The site's image model (`WAGTAILIMAGES_IMAGE_MODEL`, spec 10 §10.2).
 
     Shared by CMS pages, products (CAT.4), vendor logos and banners. It is the image model from
-    the first image on (I18N.3), so no image ever has to move between models; CMS.8 adds the
-    licence, source, author, credit and permission fields and their upload validation.
+    the first image on (I18N.3), so no image ever has to move between models.
+
+    CMS.8: every image names its licence (from the `ImageLicence` allow list) and author, plus
+    the source URL or permission reference its licence requires; `clean` refuses an image
+    without them, in the Wagtail admin and in `services.save_image`. The columns accept empty
+    values so that images migrated without known metadata can exist: they are listed for
+    review and cannot be chosen for new content until classified.
     """
 
-    admin_form_fields = Image.admin_form_fields
+    licence = models.ForeignKey(
+        ImageLicence,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="From the allow list: only licences that allow commercial use.",
+    )
+    author = models.CharField(
+        max_length=200, blank=True, help_text="The author or rights holder to credit."
+    )
+    source_url = models.URLField(
+        "source URL",
+        max_length=500,
+        blank=True,
+        help_text="Where the image comes from; not needed for own work or vendor images.",
+    )
+    credit_text = models.CharField(
+        max_length=250, blank=True, help_text="Optional: replaces the generated credit line."
+    )
+    permission_ref = models.CharField(
+        "permission reference",
+        max_length=200,
+        blank=True,
+        help_text="Written permission: reference of the stored permission document.",
+    )
+
+    METADATA_FIELDS = ("licence", "author", "source_url", "credit_text", "permission_ref")
+    admin_form_fields = (*Image.admin_form_fields, *METADATA_FIELDS)
 
     class Meta(AbstractImage.Meta):  # type: ignore[misc]
         verbose_name = "image"
         verbose_name_plural = "images"
+
+    def _terms(self) -> LicenceTerms | None:
+        licence = self.licence if self.licence_id is not None else None
+        return None if licence is None else licence.terms
+
+    def clean(self) -> None:
+        super().clean()
+        errors = metadata_errors(
+            self._terms(),
+            author=self.author,
+            source_url=self.source_url,
+            permission_ref=self.permission_ref,
+        )
+        if errors:
+            raise ValidationError(errors)
+
+    @property
+    def needs_review(self) -> bool:
+        """Migrated without its licence or author: to classify before any new use."""
+        return self.licence_id is None or not self.author.strip()
+
+    @property
+    def credit(self) -> Credit | None:
+        """The credit to show with the image; None when its licence needs no attribution."""
+        return credit_for(
+            self._terms(),
+            author=self.author,
+            source_url=self.source_url,
+            credit_text=self.credit_text,
+        )
 
 
 class MediaImageRendition(AbstractRendition):  # type: ignore[misc]

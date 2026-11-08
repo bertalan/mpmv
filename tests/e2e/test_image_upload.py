@@ -5,6 +5,7 @@ no licence and no author and gets the errors; with a free licence, its author an
 image is saved.
 """
 
+import re
 import secrets
 from collections.abc import Callable
 from pathlib import Path
@@ -12,6 +13,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Page, expect
 from pytest_django.live_server_helper import LiveServer
+from wagtail.models import Collection
 
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
@@ -41,8 +43,12 @@ def test_an_upload_without_licence_or_author_is_refused_then_accepted_with_them(
         url="https://creativecommons.org/licenses/by/4.0/",
         attribution_required=True,
     )
+    if Collection.get_first_root_node() is None:  # flushed by an earlier transactional test
+        Collection.add_root(name="Root")
     upload = tmp_path / "lake.png"
-    upload.write_bytes(MediaImageFactory.build(file__filename="lake.png").file.read())
+    upload.write_bytes(
+        MediaImageFactory.build(file__filename="lake.png", file__format="PNG").file.read()
+    )
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
     page.goto(f"{live_server.url}/admin/login/")
@@ -56,7 +62,8 @@ def test_an_upload_without_licence_or_author_is_refused_then_accepted_with_them(
     page.locator("input[type=file][name=file]").set_input_files(upload)
     page.locator("form [type=submit]").last.click()
 
-    expect(page.locator(".error-message, .w-field__errors").first).to_be_visible()
+    expect(page.get_by_text("Choose the image's licence.")).to_be_visible()
+    expect(page.get_by_text("Name the author or rights holder to credit.")).to_be_visible()
     assert not MediaImage.objects.filter(title="Lake at dawn").exists()
     shot("upload-refused")
 
@@ -66,6 +73,7 @@ def test_an_upload_without_licence_or_author_is_refused_then_accepted_with_them(
     page.get_by_label("Source URL").fill("https://example.com/lake")
     page.locator("form [type=submit]").last.click()
 
+    expect(page).not_to_have_url(re.compile(r"/images/add/"))
     expect(page.locator(".messages")).to_be_visible()
     image = MediaImage.objects.get(title="Lake at dawn")
     assert image.author == "Ada Lovelace"

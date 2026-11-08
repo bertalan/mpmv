@@ -1,4 +1,4 @@
-{% load i18n static wagtailcore_tags cms_tags %}{% get_current_language as LANGUAGE_CODE %}{% wagtail_site as current_site %}<!doctype html>
+{% load i18n static wagtailcore_tags cms_tags image_credits %}{% get_current_language as LANGUAGE_CODE %}{% wagtail_site as current_site %}<!doctype html>
 <html lang="{{ LANGUAGE_CODE }}">
 <head>
   <meta charset="utf-8">
@@ -22,6 +22,7 @@
   </header>
   <main class="site-main">
     {% block content %}{% endblock %}
+    {% if page %}{% page_image_credits page as image_credits %}{% image_credits_disclosure image_credits %}{% endif %}
   </main>
   <footer class="site-footer">
     {% navigation_links "footer" as footer_links %}

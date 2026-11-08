@@ -7,13 +7,13 @@ class CoreConfig(AppConfig):
     label = "core"
 
     # Audit policy (SEC.4, docs/dev/audit-trail.md), enforced by the core.E2xx system check.
-    audited_models = ("platformoperator", "featureflag")
+    audited_models = ("platformoperator", "featureflag", "imagelicence")
     unaudited_models = {
         "auditlog": "the audit log itself (append-only)",
         "heartbeat": "worker telemetry, not a domain change",
         "throttle": "login counters; the lockouts they cause are audited by accounts",
-        "mediaimage": "Wagtail image: editor upload, logged in Wagtail's action log (CMS.8 adds "
-        "the licence fields)",
+        "mediaimage": "Wagtail image: editor upload, logged in Wagtail's action log; its licence "
+        "metadata is validated by the model (CMS.8)",
         "mediaimagerendition": "a resized copy of an image, made by templates",
         # The job queue (ADR-0004) is used only through apps.core.tasks; its admin is read-only.
         "procrastinate.procrastinatejob": "background job queue, read-only admin",

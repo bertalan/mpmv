@@ -51,6 +51,7 @@ def test_adding_a_licence_is_audited() -> None:
     assert [c.op for c in changes.changes] == ["create"]
     entry = AuditLog.objects.get(action="core.image_licence.created")
     assert entry.target_key == str(licence.public_id)
+    assert isinstance(entry.after, dict)
     assert entry.after["code"] == "CC-BY-3.0"
 
 
