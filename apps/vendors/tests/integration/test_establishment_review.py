@@ -30,15 +30,29 @@ pytestmark = pytest.mark.django_db
 
 STAFF_CTX = AuditContext(actor_id=1, actor_label="staff:reviewer", source="admin", ip="10.0.0.1")
 
+SWISS_WITH_ITALIAN_ESTABLISHMENT = {"non_eu_company": True, "establishment_country": "IT"}
+
 MOVES_OUT = [
-    pytest.param({"registered_country": "CN"}, ("CN", "IT"), id="registered-office-to-CN"),
-    pytest.param({"establishment_country": ""}, ("CH", ""), id="loses-eu-establishment"),
+    pytest.param(
+        {"eu_company": True},
+        {"registered_country": "CN"},
+        ("DE", ""),
+        ("CN", ""),
+        id="registered-office-to-CN",
+    ),
+    pytest.param(
+        SWISS_WITH_ITALIAN_ESTABLISHMENT,
+        {"establishment_country": ""},
+        ("CH", "IT"),
+        ("CH", ""),
+        id="loses-eu-establishment",
+    ),
 ]
 
 
-def admitted_vendor(status: str = Vendor.Status.ACTIVE) -> Vendor:
-    """A Swiss company admitted through its permanent establishment in Italy."""
-    return VendorFactory.create(status=status, non_eu_company=True, establishment_country="IT")
+def admitted_vendor(status: str = Vendor.Status.ACTIVE, **fields: Any) -> Vendor:
+    """By default a Swiss company admitted through its permanent establishment in Italy."""
+    return VendorFactory.create(status=status, **(fields or SWISS_WITH_ITALIAN_ESTABLISHMENT))
 
 
 def flag_changes(changeset: Any) -> list[Any]:
@@ -49,12 +63,16 @@ def flag_changes(changeset: Any) -> list[Any]:
     ]
 
 
-@pytest.mark.parametrize(("edit", "place"), MOVES_OUT)
+@pytest.mark.parametrize(("fields", "edit", "was", "place"), MOVES_OUT)
 @pytest.mark.parametrize("status", [Vendor.Status.ACTIVE, Vendor.Status.SUSPENDED])
 def test_moving_out_of_the_set_flags_the_vendor_for_staff(
-    edit: dict[str, str], place: tuple[str, str], status: str
+    fields: dict[str, Any],
+    edit: dict[str, str],
+    was: tuple[str, str],
+    place: tuple[str, str],
+    status: str,
 ) -> None:
-    vendor = admitted_vendor(status)
+    vendor = admitted_vendor(status, **fields)
     for name, value in edit.items():
         setattr(vendor, name, value)
 
@@ -70,7 +88,9 @@ def test_moving_out_of_the_set_flags_the_vendor_for_staff(
 
     entry = AuditLog.objects.get(action=ESTABLISHMENT_FLAGGED)
     assert entry.target_key == str(vendor.public_id)
-    assert entry.before["permanent_establishment"] == "IT"
+    assert entry.before is not None
+    assert entry.after is not None
+    assert (entry.before["registered_office"], entry.before["permanent_establishment"]) == was
     assert entry.after["establishment_allowed"] is False
     assert entry.after["registered_office"] == place[0]
     assert AuditLog.objects.filter(action="vendor.updated").count() == 1
@@ -129,6 +149,7 @@ def test_the_activation_audit_records_how_the_vendor_qualified() -> None:
     ContractAcceptanceFactory.create(vendor=vendor)
     change_status(vendor, Vendor.Status.ACTIVE, ctx=STAFF_CTX)
     entry = AuditLog.objects.get(action="vendor.status_changed")
+    assert entry.after is not None
     assert entry.after["registered_office"] == "CN"
     assert entry.after["permanent_establishment"] == "IT"
     assert entry.after["establishment_allowed"] is True
@@ -140,8 +161,9 @@ def test_reinstating_a_vendor_outside_the_set_is_allowed_and_recorded() -> None:
     )
     for dry_run in (True, False):
         changeset = change_status(vendor, Vendor.Status.ACTIVE, ctx=STAFF_CTX, dry_run=dry_run)
-        assert changeset.changes[0].after["establishment_allowed"] is False
+        assert (changeset.changes[0].after or {})["establishment_allowed"] is False
     entry = AuditLog.objects.get(action="vendor.status_changed")
+    assert entry.after is not None
     assert entry.after["establishment_allowed"] is False
     assert entry.after["registered_office"] == "RS"
     assert Vendor.objects.get(pk=vendor.pk).status == Vendor.Status.ACTIVE

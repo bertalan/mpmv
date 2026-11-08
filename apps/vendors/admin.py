@@ -19,6 +19,7 @@ from django.utils.safestring import SafeString
 
 from apps.core.admin import step_up
 from apps.core.audit import audit_context
+from apps.core.changeset import ChangeSet
 
 from . import engine
 from .models import (
@@ -39,6 +40,8 @@ from .services import (
     delete_requirement,
     delete_vendor,
     delete_vendor_flag,
+    establishment_flags,
+    establishment_warning,
     legal_profile_completeness,
     onboarding_checklist,
     save_contract,
@@ -51,6 +54,16 @@ from .services import (
 StatusAction = Callable[[admin.ModelAdmin[Vendor], HttpRequest, QuerySet[Vendor]], None]
 
 
+def warn_about_establishment(
+    modeladmin: admin.ModelAdmin[Vendor], request: HttpRequest, vendor: Vendor, changes: ChangeSet
+) -> None:
+    """Warn staff when a save or a reinstatement leaves `vendor` outside the allowed vendor
+    countries (CMP.13): staff decide, nobody is suspended automatically."""
+    for change in establishment_flags(changes):
+        warning = establishment_warning(change.after or {}, vendor.status)
+        modeladmin.message_user(request, f"{vendor}: {warning}", messages.WARNING)
+
+
 def status_action(target: VendorStatus) -> StatusAction:
     """An admin action that moves the selected vendors to `target` through the service."""
 
@@ -61,11 +74,12 @@ def status_action(target: VendorStatus) -> StatusAction:
         moved = 0
         for vendor in queryset:
             try:
-                change_status(vendor, target, ctx=ctx)
+                changes = change_status(vendor, target, ctx=ctx)
             except engine.InvalidTransition as exc:
                 modeladmin.message_user(request, f"{vendor}: {exc}", messages.ERROR)
             else:
                 moved += 1
+                warn_about_establishment(modeladmin, request, vendor, changes)
         if moved:
             modeladmin.message_user(
                 request, f"{moved} vendor(s) moved to {target.label.lower()}.", messages.SUCCESS
@@ -244,7 +258,8 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         return format_html('<a href="{}">Changes to this vendor</a>', url)
 
     def save_model(self, request: HttpRequest, obj: Vendor, form: Any, change: bool) -> None:
-        save_vendor(obj, ctx=audit_context(request))
+        changes = save_vendor(obj, ctx=audit_context(request))
+        warn_about_establishment(self, request, obj, changes)
 
     def delete_model(self, request: HttpRequest, obj: Vendor) -> None:
         delete_vendor(obj, ctx=audit_context(request))
