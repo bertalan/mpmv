@@ -237,11 +237,13 @@ These rows are the payout gate, and the seeded rows include the DAC7 dataset of
 
 | Vendors | Required for a payout |
 |---|---|
-| Every vendor | registered office street, postal code, city and country; country of tax residence |
+| Every vendor | registered office street, postal code, city and country; country of tax residence; TIN issuing country (VEN.23) |
+| Sole proprietors | date of birth (DAC7, VEN.23) |
+| Every other legal form | business registration number (DAC7, VEN.23) |
 | Italy | PEC, codice fiscale, fiscal regime, delivery channel, registered office province |
 | Italian companies (not sole proprietors) | REA office, REA number, liquidation status |
 | EU member states, Italy included | VAT number, IBAN |
-| Outside the EU | IBAN, foreign TIN (`tax_code`) |
+| Outside the EU | IBAN (the TIN, or a place of birth where none is issued, comes from the DAC7 check, VEN.23) |
 
 The "Outside the EU" rows stay at go-live: a vendor with its registered office outside the EU
 and a permanent establishment in the EU can be activated (CMP.13), and the rows are ready for the
@@ -254,7 +256,9 @@ vendor has one, and it is checked with VIES (TAX.5). A "same as the VAT number" 
 companies whose TIN is their VAT number. Formats are checked per issuing country. When the
 issuing country does not issue TINs, the vendor gives the place of birth instead. Staff can
 correct or complete the dataset from the admin, behind an MFA step-up and with an AuditLog entry
-for each change.
+for each change. The DAC7 check (`engine.dac7_check`) is not a requirement row: the payout gate
+applies it on top of the active rows, so deactivating a row never lets a vendor with an
+incomplete DAC7 dataset through. The rows mirror the dataset for staff.
 
 So every vendor that passes the gate has a VAT number or a TIN, and the legal name is always
 present. Payout code (VEN.6, VEN.7) calls `assert_payout_allowed(vendor)`, which refuses with

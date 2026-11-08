@@ -89,7 +89,8 @@ def test_deactivating_every_requirement_row_cannot_relax_dac7(seeded: None) -> N
     with pytest.raises(engine.PayoutNotAllowed) as excinfo:
         assert_payout_allowed(vendor)
     assert excinfo.value.missing == ("tax_code", "iban")
-    assert legal_profile_completeness(vendor).missing == ("tax_code", "iban")
+    stored = Vendor.objects.get(pk=vendor.pk)
+    assert legal_profile_completeness(stored).missing == ("tax_code", "iban")
 
 
 def test_an_individual_without_a_date_of_birth_cannot_be_paid(seeded: None) -> None:
@@ -194,18 +195,18 @@ def test_same_as_vat_follows_a_new_vat_number_only_after_vies() -> None:
 
 def test_date_and_place_of_birth_are_encrypted_at_rest_and_masked_in_the_audit() -> None:
     vendor = VendorFactory.create(italian_sole_proprietor=True)
-    vendor.place_of_birth = "Milan"
+    vendor.place_of_birth = "Bergamo"
     vendor.date_of_birth = dt.date(1979, 3, 4)
     save_vendor(vendor, ctx=CTX)
     assert raw_column(vendor, "date_of_birth").startswith("enc1:")
     assert raw_column(vendor, "place_of_birth").startswith("enc1:")
     stored = Vendor.objects.get(pk=vendor.pk)
     assert stored.date_of_birth == dt.date(1979, 3, 4)
-    assert stored.place_of_birth == "Milan"
+    assert stored.place_of_birth == "Bergamo"
     entry = AuditLog.objects.filter(action="vendor.updated").latest("id")
     text = str(entry.before) + str(entry.after)
     assert "1979" not in text
-    assert "Milan" not in text
+    assert "Bergamo" not in text
 
 
 # --- Staff corrections: MFA step-up and audit
