@@ -97,8 +97,18 @@ def _node(key: str, names: Texts, slugs: Texts, *children: Node) -> Node:
     return Node(key=key, names=names, slugs={"en": key, **slugs}, children=children)
 
 
+# The seed's top-level categories carry this prefix in every language, so they never collide
+# with, or get mistaken for, a real category; their subcategories are the seed's by their parent.
+SEED_SLUG_PREFIX: Final = "demo-"
+
+
+def _root(key: str, names: Texts, slugs: Texts, *children: Node) -> Node:
+    prefixed = {lang: f"{SEED_SLUG_PREFIX}{slug}" for lang, slug in {"en": key, **slugs}.items()}
+    return Node(key=prefixed["en"], names=names, slugs=prefixed, children=children)
+
+
 CATEGORIES: Final = (
-    _node(
+    _root(
         "home-kitchen",
         {
             "en": "Home & kitchen",
@@ -131,7 +141,7 @@ CATEGORIES: Final = (
             {"it": "pentole-utensili", "de": "kochgeschirr", "fr": "ustensiles", "es": "menaje"},
         ),
     ),
-    _node(
+    _root(
         "clothing",
         {
             "en": "Clothing",
@@ -164,7 +174,7 @@ CATEGORIES: Final = (
             {"it": "accessori", "de": "accessoires", "fr": "accessoires", "es": "accesorios"},
         ),
     ),
-    _node(
+    _root(
         "books-stationery",
         {
             "en": "Books & stationery",
@@ -196,7 +206,7 @@ CATEGORIES: Final = (
             {"it": "quaderni", "de": "notizbuecher", "fr": "carnets", "es": "cuadernos"},
         ),
     ),
-    _node(
+    _root(
         "outdoor-garden",
         {
             "en": "Outdoor & garden",
@@ -228,7 +238,7 @@ CATEGORIES: Final = (
             {"it": "giardino", "de": "garten", "fr": "jardin", "es": "jardin"},
         ),
     ),
-    _node(
+    _root(
         "home-decor",
         {
             "en": "Home decor",
@@ -350,6 +360,7 @@ class VendorSeed:
     fiscal_regime: str
     vat_regime: str  # tax engine: oss, domestic_only, exempt
     exempt_reason: str
+    exempt_country: str  # TAX.13: the country of the law behind an "other" exemption
     identity: dict[str, str]  # further Vendor fields: address, identifiers, bank
     tagline: Texts
     description: Texts
@@ -410,6 +421,7 @@ VENDORS: Final = (
         fiscal_regime="RF01",
         vat_regime="domestic_only",
         exempt_reason="",
+        exempt_country="",
         share_capital=Decimal("10000.00"),
         identity={
             "registered_street": "Via Esempio",
@@ -446,6 +458,7 @@ VENDORS: Final = (
         fiscal_regime="RF19",
         vat_regime="exempt",
         exempt_reason="flat_rate_forfettario",
+        exempt_country="",
         identity={
             "first_name": "Bianca",
             "last_name": "Esempio",
@@ -480,6 +493,7 @@ VENDORS: Final = (
         fiscal_regime="RF01",
         vat_regime="exempt",
         exempt_reason="art74_publishing",
+        exempt_country="",
         share_capital=Decimal("20000.00"),
         identity={
             "registered_street": "Via Esempio",
@@ -516,6 +530,7 @@ VENDORS: Final = (
         fiscal_regime="RF18",
         vat_regime="oss",
         exempt_reason="",
+        exempt_country="",
         oss_since=dt.date(2025, 7, 1),
         identity={
             "registered_street": "Beispielstrasse",
@@ -551,6 +566,7 @@ VENDORS: Final = (
         fiscal_regime="RF20",
         vat_regime="exempt",
         exempt_reason="other",
+        exempt_country="FR",  # French franchise en base, the VAT number's country
         identity={
             "registered_street": "Rue Exemple",
             "registered_street_number": "5",
@@ -1177,7 +1193,7 @@ HOME_HERO_ALT: Final[Texts] = {
 }
 
 HOW_IT_WORKS: Final = PageSeed(
-    slug={"en": "how-it-works", "it": "come-funziona"},
+    slug={"en": "demo-how-it-works", "it": "demo-come-funziona"},
     title={"en": "How it works (demo)", "it": "Come funziona (demo)"},
     body={
         "en": "<p>Each vendor runs its own shop on the marketplace and ships its own orders. "

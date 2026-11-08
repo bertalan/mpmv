@@ -8,7 +8,7 @@ import time
 from collections import Counter
 from typing import Any
 
-from django.core.management.base import BaseCommand, CommandParser
+from django.core.management.base import BaseCommand, CommandError, CommandParser
 
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
@@ -32,6 +32,10 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
+        try:
+            services.check_seed_allowed()
+        except services.SeedNotAllowed as exc:
+            raise CommandError(str(exc)) from exc
         started = time.monotonic()
         action = services.reset if options["reset"] else services.seed
         changes = action(ctx=CTX, dry_run=options["dry_run"])

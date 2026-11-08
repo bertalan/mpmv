@@ -1,7 +1,7 @@
 """Synthetic placeholder images for the demo seed (ARC.10): abstract shapes drawn with Pillow.
 
 No photo, font or downloaded file is used, so the images carry no third-party rights; the same
-key always draws the same PNG bytes.
+key always draws the same WebP bytes.
 """
 
 import io
@@ -19,8 +19,8 @@ def _shade(colour: tuple[int, int, int], factor: float) -> tuple[int, int, int]:
     return (r, g, b)
 
 
-def placeholder_png(key: str, colour: tuple[int, int, int]) -> bytes:
-    """A 1200x675 PNG of soft circles and bands on `colour`, the same for the same `key`."""
+def placeholder_webp(key: str, colour: tuple[int, int, int]) -> bytes:
+    """A 1200x675 WebP of soft circles and bands on `colour`, the same for the same `key`."""
     rng = random.Random(zlib.crc32(key.encode()))  # noqa: S311 - drawing, not security
     image = Image.new("RGB", (WIDTH, HEIGHT), _shade(colour, 1.15))
     draw = ImageDraw.Draw(image)
@@ -37,5 +37,5 @@ def placeholder_png(key: str, colour: tuple[int, int, int]) -> bytes:
     draw.rectangle((40, HEIGHT - 110, 420, HEIGHT - 40), fill=(255, 255, 255))
     draw.rectangle((60, HEIGHT - 90, 400, HEIGHT - 60), fill=_shade(colour, 0.7))
     buffer = io.BytesIO()
-    image.save(buffer, format="PNG", optimize=True)
+    image.save(buffer, format="WEBP", quality=80, method=4)
     return buffer.getvalue()

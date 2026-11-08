@@ -23,7 +23,9 @@ from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from typing import Any
 
+from django.conf import settings
 from django.contrib.auth.models import Permission
+from django.core.exceptions import ImproperlyConfigured
 from django.core.files.images import ImageFile
 from django.db import transaction
 from django.db.models import Q
@@ -86,11 +88,12 @@ from apps.vendors.models import (
     Vendor,
     VendorContract,
     VendorContractTranslation,
+    VendorMember,
     VendorTranslation,
 )
 
 from . import data
-from .images import placeholder_png
+from .images import placeholder_webp
 
 PUBLISHED = translations.PUBLISHED
 SOURCE_LANGUAGE = "en"
@@ -117,6 +120,34 @@ class _Run:
         self.changes.create(model, key, after)
 
 
+# --- Where the seed may run (never on LIVE)
+
+ALLOW_ENV = "MPMV_ALLOW_SEED"  # read into settings.ALLOW_SEED (base settings)
+
+
+class SeedNotAllowed(ImproperlyConfigured):
+    """The seed was asked to run where it must not: LIVE, or STAGE without the opt-in."""
+
+
+def seed_allowed() -> bool:
+    """`settings.ALLOW_SEED` (dev, test, STAGE with MPMV_ALLOW_SEED=1), never with `LIVE_DATA`."""
+    return bool(getattr(settings, "ALLOW_SEED", False)) and not getattr(
+        settings, "LIVE_DATA", False
+    )
+
+
+def check_seed_allowed() -> None:
+    if not seed_allowed():
+        raise SeedNotAllowed(
+            "The demo seed is not allowed here: it runs with the development or test settings, "
+            f"or on STAGE with {ALLOW_ENV}=1. It never runs on LIVE (LIVE_DATA)."
+        )
+
+
+class SeedConflict(ValueError):
+    """A row with one of the seed's keys exists but was not made by the seed: never adopted."""
+
+
 # --- Public entry points
 
 
@@ -126,6 +157,7 @@ def seed(*, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     Idempotent: a second run returns an empty ChangeSet and writes nothing. A dry run does the
     whole seed in a transaction and rolls it back (placeholder image files are removed too).
     """
+    check_seed_allowed()
     run = _Run(ctx=ctx)
     with _rolled_back_if(dry_run, run), _operator_session(run):
         _platform(run)
@@ -145,23 +177,32 @@ def seed(*, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
 
 def reset(*, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Take the seed out again, never touching a row the seed does not own (module docstring)."""
+    check_seed_allowed()
     run = _Run(ctx=ctx)
     with _rolled_back_if(dry_run, run), _operator_session(run):
-        vendors = list(Vendor.objects.filter(slug__in=[spec.slug for spec in data.VENDORS]))
+        vendors = seed_vendors()
         _reset_events(run, vendors)
         _reset_cms(run)
         for vendor in vendors:
             _reset_vendor(run, vendor)
         _reset_catalog_structure(run)
         _reset_carriers(run)
-        _reset_tax_rates(run)
     return run.changes
 
 
 def seed_vendors() -> "list[Vendor]":
-    """The seed's vendors that exist, in the order of `apps.seed.data.VENDORS` (for tests)."""
+    """The seed's vendors that exist, in the order of `apps.seed.data.VENDORS`: the slug and the
+    seed owner's membership together, so a real vendor with a similar slug is never one."""
     by_slug = {v.slug: v for v in Vendor.objects.filter(slug__in=[s.slug for s in data.VENDORS])}
-    return [by_slug[spec.slug] for spec in data.VENDORS if spec.slug in by_slug]
+    return [
+        by_slug[spec.slug]
+        for spec in data.VENDORS
+        if spec.slug in by_slug and _owned_by_seed(by_slug[spec.slug], spec)
+    ]
+
+
+def _owned_by_seed(vendor: Vendor, spec: data.VendorSeed) -> bool:
+    return VendorMember.objects.filter(vendor=vendor, user__email__iexact=spec.owner_email).exists()
 
 
 # --- Run helpers
@@ -304,22 +345,6 @@ def _tax_rates(run: _Run) -> None:
             run.add(tax_services.configure_tax_rate(new, ctx=run.ctx))
 
 
-def _reset_tax_rates(run: _Run) -> None:
-    for country, rates in data.TAX_RATES.items():
-        for category, rate in rates.items():
-            for row in TaxRate.objects.filter(
-                country=country,
-                category=category,
-                rate=rate,
-                source=TaxRate.Source.MANUAL,
-                valid_from=data.SEED_EPOCH,
-                valid_to__isnull=True,
-            ):
-                snapshot = tax_services.rate_snapshot(row)
-                run.changes.delete("tax.taxrate", str(row.public_id), snapshot)
-                row.delete()
-
-
 # --- Catalog structure: attributes, categories, a landing taxonomy, brands
 
 
@@ -439,17 +464,23 @@ def _tree_node(
 
 
 def _seed_categories() -> list[Category]:
-    """The seed's categories that exist, children before their parents."""
-    keys = [child.key for node in data.CATEGORIES for child in node.children]
-    keys += [node.key for node in data.CATEGORIES]
+    """The seed's categories that exist, children before their parents: its prefixed top-level
+    categories, and the subcategories with a seed key under them (never a real category)."""
     found: list[Category] = []
-    for key in keys:
-        found.extend(
-            Category.objects.filter(
-                translations__language=SOURCE_LANGUAGE, translations__slug=key
-            ).distinct()
-        )
+    for node in data.CATEGORIES:
+        root = _child_with_key(Category.get_root_nodes(), node.key)
+        if root is None:
+            continue
+        for child in node.children:
+            sub = _child_with_key(root.get_children(), child.key)
+            if sub is not None:
+                found.append(sub)
+        found.append(root)
     return found
+
+
+def _child_with_key(nodes: Any, key: str) -> Any:
+    return nodes.filter(translations__language=SOURCE_LANGUAGE, translations__slug=key).first()
 
 
 def _reset_catalog_structure(run: _Run) -> None:
@@ -541,7 +572,7 @@ def _identity(index: int, spec: data.VendorSeed) -> dict[str, Any]:
     elif spec.country == "DE":
         values.update(
             vat_number=f"DE{300_000_000 + index:09d}",
-            tax_code=f"DE{300_000_000 + index:09d}",
+            tax_code=f"{86_000_000_000 + index:011d}",  # an 11-digit Steuer-IdNr shape
             eori=f"DE{index + 1:013d}",
             iban=_iban("DE", f"10000000{index + 1:010d}"),
         )
@@ -566,6 +597,8 @@ def _user(email: str, full_name: str, run: _Run) -> User:
 
 def _vendor(run: _Run, index: int, spec: data.VendorSeed, contract: VendorContract) -> Vendor:
     vendor = Vendor.objects.filter(slug=spec.slug).first()
+    if vendor is not None and not _owned_by_seed(vendor, spec):
+        raise SeedConflict(f"vendor {spec.slug!r} exists and is not the seed's: rename it first")
     owner = _user(spec.owner_email, f"{spec.display_name} owner (demo)", run)
     if vendor is None:
         identity = _identity(index, spec)
@@ -610,6 +643,7 @@ def _vendor(run: _Run, index: int, spec: data.VendorSeed, contract: VendorContra
             vendor=vendor,
             regime=spec.vat_regime,
             exempt_reason=spec.exempt_reason,
+            exempt_country=spec.exempt_country,
             oss_registered_since=spec.oss_since,
             valid_from=data.SEED_EPOCH,
         )
@@ -886,12 +920,12 @@ def _images(run: _Run) -> dict[str, MediaImage]:
     for key, (title, colour) in data.IMAGES.items():
         image = MediaImage.objects.filter(title=title).first()
         if image is None:
-            content = placeholder_png(key, colour)
+            content = placeholder_webp(key, colour)
             image = MediaImage(
                 title=title,
                 licence=licence,
                 author=data.IMAGE_AUTHOR,
-                file=ImageFile(_named_bytes(content), name=f"demo-{key}.png"),
+                file=ImageFile(_named_bytes(content), name=f"demo-{key}.webp"),
             )
             run.add(save_image(image))
             run.files.append(image.file.name)
@@ -1101,13 +1135,10 @@ def _reset_cms(run: _Run) -> None:
         run.changes.delete("cms.standardpage", page.url_path, {})
         page.delete()
     for page in _seed_pages(LegalPage, [spec.slug["en"] for spec in data.LEGAL_PAGES.values()]):
-        if page.versions.exists():
-            if page.live:
-                page.unpublish()
-                run.changes.update("cms.legalpage", page.url_path, {"live": True}, {"live": False})
-        else:
-            run.changes.delete("cms.legalpage", page.url_path, {})
-            page.delete()
+        # Every publish recorded an append-only LegalPageVersion: the page is unpublished.
+        if page.live:
+            page.unpublish()
+            run.changes.update("cms.legalpage", page.url_path, {"live": True}, {"live": False})
     for page in HomePage.objects.filter(depth=2).select_related("locale"):
         language = page.locale.language_code
         raw = _stripped(page.body.get_prep_value())

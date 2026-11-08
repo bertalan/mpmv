@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from apps.core.countries import default_allowed_vendor_countries
 from apps.seed import data
+from apps.seed.images import placeholder_webp
 from apps.seed.services import shipping_document
 from apps.shipping import config_format
 from apps.tax import engine as tax_engine
@@ -77,3 +78,25 @@ def test_legal_pages_are_marked_as_demo_placeholders() -> None:
         assert "(demo)" in page.title["en"]
         assert "DEMO PLACEHOLDER" in page.body["en"]
         assert "SEGNAPOSTO" in page.body["it"]
+
+
+def test_an_other_exemption_names_the_vat_country_of_its_law() -> None:
+    """TAX.13: the "other" reason stores the country of its law: the VAT number's country."""
+    for vendor in data.VENDORS:
+        if vendor.exempt_reason == "other":
+            assert vendor.exempt_country == vendor.country
+        else:
+            assert vendor.exempt_country == ""
+
+
+def test_seed_top_level_categories_and_pages_have_seed_slugs() -> None:
+    for node in data.CATEGORIES:
+        assert all(slug.startswith(data.SEED_SLUG_PREFIX) for slug in node.slugs.values())
+    assert all(slug.startswith("demo-") for slug in data.HOW_IT_WORKS.slug.values())
+
+
+def test_placeholder_images_are_reproducible_webp() -> None:
+    first = placeholder_webp("home-hero", (196, 112, 74))
+    assert first[:4] == b"RIFF"
+    assert first[8:12] == b"WEBP"
+    assert placeholder_webp("home-hero", (196, 112, 74)) == first

@@ -8,8 +8,9 @@ import io
 from decimal import Decimal
 
 import pytest
-from django.core.management import call_command
-from django.test import Client
+from django.core.management import CommandError, call_command
+from django.test import Client, override_settings
+from wagtail.models import Locale
 
 from apps.accounts.models import User
 from apps.catalog.models import Product, ProductTranslation, Variant
@@ -19,12 +20,22 @@ from apps.catalog.tests.factories import (
     CategoryTranslationFactory,
     ProductFactory,
 )
-from apps.cms.models import LegalPage, StandardPage
+from apps.cms.models import HomePage, LegalPage, StandardPage
+from apps.cms.tests.factories import StandardPageFactory
 from apps.core.changeset import ChangeSet
 from apps.core.models import AuditLog
 from apps.events.models import EventPage
 from apps.seed import data
-from apps.seed.services import TEST_CONTEXT, reset, seed, seed_vendors
+from apps.seed.apps import check_not_allowed_on_live
+from apps.seed.services import (
+    TEST_CONTEXT,
+    SeedConflict,
+    SeedNotAllowed,
+    reset,
+    seed,
+    seed_allowed,
+    seed_vendors,
+)
 from apps.shipping.models import ShippingMethod, ShippingZone, SpecialAreaTreatment
 from apps.tax.models import TaxRate
 from apps.tax.services import current_tax_profile
@@ -63,6 +74,8 @@ def test_the_seed_builds_active_vendors_with_every_regime(demo_seed: ChangeSet) 
         assert vendor.fiscal_regime == spec.fiscal_regime
         profile = current_tax_profile(vendor)
         assert (profile.regime, profile.exempt_reason) == (spec.vat_regime, spec.exempt_reason)
+        assert profile.exempt_country == spec.exempt_country  # TAX.13
+        profile.full_clean()
         assert ContractAcceptance.objects.filter(vendor=vendor).count() == 1
         assert {t.language for t in vendor.translations.all()} == {"en", "it"}
     rf20 = vendors[-1]
@@ -173,15 +186,15 @@ STOREFRONT = (
     ("/", "Made by independent makers"),
     ("/it/", "Fatto da artigiani indipendenti"),
     ("/de/", "Von unabhängigen Herstellern"),
-    ("/product-category/home-kitchen/", "Stoneware dinner plate"),
-    ("/it/categoria-prodotto/casa-e-cucina/", "Piatto piano in gres"),
+    ("/product-category/demo-home-kitchen/", "Stoneware dinner plate"),
+    ("/it/categoria-prodotto/demo-casa-e-cucina/", "Piatto piano in gres"),
     ("/material/wool/", "Merino crew-neck jumper"),
     ("/it/materiale/lana/", "Maglione girocollo in merino"),
     ("/brand/demo-brand-gamma/", "Essays on slow making"),
     ("/shop/vendor-d-outdoor/", "Steel camp lantern"),
     ("/it/shop/vendor-e-studio/", "Lampada da tavolo in ceramica"),
-    ("/how-it-works/", "How it works (demo)"),
-    ("/it/come-funziona/", "Come funziona (demo)"),
+    ("/demo-how-it-works/", "How it works (demo)"),
+    ("/it/demo-come-funziona/", "Come funziona (demo)"),
     ("/demo-terms-of-sale/", "DEMO PLACEHOLDER"),
     ("/it/demo-condizioni-di-vendita/", "SEGNAPOSTO"),
     ("/events/", "Makers fair (demo)"),
@@ -194,3 +207,56 @@ def test_the_storefront_pages_show_the_seed(demo_seed: ChangeSet, client: Client
         response = client.get(path)
         assert response.status_code == 200, path
         assert text in response.content.decode(), path
+
+
+def test_real_rows_with_generic_keys_survive_a_seed_and_a_reset() -> None:
+    """M2: the seed never adopts, and its reset never deletes, a row it did not create."""
+    garden = CategoryFactory.create()
+    CategoryTranslationFactory.create(category=garden, slug="garden")
+    home = HomePage.objects.get(locale=Locale.get_default(), depth=2)
+    how = StandardPageFactory.create(parent=home, title="How it works", slug="how-it-works")
+
+    seed(ctx=TEST_CONTEXT)
+    reset(ctx=TEST_CONTEXT)
+
+    assert Category.objects.filter(pk=garden.pk).exists()
+    assert StandardPage.objects.filter(pk=how.pk).exists()
+
+
+def test_the_seed_never_adopts_a_real_vendor_with_its_slug() -> None:
+    real = VendorFactory.create(display_name=data.VENDORS[0].display_name)
+    assert real.slug == data.VENDORS[0].slug
+
+    with pytest.raises(SeedConflict):
+        seed(ctx=TEST_CONTEXT)
+
+    assert seed_vendors() == []
+    reset(ctx=TEST_CONTEXT)
+    assert Vendor.objects.filter(pk=real.pk).exists()
+
+
+@pytest.mark.parametrize(
+    ("allow", "live_data", "allowed"),
+    [(True, False, True), (False, False, False), (True, True, False), (False, True, False)],
+)
+def test_the_seed_runs_only_where_allowed_and_never_on_live_data(
+    allow: bool, live_data: bool, allowed: bool
+) -> None:
+    with override_settings(ALLOW_SEED=allow, LIVE_DATA=live_data):
+        assert seed_allowed() is allowed
+        errors = [m.id for m in check_not_allowed_on_live()]
+    assert errors == (["seed.E001"] if allow and live_data else [])
+
+
+@pytest.mark.parametrize(("allow", "live_data"), [(False, False), (True, True)])
+def test_seed_and_reset_refuse_to_run_where_not_allowed(allow: bool, live_data: bool) -> None:
+    with override_settings(ALLOW_SEED=allow, LIVE_DATA=live_data):
+        with pytest.raises(SeedNotAllowed):
+            seed(ctx=TEST_CONTEXT)
+        with pytest.raises(SeedNotAllowed):
+            reset(ctx=TEST_CONTEXT)
+        with pytest.raises(CommandError, match="never runs on LIVE"):
+            call_command("seed")
+        with pytest.raises(CommandError, match="never runs on LIVE"):
+            call_command("seed", "--reset")
+    assert not Vendor.objects.exists()
