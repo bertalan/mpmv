@@ -82,7 +82,9 @@ on first access, outside the audit trail. Use `site_theme_choice(site)` or `acti
 custom property (`[color] text-muted = "#475569"` is `color.text-muted`, `--color-text-muted`).
 Values are strings or numbers; a value may refer to another token with `"{color.blue.700}"`, also
 inside a longer value (`"0 1px 3px {color.neutral.900}"`). Characters that could break out of a
-CSS declaration (`; { } < > \`, comments, control characters) are rejected.
+CSS declaration (`; { } < > \`, comments, control characters) and unbalanced quotes are rejected.
+`check_tokens` checks each value again once references are resolved, since two harmless parts
+can join into something that is not (`"x/"` and `"{a}*y"` make a comment).
 
 Three tiers, all in `tokens.toml`: primitives (`color.blue.700`, set by the theme), semantic
 tokens (the contract below) and component tokens (`button.bg = "{color.accent}"`, derived in

@@ -234,14 +234,33 @@ _FORBIDDEN_VALUE_RE = re.compile(r"[;{}<>\\\x00-\x1f\x7f]|/\*|\*/")
 _HEX_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 
 
+def _quotes_balanced(value: str) -> bool:
+    """Every `'` or `"` string is closed (backslashes are rejected, so there are no escapes)."""
+    quote: str | None = None
+    for char in value:
+        if quote is None:
+            if char in "'\"":
+                quote = char
+        elif char == quote:
+            quote = None
+    return quote is None
+
+
+def _check_css_value(name: str, value: str) -> None:
+    """A value (references left out) that cannot leave its CSS declaration or string."""
+    if _FORBIDDEN_VALUE_RE.search(value):
+        raise ThemeError(f"token {name!r} has a character not allowed in a CSS value")
+    if not _quotes_balanced(value):
+        raise ThemeError(f"token {name!r} has an unbalanced quote")
+
+
 def _check_value(name: str, value: str) -> None:
     if not value.strip():
         raise ThemeError(f"token {name!r} is empty")
     for reference in _REFERENCE_RE.findall(value):
         if not _TOKEN_NAME_RE.match(reference):
             raise ThemeError(f"token {name!r} refers to an invalid name {{{reference}}}")
-    if _FORBIDDEN_VALUE_RE.search(_REFERENCE_RE.sub("", value)):
-        raise ThemeError(f"token {name!r} has a character not allowed in a CSS value")
+    _check_css_value(name, _REFERENCE_RE.sub("", value))
 
 
 def parse_tokens(data: Mapping[str, object]) -> dict[str, str]:
@@ -370,32 +389,38 @@ def _floor2(ratio: float) -> str:
 
 
 def check_tokens(tokens: Tokens, contract: TokenContract) -> list[TokenViolation]:
-    """Missing required tokens, unresolved references and contrast pairs below their minimum."""
+    """Missing required tokens, unresolved references, values that are not safe CSS once
+    resolved (two harmless parts can join into `/*`), and contrast pairs below their minimum."""
     violations = [
         TokenViolation("missing", name, "required by the token contract")
         for name in contract.required
         if name not in tokens
     ]
-    violations += [
-        TokenViolation("unresolved", name, f"unresolved reference in {value!r}")
-        for name, value in sorted(tokens.items())
-        if _REFERENCE_RE.search(value)
-    ]
     invalid: set[str] = set()
+    for name, value in sorted(tokens.items()):
+        if _REFERENCE_RE.search(value):
+            violations.append(
+                TokenViolation("unresolved", name, f"unresolved reference in {value!r}")
+            )
+            continue
+        try:
+            _check_css_value(name, value)
+        except ThemeError as exc:
+            invalid.add(name)
+            violations.append(TokenViolation("invalid", name, f"resolved to {value!r}: {exc}"))
     for pair in contract.pairs:
         colours: list[str] = []
         for name in (pair.foreground, pair.background):
-            value = tokens.get(name)
-            if value is None or _REFERENCE_RE.search(value):
+            colour = tokens.get(name)
+            if colour is None or name in invalid or _REFERENCE_RE.search(colour):
                 break  # reported above
             try:
-                _channels(value)
+                _channels(colour)
             except ThemeError as exc:
-                if name not in invalid:
-                    invalid.add(name)
-                    violations.append(TokenViolation("invalid", name, str(exc)))
+                invalid.add(name)
+                violations.append(TokenViolation("invalid", name, str(exc)))
                 break
-            colours.append(value)
+            colours.append(colour)
         if len(colours) != 2:
             continue
         ratio = contrast_ratio(colours[0], colours[1])
@@ -422,7 +447,11 @@ def render_tokens_css(tokens: Tokens) -> str:
     return f"@layer tokens{{:root{{{body}}}}}\n"
 
 
-_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
+# A CSS string ('…' or "…", escapes included) or a comment, whichever starts first.
+_STRING_OR_COMMENT_RE = re.compile(
+    r"""(?P<string>"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*')|(?P<comment>/\*.*?\*/)""",
+    re.DOTALL,
+)
 _SPACE_RE = re.compile(r"\s+")
 _AROUND_RE = re.compile(r"\s*([{};,>])\s*")
 _AFTER_COLON_RE = re.compile(r":\s+")
@@ -432,14 +461,29 @@ def minify_css(css: str) -> str:
     """Drop comments and the whitespace CSS does not need.
 
     Whitespace stays where it can matter: before `:` (`.card :hover` is a descendant selector),
-    around `+` and `-` (`calc()`), and between the words of a value. Sources must not put
-    `/*`, `;`, `{` or `}` inside strings (none of our CSS needs to).
+    around `+` and `-` (`calc()`), and between the words of a value. Strings (`content: " > "`)
+    are copied as they are, and a `/*` inside a string is not a comment.
     """
-    css = _COMMENT_RE.sub("", css)
-    css = _SPACE_RE.sub(" ", css)
-    css = _AROUND_RE.sub(r"\1", css)
-    css = _AFTER_COLON_RE.sub(":", css)
-    return css.replace(";}", "}").strip()
+    parts: list[str] = []
+    outside: list[str] = []
+
+    def flush() -> None:
+        text = _SPACE_RE.sub(" ", "".join(outside))
+        text = _AROUND_RE.sub(r"\1", text)
+        text = _AFTER_COLON_RE.sub(":", text)
+        parts.append(text.replace(";}", "}"))
+        outside.clear()
+
+    position = 0
+    for match in _STRING_OR_COMMENT_RE.finditer(css):
+        outside.append(css[position : match.start()])
+        position = match.end()
+        if match.group("string") is not None:
+            flush()
+            parts.append(match.group("string"))
+    outside.append(css[position:])
+    flush()
+    return "".join(parts).strip()
 
 
 def build_theme_css(
