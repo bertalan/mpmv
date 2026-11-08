@@ -302,9 +302,12 @@ every year at the end of August", "every Monday", "first Saturday of the month")
 | `INTERVAL` | 1–12 |
 | `COUNT` or `UNTIL` | at most one of them; `UNTIL` in UTC for timed events, a date for all-day events (RFC 5545 §3.3.10) |
 | `BYDAY` | weekdays, with an ordinal (`1SA`, `-1FR`) only for `MONTHLY` and `YEARLY` |
-| `BYMONTHDAY` | 1–31 and -1 |
+| `BYMONTHDAY` | 1–31 and -1; not with `FREQ=WEEKLY` (RFC 5545 §3.3.10) |
 | `BYMONTH` | 1–12 |
 | `WKST` | accepted, passed through |
+
+Numbers are ASCII digits only; a sign is allowed only where RFC 5545 allows one (`BYMONTHDAY`
+and the `BYDAY` ordinal).
 
 Everything else (`SECONDLY`, `MINUTELY`, `HOURLY`, `BYSETPOS`, `BYYEARDAY`, `BYWEEKNO`,
 `BYHOUR`, `BYMINUTE`, `BYSECOND`, `RDATE`) is refused with a field error. The vendor area offers
@@ -325,7 +328,8 @@ def validate_rrule(text: str, all_day: bool) -> RRuleSubset      # raises Recurr
 ```
 
 `RecurrenceError.errors` lists every refused part as a `RuleError(part, message)`, so the API and
-the forms can name the field. `DTSTART` is always the first occurrence and counts towards `COUNT`;
+the forms can name the field. `DTSTART` is always the first occurrence and counts towards `COUNT`
+(an `UNTIL` before it bounds only the later occurrences);
 exdates (instants for timed events, first days for all-day events) are removed after `COUNT` and
 `UNTIL` apply. An occurrence is returned when it overlaps the window.
 

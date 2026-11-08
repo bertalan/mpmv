@@ -131,6 +131,17 @@ def test_case_7_until_stops_the_fair() -> None:
     assert [o.start for o in occurrences] == [date(2026, 8, 28), date(2027, 8, 28)]
 
 
+def test_until_before_dtstart_still_yields_dtstart_for_an_all_day_event() -> None:
+    occurrences = by_year(_fair("FREQ=YEARLY;UNTIL=20250101"))
+    assert [o.start for o in occurrences] == [date(2026, 8, 28)]
+
+
+def test_until_before_dtstart_still_yields_dtstart_for_a_timed_event() -> None:
+    spec = timed(utc(2026, 10, 19, 8), "FREQ=WEEKLY;UNTIL=20261001T000000Z")
+    occurrences = engine.expand(spec, utc(2026, 10, 1), utc(2026, 12, 1))
+    assert starts_utc(occurrences) == [utc(2026, 10, 19, 8)]
+
+
 def test_case_7_count_stops_the_fair() -> None:
     occurrences = by_year(_fair("FREQ=YEARLY;COUNT=2"))
     assert [o.start for o in occurrences] == [date(2026, 8, 28), date(2027, 8, 28)]
@@ -184,6 +195,7 @@ def test_a_timed_exdate_removes_one_occurrence() -> None:
         ("BYDAY=MO", "FREQ"),
         ("FREQ=WEEKLY;BOGUS=1", "BOGUS"),
         ("FREQ=WEEKLY;BYDAY", "BYDAY"),
+        ("FREQ=WEEKLY;BYMONTHDAY=1", "BYMONTHDAY"),  # RFC 5545 §3.3.10 forbids it with WEEKLY
     ],
 )
 def test_case_8_refused_parts_are_named(rrule: str, part: str) -> None:
@@ -191,6 +203,49 @@ def test_case_8_refused_parts_are_named(rrule: str, part: str) -> None:
         engine.validate_rrule(rrule, all_day=False)
     assert part in [error.part for error in raised.value.errors]
     assert all(error.message for error in raised.value.errors)
+
+
+# Numbers are ASCII digits only: no `int()` leniency (underscores, a plus sign where none is
+# allowed, non-ASCII digits such as Arabic-Indic or full-width ones).
+
+
+@pytest.mark.parametrize(
+    ("rrule", "part"),
+    [
+        ("FREQ=WEEKLY;INTERVAL=+3", "INTERVAL"),
+        ("FREQ=WEEKLY;INTERVAL=1_0", "INTERVAL"),
+        ("FREQ=WEEKLY;INTERVAL=\u0663", "INTERVAL"),  # Arabic-Indic three
+        ("FREQ=WEEKLY;INTERVAL=\uff13", "INTERVAL"),  # full-width three
+        ("FREQ=WEEKLY;COUNT=+3", "COUNT"),
+        ("FREQ=WEEKLY;COUNT=1_0", "COUNT"),
+        ("FREQ=WEEKLY;COUNT=\u0663", "COUNT"),
+        ("FREQ=MONTHLY;BYMONTHDAY=1_0", "BYMONTHDAY"),
+        ("FREQ=MONTHLY;BYMONTHDAY=\u0663", "BYMONTHDAY"),
+        ("FREQ=MONTHLY;BYMONTHDAY=+-3", "BYMONTHDAY"),
+        ("FREQ=MONTHLY;BYMONTHDAY=003", "BYMONTHDAY"),
+        ("FREQ=YEARLY;BYMONTH=+3", "BYMONTH"),
+        ("FREQ=YEARLY;BYMONTH=\u0663", "BYMONTH"),
+        ("FREQ=MONTHLY;BYDAY=\u0661SA", "BYDAY"),
+        ("FREQ=MONTHLY;BYDAY=1_0SA", "BYDAY"),
+        ("FREQ=WEEKLY;UNTIL=\u0662\u0660\u0662\u06671231T000000Z", "UNTIL"),
+    ],
+)
+def test_numbers_must_be_ascii_digits(rrule: str, part: str) -> None:
+    with pytest.raises(RecurrenceError) as raised:
+        engine.validate_rrule(rrule, all_day=False)
+    assert part in [error.part for error in raised.value.errors]
+
+
+def test_all_day_until_refuses_non_ascii_digits() -> None:
+    with pytest.raises(RecurrenceError) as raised:
+        engine.validate_rrule("FREQ=YEARLY;UNTIL=\u0662\u0660\u0662\u06671231", all_day=True)
+    assert [error.part for error in raised.value.errors] == ["UNTIL"]
+
+
+def test_signed_monthday_and_ordinal_are_accepted() -> None:
+    subset = engine.validate_rrule("FREQ=MONTHLY;BYMONTHDAY=+3,-1;BYDAY=+1SA", all_day=False)
+    assert subset.bymonthday == (3, -1)
+    assert subset.byday == ((1, 5),)
 
 
 def test_all_day_until_must_be_a_date() -> None:

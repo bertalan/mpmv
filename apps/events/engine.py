@@ -64,9 +64,13 @@ MAX_INTERVAL = 12
 HORIZON_MONTHS = 18  # listings and the month view expand up to 18 months ahead
 DEFAULT_LIMIT = 500  # caps runaway rules
 
-_BYDAY = re.compile(r"^([+-]?\d{1,2})?(MO|TU|WE|TH|FR|SA|SU)$")
-_UNTIL_UTC = re.compile(r"^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$")
-_UNTIL_DATE = re.compile(r"^(\d{4})(\d{2})(\d{2})$")
+# ASCII digits only: `int()` and Unicode `\d` would also take "1_0", "+3" and non-ASCII digits.
+_BYDAY = re.compile(r"^([+-]?[0-9]{1,2})?(MO|TU|WE|TH|FR|SA|SU)$")
+_UNTIL_UTC = re.compile(r"^([0-9]{4})([0-9]{2})([0-9]{2})T([0-9]{2})([0-9]{2})([0-9]{2})Z$")
+_UNTIL_DATE = re.compile(r"^([0-9]{4})([0-9]{2})([0-9]{2})$")
+_UNSIGNED = re.compile(r"^[0-9]+$")  # INTERVAL, COUNT
+_DAY_OR_MONTH = re.compile(r"^[0-9]{1,2}$")  # BYMONTH
+_SIGNED_DAY = re.compile(r"^[+-]?[0-9]{1,2}$")  # BYMONTHDAY (RFC 5545 monthdaynum)
 
 ByDay = tuple[tuple[int | None, int], ...]  # (ordinal or None, weekday with Monday = 0)
 
@@ -132,20 +136,19 @@ class Occurrence:
 # --- Validation ------------------------------------------------------------------------------
 
 
-def _parse_int(value: str) -> int | None:
-    try:
-        return int(value)
-    except ValueError:
-        return None
+def _parse_int(value: str, pattern: re.Pattern[str] = _UNSIGNED) -> int | None:
+    """`value` as an int when it matches `pattern` (ASCII digits), else None."""
+    return int(value) if pattern.match(value) else None
 
 
 def _parse_numbers(
     part: str, value: str, high: int, errors: list[RuleError], *, last: bool
 ) -> tuple[int, ...]:
-    """A comma list of 1..high, plus -1 (the last day) when `last` is set."""
+    """A comma list of 1..high, plus -1 (the last day) when `last` is set (and then signed)."""
+    pattern = _SIGNED_DAY if last else _DAY_OR_MONTH
     numbers: list[int] = []
     for item in value.split(","):
-        number = _parse_int(item)
+        number = _parse_int(item, pattern)
         if number is None or not (1 <= number <= high or (last and number == -1)):
             errors.append(RuleError(part, f"{item!r} is not allowed."))
         else:
@@ -241,6 +244,8 @@ def validate_rrule(text: str, all_day: bool) -> RRuleSubset:
     until = _parse_until(parts["UNTIL"], all_day, errors) if "UNTIL" in parts else None
 
     byday = _parse_byday(parts["BYDAY"], freq, errors) if "BYDAY" in parts else ()
+    if "BYMONTHDAY" in parts and freq == "WEEKLY":
+        errors.append(RuleError("BYMONTHDAY", "is not allowed with FREQ=WEEKLY."))
     bymonthday = (
         _parse_numbers("BYMONTHDAY", parts["BYMONTHDAY"], 31, errors, last=True)
         if "BYMONTHDAY" in parts
@@ -399,7 +404,8 @@ def expand(
 ) -> list[Occurrence]:
     """The occurrences of an event that overlap [window_start, window_end), in start order.
 
-    DTSTART is always the first occurrence and counts towards COUNT; EXDATEs are removed after
+    DTSTART is always the first occurrence and counts towards COUNT, even when UNTIL is before
+    it (UNTIL bounds only the later occurrences); EXDATEs are removed after
     COUNT and UNTIL apply (RFC 5545 §3.8.5.1). The window is capped at HORIZON_MONTHS after its
     start, and the result at `limit` occurrences. Every occurrence lasts as long as the first:
     the same elapsed time for timed events, the same number of days for all-day events.
@@ -434,7 +440,9 @@ def _expand_days(
     excluded = set(spec.exdate_days)
     result: list[Occurrence] = []
     for day in _rule_days(rule, spec.start_date, last_day):
-        if rule is not None and isinstance(rule.until, date) and day > rule.until:
+        # DTSTART is always the first occurrence; UNTIL bounds only the later ones.
+        until = rule.until if rule is not None else None
+        if isinstance(until, date) and day > until and day != spec.start_date:
             break
         if day >= first_day and day not in excluded:
             result.append(Occurrence(day, day + span))
@@ -461,7 +469,9 @@ def _expand_timed(
     for day in _rule_days(rule, first.date(), window_end.astimezone(zone).date()):
         local = datetime.combine(day, wall_time)
         start = first if day == first.date() else _resolve_local(local, zone)
-        if rule is not None and isinstance(rule.until, datetime) and start > rule.until:
+        # DTSTART is always the first occurrence; UNTIL bounds only the later ones.
+        until = rule.until if rule is not None else None
+        if isinstance(until, datetime) and start > until and day != first.date():
             break
         if start >= window_end:
             break
