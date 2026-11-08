@@ -5,7 +5,8 @@ from typing import Any
 from django.http import HttpRequest
 from ninja.security.base import AuthBase
 
-from apps.api.auth import authenticate_request, remember_client
+from apps.api.auth import authenticate_request, rate_limit, remember_client
+from apps.api.engine import RateDecision
 from apps.api.services import AuthResult
 
 
@@ -18,12 +19,21 @@ class ApiAuthError(Exception):
         self.required_scope = required_scope
 
 
+class ApiRateLimited(Exception):
+    """A key over its rate limit (CORE.12); rendered as a 429 problem by `apps.api.v1.errors`."""
+
+    def __init__(self, decision: RateDecision) -> None:
+        super().__init__("rate_limited")
+        self.decision = decision
+
+
 class ApiKey(AuthBase):
     """`Authorization: Bearer mpmv_<prefix>_<secret>` checked against the operation's scope.
 
     Pass the scope the operation needs, e.g. `auth=ApiKey("catalog:write")`. `ApiKey(None)`
     accepts any valid key: only for operations about the key itself, such as `GET /me`.
-    The scope is published in the operation's OpenAPI `security` requirement.
+    The scope is published in the operation's OpenAPI `security` requirement. An accepted key
+    is then counted against its rate limit (CORE.12): over it, the operation does not run.
     """
 
     openapi_type = "http"
@@ -42,6 +52,9 @@ class ApiKey(AuthBase):
     def __call__(self, request: HttpRequest) -> Any:
         result = authenticate_request(request, self.scope)
         remember_client(request, result.client)
-        if not result.ok:
+        if not result.ok or result.client is None:
             raise ApiAuthError(result, self.scope)
+        limited = rate_limit(result.client, self.scope)
+        if not limited.allowed:
+            raise ApiRateLimited(limited)
         return result.client

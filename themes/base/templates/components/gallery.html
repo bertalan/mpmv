@@ -1,0 +1,27 @@
+{% load i18n %}{% comment %}
+Gallery (THM.4, spec 14 §14.9): the product images in a list, each with an "Enlarge" button
+that opens it in a native modal dialog (the `<dialog>` zoom of §14.9, opened by base.js like
+components/dialog.html). Without JavaScript the images are all shown and the buttons stay
+hidden. Without images a neutral placeholder, hidden from assistive technology, keeps the
+layout.
+
+  {% include "components/gallery.html" with id="product-images" label=_("Product images") images=images only %}
+
+Context:
+- `id` (required): a prefix for the dialog ids, unique on the page.
+- `label` (required): the accessible name of the gallery.
+- `images`: a list of `url`, `alt` (what the image shows; every gallery image should say it,
+  because it is the content; without it the zoom dialog is named "<label>, image n of m"), optional `large_url` (the zoomed image, default `url`), `width` and
+  `height` (default 800 x 800).
+{% endcomment %}<section class="gallery" aria-label="{{ label }}">
+  {% if images %}<ul class="gallery__list" role="list">
+    {% for image in images %}{% blocktranslate asvar fallback with count=forloop.counter total=images|length %}{{ label }}, image {{ count }} of {{ total }}{% endblocktranslate %}{% firstof image.alt fallback as name %}<li class="gallery__item">
+      <img src="{{ image.url }}" alt="{{ image.alt }}" width="{{ image.width|default:800 }}" height="{{ image.height|default:800 }}"{% if not forloop.first %} loading="lazy"{% endif %}>
+      <button type="button" class="button button--secondary button--small gallery__zoom" data-dialog="{{ id }}-{{ forloop.counter }}" aria-haspopup="dialog" hidden>{% include "components/icon.html" with name="zoom" only %}{% translate "Enlarge" %}<span class="visually-hidden">: {{ name }}</span></button>
+      <dialog class="dialog dialog--image" id="{{ id }}-{{ forloop.counter }}" aria-label="{{ name }}">
+        <form method="dialog" class="dialog__header"><button type="submit" class="button button--ghost button--icon dialog__close" aria-label="{% translate 'Close' %}">{% include "components/icon.html" with name="close" only %}</button></form>
+        <img src="{% firstof image.large_url image.url %}" alt="{{ image.alt }}" width="{{ image.width|default:800 }}" height="{{ image.height|default:800 }}" loading="lazy">
+      </dialog>
+    </li>{% endfor %}
+  </ul>{% else %}<div class="gallery__placeholder" aria-hidden="true"></div>{% endif %}
+</section>

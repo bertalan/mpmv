@@ -1,0 +1,6 @@
+{% extends "layouts/error.html" %}
+{% load i18n %}
+{% comment %}Page not found (THM.3): rendered by Django's page_not_found with the request context.{% endcomment %}
+{% block title %}{% translate "Page not found" %} · {{ site_name }}{% endblock %}
+{% block heading %}{% translate "Page not found" %}{% endblock %}
+{% block message %}<p>{% translate "The page you asked for does not exist or has moved." %}</p>{% endblock %}

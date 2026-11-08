@@ -23,9 +23,12 @@ models tested on Vendor B's objects.
 
 from django.contrib import admin
 from django.db import models
+from django.test import Client
 
-from apps.api.models import ApiClient
-from apps.api.tests.factories import ApiClientFactory
+from apps.api.models import ApiClient, ApiRateCounter
+from apps.api.tests.factories import ApiClientFactory, ApiRateCounterFactory
+from apps.cart.models import CartLine
+from apps.cart.tests.factories import CartLineFactory
 from apps.catalog.models import (
     Product,
     ProductAttribute,
@@ -41,11 +44,16 @@ from apps.catalog.tests.factories import (
     ProductFactory,
     ProductTranslationFactory,
     SlugHistoryFactory,
+    TaxonomyFactory,
+    TaxonomyTranslationFactory,
     VariantFactory,
     VariantOptionFactory,
     VariantTranslationFactory,
 )
+from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
+from apps.events.models import EventPage, VendorEventPolicy
+from apps.events.tests.factories import EventPageFactory, VendorEventPolicyFactory
 from apps.shipping.models import (
     PickupOption,
     PickupOptionTranslation,
@@ -85,11 +93,13 @@ from apps.vendors.tests.factories import (
 )
 from tests.tenancy import (
     Access,
+    CrossTenant,
     Endpoint,
     NoVendorData,
     ObjectMaker,
     StaffOnly,
     VendorScoped,
+    member_session,
 )
 
 # --- Vendor-owned models: how to make one object owned by a given vendor
@@ -106,6 +116,7 @@ def renamed_product_alias(vendor: Vendor) -> SkuAlias:
 OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     Vendor: lambda vendor: vendor,
     ApiClient: lambda vendor: ApiClientFactory.create(vendor=vendor),
+    ApiRateCounter: lambda vendor: ApiRateCounterFactory.create(client__vendor=vendor),
     VendorMember: lambda vendor: VendorMemberFactory.create(
         vendor=vendor, role=VendorMember.Role.STAFF
     ),
@@ -156,6 +167,10 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
             vendor=vendor, valid_from=utc(2025), valid_to=utc(2026)
         )
     ),
+    CartLine: lambda vendor: CartLineFactory.create(product=ProductFactory.create(vendor=vendor)),
+    # EVT.1: a draft event page under the primary language's events index.
+    EventPage: lambda vendor: EventPageFactory.create(vendor=vendor),
+    VendorEventPolicy: lambda vendor: VendorEventPolicyFactory.create(vendor=vendor),
     TaxRegimeChangeRequest: lambda vendor: TaxRegimeChangeRequestFactory.create(
         # A reviewed request: the vendor may already have its one pending request.
         vendor=vendor,
@@ -171,11 +186,37 @@ NOT_VENDOR_OWNED: dict[str, str] = {}
 # --- Web endpoints (URL name, or route when unnamed)
 
 OWN_ACCOUNT = "The signed-in user's own second factors (CORE.4); no vendor data."
+PUBLIC_LISTING = (
+    "Public catalog listing (CAT.8): only published products of active vendors, the same for "
+    "every visitor; a non-active vendor's data never shows."
+)
+SAMPLE_TAXONOMY = "0"  # the sample path's first segment (`_sample_path` fills every param "0")
+
+
+def member_with_landing_taxonomy(client: Client, tenants: CrossTenant) -> dict[str, str]:
+    """`member_session`, plus a taxonomy with term pages whose slug is the sample path's first
+    segment: a term route only matches the slug of such a taxonomy."""
+    taxonomy = TaxonomyFactory.create(has_landing=True)
+    TaxonomyTranslationFactory.create(
+        taxonomy=taxonomy, slug=SAMPLE_TAXONOMY, status=TranslationStatus.PUBLISHED
+    )
+    return member_session(client, tenants)
+
 
 ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
+    "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
     "home": NoVendorData("Public home page."),
+    "catalog:category": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "product-category"}),
+    "catalog:brand": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "brand"}),
+    "catalog:term": NoVendorData(PUBLIC_LISTING, login=member_with_landing_taxonomy),
+    "catalog:vendor": NoVendorData(
+        "Public storefront listing (CAT.8) of an active vendor's published products; Vendor B "
+        "is not active, so its storefront is a 404.",
+        kwargs={"segment": "shop"},
+    ),
     "switch_language": NoVendorData("Stores the visitor's language choice."),
+    "themes:styleguide": StaffOnly("Component samples of the active theme (THM.4), staff only."),
     "mfa:overview": NoVendorData(OWN_ACCOUNT),
     "mfa:setup": NoVendorData(OWN_ACCOUNT),
     "mfa:totp": NoVendorData(OWN_ACCOUNT),
@@ -188,6 +229,9 @@ ENDPOINTS: dict[str, Access] = {
     "mfa:remove_device": NoVendorData(
         OWN_ACCOUNT + " The factor is looked up among the user's own.",
         kwargs={"kind": "totp", "public_id": "0"},
+    ),
+    "geocoding_find": NoVendorData(
+        "Find coordinates (EVT.12): geocodes the typed address; reads no vendor data."
     ),
     "admin:login": NoVendorData("Staff sign-in page."),
     "admin:logout": NoVendorData("Staff sign-out."),

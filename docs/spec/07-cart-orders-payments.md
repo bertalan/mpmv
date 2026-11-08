@@ -147,6 +147,17 @@ Q-74; event notifications are EVT.16, [15](15-events.md)). The owner has still t
 content, so it is not designed here: ORD.11 is a placeholder with a small estimate, re-estimated
 and detailed in this section once the owner's answers are in.
 
+### Free gifts (P2, ORD.12, owner decision MQ-9)
+
+A price is never 0.00, neither on a product nor on a variant ([03](03-catalog.md), Q-31), so a gift
+is not a zero-priced product. It is a promotion, triggered by a coupon code or by a cart condition
+(for example a minimum amount or a given product in the cart). The gift enters the order as its
+own line at full price plus a discount of 100% of that line (`discount_net`), so VAT and
+commission are computed per line as for any other line. Who funds the discount (the vendor, the
+marketplace or both) follows the bundle funding rules ([03](03-catalog.md), CAT.16 to CAT.18).
+The promotion tracks the gift's stock and a per-customer limit. The VAT treatment of gifts (free
+transfers of goods) is confirmed by the operator's accountant before the row is built (⚖️).
+
 ### Transactional emails (in the recipient's language)
 
 The platform sends order confirmations and order summaries, never invoices or receipts. Each
@@ -178,3 +189,4 @@ webhooks, quotes about to expire).
 | ORD.9 | Transactional emails per language (customer, vendor, staff); per-vendor order confirmation as a non-fiscal document | P1 | 10 | ORD.2, ARC.16 | All emails in EN, IT, DE, FR and ES with snapshot tests; the order confirmation (email and PDF) is per vendor, labelled "Documento non fiscale / Non-fiscal document" in all five languages, carries the order reference and never an invoice number, and no email or document calls itself an invoice or receipt |
 | ORD.10 | Checkout and payments kill-switch, alert on payment without transfer | P1 | 4 | ARC.8, PAY.3 | Kill-switch verified on STAGE |
 | ORD.11 | Customer account: preferences and request history (scope to be defined with the owner): one section listing the customer's product information and quote requests and holding preferences such as followed vendors and event notifications; placeholder, hours to be re-estimated once the scope is agreed | P2 | 4 | ORD.7, SHP.10 | The owner has agreed the scope, this row is re-estimated and the section is detailed in §7.2 before any code is written |
+| ORD.12 | Free-gift promotion (owner decision MQ-9): triggered by a coupon code or a cart condition; adds the gift product at full price plus a 100% discount line; discount funding by the bundle funding rules (vendor, marketplace or split), gift stock reserved like any line, a per-customer limit; VAT and commission per line; the gift VAT treatment confirmed by the accountant (⚖️) | P2 | 10 | ORD.4, CAT.17 | A qualifying cart gets the gift line at full price and a 100% discount line; no line is priced 0.00; a vendor-funded and a marketplace-funded gift give the expected ledger rows; a customer over the limit gets no second gift; an out-of-stock gift is not added; VAT and commission are computed per line |
