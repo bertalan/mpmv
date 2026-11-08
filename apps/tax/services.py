@@ -7,7 +7,8 @@ docs/dev/audit-trail.md): a change is a new row valid from a date, which closes 
 open-ended row of the same key, with one audit entry per row and the replaced version as
 `before`. Every mutation accepts `dry_run` and returns its ChangeSet. Recording a VIES answer is
 a cache write, not a configuration change: no ChangeSet, no audit entry (the vendor's own VAT
-check is audited by `apps.vendors.services.check_vat_number`).
+check is audited by `apps.vendors.services.check_vat_number`). `verify_vat_number` (TAX.5)
+puts the cache, the VIES client and the fail-closed policy together.
 """
 
 import datetime as dt
@@ -42,6 +43,7 @@ from .models import (
     VendorTaxProfile,
     VendorTaxProfileTranslation,
 )
+from .vies import ViesClient, get_vies_client
 
 TAX_RATE_MODEL = "tax.taxrate"
 RATE_CONFIGURED = "tax.rate.configured"
@@ -714,11 +716,177 @@ def latest_vat_validation(
 ) -> VatValidation | None:
     """The most recent answer about the number, optionally not older than `since`.
 
-    How old an answer may be, and what an `unavailable` answer means, is the VIES client's
-    policy (TAX.5).
+    How old an answer may be, and what an `unavailable` answer means, is the policy of
+    `verify_vat_number` (TAX.5).
     """
     country, number = _vat_key(country, vat_number)
     rows = VatValidation.objects.filter(country=country, vat_number=number)
     if since is not None:
         rows = rows.filter(checked_at__gte=since)
     return rows.order_by("-checked_at", "-id").first()
+
+
+# --- The VIES check with cache, timeout and fail-closed policy (TAX.5)
+
+
+class ViesUnavailable(Exception):
+    """VIES gave no answer; raised by the background re-check so that the job is retried."""
+
+
+@dataclass(frozen=True)
+class VatCheck:
+    """Whether a VAT number counts as verified for a B2B sale, and why (spec 05 §5.2).
+
+    `verified` is true only for a VIES `valid` answer within the cache period. `result` is the
+    VIES answer, None when VIES was not asked (`reason` says why); `validation` is the stored
+    answer, fresh or reused (`from_cache`).
+    """
+
+    country: str
+    vat_number: str
+    verified: bool
+    reason: str
+    message: str
+    result: str | None = None
+    detail: str = ""
+    validation: VatValidation | None = None
+    from_cache: bool = False
+
+    @property
+    def checked_at(self) -> dt.datetime | None:
+        return self.validation.checked_at if self.validation is not None else None
+
+    @property
+    def request_id(self) -> str:
+        return self.validation.request_id if self.validation is not None else ""
+
+    def snapshot(self) -> dict[str, Any]:
+        """The JSON-ready record an order keeps of the check (spec 05: "and in the order
+        snapshot")."""
+        return {
+            "country": self.country,
+            "vat_number": self.vat_number,
+            "verified": self.verified,
+            "result": self.result,
+            "reason": self.reason,
+            "detail": self.detail,
+            "request_id": self.request_id,
+            "checked_at": self.checked_at.isoformat() if self.checked_at else None,
+            "validation": _public_id(self.validation),
+        }
+
+
+def _vat_check(
+    query: engine.ViesQuery,
+    row: VatValidation,
+    *,
+    detail: str = "",
+    from_cache: bool,
+) -> VatCheck:
+    reason = engine.vat_check_reason(row.result, detail)
+    return VatCheck(
+        country=query.country,
+        vat_number=query.number,
+        verified=engine.is_verified(row.result),
+        reason=reason,
+        message=engine.vat_check_message(reason, country=query.country),
+        result=row.result,
+        detail=detail,
+        validation=row,
+        from_cache=from_cache,
+    )
+
+
+def _cached_vat_validation(query: engine.ViesQuery, now: dt.datetime) -> VatValidation | None:
+    """The newest valid or invalid answer within `VIES_CACHE_SECONDS`; failing that, an
+    `unavailable` answer within `VIES_UNAVAILABLE_CACHE_SECONDS`, so that an outage does not
+    make every checkout wait for the timeout. Older answers are never used."""
+    rows = VatValidation.objects.filter(country=query.country, vat_number=query.number)
+    newest = ("-checked_at", "-id")
+    definitive_since = now - dt.timedelta(seconds=settings.VIES_CACHE_SECONDS)
+    definitive = (
+        rows.filter(result__in=(engine.VAT_VALID, engine.VAT_INVALID))
+        .filter(checked_at__gte=definitive_since)
+        .order_by(*newest)
+        .first()
+    )
+    if definitive is not None:
+        return definitive
+    down_since = now - dt.timedelta(seconds=settings.VIES_UNAVAILABLE_CACHE_SECONDS)
+    return (
+        rows.filter(result=engine.VAT_UNAVAILABLE, checked_at__gte=down_since)
+        .order_by(*newest)
+        .first()
+    )
+
+
+def _ask_vies(client: ViesClient, query: engine.ViesQuery) -> engine.ViesAnswer:
+    try:
+        answer = client.check(query)
+    except Exception:  # a client must not raise; if it does, VIES is unavailable
+        logger.exception("VIES client %s raised", type(client).__name__)
+        return engine.ViesAnswer(result=engine.VAT_UNAVAILABLE, detail=engine.DETAIL_CLIENT_ERROR)
+    if answer.result not in engine.VAT_RESULTS:
+        logger.error("VIES client %s answered %r", type(client).__name__, answer.result)
+        return engine.ViesAnswer(result=engine.VAT_UNAVAILABLE, detail=engine.DETAIL_BAD_RESPONSE)
+    return answer
+
+
+def _fit(value: str, field: str) -> str:
+    max_length = getattr(VatValidation._meta.get_field(field), "max_length", None)
+    return value[:max_length] if max_length else value
+
+
+def verify_vat_number(
+    country: str,
+    vat_number: str,
+    *,
+    client: ViesClient | None = None,
+    refresh: bool = False,
+) -> VatCheck:
+    """Check a customer's VAT number for reverse charge; fails closed (spec 05 §5.2, T2).
+
+    A recent answer is reused (`_cached_vat_validation`) unless `refresh`; otherwise VIES is
+    asked once through `client` (default: `get_vies_client()`), with its timeout and no retry,
+    and the answer is stored. A number VIES cannot be asked about (country outside VIES,
+    another country's prefix, malformed) is not verified and stores nothing: every
+    `VatValidation` row is a VIES answer. Never raises because of VIES.
+    """
+    try:
+        query = engine.vies_query(country, vat_number)
+    except engine.NotCheckable as exc:
+        return VatCheck(
+            country=country.strip().upper(),
+            vat_number=vat_number.strip(),
+            verified=False,
+            reason=exc.reason,
+            message=exc.message,
+        )
+    if not refresh:
+        cached = _cached_vat_validation(query, timezone.now())
+        if cached is not None:
+            return _vat_check(query, cached, from_cache=True)
+
+    answer = _ask_vies(client if client is not None else get_vies_client(), query)
+    if answer.result == engine.VAT_UNAVAILABLE:
+        logger.warning(
+            "VIES unavailable for %s%s: %s", query.prefix, query.number, answer.detail or "-"
+        )
+    row = record_vat_validation(
+        query.country,
+        query.full_number,
+        answer.result,
+        name=_fit(answer.name, "name"),
+        address=answer.address,
+        request_id=_fit(answer.request_id, "request_id"),
+    )
+    return _vat_check(query, row, detail=answer.detail, from_cache=False)
+
+
+def recheck_vat_number(country: str, vat_number: str) -> VatCheck:
+    """Ask VIES again, skipping the cache (for the background job). Raises `ViesUnavailable`
+    when VIES gives no answer, so that the job is retried with backoff."""
+    check = verify_vat_number(country, vat_number, refresh=True)
+    if check.result == engine.VAT_UNAVAILABLE:
+        raise ViesUnavailable(check.message)
+    return check
