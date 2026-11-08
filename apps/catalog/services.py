@@ -1936,22 +1936,28 @@ def product_cards(products: Sequence[Product], language: str) -> list[ProductCar
 
 @dataclass(frozen=True)
 class ProductGrid:
-    """What a CMS product grid shows (CMS.10): the first cards of its listing and the URL of the
-    listing page in the page language (None when there is none)."""
+    """What a CMS product grid shows (CMS.10): the first cards of its listing, and the listing's
+    name and page URL in the page language (None when not looked up or when there is none)."""
 
     cards: list[ProductCard]
-    see_all_url: str | None
+    see_all_url: str | None = None
+    name: str | None = None
 
 
-def product_grid(scope: ListingScope, language: str, *, limit: int) -> ProductGrid:
+def product_grid(
+    scope: ListingScope, language: str, *, limit: int, with_anchor: bool = True
+) -> ProductGrid:
     """The newest `limit` products of the `scope` listing as cards (the CAT.8 listing query, so
-    the grid and the listing page agree) and that listing page's path in `language`. A constant
-    number of queries: the products, their texts and the listing page's slugs."""
+    the grid and the listing page agree) and, `with_anchor`, that listing's name and page path in
+    `language`. A constant number of queries: the products and their texts, plus the listing
+    page's slugs `with_anchor`."""
     cards = product_cards(list(listing_products(scope)[:limit]), language)
-    if not cards:
-        return ProductGrid(cards=[], see_all_url=None)
+    if not cards or not with_anchor:
+        return ProductGrid(cards=cards)
     anchor = scope_anchor(scope, language)
-    return ProductGrid(cards=cards, see_all_url=anchor.paths.get(language) if anchor else None)
+    if anchor is None:
+        return ProductGrid(cards=cards)
+    return ProductGrid(cards=cards, see_all_url=anchor.paths.get(language), name=anchor.name)
 
 
 @dataclass(frozen=True)

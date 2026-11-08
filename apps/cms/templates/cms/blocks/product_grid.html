@@ -1,10 +1,14 @@
-{% load i18n %}{# The product grid (CMS.10): the CAT.8 product cards; left out when no product is public. #}
+{% load i18n %}{% comment %}
+The product grid (CMS.10): the CAT.8 listing's products as base theme product tiles (THM.4);
+left out when no product is public. The heading falls back to the listing's name (block
+context), and "See all" names its listing for screen readers.
+{% endcomment %}
 {% if cards %}
 <section class="block block-product-grid">
-  {% if value.heading %}<h2>{{ value.heading }}</h2>{% endif %}
-  <ul class="product-grid">
-    {% for card in cards %}<li>{% include "catalog/includes/product_card.html" %}</li>{% endfor %}
+  {% if heading %}<h2>{{ heading }}</h2>{% endif %}
+  <ul class="product-grid" role="list">
+    {% for card in cards %}{% if card.price is not None %}{% blocktranslate asvar price with amount=card.price %}{{ currency }} {{ amount }} excl. VAT{% endblocktranslate %}{% else %}{% firstof "" as price %}{% endif %}<li>{% include "components/product_tile.html" with name=card.title url=card.url image_url=card.image_url image_alt=card.image_alt price=price only %}</li>{% endfor %}
   </ul>
-  {% if see_all_url %}<p class="block-links"><a class="product-grid-all" href="{{ see_all_url }}">{% translate "See all" %}</a></p>{% endif %}
+  {% if see_all_url %}<p class="block-links"><a class="product-grid-all" href="{{ see_all_url }}">{% if listing_name %}{% blocktranslate with name=listing_name %}See all<span class="visually-hidden"> products: {{ name }}</span>{% endblocktranslate %}{% else %}{% translate "See all" %}{% endif %}</a></p>{% endif %}
 </section>
 {% endif %}

@@ -94,8 +94,10 @@ def test_an_editor_adds_a_term_product_grid_to_the_home_page(
         "href", "/product/ceramic-vase/"
     )
     expect(page.get_by_role("link", name="Linen napkins")).to_be_visible()
+    tile = page.locator("section.block-product-grid article.product-tile").first
+    expect(tile).to_have_css("border-top-style", "solid")  # the base theme styles the tiles
     expect(page.get_by_text("Secret draft")).to_have_count(0)
-    expect(page.get_by_role("link", name="See all")).to_have_attribute(
+    expect(page.get_by_role("link", name="See all products: Weddings")).to_have_attribute(
         "href", "/occasion/weddings/"
     )
     shot("public-home")

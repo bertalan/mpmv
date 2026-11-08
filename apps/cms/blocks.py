@@ -16,9 +16,10 @@ not live, a term (or its taxonomy or parent terms) without published texts, a ve
 active. Term and storefront URLs follow spec 03 (`engine.term_path`, `engine.storefront_path`).
 
 The product grid (CMS.10) shows the newest products of one category, term, brand or vendor with
-the CAT.8 listing query (`apps.catalog.services.product_grid`), as the listing's product cards,
-and an optional "See all" link to that listing page. Only published products of active vendors
-show; a grid with none is left out.
+the CAT.8 listing query (`apps.catalog.services.product_grid`), as the base theme's product
+tiles (THM.4), and an optional "See all" link to that listing page, named after the listing for
+screen readers. An empty heading falls back to the listing's name, so the section always has
+one. Only published products of active vendors show; a grid with none is left out.
 """
 
 from collections import defaultdict
@@ -505,12 +506,18 @@ class ProductGridBlock(blocks.StructBlock):  # type: ignore[misc]
         chosen = next(iter(value["source"]), None)
         if chosen is None or chosen.value is None:
             return context
+        heading = value.get("heading") or ""
+        see_all = bool(value.get("see_all"))
         grid = product_grid(
             ListingScope(**{chosen.block_type: chosen.value}),
             _page_language(parent_context),
             limit=grid_limit(value.get("limit")),
+            # The listing's name and page: for "See all", and as the heading when it is empty.
+            with_anchor=see_all or not heading,
         )
         context["cards"] = grid.cards
-        context["see_all_url"] = grid.see_all_url if value.get("see_all") else None
+        context["heading"] = heading or grid.name or ""
+        context["listing_name"] = grid.name
+        context["see_all_url"] = grid.see_all_url if see_all else None
         context["currency"] = CURRENCY
         return context

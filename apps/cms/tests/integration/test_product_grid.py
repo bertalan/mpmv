@@ -95,7 +95,7 @@ def _grid_section(html: BeautifulSoup) -> Any:
 def _titles(html: BeautifulSoup) -> list[str]:
     section = _grid_section(html)
     assert section is not None
-    return [h.get_text(strip=True) for h in section.find_all(class_="product-card-title")]
+    return [h.get_text(strip=True) for h in section.find_all(class_="product-tile__name")]
 
 
 _counter = iter(range(10_000))
@@ -161,9 +161,21 @@ def test_a_term_grid_renders_the_cat8_results(seeded: SeedReport, maker: Term) -
     assert other.pk not in [p.pk for p in expected]
     section = _grid_section(html)
     assert section.find("h2").get_text(strip=True) == "Our picks"
-    assert section.find("data", value="12.50") is not None
+    prices = [p.get_text(" ", strip=True) for p in section.find_all(class_="product-tile__price")]
+    assert prices == ["EUR 10.00 excl. VAT", "EUR 12.50 excl. VAT"]
     links = [a["href"] for a in section.find_all("a")]
     assert any(href.endswith("-en/") and "/product/" in href for href in links)
+
+
+def test_the_grid_renders_the_base_theme_product_tiles(seeded: SeedReport, maker: Term) -> None:
+    """The base theme styles the tiles on every page (THM.4), unlike the CAT.8 cards whose
+    rules live in the listing stylesheet only."""
+    listed("Steel bag").terms.add(maker)
+    listed("Leather bag").terms.add(maker)
+    section = _grid_section(_publish(_home(), [_grid("term", maker)]))
+    assert len(section.select("ul.product-grid > li > article.product-tile")) == 2
+    assert section.find(class_="product-card") is None
+    assert [h.name for h in section.find_all(class_="product-tile__name")] == ["h3", "h3"]
 
 
 def test_a_term_grid_includes_the_term_subtree(seeded: SeedReport, maker: Term) -> None:
@@ -196,8 +208,28 @@ def test_see_all_links_to_the_canonical_listing(seeded: SeedReport, maker: Term)
     html = _publish(_home(), [_grid("term", maker)])
     see_all = _grid_section(html).find("a", class_="product-grid-all")
     assert see_all["href"] == "/compatibility/maker/"
-    assert see_all.get_text(strip=True) == "See all"
+    assert " ".join(see_all.get_text().split()) == "See all products: Maker"
+    assert see_all.find(class_="visually-hidden").get_text(strip=True) == "products: Maker"
     assert Client().get(see_all["href"]).status_code == 200
+
+
+def test_see_all_names_its_listing_in_the_page_language(seeded: SeedReport, maker: Term) -> None:
+    listed("Steel bag").terms.add(maker)
+    html = _publish(_home("it"), [_grid("term", maker, heading="Scelti per te")])
+    see_all = _grid_section(html).find("a", class_="product-grid-all")
+    assert see_all.find(class_="visually-hidden").get_text(strip=True) == "products: Marca"
+
+
+@pytest.mark.parametrize("see_all", [True, False])
+def test_an_empty_heading_falls_back_to_the_listing_name(
+    seeded: SeedReport, maker: Term, see_all: bool
+) -> None:
+    """The section is named by its h2 even when the editor leaves the heading empty."""
+    listed("Steel bag").terms.add(maker)
+    html = _publish(_home(), [_grid("term", maker, heading="", see_all=see_all)])
+    assert _grid_section(html).find("h2").get_text(strip=True) == "Maker"
+    html = _publish(_home("it"), [_grid("term", maker, heading="", see_all=see_all)])
+    assert _grid_section(html).find("h2").get_text(strip=True) == "Marca"
 
 
 def test_see_all_is_optional(seeded: SeedReport, maker: Term) -> None:
@@ -388,3 +420,22 @@ def test_the_grid_renders_with_a_constant_number_of_queries(seeded: SeedReport) 
     one = _queries_to_render(1, _landing_term(1))
     many = _queries_to_render(12, _landing_term(2))
     assert many <= one
+
+
+def test_a_grid_without_its_listing_link_skips_the_listing_lookup(
+    seeded: SeedReport, maker: Term, django_assert_num_queries: Any
+) -> None:
+    """Without "See all" and with its own heading, a grid needs only the products and their
+    texts: the listing page's slugs and name are not looked up."""
+    listed("Steel bag").terms.add(maker)
+    scope = catalog.ListingScope(term=maker)
+    with CaptureQueriesContext(connection) as with_anchor:
+        grid = catalog.product_grid(scope, "en", limit=8, with_anchor=True)
+    assert grid.see_all_url == "/compatibility/maker/"
+    assert grid.name == "Maker"
+    with django_assert_num_queries(2):
+        bare = catalog.product_grid(scope, "en", limit=8, with_anchor=False)
+    assert len(with_anchor) > 2
+    assert [c.title for c in bare.cards] == ["Steel bag"]
+    assert bare.see_all_url is None
+    assert bare.name is None

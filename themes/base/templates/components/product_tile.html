@@ -7,7 +7,8 @@ arrive formatted by the caller (catalog services); the tile only shows them.
   {% include "components/product_tile.html" with name=p.name url=p.url price=p.price_display vendor=p.vendor_name only %}
 
 Context:
-- `name` (required), `url` (required): the product name and its page.
+- `name` (required), `url`: the product name and its page; without `url` (a product with no
+  page yet) the name shows without a link.
 - `heading_level`: 2 to 6 (default 3), to fit the page's outline.
 - `image_url`, `image_alt`: the product image; `image_alt` describes what the image adds, or is
   empty when it only repeats the name. `image_width` and `image_height` (default 400 x 400)
@@ -21,7 +22,7 @@ Context:
 {% endcomment %}<article class="product-tile{% if 'out_of_stock' in badges %} product-tile--unavailable{% endif %}">
   <div class="product-tile__media">{% if image_url %}<img src="{{ image_url }}" alt="{{ image_alt|default:'' }}" width="{{ image_width|default:400 }}" height="{{ image_height|default:400 }}" loading="lazy">{% else %}<div class="product-tile__placeholder" aria-hidden="true"></div>{% endif %}</div>
   <div class="product-tile__body">
-    <h{{ heading_level|default:3 }} class="product-tile__name"><a class="product-tile__link" href="{{ url }}">{{ name }}</a></h{{ heading_level|default:3 }}>
+    <h{{ heading_level|default:3 }} class="product-tile__name">{% if url %}<a class="product-tile__link" href="{{ url }}">{{ name }}</a>{% else %}{{ name }}{% endif %}</h{{ heading_level|default:3 }}>
     {% if vendor %}<p class="product-tile__vendor">{% blocktranslate %}Sold by {{ vendor }}{% endblocktranslate %}</p>{% endif %}
     <p class="product-tile__price">{% if price %}{% if price_before %}<del><span class="visually-hidden">{% translate "Was" %} </span>{{ price_before }}</del> {% endif %}<span class="product-tile__amount">{{ price }}</span>{% else %}{% translate "Price on request" %}{% endif %}</p>
     {% if badges %}<ul class="product-tile__badges" aria-label="{% translate 'Status' %}">{% for kind in badges %}<li>{% include "components/badge.html" with kind=kind only %}</li>{% endfor %}</ul>{% endif %}
