@@ -404,6 +404,38 @@ def test_only_staff_other_than_the_requester_review() -> None:
     assert TaxRegimeChangeRequest.objects.get().status == engine.PENDING
 
 
+def remove_from_vendor(user: User, vendor: Vendor) -> None:
+    VendorMember.objects.filter(user=user, vendor=vendor).delete()
+
+
+def demote_to_staff(user: User, vendor: Vendor) -> None:
+    VendorMember.objects.filter(user=user, vendor=vendor).update(role=VendorMember.Role.STAFF)
+
+
+def deactivate(user: User, vendor: Vendor) -> None:
+    User.objects.filter(pk=user.pk).update(is_active=False)
+
+
+@pytest.mark.parametrize("lose_permission", [remove_from_vendor, demote_to_staff, deactivate])
+def test_approval_rechecks_that_the_requester_may_still_change_the_regime(
+    lose_permission: Any,
+) -> None:
+    """A request is the word of an owner; once they lose the right, it cannot be approved."""
+    vendor = VendorFactory.create(fiscal_regime="RF01")
+    request = submitted(vendor)
+    lose_permission(request.requested_by, vendor)
+
+    for dry_run in (True, False):
+        with pytest.raises(engine.RegimeChangeNotAllowed):
+            services.approve_regime_change(request, reviewer(), ctx=STAFF_CTX, dry_run=dry_run)
+    assert TaxRegimeChangeRequest.objects.get().status == engine.PENDING
+    assert VendorTaxProfile.objects.count() == 0
+    assert actions() == ["tax.regime_change.requested"]
+
+    services.reject_regime_change(request, reviewer(), reason="Owner left.", ctx=STAFF_CTX)
+    assert TaxRegimeChangeRequest.objects.get().status == engine.REJECTED
+
+
 def test_staff_without_the_review_permission_cannot_review() -> None:
     request = submitted(VendorFactory.create(fiscal_regime="RF01"))
     viewer = UserFactory.create(staff=True, permissions=["tax.view_taxregimechangerequest"])
