@@ -97,7 +97,7 @@ ATTACKS = ["javascript:alert(1)", "data:text/html,x", "vbscript:x", "//evil.exam
 @pytest.mark.parametrize("url", ATTACKS)
 def test_a_card_with_an_unsafe_url_renders_no_link(url: str) -> None:
     html = render("card", title="Spring service", url=url)
-    assert "<a" not in html
+    assert not re.search(r"<a[\s>]", html)
     assert "card--linked" not in html
     assert url not in html
     assert re.search(r'<h3 class="card__title">\s*Spring service\s*</h3>', html)
@@ -119,7 +119,7 @@ def test_a_card_heading_level_is_clamped(level: object, tag: str) -> None:
 @pytest.mark.parametrize("url", ATTACKS)
 def test_a_product_tile_with_an_unsafe_url_renders_no_link(url: str) -> None:
     html = render("product_tile", name="Touring jacket", url=url, price="€ 10.00")
-    assert "<a" not in html
+    assert not re.search(r"<a[\s>]", html)
     assert url not in html
     assert re.search(r'<h3 class="product-tile__name">\s*Touring jacket\s*</h3>', html)
 

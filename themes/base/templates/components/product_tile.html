@@ -1,4 +1,4 @@
-{% load i18n %}{% comment %}
+{% load i18n theme_tags %}{% comment %}
 Product tile (THM.4, spec 14 §14.9): one product in a grid or a list. The product name is the
 tile's only link and its `::after` covers the whole tile, so a click on the image follows it
 and screen readers hear one link named by the product (no nested interactive elements). Prices
@@ -7,8 +7,9 @@ arrive formatted by the caller (catalog services); the tile only shows them.
   {% include "components/product_tile.html" with name=p.name url=p.url price=p.price_display vendor=p.vendor_name only %}
 
 Context:
-- `name` (required), `url` (required): the product name and its page.
-- `heading_level`: 2 to 6 (default 3), to fit the page's outline.
+- `name` (required), `url` (required): the product name and its page. Only http(s) and
+  relative URLs ("/", "#", "?") are linked; any other value leaves the name unlinked.
+- `heading_level`: 2 to 6 (default 3), to fit the page's outline; out of range is clamped.
 - `image_url`, `image_alt`: the product image; `image_alt` describes what the image adds, or is
   empty when it only repeats the name. `image_width` and `image_height` (default 400 x 400)
   reserve its space. Without `image_url` a neutral placeholder, hidden from assistive
@@ -19,12 +20,12 @@ Context:
 - `vendor`: the vendor's name, shown as "Sold by …".
 - `badges`: a list of badge kinds (components/badge.html): sale, new, out_of_stock,
   on_request. "out_of_stock" also mutes the tile.
-{% endcomment %}<article class="product-tile{% if 'out_of_stock' in badges %} product-tile--unavailable{% endif %}">
+{% endcomment %}{% with href=url|safe_href level=heading_level|heading_level:3 %}<article class="product-tile{% if 'out_of_stock' in badges %} product-tile--unavailable{% endif %}">
   <div class="product-tile__media">{% if image_url %}<img src="{{ image_url }}" alt="{{ image_alt|default:'' }}" width="{{ image_width|default:400 }}" height="{{ image_height|default:400 }}" loading="lazy">{% else %}<div class="product-tile__placeholder" aria-hidden="true"></div>{% endif %}</div>
   <div class="product-tile__body">
-    <h{{ heading_level|default:3 }} class="product-tile__name"><a class="product-tile__link" href="{{ url }}">{{ name }}</a></h{{ heading_level|default:3 }}>
+    <h{{ level }} class="product-tile__name">{% if href %}<a class="product-tile__link" href="{{ href }}">{{ name }}</a>{% else %}{{ name }}{% endif %}</h{{ level }}>
     {% if vendor %}<p class="product-tile__vendor">{% blocktranslate %}Sold by {{ vendor }}{% endblocktranslate %}</p>{% endif %}
     <p class="product-tile__price">{% if price and not 'on_request' in badges %}{% if price_before %}<del><span class="visually-hidden">{% translate "Was" %} </span>{{ price_before }}</del> {% endif %}<span class="product-tile__amount">{{ price }}</span>{% else %}{% translate "Price on request" %}{% endif %}</p>
     {% if badges %}<ul class="product-tile__badges" aria-label="{% translate 'Status' %}">{% for kind in badges %}<li>{% include "components/badge.html" with kind=kind only %}</li>{% endfor %}</ul>{% endif %}
   </div>
-</article>
+</article>{% endwith %}
