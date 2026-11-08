@@ -13,17 +13,15 @@ from pathlib import Path
 
 from .engine import is_themable
 
+# An inline <script> (no src) runs under the CSP unless it is a JSON-LD data block: the browser
+# never executes `type="application/ld+json"` and spec 14 allows structured data. Any other type
+# (module, text/javascript, none) is inline code. Handlers on the tag are still caught below.
+_INLINE_SCRIPT_RE = re.compile(r"<script\b(?![^>]*\ssrc\s*=)([^>]*)>", re.IGNORECASE)
+_JSON_LD_TYPE_RE = re.compile(
+    r"\stype\s*=\s*(?:\"application/ld\+json\"|'application/ld\+json'|application/ld\+json(?=[\s/]|$))",
+    re.IGNORECASE,
+)
 _RULES: tuple[tuple[re.Pattern[str], str], ...] = (
-    # A script with `src`, or a data block (JSON-LD, JSON), which the browser never runs and
-    # the CSP does not govern, is allowed; any other inline script is not.
-    (
-        re.compile(
-            r"<script\b(?![^>]*\ssrc\s*=)"
-            r"(?![^>]*\stype\s*=\s*[\"']?application/(?:ld\+)?json[\"'\s>])[^>]*>",
-            re.IGNORECASE,
-        ),
-        "inline <script>",
-    ),
     (re.compile(r"<style\b", re.IGNORECASE), "<style> block"),
     (re.compile(r"\sstyle\s*=", re.IGNORECASE), "style attribute"),
     (re.compile(r"\son[a-z]+\s*=", re.IGNORECASE), "on… handler attribute"),
@@ -43,7 +41,11 @@ _NAME_RE = re.compile(r"^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$")
 
 def lint_template(source: str) -> list[str]:
     """`line <n>: <what>` for every pattern the strict CSP would block, in source order."""
-    findings: list[tuple[int, str]] = []
+    findings: list[tuple[int, str]] = [
+        (match.start(), "inline <script>")
+        for match in _INLINE_SCRIPT_RE.finditer(source)
+        if not _JSON_LD_TYPE_RE.search(match.group(1))
+    ]
     for pattern, what in _RULES:
         findings += [(match.start(), what) for match in pattern.finditer(source)]
     for match in _ALPINE_RE.finditer(source):

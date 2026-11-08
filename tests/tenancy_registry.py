@@ -23,6 +23,7 @@ models tested on Vendor B's objects.
 
 from django.contrib import admin
 from django.db import models
+from django.test import Client
 
 from apps.api.models import ApiClient, ApiRateCounter
 from apps.api.tests.factories import ApiClientFactory, ApiRateCounterFactory
@@ -43,10 +44,13 @@ from apps.catalog.tests.factories import (
     ProductFactory,
     ProductTranslationFactory,
     SlugHistoryFactory,
+    TaxonomyFactory,
+    TaxonomyTranslationFactory,
     VariantFactory,
     VariantOptionFactory,
     VariantTranslationFactory,
 )
+from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.shipping.models import (
     PickupOption,
@@ -87,11 +91,13 @@ from apps.vendors.tests.factories import (
 )
 from tests.tenancy import (
     Access,
+    CrossTenant,
     Endpoint,
     NoVendorData,
     ObjectMaker,
     StaffOnly,
     VendorScoped,
+    member_session,
 )
 
 # --- Vendor-owned models: how to make one object owned by a given vendor
@@ -175,11 +181,35 @@ NOT_VENDOR_OWNED: dict[str, str] = {}
 # --- Web endpoints (URL name, or route when unnamed)
 
 OWN_ACCOUNT = "The signed-in user's own second factors (CORE.4); no vendor data."
+PUBLIC_LISTING = (
+    "Public catalog listing (CAT.8): only published products of active vendors, the same for "
+    "every visitor; a non-active vendor's data never shows."
+)
+SAMPLE_TAXONOMY = "0"  # the sample path's first segment (`_sample_path` fills every param "0")
+
+
+def member_with_landing_taxonomy(client: Client, tenants: CrossTenant) -> dict[str, str]:
+    """`member_session`, plus a taxonomy with term pages whose slug is the sample path's first
+    segment: a term route only matches the slug of such a taxonomy."""
+    taxonomy = TaxonomyFactory.create(has_landing=True)
+    TaxonomyTranslationFactory.create(
+        taxonomy=taxonomy, slug=SAMPLE_TAXONOMY, status=TranslationStatus.PUBLISHED
+    )
+    return member_session(client, tenants)
+
 
 ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
     "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
     "home": NoVendorData("Public home page."),
+    "catalog:category": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "product-category"}),
+    "catalog:brand": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "brand"}),
+    "catalog:term": NoVendorData(PUBLIC_LISTING, login=member_with_landing_taxonomy),
+    "catalog:vendor": NoVendorData(
+        "Public storefront listing (CAT.8) of an active vendor's published products; Vendor B "
+        "is not active, so its storefront is a 404.",
+        kwargs={"segment": "shop"},
+    ),
     "switch_language": NoVendorData("Stores the visitor's language choice."),
     "themes:styleguide": StaffOnly("Component samples of the active theme (THM.4), staff only."),
     "mfa:overview": NoVendorData(OWN_ACCOUNT),
