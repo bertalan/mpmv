@@ -13,10 +13,14 @@ the same date as an earlier one is a correction and replaces it from that date.
 FAQ block (CMS.2, spec 10 §10.2): the FAQPage structured data.
 
 Featured cards (CMS.2, spec 10 §10.2, spec 03 "URLs"): the URLs of the term and vendor cards.
+
+Launch countdown (CMS.9, spec 10 §10.2): the state of the block at a given instant, and the
+longest a cache may keep a page whose countdown is still running.
 """
 
 import datetime as dt
 import json
+import math
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -111,3 +115,56 @@ def link_language(requested: str, primary: str, available: Sequence[Collection[s
         if all(candidate in languages for languages in available):
             return candidate
     return None
+
+
+# --- Launch countdown (CMS.9)
+
+
+@dataclass(frozen=True)
+class CountdownState:
+    """What a countdown shows at one instant: the time left, or the expired state."""
+
+    expired: bool
+    days: int = 0
+    hours: int = 0
+    minutes: int = 0
+
+
+def _require_aware(*values: dt.datetime) -> None:
+    for value in values:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("countdown datetimes must be timezone-aware")
+
+
+def countdown_state(target: dt.datetime, now: dt.datetime) -> CountdownState:
+    """The countdown to `target` at `now`; expired from the target on (exactly at it too).
+
+    The time left rounds up to the whole minute, as the browser module does: the counter
+    never reads "0 minutes" while the launch is still ahead. Both values must be aware;
+    any time zone works, the comparison is between instants.
+    """
+    _require_aware(target, now)
+    # In UTC: the difference of two datetimes sharing a tzinfo is wall-clock time, which a
+    # daylight saving change would skew.
+    left = target.astimezone(dt.UTC) - now.astimezone(dt.UTC)
+    if left <= dt.timedelta(0):
+        return CountdownState(expired=True)
+    total = math.ceil(left / dt.timedelta(minutes=1))
+    hours, minutes = divmod(total, 60)
+    days, hours = divmod(hours, 24)
+    return CountdownState(expired=False, days=days, hours=hours, minutes=minutes)
+
+
+def capped_max_age(
+    targets: Iterable[dt.datetime], now: dt.datetime, max_age: int | None
+) -> int | None:
+    """The `max-age` (seconds) a page may carry so no cache keeps it past its nearest active
+    countdown target: `max_age` itself, or the whole seconds left when fewer. Targets already
+    reached do not count; with none left, `max_age` is returned unchanged (None: not set)."""
+    _require_aware(now)
+    now = now.astimezone(dt.UTC)
+    ahead = [target.astimezone(dt.UTC) - now for target in targets if target > now]
+    if not ahead:
+        return max_age
+    left = math.floor(min(ahead).total_seconds())
+    return left if max_age is None else min(max_age, left)

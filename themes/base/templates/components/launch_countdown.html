@@ -1,23 +1,35 @@
-{% load i18n %}{% comment %}
+{% load i18n tz %}{% comment %}
 Launch countdown (THM.4 provides the component, CMS.9 the StreamField block and its module;
 spec 14 §14.9, spec 10 §10.2). The server renders the absolute launch date in a `<time>`
-element and the call to action, so the block is complete without JavaScript; after the target
-it renders the expired text and link instead. CMS.9's ES module finds `data-countdown`, shows the
-remaining time in the visitor's time zone and adds the pause button. The counter is never a
-live region (no `aria-live`): only the expiry is announced, once, by the module.
+element, with the time zone name, and the call to action, so the block is complete without
+JavaScript; after the target it renders the expired text and link instead. Before the target
+the expired part is rendered too, `hidden`, for the module to reveal at the target.
 
-  {% include "components/launch_countdown.html" with title=block.title target=block.target url=block.url action=block.cta expired=state.expired expired_text=block.expired_text expired_url=block.expired_url only %}
+The theme's countdown.js module (CMS.9) finds `data-countdown`, reads the UTC target in
+`data-target`, rewrites the date in the visitor's time zone, shows the remaining time once a
+minute and reveals the pause button. The counter is never a live region (no `aria-live`): only
+the expiry is announced, once, through the page's polite live region (layouts/base.html).
+
+  {% include "components/launch_countdown.html" with title=block.title text=block.text target=block.target url=block.url action=block.cta expired=state.expired expired_text=block.expired_text expired_url=block.expired_url only %}
 
 Context:
 - `title` (required): the heading; `heading_level` 2 to 6 (default 2).
-- `target` (required): the launch, an aware datetime.
+- `text`: a short text under the heading.
+- `target` (required): the launch, an aware datetime, shown in the active time zone.
 - `url` and `action`: the call to action before the launch.
 - `expired`: the target has passed (from CMS.9's `countdown_state`).
 - `expired_text`, `expired_url`, `expired_action`: what the block says and links to after it.
-{% endcomment %}<div class="launch-countdown{% if expired %} launch-countdown--expired{% endif %}"{% if not expired %} data-countdown="{{ target|date:'c' }}"{% endif %}>
+{% endcomment %}<div class="launch-countdown{% if expired %} launch-countdown--expired{% endif %}"{% if not expired %} data-countdown data-target="{{ target|utc|date:'Y-m-d\TH:i:s\Z' }}"{% endif %}>
   <h{{ heading_level|default:2 }} class="launch-countdown__title">{{ title }}</h{{ heading_level|default:2 }}>
-  {% if expired %}<p class="launch-countdown__expired">{{ expired_text }}</p>
-  {% if expired_url %}<a class="button" href="{{ expired_url }}">{% firstof expired_action _("Discover it") %}</a>{% endif %}{% else %}<p class="launch-countdown__date">{% translate "Available from" %} <time datetime="{{ target|date:'c' }}">{{ target|date:"DATETIME_FORMAT" }}</time></p>
-  <p class="launch-countdown__remaining" data-countdown-remaining hidden></p>
-  {% if url and action %}<a class="button" href="{{ url }}">{{ action }}</a>{% endif %}{% endif %}
+  {% if text %}<p class="launch-countdown__text">{{ text }}</p>
+  {% endif %}{% if not expired %}<div class="launch-countdown__upcoming" data-countdown-upcoming>
+    <p class="launch-countdown__date">{% translate "Available from" %} <time datetime="{{ target|date:'c' }}">{{ target|date:"DATETIME_FORMAT" }} {{ target|date:"T" }}</time></p>
+    <p class="launch-countdown__remaining" data-countdown-counter hidden>{% translate "Time left:" %} <span data-countdown-remaining></span></p>
+    <p class="launch-countdown__actions">{% if url and action %}<a class="button" href="{{ url }}">{{ action }}</a>
+      {% endif %}<button type="button" class="button button--link" data-countdown-pause data-resume-label="{% translate 'Resume countdown' %}" hidden>{% translate "Pause countdown" %}</button></p>
+  </div>
+  {% endif %}<div class="launch-countdown__after" data-countdown-expired{% if not expired %} hidden{% endif %}>
+    <p class="launch-countdown__expired">{% firstof expired_text _("Available now") %}</p>
+    {% if expired_url %}<p><a class="button" href="{{ expired_url }}">{% firstof expired_action _("Discover it") %}</a></p>{% endif %}
+  </div>
 </div>

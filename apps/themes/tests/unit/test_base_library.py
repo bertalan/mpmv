@@ -485,7 +485,7 @@ def test_a_launch_countdown_is_ready_for_the_cms9_module() -> None:
     )
     assert 'data-target="2026-12-01T09:00:00Z"' in upcoming
     assert re.search(r"<button[^>]*data-countdown-pause[^>]*hidden", upcoming)
-    assert re.search(r"<[^>]*data-countdown-remaining[^>]*hidden", upcoming)
+    assert re.search(r"<p[^>]*data-countdown-counter[^>]*hidden", upcoming)
     assert re.search(r"<div[^>]*data-countdown-expired[^>]*hidden", upcoming)
     assert "Now available" in upcoming
 

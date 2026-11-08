@@ -1,10 +1,13 @@
-"""Admin choosers for catalog terms and vendors (CMS.2 part 2/2, spec 10 §10.2).
+"""Admin choosers for catalog terms, vendors, categories and products (CMS.2, CMS.9).
 
 Wagtail's `ChooserViewSet` gives each model a chooser modal under `/admin/` and a StreamField
 block (`apps.cms.blocks.TermChooserBlock`, `VendorChooserBlock`). Editors never type a URL.
 
 - Terms are platform data with no vendor scope: every term is offered, labelled
   "taxonomy code: name" like the staff admin.
+- Categories (CMS.9): every category, platform data like the terms.
+- Products (CMS.9): only those a visitor may see (`apps.catalog.services.listed_products`),
+  labelled by SKU like the staff admin.
 - Vendors: only those with a public storefront (`apps.vendors.services.storefront_vendors`), in
   the list and in the "chosen" step alike, so a crafted request cannot pick another vendor.
 
@@ -20,7 +23,8 @@ from django.utils.translation import gettext_lazy as _
 from wagtail.admin.views.generic.chooser import ChosenView
 from wagtail.admin.viewsets.chooser import ChooserViewSet
 
-from apps.catalog.models import Term
+from apps.catalog.models import Category, Product, Term
+from apps.catalog.services import listed_products
 from apps.vendors.models import Vendor
 from apps.vendors.services import storefront_vendors
 
@@ -55,5 +59,37 @@ class VendorChooserViewSet(ChooserViewSet):  # type: ignore[misc]
         return storefront_vendors().order_by("display_name")
 
 
+class CategoryChooserViewSet(ChooserViewSet):  # type: ignore[misc]
+    model = Category
+    icon = "folder-open-inverse"
+    choose_one_text = _("Choose a category")
+    choose_another_text = _("Choose another category")
+    register_widget = False
+    per_page = 50
+
+    def get_object_list(self) -> QuerySet[Category]:
+        return Category.objects.prefetch_related("translations")
+
+
+class ProductChosenView(ChosenView):  # type: ignore[misc]
+    def get_object(self, pk: Any) -> Product:
+        return listed_products().get(pk=pk)
+
+
+class ProductChooserViewSet(ChooserViewSet):  # type: ignore[misc]
+    model = Product
+    icon = "pick"
+    choose_one_text = _("Choose a product")
+    choose_another_text = _("Choose another product")
+    register_widget = False
+    chosen_view_class = ProductChosenView
+    per_page = 50
+
+    def get_object_list(self) -> QuerySet[Product]:
+        return listed_products().order_by("sku")
+
+
+category_chooser = CategoryChooserViewSet("cms_category_chooser", url_prefix="cms/category-chooser")
+product_chooser = ProductChooserViewSet("cms_product_chooser", url_prefix="cms/product-chooser")
 term_chooser = TermChooserViewSet("cms_term_chooser", url_prefix="cms/term-chooser")
 vendor_chooser = VendorChooserViewSet("cms_vendor_chooser", url_prefix="cms/vendor-chooser")

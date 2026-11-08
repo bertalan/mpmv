@@ -28,7 +28,7 @@ from wagtail.users import wagtail_hooks as wagtail_users_hooks
 from apps.core.services import classified
 
 from .admin_views import can_classify_images, image_review
-from .choosers import term_chooser, vendor_chooser
+from .choosers import category_chooser, product_chooser, term_chooser, vendor_chooser
 from .models import NavigationMenu
 
 
@@ -97,3 +97,13 @@ def register_term_chooser() -> Any:
 @hooks.register("register_admin_viewset")  # type: ignore[untyped-decorator]
 def register_vendor_chooser() -> Any:
     return vendor_chooser
+
+
+@hooks.register("register_admin_viewset")  # type: ignore[untyped-decorator]
+def register_category_chooser() -> Any:
+    return category_chooser
+
+
+@hooks.register("register_admin_viewset")  # type: ignore[untyped-decorator]
+def register_product_chooser() -> Any:
+    return product_chooser

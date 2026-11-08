@@ -76,7 +76,11 @@ def product() -> Product:
     vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
     item: Product = ProductFactory.create(vendor=vendor, status=Product.Status.PUBLISHED)
     ProductTranslationFactory.create(
-        product=item, language="en", title="Touring jacket", slug="touring-jacket-en"
+        product=item,
+        language="en",
+        title="Touring jacket",
+        slug="touring-jacket-en",
+        status=PUBLISHED,
     )
     return item
 
@@ -218,5 +222,6 @@ def test_the_target_is_entered_in_the_operator_time_zone_and_stored_in_utc() -> 
     # The editor sees the stored value again in the operator's time zone.
     shown = target_block.get_form_state(dt.datetime(2030, 12, 1, 9, 0, tzinfo=dt.UTC))
     assert shown.startswith("2030-12-01 10:00")
-    stored = target_block.get_prep_value(dt.datetime(2030, 12, 1, 9, 0, tzinfo=dt.UTC))
-    assert dt.datetime.fromisoformat(stored) == dt.datetime(2030, 12, 1, 9, 0, tzinfo=dt.UTC)
+    cleaned = target_block.clean("2030-12-01 10:00")
+    assert cleaned.utcoffset() == dt.timedelta(0)
+    assert target_block.to_python(cleaned.isoformat()) == cleaned

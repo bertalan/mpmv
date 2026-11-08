@@ -1688,6 +1688,17 @@ def _translated_name(resolved: Any) -> str:
     return str(resolved.translation.name) if resolved.translation is not None else ""
 
 
+def category_url(category: Category, language: str) -> str | None:
+    """The listing URL of `category` in `language`, each level falling back to its source
+    language text (spec 09); None when a level has no published text (CMS.9 links)."""
+    chain = [*category.get_ancestors(), category]
+    published = _published_slugs(CategoryTranslation.objects.filter(category__in=chain), "category")
+    parts = _public_slug_paths(chain, published).get(language)
+    if parts is None:
+        return None
+    return slugs.category_path(language, parts, default_language=settings.LANGUAGE_CODE)
+
+
 def category_anchor(slug_path: str, language: str) -> ListingAnchor | None:
     """The category page at `/product-category/{slug_path}/`; None when there is none."""
     rows = CategoryTranslation.objects.all()
