@@ -40,6 +40,7 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write # push the image to ghcr.io
@@ -57,16 +58,6 @@ jobs:
           echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
           # The same image timestamp in the build and the push step below.
           echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
-      - name: Log in to the registry
-        run: echo "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-        env:
-          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Refuse to overwrite an existing release
-        run: |
-          if docker manifest inspect "$IMAGE:$VERSION" > /dev/null 2>&1; then
-            echo "$IMAGE:$VERSION already exists; release tags are immutable" >&2
-            exit 1
-          fi
       # A BuildKit container builder can push by digest; the build and push steps share its cache.
       - name: Set up the builder
         run: docker buildx create --name mpmv-release --driver docker-container --bootstrap --use
@@ -81,6 +72,17 @@ jobs:
       # any of it is pushed.
       - name: Production parity smoke (units, Caddy, TLS database, seed, rollback)
         run: deploy/ci/parity-smoke.sh mpmv-app:release
+      # Logged in only now: the smoke runs third-party images with no registry token on disk.
+      - name: Log in to the registry
+        run: echo "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Refuse to overwrite an existing release
+        run: |
+          if docker manifest inspect "$IMAGE:$VERSION" > /dev/null 2>&1; then
+            echo "$IMAGE:$VERSION already exists; release tags are immutable" >&2
+            exit 1
+          fi
       - run: mkdir -p build/sbom
       - name: Python SBOM (CycloneDX)
         if: matrix.arch == 'amd64'
