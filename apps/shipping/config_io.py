@@ -1,6 +1,8 @@
-"""Export and import of the shipping configuration, and the standard template (SHP.13, spec 06).
+"""Export and import of the shipping configuration, and the standard template (SHP.13, SHP.14,
+spec 06).
 
-Files use the format of `apps.shipping.config_format` (version 1, JSON or CSV). An import runs
+Files use the format of `apps.shipping.config_format` (version 2, JSON or CSV; version 1 files
+are still read). An import runs
 in three steps, and an invalid file changes nothing:
 
 1. shape: the format parser (`config_format.parse_json` / `parse_csv`);
@@ -16,17 +18,19 @@ in three steps, and an invalid file changes nothing:
 
 Who owns a file: a vendor, or the platform (`vendor=None`).
 
-- A vendor file writes the vendor's zones, methods, weight bands and pickup options. Its methods
-  ship to the vendor's own zones (`zone_scope` own: in the file or already stored) or to platform
-  zones (`zone_scope` platform). Country groups are platform data: the file's groups are
-  compared with the platform's and never written (a missing group is an error, a different one
-  a warning).
-- A platform file writes country groups and platform zones; methods and pickup options belong to
-  a vendor and are refused.
+- A vendor file writes the vendor's zones, methods, weight bands, special-area treatments and
+  pickup options. Its methods ship to the vendor's own zones (`zone_scope` own: in the file or
+  already stored) or to platform zones (`zone_scope` platform). Country groups and special areas
+  are platform data: the file's groups and areas are compared with the platform's and never
+  written (a missing one is an error, a different one a warning).
+- A platform file writes country groups, special areas (a carrier's remote-area list is imported
+  this way) and platform zones; methods, their parts and pickup options belong to a vendor and
+  are refused.
 - Rows are matched by their names (codes and keys) and created or updated; rows missing from the
   file are kept. A field missing from a row takes the model default on create and keeps the
   stored value on update (a method's carrier too). The weight bands a file lists for a method
   replace its stored bands; a method that lists none keeps them (`ParsedConfig.band_methods`).
+  Its special-area treatments follow the same rule (`ParsedConfig.treatment_methods`).
 
 `tax_treatment` and `over_max_weight` travel as stored data only: their meaning belongs to TAX.4
 (D-03) and SHP.3 (D-06).
@@ -55,6 +59,8 @@ from .models import (
     ShippingMethod,
     ShippingTemplate,
     ShippingZone,
+    SpecialArea,
+    SpecialAreaTreatment,
     WeightBand,
 )
 from .services import ConfigRow, delete_config, save_config
@@ -77,12 +83,19 @@ MODELS: Final[Mapping[str, type[models.Model]]] = {
     fmt.METHOD: ShippingMethod,
     fmt.BAND: WeightBand,
     fmt.PICKUP_OPTION: PickupOption,
+    fmt.SPECIAL_AREA: SpecialArea,
+    fmt.AREA_TREATMENT: SpecialAreaTreatment,
 }
 # Foreign keys: resolved from the file's names, never validated as raw values.
-RELATIONS: Final = frozenset({"vendor", "zone", "carrier", "method"})
+RELATIONS: Final = frozenset({"vendor", "zone", "carrier", "method", "area"})
 # Method fields that name its zone and carrier rather than store a value.
 METHOD_LINKS: Final = frozenset({"zone_scope", "zone", "carrier"})
-VENDOR_ROWS: Final = frozenset({fmt.METHOD, fmt.BAND, fmt.PICKUP_OPTION})
+VENDOR_ROWS: Final = frozenset({fmt.METHOD, fmt.BAND, fmt.AREA_TREATMENT, fmt.PICKUP_OPTION})
+# Platform data that a vendor file or a template names and never writes.
+PLATFORM_DATA: Final[Mapping[str, type[CountryGroup] | type[SpecialArea]]] = {
+    fmt.COUNTRY_GROUP: CountryGroup,
+    fmt.SPECIAL_AREA: SpecialArea,
+}
 
 
 @dataclass
@@ -147,22 +160,25 @@ def export_config(vendor: Vendor | None) -> dict[str, Any]:
     """The configuration of `vendor`, or of the platform (`None`), as a JSON-safe document.
 
     A vendor's export holds its zones, the country groups they use, its methods (on its zones or
-    on platform zones) with their bands, and its pickup options. The platform's holds every
-    country group and the platform zones. Rows are sorted, so equal configurations export equal.
+    on platform zones) with their bands and special-area treatments, the special areas those
+    name, and its pickup options. The platform's holds every country group, every special area
+    and the platform zones. Rows are sorted, so equal configurations export equal.
     """
     document = fmt.empty_document()
     zones = ShippingZone.objects.filter(vendor=vendor).order_by("priority", "code")
     if vendor is None:
         groups = CountryGroup.objects.all()
+        areas = SpecialArea.objects.all()
         methods: list[ShippingMethod] = []
         pickups: list[PickupOption] = []
     else:
         used = {code for zone in zones for code in zone.country_groups}
         groups = CountryGroup.objects.filter(code__in=used)
+        areas = SpecialArea.objects.filter(treatments__method__vendor=vendor).distinct()
         methods = list(
             ShippingMethod.objects.filter(vendor=vendor)
             .select_related("zone", "carrier")
-            .prefetch_related("bands")
+            .prefetch_related("bands", "area_treatments__area")
         )
         pickups = list(PickupOption.objects.filter(vendor=vendor).order_by("key"))
     document["country_groups"] = [_values(g, fmt.COUNTRY_GROUP) for g in groups.order_by("code")]
@@ -172,6 +188,9 @@ def export_config(vendor: Vendor | None) -> dict[str, Any]:
         key=lambda item: (item["zone"], item["zone_scope"], item["key"]),
     )
     document["pickup_options"] = [_values(pickup, fmt.PICKUP_OPTION) for pickup in pickups]
+    document[fmt.SPECIAL_AREAS] = [
+        _values(area, fmt.SPECIAL_AREA) for area in areas.order_by("code")
+    ]
     exported: dict[str, Any] = to_jsonable(document)
     return exported
 
@@ -192,7 +211,16 @@ def _method_values(method: ShippingMethod) -> dict[str, Any]:
     }
     bands = sorted(method.bands.all(), key=lambda band: band.from_kg)
     values[fmt.BANDS] = [_values(band, fmt.BAND) for band in bands]
+    treatments = sorted(method.area_treatments.all(), key=lambda treatment: treatment.area.code)
+    values[fmt.TREATMENTS] = [_treatment_values(treatment) for treatment in treatments]
     return values
+
+
+def _treatment_values(treatment: SpecialAreaTreatment) -> dict[str, Any]:
+    return {
+        name: treatment.area.code if name == "area" else getattr(treatment, name)
+        for name in fmt.FIELDS[fmt.AREA_TREATMENT]
+    }
 
 
 # --- Import
@@ -223,18 +251,20 @@ def import_config(
             transaction.set_rollback(True)
             return result
         if not result.changeset.is_empty:
-            _audit_import(result.changeset, vendor=vendor, ctx=ctx, source=source)
+            _audit_import(
+                result.changeset, vendor=vendor, ctx=ctx, source=source, version=parsed.version
+            )
         result.applied = True
     return result
 
 
 def _audit_import(
-    changeset: ChangeSet, *, vendor: Vendor | None, ctx: AuditContext, source: str
+    changeset: ChangeSet, *, vendor: Vendor | None, ctx: AuditContext, source: str, version: int
 ) -> None:
     after: dict[str, Any] = {
         "source": source,
         "format": fmt.FORMAT,
-        "version": fmt.VERSION,
+        "version": version,
         "summary": changeset.summary(),
     }
     key = "platform"
@@ -295,6 +325,7 @@ class _Checker:
             self.vendor_zones = set(
                 ShippingZone.objects.filter(vendor=vendor).values_list("code", flat=True)
             )
+        self.areas = set(SpecialArea.objects.values_list("code", flat=True))
         self.defaults: dict[tuple[str, str], str] = {}
         self.bands: dict[fmt.MethodId, list[tuple[engine.Band, RowReport]]] = defaultdict(list)
 
@@ -302,8 +333,8 @@ class _Checker:
         for row, report in self.rows:
             if self.platform and row.record in VENDOR_ROWS:
                 report.fail("vendor", f"A {row.record} belongs to a vendor: import it there.")
-            elif row.record == fmt.COUNTRY_GROUP and not self.platform:
-                _compare_group(row, report)
+            elif row.record in PLATFORM_DATA and not self.platform:
+                _compare_platform_row(row, report)
             else:
                 self.check_row(row, report)
         for bands in self.bands.values():
@@ -323,6 +354,10 @@ class _Checker:
         _validate(instance, report, run_clean=not (self.platform and row.record == fmt.ZONE))
         if isinstance(instance, ShippingMethod):
             self.check_method(row, instance, report)
+        elif isinstance(instance, SpecialAreaTreatment):
+            area = str(row.values.get("area", "")).strip()
+            if area not in self.areas:
+                report.fail("area", f"Unknown special area {area!r}: areas are platform data.")
         elif isinstance(instance, WeightBand) and not report.errors and row.method is not None:
             self.bands[row.method].append(((instance.from_kg, instance.to_kg), report))
 
@@ -344,8 +379,9 @@ class _Checker:
 
 def _stored_row(row: fmt.Row, vendor: Vendor | None) -> models.Model | None:
     """The stored row that `row` names in the configuration of `vendor` (or of the platform)."""
-    if row.record == fmt.COUNTRY_GROUP:
-        return CountryGroup.objects.filter(code=str(row.values["code"]).strip().lower()).first()
+    if row.record in PLATFORM_DATA:
+        model = PLATFORM_DATA[row.record]
+        return model.objects.filter(code=str(row.values["code"]).strip().lower()).first()
     if row.record == fmt.ZONE:
         return ShippingZone.objects.filter(vendor=vendor, code=row.values["code"]).first()
     if row.record == fmt.METHOD:
@@ -355,6 +391,9 @@ def _stored_row(row: fmt.Row, vendor: Vendor | None) -> models.Model | None:
     method = None if row.method is None else _stored_method(vendor, row.method)
     if method is None:
         return None
+    if row.record == fmt.AREA_TREATMENT:
+        area = str(row.values.get("area", "")).strip()
+        return method.area_treatments.filter(area__code=area).first()
     try:
         start = _from_kg(row.values)
     except ValidationError:  # reported by the band's own validation
@@ -377,6 +416,8 @@ def _stored_method(vendor: Vendor | None, method_id: fmt.MethodId) -> ShippingMe
 def _model_values(row: fmt.Row) -> dict[str, Any]:
     if row.record == fmt.METHOD:
         return {k: v for k, v in row.values.items() if k not in METHOD_LINKS}
+    if row.record == fmt.AREA_TREATMENT:
+        return {k: v for k, v in row.values.items() if k != "area"}
     return dict(row.values)
 
 
@@ -407,20 +448,35 @@ def _merge(errors: dict[str, list[str]], exc: ValidationError) -> None:
         errors.setdefault(name, []).extend(messages)
 
 
-def _compare_group(row: fmt.Row, report: RowReport) -> None:
-    """A vendor file names platform groups; it never changes them."""
+def _compare_platform_row(row: fmt.Row, report: RowReport) -> None:
+    """A vendor file or a template names platform country groups and special areas; it never
+    changes them. A missing one is an error, a different one a warning (the row is skipped)."""
+    model = PLATFORM_DATA[row.record]
+    kind = str(model._meta.verbose_name)
     code = str(row.values["code"]).strip().lower()
-    stored = CountryGroup.objects.filter(code=code).first()
+    stored = model.objects.filter(code=code).first()
     if stored is None:
-        report.fail("code", f"Unknown country group {code!r}: country groups are platform data.")
+        report.fail("code", f"Unknown {kind} {code!r}: {kind}s are platform data.")
         return
-    probe = CountryGroup(code=code, countries=row.values.get("countries", stored.countries))
+    probe = _assign(model(), {**_values(stored, row.record), **row.values})
     _validate(probe, report, run_clean=False)
-    if not report.errors and sorted(probe.countries) != sorted(stored.countries):
+    if report.errors:
+        return
+    differs = [
+        name
+        for name in fmt.FIELDS[row.record]
+        if _comparable(getattr(probe, name)) != _comparable(getattr(stored, name))
+    ]
+    if differs:
         report.status = SKIPPED
         report.warnings.append(
-            f"The platform group {code!r} has other countries; it is kept as it is."
+            f"The platform {kind} {code!r} has other {', '.join(differs)}; it is kept as it is."
         )
+
+
+def _comparable(value: Any) -> Any:
+    """Lists compare without their order (the countries of a group, for one)."""
+    return sorted(value) if isinstance(value, list) else value
 
 
 class _Writer:
@@ -441,6 +497,7 @@ class _Writer:
         self.ctx = ctx
         self.changeset = changeset
         self.band_methods = parsed.band_methods
+        self.treatment_methods = parsed.treatment_methods
         self.methods: dict[fmt.MethodId, ShippingMethod | None] = {}
 
     def write(self) -> None:
@@ -450,6 +507,8 @@ class _Writer:
         if self.vendor is None:
             for row, report in kind(fmt.COUNTRY_GROUP):
                 self.save(report, self.group(row))
+            for row, report in kind(fmt.SPECIAL_AREA):
+                self.save(report, self.special_area(row))
         for row, report in kind(fmt.ZONE):
             self.save(report, self.zone(row))
         methods = kind(fmt.METHOD)
@@ -461,10 +520,15 @@ class _Writer:
             ok = method is not None and self.save(report, method)
             self.methods[fmt.method_id(row.values)] = method if ok else None
         for method_id, method in self.methods.items():
-            if method_id not in self.band_methods:
-                continue  # the file lists no bands for it: its stored bands stay
-            bands = [item for item in kind(fmt.BAND) if item[0].method == method_id]
-            self.write_bands(method, bands)
+            # A method whose bands or treatments the file does not list keeps its stored ones.
+            if method_id in self.band_methods:
+                bands = [item for item in kind(fmt.BAND) if item[0].method == method_id]
+                self.write_bands(method, bands)
+            if method_id in self.treatment_methods:
+                treatments = [
+                    item for item in kind(fmt.AREA_TREATMENT) if item[0].method == method_id
+                ]
+                self.write_treatments(method, treatments)
         for row, report in kind(fmt.PICKUP_OPTION):
             self.save(report, self.pickup(row))
 
@@ -491,6 +555,11 @@ class _Writer:
         code = str(row.values["code"]).strip().lower()
         group = CountryGroup.objects.filter(code=code).first() or CountryGroup()
         return _assign(group, row.values)
+
+    def special_area(self, row: fmt.Row) -> SpecialArea:
+        code = str(row.values["code"]).strip().lower()
+        area = SpecialArea.objects.filter(code=code).first() or SpecialArea()
+        return _assign(area, row.values)
 
     def zone(self, row: fmt.Row) -> ShippingZone:
         zone = ShippingZone.objects.filter(vendor=self.vendor, code=row.values["code"]).first()
@@ -526,9 +595,7 @@ class _Writer:
         stored band still waiting to be rewritten starts: splitting a stored band never trips the
         database's exclusion constraint half way."""
         if method is None:
-            for _, report in bands:
-                report.status = SKIPPED
-                report.warnings.append("Not imported: its method has errors.")
+            _skip(bands)
             return
         stored = {band.from_kg: band for band in method.bands.all()}
         wanted = {_from_kg(row.values): (row, report) for row, report in bands}
@@ -539,9 +606,38 @@ class _Writer:
             band = stored.get(start) or WeightBand(method=method)
             self.save(report, _assign(band, row.values))
 
+    def write_treatments(
+        self, method: ShippingMethod | None, treatments: list[tuple[fmt.Row, RowReport]]
+    ) -> None:
+        """The file's treatments replace the method's: stored ones are matched by area code,
+        the unmatched ones deleted."""
+        if method is None:
+            _skip(treatments)
+            return
+        stored = {t.area.code: t for t in method.area_treatments.select_related("area")}
+        wanted = {str(row.values["area"]).strip(): (row, report) for row, report in treatments}
+        removed = [treatment for code, treatment in stored.items() if code not in wanted]
+        if removed:
+            self.changeset.changes.extend(delete_config(removed, ctx=self.ctx).changes)
+        for code, (row, report) in wanted.items():
+            treatment = stored.get(code)
+            if treatment is None:
+                area = SpecialArea.objects.filter(code=code).first()
+                if area is None:  # checked before writing
+                    report.fail("area", "Not available: see its row.")
+                    continue
+                treatment = SpecialAreaTreatment(method=method, area=area)
+            self.save(report, _assign(treatment, _model_values(row)))
+
     def pickup(self, row: fmt.Row) -> PickupOption:
         pickup = PickupOption.objects.filter(vendor=self.vendor, key=row.values["key"]).first()
         return _assign(pickup or PickupOption(vendor=self.vendor), row.values)
+
+
+def _skip(parts: list[tuple[fmt.Row, RowReport]]) -> None:
+    for _, report in parts:
+        report.status = SKIPPED
+        report.warnings.append("Not imported: its method has errors.")
 
 
 def _from_kg(values: Mapping[str, Any]) -> Decimal:

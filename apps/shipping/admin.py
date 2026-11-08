@@ -28,6 +28,8 @@ from .models import (
     ShippingMethod,
     ShippingMethodTranslation,
     ShippingZone,
+    SpecialArea,
+    SpecialAreaTreatment,
     WeightBand,
     zones_using_groups,
 )
@@ -146,6 +148,24 @@ class WeightBandInline(admin.TabularInline[WeightBand, ShippingMethod]):
     fields = ("from_kg", "to_kg", "cost_net", "surcharge_net")
 
 
+class SpecialAreaTreatmentInline(admin.TabularInline[SpecialAreaTreatment, ShippingMethod]):
+    """What the method does in each special area; an area it does not list gets the default,
+    an indicative cost subject to quote (SHP.14)."""
+
+    model = SpecialAreaTreatment
+    extra = 0
+    fields = ("area", "mode", "surcharge_type", "surcharge", "extra_days")
+    autocomplete_fields = ("area",)
+
+
+@admin.register(SpecialArea)
+class SpecialAreaAdmin(AuditedAdmin[SpecialArea]):
+    list_display = ("code", "name", "kind", "countries", "territory_code")
+    list_filter = ("kind",)
+    search_fields = ("code", "name", "territory_code")
+    readonly_fields = ("public_id", "created_at", "updated_at")
+
+
 @admin.register(ShippingMethod)
 class ShippingMethodAdmin(AuditedAdmin[ShippingMethod]):
     list_display = (
@@ -162,7 +182,7 @@ class ShippingMethodAdmin(AuditedAdmin[ShippingMethod]):
     search_fields = ("vendor__display_name", "zone__code", "key")
     list_select_related = ("vendor", "zone", "carrier")
     readonly_fields = ("public_id", "created_at", "updated_at")
-    inlines = (ShippingMethodTranslationInline, WeightBandInline)
+    inlines = (ShippingMethodTranslationInline, WeightBandInline, SpecialAreaTreatmentInline)
 
 
 class PickupOptionTranslationInline(admin.TabularInline[PickupOptionTranslation, PickupOption]):

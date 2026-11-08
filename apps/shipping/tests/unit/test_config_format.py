@@ -143,7 +143,7 @@ def test_a_csv_method_without_band_lines_keeps_its_bands() -> None:
 def test_csv_cells_become_lists_nulls_and_booleans() -> None:
     lines = fmt.dump_csv(sample_document()).splitlines()
     assert lines[0].split(",") == list(fmt.CSV_COLUMNS)
-    assert lines[1].startswith(f"format,{fmt.FORMAT},1,")
+    assert lines[1].startswith(f"format,{fmt.FORMAT},{fmt.VERSION},")
     parsed = fmt.parse_csv("\n".join(lines))
     rows = {row.ref: row for row in parsed.rows}
     islands = next(row for row in parsed.rows if row.values.get("code") == "islands")
@@ -157,7 +157,7 @@ def test_csv_cells_become_lists_nulls_and_booleans() -> None:
 
 def test_an_unknown_format_or_version_is_refused() -> None:
     document = sample_document()
-    document["version"] = 2
+    document["version"] = fmt.VERSION + 1
     assert messages(fmt.parse_json(document)) == [("file", "version")]
     document["format"] = "something-else"
     assert ("file", "format") in messages(fmt.parse_json(document))
@@ -202,8 +202,9 @@ def test_a_zone_scope_is_own_or_platform() -> None:
     assert messages(fmt.parse_json(document)) == [("methods[0]", "zone_scope")]
 
 
-def test_special_areas_are_reserved_for_a_later_version() -> None:
+def test_special_areas_are_not_part_of_version_1() -> None:
     document = sample_document()
+    document["version"] = 1  # SHP.14 brought them in version 2
     document["special_areas"] = [{"code": "sardinia"}]
     assert messages(fmt.parse_json(document)) == [("special_areas[0]", "special_areas")]
 
