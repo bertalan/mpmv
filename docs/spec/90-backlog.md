@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **240** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **1978 h** (P1 1604 h · P2 356 h · P3 18 h)
+- Micro-tasks: **241** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **1994 h** (P1 1630 h · P2 346 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -16,7 +16,7 @@
 |---|---|---:|---:|---:|---:|---:|
 | ARC | Architecture and foundations | 21 | 121 | 6 | 0 | 127 |
 | CORE | Identity, permissions, API, backoffice | 15 | 108 | 4 | 0 | 112 |
-| CAT | Product catalog | 18 | 126 | 60 | 0 | 186 |
+| CAT | Product catalog | 19 | 152 | 50 | 0 | 202 |
 | VEN | Vendors, commissions, ledger | 25 | 212 | 22 | 0 | 234 |
 | TAX | Tax engine | 13 | 53 | 28 | 0 | 81 |
 | SHP | Shipping and quotes | 14 | 96 | 28 | 0 | 124 |
@@ -33,7 +33,7 @@
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 6 | 19 | 23 | 0 | 42 |
 | MIG | Migration and cutover | 11 | 114 | 0 | 0 | 114 |
-| **Total** | | **240** | **1604** | **356** | **18** | **1978** |
+| **Total** | | **241** | **1630** | **346** | **18** | **1994** |
 
 ## By phase
 
@@ -84,7 +84,7 @@
 | OPS.2 | Observability: JSON logs, error tracking, healthchecks, alerts (including database disk space, WAL archiving and backup age) | P1 | 8 | ARC.5 | Alert on a simulated checkout error |
 | OPS.5 | Technical Django admin reachable only from a restricted network (owner decision Q-18): allow-list at the reverse proxy plus an app-level check on the Django admin path (defence in depth), the allowed networks as environment configuration, staff operations moved to the Wagtail admin (CORE.8) | P1 | 3 | ARC.13, CORE.8 | On STAGE the Django admin answers 404 from outside the allowed networks and works from inside; a test covers the app-level check |
 
-### F1 — Catalog, import, base frontend (37 tasks, 326 h)
+### F1 — Catalog, import, base frontend (39 tasks, 352 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -98,9 +98,11 @@
 | CAT.8 | Listings: category, taxonomy page on `/{taxonomy}/{term}/` and `/{taxonomy}/{term}/{child}/` with translated slugs (D-07), brand, vendor storefront, filters (category, taxonomy term, price, vendor) | P1 | 14 | CAT.2 | Pagination and filters with indexable URLs; a taxonomy page answers 200 on `/{taxonomy}/{term}/` in every configured language, and its paginated and filtered URLs build on the term's current URL |
 | CAT.9 | FTS + trigram + SKU prefix search on the SKU match key (including variants) | P1 | 8 | CAT.1, CAT.13 | Tests on partial SKUs and typos; `bag 100` finds `BAG  100` |
 | CAT.10 | `upsert_products`/`publish`/`retire` services with dry-run and publishing rules | P1 | 10 | CAT.1, CMP.3 | ChangeSet verified in tests |
+| CAT.11 | Catalog admin (Wagtail ViewSet): filters, bulk actions, preview, translation status. P1 since 2026-11-09: STAGE and go-live need staff product management in the Wagtail admin, not only the API and imports | P1 | 10 | CORE.8 | Staff edit products without the API |
 | CAT.12 | Audited product edit service (coherence check 5): changes to `fiscal_category`, `sales_mode`, weight and dimensions go through a `catalog.services` function (the owning vendor never changes, Q-33 and CAT.14) with dry-run, ChangeSet and AuditLog; the product and variant admins call it instead of saving directly | P1 | 4 | CAT.1, SEC.4 | A fiscal category change made in the admin shows in the audit view with before and after; a dry run writes nothing; `core.E203` passes without the price-only exemption |
 | CAT.13 | Internal identity and the vendor SKU as a label (owner decisions Q-30, Q-33): raw `sku` plus `sku_key` match key on Product and Variant, one per-vendor namespace across products and variants enforced in the database, `SkuAlias` history on rename, non-blocking SKU warnings, staff-only `staff_ref` sequence; drop the upper-case SKU normalisation of CAT.1 | P1 | 8 | CAT.1 | The §3.3 SKU cases are green; a product and a variant of one vendor cannot share a match key; the vendor never sees `staff_ref` |
 | CAT.14 | Catalogue integrity rules (owner decisions Q-29, Q-31, Q-32, Q-33): nullable `price_net` with a check (required for `buy`, never 0.00) and `public_price`; `mpn` field; vendor immutable after creation and staff `duplicate_product_to_vendor` as a draft with audit; variants only on variable products; required companion of the same vendor; cross-vendor upsells only to vendors whose versioned `CrossVendorConsent` has `in_suggestions` (vendor setting with audit) | P1 | 8 | CAT.1 | PRICE-ON-REQUEST green; changing a product's vendor is refused and a staff duplicate keeps the original's history; a simple product cannot get a variant; another vendor's companion is refused; an upsell to a vendor without opt-in is refused |
+| CAT.19 | Vendor area products `/vendor/products/` (spec 02 backoffice, "products, limited editing"): tenant-filtered list with search, status and stock filters; create and edit form for the fields a vendor owns (texts per language, price, stock, variants, images with re-encoding, categories and attributes) through `upsert_products`/`publish`/`retire` and the CAT.12 audited edit service, with dry-run preview and ChangeSet; fields the vendor cannot change (owning vendor, fiscal category once published, staff-only flags) are read-only; owner and vendor staff roles as in CORE.2; every change in the AuditLog | P1 | 16 | CORE.9, CAT.10, CAT.12, SEC.2 | A vendor creates, edits, publishes and retires a product without the API; another vendor's product is 404; a staff-only field cannot be changed by a crafted POST; the change shows in the AuditLog with before and after |
 | ING.1 | `ingest` app: staging models, ImportRun, ReviewItem, MappingTable; staging rows keyed by vendor and SKU match key, products referenced by internal identity | P1 | 10 | CAT.1, CAT.13 | Migrations + admin; an ambiguous SKU match becomes a blocking ReviewItem |
 | ING.2 | Port of `state.py` (source state, change history, stock state) to Django models + existing tests | P1 | 12 | ING.1 | Current pytest suite passes on the new storage |
 | ING.3 | HTML adapter (Vendor A) + generic Store API adapter | P1 | 12 | ING.2 | Dry-run equivalent to the current one |
@@ -261,13 +263,12 @@
 | MIG.10 | Cutover and post-go-live monitoring, including the daily 404 report, the Search Console review and the product URL batch schedule and gates of the runbook (Q-91) | P1 | 12 | MIG.9, SEC.6 | Go-live, 72 h with no critical issues; 404 report and Search Console review recorded at T+14 and T+28 |
 | MIG.11 | Staggered product and tag URL switch (owner decisions Q-91 and D-07): per-product and per-term `url_mode` and frozen legacy paths, traffic ranking from analytics (SEO.5) or the MIG.1 legacy access-log counts, configurable batch size and cadence, batch switch and rollback as a management command and staff action with dry-run and audit, sitemap, canonical and hreflang by mode, gate on 404 rate, Search Console impressions and clicks against baseline, and errors with configurable thresholds | P1 | 6 | MIG.6, CAT.5, CAT.8 | A batch switch gives a single 301 hop and an updated sitemap; a rollback leaves no redirect loop; a legacy-mode page is 200 with a self-canonical; a switched legacy tag URL is a single 301 to `/{taxonomy}/{term}/`; the next batch is refused when a gate metric is over threshold; the MIG.6 "no URL lost" count still holds after a switch and a rollback; products and terms created after go-live start in new mode |
 
-### F6 — After go-live (P2) (44 tasks, 356 h)
+### F6 — After go-live (P2) (43 tasks, 346 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
 | ARC.8 | Feature flags per environment and per vendor + kill switch (checkout, import, payments) | P2 | 6 | ARC.6 | Flags manageable from the admin |
 | CORE.10 | Support impersonation with audit | P2 | 4 | CORE.8 | Every impersonated session in AuditLog |
-| CAT.11 | Catalog admin (Wagtail ViewSet): filters, bulk actions, preview, translation status | P2 | 10 | CORE.8 | Staff edit products without the API |
 | CAT.15 | "Other sellers of this product" (owner decision Q-33): product page block and API listing the other vendors' published products with the same GTIN, or the same brand and MPN | P2 | 6 | CAT.7, CAT.14 | Two vendors' products with the same GTIN list each other; same MPN with a different brand does not match |
 | CAT.16 | Cross-vendor bundles, catalogue side (owner refinement of Q-32): `bundle` product type with components from several vendors, list price, discount (percentage or fixed, validity window, optional usage limits); vendor-created bundles funded 100% by the creator with other vendors' lines undiscounted; staff-only admin tab "Discount funding" (one row per vendor and one marketplace row) with the §3.2 validation; versioned funding proposals; bundle opt-in on `CrossVendorConsent` (versioned, audited) | P2 | 14 | CAT.14 | A vendor cannot assign a share to another vendor or the marketplace; a split that does not add up to 100% or exceeds a line's commission or a vendor's net is refused; a vendor without bundle opt-in cannot be added; a changed discount or split creates a new proposal version |
 | CAT.17 | Cross-vendor bundles, checkout and settlement: per-line funding and discounted line prices in the cart, one `VendorOrder` per vendor through the multi-vendor split, order snapshot of the bundle, split and per-line funding, ledger kinds `bundle_discount_vendor_funded` and `bundle_discount_platform_funded`, reduction shown on the CMP.2 statement, pro-rata reversal on the return of one component | P2 | 18 | CAT.16, ORD.4, VEN.4, CMP.2 | BUNDLE-SPLIT and BUNDLE-RETURN green; editing a bundle after an order leaves that order's snapshot and ledger unchanged |
