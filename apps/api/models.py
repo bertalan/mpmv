@@ -1,4 +1,5 @@
-"""API keys for API v1 and MCP (CORE.6, spec 02 §2.2) and the API mutation log (CORE.7)."""
+"""API keys for API v1 and MCP (CORE.6, spec 02 §2.2), the API mutation log (CORE.7) and the
+per-key rate limit counters (CORE.12)."""
 
 import uuid
 from typing import Any, ClassVar
@@ -10,7 +11,7 @@ from apps.core.models import BaseModel
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager
 
-from .engine import PREFIX_LENGTH, ClientState
+from .engine import KEY_WIDE_BUCKET, PREFIX_LENGTH, ClientState
 
 
 class ApiClient(BaseModel):
@@ -124,3 +125,37 @@ class ApiMutationLog(models.Model):
         if self.pk is not None:
             raise PermissionError("ApiMutationLog is append-only")
         super().save(*args, **kwargs)
+
+
+class ApiRateCounter(BaseModel):
+    """The calls one API key made in its current rate limit window (CORE.12), per bucket.
+
+    Kept in PostgreSQL, the only datastore (ADR-0001, spec 01: no Redis): every gunicorn worker
+    and container counts on the same row, so the limit does not grow with the number of
+    processes, as it would with a process-local cache. Django's database cache backend is not
+    used because its `incr` is a read then a write, which loses counts under concurrency; the
+    increment here is a single `INSERT … ON CONFLICT DO UPDATE` (`services.count_api_call`).
+
+    One row per key and bucket, reused from window to window: the table never holds more rows
+    than keys times limited scopes, so it needs no purge job. Rows go with their key.
+    """
+
+    vendor_scope: ClassVar[str] = "client__vendor"
+    objects = VendorScopedManager()
+
+    client = models.ForeignKey(ApiClient, on_delete=models.CASCADE, related_name="rate_counters")
+    bucket = models.CharField(
+        max_length=64,
+        default=KEY_WIDE_BUCKET,
+        help_text="The scope with a limit of its own, or '*' for the key-wide counter.",
+    )
+    window_start = models.DateTimeField()
+    hits = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["client", "bucket"], name="api_rate_counter_unique")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.client_id} {self.bucket}: {self.hits} since {self.window_start:%H:%M:%S}"

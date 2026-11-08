@@ -7,7 +7,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0008_seed_kill_switches"),
+        ("core", "0010_media_image"),
     ]
 
     operations = [

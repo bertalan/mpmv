@@ -55,11 +55,15 @@ INSTALLED_APPS = [
     # are accounts models. Listed before accounts so its admin can unregister the raw device admin.
     "django_otp",
     "django_otp.plugins.otp_totp",
-    # Wagtail (CMS.1, ADR-0001): pages, snippets and the editors' admin. No images, documents,
+    # Wagtail (CMS.1, ADR-0001): pages, snippets, images (I18N.3) and the editors' admin. No
     # embeds, forms or redirects yet: later CMS tasks add them when a page type needs them.
+    # Documents only because wagtail-localize's editor imports their models; its admin menu is
+    # hidden (apps.cms.wagtail_hooks) until a page type needs documents.
     "wagtail.sites",
     "wagtail.users",
     "wagtail.snippets",
+    "wagtail.images",
+    "wagtail.documents",
     "wagtail.search",
     "wagtail.admin",
     "wagtail.contrib.settings",  # BaseSiteSetting for the per-site theme (THM.1)
@@ -67,6 +71,9 @@ INSTALLED_APPS = [
     "modelcluster",
     "taggit",
     *LOCAL_APPS,
+    # Translation of CMS pages and snippets (I18N.3, spec 09). After the local apps, so the
+    # CSP-safe copies of its admin templates in apps/cms/templates take precedence.
+    "wagtail_localize",
 ]
 
 # Background jobs (ADR-0004): cron schedules are read in BUSINESS_TIME_ZONE by this hook.
@@ -192,6 +199,15 @@ LANGUAGES = [
 USE_I18N = True
 LOCALE_PATHS = [BASE_DIR / "locale"]
 
+# Transactional email (ARC.16, docs/dev/transactional-email.md). Every email goes through the
+# outbox (`apps.core.services.enqueue_email`) and the `EmailSender` named here: the console
+# backend until ARC.19 adds the EU provider's adapter (provider choice pending, Q-48). The
+# provider webhook (`/webhooks/email/`) is off while MPMV_EMAIL_WEBHOOK_SECRET is empty.
+EMAIL_SENDER = env_str("MPMV_EMAIL_SENDER", "apps.core.mail.ConsoleEmailSender")
+DEFAULT_FROM_EMAIL = env_str("MPMV_EMAIL_FROM", "no-reply@localhost")
+EMAIL_WEBHOOK_SECRET = env_str("MPMV_EMAIL_WEBHOOK_SECRET", "")
+EMAIL_FEEDBACK_PARSER = env_str("MPMV_EMAIL_FEEDBACK_PARSER", "apps.core.mail.SignedJsonFeedback")
+
 # Wagtail (CMS.1, spec 10). Page locales follow LANGUAGES: apps.cms creates a Locale row for each
 # language after every migrate. The editors' admin is at /admin/ (mpmv/urls.py).
 WAGTAIL_SITE_NAME = "MPMV"
@@ -200,6 +216,12 @@ WAGTAIL_CONTENT_LANGUAGES = LANGUAGES
 # The public address of the site, in Wagtail's admin emails and previews. The localhost fallback
 # is for a developer machine: `check --deploy` fails on LIVE and STAGE without it (cms.E001).
 WAGTAILADMIN_BASE_URL = env_str("MPMV_BASE_URL", "") or "http://localhost:8000"
+# One image model for CMS pages, products (CAT.4), vendor logos and banners (spec 10 §10.2). Set
+# before any image exists: the licence and credit fields come with CMS.8.
+WAGTAILIMAGES_IMAGE_MODEL = "core.MediaImage"
+# wagtail-localize (I18N.3): translations follow their source page; a translator syncs them from
+# the source page's "Sync translated pages" action.
+WAGTAIL_LOCALIZE_DEFAULT_TRANSLATION_MODE = "synced"
 WAGTAILSEARCH_BACKENDS = {"default": {"BACKEND": "wagtail.search.backends.database"}}
 # Passwords, email addresses, users and groups are managed where changes are audited (SEC.4),
 # not from Wagtail's account and user pages.
@@ -312,6 +334,15 @@ GEOCODING_USER_WINDOW = 60  # seconds
 # Who may use "Find coordinates" besides staff: dotted `check(user) -> bool` paths, so that core
 # does not import the vendors app.
 GEOCODING_ACCESS_POLICIES: list[str] = ["apps.vendors.services.is_vendor_member"]
+
+# Per-API-key rate limit (CORE.12, apps.api.engine): fixed windows counted in PostgreSQL, so every
+# app process shares one counter per key. API_RATE_LIMIT is the key-wide limit of every key;
+# API_RATE_LIMIT_SCOPES gives a costly scope its own counter and limit for every key, e.g.
+# {"catalog:write": "120/minute"}; API_RATE_LIMIT_CLIENTS replaces the key-wide limit of one key,
+# by ApiClient public id. Rates read "<calls>/<second|minute|hour|day>" (system check api.E003).
+API_RATE_LIMIT = "600/minute"
+API_RATE_LIMIT_SCOPES: dict[str, str] = {}
+API_RATE_LIMIT_CLIENTS: dict[str, str] = {}
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"

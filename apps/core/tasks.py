@@ -36,7 +36,7 @@ from procrastinate.jobs import Job as _QueueRow
 from procrastinate.periodic import PeriodicDeferrer, PeriodicTask
 from procrastinate.tasks import Task
 
-from . import services
+from . import mail, services
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -415,3 +415,14 @@ def purge_geocode_cache(timestamp: int) -> None:
 
     deleted = purge_expired_geocode_cache()
     logger.info("core.purge_geocode_cache deleted %d expired rows", deleted)
+
+
+@task(
+    "core.send_email",
+    retry=Retry(
+        max_attempts=mail.MAX_RETRIES, base_delay=mail.BASE_DELAY, max_delay=mail.MAX_DELAY
+    ),
+)
+def send_email(email_id: str) -> None:
+    """Send one outbox email (ARC.16); a transient failure raises, so the queue retries it."""
+    services.deliver_email(email_id)

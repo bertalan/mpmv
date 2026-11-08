@@ -1,0 +1,1 @@
+{% load i18n %}<p class="legal-meta">{% blocktranslate trimmed with number=version.number %}Version {{ number }}{% endblocktranslate %} · {% translate "Effective from" %} <time datetime="{{ version.effective_date|date:'Y-m-d' }}">{{ version.effective_date|date:"DATE_FORMAT" }}</time></p>

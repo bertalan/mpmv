@@ -1,6 +1,8 @@
 """Settings for the automated test suite."""
 
 import os
+import tempfile
+from pathlib import Path
 
 from apps.core.crypto import generate_key
 
@@ -30,3 +32,10 @@ DATABASES["default"]["TEST"] = {"NAME": os.environ.get("MPMV_TEST_DB_NAME", "tes
 GEOCODING_TRANSPORT = "apps.core.geocoding.adapters.refuse_network"
 GEOCODING_LOCATIONIQ_KEY = ""
 GEOCODING_OPENCAGE_KEY = ""
+
+# Uploaded images and their renditions (I18N.3) go to a directory of this test process only.
+MEDIA_ROOT = Path(tempfile.mkdtemp(prefix="mpmv-test-media-"))
+
+# Transactional email (ARC.16): the in-memory backend, and the templates of the outbox tests.
+EMAIL_SENDER = "apps.core.mail.MemoryEmailSender"
+TEMPLATES[0]["DIRS"] = [*TEMPLATES[0]["DIRS"], BASE_DIR / "apps" / "core" / "tests" / "templates"]  # noqa: F405

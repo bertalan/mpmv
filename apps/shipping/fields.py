@@ -16,6 +16,8 @@ from apps.core.postcodes import (
 
 from . import engine
 
+QUALIFIER_LENGTH = 3  # "PT:" in front of a pattern or province
+
 
 class ZoneCountryField(CountryField):
     """A CountryField that also accepts the "rest of the world" marker `*` (engine.WORLD)."""
@@ -72,13 +74,13 @@ class ZoneCountriesField(NormalizedArrayField):
 
 class PostcodePatternsField(NormalizedArrayField):
     """Postcode patterns of the shared grammar (`apps.core.postcodes`): `BT*`, `70000..74999`,
-    `84600`."""
+    `84600`, each optionally qualified by its country (`PT:9000..9999`)."""
 
     errors = (InvalidPostcodePattern,)
     error_code = "invalid_postcode_pattern"
 
     def default_base_field(self) -> models.Field[Any, Any]:
-        return models.CharField(max_length=MAX_PATTERN_LENGTH)
+        return models.CharField(max_length=MAX_PATTERN_LENGTH + QUALIFIER_LENGTH)
 
     def normalize(self, item: str) -> str:
         return normalize_postcode_pattern(item)
@@ -91,7 +93,7 @@ class StatesField(NormalizedArrayField):
     error_code = "invalid_state"
 
     def default_base_field(self) -> models.Field[Any, Any]:
-        return models.CharField(max_length=engine.STATE_MAX_LENGTH)
+        return models.CharField(max_length=engine.STATE_MAX_LENGTH + QUALIFIER_LENGTH)
 
     def normalize(self, item: str) -> str:
         return engine.normalize_state(item)

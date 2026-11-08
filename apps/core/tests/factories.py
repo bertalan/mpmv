@@ -1,18 +1,25 @@
 """factory_boy factories for core models (ARC.12). Synthetic values only."""
 
 import datetime as dt
+from typing import Any
 
 import factory
 from django.utils import timezone
 from factory.django import DjangoModelFactory
+from wagtail.models import Collection
 
 from apps.core import flags
 from apps.core.models import (
     AuditLog,
+    EmailSuppression,
     FeatureFlag,
     GeocodeCacheEntry,
     GeocoderState,
     Heartbeat,
+    MediaImage,
+    MediaImageRendition,
+    OutboxEmail,
+    OutboxEmailEvent,
     PlatformOperator,
     Throttle,
 )
@@ -161,3 +168,80 @@ class GeocoderStateFactory(DjangoModelFactory[GeocoderState]):
     next_slot_at = None
     failures = 0
     open_until = None
+
+
+class MediaImageFactory(DjangoModelFactory[MediaImage]):
+    """A small generated PNG (I18N.3). Pass `file__filename` to recognise it in rendered HTML.
+
+    Saving writes the file to MEDIA_ROOT, a temporary directory under the test settings. The
+    image goes into Wagtail's root collection; `.build()` leaves the collection empty, because
+    Wagtail's default looks it up in the database.
+    """
+
+    class Meta:
+        model = MediaImage
+
+    title = factory.Sequence(lambda n: f"Image {n}")
+    file = factory.django.ImageField(width=64, height=48, color="teal", filename="image.png")
+    collection = None
+
+    @classmethod
+    def _create(cls, model_class: type[MediaImage], *args: Any, **kwargs: Any) -> MediaImage:
+        if kwargs.get("collection") is None:
+            # A transactional test flushes the root collection its migration created.
+            root = Collection.get_first_root_node() or Collection.add_root(name="Root")
+            kwargs["collection"] = root
+        image: MediaImage = model_class._default_manager.create(*args, **kwargs)
+        return image
+
+
+class MediaImageRenditionFactory(DjangoModelFactory[MediaImageRendition]):
+    """A rendition as Wagtail's `get_rendition` stores it; templates normally create these."""
+
+    class Meta:
+        model = MediaImageRendition
+
+    image = factory.SubFactory(MediaImageFactory)
+    filter_spec = factory.Sequence(lambda n: f"width-{n + 10}")
+    focal_point_key = ""
+    file = factory.django.ImageField(width=10, height=8, color="teal", filename="rendition.png")
+
+
+class OutboxEmailFactory(DjangoModelFactory[OutboxEmail]):
+    """A queued transactional email (ARC.16) for a test template.
+
+    Services write the real ones through `enqueue_email`, which also queues the send job; use
+    this for tests about stored rows (history, admin listings).
+    """
+
+    class Meta:
+        model = OutboxEmail
+
+    recipient = factory.Sequence(lambda n: f"recipient{n}@example.com")
+    template_key = "tests.one_time_code"
+    language = "en"
+    context = factory.LazyFunction(lambda: '{"code": "000000", "minutes": 10}')
+    status = OutboxEmail.Status.QUEUED
+
+
+class OutboxEmailEventFactory(DjangoModelFactory[OutboxEmailEvent]):
+    """One append-only history row of an outbox email."""
+
+    class Meta:
+        model = OutboxEmailEvent
+
+    email = factory.SubFactory(OutboxEmailFactory)
+    status = OutboxEmailEvent.Kind.QUEUED
+    attempt = 0
+    detail = ""
+
+
+class EmailSuppressionFactory(DjangoModelFactory[EmailSuppression]):
+    """An address that receives no more email after a hard bounce (ARC.16)."""
+
+    class Meta:
+        model = EmailSuppression
+
+    address = factory.Sequence(lambda n: f"bounced{n}@example.com")
+    reason = EmailSuppression.Reason.HARD_BOUNCE
+    detail = ""

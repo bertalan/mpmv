@@ -548,3 +548,49 @@ def test_config_versions_are_listed_newest_first() -> None:
     first = ShippingConfigVersionFactory.create()
     second = ShippingConfigVersionFactory.create()
     assert list(ShippingConfigVersion.objects.all()) == [second, first]
+
+
+# --- Country-qualified patterns (SHP audit chunk 5)
+
+
+def test_zone_refuses_an_unqualified_pattern_or_province_in_a_multi_country_zone() -> None:
+    zone = ShippingZoneFactory.build(
+        countries=["GR", "PT"], postcode_patterns=["84*", "GR:70*"], states=["SS"]
+    )
+    with pytest.raises(ValidationError) as excinfo:
+        zone.full_clean()
+    errors = excinfo.value.message_dict
+    assert "GR:84*" in errors["postcode_patterns"][0]
+    assert "country" in errors["postcode_patterns"][0]
+    assert "country" in errors["states"][0]
+
+
+def test_zone_accepts_qualified_entries_and_unqualified_ones_with_a_single_country() -> None:
+    ShippingZoneFactory.build(
+        countries=["GR", "PT"], postcode_patterns=["gr:84*", "PT:9000..9999"], states=["GR:XX"]
+    ).full_clean()
+    ShippingZoneFactory.build(countries=["GR"], postcode_patterns=["84*"]).full_clean()
+
+
+def test_zone_counts_the_countries_of_its_groups() -> None:
+    group = CountryGroupFactory.create(countries=["IT", "FR"])
+    zone = ShippingZoneFactory.build(
+        countries=["IT"], country_groups=[group.code], postcode_patterns=["84*"]
+    )
+    with pytest.raises(ValidationError):
+        zone.full_clean()
+
+
+def test_zone_refuses_a_qualified_entry_for_a_country_it_does_not_cover() -> None:
+    zone = ShippingZoneFactory.build(countries=["GR", "PT"], postcode_patterns=["ES:28*"])
+    with pytest.raises(ValidationError) as excinfo:
+        zone.full_clean()
+    assert "ES" in excinfo.value.message_dict["postcode_patterns"][0]
+
+
+def test_rest_of_the_world_zone_takes_no_patterns_or_provinces() -> None:
+    for fields in ({"postcode_patterns": ["84*"]}, {"states": ["SS"]}):
+        with pytest.raises(ValidationError):
+            ShippingZoneFactory.build(world=True, **fields).full_clean()
+        with refused(), transaction.atomic():
+            ShippingZoneFactory.create(world=True, **fields)

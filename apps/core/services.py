@@ -1,24 +1,43 @@
 """Core services: the dry-run + audit pattern shared by all mutating services (spec 01
-conventions), the platform operator, feature flags, the worker heartbeat, throttle counters and
-the rotation of field encryption keys."""
+conventions), the platform operator, feature flags, the worker heartbeat, throttle counters,
+the rotation of field encryption keys and the transactional email outbox."""
 
 import datetime as dt
+import functools
+import json
+import logging
+import re
+import uuid
 from collections import defaultdict
-from collections.abc import Callable
-from typing import Any
+from collections.abc import Callable, Mapping
+from typing import Any, cast
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import connection, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import F, Model, Q
-from django.utils import timezone
+from django.template import Context, TemplateDoesNotExist
+from django.template.loader import select_template
+from django.utils import timezone, translation
+from django.utils.module_loading import import_string
 
-from . import crypto, encryption, flags
+from . import crypto, encryption, flags, mail
 from .audit import VENDOR_MODEL, AuditContext, record
-from .changeset import ChangeSet
-from .models import VENDOR_OVERRIDES, FeatureFlag, Heartbeat, PlatformOperator, Throttle
+from .changeset import ChangeSet, to_jsonable
+from .models import (
+    VENDOR_OVERRIDES,
+    EmailSuppression,
+    FeatureFlag,
+    Heartbeat,
+    OutboxEmail,
+    OutboxEmailEvent,
+    PlatformOperator,
+    Throttle,
+)
 from .throttling import BackoffPolicy, ThrottleState, after_failure
 from .validity import NoValidRow, OverlappingValidity, next_start_error, pick_valid
+
+logger = logging.getLogger(__name__)
 
 
 def run_mutation(
@@ -394,3 +413,279 @@ def rotate_field_keys(*, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
                 model._base_manager.filter(pk=pk).update(**values)
 
         return run_mutation(changeset, apply, ctx=ctx, action=FIELD_KEYS_ROTATED, dry_run=dry_run)
+
+
+# --- Transactional email (ARC.16, docs/dev/transactional-email.md)
+
+EMAIL_MODEL = "core.outboxemail"
+SUPPRESSION_MODEL = "core.emailsuppression"
+EMAIL_SUPPRESSED = "core.email.suppressed"
+EMAIL_PARTS = ("subject.txt", "body.txt", "body.html")
+_TEMPLATE_KEY = re.compile(r"[a-z0-9_]+(\.[a-z0-9_]+)+")
+_FEEDBACK_EVENTS = {
+    mail.HARD_BOUNCE: OutboxEmailEvent.Kind.BOUNCED,
+    mail.SOFT_BOUNCE: OutboxEmailEvent.Kind.SOFT_BOUNCED,
+    mail.COMPLAINT: OutboxEmailEvent.Kind.COMPLAINED,
+}
+
+
+class EmailRetryScheduled(Exception):
+    """A transient failure is recorded and committed; the task queue retries the send job."""
+
+
+@functools.cache
+def _sender_for(path: str) -> mail.EmailSender:
+    return cast("mail.EmailSender", import_string(path)())
+
+
+def email_sender() -> mail.EmailSender:
+    """The configured backend (`settings.EMAIL_SENDER`), one instance per process."""
+    return _sender_for(settings.EMAIL_SENDER)
+
+
+def feedback_parser() -> mail.FeedbackParser | None:
+    """The webhook's parser, or None while no webhook secret is configured (webhook off)."""
+    secret = settings.EMAIL_WEBHOOK_SECRET
+    if not secret:
+        return None
+    return cast("mail.FeedbackParser", import_string(settings.EMAIL_FEEDBACK_PARSER)(secret))
+
+
+def email_language(language: str) -> str:
+    """`language` when it is configured, else the source language (EN, spec 09 fallback)."""
+    codes = {code for code, _ in settings.LANGUAGES}
+    return language if language in codes else settings.LANGUAGE_CODE
+
+
+def _email_templates(template_key: str, language: str) -> list[Any]:
+    """Subject, text and HTML templates; a per-language file wins over the gettext one."""
+    if not _TEMPLATE_KEY.fullmatch(template_key):
+        raise ValueError(f"invalid email template key {template_key!r} (expected app.name)")
+    base = "email/" + template_key.replace(".", "/")
+    try:
+        return [
+            select_template([f"{base}/{language}/{part}", f"{base}/{part}"]) for part in EMAIL_PARTS
+        ]
+    except TemplateDoesNotExist as exc:
+        raise ValueError(f"email template {template_key!r} is incomplete: {exc}") from exc
+
+
+def _render_plain(template: Any, values: Mapping[str, Any]) -> str:
+    # Plain text is not HTML: render without autoescaping (the HTML part is escaped).
+    return str(template.template.render(Context(dict(values), autoescape=False)))
+
+
+def render_email(
+    template_key: str, language: str, context: Mapping[str, Any]
+) -> mail.RenderedEmail:
+    """Render `email/<app>/<name>/{subject.txt, body.txt, body.html}` in `language`.
+
+    Texts are translated with gettext; a missing translation shows the EN source text, and a
+    language that is not configured renders in EN. The context gets `email_language`.
+    """
+    language = email_language(language)
+    subject, text, html = _email_templates(template_key, language)
+    values = {**context, "email_language": language}
+    with translation.override(language):
+        return mail.RenderedEmail(
+            subject=" ".join(_render_plain(subject, values).split()),
+            text_body=_render_plain(text, values).strip() + "\n",
+            html_body=html.render(values),
+        )
+
+
+def is_suppressed(address: str) -> bool:
+    return EmailSuppression.objects.filter(address=mail.normalise_address(address)).exists()
+
+
+def email_snapshot(email: OutboxEmail) -> dict[str, Any]:
+    """What change reports and the history show of an email: never its context."""
+    return {
+        "recipient": email.recipient,
+        "template_key": email.template_key,
+        "language": email.language,
+        "idempotency_key": email.idempotency_key,
+        "status": email.status,
+        "attempts": email.attempts,
+        "provider_message_id": email.provider_message_id,
+    }
+
+
+def _email_event(email: OutboxEmail, status: str, detail: str = "") -> None:
+    OutboxEmailEvent.objects.create(
+        email=email, status=status, attempt=email.attempts, detail=detail[:2000]
+    )
+
+
+def enqueue_email(
+    *,
+    recipient: str,
+    template_key: str,
+    language: str,
+    context: Mapping[str, Any],
+    idempotency_key: str | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Put a transactional email in the outbox and queue its send job, in the caller's
+    transaction (a rollback drops both).
+
+    `context` is stored as a snapshot (JSON, encrypted at rest), so the email shows the values
+    of the moment it was requested. An email to a suppressed address is stored as `suppressed`
+    and never sent. With `idempotency_key`, a second request with the same key changes nothing.
+    Raises ValueError for an unknown or incomplete template.
+    """
+    from . import tasks  # tasks imports services
+
+    language = email_language(language)
+    _email_templates(template_key, language)
+    payload = json.dumps(to_jsonable(context), sort_keys=True)
+    key = idempotency_key or None
+    if key is not None and OutboxEmail.objects.filter(idempotency_key=key).exists():
+        return ChangeSet()
+    suppressed = is_suppressed(recipient)
+    email = OutboxEmail(
+        recipient=recipient.strip(),
+        template_key=template_key,
+        language=language,
+        context=payload,
+        idempotency_key=key,
+        status=OutboxEmail.Status.SUPPRESSED if suppressed else OutboxEmail.Status.QUEUED,
+    )
+    changeset = ChangeSet()
+    changeset.create(EMAIL_MODEL, str(email.public_id), email_snapshot(email))
+    if dry_run:
+        return changeset
+    try:
+        with transaction.atomic():
+            email.save()
+            _email_event(email, email.status, "address suppressed" if suppressed else "")
+            if not suppressed:
+                tasks.enqueue(tasks.send_email, email_id=str(email.public_id))
+    except IntegrityError:
+        if key is not None and OutboxEmail.objects.filter(idempotency_key=key).exists():
+            return ChangeSet()  # a concurrent request with the same key won
+        raise
+    return changeset
+
+
+def _attempt(email: OutboxEmail, *, dry_run: bool) -> str:
+    """Try to send `email`, updating its fields; return the history detail."""
+    status = OutboxEmail.Status
+    if is_suppressed(email.recipient):
+        email.status = status.SUPPRESSED
+        return "address suppressed"
+    try:
+        rendered = render_email(email.template_key, email.language, email.context_data)
+    except ValueError as exc:
+        email.status, email.last_error = status.FAILED, str(exc)
+        return email.last_error
+    violations = mail.html_violations(rendered.html_body)
+    if violations:
+        email.status = status.FAILED
+        email.last_error = "unsafe HTML: " + "; ".join(violations)
+        return email.last_error
+    if dry_run:
+        email.status = status.SENT
+        return ""
+    email.attempts += 1
+    outgoing = mail.OutgoingEmail(
+        recipient=email.recipient,
+        from_address=settings.DEFAULT_FROM_EMAIL,
+        subject=rendered.subject,
+        text_body=rendered.text_body,
+        html_body=rendered.html_body,
+        idempotency_key=str(email.public_id),
+    )
+    now = timezone.now()
+    try:
+        result = email_sender().send(outgoing)
+    except mail.PermanentSendError as exc:
+        email.status, email.next_attempt_at = status.FAILED, None
+        email.last_error = str(exc) or type(exc).__name__
+    except Exception as exc:  # transient, or an unexpected provider error: retry
+        if not isinstance(exc, mail.TransientSendError):
+            logger.exception("unexpected error sending outbox email %s", email.public_id)
+        delay = mail.retry_delay(email.attempts)
+        email.last_error = str(exc) or type(exc).__name__
+        if delay is None:
+            email.status, email.next_attempt_at = status.FAILED, None
+        else:
+            email.status = status.RETRYING
+            email.next_attempt_at = now + dt.timedelta(seconds=delay)
+    else:
+        email.status, email.sent_at = status.SENT, now
+        email.provider_message_id = result.provider_message_id
+        email.next_attempt_at, email.last_error = None, ""
+        return ""
+    return email.last_error
+
+
+def deliver_email(email_id: str | uuid.UUID, *, dry_run: bool = False) -> ChangeSet:
+    """Send one outbox email (the `core.send_email` job); safe to call more than once.
+
+    An email that is already sent, failed or suppressed is left alone, and the row is locked
+    while it is sent, so two runs never send it twice. The provider also gets the email's public
+    id as idempotency key, for the case of a crash after it accepted the email. A transient
+    failure is recorded and committed, then `EmailRetryScheduled` asks the queue to retry; after
+    the last retry, or on a permanent failure, the email is `failed` and nothing is raised.
+    Dry-run renders and checks the email without sending it.
+    """
+    with transaction.atomic():
+        email = OutboxEmail.objects.select_for_update().get(public_id=email_id)
+        if email.status in OutboxEmail.FINAL:
+            return ChangeSet()
+        before = email_snapshot(email)
+        detail = _attempt(email, dry_run=dry_run)
+        changeset = ChangeSet()
+        changeset.update(EMAIL_MODEL, str(email.public_id), before, email_snapshot(email))
+        if dry_run:
+            return changeset
+        email.save()
+        _email_event(email, email.status, detail)
+    if email.status == OutboxEmail.Status.RETRYING:
+        raise EmailRetryScheduled(f"email {email.public_id}: retry at {email.next_attempt_at}")
+    return changeset
+
+
+def suppression_snapshot(suppression: EmailSuppression) -> dict[str, Any]:
+    return {
+        "address": suppression.address,
+        "reason": suppression.reason,
+        "detail": suppression.detail,
+    }
+
+
+def record_email_feedback(
+    event: mail.FeedbackEvent, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Record a bounce or complaint from the provider (webhook, ARC.19 adapter).
+
+    The event goes into the history of the email it names, when known. A hard bounce or a
+    complaint suppresses the address (audited): later emails to it are not sent. A soft bounce
+    is history only.
+    """
+    address = mail.normalise_address(event.recipient)
+    email = (
+        OutboxEmail.objects.filter(provider_message_id=event.provider_message_id).first()
+        if event.provider_message_id
+        else None
+    )
+    changeset = ChangeSet()
+    suppression: EmailSuppression | None = None
+    if event.kind in mail.SUPPRESSING_KINDS and not is_suppressed(address):
+        suppression = EmailSuppression(address=address, reason=event.kind, detail=event.detail)
+        after = {**suppression_snapshot(suppression), "message": event.provider_message_id}
+        changeset.create(SUPPRESSION_MODEL, str(suppression.public_id), after)
+    if dry_run:
+        return changeset
+    with transaction.atomic():
+        if email is not None:
+            _email_event(email, _FEEDBACK_EVENTS[event.kind], event.detail)
+        if suppression is not None:
+            try:
+                run_mutation(
+                    changeset, suppression.save, ctx=ctx, action=EMAIL_SUPPRESSED, dry_run=False
+                )
+            except IntegrityError:  # a concurrent report suppressed it first
+                return ChangeSet()
+    return changeset

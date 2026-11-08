@@ -24,8 +24,10 @@ models tested on Vendor B's objects.
 from django.contrib import admin
 from django.db import models
 
-from apps.api.models import ApiClient
-from apps.api.tests.factories import ApiClientFactory
+from apps.api.models import ApiClient, ApiRateCounter
+from apps.api.tests.factories import ApiClientFactory, ApiRateCounterFactory
+from apps.cart.models import CartLine
+from apps.cart.tests.factories import CartLineFactory
 from apps.catalog.models import (
     Product,
     ProductAttribute,
@@ -106,6 +108,7 @@ def renamed_product_alias(vendor: Vendor) -> SkuAlias:
 OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     Vendor: lambda vendor: vendor,
     ApiClient: lambda vendor: ApiClientFactory.create(vendor=vendor),
+    ApiRateCounter: lambda vendor: ApiRateCounterFactory.create(client__vendor=vendor),
     VendorMember: lambda vendor: VendorMemberFactory.create(
         vendor=vendor, role=VendorMember.Role.STAFF
     ),
@@ -156,6 +159,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
             vendor=vendor, valid_from=utc(2025), valid_to=utc(2026)
         )
     ),
+    CartLine: lambda vendor: CartLineFactory.create(product=ProductFactory.create(vendor=vendor)),
     TaxRegimeChangeRequest: lambda vendor: TaxRegimeChangeRequestFactory.create(
         # A reviewed request: the vendor may already have its one pending request.
         vendor=vendor,
@@ -174,6 +178,7 @@ OWN_ACCOUNT = "The signed-in user's own second factors (CORE.4); no vendor data.
 
 ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
+    "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
     "home": NoVendorData("Public home page."),
     "switch_language": NoVendorData("Stores the visitor's language choice."),
     "mfa:overview": NoVendorData(OWN_ACCOUNT),
