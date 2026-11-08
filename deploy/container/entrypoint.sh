@@ -19,6 +19,7 @@ case "$role" in
       --worker-tmp-dir /dev/shm \
       --no-control-socket \
       --access-logfile - \
+      --logger-class mpmv.gunicorn_logging.RedactingLogger \
       --error-logfile - \
       "$@"
     ;;
