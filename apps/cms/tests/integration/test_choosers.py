@@ -16,7 +16,9 @@ from typing import Any
 
 import pytest
 from django.core.exceptions import ValidationError
+from django.db import connection
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from apps.accounts.models import User
@@ -32,6 +34,7 @@ from apps.catalog.tests.factories import (
 from apps.cms.blocks import LinkBlock, VendorChooserBlock
 from apps.cms.models import HomePage, StandardPage
 from apps.cms.services import SeedReport
+from apps.cms.tests.factories import StandardPageFactory
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorTranslationFactory
@@ -328,3 +331,58 @@ def test_a_link_to_a_page_that_is_not_live_has_no_href(seeded: SeedReport) -> No
         ],
     )
     assert "Our story</a>" not in html
+
+
+# --- No N+1 (#117 review): cards are resolved in bulk
+
+
+def _two_level_term(n: int) -> Term:
+    taxonomy = TaxonomyFactory.create(code=f"bulk-{n}")
+    TaxonomyTranslationFactory.create(
+        taxonomy=taxonomy, language="en", name=f"Tax {n}", slug=f"tax-{n}", status=PUBLISHED
+    )
+    parent = TermFactory.create(taxonomy=taxonomy)
+    TermTranslationFactory.create(
+        term=parent, language="en", name=f"Maker {n}", slug=f"maker-{n}", status=PUBLISHED
+    )
+    child: Term = TermFactory.create(parent=parent)
+    TermTranslationFactory.create(
+        term=child, language="en", name=f"Model {n}", slug=f"model-{n}", status=PUBLISHED
+    )
+    return child
+
+
+def _vendor(n: int) -> Vendor:
+    vendor: Vendor = VendorFactory.create(
+        display_name=f"Maker shop {n}", slug=f"maker-shop-{n}", status=Vendor.Status.ACTIVE
+    )
+    VendorTranslationFactory.create(
+        vendor=vendor, language="en", tagline=f"Tagline {n}", status=PUBLISHED
+    )
+    return vendor
+
+
+def _queries_to_render(numbers: range) -> tuple[int, str]:
+    cards: list[tuple[str, dict[str, Any]]] = []
+    for n in numbers:
+        cards.append(_card("term", _two_level_term(n)))
+        cards.append(_card("vendor", _vendor(n)))
+        cards.append(_card("page", StandardPageFactory.create(title=f"Story {n}")))
+    home = _home()
+    home.body = [_featured(*cards)]
+    home.save_revision().publish()
+    client = Client()
+    client.get(home.url)  # warm caches (site root paths, locales)
+    with CaptureQueriesContext(connection) as queries:
+        html = client.get(home.url).content.decode()
+    return len(queries), html
+
+
+def test_featured_cards_render_with_a_constant_number_of_queries(seeded: SeedReport) -> None:
+    one, _ = _queries_to_render(range(100, 101))
+    many, html = _queries_to_render(range(8))
+    for n in range(8):
+        assert f'<a href="/tax-{n}/maker-{n}/model-{n}/">Model {n}</a>' in html
+        assert f'<a href="/shop/maker-shop-{n}/">Maker shop {n}</a>' in html
+        assert f"Story {n}</a>" in html
+    assert many <= one

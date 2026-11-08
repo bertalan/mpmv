@@ -147,6 +147,15 @@ layers = [
 ]
 exhaustive = false
 
+# The layer above lets cms import catalog and vendors (spec 01: catalog --> cms). It sits above
+# tax and shipping only because import-linter layers are a total order: the graph has no
+# tax --> cms or shipping --> cms edge, so this contract keeps cms off them.
+[[tool.importlinter.contracts]]
+name = "CMS reads catalog and vendors, never tax or shipping (spec 01 graph)"
+type = "forbidden"
+source_modules = ["apps.cms"]
+forbidden_modules = ["apps.tax", "apps.shipping"]
+
 [[tool.importlinter.contracts]]
 name = "Procrastinate is used only through apps.core.tasks (ADR-0004)"
 type = "forbidden"

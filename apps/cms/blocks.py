@@ -16,8 +16,10 @@ not live, a term (or its taxonomy or parent terms) without published texts, a ve
 active. Term and storefront URLs follow spec 03 (`engine.term_path`, `engine.storefront_path`).
 """
 
+from collections import defaultdict
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -28,9 +30,9 @@ from wagtail.blocks import StructBlockValidationError
 from wagtail.images.blocks import ImageChooserBlock
 from wagtail.models import Page
 
-from apps.catalog.models import Term
+from apps.catalog.models import TaxonomyTranslation, Term, TermTranslation
 from apps.core import translations
-from apps.vendors.models import Vendor
+from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.services import has_public_storefront
 
 from .choosers import term_chooser, vendor_chooser
@@ -194,6 +196,9 @@ class FaqBlock(blocks.StructBlock):  # type: ignore[misc]
 
 
 # --- Cards (part 2/2)
+#
+# The targets of all the cards of a block are resolved in bulk (`_card_targets`): a constant
+# number of queries however many cards a page shows (#117 review).
 
 
 @dataclass(frozen=True)
@@ -203,59 +208,150 @@ class Card:
     text: str
 
 
-class _CardValue(blocks.StructValue):  # type: ignore[misc]
-    def card(self, language: str) -> Card | None:
-        """The card in `language`, or None when its target is not public."""
-        raise NotImplementedError
+@dataclass(frozen=True)
+class _Target:
+    """What a card shows by default: its target's name, URL and text in the reader's language."""
 
-    def _card(self, label: str, href: str, text: str = "") -> Card:
-        return Card(self.get("label") or label, href, self.get("text") or text)
+    name: str
+    href: str
+    text: str = ""
+
+
+class _CardValue(blocks.StructValue):  # type: ignore[misc]
+    target_kind: ClassVar[str]
+
+    def target(self) -> Any:
+        return self.get(self.target_kind)
+
+    def card(self, targets: Mapping[tuple[str, int], _Target]) -> Card | None:
+        """The card, or None when its target is not public (not in `targets`)."""
+        chosen = self.target()
+        target = None if chosen is None else targets.get((self.target_kind, chosen.pk))
+        if target is None:
+            return None
+        return Card(self.get("label") or target.name, target.href, self.get("text") or target.text)
 
 
 class PageCardValue(_CardValue):
-    def card(self, language: str) -> Card | None:
-        page = live_page(self.get("page"))
-        if page is None or not page.url:
-            return None
-        return self._card(page.title, page.url)
-
-
-def _published_languages(obj: Any) -> dict[str, Any]:
-    return {
-        row.language: row for row in obj.translations.all() if row.status == translations.PUBLISHED
-    }
+    target_kind = "page"
 
 
 class TermCardValue(_CardValue):
-    def card(self, language: str) -> Card | None:
-        """Its name and listing URL in `language`, or in the primary language when the term, its
-        taxonomy or a parent term is not published in `language` (spec 09 fallback)."""
-        term: Term | None = self.get("term")
-        if term is None:
-            return None
-        terms = [*term.get_ancestors(), term]
-        texts = [_published_languages(item) for item in (term.taxonomy, *terms)]
-        chosen = link_language(language, translations.source_language(), texts)
-        if chosen is None:
-            return None
-        taxonomy, *term_texts = (by_language[chosen] for by_language in texts)
-        href = term_path(
-            taxonomy.slug,
-            [text.slug for text in term_texts],
-            chosen,
-            translations.source_language(),
-        )
-        return self._card(term_texts[-1].name, href)
+    target_kind = "term"
 
 
 class VendorCardValue(_CardValue):
-    def card(self, language: str) -> Card | None:
-        vendor: Vendor | None = self.get("vendor")
-        if vendor is None or not has_public_storefront(vendor):
-            return None
-        href = storefront_path(vendor.slug, language, translations.source_language())
-        texts = vendor.translation(language).translation
-        return self._card(vendor.display_name, href, texts.tagline if texts is not None else "")
+    target_kind = "vendor"
+
+
+def _page_targets(pages: list[Page], language: str, request: Any) -> dict[int, _Target]:
+    """Each page in `language` when that translation is live, else itself when it is live (the
+    `live_page` rule): one query for all the translations."""
+    keys = {page.translation_key for page in pages}
+    translated = {
+        page.translation_key: page
+        for page in Page.objects.filter(
+            translation_key__in=keys, locale__language_code=language, live=True
+        )
+    }
+    targets: dict[int, _Target] = {}
+    for page in pages:
+        shown: Page | None = translated.get(page.translation_key) or (page if page.live else None)
+        url = shown.get_url(request) if shown is not None else None
+        if shown is not None and url:
+            targets[page.pk] = _Target(shown.title, url)
+    return targets
+
+
+def _published_by_owner(rows: Iterable[Any], owner: str) -> dict[int, dict[str, Any]]:
+    """Published translation rows grouped by their owner's id, then by language."""
+    grouped: dict[int, dict[str, Any]] = defaultdict(dict)
+    for row in rows:
+        grouped[getattr(row, owner)][row.language] = row
+    return grouped
+
+
+def _term_targets(terms: list[Term], language: str) -> dict[int, _Target]:
+    """Each term's name and listing URL in `language`, or in the primary language when the term,
+    its taxonomy or a parent term is not published in `language` (spec 09 fallback). Three
+    queries: the parent terms, the term texts and the taxonomy texts."""
+    primary = translations.source_language()
+    published = {"status": translations.PUBLISHED, "language__in": {language, primary}}
+
+    def ancestor_paths(term: Term) -> list[str]:
+        return [term.path[:end] for end in range(term.steplen, len(term.path), term.steplen)]
+
+    paths = {path for term in terms for path in ancestor_paths(term)}
+    nodes = {node.path: node for node in Term.objects.filter(path__in=paths)}
+    nodes.update((term.path, term) for term in terms)
+    term_texts = _published_by_owner(
+        TermTranslation.objects.filter(term_id__in={n.pk for n in nodes.values()}, **published),
+        "term_id",
+    )
+    taxonomy_texts = _published_by_owner(
+        TaxonomyTranslation.objects.filter(
+            taxonomy_id__in={term.taxonomy_id for term in terms}, **published
+        ),
+        "taxonomy_id",
+    )
+    targets: dict[int, _Target] = {}
+    for term in terms:
+        found = [nodes.get(path) for path in ancestor_paths(term)]
+        chain = [node for node in found if node is not None]
+        if len(chain) != len(found):
+            continue
+        texts = [
+            taxonomy_texts.get(term.taxonomy_id, {}),
+            *(term_texts.get(node.pk, {}) for node in (*chain, term)),
+        ]
+        chosen = link_language(language, primary, texts)
+        if chosen is None:
+            continue
+        taxonomy, *slugs = (by_language[chosen] for by_language in texts)
+        href = term_path(taxonomy.slug, [text.slug for text in slugs], chosen, primary)
+        targets[term.pk] = _Target(slugs[-1].name, href)
+    return targets
+
+
+def _vendor_targets(vendors: list[Vendor], language: str) -> dict[int, _Target]:
+    """Each active vendor's storefront URL and tagline: one query for all the taglines."""
+    public = [vendor for vendor in vendors if has_public_storefront(vendor)]
+    primary = translations.source_language()
+    texts = _published_by_owner(
+        VendorTranslation.objects.filter(
+            vendor_id__in={vendor.pk for vendor in public},
+            status=translations.PUBLISHED,
+            language__in={language, primary},
+        ),
+        "vendor_id",
+    )
+    targets: dict[int, _Target] = {}
+    for vendor in public:
+        shown = translations.resolve(texts.get(vendor.pk, {}).values(), language).translation
+        href = storefront_path(vendor.slug, language, primary)
+        targets[vendor.pk] = _Target(
+            vendor.display_name, href, shown.tagline if shown is not None else ""
+        )
+    return targets
+
+
+def _card_targets(
+    values: Iterable[_CardValue], language: str, request: Any
+) -> dict[tuple[str, int], _Target]:
+    """The public targets of `values`, keyed by (kind, id); a target that is not public is
+    missing."""
+    chosen: dict[str, list[Any]] = defaultdict(list)
+    for value in values:
+        if value.target() is not None:
+            chosen[value.target_kind].append(value.target())
+    resolved = {
+        "page": _page_targets(chosen["page"], language, request) if chosen["page"] else {},
+        "term": _term_targets(chosen["term"], language) if chosen["term"] else {},
+        "vendor": _vendor_targets(chosen["vendor"], language) if chosen["vendor"] else {},
+    }
+    return {
+        (kind, pk): target for kind, targets in resolved.items() for pk, target in targets.items()
+    }
 
 
 class TermChooserBlock(term_chooser.get_block_class("_TermChooserBlock", __name__)):  # type: ignore[misc]
@@ -338,7 +434,9 @@ class FeaturedLinksBlock(blocks.StructBlock):  # type: ignore[misc]
 
     def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
         context = super().get_context(value, parent_context=parent_context)
-        language = _page_language(parent_context)
-        cards = (child.value.card(language) for child in value["cards"])
+        values = [child.value for child in value["cards"]]
+        request = (parent_context or {}).get("request")
+        targets = _card_targets(values, _page_language(parent_context), request)
+        cards = (card_value.card(targets) for card_value in values)
         context["cards"] = [card for card in cards if card is not None]
         return context
