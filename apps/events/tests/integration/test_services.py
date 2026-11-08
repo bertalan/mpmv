@@ -35,7 +35,12 @@ from apps.events.services import (
     set_vendor_policy,
     submit_event,
 )
-from apps.events.tests.factories import STARTS_AT, EventPageFactory, primary_index
+from apps.events.tests.factories import (
+    STARTS_AT,
+    EventIndexPageFactory,
+    EventPageFactory,
+    primary_index,
+)
 from apps.vendors.models import Vendor, VendorMember
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 
@@ -105,6 +110,17 @@ def _act(page: EventPage, moderator: User, action: str, comment: str = "") -> No
     task_state.task.specific.on_action(task_state, moderator, action, comment=comment)
 
 
+def _vendor_key(page: EventPage) -> str:
+    vendor = page.vendor
+    assert vendor is not None
+    return str(vendor.public_id)
+
+
+def _json(value: Any) -> dict[str, Any]:
+    assert isinstance(value, dict)
+    return value
+
+
 def _audits() -> int:
     return AuditLog.objects.filter(target_model="events.eventpage").count()
 
@@ -154,13 +170,13 @@ def test_save_writes_one_audit_entry(owner: User) -> None:
     assert _audits() == 1
     entry = AuditLog.objects.get(target_model="events.eventpage")
     assert entry.action == "events.event_created"
-    assert entry.vendor_key == str(page.vendor.public_id)
+    assert entry.vendor_key == _vendor_key(page)
     save_event_draft(owner, {"summary": "Another summary."}, page)
     assert _audits() == 2
     latest = AuditLog.objects.filter(target_model="events.eventpage").first()
     assert latest is not None
     assert latest.action == "events.event_draft_saved"
-    assert latest.before["summary"] != latest.after["summary"]
+    assert _json(latest.before)["summary"] != _json(latest.after)["summary"]
 
 
 def test_a_dry_run_writes_no_revision_and_no_audit(owner: User) -> None:
@@ -266,10 +282,9 @@ def test_a_taken_slug_gets_a_suffix(owner: User) -> None:
 
 
 def test_a_draft_in_another_language_goes_under_that_index(owner: User) -> None:
-    locale = Locale.objects.exclude(pk=Locale.get_default().pk).first()
-    if locale is None:
-        pytest.skip("only one locale configured")
-    services.ensure_event_indexes()
+    primary_index()
+    locale = EventIndexPageFactory.create().locale  # under a home page in another language
+    assert locale != Locale.get_default()
     changes = save_event_draft(owner, _data(), vendor=_vendor_of(owner), locale=locale)
     assert changes.page is not None
     page = _fresh(changes.page)
@@ -365,8 +380,8 @@ def test_regression_3_a_higher_threshold_reviews_again(owner: User, moderator: U
     set_event_settings(staff, site, moderation_threshold=5)
     assert EventSettings.for_site(site).moderation_threshold == 5
     entry = AuditLog.objects.filter(target_model="events.eventsettings").get()
-    assert entry.before["moderation_threshold"] == 3
-    assert entry.after["moderation_threshold"] == 5
+    assert _json(entry.before)["moderation_threshold"] == 3
+    assert _json(entry.after)["moderation_threshold"] == 5
     assert AuditLog.objects.count() == audits + 1
 
     page = _create(owner, title="Next one")
@@ -467,14 +482,14 @@ def test_approval_and_changes_requested_are_audited(owner: User, moderator: User
     _act(page, moderator, "reject", comment="Give the booth number.")
     entry = AuditLog.objects.filter(action="events.event_changes_requested").get()
     assert entry.actor_id == moderator.pk
-    assert entry.after["comment"] == "Give the booth number."
-    assert entry.vendor_key == str(page.vendor.public_id)
+    assert _json(entry.after)["comment"] == "Give the booth number."
+    assert entry.vendor_key == _vendor_key(page)
 
     submit_event(owner, _fresh(page))
     _act(page, moderator, "approve")
     entry = AuditLog.objects.filter(action="events.event_approved").get()
     assert entry.actor_id == moderator.pk
-    assert entry.after["status"] == EventPage.Status.PUBLISHED
+    assert _json(entry.after)["status"] == EventPage.Status.PUBLISHED
 
 
 def test_submit_writes_one_audit_entry_and_dry_run_none(owner: User) -> None:

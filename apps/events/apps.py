@@ -53,6 +53,21 @@ class EventsConfig(AppConfig):
             (workflow_cancelled, "events.status_cancelled"),
         ):
             signal.connect(signals.sync_status_of_workflow, sender=WorkflowState, dispatch_uid=uid)
+        # "Event review" exists after migrate; approvals and requested changes are audited
+        # (EVT.3). The status sync above already follows both.
+        post_migrate.connect(
+            signals.add_review_workflow_after_migrate,
+            sender=self,
+            dispatch_uid="events.review_workflow",
+        )
+        workflow_approved.connect(
+            signals.audit_approval, sender=WorkflowState, dispatch_uid="events.audit_approved"
+        )
+        workflow_rejected.connect(
+            signals.audit_changes_requested,
+            sender=WorkflowState,
+            dispatch_uid="events.audit_rejected",
+        )
         # Wagtail's "Resubmit" (`WorkflowState.resume`) sends no workflow signal, only a save.
         post_save.connect(
             signals.sync_status_of_workflow, sender=WorkflowState, dispatch_uid="events.status_wf"

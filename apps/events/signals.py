@@ -1,4 +1,4 @@
-"""Signal adapters (EVT.1): thin, the work is in `services`."""
+"""Signal adapters (EVT.1, EVT.3): thin, the work is in `services`."""
 
 from typing import Any
 
@@ -54,3 +54,25 @@ def sync_status_of_workflow(
         page = page.specific
     if isinstance(page, EventPage):
         services.sync_event_status(page)
+
+
+def add_review_workflow_after_migrate(using: str = DEFAULT_DB_ALIAS, **kwargs: Any) -> None:
+    """`post_migrate`: the "Event review" workflow exists (EVT.3)."""
+    if using != DEFAULT_DB_ALIAS:
+        return
+    if WorkflowState._meta.db_table in connections[using].introspection.table_names():
+        services.ensure_event_review_workflow()
+
+
+def audit_approval(
+    sender: type[WorkflowState], instance: WorkflowState, user: Any = None, **kwargs: Any
+) -> None:
+    """`workflow_approved`: a moderator approved an event (its revision is published)."""
+    services.record_review_decision(instance, user, approved=True)
+
+
+def audit_changes_requested(
+    sender: type[WorkflowState], instance: WorkflowState, user: Any = None, **kwargs: Any
+) -> None:
+    """`workflow_rejected`: a moderator sent the event back with requested changes."""
+    services.record_review_decision(instance, user, approved=False)
