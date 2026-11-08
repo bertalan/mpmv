@@ -5,7 +5,7 @@ from typing import Any
 
 from django.core.management.base import BaseCommand, CommandParser
 
-from apps.cms.services import seed_legal_placeholders, seed_site
+from apps.cms.services import seed_site
 
 
 class Command(BaseCommand):
@@ -24,7 +24,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
-        report = seed_legal_placeholders() if options["legal_placeholders"] else seed_site()
+        report = seed_site(legal_placeholders=options["legal_placeholders"])
         for line in report.created:
             self.stdout.write(f"created {line}")
         self.stdout.write(self.style.SUCCESS(f"{len(report.created)} objects created"))

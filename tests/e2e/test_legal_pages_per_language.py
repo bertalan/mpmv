@@ -16,7 +16,7 @@ from pytest_django.live_server_helper import LiveServer
 
 from apps.cms.engine import GO_LIVE_LEGAL_KINDS
 from apps.cms.models import LegalPage
-from apps.cms.services import seed_legal_placeholders
+from apps.cms.services import seed_site
 from apps.core.i18n import configured_languages
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
 
@@ -26,7 +26,7 @@ pytestmark = pytest.mark.django_db(transaction=True)
 def test_every_language_has_the_five_pages_each_with_its_own_date(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
-    seed_legal_placeholders()
+    seed_site(legal_placeholders=True)
     # A new English version: the Italian translation keeps its own date.
     english = LegalPage.objects.live().get(kind="terms", locale__language_code="en")
     english.effective_date = dt.date(2027, 6, 1)
@@ -60,7 +60,7 @@ def test_every_language_has_the_five_pages_each_with_its_own_date(
 def test_a_missing_language_is_not_found_rather_than_english(
     page: Page, live_server: LiveServer
 ) -> None:
-    seed_legal_placeholders()
+    seed_site(legal_placeholders=True)
     german = LegalPage.objects.live().get(kind="returns", locale__language_code="de")
     german.unpublish()
 

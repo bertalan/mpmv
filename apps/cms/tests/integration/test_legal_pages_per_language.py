@@ -32,11 +32,11 @@ from apps.cms.services import (
     SeedReport,
     legal_readiness,
     record_legal_review,
-    seed_legal_placeholders,
+    seed_site,
     sync_page_translations,
     translate_page,
 )
-from apps.cms.tests.factories import LegalPageFactory
+from apps.cms.tests.factories import LegalPageFactory, LegalPageReviewFactory
 from apps.core.audit import AuditContext
 from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog
@@ -163,7 +163,7 @@ def test_the_readiness_check_fails_without_the_counsel_check_of_a_language(
 def test_the_seed_publishes_placeholders_of_the_five_pages_in_every_language(
     seeded: SeedReport,
 ) -> None:
-    report = seed_legal_placeholders()
+    report = seed_site(legal_placeholders=True)
 
     live = LegalPage.objects.live().select_related("locale")
     published = {(page.kind, page.locale.language_code) for page in live}
@@ -182,11 +182,11 @@ def test_the_seed_publishes_placeholders_of_the_five_pages_in_every_language(
     problems = legal_readiness()
     assert {p.missing for p in problems} == {"native_review", "counsel_check"}
 
-    assert seed_legal_placeholders().created == []
+    assert seed_site(legal_placeholders=True).created == []
 
 
 def test_a_placeholder_says_it_is_not_a_legal_text(client: Client, seeded: SeedReport) -> None:
-    seed_legal_placeholders()
+    seed_site(legal_placeholders=True)
     page = LegalPage.objects.live().get(kind="withdrawal", locale__language_code="de")
 
     html = client.get(page.url).content.decode()
@@ -265,9 +265,7 @@ def test_a_review_cannot_be_dated_in_the_future_or_recorded_twice(seeded: SeedRe
 
 
 def test_reviews_are_append_only(seeded: SeedReport) -> None:
-    page = _publish(LegalPageFactory.create(live=False))
-    _review(page, "counsel_check")
-    review = LegalPageReview.objects.get()
+    review = LegalPageReviewFactory.create()
     with pytest.raises(PermissionError):
         review.save()
     rows = LegalPageReview.objects.filter(pk=review.pk)

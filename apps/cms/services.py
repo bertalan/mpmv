@@ -189,8 +189,9 @@ def _ensure_menus(
 
 
 @transaction.atomic
-def seed_site() -> SeedReport:
-    """Make sure every configured language has a home, an About page and its two menus.
+def seed_site(*, legal_placeholders: bool = False) -> SeedReport:
+    """Make sure every configured language has a home, an About page and its two menus, and
+    with `legal_placeholders` the five go-live legal pages (I18N.9, `_seed_legal_placeholders`).
 
     Idempotent: only what is missing is created, and existing pages and menus are never
     changed. The primary-language pages and menus are created first; the other languages get
@@ -219,6 +220,8 @@ def seed_site() -> SeedReport:
         local_home = _translated(home, locale, texts.home, report)
         local_about = _translated(about, locale, texts.about, report)
         _ensure_menus(locale, local_home, local_about, report, sources=primary_menus)
+    if legal_placeholders:
+        _seed_legal_placeholders(home, report)
     return report
 
 
@@ -510,18 +513,14 @@ def legal_readiness(languages: Sequence[str] | None = None) -> list[engine.Readi
     )
 
 
-@transaction.atomic
-def seed_legal_placeholders() -> SeedReport:
+def _seed_legal_placeholders(home: HomePage, report: SeedReport) -> None:
     """Make sure the five go-live legal pages exist and are published in every language.
 
     Placeholders only: the texts are human work (Q-42). Each says it is not a legal text, and
     stays a draft on the site and in `legal_readiness` until a counsel check is recorded.
-    Idempotent: a language that has the page, whatever its text, is left alone. The site's
-    home pages are seeded first when missing (`seed_site`).
+    Idempotent: a language that has the page, whatever its text, is left alone.
     """
-    report = seed_site()
-    primary = Locale.get_default()
-    home = _primary_home(report)
+    primary = home.locale
     today = timezone.localdate()
     for kind in engine.GO_LIVE_LEGAL_KINDS:
         source = LegalPage.objects.child_of(home).filter(kind=kind).first()
@@ -536,7 +535,6 @@ def seed_legal_placeholders() -> SeedReport:
                 continue
             locale = Locale.objects.get(language_code=code)
             _translated(source, locale, legal_placeholder(code, kind), report)
-    return report
 
 
 def vendor_application_url(urlconf: str | None = None) -> str | None:

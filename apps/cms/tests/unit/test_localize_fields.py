@@ -72,7 +72,7 @@ def test_a_legal_translation_keeps_its_own_effective_date() -> None:
     """I18N.9 (Q-42): each language has its own version and effective date, so a sync from the
     source page neither copies the date nor offers it as a segment to translate."""
     date = _fields(LegalPage)["effective_date"]
-    page = LegalPage()
+    page = LegalPage.__new__(LegalPage)  # the checks never read the instance; no database
     assert not date.is_synchronized(page)
     assert not date.is_translated(page)
     assert not date.is_overridable(page)
