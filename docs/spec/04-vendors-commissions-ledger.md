@@ -172,8 +172,14 @@ platform duties of [11](11-compliance.md)) may have changed. Going through `onbo
 re-acceptance, DAC7 data, payout data) and the activation gates with the code that already
 exists, instead of a second activation path. The data kept after closure (owner, ledger,
 contracts) are reused; a vendor whose owner asked for erasure (Q-16, [02](02-core-identity-permissions.md))
-is reopened only with a new owner. Until VEN.21 is done, `closed` is terminal in
-`apps/vendors/engine.py` (`TRANSITIONS`).
+is reopened only with a new owner. In the code (VEN.21) `closed → onboarding` is the only
+transition out of `closed` in `TRANSITIONS` (`apps/vendors/engine.py`) and needs a reason, so
+only `reopen_vendor` in `apps/vendors/services.py` makes it: staff only, with dry-run, audited as
+`vendor.reopened` with the reason. The vendor's `onboarding_round` goes up and contract
+acceptances count for the current round only, so the owner accepts the contract in force again
+even when its version has not changed. No API key comes back with a reopen: closing a vendor
+revokes its keys (CORE.14), the reopen revokes any key a closure from before that rule left
+active, and an owner issues new keys once the vendor is active again.
 
 ### Plan entitlements and plan fees (VEN.19, P2)
 

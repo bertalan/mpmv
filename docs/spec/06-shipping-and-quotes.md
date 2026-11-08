@@ -173,6 +173,28 @@ Checkout rules:
   its treatment per area: surcharge (fixed, percent or per kg), extra delivery days, unavailable,
   quote only, or blocked. The default is an indicative cost subject to quote (`IndicativeRates`).
 
+SHP.14 stores them as platform data, like country groups: `SpecialArea` (code, name, kind
+`island` / `remote` / `extra_vat`, countries, postcode patterns of the shared grammar, provinces,
+and for an extra-VAT area the code of its TAX.1 `Territory`) and `SpecialAreaTreatment` (method,
+area, mode `indicative` / `surcharge` / `quote_only` / `unavailable` / `blocked`, surcharge type
+`fixed` / `percent` / `per_kg` and amount, extra days). The link to the tax territory is its code,
+not a foreign key: `tax` and `shipping` never import each other, and territories are seeded by
+TAX.7; a guard test outside both apps keeps the code formats identical. A migration seeds the
+lists above (a conservative subset where the public lists are uncertain); a carrier's remote-area
+list is imported as a platform file. The pure `engine.special_area_treatment(areas, treatments,
+dest)` tells SHP.3 which area an address is in (postcode before province, then extra-VAT before
+island before remote) and which treatment the method gives it; `services.special_area_decision`
+builds it from the stored rows. A surcharge is added to the method's net cost and rounded half up
+to cents once; extra days lengthen the indicative delivery time.
+A method whose zone reaches the address only through postcodes or provinces that lie inside the
+area (a vendor's own islands zone priced by weight bands, legacy cases 2 and 4) already prices it:
+without a treatment of its own it keeps its normal rate (surcharge 0, not indicative, no quote).
+Any other zone gets the default: a country-wide zone, a regional zone by province around a
+postcode-defined island (Capri in NA), or a country covered by broad prefixes (`0*`..`9*`). An
+extra-VAT territory always gets the default unless the method sets a treatment. A treatment row
+always wins. Areas match `CC:`-qualified postcodes and provinces in their own country only, like
+zones.
+
 ### Configuration file format (SHP.13)
 
 A file is refused with a file-level issue above 1 MiB (`config_format.MAX_FILE_BYTES`), when the
@@ -184,9 +206,10 @@ this format and imports it). The parser is `apps.shipping.config_format` (pure);
 templates are `apps.shipping.config_io`; staff use the `shipping_config` management command until
 the SHP.6 editor.
 
-**JSON**: an object with `format` = `"mpmv.shipping-config"`, `version` = `1` and these sections
+**JSON**: an object with `format` = `"mpmv.shipping-config"`, `version` = `2` and these sections
 (lists of objects; a missing optional field takes the model default on create and keeps the stored
-value on update):
+value on update). Version 2 (SHP.14) adds the special areas and the method treatments; version 1
+files are still read (they hold neither), and files are always written in version 2:
 
 | Section | Fields | Named by |
 |---|---|---|
@@ -194,21 +217,23 @@ value on update):
 | `zones` | `code`, `name`, `priority`, `countries`, `country_groups`, `postcode_patterns`, `states` | `code` |
 | `methods` | `zone_scope` (`own` default, or `platform`), `zone`, `key`, `carrier` (code), `service_level`, `min_delivery_days`, `max_delivery_days`, `is_default`, `free_shipping_threshold`, `tax_treatment`, `over_max_weight`, `bands` | `zone_scope` + `zone` + `key` |
 | `methods[].bands` | `from_kg`, `to_kg` (`null` = unlimited), `cost_net`, `surcharge_net` | `from_kg` within its method |
+| `methods[].area_treatments` | `area` (code), `mode`, `surcharge_type`, `surcharge`, `extra_days` (version 2) | `area` within its method |
 | `pickup_options` | `key`, `cost_net`, `address` | `key` |
-| `special_areas` | reserved for SHP.14: version 1 files keep it empty | |
+| `special_areas` | `code`, `name`, `kind`, `countries`, `postcode_patterns`, `states`, `territory_code` (version 2; version 1 files keep it empty) | `code` |
 
 Amounts and weights are decimal strings (`"9.90"`, `"5.000"`), never floats. Lists hold text.
 `tax_treatment` and `over_max_weight` travel as stored data only: their meaning depends on D-03
 (TAX.4) and D-06 (SHP.3). Translated names (method and group names, pickup labels) are not part of
-version 1: they stay with the translation workflow.
+the format: they stay with the translation workflow.
 
 **CSV**: the same rows, one per line, with the header `record, code, version, name, priority,
 countries, country_groups, postcode_patterns, states, zone_scope, zone, key, carrier,
 service_level, min_delivery_days, max_delivery_days, is_default, free_shipping_threshold,
-tax_treatment, over_max_weight, from_kg, to_kg, cost_net, surcharge_net, address`. `record` is
-`format` (first line, with `code` and `version`), `country_group`, `zone`, `method`, `band` or
-`pickup_option`; a band names its method with `zone_scope`, `zone` and `key`, and its method must
-be in the same file. Lists are separated by `|`; an empty number cell is `null`; booleans are
+tax_treatment, over_max_weight, from_kg, to_kg, cost_net, surcharge_net, address, kind,
+territory_code, area, mode, surcharge_type, surcharge, extra_days` (the last seven since version
+2). `record` is `format` (first line, with `code` and `version`), `country_group`, `zone`,
+`method`, `band`, `area_treatment`, `pickup_option` or `special_area`; a band or an area treatment
+names its method with `zone_scope`, `zone` and `key`, and its method must be in the same file. Lists are separated by `|`; an empty number cell is `null`; booleans are
 `true` / `false`; a cell that does not apply to its record must be empty.
 
 **Validation and import.** The parser checks only the shape (format, version, known fields, lists
@@ -222,10 +247,12 @@ a file with any error changes nothing; a dry run returns the ChangeSet and the r
 nothing. Every written row is audited, and the import itself as `shipping.config.imported` with
 its source and summary.
 
-- A vendor file writes that vendor's zones, methods, bands and pickup options; its methods ship to
-  its own zones (`own`) or to platform zones (`platform`). Country groups are platform data: they
-  are compared, never written (a missing one is an error, a different one a warning).
-- A platform file writes country groups and platform zones; methods and pickup options are refused.
+- A vendor file writes that vendor's zones, methods, bands, area treatments and pickup options;
+  its methods ship to its own zones (`own`) or to platform zones (`platform`). Country groups and
+  special areas are platform data: they are compared, never written (a missing one is an error, a
+  different one a warning).
+- A platform file writes country groups, special areas (a carrier's remote-area list) and platform
+  zones; methods, their bands and treatments, and pickup options are refused.
 - Rows are matched by name and created or updated; rows missing from the file are kept. A row
   may be partial: a missing field takes the model default on create and keeps the stored value on
   update (a stored method keeps its carrier), and the row is checked with the stored values it
@@ -233,7 +260,8 @@ its source and summary.
 - The bands a file lists for a method replace its stored bands, whatever their order in the file.
   A method that lists no bands keeps its stored ones: in JSON a method without a `bands` key
   (`"bands": []` removes every band), in CSV a method without band lines (CSV cannot write an
-  empty list: removing every band of a method takes a JSON file).
+  empty list: removing every band of a method takes a JSON file). A method's `area_treatments`
+  follow the same rule, matched by area code.
 
 **Standard template.** `ShippingTemplate` stores a document of this format without a vendor, saved
 by staff through an audited service that validates it like a vendor file; at most one template is

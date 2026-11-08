@@ -83,6 +83,7 @@ def method_form(
         "over_max_weight": "",
         **inline_management("translations", 0),
         **bands_form(*bands),
+        **inline_management("area_treatments", 0),
     }
     if is_default:
         data["is_default"] = "on"

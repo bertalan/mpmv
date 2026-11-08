@@ -13,7 +13,7 @@ puts the cache, the VIES client and the fail-closed policy together.
 
 import datetime as dt
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -259,6 +259,14 @@ def _check_reviewer(user: User, *, requested_by_id: int | None) -> None:
 
 def latest_tax_profile(vendor: Vendor) -> VendorTaxProfile | None:
     return VendorTaxProfile.objects.filter(vendor=vendor).order_by("-valid_from").first()
+
+
+def has_tax_profile(vendor: Vendor) -> bool:
+    """Whether the vendor has a tax profile, current or scheduled (VEN.18 review M2).
+
+    From then on its declared fiscal regime changes only through a TAX.2 regime-change request.
+    """
+    return VendorTaxProfile.objects.filter(vendor=vendor).exists()
 
 
 def check_profile_start(new: VendorTaxProfile) -> None:
@@ -682,17 +690,20 @@ def pending_regime_changes() -> "QuerySet[TaxRegimeChangeRequest]":
 
 @dataclass(frozen=True)
 class ProfileInconsistency:
-    """A current profile that no longer agrees with its vendor's declared fiscal regime or with
-    the country of its VAT number (TAX.13)."""
+    """A current profile that disagrees with its vendor's declared fiscal regime or with the
+    country of its VAT number (`errors`, TAX.13), or that staff must check by hand against the
+    regime (`review`, `engine.profile_review_notes`)."""
 
     profile: VendorTaxProfile
     errors: dict[str, str]
+    review: dict[str, str] = field(default_factory=dict)
 
     def describe(self) -> str:
-        problems = " ".join(self.errors.values())
+        problems = " ".join([*self.errors.values(), *self.review.values()])
+        finding = "does not match" if self.errors else "needs a manual review against"
         return (
-            f"{self.profile.vendor}: the tax profile does not match the fiscal regime or the "
-            f"VAT number. {problems}"
+            f"{self.profile.vendor}: the tax profile {finding} the fiscal regime or the VAT "
+            f"number. {problems}"
         )
 
 
@@ -701,7 +712,8 @@ def inconsistent_tax_profiles(at: dt.datetime | None = None) -> list[ProfileInco
 
     The fiscal regime (VEN.12) can change outside the regime change workflow, e.g. in the
     vendor admin, and vendors cannot import tax to stop it; this finds the result so staff can
-    fix it (a regime change request, or the fiscal regime).
+    fix it (a regime change request, or the fiscal regime). Profiles the rules cannot confirm
+    (RF20, VEN.18) are listed too, with `review` notes and no errors.
     """
     at = at or timezone.now()
     current = (
@@ -720,18 +732,24 @@ def inconsistent_tax_profiles(at: dt.datetime | None = None) -> list[ProfileInco
             exempt_country=profile.exempt_country,
             vat_country=vat_registration_country(profile.vendor),
         )
-        if errors:
-            found.append(ProfileInconsistency(profile=profile, errors=errors))
+        review = engine.profile_review_notes(
+            profile.regime, profile.exempt_reason, fiscal_regime=profile.vendor.fiscal_regime
+        )
+        if errors or review:
+            found.append(ProfileInconsistency(profile=profile, errors=errors, review=review))
     return found
 
 
 def _log_inconsistency(item: ProfileInconsistency) -> None:
     logger.warning(
-        "tax profile %s of vendor %s disagrees with its fiscal regime %r or VAT number: %s",
+        "tax profile %s of vendor %s %s fiscal regime %r or VAT number: %s",
         item.profile.public_id,
         item.profile.vendor.public_id,
+        "disagrees with its" if item.errors else "needs a manual review against its",
         item.profile.vendor.fiscal_regime,
-        "; ".join(f"{name}: {message}" for name, message in item.errors.items()),
+        "; ".join(
+            f"{name}: {message}" for name, message in [*item.errors.items(), *item.review.items()]
+        ),
     )
 
 

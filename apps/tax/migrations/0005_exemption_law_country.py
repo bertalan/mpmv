@@ -7,7 +7,7 @@ import apps.core.fields
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("tax", "0003_territory_postcode_ranges"),
+        ("tax", "0004_regime_request_fiscal_regime_rf20"),
     ]
 
     operations = [
