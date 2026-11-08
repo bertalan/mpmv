@@ -62,11 +62,23 @@ def test_numbers_become_strings() -> None:
         {"color": {"text": "#000\nx"}},
         {"color": {"text": "{color.Bad}"}},
         {"text": "#000"},
+        {"font": {"body": "'Segoe UI, sans-serif"}},
+        {"font": {"body": 'system-ui, "Noto Sans'}},
+        {"font": {"body": "'a' 'b"}},
+        {"font": {"body": "\"it's\" 'x"}},
     ],
 )
 def test_invalid_tokens_are_rejected(data: dict[str, object]) -> None:
     with pytest.raises(ThemeError):
         parse_tokens(data)
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["system-ui, 'Segoe UI', sans-serif", '"Noto Sans"', "'it\"s'", '"it\'s"'],
+)
+def test_balanced_quotes_are_allowed(value: str) -> None:
+    assert parse_tokens({"font": {"body": value}}) == {"font.body": value}
 
 
 # --- resolve_tokens
@@ -211,6 +223,21 @@ def test_a_pair_token_that_is_not_a_colour_is_reported() -> None:
     ]
 
 
+def test_a_resolved_value_is_checked_again() -> None:
+    # Each part is harmless on its own; resolved, they open a CSS comment.
+    tokens = resolve_tokens(["base"], {"base": parse_tokens({"a": {"b": "x/", "c": "{a.b}*y"}})})
+    assert tokens["a.c"] == "x/*y"
+    violations = [(v.kind, v.token) for v in check_tokens(tokens, TokenContract((), ()))]
+    assert violations == [("invalid", "a.c")]
+
+
+def test_a_resolved_value_with_unbalanced_quotes_is_reported() -> None:
+    tokens = {"font.body": "'Segoe UI"}  # e.g. from a contract check over unparsed tokens
+    violations = check_tokens(tokens, TokenContract((), ()))
+    assert [(v.kind, v.token) for v in violations] == [("invalid", "font.body")]
+    assert "quote" in violations[0].message
+
+
 # --- CSS
 
 
@@ -234,6 +261,25 @@ def test_minify_css_drops_comments_and_spaces_but_keeps_descendant_selectors() -
     }
     """
     assert minify_css(css) == ".card :hover>a,.x{margin :calc(1rem + 2px)}"
+
+
+def test_minify_css_leaves_strings_untouched() -> None:
+    css = """
+    .a::before { content: " > " ; }
+    .b::after { content: "Note: a, b"; }
+    .c::after { content: '/* not a comment */ { ; }'; }
+    .d { font-family: "Segoe  UI" , serif; }
+    """
+    assert minify_css(css) == (
+        '.a::before{content:" > "}'
+        '.b::after{content:"Note: a, b"}'
+        ".c::after{content:'/* not a comment */ { ; }'}"
+        '.d{font-family:"Segoe  UI",serif}'
+    )
+
+
+def test_minify_css_keeps_escaped_quotes_inside_strings() -> None:
+    assert minify_css('.a{content:"say \\" > \\""}') == '.a{content:"say \\" > \\""}'
 
 
 def test_build_theme_css_declares_the_layers_first_and_concatenates_base_first() -> None:

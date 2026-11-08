@@ -13,15 +13,15 @@ from wagtail.models import Site
 
 from apps.cms.services import seed_site
 from apps.cms.tests.factories import StandardPageFactory
-from apps.themes.tests.builders import write_theme
+from apps.themes.tests.builders import shipped_templates, write_theme
 from apps.themes.tests.factories import SiteFactory, ThemeSettingsFactory
 
 pytestmark = pytest.mark.django_db
 
-ALT_HOME = """{% extends "cms/base.html" %}
+ALT_HOME = """{% extends "layouts/base.html" %}
 {% block content %}<h1 class="alt-home">Alt theme: {{ page.title }}</h1>{% endblock %}
 """
-BASE_STANDARD = """{% extends "cms/base.html" %}
+BASE_STANDARD = """{% extends "layouts/base.html" %}
 {% block content %}<h1 class="base-standard">Base theme: {{ page.title }}</h1>{% endblock %}
 """
 
@@ -29,7 +29,9 @@ BASE_STANDARD = """{% extends "cms/base.html" %}
 @pytest.fixture
 def sites(tmp_path: Path, settings: SettingsWrapper) -> tuple[Site, Site]:
     root = tmp_path / "themes"
-    write_theme(root, "base", templates={"cms/standard_page.html": BASE_STANDARD})
+    write_theme(
+        root, "base", templates={**shipped_templates(), "cms/standard_page.html": BASE_STANDARD}
+    )
     write_theme(root, "alt", templates={"cms/home_page.html": ALT_HOME})
     settings.MPMV_THEMES_DIR = root
     settings.MPMV_THEME_DEFAULT = "base"

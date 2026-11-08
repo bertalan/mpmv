@@ -99,3 +99,19 @@ radius = "{radius.card}"
 
 [price]
 sale-color = "{color.danger}"
+
+# --- Accessibility tokens (THM.3, spec 14 §14.6)
+
+# Focus outline: at least 2 px in --color-focus (WCAG 2.4.7), never removed.
+[focus]
+width = "3px"
+offset = "2px"
+
+# Pointer targets: 24 x 24 CSS px at least (WCAG 2.5.8), primary controls 44 px high.
+[target]
+min = "1.5rem"
+primary = "2.75rem"
+
+[measure]
+text = "70ch"
+page = "72rem"

@@ -171,6 +171,9 @@ MPMV_THEME_DEFAULT = env_str("MPMV_THEME_DEFAULT", "") or "base"
 # Built theme CSS (THM.2): `make assets` writes themes/<slug>/{tokens,theme}.css here
 # (git-ignored); ThemeAssetsFinder serves it to runserver and collectstatic.
 MPMV_THEME_BUILD_DIR = BASE_DIR / "build" / "themes"
+# Help/contact link shown in the same place in the header and footer of every public page
+# (THM.3, WCAG 3.2.6 consistent help); empty = no help link until a contact page exists.
+MPMV_HELP_URL = env_str("MPMV_HELP_URL", "")
 
 # PostgreSQL is the only datastore (ADR-0001).
 DATABASES = {

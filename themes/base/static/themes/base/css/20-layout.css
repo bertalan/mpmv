@@ -1,0 +1,207 @@
+/* Base theme, layout layer (THM.3, spec 14 §14.6): page shell, sticky header with the
+   disclosure navigation, help link, language switcher, footer. */
+@layer layout {
+  .site-header__inner,
+  .site-main,
+  .site-footer__inner {
+    inline-size: 100%;
+    max-inline-size: var(--measure-page);
+    margin-inline: auto;
+    padding-inline: var(--space-m);
+  }
+
+  .site-main {
+    flex: 1 0 auto;
+    padding-block: var(--space-l) var(--space-2xl);
+  }
+
+  /* --- Legal pages and the vendor recruitment page (CMS.5), moved from cms/site.css. */
+
+  .legal-meta {
+    color: var(--color-text-muted);
+  }
+
+  .legal-notice {
+    padding: var(--space-s) var(--space-m);
+    background: var(--color-surface-raised);
+    border-inline-start: 0.25rem solid var(--color-border-control);
+  }
+
+  .plan-list {
+    display: grid;
+    gap: var(--space-m);
+    grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  }
+
+  .plan {
+    padding: var(--card-padding);
+    border: 1px solid var(--color-border);
+    border-radius: var(--card-radius);
+  }
+
+  .plan--highlighted {
+    border: 2px solid var(--color-text);
+  }
+
+  .plan-price {
+    font-weight: 700;
+  }
+
+  .recruitment-cta {
+    margin-block: var(--space-xl);
+  }
+
+  /* --- Header */
+
+  .site-header {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 10;
+    background: var(--color-surface);
+    border-block-end: 1px solid var(--color-border);
+  }
+
+  .site-header__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-s) var(--space-l);
+    min-block-size: var(--header-height);
+    padding-block: var(--space-xs);
+  }
+
+  .site-name {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--target-min);
+    color: var(--color-text);
+    font-family: var(--font-display);
+    font-size: var(--step-1);
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .site-header ul,
+  .site-footer ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs) var(--space-m);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .site-header li,
+  .site-footer li {
+    max-inline-size: none;
+  }
+
+  /* Links in the header and footer are at least 24 x 24 px targets (WCAG 2.5.8). */
+  .site-nav a,
+  .site-footer a,
+  .help-link {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+  }
+
+  .site-nav {
+    flex: 1 1 auto;
+  }
+
+  .site-header__tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-s) var(--space-m);
+  }
+
+  /* Disclosure navigation. Without JavaScript the button stays hidden and the list shows.
+     Once enhanced, narrow screens collapse the list behind the button. */
+  .nav-toggle {
+    background: var(--color-surface);
+    color: var(--color-text);
+    border-color: var(--color-border-control);
+  }
+
+  .nav-toggle:hover {
+    background: var(--color-surface-sunken);
+  }
+
+  .nav-toggle[aria-expanded="true"] {
+    background: var(--color-accent-tint);
+  }
+
+  @media (width < 48rem) {
+    .site-nav {
+      flex-basis: 100%;
+      order: 3;
+    }
+
+    .site-nav.is-enhanced:not(.is-open) nav {
+      display: none;
+    }
+
+    .site-nav.is-enhanced ul {
+      flex-direction: column;
+      padding-block-start: var(--space-s);
+    }
+  }
+
+  @media (width >= 48rem) {
+    .nav-toggle {
+      display: none;
+    }
+  }
+
+  /* --- Language switcher: compact buttons, the current language marked. */
+
+  .language-switcher ul {
+    gap: var(--space-xs);
+  }
+
+  .language-switcher form {
+    margin: 0;
+  }
+
+  .language-switcher button {
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+    padding: var(--space-xs) var(--space-s);
+    background: var(--color-surface);
+    color: var(--color-link);
+    border-color: var(--color-border);
+    font-weight: 400;
+  }
+
+  .language-switcher button:hover {
+    background: var(--color-accent-tint);
+  }
+
+  .language-switcher button[aria-current="true"] {
+    color: var(--color-text);
+    border-color: var(--color-text);
+    font-weight: 700;
+  }
+
+  /* --- Footer */
+
+  .site-footer {
+    background: var(--color-surface-raised);
+    border-block-start: 1px solid var(--color-border);
+  }
+
+  .site-footer__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-s) var(--space-l);
+    padding-block: var(--space-l);
+  }
+
+  .site-footer p {
+    margin: 0;
+    color: var(--color-text-muted);
+  }
+}
