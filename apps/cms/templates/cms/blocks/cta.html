@@ -1,0 +1,5 @@
+<section class="block block-cta">
+  <h2>{{ value.heading }}</h2>
+  {% if value.text %}<p>{{ value.text|linebreaksbr }}</p>{% endif %}
+  <p class="block-links">{% include "cms/blocks/link.html" with link=value.link only %}</p>
+</section>
