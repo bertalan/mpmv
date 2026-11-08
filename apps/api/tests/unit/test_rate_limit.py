@@ -1,4 +1,5 @@
-"""CORE.12: the per-API-key rate limit, pure part (rates, buckets, windows, decisions)."""
+"""CORE.12, CORE.16: the per-API-key rate limit, pure part (rates, buckets, windows, decisions,
+the precedence of the per-key override)."""
 
 import datetime as dt
 import uuid
@@ -11,7 +12,9 @@ from apps.api.engine import (
     KEY_WIDE_BUCKET,
     InvalidRateLimit,
     Rate,
-    limit_for,
+    combine_decisions,
+    key_wide_rate,
+    limits_for,
     parse_rate,
     rate_decision,
     rate_policy,
@@ -93,33 +96,80 @@ def test_retry_after_is_at_least_one_second() -> None:
 
 def test_a_scope_without_its_own_limit_uses_the_key_wide_counter() -> None:
     policy = rate_policy("600/minute", {"catalog:write": "60/minute"}, {})
-    assert limit_for(policy, scope="catalog:read", client_id=CLIENT) == (
-        KEY_WIDE_BUCKET,
-        Rate(limit=600, period=60),
+    assert limits_for(policy, scope="catalog:read", client_id=CLIENT) == (
+        (KEY_WIDE_BUCKET, Rate(limit=600, period=60)),
     )
-    assert limit_for(policy, scope=None, client_id=CLIENT) == (
-        KEY_WIDE_BUCKET,
-        Rate(limit=600, period=60),
+    assert limits_for(policy, scope=None, client_id=CLIENT) == (
+        (KEY_WIDE_BUCKET, Rate(limit=600, period=60)),
     )
 
 
 def test_a_scope_with_its_own_limit_has_its_own_counter() -> None:
     policy = rate_policy("600/minute", {"catalog:write": "60/minute"}, {})
-    assert limit_for(policy, scope="catalog:write", client_id=CLIENT) == (
-        "catalog:write",
-        Rate(limit=60, period=60),
+    assert limits_for(policy, scope="catalog:write", client_id=CLIENT) == (
+        ("catalog:write", Rate(limit=60, period=60)),
     )
 
 
-def test_a_client_override_replaces_the_key_wide_limit_of_that_key_only() -> None:
+def test_a_client_setting_replaces_the_key_wide_limit_of_that_key_only() -> None:
     policy = rate_policy("600/minute", {"catalog:write": "60/minute"}, {CLIENT: "5000/hour"})
-    assert limit_for(policy, scope="catalog:read", client_id=CLIENT) == (
-        KEY_WIDE_BUCKET,
-        Rate(limit=5000, period=3600),
+    assert limits_for(policy, scope="catalog:read", client_id=CLIENT) == (
+        (KEY_WIDE_BUCKET, Rate(limit=5000, period=3600)),
     )
-    assert limit_for(policy, scope="catalog:read", client_id=OTHER_CLIENT)[1] == Rate(600, 60)
-    # Scope limits protect costly operations from every key, overridden ones included.
-    assert limit_for(policy, scope="catalog:write", client_id=CLIENT)[1] == Rate(60, 60)
+    assert limits_for(policy, scope="catalog:read", client_id=OTHER_CLIENT) == (
+        (KEY_WIDE_BUCKET, Rate(600, 60)),
+    )
+
+
+# --- CORE.16: precedence of the per-key override
+
+
+def test_the_stored_override_wins_over_the_client_setting_and_the_default() -> None:
+    policy = rate_policy("120/minute", {}, {CLIENT: "5000/hour"})
+    assert key_wide_rate(policy, client_id=CLIENT, override=Rate(10, 60)) == Rate(10, 60)
+    assert key_wide_rate(policy, client_id=CLIENT, override=None) == Rate(5000, 3600)
+    assert key_wide_rate(policy, client_id=OTHER_CLIENT, override=None) == Rate(120, 60)
+    assert limits_for(policy, scope=None, client_id=CLIENT, override=Rate(10, 60)) == (
+        (KEY_WIDE_BUCKET, Rate(10, 60)),
+    )
+
+
+def test_a_key_with_its_own_limit_is_capped_on_a_scope_with_its_own_limit_too() -> None:
+    """The scope limit still protects the costly operation, and the key's own limit (override or
+    client setting) caps every call of that key, scoped ones included (the #102 review finding):
+    such a call counts on both counters."""
+    policy = rate_policy("120/minute", {"catalog:write": "60/minute"}, {OTHER_CLIENT: "5/minute"})
+    assert limits_for(policy, scope="catalog:write", client_id=CLIENT, override=Rate(3, 60)) == (
+        ("catalog:write", Rate(60, 60)),
+        (KEY_WIDE_BUCKET, Rate(3, 60)),
+    )
+    assert limits_for(policy, scope="catalog:write", client_id=OTHER_CLIENT) == (
+        ("catalog:write", Rate(60, 60)),
+        (KEY_WIDE_BUCKET, Rate(5, 60)),
+    )
+    # A raised key keeps the scope limit: the override never lifts a scope's protection.
+    raised = limits_for(policy, scope="catalog:write", client_id=CLIENT, override=Rate(9000, 60))
+    assert raised[0] == ("catalog:write", Rate(60, 60))
+
+
+def test_combined_decisions_refuse_when_any_counter_refuses() -> None:
+    start = dt.datetime(2026, 11, 8, 12, 0, tzinfo=UTC)
+    now = start + dt.timedelta(seconds=20)
+    scope_ok = rate_decision(hits=1, window_start=start, rate=Rate(60, 60), now=now)
+    key_over = rate_decision(hits=4, window_start=start, rate=Rate(3, 60), now=now)
+    combined = combine_decisions([scope_ok, key_over])
+    assert not combined.allowed
+    assert combined.limit == 3
+    assert combined.retry_after == 40
+
+
+def test_combined_decisions_report_the_tightest_counter_when_allowed() -> None:
+    start = dt.datetime(2026, 11, 8, 12, 0, tzinfo=UTC)
+    first = rate_decision(hits=1, window_start=start, rate=Rate(60, 60), now=start)
+    second = rate_decision(hits=2, window_start=start, rate=Rate(3, 60), now=start)
+    combined = combine_decisions([first, second])
+    assert combined.allowed
+    assert (combined.limit, combined.remaining) == (3, 1)
 
 
 @pytest.mark.parametrize(
