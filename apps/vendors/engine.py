@@ -596,27 +596,28 @@ def _address_country(identity: LegalIdentity, prefix: str) -> str:
     return country or (identity.country if prefix == "registered" else "")
 
 
-def eu_establishment_countries(identity: LegalIdentity) -> tuple[str, ...]:
-    """The EU member states where the vendor is established: its registered office (the vendor
-    country when not given) and its permanent establishment, as the CMP.13 establishment gate
-    reads them, kept when they are member states."""
-    countries = (
-        _address_country(identity, "registered"),
-        _address_country(identity, "establishment"),
-    )
-    return tuple(dict.fromkeys(c for c in countries if c in EU_MEMBER_STATES))
+def rf20_seat_country(identity: LegalIdentity) -> str:
+    """The member state where the vendor's registered office (seat) is, as the CMP.13
+    `vendor_establishment` reads it; "" when the seat is outside the EU.
+
+    Owner interim decision MQ-17: until the tax advisor answers, a permanent establishment alone
+    does not qualify for RF20, so only the seat counts. Revisit when MQ-17 is answered.
+    """
+    seat = vendor_establishment(identity).registered_office
+    return seat if seat in EU_MEMBER_STATES else ""
 
 
 def cross_border_franchise_errors(identity: LegalIdentity) -> dict[str, list[str]]:
     """Who may declare RF20 (VEN.25, owner decision MQ-5), by field.
 
-    A vendor declaring RF20 must be established in an EU member state and hold the `EX` number
-    (art. 284(3) of the VAT directive). A number, when given, must be well formed for its
-    issuing member state and issued by a member state where the vendor is established.
+    A vendor declaring RF20 must have its registered office (seat) in an EU member state and hold
+    the `EX` number (art. 284(3) of the VAT directive). A number, when given, must be well formed
+    for its issuing member state and issued by the seat's member state. A permanent
+    establishment alone does not qualify (owner interim decision MQ-17).
     """
     errors: dict[str, list[str]] = {}
     number = compact(identity.cross_border_franchise_number)
-    established = eu_establishment_countries(identity)
+    seat = rf20_seat_country(identity)
     if number:
         issuer = franchise_number_issuer(number)
         if issuer is None:
@@ -624,22 +625,22 @@ def cross_border_franchise_errors(identity: LegalIdentity) -> dict[str, list[str
                 "Not a valid cross-border franchise number: the issuing member state's VAT "
                 "prefix, its national number and the suffix EX (e.g. DE123456789EX)."
             ]
-        elif issuer not in established:
-            where = ", ".join(established) or "no EU member state"
+        elif issuer != seat:
+            where = seat or "no EU member state"
             errors[FRANCHISE_NUMBER_FIELD] = [
-                f"The number was issued by {issuer}, but the vendor is established in {where}: "
-                "it must be issued by the member state of establishment."
+                f"The number was issued by {issuer}, but the vendor's registered office is in "
+                f"{where}: it must be issued by the member state of the registered office."
             ]
     if identity.fiscal_regime == CROSS_BORDER_FRANCHISE_REGIME:
-        if not established:
+        if not seat:
             errors["fiscal_regime"] = [
-                "RF20 (cross-border VAT franchise) is only for vendors established in an EU "
-                "member state."
+                "RF20 (cross-border VAT franchise) is only for vendors whose registered office "
+                "is in an EU member state; a permanent establishment alone does not qualify."
             ]
         if not number:
             errors[FRANCHISE_NUMBER_FIELD] = [
                 "RF20 needs the cross-border franchise number (suffix EX) issued by the member "
-                "state of establishment."
+                "state of the registered office."
             ]
     return errors
 

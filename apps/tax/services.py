@@ -432,8 +432,8 @@ def _clear_review(request: TaxRegimeChangeRequest) -> None:
 
 
 def check_fiscal_regime_eligibility(vendor: Vendor, fiscal_regime: str) -> None:
-    """Refuse a fiscal regime the vendor may not declare: RF20 needs an establishment in an EU
-    member state and the EX number issued there (VEN.25, owner decision MQ-5). Raises
+    """Refuse a fiscal regime the vendor may not declare: RF20 needs the registered office in an EU
+    member state and the EX number issued there (VEN.25, MQ-5; interim MQ-17). Raises
     `ValidationError` on the request's `fiscal_regime` with every reason."""
     if fiscal_regime != vendors_engine.CROSS_BORDER_FRANCHISE_REGIME:
         return
