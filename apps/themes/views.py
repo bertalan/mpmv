@@ -21,7 +21,14 @@ from django.template import loader
 from django.views.decorators.cache import never_cache
 
 from .services import resolved_theme, use_theme
-from .styleguide import sample_forms, sample_products
+from .styleguide import (
+    sample_breadcrumbs,
+    sample_forms,
+    sample_in_page_links,
+    sample_pages,
+    sample_products,
+    sample_tabs,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +80,11 @@ def styleguide(request: HttpRequest) -> HttpResponse:
         {
             "forms": sample_forms(),
             "products": sample_products(),
+            "breadcrumbs": sample_breadcrumbs(),
+            "pages": sample_pages(5, 9),
+            "tabs": sample_tabs(),
+            "skip_links": sample_in_page_links()["skip"],
+            "page_links": sample_in_page_links()["page"],
             # ?focus=errors: the first error summary takes the focus on load (e2e tests).
             "focus_errors": request.GET.get("focus") == "errors",
         },

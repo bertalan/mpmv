@@ -243,7 +243,7 @@ def test_navigation_components_render_without_a_csp_violation(
     page.set_viewport_size({"width": 375, "height": 800})
     page.wait_for_timeout(100)  # the layout settles after the resize
     # The THM.3 header is the mobile menu pattern: a disclosure button on narrow screens.
-    expect(page.get_by_role("button", name="Menu")).to_be_visible()
+    expect(page.get_by_role("button", name="Menu", exact=True)).to_be_visible()
     shot("navigation-phone")
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
 
