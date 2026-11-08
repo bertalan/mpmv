@@ -90,6 +90,7 @@ class VendorTaxProfileFactory(DjangoModelFactory[VendorTaxProfile]):
     vendor = factory.SubFactory(VendorFactory)
     regime = engine.DOMESTIC_ONLY
     exempt_reason = ""
+    exempt_country = ""  # the country of the law of an `other` exemption (TAX.13)
     oss_registered_since = None
     valid_from = factory.LazyFunction(lambda: utc(2027))
     valid_to = None
@@ -142,6 +143,7 @@ class TaxRegimeChangeRequestFactory(DjangoModelFactory[TaxRegimeChangeRequest]):
                 vendor=factory.SelfAttribute("..vendor"),
                 regime=factory.SelfAttribute("..regime"),
                 exempt_reason=factory.SelfAttribute("..exempt_reason"),
+                exempt_country=factory.SelfAttribute("..exempt_country"),
                 oss_registered_since=factory.SelfAttribute("..oss_registered_since"),
                 valid_from=factory.SelfAttribute("..effective_from"),
             ),
@@ -157,6 +159,7 @@ class TaxRegimeChangeRequestFactory(DjangoModelFactory[TaxRegimeChangeRequest]):
     status = engine.PENDING
     regime = engine.OSS
     exempt_reason = ""
+    exempt_country = ""
     oss_registered_since = factory.LazyFunction(lambda: dt.date(2027, 7, 1))
     fiscal_regime = ""
     effective_from = factory.LazyFunction(lambda: utc(2027, 7))

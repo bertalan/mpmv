@@ -49,6 +49,9 @@ def change_form(vendor: Vendor, **overrides: Any) -> dict[str, Any]:
             *engine.LEGAL_FIELDS,
         )
     }
+    data = {name: "" if value is None else value for name, value in data.items()}
+    if vendor.tin_same_as_vat:
+        data["tin_same_as_vat"] = "on"
     data["share_capital"] = "" if vendor.share_capital is None else str(vendor.share_capital)
     data["legacy_wp_user_id"] = ""
     data.update(EMPTY_INLINE)
@@ -118,7 +121,7 @@ def test_saving_an_iban_writes_a_masked_audit_row(staff_client: Client) -> None:
 
     vendor.refresh_from_db()
     assert vendor.iban == "IT60X0542811101000000123456"
-    entry = AuditLog.objects.get(action="vendor.updated")
+    entry = AuditLog.objects.get(action="vendor.dac7_corrected")  # the IBAN is DAC7 data
     assert entry.source == "admin"
     assert entry.actor_label == "staff:staff@example.com"
     assert entry.after is not None

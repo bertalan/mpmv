@@ -37,6 +37,7 @@ def test_rf20_is_a_choice_with_its_official_label() -> None:
 def test_a_vendor_can_save_rf20_and_the_change_is_audited() -> None:
     vendor = VendorFactory.create(italian_company=True)
     vendor.fiscal_regime = RF20
+    vendor.cross_border_franchise_number = f"IT{vendor.vat_number}EX"  # VEN.25
     save_vendor(vendor, ctx=CTX)
 
     assert Vendor.objects.get(pk=vendor.pk).fiscal_regime == RF20

@@ -20,3 +20,6 @@ class TaxConfig(AppConfig):
         "source, no staff-recorded rows); the rows are the history, view-only admin, and vendor "
         "VAT checks are audited by vendors",
     }
+
+    def ready(self) -> None:
+        from . import signals  # noqa: F401  (connects the TAX.13 VAT number re-check)

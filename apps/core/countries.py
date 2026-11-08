@@ -4,6 +4,7 @@ Special VAT territories (Canary Islands, Livigno, Northern Ireland goods rulesâ€
 by the tax app, not by inventing country codes here.
 """
 
+from collections.abc import Iterable
 from typing import Final
 
 ISO_3166_ALPHA2: Final = frozenset(
@@ -42,3 +43,14 @@ def normalize_country(raw: str) -> str:
 
 def is_eu(code: str) -> bool:
     return normalize_country(code) in EU_MEMBER_STATES
+
+
+def normalize_countries(raw: Iterable[str]) -> list[str]:
+    """A set of country codes, normalized, sorted and without duplicates."""
+    return sorted({normalize_country(code) for code in raw})
+
+
+def default_allowed_vendor_countries() -> list[str]:
+    """Where vendors may be established until a platform owner changes it: the EU-27 (D-21,
+    CMP.13). The default of `PlatformOperator.allowed_vendor_countries`."""
+    return sorted(EU_MEMBER_STATES)

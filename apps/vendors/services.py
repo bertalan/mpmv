@@ -1,10 +1,13 @@
 """Vendor services: vendor data and status changes (VEN.1, SEC.4), memberships with their
 permissions (CORE.2), the legal identity with its payout requirements (VEN.12) and onboarding:
-application, versioned contract, acceptance and the activation gate (VEN.5); per-vendor feature
+application, versioned contract, acceptance and the activation gates (VEN.5, the establishment
+gate of CMP.13); per-vendor feature
 flag overrides (ARC.8)."""
 
 import dataclasses
 import datetime as dt
+import logging
+from collections.abc import Callable, Collection, Mapping
 from typing import Any
 
 from django.conf import settings
@@ -18,8 +21,14 @@ from django.utils.module_loading import import_string
 
 from apps.accounts.models import User
 from apps.core.audit import AuditContext
-from apps.core.changeset import ChangeSet
-from apps.core.services import audit_changes, flags_changed, run_mutation, save_audited
+from apps.core.changeset import Change, ChangeSet
+from apps.core.services import (
+    allowed_vendor_countries,
+    audit_changes,
+    flags_changed,
+    run_mutation,
+    save_audited,
+)
 
 from . import engine
 from .models import (
@@ -33,6 +42,8 @@ from .models import (
     VendorMember,
 )
 from .vies import VatNumberValidator
+
+logger = logging.getLogger(__name__)
 
 STATUS_CHANGED = "vendor.status_changed"
 CREATED = "vendor.created"
@@ -49,6 +60,7 @@ VENDOR_FIELDS = (
     "status",
     "country",
     *engine.LEGAL_FIELDS,
+    "tin_same_as_vat",
     "contact_email",
     "phone",
     "sales_mode_default",
@@ -69,7 +81,12 @@ def has_public_storefront(vendor: Vendor) -> bool:
 
 
 # Fields encrypted at rest (SEC.3) are masked in audit rows, or the log would hold them in clear.
-MASKED_FIELDS = {"iban": engine.mask_iban, "tax_code": engine.mask_tax_code}
+MASKED_FIELDS: dict[str, Callable[[Any], str]] = {
+    "iban": engine.mask_iban,
+    "tax_code": engine.mask_tax_code,
+    "date_of_birth": engine.mask_personal,
+    "place_of_birth": engine.mask_personal,
+}
 
 
 def vendor_snapshot(vendor: Vendor) -> dict[str, Any]:
@@ -82,7 +99,8 @@ def vendor_snapshot(vendor: Vendor) -> dict[str, Any]:
 
 def save_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Validate, create or update `vendor`, auditing its data with before/after (keyed by public
-    id, IBAN and tax code masked). `before` is read from the database with the row locked.
+    id, IBAN, tax code and personal data masked). `before` is read from the database with the
+    row locked. With "same as the VAT number" the TIN is derived here (`fill_tin_from_vat`).
 
     Incomplete legal data is always accepted: completeness is checked when a payout is
     requested (`assert_payout_allowed`), never here. A value that is present must be valid:
@@ -90,7 +108,14 @@ def save_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> 
     dry-run, and raises `ValidationError`; it also stores identifiers compact. The status is
     not changed here: it moves only through `change_status`.
     """
+    return _save_vendor(vendor, ctx=ctx, dry_run=dry_run)
+
+
+def _save_vendor(
+    vendor: Vendor, *, ctx: AuditContext, dry_run: bool, action: str | None = None
+) -> ChangeSet:
     vendor.normalize()
+    vendor.fill_tin_from_vat()
     vendor.full_clean()
     key = str(vendor.public_id)
     with transaction.atomic():
@@ -111,11 +136,17 @@ def save_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> 
                 if getattr(stored, name) != getattr(vendor, name) and before[name] == after[name]:
                     after[name] += " (replaced)"
             changes.update(MODEL_LABEL, key, before, after)
+        flags = ChangeSet() if stored is None else establishment_review(stored, vendor)
+        result = ChangeSet([*changes.changes, *flags.changes])
         if dry_run:
-            return changes
+            return result
         vendor.save()
-        audit_changes(changes, ctx=ctx, action=UPDATED if stored else CREATED)
-    return changes
+        audit_changes(changes, ctx=ctx, action=action or (UPDATED if stored else CREATED))
+        audit_changes(flags, ctx=ctx, action=ESTABLISHMENT_FLAGGED)
+        for flag in flags.changes:
+            warning = establishment_warning(flag.after or {}, str(vendor.status))
+            logger.warning("vendor %s: %s", vendor.public_id, warning)
+    return result
 
 
 def delete_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
@@ -157,18 +188,27 @@ def change_status(
     """Move `vendor` to `target` if the state machine allows it; audit the change.
 
     The check runs against the stored status (row locked), never a possibly stale instance.
-    Activating an onboarding vendor also needs its onboarding checklist (VEN.5): the contract in
-    force must be accepted. Closing a vendor revokes its API keys (`VENDOR_CLOSURE_HOOKS`,
-    CORE.14), listed in the returned ChangeSet. Raises `engine.InvalidTransition`
-    (`engine.ActivationNotAllowed` for the checklist), also on dry-run.
+    Activating an onboarding vendor needs an establishment in an allowed country (CMP.13) and
+    its onboarding checklist (VEN.5): the contract in force must be accepted. Closing a vendor
+    revokes its API keys (`VENDOR_CLOSURE_HOOKS`, CORE.14), listed in the returned ChangeSet.
+    Raises `engine.InvalidTransition` (`engine.EstablishmentNotAllowed` for the establishment,
+    `engine.ActivationNotAllowed` for the checklist), also on dry-run. Reinstating a suspended
+    vendor is a staff decision and is not gated. Every move to active records the
+    establishment and whether it is allowed (`establishment_snapshot`) in the audit entry.
     """
     with transaction.atomic():
         current = (
-            Vendor.objects.select_for_update().only("status", "slug", "public_id").get(pk=vendor.pk)
+            Vendor.objects.select_for_update()
+            .only("status", "slug", "public_id", *ESTABLISHMENT_FIELDS)
+            .get(pk=vendor.pk)
         )
         engine.check_transition(current.status, target)
-        if current.status == engine.ONBOARDING and target == engine.ACTIVE:
-            engine.check_activation(onboarding_checklist(current))
+        establishment: dict[str, Any] = {}
+        if target == engine.ACTIVE:
+            if current.status == engine.ONBOARDING:
+                assert_establishment_allowed(current)
+                engine.check_activation(onboarding_checklist(current))
+            establishment = establishment_snapshot(current, allowed_vendor_countries())
 
         # Keyed by public_id: the slug is editable and can be reused by another vendor, so it
         # would not identify the vendor across its audit history. The slug is kept for reading.
@@ -177,7 +217,7 @@ def change_status(
             MODEL_LABEL,
             str(current.public_id),
             before={"status": current.status, "slug": current.slug},
-            after={"status": str(target), "slug": current.slug},
+            after={"status": str(target), "slug": current.slug, **establishment},
         )
 
         def apply() -> None:
@@ -191,6 +231,110 @@ def change_status(
     if not dry_run:
         vendor.status = target
     return changes
+
+
+# --- Establishment gate (D-21, CMP.13)
+
+# The identity fields `engine.vendor_establishment` reads.
+ESTABLISHMENT_FIELDS = ("country", "registered_country", "establishment_country")
+
+
+def vendor_establishment(vendor: Vendor) -> engine.Establishment:
+    """Where `vendor` is established, from its VEN.12 registered office and establishment."""
+    return engine.vendor_establishment(
+        engine.LegalIdentity(**{name: getattr(vendor, name) for name in ESTABLISHMENT_FIELDS})
+    )
+
+
+def assert_establishment_allowed(vendor: Vendor) -> None:
+    """Raise `engine.EstablishmentNotAllowed`, naming the countries, unless `vendor` is
+    established in a country of `PlatformOperator.allowed_vendor_countries` now."""
+    engine.check_establishment(vendor_establishment(vendor), allowed_vendor_countries())
+
+
+ESTABLISHMENT_FLAGGED = "vendor.establishment_outside_allowed"
+
+#: Vendors the activation gate already admitted: a later move out of the set is flagged.
+ADMITTED_STATUSES = frozenset({engine.ACTIVE, engine.SUSPENDED})
+
+
+def establishment_snapshot(vendor: Vendor, allowed: Collection[str]) -> dict[str, Any]:
+    """Where `vendor` is established, and whether that is in the `allowed` countries."""
+    place = vendor_establishment(vendor)
+    return {
+        "registered_office": place.registered_office,
+        "permanent_establishment": place.permanent_establishment,
+        "establishment_allowed": engine.establishment_error(place, allowed) is None,
+    }
+
+
+def establishment_review(stored: Vendor, vendor: Vendor) -> ChangeSet:
+    """The staff flag for an identity change (spec 11 CMP.13): one change when `stored` is an
+    admitted vendor and the edited `vendor` is established elsewhere, outside the allowed set.
+
+    Nobody is suspended: staff decide, as when the owner shrinks the set.
+    """
+    flags = ChangeSet()
+    if stored.status not in ADMITTED_STATUSES:
+        return flags
+    allowed = allowed_vendor_countries()
+    before, after = establishment_snapshot(stored, allowed), establishment_snapshot(vendor, allowed)
+    if not after["establishment_allowed"] and vendor_establishment(stored) != vendor_establishment(
+        vendor
+    ):
+        flags.update(MODEL_LABEL, str(vendor.public_id), before, after)
+    return flags
+
+
+def establishment_flags(changes: ChangeSet) -> list[Change]:
+    """The changes of `changes` that leave an admitted vendor outside the allowed set."""
+    return [c for c in changes.changes if (c.after or {}).get("establishment_allowed") is False]
+
+
+def establishment_warning(place: Mapping[str, Any], status: str) -> str:
+    """The staff message for a vendor flagged by `establishment_review` or reinstated outside
+    the allowed set; `place` is an `establishment_snapshot`."""
+    establishment = place.get("permanent_establishment") or "none"
+    return (
+        "the vendor is established outside the allowed vendor countries "
+        f"(registered office {place.get('registered_office')}, permanent establishment "
+        f"{establishment}). It stays {status}: staff must review it."
+    )
+
+
+def report_vendors_outside_allowed() -> int:
+    """Log a warning for each active vendor established outside the allowed set; return how
+    many there are. Run every night (`vendors.check_establishments`)."""
+    rows = active_vendors_outside(allowed_vendor_countries())
+    for row in rows:
+        logger.warning(
+            "vendor %s: %s", row["vendor"], establishment_warning(row, str(engine.ACTIVE))
+        )
+    return len(rows)
+
+
+def active_vendors_outside(countries: Collection[str]) -> list[dict[str, str]]:
+    """The active vendors established outside `countries`, for staff to decide on.
+
+    Named by `settings.VENDORS_OUTSIDE_COUNTRIES_HOOK`: `core.set_allowed_vendor_countries`
+    lists them in its ChangeSet.
+    """
+    vendors = Vendor.objects.filter(status=engine.ACTIVE).only(
+        "public_id", "display_name", *ESTABLISHMENT_FIELDS
+    )
+    rows = []
+    for vendor in vendors.order_by("display_name", "id"):
+        place = vendor_establishment(vendor)
+        if engine.establishment_error(place, countries) is not None:
+            rows.append(
+                {
+                    "vendor": str(vendor.public_id),
+                    "name": vendor.display_name,
+                    "registered_office": place.registered_office,
+                    "permanent_establishment": place.permanent_establishment,
+                }
+            )
+    return rows
 
 
 def ensure_vendor_can_write(vendor: Vendor) -> str:
@@ -374,27 +518,40 @@ def check_vat_number(
     if status not in engine.VIES_RESULTS:
         raise ValueError(f"unexpected VIES result {status!r}")
     checked_at = timezone.now()
+    # "Same as the VAT number" (VEN.23): the TIN follows the VIES answer.
+    tin = engine.tin_from_vat(dataclasses.replace(vendor.legal_identity(), vies_status=status))
 
-    def state(vies_status: str, at: Any) -> dict[str, Any]:
-        return {"vat_number": vendor.vat_number, "vies_status": vies_status, "vies_checked_at": at}
+    def state(vies_status: str, at: Any, tax_code: str, tin_country: str) -> dict[str, Any]:
+        return {
+            "vat_number": vendor.vat_number,
+            "vies_status": vies_status,
+            "vies_checked_at": at,
+            "tax_code": engine.mask_tax_code(tax_code),
+            "tin_country": tin_country,
+        }
 
     changes = ChangeSet()
     changes.update(
         MODEL_LABEL,
         str(vendor.public_id),
-        state(vendor.vies_status, vendor.vies_checked_at),
-        state(status, checked_at),
+        state(vendor.vies_status, vendor.vies_checked_at, vendor.tax_code, vendor.tin_country),
+        state(status, checked_at, tin.tax_code, tin.tin_country),
     )
 
     def apply() -> None:
         Vendor.objects.filter(pk=vendor.pk).update(
-            vies_status=status, vies_checked_at=checked_at, updated_at=checked_at
+            vies_status=status,
+            vies_checked_at=checked_at,
+            tax_code=tin.tax_code,
+            tin_country=tin.tin_country,
+            updated_at=checked_at,
         )
 
     run_mutation(changes, apply, ctx=ctx, action=VAT_CHECKED, dry_run=dry_run)
     if not dry_run:
         vendor.vies_status = status
         vendor.vies_checked_at = checked_at
+        vendor.tax_code, vendor.tin_country = tin.tax_code, tin.tin_country
     return changes
 
 
@@ -405,13 +562,20 @@ def requirement_rules(purpose: str = engine.PAYOUT) -> list[engine.Requirement]:
 
 
 def legal_profile_completeness(vendor: Vendor, purpose: str = engine.PAYOUT) -> engine.Completeness:
-    """Which fields required for `purpose` the vendor is missing, or holds invalid values for."""
-    return engine.completeness(vendor.legal_identity(), requirement_rules(purpose), purpose=purpose)
+    """Which fields required for `purpose` the vendor is missing, or holds invalid values for.
+
+    For a payout that is the active requirement rows plus the DAC7 dataset
+    (`engine.payout_completeness`): no row can relax DAC7.
+    """
+    identity = vendor.legal_identity()
+    if purpose == engine.PAYOUT:
+        return engine.payout_completeness(identity, requirement_rules(purpose))
+    return engine.completeness(identity, requirement_rules(purpose), purpose=purpose)
 
 
 def assert_payout_allowed(vendor: Vendor) -> None:
     """Guard for payout requests (VEN.6, VEN.7): raise `engine.PayoutNotAllowed` listing the
-    required legal fields that are missing or invalid.
+    required legal fields, the DAC7 dataset included, that are missing or invalid.
 
     Checks the stored vendor, not unsaved changes on the instance.
     """
@@ -419,6 +583,29 @@ def assert_payout_allowed(vendor: Vendor) -> None:
     result = legal_profile_completeness(stored, engine.PAYOUT)
     if not result.complete:
         raise engine.PayoutNotAllowed(str(stored), result)
+
+
+# --- DAC7 dataset corrections by staff (VEN.23)
+
+DAC7_CORRECTED = "vendor.dac7_corrected"
+
+
+def correct_dac7_dataset(
+    vendor: Vendor, *, ctx: AuditContext, stepped_up: bool, dry_run: bool = False
+) -> ChangeSet:
+    """Save a staff correction or completion of the vendor's DAC7 dataset, audited as
+    `vendor.dac7_corrected` with before/after (TIN and personal data masked). A new vendor
+    created with DAC7 data needs the same step-up; its entry stays `vendor.created` (SEC.4).
+
+    `stepped_up` tells whether the staff member verified a second factor recently (CORE.4);
+    without it the correction is refused with `engine.StepUpRequired` and nothing is saved.
+    """
+    if not stepped_up:
+        raise engine.StepUpRequired(
+            "Correcting the DAC7 dataset needs a fresh second-factor verification."
+        )
+    action = None if vendor._state.adding else DAC7_CORRECTED
+    return _save_vendor(vendor, ctx=ctx, dry_run=dry_run, action=action)
 
 
 REQUIREMENT_MODEL = "vendors.legalfieldrequirement"

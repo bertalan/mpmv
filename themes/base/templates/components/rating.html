@@ -1,4 +1,4 @@
-{% load i18n %}{% comment %}
+{% load i18n theme_tags %}{% comment %}
 Rating (THM.4, spec 14 §14.9): the average rating in words ("Rated 4.5 out of 5") plus five
 star icons hidden from assistive technology; a star is filled for every whole point. The number
 of reviews follows; without reviews the component says so and shows no stars.
@@ -9,6 +9,6 @@ Context:
 - `value`: the average from 0 to 5 (a number); None when there are no reviews.
 - `count`: the number of reviews.
 - `url`: a link to the reviews, on the review count.
-{% endcomment %}<p class="rating">{% if value is not None and count %}<span class="rating__stars" aria-hidden="true">{% for star in "12345" %}<span class="rating__star{% if forloop.counter <= value %} rating__star--full{% endif %}">{% include "components/icon.html" with name="star" only %}</span>{% endfor %}</span>
+{% endcomment %}{% with url=url|safe_href %}<p class="rating">{% if value is not None and count %}<span class="rating__stars" aria-hidden="true">{% for star in "12345" %}<span class="rating__star{% if forloop.counter <= value %} rating__star--full{% endif %}">{% include "components/icon.html" with name="star" only %}</span>{% endfor %}</span>
   <span class="rating__value">{% blocktranslate %}Rated {{ value }} out of 5{% endblocktranslate %}</span>
-  {% if url %}<a class="rating__count" href="{{ url }}">{% else %}<span class="rating__count">{% endif %}{% blocktranslate count counter=count %}{{ counter }} review{% plural %}{{ counter }} reviews{% endblocktranslate %}{% if url %}</a>{% else %}</span>{% endif %}{% else %}<span class="rating__none">{% translate "No reviews yet" %}</span>{% endif %}</p>
+  {% if url %}<a class="rating__count" href="{{ url }}">{% else %}<span class="rating__count">{% endif %}{% blocktranslate count counter=count %}{{ counter }} review{% plural %}{{ counter }} reviews{% endblocktranslate %}{% if url %}</a>{% else %}</span>{% endif %}{% else %}<span class="rating__none">{% translate "No reviews yet" %}</span>{% endif %}</p>{% endwith %}
