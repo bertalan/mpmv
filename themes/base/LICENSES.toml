@@ -1,0 +1,15 @@
+# Licences of the theme's assets (spec 14 §14.8, checked by `python -m apps.themes.gates`, THM.5).
+#
+# Every file under static/themes/<slug>/ that is not CSS or JavaScript (fonts, icons, images)
+# needs exactly one entry here. Allowed licences: OFL-1.1, Apache-2.0, MIT, ISC, CC0-1.0.
+# Fonts: woff2 only, at most 4 files and 2 families per theme (spec 14 §14.7).
+#
+# [[asset]]
+# name = "Barlow"                      # family, icon set or image name
+# kind = "font"                        # font | icons | image
+# source = "https://..."               # upstream project or own-work note URL (https)
+# author = "..."
+# license = "OFL-1.1"                  # SPDX id from the allow list above
+# files = ["fonts/barlow-400.woff2"]   # paths relative to static/themes/<slug>/
+#
+# `base` uses the system font stack and inline SVG only, so it has no assets yet.

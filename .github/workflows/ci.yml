@@ -39,6 +39,9 @@ jobs:
         run: uv run lint-imports
       - name: Backlog up to date with the spec
         run: uv run tools/build_docs.py --check
+      # THM.5: token contract, CSP lint, size budgets, fonts and LICENSES.toml of every theme.
+      - name: Theme quality gates
+        run: uv run python -m apps.themes.gates
       - name: Django system checks and missing migrations
         run: |
           uv run python manage.py check
@@ -217,6 +220,16 @@ jobs:
         with:
           name: e2e-screenshots
           path: build/e2e/screenshots/
+          if-no-files-found: ignore
+      # THM.5, spec 14 §14.10: candidate baselines for pages without one, and diff images.
+      - name: Store visual baselines and diffs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-visual
+          path: |
+            build/e2e/baselines/
+            build/e2e/diffs/
           if-no-files-found: ignore
       - name: Store reports
         if: failure()

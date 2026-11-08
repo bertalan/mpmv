@@ -41,6 +41,7 @@ Unknown keys are rejected, so a typo fails instead of being ignored.
 | `services.py` | `get_registry()` (manifests read once per process), `active_theme(request)`, `use_theme(...)`, `current_chain()`, `site_theme_choice(site)`, `set_site_theme(...)` (audited, `dry_run`) |
 | `contract.py` | `TOKEN_CONTRACT`: required tokens and contrast pairs |
 | `build.py` | The CSS build (`python -m apps.themes.build`), no Django settings needed |
+| `gates.py` | The theme quality gates (`python -m apps.themes.gates`, THM.5), no Django settings needed |
 | `finders.py` | `ThemeAssetsFinder`: serves `build/themes/` as static files |
 | `loaders.py` | `ThemeLoader`, the first template loader |
 | `middleware.py` | `ThemeMiddleware`: each request renders with its site's theme |
@@ -217,6 +218,53 @@ unit test `test_vendored.py` fails on a hash mismatch, a missing or unlisted fil
 version or a disallowed licence. The pre-commit whitespace fixers and git's line-ending
 conversion skip that directory, so the hashes stay valid. To update a library, download the
 new version from its pinned URL, replace the file and update its entry.
+
+## Quality gates (THM.5)
+
+Every registered theme must pass these gates (spec 14 §14.11). A failing theme fails `make check`
+and CI.
+
+| Gate | Where | Fails on |
+|---|---|---|
+| `manifest`, `tokens` | `python -m apps.themes.gates` (`make theme-gates`, part of `make check` and the CI static job) | An invalid `theme.toml`, a missing token, a contrast pair below its minimum (a 3:1 text pair) |
+| `csp` | same | A CSP lint finding in the theme's own templates (an inline style) |
+| `size` | same | `theme.css` over 45 KB or the page's JavaScript (vendored htmx and Alpine plus the chain's modules) over 40 KB, compressed |
+| `fonts` | same | A font file that is not woff2, more than 4 font files, more than 2 families |
+| `licences` | same | A font, icon or image under `static/themes/<slug>/` without an entry in the theme's `LICENSES.toml`, an entry for a missing file, a licence outside `OFL-1.1`, `Apache-2.0`, `MIT`, `ISC`, `CC0-1.0`, or an entry without name, kind, https source or author |
+| axe-core | `tests/e2e/test_theme_quality_gates.py` | Any violation with the tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa` on `/_styleguide/` rendered with each theme |
+| visual | same, through `tests/e2e/visual.py` | A styleguide screenshot at 360, 768 or 1280 px that differs from its baseline |
+
+Sizes are measured with gzip level 9. The spec budgets are Brotli, which compresses CSS and JS
+a little better, so a theme within the gzip budget is within the Brotli one too. The format of
+`LICENSES.toml` is documented in `themes/base/LICENSES.toml`. `apps/themes/tests/unit/test_gates.py`
+runs the gates over the shipped themes and over fixture themes that each break one gate.
+
+### axe-core
+
+The e2e suite injects a pinned copy of axe-core from `tests/e2e/vendor/` (its own
+`VENDORED.toml`, hash checked by `tests/unit/test_e2e_vendored.py`, never served by the site and
+never loaded from a CDN). axe-core is MPL-2.0, which is allowed for test tooling only. Use
+`tests.e2e.axe.run_axe(page)` in a new e2e test to check another page.
+
+### Visual baselines
+
+Baselines live in `tests/e2e/baselines/<theme>/<page>-<width>.png`. Fonts render differently on
+each platform, so baselines come only from the CI image (Linux Chromium), and the comparison runs
+only there. `MPMV_VISUAL` sets the mode:
+
+| Value | Effect |
+|---|---|
+| unset | `compare` in CI, `off` elsewhere (the tests are skipped with a message) |
+| `compare` | Compare with the baselines; run it inside the CI image |
+| `update` | Write the screenshots as the new baselines (`make e2e-baselines`, inside the CI image) |
+| `off` | Skip |
+
+A page without a baseline is skipped in CI, and its screenshot is uploaded as the `e2e-visual`
+artifact (`build/e2e/baselines/`). On a mismatch the diff image (changed pixels in magenta) is in
+the same artifact (`build/e2e/diffs/`). The tolerance is 0.1% of the pixels, with a per-channel
+threshold for anti-aliasing. To add or update baselines, take the PNGs from the artifact (or run
+`make e2e-baselines` in the CI image), commit them under `tests/e2e/baselines/`, and review them in
+the pull request like code. The first baselines for `base` and `ride` are committed by THM.10.
 
 ## System checks
 
