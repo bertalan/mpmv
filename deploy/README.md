@@ -94,7 +94,7 @@ amendment). Either way the app connects with TLS `sslmode=verify-full` against a
 | `mpmv-worker.container` | `worker` |
 | `mpmv-migrate.container` | `migrate`, one-shot, started only by `mpmv-deploy` |
 | `mpmv-caddy.container` | Caddy on 80/443 with certificates in volume `mpmv-caddy-data` |
-| `mpmv-media.volume` | Volume `mpmv-media`: uploads and renditions (`MEDIA_ROOT`). App and worker write it, Caddy serves it read-only under `/media/` as inert files (no listing, `nosniff`, sandbox CSP). Back it up with the host until object storage replaces it |
+| `mpmv-media.volume` | Volume `mpmv-media`: uploads and renditions (`MEDIA_ROOT`). App and worker write it, Caddy serves only image files in Wagtail's image folders from it, read-only, as inert files (no listing, `nosniff`, sandbox CSP); any other path under `/media/` is a 404. Back it up with the host until object storage replaces it |
 
 App, worker and migrate read two env files from `~/.config/mpmv/`, in this order, and mount one
 certificate read-only:
