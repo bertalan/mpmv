@@ -23,6 +23,9 @@ from factory.django import DjangoModelFactory
 from wagtail.models import Locale, Page
 
 from apps.cms.models import (
+    BlogAuthor,
+    BlogIndexPage,
+    BlogPostPage,
     HomePage,
     LegalPage,
     LegalPageVersion,
@@ -226,3 +229,49 @@ class VendorRecruitmentPageFactory(_InTree, DjangoModelFactory[VendorRecruitment
     @classmethod
     def _default_parent(cls) -> Page:
         return _primary_home()
+
+
+class BlogAuthorFactory(DjangoModelFactory[BlogAuthor]):
+    class Meta:
+        model = BlogAuthor
+        django_get_or_create = ("name",)
+
+    name = factory.Sequence(lambda n: f"Author {n}")
+
+
+class BlogIndexPageFactory(_InTree, DjangoModelFactory[BlogIndexPage]):
+    """The blog of the primary language (CMS.3): `/blog/` under its home page."""
+
+    class Meta:
+        model = BlogIndexPage
+
+    title = "Blog"
+    slug = "blog"
+    parent = None
+    intro = "<p>News from the workshops.</p>"
+
+    @classmethod
+    def _default_parent(cls) -> Page:
+        return _primary_home()
+
+
+class BlogPostPageFactory(_InTree, DjangoModelFactory[BlogPostPage]):
+    """An article under `parent` (a `BlogIndexPage`, required). Pass `live=False` for a draft
+    and publish it with `page.save_revision().publish()`."""
+
+    class Meta:
+        model = BlogPostPage
+
+    title = factory.Sequence(lambda n: f"Article {n}")
+    slug = factory.LazyAttribute(lambda page: slugify(page.title))
+    parent = None
+    date = dt.date(2026, 3, 1)
+    summary = "A short summary."
+    body = factory.LazyFunction(lambda: [("paragraph", "<p>Article text.</p>")])
+    image = None
+    image_alt_text = ""
+    image_caption = ""
+
+    @classmethod
+    def _default_parent(cls) -> Page:
+        raise LookupError("Pass the BlogIndexPage as `parent`")
