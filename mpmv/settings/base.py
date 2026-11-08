@@ -168,6 +168,9 @@ TEMPLATES = [
 # check themes.E002 fails when it names no registered theme), then `base`.
 MPMV_THEMES_DIR = BASE_DIR / "themes"
 MPMV_THEME_DEFAULT = env_str("MPMV_THEME_DEFAULT", "") or "base"
+# Built theme CSS (THM.2): `make assets` writes themes/<slug>/{tokens,theme}.css here
+# (git-ignored); ThemeAssetsFinder serves it to runserver and collectstatic.
+MPMV_THEME_BUILD_DIR = BASE_DIR / "build" / "themes"
 
 # PostgreSQL is the only datastore (ADR-0001).
 DATABASES = {
@@ -240,6 +243,11 @@ BUSINESS_TIME_ZONE = "Europe/Rome"
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_FINDERS = [
+    "django.contrib.staticfiles.finders.FileSystemFinder",
+    "django.contrib.staticfiles.finders.AppDirectoriesFinder",
+    "apps.themes.finders.ThemeAssetsFinder",  # built theme CSS (THM.2)
+]
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
