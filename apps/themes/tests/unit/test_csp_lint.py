@@ -56,6 +56,35 @@ def test_allowed_markup_passes(source: str) -> None:
     assert lint_template(source) == []
 
 
+@pytest.mark.parametrize(
+    "source",
+    [
+        '<script type="application/ld+json">{"@type": "FAQPage"}</script>',
+        "<script type='application/ld+json'>{}</script>",
+        "<script type=application/ld+json>{}</script>",
+        '<script TYPE="Application/LD+JSON">{}</script>',
+    ],
+)
+def test_a_json_ld_data_block_is_not_an_inline_script(source: str) -> None:
+    assert lint_template(source) == []
+
+
+@pytest.mark.parametrize(
+    ("source", "finding"),
+    [
+        ('<script type="application/ld+json" onload="go()">{}</script>', "on… handler attribute"),
+        ('<script type="module">go()</script>', "inline <script>"),
+        ('<script type="text/javascript">go()</script>', "inline <script>"),
+        ("<script>go()</script>", "inline <script>"),
+        ('<script type="application/ld+jsonp">go()</script>', "inline <script>"),
+        ('<script data-type="application/ld+json">go()</script>', "inline <script>"),
+    ],
+)
+def test_any_other_inline_script_stays_forbidden(source: str, finding: str) -> None:
+    findings = lint_template(source)
+    assert any(finding in f for f in findings), findings
+
+
 def test_findings_carry_the_line_number() -> None:
     assert lint_template('<p>\n<p style="x">') == ["line 2: style attribute"]
 
