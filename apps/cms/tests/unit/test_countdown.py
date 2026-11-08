@@ -85,8 +85,13 @@ def test_the_max_age_ends_at_the_nearest_target() -> None:
     now = TARGET - dt.timedelta(seconds=90)
     later = TARGET + dt.timedelta(hours=1)
     assert capped_max_age([later, TARGET], now, 600) == 90
-    assert capped_max_age([TARGET], now, None) == 90
     assert capped_max_age([TARGET], now, 30) == 30
+
+
+def test_a_lifetime_is_only_ever_shortened_never_added() -> None:
+    # No max-age means the response was not cacheable for that long: capping must not make it so.
+    now = TARGET - dt.timedelta(days=30)
+    assert capped_max_age([TARGET], now, None) is None
 
 
 def test_the_max_age_rounds_down_to_whole_seconds() -> None:

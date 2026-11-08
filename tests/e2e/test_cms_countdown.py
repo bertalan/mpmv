@@ -54,8 +54,23 @@ def _publish_countdown(target: dt.datetime, **fields: Any) -> None:
     home.save_revision().publish()
 
 
+# A fixed winter target: Rome is on CET and New York on EST whatever day the suite runs, and the
+# server (real clock) still sees it ahead. The browser clocks are faked relative to it.
+TARGET = dt.datetime(2030, 12, 1, 9, 0, tzinfo=dt.UTC)  # 10:00 CET, 4:00 AM EST
+
+# Counts the module's timers: a busy loop of overflowing timeouts shows up as thousands.
+COUNT_TIMERS = """(() => {
+  window.__timers = 0;
+  const original = window.setTimeout;
+  window.setTimeout = (...args) => {
+    window.__timers += 1;
+    return original(...args);
+  };
+})();"""
+
+
 def _target() -> dt.datetime:
-    return (timezone.now() + dt.timedelta(minutes=30)).replace(microsecond=0)
+    return TARGET
 
 
 def test_the_counter_updates_each_minute_pauses_and_announces_the_launch_once(
@@ -117,10 +132,25 @@ def test_the_date_is_shown_in_the_visitor_time_zone(
     page.goto(f"{live_server.url}/")
     when = page.locator(".launch-countdown time")
     expect(when).to_contain_text("EST")
-    hour = target.astimezone(dt.timezone(dt.timedelta(hours=-5))).strftime("%-I:%M")
-    expect(when).to_contain_text(hour)
+    expect(when).to_contain_text("4:00")
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
     context.close()
+
+
+def test_a_paused_countdown_far_from_its_target_does_not_spin(
+    page: Page, live_server: LiveServer
+) -> None:
+    # 2030 is years away on the real clock: a paused wait that long must not overflow the timer.
+    _publish_countdown(_target())
+    page.add_init_script(COUNT_TIMERS)
+    page.goto(f"{live_server.url}/")
+    block = page.locator(".launch-countdown")
+    block.get_by_role("button", name="Pause countdown").click()
+    expect(block.get_by_role("button", name="Resume countdown")).to_be_visible()
+    before = page.evaluate("window.__timers")
+    page.wait_for_timeout(500)
+    assert page.evaluate("window.__timers") - before <= 1
+    expect(block.locator("[data-countdown-remaining]")).to_be_visible()
 
 
 def test_without_javascript_the_block_shows_the_absolute_date_and_the_cta(
