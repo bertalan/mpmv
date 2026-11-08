@@ -22,9 +22,9 @@
 
 | Page type | Use | StreamField blocks |
 |---|---|---|
-| `HomePage` | Home | hero, product grid (query), featured terms, featured vendors, CTA |
+| `HomePage` | Home | hero, product grid (query, CMS.10), featured terms, featured vendors, CTA |
 | `StandardPage` | About us, contact, FAQ | rich text, images, FAQ (with FAQPage schema), CTA |
-| `LegalPage` | Terms, privacy, cookies, withdrawal, returns | versioned text with effective date |
+| `LegalPage` | Terms, privacy, cookies, withdrawal, returns | versioned text with effective date, one version history per language (Q-42, I18N.9) |
 | `BlogIndexPage` / `BlogPostPage` | Bilingual articles, featured vendors | text, galleries, **product/term/vendor choosers** (no hand-typed URLs), author, scheduling |
 | `TermLandingPage` | Editorial page for a taxonomy term | SEO intro, the term's products by category, related articles |
 | `VendorLandingPage` | The vendor's story (heritage, workshop) beyond the standard vendor storefront | story, images, featured products |
@@ -38,6 +38,13 @@ The launch countdown block below is also available in `EventPage` bodies.
 
 Taxonomy and vendor pages combine editorial content with catalog data: they are the SEO strong point
 ("browse by taxonomy term") and today they are fragmented across tags, categories and articles.
+Taxonomy pages live on `/{taxonomy}/{term}/` (owner decision D-07, [03](03-catalog.md)); the
+legacy `/tag-product/{slug}/` URLs answer 200 with a self-canonical at cutover and then move to
+the new URLs with single-hop 301s in traffic-ordered batches (MIG.11).
+
+The product grid block (CMS.10) lists products by category, taxonomy term, brand or vendor with
+the CAT.8 listing query, so a grid and the matching listing page show the same products. It is a
+separate row from the base block library (CMS.2), which does not wait for the catalog listings.
 
 ### Launch countdown block (CMS.9)
 
@@ -75,7 +82,9 @@ A StreamField block that announces a product launch, available in `HomePage`, `S
 Every image comes from a free-licence source that allows commercial use or is self-produced
 (owner decision Q-63). Wagtail uses a custom image model, `MediaImage` (`AbstractImage`) in
 `apps/core`, set as `WAGTAILIMAGES_IMAGE_MODEL` before any image exists, so CMS pages, product
-images (CAT.4), vendor logos and banners share it:
+images (CAT.4), vendor logos and banners share it. CMS.8 does not depend on ARC.15: the image
+model and its validation work with local storage, and ARC.15 only moves the storage backend to
+object storage later:
 
 | Field | Rule |
 |---|---|
@@ -115,7 +124,8 @@ def product_jsonld(product, lang) -> dict
     # + aggregateRating (verified reviews only)
 def breadcrumb_jsonld(obj, lang) -> dict
 def robots_meta(request, obj) -> str            # noindex on 404, empty search, pagination beyond a threshold
-def sitemaps() -> dict[str, Sitemap]           # per language and type; excludes fallbacks
+def sitemaps() -> dict[str, Sitemap]           # per language and type; excludes fallbacks;
+    # products and taxonomy terms listed on the URL of their current mode (Q-91, D-07, MIG.11)
 def llms_txt(lang) -> str                       # generated from vendors, brands and taxonomy terms, key pages, event feeds
 def event_jsonld(page, lang) -> dict | None     # schema.org Event with Place, PostalAddress, GeoCoordinates (spec 15, EVT.10)
 ```
@@ -179,11 +189,12 @@ with design tokens, template overrides, CSP-safe components and WCAG 2.2 AA rule
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
 | CMS.1 | Wagtail: site, locales, base page types, per-language navigation and footer | P1 | 8 | ARC.3 | Home and static pages in every configured language |
-| CMS.2 | Reusable StreamField blocks (hero, product grid, CTA, FAQ, choosers) | P1 | 10 | CMS.1, CAT.8 | An editor builds the home page without code |
+| CMS.2 | Reusable StreamField blocks (hero, CTA, FAQ, choosers) | P1 | 8 | CMS.1 | An editor builds the home page without code |
+| CMS.10 | Product grid block (StreamField): products by category, term, brand or vendor, using the CAT.8 listing query | P1 | 3 | CMS.2, CAT.8 | An editor places a product grid filtered by a term on a page and it renders the CAT.8 results |
 | CMS.3 | Blog with scheduling, author, product/term/vendor chooser | P1 | 8 | CMS.2 | Migrated article published |
 | CMS.4 | TermLandingPage and VendorLandingPage | P1 | 10 | CMS.2, CAT.8 | A term page with its products |
-| CMS.5 | Versioned LegalPage + VendorRecruitmentPage (plans, FAQ) leading to the VEN.22 application form | P1 | 6 | CMS.1, VEN.5 | Legal page versions kept; the recruitment page shows the plans and links to the application |
-| CMS.8 | Image source, licence and credit: custom Wagtail image model `MediaImage` in `core` with licence, source, author, credit and permission fields, staff-editable `ImageLicence` allow list seeded per §10.2, upload validation in admin and services, `image_credit` component and per-page image credits disclosure, review list for migrated images without metadata | P1 | 5 | CMS.1, ARC.15 | An upload without licence or author is refused; an NC licence cannot be added to the allow list; a CC BY image shows its credit in the caption, a CC BY hero in the page credits disclosure; a CC0 image shows none; `WAGTAILIMAGES_IMAGE_MODEL` points to `MediaImage` before CAT.4 |
+| CMS.5 | Versioned LegalPage + VendorRecruitmentPage (plans, FAQ) leading to the VEN.22 application form | P1 | 6 | CMS.1, VEN.5 | Legal page versions kept per language, so a translated legal page has its own version and effective date (Q-42); the recruitment page shows the plans and links to the application |
+| CMS.8 | Image source, licence and credit: custom Wagtail image model `MediaImage` in `core` with licence, source, author, credit and permission fields, staff-editable `ImageLicence` allow list seeded per §10.2, upload validation in admin and services, `image_credit` component and per-page image credits disclosure, review list for migrated images without metadata; works with local storage, ARC.15 later moves only the storage backend | P1 | 5 | CMS.1 | An upload without licence or author is refused; an NC licence cannot be added to the allow list; a CC BY image shows its credit in the caption, a CC BY hero in the page credits disclosure; a CC0 image shows none; `WAGTAILIMAGES_IMAGE_MODEL` points to `MediaImage` before CAT.4 |
 | CMS.9 | Launch countdown StreamField block: fields per §10.2, `countdown_state` pure function, server-rendered absolute date and expired state, page cache capped at the target, CSP-safe ES module with visitor time zone, minute updates and pause button, single polite announcement at expiry | P1 | 4 | CMS.2, THM.4 | Without JavaScript the block shows the absolute date and the CTA; with it the remaining time updates once a minute in the visitor's time zone and the pause button stops it; after the target the server and the module both show the expired text and link; no `aria-live` on the counter; no CSP violation and no axe violation on a page with the block |
 | CMS.6 | Reviews: model, purchase verification, supplier import, moderation, vendor reply | P2 | 10 | ORD.2 | AggregateRating schema only with valid reviews |
 | SEO.1 | JSON-LD Product/Offer/Breadcrumb/ReturnPolicy/ShippingDetails, robots, canonical; GTIN and MPN from the product fields, no price for on-request and catalogue-only products (Q-31, Q-33) | P1 | 10 | CAT.7, SHP.3 | Rich Results Test with no errors; an on-request product's JSON-LD has no price |
