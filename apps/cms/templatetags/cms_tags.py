@@ -1,5 +1,5 @@
-"""Template tags for the public pages (CMS.1): per-language navigation and language switcher, and
-the page-level FAQPage structured data (CMS.2)."""
+"""Template tags for the public pages (CMS.1): per-language navigation and language switcher;
+the page-level FAQPage structured data (CMS.2); the page's image credits (CMS.8)."""
 
 from dataclasses import dataclass
 from typing import Any
@@ -13,7 +13,9 @@ from django.utils.safestring import SafeString, mark_safe
 from wagtail.models import Locale, Page
 
 from apps.core.i18n import configured_languages
+from apps.core.image_licences import Credit
 
+from .. import services
 from ..engine import faq_page_jsonld, jsonld_text
 from ..models import NavigationMenu
 
@@ -105,6 +107,12 @@ def language_links(context: dict[str, Any]) -> list[LanguageLink]:
             )
         )
     return links
+
+
+@register.simple_tag
+def page_image_credits(page: Page) -> list[Credit]:
+    """The credits for the page's "Image credits" disclosure (CMS.8)."""
+    return services.page_image_credits(page)
 
 
 @register.simple_tag
