@@ -1,5 +1,6 @@
-"""Pure CMS rules (no ORM): the gallery replacement rule of D-18 (I18N.3, spec 09 §9.2) and the
-FAQPage structured data of the FAQ block (CMS.2, spec 10 §10.2).
+"""Pure CMS rules (no ORM): the gallery replacement rule of D-18 (I18N.3, spec 09 §9.2), the
+FAQPage structured data of the FAQ blocks and the URLs of the term and vendor cards (CMS.2,
+spec 10 §10.2, spec 03 "URLs").
 
 An image is language neutral unless it is dedicated to one language. A language with at least
 one dedicated image shows only those; any other language shows the neutral images. Product
@@ -7,7 +8,7 @@ galleries (CAT.4) follow the same rule.
 """
 
 import json
-from collections.abc import Iterable, Mapping
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from typing import Any
 
 NEUTRAL = ""  # the `language` of an image shown in every language without dedicated images
@@ -46,3 +47,35 @@ def faq_page_jsonld(questions: Iterable[tuple[str, str]]) -> dict[str, Any]:
 def jsonld_text(data: Mapping[str, Any]) -> str:
     """`data` as JSON safe to put inside `<script type="application/ld+json">`."""
     return json.dumps(data, ensure_ascii=False).translate(_JSONLD_ESCAPES)
+
+
+# --- Card URLs (spec 03 "URLs"; taxonomy URLs follow the D-07 proposal, served by CAT.8)
+
+
+def localized_path(language: str, primary: str, segments: Iterable[str]) -> str:
+    """`/a/b/` in the primary language, `/<language>/a/b/` in any other."""
+    prefix = "" if language == primary else f"/{language}"
+    return f"{prefix}/{'/'.join(segments)}/"
+
+
+def storefront_path(vendor_slug: str, language: str, primary: str) -> str:
+    """A vendor storefront: `/shop/{vendor}/`, the slug the same in every language."""
+    return localized_path(language, primary, ["shop", vendor_slug])
+
+
+def term_path(taxonomy_slug: str, term_slugs: Sequence[str], language: str, primary: str) -> str:
+    """A term listing: `/{taxonomy}/{term}/{child}/`, slugs from the root term down."""
+    return localized_path(language, primary, [taxonomy_slug, *term_slugs])
+
+
+def link_language(requested: str, primary: str, available: Sequence[Collection[str]]) -> str | None:
+    """The language of a link made of translated segments: `requested` when every segment is
+    published in it, else `primary` when every segment is, else None (no link).
+
+    `available` holds, per segment, the languages it is published in. One language for the
+    whole URL: a mix of slugs would not resolve.
+    """
+    for candidate in (requested, primary):
+        if all(candidate in languages for languages in available):
+            return candidate
+    return None

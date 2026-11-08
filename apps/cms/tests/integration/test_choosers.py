@@ -233,7 +233,8 @@ def test_cards_keep_their_order(seeded: SeedReport, model_term: Term, pottery: V
         _home(),
         [_featured(_card("vendor", pottery), _card("term", model_term), _card("page", _about()))],
     )
-    positions = [html.index(text) for text in ("Pottery Studio", "Roadster", _about().title)]
+    cards = html[html.index("<h2>Featured</h2>") :]  # the About page is in the menu too
+    positions = [cards.index(text) for text in ("Pottery Studio", "Roadster", _about().title)]
     assert positions == sorted(positions)
     assert "style=" not in html
 

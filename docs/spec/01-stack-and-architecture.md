@@ -84,6 +84,7 @@ flowchart TD
   vendors --> tax
   vendors --> shipping
   catalog --> cart
+  catalog --> cms
   tax --> cart
   shipping --> cart
   cart --> orders

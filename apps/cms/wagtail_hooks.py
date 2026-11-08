@@ -5,6 +5,8 @@ Users and groups are managed in the staff admin (`/django-admin/`), which audits
 on users would change them without an audit entry, so their registrations are withdrawn here:
 they get no URL, no menu item and no admin link.
 
+The term and vendor choosers of the page cards (CMS.2) are admin viewsets (`choosers`).
+
 Documents are installed only for wagtail-localize (I18N.3): their menu item is hidden.
 """
 
@@ -17,6 +19,7 @@ from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet
 from wagtail.users import wagtail_hooks as wagtail_users_hooks
 
+from .choosers import term_chooser, vendor_chooser
 from .models import NavigationMenu
 
 
@@ -52,3 +55,13 @@ _withdraw("register_bulk_action", _from_wagtail_users)
 @hooks.register("construct_main_menu")  # type: ignore[untyped-decorator]
 def hide_documents_menu(request: Any, menu_items: list[Any]) -> None:
     menu_items[:] = [item for item in menu_items if item.name != "documents"]
+
+
+@hooks.register("register_admin_viewset")  # type: ignore[untyped-decorator]
+def register_term_chooser() -> Any:
+    return term_chooser
+
+
+@hooks.register("register_admin_viewset")  # type: ignore[untyped-decorator]
+def register_vendor_chooser() -> Any:
+    return vendor_chooser

@@ -139,7 +139,8 @@ layers = [
   "apps.payments",
   "apps.orders",
   "apps.cart",
-  "apps.catalog | apps.tax | apps.shipping | apps.cms",
+  "apps.cms",  # reads catalog terms and vendor storefronts (CMS.2 cards)
+  "apps.catalog | apps.tax | apps.shipping",
   "apps.vendors",
   "apps.accounts",
   "apps.core",
