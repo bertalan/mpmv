@@ -71,9 +71,12 @@ make dev-reset   # dev-down, then delete the mpmv-net network and the mpmv-media
 
 ## STAGE and LIVE (Podman Quadlets)
 
-Each environment is a Hetzner Cloud VPS (EU, x86) running rootless Podman under a dedicated
-user. PostgreSQL 17 runs self-managed on a separate database VPS, reachable only over the private
-network ([ADR-0007](../docs/adr/0007-hosting-hetzner-self-managed-postgres.md)). The units are in [`quadlet/`](quadlet/):
+Each environment runs rootless Podman under a dedicated user on a Hetzner Cloud VPS (EU). LIVE
+reaches PostgreSQL on a separate database VPS over the private network; STAGE runs PostgreSQL on
+the same VPS, listening on loopback only
+([ADR-0007](../docs/adr/0007-hosting-hetzner-self-managed-postgres.md) and its 2026-11-08
+amendment). Either way the app connects with TLS `sslmode=verify-full` against an internal CA
+(owner decision MQ-11). The units are in [`quadlet/`](quadlet/):
 
 | Unit | Runs |
 |---|---|
@@ -82,6 +85,23 @@ network ([ADR-0007](../docs/adr/0007-hosting-hetzner-self-managed-postgres.md)).
 | `mpmv-worker.container` | `worker` |
 | `mpmv-migrate.container` | `migrate`, one-shot, started only by `mpmv-deploy` |
 | `mpmv-caddy.container` | Caddy on 80/443 with certificates in volume `mpmv-caddy-data` |
+
+App, worker and migrate read two env files from `~/.config/mpmv/`, in this order, and mount one
+certificate read-only:
+
+| File | Holds |
+|---|---|
+| `mpmv.env` | Settings and secrets of the environment ([`server/mpmv.env.example`](server/mpmv.env.example)) |
+| `database.env` | `DATABASE_URL` only ([`server/database.env.example`](server/database.env.example)), usually written by the database setup. Read last, so it wins over `mpmv.env` |
+| `pg-root-ca.crt` | Root certificate of the internal CA, mounted at `/etc/mpmv/pg-root-ca.crt`; `DATABASE_URL` points `sslrootcert` at it |
+
+Caddy reads `caddy.env` ([`server/caddy.env.example`](server/caddy.env.example)):
+`MPMV_SITE_ADDRESS` is the public host name and `MPMV_NOINDEX=true` adds
+`X-Robots-Tag: noindex, nofollow` to every response (set on STAGE, empty on LIVE). Caddy gets
+the certificate from Let's Encrypt by itself (the name must resolve to the host and ports 80 and
+443 must be open) and serves the site only for that name: plain HTTP to any other name or to the
+IP address is closed without an answer, HTTPS to them fails the TLS handshake, and a `Host`
+header that differs from the TLS server name gets 421.
 
 ### First-time host setup
 
@@ -94,6 +114,8 @@ mkdir -p ~/.config/containers/systemd ~/.config/mpmv ~/.local/bin
 cp deploy/quadlet/* ~/.config/containers/systemd/
 cp deploy/caddy/Caddyfile ~/.config/mpmv/Caddyfile
 cp deploy/server/mpmv.env.example ~/.config/mpmv/mpmv.env    # fill in, then chmod 600
+cp deploy/server/database.env.example ~/.config/mpmv/database.env  # unless the DB setup wrote it; chmod 600
+cp <internal CA root certificate> ~/.config/mpmv/pg-root-ca.crt
 cp deploy/server/caddy.env.example ~/.config/mpmv/caddy.env  # fill in
 install -m 755 deploy/server/mpmv-deploy ~/.local/bin/mpmv-deploy
 podman login ghcr.io                               # only if the package is private
@@ -120,7 +142,8 @@ mpmv-deploy status         # current and previous release
 mpmv-deploy rollback       # back to the previous release
 ```
 
-`deploy` pulls the release, tags it `localhost/mpmv-app:current`, runs `mpmv-migrate` and then
+`deploy` pulls the release (an image already in local storage is reused: release tags are
+immutable), tags it `localhost/mpmv-app:current`, runs `mpmv-migrate` and then
 restarts app and worker. If the migration fails, the tag goes back to the live release and nothing
 restarts. If app or worker fail to restart on the new release, or it does not pass its health
 check, `deploy` switches back to the previous release by itself. If `rollback` cannot bring the

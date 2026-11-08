@@ -85,7 +85,7 @@ def test_deploy_pulls_migrates_then_restarts(host: Host) -> None:
     result = host.run("deploy", "1.2.0")
     assert result.returncode == 0, result.stderr
     assert host.log[:5] == [
-        f"podman pull {REGISTRY}:1.2.0",
+        f"podman pull --policy=missing {REGISTRY}:1.2.0",
         f"podman tag {REGISTRY}:1.2.0 localhost/mpmv-app:current",
         "systemctl --user start mpmv-migrate.service",
         "systemctl --user restart mpmv-app.service mpmv-worker.service",
