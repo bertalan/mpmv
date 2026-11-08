@@ -13,6 +13,8 @@ from django.contrib.auth import get_user_model
 from django.test import Client
 from pytest_django.fixtures import Settings as SettingsWrapper
 
+from apps.themes.styleguide import COMPONENTS
+
 # `themes` imports only core (spec 14 §14.3): users come from the shared root fixtures.
 MfaLogin = Callable[[Client, Any], Client]
 
@@ -154,3 +156,35 @@ def test_the_styleguide_shows_busy_buttons_inside_a_form(staff_client: Client) -
     assert form is not None
     assert re.search(r'<button type="submit"[^>]*aria-disabled="true"', form.group(0))
     assert re.search(r'aria-label="[^"]+, [^"]+"', form.group(0))
+
+
+# --- Part 3/3: navigation components, and every §14.9 component on the page
+
+
+def test_every_shown_component_has_its_section(staff_client: Client) -> None:
+    html = staff_client.get(URL).content.decode()
+    for name, (section, _template) in COMPONENTS.items():
+        assert re.search(rf'<h2 id="{section}"', html), (name, section)
+        assert f'aria-labelledby="{section}"' in html, (name, section)
+
+
+def test_every_breadcrumb_and_pagination_state_is_shown(staff_client: Client) -> None:
+    html = staff_client.get(URL).content.decode()
+    assert html.count('class="breadcrumb"') >= 2
+    pages = re.findall(r'<nav class="pagination".*?</nav>', html, re.DOTALL)
+    # First, middle and last page, and the numbered variant.
+    assert len(pages) >= 4
+    assert any('rel="prev"' not in nav for nav in pages)
+    assert any('rel="next"' not in nav for nav in pages)
+    assert any("…" in nav for nav in pages)
+
+
+def test_the_tabs_and_in_page_navigation_are_shown(staff_client: Client) -> None:
+    html = staff_client.get(URL).content.decode()
+    assert html.count('x-data="tabs"') >= 2
+    assert "in-page-nav--skip" in html
+    assert re.search(r'<nav class="in-page-nav" aria-label="[^"]+">', html)
+    # The skip link's target is on the page.
+    skip = re.search(r'class="in-page-nav in-page-nav--skip".*?href="#([^"]+)"', html, re.DOTALL)
+    assert skip is not None
+    assert f'id="{skip.group(1)}"' in html

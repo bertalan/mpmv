@@ -188,3 +188,101 @@ def test_a_busy_button_neither_clicks_nor_submits(page: Page, live_server: LiveS
     icon.click(force=True)
     page.wait_for_timeout(300)
     assert page.url == url
+
+
+# --- Part 3/3: navigation components
+
+
+def test_navigation_components_render_without_a_csp_violation(
+    page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    for section in ("Page frame", "Breadcrumbs", "Pagination", "Tabs", "In-page navigation"):
+        expect(page.get_by_role("heading", name=section, exact=True)).to_be_visible()
+    breadcrumb = page.get_by_role("navigation", name="Breadcrumb").first
+    expect(breadcrumb.locator('[aria-current="page"]')).to_be_visible()
+    # Alpine turned the tabs on: the list shows and the no-script headings are gone.
+    expect(page.get_by_role("tablist").first).to_be_visible()
+    expect(page.locator(".tabs__heading").first).to_be_hidden()
+    page.locator("#sg-breadcrumbs").scroll_into_view_if_needed()
+    shot("navigation-desktop")
+    page.set_viewport_size({"width": 375, "height": 800})
+    page.wait_for_timeout(100)  # the layout settles after the resize
+    # The THM.3 header is the mobile menu pattern: a disclosure button on narrow screens.
+    expect(page.get_by_role("button", name="Menu")).to_be_visible()
+    shot("navigation-phone")
+    assert csp_violations(page) == [], "\n".join(csp_violations(page))
+
+
+def test_tabs_work_with_arrow_keys_and_a_roving_tabindex(
+    page: Page, live_server: LiveServer
+) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    group = page.locator("#sg-tabs-product")
+    tabs = group.get_by_role("tab")
+    expect(tabs).to_have_count(3)
+    first, second, third = tabs.nth(0), tabs.nth(1), tabs.nth(2)
+    expect(first).to_have_attribute("aria-selected", "true")
+    first.focus()
+    page.keyboard.press("ArrowRight")
+    expect(second).to_be_focused()
+    expect(second).to_have_attribute("aria-selected", "true")
+    expect(second).to_have_attribute("tabindex", "0")
+    expect(first).to_have_attribute("tabindex", "-1")
+    expect(group.get_by_role("tabpanel")).to_have_count(1)
+    expect(group.locator("#sg-tabs-product-panel-2")).to_be_visible()
+    expect(group.locator("#sg-tabs-product-panel-1")).to_be_hidden()
+    page.keyboard.press("End")
+    expect(third).to_be_focused()
+    page.keyboard.press("ArrowRight")  # wraps around
+    expect(first).to_be_focused()
+    page.keyboard.press("ArrowLeft")  # and back
+    expect(third).to_be_focused()
+    page.keyboard.press("Home")
+    expect(first).to_be_focused()
+    # Tab leaves the tab list for the open panel: one tab stop per list.
+    page.keyboard.press("Tab")
+    expect(group.locator("#sg-tabs-product-panel-1")).to_be_focused()
+    # A click selects too.
+    second.click()
+    expect(second).to_have_attribute("aria-selected", "true")
+    expect(group.locator("#sg-tabs-product-panel-2")).to_be_visible()
+    assert csp_violations(page) == []
+
+
+def test_the_skip_to_filters_link_shows_on_focus_and_moves_the_focus(
+    page: Page, live_server: LiveServer
+) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    link = page.locator(".in-page-nav--skip a").first
+    target = (link.get_attribute("href") or "").lstrip("#")
+    assert target
+    box = link.bounding_box()
+    assert box is None or box["width"] <= 1
+    link.focus()
+    focused = link.bounding_box()
+    assert focused is not None
+    assert focused["width"] > 24
+    assert focused["height"] >= 24
+    page.keyboard.press("Enter")
+    expect(page.locator(f"#{target}")).to_be_in_viewport()
+    expect(page).to_have_url(re.compile(f"#{target}$"))
+
+
+def test_pagination_and_breadcrumb_links_show_a_visible_focus(
+    page: Page, live_server: LiveServer
+) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    page.locator("#sg-pagination").scroll_into_view_if_needed()
+    expect(page.locator('.pagination [aria-current="page"]').first).to_be_visible()
+    link = page.locator(".pagination a[rel=next]").first
+    link.focus()
+    expect(link).to_be_focused()
+    assert_visible_focus([page.evaluate(FOCUSED)])
+    crumb = page.get_by_role("navigation", name="Breadcrumb").first.get_by_role("link").first
+    crumb.focus()
+    assert_visible_focus([page.evaluate(FOCUSED)])
