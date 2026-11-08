@@ -10,7 +10,7 @@ belongs to this visitor) is in `session.py`.
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal, overload
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -63,16 +63,41 @@ def get_cart(*, user: User | None = None, session_key: str | None = None) -> Car
     return Cart.objects.filter(**_owner(user, session_key)).first()
 
 
+@overload
 def get_or_create_cart(
     *,
     user: User | None = None,
     session_key: str | None = None,
     language: str | None = None,
     country_hint: str = "",
-) -> Cart:
+    dry_run: Literal[False] = False,
+) -> Cart: ...
+
+
+@overload
+def get_or_create_cart(
+    *,
+    user: User | None = None,
+    session_key: str | None = None,
+    language: str | None = None,
+    country_hint: str = "",
+    dry_run: Literal[True],
+) -> ChangeSet: ...
+
+
+def get_or_create_cart(
+    *,
+    user: User | None = None,
+    session_key: str | None = None,
+    language: str | None = None,
+    country_hint: str = "",
+    dry_run: bool = False,
+) -> Cart | ChangeSet:
     """The cart of `user` or of the guest `session_key`, created on first use.
 
-    `language` and `country_hint` apply only when the cart is created.
+    `language` and `country_hint` apply only when the cart is created. With `dry_run=True`
+    nothing is written and the result is the ChangeSet: one create of the cart, or empty if the
+    cart exists. Otherwise the result is the cart.
     """
     owner = _owner(user, session_key)
     defaults: dict[str, Any] = {"country_hint": country_hint}
@@ -80,9 +105,13 @@ def get_or_create_cart(
         defaults["language"] = language
     cart = Cart.objects.filter(**owner).first()
     if cart is not None:
-        return cart
+        return ChangeSet() if dry_run else cart
     cart = Cart(**owner, **defaults)
     cart.full_clean(validate_unique=False, validate_constraints=False)  # normalizes the country
+    if dry_run:
+        changes = ChangeSet()
+        changes.create(CART_MODEL, str(cart.public_id), _cart_snapshot(cart))
+        return changes
     try:
         with transaction.atomic():
             cart.save()

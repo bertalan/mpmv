@@ -10,10 +10,10 @@ from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.cart import services
 from apps.cart.models import Cart, CartLine
-from apps.core.changeset import ChangeSet
 from apps.cart.tests.factories import CartFactory, CartLineFactory
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import ProductFactory, VariantFactory
+from apps.core.changeset import ChangeSet
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
