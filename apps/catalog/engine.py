@@ -1,9 +1,11 @@
-"""Pure catalog rules (spec 03 §3.2): SKU normalization, price validation, the rules of the
-category and term trees and of the attributes a taxonomy declares for its terms, and the shape of
-a product's typed attributes, variant axes and variants (CAT.3). No ORM here."""
+"""Pure catalog rules (spec 03 §3.2): the vendor SKU match key and warnings (CAT.13), price
+validation, the rules of the category and term trees and of the attributes a taxonomy declares for
+its terms, and the shape of a product's typed attributes, variant axes and variants (CAT.3). No ORM
+here."""
 
 import datetime as dt
 import re
+import unicodedata
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -13,22 +15,50 @@ from apps.core.money import CENT, to_decimal
 
 SKU_MAX_LENGTH = 64
 
-
-class InvalidSku(ValueError):
-    """The SKU is empty once normalized."""
-
-
-def canonical_sku(value: str) -> str:
-    """The stored form of a SKU: no surrounding whitespace, upper case. Never raises."""
-    return value.strip().upper()
+# Characters that commonly break exports, URLs, spreadsheets or matching (spec 03 §3.2).
+_SKU_SLASHES = frozenset("/\\")
+_SKU_QUOTES = frozenset("'\"`\u2018\u2019\u201a\u201b\u201c\u201d\u201e\u00b4")
 
 
-def normalize_sku(value: str) -> str:
-    """`canonical_sku`, refusing a SKU that is empty once normalized."""
-    sku = canonical_sku(value)
-    if not sku:
-        raise InvalidSku("A SKU cannot be empty.")
-    return sku
+def sku_match_key(raw: str) -> str:
+    """The key a vendor SKU is matched on: NFKC, trimmed, inner whitespace collapsed to one
+    space, case-folded. Never raises; an empty key means an unusable SKU (`sku_errors`)."""
+    text = unicodedata.normalize("NFKC", raw)
+    text = " ".join(text.split()).casefold()
+    return unicodedata.normalize("NFKC", text)
+
+
+def sku_errors(raw: str) -> list[str]:
+    """Why a SKU cannot be used at all; empty when usable. Odd characters are warnings."""
+    key = sku_match_key(raw)
+    if not key:
+        return ["A SKU cannot be empty."]
+    if len(key) > SKU_MAX_LENGTH:
+        return [f"A SKU cannot be longer than {SKU_MAX_LENGTH} characters once normalised."]
+    return []
+
+
+def sku_warnings(raw: str) -> list[str]:
+    """Characters that commonly cause trouble in a SKU. Never blocks: the SKU is kept as
+    entered, the vendor is told."""
+    warnings: list[str] = []
+    if raw != raw.strip():
+        warnings.append("starts or ends with a space")
+    inner = raw.strip()
+    if "  " in inner or any(c.isspace() and c != " " for c in inner):
+        warnings.append("contains repeated spaces, tabs or line breaks")
+    if any(c in _SKU_SLASHES for c in raw):
+        warnings.append("contains a slash")
+    if any(c in _SKU_QUOTES for c in raw):
+        warnings.append("contains quotes")
+    if any(unicodedata.category(c)[0] == "C" and not c.isspace() for c in raw):
+        warnings.append("contains control or invisible characters")
+    if any(
+        ord(c) > 127 and not unicodedata.category(c).startswith("C") and c not in _SKU_QUOTES
+        for c in raw
+    ):
+        warnings.append("contains non-ASCII characters that can look like others")
+    return warnings
 
 
 def to_price(value: object) -> Decimal:
@@ -222,6 +252,35 @@ def term_attribute_errors(schema: object, values: object) -> list[str]:
 
 ATTRIBUTE_KINDS = ("choice", "number", "text")
 VARIANT_LABEL_SEPARATOR = " / "
+# The columns' precision: ProductAttribute.numeric_value is DecimalField(12, 3), the product
+# weight and a variant's weight override DecimalField(8, 3).
+NUMBER_DIGITS, NUMBER_DECIMALS = 12, 3
+WEIGHT_DIGITS, WEIGHT_DECIMALS = 8, 3
+
+
+def decimal_fit_error(value: Decimal, max_digits: int, decimal_places: int) -> str | None:
+    """Why a finite `value` does not fit a DecimalField(max_digits, decimal_places), or None.
+
+    Too many decimals are refused, not rounded, so what is validated is what is stored.
+    """
+    integer_digits = max_digits - decimal_places
+    if abs(value) >= Decimal(10) ** integer_digits:
+        return f"has more than {integer_digits} digits before the decimal point"
+    if value != value.quantize(Decimal(1).scaleb(-decimal_places)):
+        return f"has more than {decimal_places} decimals"
+    return None
+
+
+def weight_error(value: object) -> str | None:
+    """Why `value` is not a valid weight in kg (None: no weight), or None; ends with a period."""
+    if value is None:
+        return None
+    if not isinstance(value, Decimal) or not value.is_finite():
+        return "needs an exact decimal number."
+    if value < 0:
+        return "cannot be negative."
+    error = decimal_fit_error(value, WEIGHT_DIGITS, WEIGHT_DECIMALS)
+    return None if error is None else f"{error}."
 
 
 @dataclass(frozen=True)
@@ -304,7 +363,8 @@ def _attribute_errors(spec: AttributeSpec, given: AttributeIn) -> list[str]:
             return [f"{code} needs a number."]
         if not isinstance(given.number, Decimal) or not given.number.is_finite():
             return [f"{code} needs an exact decimal number."]
-        return []
+        error = decimal_fit_error(given.number, NUMBER_DIGITS, NUMBER_DECIMALS)
+        return [] if error is None else [f"{code} {error}."]
     if given.values or has_number:
         return [f"{code} takes a text only."]
     return [] if has_text else [f"{code} needs a text."]
@@ -369,13 +429,14 @@ def product_structure_errors(
         errors.append("A variable product needs at least one variant.")
 
     combinations: dict[tuple[str, ...], str] = {}
-    skus: set[str] = set()
+    skus: dict[str, str] = {}  # match key (CAT.13) -> the SKU as first given
     for variant in variants:
         errors.extend(_variant_errors(variant, axes, allowed))
-        sku = canonical_sku(variant.sku)
-        if sku in skus:
-            errors.append(f"The variant SKU {sku} is given twice.")
-        skus.add(sku)
+        key = sku_match_key(variant.sku)
+        if key in skus:
+            errors.append(f"The variant SKU {skus[key]} is given twice.")
+        else:
+            skus[key] = variant.sku
         combination = tuple(variant.options.get(axis, "") for axis in axes)
         if combination in combinations:
             errors.append(

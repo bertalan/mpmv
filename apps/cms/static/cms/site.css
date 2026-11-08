@@ -44,3 +44,46 @@ body {
 .language-switcher form {
   margin: 0;
 }
+
+/* Legal pages and the vendor recruitment page (CMS.5). */
+.legal-meta {
+  color: #555;
+}
+
+.legal-notice {
+  border-left: 4px solid #555;
+  padding: 0.5rem 1rem;
+  background: #f4f4f4;
+}
+
+.plan-list {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+.plan {
+  border: 1px solid #ccc;
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+.plan--highlighted {
+  border: 2px solid #222;
+}
+
+.plan-price {
+  font-weight: bold;
+}
+
+.recruitment-cta {
+  margin: 2rem 0;
+}
+
+.recruitment-cta .button {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.25rem;
+  background: #222;
+  color: #fff;
+}

@@ -122,10 +122,37 @@ flowchart TD
 | Platform operator | Country, VAT number, regime, commission VAT mode, e-invoice channel (informational only: the platform sends no e-invoices, see [00](00-vision-and-review.md); removal proposed in ARC.17) and DAC7 authority come from the versioned `PlatformOperator` (`apps.core.services.current_operator(at)`); never a literal such as `"IT"` in application code (guarded by `tests/unit/test_no_platform_country_literal.py`; tests and migrations excluded) |
 | Identifiers | Internal `bigint` PK; UUID `public_id` for APIs and technical URLs; orders, ledger, stock, carts, feeds and URLs reference the internal identity. The vendor SKU is a label: unique per vendor on its match key, used only to match imports ([03](03-catalog.md)) |
 | History | Configuration tables with `valid_from` / `valid_to`; orders store snapshots, not live references |
-| Dry-run | Every mutating service accepts `dry_run=True` and returns a `ChangeSet` (diff) |
+| Dry-run | Every mutating service accepts `dry_run=True` and returns a `ChangeSet` (diff), or takes its caller's `ChangeSet`; the only exceptions are listed under [Dry-run exceptions](#dry-run-exceptions) (guarded by `tests/unit/test_dry_run_guard.py`) |
 | Audit | Every sensitive mutation writes an `AuditLog` (who, what, before/after, from where) |
 | Languages | Order EN (primary, source) → IT → DE → FR → ES → later languages; all five at go-live for interface text, visitor content in EN only until after go-live, except the existing IT texts migrated from the current site and vendor-authored events, written in any enabled language (D-18, [15](15-events.md)); languages are configuration; no hardcoded text in templates |
 | Time | UTC in the DB; Europe/Rome for cron jobs and documents |
+| Pure engines | `apps.*.engine` modules import no Django, no `models` and no `services` module (import-linter contract, ARC.18); the pure Django helpers they need come through `apps.core.text` |
+
+### Dry-run exceptions
+
+Owner decision Q-18 accepts four kinds of mutating service without `dry_run`: telemetry,
+throttle counters, one-time code consumption and migration hooks. A preview makes no sense for
+them, because the write is the point of the call or the call consumes something that cannot be
+replayed. The guard test `tests/unit/test_dry_run_guard.py` names the same services and fails
+when a new mutating service has neither `dry_run` nor a place in this table (ARC.18).
+
+| Service | Category | Reason |
+|---|---|---|
+| `apps.accounts.services.start_totp_enrolment` | one-time code | Creates the pending device with a fresh secret; a preview would issue one too |
+| `apps.accounts.services.confirm_totp_device` | one-time code | Verifying the code consumes it |
+| `apps.accounts.services.use_recovery_code` | one-time code | Verifying a recovery code consumes it |
+| `apps.accounts.services.register_passkey` | one-time code | Stores a registration whose one-time WebAuthn challenge is already spent |
+| `apps.accounts.services.authenticate_passkey` | one-time code | Spends the one-time WebAuthn challenge and advances the signature counter |
+| `apps.api.services.authenticate` | telemetry | Records when an API key was last used |
+| `apps.cms.services.sync_locales` | migration hook | Post-migrate handler that adds the missing Wagtail locales |
+| `apps.cms.services.seed_site` | migration hook | Idempotent setup seed (`seed_cms`) that only adds missing sample pages |
+| `apps.core.services.record_heartbeat` | telemetry | Operational heartbeat of a scheduled job |
+| `apps.core.services.record_throttle_failure` | throttle counter | Counts one failed attempt |
+| `apps.core.services.clear_throttle` | throttle counter | Forgets the failures of a key after a success |
+| `apps.core.services.purge_expired_throttles` | throttle counter | Deletes expired counters |
+| `apps.tax.services.record_vat_validation` | telemetry | Append-only record of a VIES answer |
+| `apps.tax.services.verify_vat_number` | telemetry | Asking VIES stores its answer in the append-only validation log; a check is a lookup |
+| `apps.tax.services.recheck_vat_number` | telemetry | Same lookup as `verify_vat_number`, forced past the cache by the background job |
 
 ## 1.4 Example of the service + pure function pattern
 
