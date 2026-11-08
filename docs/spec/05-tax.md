@@ -62,7 +62,9 @@ class VendorTaxProfile(Model):                 # versioned: new row on every app
     legal_note (translated)                    # e.g. bilingual art. 74 wording
     oss_registered_since; valid_from; valid_to; approved_by; requested_by
     # Consistent with Vendor.fiscal_regime (VEN.12), never duplicating it: RF19 (forfettario)
-    # if and only if exempt with reason flat_rate_forfettario.
+    # if and only if exempt with reason flat_rate_forfettario. RF20 (cross-border franchise,
+    # VEN.18) takes any regime but that one, and the consistency check flags every RF20 profile
+    # for a manual review until the tax advisor gives its VAT mapping.
 
 class VatValidation(Model):                    # cache of VIES results, append-only
     vat_number (without prefix); country (ISO, GR not EL)
@@ -73,6 +75,20 @@ class VatValidation(Model):                    # cache of VIES results, append-o
 Rates and vendor tax profiles are versioned like `PlatformOperator`: an exclusion constraint
 forbids overlapping periods of the same key, and a change is a new row through an audited
 service that closes the current one (TAX.1).
+
+Owner decisions of 2026-11-08:
+
+- **Staff-added profiles (MQ-1).** Staff keep the direct path that gives a vendor a tax profile
+  from the admin, for example for a migrated vendor. It runs the same checks as approving a
+  vendor's TAX.2 request (reviewer rules, consistency with the declared fiscal regime, the
+  exemption country below), and the MFA step-up of the staff member at the moment of the change
+  is recorded with the audit entry.
+- **Exemption reasons belong to a country (MQ-3).** Every exemption reason is tied to the country
+  whose law defines it, and a profile may use it only when that country is the country of the
+  vendor's VAT registration. `art74_publishing` and `flat_rate_forfettario` are Italian reasons,
+  so only vendors with an Italian VAT number can use them; a reason added later for an Austrian
+  law would be for Austrian VAT numbers only. The generic `other` reason carries the country of
+  the law its legal note cites (TAX.13).
 
 ### Engine contract
 
@@ -178,4 +194,5 @@ Intended differences from today:
 | TAX.9 | Cart tax simulator in admin and API (`/tax/simulate`) | P2 | 6 | TAX.4, SHP.4 | Staff simulate a mixed cart |
 | TAX.10 | Quarterly OSS report per country and per-vendor report | P2 | 8 | ORD.4 | CSV export verified on seed orders |
 | TAX.11 | Shared postcode grammar for tax territories (coherence check 5): `Territory.postcode_patterns` validated and matched with `apps.core.postcodes` (SHP.12), data migration from the `a-b` range form to `a..b`, the tax-only pattern code removed | P1 | 2 | TAX.1, SHP.12 | A `22100-22199` pattern is refused with the `..` hint; stored rows are migrated; `9000..9999` is accepted and matches; Portuguese and Polish postcodes with a dash match as exact postcodes |
-| TAX.12 | Consumer price display, go-live gate (Directive 98/6/EC, national consumer codes): B2C prices on cards, product pages, cart and feeds include VAT. The gross amount uses the destination country's rate through the TAX.3 tax engine; before the buyer picks a country, an estimated country (geo or locale) is used with a clear "VAT included, estimated for <country>" note. A net price shows only to business buyers who opt in. The catalog stays free of tax imports: a tax-side adapter or template tag supplies the gross amount. Destination rate versus Italian rate is confirmed by the owner (MQ-12) | P1 | 6 | TAX.3, CAT.8 | Regression tests for IT, DE and FR consumers (destination rate, estimated-country note); a business buyer's net view after opt-in; `on_request` products never priced; ROUND_HALF_UP per line; the catalog app has no tax import |
+| TAX.12 | Consumer price display, go-live gate (Directive 98/6/EC, national consumer codes): B2C prices on cards, product pages, cart and feeds include VAT. The gross amount uses the destination country's rate through the TAX.3 tax engine; before the buyer picks a country, an estimated country (geo or locale) is used with a clear "VAT included, estimated for <country>" note. A net price shows only to business buyers who opt in. The catalog stays free of tax imports: a tax-side adapter or template tag supplies the gross amount. The owner confirmed the destination rate, the estimated country and the business opt-in on 2026-11-08 (MQ-12) | P1 | 6 | TAX.3, CAT.8 | Regression tests for IT, DE and FR consumers (destination rate, estimated-country note); a business buyer's net view after opt-in; `on_request` products never priced; ROUND_HALF_UP per line; the catalog app has no tax import |
+| TAX.13 | Exemption reasons per country (owner decision MQ-3): each exemption reason declares the country of the law that defines it (IT for `art74_publishing` and `flat_rate_forfettario`; `other` stores the country of the law cited in its legal note), and the profile consistency check refuses a reason whose country differs from the country of the vendor's VAT registration, on the staff direct path and on TAX.2 approval alike; the check also runs on a VAT number change | P1 | 3 | TAX.2, VEN.12 | An Italian vendor saves `art74_publishing`; a German vendor is refused `art74_publishing` and `flat_rate_forfettario`; a staff-added profile and an approved request give the same refusal; changing an exempt Italian vendor's VAT number to another country is reported; `other` without a country is refused |

@@ -6,19 +6,24 @@ audit trail.
 """
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from django import forms
 from django.contrib import admin, messages
-from django.core.exceptions import FieldDoesNotExist, ValidationError
+from django.contrib.admin.utils import unquote
+from django.core.exceptions import FieldDoesNotExist, PermissionDenied, ValidationError
 from django.db.models import QuerySet
-from django.http import HttpRequest, HttpResponse
-from django.urls import reverse
+from django.http import Http404, HttpRequest, HttpResponse
+from django.shortcuts import redirect
+from django.template.response import TemplateResponse
+from django.urls import URLPattern, path, reverse
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import SafeString
 
+from apps.accounts.models import User
 from apps.core.admin import step_up
 from apps.core.audit import audit_context
+from apps.core.changeset import ChangeSet
 
 from . import engine
 from .models import (
@@ -34,13 +39,17 @@ from .models import (
     legal_field_label,
 )
 from .services import (
+    can_reopen,
     change_status,
     check_contract_start,
     delete_requirement,
     delete_vendor,
     delete_vendor_flag,
+    establishment_flags,
+    establishment_warning,
     legal_profile_completeness,
     onboarding_checklist,
+    reopen_vendor,
     save_contract,
     save_requirement,
     save_vendor,
@@ -49,6 +58,16 @@ from .services import (
 )
 
 StatusAction = Callable[[admin.ModelAdmin[Vendor], HttpRequest, QuerySet[Vendor]], None]
+
+
+def warn_about_establishment(
+    modeladmin: admin.ModelAdmin[Vendor], request: HttpRequest, vendor: Vendor, changes: ChangeSet
+) -> None:
+    """Warn staff when a save or a reinstatement leaves `vendor` outside the allowed vendor
+    countries (CMP.13): staff decide, nobody is suspended automatically."""
+    for change in establishment_flags(changes):
+        warning = establishment_warning(change.after or {}, vendor.status)
+        modeladmin.message_user(request, f"{vendor}: {warning}", messages.WARNING)
 
 
 def status_action(target: VendorStatus) -> StatusAction:
@@ -61,11 +80,12 @@ def status_action(target: VendorStatus) -> StatusAction:
         moved = 0
         for vendor in queryset:
             try:
-                change_status(vendor, target, ctx=ctx)
+                changes = change_status(vendor, target, ctx=ctx)
             except engine.InvalidTransition as exc:
                 modeladmin.message_user(request, f"{vendor}: {exc}", messages.ERROR)
             else:
                 moved += 1
+                warn_about_establishment(modeladmin, request, vendor, changes)
         if moved:
             modeladmin.message_user(
                 request, f"{moved} vendor(s) moved to {target.label.lower()}.", messages.SUCCESS
@@ -89,6 +109,18 @@ class VendorTranslationInline(admin.StackedInline[VendorTranslation, Vendor]):
         "shipping_policy",
         "refund_policy",
         "cancellation_policy",
+    )
+
+
+REOPEN_TEMPLATE = "admin/vendors/vendor/reopen.html"
+
+
+class ReopenForm(forms.Form):
+    reason = forms.CharField(
+        label="Reason",
+        max_length=1000,
+        widget=forms.Textarea(attrs={"rows": 4}),
+        help_text="Required: why the closed vendor is reopened. It is kept in the audit log.",
     )
 
 
@@ -124,6 +156,8 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         "public_id",
         "audit_trail",
         "onboarding",
+        "onboarding_round",
+        "reopen",
         "missing_for_payout",
         "vies_status",
         "vies_checked_at",
@@ -132,7 +166,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
     )
     fieldsets = (
         (None, {"fields": ("display_name", "slug", "status", "public_id", "audit_trail")}),
-        ("Onboarding", {"fields": ("onboarding",)}),
+        ("Onboarding", {"fields": ("onboarding", "onboarding_round", "reopen")}),
         ("Payout readiness", {"fields": ("missing_for_payout",)}),
         (
             "Legal identity",
@@ -236,6 +270,71 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
             "<strong>{}</strong><ul>{}</ul>", summary, format_html_join("", "<li>{}</li>", lines)
         )
 
+    @admin.display(description="Reopen")
+    def reopen(self, obj: Vendor | None) -> SafeString | str:
+        """A closed vendor is reopened on its own page, with a reason (VEN.21)."""
+        if obj is None or obj.pk is None or obj.status != VendorStatus.CLOSED:
+            return "-"
+        return format_html(
+            '<a class="button" href="{}">Reopen this vendor</a>',
+            reverse("admin:vendors_vendor_reopen", args=[obj.pk]),
+        )
+
+    def get_urls(self) -> list[URLPattern]:
+        def reopen(request: HttpRequest, object_id: str) -> HttpResponse:
+            # A fresh second factor, like the other sensitive staff pages (CORE.4).
+            return step_up(lambda req: self.reopen_view(req, object_id))(request)
+
+        url = path(
+            "<path:object_id>/reopen/",
+            self.admin_site.admin_view(reopen),
+            name=f"{self.opts.app_label}_{self.opts.model_name}_reopen",
+        )
+        return [url, *super().get_urls()]
+
+    def reopen_view(self, request: HttpRequest, object_id: str) -> HttpResponse:
+        """Move a closed vendor back to onboarding (`reopen_vendor`), with a mandatory reason."""
+        obj = self.get_object(request, unquote(object_id))
+        if obj is None:
+            raise Http404("No such vendor.")
+        actor = cast(User, request.user)
+        if not self.has_change_permission(request, obj) or not can_reopen(actor):
+            raise PermissionDenied  # the service checks it too
+        change_url = reverse("admin:vendors_vendor_change", args=[obj.pk])
+        if obj.status != VendorStatus.CLOSED:
+            self.message_user(request, f"{obj} is not closed: nothing to reopen.", messages.WARNING)
+            return redirect(change_url)
+
+        form = ReopenForm(request.POST or None)
+        if request.method == "POST" and form.is_valid():
+            try:
+                reopen_vendor(
+                    obj,
+                    actor=actor,
+                    reason=form.cleaned_data["reason"],
+                    ctx=audit_context(request),
+                )
+            except engine.InvalidTransition as exc:
+                form.add_error(None, str(exc))
+            else:
+                self.message_user(
+                    request,
+                    f"{obj} was reopened and is onboarding: the owner must accept the contract "
+                    "in force again before activation.",
+                    messages.SUCCESS,
+                )
+                return redirect(change_url)
+
+        context = {
+            **self.admin_site.each_context(request),
+            "opts": self.opts,
+            "original": obj,
+            "title": f"Reopen {obj}",
+            "form": form,
+            "change_url": change_url,
+        }
+        return TemplateResponse(request, REOPEN_TEMPLATE, context)
+
     @admin.display(description="Audit trail")
     def audit_trail(self, obj: Vendor) -> SafeString | str:
         if obj.pk is None:
@@ -244,7 +343,8 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         return format_html('<a href="{}">Changes to this vendor</a>', url)
 
     def save_model(self, request: HttpRequest, obj: Vendor, form: Any, change: bool) -> None:
-        save_vendor(obj, ctx=audit_context(request))
+        changes = save_vendor(obj, ctx=audit_context(request))
+        warn_about_establishment(self, request, obj, changes)
 
     def delete_model(self, request: HttpRequest, obj: Vendor) -> None:
         delete_vendor(obj, ctx=audit_context(request))

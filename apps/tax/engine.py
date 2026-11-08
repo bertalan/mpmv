@@ -76,6 +76,28 @@ def profile_errors(
     return errors
 
 
+def profile_review_notes(regime: str, exempt_reason: str, *, fiscal_regime: str) -> dict[str, str]:
+    """What staff must check by hand about a VAT regime the rules cannot confirm (VEN.18).
+
+    Never blocks a save: `profile_errors` decides what is refused. A vendor declaring RF20
+    (cross-border VAT franchise, Directive (EU) 2020/285) is exempt only in the member states
+    that admitted it to the franchise, so no single VAT regime or exemption reason fits it.
+    Until the tax advisor gives that mapping, `profile_errors` refuses only the flat-rate
+    (forfettario) exemption for RF20, and every RF20 profile is flagged here for review.
+    """
+    del regime, exempt_reason  # the RF20 mapping is still open: every combination is flagged
+    if fiscal_regime == vendors.CROSS_BORDER_FRANCHISE_REGIME:
+        return {
+            "regime": (
+                f"The vendor declares fiscal regime {vendors.CROSS_BORDER_FRANCHISE_REGIME} "
+                "(cross-border VAT franchise, Directive (EU) 2020/285), which applies only in "
+                "the member states that admitted the vendor: check the VAT regime and the "
+                "exemption reason by hand."
+            )
+        }
+    return {}
+
+
 # --- Regime change workflow (TAX.2): a vendor owner requests, staff approve or reject
 
 PENDING: Final = "pending"
