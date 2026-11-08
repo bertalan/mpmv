@@ -65,7 +65,7 @@ def refusal(call: Callable[[], Any]) -> dict[str, list[str]]:
 def test_an_italian_vendor_saves_art74_publishing() -> None:
     vendor = italian_vendor()
     staff_profile(vendor, engine.ART74_PUBLISHING)
-    assert services.current_tax_profile(vendor).exempt_reason == engine.ART74_PUBLISHING
+    assert VendorTaxProfile.objects.get(vendor=vendor).exempt_reason == engine.ART74_PUBLISHING
 
 
 @pytest.mark.parametrize(
@@ -88,7 +88,7 @@ def test_other_without_the_country_of_its_law_is_refused() -> None:
 def test_other_stores_the_country_of_its_law() -> None:
     vendor = german_vendor()
     staff_profile(vendor, engine.OTHER_EXEMPTION, exempt_country="DE")
-    assert services.current_tax_profile(vendor).exempt_country == "DE"
+    assert VendorTaxProfile.objects.get(vendor=vendor).exempt_country == "DE"
 
 
 def test_other_from_the_law_of_another_country_is_refused() -> None:
@@ -144,7 +144,7 @@ def test_an_approved_other_request_carries_the_country_of_its_law() -> None:
         oss_registered_since=None,
     )
     services.approve_regime_change(request, reviewer(), ctx=CTX)
-    assert services.current_tax_profile(vendor).exempt_country == "DE"
+    assert VendorTaxProfile.objects.get(vendor=vendor).exempt_country == "DE"
 
 
 def test_a_request_for_other_without_a_country_is_refused() -> None:
