@@ -35,6 +35,13 @@ style, no third-party host.
   places); the provider, precision and confidence then come from the cache. Otherwise the form
   shows an error on "geo source". An unchanged geocoded point is kept even after its cache
   entry expired. Clearing both inputs clears the source and the metadata.
+- Choosing a candidate also writes its point to the hidden `picked_latitude` and
+  `picked_longitude` inputs, which later drags, clicks and typing leave alone. If the author
+  moves the point before saving (spec 15 "Confirmation"), the form checks that chosen point
+  against the cache the same way and stores the moved point with its own source (`map` or
+  `manual`) and the candidate's provider, precision, confidence and time. A chosen point that no
+  cached lookup returned adds no metadata. This is the same rule as moving the geocoded point of
+  a saved page, so pick, drag, save and pick, save, drag, save give the same metadata.
 
 ## Settings
 
@@ -88,7 +95,8 @@ remain. The own module is about 300 lines, runs the same code in the admin, the 
 - EVT.4: the vendor-area event form uses the same picker: render
   `events/admin/map_picker_panel.html` (or a vendor-area copy with the same data attributes)
   next to the form's inputs and add `map_assets()` to the page media. The "Find coordinates"
-  endpoint already admits vendor members. The EVT.13 done-when for a vendor ("a vendor sets a
-  point by click, by drag and by typing") is checked there.
+  endpoint already admits vendor members. Render the form's `picked_latitude` and
+  `picked_longitude` hidden inputs too. EVT.4's done-when checks the vendor half: a vendor sets
+  a point by click, by drag and by typing, and the saved values match.
 - EVT.14: set `MPMV_MAP_TILE_URL=/maps/tiles/{z}/{x}/{y}.png` once the proxy is live.
 - EVT.15: the public maps call `createMap` from the same module.

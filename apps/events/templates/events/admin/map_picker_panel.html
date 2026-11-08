@@ -6,6 +6,7 @@ and longitude inputs below are the way to set the point.
 <div class="mpmv-map-picker" data-map-picker
     {% for name, input_id in inputs.items %} data-{{ name }}-input="{{ input_id }}"{% endfor %}
     data-source-input="{{ source_input }}"
+    {% for name, input_id in picked_inputs.items %} data-{{ name }}-input="{{ input_id }}"{% endfor %}
     data-find-url="{{ find_url }}"
     data-language="{{ language }}"
     data-tile-url="{{ tile_url }}"

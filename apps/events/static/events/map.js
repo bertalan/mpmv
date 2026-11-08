@@ -99,6 +99,17 @@ export function initPicker(root) {
   const latitudeInput = input("latitude");
   const longitudeInput = input("longitude");
   const sourceInput = input("source");
+  // The chosen "Find coordinates" candidate's point, kept when the marker is moved afterwards:
+  // the server checks it against the cached lookup and keeps the candidate's metadata with the
+  // moved point (spec 15 "Confirmation").
+  const pickedLatitudeInput = input("pickedLatitude");
+  const pickedLongitudeInput = input("pickedLongitude");
+  const remember = (latitude, longitude) => {
+    if (pickedLatitudeInput && pickedLongitudeInput) {
+      pickedLatitudeInput.value = latitude === null ? "" : latitude.toFixed(PLACES);
+      pickedLongitudeInput.value = longitude === null ? "" : longitude.toFixed(PLACES);
+    }
+  };
   const canvas = root.querySelector("[data-map-canvas]");
   if (!latitudeInput || !longitudeInput || !canvas) {
     return null;
@@ -203,6 +214,7 @@ export function initPicker(root) {
       announce(data.msgTyped);
     } else if (latitudeInput.value.trim() === "" && longitudeInput.value.trim() === "") {
       unplace();
+      remember(null, null);
       if (sourceInput) {
         sourceInput.value = "";
       }
@@ -214,6 +226,7 @@ export function initPicker(root) {
   const choose = (latitude, longitude) => {
     place(latitude, longitude);
     map.setView([latitude, longitude], POINT_ZOOM, { animate: false });
+    remember(latitude, longitude);
     write(latitude, longitude, "geocoded");
     announce(data.msgChosen);
   };

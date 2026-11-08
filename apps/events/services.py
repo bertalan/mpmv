@@ -154,7 +154,9 @@ def may_create_events_in_admin(user: AbstractBaseUser | AnonymousUser) -> bool:
 @dataclass(frozen=True)
 class PickedPoint:
     """What to store for the point the map picker sent: its source and, for a newly confirmed
-    "Find coordinates" candidate, that candidate (its metadata comes from the cache)."""
+    "Find coordinates" candidate (as chosen, or moved after choosing it), that candidate (its
+    metadata comes from the cache). With a source other than "geocoded" the sent point is kept
+    and only the candidate's metadata is stored."""
 
     source: str
     candidate: GeocodeResult | None = None
@@ -167,6 +169,7 @@ def resolve_picked_point(
     longitude: Decimal | None,
     source: str,
     address: AddressQuery,
+    chosen: tuple[Decimal, Decimal] | None = None,
     now: dt.datetime | None = None,
 ) -> PickedPoint:
     """Check the point the picker (or a person typing) sent for `page`, before it is applied.
@@ -174,6 +177,11 @@ def resolve_picked_point(
     - No point: no source (the form then clears the geocoding metadata).
     - A point placed on the map or typed keeps its source; a point without one was typed (the
       inputs are the keyboard and no-JavaScript alternative).
+    - A "Find coordinates" candidate the author chose and then moved (`chosen`, the candidate's
+      own point): the moved point keeps its source and gets the candidate's metadata when a
+      cached lookup of the form's address has a candidate there (spec 15 "Confirmation": the
+      author may adjust the point before confirming). A `chosen` point no lookup returned adds
+      no metadata. The same rule as moving the geocoded point of a saved page.
     - A "geocoded" point must be a candidate of a cached lookup of the form's address: the
       request never sets a provider, a precision or a confidence. An unchanged geocoded point
       of the page stays as it is, even after its cache entry expired.
@@ -184,7 +192,10 @@ def resolve_picked_point(
     if latitude is None and longitude is None:
         return PickedPoint(EventPage.GeoSource.NONE)
     if source != EventPage.GeoSource.GEOCODED:
-        return PickedPoint(source or EventPage.GeoSource.MANUAL)
+        moved_from = None
+        if chosen is not None and latitude is not None and longitude is not None:
+            moved_from = geocoding.cached_candidate(address, chosen[0], chosen[1], now=now)
+        return PickedPoint(source or EventPage.GeoSource.MANUAL, moved_from)
     if latitude is None or longitude is None:
         return PickedPoint(source)
     unchanged = page.geo_source == EventPage.GeoSource.GEOCODED and (

@@ -283,3 +283,83 @@ def test_staff_saves_a_point_through_the_admin_and_the_values_match(client: Clie
     draft = EventPage.objects.get(pk=page.pk).get_latest_revision_as_object()
     assert (draft.latitude, draft.longitude) == (Decimal("45.464204"), Decimal("9.189982"))
     assert draft.geo_source == EventPage.GeoSource.MAP
+
+
+# --- A "Find coordinates" candidate adjusted on the map before saving (spec 15 "Confirmation")
+
+
+def _adjusted(page: EventPage, source: str = "map", **changes: str) -> dict[str, str]:
+    """The picker after choosing the cached candidate and then moving the marker."""
+    data: dict[str, str] = {
+        "latitude": "45.464300",
+        "longitude": "9.189600",
+        "geo_source": source,
+        "picked_latitude": str(CANDIDATE["latitude"]),
+        "picked_longitude": str(CANDIDATE["longitude"]),
+        **changes,
+    }
+    return _data(page, **data)
+
+
+def test_the_picker_renders_the_hidden_chosen_candidate_inputs(client: Client) -> None:
+    _staff(client)
+    html = client.get(_edit_url(_event())).content.decode()
+    assert 'data-picked-latitude-input="id_picked_latitude"' in html
+    assert 'data-picked-longitude-input="id_picked_longitude"' in html
+    for name in ("picked_latitude", "picked_longitude"):
+        assert html.count(f'type="hidden" name="{name}"') == 1, name
+
+
+@pytest.mark.parametrize("source", ["map", "manual"])
+def test_a_candidate_moved_before_saving_keeps_its_metadata(source: str) -> None:
+    """Pick, then drag (or type), then save: the adjusted point with the candidate's metadata."""
+    _cache_candidate()
+    page = _event()
+    saved = _saved(page, _adjusted(page, source))
+    assert (saved.latitude, saved.longitude) == (Decimal("45.464300"), Decimal("9.189600"))
+    assert saved.geo_source == source
+    assert saved.geo_provider == "photon"
+    assert saved.geo_precision == "rooftop"
+    assert saved.geo_confidence == 0.8
+    assert saved.geo_at is not None
+
+
+def test_a_crafted_chosen_candidate_adds_no_metadata() -> None:
+    """The chosen point is checked against the cache: the request cannot claim a provider."""
+    _cache_candidate()
+    page = _event()
+    data = _adjusted(page, picked_latitude="45.000000", picked_longitude="9.000000")
+    saved = _saved(page, data)
+    assert saved.geo_source == EventPage.GeoSource.MAP
+    assert (saved.geo_provider, saved.geo_precision) == ("", "")
+    assert saved.geo_at is None
+
+
+def test_a_chosen_candidate_of_another_address_adds_no_metadata() -> None:
+    _cache_candidate()
+    page = _event()
+    saved = _saved(page, _adjusted(page, city="Torino"))
+    assert saved.geo_source == EventPage.GeoSource.MAP
+    assert saved.geo_provider == ""
+    assert saved.geo_at is None
+
+
+def test_an_unreadable_chosen_candidate_is_ignored() -> None:
+    _cache_candidate()
+    page = _event()
+    saved = _saved(page, _adjusted(page, picked_latitude="north", picked_longitude=""))
+    assert (saved.latitude, saved.longitude) == (Decimal("45.464300"), Decimal("9.189600"))
+    assert saved.geo_provider == ""
+
+
+def test_staff_pick_move_and_save_through_the_admin(client: Client) -> None:
+    _cache_candidate()
+    _staff(client)
+    page = _event()
+    response = client.post(_edit_url(page), _adjusted(page))
+    assert response.status_code == 302, response.content.decode()[:2000]
+    draft = EventPage.objects.get(pk=page.pk).get_latest_revision_as_object()
+    assert (draft.latitude, draft.longitude) == (Decimal("45.464300"), Decimal("9.189600"))
+    assert draft.geo_source == EventPage.GeoSource.MAP
+    assert (draft.geo_provider, draft.geo_precision) == ("photon", "rooftop")
+    assert draft.geo_at is not None

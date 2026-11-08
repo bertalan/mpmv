@@ -27,6 +27,9 @@ from wagtail.admin.panels import (
 
 # The inputs of the event form the picker reads and writes (`data-<name>-input` on the picker).
 PICKER_INPUTS = ("latitude", "longitude", "street", "postcode", "city", "country")
+# The hidden inputs that keep the chosen "Find coordinates" candidate's point when the marker is
+# moved before saving (`data-picked-latitude-input`, `data-picked-longitude-input`).
+PICKED_INPUTS = ("picked_latitude", "picked_longitude")
 
 
 def map_assets() -> Media:
@@ -69,8 +72,12 @@ class MapPickerPanel(Panel):  # type: ignore[misc]  # Wagtail is untyped
             form = self.form
             inputs = {name: form[name].auto_id for name in PICKER_INPUTS if name in form.fields}
             locale = getattr(self.instance, "locale", None)
+            # The chosen candidate's point (EVT.13): hidden fields of the form, which Wagtail
+            # renders with the form's other hidden fields; the picker only needs their ids.
+            picked = [form[name] for name in PICKED_INPUTS if name in form.fields]
             context.update(
                 inputs=inputs,
+                picked_inputs={field.name.replace("_", "-"): field.auto_id for field in picked},
                 source_input=form["geo_source"].auto_id if "geo_source" in form.fields else "",
                 find_url=reverse("geocoding_find"),
                 language=getattr(locale, "language_code", ""),

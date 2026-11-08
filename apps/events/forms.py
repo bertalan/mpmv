@@ -13,13 +13,17 @@
 - **Point (EVT.13).** The map picker fills `latitude`, `longitude` and `geo_source`; the form
   never takes geocoding metadata from the request. A "Find coordinates" candidate is confirmed
   against the cached lookup of the address (`services.resolve_picked_point`) and its provider,
-  precision and confidence come from there; no point clears the metadata.
+  precision and confidence come from there; no point clears the metadata. A candidate the author
+  moves before saving keeps its metadata: the picker sends the chosen candidate's point in the
+  hidden `picked_latitude` and `picked_longitude` inputs, checked against the cache the same way.
 """
 
 import datetime as dt
 import zoneinfo
+from decimal import Decimal
 from typing import Any
 
+from django import forms
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils import timezone
@@ -27,7 +31,7 @@ from django.utils.translation import gettext_lazy as _
 from wagtail.admin.forms import WagtailAdminPageForm
 
 from apps.catalog.models import Product, ProductStatus
-from apps.core.geocoding import AddressQuery, GeocodeResult
+from apps.core.geocoding import AddressQuery, GeocodeResult, engine
 
 ADDRESS_QUERY_FIELDS = ("country", "postcode", "city", "street")
 
@@ -91,8 +95,23 @@ class EventPageForm(WagtailAdminPageForm):  # type: ignore[misc]  # Wagtail is u
         self._clean_point(cleaned)
         return cleaned
 
+    # The point of the "Find coordinates" candidate the author chose, kept by the picker when the
+    # marker is moved afterwards (EVT.13). Hidden (Wagtail renders the form's hidden fields). A
+    # hint only: it is checked against the cache and an unreadable value is ignored.
+    picked_latitude = forms.CharField(required=False, widget=forms.HiddenInput)
+    picked_longitude = forms.CharField(required=False, widget=forms.HiddenInput)
+
     _picked_candidate: GeocodeResult | None = None
     _clear_point = False
+
+    def _chosen_point(self, cleaned: dict[str, Any]) -> tuple[Decimal, Decimal] | None:
+        try:
+            return (
+                engine.coordinate(str(cleaned.get("picked_latitude") or "").strip()),
+                engine.coordinate(str(cleaned.get("picked_longitude") or "").strip(), limit=180),
+            )
+        except ValueError:
+            return None
 
     def _clean_point(self, cleaned: dict[str, Any]) -> None:
         # Imported here: the models module imports this form.
@@ -112,6 +131,7 @@ class EventPageForm(WagtailAdminPageForm):  # type: ignore[misc]  # Wagtail is u
                 longitude=cleaned.get("longitude"),
                 source=str(cleaned.get("geo_source") or ""),
                 address=address,
+                chosen=self._chosen_point(cleaned),
             )
         except ValidationError as error:
             self.add_error(None, error)
@@ -125,8 +145,14 @@ class EventPageForm(WagtailAdminPageForm):  # type: ignore[misc]  # Wagtail is u
         page = self.instance
         if self._clear_point:
             page.clear_point()
-        if self._picked_candidate is not None:
-            page.set_geocoded_point(self._picked_candidate, at=timezone.now())
+        candidate = self._picked_candidate
+        if candidate is not None:
+            latitude, longitude, source = page.latitude, page.longitude, page.geo_source
+            page.set_geocoded_point(candidate, at=timezone.now())
+            if source != page.GeoSource.GEOCODED:
+                # Chosen, then moved on the map or typed: the moved point keeps its source and
+                # the candidate's metadata (spec 15 "Confirmation").
+                page.set_point(latitude, longitude, source=source)
         return super().save(commit=commit)
 
     def _vendor_id(self, cleaned: dict[str, Any]) -> int | None:

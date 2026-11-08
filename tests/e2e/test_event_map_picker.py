@@ -1,12 +1,14 @@
 """E2E (EVT.13): staff set an event's point in the Wagtail admin map picker (spec 15 "Map picker").
 
 Done when: a staff user sets a point by click, by drag and by typing, and the saved values
-match; "Find coordinates" lists the candidates and a chosen one is stored with its provider;
+match; "Find coordinates" lists the candidates and a chosen one is stored with its provider, also
+when the marker is dragged after choosing it (spec 15 "Confirmation");
 the admin picker passes regression case 23: no CSP violation and no request to any host other
 than the site's own (no CDN script, no external tile host, no geocoding call from the browser).
 
 The tiles come from the same-origin path of the EVT.14 proxy, answered here by a route mock, so
-no test reaches the network. The vendor-area form (EVT.4) reuses `events/map.js` when it lands.
+no test reaches the network. The vendor-area form (EVT.4) reuses `events/map.js` when it lands;
+the vendor half of the check (click, drag, typing, saved values match) is in EVT.4's done-when.
 """
 
 import secrets
@@ -124,6 +126,19 @@ def _inputs(page: Page) -> tuple[str, str, str]:
     )
 
 
+def _drag(page: Page, canvas: Locator) -> None:
+    """Drag the marker 60 px right and 40 px down with the mouse."""
+    marker = canvas.locator(".leaflet-marker-icon")
+    canvas.scroll_into_view_if_needed()
+    box = marker.bounding_box()
+    assert box is not None
+    start_x, start_y = box["x"] + box["width"] / 2, box["y"] + box["height"] - 4
+    page.mouse.move(start_x, start_y)
+    page.mouse.down()
+    page.mouse.move(start_x + 60, start_y + 40, steps=8)
+    page.mouse.up()
+
+
 def _assert_site_only(seen: list[str], live_server: LiveServer, page: Page) -> None:
     own = urlsplit(live_server.url).netloc
     foreign = [url for url in seen if urlsplit(url).netloc not in ("", own)]
@@ -160,14 +175,7 @@ def test_staff_place_a_point_by_click_and_drag_and_the_saved_values_match(
     canvas = _open_editor(page, live_server, event)
     marker = canvas.locator(".leaflet-marker-icon")
     expect(marker).to_have_count(1)
-    canvas.scroll_into_view_if_needed()
-    box = marker.bounding_box()
-    assert box is not None
-    start_x, start_y = box["x"] + box["width"] / 2, box["y"] + box["height"] - 4
-    page.mouse.move(start_x, start_y)
-    page.mouse.down()
-    page.mouse.move(start_x + 60, start_y + 40, steps=8)
-    page.mouse.up()
+    _drag(page, canvas)
     dragged = _inputs(page)
     assert dragged[:2] != (latitude, longitude)
     assert dragged[2] == EventPage.GeoSource.MAP
@@ -218,6 +226,66 @@ def test_staff_pick_a_find_coordinates_candidate(
 ) -> None:
     """The lookup goes to our endpoint (answered from the cache), never to a provider."""
     page = staff_page
+    _cache_candidates()
+    event = _event()
+    canvas = _open_editor(page, live_server, event)
+
+    page.get_by_role("button", name="Find coordinates").click()
+    candidates = page.locator("[data-map-candidates]")
+    expect(candidates.get_by_role("button")).to_have_count(2)
+    shot("candidates")
+    candidates.get_by_role("button", name="Via Esempio 1, 20121 Milano").click()
+    expect(page.locator("#id_latitude")).to_have_value("45.464270")
+    expect(page.locator("#id_longitude")).to_have_value("9.189510")
+    expect(page.locator("#id_geo_source")).to_have_value(EventPage.GeoSource.GEOCODED)
+    expect(canvas.locator(".leaflet-marker-icon")).to_have_count(1)
+    _save_draft(page)
+    saved = _saved_point(event)
+    assert (saved.latitude, saved.longitude) == (Decimal("45.464270"), Decimal("9.189510"))
+    assert saved.geo_source == EventPage.GeoSource.GEOCODED
+    assert (saved.geo_provider, saved.geo_precision) == ("photon", "rooftop")
+
+    lookups = [url for url in requests_seen if "/geocoding/find/" in url]
+    assert len(lookups) == 1
+    _assert_site_only(requests_seen, live_server, page)
+
+
+def test_staff_pick_a_candidate_then_drag_it_before_saving(
+    staff_page: Page,
+    live_server: LiveServer,
+    requests_seen: list[str],
+    shot: Callable[[str], Path],
+) -> None:
+    """Spec 15 "Confirmation": the author may adjust the chosen point before confirming; the
+    moved point is stored with the candidate's provider and precision."""
+    page = staff_page
+    _cache_candidates()
+    event = _event()
+    canvas = _open_editor(page, live_server, event)
+
+    page.get_by_role("button", name="Find coordinates").click()
+    candidates = page.locator("[data-map-candidates]")
+    candidates.get_by_role("button", name="Via Esempio 1, 20121 Milano").click()
+    expect(page.locator("#id_geo_source")).to_have_value(EventPage.GeoSource.GEOCODED)
+    _drag(page, canvas)
+    moved = _inputs(page)
+    assert moved[:2] != ("45.464270", "9.189510")
+    assert moved[2] == EventPage.GeoSource.MAP
+    # The chosen candidate's point stays in the hidden inputs through the drag.
+    expect(page.locator("#id_picked_latitude")).to_have_value("45.464270")
+    expect(page.locator("#id_picked_longitude")).to_have_value("9.189510")
+    shot("picked-then-dragged")
+    _save_draft(page)
+    saved = _saved_point(event)
+    assert (saved.latitude, saved.longitude) == (Decimal(moved[0]), Decimal(moved[1]))
+    assert saved.geo_source == EventPage.GeoSource.MAP
+    assert (saved.geo_provider, saved.geo_precision) == ("photon", "rooftop")
+    assert saved.geo_at is not None
+
+    _assert_site_only(requests_seen, live_server, page)
+
+
+def _cache_candidates() -> None:
     GeocodeCacheEntryFactory.create(
         key=engine.cache_key(ADDRESS),
         language="en",
@@ -242,24 +310,3 @@ def test_staff_pick_a_find_coordinates_candidate(
             },
         ],
     )
-    event = _event()
-    canvas = _open_editor(page, live_server, event)
-
-    page.get_by_role("button", name="Find coordinates").click()
-    candidates = page.locator("[data-map-candidates]")
-    expect(candidates.get_by_role("button")).to_have_count(2)
-    shot("candidates")
-    candidates.get_by_role("button", name="Via Esempio 1, 20121 Milano").click()
-    expect(page.locator("#id_latitude")).to_have_value("45.464270")
-    expect(page.locator("#id_longitude")).to_have_value("9.189510")
-    expect(page.locator("#id_geo_source")).to_have_value(EventPage.GeoSource.GEOCODED)
-    expect(canvas.locator(".leaflet-marker-icon")).to_have_count(1)
-    _save_draft(page)
-    saved = _saved_point(event)
-    assert (saved.latitude, saved.longitude) == (Decimal("45.464270"), Decimal("9.189510"))
-    assert saved.geo_source == EventPage.GeoSource.GEOCODED
-    assert (saved.geo_provider, saved.geo_precision) == ("photon", "rooftop")
-
-    lookups = [url for url in requests_seen if "/geocoding/find/" in url]
-    assert len(lookups) == 1
-    _assert_site_only(requests_seen, live_server, page)
