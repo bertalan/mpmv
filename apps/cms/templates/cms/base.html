@@ -6,6 +6,7 @@
   <title>{% block title %}{% firstof page.seo_title page.title %} · {{ current_site.site_name }}{% endblock %}</title>
   {% if page.search_description %}<meta name="description" content="{{ page.search_description }}">{% endif %}
   <link rel="stylesheet" href="{% static 'cms/site.css' %}">
+  {% if page %}{% faq_jsonld page %}{% endif %}
   {% block head %}{% endblock %}
 </head>
 <body>

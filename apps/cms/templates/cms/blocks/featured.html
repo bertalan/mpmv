@@ -1,0 +1,13 @@
+{% if cards %}
+<section class="block block-featured">
+  {% if value.heading %}<h2>{{ value.heading }}</h2>{% endif %}
+  <ul class="cards">
+    {% for card in cards %}
+      <li class="card">
+        <a href="{{ card.href }}">{{ card.label }}</a>
+        {% if card.text %}<p>{{ card.text|linebreaksbr }}</p>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}

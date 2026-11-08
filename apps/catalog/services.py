@@ -160,6 +160,9 @@ def set_variant_price(
 ) -> ChangeSet:
     """Set or clear (None) the net price override of `variant`; audited like product prices."""
     prices = {"price_net_override": _price("price_net_override", price_net_override, optional=True)}
+    zero = engine.override_error(prices["price_net_override"])
+    if zero is not None:
+        raise ValidationError({"price_net_override": zero})
     with transaction.atomic():
         current = (
             Variant.objects.select_for_update(of=("self",))
@@ -699,17 +702,82 @@ def duplicate_product_to_vendor(
                 },
             )
 
+        vendor_key = str(vendor.public_id)
+        copy_key = str(copy.public_id)
+        copied_texts = [_copy(t, product_id=None, slug="") for t in original.translations.all()]
+        for new_text in copied_texts:  # new slugs, unique against every other product's (CAT.5)
+            new_text.slug = slugs.unique_product_slug(
+                new_text.title,
+                new_text.language,
+                taken=_SlugsOfOtherProducts(new_text.language, None),
+            )
+            changes.create(
+                "catalog.producttranslation",
+                str(new_text.public_id),
+                {
+                    "vendor": vendor_key,
+                    "product": copy_key,
+                    "language": new_text.language,
+                    "title": new_text.title,
+                    "slug": new_text.slug,
+                },
+            )
+        attribute_rows = list(
+            original.attributes.select_related("attribute").prefetch_related("values")
+        )
+        attribute_copies = [_copy(row, product_id=None) for row in attribute_rows]
+        for row, row_copy in zip(attribute_rows, attribute_copies, strict=True):
+            changes.create(
+                "catalog.productattribute",
+                str(row_copy.public_id),
+                {
+                    "vendor": vendor_key,
+                    "product": copy_key,
+                    "attribute": row.attribute.code,
+                    "values": sorted(v.value for v in row.values.all()),
+                    "numeric_value": row_copy.numeric_value,
+                    "text_value": row_copy.text_value,
+                    "is_variant_axis": row_copy.is_variant_axis,
+                    "position": row_copy.position,
+                },
+            )
+        option_copies: list[list[VariantOption]] = []
+        for variant, variant_copy in zip(variants, copies, strict=True):
+            options = list(variant.variant_options.select_related("attribute", "value"))
+            option_copies.append([_copy(option, variant_id=None) for option in options])
+            for option in options:
+                changes.create(
+                    "catalog.variantoption",
+                    f"{variant_copy.public_id}:{option.attribute.code}",
+                    {
+                        "vendor": vendor_key,
+                        "variant": str(variant_copy.public_id),
+                        "attribute": option.attribute.code,
+                        "value": option.value.value,
+                    },
+                )
+
         def apply() -> None:
             copy.save()
             copy.secondary_categories.set(original.secondary_categories.all())
             copy.terms.set(original.terms.all())
-            for translation in original.translations.all():
-                _copy(translation, product_id=copy.pk, slug="").save()
-            for variant, variant_copy in zip(variants, copies, strict=True):
+            for new_text in copied_texts:
+                new_text.product = copy
+                new_text.save()
+            for row, row_copy in zip(attribute_rows, attribute_copies, strict=True):
+                row_copy.product = copy
+                row_copy.save()
+                row_copy.values.set(row.values.all())
+            for variant, variant_copy, new_options in zip(
+                variants, copies, option_copies, strict=True
+            ):
                 variant_copy.product = copy
                 variant_copy.save()
                 for text in variant.translations.all():
                     _copy(text, variant_id=variant_copy.pk).save()
+                for option in new_options:
+                    option.variant = variant_copy
+                VariantOption.objects.bulk_create(new_options)
 
         return run_mutation(changes, apply, ctx=ctx, action=PRODUCT_DUPLICATED, dry_run=dry_run)
 
@@ -800,7 +868,10 @@ def _product_errors(
     ):
         _add_error(errors, NON_FIELD_ERRORS, message)
     for variant in data.variants:
-        _amount(errors, "variants", variant.price_net_override)
+        override = _amount(errors, "variants", variant.price_net_override)
+        zero = engine.override_error(override)
+        if zero is not None:
+            _add_error(errors, "variants", f"{variant.sku}: {zero}")
         weight_error = engine.weight_error(variant.weight_kg_override)
         if weight_error is not None:
             _add_error(errors, "variants", f"{variant.sku}: the weight override {weight_error}")
@@ -911,6 +982,10 @@ def create_product(
         )
         for text in data.translations
     ]
+    for text in texts:  # the slug is derived now, so the ChangeSet and the row agree (CAT.5)
+        text.slug = slugs.unique_product_slug(
+            text.title, text.language, taken=_SlugsOfOtherProducts(text.language, None)
+        )
     for text in texts:
         changes.create(
             "catalog.producttranslation",
@@ -920,6 +995,7 @@ def create_product(
                 "product": product_key,
                 "language": text.language,
                 "title": text.title,
+                "slug": text.slug,
             },
         )
 
@@ -1092,9 +1168,9 @@ class _SlugsOfOtherProducts:
     """The current and old slugs of the other products in one language, asked one at a time:
     collisions are rare, so a few lookups beat loading every slug of the catalog."""
 
-    def __init__(self, language: str, product_id: int) -> None:
+    def __init__(self, language: str, product_id: int | None) -> None:
         self.language = language
-        self.product_id = product_id
+        self.product_id = -1 if product_id is None else product_id  # -1: not saved yet
 
     def __contains__(self, slug: object) -> bool:
         return (

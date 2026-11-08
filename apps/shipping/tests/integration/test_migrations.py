@@ -86,3 +86,59 @@ def test_country_group_codes_stored_in_capitals_are_lower_cased() -> None:
 
     assert CountryGroup.objects.filter(code="dach").exists()
     assert not CountryGroup.objects.filter(code="DACH").exists()
+
+
+BEFORE_QUALIFIED = [("shipping", "0007_shipping_template")]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_migration_refuses_unqualified_entries_in_multi_country_zones() -> None:
+    executor = MigrationExecutor(connection)
+    executor.migrate(BEFORE_QUALIFIED)
+    old_apps = executor.loader.project_state(BEFORE_QUALIFIED).apps
+    OldZone = old_apps.get_model("shipping", "ShippingZone")
+    OldZone.objects.create(
+        code="remote-islands",
+        name="Remote islands",
+        priority=10,
+        countries=["GR", "PT"],
+        postcode_patterns=["84*"],
+    )
+    OldZone.objects.create(
+        code="fine", name="Fine", priority=10, countries=["GR"], postcode_patterns=["84*"]
+    )
+    OldZone.objects.create(
+        code="everywhere", name="Everywhere", priority=999, countries=["*"], states=["SS"]
+    )
+
+    executor.loader.build_graph()
+    with pytest.raises(RuntimeError) as excinfo:
+        executor.migrate(executor.loader.graph.leaf_nodes())
+
+    message = str(excinfo.value)
+    assert "remote-islands" in message
+    assert "everywhere" in message
+    assert "fine" not in message
+    # Nothing was rewritten.
+    assert OldZone.objects.get(code="remote-islands").postcode_patterns == ["84*"]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_migration_keeps_zones_that_are_already_valid() -> None:
+    executor = MigrationExecutor(connection)
+    executor.migrate(BEFORE_QUALIFIED)
+    old_apps = executor.loader.project_state(BEFORE_QUALIFIED).apps
+    OldZone = old_apps.get_model("shipping", "ShippingZone")
+    OldZone.objects.create(
+        code="fine", name="Fine", priority=10, countries=["GR"], postcode_patterns=["84*"]
+    )
+    OldZone.objects.create(
+        code="qualified",
+        name="Qualified",
+        priority=10,
+        countries=["GR", "PT"],
+        postcode_patterns=["GR:84*", "PT:9000..9999"],
+    )
+    executor.loader.build_graph()
+    executor.migrate(executor.loader.graph.leaf_nodes())
+    assert ShippingZone.objects.count() == 2

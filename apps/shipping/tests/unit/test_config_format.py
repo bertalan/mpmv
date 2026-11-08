@@ -235,3 +235,24 @@ def test_an_empty_document_is_valid() -> None:
     parsed = fmt.parse_json(fmt.empty_document())
     assert parsed.ok
     assert parsed.rows == []
+
+
+# --- Hostile files are reported, never a traceback (SHP audit chunk 5, m2)
+
+
+def test_a_deeply_nested_json_file_is_a_file_level_issue() -> None:
+    parsed = fmt.parse_json("[" * 100_000 + "]" * 100_000)
+    assert not parsed.ok
+    assert parsed.issues[0].ref == fmt.FILE
+
+
+def test_a_csv_cell_over_the_csv_field_limit_is_a_file_level_issue() -> None:
+    parsed = fmt.parse_csv("record,code\n" + "x" * 200_000 + ",y\n")
+    assert not parsed.ok
+    assert parsed.issues[0].ref == fmt.FILE
+
+
+def test_a_file_over_the_size_cap_is_refused_before_parsing() -> None:
+    big = " " * (fmt.MAX_FILE_BYTES + 1)
+    assert not fmt.parse_json(big).ok
+    assert not fmt.parse_csv(big).ok

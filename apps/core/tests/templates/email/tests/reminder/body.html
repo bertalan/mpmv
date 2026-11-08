@@ -1,0 +1,7 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate %}Please complete {{ item }} by {{ due }}.{% endblocktranslate %}</p>
+<p><a href="{{ action_url }}">{% translate "Open the checklist" %}</a></p>
+</body>
+</html>
