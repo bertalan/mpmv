@@ -6,6 +6,10 @@ uses the same functions through `apps.api.v1.security.ApiKey`.
 
 The client IP comes from `apps.core.http.client_ip`: the trusted reverse proxy's header, or
 `REMOTE_ADDR` (CORE.5).
+
+Once the key is accepted, the call is counted against the key's rate limit (CORE.12,
+`services.count_api_call`); over the limit the answer is a 429 problem with `Retry-After`.
+Refused keys (401/403) are not counted: they never reach an operation.
 """
 
 import functools
@@ -16,11 +20,11 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 
 from apps.core.http import client_ip
 
-from .engine import bearer_challenge, is_write
+from .engine import RateDecision, bearer_challenge, is_write
 from .models import ApiClient
-from .problems import auth_problem
+from .problems import auth_problem, rate_limit_problem
 from .responses import problem_response
-from .services import AuthResult, authenticate
+from .services import AuthResult, authenticate, count_api_call
 
 REALM = "api"
 _REQUEST_ATTR = "api_client"
@@ -43,6 +47,17 @@ def denial_response(
     challenge = bearer_challenge(result.decision, required_scope, realm=REALM)
     headers = {"WWW-Authenticate": challenge} if challenge else {}
     return problem_response(request, auth_problem(result.decision, required_scope), headers)
+
+
+def rate_limit(client: ApiClient, required_scope: str | None) -> RateDecision:
+    """Count the call of an accepted key against its rate limit (CORE.12)."""
+    return count_api_call(client, required_scope)
+
+
+def rate_limited_response(request: HttpRequest, decision: RateDecision) -> JsonResponse:
+    """429 as an RFC 9457 problem, with `Retry-After` in seconds (RFC 9110 §10.2.3)."""
+    headers = {"Retry-After": str(decision.retry_after)}
+    return problem_response(request, rate_limit_problem(), headers)
 
 
 def remember_client(request: HttpRequest, client: ApiClient | None) -> None:
@@ -70,7 +85,7 @@ def require_api_key[**P](
     [Callable[Concatenate[HttpRequest, P], HttpResponse]],
     Callable[Concatenate[HttpRequest, P], HttpResponse],
 ]:
-    """Protect a Django view: valid key with `scope`, else 401/403."""
+    """Protect a Django view: valid key with `scope`, else 401/403; 429 over the rate limit."""
 
     def decorator(
         view: Callable[Concatenate[HttpRequest, P], HttpResponse],
@@ -81,6 +96,9 @@ def require_api_key[**P](
             if not result.ok:
                 return denial_response(request, result, scope)
             remember_client(request, result.client)
+            limited = rate_limit(api_client_of(request), scope)
+            if not limited.allowed:
+                return rate_limited_response(request, limited)
             return view(request, *args, **kwargs)
 
         return wrapped
