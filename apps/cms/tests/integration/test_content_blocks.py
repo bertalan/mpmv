@@ -94,8 +94,9 @@ def test_the_home_page_renders_its_blocks_in_order(client: Client, home: HomePag
     response = client.get("/")
     assert response.status_code == 200
     html = response.content.decode()
+    main = html[html.index("<main") :]  # the FAQPage data in <head> repeats the questions
     positions = [
-        html.index(text)
+        main.index(text)
         for text in (
             "Handmade goods",
             "Welcome to the shop.",

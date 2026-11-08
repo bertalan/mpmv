@@ -1,6 +1,6 @@
 """CMS services: locales from settings, the editors' MFA policy, seed pages and menus (CMS.1);
 page translation with wagtail-localize (I18N.3); legal page versions and the link to the vendor
-application (CMS.5).
+application (CMS.5); the page's image credits (CMS.8).
 
 Pages and menus are edited in the Wagtail admin, which keeps their revisions and its own log of
 every edit, so they are not audited here: `seed_site` only adds sample content where it is
@@ -23,6 +23,9 @@ from django.db import DEFAULT_DB_ALIAS, transaction
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.text import slugify
+from wagtail import blocks
+from wagtail.fields import StreamField
+from wagtail.images.blocks import ImageChooserBlock
 from wagtail.models import Locale, Page, Site
 from wagtail_localize.models import (
     OverridableSegment,
@@ -35,6 +38,7 @@ from wagtail_localize.operations import TranslationCreator
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.i18n import configured_languages
+from apps.core.image_licences import Credit
 from apps.core.services import run_mutation
 
 from . import engine
@@ -413,3 +417,61 @@ def vendor_application_url(urlconf: str | None = None) -> str | None:
         return reverse(APPLICATION_URL_NAME, urlconf=urlconf)
     except NoReverseMatch:
         return None
+
+
+# --- Image credits disclosure (CMS.8, spec 10 §10.2)
+
+# A block whose Meta sets `credit_in_disclosure = True` (CMS.2's hero, banners) shows its
+# images without a caption area: they are credited in the page's "Image credits" disclosure.
+DISCLOSURE_META = "credit_in_disclosure"
+# A page type lists its own image fields shown without a caption area (a hero image field).
+DISCLOSURE_FIELDS = "credit_disclosure_image_fields"
+
+
+def _images_in(block: Any, value: Any, credited_here: bool) -> Iterable[Any]:
+    credited_here = credited_here or bool(getattr(block.meta, DISCLOSURE_META, False))
+    if value is None:
+        return
+    if isinstance(block, ImageChooserBlock):
+        if credited_here:
+            yield value
+    elif isinstance(block, blocks.StructBlock):
+        for name, child in block.child_blocks.items():
+            yield from _images_in(child, value.get(name), credited_here)
+    elif isinstance(block, blocks.ListBlock):
+        for item in value:
+            yield from _images_in(block.child_block, item, credited_here)
+    elif isinstance(block, blocks.StreamBlock):
+        for child in value:
+            yield from _images_in(child.block, child.value, credited_here)
+
+
+def disclosure_images_in_stream(stream: Iterable[Any]) -> Iterable[Any]:
+    """The images of a StreamField value that are credited in the disclosure, in page order."""
+    for child in stream:
+        yield from _images_in(child.block, child.value, credited_here=False)
+
+
+def page_image_credits(page: Page) -> list[Credit]:
+    """The credits of the page's images shown without a caption area, once per image.
+
+    Only images whose licence requires attribution have one; captioned images are credited
+    in their `<figcaption>` instead.
+    """
+    # An unsaved preview (CMS.5) is already its specific class and has no content type yet.
+    if type(page) is Page:
+        page = page.specific
+    images: list[Any] = [getattr(page, name, None) for name in getattr(page, DISCLOSURE_FIELDS, ())]
+    for model_field in page._meta.get_fields():
+        if isinstance(model_field, StreamField):
+            images.extend(disclosure_images_in_stream(getattr(page, model_field.name)))
+    credits: list[Credit] = []
+    seen: set[int] = set()
+    for image in images:
+        if image is None or image.pk in seen:
+            continue
+        seen.add(image.pk)
+        credit = image.credit
+        if credit is not None:
+            credits.append(credit)
+    return credits

@@ -5,23 +5,38 @@ into an overridable segment: alt texts and captions are translated (the EN text 
 translation is published) and a translator can replace an image in one locale only. A gallery
 also applies the D-18 replacement rule (`engine.gallery_for_language`).
 
-CMS.2 adds the hero, the call to action and the FAQ. Their templates are minimal, semantic and
-CSP-safe (no inline script or style); the `base` theme restyles them (THM.3, THM.4). A link
-points to a page of the site, followed into the reader's language, or to an external URL.
+CMS.2 adds the hero, the call to action, the FAQ and the "featured links" cards. Their templates
+are minimal, semantic and CSP-safe (no inline script or style); the `base` theme restyles them
+(THM.3, THM.4). A link points to a live page of the site, followed into the reader's language,
+or to an external URL. The FAQs of a page give one FAQPage (`cms_tags.faq_jsonld`).
+
+Cards (part 2/2) point to a page, a catalog taxonomy term or a vendor storefront, chosen in the
+admin (`choosers`), never typed. A card whose target is not public is left out: a page that is
+not live, a term (or its taxonomy or parent terms) without published texts, a vendor that is not
+active. Term and storefront URLs follow spec 03 (`engine.term_path`, `engine.storefront_path`).
 """
 
-from typing import Any
+from collections import defaultdict
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
+from typing import Any, ClassVar
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.utils.safestring import mark_safe
 from django.utils.translation import get_language
 from django.utils.translation import gettext_lazy as _
 from wagtail import blocks
 from wagtail.blocks import StructBlockValidationError
 from wagtail.images.blocks import ImageChooserBlock
+from wagtail.models import Page
 
-from .engine import NEUTRAL, faq_page_jsonld, gallery_for_language, jsonld_text
+from apps.catalog.models import TaxonomyTranslation, Term, TermTranslation
+from apps.core import translations
+from apps.vendors.models import Vendor, VendorTranslation
+from apps.vendors.services import has_public_storefront
+
+from .choosers import term_chooser, vendor_chooser
+from .engine import NEUTRAL, gallery_for_language, link_language, storefront_path, term_path
 
 # Editors may use headings, emphasis, lists and links; no raw HTML, images or embeds yet.
 RICH_TEXT_FEATURES = ["h2", "h3", "bold", "italic", "ol", "ul", "link"]
@@ -69,18 +84,30 @@ class GalleryBlock(blocks.StructBlock):  # type: ignore[misc]
 
     def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
         context = super().get_context(value, parent_context=parent_context)
-        page = (parent_context or {}).get("page")
-        language = page.locale.language_code if page is not None else get_language()
-        context["images"] = gallery_for_language(value["images"], language)
+        context["images"] = gallery_for_language(value["images"], _page_language(parent_context))
         return context
+
+
+def live_page(page: Page | None) -> Page | None:
+    """`page` in the active language when that translation is live, else `page` itself when it
+    is live, else None: a link to a draft, unpublished or expired page is dropped."""
+    if page is None:
+        return None
+    target: Page = page.specific.localized
+    return target if target.live else None
+
+
+def _page_language(parent_context: dict[str, Any] | None) -> str:
+    page = (parent_context or {}).get("page")
+    return str(page.locale.language_code if page is not None else get_language())
 
 
 class LinkValue(blocks.StructValue):  # type: ignore[misc]
     def href(self) -> str:
-        """The page in the active language when it has a translation, otherwise the URL."""
-        page = self.get("page")
-        if page is not None:
-            url: str | None = page.specific.localized.url
+        """The live page in the active language (or its source), or the URL; "" for no link."""
+        if self.get("page") is not None:
+            page = live_page(self.get("page"))
+            url: str | None = page.url if page is not None else None
             return url or ""
         return str(self.get("url") or "")
 
@@ -123,6 +150,8 @@ class HeroBlock(blocks.StructBlock):  # type: ignore[misc]
         icon = "pick"
         label = _("Hero")
         template = "cms/blocks/hero.html"
+        # No caption area: a credited image goes to the page's "Image credits" (CMS.8).
+        credit_in_disclosure = True
 
     def clean(self, value: blocks.StructValue) -> blocks.StructValue:
         value = super().clean(value)
@@ -156,7 +185,8 @@ class FaqItemBlock(blocks.StructBlock):  # type: ignore[misc]
 
 
 class FaqBlock(blocks.StructBlock):  # type: ignore[misc]
-    """Questions shown as disclosures (`<details>`), with FAQPage structured data (spec 10)."""
+    """Questions shown as disclosures (`<details>`). The page template emits one FAQPage for all
+    the FAQ blocks of the page (`cms_tags.faq_jsonld`, spec 10)."""
 
     heading = blocks.CharBlock(required=False, max_length=120)
     items = blocks.ListBlock(FaqItemBlock(), min_num=1, label=_("Questions"))
@@ -166,9 +196,249 @@ class FaqBlock(blocks.StructBlock):  # type: ignore[misc]
         label = _("FAQ")
         template = "cms/blocks/faq.html"
 
+
+# --- Cards (part 2/2)
+#
+# The targets of all the cards of a block are resolved in bulk (`_card_targets`): a constant
+# number of queries however many cards a page shows (#117 review).
+
+
+@dataclass(frozen=True)
+class Card:
+    label: str
+    href: str
+    text: str
+
+
+@dataclass(frozen=True)
+class _Target:
+    """What a card shows by default: its target's name, URL and text in the reader's language."""
+
+    name: str
+    href: str
+    text: str = ""
+
+
+class _CardValue(blocks.StructValue):  # type: ignore[misc]
+    target_kind: ClassVar[str]
+
+    def target(self) -> Any:
+        return self.get(self.target_kind)
+
+    def card(self, targets: Mapping[tuple[str, int], _Target]) -> Card | None:
+        """The card, or None when its target is not public (not in `targets`)."""
+        chosen = self.target()
+        target = None if chosen is None else targets.get((self.target_kind, chosen.pk))
+        if target is None:
+            return None
+        return Card(self.get("label") or target.name, target.href, self.get("text") or target.text)
+
+
+class PageCardValue(_CardValue):
+    target_kind = "page"
+
+
+class TermCardValue(_CardValue):
+    target_kind = "term"
+
+
+class VendorCardValue(_CardValue):
+    target_kind = "vendor"
+
+
+def _page_targets(pages: list[Page], language: str, request: Any) -> dict[int, _Target]:
+    """Each page in `language` when that translation is live, else itself when it is live (the
+    `live_page` rule): one query for all the translations."""
+    keys = {page.translation_key for page in pages}
+    translated = {
+        page.translation_key: page
+        for page in Page.objects.filter(
+            translation_key__in=keys, locale__language_code=language, live=True
+        )
+    }
+    targets: dict[int, _Target] = {}
+    for page in pages:
+        shown: Page | None = translated.get(page.translation_key) or (page if page.live else None)
+        url = shown.get_url(request) if shown is not None else None
+        if shown is not None and url:
+            targets[page.pk] = _Target(shown.title, url)
+    return targets
+
+
+def _published_by_owner(rows: Iterable[Any], owner: str) -> dict[int, dict[str, Any]]:
+    """Published translation rows grouped by their owner's id, then by language."""
+    grouped: dict[int, dict[str, Any]] = defaultdict(dict)
+    for row in rows:
+        grouped[getattr(row, owner)][row.language] = row
+    return grouped
+
+
+def _term_targets(terms: list[Term], language: str) -> dict[int, _Target]:
+    """Each term's name and listing URL in `language`, or in the primary language when the term,
+    its taxonomy or a parent term is not published in `language` (spec 09 fallback). Three
+    queries: the parent terms, the term texts and the taxonomy texts."""
+    primary = translations.source_language()
+    published = {"status": translations.PUBLISHED, "language__in": {language, primary}}
+
+    def ancestor_paths(term: Term) -> list[str]:
+        return [term.path[:end] for end in range(term.steplen, len(term.path), term.steplen)]
+
+    paths = {path for term in terms for path in ancestor_paths(term)}
+    nodes = {node.path: node for node in Term.objects.filter(path__in=paths)}
+    nodes.update((term.path, term) for term in terms)
+    term_texts = _published_by_owner(
+        TermTranslation.objects.filter(term_id__in={n.pk for n in nodes.values()}, **published),
+        "term_id",
+    )
+    taxonomy_texts = _published_by_owner(
+        TaxonomyTranslation.objects.filter(
+            taxonomy_id__in={term.taxonomy_id for term in terms}, **published
+        ),
+        "taxonomy_id",
+    )
+    targets: dict[int, _Target] = {}
+    for term in terms:
+        found = [nodes.get(path) for path in ancestor_paths(term)]
+        chain = [node for node in found if node is not None]
+        if len(chain) != len(found):
+            continue
+        texts = [
+            taxonomy_texts.get(term.taxonomy_id, {}),
+            *(term_texts.get(node.pk, {}) for node in (*chain, term)),
+        ]
+        chosen = link_language(language, primary, texts)
+        if chosen is None:
+            continue
+        taxonomy, *slugs = (by_language[chosen] for by_language in texts)
+        href = term_path(taxonomy.slug, [text.slug for text in slugs], chosen, primary)
+        targets[term.pk] = _Target(slugs[-1].name, href)
+    return targets
+
+
+def _vendor_targets(vendors: list[Vendor], language: str) -> dict[int, _Target]:
+    """Each active vendor's storefront URL and tagline: one query for all the taglines."""
+    public = [vendor for vendor in vendors if has_public_storefront(vendor)]
+    primary = translations.source_language()
+    texts = _published_by_owner(
+        VendorTranslation.objects.filter(
+            vendor_id__in={vendor.pk for vendor in public},
+            status=translations.PUBLISHED,
+            language__in={language, primary},
+        ),
+        "vendor_id",
+    )
+    targets: dict[int, _Target] = {}
+    for vendor in public:
+        shown = translations.resolve(texts.get(vendor.pk, {}).values(), language).translation
+        href = storefront_path(vendor.slug, language, primary)
+        targets[vendor.pk] = _Target(
+            vendor.display_name, href, shown.tagline if shown is not None else ""
+        )
+    return targets
+
+
+def _card_targets(
+    values: Iterable[_CardValue], language: str, request: Any
+) -> dict[tuple[str, int], _Target]:
+    """The public targets of `values`, keyed by (kind, id); a target that is not public is
+    missing."""
+    chosen: dict[str, list[Any]] = defaultdict(list)
+    for value in values:
+        if value.target() is not None:
+            chosen[value.target_kind].append(value.target())
+    resolved = {
+        "page": _page_targets(chosen["page"], language, request) if chosen["page"] else {},
+        "term": _term_targets(chosen["term"], language) if chosen["term"] else {},
+        "vendor": _vendor_targets(chosen["vendor"], language) if chosen["vendor"] else {},
+    }
+    return {
+        (kind, pk): target for kind, targets in resolved.items() for pk, target in targets.items()
+    }
+
+
+class TermChooserBlock(term_chooser.get_block_class("_TermChooserBlock", __name__)):  # type: ignore[misc]
+    """A catalog taxonomy term, chosen in the term chooser modal."""
+
+
+class VendorChooserBlock(vendor_chooser.get_block_class("_VendorChooserBlock", __name__)):  # type: ignore[misc]
+    """A vendor with a public storefront, chosen in the vendor chooser modal."""
+
+    def clean(self, value: Vendor | None) -> Vendor | None:
+        value = super().clean(value)
+        if value is not None and not has_public_storefront(value):
+            raise ValidationError(_("Choose an active vendor."))
+        return value
+
+
+def _card_label() -> blocks.CharBlock:
+    return blocks.CharBlock(
+        required=False, max_length=100, help_text=_("Leave empty to use its name.")
+    )
+
+
+def _card_text() -> blocks.TextBlock:
+    return blocks.TextBlock(required=False, max_length=250)
+
+
+class PageCardBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A card to a page of the site, in the reader's language."""
+
+    page = blocks.PageChooserBlock()
+    label = _card_label()
+    text = _card_text()
+
+    class Meta:
+        icon = "doc-empty"
+        label = _("Page")
+        value_class = PageCardValue
+
+
+class TermCardBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A card to a catalog term's listing (spec 03), with its name in the reader's language."""
+
+    term = TermChooserBlock()
+    label = _card_label()
+    text = _card_text()
+
+    class Meta:
+        icon = "tag"
+        label = _("Term")
+        value_class = TermCardValue
+
+
+class VendorCardBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A card to an active vendor's storefront, with its tagline."""
+
+    vendor = VendorChooserBlock()
+    label = _card_label()
+    text = _card_text()
+
+    class Meta:
+        icon = "group"
+        label = _("Vendor")
+        value_class = VendorCardValue
+
+
+class FeaturedLinksBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A heading and cards to pages, terms and vendors; left out when no card is public."""
+
+    heading = blocks.CharBlock(required=False, max_length=120)
+    cards = blocks.StreamBlock(
+        [("page", PageCardBlock()), ("term", TermCardBlock()), ("vendor", VendorCardBlock())],
+        min_num=1,
+        label=_("Cards"),
+    )
+
+    class Meta:
+        icon = "list-ul"
+        label = _("Featured links")
+        template = "cms/blocks/featured.html"
+
     def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
         context = super().get_context(value, parent_context=parent_context)
-        questions = [(item["question"], str(item["answer"])) for item in value["items"]]
-        # JSON with <, > and & escaped: it cannot leave its script element (`jsonld_text`).
-        context["jsonld"] = mark_safe(jsonld_text(faq_page_jsonld(questions)))  # noqa: S308
+        values = [child.value for child in value["cards"]]
+        request = (parent_context or {}).get("request")
+        targets = _card_targets(values, _page_language(parent_context), request)
+        cards = (card_value.card(targets) for card_value in values)
+        context["cards"] = [card for card in cards if card is not None]
         return context

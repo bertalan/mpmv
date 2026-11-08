@@ -9,6 +9,7 @@ until the `base` theme (THM.3, THM.4) restyles them. The FAQ is an accessible di
 import json
 import re
 from collections.abc import Mapping
+from types import SimpleNamespace
 
 import pytest
 from django.core.exceptions import ValidationError
@@ -18,6 +19,7 @@ from wagtail.images.blocks import ImageChooserBlock
 from apps.cms.blocks import CallToActionBlock, FaqBlock, HeroBlock, LinkBlock
 from apps.cms.engine import faq_page_jsonld, jsonld_text
 from apps.cms.models import body_field
+from apps.cms.templatetags.cms_tags import faq_jsonld
 
 # --- The blocks of a page body
 
@@ -131,6 +133,7 @@ def test_a_call_to_action_renders_its_heading_and_link() -> None:
     _assert_csp_safe(html)
 
 
+MORE = {"question": "Do you gift wrap?", "answer": "<p>On request.</p>"}
 FAQ = {
     "heading": "Questions",
     "items": [
@@ -149,8 +152,20 @@ def test_a_faq_renders_each_question_as_a_disclosure() -> None:
     _assert_csp_safe(html)
 
 
-def test_a_faq_carries_faqpage_structured_data() -> None:
-    html = _render(FaqBlock(), FAQ)
+def test_a_faq_block_leaves_the_structured_data_to_the_page() -> None:
+    """Review fix of #109: the page emits one FAQPage for all its FAQ blocks (`faq_jsonld`)."""
+    assert "<script" not in _render(FaqBlock(), FAQ)
+
+
+def test_the_page_carries_one_faqpage_for_all_its_faq_blocks() -> None:
+    body = body_field().stream_block.to_python(
+        [
+            {"type": "faq", "value": FAQ},
+            {"type": "paragraph", "value": "<p>Between the FAQs.</p>"},
+            {"type": "faq", "value": {"heading": "", "items": [MORE]}},
+        ]
+    )
+    html = faq_jsonld(SimpleNamespace(body=body))
     scripts = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.S)
     assert len(scripts) == 1
     assert "</script" not in scripts[0]  # escaped, the data cannot close its script element
@@ -159,7 +174,14 @@ def test_a_faq_carries_faqpage_structured_data() -> None:
     assert [q["name"] for q in data["mainEntity"]] == [
         "Do you ship abroad?",
         "Can I return </script> items?",
+        "Do you gift wrap?",
     ]
+
+
+def test_a_page_without_faq_blocks_has_no_faqpage() -> None:
+    body = body_field().stream_block.to_python([{"type": "paragraph", "value": "<p>Hi.</p>"}])
+    assert faq_jsonld(SimpleNamespace(body=body)) == ""
+    assert faq_jsonld(SimpleNamespace()) == ""
 
 
 # --- Pure functions
