@@ -22,6 +22,7 @@ rules, for every other write path). The admin panels and templates come with EVT
 """
 
 import datetime as dt
+import uuid
 import zoneinfo
 from decimal import Decimal
 from typing import Any, ClassVar
@@ -287,6 +288,9 @@ class EventPage(Page):  # type: ignore[misc]  # Wagtail is untyped
     vendor_scope: ClassVar[str] = "vendor"
     objects = EventPageManager()
 
+    # The id the vendor area and the API show (like BaseModel's); each translation has its own,
+    # so a copy for translation gets a new one.
+    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     vendor = models.ForeignKey(
         Vendor,
         verbose_name=_("vendor"),
@@ -399,6 +403,7 @@ class EventPage(Page):  # type: ignore[misc]  # Wagtail is untyped
     ]
     parent_page_types: ClassVar[list[str]] = ["events.EventIndexPage"]
     subpage_types: ClassVar[list[str]] = []
+    exclude_fields_in_copy: ClassVar[list[str]] = ["public_id"]
 
     class Meta:
         verbose_name = _("event")

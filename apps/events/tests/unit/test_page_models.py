@@ -121,4 +121,4 @@ def test_a_new_event_page_is_a_draft_in_the_platform_zone() -> None:
     page = EventPageFactory.build()
     assert page.status == EventPage.Status.DRAFT
     assert page.sequence == 0
-    assert EventPage().timezone == "Europe/Rome"
+    assert EventPage._meta.get_field("timezone").get_default() == "Europe/Rome"

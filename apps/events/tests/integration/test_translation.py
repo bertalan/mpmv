@@ -75,6 +75,7 @@ def test_an_italian_page_translates_to_english_with_synchronised_dates(
         assert getattr(english, field) == getattr(italian_event, field), field
     assert english.original_locale.language_code == "it"
     assert english.translation_key == italian_event.translation_key
+    assert english.public_id != italian_event.public_id
 
     assert italian_event.starts_at is not None
     new_start = italian_event.starts_at + dt.timedelta(days=7)
