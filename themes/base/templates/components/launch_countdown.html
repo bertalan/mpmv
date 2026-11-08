@@ -1,0 +1,23 @@
+{% load i18n %}{% comment %}
+Launch countdown (THM.4 provides the component, CMS.9 the StreamField block and its module;
+spec 14 §14.9, spec 10 §10.2). The server renders the absolute launch date in a `<time>`
+element and the call to action, so the block is complete without JavaScript; after the target
+it renders the expired text and link instead. CMS.9's ES module finds `data-countdown`, shows the
+remaining time in the visitor's time zone and adds the pause button. The counter is never a
+live region (no `aria-live`): only the expiry is announced, once, by the module.
+
+  {% include "components/launch_countdown.html" with title=block.title target=block.target url=block.url action=block.cta expired=state.expired expired_text=block.expired_text expired_url=block.expired_url only %}
+
+Context:
+- `title` (required): the heading; `heading_level` 2 to 6 (default 2).
+- `target` (required): the launch, an aware datetime.
+- `url` and `action`: the call to action before the launch.
+- `expired`: the target has passed (from CMS.9's `countdown_state`).
+- `expired_text`, `expired_url`, `expired_action`: what the block says and links to after it.
+{% endcomment %}<div class="launch-countdown{% if expired %} launch-countdown--expired{% endif %}"{% if not expired %} data-countdown="{{ target|date:'c' }}"{% endif %}>
+  <h{{ heading_level|default:2 }} class="launch-countdown__title">{{ title }}</h{{ heading_level|default:2 }}>
+  {% if expired %}<p class="launch-countdown__expired">{{ expired_text }}</p>
+  {% if expired_url %}<a class="button" href="{{ expired_url }}">{% firstof expired_action _("Discover it") %}</a>{% endif %}{% else %}<p class="launch-countdown__date">{% translate "Available from" %} <time datetime="{{ target|date:'c' }}">{{ target|date:"DATETIME_FORMAT" }}</time></p>
+  <p class="launch-countdown__remaining" data-countdown-remaining hidden></p>
+  {% if url and action %}<a class="button" href="{{ url }}">{{ action }}</a>{% endif %}{% endif %}
+</div>

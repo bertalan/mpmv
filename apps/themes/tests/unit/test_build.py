@@ -49,6 +49,19 @@ def built(out: Path, slug: str, name: str = "theme.css") -> str:
 # --- The contract and the shipped themes
 
 
+def test_the_contract_covers_the_alert_and_raised_surface_colours() -> None:
+    """THM.4: alerts and the footer use these colours, so every theme must set them (§14.4)."""
+    for name in ("color.info", "color.success", "color.warning", "color.surface-raised"):
+        assert name in TOKEN_CONTRACT.required
+    pairs = {(p.foreground, p.background): p.minimum for p in TOKEN_CONTRACT.pairs}
+    for level in ("info", "success", "warning", "danger"):
+        # The alert's level bar is a UI component on the raised surface (1.4.11).
+        assert pairs[(f"color.{level}", "color.surface-raised")] == 3.0
+    for text in ("text", "text-muted", "link"):
+        assert pairs[(f"color.{text}", "color.surface-raised")] == 4.5
+    assert pairs[("color.link", "color.accent-tint")] == 4.5
+
+
 def test_the_contract_holds_the_spec_pairs() -> None:
     pairs = {(p.foreground, p.background): p.minimum for p in TOKEN_CONTRACT.pairs}
     assert pairs[("color.text", "color.surface")] == 4.5
@@ -59,7 +72,7 @@ def test_the_contract_holds_the_spec_pairs() -> None:
     assert pairs[("color.focus", "color.surface-inverse")] == 3.0
     assert pairs[("color.border-control", "color.surface")] == 3.0
     assert pairs[("color.accent", "color.surface")] == 3.0
-    assert len(TOKEN_CONTRACT.pairs) == 15
+    assert len(TOKEN_CONTRACT.pairs) == 25
     for pair in TOKEN_CONTRACT.pairs:
         assert pair.foreground in TOKEN_CONTRACT.required
         assert pair.background in TOKEN_CONTRACT.required
@@ -80,8 +93,12 @@ def test_every_shipped_theme_meets_the_token_contract(slug: str) -> None:
 def test_the_contract_rejects_a_base_with_a_weak_pair() -> None:
     tokens = resolve_tokens(["base"], {"base": read_tokens(SHIPPED_THEMES / "base")})
     weak = {**tokens, "color.text-muted": "#999999"}  # 2.85:1 on white
-    (violation,) = check_tokens(weak, TOKEN_CONTRACT)
-    assert violation.token == "color.text-muted/color.surface"
+    violations = check_tokens(weak, TOKEN_CONTRACT)
+    # Too light on the surface and on the raised surface (THM.4) alike.
+    assert [v.token for v in violations] == [
+        "color.text-muted/color.surface",
+        "color.text-muted/color.surface-raised",
+    ]
     assert isinstance(TOKEN_CONTRACT.pairs[0], ContrastPair)
 
 

@@ -1,0 +1,27 @@
+{% comment %}
+Tabs (THM.4, spec 14 §14.9), only where the content is short, such as a product's description,
+size guide and care notes. Progressive enhancement: without JavaScript every panel is shown
+under its own heading and the tab list stays `hidden`. The `tabs` Alpine component
+(themes/base/js/base.js, CSP build) shows the list, hides the headings and all panels but the
+selected one, and gives the panels `role="tabpanel"`. Keyboard (WAI-ARIA tabs pattern): one tab
+stop for the list (roving tabindex); Left and Right arrows move between the tabs and wrap, Home
+and End go to the first and last; selection follows focus; Tab moves on into the open panel.
+
+  {% include "components/tabs.html" with id="product-info" label=_("Product details") tabs=sections only %}
+
+Context:
+- `id` (required): a prefix for the ids of the tabs and panels, unique on the page.
+- `label` (required): the accessible name of the tab list.
+- `tabs`: a list of `label` and `content`; the content is escaped unless the caller marks it
+  safe (rich text rendered by the CMS, for example).
+- `selected`: the tab selected on load, 1-based (default 1).
+- `heading_level`: the level of the no-script panel headings, 2 to 6 (default 3).
+{% endcomment %}<div class="tabs" id="{{ id }}" x-data="tabs">
+  <div class="tabs__list" role="tablist" aria-label="{{ label }}" hidden @click="choose" @keydown="move">
+    {% for tab in tabs %}{% with selected|default:1 as current %}<button type="button" role="tab" id="{{ id }}-tab-{{ forloop.counter }}" aria-controls="{{ id }}-panel-{{ forloop.counter }}" aria-selected="{% if forloop.counter == current %}true{% else %}false{% endif %}" tabindex="{% if forloop.counter == current %}0{% else %}-1{% endif %}">{{ tab.label }}</button>{% endwith %}{% endfor %}
+  </div>
+  {% for tab in tabs %}<section class="tabs__panel" id="{{ id }}-panel-{{ forloop.counter }}" aria-labelledby="{{ id }}-tab-{{ forloop.counter }}">
+    <h{{ heading_level|default:3 }} class="tabs__heading">{{ tab.label }}</h{{ heading_level|default:3 }}>
+    {{ tab.content }}
+  </section>{% endfor %}
+</div>

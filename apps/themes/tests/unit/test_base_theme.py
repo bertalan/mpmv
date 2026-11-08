@@ -63,7 +63,36 @@ def test_the_focus_width_token_is_at_least_two_pixels(base_css: str) -> None:
 
 
 def test_the_sticky_header_never_hides_the_focused_element(base_css: str) -> None:
-    assert "scroll-padding-top:var(--header-height)" in base_css
+    # --header-offset is the header's measured height (base.js); the token is the fallback.
+    assert "scroll-padding-top:var(--header-offset,var(--header-height))" in base_css
+
+
+def test_the_scroll_padding_follows_the_real_header_height() -> None:
+    """THM.4: a long menu wraps the sticky header; the padding must follow it (WCAG 2.4.11)."""
+    script = (BASE / "static" / "themes" / "base" / "js" / "base.js").read_text(encoding="utf-8")
+    assert "new ResizeObserver(" in script
+    assert 'setProperty("--header-offset"' in script
+    # The token sets the header's own minimum height: writing it back would grow it forever.
+    assert 'setProperty("--header-height"' not in script
+
+
+def test_buttons_and_controls_have_their_component_rules(base_css: str) -> None:
+    """THM.4 (1/3): the variant, size, state and group rules of the form and button components."""
+    for selector in (
+        ".button--danger",
+        ".button--link",
+        ".button--small",
+        ".button--large",
+        ".button--icon",
+        ".button--loading",
+        ".button__spinner",
+        ".visually-hidden",
+        ".field--check",
+        ".field--group",
+        ".field--disabled",
+        ".error-summary",
+    ):
+        assert selector in base_css, selector
 
 
 def narrow_rules(css: str) -> str:
