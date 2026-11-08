@@ -84,6 +84,14 @@ DRY_RUN_EXCEPTIONS: Final[dict[str, tuple[str, str]]] = {
         TELEMETRY,
         "append-only record of a VIES answer",
     ),
+    "apps.tax.services.verify_vat_number": (
+        TELEMETRY,
+        "asking VIES stores its answer in the append-only validation log; a check is a lookup",
+    ),
+    "apps.tax.services.recheck_vat_number": (
+        TELEMETRY,
+        "same lookup as verify_vat_number, forced past the cache by the background job",
+    ),
 }
 
 _WRITES: Final = (

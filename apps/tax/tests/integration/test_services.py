@@ -2,11 +2,14 @@
 
 import datetime as dt
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
+from apps.accounts.models import User
+from apps.accounts.tests.factories import UserFactory
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 from apps.core.tests.factories import utc
@@ -31,6 +34,13 @@ from apps.vendors.tests.factories import VendorFactory
 pytestmark = pytest.mark.django_db
 
 CTX = AuditContext(actor_id=1, actor_label="staff:ops", source="admin", ip="127.0.0.1")
+
+
+def approver(**values: Any) -> User:
+    """Platform staff allowed to change a vendor's VAT regime (the TAX.2 review permission)."""
+    values.setdefault("permissions", [services.REVIEW_PERMISSION])
+    user: User = UserFactory.create(staff=True, **values)
+    return user
 
 
 # --- Tax rates
@@ -150,13 +160,41 @@ def test_territories_are_saved_with_an_audit_entry() -> None:
     assert Territory.objects.get().name == "Livigno"
 
 
+def test_a_territory_without_rates_can_change_its_country_and_code() -> None:
+    territory = TerritoryFactory.create(code="ES-CN", country="ES")
+    territory.country, territory.code = "PT", "PT-30"
+    services.save_territory(territory, ctx=CTX)
+    assert Territory.objects.values_list("country", "code").get() == ("PT", "PT-30")
+
+
+@pytest.mark.parametrize(("field", "value"), [("country", "PT"), ("code", "ES-XX")])
+def test_a_territory_with_rates_keeps_its_country_and_code(field: str, value: str) -> None:
+    """Rates, rate snapshots and audit entries name the territory by its code and country."""
+    territory = TerritoryFactory.create(code="ES-CN", country="ES")
+    TaxRateFactory.create(country="ES", territory=territory)
+    setattr(territory, field, value)
+    with pytest.raises(ValidationError) as exc:
+        services.save_territory(territory, ctx=CTX)
+    assert field in exc.value.message_dict
+    assert Territory.objects.values_list("country", "code").get() == ("ES", "ES-CN")
+    assert not AuditLog.objects.exists()
+
+
+def test_a_territory_with_rates_can_still_change_its_other_fields() -> None:
+    territory = TerritoryFactory.create(code="ES-CN", country="ES")
+    TaxRateFactory.create(country="ES", territory=territory)
+    territory.name = "Canary Islands"
+    services.save_territory(territory, ctx=CTX)
+    assert Territory.objects.get().name == "Canary Islands"
+
+
 # --- Vendor tax profiles
 
 
 def test_the_first_profile_of_a_vendor_is_audited_under_the_vendor() -> None:
     vendor = VendorFactory.create()
     services.configure_vendor_tax_profile(
-        VendorTaxProfileFactory.build(vendor=vendor, oss=True), ctx=CTX
+        VendorTaxProfileFactory.build(vendor=vendor, oss=True), approver=approver(), ctx=CTX
     )
     profile = VendorTaxProfile.objects.get()
     assert profile.regime == "oss"
@@ -169,10 +207,14 @@ def test_the_first_profile_of_a_vendor_is_audited_under_the_vendor() -> None:
 def test_a_regime_change_closes_the_current_profile_and_keeps_history() -> None:
     vendor = VendorFactory.create()
     services.configure_vendor_tax_profile(
-        VendorTaxProfileFactory.build(vendor=vendor, valid_from=utc(2027)), ctx=CTX
+        VendorTaxProfileFactory.build(vendor=vendor, valid_from=utc(2027)),
+        approver=approver(),
+        ctx=CTX,
     )
     services.configure_vendor_tax_profile(
-        VendorTaxProfileFactory.build(vendor=vendor, oss=True, valid_from=utc(2028)), ctx=CTX
+        VendorTaxProfileFactory.build(vendor=vendor, oss=True, valid_from=utc(2028)),
+        approver=approver(),
+        ctx=CTX,
     )
     old, new = VendorTaxProfile.objects.filter(vendor=vendor).order_by("valid_from")
     assert (old.regime, old.valid_to) == ("domestic_only", utc(2028))
@@ -188,7 +230,9 @@ def test_a_regime_change_closes_the_current_profile_and_keeps_history() -> None:
 def test_another_vendor_profile_is_not_closed() -> None:
     other = VendorTaxProfileFactory.create(valid_from=utc(2027))
     services.configure_vendor_tax_profile(
-        VendorTaxProfileFactory.build(vendor=VendorFactory.create(), valid_from=utc(2028)), ctx=CTX
+        VendorTaxProfileFactory.build(vendor=VendorFactory.create(), valid_from=utc(2028)),
+        approver=approver(),
+        ctx=CTX,
     )
     other.refresh_from_db()
     assert other.valid_to is None
@@ -202,7 +246,9 @@ def test_a_vendor_without_a_profile_is_a_clear_error() -> None:
 def test_a_profile_inconsistent_with_the_fiscal_regime_is_refused() -> None:
     vendor = VendorFactory.create(fiscal_regime=FLAT_RATE_REGIME)
     with pytest.raises(ValidationError) as exc:
-        services.configure_vendor_tax_profile(VendorTaxProfileFactory.build(vendor=vendor), ctx=CTX)
+        services.configure_vendor_tax_profile(
+            VendorTaxProfileFactory.build(vendor=vendor), approver=approver(), ctx=CTX
+        )
     assert "regime" in exc.value.message_dict
     assert VendorTaxProfile.objects.count() == 0
 
@@ -212,18 +258,59 @@ def test_an_oss_registration_date_on_another_regime_is_refused() -> None:
         vendor=VendorFactory.create(), oss_registered_since=dt.date(2026, 7, 1)
     )
     with pytest.raises(ValidationError) as exc:
-        services.configure_vendor_tax_profile(profile, ctx=CTX)
+        services.configure_vendor_tax_profile(profile, approver=approver(), ctx=CTX)
     assert "oss_registered_since" in exc.value.message_dict
     assert VendorTaxProfile.objects.count() == 0
 
 
 def test_a_profile_change_dry_run_writes_nothing() -> None:
     changeset = services.configure_vendor_tax_profile(
-        VendorTaxProfileFactory.build(vendor=VendorFactory.create()), ctx=CTX, dry_run=True
+        VendorTaxProfileFactory.build(vendor=VendorFactory.create()),
+        approver=approver(),
+        ctx=CTX,
+        dry_run=True,
     )
     assert changeset.summary()["create"] == 1
     assert VendorTaxProfile.objects.count() == 0
     assert AuditLog.objects.count() == 0
+
+
+def test_a_direct_profile_change_is_approved_in_the_acting_staff_member_name() -> None:
+    staff = approver()
+    other = approver()
+    profile = VendorTaxProfileFactory.build(vendor=VendorFactory.create(), approved_by=other)
+    services.configure_vendor_tax_profile(profile, approver=staff, ctx=CTX)
+    stored = VendorTaxProfile.objects.get()
+    assert (stored.approved_by, stored.requested_by) == (staff, None)  # staff-initiated
+
+
+def test_a_direct_profile_change_needs_the_review_permission() -> None:
+    """Changing a vendor's VAT regime directly needs what approving a request needs (TAX.2)."""
+    vendor = VendorFactory.create()
+    refused = [
+        approver(permissions=["tax.add_vendortaxprofile", "tax.view_vendortaxprofile"]),
+        UserFactory.create(permissions=[services.REVIEW_PERMISSION]),  # not staff
+        approver(is_active=False),
+    ]
+    for user in refused:
+        for dry_run in (False, True):
+            with pytest.raises(engine.RegimeChangeNotAllowed):
+                services.configure_vendor_tax_profile(
+                    VendorTaxProfileFactory.build(vendor=vendor),
+                    approver=user,
+                    ctx=CTX,
+                    dry_run=dry_run,
+                )
+    assert VendorTaxProfile.objects.count() == 0
+    assert not AuditLog.objects.exists()
+
+
+def test_a_direct_profile_change_is_not_approved_by_the_person_who_asked_for_it() -> None:
+    staff = approver()
+    profile = VendorTaxProfileFactory.build(vendor=VendorFactory.create(), requested_by=staff)
+    with pytest.raises(engine.RegimeChangeNotAllowed, match="someone other"):
+        services.configure_vendor_tax_profile(profile, approver=staff, ctx=CTX)
+    assert VendorTaxProfile.objects.count() == 0
 
 
 def test_legal_notes_are_saved_with_an_audit_entry_under_the_vendor() -> None:

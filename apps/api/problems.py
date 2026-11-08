@@ -45,6 +45,9 @@ _AUTH_DETAILS: Final[Mapping[Reason, str]] = {
     Reason.INSUFFICIENT_SCOPE: "The API key lacks the scope this operation requires.",
     Reason.VENDOR_CLOSED: "The vendor this API key acts for is closed.",
     Reason.VENDOR_SUSPENDED: "The vendor of this API key is suspended: the key may only read.",
+    Reason.VENDOR_NOT_ACTIVE: (
+        "The vendor of this API key is not active yet: the key may only read."
+    ),
 }
 
 
@@ -122,6 +125,17 @@ def validation_problem(errors: Iterable[Mapping[str, Any]]) -> Problem:
         for e in errors
     ]
     return problem(422, detail="The request is not valid.", errors=cleaned)
+
+
+def rate_limit_problem() -> Problem:
+    """429 for a key over its rate limit (CORE.12); the delay goes in the `Retry-After` header."""
+    return problem(
+        429,
+        detail=(
+            "This API key has made too many requests; retry after the delay in the "
+            "Retry-After header."
+        ),
+    )
 
 
 def auth_problem(decision: Decision, required_scope: str | None) -> Problem:
