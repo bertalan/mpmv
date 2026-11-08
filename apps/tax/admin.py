@@ -135,6 +135,7 @@ class VendorTaxProfileForm(StartCheckedForm[VendorTaxProfile]):
             "vendor",
             "regime",
             "exempt_reason",
+            "exempt_country",
             "oss_registered_since",
             "valid_from",
         )
@@ -330,6 +331,7 @@ class TaxRegimeChangeRequestAdmin(HistoryAdmin[TaxRegimeChangeRequest]):
     request_fields = (
         "regime",
         "exempt_reason",
+        "exempt_country",
         "oss_registered_since",
         "fiscal_regime",
         "effective_from",
