@@ -7,8 +7,9 @@ and one footer menu per locale, falling back to the primary language when a loca
 Their links are a StreamField (page or external link): unlike inline panels and FK choosers,
 its admin editor needs no inline script, so it works under the strict CSP (SEC.1).
 
-Bodies are StreamFields with rich-text paragraphs, images and galleries (I18N.3); the other
-reusable blocks (hero, product grid, CTA, FAQ) are CMS.2.
+Bodies are StreamFields with rich-text paragraphs, images and galleries (I18N.3), heroes, calls to
+action, FAQs and "featured links" cards to pages, catalog terms and vendors (CMS.2); the product
+grid comes with CMS.10.
 
 Translation (I18N.3, spec 09 §9.2): wagtail-localize copies a page into another locale and keeps
 it in sync with its source. Texts, alt texts and captions are translated; images are synchronised
@@ -36,18 +37,27 @@ from wagtail.models import Page, TranslatableMixin
 from wagtail_localize.fields import SynchronizedField
 
 from . import engine
-from .blocks import FigureBlock, GalleryBlock
-
-# Editors may use headings, emphasis, lists and links; no raw HTML, images or embeds yet.
-RICH_TEXT_FEATURES = ["h2", "h3", "bold", "italic", "ol", "ul", "link"]
+from .blocks import (
+    RICH_TEXT_FEATURES,
+    CallToActionBlock,
+    FaqBlock,
+    FeaturedLinksBlock,
+    FigureBlock,
+    GalleryBlock,
+    HeroBlock,
+)
 
 
 def body_field(verbose_name: Any = None) -> StreamField:
     return StreamField(
         [
-            ("paragraph", blocks.RichTextBlock(features=RICH_TEXT_FEATURES)),
+            ("hero", HeroBlock()),
+            ("paragraph", blocks.RichTextBlock(features=RICH_TEXT_FEATURES, label=_("Rich text"))),
             ("figure", FigureBlock()),
             ("gallery", GalleryBlock()),
+            ("cta", CallToActionBlock()),
+            ("faq", FaqBlock()),
+            ("featured", FeaturedLinksBlock()),
         ],
         blank=True,
         verbose_name=verbose_name or _("body"),
