@@ -195,6 +195,7 @@ CLAIM_ACTIONS = (
     claim_action("approve_claim", "Approve the submitted claim"),
     claim_action("reject_claim", "Reject the submitted claim"),
 )
+STEP_UP_CLAIM_ACTIONS = frozenset({"approve_claim", "reject_claim"})
 
 
 @admin.register(Vendor)
@@ -347,6 +348,16 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
             '<a class="button" href="{}">Reopen this vendor</a>',
             reverse("admin:vendors_vendor_reopen", args=[obj.pk]),
         )
+
+    def changelist_view(
+        self, request: HttpRequest, extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        """Deciding a claim (it grants the owner role, or refuses it) needs a fresh second
+        factor, like the other sensitive staff pages (CORE.4); browsing the list does not."""
+        parent = super().changelist_view
+        if request.method == "POST" and request.POST.get("action") in STEP_UP_CLAIM_ACTIONS:
+            return step_up(lambda req: parent(req, extra_context))(request)
+        return parent(request, extra_context)
 
     def get_urls(self) -> list[URLPattern]:
         def reopen(request: HttpRequest, object_id: str) -> HttpResponse:

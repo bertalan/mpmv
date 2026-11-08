@@ -7,7 +7,12 @@ opens the link in the session, signs nobody in, and leads here. The page then as
    and audited, and lock the claim);
 2. a password and an authenticator app (the key is kept in the session until the first code
    checks out); `services.submit_claim` then creates the account, spends the link and submits
-   the claim for staff approval, all at once.
+   the claim for staff approval, all at once;
+3. or, when an account already uses the legal email of record (a claimant whose earlier claim
+   was rejected, or who claimed another vendor with the same legal email), that account's own
+   password (through `authenticate`, so the login lockout and captcha apply) and a code from
+   its own authenticator app; `services.submit_claim_as_account` then spends the link and
+   submits the claim. The link alone never signs anyone in and never changes the account.
 
 Every POST is rate limited per IP. A visitor who is signed in is refused: a claim never changes
 an existing account. Responses are never cached and send no path in the Referer.
@@ -17,7 +22,7 @@ import math
 from typing import Any
 
 import segno
-from django.contrib.auth import login
+from django.contrib.auth import authenticate, login
 from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
@@ -28,11 +33,15 @@ from django.views.decorators.http import require_http_methods
 from apps.accounts import engine as accounts_engine
 from apps.accounts.decorators import mfa_exempt
 from apps.accounts.mfa_session import complete_verification
+from apps.accounts.models import User
 from apps.accounts.services import (
+    TOTP,
     ActionLinkCheck,
     forget_email_bound_link,
     new_totp_key,
     pending_totp_device,
+    record_mfa_failure,
+    verify_totp,
 )
 from apps.core.audit import audit_context
 from apps.core.http import client_ip
@@ -45,10 +54,7 @@ SIGN_IN_BACKEND = "django.contrib.auth.backends.ModelBackend"
 TOO_MANY_ATTEMPTS = "Too many attempts. Please try again later."
 NO_MATCH = "This does not match the VAT number or TIN we hold for this vendor."
 INVALID_CODE = "Invalid code. Check the time on your device and try again."
-ACCOUNT_EXISTS = (
-    "An account already uses this email address. Contact the platform staff to link it to "
-    "the vendor."
-)
+SIGN_IN_FAILED = "The password or the authentication code is not correct."
 
 
 def _private(response: HttpResponse) -> HttpResponse:
@@ -89,12 +95,20 @@ def _forget(request: HttpRequest, vendor_key: str) -> None:
     forget_email_bound_link(request.session, services.CLAIM_PURPOSE, vendor_key)
 
 
+def _sign_in_page(request: HttpRequest, vendor: Vendor, error: str = "") -> HttpResponse:
+    """An account already uses the legal email: it signs in with its own factors instead."""
+    context = {"vendor": vendor, "email": vendor.contact_email, "error": error}
+    return _page(request, "sign_in", context)
+
+
 def _account_page(
     request: HttpRequest,
     vendor: Vendor,
     link: ActionLinkCheck,
     errors: list[str] | None = None,
 ) -> HttpResponse:
+    if services.claim_account(vendor) is not None:
+        return _sign_in_page(request, vendor)
     key = _pending_key(request, str(vendor.public_id), link)
     device = pending_totp_device(key, vendor.contact_email)
     qr = segno.make(device.config_url, error="m")
@@ -135,7 +149,7 @@ def _submit(request: HttpRequest, vendor: Vendor, link: ActionLinkCheck) -> Http
     except services.ClaimCodeInvalid:
         return _account_page(request, vendor, link, [INVALID_CODE])
     except services.ClaimAccountExists:
-        return _account_page(request, vendor, link, [ACCOUNT_EXISTS])
+        return _sign_in_page(request, vendor)
     except engine.ClaimError:
         return _refused(request)
     _forget(request, vendor_key)
@@ -143,6 +157,28 @@ def _submit(request: HttpRequest, vendor: Vendor, link: ActionLinkCheck) -> Http
     complete_verification(request, submitted.enrolment.device)
     context = {"vendor": vendor, "codes": submitted.enrolment.recovery_codes}
     return _page(request, "submitted", context)
+
+
+def _sign_in(request: HttpRequest, vendor: Vendor, link: ActionLinkCheck) -> HttpResponse:
+    """Submit the claim for the existing account, after its own password and authenticator."""
+    account = services.claim_account(vendor)
+    if account is None:
+        return _account_page(request, vendor, link)
+    user = authenticate(request, username=account.email, password=request.POST.get("password", ""))
+    if not isinstance(user, User) or user.pk != account.pk:
+        return _sign_in_page(request, vendor, SIGN_IN_FAILED)
+    device = verify_totp(user, request.POST.get("code", "").strip())
+    if device is None:
+        record_mfa_failure(user, TOTP, ctx=audit_context(request))
+        return _sign_in_page(request, vendor, SIGN_IN_FAILED)
+    try:
+        services.submit_claim_as_account(link, user, ctx=audit_context(request))
+    except engine.ClaimError:
+        return _refused(request)
+    _forget(request, str(vendor.public_id))
+    login(request, user, backend=SIGN_IN_BACKEND)
+    complete_verification(request, device)
+    return _page(request, "submitted", {"vendor": vendor, "codes": []})
 
 
 @mfa_exempt
@@ -181,4 +217,6 @@ def claim(request: HttpRequest, vendor_key: str) -> HttpResponse:
         return _page(request, "identity", {"vendor": vendor, "error": ""})
     if step == "account":
         return _submit(request, vendor, link)
+    if step == "sign_in":
+        return _sign_in(request, vendor, link)
     return _account_page(request, vendor, link)

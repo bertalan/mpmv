@@ -31,6 +31,7 @@ from apps.accounts.services import (
     Enrolment,
     email_bound_link,
     enrol_totp_key,
+    has_second_factor,
     register_action_purpose,
     send_action_link_email,
     spend_email_bound_link,
@@ -1396,6 +1397,47 @@ def submit_claim(
     return SubmittedClaim(claim, user, enrolment)
 
 
+def claim_account(vendor: Vendor) -> User | None:
+    """The account that already uses the legal email of record of `vendor`, if any."""
+    email = normalize_email_address(vendor.contact_email)
+    return User.objects.filter(email=email).first() if email else None
+
+
+def submit_claim_as_account(link: ActionLinkCheck, user: User, *, ctx: AuditContext) -> VendorClaim:
+    """Submit the claim for an existing account with the legal email of record (a returning
+    claimant, or one who already claimed another vendor with the same legal email).
+
+    The caller has just checked the account's own password and second factor; the link only
+    proved control of the mailbox and never signs anyone in. Nothing on the account changes.
+    Raises `engine.ClaimError` (link not valid, identity not confirmed with this link, account
+    not the legal email's, inactive or without a second factor). Spends the link: no dry-run.
+    """
+    with transaction.atomic():
+        claim = _lock_open_claim(link)
+        if not claim.confirmed_link or claim.confirmed_link != claim_link_digest(link):
+            raise engine.ClaimError("confirm the VAT number or TIN first")
+        if (
+            not user.is_active
+            or user.email != normalize_email_address(claim.vendor.contact_email)
+            or not has_second_factor(user)
+        ):
+            raise engine.ClaimError("this account cannot claim the vendor")
+        try:
+            spend_email_bound_link(link, user, ctx=ctx)
+        except ActionLinkSpent as exc:
+            raise engine.ClaimError("the claim link was already used") from exc
+        before = claim_snapshot(claim)
+        claim.status = VendorClaim.Status.SUBMITTED
+        claim.claimant = user
+        claim.submitted_at = timezone.now()
+        claim.confirmed_link = ""
+        claim.save()
+        record(
+            ctx, CLAIM_SUBMITTED, CLAIM_MODEL, str(claim.public_id), before, claim_snapshot(claim)
+        )
+    return claim
+
+
 def _decide(
     claim: VendorClaim, status: str, action: str, *, ctx: AuditContext, dry_run: bool
 ) -> ChangeSet:
@@ -1407,6 +1449,8 @@ def _decide(
         )
         if locked.status != VendorClaim.Status.SUBMITTED or locked.claimant is None:
             raise engine.ClaimError(f"{locked.vendor} has no claim waiting for approval")
+        if status == VendorClaim.Status.APPROVED:
+            _check_claim_still_approvable(locked.vendor, locked.claimant)
         before = claim_snapshot(locked)
         locked.status = status
         changes = ChangeSet()
@@ -1422,13 +1466,28 @@ def _decide(
     return changes
 
 
+def _check_claim_still_approvable(vendor: Vendor, claimant: User) -> None:
+    """Approval re-checks what submission checked: the vendor has no account holder yet, and
+    the claimant's email is still the legal email of record (staff may have changed it)."""
+    if VendorMember.objects.filter(vendor=vendor).exists():
+        raise engine.ClaimError(f"{vendor} already has an account holder: reject the claim")
+    if not claimant.is_active or claimant.email != normalize_email_address(vendor.contact_email):
+        raise engine.ClaimError(
+            f"{vendor}: the claimant's email is no longer the legal email of record"
+        )
+
+
 def approve_claim(claim: VendorClaim, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Staff approve a submitted claim: the claimant becomes the vendor's owner, and only now
     may change its legal identity, tax profile and payout data. Raises `engine.ClaimError`
-    when no claim waits for approval."""
+    when no claim waits for approval, the vendor meanwhile got an account holder, or the
+    claimant's email is no longer the legal email of record (or the account is inactive)."""
     return _decide(claim, VendorClaim.Status.APPROVED, CLAIM_APPROVED, ctx=ctx, dry_run=dry_run)
 
 
 def reject_claim(claim: VendorClaim, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
-    """Staff reject a submitted claim: nothing is granted; staff may send a new link later."""
+    """Staff reject a submitted claim: nothing is granted; staff may send a new link later.
+
+    The claimant's account stays. With a new link it claims again by signing in with its own
+    password and second factor (`submit_claim_as_account`)."""
     return _decide(claim, VendorClaim.Status.REJECTED, CLAIM_REJECTED, ctx=ctx, dry_run=dry_run)

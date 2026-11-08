@@ -155,9 +155,15 @@ def payout_eligibility(vendor) -> Eligibility               # DAC7 complete, acc
    until staff regenerate the link. The password and the authenticator app (TOTP, the key kept
    in the session until its first code checks out) come next; the account, its second factor,
    the spent link and the submitted claim are written in one transaction. An existing account
-   with the legal email is never taken over (the claim stops and the claimant contacts staff).
-   The claimant gets no membership until staff approve the claim (`VendorClaim`, admin actions
-   on the vendor list), so before approval they reach no vendor data at all.
+   with the legal email is never taken over or changed: when one exists (a claimant whose claim
+   was rejected and who got a new link, or who already claimed another vendor with the same
+   legal email), the claim page asks for that account's own password (the login lockout and
+   captcha apply) and a code from its own authenticator app instead, then submits the claim for
+   it. The link alone never signs anyone in. The claimant gets no membership until staff approve
+   the claim (`VendorClaim`, admin actions on the vendor list), so before approval they reach no
+   vendor data at all. Approving or rejecting needs a fresh second factor (step-up), and
+   approval is refused when the vendor meanwhile got a member or the claimant's email is no
+   longer the legal email of record.
 2. **Paid order**: for each `VendorOrder` the rule snapshot is frozen, `compute_commission` is
    computed, and the ledger rows are written (`sale`, `shipping`, `commission`, `payment_fee`).
 3. **Transfer**: with *separate charges and transfers* (see [07](07-cart-orders-payments.md)) a Stripe

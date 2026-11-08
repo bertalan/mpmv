@@ -72,6 +72,10 @@ DRY_RUN_EXCEPTIONS: Final[dict[str, tuple[str, str]]] = {
         ONE_TIME_CODE,
         "spends the claim link and the authenticator code that creates the account (VEN.24)",
     ),
+    "apps.vendors.services.submit_claim_as_account": (
+        ONE_TIME_CODE,
+        "spends the claim link of an existing account that just signed in (VEN.24)",
+    ),
     "apps.api.services.authenticate": (
         TELEMETRY,
         "records when an API key was last used",

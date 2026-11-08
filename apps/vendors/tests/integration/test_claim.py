@@ -21,7 +21,8 @@ from pytest_django.fixtures import Settings as SettingsWrapper
 from apps.accounts import engine as accounts_engine
 from apps.accounts import services as accounts_services
 from apps.accounts.models import ActionLinkUse, User
-from apps.accounts.tests.factories import UserFactory
+from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
+from apps.accounts.tests.mfa import totp_token
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog, OutboxEmail
 from apps.vendors import engine, services, views
@@ -350,12 +351,125 @@ def test_an_existing_account_with_the_legal_email_is_not_taken_over(client: Clie
     existing = UserFactory.create(email=vendor.contact_email)
     open_link(client, send_link(vendor))
     confirm_identity(client, vendor, vendor.vat_number)
-    response = create_account(client, vendor)
+    response = create_account(client, vendor, code="123456")  # a forged account step
     assert response.status_code == 200
-    assert "already" in response.content.decode()
+    body = response.content.decode()
+    assert "already uses" in body
+    assert 'name="step" value="sign_in"' in body
     existing.refresh_from_db()
     assert not TOTPDevice.objects.filter(user=existing).exists()
     assert VendorClaim.objects.get(vendor=vendor).status == VendorClaim.Status.OPEN
+
+
+def test_after_the_identity_an_existing_account_is_asked_to_sign_in(client: Client) -> None:
+    vendor = imported_vendor()
+    UserFactory.create(email=vendor.contact_email)
+    open_link(client, send_link(vendor))
+    response = confirm_identity(client, vendor, vendor.vat_number)
+    body = response.content.decode()
+    assert 'name="step" value="sign_in"' in body
+    assert 'name="password1"' not in body  # no new password for an existing account
+    assert views.CLAIM_SESSION_KEY not in client.session  # no authenticator key handed out
+
+
+def returning_claimant(email: str) -> tuple[User, str, TOTPDevice]:
+    """An account with the legal email, a known password and a confirmed authenticator."""
+    password = secrets.token_urlsafe(16)
+    user = User.objects.filter(email=email).first() or UserFactory.create(email=email)
+    user.set_password(password)
+    user.save()
+    return user, password, TOTPDeviceFactory.create(user=user)
+
+
+def sign_in_and_submit(client: Client, vendor: Vendor, password: str, code: str) -> Any:
+    return client.post(claim_url(vendor), {"step": "sign_in", "password": password, "code": code})
+
+
+def test_an_existing_account_signs_in_with_its_own_factors_and_submits(client: Client) -> None:
+    vendor = imported_vendor()
+    user, password, device = returning_claimant(vendor.contact_email)
+    open_link(client, send_link(vendor))
+    confirm_identity(client, vendor, vendor.vat_number)
+    response = sign_in_and_submit(client, vendor, password, totp_token(device))
+    assert response.status_code == 200
+    assert "waiting for approval" in response.content.decode()
+    claim = VendorClaim.objects.get(vendor=vendor)
+    assert claim.status == VendorClaim.Status.SUBMITTED
+    assert claim.claimant == user
+    assert ActionLinkUse.objects.get().user == user
+    assert int(client.session["_auth_user_id"]) == user.pk
+    assert TOTPDevice.objects.filter(user=user).count() == 1  # its factors are untouched
+    (submitted,) = actions(services.CLAIM_SUBMITTED)
+    assert (submitted.after or {})["claimant"] == str(user.public_id)
+
+
+@pytest.mark.parametrize("wrong", ["password", "code"])
+def test_an_existing_account_with_a_wrong_factor_submits_nothing(
+    client: Client, wrong: str
+) -> None:
+    vendor = imported_vendor()
+    _user, password, device = returning_claimant(vendor.contact_email)
+    open_link(client, send_link(vendor))
+    confirm_identity(client, vendor, vendor.vat_number)
+    good = totp_token(device)
+    response = sign_in_and_submit(
+        client,
+        vendor,
+        secrets.token_urlsafe(16) if wrong == "password" else password,
+        str((int(good) + 1) % 1_000_000).zfill(6) if wrong == "code" else good,
+    )
+    assert response.status_code == 200
+    assert "not correct" in response.content.decode()
+    assert VendorClaim.objects.get(vendor=vendor).status == VendorClaim.Status.OPEN
+    assert not ActionLinkUse.objects.exists()
+    assert "_auth_user_id" not in client.session
+
+
+def test_signing_in_needs_the_identity_first(client: Client) -> None:
+    vendor = imported_vendor()
+    _user, password, device = returning_claimant(vendor.contact_email)
+    open_link(client, send_link(vendor))
+    response = sign_in_and_submit(client, vendor, password, totp_token(device))
+    assert response.status_code == 403
+    assert VendorClaim.objects.get(vendor=vendor).status == VendorClaim.Status.OPEN
+
+
+def test_a_rejected_claimant_claims_again_with_a_new_link(client: Client) -> None:
+    vendor = imported_vendor()
+    full_claim(client, vendor)
+    first = VendorClaim.objects.get(vendor=vendor)
+    claimant = first.claimant
+    services.reject_claim(first, ctx=SYSTEM)
+    path = send_link(vendor)
+
+    again = Client()
+    _user, password, device = returning_claimant(vendor.contact_email)
+    open_link(again, path)
+    confirm_identity(again, vendor, vendor.vat_number)
+    response = sign_in_and_submit(again, vendor, password, totp_token(device))
+    assert "waiting for approval" in response.content.decode()
+    claim = VendorClaim.objects.get(vendor=vendor)
+    assert claim.status == VendorClaim.Status.SUBMITTED
+    assert claim.claimant == claimant
+    services.approve_claim(claim, ctx=SYSTEM)
+    assert claimant is not None
+    assert services.member_role(claimant, vendor) == engine.OWNER
+
+
+def test_a_second_vendor_with_the_same_legal_email_can_be_claimed(client: Client) -> None:
+    first = imported_vendor()
+    full_claim(client, first)
+    services.approve_claim(VendorClaim.objects.get(vendor=first), ctx=SYSTEM)
+    second = imported_vendor()
+
+    other = Client()
+    claimant, password, device = returning_claimant(second.contact_email)
+    open_link(other, send_link(second))
+    confirm_identity(other, second, second.vat_number)
+    sign_in_and_submit(other, second, password, totp_token(device))
+    services.approve_claim(VendorClaim.objects.get(vendor=second), ctx=SYSTEM)
+    assert services.member_role(claimant, first) == engine.OWNER
+    assert services.member_role(claimant, second) == engine.OWNER
 
 
 def test_a_submitted_link_cannot_be_used_again(client: Client) -> None:
@@ -413,6 +527,25 @@ def test_approval_dry_run_changes_nothing(client: Client) -> None:
     changes = services.approve_claim(claim, ctx=SYSTEM, dry_run=True)
     assert not changes.is_empty
     assert VendorClaim.objects.get(vendor=vendor).status == VendorClaim.Status.SUBMITTED
+    assert not VendorMember.objects.filter(vendor=vendor).exists()
+
+
+def test_approval_is_refused_when_the_vendor_already_has_a_member(client: Client) -> None:
+    vendor = imported_vendor()
+    full_claim(client, vendor)
+    VendorMemberFactory.create(vendor=vendor)
+    with pytest.raises(engine.ClaimError):
+        services.approve_claim(VendorClaim.objects.get(vendor=vendor), ctx=SYSTEM)
+    assert VendorClaim.objects.get(vendor=vendor).status == VendorClaim.Status.SUBMITTED
+    assert not actions(services.CLAIM_APPROVED)
+
+
+def test_approval_is_refused_when_the_legal_email_changed(client: Client) -> None:
+    vendor = imported_vendor()
+    full_claim(client, vendor)
+    Vendor.objects.filter(pk=vendor.pk).update(contact_email="new-legal@vendor-a.example")
+    with pytest.raises(engine.ClaimError):
+        services.approve_claim(VendorClaim.objects.get(vendor=vendor), ctx=SYSTEM)
     assert not VendorMember.objects.filter(vendor=vendor).exists()
 
 

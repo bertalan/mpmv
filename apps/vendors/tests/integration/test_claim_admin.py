@@ -2,10 +2,12 @@
 
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import urlsplit
 
 import pytest
 from django.test import Client
 from django.urls import reverse
+from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
@@ -112,3 +114,27 @@ def test_the_change_page_shows_the_claim_status(staff_client: Client) -> None:
     locked = VendorClaimFactory.create(status=VendorClaim.Status.LOCKED, version=3)
     page = staff_client.get(reverse("admin:vendors_vendor_change", args=[locked.vendor.pk]))
     assert "Locked after too many wrong answers (link version 3)" in page.content.decode()
+
+
+@pytest.mark.parametrize("action", ["approve_claim", "reject_claim"])
+def test_deciding_a_claim_needs_a_fresh_second_factor(
+    staff_client: Client, settings: SettingsWrapper, action: str
+) -> None:
+    settings.MFA_STEP_UP_MAX_AGE = -1  # no verification counts as fresh
+    vendor = VendorFactory.create(italian_company=True)
+    claim = submitted_claim(vendor)
+    response = staff_client.post(
+        reverse(CHANGELIST), {"action": action, "_selected_action": [vendor.pk]}
+    )
+    assert response.status_code == 302
+    assert urlsplit(response["Location"]).path == reverse("mfa:verify")
+    claim.refresh_from_db()
+    assert claim.status == VendorClaim.Status.SUBMITTED
+    assert not VendorMember.objects.filter(vendor=vendor).exists()
+
+
+def test_the_changelist_itself_needs_no_fresh_second_factor(
+    staff_client: Client, settings: SettingsWrapper
+) -> None:
+    settings.MFA_STEP_UP_MAX_AGE = -1
+    assert staff_client.get(reverse(CHANGELIST)).status_code == 200

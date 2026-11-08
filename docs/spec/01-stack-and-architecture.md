@@ -160,6 +160,7 @@ when a new mutating service has neither `dry_run` nor a place in this table (ARC
 | `apps.tax.services.recheck_vat_number` | telemetry | Same lookup as `verify_vat_number`, forced past the cache by the background job |
 | `apps.vendors.services.confirm_claim_identity` | throttle counter | Counts a wrong VAT number or TIN against the claim and locks it after too many (VEN.24) |
 | `apps.vendors.services.submit_claim` | one-time code | Spends the claim link and the authenticator code that creates the account (VEN.24) |
+| `apps.vendors.services.submit_claim_as_account` | one-time code | Spends the claim link of an existing account that just signed in (VEN.24) |
 
 ## 1.4 Example of the service + pure function pattern
 
