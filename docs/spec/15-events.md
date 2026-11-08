@@ -311,8 +311,8 @@ Everything else (`SECONDLY`, `MINUTELY`, `HOURLY`, `BYSETPOS`, `BYYEARDAY`, `BYW
 presets (every year on these dates, every week on these days, every month on this day) and writes
 the RRULE; the API and the admin accept the RRULE text.
 
-Expansion is a pure function in `apps/events/engine.py`, built on `dateutil.rrule` (python-dateutil
-as a direct dependency):
+Expansion is a pure function in `apps/events/engine.py`. The subset is small, so the engine
+expands it directly with `datetime` and `zoneinfo` and needs no rule library:
 
 ```python
 @dataclass(frozen=True)
@@ -324,13 +324,19 @@ def expand(spec: RecurrenceSpec, window_start: datetime, window_end: datetime,
 def validate_rrule(text: str, all_day: bool) -> RRuleSubset      # raises RecurrenceError
 ```
 
+`RecurrenceError.errors` lists every refused part as a `RuleError(part, message)`, so the API and
+the forms can name the field. `DTSTART` is always the first occurrence and counts towards `COUNT`;
+exdates (instants for timed events, first days for all-day events) are removed after `COUNT` and
+`UNTIL` apply. An occurrence is returned when it overlaps the window.
+
 - Timed occurrences are computed in **local time of the event's zone** and converted to UTC
   afterwards, so a weekly 10:00 meeting stays at 10:00 local across daylight saving changes.
 - A local time that does not exist (spring forward) moves forward by the gap, and an ambiguous
   one (fall back) takes the first instance, as RFC 5545 §3.3.5 requires.
 - The duration of each occurrence is the duration of the first one; for all-day events it is the
   number of days.
-- Listings and the month view expand up to 18 months ahead. `limit` caps runaway rules. The ICS feed does not expand: it passes the RRULE through.
+- Listings and the month view expand up to 18 months ahead: `expand` caps the window at 18 months
+  after its start (`horizon_end`). `limit` caps runaway rules. The ICS feed does not expand: it passes the RRULE through.
 
 ### Location, coordinates and geocoding
 

@@ -12,7 +12,7 @@ ROME = ZoneInfo("Europe/Rome")
 
 
 def utc(*parts: int) -> datetime:
-    return datetime(*parts, tzinfo=UTC)  # type: ignore[misc]
+    return datetime(*parts, tzinfo=UTC)  # type: ignore[arg-type,misc]
 
 
 def timed(
@@ -61,7 +61,7 @@ def test_case_5_weekly_event_keeps_local_time_when_dst_ends() -> None:
         assert isinstance(occurrence.start, datetime)
         assert occurrence.start.tzinfo == ROME
         assert (occurrence.start.hour, occurrence.start.minute) == (10, 0)
-        assert occurrence.end - occurrence.start == timedelta(hours=1)  # type: ignore[operator]
+        assert occurrence.end - occurrence.start == timedelta(hours=1)
 
 
 def test_case_5_weekly_event_goes_back_to_0800_utc_when_dst_starts() -> None:
@@ -108,8 +108,17 @@ def _spans(occurrences: list[Occurrence]) -> list[tuple[object, object]]:
     return [(o.start, o.end) for o in occurrences]
 
 
+def by_year(spec: RecurrenceSpec, first: int = 2026, last: int = 2030) -> list[Occurrence]:
+    """Expand one calendar year at a time: each window stays inside the horizon."""
+    occurrences: list[Occurrence] = []
+    for year in range(first, last + 1):
+        window = engine.expand(spec, utc(year, 1, 1), utc(year + 1, 1, 1))
+        occurrences.extend(o for o in window if o not in occurrences)
+    return occurrences
+
+
 def test_case_7_yearly_fair_keeps_its_six_days() -> None:
-    occurrences = engine.expand(_fair("FREQ=YEARLY"), utc(2026, 1, 1), utc(2028, 12, 31))
+    occurrences = by_year(_fair("FREQ=YEARLY"), last=2028)
     assert _spans(occurrences) == [
         (date(2026, 8, 28), date(2026, 9, 2)),
         (date(2027, 8, 28), date(2027, 9, 2)),
@@ -118,20 +127,18 @@ def test_case_7_yearly_fair_keeps_its_six_days() -> None:
 
 
 def test_case_7_until_stops_the_fair() -> None:
-    occurrences = engine.expand(
-        _fair("FREQ=YEARLY;UNTIL=20270828"), utc(2026, 1, 1), utc(2030, 1, 1)
-    )
+    occurrences = by_year(_fair("FREQ=YEARLY;UNTIL=20270828"))
     assert [o.start for o in occurrences] == [date(2026, 8, 28), date(2027, 8, 28)]
 
 
 def test_case_7_count_stops_the_fair() -> None:
-    occurrences = engine.expand(_fair("FREQ=YEARLY;COUNT=2"), utc(2026, 1, 1), utc(2030, 1, 1))
+    occurrences = by_year(_fair("FREQ=YEARLY;COUNT=2"))
     assert [o.start for o in occurrences] == [date(2026, 8, 28), date(2027, 8, 28)]
 
 
 def test_case_7_an_exdate_removes_one_year() -> None:
     spec = _fair("FREQ=YEARLY;COUNT=3", exdate_days=(date(2027, 8, 28),))
-    occurrences = engine.expand(spec, utc(2026, 1, 1), utc(2030, 1, 1))
+    occurrences = by_year(spec)
     assert [o.start for o in occurrences] == [date(2026, 8, 28), date(2028, 8, 28)]
 
 
@@ -258,12 +265,12 @@ def test_last_friday_of_the_month() -> None:
 def test_every_monday_and_wednesday() -> None:
     spec = timed(utc(2026, 11, 9, 9), "FREQ=WEEKLY;BYDAY=MO,WE")
     occurrences = engine.expand(spec, utc(2026, 11, 1), utc(2026, 11, 20))
-    assert [o.start.day for o in occurrences] == [9, 11, 16, 18]  # type: ignore[union-attr]
+    assert [o.start.day for o in occurrences] == [9, 11, 16, 18]
 
 
 def test_every_august_on_the_last_saturday() -> None:
     spec = timed(utc(2026, 8, 29, 8), "FREQ=YEARLY;BYMONTH=8;BYDAY=-1SA")
-    occurrences = engine.expand(spec, utc(2026, 1, 1), utc(2029, 1, 1))
+    occurrences = by_year(spec, last=2028)
     assert [o.start.date() for o in occurrences] == [  # type: ignore[union-attr]
         date(2026, 8, 29),
         date(2027, 8, 28),
@@ -284,13 +291,13 @@ def test_last_day_of_the_month() -> None:
 def test_monthly_on_the_31st_skips_short_months() -> None:
     spec = timed(utc(2027, 1, 31, 9), "FREQ=MONTHLY;COUNT=3")
     occurrences = engine.expand(spec, utc(2027, 1, 1), utc(2028, 1, 1))
-    assert [o.start.month for o in occurrences] == [1, 3, 5]  # type: ignore[union-attr]
+    assert [o.start.month for o in occurrences] == [1, 3, 5]
 
 
 def test_interval_skips_periods() -> None:
     spec = timed(utc(2026, 11, 9, 9), "FREQ=WEEKLY;INTERVAL=2")
     occurrences = engine.expand(spec, utc(2026, 11, 1), utc(2026, 12, 10))
-    assert [o.start.day for o in occurrences] == [9, 23, 7]  # type: ignore[union-attr]
+    assert [o.start.day for o in occurrences] == [9, 23, 7]
 
 
 def test_a_single_event_without_a_rule() -> None:
@@ -314,7 +321,7 @@ def test_the_window_is_capped_at_the_horizon() -> None:
     spec = timed(utc(2026, 11, 9, 9), "FREQ=MONTHLY")
     occurrences = engine.expand(spec, utc(2026, 11, 1), utc(2036, 11, 1))
     assert len(occurrences) == engine.HORIZON_MONTHS
-    assert occurrences[-1].start < engine.horizon_end(utc(2026, 11, 1))  # type: ignore[operator]
+    assert occurrences[-1].start < engine.horizon_end(utc(2026, 11, 1))
     assert engine.horizon_end(utc(2026, 11, 1)) == utc(2028, 5, 1)
 
 
@@ -366,7 +373,9 @@ def test_expansion_properties(
         assert occurrence.start.tzinfo == ROME
         assert occurrence.start < window_end
         assert occurrence.end > window_start
-        assert occurrence.end - occurrence.start == timedelta(minutes=90)
+        assert occurrence.end.astimezone(UTC) - occurrence.start.astimezone(UTC) == timedelta(
+            minutes=90
+        )
         assert occurrence.start >= spec.starts_at  # type: ignore[operator]
 
 
