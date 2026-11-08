@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("vendors", "0014_fiscal_regime_rf20"),
+        ("vendors", "0015_reopen_onboarding_round"),
     ]
 
     operations = [
