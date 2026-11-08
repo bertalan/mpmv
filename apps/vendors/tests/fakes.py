@@ -26,5 +26,9 @@ def seed_legal_requirements() -> None:
     Transactional tests flush the tables, seeded rows included; tests that rely on the seeded
     rules call this instead of assuming the migration's rows are still there.
     """
-    for name in ("0005_seed_legal_requirements", "0007_seed_dac7_requirements"):
+    for name in (
+        "0005_seed_legal_requirements",
+        "0007_seed_dac7_requirements",
+        "0018_seed_dac7_seller_dataset",
+    ):
         importlib.import_module(f"apps.vendors.migrations.{name}").seed(apps, None)
