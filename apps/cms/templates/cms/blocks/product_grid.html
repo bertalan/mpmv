@@ -1,0 +1,10 @@
+{% load i18n %}{# The product grid (CMS.10): the CAT.8 product cards; left out when no product is public. #}
+{% if cards %}
+<section class="block block-product-grid">
+  {% if value.heading %}<h2>{{ value.heading }}</h2>{% endif %}
+  <ul class="product-grid">
+    {% for card in cards %}<li>{% include "catalog/includes/product_card.html" %}</li>{% endfor %}
+  </ul>
+  {% if see_all_url %}<p class="block-links"><a class="product-grid-all" href="{{ see_all_url }}">{% translate "See all" %}</a></p>{% endif %}
+</section>
+{% endif %}

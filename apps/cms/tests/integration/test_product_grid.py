@@ -25,6 +25,7 @@ from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.catalog import services as catalog
+from apps.catalog.listings import ListingParams
 from apps.catalog.models import Brand, Category, Product, Term
 from apps.catalog.tests.factories import (
     BrandFactory,
@@ -152,7 +153,7 @@ def test_a_term_grid_renders_the_cat8_results(seeded: SeedReport, maker: Term) -
     newer.terms.add(maker)
     html = _publish(_home(), [_grid("term", maker)])
     expected = catalog.listing_page(
-        catalog.ListingScope(term=maker), catalog.listings.ListingParams(), "en"
+        catalog.ListingScope(term=maker), ListingParams(), "en"
     ).products
     assert [p.pk for p in expected] == [newer.pk, older.pk]
     assert _titles(html) == ["Leather bag", "Steel bag"]

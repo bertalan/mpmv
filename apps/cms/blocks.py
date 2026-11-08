@@ -14,6 +14,11 @@ Cards (part 2/2) point to a page, a catalog taxonomy term or a vendor storefront
 admin (`choosers`), never typed. A card whose target is not public is left out: a page that is
 not live, a term (or its taxonomy or parent terms) without published texts, a vendor that is not
 active. Term and storefront URLs follow spec 03 (`engine.term_path`, `engine.storefront_path`).
+
+The product grid (CMS.10) shows the newest products of one category, term, brand or vendor with
+the CAT.8 listing query (`apps.catalog.services.product_grid`), as the listing's product cards,
+and an optional "See all" link to that listing page. Only published products of active vendors
+show; a grid with none is left out.
 """
 
 from collections import defaultdict
@@ -31,12 +36,23 @@ from wagtail.images.blocks import ImageChooserBlock
 from wagtail.models import Page
 
 from apps.catalog.models import TaxonomyTranslation, Term, TermTranslation
+from apps.catalog.services import ListingScope, product_grid
 from apps.core import translations
+from apps.core.money import CURRENCY
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.services import has_public_storefront
 
-from .choosers import term_chooser, vendor_chooser
-from .engine import NEUTRAL, gallery_for_language, link_language, storefront_path, term_path
+from .choosers import brand_chooser, category_chooser, term_chooser, vendor_chooser
+from .engine import (
+    NEUTRAL,
+    PRODUCT_GRID_DEFAULT,
+    PRODUCT_GRID_MAX,
+    gallery_for_language,
+    grid_limit,
+    link_language,
+    storefront_path,
+    term_path,
+)
 
 # Editors may use headings, emphasis, lists and links; no raw HTML, images or embeds yet.
 RICH_TEXT_FEATURES = ["h2", "h3", "bold", "italic", "ol", "ul", "link"]
@@ -441,4 +457,60 @@ class FeaturedLinksBlock(blocks.StructBlock):  # type: ignore[misc]
         targets = _card_targets(values, _page_language(parent_context), request)
         cards = (card_value.card(targets) for card_value in values)
         context["cards"] = [card for card in cards if card is not None]
+        return context
+
+
+# --- Product grid (CMS.10)
+
+
+class CategoryChooserBlock(category_chooser.get_block_class("_CategoryChooserBlock", __name__)):  # type: ignore[misc]
+    """A catalog category, chosen in the category chooser modal."""
+
+
+class BrandChooserBlock(brand_chooser.get_block_class("_BrandChooserBlock", __name__)):  # type: ignore[misc]
+    """A catalog brand, chosen in the brand chooser modal."""
+
+
+class ProductGridBlock(blocks.StructBlock):  # type: ignore[misc]
+    """The newest products of one category, term, brand or vendor (the CAT.8 listing query)."""
+
+    heading = blocks.CharBlock(required=False, max_length=120)
+    source = blocks.StreamBlock(
+        [
+            ("category", CategoryChooserBlock(label=_("Category"))),
+            ("term", TermChooserBlock(label=_("Term"))),
+            ("brand", BrandChooserBlock(label=_("Brand"))),
+            ("vendor", VendorChooserBlock(label=_("Vendor"))),
+        ],
+        min_num=1,
+        max_num=1,
+        label=_("Products of"),
+    )
+    limit = blocks.IntegerBlock(
+        min_value=1,
+        max_value=PRODUCT_GRID_MAX,
+        default=PRODUCT_GRID_DEFAULT,
+        label=_("Number of products"),
+    )
+    see_all = blocks.BooleanBlock(required=False, default=True, label=_("Link to the full listing"))
+
+    class Meta:
+        icon = "grip"
+        label = _("Product grid")
+        template = "cms/blocks/product_grid.html"
+
+    def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
+        context = super().get_context(value, parent_context=parent_context)
+        context["cards"], context["see_all_url"] = [], None
+        chosen = next(iter(value["source"]), None)
+        if chosen is None or chosen.value is None:
+            return context
+        grid = product_grid(
+            ListingScope(**{chosen.block_type: chosen.value}),
+            _page_language(parent_context),
+            limit=grid_limit(value.get("limit")),
+        )
+        context["cards"] = grid.cards
+        context["see_all_url"] = grid.see_all_url if value.get("see_all") else None
+        context["currency"] = CURRENCY
         return context

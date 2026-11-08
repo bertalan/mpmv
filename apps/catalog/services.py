@@ -1694,9 +1694,12 @@ def category_anchor(slug_path: str, language: str) -> ListingAnchor | None:
     tree_path = _find_tree_path(rows, "category", slug_path, language)
     if tree_path is None:
         return None
-    category = Category.objects.get(path=tree_path)
+    return _category_anchor(Category.objects.get(path=tree_path), language)
+
+
+def _category_anchor(category: Category, language: str) -> ListingAnchor:
     chain = [*category.get_ancestors(), category]
-    published = _published_slugs(rows.filter(category__in=chain), "category")
+    published = _published_slugs(CategoryTranslation.objects.filter(category__in=chain), "category")
     paths = {
         lang: slugs.category_path(lang, parts, default_language=settings.LANGUAGE_CODE)
         for lang, parts in _public_slug_paths(chain, published).items()
@@ -1728,18 +1731,22 @@ def term_anchor(taxonomy_slug: str, slug_path: str, language: str) -> ListingAnc
     found = _by_slug(taxonomy_rows.select_related("taxonomy"), taxonomy_slug, language)
     if found is None:
         return None
-    taxonomy = found.taxonomy
-    term_rows = TermTranslation.objects.filter(term__taxonomy=taxonomy)
+    term_rows = TermTranslation.objects.filter(term__taxonomy=found.taxonomy)
     tree_path = _find_tree_path(term_rows, "term", slug_path, language)
     if tree_path is None:
         return None
-    term = Term.objects.get(path=tree_path)
+    return _term_anchor(Term.objects.get(path=tree_path), language)
+
+
+def _term_anchor(term: Term, language: str) -> ListingAnchor:
+    taxonomy_rows = _landing_taxonomy_texts().filter(taxonomy_id=term.taxonomy_id)
+    term_rows = TermTranslation.objects.filter(term__taxonomy_id=term.taxonomy_id)
     chain = [*term.get_ancestors(), term]
     published = _published_slugs(term_rows.filter(term__in=chain), "term")
-    taxonomy_slugs = _published_slugs(taxonomy_rows.filter(taxonomy=taxonomy), "taxonomy")
+    taxonomy_slugs = _published_slugs(taxonomy_rows, "taxonomy").get(term.taxonomy_id, {})
     paths: dict[str, str] = {}
     for lang, parts in _public_slug_paths(chain, published).items():
-        segment = _public_slug(taxonomy_slugs.get(taxonomy.pk, {}), lang)
+        segment = _public_slug(taxonomy_slugs, lang)
         if segment is not None:
             paths[lang] = slugs.term_path(
                 lang, segment, parts, default_language=settings.LANGUAGE_CODE
@@ -1757,7 +1764,10 @@ def brand_anchor(slug: str, language: str) -> ListingAnchor | None:
     found = _by_slug(BrandTranslation.objects.select_related("brand"), slug, language)
     if found is None:
         return None
-    brand = found.brand
+    return _brand_anchor(found.brand)
+
+
+def _brand_anchor(brand: Brand) -> ListingAnchor:
     published = _published_slugs(BrandTranslation.objects.filter(brand=brand), "brand")
     brand_slugs = published.get(brand.pk, {})
     paths: dict[str, str] = {}
@@ -1783,6 +1793,10 @@ def vendor_anchor(slug: str, language: str) -> ListingAnchor | None:
     vendor = Vendor.objects.filter(slug=slug, status=Vendor.Status.ACTIVE).first()
     if vendor is None:
         return None
+    return _vendor_anchor(vendor)
+
+
+def _vendor_anchor(vendor: Vendor) -> ListingAnchor:
     texts = set(
         vendor.translations.filter(status=translations.PUBLISHED).values_list("language", flat=True)
     )
@@ -1797,6 +1811,25 @@ def vendor_anchor(slug: str, language: str) -> ListingAnchor | None:
         paths=paths,
         published=published or (translations.source_language(),),
     )
+
+
+def scope_anchor(scope: ListingScope, language: str) -> ListingAnchor | None:
+    """The listing page of a one-part scope (a CMS product grid's "See all", CMS.10): None for
+    a scope of several parts or none, or a vendor that is not active. Its `paths` lack the
+    languages with no public slug, and all of them for a taxonomy without term pages."""
+    parts = [part for part in (scope.category, scope.term, scope.brand, scope.vendor) if part]
+    if len(parts) != 1:
+        return None
+    if scope.category is not None:
+        return _category_anchor(scope.category, language)
+    if scope.term is not None:
+        return _term_anchor(scope.term, language)
+    if scope.brand is not None:
+        return _brand_anchor(scope.brand)
+    vendor = scope.vendor
+    if vendor is None or vendor.status != Vendor.Status.ACTIVE:
+        return None
+    return _vendor_anchor(vendor)
 
 
 def _filter_slug_paths(
@@ -1899,6 +1932,26 @@ def product_cards(products: Sequence[Product], language: str) -> list[ProductCar
             ProductCard(title=title, url=url, price=engine.public_price(product), image_alt=title)
         )
     return cards
+
+
+@dataclass(frozen=True)
+class ProductGrid:
+    """What a CMS product grid shows (CMS.10): the first cards of its listing and the URL of the
+    listing page in the page language (None when there is none)."""
+
+    cards: list[ProductCard]
+    see_all_url: str | None
+
+
+def product_grid(scope: ListingScope, language: str, *, limit: int) -> ProductGrid:
+    """The newest `limit` products of the `scope` listing as cards (the CAT.8 listing query, so
+    the grid and the listing page agree) and that listing page's path in `language`. A constant
+    number of queries: the products, their texts and the listing page's slugs."""
+    cards = product_cards(list(listing_products(scope)[:limit]), language)
+    if not cards:
+        return ProductGrid(cards=[], see_all_url=None)
+    anchor = scope_anchor(scope, language)
+    return ProductGrid(cards=cards, see_all_url=anchor.paths.get(language) if anchor else None)
 
 
 @dataclass(frozen=True)

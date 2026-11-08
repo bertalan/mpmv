@@ -8,8 +8,8 @@ Their links are a StreamField (page or external link): unlike inline panels and 
 its admin editor needs no inline script, so it works under the strict CSP (SEC.1).
 
 Bodies are StreamFields with rich-text paragraphs, images and galleries (I18N.3), heroes, calls to
-action, FAQs and "featured links" cards to pages, catalog terms and vendors (CMS.2); the product
-grid comes with CMS.10.
+action, FAQs and "featured links" cards to pages, catalog terms and vendors (CMS.2); home and
+standard pages also take the product grid (CMS.10).
 
 Translation (I18N.3, spec 09 §9.2): wagtail-localize copies a page into another locale and keeps
 it in sync with its source. Texts, alt texts and captions are translated; images are synchronised
@@ -45,10 +45,13 @@ from .blocks import (
     FigureBlock,
     GalleryBlock,
     HeroBlock,
+    ProductGridBlock,
 )
 
 
-def body_field(verbose_name: Any = None) -> StreamField:
+def body_field(verbose_name: Any = None, *, products: bool = False) -> StreamField:
+    """A page body; `products` adds the product grid (CMS.10) for the home and standard pages."""
+    grid = [("product_grid", ProductGridBlock())] if products else []
     return StreamField(
         [
             ("hero", HeroBlock()),
@@ -58,6 +61,7 @@ def body_field(verbose_name: Any = None) -> StreamField:
             ("cta", CallToActionBlock()),
             ("faq", FaqBlock()),
             ("featured", FeaturedLinksBlock()),
+            *grid,
         ],
         blank=True,
         verbose_name=verbose_name or _("body"),
@@ -71,7 +75,7 @@ class HomePage(Page):  # type: ignore[misc]  # Wagtail is untyped
     on every save (the page table holds the locale, so no database constraint can).
     """
 
-    body = body_field()
+    body = body_field(products=True)
 
     content_panels: ClassVar[list[Any]] = [*Page.content_panels, FieldPanel("body")]
     parent_page_types: ClassVar[list[str]] = ["wagtailcore.Page"]
@@ -110,7 +114,7 @@ class StandardPage(Page):  # type: ignore[misc]
         help_text=_("Describes the main image for people who cannot see it."),
     )
     image_caption = models.CharField(_("caption"), max_length=250, blank=True)
-    body = body_field()
+    body = body_field(products=True)
 
     content_panels: ClassVar[list[Any]] = [
         *Page.content_panels,
