@@ -1,4 +1,4 @@
-{% load i18n %}{% comment %}
+{% load i18n theme_tags %}{% comment %}
 Scroll-snap carousel with buttons (THM.4, spec 14 §14.9): a horizontal list that scrolls and
 snaps with CSS alone (touch, trackpad, Shift + wheel, and the arrow keys once the focusable track
 has the focus). The theme script (base.js) reveals the Previous and Next buttons, which scroll by
@@ -22,7 +22,7 @@ Context:
   <ul class="carousel__track" id="{{ id }}-track" tabindex="0" role="list" aria-label="{% blocktranslate %}{{ label }}, list{% endblocktranslate %}">
     {% for slide in slides %}<li class="carousel__slide">
       {% if slide.image_url %}<img src="{{ slide.image_url }}" alt="{{ slide.image_alt|default:'' }}" width="400" height="400" loading="lazy">{% endif %}
-      <h{{ heading_level|default:3 }} class="carousel__title">{% if slide.url %}<a href="{{ slide.url }}">{{ slide.title }}</a>{% else %}{{ slide.title }}{% endif %}</h{{ heading_level|default:3 }}>
+      <h{{ heading_level|default:3 }} class="carousel__title">{% with href=slide.url|safe_href %}{% if href %}<a href="{{ href }}">{{ slide.title }}</a>{% else %}{{ slide.title }}{% endif %}{% endwith %}</h{{ heading_level|default:3 }}>
       {% if slide.text %}<p>{{ slide.text }}</p>{% endif %}
     </li>{% endfor %}
   </ul>

@@ -25,6 +25,7 @@ GUIDE = ROOT / "docs" / "dev" / "dependency-updates.md"
 ECOSYSTEMS = {"uv", "github-actions", "docker"}
 SBOM_ACTION = "anchore/sbom-action@"
 COMMIT_SHA = re.compile(r"[0-9a-f]{40}")
+IMAGE_SBOM = "mpmv-image-${{ matrix.arch }}.cdx.json"
 # uv is still 0.x: its minor releases carry breaking changes, so its image is never grouped.
 UV_IMAGE = "astral-sh/uv"
 
@@ -224,14 +225,14 @@ def test_ci_publishes_python_and_image_sboms() -> None:
     ci = load(CI)
     static = steps(ci, "static")
     assert any(step.get("run", "").strip() == "make sbom" for step in static)
-    image = steps(ci, "image")
+    image = steps(ci, "image-build")
     sbom = [step for step in image if step.get("uses", "").startswith(SBOM_ACTION)]
     assert sbom, "the image job must generate an SBOM of the built image"
     assert sbom[0]["with"]["image"] == "mpmv-app:ci"
     assert sbom[0]["with"]["format"] == "cyclonedx-json"
     uploads = [
         step["with"]["path"]
-        for job in ("static", "image")
+        for job in ("static", "image-build")
         for step in steps(ci, job)
         if step.get("uses", "").startswith("actions/upload-artifact@")
     ]
@@ -250,7 +251,7 @@ def test_release_attaches_both_sboms_to_the_github_release() -> None:
     ]
     assert any("build/sbom" in str(step["with"]["path"]) for step in uploads)
     attach = release["jobs"]["attach"]
-    assert attach["needs"] == "image"
+    assert attach["needs"] == "publish"
     attach_steps = steps(release, "attach")
     assert any(
         step.get("uses", "").startswith("actions/download-artifact@") for step in attach_steps
@@ -300,7 +301,7 @@ def test_review_guide_is_documented() -> None:
         assert topic in text, topic
 
 
-@pytest.mark.parametrize(("path", "job"), [(CI, "image"), (RELEASE, "image")])
+@pytest.mark.parametrize(("path", "job"), [(CI, "image-build"), (RELEASE, "image")])
 def test_image_sbom_falls_back_to_the_syft_container_and_never_goes_missing(
     path: Path, job: str
 ) -> None:
@@ -314,10 +315,12 @@ def test_image_sbom_falls_back_to_the_syft_container_and_never_goes_missing(
     assert action["continue-on-error"] is True
     assert fallback["if"] == "steps.sbom.outcome == 'failure'"
     assert re.search(r"anchore/syft:v\d+\.\d+\.\d+ ", fallback["run"])
-    assert "cyclonedx-json=/out/mpmv-image.cdx.json" in fallback["run"]
+    # ARC.13: one SBOM per architecture, named after it.
+    assert f"cyclonedx-json=/out/{IMAGE_SBOM}" in fallback["run"]
+    assert action["with"]["output-file"] == f"build/sbom/{IMAGE_SBOM}"
     assert "if" not in present
     assert "continue-on-error" not in present
-    assert present["run"] == "test -s build/sbom/mpmv-image.cdx.json"
+    assert present["run"] == f"test -s build/sbom/{IMAGE_SBOM}"
     assert (
         names.index("Image SBOM (CycloneDX)")
         < names.index("Image SBOM fallback (syft container)")
