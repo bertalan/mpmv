@@ -1,6 +1,7 @@
 """VEN.24: staff send, resend / regenerate, approve and reject vendor claims from the admin."""
 
 from collections.abc import Callable
+from typing import Any
 
 import pytest
 from django.test import Client
@@ -12,7 +13,11 @@ from apps.core.audit import AuditContext
 from apps.core.models import AuditLog, OutboxEmail
 from apps.vendors import engine, services
 from apps.vendors.models import Vendor, VendorClaim, VendorMember
-from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
+from apps.vendors.tests.factories import (
+    VendorClaimFactory,
+    VendorFactory,
+    VendorMemberFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -26,7 +31,7 @@ def staff_client(client: Client, superuser: User, mfa_login: MfaLogin) -> Client
     return mfa_login(client, superuser)
 
 
-def run_action(client: Client, action: str, vendor: Vendor) -> Client:
+def run_action(client: Client, action: str, vendor: Vendor) -> Any:
     response = client.post(
         reverse(CHANGELIST), {"action": action, "_selected_action": [vendor.pk]}, follow=True
     )
@@ -34,8 +39,8 @@ def run_action(client: Client, action: str, vendor: Vendor) -> Client:
     return response
 
 
-def messages_of(response: Client) -> list[str]:
-    return [str(message) for message in response.context["messages"]]  # type: ignore[attr-defined]
+def messages_of(response: Any) -> list[str]:
+    return [str(message) for message in response.context["messages"]]
 
 
 def submitted_claim(vendor: Vendor) -> VendorClaim:
@@ -103,3 +108,7 @@ def test_the_change_page_shows_the_claim_status(staff_client: Client) -> None:
     submitted_claim(vendor)
     page = staff_client.get(reverse("admin:vendors_vendor_change", args=[vendor.pk]))
     assert "Submitted, waiting for approval" in page.content.decode()
+
+    locked = VendorClaimFactory.create(status=VendorClaim.Status.LOCKED, version=3)
+    page = staff_client.get(reverse("admin:vendors_vendor_change", args=[locked.vendor.pk]))
+    assert "Locked after too many wrong answers (link version 3)" in page.content.decode()

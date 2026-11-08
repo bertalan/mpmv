@@ -22,7 +22,7 @@ from django.utils.safestring import SafeString
 
 from apps.accounts.models import User
 from apps.core.admin import step_up
-from apps.core.audit import audit_context
+from apps.core.audit import AuditContext, audit_context
 
 from . import engine
 from .models import (
@@ -30,6 +30,7 @@ from .models import (
     CrossVendorConsent,
     LegalFieldRequirement,
     Vendor,
+    VendorClaim,
     VendorContract,
     VendorContractTranslation,
     VendorFeatureFlag,
@@ -38,6 +39,7 @@ from .models import (
     legal_field_label,
 )
 from .services import (
+    approve_claim,
     can_reopen,
     change_status,
     check_contract_start,
@@ -46,11 +48,13 @@ from .services import (
     delete_vendor_flag,
     legal_profile_completeness,
     onboarding_checklist,
+    reject_claim,
     reopen_vendor,
     save_contract,
     save_requirement,
     save_vendor,
     save_vendor_flag,
+    send_claim_link,
     set_cross_vendor_consent,
 )
 
@@ -132,6 +136,53 @@ def _address(prefix: str) -> tuple[str, ...]:
     )
 
 
+def _submitted_claim(vendor: Vendor) -> VendorClaim:
+    claim = VendorClaim.objects.filter(vendor=vendor).first()
+    if claim is None or claim.status != VendorClaim.Status.SUBMITTED:
+        raise engine.ClaimError("no claim is waiting for approval")
+    return claim
+
+
+def _run_claim_step(name: str, vendor: Vendor, ctx: AuditContext) -> str:
+    if name == "send_claim_link":
+        resent = VendorClaim.objects.filter(vendor=vendor).exists()
+        send_claim_link(vendor, ctx=ctx)
+        if resent:
+            return "a new claim link was sent; the previous link no longer works."
+        return "the claim link was sent to the legal email of record."
+    if name == "approve_claim":
+        approve_claim(_submitted_claim(vendor), ctx=ctx)
+        return "claim approved: the claimant is now the owner."
+    reject_claim(_submitted_claim(vendor), ctx=ctx)
+    return "claim rejected: nothing was granted."
+
+
+def claim_action(name: str, description: str) -> StatusAction:
+    """An admin action that runs one claim step (VEN.24) on each selected vendor."""
+
+    def action(
+        modeladmin: admin.ModelAdmin[Vendor], request: HttpRequest, queryset: QuerySet[Vendor]
+    ) -> None:
+        ctx = audit_context(request)
+        for vendor in queryset:
+            try:
+                done = _run_claim_step(name, vendor, ctx)
+            except engine.ClaimError as exc:
+                modeladmin.message_user(request, f"{vendor}: {exc}", messages.ERROR)
+            else:
+                modeladmin.message_user(request, f"{vendor}: {done}", messages.SUCCESS)
+
+    action.__name__ = name
+    return admin.action(description=description, permissions=["change"])(action)
+
+
+CLAIM_ACTIONS = (
+    claim_action("send_claim_link", "Send or regenerate the claim link (imported vendors)"),
+    claim_action("approve_claim", "Approve the submitted claim"),
+    claim_action("reject_claim", "Reject the submitted claim"),
+)
+
+
 @admin.register(Vendor)
 class VendorAdmin(admin.ModelAdmin[Vendor]):
     list_display = ("display_name", "legal_name", "status", "country", "contact_email")
@@ -144,6 +195,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         "onboarding",
         "onboarding_round",
         "reopen",
+        "claim_status",
         "missing_for_payout",
         "vies_status",
         "vies_checked_at",
@@ -152,7 +204,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
     )
     fieldsets = (
         (None, {"fields": ("display_name", "slug", "status", "public_id", "audit_trail")}),
-        ("Onboarding", {"fields": ("onboarding", "onboarding_round", "reopen")}),
+        ("Onboarding", {"fields": ("onboarding", "onboarding_round", "reopen", "claim_status")}),
         ("Payout readiness", {"fields": ("missing_for_payout",)}),
         (
             "Legal identity",
@@ -206,10 +258,13 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
     )
     inlines = (VendorTranslationInline,)
     # One action per status reachable by some transition (nothing ever moves back to applicant).
-    actions = tuple(
-        status_action(status)
-        for status in VendorStatus
-        if any(status in targets for targets in engine.TRANSITIONS.values())
+    actions = (
+        *(
+            status_action(status)
+            for status in VendorStatus
+            if any(status in targets for targets in engine.TRANSITIONS.values())
+        ),
+        *CLAIM_ACTIONS,
     )
 
     @admin.display(description="Missing for payout")
@@ -255,6 +310,19 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         return format_html(
             "<strong>{}</strong><ul>{}</ul>", summary, format_html_join("", "<li>{}</li>", lines)
         )
+
+    @admin.display(description="Claim")
+    def claim_status(self, obj: Vendor | None) -> str:
+        """VEN.24: the claim of an imported vendor; the list actions send, approve or reject."""
+        if obj is None or obj.pk is None:
+            return "-"
+        claim = VendorClaim.objects.filter(vendor=obj).select_related("claimant").first()
+        if claim is None:
+            return "No claim link sent."
+        text = f"{claim.get_status_display()} (link version {claim.version})"
+        if claim.claimant is not None:
+            text += f", claimant {claim.claimant.email}"
+        return text
 
     @admin.display(description="Reopen")
     def reopen(self, obj: Vendor | None) -> SafeString | str:

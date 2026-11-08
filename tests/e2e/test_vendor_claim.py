@@ -29,7 +29,8 @@ SYSTEM = AuditContext(actor_label="system:test", source=AuditLog.Source.SYSTEM)
 def emailed_link_path() -> str:
     email = OutboxEmail.objects.order_by("-id").first()
     assert email is not None
-    return "/" + json.loads(email.context)["action_url"].split("/", 3)[3]
+    url = str(json.loads(email.context)["action_url"])
+    return "/" + url.split("/", 3)[3]
 
 
 def code_from_secret(secret: str) -> str:

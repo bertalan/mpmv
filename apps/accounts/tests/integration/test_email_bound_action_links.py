@@ -147,7 +147,7 @@ def test_a_new_email_of_record_invalidates_the_link(client: Client) -> None:
     assert response["Location"] == reverse("test-invite", args=["inv-1"])
     assert client.get(response["Location"]).status_code == 403
     entry = AuditLog.objects.get(action=services.ACTION_LINK_REFUSED)
-    assert entry.after["reason"] == engine.WRONG_RECIPIENT
+    assert (entry.after or {})["reason"] == engine.WRONG_RECIPIENT
 
 
 def test_a_new_version_invalidates_an_already_opened_link(client: Client) -> None:

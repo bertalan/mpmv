@@ -16,7 +16,7 @@ from django.test import Client
 from django.urls import reverse
 from django_otp.oath import TOTP
 from django_otp.plugins.otp_totp.models import TOTPDevice
-from pytest_django.fixtures import SettingsWrapper
+from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.accounts import engine as accounts_engine
 from apps.accounts import services as accounts_services
@@ -47,7 +47,7 @@ def imported_vendor(**kwargs: Any) -> Vendor:
 
 
 def link_path(email: OutboxEmail) -> str:
-    url = json.loads(email.context)["action_url"]
+    url = str(json.loads(email.context)["action_url"])
     return "/" + url.split("/", 3)[3]
 
 
@@ -210,7 +210,7 @@ def test_an_expired_link_is_refused(client: Client, monkeypatch: pytest.MonkeyPa
     response = client.get(claim_url(vendor))
     assert response.status_code == 403
     refused = actions(accounts_services.ACTION_LINK_REFUSED)
-    assert [entry.after["reason"] for entry in refused] == [accounts_engine.EXPIRED]
+    assert [(entry.after or {})["reason"] for entry in refused] == [accounts_engine.EXPIRED]
 
 
 def test_a_new_legal_email_invalidates_the_link(client: Client) -> None:
@@ -249,7 +249,7 @@ def test_a_wrong_vat_number_is_refused_and_audited(client: Client) -> None:
     assert claim.confirmed_link == ""
     (refused,) = actions(services.CLAIM_IDENTITY_REFUSED)
     assert refused.vendor_key == str(vendor.public_id)
-    assert refused.after["failed_attempts"] == 1
+    assert (refused.after or {})["failed_attempts"] == 1
     assert wrong not in json.dumps([refused.before, refused.after])
     assert vendor.vat_number not in json.dumps([refused.before, refused.after])
 
@@ -312,7 +312,7 @@ def test_the_claim_is_submitted_with_a_password_and_an_authenticator(client: Cli
     assert int(client.session["_auth_user_id"]) == user.pk
     (submitted,) = actions(services.CLAIM_SUBMITTED)
     assert submitted.vendor_key == str(vendor.public_id)
-    assert submitted.after["claimant"] == str(user.public_id)
+    assert (submitted.after or {})["claimant"] == str(user.public_id)
 
 
 def test_a_wrong_authenticator_code_creates_nothing(client: Client) -> None:
@@ -441,16 +441,16 @@ def test_regenerating_refuses_the_old_link_and_audits_both_steps(client: Client)
     assert claim.version == 2
     (regenerated,) = actions(services.CLAIM_LINK_REGENERATED)
     (invalidated,) = actions(services.CLAIM_LINK_INVALIDATED)
-    assert regenerated.before["version"] == 1
-    assert regenerated.after["version"] == 2
-    assert invalidated.before["version"] == 1
+    assert (regenerated.before or {})["version"] == 1
+    assert (regenerated.after or {})["version"] == 2
+    assert (invalidated.before or {})["version"] == 1
     assert invalidated.vendor_key == str(vendor.public_id)
     assert OutboxEmail.objects.filter(recipient=vendor.contact_email).count() == 2
 
     open_link(client, old)
     assert client.get(claim_url(vendor)).status_code == 403
     refused = actions(accounts_services.ACTION_LINK_REFUSED)
-    assert [entry.after["reason"] for entry in refused] == [accounts_engine.OLD_VERSION]
+    assert [(entry.after or {})["reason"] for entry in refused] == [accounts_engine.OLD_VERSION]
 
     fresh = Client()
     open_link(fresh, new)

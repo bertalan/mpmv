@@ -147,6 +147,17 @@ def payout_eligibility(vendor) -> Eligibility               # DAC7 complete, acc
    data (legal identity, tax profile) or payout data. Links expire, so staff have a "resend /
    regenerate" action: it issues a new link and invalidates the old one, and both steps are in
    the AuditLog.
+   Implementation (VEN.24): the legal email of record is `Vendor.contact_email`; a vendor that
+   already has a member, or has neither a VAT number nor a TIN, cannot be claimed. The claim
+   page asks for the VAT number or TIN first (spaces, dots, dashes and the country prefix are
+   ignored); each wrong answer is audited without the typed value, claim-page POSTs are rate
+   limited per IP, and the claim locks after `VENDOR_CLAIM_MAX_FAILURES` (5) wrong answers
+   until staff regenerate the link. The password and the authenticator app (TOTP, the key kept
+   in the session until its first code checks out) come next; the account, its second factor,
+   the spent link and the submitted claim are written in one transaction. An existing account
+   with the legal email is never taken over (the claim stops and the claimant contacts staff).
+   The claimant gets no membership until staff approve the claim (`VendorClaim`, admin actions
+   on the vendor list), so before approval they reach no vendor data at all.
 2. **Paid order**: for each `VendorOrder` the rule snapshot is frozen, `compute_commission` is
    computed, and the ledger rows are written (`sale`, `shipping`, `commission`, `payment_fee`).
 3. **Transfer**: with *separate charges and transfers* (see [07](07-cart-orders-payments.md)) a Stripe

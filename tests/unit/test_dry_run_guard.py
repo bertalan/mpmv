@@ -56,6 +56,22 @@ DRY_RUN_EXCEPTIONS: Final[dict[str, tuple[str, str]]] = {
         ONE_TIME_CODE,
         "spends the single sign-in use of a secure action link (CORE.15)",
     ),
+    "apps.accounts.services.enrol_totp_key": (
+        ONE_TIME_CODE,
+        "stores an authenticator key whose first code was just checked (VEN.24 claim page)",
+    ),
+    "apps.accounts.services.spend_email_bound_link": (
+        ONE_TIME_CODE,
+        "spends the single use of an email-bound secure action link (VEN.24)",
+    ),
+    "apps.vendors.services.confirm_claim_identity": (
+        THROTTLE,
+        "counts a wrong VAT number or TIN against the claim and locks it after too many (VEN.24)",
+    ),
+    "apps.vendors.services.submit_claim": (
+        ONE_TIME_CODE,
+        "spends the claim link and the authenticator code that creates the account (VEN.24)",
+    ),
     "apps.api.services.authenticate": (
         TELEMETRY,
         "records when an API key was last used",

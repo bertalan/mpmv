@@ -3,6 +3,7 @@ permissions, and the legal and e-invoicing identity (validators, required fields
 party block)."""
 
 import dataclasses
+import hmac
 import re
 from collections.abc import Collection, Container, Iterable, Mapping, Sequence
 from decimal import Decimal
@@ -1158,3 +1159,71 @@ class ActivationNotAllowed(InvalidTransition):
 def check_activation(checklist: OnboardingChecklist) -> None:
     if not checklist.ready:
         raise ActivationNotAllowed(checklist)
+
+
+# --- Claiming an imported vendor (VEN.24, owner decision MQ-1, spec 04 "Flows")
+#
+# A vendor imported without an account holder is claimed through an email-bound secure link
+# (CORE.15) sent to its legal email of record. The claimant proves they know the stored VAT
+# number or TIN; staff approve the claim before the claimant becomes the owner.
+
+CLAIM_OPEN: Final = "open"  # a link is out, waiting for the claimant
+CLAIM_LOCKED: Final = "locked"  # too many wrong VAT numbers or TINs: staff regenerate the link
+CLAIM_SUBMITTED: Final = "submitted"  # account created, waiting for staff approval
+CLAIM_APPROVED: Final = "approved"  # the claimant is the vendor's owner
+CLAIM_REJECTED: Final = "rejected"  # staff refused it: nothing granted, a new link may follow
+
+CLAIM_STATUSES: Final = (CLAIM_OPEN, CLAIM_LOCKED, CLAIM_SUBMITTED, CLAIM_APPROVED, CLAIM_REJECTED)
+
+
+class ClaimError(ValueError):
+    """A claim step the rules refuse (the message is safe to show to staff)."""
+
+
+def check_claim_link_can_be_sent(status: str | None) -> None:
+    """A link is sent for a new claim, or regenerated while no claim waits for staff and none
+    was approved (a pending claim is decided first)."""
+    if status == CLAIM_SUBMITTED:
+        raise ClaimError("a claim is waiting for approval: approve or reject it first")
+    if status == CLAIM_APPROVED:
+        raise ClaimError("the vendor was already claimed")
+
+
+def claim_locks_after(failed_attempts: int, *, max_failures: int) -> bool:
+    """Whether a claim with `failed_attempts` wrong answers is locked."""
+    return failed_attempts >= max_failures
+
+
+def _tax_id(value: str) -> str:
+    """Letters and digits only, upper case: how a typed VAT number or TIN is compared."""
+    return "".join(char for char in value if char.isalnum()).upper()
+
+
+def _tax_id_forms(value: str, prefix: str) -> set[str]:
+    """A stored identifier with and without the country's VAT prefix."""
+    compacted = _tax_id(value)
+    if not compacted:
+        return set()
+    forms = {compacted}
+    if compacted.startswith(prefix) and len(compacted) > len(prefix):
+        forms.add(compacted[len(prefix) :])
+    else:
+        forms.add(prefix + compacted)
+    return forms
+
+
+def claim_identity_matches(typed: str, *, vat_number: str, tax_code: str, country: str) -> bool:
+    """Whether `typed` is the vendor's stored VAT number or TIN.
+
+    Spaces, dots and dashes are ignored, letters compared in upper case, and a VAT number may
+    be typed with or without the country prefix. Every stored form is compared in constant time.
+    """
+    candidate = _tax_id(typed)
+    prefix = vat_prefix(country)
+    if not candidate or candidate == prefix:
+        return False
+    stored = _tax_id_forms(vat_number, prefix) | _tax_id_forms(tax_code, prefix)
+    matched = False
+    for form in sorted(stored):
+        matched |= hmac.compare_digest(candidate.encode(), form.encode())
+    return matched

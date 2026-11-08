@@ -1,7 +1,7 @@
 """Vendor services: vendor data and status changes (VEN.1, SEC.4), memberships with their
 permissions (CORE.2), the legal identity with its payout requirements (VEN.12) and onboarding:
 application, versioned contract, acceptance and the activation gate (VEN.5); per-vendor feature
-flag overrides (ARC.8)."""
+flag overrides (ARC.8); claiming an imported vendor (VEN.24)."""
 
 import dataclasses
 import datetime as dt
@@ -10,16 +10,39 @@ from typing import Any
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.password_validation import validate_password
+from django.contrib.sessions.backends.base import SessionBase
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection, transaction
 from django.db.models import OuterRef, QuerySet, Subquery
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.module_loading import import_string
 
-from apps.accounts.models import User
-from apps.core.audit import AuditContext
+from apps.accounts import engine as accounts_engine
+from apps.accounts.models import User, normalize_email_address
+from apps.accounts.services import (
+    ActionLinkCheck,
+    ActionLinkSpent,
+    ActionPurpose,
+    Enrolment,
+    email_bound_link,
+    enrol_totp_key,
+    register_action_purpose,
+    send_action_link_email,
+    spend_email_bound_link,
+    totp_key_time_step,
+)
+from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
-from apps.core.services import audit_changes, flags_changed, run_mutation, save_audited
+from apps.core.services import (
+    audit_changes,
+    consume_rate_limit,
+    flags_changed,
+    run_mutation,
+    save_audited,
+)
+from apps.core.throttling import ip_bucket
 
 from . import engine
 from .models import (
@@ -27,6 +50,7 @@ from .models import (
     CrossVendorConsent,
     LegalFieldRequirement,
     Vendor,
+    VendorClaim,
     VendorContract,
     VendorContractTranslation,
     VendorFeatureFlag,
@@ -954,3 +978,332 @@ def set_cross_vendor_consent(
             supersedes=None if latest is None else consent_snapshot(latest),
         )
         return run_mutation(changes, consent.save, ctx=ctx, action=CONSENT_SET, dry_run=dry_run)
+
+
+# --- Claiming an imported vendor (VEN.24, owner decision MQ-1, spec 04 "Flows")
+#
+# Staff send a link (an email-bound CORE.15 purpose) that goes only to the vendor's legal email
+# of record, `Vendor.contact_email`. The claimant confirms the stored VAT number or TIN (wrong
+# answers are counted, audited and lock the claim), then sets a password and enrols an
+# authenticator app: the account is created and the claim submitted in one transaction, which
+# spends the link. The claimant gets no membership until staff approve the claim, so before
+# approval they cannot change the legal identity, the tax profile or the payout data.
+# Regenerating the link raises the claim version: the old link is refused.
+
+CLAIM_PURPOSE = "vendors.claim"
+CLAIM_EMAIL_TEMPLATE = "vendors.claim_link"
+CLAIM_MODEL = "vendors.vendorclaim"
+CLAIM_LINK_SENT = "vendor.claim_link_sent"
+CLAIM_LINK_REGENERATED = "vendor.claim_link_regenerated"
+CLAIM_LINK_INVALIDATED = "vendor.claim_link_invalidated"
+CLAIM_IDENTITY_CONFIRMED = "vendor.claim_identity_confirmed"
+CLAIM_IDENTITY_REFUSED = "vendor.claim_identity_refused"
+CLAIM_LOCKED = "vendor.claim_locked"
+CLAIM_SUBMITTED = "vendor.claim_submitted"
+CLAIM_APPROVED = "vendor.claim_approved"
+CLAIM_REJECTED = "vendor.claim_rejected"
+CLAIM_RATE_WINDOW = dt.timedelta(minutes=15)
+
+
+class ClaimCodeInvalid(engine.ClaimError):
+    """The authenticator-app code does not match the key shown on the claim page."""
+
+
+class ClaimAccountExists(engine.ClaimError):
+    """An account already uses the legal email of record: the claim never takes it over."""
+
+
+def claim_snapshot(claim: VendorClaim) -> dict[str, Any]:
+    """Public ids and counters only: never the typed VAT number or TIN, never the link."""
+    return {
+        "vendor": str(claim.vendor.public_id),
+        "status": claim.status,
+        "version": claim.version,
+        "failed_attempts": claim.failed_attempts,
+        "claimant": str(claim.claimant.public_id) if claim.claimant else None,
+    }
+
+
+def _open_claim(object_key: str) -> VendorClaim | None:
+    try:
+        return (
+            VendorClaim.objects.select_related("vendor")
+            .filter(vendor__public_id=object_key, status=VendorClaim.Status.OPEN)
+            .first()
+        )
+    except ValidationError:  # not a UUID: no vendor
+        return None
+
+
+def _claim_version(object_key: str) -> str | None:
+    """The version links of an open claim are bound to; None once the claim is not open."""
+    claim = _open_claim(object_key)
+    return None if claim is None else str(claim.version)
+
+
+def _legal_email(object_key: str) -> str | None:
+    """The vendor's legal email of record: the only address a claim link goes to."""
+    try:
+        vendor = Vendor.objects.filter(public_id=object_key).only("contact_email").first()
+    except ValidationError:
+        return None
+    return vendor.contact_email if vendor else None
+
+
+def claim_path(object_key: str) -> str:
+    return reverse("vendor_claim:claim", args=[object_key])
+
+
+def register_claim_purpose() -> None:
+    """Register the email-bound claim link with the CORE.15 action links (AppConfig.ready)."""
+    register_action_purpose(
+        ActionPurpose(
+            name=CLAIM_PURPOSE,
+            version_of=_claim_version,
+            url_of=claim_path,
+            email_of=_legal_email,
+        )
+    )
+
+
+def claim_link(session: SessionBase, object_key: str) -> ActionLinkCheck:
+    """The claim link opened in this session for the vendor `object_key`, checked again now."""
+    return email_bound_link(session, CLAIM_PURPOSE, object_key)
+
+
+def claim_retry_after(ip: str | None) -> dt.timedelta:
+    """Count one claim-page POST from `ip`; zero when allowed, else the wait (Retry-After)."""
+    return consume_rate_limit(
+        f"vendor-claim:ip:{ip_bucket(ip) or 'unknown'}",
+        limit=settings.VENDOR_CLAIM_RATE_LIMIT,
+        window=CLAIM_RATE_WINDOW,
+    )
+
+
+def send_claim_link(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Send the claim link of `vendor` to its legal email of record, or a new one (resend /
+    regenerate) that invalidates the link sent before; every step audited.
+
+    Raises `engine.ClaimError` when the vendor already has an account holder, has no legal
+    email or no VAT number or TIN to confirm, or a claim waits for approval or was approved.
+    """
+    with transaction.atomic():
+        locked = Vendor.objects.select_for_update().get(pk=vendor.pk)
+        if VendorMember.objects.filter(vendor=locked).exists():
+            raise engine.ClaimError(f"{locked} already has an account holder")
+        if not locked.contact_email.strip():
+            raise engine.ClaimError(f"{locked} has no legal email of record")
+        if not (locked.vat_number.strip() or locked.tax_code.strip()):
+            raise engine.ClaimError(f"{locked} has no VAT number or TIN to confirm")
+        claim = VendorClaim.objects.select_for_update().filter(vendor=locked).first()
+        engine.check_claim_link_can_be_sent(claim.status if claim else None)
+
+        changes = ChangeSet()
+        audits: list[tuple[str, dict[str, Any] | None, dict[str, Any] | None]] = []
+        if claim is None:
+            claim = VendorClaim(vendor=locked)
+            after = claim_snapshot(claim)
+            changes.create(CLAIM_MODEL, str(claim.public_id), after)
+            audits.append((CLAIM_LINK_SENT, None, after))
+        else:
+            before = claim_snapshot(claim)
+            claim.version += 1
+            claim.status = VendorClaim.Status.OPEN
+            claim.failed_attempts = 0
+            claim.confirmed_link = ""
+            claim.claimant = None
+            claim.submitted_at = None
+            claim.decided_at = None
+            after = claim_snapshot(claim)
+            changes.update(CLAIM_MODEL, str(claim.public_id), before, after)
+            audits.append((CLAIM_LINK_INVALIDATED, before, {"version": before["version"]}))
+            audits.append((CLAIM_LINK_REGENERATED, before, after))
+        if dry_run:
+            return changes
+
+        claim.link_sent_at = timezone.now()
+        claim.save()
+        for action, before_snapshot, after_snapshot in audits:
+            if action == CLAIM_LINK_INVALIDATED:
+                after_snapshot = {"vendor": str(locked.public_id), **(after_snapshot or {})}
+            record(ctx, action, CLAIM_MODEL, str(claim.public_id), before_snapshot, after_snapshot)
+        send_action_link_email(
+            purpose=CLAIM_PURPOSE,
+            object_key=str(locked.public_id),
+            version=claim.version,
+            template_key=CLAIM_EMAIL_TEMPLATE,
+            context={"vendor_name": locked.legal_name},
+            expires_in=settings.VENDOR_CLAIM_LINK_MAX_AGE,
+            ctx=ctx,
+        )
+    return changes
+
+
+def claim_link_digest(link: ActionLinkCheck) -> str:
+    """SHA-256 of the link's nonce: names the link without the token ("" without claims)."""
+    return accounts_engine.action_nonce_digest(link.claims.nonce) if link.claims else ""
+
+
+def _lock_open_claim(link: ActionLinkCheck) -> VendorClaim:
+    """The claim a valid, opened link belongs to, locked; the link must still be current."""
+    claims = link.claims
+    if link.refusal is not None or claims is None or claims.purpose != CLAIM_PURPOSE:
+        raise engine.ClaimError("the claim link is not valid")
+    claim = (
+        VendorClaim.objects.select_for_update(of=("self",))
+        .select_related("vendor")
+        .filter(vendor__public_id=claims.object_key)
+        .first()
+    )
+    if (
+        claim is None
+        or claim.status != VendorClaim.Status.OPEN
+        or str(claim.version) != claims.version
+    ):
+        raise engine.ClaimError("the claim link is not valid")
+    return claim
+
+
+def confirm_claim_identity(link: ActionLinkCheck, typed: str, *, ctx: AuditContext) -> bool:
+    """Check the VAT number or TIN the claimant typed against the stored ones.
+
+    A match records that this link confirmed the identity (the account step needs it). A
+    mismatch is counted and audited (never the typed value); the claim locks after
+    `settings.VENDOR_CLAIM_MAX_FAILURES`. Raises `engine.ClaimError` for a link that is not
+    valid now (expired, regenerated, locked or used). A throttle counter: no dry-run.
+    """
+    with transaction.atomic():
+        claim = _lock_open_claim(link)
+        vendor = claim.vendor
+        before = claim_snapshot(claim)
+        key = str(claim.public_id)
+        if engine.claim_identity_matches(
+            typed, vat_number=vendor.vat_number, tax_code=vendor.tax_code, country=vendor.country
+        ):
+            claim.confirmed_link = claim_link_digest(link)
+            claim.save(update_fields=["confirmed_link", "updated_at"])
+            record(ctx, CLAIM_IDENTITY_CONFIRMED, CLAIM_MODEL, key, None, claim_snapshot(claim))
+            return True
+        claim.failed_attempts += 1
+        locks = engine.claim_locks_after(
+            claim.failed_attempts, max_failures=settings.VENDOR_CLAIM_MAX_FAILURES
+        )
+        if locks:
+            claim.status = VendorClaim.Status.LOCKED
+            claim.confirmed_link = ""
+        claim.save(update_fields=["failed_attempts", "status", "confirmed_link", "updated_at"])
+        record(ctx, CLAIM_IDENTITY_REFUSED, CLAIM_MODEL, key, before, claim_snapshot(claim))
+        if locks:
+            record(ctx, CLAIM_LOCKED, CLAIM_MODEL, key, before, claim_snapshot(claim))
+    return False
+
+
+def identity_confirmed(link: ActionLinkCheck) -> bool:
+    """Whether this (valid) link already confirmed the VAT number or TIN of its open claim."""
+    claims = link.claims
+    if link.refusal is not None or claims is None:
+        return False
+    claim = _open_claim(claims.object_key)
+    return (
+        claim is not None
+        and str(claim.version) == claims.version
+        and bool(claim.confirmed_link)
+        and claim.confirmed_link == accounts_engine.action_nonce_digest(claims.nonce)
+    )
+
+
+@dataclasses.dataclass(frozen=True)
+class SubmittedClaim:
+    claim: VendorClaim
+    claimant: User
+    enrolment: Enrolment
+
+
+def submit_claim(
+    link: ActionLinkCheck,
+    *,
+    full_name: str,
+    password: str,
+    totp_key: str,
+    totp_code: str,
+    language: str,
+    ctx: AuditContext,
+) -> SubmittedClaim:
+    """Create the claimant's account with its password and authenticator app, spend the link
+    and submit the claim for staff approval, all or nothing.
+
+    The account's email is the legal email of record (the link proved control of it). The
+    claimant gets no membership: staff approve first (`approve_claim`). Raises
+    `engine.ClaimError` (link not valid, identity not confirmed with this link),
+    `ClaimCodeInvalid`, `ClaimAccountExists`, or `ValidationError` for a weak password. Spends
+    a one-time code and the link: no dry-run.
+    """
+    with transaction.atomic():
+        claim = _lock_open_claim(link)
+        nonce_digest = claim_link_digest(link)
+        if not claim.confirmed_link or claim.confirmed_link != nonce_digest:
+            raise engine.ClaimError("confirm the VAT number or TIN first")
+        email = normalize_email_address(claim.vendor.contact_email)
+        if User.objects.filter(email=email).exists():
+            raise ClaimAccountExists("an account already uses this email address")
+        user = User(email=email, full_name=full_name.strip(), preferred_language=language)
+        validate_password(password, user)
+        time_step = totp_key_time_step(totp_key, totp_code)
+        if time_step is None:
+            raise ClaimCodeInvalid("invalid authenticator code")
+
+        user.set_password(password)
+        user.save()
+        try:
+            spend_email_bound_link(link, user, ctx=ctx)
+        except ActionLinkSpent as exc:
+            raise engine.ClaimError("the claim link was already used") from exc
+        enrolment = enrol_totp_key(user, totp_key, time_step=time_step, ctx=ctx)
+        before = claim_snapshot(claim)
+        claim.status = VendorClaim.Status.SUBMITTED
+        claim.claimant = user
+        claim.submitted_at = timezone.now()
+        claim.confirmed_link = ""
+        claim.save()
+        record(
+            ctx, CLAIM_SUBMITTED, CLAIM_MODEL, str(claim.public_id), before, claim_snapshot(claim)
+        )
+    return SubmittedClaim(claim, user, enrolment)
+
+
+def _decide(
+    claim: VendorClaim, status: str, action: str, *, ctx: AuditContext, dry_run: bool
+) -> ChangeSet:
+    with transaction.atomic():
+        locked = (
+            VendorClaim.objects.select_for_update(of=("self",))
+            .select_related("vendor", "claimant")
+            .get(pk=claim.pk)
+        )
+        if locked.status != VendorClaim.Status.SUBMITTED or locked.claimant is None:
+            raise engine.ClaimError(f"{locked.vendor} has no claim waiting for approval")
+        before = claim_snapshot(locked)
+        locked.status = status
+        changes = ChangeSet()
+        changes.update(CLAIM_MODEL, str(locked.public_id), before, claim_snapshot(locked))
+        if dry_run:
+            return changes
+        if status == VendorClaim.Status.APPROVED:
+            add_member(locked.vendor, locked.claimant, engine.OWNER, ctx=ctx)
+        locked.decided_at = timezone.now()
+        locked.save(update_fields=["status", "decided_at", "updated_at"])
+        audit_changes(changes, ctx=ctx, action=action)
+    claim.status, claim.decided_at = locked.status, locked.decided_at
+    return changes
+
+
+def approve_claim(claim: VendorClaim, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Staff approve a submitted claim: the claimant becomes the vendor's owner, and only now
+    may change its legal identity, tax profile and payout data. Raises `engine.ClaimError`
+    when no claim waits for approval."""
+    return _decide(claim, VendorClaim.Status.APPROVED, CLAIM_APPROVED, ctx=ctx, dry_run=dry_run)
+
+
+def reject_claim(claim: VendorClaim, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Staff reject a submitted claim: nothing is granted; staff may send a new link later."""
+    return _decide(claim, VendorClaim.Status.REJECTED, CLAIM_REJECTED, ctx=ctx, dry_run=dry_run)
