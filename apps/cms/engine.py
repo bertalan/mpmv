@@ -81,7 +81,7 @@ def content_changed(latest: Mapping[str, Any] | None, current: Mapping[str, Any]
     return latest is None or dict(latest) != dict(current)
 
 
-# --- Card URLs (spec 03 "URLs"; taxonomy URLs follow the D-07 proposal, served by CAT.8)
+# --- Card URLs (spec 03 "URLs"; taxonomy URLs follow D-07, served by CAT.8)
 
 
 def localized_path(language: str, primary: str, segments: Iterable[str]) -> str:
