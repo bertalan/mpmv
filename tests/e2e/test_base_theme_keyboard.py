@@ -66,6 +66,8 @@ def _help_url(settings: SettingsWrapper) -> None:
 
 def tab_through(page: Page) -> list[dict[str, Any]]:
     """Press Tab until every control was reached once (or twice the count): the focus stops."""
+    # After a click-driven navigation the URL can match before theme.css has loaded.
+    page.wait_for_load_state("load")
     total = page.evaluate(MARK_CONTROLS)
     assert total > 0
     stops: list[dict[str, Any]] = []
