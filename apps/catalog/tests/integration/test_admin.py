@@ -143,14 +143,14 @@ def test_add_product_with_translations_and_a_variant(staff_client: Client) -> No
     assert response.status_code == 302, response.content.decode()
 
     product = Product.objects.get()
-    assert product.sku == "BAG-01"
+    assert (product.sku, product.sku_key) == ("bag-01", "bag-01")
     assert product.vendor == vendor
     assert product.status == Product.Status.DRAFT
     assert product.price_net == Decimal("25.00")
     assert product.translations.get(language="en").title == "Leather bag"
     assert product.translation("it").is_fallback is True
     variant = product.variants.get()
-    assert (variant.sku, variant.vendor, variant.is_default) == ("BAG-01-RED", vendor, True)
+    assert (variant.sku, variant.vendor, variant.is_default) == ("bag-01-red", vendor, True)
     assert variant.price_net_override == Decimal("27.00")
     # CAT.12: creations are audited; a first price is not a price change.
     assert sorted(domain_entries().values_list("action", flat=True)) == [

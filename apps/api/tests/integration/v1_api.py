@@ -29,8 +29,12 @@ LEAKY_DETAIL = "internal detail that must never reach the client"
 router = Router(tags=["test"])
 
 
-@router.post("/clients/{public_id}/revoke", response=ChangeSetOut, auth=ApiKey("clients:write"))
-def revoke_client(request: HttpRequest, public_id: uuid.UUID, dry_run: DryRun = False) -> object:
+# A vendor key holds only vendor-grantable scopes, at issuance and at request time (CORE.14), so
+# the operations below that vendor keys call require this one; `test:*` scopes are platform-only.
+VENDOR_SCOPE = "stock:write"
+
+
+def _revoke(request: HttpRequest, public_id: uuid.UUID, dry_run: bool) -> object:
     """A real mutating service behind a test-only route: proves dry-run, audit and call log.
 
     The target is found within the caller's actor scope, as in every API v1 operation on vendor
@@ -41,6 +45,19 @@ def revoke_client(request: HttpRequest, public_id: uuid.UUID, dry_run: DryRun = 
     return changeset_out(changeset, dry_run=dry_run)
 
 
+@router.post("/clients/{public_id}/revoke", response=ChangeSetOut, auth=ApiKey("clients:write"))
+def revoke_client(request: HttpRequest, public_id: uuid.UUID, dry_run: DryRun = False) -> object:
+    return _revoke(request, public_id, dry_run)
+
+
+@router.post("/vendor/clients/{public_id}/revoke", response=ChangeSetOut, auth=ApiKey(VENDOR_SCOPE))
+def vendor_revoke_client(
+    request: HttpRequest, public_id: uuid.UUID, dry_run: DryRun = False
+) -> object:
+    """The same operation under a vendor-grantable scope, for vendor keys (CORE.13, CORE.14)."""
+    return _revoke(request, public_id, dry_run)
+
+
 class EchoIn(Schema):
     name: str
     quantity: int = Field(gt=0)
@@ -48,6 +65,14 @@ class EchoIn(Schema):
 
 @router.post("/echo", auth=ApiKey("test:write"))
 def echo(request: HttpRequest, payload: EchoIn, dry_run: DryRun = False) -> dict[str, object]:
+    return {"name": payload.name, "quantity": payload.quantity, "dry_run": dry_run}
+
+
+@router.post("/vendor/echo", auth=ApiKey(VENDOR_SCOPE))
+def vendor_echo(
+    request: HttpRequest, payload: EchoIn, dry_run: DryRun = False
+) -> dict[str, object]:
+    """`/echo` under a vendor-grantable scope, for vendor keys (CORE.14)."""
     return {"name": payload.name, "quantity": payload.quantity, "dry_run": dry_run}
 
 

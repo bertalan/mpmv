@@ -115,7 +115,7 @@ class VariantIn(Schema):
     sku: str = Field(min_length=1, max_length=engine.SKU_MAX_LENGTH)
     options: dict[str, str] = Field(description="Value code per variant axis, e.g. {size: m}.")
     price_net_override: Decimal | None = None
-    weight_kg_override: Decimal | None = None
+    weight_kg_override: Decimal | None = Field(None, ge=0, max_digits=8, decimal_places=3)
     stock_qty: int = Field(0, ge=0)
     is_default: bool = False
 
@@ -195,7 +195,13 @@ def create_product(
     variants. 201 with the ChangeSet when created; 200 with it on `?dry_run=true`."""
     vendor = _vendor(request, payload.vendor)
     changes = services.create_product(
-        vendor, payload.to_engine(), ctx=audit_context(request), dry_run=dry_run
+        vendor,
+        payload.to_engine(),
+        ctx=audit_context(request),
+        dry_run=dry_run,
+        # A vendor key writes only while its vendor is active: checked again in the write
+        # transaction, in case the vendor was suspended after the key was authenticated.
+        require_active_vendor=api_client_of(request).vendor is not None,
     )
     return Status(200 if dry_run else 201, changeset_out(changes, dry_run=dry_run))
 
