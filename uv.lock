@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.13"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -1498,6 +1498,7 @@ dependencies = [
     { name = "psycopg", extra = ["binary"] },
     { name = "segno" },
     { name = "wagtail" },
+    { name = "wagtail-localize" },
     { name = "webauthn" },
     { name = "whitenoise" },
 ]
@@ -1535,6 +1536,7 @@ requires-dist = [
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3" },
     { name = "segno", specifier = ">=1.6.6" },
     { name = "wagtail", specifier = ">=8.1,<8.2" },
+    { name = "wagtail-localize", specifier = ">=1.14.5,<1.15" },
     { name = "webauthn", specifier = ">=3.0.1" },
     { name = "whitenoise", specifier = ">=6.12" },
 ]
@@ -1867,6 +1869,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/bf/db/7fc19e6f2dc92a966727031389fc2e08b558f0f25eb7403c1119ad4713cd/pluggy-1.7.0.tar.gz", hash = "sha256:d1eaa46ebb595891b860ab086b4d09c8588af65ebd4361b8e8f4bb8920b90ba8", size = 123304, upload-time = "2026-10-15T09:50:58.343Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/40/9e/2b38731e0fc536806f16490e1a12d7f0dc2a1235aa8cc07bcc75416a7daa/pluggy-1.7.0-py3-none-any.whl", hash = "sha256:7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec", size = 27082, upload-time = "2026-10-15T09:50:56.808Z" },
+]
+
+[[package]]
+name = "polib"
+version = "1.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/10/9a/79b1067d27e38ddf84fe7da6ec516f1743f31f752c6122193e7bce38bdbf/polib-1.2.0.tar.gz", hash = "sha256:f3ef94aefed6e183e342a8a269ae1fc4742ba193186ad76f175938621dbfc26b", size = 161658, upload-time = "2023-02-23T17:53:56.873Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6b/99/45bb1f9926efe370c6dbe324741c749658e44cb060124f28dad201202274/polib-1.2.0-py2.py3-none-any.whl", hash = "sha256:1c77ee1b81feb31df9bca258cbc58db1bbb32d10214b173882452c73af06d62d", size = 20634, upload-time = "2023-02-23T17:53:59.919Z" },
 ]
 
 [[package]]
@@ -2766,6 +2777,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/7f/f4/b610c5f9e26b43fc404045800a2a3d167e2b055e69837f4ebf3331f78c07/wagtail-8.1.tar.gz", hash = "sha256:5c1abb0e11efc31454db0b5312d6786b5d8fdfbef5c815b7d8bacb2ad6bd486c", size = 7073619, upload-time = "2026-11-02T15:58:35.52Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/15/9d/76d9a648ae7fe34425b474be23d9e0bef43f2f332d848a0d2e865c042564/wagtail-8.1-py3-none-any.whl", hash = "sha256:dd7c988377ec6b8fcbd9ea8b5e36d34d800706bb70f927711ff4575619752d42", size = 9756355, upload-time = "2026-11-02T15:57:51.495Z" },
+]
+
+[[package]]
+name = "wagtail-localize"
+version = "1.14.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+    { name = "polib" },
+    { name = "typing-extensions" },
+    { name = "wagtail" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/50/09/edc4a6a17edcdf78d2a5bf8395e68f991c709d101aad0ce4fc636b0f9ef0/wagtail_localize-1.14.5.tar.gz", hash = "sha256:7e21bb845bd0142a554a8ddb5819450782107dac94756a90f56085991a4c318d", size = 1189851, upload-time = "2026-08-19T15:11:22.001Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/27/64/59c70f0c48e37bcec2706963adbe5a577e178bdf56790f10e581ffff8f35/wagtail_localize-1.14.5-py3-none-any.whl", hash = "sha256:c08841d1d982e238b4cf5fb8e5d4cace82cf8e8d255fd0db4fa11dd874d7c0fd", size = 535341, upload-time = "2026-08-19T15:11:20.441Z" },
 ]
 
 [[package]]
