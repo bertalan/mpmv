@@ -103,7 +103,18 @@
     background: var(--color-accent-tint);
   }
 
+  /* Below 48rem the header wraps to two rows or more (about 90 px), taller than the
+     --header-height scroll padding: a sticky header there could hide the focused element
+     (WCAG 2.4.11). It scrolls away with the page instead, and needs no scroll padding. */
   @media (width < 48rem) {
+    html {
+      scroll-padding-top: 0;
+    }
+
+    .site-header {
+      position: static;
+    }
+
     .site-nav {
       flex-basis: 100%;
       order: 3;

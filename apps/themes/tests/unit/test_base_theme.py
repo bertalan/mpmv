@@ -66,6 +66,26 @@ def test_the_sticky_header_never_hides_the_focused_element(base_css: str) -> Non
     assert "scroll-padding-top:var(--header-height)" in base_css
 
 
+def narrow_rules(css: str) -> str:
+    """The rules inside every `@media (width<48rem)` block of the minified CSS."""
+    rules = []
+    for match in re.finditer(r"@media \(width ?< ?48rem\)\{", css):
+        depth, end = 1, match.end()
+        while depth:
+            depth += {"{": 1, "}": -1}.get(css[end], 0)
+            end += 1
+        rules.append(css[match.end() : end - 1])
+    return "".join(rules)
+
+
+def test_the_header_is_not_sticky_on_narrow_screens(base_css: str) -> None:
+    # Below 48rem the header wraps to about 90 px: taller than the 4rem scroll padding, so a
+    # sticky header could hide the focused element (WCAG 2.4.11). It scrolls away instead.
+    narrow = narrow_rules(base_css)
+    assert re.search(r"\.site-header\{[^}]*position:static", narrow), narrow
+    assert re.search(r"html\{[^}]*scroll-padding-top:0", narrow), narrow
+
+
 def test_form_fields_mark_required_and_invalid_states(base_css: str) -> None:
     assert ".field__required" in base_css
     assert '[aria-invalid="true"]' in base_css or "[aria-invalid=true]" in base_css

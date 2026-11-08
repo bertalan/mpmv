@@ -56,6 +56,39 @@ def test_allowed_markup_passes(source: str) -> None:
     assert lint_template(source) == []
 
 
+@pytest.mark.parametrize(
+    "source",
+    [
+        "<div x-data='{ open: false }'>",
+        "<button @click='open = !open'>",
+        "<p x-show='open && ready'>",
+        '<p :class=\'open ? "a" : "b"\'>',
+        "<button @click=toggle()>",
+        "<p x-show=!open>",
+        "<p x-init=start()>",
+        "<div x-data={open:true}>",
+    ],
+)
+def test_alpine_expressions_are_found_whatever_the_quoting(source: str) -> None:
+    findings = lint_template(source)
+    assert any("Alpine expression" in f for f in findings), findings
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "<div x-data='disclosure' @keydown.escape='close'>",
+        "<button x-on:click='toggle' :aria-expanded='expanded'>",
+        "<div x-data=disclosure @keydown.escape=close>",
+        "<button x-on:click=toggle :aria-expanded=expanded>",
+        "<div x-data=disclosure>",
+        '<button @click=toggle class="nav-toggle">',
+    ],
+)
+def test_alpine_names_pass_whatever_the_quoting(source: str) -> None:
+    assert lint_template(source) == []
+
+
 def test_findings_carry_the_line_number() -> None:
     assert lint_template('<p>\n<p style="x">') == ["line 2: style attribute"]
 

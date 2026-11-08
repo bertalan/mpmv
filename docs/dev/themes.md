@@ -175,7 +175,8 @@ adds the component library.
 - **Language switcher**: `components/language_switcher.html`, one POST form per language to
   `switch_language`; works without JavaScript.
 - **Accessibility rules in `theme.css`**: `:focus-visible` outline of `--focus-width` (3 px) in
-  `--color-focus`, never removed; `scroll-padding-top: var(--header-height)`; header and footer
+  `--color-focus`, never removed; `scroll-padding-top: var(--header-height)` for the sticky
+  header, which below 48rem (where it wraps taller than that) is not sticky; header and footer
   links at least `--target-min` (24 px), buttons and fields `--target-primary` (44 px) high;
   transitions only inside `prefers-reduced-motion: no-preference`, and none under `reduce`.
 
