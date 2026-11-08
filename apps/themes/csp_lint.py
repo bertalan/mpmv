@@ -14,7 +14,16 @@ from pathlib import Path
 from .engine import is_themable
 
 _RULES: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"<script\b(?![^>]*\ssrc\s*=)[^>]*>", re.IGNORECASE), "inline <script>"),
+    # A script with `src`, or a data block (JSON-LD, JSON), which the browser never runs and
+    # the CSP does not govern, is allowed; any other inline script is not.
+    (
+        re.compile(
+            r"<script\b(?![^>]*\ssrc\s*=)"
+            r"(?![^>]*\stype\s*=\s*[\"']?application/(?:ld\+)?json[\"'\s>])[^>]*>",
+            re.IGNORECASE,
+        ),
+        "inline <script>",
+    ),
     (re.compile(r"<style\b", re.IGNORECASE), "<style> block"),
     (re.compile(r"\sstyle\s*=", re.IGNORECASE), "style attribute"),
     (re.compile(r"\son[a-z]+\s*=", re.IGNORECASE), "on… handler attribute"),
