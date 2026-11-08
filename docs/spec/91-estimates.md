@@ -29,6 +29,13 @@ vendor key policy), TAX.11 (2 h, shared postcode grammar for tax territories) an
 activation gate for the DSA article 30 data), grew VEN.18 (2 → 3 h, RF20 in the tax request) and
 narrowed SHP.2 to the legacy cases (8 → 6 h): +15 h of P1.
 
+The transactional email task is split in two (2026-11-08): ARC.16 keeps the code (outbox,
+`EmailSender` with test and console backends, templates, bounce ingestion) and depends on ARC.9
+only (8 → 5 h); the new row ARC.19 (3 h, depends on ARC.16 and ARC.13) wires the EU provider on
+STAGE and LIVE once owner question Q-48 picks it, with DKIM, SPF and DMARC, the provider webhook and
+a deliverability check: +1 task, 0 h of P1. Eleven P1 tasks (94 h) that waited for STAGE only
+through ARC.16 no longer do.
+
 The owner's decision D-07 (2026-11-07: descriptive `/{taxonomy}/{term}/` URLs, legacy tag URLs
 moved with the staggered product URL mechanism) widens CAT.8, MIG.6 and MIG.11 at the same hours.
 The product grid block leaves CMS.2 (10 → 8 h, now depending on CMS.1 only) for the new row CMS.10
@@ -180,7 +187,8 @@ Source: merged pull requests and their timestamps, the generated backlog, and th
 
 ### Forecast for the rest of P1
 
-**142 P1 tasks remain, worth 1,242 estimated hours.** At the previous measurement 134 tasks and
+**143 P1 tasks remain, worth 1,242 estimated hours** (142 at the measurement, plus ARC.19 from
+the ARC.16 split, §91.2). At the previous measurement 134 tasks and
 1,210 hours remained; since then the owner's events answers added VEN.20 and shrank EVT.7 (+10 h),
 wave 6 closed 28 P1 hours, the SHP.12 implementation added SHP.12 to SHP.14 (+34 h) and coherence
 check 5 added six small rows and resized two (+15 h, §91.2), and the D-07 follow-up split the
@@ -194,7 +202,8 @@ product grid out of CMS.2 into CMS.10 (+1 task, +1 h, §91.2).
 
 That is at least two weekly budgets, so **3–4 calendar weeks for P1 code**, provided the open
 decisions are answered in time. The schedule is now gated more by decisions and accounts than by
-agent time: STAGE (ARC.13, which needs the Hetzner account) gates 51 P1 tasks worth 489 hours, and
+agent time: STAGE (ARC.13, which needs the Hetzner account) gates 40 P1 tasks worth 395 hours (51 and 489
+before the ARC.16 split), and
 the open D-xx decisions gate most of the rest (D-04 20 tasks and 239 hours, D-06 21 tasks and
 173 hours, D-14 11 tasks and 124 hours, D-01 12 tasks and 106 hours). D-07 (29 tasks and 241 hours
 at this measurement) was decided by the owner on the same day and no longer gates them.
