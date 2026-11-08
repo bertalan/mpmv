@@ -1,7 +1,8 @@
 """Core models: the abstract base, translation and versioned-configuration models, the
 append-only audit log, the platform operator, the feature flags, the shared image model and its
-licence allow list."""
+licence allow list, the transactional email outbox."""
 
+import json
 import uuid
 from typing import Any, ClassVar, Self
 
@@ -13,7 +14,7 @@ from django.utils import timezone
 from wagtail.images.models import AbstractImage, AbstractRendition, Image
 
 from . import flags, translations
-from .fields import CountryField, LanguageField
+from .fields import CountryField, EncryptedTextField, LanguageField
 from .image_licences import (
     Credit,
     LicenceTerms,
@@ -535,3 +536,122 @@ class MediaImageRendition(AbstractRendition):  # type: ignore[misc]
                 name="core_one_rendition_per_filter",
             ),
         ]
+
+
+# --- Transactional email (ARC.16)
+
+
+class OutboxEmail(BaseModel):
+    """One transactional email, from the request to send it until the provider accepts it.
+
+    Written by `apps.core.services.enqueue_email` (which queues the `core.send_email` job in the
+    same transaction) and `deliver_email`; every status change adds an `OutboxEmailEvent`. The
+    context is a snapshot of the values the templates need, encrypted at rest: it can hold a
+    one-time code or personal data. `idempotency_key` (optional, chosen by the caller, e.g.
+    `order:<public id>:confirmation`) makes a repeated request a no-op.
+    """
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        RETRYING = "retrying", "Waiting for a retry"
+        SENT = "sent", "Accepted by the provider"
+        FAILED = "failed", "Failed"
+        SUPPRESSED = "suppressed", "Not sent: address suppressed"
+
+    #: No further send attempt for these.
+    FINAL: ClassVar[frozenset[str]] = frozenset({Status.SENT, Status.FAILED, Status.SUPPRESSED})
+
+    recipient = models.EmailField(max_length=254)
+    template_key = models.CharField(max_length=100)
+    language = LanguageField()
+    context = EncryptedTextField(blank=True, help_text="JSON snapshot of the template context.")
+    idempotency_key = models.CharField(max_length=200, unique=True, null=True, blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.QUEUED)
+    attempts = models.PositiveIntegerField(default=0)
+    next_attempt_at = models.DateTimeField(null=True, blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    provider_message_id = models.CharField(max_length=200, blank=True, db_index=True)
+    last_error = models.TextField(blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["status", "next_attempt_at"])]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(
+                    status__in=["queued", "retrying", "sent", "failed", "suppressed"]
+                ),
+                name="core_outboxemail_status_valid",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.template_key} to {self.recipient} ({self.status})"
+
+    @property
+    def context_data(self) -> dict[str, Any]:
+        data = json.loads(self.context or "{}")
+        return data if isinstance(data, dict) else {}
+
+
+class OutboxEmailEvent(models.Model):
+    """Append-only history of an outbox email: each status change and provider feedback.
+
+    The database refuses updates and deletes (trigger), like the audit log.
+    """
+
+    class Kind(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        RETRYING = "retrying", "Transient failure, retry scheduled"
+        SENT = "sent", "Accepted by the provider"
+        FAILED = "failed", "Failed"
+        SUPPRESSED = "suppressed", "Not sent: address suppressed"
+        BOUNCED = "bounced", "Hard bounce reported"
+        SOFT_BOUNCED = "soft_bounced", "Soft bounce reported"
+        COMPLAINED = "complained", "Complaint reported"
+
+    email = models.ForeignKey(OutboxEmail, on_delete=models.PROTECT, related_name="events")
+    status = models.CharField(max_length=16, choices=Kind.choices)
+    attempt = models.PositiveIntegerField(default=0)
+    detail = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["pk"]
+
+    def __str__(self) -> str:
+        return f"{self.status} (attempt {self.attempt})"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if self.pk is not None:
+            raise PermissionError("OutboxEmailEvent is append-only")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
+        raise PermissionError("OutboxEmailEvent is append-only")
+
+
+class EmailSuppression(BaseModel):
+    """An address that receives no more email: it hard-bounced or its owner complained.
+
+    Written by `apps.core.services.record_email_feedback` (audited). The address is stored
+    normalised (`apps.core.mail.normalise_address`).
+    """
+
+    class Reason(models.TextChoices):
+        HARD_BOUNCE = "hard_bounce", "Hard bounce"
+        COMPLAINT = "complaint", "Complaint"
+
+    address = models.CharField(max_length=254, unique=True)
+    reason = models.CharField(max_length=16, choices=Reason.choices)
+    detail = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(reason__in=["hard_bounce", "complaint"]),
+                name="core_emailsuppression_reason_valid",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.address} ({self.reason})"

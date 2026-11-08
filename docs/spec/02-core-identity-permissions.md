@@ -106,6 +106,14 @@ The second factor is a TOTP authenticator app or a passkey. The confirmed parame
 - API: `Authorization: Bearer mpmv_<prefix>_<secret>` header, constant-time comparison,
   scope checked per route, rate limit per API key with counters in a cache shared by every app
   process (CORE.12, owner decision Q-18), logging of every mutating call.
+- API rate limit (CORE.12): fixed windows per key, counted in PostgreSQL (`ApiRateCounter`, one
+  atomic upsert per call), so every app process shares one counter and no Redis is needed.
+  `API_RATE_LIMIT` (default `600/minute`) is the key-wide limit of every key;
+  `API_RATE_LIMIT_SCOPES` gives a costly scope its own counter and limit for every key;
+  `API_RATE_LIMIT_CLIENTS` replaces the key-wide limit of one key, by `ApiClient` public id. Only
+  calls of an accepted key count (401/403 refusals do not). Over the limit the answer is a 429
+  `rate_limited` problem with `Retry-After` (seconds to the end of the window); a mutating call
+  refused this way is in the mutation log.
 - Vendor key policy (CORE.14): a vendor key is issued only while its vendor is active, and holds
   only the vendor-grantable scopes (`VENDOR_GRANTABLE_SCOPES` in `apps/api/engine.py`, an
   allow-list checked at issuance and again on every request, so a key issued before a scope

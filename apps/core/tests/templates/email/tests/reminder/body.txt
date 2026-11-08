@@ -1,0 +1,2 @@
+{% load i18n %}{% blocktranslate %}Please complete {{ item }} by {{ due }}.{% endblocktranslate %}
+{{ action_url }}

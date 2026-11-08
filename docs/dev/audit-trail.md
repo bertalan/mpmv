@@ -38,6 +38,7 @@ vendor's change page links to its trail (`?vendor=<public id>`).
 | Vendor onboarding (VEN.5) | `vendor.application_submitted` (the applicant vendor and its owner membership), `vendor.contract_saved` (contract versions), `vendor.contract_accepted` (who, which version, language, text hash, IP; the acceptance rows are append-only too, and once a version is accepted the database refuses any change to it or its texts) |
 | Platform configuration (ARC.7) | `core.platform_operator.configured` |
 | Feature flags (ARC.8) | `core.feature_flag.created`, `.updated` (staff switches, kill switches included); `vendor.feature_flag_saved`, `.feature_flag_deleted` (per-vendor overrides, under the vendor's key); see [feature-flags.md](feature-flags.md) |
+| Email suppression (ARC.16) | `core.email.suppressed` (the address, the reason, hard bounce or complaint, and the provider message id; see [transactional-email.md](transactional-email.md)); the outbox itself is a delivery queue with its own append-only history (`core.outboxemailevent`), not audited |
 | Image licences (CMS.8) | `core.image_licence.created`, `.updated` (the staff-editable allow list; NC and ND licences are refused, entries are never deleted). Images themselves are CMS content: uploads and edits are in Wagtail's action log |
 | Field encryption keys (SEC.3) | `core.field_keys.rotated` (one per object, key ids only; see [field-encryption.md](field-encryption.md)) |
 | Product prices (CAT.1) | `catalog.product.price_changed`, `catalog.variant.price_changed` |
