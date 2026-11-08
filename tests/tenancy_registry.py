@@ -163,6 +163,7 @@ OWN_ACCOUNT = "The signed-in user's own second factors (CORE.4); no vendor data.
 
 ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
+    "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
     "home": NoVendorData("Public home page."),
     "switch_language": NoVendorData("Stores the visitor's language choice."),
     "mfa:overview": NoVendorData(OWN_ACCOUNT),

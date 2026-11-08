@@ -23,6 +23,8 @@ from apps.core.checks import check_audit_policy
 NOT_SENSITIVE_SERVICES = {
     "apps.accounts.services.set_preferred_language": "a display preference, not a security fact",
     "apps.api.services.record_mutation_call": "logs the API call itself; `dry_run` is a field",
+    "apps.core.services.enqueue_email": "the outbox is a delivery queue with its own history",
+    "apps.core.services.deliver_email": "a delivery attempt, kept in the outbox history",
 }
 
 
