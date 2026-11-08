@@ -29,12 +29,23 @@ def _axe_helper_style(violation: str) -> bool:
     return "style-src-elem blocked inline" in violation and "wagtailadmin/js/vendor.js" in violation
 
 
+def _label(text: str) -> re.Pattern[str]:
+    """A field's accessible name: Wagtail appends "*" to the label of a required field."""
+    return re.compile(rf"^{text}\*?$")
+
+
 def _add_block(page: Page, label: str) -> Locator:
     """Append a block of type `label` to the body and return its form."""
     body = page.locator("#panel-child-content-body-section")
     body.get_by_role("button", name="Insert a block").last.click()
     page.get_by_role("option", name=label, exact=True).click()
-    block = body.locator("[data-contentpath][data-streamfield-child]").last
+    # The new block is the last top-level one; its fields are named `body-<index>-value-…`.
+    index = int(page.locator("input[name=body-count]").input_value()) - 1
+    block = (
+        body.locator("[data-streamfield-child]")
+        .filter(has=page.locator(f'[name^="body-{index}-value-"]'))
+        .first
+    )
     expect(block).to_be_visible()
     return block
 
@@ -57,23 +68,27 @@ def test_an_editor_builds_the_home_page_with_hero_cta_and_faq(
     page.goto(f"{live_server.url}/admin/pages/{home.pk}/edit/")
 
     hero = _add_block(page, "Hero")
-    hero.get_by_label("Heading").fill("Handmade goods")
-    hero.get_by_label("Text").fill("From small workshops.")
+    hero.get_by_role("textbox", name=_label("Heading")).fill("Handmade goods")
+    hero.get_by_role("textbox", name=_label("Text")).fill("From small workshops.")
     hero.get_by_role("button", name="Choose an image").click()
     modal = page.locator(".modal")
     modal.get_by_text("Workshop banner").click()
     expect(modal).to_be_hidden()
-    hero.get_by_label("Alt text").fill("A potter at the wheel")
+    hero.get_by_role("textbox", name=_label("Alt text")).fill("A potter at the wheel")
 
     cta = _add_block(page, "Call to action")
-    cta.get_by_label("Heading").fill("Sell with us")
-    cta.get_by_label("URL").fill("https://example.com/apply/")
-    cta.get_by_label("Label").fill("Apply")
+    cta.get_by_role("textbox", name=_label("Heading")).fill("Sell with us")
+    cta.get_by_role("textbox", name=_label("URL")).fill("https://example.com/apply/")
+    cta.get_by_role("textbox", name=_label("Label")).fill("Apply")
 
     faq = _add_block(page, "FAQ")
-    faq.get_by_label("Heading").fill("Questions")
-    faq.get_by_label("Question").fill("Do you ship abroad?")
-    faq.locator("[contenteditable=true]").first.fill("Yes, to most countries.")
+    faq.get_by_role("textbox", name=_label("Heading")).fill("Questions")
+    faq.get_by_role("textbox", name=_label("Question")).fill("Do you ship abroad?")
+    answer_editor = faq.locator(".public-DraftEditor-content").first  # Draftail rich text
+    answer_editor.click()
+    answer_editor.press_sequentially("Yes, to most countries.")
+    # Draftail saves into its hidden input after a short pause: publish only once it has.
+    expect(faq.locator('input[name$="-value-answer"]')).to_have_value(re.compile("most countries"))
     shot("admin-blocks")
 
     page.get_by_role("button", name="More actions").click()

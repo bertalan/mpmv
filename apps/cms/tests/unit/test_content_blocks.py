@@ -8,6 +8,7 @@ until the `base` theme (THM.3, THM.4) restyles them. The FAQ is an accessible di
 
 import json
 import re
+from collections.abc import Mapping
 
 import pytest
 from django.core.exceptions import ValidationError
@@ -84,7 +85,7 @@ def test_a_hero_without_an_image_needs_no_alt_text() -> None:
 # --- Rendering: semantic, CSP-safe markup
 
 
-def _render(block: blocks.Block, raw: dict[str, object]) -> str:
+def _render(block: blocks.Block, raw: Mapping[str, object]) -> str:
     html: str = block.render(block.to_python(raw))
     return html
 
