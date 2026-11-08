@@ -8,10 +8,11 @@ Their links are a StreamField (page or external link): unlike inline panels and 
 its admin editor needs no inline script, so it works under the strict CSP (SEC.1).
 
 Bodies are StreamFields with rich-text paragraphs, images and galleries (I18N.3), heroes, calls to
-action, FAQs and "featured links" cards to pages, catalog terms and vendors (CMS.2) and launch
-countdowns (CMS.9); the product grid comes with CMS.10. A page with a running countdown caps the
-Cache-Control `max-age` and `s-maxage` set upstream at the target (`CountdownCacheMixin`), so no
-cache serves the countdown after the launch; it never adds a lifetime.
+action, FAQs and "featured links" cards to pages, catalog terms and vendors (CMS.2); home and
+standard pages also take launch countdowns (CMS.9) and the product grid (CMS.10). A page with a
+running countdown caps the Cache-Control `max-age` and `s-maxage` set upstream at the target
+(`CountdownCacheMixin`), so no cache serves the countdown after the launch; it never adds a
+lifetime.
 
 Translation (I18N.3, spec 09 §9.2): wagtail-localize copies a page into another locale and keeps
 it in sync with its source. Texts, alt texts and captions are translated; images are synchronised
@@ -50,14 +51,19 @@ from .blocks import (
     GalleryBlock,
     HeroBlock,
     LaunchCountdownBlock,
+    ProductGridBlock,
     countdown_targets,
 )
 
 
-def body_field(verbose_name: Any = None, *, countdown: bool = False) -> StreamField:
+def body_field(
+    verbose_name: Any = None, *, countdown: bool = False, products: bool = False
+) -> StreamField:
     """A page body. `countdown`: also offer the launch countdown (CMS.9: home and standard
-    pages; the page class then needs `CountdownCacheMixin`)."""
+    pages; the page class then needs `CountdownCacheMixin`). `products`: also offer the product
+    grid (CMS.10: home and standard pages)."""
     extra = [("countdown", LaunchCountdownBlock())] if countdown else []
+    grid = [("product_grid", ProductGridBlock())] if products else []
     return StreamField(
         [
             ("hero", HeroBlock()),
@@ -67,6 +73,7 @@ def body_field(verbose_name: Any = None, *, countdown: bool = False) -> StreamFi
             ("cta", CallToActionBlock()),
             ("faq", FaqBlock()),
             ("featured", FeaturedLinksBlock()),
+            *grid,
             *extra,
         ],
         blank=True,
@@ -121,7 +128,7 @@ class HomePage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is u
     on every save (the page table holds the locale, so no database constraint can).
     """
 
-    body = body_field(countdown=True)
+    body = body_field(countdown=True, products=True)
 
     content_panels: ClassVar[list[Any]] = [*Page.content_panels, FieldPanel("body")]
     parent_page_types: ClassVar[list[str]] = ["wagtailcore.Page"]
@@ -162,7 +169,7 @@ class StandardPage(CountdownCacheMixin, Page):  # type: ignore[misc]
         help_text=_("Describes the main image for people who cannot see it."),
     )
     image_caption = models.CharField(_("caption"), max_length=250, blank=True)
-    body = body_field(countdown=True)
+    body = body_field(countdown=True, products=True)
 
     content_panels: ClassVar[list[Any]] = [
         *Page.content_panels,

@@ -37,7 +37,14 @@ LOCAL_APPS = [
     "apps.compliance",
     "apps.api",
     "apps.mcp",
+    "apps.seed",  # demo data seed (ARC.10): above every app, imported by none
 ]
+
+# Demo data seed (ARC.10, docs/dev/demo-seed.md): off unless allowed. Dev and test allow it;
+# STAGE opts in with MPMV_ALLOW_SEED=1. LIVE_DATA marks an environment holding real data
+# (live.py): the seed never runs there, and the `seed.E001` check fails if it is allowed.
+ALLOW_SEED = env_bool("MPMV_ALLOW_SEED", default=False)
+LIVE_DATA = False
 
 INSTALLED_APPS = [
     # Django's admin with the self-service password change audited (SEC.4).
@@ -360,12 +367,14 @@ GEOCODING_USER_WINDOW = 60  # seconds
 # does not import the vendors app.
 GEOCODING_ACCESS_POLICIES: list[str] = ["apps.vendors.services.is_vendor_member"]
 
-# Per-API-key rate limit (CORE.12, apps.api.engine): fixed windows counted in PostgreSQL, so every
-# app process shares one counter per key. API_RATE_LIMIT is the key-wide limit of every key;
+# Per-API-key rate limit (CORE.12, CORE.16, apps.api.engine): fixed windows counted in PostgreSQL,
+# so every app process shares one counter per key. API_RATE_LIMIT is the key-wide limit of every
+# key, set per environment with MPMV_API_RATE_LIMIT (default 120/minute, owner decision MQ-4);
 # API_RATE_LIMIT_SCOPES gives a costly scope its own counter and limit for every key, e.g.
-# {"catalog:write": "120/minute"}; API_RATE_LIMIT_CLIENTS replaces the key-wide limit of one key,
-# by ApiClient public id. Rates read "<calls>/<second|minute|hour|day>" (system check api.E003).
-API_RATE_LIMIT = "600/minute"
+# {"catalog:write": "60/minute"}; API_RATE_LIMIT_CLIENTS replaces the key-wide limit of one key,
+# by ApiClient public id. A per-key override that staff set in the admin (ApiClient.rate_limit)
+# wins over both. Rates read "<calls>/<second|minute|hour|day>" (system check api.E003).
+API_RATE_LIMIT = env_str("MPMV_API_RATE_LIMIT", "") or "120/minute"
 API_RATE_LIMIT_SCOPES: dict[str, str] = {}
 API_RATE_LIMIT_CLIENTS: dict[str, str] = {}
 

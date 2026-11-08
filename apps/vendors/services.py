@@ -7,7 +7,7 @@ flag overrides (ARC.8)."""
 import dataclasses
 import datetime as dt
 import logging
-from collections.abc import Collection, Mapping
+from collections.abc import Callable, Collection, Mapping
 from typing import Any
 
 from django.conf import settings
@@ -60,6 +60,7 @@ VENDOR_FIELDS = (
     "status",
     "country",
     *engine.LEGAL_FIELDS,
+    "tin_same_as_vat",
     "contact_email",
     "phone",
     "sales_mode_default",
@@ -80,7 +81,12 @@ def has_public_storefront(vendor: Vendor) -> bool:
 
 
 # Fields encrypted at rest (SEC.3) are masked in audit rows, or the log would hold them in clear.
-MASKED_FIELDS = {"iban": engine.mask_iban, "tax_code": engine.mask_tax_code}
+MASKED_FIELDS: dict[str, Callable[[Any], str]] = {
+    "iban": engine.mask_iban,
+    "tax_code": engine.mask_tax_code,
+    "date_of_birth": engine.mask_personal,
+    "place_of_birth": engine.mask_personal,
+}
 
 
 def vendor_snapshot(vendor: Vendor) -> dict[str, Any]:
@@ -93,7 +99,8 @@ def vendor_snapshot(vendor: Vendor) -> dict[str, Any]:
 
 def save_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Validate, create or update `vendor`, auditing its data with before/after (keyed by public
-    id, IBAN and tax code masked). `before` is read from the database with the row locked.
+    id, IBAN, tax code and personal data masked). `before` is read from the database with the
+    row locked. With "same as the VAT number" the TIN is derived here (`fill_tin_from_vat`).
 
     Incomplete legal data is always accepted: completeness is checked when a payout is
     requested (`assert_payout_allowed`), never here. A value that is present must be valid:
@@ -101,7 +108,14 @@ def save_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> 
     dry-run, and raises `ValidationError`; it also stores identifiers compact. The status is
     not changed here: it moves only through `change_status`.
     """
+    return _save_vendor(vendor, ctx=ctx, dry_run=dry_run)
+
+
+def _save_vendor(
+    vendor: Vendor, *, ctx: AuditContext, dry_run: bool, action: str | None = None
+) -> ChangeSet:
     vendor.normalize()
+    vendor.fill_tin_from_vat()
     vendor.full_clean()
     key = str(vendor.public_id)
     with transaction.atomic():
@@ -127,7 +141,7 @@ def save_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> 
         if dry_run:
             return result
         vendor.save()
-        audit_changes(changes, ctx=ctx, action=UPDATED if stored else CREATED)
+        audit_changes(changes, ctx=ctx, action=action or (UPDATED if stored else CREATED))
         audit_changes(flags, ctx=ctx, action=ESTABLISHMENT_FLAGGED)
         for flag in flags.changes:
             warning = establishment_warning(flag.after or {}, str(vendor.status))
@@ -504,27 +518,40 @@ def check_vat_number(
     if status not in engine.VIES_RESULTS:
         raise ValueError(f"unexpected VIES result {status!r}")
     checked_at = timezone.now()
+    # "Same as the VAT number" (VEN.23): the TIN follows the VIES answer.
+    tin = engine.tin_from_vat(dataclasses.replace(vendor.legal_identity(), vies_status=status))
 
-    def state(vies_status: str, at: Any) -> dict[str, Any]:
-        return {"vat_number": vendor.vat_number, "vies_status": vies_status, "vies_checked_at": at}
+    def state(vies_status: str, at: Any, tax_code: str, tin_country: str) -> dict[str, Any]:
+        return {
+            "vat_number": vendor.vat_number,
+            "vies_status": vies_status,
+            "vies_checked_at": at,
+            "tax_code": engine.mask_tax_code(tax_code),
+            "tin_country": tin_country,
+        }
 
     changes = ChangeSet()
     changes.update(
         MODEL_LABEL,
         str(vendor.public_id),
-        state(vendor.vies_status, vendor.vies_checked_at),
-        state(status, checked_at),
+        state(vendor.vies_status, vendor.vies_checked_at, vendor.tax_code, vendor.tin_country),
+        state(status, checked_at, tin.tax_code, tin.tin_country),
     )
 
     def apply() -> None:
         Vendor.objects.filter(pk=vendor.pk).update(
-            vies_status=status, vies_checked_at=checked_at, updated_at=checked_at
+            vies_status=status,
+            vies_checked_at=checked_at,
+            tax_code=tin.tax_code,
+            tin_country=tin.tin_country,
+            updated_at=checked_at,
         )
 
     run_mutation(changes, apply, ctx=ctx, action=VAT_CHECKED, dry_run=dry_run)
     if not dry_run:
         vendor.vies_status = status
         vendor.vies_checked_at = checked_at
+        vendor.tax_code, vendor.tin_country = tin.tax_code, tin.tin_country
     return changes
 
 
@@ -535,13 +562,20 @@ def requirement_rules(purpose: str = engine.PAYOUT) -> list[engine.Requirement]:
 
 
 def legal_profile_completeness(vendor: Vendor, purpose: str = engine.PAYOUT) -> engine.Completeness:
-    """Which fields required for `purpose` the vendor is missing, or holds invalid values for."""
-    return engine.completeness(vendor.legal_identity(), requirement_rules(purpose), purpose=purpose)
+    """Which fields required for `purpose` the vendor is missing, or holds invalid values for.
+
+    For a payout that is the active requirement rows plus the DAC7 dataset
+    (`engine.payout_completeness`): no row can relax DAC7.
+    """
+    identity = vendor.legal_identity()
+    if purpose == engine.PAYOUT:
+        return engine.payout_completeness(identity, requirement_rules(purpose))
+    return engine.completeness(identity, requirement_rules(purpose), purpose=purpose)
 
 
 def assert_payout_allowed(vendor: Vendor) -> None:
     """Guard for payout requests (VEN.6, VEN.7): raise `engine.PayoutNotAllowed` listing the
-    required legal fields that are missing or invalid.
+    required legal fields, the DAC7 dataset included, that are missing or invalid.
 
     Checks the stored vendor, not unsaved changes on the instance.
     """
@@ -549,6 +583,29 @@ def assert_payout_allowed(vendor: Vendor) -> None:
     result = legal_profile_completeness(stored, engine.PAYOUT)
     if not result.complete:
         raise engine.PayoutNotAllowed(str(stored), result)
+
+
+# --- DAC7 dataset corrections by staff (VEN.23)
+
+DAC7_CORRECTED = "vendor.dac7_corrected"
+
+
+def correct_dac7_dataset(
+    vendor: Vendor, *, ctx: AuditContext, stepped_up: bool, dry_run: bool = False
+) -> ChangeSet:
+    """Save a staff correction or completion of the vendor's DAC7 dataset, audited as
+    `vendor.dac7_corrected` with before/after (TIN and personal data masked). A new vendor
+    created with DAC7 data needs the same step-up; its entry stays `vendor.created` (SEC.4).
+
+    `stepped_up` tells whether the staff member verified a second factor recently (CORE.4);
+    without it the correction is refused with `engine.StepUpRequired` and nothing is saved.
+    """
+    if not stepped_up:
+        raise engine.StepUpRequired(
+            "Correcting the DAC7 dataset needs a fresh second-factor verification."
+        )
+    action = None if vendor._state.adding else DAC7_CORRECTED
+    return _save_vendor(vendor, ctx=ctx, dry_run=dry_run, action=action)
 
 
 REQUIREMENT_MODEL = "vendors.legalfieldrequirement"

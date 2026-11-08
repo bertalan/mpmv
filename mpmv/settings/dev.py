@@ -19,3 +19,4 @@ if not os.environ.get("MPMV_FIELD_ENCRYPTION_KEYS"):
 from .base import *  # noqa: F403
 
 DEBUG = True
+ALLOW_SEED = True  # `make seed` (ARC.10)

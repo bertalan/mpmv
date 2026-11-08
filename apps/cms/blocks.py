@@ -19,6 +19,12 @@ The launch countdown (CMS.9) announces a launch: the target is entered in the op
 zone and stored in UTC, `engine.countdown_state` decides between the countdown and the expired
 state, and its links default to the chosen product or category. The theme component renders
 it; the theme's `countdown.js` module adds the live counter.
+
+The product grid (CMS.10) shows the newest products of one category, term, brand or vendor with
+the CAT.8 listing query (`apps.catalog.services.product_grid`), as the base theme's product
+tiles (THM.4), and an optional "See all" link to that listing page, named after the listing for
+screen readers. An empty heading falls back to the listing's name, so the section always has
+one. Only published products of active vendors show; a grid with none is left out.
 """
 
 import datetime as dt
@@ -41,16 +47,32 @@ from wagtail.images.blocks import ImageChooserBlock
 from wagtail.models import Page
 
 from apps.catalog.models import Category, Product, TaxonomyTranslation, Term, TermTranslation
-from apps.catalog.services import category_url, listed_products, product_cards
+from apps.catalog.services import (
+    ListingScope,
+    category_url,
+    listed_products,
+    product_cards,
+    product_grid,
+)
 from apps.core import translations
+from apps.core.money import CURRENCY
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.services import has_public_storefront
 
-from .choosers import category_chooser, product_chooser, term_chooser, vendor_chooser
+from .choosers import (
+    brand_chooser,
+    category_chooser,
+    product_chooser,
+    term_chooser,
+    vendor_chooser,
+)
 from .engine import (
     NEUTRAL,
+    PRODUCT_GRID_DEFAULT,
+    PRODUCT_GRID_MAX,
     countdown_state,
     gallery_for_language,
+    grid_limit,
     link_language,
     storefront_path,
     term_path,
@@ -462,6 +484,68 @@ class FeaturedLinksBlock(blocks.StructBlock):  # type: ignore[misc]
         return context
 
 
+# --- Product grid (CMS.10)
+
+
+class CategoryChooserBlock(category_chooser.get_block_class("_CategoryChooserBlock", __name__)):  # type: ignore[misc]
+    """A catalog category, chosen in the category chooser modal."""
+
+
+class BrandChooserBlock(brand_chooser.get_block_class("_BrandChooserBlock", __name__)):  # type: ignore[misc]
+    """A catalog brand, chosen in the brand chooser modal."""
+
+
+class ProductGridBlock(blocks.StructBlock):  # type: ignore[misc]
+    """The newest products of one category, term, brand or vendor (the CAT.8 listing query)."""
+
+    heading = blocks.CharBlock(required=False, max_length=120)
+    source = blocks.StreamBlock(
+        [
+            ("category", CategoryChooserBlock(label=_("Category"))),
+            ("term", TermChooserBlock(label=_("Term"))),
+            ("brand", BrandChooserBlock(label=_("Brand"))),
+            ("vendor", VendorChooserBlock(label=_("Vendor"))),
+        ],
+        min_num=1,
+        max_num=1,
+        label=_("Products of"),
+    )
+    limit = blocks.IntegerBlock(
+        min_value=1,
+        max_value=PRODUCT_GRID_MAX,
+        default=PRODUCT_GRID_DEFAULT,
+        label=_("Number of products"),
+    )
+    see_all = blocks.BooleanBlock(required=False, default=True, label=_("Link to the full listing"))
+
+    class Meta:
+        icon = "grip"
+        label = _("Product grid")
+        template = "cms/blocks/product_grid.html"
+
+    def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
+        context = super().get_context(value, parent_context=parent_context)
+        context["cards"], context["see_all_url"] = [], None
+        chosen = next(iter(value["source"]), None)
+        if chosen is None or chosen.value is None:
+            return context
+        heading = value.get("heading") or ""
+        see_all = bool(value.get("see_all"))
+        grid = product_grid(
+            ListingScope(**{chosen.block_type: chosen.value}),
+            _page_language(parent_context),
+            limit=grid_limit(value.get("limit")),
+            # The listing's name and page: for "See all", and as the heading when it is empty.
+            with_anchor=see_all or not heading,
+        )
+        context["cards"] = grid.cards
+        context["heading"] = heading or grid.name or ""
+        context["listing_name"] = grid.name
+        context["see_all_url"] = grid.see_all_url if see_all else None
+        context["currency"] = CURRENCY
+        return context
+
+
 # --- Launch countdown (CMS.9)
 
 
@@ -493,12 +577,6 @@ class OperatorDateTimeBlock(blocks.DateTimeBlock):  # type: ignore[misc]
         return OperatorDateTimeField(
             widget=AdminDateTimeInput(format=self.format), **self.field_options
         )
-
-
-class CategoryChooserBlock(
-    category_chooser.get_block_class("_CategoryChooserBlock", __name__)  # type: ignore[misc]
-):
-    """A catalog category, chosen in the category chooser modal."""
 
 
 class ProductChooserBlock(
