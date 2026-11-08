@@ -33,8 +33,10 @@ def request_() -> HttpRequest:
 
 def test_the_project_routes_400_and_500_to_the_theme_handlers() -> None:
     resolver = get_resolver()
-    assert resolver.resolve_error_handler(500) is views.server_error
-    assert resolver.resolve_error_handler(400) is views.bad_request
+    handlers: dict[int, object] = {
+        code: resolver.resolve_error_handler(code) for code in (400, 500)
+    }
+    assert handlers == {400: views.bad_request, 500: views.server_error}
 
 
 def test_the_500_page_renders_with_base_without_the_database(request_: HttpRequest) -> None:
@@ -75,7 +77,7 @@ def test_the_400_page_renders_with_base_without_the_database(request_: HttpReque
 
 
 def test_a_broken_error_template_falls_back_to_plain_text(request_: HttpRequest) -> None:
-    with mock.patch.object(views.loader, "get_template", side_effect=RuntimeError("boom")):
+    with mock.patch("apps.themes.views.loader.get_template", side_effect=RuntimeError("boom")):
         response = views.server_error(request_)
     assert response.status_code == 500
     assert b"Server Error (500)" in response.content
