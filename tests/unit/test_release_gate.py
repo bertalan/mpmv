@@ -6,10 +6,13 @@ units, so the server installs the units of the tag it runs. These rules keep tha
 """
 
 import fnmatch
+import os
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -105,6 +108,35 @@ def test_a_release_is_pushed_only_after_the_smoke_passes() -> None:
     assert names.index("Build") < smoke < names.index("Push by digest")
     assert "mpmv-app:release" in job["steps"][smoke]["run"]
     assert job["strategy"]["fail-fast"] is True
+    # The smoke runs third-party images: no registry write token on disk yet.
+    assert smoke < names.index("Log in to the registry")
+    assert 0 < job["timeout-minutes"] <= 60
+
+
+@pytest.mark.parametrize(
+    "ci_env",
+    [
+        {},
+        {"GITHUB_ACTIONS": "true"},
+        {"GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "self-hosted"},
+        {"MPMV_PARITY_THROWAWAY_HOST": "yes"},
+    ],
+)
+def test_the_smoke_refuses_to_run_outside_a_hosted_ci_runner(
+    tmp_path: Path, ci_env: dict[str, str]
+) -> None:
+    """It overwrites ~/.config/mpmv and the units: never on a server or a workstation."""
+    env = {"PATH": os.environ["PATH"], "HOME": str(tmp_path), **ci_env}
+    result = subprocess.run(  # noqa: S603 (fixed script path)
+        ["bash", str(SMOKE), "mpmv-app:ci"],  # noqa: S607
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert "CI-only" in result.stderr
+    assert list(tmp_path.iterdir()) == []
 
 
 # --- The smoke runs the real thing.
@@ -124,6 +156,12 @@ def test_the_smoke_uses_tls_verify_full_and_generated_secrets_only() -> None:
     text = SMOKE.read_text()
     assert "sslmode=verify-full&sslrootcert=/etc/mpmv/pg-root-ca.crt" in text
     assert "ssl=on" in text
+    # The server takes TLS only, and the app's own session is checked to be TLS.
+    assert "hostssl all all all scram-sha-256" in text
+    assert "hba_file=" in text
+    assert "pg_stat_ssl WHERE pid = pg_backend_pid()" in text
+    assert "sslmode=disable" in text
+    assert re.search(r"postgres_image=\S+:17@sha256:[0-9a-f]{64}\n", text)
     assert "secrets.token" in text
     assert not CREDENTIAL_LITERAL.search(text), CREDENTIAL_LITERAL.search(text)
 
@@ -142,6 +180,12 @@ def test_the_smoke_checks_pages_media_health_and_rollback() -> None:
         "can write outside /app/media",
         '"$deployer" deploy "$bad"',
         '[ "$took" -lt 60 ]',
+        # Proof of a real rollback, not an early stop that also exits non-zero.
+        "installed the units of $bad",
+        "rolling back to $good",
+        "installed the units of $good",
+        "doctor:|nothing changed",
+        "trap on_exit EXIT",
     ):
         assert needle in text, needle
 

@@ -378,6 +378,13 @@ def test_a_bad_release_is_rolled_back_with_its_units(host: Host, failure: str) -
 
     assert result.returncode != 0
     assert "release 1.1.0 failed" in result.stderr
+    # The log proves the bad units went in and the live ones came back (ARC.23 parity smoke).
+    messages = result.stderr
+    assert (
+        messages.index("installed the units of 1.1.0")
+        < messages.index("rolling back to 1.0.0")
+        < messages.index("installed the units of 1.0.0")
+    )
     assert actions(host.log)[-3:] == [
         "systemctl --user daemon-reload",
         f"podman tag {REGISTRY}:1.0.0 localhost/mpmv-app:current",

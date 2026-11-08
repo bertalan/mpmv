@@ -118,7 +118,8 @@ install_set() {
   for f in "$set_dir"/quadlet/*; do put "$f" "$QUADLET_DIR/${f##*/}" 0644 || return 1; done
   if [ -f "$set_dir/caddy/Caddyfile" ]; then put "$set_dir/caddy/Caddyfile" "$CONFIG_DIR/Caddyfile" 0644 || return 1; fi
   if [ -f "$set_dir/server/mpmv-deploy" ]; then put "$set_dir/server/mpmv-deploy" "$BIN_PATH" 0755 || return 1; fi
-  systemctl --user daemon-reload
+  systemctl --user daemon-reload || return 1
+  log "installed the units of $1"
 }
 
 prune_sets() {

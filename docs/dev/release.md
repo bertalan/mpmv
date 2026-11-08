@@ -25,6 +25,11 @@ seeds, fetches `/healthz`, the home page, a category page and a seeded `/media/`
 Caddy, checks the containers' read-only root, capabilities and media volume, then deploys a
 deliberately bad release and requires the rollback, units included, in under 60 s.
 
+The smoke rewrites the runner's MPMV configuration and leaves it, its containers and its sysctl
+changes behind, so it runs only on GitHub-hosted (ephemeral) runners: it refuses to start
+elsewhere unless `MPMV_PARITY_THROWAWAY_HOST=1` declares the host disposable. Never point it at a
+server or at a self-hosted runner that is reused between jobs.
+
 ## Deploying to STAGE
 
 From a workstation, by absolute path (a non-interactive ssh session has no `~/.local/bin` on

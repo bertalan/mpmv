@@ -9,7 +9,10 @@
 #   deploy/ci/parity-smoke.sh <docker image>      e.g. mpmv-app:ci
 #
 # Every secret is generated here, for this run only. The script changes the runner (sysctl,
-# lingering, the runner user's ~/.config): run it on a throwaway CI runner, never on a server.
+# lingering, apt packages) and OVERWRITES the runner user's ~/.config/mpmv env files, CA, units
+# and ~/.local/bin/mpmv-deploy. It leaves all of that behind, so it refuses to run anywhere but a
+# GitHub-hosted (ephemeral) runner unless MPMV_PARITY_THROWAWAY_HOST=1 says the host is
+# disposable. Never run it on a server.
 #
 # Caddy and the test site name: the production Caddyfile serves {$MPMV_SITE_ADDRESS} with automatic
 # HTTPS. The smoke uses a *.localhost name, for which Caddy issues the certificate from its own
@@ -17,6 +20,13 @@
 # mpmv-caddy-data volume before Caddy starts, so curl can verify the certificate. The Caddyfile
 # itself is the release's, unchanged.
 set -euo pipefail
+
+if ! { [ "${GITHUB_ACTIONS:-}" = true ] && [ "${RUNNER_ENVIRONMENT:-}" = github-hosted ]; } &&
+  [ "${MPMV_PARITY_THROWAWAY_HOST:-}" != 1 ]; then
+  echo "parity-smoke.sh: CI-only, it overwrites this host's MPMV configuration." >&2
+  echo "Run it on a GitHub-hosted runner, or set MPMV_PARITY_THROWAWAY_HOST=1 on a disposable host." >&2
+  exit 2
+fi
 
 image="${1:?usage: parity-smoke.sh <docker image>}"
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -30,6 +40,8 @@ deployer="$HOME/.local/bin/mpmv-deploy"
 config="$HOME/.config/mpmv"
 units="$HOME/.config/containers/systemd"
 started=$SECONDS
+# Pinned by digest, like third-party code in the release job (multi-arch index of postgres:17).
+postgres_image=docker.io/library/postgres:17@sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f
 
 group() { echo "::group::$*"; }
 endgroup() { echo "::endgroup::"; }
@@ -42,9 +54,15 @@ dump() {
 }
 fail() {
   echo "::error::parity smoke: $*"
-  dump
   exit 1
 }
+# Every failure prints the diagnostics, also one that `set -e` ends without calling fail.
+on_exit() {
+  local rc=$?
+  if [ "$rc" -ne 0 ]; then dump; fi
+  exit "$rc"
+}
+trap on_exit EXIT
 random() { python3 -c 'import secrets; print(secrets.token_urlsafe(32))'; }
 unit_value() { sed -n "s/^$2=//p" "$repo/deploy/quadlet/$1" | head -n 1; }
 
@@ -114,14 +132,16 @@ openssl x509 -req -in "$work/pki/server.csr" -CA "$work/pki/db-ca.crt" -CAkey "$
   -CAcreateserial -days 2 -out "$work/db-tls/server.crt" \
   -extfile <(printf 'subjectAltName=DNS:%s\nextendedKeyUsage=serverAuth\n' "$db_host") 2>/dev/null
 cp "$work/pki/db-ca.crt" "$config/pg-root-ca.crt"
+# TLS or nothing: the socket for the image's own set-up, hostssl only over the network.
+printf 'local all all trust\nhostssl all all all scram-sha-256\n' >"$work/db-tls/pg_hba.conf"
 network="$(unit_value mpmv.network NetworkName)"
 podman network create --subnet "$(unit_value mpmv.network Subnet)" "$network" >/dev/null
 podman run -d --name "$db_host" --network "$network" \
   -e POSTGRES_USER=mpmv -e POSTGRES_DB=mpmv -e POSTGRES_PASSWORD="$db_password" \
-  -v "$work/db-tls:/tls:ro" --entrypoint sh docker.io/library/postgres:17 -c '
+  -v "$work/db-tls:/tls:ro" --entrypoint sh "$postgres_image" -c '
     install -d -o postgres -m 700 /run/tls &&
-    install -o postgres -m 600 /tls/server.key /tls/server.crt /run/tls/ &&
-    exec docker-entrypoint.sh postgres -c ssl=on \
+    install -o postgres -m 600 /tls/server.key /tls/server.crt /tls/pg_hba.conf /run/tls/ &&
+    exec docker-entrypoint.sh postgres -c ssl=on -c hba_file=/run/tls/pg_hba.conf \
       -c ssl_cert_file=/run/tls/server.crt -c ssl_key_file=/run/tls/server.key' >/dev/null
 for _ in $(seq 60); do
   if podman exec "$db_host" pg_isready -q -h 127.0.0.1 -U mpmv; then break; fi
@@ -175,6 +195,19 @@ for c in mpmv-app mpmv-worker; do
 done
 [ "$(podman exec mpmv-app stat -c %u:%g /app/media)" = 10001:10001 ] || fail "media volume not owned by the image user"
 podman exec mpmv-app python manage.py check --deploy --fail-level ERROR
+# The app's own connection is TLS, and the server refuses one without it.
+app_ssl="$(podman exec mpmv-app python manage.py shell -c '
+from django.db import connection
+with connection.cursor() as cursor:
+    cursor.execute("SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()")
+    print(cursor.fetchone()[0])')"
+[ "$app_ssl" = True ] || fail "the app's database connection is not TLS ($app_ssl)"
+if podman exec mpmv-app python -c '
+import os, psycopg
+psycopg.connect(os.environ["DATABASE_URL"].split("?")[0] + "?sslmode=disable").close()' 2>/dev/null; then
+  fail "the database accepted a connection without TLS"
+fi
+echo "database: app connection over TLS, plain connection refused"
 # Nothing in the app may try to write to the read-only root (e.g. a server control socket).
 if podman logs mpmv-app 2>&1 | grep -F "Read-only file system"; then fail "the app writes to its read-only root"; fi
 endgroup
@@ -223,9 +256,19 @@ ENTRYPOINT ["/bin/sh", "-c", "[ \"\$0\" = migrate ]"]
 EOF
 podman build -q -t "$registry:$bad" -f "$work/bad/Containerfile" "$work/bad" >/dev/null
 t0=$SECONDS
-if "$deployer" deploy "$bad"; then fail "the bad release went live"; fi
+# Keep the deployer's messages: they must prove the bad units went in and a rollback ran, not an
+# early stop (doctor, extraction) that also exits non-zero and leaves the good release in place.
+if "$deployer" deploy "$bad" 2>"$work/bad-deploy.log"; then
+  cat "$work/bad-deploy.log" >&2
+  fail "the bad release went live"
+fi
 took=$((SECONDS - t0))
+cat "$work/bad-deploy.log" >&2
 echo "bad release detected and rolled back in $took s"
+grep -qF "installed the units of $bad" "$work/bad-deploy.log" || fail "the bad release's units were never installed"
+grep -qF "rolling back to $good" "$work/bad-deploy.log" || fail "no rollback ran"
+grep -qF "installed the units of $good" "$work/bad-deploy.log" || fail "the rollback did not reinstall the good units"
+if grep -qE "doctor:|nothing changed" "$work/bad-deploy.log"; then fail "the bad deploy stopped before installing"; fi
 [ "$took" -lt 60 ] || fail "rollback took $took s (limit 60 s)"
 # Read the whole status first: `grep -q` closing the pipe early would fail the writer (pipefail).
 release_status="$("$deployer" status)"
