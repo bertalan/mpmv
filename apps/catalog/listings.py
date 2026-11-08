@@ -361,6 +361,21 @@ def filter_chips(
     return chips
 
 
+def carried_filters(
+    params: ListingParams, offered: Collection[tuple[str, str]]
+) -> list[tuple[str, str]]:
+    """The applied filters the filter form has no control for, as (name, value) hidden fields:
+    the category, and each selected term that is not among the `offered` (key, value) boxes.
+    A GET form replaces the whole query, so without them submitting it would drop them."""
+    carried: list[tuple[str, str]] = []
+    if params.category:
+        carried.append((CATEGORY, params.category))
+    carried.extend(
+        (key, slug) for key, slugs in params.terms for slug in slugs if (key, slug) not in offered
+    )
+    return carried
+
+
 def page_numbers(window: PageWindow, *, around: int = 2) -> list[int | None]:
     """The page numbers a pagination shows: the first, the last and `around` pages on each
     side of the current one; None marks a gap of two pages or more (a single missing page is

@@ -156,6 +156,9 @@ def _listing(
         "cards": services.product_cards(page.products, language),
         "currency": CURRENCY,
         "filter_groups": groups,
+        "carried_filters": listings.carried_filters(
+            params, {(group.key, option.value) for group in groups for option in group.options}
+        ),
         "vendor_options": vendors,
         "price_min": _amount(params.price_min),
         "price_max": _amount(params.price_max),

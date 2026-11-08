@@ -1803,16 +1803,22 @@ class ProductCard:
 
 
 def product_cards(products: Sequence[Product], language: str) -> list[ProductCard]:
-    """The cards of `products`, in order; their texts in one query."""
+    """The cards of `products`, in order; their texts in one query. A card whose product has
+    no published text in `language` links to its URL in the language of the text it shows."""
     rows = list(products)
     models.prefetch_related_objects(rows, "translations")
     cards: list[ProductCard] = []
     for product in rows:
-        text = product.translation(language).translation
+        # Resolved in Python from the prefetched rows: `product.translation()` filters the
+        # manager, which skips the prefetch cache and costs a query per card.
+        resolved = translations.resolve(product.translations.all(), language)
+        text = resolved.translation
         title = text.title if text is not None else product.sku
         url = None
-        if text is not None and text.slug:
-            url = slugs.product_path(language, text.slug, default_language=settings.LANGUAGE_CODE)
+        if text is not None and text.slug and resolved.language is not None:
+            url = slugs.product_path(
+                resolved.language, text.slug, default_language=settings.LANGUAGE_CODE
+            )
         cards.append(
             ProductCard(title=title, url=url, price=engine.public_price(product), image_alt=title)
         )

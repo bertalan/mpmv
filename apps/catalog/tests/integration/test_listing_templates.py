@@ -13,11 +13,15 @@ from typing import Any
 
 import pytest
 from bs4 import BeautifulSoup
+from django.db import connection
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
 
 from apps.catalog import services
 from apps.catalog.models import Product, SalesMode
 from apps.catalog.tests.factories import (
+    CategoryFactory,
+    CategoryTranslationFactory,
     ProductFactory,
     ProductTranslationFactory,
     TaxonomyFactory,
@@ -212,3 +216,71 @@ def test_the_empty_state(client: Client, shop: dict[str, Any]) -> None:
     assert "No products match" in page.get_text()
     assert page.find("nav", attrs={"aria-label": "Pagination"}) is None
     assert page.find("a", string=re.compile("Clear all filters"))["href"] == "/compatibility/maker/"
+
+
+def form_query(form: Any, **extra: str) -> list[tuple[str, str]]:
+    """What the browser sends for `form` as rendered, plus `extra` boxes ticked."""
+    pairs = [
+        (field["name"], field.get("value", ""))
+        for field in form.find_all("input")
+        if field.get("type") == "hidden"
+        or (field.get("type") == "checkbox" and field.has_attr("checked"))
+        or (field.get("type") == "number" and field.get("value"))
+    ]
+    pairs.extend(extra.items())
+    return pairs
+
+
+def test_submitting_the_form_keeps_an_applied_category(
+    client: Client, shop: dict[str, Any]
+) -> None:
+    bags = CategoryFactory.create()
+    CategoryTranslationFactory.create(category=bags, slug="bags", status=PUBLISHED)
+    shop["priced"].category = bags
+    shop["priced"].save()
+    form = soup(client, "/compatibility/maker/?category=bags").find(
+        "form", attrs={"role": "search"}
+    )
+    assert form.find("input", attrs={"type": "hidden", "name": "category"})["value"] == "bags"
+    query = "&".join(f"{key}={value}" for key, value in form_query(form, colour="red"))
+    response = client.get(f"{form['action']}?{query}", follow=True)
+    assert response.status_code == 200
+    assert response.context["params"].category == "bags"
+    assert response.context["params"].term_slugs("colour") == ("red",)
+
+
+def test_the_form_has_no_hidden_field_without_a_category(
+    client: Client, shop: dict[str, Any]
+) -> None:
+    form = soup(client, "/compatibility/maker/?colour=red").find("form", attrs={"role": "search"})
+    # The selected term is a ticked box, not a hidden field as well.
+    assert form.find("input", type="hidden") is None
+
+
+def test_a_card_on_a_fallback_language_page_links_to_the_source_language_url(
+    client: Client, shop: dict[str, Any]
+) -> None:
+    product = ProductFactory.create(
+        vendor=VendorFactory.create(status=Vendor.Status.ACTIVE),
+        status=Product.Status.PUBLISHED,
+    )
+    ProductTranslationFactory.create(
+        product=product, title="Plain bag", slug="plain-bag-en", status=PUBLISHED
+    )
+    product.terms.add(shop["maker"])
+    page = soup(client, "/it/compatibilita/marca/")
+    assert page.find("a", string=re.compile("Plain bag"))["href"] == "/product/plain-bag-en/"
+
+
+def test_the_cards_load_their_texts_in_a_fixed_number_of_queries(
+    client: Client, shop: dict[str, Any]
+) -> None:
+    def count() -> int:
+        with CaptureQueriesContext(connection) as queries:
+            assert client.get("/compatibility/maker/").status_code == 200
+        return len(queries)
+
+    before = count()
+    for n in range(3):
+        listed(f"Extra bag {n}").terms.add(shop["maker"])
+    assert count() == before

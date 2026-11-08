@@ -105,3 +105,12 @@ def test_page_links_mark_gaps() -> None:
     links = listings.page_links(ListingParams(), BASE, window(1, 10))
     assert [link.number for link in links] == [1, 2, 3, None, 10]
     assert links[3] == listings.PageLink(None, None, current=False)
+
+
+def test_carried_filters_are_the_category_and_the_terms_the_form_does_not_offer() -> None:
+    params = ListingParams(category="bags/small", terms=(("colour", ("blue", "red")),))
+    assert listings.carried_filters(params, {("colour", "red")}) == [
+        ("category", "bags/small"),
+        ("colour", "blue"),
+    ]
+    assert listings.carried_filters(ListingParams(vendor="acme", page=2), set()) == []

@@ -2,7 +2,9 @@
 <section class="listing-filters" aria-labelledby="listing-filters-heading">
   <h2 id="listing-filters-heading">{% translate "Filters" %}</h2>
   <form method="get" action="{{ location }}" role="search" aria-labelledby="listing-filters-heading">
-    {% for group in filter_groups %}
+    {# Applied filters with no control below (the category, a term not offered): a GET form replaces the whole query. #}
+    {% for name, value in carried_filters %}<input type="hidden" name="{{ name }}" value="{{ value }}">
+    {% endfor %}{% for group in filter_groups %}
       <fieldset>
         <legend>{{ group.label }}</legend>
         <ul>
