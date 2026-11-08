@@ -151,7 +151,9 @@ def test_the_migration_widens_the_request_constraint_and_is_reversible() -> None
     executor.loader.build_graph()
     executor.migrate(AFTER)
     TaxRegimeChangeRequest.objects.filter(pk=request.pk).update(fiscal_regime=RF20)
-    assert TaxRegimeChangeRequest.objects.get(pk=request.pk).fiscal_regime == RF20
+    # Only the columns of 0004: later migrations add fields to the current model.
+    stored = TaxRegimeChangeRequest.objects.only("fiscal_regime").get(pk=request.pk)
+    assert stored.fiscal_regime == RF20
 
     executor.loader.build_graph()
     executor.migrate(executor.loader.graph.leaf_nodes())
