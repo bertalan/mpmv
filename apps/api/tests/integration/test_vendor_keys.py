@@ -42,6 +42,11 @@ def _issue(**kwargs: Any) -> IssuedKey:
     )
 
 
+def _active() -> Vendor:
+    """Vendor keys are issued only for an active vendor (CORE.14)."""
+    return VendorFactory.create(status=Vendor.Status.ACTIVE)
+
+
 def _owner(vendor: Vendor) -> VendorMember:
     return VendorMemberFactory.create(vendor=vendor, role=VendorMember.Role.OWNER)
 
@@ -67,7 +72,7 @@ def test_api_clients_are_vendor_scoped_through_their_vendor() -> None:
 
 
 def test_a_vendor_member_lists_only_their_vendors_keys_and_never_platform_keys() -> None:
-    owner_a = _owner(VendorFactory.create())
+    owner_a = _owner(_active())
     key_a = ApiClientFactory.create(vendor=owner_a.vendor)
     ApiClientFactory.create(vendor_key=True)
     ApiClientFactory.create()
@@ -79,7 +84,7 @@ def test_a_vendor_member_lists_only_their_vendors_keys_and_never_platform_keys()
 
 def test_a_vendor_keys_actor_scope_is_its_vendor() -> None:
     key_a = ApiClientFactory.create(vendor_key=True)
-    vendor_b = VendorFactory.create()
+    vendor_b = _active()
     assert key_a.vendor is not None
 
     assert list(Vendor.objects.for_actor(key_a)) == [key_a.vendor]
@@ -89,7 +94,7 @@ def test_a_vendor_keys_actor_scope_is_its_vendor() -> None:
 
 
 def test_a_platform_keys_actor_scope_is_every_vendor() -> None:
-    vendors = {VendorFactory.create(), VendorFactory.create()}
+    vendors = {_active(), _active()}
     assert set(Vendor.objects.for_actor(ApiClientFactory.create())) == vendors
 
 
@@ -112,7 +117,7 @@ def _issuing_staff(**kwargs: Any) -> Any:
 
 
 def test_platform_staff_issue_a_vendor_key() -> None:
-    vendor = VendorFactory.create()
+    vendor = _active()
     staff = _issuing_staff()
 
     issued = _issue(vendor=vendor, issuer=staff, ctx=user_context(staff, "127.0.0.1"))
@@ -125,7 +130,7 @@ def test_platform_staff_issue_a_vendor_key() -> None:
 def test_a_superuser_issues_platform_and_vendor_keys() -> None:
     superuser = UserFactory.create(superuser=True)
     assert _issue(issuer=superuser).client is not None
-    assert _issue(vendor=VendorFactory.create(), issuer=superuser).client is not None
+    assert _issue(vendor=_active(), issuer=superuser).client is not None
 
 
 @pytest.mark.parametrize("permissions", [[], ["api.view_apiclient", "api.change_apiclient"]])
@@ -133,7 +138,7 @@ def test_a_superuser_issues_platform_and_vendor_keys() -> None:
 def test_staff_without_the_add_permission_issue_no_key(key: str, permissions: list[str]) -> None:
     """`is_staff` alone (admin login) is not a right to mint a cross-tenant credential."""
     staff = UserFactory.create(staff=True, permissions=permissions)
-    vendor = VendorFactory.create() if key == "vendor" else None
+    vendor = _active() if key == "vendor" else None
 
     with pytest.raises(PermissionDenied):
         _issue(vendor=vendor, issuer=staff)
@@ -144,19 +149,19 @@ def test_staff_without_the_add_permission_issue_no_key(key: str, permissions: li
 
 
 def test_staff_without_the_add_permission_still_issue_keys_of_a_vendor_they_own() -> None:
-    owner = _owner(VendorFactory.create())
+    owner = _owner(_active())
     owner.user.is_staff = True
     owner.user.save(update_fields=["is_staff"])
 
     assert _issue(vendor=owner.vendor, issuer=owner.user).client is not None
     with pytest.raises(PermissionDenied):
-        _issue(vendor=VendorFactory.create(), issuer=owner.user)
+        _issue(vendor=_active(), issuer=owner.user)
     with pytest.raises(PermissionDenied):
         _issue(issuer=owner.user)
 
 
 def test_an_owner_issues_a_key_for_their_own_vendor() -> None:
-    owner = _owner(VendorFactory.create())
+    owner = _owner(_active())
     issued = _issue(vendor=owner.vendor, issuer=owner.user)
     assert issued.client is not None
     assert issued.client.vendor == owner.vendor
@@ -167,12 +172,12 @@ def test_an_owner_issues_a_key_for_their_own_vendor() -> None:
     ["vendor staff member", "owner of another vendor", "customer", "inactive owner", "anonymous"],
 )
 def test_nobody_else_issues_a_vendor_key(who: str) -> None:
-    vendor = VendorFactory.create()
+    vendor = _active()
     issuer: Any
     if who == "vendor staff member":
         issuer = VendorMemberFactory.create(vendor=vendor, role=VendorMember.Role.STAFF).user
     elif who == "owner of another vendor":
-        issuer = _owner(VendorFactory.create()).user
+        issuer = _owner(_active()).user
     elif who == "customer":
         issuer = UserFactory.create()
     elif who == "inactive owner":
@@ -191,17 +196,17 @@ def test_nobody_else_issues_a_vendor_key(who: str) -> None:
 def test_inactive_staff_do_not_issue_vendor_keys() -> None:
     staff = _issuing_staff(is_active=False)
     with pytest.raises(PermissionDenied):
-        _issue(vendor=VendorFactory.create(), issuer=staff)
+        _issue(vendor=_active(), issuer=staff)
 
 
 def test_a_vendor_key_needs_an_issuer() -> None:
     with pytest.raises(PermissionDenied):
-        _issue(vendor=VendorFactory.create())
+        _issue(vendor=_active())
     assert not ApiClient.objects.exists()
 
 
 def test_only_platform_staff_issue_platform_keys() -> None:
-    owner = _owner(VendorFactory.create())
+    owner = _owner(_active())
     with pytest.raises(PermissionDenied):
         _issue(issuer=owner.user)
     assert _issue(issuer=_issuing_staff()).client is not None
@@ -215,19 +220,19 @@ def test_a_platform_key_issued_by_the_system_needs_no_issuer() -> None:
 
 
 def test_a_dry_run_vendor_key_checks_the_issuer_and_creates_nothing() -> None:
-    owner = _owner(VendorFactory.create())
+    owner = _owner(_active())
     issued = _issue(vendor=owner.vendor, issuer=owner.user, dry_run=True)
     assert issued.changeset.summary()["create"] == 1
     assert not ApiClient.objects.exists()
     with pytest.raises(PermissionDenied):
-        _issue(vendor=VendorFactory.create(), issuer=owner.user, dry_run=True)
+        _issue(vendor=_active(), issuer=owner.user, dry_run=True)
 
 
 # --- Audit
 
 
 def test_issuing_a_vendor_key_is_audited_with_the_issuer_and_the_vendor() -> None:
-    owner = _owner(VendorFactory.create())
+    owner = _owner(_active())
     issued = _issue(vendor=owner.vendor, issuer=owner.user, ctx=user_context(owner.user, None))
     assert issued.client is not None
 
