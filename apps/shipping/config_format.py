@@ -229,14 +229,24 @@ def empty_document() -> dict[str, Any]:
 # --- Reading
 
 
+MAX_FILE_BYTES: Final = 1024 * 1024  # an upload adapter (SHP.6) reuses this cap
+
+
+def _too_big() -> str:
+    return f"The file is larger than {MAX_FILE_BYTES // 1024} KiB."
+
+
 def parse_json(source: str | bytes | Mapping[str, Any]) -> ParsedConfig:
     """The rows of a JSON document (text or already loaded), with the issues of its shape."""
     parsed = ParsedConfig()
     data: Any = source
     if isinstance(source, str | bytes):
+        if len(source) > MAX_FILE_BYTES:
+            parsed.issue(FILE, "format", _too_big())
+            return parsed
         try:
             data = json.loads(source)
-        except ValueError as exc:
+        except (ValueError, RecursionError) as exc:
             parsed.issue(FILE, "format", f"Not a JSON document: {exc}.")
             return parsed
     if not isinstance(data, Mapping):
@@ -280,6 +290,17 @@ def _items(
 def parse_csv(text: str) -> ParsedConfig:
     """The rows of a CSV file, with the issues of its shape; refs are line numbers."""
     parsed = ParsedConfig()
+    if len(text) > MAX_FILE_BYTES:
+        parsed.issue(FILE, "format", _too_big())
+        return parsed
+    try:
+        return _parse_csv(text, parsed)
+    except csv.Error as exc:
+        parsed.issue(FILE, "format", f"Not a readable CSV file: {exc}.")
+        return parsed
+
+
+def _parse_csv(text: str, parsed: ParsedConfig) -> ParsedConfig:
     reader = csv.reader(io.StringIO(text))
     header = next(reader, None)
     if header is None or "record" not in header:
