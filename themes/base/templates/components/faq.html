@@ -1,0 +1,19 @@
+{% comment %}
+FAQ (THM.4, spec 14 §14.9): a titled list of questions, each a native disclosure (`<details>`),
+for content pages and the CMS.2 FAQ block. The FAQPage structured data is SEO's job, not the
+component's.
+
+  {% include "components/faq.html" with id="shipping-faq" title=_("Shipping questions") questions=faq only %}
+
+Context:
+- `id` (required): the id of the heading, which names the section.
+- `title` (required): the heading.
+- `heading_level`: 2 to 6 (default 2); the questions themselves are summaries, not headings.
+- `questions`: a list of `question` and `answer`; the answer is escaped unless marked safe.
+{% endcomment %}<section class="faq" aria-labelledby="{{ id }}">
+  <h{{ heading_level|default:2 }} id="{{ id }}">{{ title }}</h{{ heading_level|default:2 }}>
+  {% for item in questions %}<details class="faq__item">
+    <summary class="faq__question">{{ item.question }}</summary>
+    <div class="faq__answer">{{ item.answer }}</div>
+  </details>{% endfor %}
+</section>

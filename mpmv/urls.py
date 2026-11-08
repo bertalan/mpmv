@@ -18,6 +18,10 @@ from wagtail.admin import urls as wagtailadmin_urls
 from apps.accounts.views import switch_language
 from apps.core.views import email_webhook
 
+# Error pages with the `base` layouts (THM.3); 400 and 500 render without the database.
+handler400 = "apps.themes.views.bad_request"
+handler500 = "apps.themes.views.server_error"
+
 
 def healthz(request: HttpRequest) -> JsonResponse:
     """Liveness probe for the container runtime and uptime checks."""
@@ -34,6 +38,8 @@ urlpatterns = [
     path("api/v1/", include("apps.api.urls")),
     path("account/mfa/", include("apps.accounts.urls")),
     path("geocoding/", include("apps.core.geocoding.urls")),  # "Find coordinates" (EVT.12)
+    # Staff-only styleguide of the active theme (THM.4); a string, as no app imports themes.
+    path("_styleguide/", include("apps.themes.urls")),
     *i18n_patterns(
         path("", include("apps.catalog.urls")),  # listings (CAT.8): before the CMS catch-all
         path("", include("apps.cms.urls")),

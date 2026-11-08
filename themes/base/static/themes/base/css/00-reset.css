@@ -25,4 +25,9 @@
   select {
     font: inherit;
   }
+
+  /* `hidden` always hides, whatever display a later layer gives the element (THM.3). */
+  [hidden] {
+    display: none !important;
+  }
 }

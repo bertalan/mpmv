@@ -1,6 +1,6 @@
-{% extends "cms/base.html" %}
+{% extends "layouts/content.html" %}
 {% load i18n wagtailcore_tags %}
-{% block content %}
+{% block page_content %}
   <article class="legal-page">
     <h1>{{ version.title }}</h1>
     {% include "cms/includes/legal_version_meta.html" %}

@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **229** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **1911 h** (P1 1559 h · P2 334 h · P3 18 h)
+- Micro-tasks: **230** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **1917 h** (P1 1565 h · P2 334 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -18,7 +18,7 @@
 | CORE | Identity, permissions, API, backoffice | 14 | 105 | 4 | 0 | 109 |
 | CAT | Product catalog | 18 | 126 | 60 | 0 | 186 |
 | VEN | Vendors, commissions, ledger | 22 | 197 | 22 | 0 | 219 |
-| TAX | Tax engine | 11 | 44 | 28 | 0 | 72 |
+| TAX | Tax engine | 12 | 50 | 28 | 0 | 78 |
 | SHP | Shipping and quotes | 14 | 96 | 28 | 0 | 124 |
 | ORD | Cart, orders, returns | 11 | 102 | 4 | 0 | 106 |
 | PAY | Payments (Stripe Connect) | 4 | 40 | 0 | 0 | 40 |
@@ -33,7 +33,7 @@
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 5 | 19 | 11 | 0 | 30 |
 | MIG | Migration and cutover | 11 | 114 | 0 | 0 | 114 |
-| **Total** | | **229** | **1559** | **334** | **18** | **1911** |
+| **Total** | | **230** | **1565** | **334** | **18** | **1917** |
 
 ## By phase
 
@@ -122,7 +122,7 @@
 | THM.5 | Theme quality gates, parametrised over registered themes: CSP template lint, axe-core (`wcag22aa`) on the styleguide, visual comparison harness with CI-only baselines, size budgets, `LICENSES.toml` check | P1 | 6 | THM.4, ARC.11 | A theme with a 3:1 text pair, an inline style, an unlicensed font or a 50 KB CSS file fails CI; `base` passes |
 | THM.6 | First vertical theme `ride`: colour tokens from the operator palette (§14.4, §14.12), type scale, spacing and shapes from the reference template's visual language, self-hosted Barlow and Barlow Condensed (OFL 1.1, from upstream), SVG icon subset, header, hero and home block overrides, placeholder imagery, `LICENSES.toml` | P1 | 8 | THM.4, CMS.2 | Home page renders with `ride` and passes the THM.5 gates; no file derived from the reference template (PR checklist) |
 
-### F2 — Checkout: tax, shipping, orders, payments (32 tasks, 292 h)
+### F2 — Checkout: tax, shipping, orders, payments (33 tasks, 298 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -134,6 +134,7 @@
 | TAX.5 | VIES client with cache, timeout, fail-closed | P1 | 6 | TAX.1 | Test with simulated VIES down |
 | TAX.7 | Special territories by postcode (initial dataset) | P1 | 4 | TAX.1, TAX.11 | T15 green |
 | TAX.11 | Shared postcode grammar for tax territories (coherence check 5): `Territory.postcode_patterns` validated and matched with `apps.core.postcodes` (SHP.12), data migration from the `a-b` range form to `a..b`, the tax-only pattern code removed | P1 | 2 | TAX.1, SHP.12 | A `22100-22199` pattern is refused with the `..` hint; stored rows are migrated; `9000..9999` is accepted and matches; Portuguese and Polish postcodes with a dash match as exact postcodes |
+| TAX.12 | Consumer price display, go-live gate (Directive 98/6/EC, national consumer codes): B2C prices on cards, product pages, cart and feeds include VAT. The gross amount uses the destination country's rate through the TAX.3 tax engine; before the buyer picks a country, an estimated country (geo or locale) is used with a clear "VAT included, estimated for <country>" note. A net price shows only to business buyers who opt in. The catalog stays free of tax imports: a tax-side adapter or template tag supplies the gross amount. Destination rate versus Italian rate is confirmed by the owner (MQ-12) | P1 | 6 | TAX.3, CAT.8 | Regression tests for IT, DE and FR consumers (destination rate, estimated-country note); a business buyer's net view after opt-in; `on_request` products never priced; ROUND_HALF_UP per line; the catalog app has no tax import |
 | SHP.1 | Carrier, Zone, VendorZoneRate, WeightBand (exclusion constraint), PickupOption, ConfigVersion models | P1 | 10 | VEN.1 | DB constraints tested |
 | SHP.2 | Legacy cases 1–7 against the `match_postcode` and `resolve_zone` pure functions that SHP.12 built; destination country normalised before matching (`EL` → `GR`, `UK` → `GB`), postcode patterns parsed once per zone, a spaced dash range (`70000 - 74999`) refused like the old range form | P1 | 6 | SHP.12 | Cases 1–7 green; an `EL` destination matches a `GR` zone; `70000 - 74999` is refused with the `..` hint |
 | SHP.3 | `quote_shipping` with Rates/IndicativeRates/NeedsQuote/Blocked outcomes, over-band policy, pickup, free-shipping threshold per method | P1 | 8 | SHP.2, SHP.12, SHP.14 | Cases 8–13 green |
@@ -226,7 +227,7 @@
 | EVT.13 | Map picker for the Wagtail admin panel and the vendor-area form: vendored Leaflet 1.9.4 (`VENDORED.toml`, licence entry), shared `events/map.js` module in picker mode (click to place, drag, latitude and longitude inputs, candidate list from "Find coordinates"), `wagtailgeowidget` evaluated against the CSP and server-side geocoding rules | P1 | 6 | EVT.1, EVT.12, THM.3 | A staff user and a vendor each set a point by click, by drag and by typing, and the saved values match; the admin picker passes the regression case 23 check; the vendored hash check passes |
 | EVT.14 | Tile proxy `/maps/tiles/{z}/{x}/{y}.png` behind the `TileProvider` setting: upstream URL and attribution from settings, identifying User-Agent, object-storage cache of at least 7 days or the upstream headers, long cache headers for the CDN, strict `z`/`x`/`y` validation, per-IP rate limit, upstream request counter for the OSM policy | P1 | 6 | ARC.15, CORE.5 | A second request for a tile is served from the cache without an upstream call (fake upstream); `z=19`, negative or non-integer values return 404 with no upstream call; switching the upstream setting needs no code change; the attribution comes from the setting |
 | EVT.15 | Public maps: event page map with popup, text address above, skip link, labelled region, keyboard-focusable marker, wheel zoom off until focus, reduced motion, no-JavaScript fallback, directions links (Google, OpenStreetMap, `geo:`), "Open in maps" search link without coordinates; index map of the listed events with coordinates | P1 | 6 | EVT.6, EVT.13, EVT.14 | Regression cases 21–23 green; axe (WCAG 2.2 AA) passes on an event page and the index with a map; the attribution is visible with and without JavaScript |
-| THM.7 | `ride` catalog pages: listings with filters, search results, product card, product page, vendor storefront | P1 | 6 | THM.6, CAT.7, CAT.8, VEN.10 | Catalog key pages pass the THM.5 gates at 360, 768 and 1280 px |
+| THM.7 | `ride` catalog pages: listings with filters, search results, product card, product page, vendor storefront | P1 | 6 | THM.6, CAT.7, CAT.8, VEN.10, TAX.12 | Catalog key pages pass the THM.5 gates at 360, 768 and 1280 px |
 | THM.8 | `ride` cart, checkout and account pages: cart, checkout steps, Payment Element appearance from tokens, order confirmation, customer area, sign in and up, MFA, password reset | P1 | 6 | THM.6, ORD.5, ORD.7 | A keyboard-only e2e checkout completes in test mode with `ride`; the Payment Element uses the theme's colours and fonts |
 | THM.9 | `ride` content and system pages: blog, standard, legal, contact, term and vendor landing, vendor recruitment, 404 and 500, consent banner styling | P1 | 4 | THM.6, CMS.3, CMS.4, CMS.5, SEO.5 | Content key pages and the consent banner pass the THM.5 gates; focus is never hidden by the banner or the sticky header |
 | THM.10 | Visual regression baselines for `base` and `ride`: styleguide and key pages at three widths, CI job, update procedure in the developer docs | P1 | 4 | THM.5, THM.7, THM.8, THM.9 | CI compares every key page with its baseline; an intentional change needs a reviewed baseline update |

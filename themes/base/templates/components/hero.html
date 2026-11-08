@@ -1,0 +1,23 @@
+{% comment %}
+Hero (THM.4, spec 14 §14.9): the opening block of the home page and of landing pages (CMS.2): a
+large heading, a line of text and up to two actions, with an optional image beside or behind
+it. The image is decorative (empty alt) unless `image_alt` says what it adds; the text never
+sits on the image without a solid surface, so its contrast never depends on the photo.
+
+  {% include "components/hero.html" with title=page.hero_title text=page.hero_text url=shop_url action=_("Shop now") heading_level=1 only %}
+
+Context:
+- `title` (required): the heading; `heading_level` 1 to 6 (default 2; 1 on a home page whose
+  hero carries the page title).
+- `text`: the line under it.
+- `url` and `action`: the main action, a large primary button.
+- `secondary_url` and `secondary_action`: a second, secondary action.
+- `image_url`, `image_alt`, `image_width`, `image_height` (default 1200 x 800).
+{% endcomment %}<div class="hero{% if image_url %} hero--image{% endif %}">
+  <div class="hero__content">
+    <h{{ heading_level|default:2 }} class="hero__title">{{ title }}</h{{ heading_level|default:2 }}>
+    {% if text %}<p class="hero__text">{{ text }}</p>{% endif %}
+    {% if url and action or secondary_url and secondary_action %}<div class="hero__actions">{% if url and action %}<a class="button button--large" href="{{ url }}">{{ action }}</a>{% endif %}{% if secondary_url and secondary_action %}<a class="button button--large button--secondary" href="{{ secondary_url }}">{{ secondary_action }}</a>{% endif %}</div>{% endif %}
+  </div>
+  {% if image_url %}<img class="hero__image" src="{{ image_url }}" alt="{{ image_alt|default:'' }}" width="{{ image_width|default:1200 }}" height="{{ image_height|default:800 }}">{% endif %}
+</div>

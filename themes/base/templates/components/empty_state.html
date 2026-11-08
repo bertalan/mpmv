@@ -1,0 +1,16 @@
+{% comment %}
+Empty state (THM.4, spec 14 §14.9): what a list, a cart or a search with nothing in it shows: a
+heading that says so, a line of help and, when there is one, the next step as a button.
+
+  {% include "components/empty_state.html" with title=_("Your cart is empty") text=_("Find something you like.") url=home_url action=_("Start shopping") only %}
+
+Context:
+- `title` (required): the heading.
+- `heading_level`: 2 to 6 (default 2).
+- `text`: the line of help.
+- `url` and `action`: the next step, a link styled as a button.
+{% endcomment %}<div class="empty-state">
+  <h{{ heading_level|default:2 }}>{{ title }}</h{{ heading_level|default:2 }}>
+  {% if text %}<p>{{ text }}</p>{% endif %}
+  {% if url and action %}<a class="button" href="{{ url }}">{{ action }}</a>{% endif %}
+</div>
