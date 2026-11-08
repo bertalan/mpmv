@@ -1,6 +1,6 @@
 """Pure vendor rules (no ORM): status state machine, slug generation, member roles and their
 permissions, and the legal and e-invoicing identity (validators, required fields, FatturaPA
-party block), onboarding and the establishment gate (CMP.13)."""
+party block, RF20 eligibility), onboarding and the establishment gate (CMP.13)."""
 
 import dataclasses
 import datetime as dt
@@ -545,6 +545,63 @@ def is_valid_tin(tin: str, country: str) -> bool:
     return pattern is None or bool(pattern.fullmatch(_TIN_SEPARATORS.sub("", code)))
 
 
+# --- Cross-border SME franchise number (VEN.25, owner decision MQ-5)
+#
+# A small enterprise using the VAT franchise of another member state (art. 284(2) of the VAT
+# directive as amended by Directive (EU) 2020/285) gets from its member state of establishment
+# an individual identification number with the suffix "EX" (art. 284(3)). The national part
+# follows the issuing member state's VAT number format, after its VAT prefix (EL for Greece).
+
+FRANCHISE_NUMBER_SUFFIX: Final = "EX"
+
+# National part of the number, by issuing member state (ISO code): the VIES VAT number formats.
+CROSS_BORDER_FRANCHISE_NUMBER_FORMATS: Final[Mapping[str, str]] = {
+    "AT": r"U\d{8}",
+    "BE": r"[01]\d{9}",
+    "BG": r"\d{9,10}",
+    "CY": r"\d{8}[A-Z]",
+    "CZ": r"\d{8,10}",
+    "DE": r"\d{9}",
+    "DK": r"\d{8}",
+    "EE": r"\d{9}",
+    "ES": r"[A-Z0-9]\d{7}[A-Z0-9]",
+    "FI": r"\d{8}",
+    "FR": r"[A-HJ-NP-Z0-9]{2}\d{9}",
+    "GR": r"\d{9}",
+    "HR": r"\d{11}",
+    "HU": r"\d{8}",
+    "IE": r"\d{7}[A-W][A-I]?|\d[A-Z+*]\d{5}[A-W]",
+    "IT": r"\d{11}",  # country-literal: the Italian issuer format, one EU member state of 27
+    "LT": r"\d{9}|\d{12}",
+    "LU": r"\d{8}",
+    "LV": r"\d{11}",
+    "MT": r"\d{8}",
+    "NL": r"\d{9}B\d{2}",
+    "PL": r"\d{10}",
+    "PT": r"\d{9}",
+    "RO": r"[1-9]\d{1,9}",
+    "SE": r"\d{12}",
+    "SI": r"\d{8}",
+    "SK": r"\d{10}",
+}
+_FRANCHISE_NUMBER_ISSUERS: Final = {
+    vat_prefix(country): (country, re.compile(pattern, re.ASCII))
+    for country, pattern in CROSS_BORDER_FRANCHISE_NUMBER_FORMATS.items()
+}
+
+
+def franchise_number_issuer(number: str) -> str | None:
+    """The member state (ISO code) that issued a well-formed `EX` number; None otherwise."""
+    code = compact(number)
+    if not code.endswith(FRANCHISE_NUMBER_SUFFIX):
+        return None
+    issuer = _FRANCHISE_NUMBER_ISSUERS.get(code[:2])
+    if issuer is None:
+        return None
+    country, national = issuer
+    return country if national.fullmatch(code[2 : -len(FRANCHISE_NUMBER_SUFFIX)]) else None
+
+
 @dataclasses.dataclass(frozen=True)
 class LegalIdentity:
     """A vendor's legal and e-invoicing identity, as plain values (field names = model fields)."""
@@ -561,6 +618,7 @@ class LegalIdentity:
     tin_country: str = ""
     tax_residence_country: str = ""
     fiscal_regime: str = ""
+    cross_border_franchise_number: str = ""
     ateco_code: str = ""
     eori: str = ""
     business_registration_number: str = ""
@@ -616,14 +674,66 @@ COMPACT_FIELDS: Final = (
     "rea_number",
     "sdi_recipient_code",
     "fiscal_representative_vat_number",
+    "cross_border_franchise_number",
     "iban",
     "bic",
 )
+
+FRANCHISE_NUMBER_FIELD: Final = "cross_border_franchise_number"
 
 
 def _address_country(identity: LegalIdentity, prefix: str) -> str:
     country: str = getattr(identity, f"{prefix}_country")
     return country or (identity.country if prefix == "registered" else "")
+
+
+def rf20_seat_country(identity: LegalIdentity) -> str:
+    """The member state where the vendor's registered office (seat) is, as the CMP.13
+    `vendor_establishment` reads it; "" when the seat is outside the EU.
+
+    Owner interim decision MQ-17: until the tax advisor answers, a permanent establishment alone
+    does not qualify for RF20, so only the seat counts. Revisit when MQ-17 is answered.
+    """
+    seat = vendor_establishment(identity).registered_office
+    return seat if seat in EU_MEMBER_STATES else ""
+
+
+def cross_border_franchise_errors(identity: LegalIdentity) -> dict[str, list[str]]:
+    """Who may declare RF20 (VEN.25, owner decision MQ-5), by field.
+
+    A vendor declaring RF20 must have its registered office (seat) in an EU member state and hold
+    the `EX` number (art. 284(3) of the VAT directive). A number, when given, must be well formed
+    for its issuing member state and issued by the seat's member state. A permanent
+    establishment alone does not qualify (owner interim decision MQ-17).
+    """
+    errors: dict[str, list[str]] = {}
+    number = compact(identity.cross_border_franchise_number)
+    seat = rf20_seat_country(identity)
+    if number:
+        issuer = franchise_number_issuer(number)
+        if issuer is None:
+            errors[FRANCHISE_NUMBER_FIELD] = [
+                "Not a valid cross-border franchise number: the issuing member state's VAT "
+                "prefix, its national number and the suffix EX (e.g. DE123456789EX)."
+            ]
+        elif issuer != seat:
+            where = seat or "no EU member state"
+            errors[FRANCHISE_NUMBER_FIELD] = [
+                f"The number was issued by {issuer}, but the vendor's registered office is in "
+                f"{where}: it must be issued by the member state of the registered office."
+            ]
+    if identity.fiscal_regime == CROSS_BORDER_FRANCHISE_REGIME:
+        if not seat:
+            errors["fiscal_regime"] = [
+                "RF20 (cross-border VAT franchise) is only for vendors whose registered office "
+                "is in an EU member state; a permanent establishment alone does not qualify."
+            ]
+        if not number:
+            errors[FRANCHISE_NUMBER_FIELD] = [
+                "RF20 needs the cross-border franchise number (suffix EX) issued by the member "
+                "state of the registered office."
+            ]
+    return errors
 
 
 def normalized(identity: LegalIdentity) -> LegalIdentity:
@@ -720,6 +830,8 @@ def identity_errors(identity: LegalIdentity) -> dict[str, list[str]]:
         errors["share_capital"] = ["The share capital cannot be negative."]
     errors.update(_address_errors(ident, "registered"))
     errors.update(_address_errors(ident, "establishment"))
+    for name, messages in cross_border_franchise_errors(ident).items():
+        errors.setdefault(name, []).extend(messages)
     return errors
 
 

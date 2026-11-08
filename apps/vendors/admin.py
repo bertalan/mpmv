@@ -198,6 +198,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
                     "tin_same_as_vat",
                     "tax_residence_country",
                     "fiscal_regime",
+                    "cross_border_franchise_number",
                     "ateco_code",
                     "eori",
                 )

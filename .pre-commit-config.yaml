@@ -4,13 +4,15 @@ repos:
     hooks:
       # Vendored files stay byte-identical to upstream: VENDORED.toml records their SHA-256.
       - id: end-of-file-fixer
-        exclude: ^apps/themes/static/vendor/
+        exclude: ^(apps/themes/static/vendor|tests/e2e/vendor)/
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
-        exclude: ^apps/themes/static/vendor/
+        exclude: ^(apps/themes/static/vendor|tests/e2e/vendor)/
       - id: check-toml
       - id: check-yaml
       - id: check-added-large-files
+        # axe-core (THM.5) is a pinned, hashed test tool of about 540 KB.
+        exclude: ^tests/e2e/vendor/axe\.min\.js$
       - id: detect-private-key
   - repo: local
     hooks:

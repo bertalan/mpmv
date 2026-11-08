@@ -57,7 +57,7 @@ def unseed(apps: Any, schema_editor: Any) -> None:
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("vendors", "0016_dac7_seller_dataset"),
+        ("vendors", "0017_dac7_seller_dataset"),
     ]
 
     operations = [

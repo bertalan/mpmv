@@ -45,7 +45,7 @@ def backfill(apps: Any, schema_editor: Any) -> None:
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("vendors", "0017_seed_dac7_seller_dataset"),
+        ("vendors", "0018_seed_dac7_seller_dataset"),
     ]
 
     operations = [
