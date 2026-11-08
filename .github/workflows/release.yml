@@ -4,6 +4,8 @@
 # ARC.13 (ADR-0007 amendment 2026-11-08): the image is multi-arch. Each architecture is built on a
 # native runner (no QEMU) and pushed by digest only, with no tag of its own; the publish job then
 # tags one manifest list holding both, so a release tag never points to half a release.
+# ARC.23: each architecture passes the production parity smoke (deploy/ci/parity-smoke.sh) before
+# its image is pushed; see docs/dev/release.md.
 # OPS.4: the GitHub release for the tag carries the CycloneDX SBOMs of the Python environment and
 # of the published image, one per architecture (docs/dev/dependency-updates.md). Only the small
 # attach job, which runs no third-party action, can write to the repository; the image and publish
@@ -75,6 +77,10 @@ jobs:
           --load --tag mpmv-app:release .
       - name: Built for the runner's architecture
         run: test "$(docker image inspect --format '{{.Architecture}}' mpmv-app:release)" = "$ARCH"
+      # ARC.23: the release runs as on STAGE (units, Caddy, TLS database, seed, rollback) before
+      # any of it is pushed.
+      - name: Production parity smoke (units, Caddy, TLS database, seed, rollback)
+        run: deploy/ci/parity-smoke.sh mpmv-app:release
       - run: mkdir -p build/sbom
       - name: Python SBOM (CycloneDX)
         if: matrix.arch == 'amd64'

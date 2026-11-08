@@ -120,6 +120,8 @@ jobs:
     # serves and passes its own health check against PostgreSQL.
     # ARC.13: once per architecture, each on a native runner (no QEMU), so an arm64 break shows
     # up on the PR. The required check is the "Container image" gate job below.
+    # ARC.23: the parity smoke deploys the image with mpmv-deploy under the real Quadlet units, the
+    # production Caddyfile and PostgreSQL over TLS verify-full (deploy/ci/parity-smoke.sh).
     name: Container image (${{ matrix.arch }})
     strategy:
       fail-fast: false
@@ -130,17 +132,7 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: mpmv
-          POSTGRES_HOST_AUTH_METHOD: trust
-          POSTGRES_DB: mpmv
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U mpmv -d mpmv"
-          --health-interval 5s --health-timeout 5s --health-retries 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - name: Build the Containerfile
@@ -194,28 +186,8 @@ jobs:
               assert pathlib.Path("staticfiles", hashed).is_file(), hashed
               print(slug, "->", hashed)
           '
-      - name: Migrate, serve and pass the health check
-        run: |
-          env_file="$RUNNER_TEMP/app.env"
-          printf 'DJANGO_SECRET_KEY=%s\n' \
-            "$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')" > "$env_file"
-          printf 'DATABASE_URL=%s\nDJANGO_ALLOWED_HOSTS=localhost\n' "$DATABASE_URL" >> "$env_file"
-          # CMS.1: `check --deploy` requires a public base URL (cms.E001).
-          printf 'MPMV_BASE_URL=https://mpmv.example.com\n' >> "$env_file"
-          # SEC.3: a throwaway field encryption key, generated for this run only.
-          printf 'MPMV_FIELD_ENCRYPTION_KEYS=ci:%s\n' \
-            "$(python3 -c 'import base64, secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())')" \
-            >> "$env_file"
-          run="docker run --network host --env-file $env_file --read-only --tmpfs /tmp"
-          $run --rm mpmv-app:ci migrate
-          $run --rm mpmv-app:ci manage check --deploy --fail-level ERROR
-          $run -d --name mpmv-app-ci mpmv-app:ci web
-          for _ in $(seq 30); do
-            if docker exec mpmv-app-ci python -m mpmv.healthcheck; then exit 0; fi
-            sleep 1
-          done
-          docker logs mpmv-app-ci
-          exit 1
+      - name: Production parity smoke (units, Caddy, TLS database, seed, rollback)
+        run: deploy/ci/parity-smoke.sh mpmv-app:ci
 
   image:
     # Branch protection requires this check. It passes only when both architectures passed; it
