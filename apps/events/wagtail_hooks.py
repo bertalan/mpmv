@@ -9,7 +9,9 @@
   action menu and the explorer listing; the "Events" menu holds the events awaiting review,
   the vendors' moderation policies and the events settings (`admin_views`). A non-staff user
   never edits a hidden event, nor publishes one (alone or in bulk) while its vendor needs
-  review: the submission goes through "Event review".
+  review: the submission goes through "Event review". wagtail-localize's own views keep the
+  same rules through `apps.events.middleware`, and `EventPage.publish` refuses a hidden page on
+  every path but `restore_event`.
 """
 
 from collections.abc import Iterator
@@ -82,11 +84,10 @@ def refuse_vendors_editing_events(request: HttpRequest, page: Any) -> None:
         return
     if admin_edit_refused(request.user, event):
         raise PermissionDenied
-    if (
-        request.method == "POST"
-        and request.POST.get(PUBLISH)
-        and admin_publish_refused(request.user, event)
-    ):
+    # Wagtail's editor posts `action-publish`; wagtail-localize's translation editor, which
+    # replaces it on a synced translation, posts `action=publish`.
+    publishes = bool(request.POST.get(PUBLISH)) or request.POST.get("action") == "publish"
+    if request.method == "POST" and publishes and admin_publish_refused(request.user, event):
         raise PermissionDenied
 
 

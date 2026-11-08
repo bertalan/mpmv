@@ -53,6 +53,7 @@ from wagtail.models import (
     Workflow,
     WorkflowState,
 )
+from wagtail_localize.models import Translation, TranslationSource
 
 from apps.accounts.models import User
 from apps.catalog.models import Category, Product
@@ -217,6 +218,41 @@ def admin_publish_refused(user: AbstractBaseUser | AnonymousUser, page: EventPag
     if _is_staff(user):
         return False
     return page.hidden_at is not None or page.review_needed()
+
+
+def localize_view_event(kwargs: Mapping[str, Any]) -> EventPage | None:
+    """The event behind a wagtail-localize admin view, from its URL arguments (`page_id`,
+    `translation_source_id` or `translation_id`); `None` for any other object.
+
+    Those views run no `before_edit_page` hook, so the admin guard resolves their event here.
+    """
+    source: TranslationSource | None = None
+    if "page_id" in kwargs:
+        return EventPage.objects.filter(pk=kwargs["page_id"]).first()
+    if "translation_source_id" in kwargs:
+        source = TranslationSource.objects.filter(pk=kwargs["translation_source_id"]).first()
+    elif "translation_id" in kwargs:
+        translation = (
+            Translation.objects.select_related("source").filter(pk=kwargs["translation_id"]).first()
+        )
+        source = translation.source if translation is not None else None
+    if source is None:
+        return None
+    # A source names its object by translation key and locale: no match for another model.
+    return EventPage.objects.filter(
+        translation_key=source.object_id, locale_id=source.locale_id
+    ).first()
+
+
+def admin_localize_refused(
+    user: AbstractBaseUser | AnonymousUser, page: EventPage, *, publishes: bool
+) -> bool:
+    """The rules of `admin_edit_refused` and `admin_publish_refused` for wagtail-localize's
+    views: a non-staff user never touches a hidden event's translations, nor publishes them
+    without review while the vendor needs review."""
+    if admin_edit_refused(user, page):
+        return True
+    return publishes and admin_publish_refused(user, page)
 
 
 def events_awaiting_review() -> list[tuple[EventPage, WorkflowState]]:
