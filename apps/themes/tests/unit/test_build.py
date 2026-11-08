@@ -126,6 +126,17 @@ def test_an_invalid_manifest_stops_the_build(themes: Path, tmp_path: Path) -> No
         build_themes(themes, tmp_path / "out")
 
 
+def test_theme_js_modules_are_copied_next_to_the_css(themes: Path, tmp_path: Path) -> None:
+    # THM.3: theme behaviour lives in ES modules under static/themes/<slug>/js/.
+    module = themes / "alt" / "static" / "themes" / "alt" / "js" / "menu.js"
+    module.parent.mkdir(parents=True)
+    module.write_text('document.addEventListener("alpine:init", () => {});\n', encoding="utf-8")
+    out = tmp_path / "out"
+    build_themes(themes, out)
+    assert built(out, "alt", "js/menu.js") == module.read_text(encoding="utf-8")
+    assert not (out / "themes" / "base" / "js" / "menu.js").exists()
+
+
 def test_stale_output_of_a_removed_theme_is_deleted(themes: Path, tmp_path: Path) -> None:
     out = tmp_path / "out"
     stale = out / "themes" / "gone" / "theme.css"
