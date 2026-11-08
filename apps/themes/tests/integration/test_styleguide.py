@@ -14,6 +14,7 @@ from django.test import Client
 from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.themes.styleguide import COMPONENTS
+from apps.themes.tests.builders import SHIPPED_THEMES
 
 # `themes` imports only core (spec 14 §14.3): users come from the shared root fixtures.
 MfaLogin = Callable[[Client, Any], Client]
@@ -175,6 +176,29 @@ def test_every_shown_component_is_rendered_in_its_section(staff_client: Client) 
         # The page frame (skip link, header, language switcher, footer) wraps the page itself.
         where = html if shown.section == "sg-frame" else section_html(html, shown.section)
         assert shown.marker in where, (name, shown.section, shown.marker)
+
+
+def test_every_shown_component_is_included_from_its_own_template() -> None:
+    # A marker alone could come from hand-written markup: each component must be rendered by
+    # including its own file in its section of the styleguide, directly or through a component
+    # the section includes (a grid includes its tiles); the page frame through the base layout.
+    sources = SHIPPED_THEMES / "base/templates"
+    styleguide = (sources / "styleguide.html").read_text(encoding="utf-8")
+
+    def with_includes(source: str) -> str:
+        nested = [
+            (sources / name).read_text(encoding="utf-8")
+            for name in re.findall(r'{% include "(components/[a-z_]+\.html)"', source)
+            if (sources / name).is_file()
+        ]
+        return source + "".join(nested)
+
+    for name, shown in COMPONENTS.items():
+        if shown.section == "sg-frame":
+            where = with_includes((sources / "layouts/base.html").read_text(encoding="utf-8"))
+        else:
+            where = with_includes(section_html(styleguide, shown.section))
+        assert f'{{% include "{shown.template}"' in where, (name, shown.template)
 
 
 def test_every_breadcrumb_and_pagination_state_is_shown(staff_client: Client) -> None:

@@ -15,6 +15,7 @@ from django.template.loader import render_to_string
 from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.themes.build import render_themes
+from apps.themes.contract import PAIRS, TEXT, UI
 from apps.themes.tests.builders import SHIPPED_THEMES
 
 
@@ -86,12 +87,36 @@ def test_a_price_shows_the_amount() -> None:
     assert "€ 39.00" in html
 
 
-def test_a_reduced_price_strikes_the_old_one_and_shows_the_omnibus_reference() -> None:
-    html = render("price", amount="€ 39.00", before="€ 49.00", lowest="€ 45.00")
-    assert re.search(r"<del>.*€ 49.00.*</del>", html, re.DOTALL)
-    assert re.search(r'<span class="visually-hidden">[^<]+</span>\s*€ 49.00', html)
+def struck_through(html: str) -> list[str]:
+    return re.findall(r"<del>(.*?)</del>", html, re.DOTALL)
+
+
+def test_a_reduced_price_strikes_through_the_lowest_price_of_the_last_30_days() -> None:
+    # Omnibus (Directive 2019/2161, spec 11 CMP.6): the one reference price of a reduction is
+    # the lowest price of the last 30 days, struck through and labelled as such.
+    html = render("price", amount="€ 39.00", lowest_30_days="€ 45.00")
+    struck = struck_through(html)
+    assert len(struck) == 1
+    assert "€ 45.00" in struck[0]
     assert "Lowest price in the last 30 days" in html
-    assert "€ 45.00" in html
+    assert "price__amount--reduced" in html
+
+
+def test_an_arbitrary_previous_price_is_never_the_struck_through_reference() -> None:
+    html = render("price", amount="€ 39.00", before="€ 49.00", lowest_30_days="€ 45.00")
+    assert "€ 49.00" not in html
+    struck = struck_through(html)
+    assert len(struck) == 1
+    assert "€ 45.00" in struck[0]
+
+
+def test_a_reduction_without_the_30_day_reference_strikes_nothing_through() -> None:
+    contexts: list[dict[str, str]] = [{"before": "€ 49.00"}, {"lowest": "€ 49.00"}, {}]
+    for context in contexts:
+        html = render("price", amount="€ 39.00", **context)
+        assert "<del>" not in html, context
+        assert "€ 49.00" not in html, context
+        assert "price__amount--reduced" not in html, context
 
 
 def test_a_price_on_request_shows_no_amount() -> None:
@@ -194,6 +219,15 @@ def test_a_gallery_lists_its_images_with_a_zoom_dialog_each() -> None:
     assert_no_inline_code(html)
 
 
+def test_a_gallery_dialog_has_a_name_when_its_image_has_no_alt_text() -> None:
+    images = [{"url": "/static/a.svg", "alt": "Front view"}, {"url": "/static/a.svg", "alt": ""}]
+    html = render("gallery", id="g3", label="Product images", images=images)
+    dialog = r'<dialog class="dialog dialog--image" id="g3-\d" aria-label="([^"]*)"'
+    names = re.findall(dialog, html)
+    assert names == ["Front view", "Product images, image 2 of 2"]
+    assert '<span class="visually-hidden">: Product images, image 2 of 2</span>' in html
+
+
 def test_a_gallery_without_images_shows_a_placeholder() -> None:
     html = render("gallery", id="g2", label="Product images", images=[])
     assert "gallery__placeholder" in html
@@ -213,7 +247,18 @@ def test_a_carousel_is_a_labelled_scroll_snap_list_with_hidden_buttons() -> None
     assert html.count("<li") == 2
     assert html.count("data-carousel=") == 2
     assert html.count(" hidden") >= 2
+    # The region and its track are named differently, so the name is not announced twice.
+    labels = re.findall(r'aria-label="([^"]*Featured[^"]*)"', html)
+    assert len(labels) == 2
+    assert len(set(labels)) == 2
     assert_no_inline_code(html)
+
+
+def test_the_carousel_buttons_say_when_an_edge_is_reached(script: str) -> None:
+    sync = script[script.index("function syncCarousel") :]
+    assert "setAriaDisabled(" in sync[: sync.index("\n}\n")]
+    helper = script[script.index("function setAriaDisabled") :]
+    assert 'setAttribute("aria-disabled", "true")' in helper[: helper.index("\n}\n")]
 
 
 def test_the_carousel_snaps_and_honours_reduced_motion(css: str, script: str) -> None:
@@ -234,6 +279,22 @@ def test_a_quantity_stepper_is_a_number_field_with_hidden_buttons() -> None:
     assert 'inputmode="numeric"' in html
     assert len(re.findall(r'<button type="button"[^>]*data-step="-?1"[^>]*hidden', html)) == 2
     assert_no_inline_code(html)
+
+
+def test_a_quantity_stepper_keeps_zero_limits_and_values() -> None:
+    # Out of stock: max 0 must stay a limit, not vanish into an unlimited field.
+    html = render("quantity_stepper", id="qty0", label="Quantity", value=0, min=0, max=0)
+    assert re.search(r'<input[^>]*value="0" min="0" max="0"', html)
+    defaults = render("quantity_stepper", id="qty3", label="Quantity")
+    assert re.search(r'<input[^>]*value="1" min="1" step="1"', defaults)
+    assert "max=" not in defaults
+
+
+def test_the_stepper_marks_its_limits_with_aria_disabled_to_keep_the_focus(script: str) -> None:
+    # A focused button that turns `disabled` drops the focus to <body> (WCAG 2.4.3).
+    sync = script[script.index("function syncStepper") : script.index("function revealEnhanced")]
+    assert "aria-disabled" in sync
+    assert "button.disabled = input.disabled;" in sync
 
 
 def test_a_disabled_quantity_stepper_disables_the_field() -> None:
@@ -322,6 +383,15 @@ def test_the_toast_region_is_a_polite_status_region_present_on_load() -> None:
 def test_the_theme_script_adds_toasts_and_dismisses_them(script: str) -> None:
     assert "[data-toast]" in script
     assert ".toast" in script
+
+
+def test_dismissing_a_toast_keeps_the_focus_near_the_toasts(script: str) -> None:
+    # A toast is not an alert: the focus goes to a neighbouring toast or back to the control
+    # that raised it, not to the top of the main content.
+    dismiss = script[script.index("function dismissToast") :]
+    dismiss = dismiss[: dismiss.index("\n}\n")]
+    assert "toastTriggers" in dismiss
+    assert ".toast__dismiss" in dismiss
 
 
 def test_a_responsive_table_scrolls_in_a_named_focusable_region() -> None:
@@ -431,3 +501,14 @@ def test_a_launch_countdown_shows_the_absolute_date_before_and_the_expired_text_
 )
 def test_every_component_has_its_style(css: str, selector: str) -> None:
     assert selector in css
+
+
+def test_the_library_colour_pairs_are_in_the_token_contract() -> None:
+    # 40-library.css draws text-muted on the raised surface (order summary, cart line) and
+    # warning and success bars on the plain and the raised surface: a child theme that breaks
+    # one of these contrasts must fail the contract check (spec 14 §14.4).
+    pairs = {(pair.foreground, pair.background): pair.minimum for pair in PAIRS}
+    assert pairs[("color.text-muted", "color.surface-raised")] >= TEXT
+    for level in ("color.warning", "color.success"):
+        assert pairs[(level, "color.surface")] >= UI
+        assert pairs[(level, "color.surface-raised")] >= UI

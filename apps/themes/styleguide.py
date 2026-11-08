@@ -99,6 +99,7 @@ def sample_products() -> list[dict[str, Any]]:
     return [
         {
             "name": _("Touring jacket"),
+            "url": "#sg-tiles",
             "image_url": image,
             "image_alt": _("Grey placeholder shape"),
             "price": "€ 189.00",
@@ -107,6 +108,7 @@ def sample_products() -> list[dict[str, Any]]:
         },
         {
             "name": _("Rain cover"),
+            "url": "#sg-tiles",
             "image_url": image,
             "image_alt": "",
             "price": "€ 39.00",
@@ -116,6 +118,7 @@ def sample_products() -> list[dict[str, Any]]:
         },
         {
             "name": _("Winter gloves"),
+            "url": "#sg-tiles",
             "image_url": image,
             "image_alt": "",
             "price": "€ 59.00",
@@ -124,6 +127,7 @@ def sample_products() -> list[dict[str, Any]]:
         },
         {
             "name": _("Made-to-measure seat"),
+            "url": "#sg-tiles",
             "image_url": "",
             "price": "",
             "vendor": "Vendor D",
@@ -162,7 +166,7 @@ COMPONENTS: dict[str, Shown] = {
     "price": Shown("sg-price", "components/price.html", 'class="price"'),
     "rating": Shown("sg-rating", "components/rating.html", 'class="rating"'),
     "product card": Shown("sg-tiles", "components/product_tile.html", 'class="product-tile'),
-    "product grid": Shown("sg-tiles", "components/product_tile.html", 'class="product-grid"'),
+    "product grid": Shown("sg-tiles", "components/product_grid.html", 'class="product-grid"'),
     "pagination": Shown("sg-pagination", "components/pagination.html", 'class="pagination"'),
     "accordion": Shown("sg-accordion", "components/accordion.html", 'class="accordion"'),
     "tabs": Shown("sg-tabs", "components/tabs.html", 'class="tabs"'),

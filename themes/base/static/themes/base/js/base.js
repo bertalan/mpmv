@@ -114,9 +114,10 @@ if (siteHeader && "ResizeObserver" in window) {
   }).observe(siteHeader);
 }
 
-// Dismissible alerts (THM.4, components/alert.html): the "Dismiss" button is rendered `hidden`,
-// so it shows only once this script runs; a click removes its alert and moves the focus to the
-// main content, never leaving it on a removed element. Delegated: alerts swapped in by htmx work
+// Dismissible alerts and toasts (THM.4, components/alert.html, components/toast.html): the
+// "Dismiss" button is rendered `hidden`, so it shows only once this script runs; a click removes
+// its alert and moves the focus to the main content, never leaving it on a removed element. A
+// toast keeps the focus near the toasts instead (see dismissToast). Delegated: alerts swapped in by htmx work
 // too. htmx 2 fires htmx:load on every element it adds, in-band or out of band (an out-of-band
 // swap fires no htmx:afterSwap), so the buttons inside the new element are revealed there. No
 // inline handler, so the strict CSP holds.
@@ -136,9 +137,30 @@ document.addEventListener("click", (event) => {
   if (!alert) {
     return;
   }
+  if (alert.matches(".toast")) {
+    dismissToast(alert);
+    return;
+  }
   alert.remove();
   document.getElementById("main")?.focus();
 });
+
+// The control that raised each toast (a button with data-toast), to give the focus back to.
+const toastTriggers = new WeakMap();
+
+// A toast sits at the end of the main content: sending the focus to the top of it would lose
+// the visitor's place. The focus goes to the next toast's Dismiss button, else the previous
+// one's, else back to the control that raised the toast, else to the main content.
+function dismissToast(toast) {
+  const neighbour = [toast.nextElementSibling, toast.previousElementSibling].find((element) =>
+    element?.matches(".toast"),
+  );
+  const trigger = toastTriggers.get(toast);
+  toast.remove();
+  const target =
+    neighbour?.querySelector(".toast__dismiss") ?? (trigger?.isConnected ? trigger : null);
+  (target ?? document.getElementById("main"))?.focus();
+}
 
 // Busy and disabled-but-focusable controls (THM.4, components/button.html): a loading button
 // carries aria-disabled="true" and keeps the focus, but it must not act. Capture phase, so no
@@ -177,15 +199,38 @@ document.querySelector(".error-summary[data-autofocus]")?.focus();
 // element htmx adds.
 const ENHANCED = "[data-dialog], [data-carousel], [data-step], [data-toast]";
 
-// Quantity stepper: the buttons step the field within its min and max, fire the events a typed
-// change fires, and are disabled at the limits (or with the field).
+// Quantity stepper: the buttons step the field within its min and max and fire the events a
+// typed change fires. At a limit a button is marked aria-disabled, not disabled: a focused
+// button that turns disabled drops the focus to <body> (WCAG 2.4.3, 2.4.7), while the capture
+// guard above stops its clicks. Only a disabled field disables its buttons.
 function syncStepper(input) {
   const value = Number(input.value);
   for (const button of input.closest(".quantity").querySelectorAll("[data-step]")) {
     const down = button.dataset.step === "-1";
     const limit = down ? input.min : input.max;
     const atLimit = limit !== "" && (down ? value <= Number(limit) : value >= Number(limit));
-    button.disabled = input.disabled || atLimit;
+    button.disabled = input.disabled;
+    setAriaDisabled(button, atLimit && !input.disabled);
+  }
+}
+
+function setAriaDisabled(button, disabled) {
+  if (disabled) {
+    button.setAttribute("aria-disabled", "true");
+  } else {
+    button.removeAttribute("aria-disabled");
+  }
+}
+
+// Carousel: the Previous button is marked aria-disabled at the start of the track and the Next
+// button at its end, so a click that cannot scroll is announced as unavailable. `scrollLeft` is
+// negative in a right-to-left page, hence the absolute value; one pixel absorbs rounding.
+function syncCarousel(track) {
+  const offset = Math.abs(track.scrollLeft);
+  const atStart = offset <= 1;
+  const atEnd = offset + track.clientWidth >= track.scrollWidth - 1;
+  for (const button of document.querySelectorAll(`[data-carousel][aria-controls="${track.id}"]`)) {
+    setAriaDisabled(button, button.dataset.carousel === "next" ? atEnd : atStart);
   }
 }
 
@@ -200,6 +245,9 @@ function revealEnhanced(root) {
   for (const input of root.querySelectorAll?.(".quantity input") ?? []) {
     syncStepper(input);
   }
+  for (const track of root.querySelectorAll?.(".carousel__track") ?? []) {
+    syncCarousel(track);
+  }
 }
 
 revealEnhanced(document);
@@ -207,6 +255,21 @@ document.addEventListener("htmx:load", (event) => revealEnhanced(event.target));
 document.addEventListener("input", (event) => {
   if (event.target.matches?.(".quantity input")) {
     syncStepper(event.target);
+  }
+});
+// Scroll events do not bubble: listen in the capture phase for every carousel track.
+document.addEventListener(
+  "scroll",
+  (event) => {
+    if (event.target.matches?.(".carousel__track")) {
+      syncCarousel(event.target);
+    }
+  },
+  { capture: true, passive: true },
+);
+window.addEventListener("resize", () => {
+  for (const track of document.querySelectorAll(".carousel__track")) {
+    syncCarousel(track);
   }
 });
 
@@ -256,6 +319,7 @@ document.addEventListener("click", (event) => {
     }
     const toast = template.content.firstElementChild.cloneNode(true);
     toast.querySelector(".toast__message").textContent = trigger.dataset.toast;
+    toastTriggers.set(toast, trigger);
     region.insertBefore(toast, template);
   }
 });

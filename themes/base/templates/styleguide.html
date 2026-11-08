@@ -137,9 +137,7 @@ first error summary takes the focus on load.
   <section aria-labelledby="sg-tiles">
     <h2 id="sg-tiles">{% translate "Product tiles" %}</h2>
     <p>{% translate "New, on sale, out of stock, and price on request without an image." %}</p>
-    <ul class="product-grid" role="list">
-      {% for product in products %}<li>{% include "components/product_tile.html" with name=product.name url="#sg-tiles" image_url=product.image_url image_alt=product.image_alt price=product.price price_before=product.price_before vendor=product.vendor badges=product.badges only %}</li>{% endfor %}
-    </ul>
+    {% include "components/product_grid.html" with products=products only %}
   </section>
 
   <section aria-labelledby="sg-badges">
@@ -240,7 +238,7 @@ first error summary takes the focus on load.
     <h2 id="sg-price">{% translate "Price" %}</h2>
     <div class="styleguide__examples">
       <div class="styleguide__example">{% include "components/price.html" with amount="€ 189.00" note=_("VAT included") only %}<span class="styleguide__state">{% translate "regular, with a note" %}</span></div>
-      <div class="styleguide__example">{% include "components/price.html" with amount="€ 39.00" before="€ 49.00" lowest="€ 45.00" only %}<span class="styleguide__state">{% translate "reduced, with the 30-day reference" %}</span></div>
+      <div class="styleguide__example">{% include "components/price.html" with amount="€ 39.00" lowest_30_days="€ 45.00" only %}<span class="styleguide__state">{% translate "reduced, with the 30-day reference" %}</span></div>
       <div class="styleguide__example">{% include "components/price.html" with amount="€ 29.00" from_price=True only %}<span class="styleguide__state">{% translate "from, several variants" %}</span></div>
       <div class="styleguide__example">{% include "components/price.html" with on_request=True only %}<span class="styleguide__state">{% translate "on request" %}</span></div>
     </div>

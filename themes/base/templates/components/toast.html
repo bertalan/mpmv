@@ -6,7 +6,8 @@ page loads, because a screen reader announces only changes to a region that alre
 theme script (base.js) from a button with `data-toast="<message>"` and
 `data-toast-region="<id>"`, which clones the `<template>` below. Toasts never disappear on a
 timer (WCAG 2.2.1): each has a Dismiss button, which removes it and moves the focus to the
-main content, like a dismissible alert. One region per page, at the end of the main content.
+next toast's Dismiss button (or the previous one), else back to the control that raised it,
+else to the main content. One region per page, at the end of the main content.
 
   {% include "components/toast.html" with id="toasts" messages=toast_messages only %}
 

@@ -426,6 +426,30 @@ def test_the_quantity_stepper_steps_within_its_limits(page: Page, live_server: L
     expect(page.locator("#sg-qty-disabled")).to_be_disabled()
 
 
+def test_the_quantity_stepper_keeps_the_keyboard_focus_at_its_limits(
+    page: Page, live_server: LiveServer
+) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    stepper = page.locator(".quantity", has=page.locator("#sg-qty-default"))
+    field = page.locator("#sg-qty-default")
+    plus = stepper.get_by_role("button", name="Increase quantity")
+    minus = stepper.get_by_role("button", name="Decrease quantity")
+    plus.focus()
+    for _ in range(4):  # 2 to the maximum of 5, then once more at the limit
+        page.keyboard.press("Enter")
+    expect(field).to_have_value("5")
+    expect(plus).to_be_focused()
+    expect(plus).to_have_attribute("aria-disabled", "true")
+    minus.focus()
+    for _ in range(5):  # down to the minimum of 1, then once more
+        page.keyboard.press("Enter")
+    expect(field).to_have_value("1")
+    expect(minus).to_be_focused()
+    expect(minus).to_have_attribute("aria-disabled", "true")
+    expect(plus).not_to_have_attribute("aria-disabled", "true")
+
+
 def test_the_carousel_buttons_scroll_the_track(page: Page, live_server: LiveServer) -> None:
     page.set_viewport_size({"width": 1280, "height": 900})
     page.emulate_media(reduced_motion="reduce")
@@ -433,14 +457,19 @@ def test_the_carousel_buttons_scroll_the_track(page: Page, live_server: LiveServ
     track = page.locator("#sg-carousel-featured-track")
     track.scroll_into_view_if_needed()
     assert track.evaluate("(el) => el.scrollLeft") == 0
-    page.get_by_role("button", name="Next items").click()
+    previous = page.get_by_role("button", name="Previous items")
+    following = page.get_by_role("button", name="Next items")
+    expect(previous).to_have_attribute("aria-disabled", "true")
+    expect(following).not_to_have_attribute("aria-disabled", "true")
+    following.click()
     page.wait_for_function(
         "() => document.getElementById('sg-carousel-featured-track').scrollLeft > 0"
     )
-    page.get_by_role("button", name="Previous items").click()
-    page.wait_for_function(
-        "() => document.getElementById('sg-carousel-featured-track').scrollLeft === 0"
-    )
+    expect(previous).not_to_have_attribute("aria-disabled", "true")
+    track.evaluate("(el) => el.scrollTo({left: el.scrollWidth})")
+    expect(following).to_have_attribute("aria-disabled", "true")
+    previous.click()
+    expect(following).not_to_have_attribute("aria-disabled", "true")
 
 
 def test_a_toast_is_added_to_the_live_region_and_dismissed(
@@ -455,5 +484,14 @@ def test_a_toast_is_added_to_the_live_region_and_dismissed(
     expect(region.locator(".toast").last).to_contain_text("Added to the cart.")
     region.locator(".toast").last.get_by_role("button", name="Dismiss").click()
     expect(region.locator(".toast")).to_have_count(1)
+    # The focus moves to the remaining toast's Dismiss button, not to the top of the content.
+    expect(region.locator(".toast").first.get_by_role("button", name="Dismiss")).to_be_focused()
+    region.locator(".toast").first.get_by_role("button", name="Dismiss").click()
+    expect(region.locator(".toast")).to_have_count(0)
+    # The last toast was raised on load, not by a control: the focus falls back to the content.
     expect(page.locator("#main")).to_be_focused()
+    trigger = page.get_by_role("button", name="Show a toast")
+    trigger.click()
+    region.locator(".toast").first.get_by_role("button", name="Dismiss").click()
+    expect(trigger).to_be_focused()
     assert csp_violations(page) == []

@@ -2,7 +2,9 @@
    rating, accordion and FAQ, dialog and gallery, carousel, quantity stepper, cart line, order
    summary, step indicator, empty state, toasts, responsive table, hero, CTA band, logo strip,
    launch countdown and image credit. Colours only through tokens, and only in the pairs of the
-   token contract (text on surface or raised surface, on-accent on accent). */
+   token contract (apps/themes/contract.py: text and text-muted on the surface or the raised
+   surface, on-accent on accent, the warning and success bars on either surface), except the
+   decorative --color-border lines, which carry no information. */
 @layer components {
   /* --- Search form: the field and its button on one row. */
 
@@ -53,7 +55,7 @@
     text-align: center;
   }
 
-  /* --- Price: the amount large, the previous price struck through, the references small. */
+  /* --- Price: the amount large; above it, small, the struck-through 30-day lowest price. */
 
   .price {
     display: flex;
