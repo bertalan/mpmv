@@ -25,6 +25,12 @@ NOT_SENSITIVE_SERVICES = {
     "apps.api.services.record_mutation_call": "logs the API call itself; `dry_run` is a field",
     "apps.core.services.enqueue_email": "the outbox is a delivery queue with its own history",
     "apps.core.services.deliver_email": "a delivery attempt, kept in the outbox history",
+    # ORD.1: a cart holds display prices only; the order placed from it is audited.
+    "apps.cart.services.get_or_create_cart": "a shopper's cart, not a financial or security fact",
+    "apps.cart.services.add_to_cart": "a shopper's cart, not a financial or security fact",
+    "apps.cart.services.set_line_quantity": "a shopper's cart, not a financial or security fact",
+    "apps.cart.services.remove_line": "a shopper's cart, not a financial or security fact",
+    "apps.cart.services.merge_carts": "a shopper's cart, not a financial or security fact",
 }
 
 
