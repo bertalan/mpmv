@@ -151,6 +151,8 @@ when a new mutating service has neither `dry_run` nor a place in this table (ARC
 | `apps.core.services.clear_throttle` | throttle counter | Forgets the failures of a key after a success |
 | `apps.core.services.purge_expired_throttles` | throttle counter | Deletes expired counters |
 | `apps.tax.services.record_vat_validation` | telemetry | Append-only record of a VIES answer |
+| `apps.tax.services.verify_vat_number` | telemetry | Asking VIES stores its answer in the append-only validation log; a check is a lookup |
+| `apps.tax.services.recheck_vat_number` | telemetry | Same lookup as `verify_vat_number`, forced past the cache by the background job |
 
 ## 1.4 Example of the service + pure function pattern
 
