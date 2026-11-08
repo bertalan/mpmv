@@ -48,3 +48,25 @@ if (siteHeader && "ResizeObserver" in window) {
     document.documentElement.style.setProperty("--header-offset", `${height}px`);
   }).observe(siteHeader);
 }
+
+// Dismissible alerts (THM.4, components/alert.html): the "Dismiss" button is rendered `hidden`,
+// so it shows only once this script runs; a click removes its alert and moves the focus to the
+// main content, never leaving it on a removed element. Delegated: alerts swapped in by htmx work
+// too. No inline handler, so the strict CSP holds.
+for (const button of document.querySelectorAll("[data-dismiss]")) {
+  button.hidden = false;
+}
+document.addEventListener("htmx:afterSwap", (event) => {
+  for (const button of event.target.querySelectorAll("[data-dismiss]")) {
+    button.hidden = false;
+  }
+});
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-dismiss]");
+  const alert = button && button.closest(".alert");
+  if (!alert) {
+    return;
+  }
+  alert.remove();
+  document.getElementById("main")?.focus();
+});

@@ -1,0 +1,25 @@
+{% load i18n %}{% comment %}
+Alert (THM.4, spec 14 §14.9): a message box with a level bar in colour and the level in words
+(never colour alone, WCAG 1.4.1).
+
+  {% include "components/alert.html" with level="success" message=_("Your address was saved.") only %}
+
+Context:
+- `level`: "info" (default), "success", "warning" or "danger".
+- `title`: the bold first line; by default the level in words ("Information", "Success",
+  "Warning", "Error").
+- `message`: the text under the title.
+- `id`: an id for the box, for example to target it with htmx.
+- `live`: "polite" makes the box a status region (`role="status"`), "assertive" an alert region
+  (`role="alert"`) for an error that needs attention now (WCAG 4.1.3). A screen reader announces
+  a live region only when its content changes: render the box when the page loads and swap the
+  message in later, or insert the whole box with htmx after an action.
+- `dismissible`: adds a "Dismiss" button. It stays `hidden` until the theme script (base.js)
+  runs, then removes the box and moves the focus to the main content; no inline script.
+{% endcomment %}<div class="alert alert--{{ level|default:'info' }}{% if dismissible %} alert--dismissible{% endif %}{% if live %} alert--live{% endif %}"{% if id %} id="{{ id }}"{% endif %}{% if live == "assertive" %} role="alert"{% elif live %} role="status"{% endif %}>
+  <div class="alert__content">
+    <p class="alert__title">{% if title %}{{ title }}{% elif level == "success" %}{% translate "Success" %}{% elif level == "warning" %}{% translate "Warning" %}{% elif level == "danger" %}{% translate "Error" %}{% else %}{% translate "Information" %}{% endif %}</p>
+    {% if message %}<p>{{ message }}</p>{% endif %}
+  </div>
+  {% if dismissible %}<button type="button" class="button button--ghost button--small button--icon alert__dismiss" aria-label="{% translate 'Dismiss' %}" data-dismiss hidden>{% include "components/icon.html" with name="close" only %}</button>{% endif %}
+</div>

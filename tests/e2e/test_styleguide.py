@@ -129,6 +129,7 @@ def test_a_click_anywhere_on_a_tile_follows_its_one_link(
     href = link.get_attribute("href") or ""
     assert href.startswith("#")
     # A mouse click on the image: the stretched link sits above it, so the link takes the click.
+    tile.scroll_into_view_if_needed()
     box = tile.locator(".product-tile__media").bounding_box()
     assert box is not None
     page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)

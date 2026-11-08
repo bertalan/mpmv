@@ -33,8 +33,8 @@ def base_css() -> str:
     return render_themes(SHIPPED_THEMES)["themes/base/theme.css"]
 
 
-def render(name: str, **context: Any) -> str:
-    return render_to_string(f"components/{name}.html", context).strip()
+def render(component: str, /, **context: Any) -> str:
+    return render_to_string(f"components/{component}.html", context).strip()
 
 
 def assert_no_inline_code(html: str) -> None:
@@ -189,9 +189,9 @@ def test_a_tile_never_uses_inline_code() -> None:
 def test_the_tile_link_covers_the_whole_tile(base_css: str) -> None:
     css = re.sub(r"\s+", "", base_css)
     assert ".product-tile{" in css
-    assert re.search(r"\.product-tile\{[^}]*position:relative", css)
+    assert re.search(r"\.product-tile[,{][^}]*position:relative", css)
     assert re.search(r"\.product-tile__link::after\{[^}]*content:\"\"[^}]*inset:0", css), css
-    assert re.search(r"\.card__link::after\{[^}]*inset:0", css)
+    assert re.search(r"\.card__link::after[^{]*\{[^}]*inset:0", css)
 
 
 # --- Alerts

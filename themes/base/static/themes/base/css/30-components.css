@@ -1,6 +1,6 @@
 /* Base theme, component layer (THM.4, spec 14 §14.9): buttons (components/button.html), form
-   fields (components/field.html), the error summary (components/error_summary.html) and the
-   styleguide page. Colours only through tokens; every pair used here is in the token contract.
+   fields (components/field.html), the error summary (components/error_summary.html), cards,
+   product tiles, badges, alerts and the styleguide page. Colours only through tokens; every pair used here is in the token contract.
    The default button and the secondary and ghost variants live in the base layer (THM.3). */
 @layer components {
   /* --- Buttons: variants. Contrast is symmetric, so the danger hover (surface on danger) holds
@@ -225,6 +225,211 @@
   .error-summary a {
     color: var(--color-danger);
     font-weight: 600;
+  }
+
+  /* --- Cards and product tiles (components/card.html, components/product_tile.html). The
+     title link's ::after covers the box, so the whole box is one link target and holds no
+     nested interactive element; the link keeps its own focus outline and the box shows one
+     more around itself. */
+
+  .card-grid,
+  .product-grid {
+    display: grid;
+    gap: var(--space-l);
+    margin: 0 0 var(--space-l);
+    padding: 0;
+    list-style: none;
+  }
+
+  .card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
+  }
+
+  .product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(13rem, 100%), 1fr));
+  }
+
+  .card-grid > li,
+  .product-grid > li {
+    display: grid;
+  }
+
+  .card,
+  .product-tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: var(--card-radius);
+  }
+
+  .card--linked:hover,
+  .product-tile:hover {
+    box-shadow: var(--shadow-raised);
+  }
+
+  .card__image,
+  .product-tile__media img {
+    display: block;
+    inline-size: 100%;
+    block-size: auto;
+    object-fit: cover;
+  }
+
+  .card__body,
+  .product-tile__body {
+    display: grid;
+    align-content: start;
+    gap: var(--space-xs);
+    padding: var(--card-padding);
+  }
+
+  .card__body > *,
+  .product-tile__body > * {
+    margin: 0;
+  }
+
+  .card__title,
+  .product-tile__name {
+    font-size: var(--step-1);
+    line-height: 1.25;
+  }
+
+  .card__meta,
+  .product-tile__vendor {
+    color: var(--color-text-muted);
+    font-size: 0.875em;
+  }
+
+  .card__link,
+  .product-tile__link {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .card__link:hover,
+  .product-tile__link:hover {
+    text-decoration: underline;
+  }
+
+  .card__link::after,
+  .product-tile__link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--card-radius);
+  }
+
+  .card__link:focus-visible::after,
+  .product-tile__link:focus-visible::after {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: calc(-1 * var(--focus-width));
+  }
+
+  .product-tile__media {
+    aspect-ratio: 1;
+    background: var(--color-surface-sunken);
+  }
+
+  .product-tile__media img {
+    block-size: 100%;
+  }
+
+  .product-tile__placeholder {
+    block-size: 100%;
+  }
+
+  .product-tile__price {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-xs) var(--space-s);
+    font-weight: 700;
+  }
+
+  .product-tile__price del {
+    color: var(--color-text-muted);
+    font-weight: 400;
+  }
+
+  .product-tile__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .product-tile--unavailable .product-tile__media img {
+    opacity: 0.6;
+  }
+
+  /* --- Badges: the meaning in words; colour only adds to it (WCAG 1.4.1). Pairs: danger,
+     text-muted and secondary-text on surface, accent on accent-tint. */
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem var(--space-s);
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid currentcolor;
+    border-radius: 999px;
+    font-size: 0.875em;
+    font-weight: 600;
+    line-height: 1.25;
+    white-space: nowrap;
+  }
+
+  .badge--sale {
+    color: var(--color-danger);
+  }
+
+  .badge--new {
+    background: var(--color-accent-tint);
+    color: var(--color-accent);
+  }
+
+  .badge--out-of-stock {
+    color: var(--color-text-muted);
+    border-style: dashed;
+  }
+
+  .badge--on-request {
+    color: var(--color-secondary-text);
+  }
+
+  /* --- Alerts (components/alert.html): the levels are in the base layer (THM.3); danger is
+     the component's name for the error level. A dismissible alert puts its button at the end. */
+
+  .alert--danger {
+    --alert-accent: var(--color-danger);
+  }
+
+  .alert__content > * {
+    margin-block: 0;
+  }
+
+  .alert__content > * + * {
+    margin-block-start: var(--space-xs);
+  }
+
+  .alert--dismissible {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-s);
+  }
+
+  .alert--dismissible .alert__content {
+    flex: 1;
+  }
+
+  .alert__dismiss {
+    flex-shrink: 0;
   }
 
   /* --- Styleguide page (/_styleguide/, staff only): examples in rows with a state caption. */

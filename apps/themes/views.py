@@ -21,7 +21,7 @@ from django.template import loader
 from django.views.decorators.cache import never_cache
 
 from .services import resolved_theme, use_theme
-from .styleguide import sample_forms
+from .styleguide import sample_forms, sample_products
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +67,10 @@ def styleguide(request: HttpRequest) -> HttpResponse:
     indexed (meta tag and `X-Robots-Tag`) nor cached. It is not a CMS page, so no sitemap lists
     it. Accessibility and visual tests run against it.
     """
-    response = render(request, "styleguide.html", {"forms": sample_forms()})
+    response = render(
+        request,
+        "styleguide.html",
+        {"forms": sample_forms(), "products": sample_products()},
+    )
     response["X-Robots-Tag"] = "noindex, nofollow"
     return response
