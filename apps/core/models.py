@@ -7,13 +7,14 @@ import uuid
 from typing import Any, ClassVar, Self
 
 from django.contrib.postgres.constraints import ExclusionConstraint
-from django.contrib.postgres.fields import DateTimeRangeField, RangeOperators
+from django.contrib.postgres.fields import ArrayField, DateTimeRangeField, RangeOperators
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils import timezone
 from wagtail.images.models import AbstractImage, AbstractRendition, Image
 
 from . import flags, translations
+from .countries import default_allowed_vendor_countries
 from .fields import CountryField, EncryptedTextField, LanguageField
 from .image_licences import (
     Credit,
@@ -22,6 +23,11 @@ from .image_licences import (
     metadata_errors,
     restricted_licence_error,
 )
+
+# The dedicated platform owner permission (spec 02 roles, CMP.13): never implied by staff or
+# admin access, superuser status included. Granted as `core.platform_owner`, directly or through a
+# group, and checked by `services.is_platform_owner`, not `has_perm` (true for any superuser).
+PLATFORM_OWNER_CODENAME = "platform_owner"
 
 
 class BaseModel(models.Model):
@@ -310,7 +316,8 @@ class PlatformOperator(Versioned):
     reporting: code reads them with `apps.core.services.current_operator()` and never hard-codes
     a platform country. Rows are history: a change (e.g. a relocation to another EU country) is
     a new row through `configure_platform_operator`, which closes the previous one. Only
-    `valid_to` may be written on an existing row, to close it.
+    `valid_to` may be written on an existing row, to close it. The countries where vendors may
+    be established change only through `set_allowed_vendor_countries` (CMP.13).
     """
 
     class TaxRegime(models.TextChoices):
@@ -340,11 +347,31 @@ class PlatformOperator(Versioned):
         "DAC7 reporting authority country",
         help_text="Member state whose authority receives the DAC7 report.",
     )
+    # D-21, CMP.13: changed only by a platform owner through
+    # `apps.core.services.set_allowed_vendor_countries`; other new versions carry it over.
+    allowed_vendor_countries = ArrayField(
+        CountryField(),
+        default=default_allowed_vendor_countries,
+        editable=False,
+        verbose_name="allowed vendor establishment countries",
+        help_text="A vendor is activated only when its registered office or permanent "
+        "establishment is in one of these countries.",
+    )
 
     class Meta:
         ordering = ["-valid_from"]
+        permissions = [
+            (
+                PLATFORM_OWNER_CODENAME,
+                "Platform owner: owner-only settings, such as the allowed vendor countries",
+            )
+        ]
         constraints = [
             valid_period_check("core_platformoperator_valid_to_after_valid_from"),
+            models.CheckConstraint(
+                condition=models.Q(allowed_vendor_countries__len__gt=0),
+                name="core_platformoperator_allowed_vendor_countries_not_empty",
+            ),
             ExclusionConstraint(
                 name="core_platformoperator_no_overlap",
                 expressions=[(TsTzRange("valid_from", "valid_to"), RangeOperators.OVERLAPS)],

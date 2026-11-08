@@ -1,6 +1,6 @@
 """Pure vendor rules (no ORM): status state machine, slug generation, member roles and their
 permissions, and the legal and e-invoicing identity (validators, required fields, FatturaPA
-party block)."""
+party block), onboarding and the establishment gate (CMP.13)."""
 
 import dataclasses
 import re
@@ -23,18 +23,31 @@ CLOSED: Final = "closed"
 STATUSES: Final = (APPLICANT, ONBOARDING, ACTIVE, SUSPENDED, CLOSED)
 
 # Forward along the lifecycle, reinstatement after a suspension, and closure from any open
-# status (a rejected application is closed too). Closed is terminal.
+# status (a rejected application is closed too). A closed vendor is only reopened by staff, back
+# to onboarding and never straight to active (VEN.21, owner decision Q-17).
 TRANSITIONS: Final[Mapping[str, frozenset[str]]] = {
     APPLICANT: frozenset({ONBOARDING, CLOSED}),
     ONBOARDING: frozenset({ACTIVE, CLOSED}),
     ACTIVE: frozenset({SUSPENDED, CLOSED}),
     SUSPENDED: frozenset({ACTIVE, CLOSED}),
-    CLOSED: frozenset(),
+    CLOSED: frozenset({ONBOARDING}),
 }
+
+# Transitions that need a reason, recorded in the audit log: the reopening of a closed vendor
+# (`services.reopen_vendor`). `services.change_status` passes no reason, so it cannot make them.
+REASON_REQUIRED: Final[frozenset[tuple[str, str]]] = frozenset({(CLOSED, ONBOARDING)})
 
 
 class InvalidTransition(ValueError):
     """Raised when a vendor status change is not allowed by the state machine."""
+
+
+class ReasonRequired(InvalidTransition):
+    """The status change needs a reason (`REASON_REQUIRED`) and none was given."""
+
+
+class ReopenNotAllowed(InvalidTransition):
+    """The closed vendor cannot be reopened as it is: no active owner could onboard it."""
 
 
 def allowed_transitions(status: str) -> frozenset[str]:
@@ -43,11 +56,36 @@ def allowed_transitions(status: str) -> frozenset[str]:
     return TRANSITIONS[status]
 
 
-def check_transition(current: str, target: str) -> None:
+def check_transition(current: str, target: str, *, reason: str = "") -> None:
     if target not in TRANSITIONS:
         raise InvalidTransition(f"unknown vendor status {target!r}")
     if target not in allowed_transitions(current):
         raise InvalidTransition(f"vendor status change {current} → {target} is not allowed")
+    if (current, target) in REASON_REQUIRED and not reason.strip():
+        raise ReasonRequired(
+            f"vendor status change {current} → {target} needs a reason: "
+            "staff reopen a closed vendor from its page, saying why"
+        )
+
+
+def check_reopen(status: str, *, reason: str, has_active_owner: bool) -> None:
+    """Only a closed vendor is reopened, with a reason, back to onboarding (VEN.21).
+
+    Onboarding needs an owner to accept the contract: without an active owner (e.g. the only
+    owner asked for erasure, Q-16) a new owner is added first.
+    """
+    # TODO(CMP.4): once erasure flags restricted owners, exclude them here instead of relying
+    # on `is_active` alone, so a reactivated erased account cannot reopen the vendor.
+    if status != CLOSED:
+        raise InvalidTransition(
+            f"vendor status change {status} → {ONBOARDING} is not a reopen: "
+            "only a closed vendor is reopened"
+        )
+    check_transition(status, ONBOARDING, reason=reason)
+    if not has_active_owner:
+        raise ReopenNotAllowed(
+            "the vendor has no active owner to onboard it again: add a new owner first"
+        )
 
 
 class VendorCannotWrite(Exception):
@@ -193,7 +231,12 @@ LEGAL_FORMS: Final = (SOLE_PROPRIETORSHIP, PARTNERSHIP, SRL, SPA, COOPERATIVE, O
 # Forms registered in the company register as companies (FatturaPA `IscrizioneREA`).
 COMPANY_FORMS: Final = frozenset({PARTNERSHIP, SRL, SPA, COOPERATIVE})
 
-# FatturaPA 1.2.x `RegimeFiscale`, with the official labels of the SDI specification.
+# The Agenzia delle Entrate FatturaPA technical specification (Specifiche tecniche) that the
+# regime list and the party blocks follow (schema FPR12 1.2.x). Version 1.9 added RF20 from
+# 2025-04-01; a new version updates this constant and the pinned list in the tests (VEN.18).
+FATTURAPA_SPECIFICATION_VERSION: Final = "1.9.1"
+
+# FatturaPA `RegimeFiscale`, with the official labels of the SDI specification.
 # There is no RF03 (it was removed from the specification).
 FISCAL_REGIMES: Final[Mapping[str, str]] = {
     "RF01": "Ordinario",
@@ -222,8 +265,10 @@ FISCAL_REGIMES: Final[Mapping[str, str]] = {
     "RF17": "IVA per cassa (art. 32-bis, DL 83/2012)",
     "RF18": "Altro",
     "RF19": "Regime forfettario (art.1, c.54-89, L. 190/2014)",
+    "RF20": "Regime transfrontaliero di Franchigia IVA (Direttiva UE 2020/285)",
 }
 FLAT_RATE_REGIME: Final = "RF19"  # forfettario
+CROSS_BORDER_FRANCHISE_REGIME: Final = "RF20"  # Directive (EU) 2020/285, per member state
 
 SOLE_SHAREHOLDER: Final = "SU"
 SEVERAL_SHAREHOLDERS: Final = "SM"
@@ -737,7 +782,8 @@ class PayoutNotAllowed(ValueError):
         )
 
 
-# --- FatturaPA 1.2.x party blocks (data only: CMP.2 writes the XML)
+# --- FatturaPA 1.2.x party blocks, specification `FATTURAPA_SPECIFICATION_VERSION` (data only:
+# CMP.2 writes the XML)
 
 CEDENTE: Final = "CedentePrestatore"  # the vendor invoices (its customers)
 CESSIONARIO: Final = "CessionarioCommittente"  # the vendor is invoiced (platform commissions)
@@ -876,7 +922,8 @@ def _contatti(ident: LegalIdentity) -> dict[str, str]:
 def fatturapa_party(identity: LegalIdentity, role: str = CEDENTE) -> dict[str, Any]:
     """The FatturaPA 1.2.x `CedentePrestatore` or `CessionarioCommittente` block, as a dict.
 
-    Keys follow the FatturaPA element names and order. Raises `PartyBlockError` listing every
+    Keys follow the FatturaPA element names and order of technical specification
+    `FATTURAPA_SPECIFICATION_VERSION`. Raises `PartyBlockError` listing every
     missing or invalid value (presence and length, plus the `identity_errors` of the emitted
     identifiers: VAT and codice fiscale checksums, EORI, province and REA codes, the fiscal
     representative's VAT number); nothing is truncated or guessed.
@@ -912,7 +959,7 @@ def fatturapa_party(identity: LegalIdentity, role: str = CEDENTE) -> dict[str, A
     dati["Anagrafica"] = _anagrafica(block, ident)
     if role == CEDENTE:
         if ident.fiscal_regime not in FISCAL_REGIMES:
-            block.problems.append("fiscal_regime: RegimeFiscale is mandatory (RF01-RF19)")
+            block.problems.append("fiscal_regime: RegimeFiscale is mandatory (RF01-RF20)")
         dati["RegimeFiscale"] = ident.fiscal_regime
 
     party: dict[str, Any] = {"DatiAnagrafici": dati, "Sede": _sede(block, ident, "registered")}
@@ -1111,3 +1158,67 @@ class ActivationNotAllowed(InvalidTransition):
 def check_activation(checklist: OnboardingChecklist) -> None:
     if not checklist.ready:
         raise ActivationNotAllowed(checklist)
+
+
+# --- Establishment gate (D-21, CMP.13)
+#
+# At go-live the platform admits only vendors established in the EU: a non-EU vendor selling
+# goods in the EU would make the platform the deemed VAT supplier (VAT directive art. 14a). The
+# allowed countries are a `PlatformOperator` setting; the activation checks the VEN.12 identity
+# against it. Evidence of a permanent establishment is checked by staff.
+
+
+@dataclasses.dataclass(frozen=True)
+class Establishment:
+    """The countries where a vendor is established ("" when it has no permanent establishment)."""
+
+    registered_office: str
+    permanent_establishment: str = ""
+
+    @property
+    def countries(self) -> tuple[str, ...]:
+        return tuple(
+            dict.fromkeys(c for c in (self.registered_office, self.permanent_establishment) if c)
+        )
+
+
+def vendor_establishment(identity: LegalIdentity) -> Establishment:
+    """The registered office country (the vendor's country when not given) and the permanent
+    establishment country of a legal identity."""
+    return Establishment(
+        registered_office=_address_country(identity, "registered"),
+        permanent_establishment=_address_country(identity, "establishment"),
+    )
+
+
+def establishment_error(establishment: Establishment, allowed: Collection[str]) -> str | None:
+    """Why a vendor established at `establishment` cannot be activated; None when it can, i.e.
+    when its registered office or permanent establishment is in `allowed`."""
+    if any(country in allowed for country in establishment.countries):
+        return None
+    office = establishment.registered_office
+    if establishment.permanent_establishment:
+        return (
+            f"the vendor cannot be activated: its registered office is in {office} and its "
+            f"permanent establishment in {establishment.permanent_establishment}, and the "
+            "platform does not admit vendors established in either country"
+        )
+    return (
+        f"the vendor cannot be activated: its registered office is in {office}, where the "
+        "platform does not admit vendors, and it has no permanent establishment in a country "
+        "where it does"
+    )
+
+
+class EstablishmentNotAllowed(InvalidTransition):
+    """The vendor is not established in a country where the platform admits vendors."""
+
+    def __init__(self, establishment: Establishment, message: str) -> None:
+        self.establishment = establishment
+        super().__init__(message)
+
+
+def check_establishment(establishment: Establishment, allowed: Collection[str]) -> None:
+    error = establishment_error(establishment, allowed)
+    if error is not None:
+        raise EstablishmentNotAllowed(establishment, error)

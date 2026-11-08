@@ -30,6 +30,7 @@ from apps.events.models import (
     EventSettings,
     VendorEventPolicy,
 )
+from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
 STARTS_AT = dt.datetime(2027, 3, 10, 8, 0, tzinfo=dt.UTC)
@@ -142,7 +143,8 @@ class EventPageFactory(_InTree, DjangoModelFactory[EventPage]):
     slug = factory.LazyAttribute(lambda page: slugify(page.title))
     parent = None
     live = False
-    vendor = factory.SubFactory(VendorFactory)
+    # Active: public queries leave out the events of other vendors (spec 15 §Status).
+    vendor = factory.SubFactory(VendorFactory, status=Vendor.Status.ACTIVE)
     event_type = EventPage.EventType.FAIR
     summary = "Meet the makers at the spring trade fair."
     all_day = False

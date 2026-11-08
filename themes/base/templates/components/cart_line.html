@@ -1,4 +1,4 @@
-{% load i18n %}{% comment %}
+{% load i18n theme_tags %}{% comment %}
 Cart line (THM.4, spec 14 §14.9): one product in the cart, as a list item of a per-vendor
 package (ORD.5). The product name is a link; the quantity stepper and the remove button belong
 to the cart form that wraps the list (the remove button submits `remove=<id>`). Prices arrive
@@ -16,7 +16,7 @@ Context:
 - `unit_price`, `total` (required): the formatted unit price and line total.
 - `quantity` (required), `max`: the quantity and its limit.
 - `problem`: a message about the line, shown as a warning.
-{% endcomment %}<li class="cart-line{% if problem %} cart-line--problem{% endif %}">
+{% endcomment %}{% with url=url|safe_href %}<li class="cart-line{% if problem %} cart-line--problem{% endif %}">
   <div class="cart-line__media">{% if image_url %}<img src="{{ image_url }}" alt="{{ image_alt|default:'' }}" width="96" height="96" loading="lazy">{% else %}<div class="cart-line__placeholder" aria-hidden="true"></div>{% endif %}</div>
   <div class="cart-line__details">
     <p class="cart-line__name">{% if url %}<a href="{{ url }}">{{ name }}</a>{% else %}{{ name }}{% endif %}</p>
@@ -30,4 +30,4 @@ Context:
     {% blocktranslate asvar remove_label %}Remove {{ name }}{% endblocktranslate %}<button type="submit" class="button button--link button--small cart-line__remove" name="remove" value="{{ id }}" aria-label="{{ remove_label }}">{% translate "Remove" %}</button>
   </div>
   <p class="cart-line__total"><span class="visually-hidden">{% translate "Line total" %}: </span>{{ total }}</p>
-</li>
+</li>{% endwith %}

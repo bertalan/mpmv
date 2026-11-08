@@ -1,4 +1,4 @@
-{% load i18n tz %}{% comment %}
+{% load i18n theme_tags tz %}{% comment %}
 Launch countdown (THM.4 provides the component, CMS.9 the StreamField block and its module;
 spec 14 §14.9, spec 10 §10.2). The server renders the absolute launch date in a `<time>`
 element, with the time zone name, and the call to action, so the block is complete without
@@ -19,7 +19,7 @@ Context:
 - `url` and `action`: the call to action before the launch.
 - `expired`: the target has passed (from CMS.9's `countdown_state`).
 - `expired_text`, `expired_url`, `expired_action`: what the block says and links to after it.
-{% endcomment %}<div class="launch-countdown{% if expired %} launch-countdown--expired{% endif %}"{% if not expired %} data-countdown data-target="{{ target|utc|date:'Y-m-d\TH:i:s\Z' }}"{% endif %}>
+{% endcomment %}{% with url=url|safe_href expired_url=expired_url|safe_href %}<div class="launch-countdown{% if expired %} launch-countdown--expired{% endif %}"{% if not expired %} data-countdown data-target="{{ target|utc|date:'Y-m-d\TH:i:s\Z' }}"{% endif %}>
   <h{{ heading_level|default:2 }} class="launch-countdown__title">{{ title }}</h{{ heading_level|default:2 }}>
   {% if text %}<p class="launch-countdown__text">{{ text }}</p>
   {% endif %}{% if not expired %}<div class="launch-countdown__upcoming" data-countdown-upcoming>
@@ -32,4 +32,4 @@ Context:
     <p class="launch-countdown__expired">{% firstof expired_text _("Available now") %}</p>
     {% if expired_url %}<p><a class="button" href="{{ expired_url }}">{% firstof expired_action _("Discover it") %}</a></p>{% endif %}
   </div>
-</div>
+</div>{% endwith %}

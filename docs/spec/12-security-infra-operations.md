@@ -57,7 +57,10 @@ flowchart LR
   STAGE and LIVE run on Hetzner Cloud, EU region, x86 servers
   ([ADR-0007](../adr/0007-hosting-hetzner-self-managed-postgres.md)): each has an app VPS (app,
   worker and Caddy as Podman Quadlets) and a dedicated database VPS running self-managed
-  PostgreSQL 17, reachable only over the Hetzner private network.
+  PostgreSQL 17, reachable only over the Hetzner private network. The app still connects with
+  TLS and `sslmode=verify-full`: the database is not public, so no public certificate is needed,
+  and a free internal certificate authority (openssl or step-ca) signs the server certificate;
+  the app container mounts its root certificate (owner decision MQ-11, ARC.13).
 - **Deploy**: versioned image built by CI, migrations in a dedicated step, rollback by tag; no
   `git pull` on the servers.
 - **Backup**: run by us, since PostgreSQL is self-managed. pgBackRest archives WAL continuously and
@@ -69,6 +72,13 @@ flowchart LR
   and backup age (OPS.2).
 - **Observability**: JSON logs, error tracking, healthchecks, business metrics (orders per day,
   checkout errors, failed webhooks, failed jobs, translation queues), alerts via email or chat.
+  A worker whose ARC.9 heartbeat stops is restarted automatically and staff are alerted (owner
+  decision MQ-10, ARC.13).
+- **Security operations dashboard** (P2, OPS.6, owner idea MQ-4): a live view for management of
+  what is happening in the system, with anomalies and spikes per API key or per user, and
+  suggested corrective commands (revoke a key, raise a limit, unlock a user) that run only after
+  a staff member confirms them with MFA. The commands are the existing audited services, never
+  new shortcuts.
 - **Initial sizing**: per environment, an app VPS with 4 vCPUs and 8 GB for app and workers, and a
   database VPS with 4 vCPUs and 8–16 GB for PostgreSQL, are enough at the current scale.
 
@@ -98,3 +108,4 @@ flowchart LR
 | OPS.3 | Runbooks: incidents (including 72 h data breach), payouts, rate updates, vendor onboarding | P2 | 8 | — | Runbooks in the repo |
 | OPS.4 | Automated dependency updates (PRs) + SBOM | P2 | 3 | ARC.4 | Weekly update PRs |
 | OPS.5 | Technical Django admin reachable only from a restricted network (owner decision Q-18): allow-list at the reverse proxy plus an app-level check on the Django admin path (defence in depth), the allowed networks as environment configuration, staff operations moved to the Wagtail admin (CORE.8) | P1 | 3 | ARC.13, CORE.8 | On STAGE the Django admin answers 404 from outside the allowed networks and works from inside; a test covers the app-level check |
+| OPS.6 | Security operations dashboard (owner idea MQ-4): live view of system actions from the AuditLog, the API mutation log and the rate-limit counters, with anomalies and per-key and per-user spikes, and suggested corrective commands (revoke a key, raise a limit, unlock a user) that staff confirm with an MFA step-up; each command calls the existing audited service | P2 | 12 | SEC.4, CORE.16, CORE.8 | A simulated spike on one key shows up with a "revoke key" or "raise limit" suggestion; a suggestion runs only after step-up and writes the same AuditLog entry as the service it calls; a staff member without the permission sees no dashboard |
