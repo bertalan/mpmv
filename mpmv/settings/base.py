@@ -37,6 +37,7 @@ LOCAL_APPS = [
     "apps.compliance",
     "apps.api",
     "apps.mcp",
+    "apps.seed",  # demo data seed (ARC.10): above every app, imported by none
 ]
 
 INSTALLED_APPS = [
