@@ -61,7 +61,9 @@ deploy() {
 
   # Release tags are immutable, so an image already in local storage is the release: reuse it
   # (redeploys and rollback drills work without the registry).
-  podman pull --policy=missing "$REGISTRY_IMAGE:$version" >/dev/null
+  if ! podman image exists "$REGISTRY_IMAGE:$version"; then
+    podman pull "$REGISTRY_IMAGE:$version" >/dev/null
+  fi
   podman tag "$REGISTRY_IMAGE:$version" "$LOCAL_IMAGE"
   if ! systemctl --user start mpmv-migrate.service; then
     # The running containers were never restarted: put the tag back so a reboot keeps them.
