@@ -1,7 +1,9 @@
 """Staff admin for the tax configuration (TAX.1; Wagtail admin replaces it in CORE.8).
 
 Rates and vendor tax profiles are history: staff add a new row through the audited services,
-which close the current one, and can view earlier rows but never edit or delete them.
+which close the current one, and can view earlier rows but never edit or delete them. Adding
+either asks for a fresh second factor (CORE.4 step-up); adding a profile also needs the review
+permission, as approving a request does.
 Territories and legal notes are edited through audited services; VIES answers are view-only.
 
 Regime change requests (TAX.2) come from vendor owners; staff review them here, next to the
@@ -27,6 +29,7 @@ from django.utils.safestring import SafeString
 
 from apps.accounts.decorators import step_up_required
 from apps.accounts.models import User
+from apps.core.admin import step_up
 from apps.core.audit import audit_context
 
 from . import engine, services
@@ -92,6 +95,14 @@ class TaxRateAdmin(HistoryAdmin[TaxRate]):
     def save_model(self, request: HttpRequest, obj: TaxRate, form: Any, change: bool) -> None:
         services.configure_tax_rate(obj, ctx=audit_context(request))
 
+    def add_view(
+        self, request: HttpRequest, form_url: str = "", extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        """A rate change asks for a fresh second factor (spec 02 §2, "rate changes"). Rates are
+        never edited, so the change view (view-only) needs no step-up."""
+        parent = super().add_view
+        return step_up(lambda req: parent(req, form_url, extra_context))(request)
+
 
 @admin.register(Territory)
 class TerritoryAdmin(NoDeleteAdmin[Territory]):
@@ -101,6 +112,15 @@ class TerritoryAdmin(NoDeleteAdmin[Territory]):
     list_filter = ("vat_status", "country")
     search_fields = ("code", "name")
     readonly_fields = ("public_id", "created_at", "updated_at")
+
+    def get_readonly_fields(
+        self, request: HttpRequest, obj: Territory | None = None
+    ) -> tuple[str, ...]:
+        """A territory with rates keeps its country and code (`services.territory_key_errors`)."""
+        fields = tuple(super().get_readonly_fields(request, obj))
+        if obj is not None and obj.rates.exists():
+            return ("code", "country", *fields)
+        return fields
 
     def save_model(self, request: HttpRequest, obj: Territory, form: Any, change: bool) -> None:
         services.save_territory(obj, ctx=audit_context(request))
@@ -114,7 +134,6 @@ class VendorTaxProfileForm(StartCheckedForm[VendorTaxProfile]):
             "regime",
             "exempt_reason",
             "oss_registered_since",
-            "requested_by",
             "valid_from",
         )
 
@@ -136,22 +155,48 @@ def warn_about_tax_profiles(modeladmin: admin.ModelAdmin[Any], request: HttpRequ
 
 @admin.register(VendorTaxProfile)
 class VendorTaxProfileAdmin(HistoryAdmin[VendorTaxProfile]):
-    """Adding a profile here approves it in the staff member's name; vendor requests are
-    reviewed under tax regime change requests (TAX.2)."""
+    """Adding a profile here is a staff-initiated regime change, approved in the staff member's
+    name: it needs what approving a vendor request needs (TAX.2), the review permission and a
+    fresh second factor, and has no requester. Vendor requests are reviewed under tax regime
+    change requests."""
 
     form = VendorTaxProfileForm
-    list_display = ("vendor", "regime", "exempt_reason", "valid_from", "valid_to", "approved_by")
+    list_display = (
+        "vendor",
+        "regime",
+        "exempt_reason",
+        "valid_from",
+        "valid_to",
+        "requested",
+        "approved_by",
+    )
     list_filter = ("regime", "exempt_reason")
     search_fields = ("vendor__display_name", "vendor__legal_name")
-    list_select_related = ("vendor", "approved_by")
-    raw_id_fields = ("vendor", "requested_by")
-    readonly_fields = ("public_id", "valid_to", "approved_by", "created_at")
+    list_select_related = ("vendor", "requested_by", "approved_by")
+    raw_id_fields = ("vendor",)
+    readonly_fields = ("public_id", "valid_to", "requested", "approved_by", "created_at")
+
+    @admin.display(description="Requested by")
+    def requested(self, obj: VendorTaxProfile) -> str:
+        return str(obj.requested_by) if obj.requested_by is not None else "staff-initiated"
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return super().has_add_permission(request) and request.user.has_perm(
+            services.REVIEW_PERMISSION
+        )
+
+    def add_view(
+        self, request: HttpRequest, form_url: str = "", extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        parent = super().add_view
+        return step_up(lambda req: parent(req, form_url, extra_context))(request)
 
     def save_model(
         self, request: HttpRequest, obj: VendorTaxProfile, form: Any, change: bool
     ) -> None:
-        obj.approved_by = request.user  # type: ignore[assignment]
-        services.configure_vendor_tax_profile(obj, ctx=audit_context(request))
+        services.configure_vendor_tax_profile(
+            obj, approver=cast(User, request.user), ctx=audit_context(request)
+        )
 
     def changelist_view(
         self, request: HttpRequest, extra_context: dict[str, Any] | None = None

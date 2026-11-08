@@ -13,6 +13,9 @@ class CatalogConfig(AppConfig):
     unaudited_models = {
         "producttranslation": "storefront texts under the translation workflow",
         "varianttranslation": "storefront texts under the translation workflow",
+        # CAT.13: written only by a database trigger on SKU renames, which services audit.
+        "skualias": "SKU rename history written by a database trigger; renames through "
+        "services.rename_product_sku and rename_variant_sku are audited",
         # CAT.2: platform navigation data, no money, access or legal facts.
         "category": "navigation structure (category tree); no money, access or legal facts",
         "categorytranslation": "storefront texts under the translation workflow",

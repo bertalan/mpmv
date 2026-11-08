@@ -7,9 +7,13 @@ A vendor key (CORE.13) is issued only by platform staff holding `api.add_apiclie
 of that vendor; a platform key only by such staff, or by trusted code without an issuer (shell,
 deploy scripts).
 
-Vendor key policy (CORE.14): a vendor key holds only `engine.VENDOR_GRANTABLE_SCOPES`; a key of
-a suspended vendor only reads (403 on writes); a key of a closed vendor is refused (401); deleting
-a vendor audits each of its keys (`vendor_key_deletions`).
+Vendor key policy (CORE.14): a vendor key is issued only for an active vendor and holds only
+`engine.VENDOR_GRANTABLE_SCOPES`, checked again on every request; only a key of an active vendor
+writes (403 for applicant, onboarding and suspended vendors, which only read); a key of a closed
+vendor is refused (401); deleting a vendor audits each of its keys (`vendor_key_deletions`).
+
+Rate limit (CORE.12): `count_api_call` counts each authenticated call on a PostgreSQL counter
+shared by every app process (`ApiRateCounter`); limits come from the `API_RATE_LIMIT*` settings.
 """
 
 import datetime as dt
@@ -17,15 +21,18 @@ import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import PermissionDenied
+from django.db import connection
 from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.services import run_mutation
+from apps.vendors import engine as vendor_engine
 from apps.vendors.engine import VendorAction
 from apps.vendors.models import Vendor
 from apps.vendors.services import has_vendor_permission
@@ -35,17 +42,24 @@ from .engine import (
     Decision,
     GeneratedKey,
     InvalidApiClient,
+    RateDecision,
+    RatePolicy,
     Reason,
     deny,
     evaluate,
     generate_key,
     hash_key,
     key_matches,
+    limit_for,
     normalize_allowed_ips,
     parse_authorization,
+    platform_only_scopes,
+    rate_decision,
+    rate_policy,
     validate_scopes,
+    window_start,
 )
-from .models import ApiClient, ApiMutationLog
+from .models import ApiClient, ApiMutationLog, ApiRateCounter
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +141,15 @@ def check_issuer(issuer: AbstractBaseUser | AnonymousUser | None, vendor: Vendor
         raise PermissionDenied("only platform staff or an owner of the vendor issue its API keys")
 
 
+def _check_vendor_active(vendor: Vendor) -> None:
+    """Vendor keys are issued only while the vendor is active (CORE.14), as stored."""
+    status = Vendor.objects.filter(pk=vendor.pk).values_list("status", flat=True).first()
+    if status != vendor_engine.ACTIVE:
+        raise InvalidApiClient(
+            f"API keys are issued only for an active vendor; this vendor is {status or 'missing'}"
+        )
+
+
 def issue_api_client(
     *,
     name: str,
@@ -141,8 +164,11 @@ def issue_api_client(
     """Issue a key: for `vendor` (a vendor key) or, without one, a platform key.
 
     `issuer` is the user asking for it (see `check_issuer`); the audit entry names the vendor.
+    A vendor key needs an active vendor (CORE.14): InvalidApiClient otherwise, also on dry-run.
     """
     check_issuer(issuer, vendor)
+    if vendor is not None:
+        _check_vendor_active(vendor)
     if not name.strip():
         raise InvalidApiClient("name is required")
     generated = _new_key()
@@ -220,10 +246,10 @@ def authenticate(
     now: dt.datetime | None = None,
 ) -> AuthResult:
     """Check an `Authorization` header: 401 for bad/expired/revoked keys and closed vendors,
-    403 for IP, scope, or a write by a suspended vendor's key (CORE.14).
+    403 for IP, scope, or a write by the key of a vendor that is not active (CORE.14).
 
     `write` says whether the call changes state; a caller that does not say is treated as
-    writing, so a suspended vendor's key is refused unless the call is known to be a read.
+    writing, so a key of a vendor that is not active is refused unless the call is a read.
     The vendor status is read with the key on every call: suspending, reinstating or closing a
     vendor takes effect on its keys at once.
     """
@@ -262,6 +288,30 @@ def vendor_key_deletions(vendor: Vendor, changes: ChangeSet) -> None:
         changes.delete(MODEL, str(client.public_id), client.snapshot())
 
 
+# --- Vendor keys holding platform-only scopes (CORE.14)
+
+
+@dataclass(frozen=True)
+class ScopeViolation:
+    client: ApiClient
+    platform_only: list[str]
+
+
+def vendor_keys_with_platform_scopes() -> list[ScopeViolation]:
+    """Active vendor keys that hold platform-only scopes, e.g. issued before CORE.14 classed a
+    scope platform-only. Read-only: such a scope is refused at request time anyway; revoke or
+    reissue the key to clean it up."""
+    violations: list[ScopeViolation] = []
+    clients = ApiClient.objects.select_related("vendor").filter(
+        vendor__isnull=False, is_active=True
+    )
+    for client in clients.order_by("pk"):
+        platform_only = platform_only_scopes(client.scopes)
+        if platform_only:
+            violations.append(ScopeViolation(client, platform_only))
+    return violations
+
+
 # --- Mutation log (CORE.7)
 
 
@@ -291,3 +341,59 @@ def record_mutation_call(
         ip=ip,
         duration_ms=max(duration_ms, 0),
     )
+
+
+# --- Rate limit (CORE.12)
+# An operational counter, not a domain change: no ChangeSet, dry-run or audit (like the CORE.5
+# login throttles). A refused call is in the application log and, when mutating, in the
+# mutation log with status 429.
+
+_COUNTER = ApiRateCounter._meta.db_table
+# One atomic statement: concurrent calls of every process serialize on the row, none is lost. A
+# call that arrives with an older window (it started just before the boundary) counts in the
+# newer one instead of resetting it.
+_COUNT_SQL = f"""
+INSERT INTO {_COUNTER} (public_id, created_at, updated_at, client_id, bucket, window_start, hits)
+VALUES (gen_random_uuid(), now(), now(), %s, %s, %s, 1)
+ON CONFLICT (client_id, bucket) DO UPDATE SET
+    hits = CASE WHEN EXCLUDED.window_start > {_COUNTER}.window_start THEN 1
+                ELSE {_COUNTER}.hits + 1 END,
+    window_start = GREATEST({_COUNTER}.window_start, EXCLUDED.window_start),
+    updated_at = EXCLUDED.updated_at
+RETURNING hits, window_start
+"""  # noqa: S608  (only the table name is interpolated, from the model; values are parameters)
+
+
+def rate_policy_from_settings() -> RatePolicy:
+    """`API_RATE_LIMIT` (every key), `API_RATE_LIMIT_SCOPES`, `API_RATE_LIMIT_CLIENTS`."""
+    return rate_policy(
+        settings.API_RATE_LIMIT,
+        settings.API_RATE_LIMIT_SCOPES,
+        settings.API_RATE_LIMIT_CLIENTS,
+    )
+
+
+def count_api_call(
+    client: ApiClient, scope: str | None, *, now: dt.datetime | None = None
+) -> RateDecision:
+    """Count one call of `client` to an operation requiring `scope`; say whether it may run.
+
+    Call it outside a transaction (API requests are not atomic): the increment commits at once,
+    so other processes see it, and the row lock is not held for the rest of the request.
+    """
+    now = now or timezone.now()
+    policy = rate_policy_from_settings()
+    bucket, rate = limit_for(policy, scope=scope, client_id=str(client.public_id))
+    with connection.cursor() as cursor:
+        cursor.execute(_COUNT_SQL, [client.pk, bucket, window_start(now, rate)])
+        hits, current_start = cursor.fetchone()
+    decision = rate_decision(hits=hits, window_start=current_start, rate=rate, now=now)
+    if not decision.allowed:
+        logger.info(
+            "API key rate limited: prefix=%s bucket=%s limit=%d/%ds",
+            client.key_prefix,
+            bucket,
+            rate.limit,
+            rate.period,
+        )
+    return decision

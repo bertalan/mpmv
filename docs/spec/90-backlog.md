@@ -6,7 +6,7 @@
 
 ## Summary
 
-- Micro-tasks: **228** in **19** macro areas
+- Micro-tasks: **229** in **19** macro areas
 - Estimated hours (development + automated tests, AI-assisted development): **1911 h** (P1 1559 h · P2 334 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
@@ -14,7 +14,7 @@
 
 | Macro | Area | Tasks | P1 h | P2 h | P3 h | Total h |
 |---|---|---:|---:|---:|---:|---:|
-| ARC | Architecture and foundations | 17 | 103 | 6 | 0 | 109 |
+| ARC | Architecture and foundations | 18 | 103 | 6 | 0 | 109 |
 | CORE | Identity, permissions, API, backoffice | 14 | 105 | 4 | 0 | 109 |
 | CAT | Product catalog | 18 | 126 | 60 | 0 | 186 |
 | VEN | Vendors, commissions, ledger | 22 | 197 | 22 | 0 | 219 |
@@ -33,11 +33,11 @@
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 5 | 19 | 11 | 0 | 30 |
 | MIG | Migration and cutover | 11 | 114 | 0 | 0 | 114 |
-| **Total** | | **228** | **1559** | **334** | **18** | **1911** |
+| **Total** | | **229** | **1559** | **334** | **18** | **1911** |
 
 ## By phase
 
-### F0 — Foundations (37 tasks, 252 h)
+### F0 — Foundations (38 tasks, 252 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -53,9 +53,10 @@
 | ARC.12 | Adopt factory_boy for test data: one DjangoModelFactory per model in `apps/<app>/tests/factories.py`, Faker with a fixed seed, synthetic data only; convert hand-written builders; document in ADR-0006 and CONTRIBUTING | P1 | 4 | ARC.6 | Every model has a factory used by the tests; no hand-written model builders left |
 | ARC.13 | STAGE environment on Hetzner: provision app and DB VPS, deploy from tag, rollback (including a deliberately unhealthy release), smoke tests; includes the STAGE checks of CORE.7 (OpenAPI published) and I18N.1 (`/it/`, `/de/`, `/fr/` and `/es/` active) | P1 | 8 | ARC.5 | Tag deploy and automatic rollback proven on STAGE; CORE.7 and I18N.1 STAGE checks pass |
 | ARC.15 | Media storage: S3-compatible Hetzner Object Storage (EU) behind the CDN, private buckets for documents, signed URLs, django-storages | P1 | 6 | ARC.5, ARC.13 | Uploads work on STAGE with a read-only container filesystem; private documents only via signed URLs |
-| ARC.16 | Transactional email: provider behind an `EmailSender` interface (EU provider, choice pending), per-language templates (gettext), DKIM/SPF/DMARC, bounce and complaint handling, outbox with retries on the task queue, test backend | P1 | 8 | ARC.9, ARC.13 | OTP, reminder and order emails are sent through the outbox with retries and bounces recorded |
+| ARC.16 | Transactional email code: `EmailSender` interface with test (in-memory) and console backends, outbox on the task queue with retries, exponential backoff and idempotent sends, per-language templates (gettext, EN fallback) with a text and a CSP-safe HTML body and no tracking pixels, provider-neutral bounce and complaint ingestion with a signed-webhook stub and address suppression | P1 | 5 | ARC.9 | OTP, reminder and order emails are sent through the outbox; a transient failure retries and a permanent one stops; a hard bounce suppresses later sends; no email contains a tracking pixel |
 | ARC.17 | Remove the e-invoicing leftovers of the no-invoicing principle (coherence check 5): `PlatformOperator.einvoice_channel` and its choices (migration), admin, factory and tests, and comments that say the platform writes FatturaPA XML | P1 | 1 | ARC.7 | No model, admin, service, factory or test refers to an e-invoice channel; `makemigrations --check` is clean |
 | ARC.18 | Architecture guards (coherence checks 2 and 5, owner decision Q-18): an import-linter contract that forbids `django.db` and any `services` or `models` module in `apps.*.engine`; the accepted exceptions to the dry-run rule (telemetry, throttle counters, one-time code consumption, migration hooks) listed in the §1.3 conventions with a guard test that names them | P1 | 2 | ARC.4, ARC.6 | `lint-imports` fails when an engine imports `django.db`; a new mutating service without `dry_run` that is not on the list fails the guard test |
+| ARC.19 | Transactional email on STAGE/LIVE: EU provider adapter behind `EmailSender` (provider choice pending, owner question Q-48), DKIM/SPF/DMARC DNS, provider webhook endpoint registration, deliverability check | P1 | 3 | ARC.16, ARC.13 | STAGE sends an OTP email through the provider with DKIM, SPF and DMARC passing; a test bounce reaches the webhook and suppresses the address |
 | CORE.1 | Custom `User`, login via email, preferred language | P1 | 6 | ARC.6 | Initial migration with custom User |
 | CORE.2 | `VendorMember` with owner/staff roles, per-role permissions | P1 | 6 | CORE.1, VEN.1 | Role matrix tested |
 | CORE.3 | `VendorScopedQuerySet` + 404 helper + reusable cross-tenant test fixture | P1 | 8 | CORE.2 | Negative tests generated for every endpoint |
