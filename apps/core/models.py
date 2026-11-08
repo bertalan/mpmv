@@ -3,15 +3,18 @@ append-only audit log, the platform operator, the feature flags, the shared imag
 licence allow list, the transactional email outbox."""
 
 import json
+import posixpath
 import uuid
 from typing import Any, ClassVar, Self
 
 from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import ArrayField, DateTimeRangeField, RangeOperators
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.db import models, transaction
 from django.utils import timezone
 from wagtail.images.models import AbstractImage, AbstractRendition, Image
+from wagtail.models import Collection
 
 from . import flags, translations
 from .countries import default_allowed_vendor_countries
@@ -23,6 +26,7 @@ from .image_licences import (
     metadata_errors,
     restricted_licence_error,
 )
+from .svg import LOGO_COLLECTION_NAME, UnsafeSvgError, sanitise_svg
 
 # The dedicated platform owner permission (spec 02 roles, CMP.13): never implied by staff or
 # admin access, superuser status included. Granted as `core.platform_owner`, directly or through a
@@ -571,8 +575,49 @@ class MediaImage(AbstractImage):  # type: ignore[misc]  # Wagtail is untyped
             source_url=self.source_url,
             permission_ref=self.permission_ref,
         )
+        svg_error = self._clean_svg()
+        if svg_error:
+            errors["file"] = svg_error
         if errors:
             raise ValidationError(errors)
+
+    def _looks_like_svg(self) -> bool:
+        file: Any = self.file
+        if posixpath.splitext(file.name or "")[1].lower() == ".svg":
+            return True
+        if file._committed:  # a stored file passed the form's format check
+            return False
+        file.open("rb")
+        head: bytes = file.read(256).lstrip(b"\xef\xbb\xbf \t\r\n")
+        file.seek(0)
+        return head.startswith(b"<")
+
+    def _clean_svg(self) -> str | None:
+        """THM.12: an SVG must sit in the logos collection and pass `apps.core.svg`; a new
+        upload is replaced by its re-serialisation. The reason it is refused, or None."""
+        file: Any = self.file
+        if not file or not self._looks_like_svg():
+            return None
+        if self.collection_id is None or not (
+            Collection.objects.ancestor_of(self.collection, inclusive=True)
+            .filter(name=LOGO_COLLECTION_NAME)
+            .exists()
+        ):
+            return (
+                "SVG is for logos and icons only: upload it to the "
+                f"{LOGO_COLLECTION_NAME!r} collection."
+            )
+        if file._committed:
+            return None  # checked and re-serialised when it was uploaded
+        file.open("rb")
+        data = file.read()
+        file.seek(0)
+        try:
+            cleaned = sanitise_svg(data)
+        except UnsafeSvgError as error:
+            return f"This SVG is refused: {error}"
+        file.file = ContentFile(cleaned, name=posixpath.basename(file.name))  # saved on save()
+        return None
 
     @property
     def needs_review(self) -> bool:

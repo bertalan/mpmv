@@ -92,10 +92,15 @@ def test_an_avif_rendition_is_really_avif() -> None:
 
 
 def _sources(html: str) -> dict[str, str]:
-    return dict(
-        (kind, srcset)
-        for srcset, kind in re.findall(r'<source srcset="([^"]+)"[^>]*type="([^"]+)"', html)
-    )
+    """{type: srcset} of every <source>, in document order."""
+    sources: dict[str, str] = {}
+    for tag in re.findall(r"<source [^>]+>", html):
+        kind = re.search(r'type="([^"]+)"', tag)
+        srcset = re.search(r'srcset="([^"]+)"', tag)
+        assert kind is not None
+        assert srcset is not None
+        sources[kind.group(1)] = srcset.group(1)
+    return sources
 
 
 def test_the_responsive_tag_renders_avif_webp_and_a_jpeg_fallback() -> None:
@@ -253,8 +258,9 @@ def test_an_svg_logo_renders_as_svg_through_the_responsive_tag() -> None:
 def test_the_admin_refuses_a_scripted_svg_upload(client: Client) -> None:
     password = secrets.token_urlsafe(16)
     editor = UserFactory.create(email="editor@example.com", password=password, superuser=True)
-    verified_login(client, editor, password)
+    verified_login(client, editor)
     licence = MediaImageFactory.create().licence
+    assert licence is not None
 
     response = client.post(
         "/admin/images/add/",
@@ -268,6 +274,7 @@ def test_the_admin_refuses_a_scripted_svg_upload(client: Client) -> None:
     )
 
     assert response.status_code == 200  # the form again, with the error
+    assert "This SVG is refused" in response.content.decode()
     assert not MediaImage.objects.filter(title="Evil logo").exists()
 
 

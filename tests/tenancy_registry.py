@@ -211,6 +211,10 @@ def member_with_landing_taxonomy(client: Client, tenants: CrossTenant) -> dict[s
 ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
     "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
+    "media": NoVendorData(
+        "Public image files (THM.12): published images and their renditions, no vendor data.",
+        kwargs={"path": "images/missing.webp"},
+    ),
     "home": NoVendorData("Public home page."),
     "catalog:category": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "product-category"}),
     "catalog:brand": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "brand"}),

@@ -21,6 +21,7 @@ dependencies = [
   "cryptography>=50.0.2",
   "wagtail>=8.1,<8.2",
   "wagtail-localize>=1.14.5,<1.15",
+  "defusedxml>=0.7.1",  # SVG logo checks (THM.12)
 ]
 
 [dependency-groups]
@@ -70,7 +71,7 @@ exclude = ["^build/", "^private/", "^tools/", "^\\.claude/"]
 untyped_calls_exclude = ["factory"]
 
 [[tool.mypy.overrides]]
-module = ["dj_database_url", "croniter", "django_otp", "django_otp.*", "whitenoise", "whitenoise.*"]
+module = ["dj_database_url", "croniter", "django_otp", "django_otp.*", "whitenoise", "whitenoise.*", "defusedxml", "defusedxml.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

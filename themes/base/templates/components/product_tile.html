@@ -1,4 +1,4 @@
-{% load i18n theme_tags %}{% comment %}
+{% load i18n theme_tags responsive_images %}{% comment %}
 Product tile (THM.4, spec 14 §14.9): one product in a grid or a list. The product name is the
 tile's only link and its `::after` covers the whole tile, so a click on the image follows it
 and screen readers hear one link named by the product (no nested interactive elements). Prices
@@ -10,6 +10,8 @@ Context:
 - `name` (required), `url` (required): the product name and its page. Only http(s) and
   relative URLs ("/", "#", "?") are linked; any other value leaves the name unlinked.
 - `heading_level`: 2 to 6 (default 3), to fit the page's outline; out of range is clamped.
+- `image`: the product's Wagtail image, rendered as AVIF/WebP/JPEG renditions with `srcset`
+  and `sizes` (THM.12); it wins over `image_url`.
 - `image_url`, `image_alt`: the product image; `image_alt` describes what the image adds, or is
   empty when it only repeats the name. `image_width` and `image_height` (default 400 x 400)
   reserve its space. Without `image_url` a neutral placeholder, hidden from assistive
@@ -21,7 +23,7 @@ Context:
 - `badges`: a list of badge kinds (components/badge.html): sale, new, out_of_stock,
   on_request. "out_of_stock" also mutes the tile.
 {% endcomment %}{% with href=url|safe_href level=heading_level|heading_level:3 %}<article class="product-tile{% if 'out_of_stock' in badges %} product-tile--unavailable{% endif %}">
-  <div class="product-tile__media">{% if image_url %}<img src="{{ image_url }}" alt="{{ image_alt|default:'' }}" width="{{ image_width|default:400 }}" height="{{ image_height|default:400 }}" loading="lazy">{% else %}<div class="product-tile__placeholder" aria-hidden="true"></div>{% endif %}</div>
+  <div class="product-tile__media">{% if image %}{% responsive_image image "card" alt=image_alt %}{% elif image_url %}<img src="{{ image_url }}" alt="{{ image_alt|default:'' }}" width="{{ image_width|default:400 }}" height="{{ image_height|default:400 }}" loading="lazy">{% else %}<div class="product-tile__placeholder" aria-hidden="true"></div>{% endif %}</div>
   <div class="product-tile__body">
     <h{{ level }} class="product-tile__name">{% if href %}<a class="product-tile__link" href="{{ href }}">{{ name }}</a>{% else %}{{ name }}{% endif %}</h{{ level }}>
     {% if vendor %}<p class="product-tile__vendor">{% blocktranslate %}Sold by {{ vendor }}{% endblocktranslate %}</p>{% endif %}
