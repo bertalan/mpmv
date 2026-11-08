@@ -710,26 +710,34 @@ def cancel_event(
     return changes
 
 
-def record_review_decision(state: WorkflowState, user: Any, *, approved: bool) -> None:
-    """Audit a moderator's decision on "Event review" (Wagtail's workflow signals)."""
+def record_review_decision(
+    state: WorkflowState, user: Any, *, approved: bool, dry_run: bool = False
+) -> EventChangeSet:
+    """Audit a moderator's decision on "Event review" (Wagtail's workflow signals) and sync
+    the page's status. Pages of other types are left alone (an empty ChangeSet)."""
+    changes = EventChangeSet()
     page = state.content_object
     if isinstance(page, Page):
         page = page.specific
     if not isinstance(page, EventPage):
-        return
+        return changes
     task_state = (
         TaskState.objects.filter(workflow_state=state).order_by("-finished_at", "-pk").first()
     )
-    sync_event_status(page)
-    current = _fresh(page)
-    before = {"vendor": _vendor_key(current), "workflow": WorkflowState.STATUS_IN_PROGRESS}
-    after = _state(current) | {
-        "workflow": state.status,
-        "comment": task_state.comment if task_state is not None else "",
-    }
-    ctx = user_context(user, ip=None) if user is not None else SYSTEM
-    action = "events.event_approved" if approved else "events.event_changes_requested"
-    _record(ctx, action, current, before, after)
+    with _mutation(dry_run):
+        sync_event_status(page)
+        current = _fresh(page)
+        before = {"vendor": _vendor_key(current), "workflow": WorkflowState.STATUS_IN_PROGRESS}
+        after = _state(current) | {
+            "workflow": state.status,
+            "comment": task_state.comment if task_state is not None else "",
+        }
+        changes.page = current
+        changes.update(EVENT, _key(current), before, after)
+        ctx = user_context(user, ip=None) if user is not None else SYSTEM
+        action = "events.event_approved" if approved else "events.event_changes_requested"
+        _record(ctx, action, current, before, after)
+    return changes
 
 
 # --- Moderation policy and settings (staff, audited)
