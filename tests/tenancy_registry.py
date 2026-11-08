@@ -52,6 +52,8 @@ from apps.catalog.tests.factories import (
 )
 from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
+from apps.events.models import EventPage, VendorEventPolicy
+from apps.events.tests.factories import EventPageFactory, VendorEventPolicyFactory
 from apps.shipping.models import (
     PickupOption,
     PickupOptionTranslation,
@@ -166,6 +168,9 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         )
     ),
     CartLine: lambda vendor: CartLineFactory.create(product=ProductFactory.create(vendor=vendor)),
+    # EVT.1: a draft event page under the primary language's events index.
+    EventPage: lambda vendor: EventPageFactory.create(vendor=vendor),
+    VendorEventPolicy: lambda vendor: VendorEventPolicyFactory.create(vendor=vendor),
     TaxRegimeChangeRequest: lambda vendor: TaxRegimeChangeRequestFactory.create(
         # A reviewed request: the vendor may already have its one pending request.
         vendor=vendor,

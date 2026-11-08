@@ -124,6 +124,8 @@ class HomePage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is u
         "cms.StandardPage",
         "cms.LegalPage",
         "cms.VendorRecruitmentPage",
+        # The `/events/` index (EVT.1): named by string, so cms never imports apps.events.
+        "events.EventIndexPage",
     ]
     template = "cms/home_page.html"
 
