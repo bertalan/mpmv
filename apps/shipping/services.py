@@ -1,11 +1,11 @@
-"""Shipping services: audited writes of the shipping configuration (SHP.1, SHP.12), and the zone
-snapshots the pure zone resolution works on.
+"""Shipping services: audited writes of the shipping configuration (SHP.1, SHP.12, SHP.14), and
+the zone and special-area snapshots the pure resolution works on.
 
-Carriers, country groups, zones, shipping methods, weight bands and pickup options are prices
-or decide them, so every create, change and delete goes through here, whatever the adapter
-(admin, the SHP.5 and SHP.13 imports, the SHP.6 editor): it is validated, returned as a ChangeSet
-(dry-run) and written to the audit log with before and after (spec 01 conventions,
-docs/dev/audit-trail.md).
+Carriers, country groups, zones, shipping methods, weight bands, special areas, the treatments
+methods give them and pickup options are prices or decide them, so every create, change and
+delete goes through here, whatever the adapter (admin, the SHP.5 and SHP.13 imports, the SHP.6
+editor): it is validated, returned as a ChangeSet (dry-run) and written to the audit log with
+before and after (spec 01 conventions, docs/dev/audit-trail.md).
 """
 
 from collections.abc import Iterable
@@ -19,28 +19,53 @@ from apps.core.changeset import ChangeSet
 from apps.core.services import run_mutation, save_audited
 from apps.vendors.models import Vendor
 
-from .engine import ZoneSnap
+from .engine import (
+    AreaTreatment,
+    Destination,
+    SpecialAreaDecision,
+    SpecialAreaSnap,
+    ZoneSnap,
+)
+from .engine import special_area_treatment as resolve_area_treatment
 from .models import (
     Carrier,
     CountryGroup,
     PickupOption,
     ShippingMethod,
     ShippingZone,
+    SpecialArea,
+    SpecialAreaTreatment,
     WeightBand,
     zones_using_groups,
 )
 
-type ConfigRow = Carrier | CountryGroup | ShippingZone | ShippingMethod | WeightBand | PickupOption
+type ConfigRow = (
+    Carrier
+    | CountryGroup
+    | ShippingZone
+    | ShippingMethod
+    | WeightBand
+    | SpecialArea
+    | SpecialAreaTreatment
+    | PickupOption
+)
 
-# Deletion order: rows that others point to come last (methods protect zones and carriers; zones
-# name country groups).
+# Deletion order: rows that others point to come last (methods protect zones and carriers;
+# treatments protect special areas; zones name country groups).
 CONFIG_MODELS: tuple[type[models.Model], ...] = (
     WeightBand,
+    SpecialAreaTreatment,
     PickupOption,
     ShippingMethod,
     ShippingZone,
+    SpecialArea,
     CountryGroup,
     Carrier,
+)
+# Rows that belong to a method and leave with it (cascade), each audited.
+METHOD_ROWS: tuple[type[WeightBand] | type[SpecialAreaTreatment], ...] = (
+    WeightBand,
+    SpecialAreaTreatment,
 )
 NOT_SNAPSHOTTED = frozenset({"id", "public_id", "created_at", "updated_at"})
 
@@ -69,7 +94,7 @@ def config_snapshot(obj: models.Model) -> dict[str, Any]:
             data[field.name] = None if related is None else str(related.public_id)
         else:
             data[field.name] = field.value_from_object(obj)
-    if isinstance(obj, WeightBand):
+    if isinstance(obj, WeightBand | SpecialAreaTreatment):
         data[VENDOR_FIELD] = str(obj.method.vendor.public_id)
     return data
 
@@ -115,16 +140,21 @@ def delete_config(
 ) -> ChangeSet:
     """Delete configuration rows, audited as `shipping.<model>.deleted`.
 
-    Deleting a method deletes its weight bands: each band is audited too, so no price leaves the
-    configuration without a trace. A country group that a remaining zone uses is refused with
-    `ProtectedError`, also on dry-run.
+    Deleting a method deletes its weight bands and special-area treatments: each one is audited
+    too, so no price leaves the configuration without a trace. A country group that a remaining
+    zone uses is refused with `ProtectedError`, also on dry-run; a special area a method treats
+    is protected by the database.
     """
     targets = list(rows)
     for obj in targets:
         _check(obj)
     _refuse_groups_in_use(targets)
     method_ids = [obj.pk for obj in targets if isinstance(obj, ShippingMethod)]
-    cascaded = WeightBand.objects.filter(method_id__in=method_ids).select_related("method__vendor")
+    cascaded: list[ConfigRow] = [
+        row
+        for model in METHOD_ROWS
+        for row in model.objects.filter(method_id__in=method_ids).select_related("method__vendor")
+    ]
     unique = {(type(obj), obj.pk): obj for obj in [*cascaded, *targets]}
 
     changes = ChangeSet()
@@ -165,7 +195,11 @@ def zone_snaps(vendor: Vendor) -> list[ZoneSnap]:
     served = zones_available_to(vendor).filter(
         methods__vendor=vendor, methods__carrier__is_active=True
     )  # one filter call: the same method has both
-    zones = list(served.distinct())
+    return _snapshots(list(served.distinct()))
+
+
+def _snapshots(zones: list[ShippingZone]) -> list[ZoneSnap]:
+    """Snapshots of `zones`, country groups expanded."""
     codes = {code for zone in zones for code in zone.country_groups}
     members = {
         group.code: frozenset(group.countries)
@@ -185,3 +219,29 @@ def zone_snaps(vendor: Vendor) -> list[ZoneSnap]:
         )
         for zone in zones
     ]
+
+
+# --- Special areas a method's package may go to, for `engine.special_area_treatment` (SHP.14)
+
+
+def special_area_snaps() -> list[SpecialAreaSnap]:
+    """Snapshots of every special area (platform data)."""
+    return [area.snap() for area in SpecialArea.objects.all()]
+
+
+def area_treatments(method: ShippingMethod) -> dict[str, AreaTreatment]:
+    """The treatments `method` sets, by special area code; areas it does not list get the
+    default (an indicative cost subject to quote)."""
+    rows = SpecialAreaTreatment.objects.filter(method=method).select_related("area")
+    return {row.area.code: row.snap() for row in rows}
+
+
+def special_area_decision(method: ShippingMethod, dest: Destination) -> SpecialAreaDecision | None:
+    """The special area `dest` is in and the treatment `method` gives it, or None when `dest` is
+    in no special area. SHP.3 turns the decision into its outcome: IndicativeRates for an
+    estimate, a surcharged rate, NeedsQuote, or Blocked.
+
+    A method whose zone reaches `dest` only through postcodes or provinces inside the area keeps
+    its normal rate unless it sets a treatment of its own (`engine.zone_within_area`)."""
+    (zone,) = _snapshots([method.zone])
+    return resolve_area_treatment(special_area_snaps(), area_treatments(method), dest, zone)
