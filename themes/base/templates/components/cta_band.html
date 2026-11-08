@@ -1,4 +1,4 @@
-{% comment %}
+{% load theme_tags %}{% comment %}
 CTA band (THM.4, spec 14 §14.9): a full-width call to action between page sections (CMS.2
 blocks, the vendor recruitment page): a heading, a line of text and one action.
 
@@ -9,10 +9,10 @@ Context:
 - `text`: the line under it.
 - `url` and `action`: the one action, a link styled as a button.
 - `variant`: "accent" for the accent surface (default: the raised surface).
-{% endcomment %}<div class="cta-band{% if variant == 'accent' %} cta-band--accent{% endif %}">
+{% endcomment %}{% with url=url|safe_href %}<div class="cta-band{% if variant == 'accent' %} cta-band--accent{% endif %}">
   <div class="cta-band__content">
     <h{{ heading_level|default:2 }} class="cta-band__title">{{ title }}</h{{ heading_level|default:2 }}>
     {% if text %}<p>{{ text }}</p>{% endif %}
   </div>
   {% if url and action %}<a class="button button--large{% if variant == 'accent' %} button--secondary{% endif %}" href="{{ url }}">{{ action }}</a>{% endif %}
-</div>
+</div>{% endwith %}

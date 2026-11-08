@@ -1,6 +1,6 @@
 """Pure vendor rules (no ORM): status state machine, slug generation, member roles and their
 permissions, and the legal and e-invoicing identity (validators, required fields, FatturaPA
-party block)."""
+party block), onboarding and the establishment gate (CMP.13)."""
 
 import dataclasses
 import hmac
@@ -1227,3 +1227,67 @@ def claim_identity_matches(typed: str, *, vat_number: str, tax_code: str, countr
     for form in sorted(stored):
         matched |= hmac.compare_digest(candidate.encode(), form.encode())
     return matched
+
+
+# --- Establishment gate (D-21, CMP.13)
+#
+# At go-live the platform admits only vendors established in the EU: a non-EU vendor selling
+# goods in the EU would make the platform the deemed VAT supplier (VAT directive art. 14a). The
+# allowed countries are a `PlatformOperator` setting; the activation checks the VEN.12 identity
+# against it. Evidence of a permanent establishment is checked by staff.
+
+
+@dataclasses.dataclass(frozen=True)
+class Establishment:
+    """The countries where a vendor is established ("" when it has no permanent establishment)."""
+
+    registered_office: str
+    permanent_establishment: str = ""
+
+    @property
+    def countries(self) -> tuple[str, ...]:
+        return tuple(
+            dict.fromkeys(c for c in (self.registered_office, self.permanent_establishment) if c)
+        )
+
+
+def vendor_establishment(identity: LegalIdentity) -> Establishment:
+    """The registered office country (the vendor's country when not given) and the permanent
+    establishment country of a legal identity."""
+    return Establishment(
+        registered_office=_address_country(identity, "registered"),
+        permanent_establishment=_address_country(identity, "establishment"),
+    )
+
+
+def establishment_error(establishment: Establishment, allowed: Collection[str]) -> str | None:
+    """Why a vendor established at `establishment` cannot be activated; None when it can, i.e.
+    when its registered office or permanent establishment is in `allowed`."""
+    if any(country in allowed for country in establishment.countries):
+        return None
+    office = establishment.registered_office
+    if establishment.permanent_establishment:
+        return (
+            f"the vendor cannot be activated: its registered office is in {office} and its "
+            f"permanent establishment in {establishment.permanent_establishment}, and the "
+            "platform does not admit vendors established in either country"
+        )
+    return (
+        f"the vendor cannot be activated: its registered office is in {office}, where the "
+        "platform does not admit vendors, and it has no permanent establishment in a country "
+        "where it does"
+    )
+
+
+class EstablishmentNotAllowed(InvalidTransition):
+    """The vendor is not established in a country where the platform admits vendors."""
+
+    def __init__(self, establishment: Establishment, message: str) -> None:
+        self.establishment = establishment
+        super().__init__(message)
+
+
+def check_establishment(establishment: Establishment, allowed: Collection[str]) -> None:
+    error = establishment_error(establishment, allowed)
+    if error is not None:
+        raise EstablishmentNotAllowed(establishment, error)

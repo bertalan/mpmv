@@ -149,6 +149,10 @@ VENDOR_CLOSURE_HOOKS: list[str] = [
     "apps.api.services.revoke_vendor_keys",  # the vendor's API keys
 ]
 
+# Allowed vendor countries (CMP.13): `core` cannot import `vendors`, so this names the function
+# that lists the active vendors established outside a new allowed set.
+VENDORS_OUTSIDE_COUNTRIES_HOOK = "apps.vendors.services.active_vendors_outside"
+
 ROOT_URLCONF = "mpmv.urls"
 WSGI_APPLICATION = "mpmv.wsgi.application"
 ASGI_APPLICATION = "mpmv.asgi.application"
