@@ -168,7 +168,9 @@ transition out of `closed` in `TRANSITIONS` (`apps/vendors/engine.py`) and needs
 only `reopen_vendor` in `apps/vendors/services.py` makes it: staff only, with dry-run, audited as
 `vendor.reopened` with the reason. The vendor's `onboarding_round` goes up and contract
 acceptances count for the current round only, so the owner accepts the contract in force again
-even when its version has not changed.
+even when its version has not changed. No API key comes back with a reopen: closing a vendor
+revokes its keys (CORE.14), the reopen revokes any key a closure from before that rule left
+active, and an owner issues new keys once the vendor is active again.
 
 ### Plan entitlements and plan fees (VEN.19, P2)
 

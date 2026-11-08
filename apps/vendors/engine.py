@@ -74,6 +74,8 @@ def check_reopen(status: str, *, reason: str, has_active_owner: bool) -> None:
     Onboarding needs an owner to accept the contract: without an active owner (e.g. the only
     owner asked for erasure, Q-16) a new owner is added first.
     """
+    # TODO(CMP.4): once erasure flags restricted owners, exclude them here instead of relying
+    # on `is_active` alone, so a reactivated erased account cannot reopen the vendor.
     if status != CLOSED:
         raise InvalidTransition(
             f"vendor status change {status} → {ONBOARDING} is not a reopen: "

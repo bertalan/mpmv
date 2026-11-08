@@ -131,6 +131,15 @@ def delete_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -
     return changes
 
 
+def _run_closure_hooks(
+    vendor: Vendor, changes: ChangeSet, *, ctx: AuditContext, dry_run: bool
+) -> None:
+    """Revoke, audited, what only an active vendor may hold (its API keys, CORE.14): each hook
+    in `settings.VENDOR_CLOSURE_HOOKS` returns its changes, added to `changes`."""
+    for path in settings.VENDOR_CLOSURE_HOOKS:
+        changes.changes.extend(import_string(path)(vendor, ctx=ctx, dry_run=dry_run).changes)
+
+
 def change_status(
     vendor: Vendor, target: str, *, ctx: AuditContext, dry_run: bool = False
 ) -> ChangeSet:
@@ -138,8 +147,9 @@ def change_status(
 
     The check runs against the stored status (row locked), never a possibly stale instance.
     Activating an onboarding vendor also needs its onboarding checklist (VEN.5): the contract in
-    force must be accepted. Raises `engine.InvalidTransition` (`engine.ActivationNotAllowed`
-    for the checklist), also on dry-run.
+    force must be accepted. Closing a vendor revokes its API keys (`VENDOR_CLOSURE_HOOKS`,
+    CORE.14), listed in the returned ChangeSet. Raises `engine.InvalidTransition`
+    (`engine.ActivationNotAllowed` for the checklist), also on dry-run.
     """
     with transaction.atomic():
         current = (
@@ -164,6 +174,8 @@ def change_status(
             current.save(update_fields=["status", "updated_at"])
 
         run_mutation(changes, apply, ctx=ctx, action=STATUS_CHANGED, dry_run=dry_run)
+        if target == engine.CLOSED:
+            _run_closure_hooks(current, changes, ctx=ctx, dry_run=dry_run)
 
     if not dry_run:
         vendor.status = target
@@ -741,7 +753,9 @@ def reopen_vendor(
     The vendor's onboarding round goes up, so an acceptance from before the closure no longer
     counts: an owner accepts the contract in force again, and activation re-runs the checklist
     and gates through `change_status`. The kept data (owner, ledger, contracts) are reused.
-    Checked against the stored vendor (row locked). Raises `PermissionDenied` (see
+    No API key comes back: closing revoked them, and a key a closure from before CORE.14 left
+    active is revoked here (`VENDOR_CLOSURE_HOOKS`); an owner issues new keys once the vendor is
+    active again. Checked against the stored vendor (row locked). Raises `PermissionDenied` (see
     `can_reopen`), `engine.ReasonRequired` (blank reason), `engine.InvalidTransition` (not
     closed) or `engine.ReopenNotAllowed` (no active owner), also on dry-run.
     """
@@ -785,6 +799,7 @@ def reopen_vendor(
             current.save(update_fields=["status", "onboarding_round", "updated_at"])
 
         run_mutation(changes, apply, ctx=ctx, action=REOPENED, dry_run=dry_run)
+        _run_closure_hooks(current, changes, ctx=ctx, dry_run=dry_run)
 
     if not dry_run:
         vendor.status, vendor.onboarding_round = engine.ONBOARDING, round_

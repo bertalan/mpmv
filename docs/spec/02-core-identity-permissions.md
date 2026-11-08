@@ -112,7 +112,9 @@ The second factor is a TOTP authenticator app or a passkey. The confirmed parame
   became platform-only cannot use it; `manage.py vendor_key_scopes` lists such keys). Every
   other scope is platform-only. The vendor's status is read on every call: only an active
   vendor's key writes; an applicant, onboarding or suspended vendor's key only reads (403 on
-  POST, PUT, PATCH and DELETE, dry-runs included); a closed vendor's key gets 401. Vendor-scoped
+  POST, PUT, PATCH and DELETE, dry-runs included); a closed vendor's key gets 401. Closing a
+  vendor also revokes each of its keys, one AuditLog entry per key, so reopening it (VEN.21)
+  revives none: the vendor issues new keys once active again. Vendor-scoped
   write services reached by API v1 read the status again inside the write transaction (row
   read `FOR SHARE`), so a vendor suspended after its key was authenticated gets that write
   refused. Deleting a vendor writes one AuditLog entry per key it deletes.
