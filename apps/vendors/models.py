@@ -180,6 +180,15 @@ class Vendor(BaseModel):
         blank=True,
         help_text="The regime declared on invoices (FatturaPA RegimeFiscale; RF19 = forfettario).",
     )
+    cross_border_franchise_number = models.CharField(
+        "cross-border franchise number",
+        max_length=20,
+        blank=True,
+        help_text=(
+            "RF20 only: the number with the suffix EX issued by the member state of "
+            "establishment for the cross-border VAT franchise (e.g. DE123456789EX)."
+        ),
+    )
     ateco_code = models.CharField("ATECO code", max_length=8, blank=True)
     eori = models.CharField("EORI number", max_length=17, blank=True)
     registered_street = models.CharField("registered office street", max_length=200, blank=True)

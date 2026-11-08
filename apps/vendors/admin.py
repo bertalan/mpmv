@@ -149,6 +149,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
                     "tax_code",
                     "tax_residence_country",
                     "fiscal_regime",
+                    "cross_border_franchise_number",
                     "ateco_code",
                     "eori",
                 )

@@ -11,6 +11,7 @@ check is audited by `apps.vendors.services.check_vat_number`). `verify_vat_numbe
 puts the cache, the VIES client and the fail-closed policy together.
 """
 
+import dataclasses
 import datetime as dt
 import logging
 from dataclasses import dataclass, field
@@ -30,6 +31,7 @@ from apps.core.countries import normalize_country
 from apps.core.models import Versioned
 from apps.core.services import run_mutation, save_audited
 from apps.core.validity import NoValidRow, next_start_error, pick_valid
+from apps.vendors import engine as vendors_engine
 from apps.vendors.engine import VendorAction, split_vat_number
 from apps.vendors.models import Vendor
 from apps.vendors.services import has_vendor_permission, save_vendor
@@ -429,6 +431,20 @@ def _clear_review(request: TaxRegimeChangeRequest) -> None:
     request.profile = None
 
 
+def check_fiscal_regime_eligibility(vendor: Vendor, fiscal_regime: str) -> None:
+    """Refuse a fiscal regime the vendor may not declare: RF20 needs an establishment in an EU
+    member state and the EX number issued there (VEN.25, owner decision MQ-5). Raises
+    `ValidationError` on the request's `fiscal_regime` with every reason."""
+    if fiscal_regime != vendors_engine.CROSS_BORDER_FRANCHISE_REGIME:
+        return
+    identity = dataclasses.replace(vendor.legal_identity(), fiscal_regime=fiscal_regime)
+    errors = vendors_engine.cross_border_franchise_errors(identity)
+    if errors:
+        raise ValidationError(
+            {"fiscal_regime": [m for messages in errors.values() for m in messages]}
+        )
+
+
 def request_regime_change(
     request: TaxRegimeChangeRequest, *, ctx: AuditContext, dry_run: bool = False
 ) -> ChangeSet:
@@ -438,7 +454,8 @@ def request_regime_change(
     staff cannot change the tax regime). The status and review fields are reset: a new request
     is pending and unreviewed. The request must be consistent with the fiscal regime
     the vendor will declare (`engine.request_errors`), start after the vendor's latest profile
-    and change something. Raises `engine.RegimeChangeNotAllowed`,
+    and change something; a move to RF20 needs the vendor's eligibility
+    (`check_fiscal_regime_eligibility`, VEN.25). Raises `engine.RegimeChangeNotAllowed`,
     `engine.PendingRequestExists` or `ValidationError`, also on dry-run.
     """
     if not request._state.adding:
@@ -469,6 +486,8 @@ def request_regime_change(
             requested=request.fiscal_regime,
             current=vendor.fiscal_regime,
         )
+        if resulting != vendor.fiscal_regime:
+            check_fiscal_regime_eligibility(vendor, resulting)
         if _same_regime(request, latest) and resulting == vendor.fiscal_regime:
             raise ValidationError({"regime": "This is already the vendor's VAT regime."})
 
@@ -546,7 +565,8 @@ def approve_regime_change(
     regime may have changed since the request, and the requester must still hold the
     `TAX_REGIME` permission (an owner removed or demoted since asking cannot have the request
     approved; it can still be rejected). A change of the declared fiscal regime is
-    approved on or after its business-time date only (`engine.fiscal_regime_change_error`).
+    approved on or after its business-time date only (`engine.fiscal_regime_change_error`),
+    and a move to RF20 only for an eligible vendor as stored now (VEN.25).
     Each write is
     audited by its own service (`vendor.updated`, `tax.vendor_tax_profile.configured`) plus
     `tax.regime_change.approved`; the returned ChangeSet holds them all. Raises
@@ -579,6 +599,7 @@ def approve_regime_change(
             current=vendor.fiscal_regime,
         )
         if fiscal_regime != vendor.fiscal_regime:
+            check_fiscal_regime_eligibility(vendor, fiscal_regime)
             error = engine.fiscal_regime_change_error(
                 business_date(current.effective_from), today=business_date(timezone.now())
             )
