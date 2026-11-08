@@ -1,0 +1,5 @@
+# Uploaded media and image renditions (MEDIA_ROOT); survives container replacement. The app and
+# the worker write to it, Caddy serves it read-only under /media/. Object storage replaces it
+# later (spec 12 §12.4); until then it is part of the host backup.
+[Volume]
+VolumeName=mpmv-media

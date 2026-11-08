@@ -203,3 +203,48 @@ def test_caddy_noindex_header_is_behind_a_flag_that_is_off_by_default() -> None:
     example = (ROOT / "deploy" / "server" / "caddy.env.example").read_text()
     assert re.search(r"^MPMV_NOINDEX=$", example, re.M)
     assert re.search(r"^MPMV_SITE_ADDRESS=$", example, re.M)
+
+
+MEDIA_UNITS = ("mpmv-app.container", "mpmv-worker.container")
+
+
+def mounts_of(name: str) -> list[list[str]]:
+    return [v.split(":") for v in values(load(name), "Container", "Volume")]
+
+
+def test_media_volume_is_named_and_prefixed() -> None:
+    """ARC.13: uploads and renditions survive container replacement, until object storage."""
+    unit = load("mpmv-media.volume")
+    assert values(unit, "Volume", "VolumeName") == ["mpmv-media"]
+
+
+@pytest.mark.parametrize("name", MEDIA_UNITS)
+def test_app_and_worker_write_media_only_to_the_media_volume(name: str) -> None:
+    """The root file system stays read-only; MEDIA_ROOT is the one writable mount."""
+    media = [m for m in mounts_of(name) if m[0] == "mpmv-media.volume"]
+    assert len(media) == 1, mounts_of(name)
+    assert media[0][1] == "/app/media"
+    options = media[0][2].split(",") if len(media[0]) == 3 else []
+    assert "ro" not in options
+    assert "U" in options, "owned by the image's non-root user"
+
+
+def test_caddy_mounts_media_read_only() -> None:
+    media = [m for m in mounts_of("mpmv-caddy.container") if m[0] == "mpmv-media.volume"]
+    assert media == [["mpmv-media.volume", "/srv/media", "ro"]]
+
+
+def test_caddy_serves_media_as_inert_static_files() -> None:
+    """SEC.4: nothing under /media/ is executed, sniffed or able to run scripts."""
+    text = CADDYFILE.read_text()
+    block = re.search(r"^\thandle_path /media/\* \{\n(.*?)\n\t\}$", text, re.M | re.S)
+    assert block, "media must be served by Caddy from the volume"
+    body = block.group(1)
+    assert re.search(r"^\t\troot \* /srv/media$", body, re.M)
+    assert re.search(r"^\t\tfile_server$", body, re.M), "no browse, no templates"
+    for directive in ("browse", "templates", "php"):
+        assert directive not in body
+    assert re.search(r"^\t\theader X-Content-Type-Options nosniff$", body, re.M)
+    csp = r"^\t\theader Content-Security-Policy \"default-src 'none'; sandbox\"$"
+    assert re.search(csp, body, re.M)
+    assert re.search(r"^\thandle \{\n\t\treverse_proxy mpmv-app:8000 \{$", text, re.M)

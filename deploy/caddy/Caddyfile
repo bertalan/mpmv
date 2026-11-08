@@ -31,8 +31,21 @@
 	header @noindex X-Robots-Tag "noindex, nofollow"
 
 	encode zstd gzip
-	reverse_proxy mpmv-app:8000 {
-		header_up X-Real-IP {client_ip}
+
+	# Uploaded media and renditions, straight from the mpmv-media volume (read-only). They are
+	# inert files: no directory listing, no MIME sniffing, and a sandbox CSP in case a file is
+	# opened directly (SEC.4). Image uploads are re-encoded by the app before they get here.
+	handle_path /media/* {
+		root * /srv/media
+		header X-Content-Type-Options nosniff
+		header Content-Security-Policy "default-src 'none'; sandbox"
+		file_server
+	}
+
+	handle {
+		reverse_proxy mpmv-app:8000 {
+			header_up X-Real-IP {client_ip}
+		}
 	}
 }
 
