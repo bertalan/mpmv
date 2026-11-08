@@ -14,6 +14,7 @@ from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
 from django.db import connection, transaction
+from django.db.models import OuterRef, QuerySet, Subquery
 from django.utils import timezone
 from django.utils.module_loading import import_string
 
@@ -31,6 +32,7 @@ from apps.core.services import (
 from . import engine
 from .models import (
     ContractAcceptance,
+    CrossVendorConsent,
     LegalFieldRequirement,
     Vendor,
     VendorContract,
@@ -219,6 +221,33 @@ def active_vendors_outside(countries: Collection[str]) -> list[dict[str, str]]:
                 }
             )
     return rows
+
+
+def ensure_vendor_can_write(vendor: Vendor) -> str:
+    """Re-read `vendor`'s status inside the caller's write transaction; raise
+    `engine.VendorCannotWrite` unless the vendor is active (CORE.14). Returns the status.
+
+    For writes made on behalf of a vendor's API key. The key's vendor status is checked when the
+    request is authenticated; this closes the window between that check and the write. The row
+    is read `FOR SHARE`: concurrent writes of the same vendor proceed, while `change_status`
+    (`FOR UPDATE`) waits for them to commit, and a write that starts after a status change
+    commits sees the new status. Must run inside `transaction.atomic()`, or the lock would end
+    with the read.
+    """
+    if not connection.in_atomic_block:
+        raise RuntimeError("ensure_vendor_can_write must run inside the write transaction")
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"SELECT status FROM {connection.ops.quote_name(Vendor._meta.db_table)} "  # noqa: S608
+            "WHERE id = %s FOR SHARE",
+            [vendor.pk],
+        )
+        row = cursor.fetchone()
+    if row is None:
+        raise Vendor.DoesNotExist(f"vendor {vendor.public_id} does not exist")
+    status = str(row[0])
+    engine.check_can_write(status)
+    return status
 
 
 # --- Memberships (CORE.2)
@@ -777,3 +806,90 @@ def delete_vendor_flag(
         flags_changed()
 
     return run_mutation(changes, apply, ctx=ctx, action=VENDOR_FLAG_DELETED, dry_run=dry_run)
+
+
+# --- Cross-vendor consent (CAT.14, owner decision Q-32): a versioned, audited vendor setting.
+
+CONSENT_MODEL = "vendors.crossvendorconsent"
+CONSENT_SET = "vendors.cross_vendor_consent.set"
+
+
+def consent_snapshot(consent: CrossVendorConsent) -> dict[str, Any]:
+    return {
+        "vendor": str(consent.vendor.public_id),
+        "in_suggestions": consent.in_suggestions,
+        "in_bundles": consent.in_bundles,
+        "valid_from": consent.valid_from,
+        "set_by": consent.set_by,
+    }
+
+
+def current_cross_vendor_consent(
+    vendor: Vendor, at: dt.datetime | None = None
+) -> CrossVendorConsent | None:
+    """The version in force at `at` (default: now): the latest one started by then."""
+    at = at or timezone.now()
+    return (
+        CrossVendorConsent.objects.filter(vendor=vendor, valid_from__lte=at)
+        .order_by("-valid_from")
+        .first()
+    )
+
+
+def in_suggestions_allowed(vendor: Vendor, at: dt.datetime | None = None) -> bool:
+    """Whether other vendors may suggest this vendor's products; no version: opted out."""
+    consent = current_cross_vendor_consent(vendor, at)
+    return consent is not None and consent.in_suggestions
+
+
+def vendors_in_suggestions(at: dt.datetime | None = None) -> QuerySet[Vendor]:
+    """The vendors whose version in force at `at` (default: now) allows other vendors'
+    suggestions; usable as a subquery (`vendor__in=`)."""
+    at = at or timezone.now()
+    in_force = (
+        CrossVendorConsent.objects.filter(vendor=OuterRef("pk"), valid_from__lte=at)
+        .order_by("-valid_from")
+        .values("in_suggestions")[:1]
+    )
+    return Vendor.objects.annotate(in_suggestions_now=Subquery(in_force)).filter(
+        in_suggestions_now=True
+    )
+
+
+def set_cross_vendor_consent(
+    vendor: Vendor,
+    *,
+    in_suggestions: bool | None = None,
+    in_bundles: bool | None = None,
+    valid_from: dt.datetime | None = None,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Record a new consent version from `valid_from` (default: now); None keeps a flag as in
+    the latest version (opted out if there is none). Versions are never edited, and a new one
+    starts after the latest, so the history of what was allowed when stays explainable."""
+    with transaction.atomic():
+        locked = Vendor.objects.select_for_update().get(pk=vendor.pk)
+        latest = CrossVendorConsent.objects.filter(vendor=locked).order_by("-valid_from").first()
+        start = valid_from or timezone.now()
+        if latest is not None and start <= latest.valid_from:
+            raise ValidationError({"valid_from": "A new version must start after the latest one."})
+        consent = CrossVendorConsent(
+            vendor=locked,
+            in_suggestions=(
+                in_suggestions
+                if in_suggestions is not None
+                else bool(latest and latest.in_suggestions)
+            ),
+            in_bundles=in_bundles if in_bundles is not None else bool(latest and latest.in_bundles),
+            valid_from=start,
+            set_by=ctx.actor_label,
+        )
+        changes = ChangeSet()
+        changes.create(
+            CONSENT_MODEL,
+            str(consent.public_id),
+            consent_snapshot(consent),
+            supersedes=None if latest is None else consent_snapshot(latest),
+        )
+        return run_mutation(changes, consent.save, ctx=ctx, action=CONSENT_SET, dry_run=dry_run)

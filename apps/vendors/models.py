@@ -706,3 +706,47 @@ class VendorFeatureFlag(BaseModel):
                     "for this vendor, never on (when the platform value is off, it stays off)."
                 }
             )
+
+
+class CrossVendorConsent(BaseModel):
+    """A vendor's opt-in to other vendors' suggestions and bundles (spec 04 §4.2, CAT.14).
+
+    Versioned and append-only (database trigger, migration 0013): a change is a new row from
+    `valid_from`, written and audited by `services.set_cross_vendor_consent`. The row valid at an
+    instant is the latest one started by then; no row means opted out (owner decision Q-32).
+    """
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
+
+    vendor = models.ForeignKey(
+        Vendor, on_delete=models.PROTECT, related_name="cross_vendor_consents"
+    )
+    in_suggestions = models.BooleanField(
+        "in other vendors' suggestions",
+        default=False,
+        help_text="Its products may be suggested (cross-sell, up-sell) by other vendors.",
+    )
+    in_bundles = models.BooleanField(
+        "in other parties' bundles",
+        default=False,
+        help_text="Its products may be part of bundles created by others (CAT.16).",
+    )
+    valid_from = models.DateTimeField()
+    set_by = models.CharField(max_length=150, help_text="Who recorded this version.")
+
+    class Meta:
+        ordering = ["vendor", "-valid_from"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["vendor", "valid_from"], name="vendors_crossvendorconsent_unique_start"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.vendor} consent from {self.valid_from:%Y-%m-%d %H:%M}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self._state.adding:
+            raise PermissionError("CrossVendorConsent is append-only")
+        super().save(*args, **kwargs)

@@ -106,11 +106,24 @@ The second factor is a TOTP authenticator app or a passkey. The confirmed parame
 - API: `Authorization: Bearer mpmv_<prefix>_<secret>` header, constant-time comparison,
   scope checked per route, rate limit per API key with counters in a cache shared by every app
   process (CORE.12, owner decision Q-18), logging of every mutating call.
-- Vendor key policy (CORE.14): a vendor key holds only the vendor-grantable scopes
-  (`VENDOR_GRANTABLE_SCOPES` in `apps/api/engine.py`, an allow-list checked at issuance); every
-  other scope is platform-only. The vendor's status is read on every call: a suspended vendor's
-  key only reads (403 on POST, PUT, PATCH and DELETE, dry-runs included), a closed vendor's key
-  gets 401. Deleting a vendor writes one AuditLog entry per key it deletes.
+- API rate limit (CORE.12): fixed windows per key, counted in PostgreSQL (`ApiRateCounter`, one
+  atomic upsert per call), so every app process shares one counter and no Redis is needed.
+  `API_RATE_LIMIT` (default `600/minute`) is the key-wide limit of every key;
+  `API_RATE_LIMIT_SCOPES` gives a costly scope its own counter and limit for every key;
+  `API_RATE_LIMIT_CLIENTS` replaces the key-wide limit of one key, by `ApiClient` public id. Only
+  calls of an accepted key count (401/403 refusals do not). Over the limit the answer is a 429
+  `rate_limited` problem with `Retry-After` (seconds to the end of the window); a mutating call
+  refused this way is in the mutation log.
+- Vendor key policy (CORE.14): a vendor key is issued only while its vendor is active, and holds
+  only the vendor-grantable scopes (`VENDOR_GRANTABLE_SCOPES` in `apps/api/engine.py`, an
+  allow-list checked at issuance and again on every request, so a key issued before a scope
+  became platform-only cannot use it; `manage.py vendor_key_scopes` lists such keys). Every
+  other scope is platform-only. The vendor's status is read on every call: only an active
+  vendor's key writes; an applicant, onboarding or suspended vendor's key only reads (403 on
+  POST, PUT, PATCH and DELETE, dry-runs included); a closed vendor's key gets 401. Vendor-scoped
+  write services reached by API v1 read the status again inside the write transaction (row
+  read `FOR SHARE`), so a vendor suspended after its key was authenticated gets that write
+  refused. Deleting a vendor writes one AuditLog entry per key it deletes.
 - Impersonation for support (equivalent of Login as User), staff only, with audit.
 
 ### Secure action links (CORE.15)
@@ -162,7 +175,10 @@ admin reports or read-only MCP tools.
 ### Backoffice
 
 - **Wagtail admin** for staff and editors: pages, images, snippets; `ModelViewSet` for vendors,
-  products, zones, rates, orders and quotes, with filters and bulk actions.
+  products, zones, rates, orders and quotes, with filters and bulk actions. Editors get our own
+  roles, each limited to its part of the page tree (for example blog editors, legal pages, event
+  moderators), instead of Wagtail's default Editors and Moderators groups (owner, 2026-11-07,
+  Q-58; CORE.8).
 - **Vendor dashboard** as a separate area (`/vendor/`), HTMX templates, tenant-filtered views:
   orders, quote entry, products (limited editing), payouts, tax regime change
   request, holiday and closure schedule (VEN.20), events. Vendors never get the Wagtail admin: their event pages are created and edited
@@ -213,7 +229,7 @@ staff can revert a change to an earlier version. This is part of CORE.9.
 | CORE.5 | Rate limiting and progressive lockout on login/registration, Turnstile | P1 | 6 | CORE.1 | Tests on failed attempts |
 | CORE.6 | `ApiClient`: issuance, hashing, scopes, expiry, rotation, revocation, IP allow-list | P1 | 10 | CORE.1 | Expired or out-of-scope key → 401/403 |
 | CORE.7 | Ninja API v1 skeleton: auth, dry-run, RFC 9457 errors, OpenAPI, mutation log | P1 | 10 | CORE.6, ARC.13 | OpenAPI spec published on STAGE |
-| CORE.8 | Wagtail admin: staff menu, base ViewSet with tenant filters and bulk actions; platform staff as a dedicated permission instead of `is_staff` in `for_actor` (Q-34); staff unlock of a locked account with audit, and automatic unlock after a completed password reset (Q-18) | P1 | 13 | CORE.3 | Staff manage vendors and products from the admin; a user with Wagtail admin access but without the platform staff permission sees no vendor's data (negative test); staff unlock a locked account and the unlock is in the AuditLog; a completed password reset clears the lockout |
+| CORE.8 | Wagtail admin: staff menu, base ViewSet with tenant filters and bulk actions; platform staff as a dedicated permission instead of `is_staff` in `for_actor` (Q-34); staff unlock of a locked account with audit, and automatic unlock after a completed password reset (Q-18); our own editor roles (for example blog editors, legal pages, event moderators) replacing Wagtail's default Editors and Moderators groups, which stay until then (Q-58) | P1 | 15 | CORE.3 | Staff manage vendors and products from the admin; a blog editor cannot edit the About page or a legal page; Wagtail's default Editors and Moderators groups no longer exist after the data migration; a user with Wagtail admin access but without the platform staff permission sees no vendor's data (negative test); staff unlock a locked account and the unlock is in the AuditLog; a completed password reset clears the lockout |
 | CORE.9 | Vendor area `/vendor/`: layout, navigation, essential KPI dashboard; storefront profile editing (texts, logo, return and shipping policies) for the owner only, with post-moderation notice to the moderators, audit and staff revert (Q-16); new applicants arrive from the VEN.22 public application | P1 | 16 | CORE.3 | Vendor sees only their own data; vendor staff cannot edit the storefront profile; an owner's profile change notifies the moderators, is in the AuditLog with before and after, and staff revert it to the previous version |
 | CORE.10 | Support impersonation with audit | P2 | 4 | CORE.8 | Every impersonated session in AuditLog |
 | CORE.12 | Per-API-key rate limit (Q-18): limits per `ApiClient` from settings, counters in a cache shared by every app process (PostgreSQL-backed, spec 01), 429 response in RFC 9457 format with `Retry-After` | P1 | 4 | CORE.7 | Two app processes share one counter; the request over the limit gets 429 with `Retry-After`; another key is not affected |
