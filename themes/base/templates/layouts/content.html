@@ -1,0 +1,11 @@
+{% extends "layouts/base.html" %}
+{% comment %}
+Content page shell (THM.3, spec 14 §14.9): one column at the standard reading width, for the
+standard, legal and contact pages, articles and the error pages. Pages fill `page_content`.
+There is no sidebar variant: spec 14 lists none for the content pages.
+{% endcomment %}
+{% block content %}
+  <div class="page-content">
+    {% block page_content %}{% endblock %}
+  </div>
+{% endblock %}

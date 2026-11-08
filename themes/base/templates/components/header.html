@@ -9,7 +9,8 @@ and returns focus to the button. Only property and method names appear in the di
 the Alpine CSP build requires.
 
 Context: `site_name`, `links` (label and url), `languages` (see language_switcher.html), and
-the context of the help link.
+the context of the help link. Without `links` or `languages` (the 500 page) the menu or the
+switcher is left out.
 {% endcomment %}<header class="site-header">
   <div class="site-header__inner">
     <a class="site-name" href="{% url 'home' %}">{{ site_name }}</a>
@@ -25,7 +26,7 @@ the context of the help link.
     {% endif %}
     <div class="site-header__tools">
       {% include "components/help_link.html" %}
-      {% include "components/language_switcher.html" %}
+      {% if languages %}{% include "components/language_switcher.html" %}{% endif %}
     </div>
   </div>
 </header>

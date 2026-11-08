@@ -15,6 +15,10 @@ from wagtail.admin import urls as wagtailadmin_urls
 
 from apps.accounts.views import switch_language
 
+# Error pages with the `base` layouts (THM.3); 400 and 500 render without the database.
+handler400 = "apps.themes.views.bad_request"
+handler500 = "apps.themes.views.server_error"
+
 
 def healthz(request: HttpRequest) -> JsonResponse:
     """Liveness probe for the container runtime and uptime checks."""

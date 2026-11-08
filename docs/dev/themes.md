@@ -141,12 +141,29 @@ Every public page extends a layout of `base` and fills its `content` block:
 |---|---|---|
 | `layouts/base.html` | CMS pages and every public page | `title` and `description` default to the CMS page's SEO fields; blocks `head`, `header`, `content`, `footer` |
 | `layouts/account.html` | Customer and vendor areas, sign-in steps (MFA pages) | Extends `base.html`; pages fill `account_content`; the language switcher returns to the same path |
+| `layouts/content.html` | Standard, legal and contact pages, articles, error pages | Extends `base.html`; one column at `--measure-text`; pages fill `page_content`. No sidebar variant (spec 14 lists none) |
+| `layouts/error.html` | `400.html`, `403.html`, `403_csrf.html`, `404.html`, `500.html` | Extends `content.html`; pages fill `title`, `heading`, `message`; adds `noindex` |
 
 The shell, in order: the skip link (`components/skip_link.html`, the first focusable element,
 shown on focus, target `<main id="main" tabindex="-1">`), the sticky header
 (`components/header.html`: site name, main navigation as a disclosure, help link, language
-switcher), `<main>`, then the footer with the help link again and the footer menu. Part 2 of
-THM.3 completes the footer, page shells and error pages; THM.4 adds the component library.
+switcher), `<main>`, then the footer (`components/footer.html`: the help link again, the
+footer menu of CMS.1, a `legal_links` slot for the CMS.5 legal pages, the copyright line). THM.4
+adds the component library.
+
+- **Error pages.** Django renders 403, 404 and the CSRF failure page with the request context,
+  so they keep the full header and footer. `handler400` and `handler500` point to
+  `apps/themes/views.py`, which renders `400.html` and `500.html` with a plain context
+  (`minimal_chrome`: no CMS menus, no language switcher, no CSRF token) and the theme the
+  request already resolved or the default one (`services.resolved_theme`): no database query,
+  because a 500 is often a database failure and a 400 often a bad `Host` that the site lookup
+  would raise on again. If even that fails, a plain text response.
+- **Form fields.** `components/field.html` renders a bound field: a visible label tied to the
+  control, a "(required)" marker next to the `required` attribute, the help text and the inline
+  error list. Django sets `aria-describedby` (help text and errors) and `aria-invalid`.
+- **Buttons and alerts** are base-layer styles: `button`/`.button`, `.button--secondary`,
+  `.button--ghost`; `.alert` with `.alert--info|success|warning|error` (a level bar in
+  `--color-info|success|warning|danger`, the text in `--color-text`; say the level in words).
 
 - **Disclosure navigation.** Without JavaScript the links are shown and the menu button stays
   `hidden`. The `disclosure` Alpine component (`js/base.js`) shows the button; below 48rem the

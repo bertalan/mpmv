@@ -3,7 +3,7 @@
 - `get_registry()` reads every `<MPMV_THEMES_DIR>/<slug>/theme.toml` once per process (cached
   per directory; changing a `MPMV_THEME*` setting clears it).
 - `active_theme(request)`: the Wagtail Site's `ThemeSettings`, then `MPMV_THEME_DEFAULT`, then
-  `base`; resolved once per request.
+  `base`; resolved once per request. `resolved_theme(request)` never queries (error pages).
 - `use_theme(request_or_slug)` sets the theme the template loader uses in this context;
   `ThemeMiddleware` wraps every request in it. Outside a request the default theme applies.
 - `set_site_theme(...)` is the only writer of `ThemeSettings` (audited, dry-run).
@@ -95,6 +95,18 @@ def active_theme(request: HttpRequest) -> ThemeManifest:
     manifest = registry[pick_theme(choice, default_theme(), registry)]
     setattr(request, _REQUEST_ATTR, manifest)
     return manifest
+
+
+def resolved_theme(request: HttpRequest) -> ThemeManifest:
+    """The request's theme if it was already resolved, else the default: never a query.
+
+    For the error pages that must render while the database is down (THM.3).
+    """
+    cached: ThemeManifest | None = getattr(request, _REQUEST_ATTR, None)
+    if cached is not None:
+        return cached
+    registry = get_registry()
+    return registry[pick_theme("", default_theme(), registry)]
 
 
 @contextlib.contextmanager

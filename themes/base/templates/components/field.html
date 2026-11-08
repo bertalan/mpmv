@@ -1,0 +1,16 @@
+{% load i18n %}{% comment %}
+Form field (THM.3, spec 14 §14.6): a visible label tied to the control (never placeholder-only),
+a visible "required" marker next to the `required` attribute, the help text and the inline
+errors. Django sets `aria-describedby` on the control to the help text (`<id>_helptext`) and
+error list (`<id>_error`) ids, and `aria-invalid="true"` when there are errors (WCAG 1.3.1,
+3.3.1, 3.3.2). Grouped widgets (radio and checkbox lists) get a fieldset and a legend.
+THM.4 adds the error summary and the other field variants.
+
+Context: `field`, a bound form field.
+{% endcomment %}<div class="field{% if field.errors %} field--invalid{% endif %}">
+  {% if field.use_fieldset %}<fieldset{% if field.aria_describedby %} aria-describedby="{{ field.aria_describedby }}"{% endif %}><legend>{% else %}<label for="{{ field.id_for_label }}">{% endif %}{{ field.label }}{% if field.field.required %} <span class="field__required">({% translate "required" %})</span>{% endif %}{% if field.use_fieldset %}</legend>{% else %}</label>{% endif %}
+  {% if field.help_text %}<p class="helptext" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</p>{% endif %}
+  {{ field.errors }}
+  {{ field }}
+  {% if field.use_fieldset %}</fieldset>{% endif %}
+</div>

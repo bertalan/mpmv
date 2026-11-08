@@ -1,9 +1,12 @@
-{% load i18n static wagtailcore_tags cms_tags %}{% get_current_language as LANGUAGE_CODE %}{% wagtail_site as current_site %}{% firstof current_site.site_name "MPMV" as site_name %}<!doctype html>
+{% load i18n static wagtailcore_tags cms_tags %}{% get_current_language as LANGUAGE_CODE %}{% wagtail_site as current_site %}{% firstof current_site.site_name site_name "MPMV" as site_name %}<!doctype html>
 {% comment %}
 Public page layout of the base theme (THM.3, spec 14 §14.3, §14.6). Pages extend it and fill
 `content`; `title` and `description` default to the CMS page's SEO fields. The header holds the
 skip link target, the disclosure navigation, the help link and the language switcher; the help
 link repeats in the footer, in the same place on every page (WCAG 3.2.6).
+
+Outside the `header` and `footer` blocks nothing here queries the database: without a request
+in the context (the 500 page) `wagtail_site` is None and `site_name` comes from the context.
 
 Strict CSP: no inline script or style. The theme module registers its Alpine components before
 the vendored Alpine CSP build starts (both are deferred and run in document order); htmx reads
@@ -32,20 +35,8 @@ its configuration from the meta tag.
     {% block content %}{% endblock %}
   </main>
   {% block footer %}
-  <footer class="site-footer">
-    <div class="site-footer__inner">
-      {% include "components/help_link.html" %}
-      {% navigation_links "footer" as footer_links %}
-      {% if footer_links %}
-        <nav aria-label="{% translate 'Footer' %}">
-          <ul>
-            {% for link in footer_links %}<li><a href="{{ link.url }}">{{ link.label }}</a></li>{% endfor %}
-          </ul>
-        </nav>
-      {% endif %}
-      <p>&copy; {% now "Y" %} {{ site_name }}</p>
-    </div>
-  </footer>
+    {% navigation_links "footer" as footer_links %}
+    {% include "components/footer.html" with site_name=site_name links=footer_links %}
   {% endblock %}
 </body>
 </html>
