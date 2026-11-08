@@ -381,7 +381,7 @@ def test_a_soft_bounce_is_recorded_but_does_not_suppress(sender: mail.MemoryEmai
 
 @pytest.mark.django_db
 def test_feedback_dry_run_and_repeated_bounces_change_nothing_more() -> None:
-    EmailSuppressionFactory(address="gone@example.com")
+    EmailSuppressionFactory.create(address="gone@example.com")
     preview = services.record_email_feedback(
         mail.FeedbackEvent(mail.HARD_BOUNCE, "new@example.com", "", ""), ctx=CTX, dry_run=True
     )
@@ -406,9 +406,8 @@ def webhook_secret() -> Iterator[str]:
 
 
 def _post(client: Client, body: bytes, headers: dict[str, str]) -> Any:
-    extra = {f"HTTP_{name.upper().replace('-', '_')}": value for name, value in headers.items()}
     return client.post(
-        reverse("email_webhook"), data=body, content_type="application/json", **extra
+        reverse("email_webhook"), data=body, content_type="application/json", headers=headers
     )
 
 
@@ -499,7 +498,7 @@ def test_an_email_with_a_tracking_pixel_is_never_sent(sender: mail.MemoryEmailSe
 
 @pytest.mark.django_db
 def test_the_outbox_history_is_append_only() -> None:
-    event = OutboxEmailEventFactory(email=OutboxEmailFactory())
+    event = OutboxEmailEventFactory.create(email=OutboxEmailFactory.create())
     event.detail = "changed"
     with pytest.raises(PermissionError):
         event.save()
