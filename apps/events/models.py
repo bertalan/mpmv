@@ -21,7 +21,9 @@ member's own vendor's events for a vendor member, and nothing for anyone else. A
 keeps it in step with `live`, the workflow state, `cancelled_at` and `hidden_at`.
 
 Validation lives in `clean()` (field errors for the forms) and in check constraints (the same
-rules, for every other write path). The admin panels and templates come with EVT.1 part 2/2.
+rules, for every other write path). The admin panels are in `panels` and the admin form in
+`forms` (EVT.1 part 2/2); the public templates are `events/event_index_page.html` and
+`events/event_page.html`.
 """
 
 import datetime as dt
@@ -35,9 +37,11 @@ from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, Q
+from django.http import Http404, HttpRequest
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalManyToManyField
 from wagtail import blocks
+from wagtail.admin.panels import FieldPanel
 from wagtail.contrib.settings.models import BaseSiteSetting
 from wagtail.fields import RichTextField, StreamField
 from wagtail.images import get_image_model_string
@@ -58,6 +62,8 @@ from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager, VendorScopedQuerySet
 
 from . import engine
+from .forms import EventPageForm
+from .panels import event_content_panels
 
 # --- Choices
 
@@ -120,12 +126,35 @@ class EventIndexPage(Page):  # type: ignore[misc]  # Wagtail is untyped
 
     intro = RichTextField(_("introduction"), features=RICH_TEXT_FEATURES, blank=True)
 
+    content_panels: ClassVar[list[Any]] = [*Page.content_panels, FieldPanel("intro")]
     parent_page_types: ClassVar[list[str]] = ["cms.HomePage"]
     subpage_types: ClassVar[list[str]] = ["events.EventPage"]
     max_count_per_parent = 1
 
     class Meta:
         verbose_name = _("events index")
+
+    def events(self) -> list["EventPage"]:
+        """The live, public, not hidden events of an active vendor (or of the platform) in this
+        index's language, soonest first (spec 15 §Status).
+
+        A minimal list: the EVT.6 listing rules (upcoming only, filters, months, pagination,
+        the original-language fallback) replace it.
+        """
+        pages = (
+            EventPage.objects.child_of(self)
+            .live()
+            .public()
+            .filter(hidden_at__isnull=True)
+            .filter(Q(vendor__isnull=True) | Q(vendor__status=Vendor.Status.ACTIVE))
+            .select_related("vendor")
+        )
+        return sorted(pages, key=lambda page: page.sort_key())
+
+    def get_context(self, request: HttpRequest, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        context: dict[str, Any] = super().get_context(request, *args, **kwargs)
+        context["events"] = self.events()
+        return context
 
 
 class EventPageQuerySet(PageQuerySet, VendorScopedQuerySet["EventPage"]):  # type: ignore[misc]
@@ -406,6 +435,8 @@ class EventPage(Page):  # type: ignore[misc]  # Wagtail is untyped
     override_translatable_fields: ClassVar[list[SynchronizedField]] = [
         SynchronizedField(name, overridable=False) for name in SYNCHRONISED_FIELDS
     ]
+    content_panels: ClassVar[list[Any]] = event_content_panels()
+    base_form_class = EventPageForm
     parent_page_types: ClassVar[list[str]] = ["events.EventIndexPage"]
     subpage_types: ClassVar[list[str]] = []
     exclude_fields_in_copy: ClassVar[list[str]] = ["public_id"]
@@ -413,6 +444,41 @@ class EventPage(Page):  # type: ignore[misc]  # Wagtail is untyped
     class Meta:
         verbose_name = _("event")
         constraints = _constraints()
+
+    # --- Public routing (spec 15 §Status)
+
+    def is_publicly_visible(self) -> bool:
+        """Not hidden, and the vendor (if any) active: the rest of the public query is Wagtail's
+        own (`live`, view restrictions)."""
+        if self.hidden_at is not None:
+            return False
+        vendor = self.vendor
+        return vendor is None or vendor.status == Vendor.Status.ACTIVE
+
+    def route(self, request: HttpRequest, path_components: list[str]) -> Any:
+        """A hidden event, or one of a suspended or closed vendor, is a 404 to visitors.
+
+        `route` serves public URLs only: Wagtail's admin and vendor-area previews call `serve`
+        directly, so staff and the vendor still preview such a page.
+        """
+        if not path_components and not self.is_publicly_visible():
+            raise Http404
+        return super().route(request, path_components)
+
+    # --- Display (templates)
+
+    def zone(self) -> zoneinfo.ZoneInfo:
+        return zoneinfo.ZoneInfo(self.timezone)
+
+    def sort_key(self) -> dt.datetime:
+        """When the event starts, for ordering timed and all-day events together."""
+        if self.starts_at is not None:
+            return self.starts_at
+        day = self.start_date or dt.date.max
+        return dt.datetime.combine(day, dt.time.min, tzinfo=self.zone())
+
+    def has_address(self) -> bool:
+        return any(getattr(self, name) for name in ("venue_name", "booth", *ADDRESS_FIELDS))
 
     # --- Coordinates (EVT.12 candidates come through the core `Geocoder` protocol)
 

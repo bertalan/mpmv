@@ -105,6 +105,8 @@ AUTH_USER_MODEL = "accounts.User"
 # Lockout and captcha checks run first, before any password is checked (CORE.5).
 AUTHENTICATION_BACKENDS = [
     "apps.accounts.backends.LoginProtectionBackend",
+    # Vendors do not get the Wagtail admin (spec 15): before ModelBackend, whose groups grant it.
+    "apps.vendors.backends.VendorAdminRefusalBackend",
     "django.contrib.auth.backends.ModelBackend",
 ]
 
