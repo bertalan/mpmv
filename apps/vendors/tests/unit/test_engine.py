@@ -54,7 +54,7 @@ def test_valid_transitions_are_accepted(current: str, target: str) -> None:
         (ACTIVE, ONBOARDING),
         (ACTIVE, APPLICANT),
         (SUSPENDED, ONBOARDING),
-        (CLOSED, ACTIVE),  # closed is terminal
+        (CLOSED, ACTIVE),  # a closed vendor is reopened to onboarding only (VEN.21)
         (CLOSED, APPLICANT),
         (ACTIVE, ACTIVE),  # a no-op is not a transition
     ],
@@ -64,8 +64,9 @@ def test_invalid_transitions_are_refused(current: str, target: str) -> None:
         check_transition(current, target)
 
 
-def test_closed_is_terminal() -> None:
-    assert allowed_transitions(CLOSED) == frozenset()
+def test_closed_only_reopens_to_onboarding() -> None:
+    # VEN.21: staff reopen with a reason (test_engine_reopen.py); never straight to active.
+    assert allowed_transitions(CLOSED) == frozenset({ONBOARDING})
 
 
 def test_every_status_has_a_transition_entry() -> None:

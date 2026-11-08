@@ -132,6 +132,17 @@ OTP_ADMIN_HIDE_SENSITIVE_DATA = True
 VENDOR_DELETION_AUDIT_HOOKS: list[str] = [
     "apps.api.services.vendor_key_deletions",  # the vendor's API keys (CORE.13)
 ]
+# Vendor closure (CORE.14, VEN.21): each dotted path names a `hook(vendor, *, ctx, dry_run) ->
+# ChangeSet` that revokes, audited, what only an active vendor may hold. Run when a vendor is
+# closed, and again when it is reopened (rows a closure left behind); its changes join the
+# closure's or reopen's ChangeSet.
+VENDOR_CLOSURE_HOOKS: list[str] = [
+    "apps.api.services.revoke_vendor_keys",  # the vendor's API keys
+]
+
+# Allowed vendor countries (CMP.13): `core` cannot import `vendors`, so this names the function
+# that lists the active vendors established outside a new allowed set.
+VENDORS_OUTSIDE_COUNTRIES_HOOK = "apps.vendors.services.active_vendors_outside"
 
 ROOT_URLCONF = "mpmv.urls"
 WSGI_APPLICATION = "mpmv.wsgi.application"
@@ -349,12 +360,14 @@ GEOCODING_USER_WINDOW = 60  # seconds
 # does not import the vendors app.
 GEOCODING_ACCESS_POLICIES: list[str] = ["apps.vendors.services.is_vendor_member"]
 
-# Per-API-key rate limit (CORE.12, apps.api.engine): fixed windows counted in PostgreSQL, so every
-# app process shares one counter per key. API_RATE_LIMIT is the key-wide limit of every key;
+# Per-API-key rate limit (CORE.12, CORE.16, apps.api.engine): fixed windows counted in PostgreSQL,
+# so every app process shares one counter per key. API_RATE_LIMIT is the key-wide limit of every
+# key, set per environment with MPMV_API_RATE_LIMIT (default 120/minute, owner decision MQ-4);
 # API_RATE_LIMIT_SCOPES gives a costly scope its own counter and limit for every key, e.g.
-# {"catalog:write": "120/minute"}; API_RATE_LIMIT_CLIENTS replaces the key-wide limit of one key,
-# by ApiClient public id. Rates read "<calls>/<second|minute|hour|day>" (system check api.E003).
-API_RATE_LIMIT = "600/minute"
+# {"catalog:write": "60/minute"}; API_RATE_LIMIT_CLIENTS replaces the key-wide limit of one key,
+# by ApiClient public id. A per-key override that staff set in the admin (ApiClient.rate_limit)
+# wins over both. Rates read "<calls>/<second|minute|hour|day>" (system check api.E003).
+API_RATE_LIMIT = env_str("MPMV_API_RATE_LIMIT", "") or "120/minute"
 API_RATE_LIMIT_SCOPES: dict[str, str] = {}
 API_RATE_LIMIT_CLIENTS: dict[str, str] = {}
 

@@ -1,4 +1,4 @@
-{% comment %}
+{% load theme_tags %}{% comment %}
 Card (THM.4, spec 14 §14.9): a titled box for an article teaser, a service or a landing block.
 With a `url`, the title link is the card's only interactive element and its `::after` covers
 the whole card, so a click anywhere follows it and screen readers hear one link named by the
@@ -8,18 +8,19 @@ title (no nested links or buttons, WCAG 2.4.4).
 
 Context:
 - `title` (required): the heading text, and the link's accessible name.
-- `heading_level`: 2 to 6 (default 3), to fit the page's outline.
-- `url`: makes the whole card a link.
+- `heading_level`: 2 to 6 (default 3), to fit the page's outline; out of range is clamped.
+- `url`: makes the whole card a link. Only http(s) and relative URLs ("/", "#", "?") count:
+  any other value renders no link.
 - `text`: one short paragraph under the title.
 - `meta`: a muted line under the title, such as a date or a category.
 - `image_url`, `image_alt`: an image on top; `image_alt` describes it, or stays empty when the
   image only decorates (the title already names the card). `image_width` and `image_height`
   (default 640 x 400) reserve its space.
-{% endcomment %}<article class="card{% if url %} card--linked{% endif %}">
+{% endcomment %}{% with href=url|safe_href level=heading_level|heading_level:3 %}<article class="card{% if href %} card--linked{% endif %}">
   {% if image_url %}<img class="card__image" src="{{ image_url }}" alt="{{ image_alt|default:'' }}" width="{{ image_width|default:640 }}" height="{{ image_height|default:400 }}" loading="lazy">{% endif %}
   <div class="card__body">
-    <h{{ heading_level|default:3 }} class="card__title">{% if url %}<a class="card__link" href="{{ url }}">{{ title }}</a>{% else %}{{ title }}{% endif %}</h{{ heading_level|default:3 }}>
+    <h{{ level }} class="card__title">{% if href %}<a class="card__link" href="{{ href }}">{{ title }}</a>{% else %}{{ title }}{% endif %}</h{{ level }}>
     {% if meta %}<p class="card__meta">{{ meta }}</p>{% endif %}
     {% if text %}<p class="card__text">{{ text }}</p>{% endif %}
   </div>
-</article>
+</article>{% endwith %}
