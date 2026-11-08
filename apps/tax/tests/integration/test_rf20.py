@@ -33,6 +33,11 @@ AFTER = [("tax", "0004_regime_request_fiscal_regime_rf20")]
 
 
 def _request_to_rf20(vendor: Vendor) -> TaxRegimeChangeRequest:
+    # VEN.25: RF20 needs the EX number issued by the member state of establishment (Italy here).
+    Vendor.objects.filter(pk=vendor.pk).update(
+        cross_border_franchise_number=f"IT{vendor.vat_number.removeprefix('IT')}EX"
+    )
+    vendor.refresh_from_db()
     owner = VendorMemberFactory.create(vendor=vendor).user
     request: TaxRegimeChangeRequest = TaxRegimeChangeRequestFactory.build(
         vendor=vendor,
