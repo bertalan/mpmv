@@ -43,7 +43,6 @@ SYNCHRONISED = (
     "geo_confidence",
     "geo_at",
     "listing_image",
-    "status",
     "sequence",
     "cancelled_at",
     "hidden_at",
@@ -77,6 +76,12 @@ def test_structured_fields_are_synchronised_and_not_overridable() -> None:
         field = fields[name]
         assert isinstance(field, SynchronizedField), name
         assert not field.overridable, name
+
+
+def test_status_is_each_pages_own_and_never_copied_by_wagtail_localize() -> None:
+    """A draft translation of a live event is a draft: `status` follows its own page's state."""
+    assert "status" not in _fields(EventPage)
+    assert not EventPage._meta.get_field("status").editable
 
 
 def test_texts_are_translatable() -> None:

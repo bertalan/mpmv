@@ -35,10 +35,20 @@ def sync_status_of_page(sender: type[EventPage], instance: EventPage, **kwargs: 
     services.sync_event_status(instance)
 
 
+def sync_status_of_saved_page(
+    sender: type[EventPage], instance: EventPage, raw: bool = False, **kwargs: Any
+) -> None:
+    """`post_save` of an event page: a copy (for translation) carries the source's status."""
+    if not raw:
+        services.sync_event_status(instance)
+
+
 def sync_status_of_workflow(
     sender: type[WorkflowState], instance: WorkflowState, **kwargs: Any
 ) -> None:
-    """Workflow submitted, approved, rejected or cancelled: the page's status may change."""
+    """Workflow submitted, approved, rejected, cancelled or saved (a resume): sync the page."""
+    if kwargs.get("raw"):
+        return
     page = instance.content_object
     if isinstance(page, Page):
         page = page.specific

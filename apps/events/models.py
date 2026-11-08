@@ -4,8 +4,11 @@ An `EventIndexPage` (`/<lang>/events/`) sits under each language's `HomePage`, o
 locale, all linked as translations (`services.ensure_event_indexes`). Its children are
 `EventPage`s, written in any enabled language (owner decision Q-72, an exception to D-18):
 `original_locale` records it, and translations are optional. The structured fields (dates,
-recurrence, location, coordinates, vendor, links, cancellation, hiding) are synchronised to
-every translation and cannot be overridden; title, summary, body and venue name are translated.
+recurrence, location, coordinates, vendor, cancellation, hiding) are synchronised to every
+translation by wagtail-localize and cannot be overridden; title, summary, body and venue name are
+translated. The product and category links are many-to-many fields, which wagtail-localize does
+not synchronise: the EVT.8 publish service copies them to every translation. `status` is not
+synchronised: each translation's comes from its own Wagtail state.
 
 A vendor's closure is not an event (owner decision Q-73): there is no closure type.
 
@@ -165,7 +168,6 @@ SYNCHRONISED_FIELDS = (
     "geo_confidence",
     "geo_at",
     "listing_image",
-    "status",
     "sequence",
     "cancelled_at",
     "hidden_at",
@@ -373,13 +375,16 @@ class EventPage(Page):  # type: ignore[misc]  # Wagtail is untyped
         related_name="+",
     )
 
-    # State: `status` is denormalised (services.sync_event_status).
+    # State: `status` is denormalised (services.sync_event_status) from each page's own `live`
+    # and workflow state, so a draft translation of a live event is a draft. Not editable: no
+    # form writes it, and wagtail-localize leaves it out of the synchronised copy.
     status = models.CharField(
         _("status"),
         max_length=16,
         choices=EventStatus.choices,
         default=EventStatus.DRAFT,
         db_index=True,
+        editable=False,
     )
     sequence = models.PositiveIntegerField(_("ICS sequence"), default=0)
     cancelled_at = models.DateTimeField(_("cancelled at"), null=True, blank=True)

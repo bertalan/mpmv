@@ -6,9 +6,16 @@ publish, unpublish and workflow signals.
 """
 
 import pytest
+from django.contrib.auth.base_user import AbstractBaseUser as User
 from django.contrib.auth.models import Group
 from django.utils import timezone
-from wagtail.models import GroupApprovalTask, Workflow, WorkflowPage, WorkflowTask
+from wagtail.models import (
+    GroupApprovalTask,
+    Workflow,
+    WorkflowPage,
+    WorkflowState,
+    WorkflowTask,
+)
 
 from apps.accounts.tests.factories import UserFactory
 from apps.core.changeset import ChangeSet
@@ -55,8 +62,7 @@ def test_a_hidden_event_is_hidden() -> None:
     assert _status(page) == EventPage.Status.HIDDEN
 
 
-def test_a_first_publication_in_review_is_pending() -> None:
-    page = EventPageFactory.create()
+def _start_review(page: EventPage) -> tuple[WorkflowState, User]:
     workflow = Workflow.objects.create(name="Event review")
     task = GroupApprovalTask.objects.create(name="Review")
     task.groups.add(Group.objects.create(name="Event moderators"))
@@ -64,7 +70,27 @@ def test_a_first_publication_in_review_is_pending() -> None:
     WorkflowPage.objects.create(workflow=workflow, page=page.get_parent())
     author = UserFactory.create(staff=True)
     page.save_revision(user=author)
-    workflow.start(page, author)
+    state = workflow.start(page, author)
+    return state, author
+
+
+def test_a_first_publication_in_review_is_pending() -> None:
+    page = EventPageFactory.create()
+    _start_review(page)
+    assert _status(page) == EventPage.Status.PENDING
+
+
+def test_a_resubmission_after_requested_changes_is_pending_again() -> None:
+    """Wagtail's "Resubmit" (`WorkflowState.resume`) sends no workflow signal."""
+    page = EventPageFactory.create()
+    state, author = _start_review(page)
+    reviewer = UserFactory.create(staff=True, is_superuser=True)
+    task_state = state.current_task_state
+    task_state.specific.task.specific.on_action(task_state, reviewer, "reject")
+    state.refresh_from_db()
+    assert state.status == WorkflowState.STATUS_NEEDS_CHANGES
+    assert _status(page) == EventPage.Status.DRAFT
+    state.resume(author)
     assert _status(page) == EventPage.Status.PENDING
 
 

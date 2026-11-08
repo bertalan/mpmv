@@ -1,5 +1,5 @@
 from django.apps import AppConfig
-from django.db.models.signals import post_migrate
+from django.db.models.signals import post_migrate, post_save
 
 
 class EventsConfig(AppConfig):
@@ -53,3 +53,12 @@ class EventsConfig(AppConfig):
             (workflow_cancelled, "events.status_cancelled"),
         ):
             signal.connect(signals.sync_status_of_workflow, sender=WorkflowState, dispatch_uid=uid)
+        # Wagtail's "Resubmit" (`WorkflowState.resume`) sends no workflow signal, only a save.
+        post_save.connect(
+            signals.sync_status_of_workflow, sender=WorkflowState, dispatch_uid="events.status_wf"
+        )
+        # A new page (also a copy for translation, which publishes nothing) and any later save:
+        # the status is the page's own, never one copied from another page.
+        post_save.connect(
+            signals.sync_status_of_saved_page, sender=EventPage, dispatch_uid="events.status_save"
+        )

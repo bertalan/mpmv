@@ -11,9 +11,11 @@ The authoring, moderation, hiding and cancelling services (`save_event_draft`, `
 - `sync_event_status` writes the denormalised `status` from the Wagtail state.
 """
 
+import logging
 import uuid
 
 from django.db import transaction
+from wagtail.models import Page
 
 from apps.cms.models import HomePage
 from apps.core.changeset import ChangeSet
@@ -25,6 +27,8 @@ from .models import EventIndexPage, EventPage
 INDEX = "events.eventindexpage"
 EVENT = "events.eventpage"
 INDEX_SLUG = "events"
+
+logger = logging.getLogger(__name__)
 
 # Titles of the index page per language; a language without an entry gets the primary one's.
 INDEX_TITLES = {
@@ -44,7 +48,9 @@ def ensure_event_indexes(*, dry_run: bool = False) -> ChangeSet:
     """Add a published `EventIndexPage` under every enabled language's home page lacking one.
 
     Idempotent: existing indexes are never changed. New ones take the `translation_key` of an
-    existing index, so all languages' indexes are translations of each other.
+    existing index, so all languages' indexes are translations of each other. A home page that
+    already has another page with the slug `events` is skipped with a warning: the editors
+    decide, and `post_migrate` never fails on it.
     """
     changes = ChangeSet()
     languages = configured_languages()
@@ -59,6 +65,11 @@ def ensure_event_indexes(*, dry_run: bool = False) -> ChangeSet:
         )
         for home in homes:
             if indexes.child_of(home).exists():
+                continue
+            if Page.objects.child_of(home).filter(slug=INDEX_SLUG).exists():
+                logger.warning(
+                    "No events index under home page %s: the slug %r is taken", home.pk, INDEX_SLUG
+                )
                 continue
             language = home.locale.language_code
             index = EventIndexPage(

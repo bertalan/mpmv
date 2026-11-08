@@ -89,3 +89,20 @@ def test_an_italian_page_translates_to_english_with_synchronised_dates(
     assert english.starts_at == new_start
     assert english.ends_at == new_start + dt.timedelta(hours=6)
     assert english.latitude == Decimal("45.500000")
+
+
+def test_a_copy_for_translation_of_a_live_event_is_a_draft(italian_event: EventPage) -> None:
+    """The status is each page's own: "Add translation" makes a draft, never a published row."""
+    english = italian_event.copy_for_translation(Locale.objects.get(language_code="en")).specific
+    english = EventPage.objects.get(pk=english.pk)
+    assert not english.live
+    assert english.status == EventPage.Status.DRAFT
+    assert EventPage.objects.get(pk=italian_event.pk).status == EventPage.Status.PUBLISHED
+
+
+def test_a_wagtail_localize_translation_keeps_its_own_status(italian_event: EventPage) -> None:
+    translate_page(italian_event, ["en"])
+    english = italian_event.get_translation(Locale.objects.get(language_code="en"))
+    assert EventPage.objects.get(pk=english.pk).status == (
+        EventPage.Status.PUBLISHED if english.live else EventPage.Status.DRAFT
+    )
