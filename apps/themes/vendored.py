@@ -37,11 +37,11 @@ def read_vendored(root: Path = VENDOR_DIR) -> list[VendoredFile]:
         raise ValueError(f"{MANIFEST} cannot be read: {exc}") from exc
 
 
-def _entry_errors(entry: VendoredFile) -> list[str]:
+def _entry_errors(entry: VendoredFile, allowed: frozenset[str]) -> list[str]:
     errors = []
     if not _EXACT_VERSION_RE.match(entry.version):
         errors.append(f"version {entry.version!r} is not an exact x.y.z")
-    if entry.license not in ALLOWED_LICENCES:
+    if entry.license not in allowed:
         errors.append(f"licence {entry.license!r} is not allowed")
     if not entry.source.startswith("https://"):
         errors.append("source must be an https URL")
@@ -50,8 +50,14 @@ def _entry_errors(entry: VendoredFile) -> list[str]:
     return errors
 
 
-def check_vendored(root: Path = VENDOR_DIR) -> list[str]:
-    """Every difference between `root` and its manifest, as `<file>: <problem>` lines."""
+def check_vendored(
+    root: Path = VENDOR_DIR, *, allowed: frozenset[str] = ALLOWED_LICENCES
+) -> list[str]:
+    """Every difference between `root` and its manifest, as `<file>: <problem>` lines.
+
+    `allowed` is the licence allow list: the site's own (`ALLOWED_LICENCES`) by default; test
+    tooling that is never served (THM.5, axe-core) passes a wider one.
+    """
     try:
         entries = read_vendored(root)
     except ValueError as exc:
@@ -60,7 +66,7 @@ def check_vendored(root: Path = VENDOR_DIR) -> list[str]:
     listed = set()
     for entry in entries:
         listed.add(entry.path)
-        problems = _entry_errors(entry)
+        problems = _entry_errors(entry, allowed)
         path = root / entry.path
         if not path.is_file():
             problems.append("listed in VENDORED.toml but missing")

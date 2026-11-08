@@ -1,0 +1,51 @@
+# THM.5, spec 14 §14.10: render the visual baselines on the CI runner (Linux Chromium).
+# Run it by hand on a branch (Actions > Visual baselines > Run workflow, or
+# `gh workflow run visual-baselines.yml --ref <branch>`), download the `visual-baselines`
+# artifact, commit the PNGs under tests/e2e/baselines/ and review them in the pull request.
+name: Visual baselines
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  UV_FROZEN: "1"
+  DJANGO_SETTINGS_MODULE: mpmv.settings.test
+  # Throwaway service database with trust auth: no credentials in the repository.
+  DATABASE_URL: postgres://mpmv@localhost:5432/mpmv
+
+jobs:
+  baselines:
+    name: Render visual baselines
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mpmv
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: mpmv
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mpmv -d mpmv"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+      - run: uv sync
+      - name: Install Chromium
+        run: uv run playwright install --with-deps chromium
+      - name: Render baselines
+        env:
+          MPMV_VISUAL: update
+        run: uv run pytest -m e2e -k visual_baseline
+      - name: Store baselines
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-baselines
+          path: tests/e2e/baselines/
+          if-no-files-found: error
