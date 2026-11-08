@@ -26,6 +26,8 @@ from django.db import models
 
 from apps.api.models import ApiClient, ApiRateCounter
 from apps.api.tests.factories import ApiClientFactory, ApiRateCounterFactory
+from apps.cart.models import CartLine
+from apps.cart.tests.factories import CartLineFactory
 from apps.catalog.models import (
     Product,
     ProductAttribute,
@@ -157,6 +159,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
             vendor=vendor, valid_from=utc(2025), valid_to=utc(2026)
         )
     ),
+    CartLine: lambda vendor: CartLineFactory.create(product=ProductFactory.create(vendor=vendor)),
     TaxRegimeChangeRequest: lambda vendor: TaxRegimeChangeRequestFactory.create(
         # A reviewed request: the vendor may already have its one pending request.
         vendor=vendor,
