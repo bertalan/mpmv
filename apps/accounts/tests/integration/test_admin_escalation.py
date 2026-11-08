@@ -338,3 +338,258 @@ def test_a_superuser_still_edits_groups(client: Client, superuser: User) -> None
     )
     assert response.status_code == 302, response.content.decode()
     assert [p.codename for p in group.permissions.all()] == ["change_vendor"]
+
+
+# --- Accounts that hold permissions without staff status are privileged too (review M1)
+#
+# A Wagtail editor gets `wagtailadmin.access_admin` from a group and needs no staff status
+# (spec CMS.1). Taking over that account (password, then MFA) would give the attacker
+# permissions they do not hold, so it is managed by superusers only, like a staff account.
+
+
+def _group_editor() -> User:
+    editor = UserFactory.create(email="editor@example.com")
+    group = Group.objects.create(name="Test editors")
+    group.permissions.add(_permission("wagtailadmin.access_admin"))
+    editor.groups.add(group)
+    return editor
+
+
+def _privileged(role: str, superuser: User) -> User:
+    """A target account that holds access: staff, superuser, a group or a direct permission."""
+    if role == "superuser":
+        return superuser
+    if role == "staff":
+        return UserFactory.create(email="colleague@example.com", staff=True)
+    if role == "group":
+        return _group_editor()
+    assert role == "permission"
+    return UserFactory.create(email="perm@example.com", permissions=["wagtailadmin.access_admin"])
+
+
+NON_STAFF_ROLES = pytest.mark.parametrize("role", ["group", "permission"])
+PRIVILEGED_ROLES = pytest.mark.parametrize("role", ["superuser", "staff", "group", "permission"])
+
+
+@FRESHNESS
+@NON_STAFF_ROLES
+def test_staff_cannot_set_the_password_of_an_account_that_holds_permissions(
+    client: Client, attacker: User, superuser: User, fresh: bool, role: str
+) -> None:
+    target = _privileged(role, superuser)
+    login(client, attacker, fresh=fresh)
+    old_hash = target.password
+    status, password = _set_password(client, target)
+    assert status in (302, 403)
+    target.refresh_from_db()
+    assert target.password == old_hash
+    assert not target.check_password(password)
+
+
+@NON_STAFF_ROLES
+def test_a_fresh_staff_member_refused_with_403_on_a_permission_holder_password(
+    client: Client, attacker: User, superuser: User, role: str
+) -> None:
+    target = _privileged(role, superuser)
+    login(client, attacker, fresh=True)
+    url = reverse("admin:auth_user_password_change", args=[target.pk])
+    assert client.get(url).status_code == 403
+    assert _set_password(client, target)[0] == 403
+
+
+@FRESHNESS
+@NON_STAFF_ROLES
+def test_staff_cannot_reset_mfa_of_an_account_that_holds_permissions(
+    client: Client, attacker: User, superuser: User, fresh: bool, role: str
+) -> None:
+    target = _privileged(role, superuser)
+    TOTPDeviceFactory.create(user=target)
+    customer = UserFactory.create(email="customer@example.com")
+    TOTPDeviceFactory.create(user=customer)
+    login(client, attacker, fresh=fresh)
+    _reset_mfa(client, customer, target)
+    assert services.has_second_factor(target)
+    assert services.has_second_factor(customer)
+
+
+def test_a_superuser_still_manages_a_group_editor(client: Client, superuser: User) -> None:
+    editor = _group_editor()
+    TOTPDeviceFactory.create(user=editor)
+    login(client, superuser, fresh=True)
+    status, password = _set_password(client, editor)
+    assert status == 302
+    editor.refresh_from_db()
+    assert editor.check_password(password)
+    _reset_mfa(client, editor)
+    assert not services.has_second_factor(editor)
+
+
+# --- Only a superuser deactivates, re-addresses or deletes a privileged account (review M2)
+
+
+@pytest.fixture
+def deleter() -> User:
+    """The attacker's colleague who may also delete users."""
+    return UserFactory.create(
+        email="deleter@example.com",
+        staff=True,
+        permissions=["accounts.view_user", "accounts.change_user", "accounts.delete_user"],
+    )
+
+
+@FRESHNESS
+@PRIVILEGED_ROLES
+def test_staff_cannot_deactivate_or_re_address_a_privileged_account(
+    client: Client, attacker: User, superuser: User, fresh: bool, role: str
+) -> None:
+    target = _privileged(role, superuser)
+    email = target.email
+    login(client, attacker, fresh=fresh)
+    client.post(
+        reverse("admin:accounts_user_change", args=[target.pk]),
+        user_form(target, is_active="", email="taken-over@example.com"),
+    )
+    target.refresh_from_db()
+    assert target.is_active
+    assert target.email == email
+
+
+@PRIVILEGED_ROLES
+def test_email_and_active_flag_are_read_only_on_a_privileged_account(
+    client: Client, attacker: User, superuser: User, role: str
+) -> None:
+    target = _privileged(role, superuser)
+    login(client, attacker, fresh=True)
+    response = client.get(reverse("admin:accounts_user_change", args=[target.pk]))
+    assert response.status_code == 200
+    form_fields = response.context["adminform"].form.fields
+    assert "email" not in form_fields
+    assert "is_active" not in form_fields
+
+
+def test_staff_cannot_re_address_their_own_account(client: Client, attacker: User) -> None:
+    login(client, attacker, fresh=True)
+    client.post(
+        reverse("admin:accounts_user_change", args=[attacker.pk]),
+        user_form(attacker, email="elsewhere@example.com"),
+    )
+    attacker.refresh_from_db()
+    assert attacker.email == "support@example.com"
+
+
+def test_staff_can_still_deactivate_and_re_address_a_customer(
+    client: Client, attacker: User
+) -> None:
+    customer = UserFactory.create(email="customer@example.com")
+    login(client, attacker, fresh=True)
+    response = client.post(
+        reverse("admin:accounts_user_change", args=[customer.pk]),
+        user_form(customer, is_active="", email="customer2@example.com"),
+    )
+    assert response.status_code == 302, response.content.decode()
+    customer.refresh_from_db()
+    assert not customer.is_active
+    assert customer.email == "customer2@example.com"
+
+
+def test_a_superuser_still_deactivates_and_re_addresses_a_staff_account(
+    client: Client, superuser: User
+) -> None:
+    colleague = UserFactory.create(email="colleague@example.com", staff=True)
+    login(client, superuser, fresh=True)
+    response = client.post(
+        reverse("admin:accounts_user_change", args=[colleague.pk]),
+        user_form(colleague, is_active="", email="colleague2@example.com"),
+    )
+    assert response.status_code == 302, response.content.decode()
+    colleague.refresh_from_db()
+    assert not colleague.is_active
+    assert colleague.email == "colleague2@example.com"
+
+
+def _delete_one(client: Client, target: User) -> Any:
+    return client.post(reverse("admin:accounts_user_delete", args=[target.pk]), {"post": "yes"})
+
+
+def _delete_batch(client: Client, *targets: User) -> Any:
+    return client.post(
+        reverse("admin:accounts_user_changelist"),
+        {
+            "action": "delete_selected",
+            "_selected_action": [t.pk for t in targets],
+            "post": "yes",
+        },
+    )
+
+
+def _exists(user: User) -> bool:
+    return User.objects.filter(pk=user.pk).exists()
+
+
+@FRESHNESS
+@PRIVILEGED_ROLES
+def test_staff_cannot_delete_a_privileged_account(
+    client: Client, deleter: User, superuser: User, fresh: bool, role: str
+) -> None:
+    target = _privileged(role, superuser)
+    login(client, deleter, fresh=fresh)
+    url = reverse("admin:accounts_user_delete", args=[target.pk])
+    get = client.get(url)
+    post = _delete_one(client, target)
+    assert _exists(target)
+    if fresh:
+        assert get.status_code == 403
+        assert post.status_code == 403
+
+
+@FRESHNESS
+@PRIVILEGED_ROLES
+def test_a_bulk_delete_with_a_privileged_account_is_refused_as_a_whole(
+    client: Client, deleter: User, superuser: User, fresh: bool, role: str
+) -> None:
+    target = _privileged(role, superuser)
+    customer = UserFactory.create(email="customer@example.com")
+    login(client, deleter, fresh=fresh)
+    _delete_batch(client, customer, target)
+    assert _exists(target)
+    assert _exists(customer)
+
+
+def test_deleting_a_user_needs_a_fresh_step_up(client: Client, deleter: User) -> None:
+    customer = UserFactory.create(email="customer@example.com")
+    login(client, deleter)
+    url = reverse("admin:accounts_user_delete", args=[customer.pk])
+    for response in (client.get(url), _delete_one(client, customer)):
+        assert response.status_code == 302
+        assert urlsplit(response["Location"]).path == reverse("mfa:verify")
+    _delete_batch(client, customer)
+    assert _exists(customer)
+
+
+def test_a_superuser_also_needs_a_fresh_step_up_to_delete(client: Client, superuser: User) -> None:
+    colleague = UserFactory.create(email="colleague@example.com", staff=True)
+    login(client, superuser)
+    response = _delete_one(client, colleague)
+    assert urlsplit(response["Location"]).path == reverse("mfa:verify")
+    _delete_batch(client, colleague)
+    assert _exists(colleague)
+
+
+def test_staff_can_still_delete_customers_after_stepping_up(client: Client, deleter: User) -> None:
+    one = UserFactory.create(email="one@example.com")
+    two = UserFactory.create(email="two@example.com")
+    three = UserFactory.create(email="three@example.com")
+    login(client, deleter, fresh=True)
+    assert _delete_one(client, one).status_code == 302
+    assert _delete_batch(client, two, three).status_code == 302
+    assert not any(_exists(user) for user in (one, two, three))
+
+
+def test_a_superuser_still_deletes_privileged_accounts(client: Client, superuser: User) -> None:
+    colleague = UserFactory.create(email="colleague@example.com", staff=True)
+    other = UserFactory.create(email="other@example.com", superuser=True)
+    editor = _group_editor()
+    login(client, superuser, fresh=True)
+    assert _delete_one(client, colleague).status_code == 302
+    assert _delete_batch(client, other, editor).status_code == 302
+    assert not any(_exists(user) for user in (colleague, other, editor))
