@@ -193,9 +193,34 @@ def territory_snapshot(territory: Territory) -> dict[str, Any]:
     return {name: getattr(territory, name) for name in TERRITORY_FIELDS}
 
 
+def territory_key_errors(territory: Territory) -> dict[str, str]:
+    """Why `territory` cannot change its country or code; empty when it can.
+
+    Rates check `territory.country == country` only when they are written, and rate snapshots
+    and audit entries name the territory by its code: once a territory has rates, both are fixed.
+    """
+    if territory.pk is None:
+        return {}
+    stored = Territory.objects.filter(pk=territory.pk).values("country", "code").first()
+    if stored is None or not TaxRate.objects.filter(territory_id=territory.pk).exists():
+        return {}
+    return {
+        name: f"The territory has tax rates: its {name} stays {stored[name]}."
+        for name in ("country", "code")
+        if getattr(territory, name) != stored[name]
+    }
+
+
 def save_territory(territory: Territory, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
-    """Create or change a territory, audited. Territories are not versioned: rates are."""
+    """Create or change a territory, audited. Territories are not versioned: rates are.
+
+    A territory with rates keeps its country and code (`territory_key_errors`); raises
+    `ValidationError` otherwise, also on dry-run.
+    """
     territory.full_clean()
+    errors = territory_key_errors(territory)
+    if errors:
+        raise ValidationError(errors)
     return save_audited(
         territory,
         territory_snapshot,
@@ -218,6 +243,18 @@ def profile_snapshot(profile: VendorTaxProfile) -> dict[str, Any]:
     return values
 
 
+def _check_reviewer(user: User, *, requested_by_id: int | None) -> None:
+    """Refuse `user` as the approver of a VAT regime change (`engine.reviewer_error`)."""
+    error = engine.reviewer_error(
+        is_staff=user.is_staff,
+        is_active=user.is_active,
+        has_permission=user.has_perm(REVIEW_PERMISSION),
+        is_requester=requested_by_id is not None and user.pk == requested_by_id,
+    )
+    if error is not None:
+        raise engine.RegimeChangeNotAllowed(error)
+
+
 def latest_tax_profile(vendor: Vendor) -> VendorTaxProfile | None:
     return VendorTaxProfile.objects.filter(vendor=vendor).order_by("-valid_from").first()
 
@@ -228,14 +265,20 @@ def check_profile_start(new: VendorTaxProfile) -> None:
 
 
 def configure_vendor_tax_profile(
-    new: VendorTaxProfile, *, ctx: AuditContext, dry_run: bool = False
+    new: VendorTaxProfile, *, approver: User, ctx: AuditContext, dry_run: bool = False
 ) -> ChangeSet:
     """Give the vendor a new VAT regime from `new.valid_from`, closing the current profile.
 
-    `new.approved_by` is the staff member who approved it; vendor requests go through
-    `approve_regime_change` (TAX.2), which calls this. The regime must agree with the vendor's
-    declared fiscal regime (RF19, see `engine.profile_errors`).
+    `approver` becomes `new.approved_by`. Changing a vendor's VAT regime needs what reviewing a
+    request needs (`engine.reviewer_error`): active platform staff holding the review
+    permission, other than `new.requested_by`. Vendor requests go through
+    `approve_regime_change` (TAX.2), which calls this with the requester; a profile added by
+    staff directly has no `requested_by` (staff-initiated). The regime must agree with the
+    vendor's declared fiscal regime (RF19, see `engine.profile_errors`). Raises
+    `engine.RegimeChangeNotAllowed` or `ValidationError`, also on dry-run.
     """
+    _check_reviewer(approver, requested_by_id=new.requested_by_id)
+    new.approved_by = approver
     return _configure_version(
         new,
         VendorTaxProfile.objects.filter(vendor=new.vendor),
@@ -435,14 +478,7 @@ def _lock_for_review(request: TaxRegimeChangeRequest, reviewer: User) -> TaxRegi
         .select_related("vendor", "requested_by", "reviewed_by", "profile")
         .get(pk=request.pk)
     )
-    error = engine.reviewer_error(
-        is_staff=reviewer.is_staff,
-        is_active=reviewer.is_active,
-        has_permission=reviewer.has_perm(REVIEW_PERMISSION),
-        is_requester=reviewer.pk == current.requested_by_id,
-    )
-    if error is not None:
-        raise engine.RegimeChangeNotAllowed(error)
+    _check_reviewer(reviewer, requested_by_id=current.requested_by_id)
     engine.check_reviewable(current.status)
     return current
 
@@ -499,7 +535,9 @@ def approve_regime_change(
     current one) and, when the request moves it, sets the vendor's fiscal regime.
 
     The checks run against the stored request and vendor, rows locked: the vendor's fiscal
-    regime may have changed since the request. A change of the declared fiscal regime is
+    regime may have changed since the request, and the requester must still hold the
+    `TAX_REGIME` permission (an owner removed or demoted since asking cannot have the request
+    approved; it can still be rejected). A change of the declared fiscal regime is
     approved on or after its business-time date only (`engine.fiscal_regime_change_error`).
     Each write is
     audited by its own service (`vendor.updated`, `tax.vendor_tax_profile.configured`) plus
@@ -511,6 +549,12 @@ def approve_regime_change(
     with transaction.atomic():
         current = _lock_for_review(request, reviewer)
         vendor = Vendor.objects.select_for_update().get(pk=current.vendor_id)
+        requester = current.requested_by
+        if not has_vendor_permission(requester, vendor, VendorAction.TAX_REGIME):
+            raise engine.RegimeChangeNotAllowed(
+                f"{requester} may no longer change the tax regime of vendor {vendor.public_id}: "
+                "reject the request instead."
+            )
         errors = engine.request_errors(
             current.regime,
             current.exempt_reason,
@@ -541,11 +585,12 @@ def approve_regime_change(
             exempt_reason=current.exempt_reason,
             oss_registered_since=current.oss_registered_since,
             valid_from=current.effective_from,
-            requested_by=current.requested_by,
-            approved_by=reviewer,
+            requested_by=requester,
         )
         changeset.changes.extend(
-            configure_vendor_tax_profile(profile, ctx=ctx, dry_run=dry_run).changes
+            configure_vendor_tax_profile(
+                profile, approver=reviewer, ctx=ctx, dry_run=dry_run
+            ).changes
         )
         changeset.changes.extend(
             _review(

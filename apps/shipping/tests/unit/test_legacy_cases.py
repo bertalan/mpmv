@@ -6,6 +6,8 @@ GR, GB and PT; Vendor D with its own carrier and zones, `*` (World) included. Th
 patterns deliberately share their digits with mainland Italian postcodes (case 1).
 """
 
+from typing import Any
+
 import pytest
 
 from apps.core.countries import EU_MEMBER_STATES, InvalidCountry
@@ -24,19 +26,19 @@ VENDOR_D = 4  # own carrier, own zones
 # Greek islands: Crete 70-74, North Aegean 81-83, Cyclades 84, Dodecanese 85, Ionian 28/29/31/49,
 # Sporades 37. Northern Ireland BT. Madeira and the Azores 9000-9999.
 REMOTE_PATTERNS = (
-    "70000..74999",
-    "81*",
-    "82*",
-    "83*",
-    "84*",
-    "85*",
-    "28*",
-    "29*",
-    "31*",
-    "37*",
-    "49*",
-    "BT*",
-    "9000..9999",
+    "GR:70000..74999",
+    "GR:81*",
+    "GR:82*",
+    "GR:83*",
+    "GR:84*",
+    "GR:85*",
+    "GR:28*",
+    "GR:29*",
+    "GR:31*",
+    "GR:37*",
+    "GR:49*",
+    "GB:BT*",
+    "PT:9000..9999",
 )
 
 ITALY = ZoneSnap(code="italy", priority=100, countries=frozenset({"IT"}))
@@ -246,3 +248,59 @@ def test_parsed_patterns_do_not_change_zone_equality() -> None:
     assert a == b
     assert hash(a) == hash(b)
     assert "parsed_patterns" not in repr(a)
+
+
+# --- Case 20: a pattern of a multi-country zone applies only to its own country
+
+
+@pytest.mark.parametrize("postcode", ["2800-001", "7000-001", "8500-001"])
+def test_case_20_mainland_portuguese_postcodes_with_a_greek_island_prefix_stay_in_zone_3(
+    postcode: str,
+) -> None:
+    # 28*, 70000..74999 and 85* are Greek island patterns; PT 2800-001 is Almada.
+    assert zone_for(Destination("PT", postcode=postcode)) == "zone-3"
+
+
+@pytest.mark.parametrize(
+    ("country", "postcode", "expected"),
+    [
+        ("GR", "28100", "remote-islands"),
+        ("GB", "BT1 1AA", "remote-islands"),
+        ("PT", "9000-001", "remote-islands"),
+        ("GR", "9000", "zone-5"),
+        ("GB", "9000 1AA", "zone-4"),
+    ],
+)
+def test_case_20_each_pattern_applies_to_its_own_country_only(
+    country: str, postcode: str, expected: str
+) -> None:
+    assert zone_for(Destination(country, postcode=postcode)) == expected
+
+
+def test_case_20_provinces_are_qualified_by_country_too() -> None:
+    zone = ZoneSnap(
+        code="islands",
+        priority=10,
+        countries=frozenset({"IT", "ES"}),
+        states=("IT:SS", "ES:CA"),
+    )
+    assert engine.zone_match(zone, Destination("IT", state="SS")) is engine.Specificity.PROVINCE
+    assert engine.zone_match(zone, Destination("ES", state="SS")) is None
+    assert engine.zone_match(zone, Destination("ES", state="CA")) is engine.Specificity.PROVINCE
+
+
+@pytest.mark.parametrize("field", ["postcode_patterns", "states"])
+def test_an_unqualified_entry_needs_a_zone_with_exactly_one_country(field: str) -> None:
+    entry = ("84*",) if field == "postcode_patterns" else ("SS",)
+    fields: dict[str, Any] = {field: entry}
+    with pytest.raises(engine.UnqualifiedEntry, match="country"):
+        ZoneSnap(code="z", priority=1, countries=frozenset({"GR", "PT"}), **fields)
+    with pytest.raises(engine.UnqualifiedEntry):
+        ZoneSnap(
+            code="z",
+            priority=1,
+            countries=frozenset({"GR"}),
+            group_countries=frozenset({"PT"}),
+            **fields,
+        )
+    ZoneSnap(code="z", priority=1, countries=frozenset({"GR"}), **fields)

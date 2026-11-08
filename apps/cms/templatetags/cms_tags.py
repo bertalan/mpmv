@@ -1,4 +1,5 @@
-"""Template tags for the public pages (CMS.1): per-language navigation and language switcher."""
+"""Template tags for the public pages (CMS.1): per-language navigation and language switcher, and
+the page-level FAQPage structured data (CMS.2)."""
 
 from dataclasses import dataclass
 from typing import Any
@@ -8,10 +9,12 @@ from django.conf import settings
 from django.http import HttpRequest
 from django.urls import reverse
 from django.utils import translation
+from django.utils.safestring import SafeString, mark_safe
 from wagtail.models import Locale, Page
 
 from apps.core.i18n import configured_languages
 
+from ..engine import faq_page_jsonld, jsonld_text
 from ..models import NavigationMenu
 
 register = template.Library()
@@ -102,3 +105,22 @@ def language_links(context: dict[str, Any]) -> list[LanguageLink]:
             )
         )
     return links
+
+
+@register.simple_tag
+def faq_jsonld(page: Any) -> SafeString:
+    """One FAQPage `<script>` for every question of the page's FAQ blocks, in order; "" if none.
+
+    One page-level object, as search engines expect one FAQPage per page (spec 10).
+    """
+    questions = [
+        (item["question"], str(item["answer"]))
+        for block in getattr(page, "body", None) or []
+        if block.block_type == "faq"
+        for item in block.value["items"]
+    ]
+    if not questions:
+        return mark_safe("")
+    # JSON with <, > and & escaped: it cannot leave its script element (`jsonld_text`).
+    data = jsonld_text(faq_page_jsonld(questions))
+    return mark_safe(f'<script type="application/ld+json">{data}</script>')  # noqa: S308

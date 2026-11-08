@@ -16,14 +16,14 @@ from ninja import NinjaAPI
 from ninja.errors import HttpError
 from ninja.errors import ValidationError as NinjaValidationError
 
-from apps.api.auth import denial_response
+from apps.api.auth import denial_response, rate_limited_response
 from apps.api.engine import Reason, deny, vendor_write_refusal
 from apps.api.problems import Problem, problem, validation_problem
 from apps.api.responses import problem_response
 from apps.api.services import AuthResult
 from apps.vendors.engine import VendorCannotWrite
 
-from .security import ApiAuthError
+from .security import ApiAuthError, ApiRateLimited
 
 logger = logging.getLogger("apps.api")
 
@@ -66,6 +66,10 @@ def _respond(request: HttpRequest, built: Problem) -> HttpResponse:
 
 def _on_auth(request: HttpRequest, exc: ApiAuthError) -> HttpResponse:
     return denial_response(request, exc.result, exc.required_scope)
+
+
+def _on_rate_limited(request: HttpRequest, exc: ApiRateLimited) -> HttpResponse:
+    return rate_limited_response(request, exc.decision)
 
 
 def _on_http_error(request: HttpRequest, exc: HttpError) -> HttpResponse:
@@ -113,6 +117,7 @@ def _on_unexpected(request: HttpRequest, exc: Exception) -> HttpResponse:
 
 _HANDLERS: tuple[tuple[type[Exception], Callable[[HttpRequest, Any], HttpResponse]], ...] = (
     (ApiAuthError, _on_auth),
+    (ApiRateLimited, _on_rate_limited),  # the per-key rate limit (CORE.12)
     (HttpError, _on_http_error),  # also ninja's own 401/403 and the 429 of throttling
     (NinjaValidationError, _on_ninja_validation),
     (DjangoValidationError, _on_django_validation),

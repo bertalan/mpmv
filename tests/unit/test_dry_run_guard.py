@@ -80,6 +80,10 @@ DRY_RUN_EXCEPTIONS: Final[dict[str, tuple[str, str]]] = {
         THROTTLE,
         "deletes expired counters",
     ),
+    "apps.core.services.consume_rate_limit": (
+        THROTTLE,
+        "counts one request against a fixed-window rate limit",
+    ),
     "apps.tax.services.record_vat_validation": (
         TELEMETRY,
         "append-only record of a VIES answer",

@@ -20,6 +20,7 @@ dependencies = [
   "segno>=1.6.6",
   "cryptography>=50.0.2",
   "wagtail>=8.1,<8.2",
+  "wagtail-localize>=1.14.5,<1.15",
 ]
 
 [dependency-groups]
@@ -76,13 +77,14 @@ ignore_missing_imports = true
 # Wagtail and its dependencies ship no type information (CMS.1).
 module = [
   "wagtail", "wagtail.*", "modelcluster", "modelcluster.*", "modelsearch", "modelsearch.*",
-  "taggit", "taggit.*", "treebeard", "treebeard.*",
+  "taggit", "taggit.*", "treebeard", "treebeard.*", "wagtail_localize", "wagtail_localize.*",
+  "willow", "willow.*",
 ]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # Generated migrations name Wagtail's swappable page model setting, which only Wagtail defines.
-module = ["apps.cms.migrations.*"]
+module = ["apps.cms.migrations.*", "apps.core.migrations.*"]
 disable_error_code = ["misc"]
 
 [[tool.mypy.overrides]]
@@ -137,12 +139,22 @@ layers = [
   "apps.payments",
   "apps.orders",
   "apps.cart",
-  "apps.catalog | apps.tax | apps.shipping | apps.cms",
+  "apps.cms",  # reads catalog terms and vendor storefronts (CMS.2 cards)
+  "apps.catalog | apps.tax | apps.shipping",
   "apps.vendors",
   "apps.accounts",
   "apps.core",
 ]
 exhaustive = false
+
+# The layer above lets cms import catalog and vendors (spec 01: catalog --> cms). It sits above
+# tax and shipping only because import-linter layers are a total order: the graph has no
+# tax --> cms or shipping --> cms edge, so this contract keeps cms off them.
+[[tool.importlinter.contracts]]
+name = "CMS reads catalog and vendors, never tax or shipping (spec 01 graph)"
+type = "forbidden"
+source_modules = ["apps.cms"]
+forbidden_modules = ["apps.tax", "apps.shipping"]
 
 [[tool.importlinter.contracts]]
 name = "Procrastinate is used only through apps.core.tasks (ADR-0004)"

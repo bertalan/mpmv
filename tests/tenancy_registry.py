@@ -25,8 +25,10 @@ from django.contrib import admin
 from django.db import models
 from django.test import Client
 
-from apps.api.models import ApiClient
-from apps.api.tests.factories import ApiClientFactory
+from apps.api.models import ApiClient, ApiRateCounter
+from apps.api.tests.factories import ApiClientFactory, ApiRateCounterFactory
+from apps.cart.models import CartLine
+from apps.cart.tests.factories import CartLineFactory
 from apps.catalog.models import (
     Product,
     ProductAttribute,
@@ -112,6 +114,7 @@ def renamed_product_alias(vendor: Vendor) -> SkuAlias:
 OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     Vendor: lambda vendor: vendor,
     ApiClient: lambda vendor: ApiClientFactory.create(vendor=vendor),
+    ApiRateCounter: lambda vendor: ApiRateCounterFactory.create(client__vendor=vendor),
     VendorMember: lambda vendor: VendorMemberFactory.create(
         vendor=vendor, role=VendorMember.Role.STAFF
     ),
@@ -162,6 +165,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
             vendor=vendor, valid_from=utc(2025), valid_to=utc(2026)
         )
     ),
+    CartLine: lambda vendor: CartLineFactory.create(product=ProductFactory.create(vendor=vendor)),
     TaxRegimeChangeRequest: lambda vendor: TaxRegimeChangeRequestFactory.create(
         # A reviewed request: the vendor may already have its one pending request.
         vendor=vendor,
@@ -196,6 +200,7 @@ def member_with_landing_taxonomy(client: Client, tenants: CrossTenant) -> dict[s
 
 ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
+    "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
     "home": NoVendorData("Public home page."),
     "catalog:category": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "product-category"}),
     "catalog:brand": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "brand"}),
@@ -218,6 +223,9 @@ ENDPOINTS: dict[str, Access] = {
     "mfa:remove_device": NoVendorData(
         OWN_ACCOUNT + " The factor is looked up among the user's own.",
         kwargs={"kind": "totp", "public_id": "0"},
+    ),
+    "geocoding_find": NoVendorData(
+        "Find coordinates (EVT.12): geocodes the typed address; reads no vendor data."
     ),
     "admin:login": NoVendorData("Staff sign-in page."),
     "admin:logout": NoVendorData("Staff sign-out."),
