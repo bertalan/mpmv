@@ -16,7 +16,7 @@ from typing import Any, cast
 
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
-from django.contrib.auth.models import AnonymousUser, PermissionsMixin
+from django.contrib.auth.models import AnonymousUser, Permission, PermissionsMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, connection, transaction
 from django.db.models import F, Model, Q, QuerySet
@@ -256,12 +256,19 @@ class AllowedCountriesChangeSet(ChangeSet):
 
 
 def is_platform_owner(user: AbstractBaseUser | AnonymousUser) -> bool:
-    """An active user holding the dedicated permission; staff or admin access is not enough."""
-    return bool(
-        user.is_active
-        and isinstance(user, PermissionsMixin)
-        and user.has_perm(PLATFORM_OWNER_PERMISSION)
-    )
+    """An active user granted the dedicated permission, directly or through a group.
+
+    Staff or admin access is not enough (spec 02 roles), superuser status included: Django's
+    `has_perm` (and `get_all_permissions`) grant every permission to an active superuser, so the
+    grant is read from the permission tables instead.
+    """
+    if not (user.is_active and isinstance(user, PermissionsMixin) and user.pk is not None):
+        return False
+    return Permission.objects.filter(
+        Q(user=user) | Q(group__user=user),
+        content_type__app_label=PlatformOperator._meta.app_label,
+        codename=PLATFORM_OWNER_CODENAME,
+    ).exists()
 
 
 def allowed_vendor_countries(at: dt.datetime | None = None) -> frozenset[str]:

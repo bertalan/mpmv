@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import AnonymousUser, Group, Permission
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import Client, override_settings
 from django.urls import reverse
@@ -149,6 +149,46 @@ def test_a_user_without_the_platform_owner_permission_is_refused(
             )
     assert PlatformOperator.objects.count() == 1
     assert not AuditLog.objects.exists()
+
+
+def test_a_superuser_without_the_explicit_permission_is_refused(
+    operator: PlatformOperator,
+) -> None:
+    # Spec 02 roles: the technical superuser is a maintenance role, not a platform owner.
+    user = make_user(is_staff=True, is_superuser=True)
+    assert user.has_perm(PLATFORM_OWNER_PERMISSION)  # Django's implicit superuser grant
+    for dry_run in (True, False):
+        with pytest.raises(PlatformOwnerRequired):
+            set_allowed_vendor_countries(
+                ["IT"], actor=user, reason=REASON, ctx=CTX, dry_run=dry_run
+            )
+    assert PlatformOperator.objects.count() == 1
+    assert not AuditLog.objects.exists()
+
+
+def test_a_superuser_granted_the_permission_is_an_owner(operator: PlatformOperator) -> None:
+    user = make_user(owner=True, is_staff=True, is_superuser=True)
+    set_allowed_vendor_countries(["IT"], actor=user, reason=REASON, ctx=CTX)
+    assert allowed_vendor_countries() == frozenset({"IT"})
+
+
+def test_the_permission_granted_through_a_group_makes_an_owner(
+    operator: PlatformOperator,
+) -> None:
+    app_label, codename = PLATFORM_OWNER_PERMISSION.split(".")
+    owners = Group.objects.create(name="Platform owners")
+    owners.permissions.add(
+        Permission.objects.get(content_type__app_label=app_label, codename=codename)
+    )
+    user = make_user(is_staff=True)
+    user.groups.add(owners)
+    set_allowed_vendor_countries(["IT"], actor=user, reason=REASON, ctx=CTX)
+    assert allowed_vendor_countries() == frozenset({"IT"})
+
+
+def test_an_anonymous_user_is_refused(operator: PlatformOperator) -> None:
+    with pytest.raises(PlatformOwnerRequired):
+        set_allowed_vendor_countries(["IT"], actor=AnonymousUser(), reason=REASON, ctx=CTX)
 
 
 def test_an_inactive_platform_owner_is_refused(operator: PlatformOperator) -> None:

@@ -6,7 +6,8 @@ flag overrides (ARC.8)."""
 
 import dataclasses
 import datetime as dt
-from collections.abc import Collection
+import logging
+from collections.abc import Collection, Mapping
 from typing import Any
 
 from django.conf import settings
@@ -20,7 +21,7 @@ from django.utils.module_loading import import_string
 
 from apps.accounts.models import User
 from apps.core.audit import AuditContext
-from apps.core.changeset import ChangeSet
+from apps.core.changeset import Change, ChangeSet
 from apps.core.services import (
     allowed_vendor_countries,
     audit_changes,
@@ -41,6 +42,8 @@ from .models import (
     VendorMember,
 )
 from .vies import VatNumberValidator
+
+logger = logging.getLogger(__name__)
 
 STATUS_CHANGED = "vendor.status_changed"
 CREATED = "vendor.created"
@@ -117,11 +120,17 @@ def save_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> 
                 if getattr(stored, name) != getattr(vendor, name) and before[name] == after[name]:
                     after[name] += " (replaced)"
             changes.update(MODEL_LABEL, key, before, after)
+        flags = ChangeSet() if stored is None else establishment_review(stored, vendor)
+        result = ChangeSet([*changes.changes, *flags.changes])
         if dry_run:
-            return changes
+            return result
         vendor.save()
         audit_changes(changes, ctx=ctx, action=UPDATED if stored else CREATED)
-    return changes
+        audit_changes(flags, ctx=ctx, action=ESTABLISHMENT_FLAGGED)
+        for flag in flags.changes:
+            warning = establishment_warning(flag.after or {}, str(vendor.status))
+            logger.warning("vendor %s: %s", vendor.public_id, warning)
+    return result
 
 
 def delete_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
@@ -157,7 +166,9 @@ def change_status(
     Activating an onboarding vendor needs an establishment in an allowed country (CMP.13) and
     its onboarding checklist (VEN.5): the contract in force must be accepted. Raises
     `engine.InvalidTransition` (`engine.EstablishmentNotAllowed` for the establishment,
-    `engine.ActivationNotAllowed` for the checklist), also on dry-run.
+    `engine.ActivationNotAllowed` for the checklist), also on dry-run. Reinstating a suspended
+    vendor is a staff decision and is not gated. Every move to active records the
+    establishment and whether it is allowed (`establishment_snapshot`) in the audit entry.
     """
     with transaction.atomic():
         current = (
@@ -166,9 +177,12 @@ def change_status(
             .get(pk=vendor.pk)
         )
         engine.check_transition(current.status, target)
-        if current.status == engine.ONBOARDING and target == engine.ACTIVE:
-            assert_establishment_allowed(current)
-            engine.check_activation(onboarding_checklist(current))
+        establishment: dict[str, Any] = {}
+        if target == engine.ACTIVE:
+            if current.status == engine.ONBOARDING:
+                assert_establishment_allowed(current)
+                engine.check_activation(onboarding_checklist(current))
+            establishment = establishment_snapshot(current, allowed_vendor_countries())
 
         # Keyed by public_id: the slug is editable and can be reused by another vendor, so it
         # would not identify the vendor across its audit history. The slug is kept for reading.
@@ -177,7 +191,7 @@ def change_status(
             MODEL_LABEL,
             str(current.public_id),
             before={"status": current.status, "slug": current.slug},
-            after={"status": str(target), "slug": current.slug},
+            after={"status": str(target), "slug": current.slug, **establishment},
         )
 
         def apply() -> None:
@@ -208,6 +222,67 @@ def assert_establishment_allowed(vendor: Vendor) -> None:
     """Raise `engine.EstablishmentNotAllowed`, naming the countries, unless `vendor` is
     established in a country of `PlatformOperator.allowed_vendor_countries` now."""
     engine.check_establishment(vendor_establishment(vendor), allowed_vendor_countries())
+
+
+ESTABLISHMENT_FLAGGED = "vendor.establishment_outside_allowed"
+
+#: Vendors the activation gate already admitted: a later move out of the set is flagged.
+ADMITTED_STATUSES = frozenset({engine.ACTIVE, engine.SUSPENDED})
+
+
+def establishment_snapshot(vendor: Vendor, allowed: Collection[str]) -> dict[str, Any]:
+    """Where `vendor` is established, and whether that is in the `allowed` countries."""
+    place = vendor_establishment(vendor)
+    return {
+        "registered_office": place.registered_office,
+        "permanent_establishment": place.permanent_establishment,
+        "establishment_allowed": engine.establishment_error(place, allowed) is None,
+    }
+
+
+def establishment_review(stored: Vendor, vendor: Vendor) -> ChangeSet:
+    """The staff flag for an identity change (spec 11 CMP.13): one change when `stored` is an
+    admitted vendor and the edited `vendor` is established elsewhere, outside the allowed set.
+
+    Nobody is suspended: staff decide, as when the owner shrinks the set.
+    """
+    flags = ChangeSet()
+    if stored.status not in ADMITTED_STATUSES:
+        return flags
+    allowed = allowed_vendor_countries()
+    before, after = establishment_snapshot(stored, allowed), establishment_snapshot(vendor, allowed)
+    if not after["establishment_allowed"] and vendor_establishment(stored) != vendor_establishment(
+        vendor
+    ):
+        flags.update(MODEL_LABEL, str(vendor.public_id), before, after)
+    return flags
+
+
+def establishment_flags(changes: ChangeSet) -> list[Change]:
+    """The changes of `changes` that leave an admitted vendor outside the allowed set."""
+    return [c for c in changes.changes if (c.after or {}).get("establishment_allowed") is False]
+
+
+def establishment_warning(place: Mapping[str, Any], status: str) -> str:
+    """The staff message for a vendor flagged by `establishment_review` or reinstated outside
+    the allowed set; `place` is an `establishment_snapshot`."""
+    establishment = place.get("permanent_establishment") or "none"
+    return (
+        "the vendor is established outside the allowed vendor countries "
+        f"(registered office {place.get('registered_office')}, permanent establishment "
+        f"{establishment}). It stays {status}: staff must review it."
+    )
+
+
+def report_vendors_outside_allowed() -> int:
+    """Log a warning for each active vendor established outside the allowed set; return how
+    many there are. Run every night (`vendors.check_establishments`)."""
+    rows = active_vendors_outside(allowed_vendor_countries())
+    for row in rows:
+        logger.warning(
+            "vendor %s: %s", row["vendor"], establishment_warning(row, str(engine.ACTIVE))
+        )
+    return len(rows)
 
 
 def active_vendors_outside(countries: Collection[str]) -> list[dict[str, str]]:
