@@ -10,6 +10,7 @@ from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.cart import services
 from apps.cart.models import Cart, CartLine
+from apps.core.changeset import ChangeSet
 from apps.cart.tests.factories import CartFactory, CartLineFactory
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import ProductFactory, VariantFactory
@@ -68,6 +69,29 @@ def test_get_or_create_cart_for_a_user_and_for_a_guest_session() -> None:
     )
     assert services.get_cart(session_key="abc") == guest
     assert services.get_cart(session_key="nope") is None
+
+
+def test_get_or_create_cart_dry_run_writes_nothing_and_describes_the_cart() -> None:
+    user = UserFactory.create()
+    changes = services.get_or_create_cart(user=user, language="it", country_hint="de", dry_run=True)
+    assert isinstance(changes, ChangeSet)
+    assert Cart.objects.count() == 0
+    [change] = changes.changes
+    assert (change.op, change.model) == ("create", "cart.cart")
+    assert change.after is not None
+    assert (change.after["user"], change.after["language"], change.after["country_hint"]) == (
+        user.pk,
+        "it",
+        "DE",
+    )
+
+
+def test_get_or_create_cart_dry_run_is_empty_when_the_cart_exists() -> None:
+    user = UserFactory.create()
+    services.get_or_create_cart(user=user)
+    changes = services.get_or_create_cart(user=user, dry_run=True)
+    assert changes.changes == []
+    assert Cart.objects.count() == 1
 
 
 def test_a_cart_is_for_a_user_or_a_session_not_both() -> None:
