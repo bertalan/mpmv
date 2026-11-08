@@ -7,8 +7,9 @@ arrive formatted by the caller (catalog services); the tile only shows them.
   {% include "components/product_tile.html" with name=p.name url=p.url price=p.price_display vendor=p.vendor_name only %}
 
 Context:
-- `name` (required), `url` (required): the product name and its page. Only http(s) and
-  relative URLs ("/", "#", "?") are linked; any other value leaves the name unlinked.
+- `name` (required), `url`: the product name and its page. Only http(s) and relative URLs
+  ("/", "#", "?") are linked; without `url` (a product with no page yet) or with any other value
+  the name shows without a link.
 - `heading_level`: 2 to 6 (default 3), to fit the page's outline; out of range is clamped.
 - `image_url`, `image_alt`: the product image; `image_alt` describes what the image adds, or is
   empty when it only repeats the name. `image_width` and `image_height` (default 400 x 400)
