@@ -10,7 +10,9 @@ deploy scripts).
 Vendor key policy (CORE.14): a vendor key is issued only for an active vendor and holds only
 `engine.VENDOR_GRANTABLE_SCOPES`, checked again on every request; only a key of an active vendor
 writes (403 for applicant, onboarding and suspended vendors, which only read); a key of a closed
-vendor is refused (401); deleting a vendor audits each of its keys (`vendor_key_deletions`).
+vendor is refused (401); closing a vendor revokes each of its keys (`revoke_vendor_keys`), so a
+reopened vendor gets none back and issues new ones once active again; deleting a vendor audits
+each of its keys (`vendor_key_deletions`).
 
 Rate limit (CORE.12): `count_api_call` counts each authenticated call on a PostgreSQL counter
 shared by every app process (`ApiRateCounter`); limits come from the `API_RATE_LIMIT*` settings.
@@ -274,7 +276,21 @@ def authenticate(
     return AuthResult(decision, client)
 
 
-# --- Vendor deletion (CORE.14)
+# --- Vendor closure and deletion (CORE.14)
+
+
+def revoke_vendor_keys(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Revoke every active key of `vendor`, one `api.client.revoked` audit entry per key.
+
+    Named in `settings.VENDOR_CLOSURE_HOOKS` and called by `apps.vendors.services` when the
+    vendor is closed or reopened (`vendors` cannot import this app): keys work only for active
+    vendors, and a revoked key is never restored, so a reopened vendor issues new keys.
+    """
+    changes = ChangeSet()
+    clients = ApiClient.objects.select_related("vendor").filter(vendor=vendor, is_active=True)
+    for client in clients.order_by("pk"):
+        changes.changes.extend(revoke_api_client(client, ctx=ctx, dry_run=dry_run).changes)
+    return changes
 
 
 def vendor_key_deletions(vendor: Vendor, changes: ChangeSet) -> None:

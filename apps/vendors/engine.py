@@ -23,18 +23,31 @@ CLOSED: Final = "closed"
 STATUSES: Final = (APPLICANT, ONBOARDING, ACTIVE, SUSPENDED, CLOSED)
 
 # Forward along the lifecycle, reinstatement after a suspension, and closure from any open
-# status (a rejected application is closed too). Closed is terminal.
+# status (a rejected application is closed too). A closed vendor is only reopened by staff, back
+# to onboarding and never straight to active (VEN.21, owner decision Q-17).
 TRANSITIONS: Final[Mapping[str, frozenset[str]]] = {
     APPLICANT: frozenset({ONBOARDING, CLOSED}),
     ONBOARDING: frozenset({ACTIVE, CLOSED}),
     ACTIVE: frozenset({SUSPENDED, CLOSED}),
     SUSPENDED: frozenset({ACTIVE, CLOSED}),
-    CLOSED: frozenset(),
+    CLOSED: frozenset({ONBOARDING}),
 }
+
+# Transitions that need a reason, recorded in the audit log: the reopening of a closed vendor
+# (`services.reopen_vendor`). `services.change_status` passes no reason, so it cannot make them.
+REASON_REQUIRED: Final[frozenset[tuple[str, str]]] = frozenset({(CLOSED, ONBOARDING)})
 
 
 class InvalidTransition(ValueError):
     """Raised when a vendor status change is not allowed by the state machine."""
+
+
+class ReasonRequired(InvalidTransition):
+    """The status change needs a reason (`REASON_REQUIRED`) and none was given."""
+
+
+class ReopenNotAllowed(InvalidTransition):
+    """The closed vendor cannot be reopened as it is: no active owner could onboard it."""
 
 
 def allowed_transitions(status: str) -> frozenset[str]:
@@ -43,11 +56,36 @@ def allowed_transitions(status: str) -> frozenset[str]:
     return TRANSITIONS[status]
 
 
-def check_transition(current: str, target: str) -> None:
+def check_transition(current: str, target: str, *, reason: str = "") -> None:
     if target not in TRANSITIONS:
         raise InvalidTransition(f"unknown vendor status {target!r}")
     if target not in allowed_transitions(current):
         raise InvalidTransition(f"vendor status change {current} → {target} is not allowed")
+    if (current, target) in REASON_REQUIRED and not reason.strip():
+        raise ReasonRequired(
+            f"vendor status change {current} → {target} needs a reason: "
+            "staff reopen a closed vendor from its page, saying why"
+        )
+
+
+def check_reopen(status: str, *, reason: str, has_active_owner: bool) -> None:
+    """Only a closed vendor is reopened, with a reason, back to onboarding (VEN.21).
+
+    Onboarding needs an owner to accept the contract: without an active owner (e.g. the only
+    owner asked for erasure, Q-16) a new owner is added first.
+    """
+    # TODO(CMP.4): once erasure flags restricted owners, exclude them here instead of relying
+    # on `is_active` alone, so a reactivated erased account cannot reopen the vendor.
+    if status != CLOSED:
+        raise InvalidTransition(
+            f"vendor status change {status} → {ONBOARDING} is not a reopen: "
+            "only a closed vendor is reopened"
+        )
+    check_transition(status, ONBOARDING, reason=reason)
+    if not has_active_owner:
+        raise ReopenNotAllowed(
+            "the vendor has no active owner to onboard it again: add a new owner first"
+        )
 
 
 class VendorCannotWrite(Exception):
