@@ -3,9 +3,9 @@ override raises one key's limit without affecting another key; the override chan
 without step-up and is in the AuditLog.
 
 Precedence of a key's key-wide limit: the override stored on the `ApiClient` (set by staff), then
-`API_RATE_LIMIT_CLIENTS`, then `API_RATE_LIMIT`. A key with its own limit (either of the first
-two) is capped on scopes with their own limit too: such a call counts on the scope counter and on
-the key-wide one.
+`API_RATE_LIMIT_CLIENTS`, then `API_RATE_LIMIT`. A key whose own limit (either of the first two)
+is below the default is capped on scopes with their own limit too: such a call counts on the
+scope counter and on the key-wide one. A raised key keeps separate budgets, like a default key.
 """
 
 import datetime as dt
@@ -90,6 +90,21 @@ def test_a_raised_key_keeps_the_scope_limit(settings: SettingsWrapper) -> None:
     raised = ApiClientFactory.create(rate_limit="1000/minute")
     assert calls(raised, 2, "catalog:write") == [True, False]
     assert calls(raised, 1, None) == [True]
+
+
+def test_a_raised_key_with_scoped_traffic_never_gets_fewer_calls_than_a_default_key(
+    settings: SettingsWrapper,
+) -> None:
+    """The #136 review finding: a staff raise must not cut the key's unscoped budget."""
+    settings.API_RATE_LIMIT = "120/minute"
+    settings.API_RATE_LIMIT_SCOPES = {"catalog:write": "100/minute"}
+    default, raised = ApiClientFactory.create_batch(2)
+    set_api_client_rate_limit(raised, "150/minute", ctx=CTX)
+    default_total = sum(calls(default, 101, "catalog:write")) + sum(calls(default, 200))
+    raised_total = sum(calls(raised, 101, "catalog:write")) + sum(calls(raised, 200))
+    assert default_total == 100 + 120
+    assert raised_total == 100 + 150
+    assert raised_total >= default_total
 
 
 def test_a_key_capped_by_the_client_setting_is_capped_on_scopes_too(

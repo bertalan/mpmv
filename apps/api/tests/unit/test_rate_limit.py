@@ -152,6 +152,36 @@ def test_a_key_with_its_own_limit_is_capped_on_a_scope_with_its_own_limit_too() 
     assert raised[0] == ("catalog:write", Rate(60, 60))
 
 
+@pytest.mark.parametrize(
+    "own",
+    [Rate(9000, 60), Rate(120, 60), Rate(7200, 3600), Rate(3, 1)],
+    ids=["raised", "equal", "equal-other-period", "raised-per-second"],
+)
+def test_a_key_not_below_the_default_keeps_separate_budgets_on_scoped_calls(own: Rate) -> None:
+    """A raise (or a limit equal to the default) must never cut the key's unscoped budget: its
+    scoped calls count on the scope counter only, like a key on the default limit (CORE.16, the
+    #136 review finding)."""
+    policy = rate_policy(
+        "120/minute", {"catalog:write": "60/minute"}, {OTHER_CLIENT: "9000/minute"}
+    )
+    assert limits_for(policy, scope="catalog:write", client_id=CLIENT, override=own) == (
+        ("catalog:write", Rate(60, 60)),
+    )
+    assert limits_for(policy, scope="catalog:write", client_id=OTHER_CLIENT) == (
+        ("catalog:write", Rate(60, 60)),
+    )
+
+
+def test_a_key_below_the_default_with_another_period_is_capped_on_scoped_calls() -> None:
+    policy = rate_policy("120/minute", {"catalog:write": "60/minute"}, {})
+    # 5000/hour is about 83 calls a minute: below 120/minute.
+    lowered = Rate(5000, 3600)
+    assert limits_for(policy, scope="catalog:write", client_id=CLIENT, override=lowered) == (
+        ("catalog:write", Rate(60, 60)),
+        (KEY_WIDE_BUCKET, lowered),
+    )
+
+
 def test_combined_decisions_refuse_when_any_counter_refuses() -> None:
     start = dt.datetime(2026, 11, 8, 12, 0, tzinfo=UTC)
     now = start + dt.timedelta(seconds=20)

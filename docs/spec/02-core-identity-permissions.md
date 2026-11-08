@@ -118,9 +118,11 @@ The second factor is a TOTP authenticator app or a passkey. The confirmed parame
   the change permission, audited (`api.client.rate_limit_changed`) and behind an MFA step-up
   (CORE.16). Precedence of a key's key-wide limit: that override, then
   `API_RATE_LIMIT_CLIENTS`, then `API_RATE_LIMIT`. A scope with its own limit keeps it for every
-  key, a raised one included; a key with a limit of its own (override or
-  `API_RATE_LIMIT_CLIENTS`) is also capped on such scopes, because those calls count on its
-  key-wide counter too. A key on the default limit keeps separate budgets. Only
+  key, a raised one included. A key whose own limit (override or `API_RATE_LIMIT_CLIENTS`) is
+  below `API_RATE_LIMIT` (compared as calls per second) is also capped on such scopes, because
+  those calls count on its key-wide counter too. A key on the default limit, or one raised to or
+  above it, keeps separate budgets, so a raise never leaves a key fewer calls than a default key
+  (pending owner confirmation of this precedence). Only
   calls of an accepted key count (401/403 refusals do not). Over the limit the answer is a 429
   `rate_limited` problem with `Retry-After` (seconds to the end of the window); a mutating call
   refused this way is in the mutation log.

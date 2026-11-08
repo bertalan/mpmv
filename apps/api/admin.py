@@ -47,7 +47,8 @@ class RateLimitForm(forms.Form):
         help_text=(
             "Key-wide calls per window, e.g. 1200/minute or 50000/day (units: second, minute, "
             "hour, day). Raises or lowers this key only; empty uses the settings. Scopes with a "
-            "limit of their own keep it."
+            "limit of their own keep it. A limit below API_RATE_LIMIT also caps this key's calls "
+            "to those scopes; a raise leaves them on their own counters."
         ),
     )
 

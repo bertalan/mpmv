@@ -394,17 +394,24 @@ def limits_for(
       `key_wide_rate`.
     - A scope with its own limit counts on its own counter, for every key: it protects a costly
       operation, and a key's own limit never lifts it.
-    - A key with a limit of its own (`override`, or an entry in `policy.clients`) is capped on
-      every call: its calls to a scope with its own limit count on the key-wide counter too
-      (CORE.16; before, a capped key was not capped on such scopes). A key on the default limit
-      keeps the CORE.12 behaviour: those calls do not use up its key-wide budget.
+    - A key whose key-wide limit is below the default (`rate_is_below`) is capped on every
+      call: its calls to a scope with its own limit count on the key-wide counter too (CORE.16;
+      before, a capped key was not capped on such scopes).
+    - Any other key (default limit, or one raised or equal to it) keeps the CORE.12 behaviour:
+      those calls do not use up its key-wide budget, so a raise never cuts a key's unscoped
+      budget below what a default key gets.
     """
-    has_own_limit = override is not None or client_id in policy.clients
-    key_wide = (KEY_WIDE_BUCKET, key_wide_rate(policy, client_id=client_id, override=override))
+    own = key_wide_rate(policy, client_id=client_id, override=override)
+    key_wide = (KEY_WIDE_BUCKET, own)
     if scope is not None and scope in policy.scopes:
         scoped = (scope, policy.scopes[scope])
-        return (scoped, key_wide) if has_own_limit else (scoped,)
+        return (scoped, key_wide) if rate_is_below(own, policy.default) else (scoped,)
     return (key_wide,)
+
+
+def rate_is_below(rate: Rate, other: Rate) -> bool:
+    """Whether `rate` allows fewer calls per second than `other` (exact, no floats)."""
+    return rate.limit * other.period < other.limit * rate.period
 
 
 def window_start(now: dt.datetime, rate: Rate) -> dt.datetime:
