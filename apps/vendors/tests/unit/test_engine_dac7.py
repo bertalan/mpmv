@@ -307,3 +307,119 @@ def test_the_payout_gate_merges_rules_and_dac7_in_field_order() -> None:
 def test_the_payout_gate_reports_invalid_dac7_fields() -> None:
     result = engine.payout_completeness(entity(tax_code="1234"), [])
     assert result.invalid == ("tax_code",)
+
+
+# --- "Same as the VAT number" only where the VAT number is the TIN (review of PR #137)
+
+# One VAT number per country that allows the option: without its prefix it is a TIN of that
+# country (TIN_FORMATS), so the derived TIN is valid.
+SAME_AS_VAT_SAMPLES = {
+    "BE": "BE0123456789",
+    "BG": "BG123456789",
+    "CY": "CY12345678X",
+    "CZ": "CZ12345678",
+    "DK": "DK12345678",
+    "ES": "ESB12345678",
+    "FI": "FI12345678",
+    "GR": "EL123456789",
+    "HR": "HR12345678901",
+    "IE": "IE1234567T",
+    "IT": "IT" + IT_VAT,
+    "LV": "LV12345678901",
+    "PL": "PL1234567890",
+    "PT": "PT123456789",
+    "RO": "RO12345678",
+    "SI": "SI12345678",
+    "SK": "SK1234567890",
+}
+
+
+def same_as_vat(country: str, vat_number: str, **overrides: Any) -> LegalIdentity:
+    values: dict[str, Any] = {
+        "country": country,
+        "vat_number": vat_number,
+        "tax_code": "",
+        "tin_country": "",
+        "tin_same_as_vat": True,
+        "vies_status": engine.VIES_VALID,
+        "registered_country": country,
+    }
+    values.update(overrides)
+    return entity(**values)
+
+
+def test_every_country_allowing_same_as_vat_has_a_sample() -> None:
+    assert set(SAME_AS_VAT_SAMPLES) == set(engine.SAME_AS_VAT_COUNTRIES)
+
+
+@pytest.mark.parametrize(("country", "vat_number"), sorted(SAME_AS_VAT_SAMPLES.items()))
+def test_same_as_vat_derives_a_valid_tin_in_every_allowed_country(
+    country: str, vat_number: str
+) -> None:
+    identity = same_as_vat(country, vat_number)
+    assert "tin_same_as_vat" not in engine.identity_errors(identity)
+    filled = engine.tin_from_vat(identity)
+    assert filled.tin_country == country
+    assert filled.tax_code
+    assert engine.is_valid_tin(filled.tax_code, country)
+    assert "tax_code" not in engine.dac7_check(filled).invalid
+
+
+@pytest.mark.parametrize(
+    ("country", "vat_number"),
+    [
+        ("DE", "DE000000000"),
+        ("AT", "ATU12345678"),
+        ("FR", "FR12345678901"),
+        ("NL", "NL123456789B01"),
+        ("SE", "SE123456789001"),
+        ("US", "US123456789"),
+    ],
+)
+def test_same_as_vat_is_refused_where_the_vat_number_is_not_the_tin(
+    country: str, vat_number: str
+) -> None:
+    identity = same_as_vat(country, vat_number)
+    assert "tin_same_as_vat" in engine.identity_errors(identity)
+    filled = engine.tin_from_vat(identity)
+    assert (filled.tax_code, filled.tin_country) == ("", "")
+
+
+def test_vies_unavailable_keeps_a_tin_already_derived_from_the_vat_number() -> None:
+    identity = same_as_vat("IT", "IT" + IT_VAT, tax_code=IT_VAT, tin_country="IT")
+    kept = engine.tin_from_vat(dataclasses.replace(identity, vies_status=engine.VIES_UNAVAILABLE))
+    assert (kept.tax_code, kept.tin_country) == (IT_VAT, "IT")
+    # A definite answer still decides.
+    gone = engine.tin_from_vat(dataclasses.replace(identity, vies_status=engine.VIES_INVALID))
+    assert (gone.tax_code, gone.tin_country) == ("", "")
+
+
+def test_vies_unavailable_does_not_keep_a_tin_that_is_not_the_vat_number() -> None:
+    identity = same_as_vat(
+        "IT", "IT" + IT_VAT, tax_code=CF, tin_country="IT", vies_status=engine.VIES_UNAVAILABLE
+    )
+    assert engine.tin_from_vat(identity).tax_code == ""
+
+
+# --- An entity always needs a TIN, even where TINs are not issued (review of PR #137)
+
+
+def test_an_entity_whose_country_issues_no_tin_still_needs_a_tin() -> None:
+    assert "AE" in engine.NO_TIN_COUNTRIES
+    identity = entity(
+        country="AE",
+        legal_name="Acme LLC",
+        vat_number="",
+        tax_code="",
+        tin_country="AE",
+        tax_residence_country="AE",
+        business_registration_number="123",
+        registered_country="AE",
+        registered_postal_code="00000",
+        registered_city="Dubai",
+        iban=GB_IBAN,
+    )
+    assert engine.dac7_check(identity).missing == ("tax_code",)
+    with_birthplace = dataclasses.replace(identity, place_of_birth="Dubai")
+    assert engine.dac7_check(with_birthplace).missing == ("tax_code",)
+    assert engine.dac7_check(dataclasses.replace(identity, tax_code="TRN123456")).complete

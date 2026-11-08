@@ -315,6 +315,31 @@ _TIN_SEPARATORS = re.compile(r"[./-]")
 # Jurisdictions that issue no TIN (in their absence DAC7 asks an individual's place of birth).
 # A reviewable list, kept short on purpose: staff can still record a TIN when there is one.
 NO_TIN_COUNTRIES: Final = frozenset({"AE", "BM", "BS", "KY", "MC", "VG"})
+# Member States where an entity's VAT number, without its prefix, is also its TIN: only there is
+# "same as the VAT number" offered. Elsewhere the two differ (AT "U" + 8 digits, DE, FR, NL, SE
+# "01" suffix, EE, HU, LT, LU, MT): the vendor enters the TIN. A test derives a valid TIN for
+# every country listed here.
+SAME_AS_VAT_COUNTRIES: Final = frozenset(
+    {
+        "BE",
+        "BG",
+        "CY",
+        "CZ",
+        "DK",
+        "ES",
+        "FI",
+        "GR",
+        "HR",
+        "IE",
+        ITALY,
+        "LV",
+        "PL",
+        "PT",
+        "RO",
+        "SI",
+        "SK",
+    }
+)
 
 _ITALIAN_VAT = re.compile(r"\d{11}", re.ASCII)
 _OMOCODIA_DIGIT = "[0-9LMNPQRSTUV]"
@@ -614,6 +639,11 @@ def identity_errors(identity: LegalIdentity) -> dict[str, list[str]]:
             errors["tin_same_as_vat"] = ["Only an entity's TIN can be its VAT number."]
         elif not ident.vat_number:
             errors["tin_same_as_vat"] = ["There is no VAT number to use as the TIN."]
+        elif _vat_number_as_tin(ident) is None:
+            errors["tin_same_as_vat"] = [
+                f"In {ident.country or 'this country'} the VAT number is not the TIN: "
+                "enter the TIN instead."
+            ]
     check("fiscal_regime", ident.fiscal_regime in FISCAL_REGIMES, "Unknown fiscal regime.")
     check("legal_form", ident.legal_form in LEGAL_FORMS, "Unknown legal form.")
     check("ateco_code", is_valid_ateco(ident.ateco_code), "An ATECO code looks like 47.91.10.")
@@ -840,13 +870,33 @@ def is_individual(identity: LegalIdentity) -> bool:
 def tin_from_vat(identity: LegalIdentity) -> LegalIdentity:
     """Apply "same as the VAT number": the TIN is the VAT number (without its prefix) issued by
     the vendor's country once VIES says it is valid, and nothing until then. Without the option
-    the identity is returned unchanged."""
+    the identity is returned unchanged.
+
+    Only in `SAME_AS_VAT_COUNTRIES`, and only when the derived value is a valid TIN there:
+    otherwise no TIN is derived (and `identity_errors` refuses the option). While VIES is
+    unavailable, a TIN already derived from this VAT number is kept: only a definite answer
+    changes it.
+    """
     if not identity.tin_same_as_vat:
         return identity
-    if not identity.vat_number or identity.vies_status != VIES_VALID:
+    derived = _vat_number_as_tin(identity)
+    if derived is None:
         return dataclasses.replace(identity, tax_code="", tin_country="")
+    country, number = derived
+    if identity.vies_status == VIES_VALID or (
+        identity.vies_status == VIES_UNAVAILABLE
+        and (compact(identity.tax_code), identity.tin_country) == (number, country)
+    ):
+        return dataclasses.replace(identity, tax_code=number, tin_country=country)
+    return dataclasses.replace(identity, tax_code="", tin_country="")
+
+
+def _vat_number_as_tin(identity: LegalIdentity) -> tuple[str, str] | None:
+    """(country, TIN) taken from the VAT number, where that number is a valid TIN; else None."""
+    if not identity.vat_number or identity.country not in SAME_AS_VAT_COUNTRIES:
+        return None
     country, number = split_vat_number(identity.vat_number, identity.country)
-    return dataclasses.replace(identity, tax_code=number, tin_country=country)
+    return (country, number) if is_valid_tin(number, country) else None
 
 
 def dac7_check(identity: LegalIdentity) -> Completeness:
@@ -856,6 +906,8 @@ def dac7_check(identity: LegalIdentity) -> Completeness:
     The parts depend on the legal form: names and date of birth for an individual, legal name
     and business registration number for an entity. The TIN is always needed with its issuing
     country; when that country issues no TIN, an individual gives the place of birth instead.
+    An entity always needs a TIN (or the identifier its country uses as one), so every entity
+    that passes has a tax identifier for FatturaPA.
     The VAT number, the account holder's name and a permanent establishment are reported only
     when there is one, so they are never missing.
     """
@@ -877,11 +929,11 @@ def dac7_check(identity: LegalIdentity) -> Completeness:
     if ident.registered_country == ITALY:
         need("registered_province")
     need("tin_country")
-    if ident.tin_country in NO_TIN_COUNTRIES:
-        if is_individual(ident) and not ident.tax_code:
+    if ident.tin_country in NO_TIN_COUNTRIES and is_individual(ident):
+        if not ident.tax_code:
             need("place_of_birth")
     else:
-        need("tax_code")
+        need("tax_code")  # an entity always: the place of birth is no fallback for it
     need("tax_residence_country", "iban")
 
     errors = identity_errors(ident)

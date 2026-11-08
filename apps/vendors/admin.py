@@ -265,10 +265,11 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
     def get_form(
         self, request: HttpRequest, obj: Vendor | None = None, change: bool = False, **kwargs: Any
     ) -> type[forms.ModelForm[Vendor]]:
-        """The change form refuses a change to the DAC7 dataset unless the staff member verified
-        a second factor recently (VEN.23, CORE.4): the page stays open, nothing is saved."""
+        """The add and change forms refuse DAC7 data (a new vendor's, or a change to it) unless
+        the staff member verified a second factor recently (VEN.23, CORE.4): the page stays
+        open, nothing is saved."""
         form: type[forms.ModelForm[Vendor]] = super().get_form(request, obj, change, **kwargs)
-        if obj is None or is_recently_verified(request):
+        if is_recently_verified(request):
             return form
         verify_url = reverse("mfa:verify") + "?" + urlencode({"next": request.get_full_path()})
 
@@ -289,7 +290,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
 
     def save_model(self, request: HttpRequest, obj: Vendor, form: Any, change: bool) -> None:
         ctx = audit_context(request)
-        if change and engine.DAC7_FIELDS & set(form.changed_data):
+        if engine.DAC7_FIELDS & set(form.changed_data):
             correct_dac7_dataset(obj, ctx=ctx, stepped_up=is_recently_verified(request))
         else:
             save_vendor(obj, ctx=ctx)

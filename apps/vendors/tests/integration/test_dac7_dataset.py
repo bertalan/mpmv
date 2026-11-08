@@ -313,3 +313,63 @@ def test_the_admin_saves_a_dac7_correction_after_step_up(client: Client, staff: 
     assert entry.source == "admin"
     assert "98765432109" not in str(entry.after)
     assert "1980" not in str(entry.after)
+
+
+# --- Review of PR #137
+
+
+def test_same_as_vat_is_refused_where_the_vat_number_is_not_the_tin() -> None:
+    vendor = VendorFactory.create(eu_company=True)
+    vendor.tin_same_as_vat = True
+    with pytest.raises(ValidationError) as excinfo:
+        save_vendor(vendor, ctx=CTX)
+    assert "tin_same_as_vat" in excinfo.value.message_dict
+
+
+def test_vies_check_never_stores_an_invalid_derived_tin(seeded: None) -> None:
+    vendor = VendorFactory.create(eu_company=True)
+    Vendor.objects.filter(pk=vendor.pk).update(tin_same_as_vat=True)  # bypasses validation
+    vendor.refresh_from_db()
+    check_vat_number(vendor, FakeVatNumberValidator(default=engine.VIES_VALID), ctx=CTX)
+    stored = Vendor.objects.get(pk=vendor.pk)
+    assert (stored.tax_code, stored.tin_country) == ("", "")
+    assert "tax_code" not in legal_profile_completeness(stored).invalid
+
+
+def test_vies_unavailable_keeps_the_tin_derived_from_a_valid_answer() -> None:
+    vendor = VendorFactory.create(
+        italian_company=True, tax_code="", tin_country="", tin_same_as_vat=True
+    )
+    check_vat_number(vendor, FakeVatNumberValidator(default=engine.VIES_VALID), ctx=CTX)
+    check_vat_number(vendor, FakeVatNumberValidator(default=engine.VIES_UNAVAILABLE), ctx=CTX)
+    stored = Vendor.objects.get(pk=vendor.pk)
+    assert stored.vies_status == engine.VIES_UNAVAILABLE
+    assert (stored.tax_code, stored.tin_country) == (vendor.vat_number, "IT")
+    stored.phone = "+39 06 1234567"
+    save_vendor(stored, ctx=CTX)  # a later save keeps it too
+    assert Vendor.objects.get(pk=vendor.pk).tax_code == vendor.vat_number
+
+
+def add_form(**overrides: Any) -> dict[str, Any]:
+    vendor = VendorFactory.build(eu_company=True)
+    data = change_form(vendor, **overrides)
+    return {name: value for name, value in data.items() if name != "tin_same_as_vat"}
+
+
+def test_the_admin_refuses_a_new_vendor_with_dac7_data_without_a_fresh_second_factor(
+    client: Client, staff: User
+) -> None:
+    verified_login(client, staff, verified_at=time.time() - 3600)
+    response = client.post(reverse("admin:vendors_vendor_add"), add_form())
+    assert response.status_code == 200
+    assert "fresh second-factor verification" in response.content.decode()
+    assert not Vendor.objects.exists()
+
+
+def test_the_admin_adds_a_vendor_with_dac7_data_after_step_up(client: Client, staff: User) -> None:
+    verified_login(client, staff)
+    response = client.post(reverse("admin:vendors_vendor_add"), add_form())
+    assert response.status_code == 302, response.content.decode()
+    vendor = Vendor.objects.get()
+    assert vendor.tin_country == "DE"
+    assert AuditLog.objects.filter(action="vendor.created", target_key=str(vendor.public_id))

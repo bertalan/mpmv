@@ -451,7 +451,8 @@ def correct_dac7_dataset(
     vendor: Vendor, *, ctx: AuditContext, stepped_up: bool, dry_run: bool = False
 ) -> ChangeSet:
     """Save a staff correction or completion of the vendor's DAC7 dataset, audited as
-    `vendor.dac7_corrected` with before/after (TIN and personal data masked).
+    `vendor.dac7_corrected` with before/after (TIN and personal data masked). A new vendor
+    created with DAC7 data needs the same step-up; its entry stays `vendor.created` (SEC.4).
 
     `stepped_up` tells whether the staff member verified a second factor recently (CORE.4);
     without it the correction is refused with `engine.StepUpRequired` and nothing is saved.
@@ -460,7 +461,8 @@ def correct_dac7_dataset(
         raise engine.StepUpRequired(
             "Correcting the DAC7 dataset needs a fresh second-factor verification."
         )
-    return _save_vendor(vendor, ctx=ctx, dry_run=dry_run, action=DAC7_CORRECTED)
+    action = None if vendor._state.adding else DAC7_CORRECTED
+    return _save_vendor(vendor, ctx=ctx, dry_run=dry_run, action=action)
 
 
 REQUIREMENT_MODEL = "vendors.legalfieldrequirement"
