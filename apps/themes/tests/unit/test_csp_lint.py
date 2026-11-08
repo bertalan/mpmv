@@ -21,6 +21,9 @@ ROOT = Path(__file__).resolve().parents[4]
     [
         ("<script>alert(1)</script>", "inline <script>"),
         ('<script nonce="{{ csp_nonce }}">go()</script>', "inline <script>"),
+        ('<script type="text/javascript">go()</script>', "inline <script>"),
+        ('<script type="module">go()</script>', "inline <script>"),
+        ('<script type="application/javascript">go()</script>', "inline <script>"),
         ("<style>p{}</style>", "<style> block"),
         ('<p style="color:red">', "style attribute"),
         ('<button onclick="go()">', "on… handler attribute"),

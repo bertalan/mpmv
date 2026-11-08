@@ -1,0 +1,484 @@
+/* Base theme, component layer (THM.4, spec 14 §14.9): buttons (components/button.html), form
+   fields (components/field.html), the error summary (components/error_summary.html), cards,
+   product tiles, badges, alerts and the styleguide page. Colours only through tokens; every pair used here is in the token contract.
+   The default button and the secondary and ghost variants live in the base layer (THM.3). */
+@layer components {
+  /* --- Buttons: variants. Contrast is symmetric, so the danger hover (surface on danger) holds
+     the danger / surface pair; the ghost hover holds link / accent-tint. */
+
+  .button--danger {
+    --button-bg: transparent;
+    --button-fg: var(--color-danger);
+    --button-bg-hover: var(--color-danger);
+
+    border-color: var(--color-danger);
+  }
+
+  .button--danger:hover:not(:disabled, [aria-disabled="true"]) {
+    color: var(--color-surface);
+  }
+
+  .button--link {
+    --button-bg: transparent;
+    --button-fg: var(--color-link);
+    --button-bg-hover: transparent;
+
+    min-inline-size: var(--target-min);
+    padding-inline: var(--space-xs);
+    font-weight: 400;
+    text-decoration: underline;
+    text-decoration-thickness: 0.08em;
+    text-underline-offset: 0.18em;
+  }
+
+  .button--link:hover {
+    text-decoration-thickness: 0.14em;
+  }
+
+  /* --- Sizes: small keeps the 24 px minimum target (WCAG 2.5.8) for dense tools. */
+
+  .button--small {
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+    padding: 0.125rem var(--space-s);
+    font-size: 0.875em;
+  }
+
+  .button--large {
+    min-block-size: calc(var(--target-primary) + var(--space-s));
+    padding-inline: var(--space-l);
+    font-size: var(--step-1);
+  }
+
+  /* --- Icons: decorative, in the text colour, never shrunk by the label. */
+
+  .icon {
+    flex-shrink: 0;
+    inline-size: 1.25em;
+    block-size: 1.25em;
+  }
+
+  .button--icon {
+    padding: 0;
+    inline-size: var(--target-primary);
+  }
+
+  .button--icon.button--small {
+    inline-size: var(--target-min);
+  }
+
+  /* --- States. Disabled controls are exempt from the contrast rules (1.4.3) but keep a
+     readable muted text; a loading button keeps its colours and shows a spinner. */
+
+  button:disabled,
+  .button[aria-disabled="true"]:not(.button--loading) {
+    --button-bg: var(--color-surface-sunken);
+    --button-fg: var(--color-text-muted);
+    --button-bg-hover: var(--color-surface-sunken);
+
+    border-color: var(--color-border);
+    text-decoration: none;
+    cursor: not-allowed;
+  }
+
+  .button--loading {
+    cursor: progress;
+  }
+
+  .button__spinner {
+    inline-size: 1em;
+    block-size: 1em;
+    border: 0.15em solid currentcolor;
+    border-block-start-color: transparent;
+    border-radius: 50%;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .button__spinner {
+      animation: button-spin 0.8s linear infinite;
+    }
+  }
+
+  @keyframes button-spin {
+    to {
+      transform: rotate(1turn);
+    }
+  }
+
+  /* --- Form fields: textarea, file input, single checkbox, radio and checkbox groups. */
+
+  textarea {
+    min-block-size: 6rem;
+    resize: vertical;
+  }
+
+  input[type="file"] {
+    padding-block: var(--space-xs);
+  }
+
+  input[type="file"]::file-selector-button {
+    min-block-size: var(--target-min);
+    margin-inline-end: var(--space-s);
+    padding: 0.125rem var(--space-s);
+    background: var(--color-surface);
+    color: var(--color-link);
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-control);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .field__check {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-s);
+  }
+
+  /* The help text and errors of a single checkbox line up with its label, not the box. */
+  .field--check .helptext,
+  .field--check .errorlist {
+    margin-inline-start: calc(var(--target-min) + var(--space-s));
+  }
+
+  .field__check input {
+    flex-shrink: 0;
+    margin: 0.125rem 0 0;
+  }
+
+  .field__check label,
+  .field--group label {
+    margin: 0;
+    font-weight: 400;
+  }
+
+  .field--group label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-s);
+    min-block-size: var(--target-min);
+  }
+
+  .field--group input {
+    flex-shrink: 0;
+    margin: 0;
+  }
+
+  .field--group fieldset > div {
+    display: grid;
+    gap: var(--space-xs);
+  }
+
+  .field--disabled label,
+  .field--disabled legend {
+    color: var(--color-text-muted);
+  }
+
+  input:disabled,
+  select:disabled,
+  textarea:disabled {
+    background: var(--color-surface-sunken);
+    color: var(--color-text-muted);
+    border-color: var(--color-border);
+    cursor: not-allowed;
+  }
+
+  /* The base input rule is more specific than [aria-invalid] (THM.3): restate the border. */
+  .field--invalid input[aria-invalid="true"],
+  .field--invalid select[aria-invalid="true"],
+  .field--invalid textarea[aria-invalid="true"] {
+    border-color: var(--color-danger);
+    border-width: 2px;
+  }
+
+  .field--invalid input[type="checkbox"],
+  .field--invalid input[type="radio"] {
+    outline: 2px solid var(--color-danger);
+    outline-offset: 1px;
+  }
+
+  .field--invalid input[type="checkbox"]:focus-visible,
+  .field--invalid input[type="radio"]:focus-visible {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: var(--focus-offset);
+  }
+
+  /* --- Error summary: at the top of the form, a link per field error (WCAG 3.3.1). */
+
+  .error-summary {
+    max-inline-size: var(--measure-text);
+    margin-block: 0 var(--space-l);
+    padding: var(--space-m);
+    border: 0.25rem solid var(--color-danger);
+    border-radius: var(--radius-control);
+  }
+
+  .error-summary h2 {
+    margin-block: 0 var(--space-s);
+    font-size: var(--step-1);
+  }
+
+  .error-summary ul {
+    margin: 0;
+    padding-inline-start: var(--space-l);
+  }
+
+  .error-summary a {
+    color: var(--color-danger);
+    font-weight: 600;
+  }
+
+  /* --- Cards and product tiles (components/card.html, components/product_tile.html). The
+     title link's ::after covers the box, so the whole box is one link target and holds no
+     nested interactive element; the link keeps its own focus outline and the box shows one
+     more around itself. */
+
+  .card-grid,
+  .product-grid {
+    display: grid;
+    gap: var(--space-l);
+    margin: 0 0 var(--space-l);
+    padding: 0;
+    list-style: none;
+  }
+
+  .card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(16rem, 100%), 1fr));
+  }
+
+  .product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(13rem, 100%), 1fr));
+  }
+
+  .card-grid > li,
+  .product-grid > li {
+    display: grid;
+  }
+
+  .card,
+  .product-tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: var(--card-radius);
+  }
+
+  .card--linked:hover,
+  .product-tile:hover {
+    box-shadow: var(--shadow-raised);
+  }
+
+  .card__image,
+  .product-tile__media img {
+    display: block;
+    inline-size: 100%;
+    block-size: auto;
+    object-fit: cover;
+  }
+
+  .card__body,
+  .product-tile__body {
+    display: grid;
+    align-content: start;
+    gap: var(--space-xs);
+    padding: var(--card-padding);
+  }
+
+  .card__body > *,
+  .product-tile__body > * {
+    margin: 0;
+  }
+
+  .card__title,
+  .product-tile__name {
+    font-size: var(--step-1);
+    line-height: 1.25;
+  }
+
+  .card__meta,
+  .product-tile__vendor {
+    color: var(--color-text-muted);
+    font-size: 0.875em;
+  }
+
+  .card__link,
+  .product-tile__link {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .card__link:hover,
+  .product-tile__link:hover {
+    text-decoration: underline;
+  }
+
+  .card__link::after,
+  .product-tile__link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--card-radius);
+  }
+
+  .card__link:focus-visible::after,
+  .product-tile__link:focus-visible::after {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: calc(-1 * var(--focus-width));
+  }
+
+  .product-tile__media {
+    aspect-ratio: 1;
+    background: var(--color-surface-sunken);
+  }
+
+  .product-tile__media img {
+    block-size: 100%;
+  }
+
+  .product-tile__placeholder {
+    block-size: 100%;
+  }
+
+  .product-tile__price {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-xs) var(--space-s);
+    font-weight: 700;
+  }
+
+  .product-tile__price del {
+    color: var(--color-text-muted);
+    font-weight: 400;
+  }
+
+  .product-tile__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .product-tile--unavailable .product-tile__media img {
+    opacity: 0.6;
+  }
+
+  /* --- Badges: the meaning in words; colour only adds to it (WCAG 1.4.1). Pairs: danger,
+     text-muted and secondary-text on surface, accent on accent-tint. */
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem var(--space-s);
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid currentcolor;
+    border-radius: 999px;
+    font-size: 0.875em;
+    font-weight: 600;
+    line-height: 1.25;
+    white-space: nowrap;
+  }
+
+  .badge--sale {
+    color: var(--color-danger);
+  }
+
+  .badge--new {
+    background: var(--color-accent-tint);
+    color: var(--color-accent);
+  }
+
+  .badge--out-of-stock {
+    color: var(--color-text-muted);
+    border-style: dashed;
+  }
+
+  .badge--on-request {
+    color: var(--color-secondary-text);
+  }
+
+  /* --- Alerts (components/alert.html): the levels are in the base layer (THM.3); danger is
+     the component's name for the error level. A dismissible alert puts its button at the end. */
+
+  .alert--danger {
+    --alert-accent: var(--color-danger);
+  }
+
+  .alert__content > * {
+    margin-block: 0;
+  }
+
+  .alert__content > * + * {
+    margin-block-start: var(--space-xs);
+  }
+
+  .alert--dismissible {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-s);
+  }
+
+  .alert--dismissible .alert__content {
+    flex: 1;
+  }
+
+  .alert__dismiss {
+    flex-shrink: 0;
+  }
+
+  /* --- Styleguide page (/_styleguide/, staff only): examples in rows with a state caption. */
+
+  .styleguide section {
+    margin-block-end: var(--space-2xl);
+  }
+
+  .styleguide__examples {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-m) var(--space-l);
+    margin-block-end: var(--space-l);
+  }
+
+  .styleguide__example {
+    display: grid;
+    justify-items: start;
+    gap: var(--space-xs);
+  }
+
+  .styleguide__state {
+    color: var(--color-text-muted);
+    font-size: 0.875em;
+  }
+
+  .styleguide__forms {
+    display: grid;
+    gap: var(--space-xl);
+    grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
+  }
+
+  .styleguide__forms form {
+    margin: 0;
+  }
+}
+
+@layer utilities {
+  /* Text for screen readers only, kept in the accessibility tree. */
+  .visually-hidden {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+}

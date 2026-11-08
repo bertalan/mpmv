@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <!-- Styleguide sample image (THM.4): drawn for MPMV, no external source. -->
+  <rect width="400" height="400" fill="#E2E8F0"/>
+  <circle cx="200" cy="170" r="90" fill="#94A3B8"/>
+  <rect x="90" y="290" width="220" height="40" rx="8" fill="#64748B"/>
+</svg>

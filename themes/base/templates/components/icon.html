@@ -1,0 +1,10 @@
+{% comment %}
+Icon (THM.4, spec 14 §14.5): a decorative inline SVG, hidden from assistive technology; the
+control that shows it carries the text or the `aria-label`. Drawn in currentColor, 1em square.
+Simple strokes drawn for MPMV (clean-room, §14.8). A theme with its own icon set overrides this
+file, for example with a same-origin sprite (`<svg><use href="…#name">`).
+
+Context: `name`, one of close, search, plus, minus, menu, check.
+{% endcomment %}<svg class="icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+{% if name == "close" %}<path d="M6 6l12 12M18 6L6 18"/>{% elif name == "search" %}<path d="M10.5 4a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13zM15.5 15.5L20 20"/>{% elif name == "plus" %}<path d="M12 5v14M5 12h14"/>{% elif name == "minus" %}<path d="M5 12h14"/>{% elif name == "menu" %}<path d="M4 7h16M4 12h16M4 17h16"/>{% elif name == "check" %}<path d="M5 12.5l4.5 4.5L19 7"/>{% endif %}
+</svg>
