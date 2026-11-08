@@ -41,7 +41,7 @@ def test_staff_create_a_product_and_change_its_price(
     expect(page.locator(".messagelist")).to_contain_text("was added successfully")
 
     product = Product.objects.get()
-    assert product.sku == "BAG-01"
+    assert (product.sku, product.sku_key) == ("bag-01", "bag-01")  # kept as typed (CAT.13)
     assert product.translations.get(language="en").title == "Leather bag"
 
     page.locator("#id_price_net").fill("29.00")
