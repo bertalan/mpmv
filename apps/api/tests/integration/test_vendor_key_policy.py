@@ -1,7 +1,9 @@
 """CORE.14: the vendor API key policy, end to end.
 
-- A vendor key cannot be issued with a platform-only scope.
-- A suspended vendor's key reads (200) and is refused on writes (403), dry-runs included.
+- A vendor key is issued only for an active vendor, and never with a platform-only scope.
+- A vendor key holding a platform-only scope (issued before the policy) is refused it (403).
+- Only an active vendor's key writes: a suspended, applicant or onboarding vendor's key reads
+  (200) and is refused on writes (403), dry-runs included.
 - A closed vendor's key is refused (401).
 - Deleting a vendor writes one audit entry per key deleted with it.
 
@@ -22,6 +24,7 @@ from apps.api.engine import InvalidApiClient, Reason
 from apps.api.models import ApiClient, ApiMutationLog
 from apps.api.services import IssuedKey, authenticate, issue_api_client
 from apps.api.tests.factories import ApiClientFactory
+from apps.api.tests.integration.v1_api import VENDOR_SCOPE
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 from apps.vendors.models import Vendor, VendorMember
@@ -32,18 +35,23 @@ pytestmark = [pytest.mark.django_db, pytest.mark.urls("apps.api.tests.integratio
 
 SYSTEM = AuditContext(actor_label="system:test", source="system")
 ME = "/api/v1/me"  # a read open to any valid key
-ECHO = "/api/v1-test/test/echo"  # a write that needs test:write
+ECHO = "/api/v1-test/test/vendor/echo"  # a write that needs a vendor-grantable scope
 CLIENT_MODEL = "api.apiclient"
 HOOK = "apps.api.services.vendor_key_deletions"
+NOT_ACTIVE = [Vendor.Status.APPLICANT, Vendor.Status.ONBOARDING]
 
 
 def _bearer(key: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {key}"}
 
 
+def _active() -> Vendor:
+    return VendorFactory.create(status=Vendor.Status.ACTIVE)
+
+
 def _key_of(status: str, scopes: list[str] | None = None) -> str:
     vendor = VendorFactory.create(status=status)
-    _, key = ApiClientFactory.create_with_key(vendor=vendor, scopes=scopes or ["test:write"])
+    _, key = ApiClientFactory.create_with_key(vendor=vendor, scopes=scopes or [VENDOR_SCOPE])
     return key
 
 
@@ -75,7 +83,7 @@ def _issue(vendor: Vendor, scopes: list[str], **kwargs: Any) -> IssuedKey:
 
 @pytest.mark.parametrize("dry_run", [False, True])
 def test_a_vendor_key_cannot_be_issued_with_a_platform_only_scope(dry_run: bool) -> None:
-    vendor = VendorFactory.create()
+    vendor = _active()
     with pytest.raises(InvalidApiClient, match="platform-only"):
         _issue(vendor, ["catalog:write", "clients:write"], dry_run=dry_run)
     assert not ApiClient.objects.filter(vendor=vendor).exists()
@@ -89,14 +97,14 @@ def test_platform_staff_cannot_grant_a_platform_only_scope_to_a_vendor_key_eithe
             name="Vendor feed",
             scopes=["clients:write"],
             expires_at=timezone.now() + dt.timedelta(days=90),
-            vendor=VendorFactory.create(),
+            vendor=_active(),
             issuer=staff,
             ctx=SYSTEM,
         )
 
 
 def test_a_vendor_key_is_issued_with_vendor_grantable_scopes() -> None:
-    issued = _issue(VendorFactory.create(), ["catalog:write", "events:read"])
+    issued = _issue(_active(), ["catalog:write", "events:read"])
     assert issued.client is not None
     assert issued.client.scopes == ["catalog:write", "events:read"]
 
@@ -110,6 +118,90 @@ def test_a_platform_key_may_hold_a_platform_only_scope() -> None:
     )
     assert issued.client is not None
     assert issued.client.scopes == ["clients:write"]
+
+
+# --- Issuance: active vendors only
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_an_onboarding_vendors_owner_cannot_issue_a_key(dry_run: bool) -> None:
+    vendor = VendorFactory.create(status=Vendor.Status.ONBOARDING)
+    with pytest.raises(InvalidApiClient, match="active vendor; this vendor is onboarding"):
+        _issue(vendor, ["catalog:write"], dry_run=dry_run)
+    assert not ApiClient.objects.filter(vendor=vendor).exists()
+    assert not AuditLog.objects.filter(target_model=CLIENT_MODEL).exists()
+
+
+@pytest.mark.parametrize(
+    "status", [Vendor.Status.APPLICANT, Vendor.Status.SUSPENDED, Vendor.Status.CLOSED]
+)
+def test_no_vendor_key_is_issued_unless_the_vendor_is_active(status: str) -> None:
+    with pytest.raises(InvalidApiClient, match=f"this vendor is {status}"):
+        _issue(VendorFactory.create(status=status), ["catalog:read"])
+
+
+def test_platform_staff_cannot_issue_a_key_for_a_vendor_that_is_not_active_either() -> None:
+    staff = UserFactory.create(staff=True, permissions=["api.add_apiclient"])
+    with pytest.raises(InvalidApiClient, match="active vendor"):
+        issue_api_client(
+            name="Vendor feed",
+            scopes=["catalog:read"],
+            expires_at=timezone.now() + dt.timedelta(days=90),
+            vendor=VendorFactory.create(status=Vendor.Status.ONBOARDING),
+            issuer=staff,
+            ctx=SYSTEM,
+        )
+
+
+def test_the_stored_vendor_status_decides_the_issuance() -> None:
+    vendor = _active()
+    Vendor.objects.filter(pk=vendor.pk).update(status=Vendor.Status.SUSPENDED)
+    with pytest.raises(InvalidApiClient, match="suspended"):
+        _issue(vendor, ["catalog:read"])  # the instance still says active
+
+
+# --- Platform-only scopes held from before the policy
+
+
+def test_a_vendor_key_holding_a_platform_only_scope_is_refused_it(client: Client) -> None:
+    key = _key_of(Vendor.Status.ACTIVE, scopes=[VENDOR_SCOPE, "test:write"])
+    response = client.post(
+        "/api/v1-test/test/echo",
+        data={"name": "Item", "quantity": 1},
+        content_type="application/json",
+        headers=_bearer(key),
+    )
+    assert response.status_code == 403
+    assert response.json()["code"] == Reason.INSUFFICIENT_SCOPE
+    assert _write(client, key).status_code == 200  # its vendor-grantable scope still works
+
+
+# --- Not yet active vendor: reads only
+
+
+@pytest.mark.parametrize("status", NOT_ACTIVE)
+def test_a_not_yet_active_vendors_key_reads(client: Client, status: str) -> None:
+    assert client.get(ME, headers=_bearer(_key_of(status))).status_code == 200
+
+
+@pytest.mark.parametrize("status", NOT_ACTIVE)
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_an_existing_key_of_a_not_yet_active_vendor_gets_403_on_writes(
+    client: Client, status: str, dry_run: bool
+) -> None:
+    response = _write(client, _key_of(status), dry_run=dry_run)
+    assert response.status_code == 403
+    assert response["Content-Type"] == "application/problem+json"
+    assert response.json()["code"] == Reason.VENDOR_NOT_ACTIVE
+
+
+def test_activating_a_vendor_gives_its_existing_keys_their_writes(client: Client) -> None:
+    vendor = VendorFactory.create(status=Vendor.Status.ONBOARDING)
+    _, key = ApiClientFactory.create_with_key(vendor=vendor, scopes=[VENDOR_SCOPE])
+    assert _write(client, key).status_code == 403
+
+    Vendor.objects.filter(pk=vendor.pk).update(status=Vendor.Status.ACTIVE)
+    assert _write(client, key).status_code == 200
 
 
 # --- Suspended vendor: reads only
@@ -142,7 +234,7 @@ def test_an_active_vendors_key_writes(client: Client) -> None:
 
 def test_reinstating_a_vendor_gives_its_keys_their_writes_back(client: Client) -> None:
     vendor = VendorFactory.create(status=Vendor.Status.SUSPENDED)
-    _, key = ApiClientFactory.create_with_key(vendor=vendor, scopes=["test:write"])
+    _, key = ApiClientFactory.create_with_key(vendor=vendor, scopes=[VENDOR_SCOPE])
     assert _write(client, key).status_code == 403
 
     Vendor.objects.filter(pk=vendor.pk).update(status=Vendor.Status.ACTIVE)

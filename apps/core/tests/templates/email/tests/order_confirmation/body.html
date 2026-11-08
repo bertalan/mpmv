@@ -1,0 +1,7 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate %}Thank you, {{ customer_name }}. We received order {{ order_number }}.{% endblocktranslate %}</p>
+<p>{% blocktranslate %}Total: {{ total }} EUR{% endblocktranslate %}</p>
+</body>
+</html>

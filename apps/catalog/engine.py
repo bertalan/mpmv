@@ -1,9 +1,11 @@
-"""Pure catalog rules (spec 03 §3.2): SKU normalization, price validation, the rules of the
-category and term trees and of the attributes a taxonomy declares for its terms, and the shape of
-a product's typed attributes, variant axes and variants (CAT.3). No ORM here."""
+"""Pure catalog rules (spec 03 §3.2): the vendor SKU match key and warnings (CAT.13), price
+validation, the rules of the category and term trees and of the attributes a taxonomy declares for
+its terms, and the shape of a product's typed attributes, variant axes and variants (CAT.3). No ORM
+here."""
 
 import datetime as dt
 import re
+import unicodedata
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -13,22 +15,50 @@ from apps.core.money import CENT, to_decimal
 
 SKU_MAX_LENGTH = 64
 
-
-class InvalidSku(ValueError):
-    """The SKU is empty once normalized."""
-
-
-def canonical_sku(value: str) -> str:
-    """The stored form of a SKU: no surrounding whitespace, upper case. Never raises."""
-    return value.strip().upper()
+# Characters that commonly break exports, URLs, spreadsheets or matching (spec 03 §3.2).
+_SKU_SLASHES = frozenset("/\\")
+_SKU_QUOTES = frozenset("'\"`\u2018\u2019\u201a\u201b\u201c\u201d\u201e\u00b4")
 
 
-def normalize_sku(value: str) -> str:
-    """`canonical_sku`, refusing a SKU that is empty once normalized."""
-    sku = canonical_sku(value)
-    if not sku:
-        raise InvalidSku("A SKU cannot be empty.")
-    return sku
+def sku_match_key(raw: str) -> str:
+    """The key a vendor SKU is matched on: NFKC, trimmed, inner whitespace collapsed to one
+    space, case-folded. Never raises; an empty key means an unusable SKU (`sku_errors`)."""
+    text = unicodedata.normalize("NFKC", raw)
+    text = " ".join(text.split()).casefold()
+    return unicodedata.normalize("NFKC", text)
+
+
+def sku_errors(raw: str) -> list[str]:
+    """Why a SKU cannot be used at all; empty when usable. Odd characters are warnings."""
+    key = sku_match_key(raw)
+    if not key:
+        return ["A SKU cannot be empty."]
+    if len(key) > SKU_MAX_LENGTH:
+        return [f"A SKU cannot be longer than {SKU_MAX_LENGTH} characters once normalised."]
+    return []
+
+
+def sku_warnings(raw: str) -> list[str]:
+    """Characters that commonly cause trouble in a SKU. Never blocks: the SKU is kept as
+    entered, the vendor is told."""
+    warnings: list[str] = []
+    if raw != raw.strip():
+        warnings.append("starts or ends with a space")
+    inner = raw.strip()
+    if "  " in inner or any(c.isspace() and c != " " for c in inner):
+        warnings.append("contains repeated spaces, tabs or line breaks")
+    if any(c in _SKU_SLASHES for c in raw):
+        warnings.append("contains a slash")
+    if any(c in _SKU_QUOTES for c in raw):
+        warnings.append("contains quotes")
+    if any(unicodedata.category(c)[0] == "C" and not c.isspace() for c in raw):
+        warnings.append("contains control or invisible characters")
+    if any(
+        ord(c) > 127 and not unicodedata.category(c).startswith("C") and c not in _SKU_QUOTES
+        for c in raw
+    ):
+        warnings.append("contains non-ASCII characters that can look like others")
+    return warnings
 
 
 def to_price(value: object) -> Decimal:
@@ -61,7 +91,9 @@ def price_errors(
     errors: dict[str, str] = {}
     if price_net is not None and price_net == 0:
         errors["price_net"] = ZERO_PRICE
-    if sale_price_net is None:
+    if sale_price_net is not None and sale_price_net == 0:
+        errors["sale_price_net"] = ZERO_SALE_PRICE
+    elif sale_price_net is None:
         if sale_from is not None or sale_to is not None:
             errors["sale_price_net"] = "A sale period needs a sale price."
     elif price_net is None:
@@ -78,6 +110,15 @@ def price_errors(
 BUY = "buy"  # the only sales mode with a public price (models.SalesMode.BUY)
 ZERO_PRICE = "A price cannot be 0.00; leave it empty when there is no price."
 PRICE_REQUIRED = "A product for sale needs a price."
+# A sale or an override at 0.00 would sell for nothing. Owner to confirm for the sale price
+# (a 100% sale would need this rule relaxed).
+ZERO_SALE_PRICE = "A sale price must be above 0.00."
+ZERO_OVERRIDE = "A price override must be above 0.00; leave it empty to use the product's price."
+
+
+def override_error(price_net_override: Decimal | None) -> str | None:
+    """A variant override is empty (the product's price) or above 0.00."""
+    return ZERO_OVERRIDE if price_net_override is not None and price_net_override == 0 else None
 
 
 class Priced(Protocol):
@@ -100,6 +141,22 @@ def public_price(product: Priced) -> Decimal | None:
     staff, but it is never public: not on pages, feeds or JSON-LD. Back to `buy`, it shows again.
     """
     return product.price_net if product.sales_mode == BUY else None
+
+
+class Overriding(Protocol):
+    @property
+    def price_net_override(self) -> Decimal | None: ...
+
+
+def public_variant_price(product: Priced, variant: Overriding) -> Decimal | None:
+    """The net price buyers may see for `variant`: its override, else the product's price.
+
+    None ("Price on request") unless the product is for sale: an override of an `on_request` or
+    `catalog_only` product is never public, like the product's own price.
+    """
+    if public_price(product) is None:
+        return None
+    return product.price_net if variant.price_net_override is None else variant.price_net_override
 
 
 # --- Trees (CAT.2): categories and terms use treebeard materialized paths.
@@ -399,13 +456,14 @@ def product_structure_errors(
         errors.append("A variable product needs at least one variant.")
 
     combinations: dict[tuple[str, ...], str] = {}
-    skus: set[str] = set()
+    skus: dict[str, str] = {}  # match key (CAT.13) -> the SKU as first given
     for variant in variants:
         errors.extend(_variant_errors(variant, axes, allowed))
-        sku = canonical_sku(variant.sku)
-        if sku in skus:
-            errors.append(f"The variant SKU {sku} is given twice.")
-        skus.add(sku)
+        key = sku_match_key(variant.sku)
+        if key in skus:
+            errors.append(f"The variant SKU {skus[key]} is given twice.")
+        else:
+            skus[key] = variant.sku
         combination = tuple(variant.options.get(axis, "") for axis in axes)
         if combination in combinations:
             errors.append(

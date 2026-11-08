@@ -1,7 +1,8 @@
 """Catalog services: audited price changes (CAT.1), audited product and variant edits (CAT.12),
-taxonomy queries (CAT.2), the catalogue integrity rules (CAT.14), and products created with
-typed attributes, variant axes and variants (CAT.3), and product slugs with their history
-(CAT.5).
+taxonomy queries (CAT.2), the catalogue integrity rules (CAT.14), products created with typed
+attributes, variant axes and variants (CAT.3), product slugs with their history (CAT.5), the
+vendor SKU: audited renames and matching by match key and alias history (CAT.13), and the listing
+query (CAT.8).
 
 Every price change goes through here, whatever the adapter (admin, API, import, MCP): it is
 validated, returned as a ChangeSet (dry-run) and written to the audit log. The 30-day price
@@ -9,7 +10,9 @@ history for the Omnibus rule (CMP.6) can be built from these audit rows.
 """
 
 import datetime as dt
-from collections.abc import Iterable
+import logging
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Any
 
@@ -26,13 +29,17 @@ from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.services import audit_changes, run_mutation
 from apps.vendors.models import Vendor
-from apps.vendors.services import vendors_in_suggestions
+from apps.vendors.scoping import VendorScopedQuerySet
+from apps.vendors.services import ensure_vendor_can_write, vendors_in_suggestions
 
-from . import engine, slugs
+from . import engine, listings, slugs
 from .models import (
     Attribute,
     AttributeValue,
+    Brand,
+    BrandTranslation,
     Category,
+    CategoryTranslation,
     FiscalCategory,
     Product,
     ProductAttribute,
@@ -40,12 +47,20 @@ from .models import (
     ProductStatus,
     ProductTranslation,
     SalesMode,
+    SkuAlias,
     SlugHistory,
     StockStatus,
+    Taxonomy,
+    TaxonomyTranslation,
     Term,
+    TermTranslation,
     Variant,
     VariantOption,
+    sku_owner,
+    sku_taken_message,
 )
+
+logger = logging.getLogger(__name__)
 
 PRODUCT_MODEL = "catalog.product"
 VARIANT_MODEL = "catalog.variant"
@@ -145,6 +160,9 @@ def set_variant_price(
 ) -> ChangeSet:
     """Set or clear (None) the net price override of `variant`; audited like product prices."""
     prices = {"price_net_override": _price("price_net_override", price_net_override, optional=True)}
+    zero = engine.override_error(prices["price_net_override"])
+    if zero is not None:
+        raise ValidationError({"price_net_override": zero})
     with transaction.atomic():
         current = (
             Variant.objects.select_for_update(of=("self",))
@@ -380,13 +398,210 @@ def products_in_category(
     return Product.objects.filter(in_tree).distinct()
 
 
+# --- The vendor SKU (CAT.13, owner decisions Q-30 and Q-33)
+
+SKU_ALIAS_MODEL = "catalog.skualias"
+PRODUCT_SKU_RENAMED = "catalog.product.sku_renamed"
+VARIANT_SKU_RENAMED = "catalog.variant.sku_renamed"
+SKU_ROWS_UPDATED = "catalog.sku_rows_updated"
+
+# Fields an update by SKU may write: stock only. Prices, weights and the rest go through their
+# own audited services; creating products belongs to the import pipelines (ING).
+SKU_ROW_FIELDS = frozenset({"stock_qty", "stock_status"})
+
+type SkuItem = Product | Variant
+
+
+def _label(item: SkuItem) -> str:
+    """How a report names an item to the vendor: never the staff-only `staff_ref`."""
+    kind = "product" if isinstance(item, Product) else "variant"
+    return f"{kind} {item.sku!r} ({item.public_id})"
+
+
+class AmbiguousSkuMatch(ValidationError):
+    """Some SKUs match more than one item of the vendor (a current SKU and another item's old
+    alias): the run stops, the importer never guesses. `candidates` maps each such SKU, as
+    given, to the items it matches."""
+
+    def __init__(self, candidates: Mapping[str, Sequence[SkuItem]]) -> None:
+        self.candidates = {raw: list(items) for raw, items in candidates.items()}
+        lines = [
+            f"SKU {raw!r} matches " + " and ".join(_label(item) for item in items)
+            for raw, items in self.candidates.items()
+        ]
+        super().__init__("Ambiguous SKU match, nothing written: " + "; ".join(lines) + ".")
+
+
+def sku_snapshot(item: SkuItem) -> dict[str, Any]:
+    return {"sku": item.sku, "sku_key": item.sku_key, "vendor": str(item.vendor.public_id)}
+
+
+def _lock(item: SkuItem) -> SkuItem:
+    if isinstance(item, Product):
+        return (
+            Product.objects.select_for_update(of=("self",)).select_related("vendor").get(pk=item.pk)
+        )
+    return Variant.objects.select_for_update(of=("self",)).select_related("vendor").get(pk=item.pk)
+
+
+def _rename(
+    item: SkuItem, sku: str, *, model: str, action: str, ctx: AuditContext, dry_run: bool
+) -> ChangeSet:
+    errors = engine.sku_errors(sku)
+    if errors:
+        raise ValidationError({"sku": errors})
+    new_key = engine.sku_match_key(sku)
+    with transaction.atomic():
+        current = _lock(item)
+        owner = sku_owner(
+            current.vendor_id,
+            new_key,
+            product_pk=current.pk if isinstance(current, Product) else None,
+            variant_pk=current.pk if isinstance(current, Variant) else None,
+        )
+        if owner is not None:
+            raise ValidationError({"sku": sku_taken_message(owner)})
+        before = sku_snapshot(current)
+        changes = ChangeSet()
+        changes.update(
+            model, str(current.public_id), before, {**before, "sku": sku, "sku_key": new_key}
+        )
+        if new_key != current.sku_key:  # the database trigger writes the alias row
+            changes.create(
+                SKU_ALIAS_MODEL,
+                f"{current.vendor.public_id}:{current.sku_key}",
+                {
+                    "sku": current.sku,
+                    "sku_key": current.sku_key,
+                    model.split(".")[1]: str(current.public_id),
+                },
+            )
+
+        def apply() -> None:
+            current.sku = sku
+            current.save(update_fields=["sku", "updated_at"])
+
+        run_mutation(changes, apply, ctx=ctx, action=action, dry_run=dry_run)
+
+    if not dry_run:
+        item.sku, item.sku_key = sku, new_key
+    return changes
+
+
+def rename_product_sku(
+    product: Product, sku: str, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Give `product` a new vendor SKU, kept raw. The old match key stays as a `SkuAlias`, so
+    older import files still match. Odd characters are allowed (`engine.sku_warnings`); an
+    empty SKU or a match key the vendor already uses is a ValidationError."""
+    return _rename(
+        product, sku, model=PRODUCT_MODEL, action=PRODUCT_SKU_RENAMED, ctx=ctx, dry_run=dry_run
+    )
+
+
+def rename_variant_sku(
+    variant: Variant, sku: str, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """`rename_product_sku` for a variant: the namespace is shared with products."""
+    return _rename(
+        variant, sku, model=VARIANT_MODEL, action=VARIANT_SKU_RENAMED, ctx=ctx, dry_run=dry_run
+    )
+
+
+def match_skus(vendor: Vendor, skus: Iterable[str]) -> dict[str, SkuItem | None]:
+    """The product or variant of `vendor` each SKU (as given) refers to, or None.
+
+    Matches the current match key, then the `SkuAlias` history. A SKU matching more than one
+    item raises AmbiguousSkuMatch naming every candidate, before anything is written.
+    """
+    raw_skus = list(dict.fromkeys(skus))
+    keys = {raw: engine.sku_match_key(raw) for raw in raw_skus}
+    wanted = set(keys.values())
+    found: dict[str, dict[tuple[str, int], SkuItem]] = {key: {} for key in wanted}
+    for product in Product.objects.filter(vendor=vendor, sku_key__in=wanted):
+        found[product.sku_key][("product", product.pk)] = product
+    for variant in Variant.objects.filter(vendor=vendor, sku_key__in=wanted):
+        found[variant.sku_key][("variant", variant.pk)] = variant
+    aliases = SkuAlias.objects.filter(vendor=vendor, sku_key__in=wanted).select_related(
+        "product", "variant"
+    )
+    for alias in aliases:
+        if alias.product is not None:
+            found[alias.sku_key].setdefault(("product", alias.product.pk), alias.product)
+        elif alias.variant is not None:
+            found[alias.sku_key].setdefault(("variant", alias.variant.pk), alias.variant)
+
+    result: dict[str, SkuItem | None] = {}
+    ambiguous: dict[str, list[SkuItem]] = {}
+    for raw in raw_skus:
+        items = list(found[keys[raw]].values())
+        if len(items) > 1:
+            ambiguous[raw] = items
+        result[raw] = items[0] if len(items) == 1 else None
+    if ambiguous:
+        raise AmbiguousSkuMatch(ambiguous)
+    return result
+
+
+@dataclass(frozen=True)
+class SkuRow:
+    """One row of a vendor file: a SKU and the values to set (`SKU_ROW_FIELDS` only)."""
+
+    sku: str
+    values: Mapping[str, Any] = field(default_factory=dict)
+
+
+def update_by_sku(
+    vendor: Vendor, rows: Sequence[SkuRow], *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Update the vendor's products and variants named by SKU (match key, then aliases).
+
+    All or nothing: an ambiguous SKU (AmbiguousSkuMatch), an unknown SKU or a field outside
+    `SKU_ROW_FIELDS` (ValidationError) stops the run before anything is written. Another
+    vendor's items are never matched.
+    """
+    outside = sorted({name for row in rows for name in row.values} - SKU_ROW_FIELDS)
+    if outside:
+        raise ValidationError(f"These fields cannot be updated by SKU: {', '.join(outside)}.")
+    matches = match_skus(vendor, (row.sku for row in rows))
+    unknown = [raw for raw, item in matches.items() if item is None]
+    if unknown:
+        raise ValidationError(
+            "No product or variant of this vendor has these SKUs: "
+            + ", ".join(repr(raw) for raw in unknown)
+            + "."
+        )
+
+    changes = ChangeSet()
+    updates: list[tuple[SkuItem, dict[str, Any]]] = []
+    for row in rows:
+        item = matches[row.sku]
+        if item is None:  # pragma: no cover - refused above
+            continue
+        before = {"sku": item.sku, **{name: getattr(item, name) for name in row.values}}
+        model = PRODUCT_MODEL if isinstance(item, Product) else VARIANT_MODEL
+        changes.update(model, str(item.public_id), before, {**before, **row.values})
+        updates.append((item, dict(row.values)))
+
+    def apply() -> None:
+        for item, values in updates:
+            for name, value in values.items():
+                setattr(item, name, value)
+            item.save(update_fields=[*values, "updated_at"])
+
+    return run_mutation(changes, apply, ctx=ctx, action=SKU_ROWS_UPDATED, dry_run=dry_run)
+
+
 # --- Catalogue integrity (CAT.14, owner decisions Q-32 and Q-33)
 
 PRODUCT_DUPLICATED = "catalog.product.duplicated_to_vendor"
 UPSELL_NOT_ALLOWED = "{sku}: its vendor has not opted in to other vendors' suggestions."
 
-# A copy gets its own identity and timestamps.
-DUPLICATE_SKIPPED = frozenset({"id", "public_id", "created_at", "updated_at"})
+# A copy gets its own identity and timestamps: a new staff_ref from the database sequence and a
+# match key set on save from its SKU (CAT.13).
+DUPLICATE_SKIPPED = frozenset(
+    {"id", "public_id", "created_at", "updated_at", "staff_ref", "sku_key"}
+)
 
 
 def _copy[M: models.Model](instance: M, **overrides: Any) -> M:
@@ -445,10 +660,20 @@ def duplicate_product_to_vendor(
         )
         copy.full_clean()
         variants = list(original.variants.prefetch_related("translations"))
-        taken = Variant.objects.filter(vendor=vendor, sku__in=[v.sku for v in variants])
-        if taken.exists():
-            skus = ", ".join(sorted(taken.values_list("sku", flat=True)))
-            raise ValidationError({"sku": f"The vendor already has variants with SKU {skus}."})
+        # The copy's own SKU was checked by full_clean; its variants share the target vendor's
+        # namespace with products and variants alike, by match key (CAT.13).
+        keys = {variant.sku_key: variant.sku for variant in variants}
+        taken = {
+            *Product.objects.filter(vendor=vendor, sku_key__in=keys).values_list(
+                "sku_key", flat=True
+            ),
+            *Variant.objects.filter(vendor=vendor, sku_key__in=keys).values_list(
+                "sku_key", flat=True
+            ),
+        }
+        if taken:
+            skus = ", ".join(sorted(keys[key] for key in taken))
+            raise ValidationError({"sku": f"The vendor already uses these SKUs: {skus}."})
 
         changes = ChangeSet()
         changes.create(
@@ -477,17 +702,82 @@ def duplicate_product_to_vendor(
                 },
             )
 
+        vendor_key = str(vendor.public_id)
+        copy_key = str(copy.public_id)
+        copied_texts = [_copy(t, product_id=None, slug="") for t in original.translations.all()]
+        for new_text in copied_texts:  # new slugs, unique against every other product's (CAT.5)
+            new_text.slug = slugs.unique_product_slug(
+                new_text.title,
+                new_text.language,
+                taken=_SlugsOfOtherProducts(new_text.language, None),
+            )
+            changes.create(
+                "catalog.producttranslation",
+                str(new_text.public_id),
+                {
+                    "vendor": vendor_key,
+                    "product": copy_key,
+                    "language": new_text.language,
+                    "title": new_text.title,
+                    "slug": new_text.slug,
+                },
+            )
+        attribute_rows = list(
+            original.attributes.select_related("attribute").prefetch_related("values")
+        )
+        attribute_copies = [_copy(row, product_id=None) for row in attribute_rows]
+        for row, row_copy in zip(attribute_rows, attribute_copies, strict=True):
+            changes.create(
+                "catalog.productattribute",
+                str(row_copy.public_id),
+                {
+                    "vendor": vendor_key,
+                    "product": copy_key,
+                    "attribute": row.attribute.code,
+                    "values": sorted(v.value for v in row.values.all()),
+                    "numeric_value": row_copy.numeric_value,
+                    "text_value": row_copy.text_value,
+                    "is_variant_axis": row_copy.is_variant_axis,
+                    "position": row_copy.position,
+                },
+            )
+        option_copies: list[list[VariantOption]] = []
+        for variant, variant_copy in zip(variants, copies, strict=True):
+            options = list(variant.variant_options.select_related("attribute", "value"))
+            option_copies.append([_copy(option, variant_id=None) for option in options])
+            for option in options:
+                changes.create(
+                    "catalog.variantoption",
+                    f"{variant_copy.public_id}:{option.attribute.code}",
+                    {
+                        "vendor": vendor_key,
+                        "variant": str(variant_copy.public_id),
+                        "attribute": option.attribute.code,
+                        "value": option.value.value,
+                    },
+                )
+
         def apply() -> None:
             copy.save()
             copy.secondary_categories.set(original.secondary_categories.all())
             copy.terms.set(original.terms.all())
-            for translation in original.translations.all():
-                _copy(translation, product_id=copy.pk, slug="").save()
-            for variant, variant_copy in zip(variants, copies, strict=True):
+            for new_text in copied_texts:
+                new_text.product = copy
+                new_text.save()
+            for row, row_copy in zip(attribute_rows, attribute_copies, strict=True):
+                row_copy.product = copy
+                row_copy.save()
+                row_copy.values.set(row.values.all())
+            for variant, variant_copy, new_options in zip(
+                variants, copies, option_copies, strict=True
+            ):
                 variant_copy.product = copy
                 variant_copy.save()
                 for text in variant.translations.all():
                     _copy(text, variant_id=variant_copy.pk).save()
+                for option in new_options:
+                    option.variant = variant_copy
+                VariantOption.objects.bulk_create(new_options)
 
         return run_mutation(changes, apply, ctx=ctx, action=PRODUCT_DUPLICATED, dry_run=dry_run)
 
@@ -552,10 +842,6 @@ def _product_errors(
 ) -> dict[str, list[str]]:
     """Every reason the payload cannot be created, by field (NON_FIELD_ERRORS: its shape)."""
     errors: dict[str, list[str]] = {}
-    try:
-        engine.normalize_sku(data.sku)
-    except engine.InvalidSku as exc:
-        _add_error(errors, "sku", str(exc))
     price = _amount(errors, "price_net", data.price_net)
     if price is not None and price == 0:  # CAT.14, Q-31: never 0.00
         _add_error(errors, "price_net", engine.ZERO_PRICE)
@@ -582,22 +868,56 @@ def _product_errors(
     ):
         _add_error(errors, NON_FIELD_ERRORS, message)
     for variant in data.variants:
-        if not engine.canonical_sku(variant.sku):
-            _add_error(errors, "variants", "A variant SKU cannot be empty.")
-        _amount(errors, "variants", variant.price_net_override)
+        override = _amount(errors, "variants", variant.price_net_override)
+        zero = engine.override_error(override)
+        if zero is not None:
+            _add_error(errors, "variants", f"{variant.sku}: {zero}")
         weight_error = engine.weight_error(variant.weight_kg_override)
         if weight_error is not None:
             _add_error(errors, "variants", f"{variant.sku}: the weight override {weight_error}")
         if variant.stock_qty < 0:
             _add_error(errors, "variants", f"{variant.sku}: the stock cannot be negative.")
 
-    if Product.objects.filter(vendor=vendor, sku=engine.canonical_sku(data.sku)).exists():
-        _add_error(errors, "sku", "This vendor already has a product with this SKU.")
-    skus = [engine.canonical_sku(v.sku) for v in data.variants]
-    taken = Variant.objects.filter(vendor=vendor, sku__in=skus).values_list("sku", flat=True)
-    for sku in sorted(taken):
-        _add_error(errors, "variants", f"This vendor already has a variant with this SKU: {sku}.")
+    _sku_namespace_errors(errors, vendor, data)
     return errors
+
+
+def _sku_namespace_errors(
+    errors: dict[str, list[str]], vendor: Vendor, data: engine.ProductIn
+) -> None:
+    """The SKUs are usable and free in the vendor's namespace: one per match key, across
+    products and variants together (CAT.13, Q-30); the database would refuse them."""
+    for message in engine.sku_errors(data.sku):
+        _add_error(errors, "sku", message)
+    product_key = engine.sku_match_key(data.sku)
+    if product_key:
+        owner = sku_owner(vendor.pk, product_key)
+        if owner is not None:
+            _add_error(errors, "sku", sku_taken_message(owner))
+    given: dict[str, str] = {}  # match key -> the variant SKU as first given
+    for variant in data.variants:
+        key = engine.sku_match_key(variant.sku)
+        if not key:
+            _add_error(errors, "variants", "A variant SKU cannot be empty.")
+        else:
+            for message in engine.sku_errors(variant.sku):
+                _add_error(errors, "variants", f"{variant.sku!r}: {message}")
+        if key:
+            given.setdefault(key, variant.sku)
+    if product_key in given:
+        _add_error(
+            errors,
+            "variants",
+            f"A variant cannot have the SKU of its product: {given[product_key]}.",
+        )
+    for model, label in ((Product, "product"), (Variant, "variant")):
+        taken = model.objects.filter(vendor=vendor, sku_key__in=given).values_list(
+            "sku_key", flat=True
+        )
+        for sku in sorted(given[key] for key in taken):
+            _add_error(
+                errors, "variants", f"This vendor already has a {label} with this SKU: {sku}."
+            )
 
 
 def create_product(
@@ -606,6 +926,7 @@ def create_product(
     *,
     ctx: AuditContext,
     dry_run: bool = False,
+    require_active_vendor: bool = False,
 ) -> ChangeSet:
     """Create `vendor`'s product with its texts, typed attributes, variant axes and variants.
 
@@ -615,6 +936,10 @@ def create_product(
     order they are given in, so the first axis given is the first axis shown; the variants are
     numbered in display order: by the first axis, then the next, each by the position of the
     value in its attribute (S, M, L). Raises ValidationError, also on dry-run.
+
+    `require_active_vendor` is for a write on behalf of the vendor's own API key (CORE.14): the
+    vendor's status is read again inside the write transaction (`ensure_vendor_can_write`), and
+    `VendorCannotWrite` is raised, nothing written, unless the vendor is still active.
     """
     catalogue = _attribute_catalogue({a.code for a in data.attributes})
     errors = _product_errors(vendor, data, catalogue)
@@ -624,7 +949,7 @@ def create_product(
     vendor_key = str(vendor.public_id)
     product = Product(
         vendor=vendor,
-        sku=engine.canonical_sku(data.sku),
+        sku=data.sku,
         kind=data.kind,
         sales_mode=data.sales_mode,
         fiscal_category=data.fiscal_category,
@@ -657,6 +982,10 @@ def create_product(
         )
         for text in data.translations
     ]
+    for text in texts:  # the slug is derived now, so the ChangeSet and the row agree (CAT.5)
+        text.slug = slugs.unique_product_slug(
+            text.title, text.language, taken=_SlugsOfOtherProducts(text.language, None)
+        )
     for text in texts:
         changes.create(
             "catalog.producttranslation",
@@ -666,6 +995,7 @@ def create_product(
                 "product": product_key,
                 "language": text.language,
                 "title": text.title,
+                "slug": text.slug,
             },
         )
 
@@ -705,7 +1035,7 @@ def create_product(
         variant = Variant(
             product=product,
             vendor=vendor,
-            sku=engine.canonical_sku(given_variant.sku),
+            sku=given_variant.sku,
             price_net_override=_amount({}, "variants", given_variant.price_net_override),
             weight_kg_override=_stored(given_variant.weight_kg_override, engine.WEIGHT_DECIMALS),
             stock_qty=given_variant.stock_qty,
@@ -742,6 +1072,8 @@ def create_product(
             )
 
     def apply() -> None:
+        if require_active_vendor:
+            ensure_vendor_can_write(vendor)
         product.save()
         for text in texts:
             text.save()
@@ -836,9 +1168,9 @@ class _SlugsOfOtherProducts:
     """The current and old slugs of the other products in one language, asked one at a time:
     collisions are rare, so a few lookups beat loading every slug of the catalog."""
 
-    def __init__(self, language: str, product_id: int) -> None:
+    def __init__(self, language: str, product_id: int | None) -> None:
         self.language = language
-        self.product_id = product_id
+        self.product_id = -1 if product_id is None else product_id  # -1: not saved yet
 
     def __contains__(self, slug: object) -> bool:
         return (
@@ -1023,3 +1355,510 @@ def old_slug_redirect(language: str, slug: str) -> str | None:
     if current is None:
         return None
     return slugs.product_path(language, current, default_language=settings.LANGUAGE_CODE)
+
+
+# --- Listings (CAT.8): the query behind category, term, brand and vendor pages and the CMS
+# product grid (CMS.10). Parsing and URLs are pure (`listings`); slugs and querysets are here.
+
+LISTING_ORDER = ("-created_at", "-pk")  # newest first; the pk keeps pages stable
+LISTING_PER_PAGE = 24
+
+
+@dataclass(frozen=True)
+class ListingScope:
+    """The fixed context of a listing: the page it is on, or the CMS grid's selection.
+
+    Each given part narrows the listing; a category or term includes its subtree.
+    """
+
+    category: Category | None = None
+    term: Term | None = None
+    brand: Brand | None = None
+    vendor: Vendor | None = None
+
+
+@dataclass(frozen=True)
+class ListingFilter:
+    """Visitor filters resolved to tree paths and objects.
+
+    Categories are OR-ed; term groups are AND-ed, the terms of one group (one taxonomy) OR-ed,
+    each with its subtree. A price bound keeps only products with a public price (Q-31).
+    """
+
+    category_paths: tuple[str, ...] = ()
+    term_groups: tuple[tuple[str, ...], ...] = ()
+    vendor: Vendor | None = None
+    price_min: Decimal | None = None
+    price_max: Decimal | None = None
+    matches_nothing: bool = False
+
+
+@dataclass(frozen=True)
+class ResolvedFilter:
+    filters: ListingFilter
+    unknown: tuple[str, ...] = ()  # keys with a value that matched nothing (a stale link)
+
+
+@dataclass(frozen=True)
+class ListingPage:
+    params: listings.ListingParams
+    products: list[Product]
+    window: listings.PageWindow
+    unknown: tuple[str, ...]
+
+
+def listed_products() -> "VendorScopedQuerySet[Product]":
+    """Products a visitor may see in a listing: published, of an active vendor.
+
+    Retired products keep their page (spec 03 §3.2) but leave the listings. Products without a
+    public price are listed, showing "Price on request".
+    """
+    return Product.objects.filter(
+        status=ProductStatus.PUBLISHED, vendor__status=Vendor.Status.ACTIVE
+    )
+
+
+def _in_subtrees(field: str, paths: Iterable[str]) -> Q:
+    q = Q()
+    for path in paths:
+        q |= Q(**{f"{field}__path__startswith": path})
+    return q
+
+
+def _matching(products: "QuerySet[Product]", condition: Q) -> "QuerySet[Product]":
+    """Narrow through a subquery, so a to-many join never duplicates a product."""
+    return products.filter(pk__in=Product.objects.filter(condition).values("pk"))
+
+
+NO_SCOPE = ListingScope()
+NO_FILTER = ListingFilter()
+
+
+def listing_products(
+    scope: ListingScope = NO_SCOPE, filters: ListingFilter = NO_FILTER
+) -> "QuerySet[Product]":
+    """The listed products of `scope` matching `filters`, newest first. Slice it for a grid."""
+    scoped = listed_products()
+    if filters.matches_nothing:
+        return scoped.none()
+    for vendor in (scope.vendor, filters.vendor):
+        if vendor is not None:
+            scoped = scoped.for_vendor(vendor)  # the tenant scope (CORE.3)
+    products: QuerySet[Product] = scoped
+    if scope.brand is not None:
+        products = products.filter(brand=scope.brand)
+    category_paths = (scope.category.path,) if scope.category is not None else ()
+    for paths in (category_paths, filters.category_paths):
+        if paths:
+            in_tree = _in_subtrees("category", paths) | _in_subtrees("secondary_categories", paths)
+            products = _matching(products, in_tree)
+    scope_terms = ((scope.term.path,),) if scope.term is not None else ()
+    for group in (*scope_terms, *filters.term_groups):
+        products = _matching(products, _in_subtrees("terms", group))
+    if filters.price_min is not None or filters.price_max is not None:
+        products = products.filter(sales_mode=SalesMode.BUY, price_net__isnull=False)
+        if filters.price_min is not None:
+            products = products.filter(price_net__gte=filters.price_min)
+        if filters.price_max is not None:
+            products = products.filter(price_net__lte=filters.price_max)
+    return products.order_by(*LISTING_ORDER)
+
+
+def _paths_by_slug_path(
+    rows: "QuerySet[Any]", owner: str, values: Iterable[str], language: str
+) -> dict[str, str]:
+    """The tree path of the one category or term each slug path names; values that name none,
+    or more than one, are left out.
+
+    Each level matches its slug in `language` or, for nodes without a text in it, in the source
+    language (explicit EN fallback, D-18). Slugs are unique among siblings in one language only,
+    so a level is matched below the previous one; a slug two siblings answer to (one's own
+    text, the other's fallback) is ambiguous and matches nothing.
+    """
+    paths = {value: listings.slug_path(value) for value in values}
+    segments = {slug for path in paths.values() for slug in path}
+    source = translations.source_language()
+    candidates = list(
+        rows.filter(slug__in=segments, language__in={language, source}).values_list(
+            f"{owner}_id", "language", "slug", f"{owner}__path", f"{owner}__depth"
+        )
+    )
+    translated = set(
+        rows.filter(
+            language=language, **{f"{owner}_id__in": {c[0] for c in candidates}}
+        ).values_list(f"{owner}_id", flat=True)
+    )
+    level: dict[tuple[int, str], list[str]] = {}
+    for owner_id, row_language, slug, tree_path, depth in candidates:
+        if row_language == language or owner_id not in translated:
+            level.setdefault((depth, slug), []).append(tree_path)
+    found: dict[str, str] = {}
+    for value, slug_path in paths.items():
+        parent = ""
+        for depth, slug in enumerate(slug_path, start=1):
+            matches = [p for p in level.get((depth, slug), []) if p.startswith(parent)]
+            if len(matches) != 1:
+                break
+            parent = matches[0]
+        else:
+            found[value] = parent
+    return found
+
+
+def listing_term_keys(language: str) -> dict[str, Taxonomy]:
+    """The filterable taxonomies by their slug in `language` (EN fallback): the query keys of
+    the term filters. A slug equal to a reserved listing parameter is left out.
+
+    The slug constraint holds per language, so one taxonomy's slug in `language` can equal
+    another's EN fallback slug: the slug in `language` wins, and the clash is logged.
+    """
+    source = translations.source_language()
+    by_taxonomy: dict[int, TaxonomyTranslation] = {}
+    rows = TaxonomyTranslation.objects.filter(
+        taxonomy__filterable=True, language__in={language, source}
+    ).select_related("taxonomy")
+    for row in rows:
+        if row.taxonomy_id not in by_taxonomy or row.language == language:
+            by_taxonomy[row.taxonomy_id] = row
+    keys: dict[str, TaxonomyTranslation] = {}
+    for row in sorted(by_taxonomy.values(), key=lambda r: r.taxonomy_id):
+        if not row.slug or row.slug in listings.RESERVED_KEYS:
+            continue
+        taken = keys.get(row.slug)
+        if taken is not None:
+            kept, dropped = (taken, row) if taken.language == language else (row, taken)
+            logger.warning(
+                "Listing filter key %r in %r: taxonomy %s (fallback slug) is hidden by "
+                "taxonomy %s; give it a slug in this language.",
+                row.slug,
+                language,
+                dropped.taxonomy.code,
+                kept.taxonomy.code,
+            )
+            row = kept
+        keys[row.slug] = row
+    return {slug: row.taxonomy for slug, row in keys.items()}
+
+
+def parse_listing_query(query: Mapping[str, Sequence[str]], language: str) -> listings.ParsedParams:
+    """`listings.parse_listing_params` with the taxonomy keys of `language`."""
+    return listings.parse_listing_params(query, term_keys=listing_term_keys(language).keys())
+
+
+def resolve_listing_filter(params: listings.ListingParams, language: str) -> ResolvedFilter:
+    """Turn the slugs of `params` into a filter. A value that matches nothing (a renamed term,
+    a closed vendor) is reported in `unknown`, and the filter then matches nothing: the
+    adapter answers 404 or redirects to the canonical URL without it. Category and term values
+    are slug paths from the top of their tree (`parent/child`)."""
+    unknown: list[str] = []
+    category_paths: tuple[str, ...] = ()
+    if params.category:
+        category = _paths_by_slug_path(
+            CategoryTranslation.objects.all(), "category", [params.category], language
+        ).get(params.category)
+        if category is not None:
+            category_paths = (category,)
+        else:
+            unknown.append(listings.CATEGORY)
+    taxonomies = listing_term_keys(language) if params.terms else {}
+    term_groups: list[tuple[str, ...]] = []
+    for key, term_slugs in params.terms:
+        taxonomy = taxonomies.get(key)
+        found: dict[str, str] = {}
+        if taxonomy is not None:
+            rows = TermTranslation.objects.filter(term__taxonomy=taxonomy)
+            found = _paths_by_slug_path(rows, "term", term_slugs, language)
+        if any(slug not in found for slug in term_slugs):
+            unknown.append(key)
+        term_groups.append(tuple(sorted(set(found.values()))))
+    vendor = None
+    if params.vendor:
+        vendor = Vendor.objects.filter(slug=params.vendor, status=Vendor.Status.ACTIVE).first()
+        if vendor is None:
+            unknown.append(listings.VENDOR)
+    filters = ListingFilter(
+        category_paths=category_paths,
+        term_groups=tuple(term_groups),
+        vendor=vendor,
+        price_min=params.price_min,
+        price_max=params.price_max,
+        matches_nothing=bool(unknown),
+    )
+    return ResolvedFilter(filters=filters, unknown=tuple(sorted(unknown)))
+
+
+def listing_page(
+    scope: ListingScope,
+    params: listings.ListingParams,
+    language: str,
+    *,
+    per_page: int = LISTING_PER_PAGE,
+) -> ListingPage:
+    """One page of a listing: its products, the page window and the unknown filter keys.
+
+    A page past the end has no products and `window.out_of_range` (the adapter answers 404).
+    """
+    resolved = resolve_listing_filter(params, language)
+    products = listing_products(scope, resolved.filters)
+    window = listings.page_window(total=products.count(), page=params.page, per_page=per_page)
+    rows: list[Product] = []
+    if not window.out_of_range:
+        selected = products.select_related("vendor", "brand", "category")
+        rows = list(selected[window.offset : window.offset + window.limit])
+    return ListingPage(params=params, products=rows, window=window, unknown=resolved.unknown)
+
+
+# --- Listing pages (CAT.8): what a category, term, brand or vendor page is about, the page path
+# in every language (D-07 URLs), and filters re-expressed in another language for the canonical
+# and hreflang links.
+
+
+@dataclass(frozen=True)
+class ListingAnchor:
+    """The subject of a listing page and where the page lives in each language.
+
+    `paths` holds the page path in every configured language the page exists in: each slug is
+    the one of the published text in that language, else of the published source text (the
+    explicit fallback, spec 09). `published` are the languages with their own published text,
+    the `hreflang` set; any other language shows the fallback with the source canonical.
+    """
+
+    scope: ListingScope
+    name: str
+    paths: dict[str, str]
+    published: tuple[str, ...]
+
+    def is_fallback(self, language: str) -> bool:
+        return language not in self.published
+
+
+def _languages() -> list[str]:
+    return [str(code) for code, _name in settings.LANGUAGES]
+
+
+def _published_slugs(rows: "QuerySet[Any]", owner: str) -> dict[int, dict[str, str]]:
+    """Published slugs by owner id, then by language."""
+    found: dict[int, dict[str, str]] = {}
+    published = rows.filter(status=translations.PUBLISHED, slug__gt="")
+    for owner_id, language, slug in published.values_list(f"{owner}_id", "language", "slug"):
+        found.setdefault(owner_id, {})[language] = slug
+    return found
+
+
+def _public_slug(slugs_by_language: Mapping[str, str], language: str) -> str | None:
+    return slugs_by_language.get(language) or slugs_by_language.get(translations.source_language())
+
+
+def _public_slug_paths(
+    chain: Sequence[Any], published: Mapping[int, Mapping[str, str]]
+) -> dict[str, tuple[str, ...]]:
+    """The slug path of the last node of `chain` (root first) in every language where each
+    node has a published text in that language or in the source language."""
+    found: dict[str, tuple[str, ...]] = {}
+    for language in _languages():
+        parts = [_public_slug(published.get(node.pk, {}), language) for node in chain]
+        if all(parts):
+            found[language] = tuple(str(part) for part in parts)
+    return found
+
+
+def _published_languages(published: Mapping[str, str]) -> tuple[str, ...]:
+    return tuple(language for language in _languages() if language in published)
+
+
+def _find_tree_path(rows: "QuerySet[Any]", owner: str, value: str, language: str) -> str | None:
+    """The tree path of the node a slug path names in `language` (with the source fallback),
+    else in any other configured language: an other-language URL still finds its page, which
+    then redirects to its own slugs."""
+    for candidate in dict.fromkeys([language, *_languages()]):
+        found = _paths_by_slug_path(rows, owner, [value], candidate).get(value)
+        if found is not None:
+            return found
+    return None
+
+
+def _by_slug(rows: "QuerySet[Any]", slug: str, language: str) -> Any:
+    """The row with `slug`, preferring `language`, then the source language, then any."""
+    order = {language: 0, translations.source_language(): 1}
+    candidates = sorted(rows.filter(slug=slug), key=lambda row: order.get(row.language, 2))
+    return candidates[0] if candidates else None
+
+
+def _translated_name(resolved: Any) -> str:
+    return str(resolved.translation.name) if resolved.translation is not None else ""
+
+
+def category_anchor(slug_path: str, language: str) -> ListingAnchor | None:
+    """The category page at `/product-category/{slug_path}/`; None when there is none."""
+    rows = CategoryTranslation.objects.all()
+    tree_path = _find_tree_path(rows, "category", slug_path, language)
+    if tree_path is None:
+        return None
+    category = Category.objects.get(path=tree_path)
+    chain = [*category.get_ancestors(), category]
+    published = _published_slugs(rows.filter(category__in=chain), "category")
+    paths = {
+        lang: slugs.category_path(lang, parts, default_language=settings.LANGUAGE_CODE)
+        for lang, parts in _public_slug_paths(chain, published).items()
+    }
+    return ListingAnchor(
+        scope=ListingScope(category=category),
+        name=_translated_name(category.translation(language)),
+        paths=paths,
+        published=_published_languages(published.get(category.pk, {})),
+    )
+
+
+def _landing_taxonomy_texts() -> "QuerySet[TaxonomyTranslation]":
+    return TaxonomyTranslation.objects.filter(
+        taxonomy__has_landing=True, status=translations.PUBLISHED
+    )
+
+
+def landing_taxonomy_slug_exists(slug: str) -> bool:
+    """Whether `slug` is the published slug, in some language, of a taxonomy with term pages
+    (an unreviewed text never claims a path)."""
+    return _landing_taxonomy_texts().filter(slug=slug).exists()
+
+
+def term_anchor(taxonomy_slug: str, slug_path: str, language: str) -> ListingAnchor | None:
+    """The term page at `/{taxonomy}/{term}/…` (D-07); None when there is none. The taxonomy
+    segment is a published slug; the views hand any path that names no term page to the CMS."""
+    taxonomy_rows = _landing_taxonomy_texts()
+    found = _by_slug(taxonomy_rows.select_related("taxonomy"), taxonomy_slug, language)
+    if found is None:
+        return None
+    taxonomy = found.taxonomy
+    term_rows = TermTranslation.objects.filter(term__taxonomy=taxonomy)
+    tree_path = _find_tree_path(term_rows, "term", slug_path, language)
+    if tree_path is None:
+        return None
+    term = Term.objects.get(path=tree_path)
+    chain = [*term.get_ancestors(), term]
+    published = _published_slugs(term_rows.filter(term__in=chain), "term")
+    taxonomy_slugs = _published_slugs(taxonomy_rows.filter(taxonomy=taxonomy), "taxonomy")
+    paths: dict[str, str] = {}
+    for lang, parts in _public_slug_paths(chain, published).items():
+        segment = _public_slug(taxonomy_slugs.get(taxonomy.pk, {}), lang)
+        if segment is not None:
+            paths[lang] = slugs.term_path(
+                lang, segment, parts, default_language=settings.LANGUAGE_CODE
+            )
+    return ListingAnchor(
+        scope=ListingScope(term=term),
+        name=_translated_name(term.translation(language)),
+        paths=paths,
+        published=_published_languages(published.get(term.pk, {})),
+    )
+
+
+def brand_anchor(slug: str, language: str) -> ListingAnchor | None:
+    """The brand page at `/brand/{slug}/`; None when there is none."""
+    found = _by_slug(BrandTranslation.objects.select_related("brand"), slug, language)
+    if found is None:
+        return None
+    brand = found.brand
+    published = _published_slugs(BrandTranslation.objects.filter(brand=brand), "brand")
+    brand_slugs = published.get(brand.pk, {})
+    paths: dict[str, str] = {}
+    for lang in _languages():
+        public = _public_slug(brand_slugs, lang)
+        if public is not None:
+            paths[lang] = slugs.brand_path(lang, public, default_language=settings.LANGUAGE_CODE)
+    return ListingAnchor(
+        scope=ListingScope(brand=brand),
+        name=str(brand.name),
+        paths=paths,
+        published=_published_languages(brand_slugs),
+    )
+
+
+def vendor_anchor(slug: str, language: str) -> ListingAnchor | None:
+    """The product listing of an active vendor's storefront at `/shop/{slug}/`.
+
+    The vendor slug is not translated, so the page exists in every language; the languages
+    with a published vendor text are the `hreflang` set (the source language when there is
+    none yet).
+    """
+    vendor = Vendor.objects.filter(slug=slug, status=Vendor.Status.ACTIVE).first()
+    if vendor is None:
+        return None
+    texts = set(
+        vendor.translations.filter(status=translations.PUBLISHED).values_list("language", flat=True)
+    )
+    published = tuple(lang for lang in _languages() if lang in texts)
+    paths = {
+        lang: slugs.vendor_path(lang, vendor.slug, default_language=settings.LANGUAGE_CODE)
+        for lang in _languages()
+    }
+    return ListingAnchor(
+        scope=ListingScope(vendor=vendor),
+        name=str(vendor.display_name),
+        paths=paths,
+        published=published or (translations.source_language(),),
+    )
+
+
+def _filter_slug_paths(
+    rows: "QuerySet[Any]", owner: str, tree_paths: Iterable[str], steplen: int, language: str
+) -> dict[str, str]:
+    """The slug path naming each node of `tree_paths` in a `language` filter: each level's slug
+    in that language, else in the source language (the rule of `_paths_by_slug_path`). One
+    query for all of them; a node with a level that has no such slug is left out."""
+    trees = set(tree_paths)
+    levels = {
+        tree: [tree[:end] for end in range(steplen, len(tree) + 1, steplen)] for tree in trees
+    }
+    prefixes = {prefix for chain in levels.values() for prefix in chain}
+    if not prefixes:
+        return {}
+    source = translations.source_language()
+    found: dict[str, str] = {}
+    matching = rows.filter(
+        **{f"{owner}__path__in": prefixes}, language__in={language, source}
+    ).values_list(f"{owner}__path", "language", "slug")
+    for path, row_language, slug in matching:
+        if row_language == language or path not in found:
+            found[path] = slug
+    return {
+        tree: listings.PATH_SEPARATOR.join(found[prefix] for prefix in chain)
+        for tree, chain in levels.items()
+        if all(prefix in found for prefix in chain)
+    }
+
+
+def listing_params_in(
+    params: listings.ListingParams, from_language: str, to_language: str
+) -> listings.ListingParams | None:
+    """The `params` of a `from_language` page, written for the same listing in `to_language`
+    (taxonomy keys, category and term slug paths depend on the language). None when a value has
+    no equivalent there."""
+    if from_language == to_language or not (params.category or params.terms):
+        return params
+    category = params.category
+    if category:
+        rows = CategoryTranslation.objects.all()
+        tree = _paths_by_slug_path(rows, "category", [category], from_language).get(category)
+        if tree is None:
+            return None
+        written = _filter_slug_paths(rows, "category", [tree], Category.steplen, to_language)
+        category = written.get(tree)
+        if category is None:
+            return None
+    from_keys = listing_term_keys(from_language)
+    to_keys = {taxonomy.pk: key for key, taxonomy in listing_term_keys(to_language).items()}
+    terms: list[tuple[str, tuple[str, ...]]] = []
+    for key, values in params.terms:
+        taxonomy = from_keys.get(key)
+        new_key = to_keys.get(taxonomy.pk) if taxonomy is not None else None
+        if new_key is None:
+            return None
+        term_rows = TermTranslation.objects.filter(term__taxonomy=taxonomy)
+        trees = _paths_by_slug_path(term_rows, "term", values, from_language)
+        if any(value not in trees for value in values):
+            return None
+        written = _filter_slug_paths(term_rows, "term", trees.values(), Term.steplen, to_language)
+        if any(tree not in written for tree in trees.values()):
+            return None
+        terms.append((new_key, tuple(sorted({written[trees[value]] for value in values}))))
+    return replace(params, category=category, terms=tuple(sorted(terms)))
