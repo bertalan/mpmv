@@ -1,14 +1,19 @@
 """CMS services: locales from settings, the editors' MFA policy, seed pages and menus (CMS.1);
-legal page versions and the link to the vendor application (CMS.5).
+page translation with wagtail-localize (I18N.3); legal page versions and the link to the vendor
+application (CMS.5).
 
 Pages and menus are edited in the Wagtail admin, which keeps their revisions and its own log of
 every edit, so they are not audited here: `seed_site` only adds sample content where it is
-missing (local development, STAGE and the e2e suite). Legal page versions are the exception:
-they are the record of which text applied when, so each one is audited.
+missing (local development, STAGE and the e2e suite). Translators work in wagtail-localize's
+editor; the translation services below do the same steps for scripts and migrations (MIG.7),
+each with a dry run that rolls everything back and reports the pages it would change. Legal
+page versions are the exception to auditing: they are the record of which text applied when,
+so each one is audited.
 """
 
 import hashlib
 import json
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -19,6 +24,13 @@ from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.text import slugify
 from wagtail.models import Locale, Page, Site
+from wagtail_localize.models import (
+    OverridableSegment,
+    SegmentOverride,
+    Translation,
+    TranslationSource,
+)
+from wagtail_localize.operations import TranslationCreator
 
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
@@ -194,6 +206,150 @@ def seed_site() -> SeedReport:
         local_about = _translated(about, locale, texts.about, report)
         _ensure_menus(locale, local_home, local_about, report, sources=primary_menus)
     return report
+
+
+# --- Page translation (I18N.3)
+
+PAGE = "cms.page"
+
+
+def _snapshot(page: Page) -> dict[str, Any]:
+    """What a translation changes on a page: texts, the main image, the body.
+
+    wagtail-localize publishes a translation once the transaction commits, so the live state is
+    not part of it.
+    """
+    page = page.specific
+    body = getattr(page, "body", None)
+    return {
+        "title": page.title,
+        "slug": page.slug,
+        "image": getattr(page, "image_id", None),
+        "body": json.dumps(body.raw_data, sort_keys=True, default=str) if body else "",
+    }
+
+
+def _current(page: Page) -> Page:
+    """The page as stored: a caller's copy may predate a publish (its `live` flag included)."""
+    current: Page = Page.objects.get(pk=page.pk).specific
+    return current
+
+
+def _key(page: Page, locale: Locale) -> str:
+    return f"{page.translation_key}:{locale.language_code}"
+
+
+def _in_savepoint(dry_run: bool, work: Callable[[ChangeSet], None]) -> ChangeSet:
+    """Run `work` in a savepoint, rolled back when `dry_run`: the changes are reported only."""
+    changes = ChangeSet()
+    with transaction.atomic():
+        work(changes)
+        if dry_run:
+            transaction.set_rollback(True)
+    return changes
+
+
+def translate_page(
+    page: Page,
+    language_codes: Iterable[str],
+    *,
+    user: AbstractBaseUser | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Create synced wagtail-localize translations of `page` in the languages it lacks.
+
+    Each copy goes under the translation of the page's parent (the language's home page) and
+    starts with the source texts and images, published when the source is. Languages that
+    already have the page, and the page's own language, are left alone.
+    """
+    page = _current(page)
+    codes = [code for code in dict.fromkeys(language_codes) if code != page.locale.language_code]
+    missing = [
+        locale
+        for locale in Locale.objects.filter(language_code__in=codes)
+        if page.get_translation_or_none(locale) is None
+    ]
+
+    def work(changes: ChangeSet) -> None:
+        if not missing:
+            return
+        TranslationCreator(user, missing).create_translations(page)
+        for locale in missing:
+            changes.create(PAGE, _key(page, locale), _snapshot(page.get_translation(locale)))
+
+    return _in_savepoint(dry_run, work)
+
+
+def sync_page_translations(
+    page: Page, *, user: AbstractBaseUser | None = None, dry_run: bool = False
+) -> ChangeSet:
+    """Bring the source page's current content into its translations ("Sync translated pages").
+
+    Published string translations and image overrides are kept; texts without a translation
+    and images without an override follow the source. A translation is published again when
+    it is live.
+    """
+    page = _current(page)
+
+    def work(changes: ChangeSet) -> None:
+        source, _created = TranslationSource.update_or_create_from_instance(page)
+        translations = source.translations.filter(enabled=True).select_related("target_locale")
+        for translation in translations:
+            target = translation.get_target_instance()
+            before = _snapshot(target)
+            translation.save_target(user=user, publish=target.live)
+            after = _snapshot(translation.get_target_instance())
+            changes.update(PAGE, _key(page, translation.target_locale), before, after)
+
+    return _in_savepoint(dry_run, work)
+
+
+def override_image(
+    page: Page,
+    language_code: str,
+    path: str,
+    image: Any,
+    *,
+    user: AbstractBaseUser | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Replace one image of `page` in one language only, as a translator does in the editor.
+
+    `path` names the image segment: `image` for the main image, `body.<block id>.image` for an
+    image block. The other languages keep the source image. Raises LookupError when the page
+    has no wagtail-localize translation in that language or no such image segment.
+    """
+    page = _current(page)
+    translation = (
+        Translation.objects.filter(
+            source__object_id=page.translation_key,
+            target_locale__language_code=language_code,
+            enabled=True,
+        )
+        .select_related("source", "target_locale")
+        .first()
+    )
+    if translation is None:
+        raise LookupError(f"No translation of {page} in {language_code!r}")
+    segment = OverridableSegment.objects.filter(
+        source=translation.source, context__path=path
+    ).first()
+    if segment is None:
+        raise LookupError(f"No image at {path!r} in {page}")
+
+    def work(changes: ChangeSet) -> None:
+        SegmentOverride.objects.update_or_create(
+            locale=translation.target_locale,
+            context=segment.context,
+            defaults={"data_json": json.dumps(image.pk), "last_translated_by": user},
+        )
+        target = translation.get_target_instance()
+        before = _snapshot(target)
+        translation.save_target(user=user, publish=target.live)
+        after = _snapshot(translation.get_target_instance())
+        changes.update(PAGE, _key(page, translation.target_locale), before, after)
+
+    return _in_savepoint(dry_run, work)
 
 
 # --- Legal pages and vendor recruitment (CMS.5)
