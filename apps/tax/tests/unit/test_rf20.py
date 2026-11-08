@@ -15,6 +15,12 @@ from apps.vendors.engine import CROSS_BORDER_FRANCHISE_REGIME, FLAT_RATE_REGIME
 RF20 = CROSS_BORDER_FRANCHISE_REGIME
 
 ACCEPTED = [("oss", ""), ("domestic_only", ""), ("exempt", "art74_publishing"), ("exempt", "other")]
+# The "other" exemption names the country of the law its legal note cites (TAX.13).
+LAW_COUNTRY = "DE"
+
+
+def law_country(reason: str) -> str:
+    return LAW_COUNTRY if reason == "other" else ""
 
 
 # --- Profile consistency
@@ -24,7 +30,10 @@ ACCEPTED = [("oss", ""), ("domestic_only", ""), ("exempt", "art74_publishing"), 
 def test_an_rf20_vendor_may_have_any_regime_but_the_flat_rate_exemption(
     regime: str, reason: str
 ) -> None:
-    assert engine.profile_errors(regime, reason, fiscal_regime=RF20) == {}
+    errors = engine.profile_errors(
+        regime, reason, fiscal_regime=RF20, exempt_country=law_country(reason)
+    )
+    assert errors == {}
 
 
 def test_an_rf20_profile_with_the_flat_rate_exemption_is_reported() -> None:
@@ -62,7 +71,11 @@ def test_requests_involving_rf20_are_accepted(
     regime: str, reason: str, requested: str, current: str
 ) -> None:
     errors = engine.request_errors(
-        regime, reason, requested_fiscal_regime=requested, current_fiscal_regime=current
+        regime,
+        reason,
+        requested_fiscal_regime=requested,
+        current_fiscal_regime=current,
+        exempt_country=law_country(reason),
     )
     assert errors == {}
 
