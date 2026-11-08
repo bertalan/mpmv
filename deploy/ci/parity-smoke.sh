@@ -196,11 +196,11 @@ done
 [ "$(podman exec mpmv-app stat -c %u:%g /app/media)" = 10001:10001 ] || fail "media volume not owned by the image user"
 podman exec mpmv-app python manage.py check --deploy --fail-level ERROR
 # The app's own connection is TLS, and the server refuses one without it.
-app_ssl="$(podman exec mpmv-app python manage.py shell -c '
+app_ssl="$(podman exec mpmv-app python manage.py shell --verbosity 0 -c '
 from django.db import connection
 with connection.cursor() as cursor:
     cursor.execute("SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()")
-    print(cursor.fetchone()[0])')"
+    print(cursor.fetchone()[0])' | tail -n 1)"
 [ "$app_ssl" = True ] || fail "the app's database connection is not TLS ($app_ssl)"
 if podman exec mpmv-app python -c '
 import os, psycopg
