@@ -54,10 +54,13 @@ flowchart LR
 ```
 
 - **Environments**: local (Apple `container`, same OCI images), STAGE, LIVE; differences only via env; STAGE with synthetic data.
-  STAGE and LIVE run on Hetzner Cloud, EU region, x86 servers
-  ([ADR-0007](../adr/0007-hosting-hetzner-self-managed-postgres.md)): each has an app VPS (app,
+  STAGE and LIVE run on Hetzner Cloud, EU region, servers (Arm64 recommended)
+  ([ADR-0007](../adr/0007-hosting-hetzner-self-managed-postgres.md)). LIVE has an app VPS (app,
   worker and Caddy as Podman Quadlets) and a dedicated database VPS running self-managed
-  PostgreSQL 17, reachable only over the Hetzner private network. The app still connects with
+  PostgreSQL 17, reachable only over the Hetzner private network. STAGE (synthetic data only) runs
+  all of this on one VPS, with PostgreSQL listening on the loopback interface only (owner
+  decision 2026-11-08); STAGE and LIVE never share a machine, keys or database. The release
+  image is multi-arch (amd64 and arm64). The app still connects with
   TLS and `sslmode=verify-full`: the database is not public, so no public certificate is needed,
   and a free internal certificate authority (openssl or step-ca) signs the server certificate;
   the app container mounts its root certificate (owner decision MQ-11, ARC.13).
