@@ -170,9 +170,10 @@ def test_a_term_card_label_replaces_the_term_name(seeded: SeedReport, model_term
 
 def test_a_term_without_published_texts_gets_no_card(seeded: SeedReport) -> None:
     term = TermFactory.create()
-    TermTranslationFactory.create(term=term, language="en", name="Hidden", slug="hidden")
-    html = _publish(_home(), [_featured(_card("term", term, label="Hidden"))])
-    assert "Hidden" not in html
+    # A label no layout uses (the base theme's header binds an Alpine `toggleHidden`).
+    TermTranslationFactory.create(term=term, language="en", name="Unlisted term", slug="unlisted")
+    html = _publish(_home(), [_featured(_card("term", term, label="Unlisted term"))])
+    assert "Unlisted term" not in html
 
 
 # --- Vendor cards
