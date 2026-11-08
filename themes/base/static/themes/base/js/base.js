@@ -132,7 +132,7 @@ revealDismissButtons(document);
 document.addEventListener("htmx:load", (event) => revealDismissButtons(event.target));
 document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-dismiss]");
-  const alert = button && button.closest(".alert");
+  const alert = button && button.closest(".alert, .toast");
   if (!alert) {
     return;
   }
@@ -168,3 +168,94 @@ document.addEventListener(
 // marked data-autofocus takes the focus, so the visitor starts on the list of errors (WCAG
 // 3.3.1). A module runs once the document is parsed, so the box is already there.
 document.querySelector(".error-summary[data-autofocus]")?.focus();
+
+// Script-only controls of the component library (THM.4): the dialog openers
+// (components/dialog.html, components/gallery.html), the carousel buttons
+// (components/carousel.html), the quantity buttons (components/quantity_stepper.html) and the
+// toast buttons of the styleguide (components/toast.html) are
+// rendered `hidden`, so without JavaScript no button does nothing. Revealed here, and in every
+// element htmx adds.
+const ENHANCED = "[data-dialog], [data-carousel], [data-step], [data-toast]";
+
+// Quantity stepper: the buttons step the field within its min and max, fire the events a typed
+// change fires, and are disabled at the limits (or with the field).
+function syncStepper(input) {
+  const value = Number(input.value);
+  for (const button of input.closest(".quantity").querySelectorAll("[data-step]")) {
+    const down = button.dataset.step === "-1";
+    const limit = down ? input.min : input.max;
+    const atLimit = limit !== "" && (down ? value <= Number(limit) : value >= Number(limit));
+    button.disabled = input.disabled || atLimit;
+  }
+}
+
+function revealEnhanced(root) {
+  const buttons = [...(root.querySelectorAll?.(ENHANCED) ?? [])];
+  if (root.matches?.(ENHANCED)) {
+    buttons.push(root);
+  }
+  for (const button of buttons) {
+    button.hidden = false;
+  }
+  for (const input of root.querySelectorAll?.(".quantity input") ?? []) {
+    syncStepper(input);
+  }
+}
+
+revealEnhanced(document);
+document.addEventListener("htmx:load", (event) => revealEnhanced(event.target));
+document.addEventListener("input", (event) => {
+  if (event.target.matches?.(".quantity input")) {
+    syncStepper(event.target);
+  }
+});
+
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+document.addEventListener("click", (event) => {
+  // Dialog: a native modal; the browser traps the focus, closes on Escape and returns the focus.
+  const opener = event.target.closest("[data-dialog]");
+  if (opener) {
+    document.getElementById(opener.dataset.dialog)?.showModal();
+    return;
+  }
+  // Carousel: scroll by one view of the track, without smooth motion when reduced is asked.
+  const control = event.target.closest("[data-carousel]");
+  if (control) {
+    const track = document.getElementById(control.getAttribute("aria-controls"));
+    const direction = control.dataset.carousel === "next" ? 1 : -1;
+    track?.scrollBy({
+      left: direction * track.clientWidth,
+      behavior: reducedMotion.matches ? "auto" : "smooth",
+    });
+    return;
+  }
+  // Quantity stepper.
+  const step = event.target.closest("[data-step]");
+  if (step) {
+    const input = document.getElementById(step.getAttribute("aria-controls"));
+    if (!input || input.disabled) {
+      return;
+    }
+    if (step.dataset.step === "-1") {
+      input.stepDown();
+    } else {
+      input.stepUp();
+    }
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return;
+  }
+  // Toast: clone the region's template with the message; the polite region announces it.
+  const trigger = event.target.closest("[data-toast]");
+  if (trigger) {
+    const region = document.getElementById(trigger.dataset.toastRegion);
+    const template = region?.querySelector("template");
+    if (!template) {
+      return;
+    }
+    const toast = template.content.firstElementChild.cloneNode(true);
+    toast.querySelector(".toast__message").textContent = trigger.dataset.toast;
+    region.insertBefore(toast, template);
+  }
+});

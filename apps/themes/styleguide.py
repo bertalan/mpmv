@@ -4,10 +4,12 @@ The page shows every component of the active theme in every state. These forms c
 of each control; the view renders them unbound, disabled and bound with invalid data, each with
 its own prefix so that the ids on the page never repeat. The product tiles come in every state:
 with and without an image, on sale, new, out of stock and with no price. Part 3/3 adds the
-breadcrumb trails, numbered pages and tabs, and `COMPONENTS`, the §14.9 list mirrored.
+breadcrumb trails, numbered pages and tabs, the samples of the rest of the library, and
+`COMPONENTS`, the §14.9 list mirrored.
 """
 
-from typing import Any
+from datetime import UTC, datetime
+from typing import Any, NamedTuple
 
 from django import forms
 from django.templatetags.static import static
@@ -131,48 +133,64 @@ def sample_products() -> list[dict[str, Any]]:
 
 
 # --- Every component of spec 14 §14.9, by the name the spec gives it (a unit test reads the
-# spec's list and compares). A component shown on the styleguide maps to its section id and its
-# template in `templates/components/`. The others are deferred to the backlog task that builds
-# the page using them, or to None when no task owns them yet (see the THM.4 3/3 pull request).
+# spec's list and compares). Each one maps to the styleguide section that shows it, its template
+# and a marker of its markup that the integration test looks for in that section.
 
-COMPONENTS: dict[str, tuple[str, str]] = {
-    "skip link": ("sg-frame", "skip_link.html"),
-    "header and disclosure navigation": ("sg-frame", "header.html"),
-    "language switcher": ("sg-frame", "language_switcher.html"),
-    "footer": ("sg-frame", "footer.html"),
-    "breadcrumb": ("sg-breadcrumbs", "breadcrumb.html"),
-    "pagination": ("sg-pagination", "pagination.html"),
-    "tabs": ("sg-tabs", "tabs.html"),
-    "buttons": ("sg-buttons", "button.html"),
-    "form fields": ("sg-text", "field.html"),
-    "alert": ("sg-alerts", "alert.html"),
-    "badge": ("sg-badges", "badge.html"),
-    "product card": ("sg-tiles", "product_tile.html"),
-    "product grid": ("sg-tiles", "product_tile.html"),
-}
 
-DEFERRED_COMPONENTS: dict[str, str | None] = {
-    "search form": "CAT.9",
-    "mini-cart status": "ORD.5",
-    "price": "CAT.7",
-    "rating": None,
-    "accordion": None,
-    "dialog": "CAT.7",
-    "scroll-snap carousel with buttons": None,
-    "gallery": "CAT.7",
-    "quantity stepper": "ORD.5",
-    "cart line": "ORD.5",
-    "order summary": "ORD.5",
-    "step indicator": "ORD.5",
-    "empty state": None,
-    "live-region toast": "ORD.5",
-    "responsive table": "ORD.7",
-    "hero": "CMS.2",
-    "CTA band": "CMS.2",
-    "logo strip": "THM.6",
-    "FAQ": "CMS.2",
-    "launch countdown": "CMS.9",
-    "image credit": "CMS.8",
+class Shown(NamedTuple):
+    section: str
+    template: str
+    marker: str
+
+
+COMPONENTS: dict[str, Shown] = {
+    "skip link": Shown("sg-frame", "components/skip_link.html", 'class="skip-link"'),
+    "header and disclosure navigation": Shown(
+        "sg-frame", "components/header.html", 'class="site-header"'
+    ),
+    "language switcher": Shown(
+        "sg-frame", "components/language_switcher.html", 'class="language-switcher"'
+    ),
+    "footer": Shown("sg-frame", "components/footer.html", 'class="site-footer"'),
+    "search form": Shown("sg-search", "components/search_form.html", 'class="search-form'),
+    "mini-cart status": Shown("sg-mini-cart", "components/mini_cart.html", 'class="mini-cart"'),
+    "breadcrumb": Shown("sg-breadcrumbs", "components/breadcrumb.html", 'class="breadcrumb"'),
+    "buttons": Shown("sg-buttons", "components/button.html", 'class="button'),
+    "form fields": Shown("sg-text", "components/field.html", 'class="field'),
+    "alert": Shown("sg-alerts", "components/alert.html", 'class="alert'),
+    "badge": Shown("sg-badges", "components/badge.html", 'class="badge'),
+    "price": Shown("sg-price", "components/price.html", 'class="price"'),
+    "rating": Shown("sg-rating", "components/rating.html", 'class="rating"'),
+    "product card": Shown("sg-tiles", "components/product_tile.html", 'class="product-tile'),
+    "product grid": Shown("sg-tiles", "components/product_tile.html", 'class="product-grid"'),
+    "pagination": Shown("sg-pagination", "components/pagination.html", 'class="pagination"'),
+    "accordion": Shown("sg-accordion", "components/accordion.html", 'class="accordion"'),
+    "tabs": Shown("sg-tabs", "components/tabs.html", 'class="tabs"'),
+    "dialog": Shown("sg-dialog", "components/dialog.html", 'class="dialog"'),
+    "scroll-snap carousel with buttons": Shown(
+        "sg-carousel", "components/carousel.html", 'class="carousel"'
+    ),
+    "gallery": Shown("sg-gallery", "components/gallery.html", 'class="gallery"'),
+    "quantity stepper": Shown(
+        "sg-quantity", "components/quantity_stepper.html", 'class="quantity"'
+    ),
+    "cart line": Shown("sg-cart", "components/cart_line.html", 'class="cart-line'),
+    "order summary": Shown("sg-cart", "components/order_summary.html", 'class="order-summary"'),
+    "step indicator": Shown("sg-steps", "components/step_indicator.html", 'class="steps"'),
+    "empty state": Shown("sg-empty", "components/empty_state.html", 'class="empty-state"'),
+    "live-region toast": Shown("sg-toasts", "components/toast.html", 'class="toast-region"'),
+    "responsive table": Shown("sg-tables", "components/table.html", 'class="table-scroll"'),
+    "hero": Shown("sg-hero", "components/hero.html", 'class="hero'),
+    "CTA band": Shown("sg-cta", "components/cta_band.html", 'class="cta-band'),
+    "logo strip": Shown("sg-logos", "components/logo_strip.html", 'class="logo-strip"'),
+    "FAQ": Shown("sg-faq", "components/faq.html", 'class="faq"'),
+    "launch countdown": Shown(
+        "sg-countdown", "components/launch_countdown.html", 'class="launch-countdown'
+    ),
+    # CMS.8 ships the credit in the core app; the styleguide shows it with the active theme.
+    "image credit": Shown(
+        "sg-credits", "core/components/image_credit.html", 'class="image-credit"'
+    ),
 }
 
 
@@ -223,3 +241,79 @@ def sample_tabs() -> list[dict[str, Any]]:
         {"label": _("Size guide"), "content": _("Measure your chest and pick the next size up.")},
         {"label": _("Care"), "content": _("Wash at 30 degrees, never tumble dry.")},
     ]
+
+
+def sample_library() -> dict[str, Any]:
+    """Samples for the rest of the library: commerce, content and feedback components."""
+    image = static("styleguide/sample-product.svg")
+    return {
+        "image": image,
+        "accordion": [
+            {"title": _("Shipping"), "content": _("Two to four working days across the EU.")},
+            {"title": _("Returns"), "content": _("Within 14 days, free of charge."), "open": True},
+            {"title": _("Warranty"), "content": _("Two years on every product.")},
+        ],
+        "faq": [
+            {"question": _("Do you ship abroad?"), "answer": _("Yes, to every EU country.")},
+            {"question": _("Can I pay by bank transfer?"), "answer": _("Yes, at checkout.")},
+        ],
+        "slides": [
+            {"title": _("Touring jacket"), "text": "€ 189.00", "url": "#sg-carousel"},
+            {"title": _("Rain cover"), "text": "€ 39.00", "url": "#sg-carousel"},
+            {"title": _("Winter gloves"), "text": "€ 59.00", "url": "#sg-carousel"},
+            {"title": _("Tank bag"), "text": "€ 79.00", "url": "#sg-carousel"},
+            {"title": _("Helmet visor"), "text": "€ 29.00", "url": "#sg-carousel"},
+        ],
+        "images": [
+            {"url": image, "alt": _("The jacket from the front")},
+            {"url": image, "alt": _("The jacket from the side")},
+            {"url": image, "alt": _("The collar, close up")},
+        ],
+        "summary": [
+            {"label": _("Subtotal"), "amount": "€ 228.00"},
+            {"label": _("Shipping, Vendor A"), "amount": "€ 9.00"},
+            {"label": _("Discount"), "amount": "-€ 10.00"},
+        ],
+        "summary_pending": [
+            {"label": _("Subtotal"), "amount": "€ 39.00"},
+            {"label": _("Shipping"), "amount": _("Calculated at the next step")},
+        ],
+        "steps": [
+            {"label": _("Cart"), "url": "#sg-steps"},
+            {"label": _("Address"), "url": "#sg-steps"},
+            {"label": _("Shipping"), "url": "#sg-steps"},
+            {"label": _("Payment"), "url": "#sg-steps"},
+        ],
+        "columns": [
+            {"label": _("Order")},
+            {"label": _("Date")},
+            {"label": _("Vendor")},
+            {"label": _("Status")},
+            {"label": _("Items"), "numeric": True},
+            {"label": _("Total"), "numeric": True},
+        ],
+        "rows": [
+            ["SAMPLE-1001", "2026-10-02", "Vendor A", _("Shipped"), "2", "€ 228.00"],
+            ["SAMPLE-1002", "2026-10-14", "Vendor B", _("Paid"), "1", "€ 39.00"],
+            ["SAMPLE-1003", "2026-11-01", "Vendor C", _("Cancelled"), "3", "€ 177.00"],
+        ],
+        "logos": [
+            {"name": "Vendor A", "image_url": image, "url": "#sg-logos"},
+            {"name": "Vendor B", "image_url": image, "url": "#sg-logos"},
+            {"name": "Vendor C", "image_url": image},
+        ],
+        "launch": datetime(2030, 3, 1, 9, 0, tzinfo=UTC),
+        "launched": datetime(2026, 3, 1, 9, 0, tzinfo=UTC),
+        "credit_full": {
+            "text": _("Photo by Ada Rossi"),
+            "licence_name": "CC BY 4.0",
+            "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+            "source_url": "#sg-credits",
+        },
+        "credit_plain": {"text": _("Own work, Vendor A"), "licence_name": "CC0 1.0"},
+        "credits": [
+            {"text": _("Photo by Ada Rossi"), "licence_name": "CC BY 4.0"},
+            {"text": _("Own work, Vendor A"), "licence_name": "CC0 1.0"},
+        ],
+        "toasts": [_("Address saved.")],
+    }

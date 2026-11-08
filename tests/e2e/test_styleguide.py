@@ -58,7 +58,7 @@ def test_staff_see_every_component_without_a_csp_violation(
     expect(page.locator("html")).to_have_attribute("data-theme", "base")
     for section in SECTIONS:
         expect(page.get_by_role("heading", name=section, exact=True)).to_be_visible()
-    expect(page.get_by_role("button", name="Close")).to_be_visible()
+    expect(page.get_by_role("button", name="Close", exact=True)).to_be_visible()
     expect(page.locator(".error-summary a").first).to_be_visible()
     shot("desktop")
 
@@ -97,7 +97,11 @@ def test_an_error_summary_link_leads_to_its_field(page: Page, live_server: LiveS
 
 # --- Part 2/3: cards, product tiles, badges and alerts
 
-IMAGES_LOADED = "() => [...document.images].every((img) => img.complete && img.naturalWidth > 0)"
+# Images of a closed dialog (the gallery zoom) are lazy and load only when it opens.
+IMAGES_LOADED = (
+    "() => [...document.images].filter((img) => !img.closest('dialog:not([open])'))"
+    ".every((img) => img.complete && img.naturalWidth > 0)"
+)
 
 
 def test_cards_tiles_badges_and_alerts_render_without_a_csp_violation(
@@ -108,8 +112,8 @@ def test_cards_tiles_badges_and_alerts_render_without_a_csp_violation(
     tiles = page.locator(".product-tile")
     expect(tiles.first).to_be_visible()
     assert tiles.count() >= 4
-    # The images load lazily: bring each one on screen, then wait for all of them.
-    page.evaluate("() => [...document.images].forEach((img) => img.scrollIntoView())")
+    # The images load lazily: make them eager, then wait for all of them.
+    page.evaluate("() => [...document.images].forEach((img) => { img.loading = 'eager'; })")
     page.wait_for_function(IMAGES_LOADED, timeout=5000)
     for kind in ("Sale", "New", "Out of stock", "On request"):
         expect(page.locator(".badge", has_text=kind).first).to_be_visible()
@@ -319,3 +323,137 @@ def test_pagination_and_breadcrumb_links_show_a_visible_focus(
     crumb = page.get_by_role("navigation", name="Breadcrumb").first.get_by_role("link").first
     crumb.focus()
     assert_visible_focus([page.evaluate(FOCUSED)])
+
+
+# --- Part 3/3: the rest of the library
+
+LIBRARY_SECTIONS = (
+    "Search form",
+    "Mini-cart status",
+    "Price",
+    "Rating",
+    "Accordion",
+    "Dialog",
+    "Carousel",
+    "Gallery",
+    "Quantity stepper",
+    "Cart lines and order summary",
+    "Step indicator",
+    "Empty state",
+    "Toasts",
+    "Responsive table",
+    "Hero",
+    "CTA band",
+    "Logo strip",
+    "FAQ",
+    "Launch countdown",
+    "Image credits",
+)
+
+
+def test_the_whole_library_renders_without_a_csp_violation(
+    page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    for section in LIBRARY_SECTIONS:
+        heading = page.get_by_role("heading", name=section, exact=True)
+        heading.scroll_into_view_if_needed()
+        expect(heading).to_be_visible()
+    # base.js revealed the script-only controls.
+    expect(page.get_by_role("button", name="Open the size guide")).to_be_visible()
+    expect(page.get_by_role("button", name="Next items")).to_be_visible()
+    expect(page.get_by_role("button", name="Increase quantity").first).to_be_visible()
+    page.evaluate("() => [...document.images].forEach((img) => { img.loading = 'eager'; })")
+    page.wait_for_function(IMAGES_LOADED, timeout=5000)
+    page.locator("#sg-search").scroll_into_view_if_needed()
+    shot("library-desktop")
+    page.set_viewport_size({"width": 375, "height": 800})
+    page.wait_for_timeout(100)  # the layout settles after the resize
+    # The page never scrolls sideways; wide tables scroll in their own region.
+    assert page.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth")
+    shot("library-phone")
+    assert csp_violations(page) == [], "\n".join(csp_violations(page))
+
+
+def test_a_dialog_traps_the_focus_closes_on_escape_and_returns_it(
+    page: Page, live_server: LiveServer
+) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    opener = page.get_by_role("button", name="Open the size guide")
+    opener.click()
+    dialog = page.get_by_role("dialog", name="Size guide")
+    expect(dialog).to_be_visible()
+    expect(dialog.get_by_role("button", name="Close")).to_be_focused()
+    page.keyboard.press("Escape")
+    expect(dialog).to_be_hidden()
+    expect(opener).to_be_focused()
+    # The close button closes it too, without script.
+    opener.click()
+    dialog.get_by_role("button", name="Close").click()
+    expect(dialog).to_be_hidden()
+    assert csp_violations(page) == []
+
+
+def test_a_gallery_image_opens_enlarged(page: Page, live_server: LiveServer) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    page.locator(".gallery__zoom").first.click()
+    dialog = page.get_by_role("dialog", name="The jacket from the front")
+    expect(dialog).to_be_visible()
+    page.keyboard.press("Escape")
+    expect(dialog).to_be_hidden()
+
+
+def test_the_quantity_stepper_steps_within_its_limits(page: Page, live_server: LiveServer) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    stepper = page.locator(".quantity", has=page.locator("#sg-qty-default"))
+    field = page.locator("#sg-qty-default")
+    plus = stepper.get_by_role("button", name="Increase quantity")
+    minus = stepper.get_by_role("button", name="Decrease quantity")
+    expect(field).to_have_value("2")
+    for _ in range(3):
+        plus.click()
+    expect(field).to_have_value("5")
+    expect(plus).to_be_disabled()
+    minus.click()
+    expect(field).to_have_value("4")
+    expect(plus).to_be_enabled()
+    at_min = page.locator(".quantity", has=page.locator("#sg-qty-min"))
+    expect(at_min.get_by_role("button", name="Decrease quantity")).to_be_disabled()
+    expect(page.locator("#sg-qty-disabled")).to_be_disabled()
+
+
+def test_the_carousel_buttons_scroll_the_track(page: Page, live_server: LiveServer) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    page.emulate_media(reduced_motion="reduce")
+    open_styleguide(page, live_server)
+    track = page.locator("#sg-carousel-featured-track")
+    track.scroll_into_view_if_needed()
+    assert track.evaluate("(el) => el.scrollLeft") == 0
+    page.get_by_role("button", name="Next items").click()
+    page.wait_for_function(
+        "() => document.getElementById('sg-carousel-featured-track').scrollLeft > 0"
+    )
+    page.get_by_role("button", name="Previous items").click()
+    page.wait_for_function(
+        "() => document.getElementById('sg-carousel-featured-track').scrollLeft === 0"
+    )
+
+
+def test_a_toast_is_added_to_the_live_region_and_dismissed(
+    page: Page, live_server: LiveServer
+) -> None:
+    page.set_viewport_size({"width": 1280, "height": 900})
+    open_styleguide(page, live_server)
+    region = page.locator("#sg-toast-region")
+    expect(region.locator(".toast")).to_have_count(1)
+    page.get_by_role("button", name="Show a toast").click()
+    expect(region.locator(".toast")).to_have_count(2)
+    expect(region.locator(".toast").last).to_contain_text("Added to the cart.")
+    region.locator(".toast").last.get_by_role("button", name="Dismiss").click()
+    expect(region.locator(".toast")).to_have_count(1)
+    expect(page.locator("#main")).to_be_focused()
+    assert csp_violations(page) == []

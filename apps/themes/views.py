@@ -25,6 +25,7 @@ from .styleguide import (
     sample_breadcrumbs,
     sample_forms,
     sample_in_page_links,
+    sample_library,
     sample_pages,
     sample_products,
     sample_tabs,
@@ -83,6 +84,7 @@ def styleguide(request: HttpRequest) -> HttpResponse:
             "breadcrumbs": sample_breadcrumbs(),
             "pages": sample_pages(5, 9),
             "tabs": sample_tabs(),
+            "library": sample_library(),
             "skip_links": sample_in_page_links()["skip"],
             "page_links": sample_in_page_links()["page"],
             # ?focus=errors: the first error summary takes the focus on load (e2e tests).

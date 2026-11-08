@@ -1,0 +1,666 @@
+/* Base theme, component layer, part 2 (THM.4, spec 14 §14.9): search form, mini-cart, price,
+   rating, accordion and FAQ, dialog and gallery, carousel, quantity stepper, cart line, order
+   summary, step indicator, empty state, toasts, responsive table, hero, CTA band, logo strip,
+   launch countdown and image credit. Colours only through tokens, and only in the pairs of the
+   token contract (text on surface or raised surface, on-accent on accent). */
+@layer components {
+  /* --- Search form: the field and its button on one row. */
+
+  .search-form {
+    display: grid;
+    gap: var(--space-xs);
+    max-inline-size: 32rem;
+  }
+
+  .search-form__row {
+    display: flex;
+    gap: var(--space-xs);
+  }
+
+  .search-form__row input {
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  /* --- Mini-cart: the icon with its count, the word "Cart" beside it. */
+
+  .mini-cart {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    min-block-size: var(--target-primary);
+    padding-inline: var(--space-xs);
+  }
+
+  .mini-cart__icon {
+    position: relative;
+    display: inline-flex;
+    margin-inline-end: 0.75em;
+  }
+
+  .mini-cart__count {
+    position: absolute;
+    inset-block-start: -0.5em;
+    inset-inline-end: -0.75em;
+    min-inline-size: 1.5em;
+    padding-inline: 0.25em;
+    border-radius: 1em;
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+    font-size: 0.75em;
+    font-weight: 700;
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  /* --- Price: the amount large, the previous price struck through, the references small. */
+
+  .price {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--space-s);
+    margin-block: 0 var(--space-m);
+  }
+
+  .price__amount {
+    font-size: var(--step-2);
+    font-weight: 700;
+  }
+
+  .price__amount--request {
+    font-size: var(--step-1);
+  }
+
+  .price del,
+  .price__reference,
+  .price__note {
+    color: var(--color-text-muted);
+  }
+
+  .price__reference,
+  .price__note {
+    flex-basis: 100%;
+    font-size: 0.875em;
+  }
+
+  /* --- Rating: the stars are decoration, the words carry the value. */
+
+  .rating {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-xs) var(--space-s);
+    margin-block: 0 var(--space-m);
+  }
+
+  .rating__stars {
+    display: inline-flex;
+    color: var(--color-accent);
+  }
+
+  .rating__star--full .icon {
+    fill: currentColor;
+  }
+
+  .rating__count,
+  .rating__none {
+    color: var(--color-text-muted);
+  }
+
+  a.rating__count {
+    color: var(--color-link);
+  }
+
+  /* --- Accordion and FAQ: native disclosures; the summary is a 44 px target with its own
+     marker that turns when open. */
+
+  .accordion,
+  .faq {
+    margin-block-end: var(--space-l);
+    border-block-start: 1px solid var(--color-border);
+  }
+
+  .faq {
+    border-block-start: 0;
+  }
+
+  .accordion__item,
+  .faq__item {
+    border-block-end: 1px solid var(--color-border);
+  }
+
+  .accordion__summary,
+  .faq__question {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-s);
+    min-block-size: var(--target-primary);
+    padding-block: var(--space-s);
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .accordion__summary::-webkit-details-marker,
+  .faq__question::-webkit-details-marker {
+    display: none;
+  }
+
+  .accordion__summary::after,
+  .faq__question::after {
+    content: "+" / "";
+    font-size: var(--step-1);
+    line-height: 1;
+  }
+
+  [open] > .accordion__summary::after,
+  [open] > .faq__question::after {
+    content: "−" / "";
+  }
+
+  .accordion__content,
+  .faq__answer {
+    padding-block-end: var(--space-m);
+  }
+
+  /* --- Dialog: a modal card over a dimmed page; the image variant shows the large image. */
+
+  .dialog {
+    inline-size: min(40rem, 100% - 2 * var(--space-m));
+    max-block-size: calc(100% - 2 * var(--space-m));
+    padding: var(--space-m) var(--space-l) var(--space-l);
+    border: 1px solid var(--color-border);
+    border-radius: var(--card-radius);
+    background: var(--color-surface);
+    color: var(--color-text);
+    box-shadow: var(--shadow-raised);
+  }
+
+  .dialog::backdrop {
+    background: color-mix(in srgb, var(--color-text) 60%, transparent);
+  }
+
+  .dialog__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-s);
+    margin-block-end: var(--space-s);
+  }
+
+  .dialog--image .dialog__header {
+    justify-content: flex-end;
+  }
+
+  .dialog__title {
+    margin: 0;
+  }
+
+  .dialog--image {
+    inline-size: min(56rem, 100% - 2 * var(--space-m));
+    padding: var(--space-s);
+  }
+
+  /* --- Gallery: the images in a grid; the zoom button under each. */
+
+  .gallery__list {
+    display: grid;
+    gap: var(--space-m);
+    grid-template-columns: repeat(auto-fill, minmax(min(12rem, 100%), 1fr));
+    margin: 0 0 var(--space-l);
+    padding: 0;
+    list-style: none;
+  }
+
+  .gallery__item {
+    display: grid;
+    gap: var(--space-xs);
+    justify-items: start;
+  }
+
+  .gallery__item > img,
+  .gallery__placeholder {
+    inline-size: 100%;
+    aspect-ratio: 1;
+    border-radius: var(--radius-card);
+    object-fit: cover;
+  }
+
+  .gallery__placeholder,
+  .cart-line__placeholder {
+    max-inline-size: 16rem;
+    background: var(--color-surface-sunken);
+  }
+
+  /* --- Carousel: CSS scroll snapping; the buttons only scroll the track. */
+
+  .carousel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-s);
+    margin-block-end: var(--space-l);
+  }
+
+  .carousel__controls {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-xs);
+  }
+
+  .carousel__track {
+    display: flex;
+    gap: var(--space-m);
+    margin: 0;
+    padding: 0 0 var(--space-s);
+    list-style: none;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+  }
+
+  /* About three slides in view on a wide screen, one and a bit on a phone. */
+  .carousel__slide {
+    flex: 0 0 clamp(12rem, 30%, 20rem);
+    padding: var(--card-padding);
+    border: 1px solid var(--color-border);
+    border-radius: var(--card-radius);
+    background: var(--color-surface-raised);
+    scroll-snap-align: start;
+  }
+
+  .carousel__title {
+    margin-block: 0 var(--space-xs);
+    font-size: var(--step-1);
+  }
+
+  .carousel__slide > :last-child {
+    margin-block-end: 0;
+  }
+
+  /* --- Quantity stepper: buttons and field on one row, the field wide enough for 3 digits. */
+
+  .quantity {
+    display: grid;
+    gap: var(--space-xs);
+    justify-items: start;
+  }
+
+  .quantity__row {
+    display: flex;
+    gap: var(--space-xs);
+  }
+
+  .quantity input {
+    inline-size: 5em;
+    text-align: center;
+  }
+
+  /* --- Cart line: image, details, actions and total; stacked on narrow screens. */
+
+  .cart-lines {
+    margin: 0 0 var(--space-l);
+    padding: 0;
+    list-style: none;
+  }
+
+  .cart-line {
+    display: grid;
+    grid-template-columns: 6rem 1fr;
+    gap: var(--space-s) var(--space-m);
+    padding-block: var(--space-m);
+    border-block-end: 1px solid var(--color-border);
+  }
+
+  .cart-line p {
+    margin: 0;
+  }
+
+  .cart-line__media img,
+  .cart-line__placeholder {
+    inline-size: 6rem;
+    aspect-ratio: 1;
+    border-radius: var(--radius-control);
+    object-fit: cover;
+  }
+
+  .cart-line__name {
+    font-weight: 600;
+  }
+
+  .cart-line__variant,
+  .cart-line__vendor,
+  .cart-line__unit {
+    color: var(--color-text-muted);
+    font-size: 0.875em;
+  }
+
+  .cart-line__problem {
+    margin-block-start: var(--space-xs);
+    padding-inline-start: var(--space-s);
+    border-inline-start: 4px solid var(--color-warning);
+  }
+
+  .cart-line__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: var(--space-s);
+    grid-column: 2;
+  }
+
+  .cart-line__total {
+    grid-column: 2;
+    font-weight: 700;
+  }
+
+  @media (width >= 48rem) {
+    .cart-line {
+      grid-template-columns: 6rem 1fr auto auto;
+      align-items: start;
+    }
+
+    .cart-line__actions,
+    .cart-line__total {
+      grid-column: auto;
+    }
+  }
+
+  /* --- Order summary: label and amount on one row, the total bold above a rule. */
+
+  .order-summary {
+    max-inline-size: 28rem;
+    margin-block-end: var(--space-l);
+    padding: var(--card-padding);
+    border: 1px solid var(--color-border);
+    border-radius: var(--card-radius);
+    background: var(--color-surface-raised);
+  }
+
+  .order-summary > h2,
+  .order-summary > h3 {
+    margin-block-start: 0;
+  }
+
+  .order-summary__list {
+    margin: 0;
+  }
+
+  .order-summary__line {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-m);
+    padding-block: var(--space-xs);
+  }
+
+  .order-summary__line dd {
+    margin: 0;
+    text-align: end;
+  }
+
+  .order-summary__line--total {
+    margin-block-start: var(--space-xs);
+    padding-block-start: var(--space-s);
+    border-block-start: 2px solid var(--color-text);
+    font-size: var(--step-1);
+    font-weight: 700;
+  }
+
+  .order-summary__note {
+    margin-block: var(--space-xs) 0;
+    color: var(--color-text-muted);
+    font-size: 0.875em;
+  }
+
+  /* --- Step indicator: numbered steps; done ones carry a tick, the current one is bold and
+     underlined, so the state never rests on colour alone. */
+
+  .steps__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-s) var(--space-l);
+    margin: 0 0 var(--space-l);
+    padding: 0;
+    list-style: none;
+    counter-reset: none;
+  }
+
+  .steps__step,
+  .steps__step a {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    min-block-size: var(--target-min);
+  }
+
+  .steps__step {
+    color: var(--color-text-muted);
+  }
+
+  .steps__number {
+    display: inline-grid;
+    place-items: center;
+    inline-size: 1.75em;
+    block-size: 1.75em;
+    border: 2px solid currentColor;
+    border-radius: 50%;
+    font-size: 0.875em;
+    font-weight: 700;
+  }
+
+  .steps__step--current {
+    color: var(--color-text);
+    font-weight: 700;
+    text-decoration: underline;
+    text-decoration-thickness: 0.14em;
+    text-underline-offset: 0.3em;
+  }
+
+  .steps__step--current .steps__number {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+    border-color: var(--color-accent);
+  }
+
+  /* --- Empty state: centred, with room around it. */
+
+  .empty-state {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-s);
+    margin-block-end: var(--space-l);
+    padding: var(--space-xl) var(--space-m);
+    border: 1px dashed var(--color-border-control);
+    border-radius: var(--card-radius);
+    text-align: center;
+  }
+
+  .empty-state > * {
+    margin: 0;
+  }
+
+  /* --- Toasts: stacked messages; they stay until dismissed. */
+
+  .toast-region {
+    display: grid;
+    gap: var(--space-s);
+    margin-block-end: var(--space-l);
+  }
+
+  .toast {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-s);
+    max-inline-size: 28rem;
+    padding: var(--space-s) var(--space-m);
+    border: 1px solid var(--color-border);
+    border-inline-start: 4px solid var(--color-success);
+    border-radius: var(--radius-control);
+    background: var(--color-surface-raised);
+    box-shadow: var(--shadow-raised);
+  }
+
+  .toast__message {
+    margin: 0;
+  }
+
+  /* --- Responsive table: the region scrolls, the page does not. */
+
+  .table-scroll {
+    max-inline-size: 100%;
+    margin-block-end: var(--space-l);
+    overflow-x: auto;
+  }
+
+  .table {
+    inline-size: 100%;
+    border-collapse: collapse;
+  }
+
+  .table caption {
+    padding-block-end: var(--space-s);
+    font-weight: 700;
+    text-align: start;
+  }
+
+  .table th,
+  .table td {
+    padding: var(--space-xs) var(--space-s);
+    border-block-end: 1px solid var(--color-border);
+    text-align: start;
+    white-space: nowrap;
+  }
+
+  .table thead th {
+    border-block-end-width: 2px;
+  }
+
+  .table .numeric {
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* --- Hero: heading and actions on a solid surface, the image beside it from 48rem. */
+
+  .hero {
+    display: grid;
+    gap: var(--space-l);
+    align-items: center;
+    margin-block-end: var(--space-xl);
+    padding: var(--space-xl) var(--space-l);
+    border-radius: var(--card-radius);
+    background: var(--color-surface-raised);
+  }
+
+  .hero__title {
+    margin-block: 0 var(--space-s);
+    font-family: var(--font-display);
+    font-size: var(--step-4);
+    line-height: 1.1;
+  }
+
+  .hero__text {
+    max-inline-size: var(--measure-text);
+    margin-block: 0 var(--space-m);
+    font-size: var(--step-1);
+  }
+
+  .hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-s);
+  }
+
+  .hero__image {
+    inline-size: 100%;
+    border-radius: var(--card-radius);
+    object-fit: cover;
+  }
+
+  @media (width >= 48rem) {
+    .hero--image {
+      grid-template-columns: 3fr 2fr;
+    }
+  }
+
+  /* --- CTA band: heading and one action; the accent variant on the accent surface. */
+
+  .cta-band {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-m) var(--space-l);
+    margin-block-end: var(--space-l);
+    padding: var(--space-l);
+    border-radius: var(--card-radius);
+    background: var(--color-surface-raised);
+  }
+
+  .cta-band__title {
+    margin-block: 0 var(--space-xs);
+  }
+
+  .cta-band__content > :last-child {
+    margin-block-end: 0;
+  }
+
+  .cta-band--accent {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  /* --- Logo strip: logos in a wrapping row, at one height. */
+
+  .logo-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-m) var(--space-xl);
+    margin: 0 0 var(--space-l);
+    padding: 0;
+    list-style: none;
+  }
+
+  .logo-strip img {
+    block-size: 3rem;
+    inline-size: auto;
+  }
+
+  .logo-strip a {
+    display: inline-block;
+  }
+
+  /* --- Launch countdown: the date stands out; the expired state reads as a plain notice. */
+
+  .launch-countdown {
+    margin-block-end: var(--space-l);
+    padding: var(--card-padding);
+    border: 1px solid var(--color-border);
+    border-radius: var(--card-radius);
+    background: var(--color-surface-raised);
+  }
+
+  .launch-countdown__title {
+    margin-block-start: 0;
+  }
+
+  .launch-countdown__date {
+    font-size: var(--step-1);
+    font-weight: 600;
+  }
+
+  /* --- Image credit (CMS.8, core/components/image_credit.html): small text under the image. */
+
+  .image-credit {
+    color: var(--color-text-muted);
+    font-size: 0.875em;
+  }
+
+  .image-credits summary {
+    min-block-size: var(--target-min);
+    cursor: pointer;
+  }
+}

@@ -1,0 +1,19 @@
+{% load i18n %}{% comment %}
+Live-region toast (THM.4, spec 14 §14.9): short confirmations such as "Added to cart". The
+region is a polite status region rendered empty, or with the messages of the request, when the
+page loads, because a screen reader announces only changes to a region that already exists
+(WCAG 4.1.3). New toasts are added into it: by htmx (swap a `.toast` into the region), or by the
+theme script (base.js) from a button with `data-toast="<message>"` and
+`data-toast-region="<id>"`, which clones the `<template>` below. Toasts never disappear on a
+timer (WCAG 2.2.1): each has a Dismiss button, which removes it and moves the focus to the
+main content, like a dismissible alert. One region per page, at the end of the main content.
+
+  {% include "components/toast.html" with id="toasts" messages=toast_messages only %}
+
+Context:
+- `id` (required): the id of the region.
+- `messages`: the toasts shown on load (for example Django messages of the success level).
+{% endcomment %}<div class="toast-region" id="{{ id }}" role="status" aria-live="polite">
+  {% for message in messages %}<div class="toast"><p class="toast__message">{{ message }}</p><button type="button" class="button button--ghost button--small button--icon toast__dismiss" aria-label="{% translate 'Dismiss' %}" data-dismiss hidden>{% include "components/icon.html" with name="close" only %}</button></div>{% endfor %}
+  <template><div class="toast"><p class="toast__message"></p><button type="button" class="button button--ghost button--small button--icon toast__dismiss" aria-label="{% translate 'Dismiss' %}" data-dismiss>{% include "components/icon.html" with name="close" only %}</button></div></template>
+</div>

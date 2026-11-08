@@ -11,21 +11,21 @@
   list with a roving tabindex and arrow keys.
 - In-page navigation (`components/in_page_nav.html`): a labelled list of links to sections of
   the page; the "skip" variant shows its links only on focus (skip to filters).
-- Coverage: `apps.themes.styleguide.COMPONENTS` mirrors the §14.9 component list, so every
-  component is either shown on the styleguide or deferred, by name, to the task that builds it.
+- Coverage: `apps.themes.styleguide.COMPONENTS` mirrors the §14.9 component list: every
+  component is shown on the styleguide, with its section, its template and a marker of its
+  markup (the integration test checks the marker is rendered in that section).
 """
 
-import csv
 import re
 from pathlib import Path
 from typing import Any
 
 import pytest
-from django.template.loader import render_to_string
+from django.template.loader import get_template, render_to_string
 from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.themes.build import render_themes
-from apps.themes.styleguide import COMPONENTS, DEFERRED_COMPONENTS
+from apps.themes.styleguide import COMPONENTS
 from apps.themes.tests.builders import SHIPPED_THEMES
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -258,7 +258,7 @@ def test_in_page_navigation_without_links_renders_nothing() -> None:
     assert render("in_page_nav", label="On this page", links=[]) == ""
 
 
-# --- Every §14.9 component is on the styleguide, or deferred by name
+# --- Every §14.9 component is on the styleguide
 
 
 def spec_components() -> list[str]:
@@ -270,23 +270,15 @@ def spec_components() -> list[str]:
     return [name.strip() for name in flat.split(",")]
 
 
-def test_the_component_list_mirrors_the_spec() -> None:
-    assert set(COMPONENTS) | set(DEFERRED_COMPONENTS) == set(spec_components())
-    assert not set(COMPONENTS) & set(DEFERRED_COMPONENTS)
+def test_every_spec_component_is_on_the_styleguide() -> None:
+    assert sorted(COMPONENTS) == sorted(spec_components())
 
 
-def test_every_shown_component_names_a_section_and_a_template() -> None:
-    templates = SHIPPED_THEMES / "base/templates/components"
-    for name, (section, template) in COMPONENTS.items():
-        assert section.startswith("sg-"), name
-        assert (templates / template).is_file(), (name, template)
-
-
-def test_every_deferred_component_names_a_backlog_task_or_none() -> None:
-    with (ROOT / "docs/spec/backlog.csv").open(encoding="utf-8") as handle:
-        tasks = {row["id"] for row in csv.DictReader(handle)}
-    for name, task in DEFERRED_COMPONENTS.items():
-        assert task is None or task in tasks, (name, task)
+def test_every_shown_component_names_a_section_a_template_and_a_marker() -> None:
+    for name, shown in COMPONENTS.items():
+        assert shown.section.startswith("sg-"), name
+        assert get_template(shown.template), (name, shown.template)
+        assert shown.marker.startswith('class="'), name
 
 
 def test_the_navigation_components_are_shown() -> None:

@@ -1,0 +1,16 @@
+{% load i18n %}{% comment %}
+Price (THM.4, spec 14 §14.9): the price of a product page, formatted by the caller (catalog
+services). A reduced price strikes the previous one through and says "Was" to screen readers;
+the Omnibus reference (the lowest price of the last 30 days before the reduction, Directive
+2019/2161) is shown under it whenever a reduction is announced.
+
+  {% include "components/price.html" with amount=p.price before=p.price_before lowest=p.lowest_30_days only %}
+
+Context:
+- `amount` (required unless `on_request`): the current price, formatted.
+- `before`: the previous price; the price is then shown as reduced.
+- `lowest`: the lowest price of the last 30 days, shown with `before`.
+- `note`: a line under the price, such as "VAT included" or "Shipping calculated at checkout".
+- `from_price`: the amount is the lowest of several variants ("From € 39.00").
+- `on_request`: no amount; "Price on request".
+{% endcomment %}<p class="price">{% if on_request %}<span class="price__amount price__amount--request">{% translate "Price on request" %}</span>{% else %}{% if before %}<del><span class="visually-hidden">{% translate "Was" %} </span>{{ before }}</del> <span class="visually-hidden">{% translate "Now" %} </span>{% endif %}{% if from_price %}<span class="price__from">{% translate "From" %}</span> {% endif %}<span class="price__amount{% if before %} price__amount--reduced{% endif %}">{{ amount }}</span>{% if before and lowest %}<span class="price__reference">{% blocktranslate %}Lowest price in the last 30 days: {{ lowest }}{% endblocktranslate %}</span>{% endif %}{% endif %}{% if note %}<span class="price__note">{{ note }}</span>{% endif %}</p>

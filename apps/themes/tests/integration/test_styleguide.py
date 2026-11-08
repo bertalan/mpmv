@@ -161,11 +161,20 @@ def test_the_styleguide_shows_busy_buttons_inside_a_form(staff_client: Client) -
 # --- Part 3/3: navigation components, and every §14.9 component on the page
 
 
-def test_every_shown_component_has_its_section(staff_client: Client) -> None:
+def section_html(html: str, section: str) -> str:
+    """The HTML of one top-level styleguide section, up to the next one."""
+    start = html.index(f'<section aria-labelledby="{section}">')
+    end = html.find('<section aria-labelledby="sg-', start + 1)
+    return html[start : end if end >= 0 else len(html)]
+
+
+def test_every_shown_component_is_rendered_in_its_section(staff_client: Client) -> None:
     html = staff_client.get(URL).content.decode()
-    for name, (section, _template) in COMPONENTS.items():
-        assert re.search(rf'<h2 id="{section}"', html), (name, section)
-        assert f'aria-labelledby="{section}"' in html, (name, section)
+    for name, shown in COMPONENTS.items():
+        assert re.search(rf'<h2 id="{shown.section}"', html), (name, shown.section)
+        # The page frame (skip link, header, language switcher, footer) wraps the page itself.
+        where = html if shown.section == "sg-frame" else section_html(html, shown.section)
+        assert shown.marker in where, (name, shown.section, shown.marker)
 
 
 def test_every_breadcrumb_and_pagination_state_is_shown(staff_client: Client) -> None:
@@ -188,3 +197,55 @@ def test_the_tabs_and_in_page_navigation_are_shown(staff_client: Client) -> None
     skip = re.search(r'class="in-page-nav in-page-nav--skip".*?href="#([^"]+)"', html, re.DOTALL)
     assert skip is not None
     assert f'id="{skip.group(1)}"' in html
+
+
+def test_the_commerce_components_are_shown_in_every_state(staff_client: Client) -> None:
+    html = staff_client.get(URL).content.decode()
+    price = section_html(html, "sg-price")
+    assert "<del>" in price
+    assert "Lowest price in the last 30 days" in price
+    assert "Price on request" in price
+    rating = section_html(html, "sg-rating")
+    assert "out of 5" in rating
+    assert "No reviews yet" in rating
+    quantity = section_html(html, "sg-quantity")
+    assert re.search(r'<input type="number"[^>]*\sdisabled', quantity)
+    cart = section_html(html, "sg-cart")
+    assert "cart-line--problem" in cart
+    assert cart.count('class="order-summary"') == 2
+    assert section_html(html, "sg-steps").count('aria-current="step"') == 2
+    assert section_html(html, "sg-mini-cart").count('class="mini-cart"') == 3
+
+
+def test_the_interactive_components_work_without_javascript(staff_client: Client) -> None:
+    html = staff_client.get(URL).content.decode()
+    # Every script-only control is hidden in the HTML; base.js reveals it.
+    for attribute in ("data-dialog", "data-carousel", "data-step", "data-toast"):
+        controls = re.findall(rf"<button[^>]*\s{attribute}=[^>]*>", html)
+        assert controls, attribute
+        assert all(re.search(r"\shidden[\s>]", button) for button in controls), attribute
+    assert re.search(r'<form method="dialog"', section_html(html, "sg-dialog"))
+    assert section_html(html, "sg-accordion").count("<details") == 6
+    assert 'role="status" aria-live="polite"' in section_html(html, "sg-toasts")
+
+
+def test_the_content_components_are_shown_in_every_state(staff_client: Client) -> None:
+    html = staff_client.get(URL).content.decode()
+    assert "gallery__placeholder" in section_html(html, "sg-gallery")
+    tables = section_html(html, "sg-tables")
+    assert "No returns yet." in tables
+    assert tables.count('tabindex="0"') == 2
+    assert "hero--image" in section_html(html, "sg-hero")
+    assert "cta-band--accent" in section_html(html, "sg-cta")
+    countdown = section_html(html, "sg-countdown")
+    assert "<time datetime=" in countdown
+    assert "launch-countdown--expired" in countdown
+    assert section_html(html, "sg-empty").count('class="empty-state"') == 2
+
+
+def test_the_image_credit_is_shown_with_and_without_links(staff_client: Client) -> None:
+    credits = section_html(staff_client.get(URL).content.decode(), "sg-credits")
+    assert credits.count('class="image-credit"') >= 3
+    assert 'rel="license"' in credits
+    assert "CC0 1.0" in credits
+    assert '<details class="image-credits">' in credits
