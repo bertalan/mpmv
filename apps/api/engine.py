@@ -47,13 +47,18 @@ VENDOR_GRANTABLE_SCOPES: Final = frozenset(
     }
 )
 
-# HTTP methods that change state. A key of a suspended vendor may not use them (CORE.14), dry-runs
+# HTTP methods that change state. Only a key of an active vendor may use them (CORE.14), dry-runs
 # included; API v1 also requires `?dry_run=` on each of them (CORE.7).
 MUTATING_METHODS: Final = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
 def is_write(method: str) -> bool:
     return method.upper() in MUTATING_METHODS
+
+
+def platform_only_scopes(scopes: Iterable[str]) -> list[str]:
+    """The scopes in `scopes` that a vendor key may not hold (outside `VENDOR_GRANTABLE_SCOPES`)."""
+    return sorted({scope for scope in scopes if scope not in VENDOR_GRANTABLE_SCOPES})
 
 
 class InvalidApiClient(ValueError):
@@ -82,10 +87,16 @@ class Reason(StrEnum):
     INSUFFICIENT_SCOPE = "insufficient_scope"
     VENDOR_CLOSED = "vendor_closed"  # CORE.14: the key's vendor is closed
     VENDOR_SUSPENDED = "vendor_suspended"  # CORE.14: a write by a suspended vendor's key
+    VENDOR_NOT_ACTIVE = "vendor_not_active"  # CORE.14: a write by a not yet active vendor's key
 
 
 _FORBIDDEN_REASONS: Final = frozenset(
-    {Reason.IP_NOT_ALLOWED, Reason.INSUFFICIENT_SCOPE, Reason.VENDOR_SUSPENDED}
+    {
+        Reason.IP_NOT_ALLOWED,
+        Reason.INSUFFICIENT_SCOPE,
+        Reason.VENDOR_SUSPENDED,
+        Reason.VENDOR_NOT_ACTIVE,
+    }
 )
 
 
@@ -177,6 +188,21 @@ def ip_allowed(ip: str | None, allowed: Sequence[str] | None) -> bool:
     return any(address in ipaddress.ip_network(network) for network in allowed)
 
 
+def vendor_write_refusal(vendor_status: str) -> Reason | None:
+    """Why a vendor key may not write while its vendor has `vendor_status`; None when it may.
+
+    Only an active vendor's key writes (CORE.14): a closed vendor's key is refused outright (401),
+    a suspended one's and a not yet active one's (applicant, onboarding) only read (403).
+    """
+    if vendor_status == vendor_engine.ACTIVE:
+        return None
+    if vendor_status == vendor_engine.CLOSED:
+        return Reason.VENDOR_CLOSED
+    if vendor_status == vendor_engine.SUSPENDED:
+        return Reason.VENDOR_SUSPENDED
+    return Reason.VENDOR_NOT_ACTIVE
+
+
 def evaluate(
     state: ClientState,
     *,
@@ -185,13 +211,17 @@ def evaluate(
     required_scope: str | None,
     write: bool = True,
 ) -> Decision:
-    """Order: revoked → expired → closed vendor (401), then IP allow-list → scope → suspended
-    vendor writing (403).
+    """Order: revoked → expired → closed vendor (401), then IP allow-list → scope → a write by a
+    vendor that is not active (403).
 
     `required_scope=None` is for operations open to any valid key (e.g. `GET /api/v1/me`).
-    `write` says whether the call changes state (`is_write(method)`); it defaults to True so a
-    caller that does not say is refused like a write (CORE.14: a suspended vendor's key reads only).
+    A vendor key never passes the scope check for a platform-only scope, even if it holds it (a
+    key issued before the scope was classed platform-only): the allow-list is enforced here too,
+    not only at issuance. `write` says whether the call changes state (`is_write(method)`); it
+    defaults to True so a caller that does not say is refused like a write (CORE.14: only an
+    active vendor's key writes).
     """
+    vendor_key = state.vendor_status is not None
     if not state.is_active:
         return deny(Reason.REVOKED)
     if state.expires_at <= now:
@@ -200,10 +230,15 @@ def evaluate(
         return deny(Reason.VENDOR_CLOSED)
     if not ip_allowed(ip, state.allowed_ips):
         return deny(Reason.IP_NOT_ALLOWED)
-    if required_scope is not None and required_scope not in state.scopes:
+    if required_scope is not None and (
+        required_scope not in state.scopes
+        or (vendor_key and required_scope not in VENDOR_GRANTABLE_SCOPES)
+    ):
         return deny(Reason.INSUFFICIENT_SCOPE)
-    if write and state.vendor_status == vendor_engine.SUSPENDED:
-        return deny(Reason.VENDOR_SUSPENDED)
+    if write and state.vendor_status is not None:
+        refusal = vendor_write_refusal(state.vendor_status)
+        if refusal is not None:
+            return deny(refusal)
     return ALLOWED
 
 
@@ -238,7 +273,7 @@ def validate_scopes(scopes: Iterable[str], *, vendor_key: bool = False) -> list[
     if invalid:
         raise InvalidApiClient(f"invalid scopes: {invalid!r} (expected resource:action)")
     if vendor_key:
-        platform_only = [scope for scope in cleaned if scope not in VENDOR_GRANTABLE_SCOPES]
+        platform_only = platform_only_scopes(cleaned)
         if platform_only:
             raise InvalidApiClient(
                 f"platform-only scopes cannot be granted to a vendor key: {platform_only!r}"
