@@ -32,7 +32,8 @@ def test_staff_see_a_vendor_change_with_before_and_after(
     expect(page.locator(".messagelist")).to_contain_text("was changed successfully")
 
     page.get_by_role("link", name="Changes to this vendor").click()
-    expect(page.locator("#result_list")).to_contain_text("vendor.updated")
+    # The VAT number is DAC7 data: a staff change is a DAC7 correction (VEN.23).
+    expect(page.locator("#result_list")).to_contain_text("vendor.dac7_corrected")
     shot("vendor-trail")
 
     page.locator("#result_list tbody tr").first.locator("a").first.click()

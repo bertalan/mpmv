@@ -54,7 +54,7 @@ def vendor_editor_client(client: Client, mfa_login: Any) -> Client:
 def change_form(vendor: Vendor, **overrides: Any) -> dict[str, Any]:
     """The POST data of the vendor change form, as the browser would send it unchanged."""
     data: dict[str, Any] = {
-        name: getattr(vendor, name)
+        name: "" if getattr(vendor, name) is None else getattr(vendor, name)
         for name in (
             "display_name",
             "slug",
@@ -127,7 +127,10 @@ def test_without_a_tax_profile_staff_still_set_the_regime(superuser_client: Clie
     assert (
         '<select name="fiscal_regime"' in superuser_client.get(change_url(vendor)).content.decode()
     )
-    response = superuser_client.post(change_url(vendor), change_form(vendor, fiscal_regime=RF20))
+    form = change_form(  # VEN.25: RF20 needs the EX number issued by Italy
+        vendor, fiscal_regime=RF20, cross_border_franchise_number=f"IT{vendor.vat_number}EX"
+    )
+    response = superuser_client.post(change_url(vendor), form)
     assert response.status_code == 302, response.content.decode()
     vendor.refresh_from_db()
     assert vendor.fiscal_regime == RF20

@@ -122,7 +122,7 @@ def test_the_database_check_passes_with_the_right_key() -> None:
 def test_a_wrong_key_fails_the_database_check_and_every_read() -> None:
     vendor = VendorFactory.create(italian_sole_proprietor=True)
     with override_settings(FIELD_ENCRYPTION_KEYS=[generate_key("test")]):
-        assert database_check() == ["core.E304", "core.E304"]
+        assert database_check() == ["core.E304"] * 3  # IBAN, tax code, date of birth
         with pytest.raises(DecryptionError, match=r"vendors\.vendor"):
             Vendor.objects.get(pk=vendor.pk)
 
@@ -130,13 +130,13 @@ def test_a_wrong_key_fails_the_database_check_and_every_read() -> None:
 def test_a_retired_key_still_in_use_fails_the_database_check() -> None:
     VendorFactory.create(italian_sole_proprietor=True)
     with override_settings(FIELD_ENCRYPTION_KEYS=[generate_key("k2")]):
-        assert database_check() == ["core.E303", "core.E303"]
+        assert database_check() == ["core.E303"] * 3
 
 
 def test_rows_on_an_old_key_or_in_clear_are_reported() -> None:
     vendor = VendorFactory.create(italian_sole_proprietor=True)
     with override_settings(FIELD_ENCRYPTION_KEYS=[generate_key("k2"), current_key()]):
-        assert database_check() == ["core.W301", "core.W301"]
+        assert database_check() == ["core.W301"] * 3
     set_raw(vendor, "tax_code", "RSSMRA85T10A562S")
     assert database_check() == ["core.W302"]
 
@@ -159,6 +159,7 @@ def test_rotation_re_encrypts_with_the_new_key_audited_without_values() -> None:
         assert preview.changes[0].fields == {
             "iban": ("key test", "key k2"),
             "tax_code": ("key test", "key k2"),
+            "date_of_birth": ("key test", "key k2"),
         }
         assert raw_key_ids(vendor) == {"test"}
         assert not AuditLog.objects.exists()

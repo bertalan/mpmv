@@ -142,3 +142,64 @@ def test_the_app_trusts_the_client_ip_header_only_from_the_proxy_network() -> No
     header = env["MPMV_TRUSTED_PROXY_HEADER"]
     caddyfile = (ROOT / "deploy" / "caddy" / "Caddyfile").read_text()
     assert re.search(rf"^\s*header_up {re.escape(header)} \{{client_ip\}}$", caddyfile, re.M)
+
+
+DB_ROOT_CA = "/etc/mpmv/pg-root-ca.crt"
+
+
+@pytest.mark.parametrize("name", APP_UNITS)
+def test_app_units_read_the_environment_then_the_database_connection(name: str) -> None:
+    """ARC.13: the database setup writes DATABASE_URL into its own file; it is read last."""
+    files = values(load(name), "Container", "EnvironmentFile")
+    assert files == ["%h/.config/mpmv/mpmv.env", "%h/.config/mpmv/database.env"]
+
+
+@pytest.mark.parametrize("name", APP_UNITS)
+def test_app_units_mount_the_database_root_ca_read_only(name: str) -> None:
+    """MQ-11: sslmode=verify-full against the internal CA, whose root the container mounts."""
+    mounts = [v.split(":") for v in values(load(name), "Container", "Volume")]
+    ca = [m for m in mounts if len(m) == 3 and m[1] == DB_ROOT_CA]
+    assert len(ca) == 1, mounts
+    assert "ro" in ca[0][2].split(",")
+
+
+def test_database_url_lives_only_in_the_database_env_example() -> None:
+    server = ROOT / "deploy" / "server"
+    assert "DATABASE_URL" not in env_example(), "with two env files the later one wins"
+    database = (server / "database.env.example").read_text()
+    assert re.search(r"^DATABASE_URL=$", database, re.M)
+    assert f"sslrootcert={DB_ROOT_CA}" in database
+    assert "sslmode=verify-full" in database
+
+
+CADDYFILE = ROOT / "deploy" / "caddy" / "Caddyfile"
+
+
+def caddy_sites() -> list[str]:
+    """Top-level block headers of the Caddyfile (an empty string is the global options block)."""
+    heads = []
+    for line in CADDYFILE.read_text().splitlines():
+        if line and not line[0].isspace() and line.rstrip().endswith("{"):
+            heads.append(line.rstrip()[:-1].strip())
+    return heads
+
+
+def test_caddy_serves_only_the_configured_site_name() -> None:
+    """ARC.13: the host name comes from the environment; any other name or an IP gets no site."""
+    assert caddy_sites() == ["", "{$MPMV_SITE_ADDRESS}", "http://"]
+    text = CADDYFILE.read_text()
+    assert re.search(r"^http:// \{\n\tabort\n\}$", text, re.M), "catch-all must serve nothing"
+    assert re.search(r"^\t\tstrict_sni_host on$", text, re.M)
+    assert "tls internal" not in text, "Let's Encrypt only"
+    assert "on_demand" not in text, "Let's Encrypt only, for the configured name"
+
+
+def test_caddy_noindex_header_is_behind_a_flag_that_is_off_by_default() -> None:
+    text = CADDYFILE.read_text()
+    flag = re.search(r"^\t@noindex expression `\{env\.MPMV_NOINDEX\} in \[(.*)\]`$", text, re.M)
+    assert flag, "X-Robots-Tag must depend on MPMV_NOINDEX"
+    assert '""' not in flag.group(1), "an empty or unset flag means off (LIVE)"
+    assert re.search(r'^\theader @noindex X-Robots-Tag "noindex, nofollow"$', text, re.M)
+    example = (ROOT / "deploy" / "server" / "caddy.env.example").read_text()
+    assert re.search(r"^MPMV_NOINDEX=$", example, re.M)
+    assert re.search(r"^MPMV_SITE_ADDRESS=$", example, re.M)

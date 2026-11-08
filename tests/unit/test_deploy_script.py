@@ -18,6 +18,7 @@ REGISTRY = "registry.invalid/acme/mpmv-app"
 FAKE_PODMAN = """#!/bin/sh
 echo "podman $*" >> "$FAKE_DIR/log"
 case "$1" in
+  image) [ "$2" = exists ] && grep -qxF "$3" "$FAKE_DIR/local" 2>/dev/null; exit ;;
   tag) echo "${2##*:}" > "$FAKE_DIR/current" ;;
   healthcheck)
     current=$(cat "$FAKE_DIR/current" 2>/dev/null || true)
@@ -84,7 +85,8 @@ def host(tmp_path: Path) -> Host:
 def test_deploy_pulls_migrates_then_restarts(host: Host) -> None:
     result = host.run("deploy", "1.2.0")
     assert result.returncode == 0, result.stderr
-    assert host.log[:5] == [
+    assert host.log[:6] == [
+        f"podman image exists {REGISTRY}:1.2.0",
         f"podman pull {REGISTRY}:1.2.0",
         f"podman tag {REGISTRY}:1.2.0 localhost/mpmv-app:current",
         "systemctl --user start mpmv-migrate.service",
@@ -207,3 +209,12 @@ def test_status_prints_current_and_previous(host: Host) -> None:
     assert result.returncode == 0
     assert "current: 1.1.0" in result.stdout
     assert "previous: 1.0.0" in result.stdout
+
+
+def test_deploy_reuses_a_release_already_in_local_storage(host: Host) -> None:
+    """Release tags are immutable: a local copy is the release, no pull needed (ARC.13)."""
+    (host.root / "local").write_text(f"{REGISTRY}:1.2.0\n")
+    result = host.run("deploy", "1.2.0")
+    assert result.returncode == 0, result.stderr
+    assert not any(line.startswith("podman pull") for line in host.log)
+    assert f"podman tag {REGISTRY}:1.2.0 localhost/mpmv-app:current" in host.log
