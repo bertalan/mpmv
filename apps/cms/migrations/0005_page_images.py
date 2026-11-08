@@ -10,7 +10,7 @@ import apps.cms.blocks
 class Migration(migrations.Migration):
     dependencies = [
         ("cms", "0004_legalpageversion_append_only"),
-        ("core", "0009_media_image"),
+        ("core", "0010_media_image"),
     ]
 
     operations = [
