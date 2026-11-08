@@ -473,6 +473,46 @@ def test_regression_4_an_edit_in_review_keeps_the_approved_revision(
     assert _fresh(page).title == "Edited title"
 
 
+def test_regression_4_a_vendor_cannot_edit_an_event_awaiting_review(
+    owner: User, moderator: User
+) -> None:
+    page = _create(owner)
+    submit_event(owner, page)
+    revisions = Revision.objects.count()
+    for dry_run in (True, False):
+        with pytest.raises(ValidationError):
+            save_event_draft(owner, {"title": "UNREVIEWED"}, _fresh(page), dry_run=dry_run)
+    assert Revision.objects.count() == revisions
+
+    _act(page, moderator, "approve")
+    assert _fresh(page).title == "Spring trade fair"
+
+
+def test_regression_4_approval_publishes_the_reviewed_revision(
+    owner: User, moderator: User
+) -> None:
+    page = _create(owner)
+    submit_event(owner, page)
+    # A revision saved past the service (another adapter) while the review is in progress.
+    unreviewed = _fresh(page).get_latest_revision_as_object()
+    unreviewed.title = "UNREVIEWED"
+    unreviewed.save_revision(user=owner)
+
+    _act(page, moderator, "approve")
+    assert _fresh(page).title == "Spring trade fair"
+
+
+def test_regression_4_a_moderator_edit_in_review_is_published_on_approval(
+    owner: User, moderator: User
+) -> None:
+    page = _create(owner)
+    submit_event(owner, page)
+    save_event_draft(moderator, {"title": "Moderated title"}, _fresh(page))
+
+    _act(page, moderator, "approve")
+    assert _fresh(page).title == "Moderated title"
+
+
 # --- Workflow signal handlers: approval and changes requested are audited
 
 

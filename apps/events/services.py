@@ -319,6 +319,11 @@ def _refuse_hidden(actor: Any, page: EventPage) -> None:
         raise EventRefused("a hidden event is restored by platform staff only")
 
 
+def _in_review(page: EventPage) -> bool:
+    state = page.current_workflow_state
+    return state is not None and state.status == WorkflowState.STATUS_IN_PROGRESS
+
+
 def _fresh(page: EventPage) -> EventPage:
     fresh: EventPage = EventPage.objects.get(pk=page.pk)
     return fresh
@@ -469,7 +474,9 @@ def save_event_draft(
 
     Vendor members with the events permission write their vendor's events; only platform staff
     write platform events (`vendor=None`) and other vendors' events. A hidden page is refused
-    to its vendor (`EventRefused`). Invalid data raises `ValidationError` with field errors.
+    to its vendor (`EventRefused`), and so is a page awaiting review (`ValidationError`): the
+    approval publishes the reviewed revision. Invalid data raises `ValidationError` with field
+    errors.
     """
     ctx = _context(actor, ctx)
     staff = _is_staff(actor)
@@ -477,6 +484,9 @@ def save_event_draft(
         return _create_event(actor, data, vendor, locale, staff=staff, ctx=ctx, dry_run=dry_run)
     stored = _event_for(actor, page)
     _refuse_hidden(actor, stored)
+    if not staff and _in_review(stored):
+        # The approval publishes what the moderator reviewed: no vendor edit while it waits.
+        raise ValidationError(_("The event is awaiting review and cannot be edited."))
     changes = EventChangeSet(page=stored)
     with _mutation(dry_run):
         draft: EventPage = stored.get_latest_revision_as_object()
@@ -547,7 +557,7 @@ def submit_event(
     with _mutation(dry_run):
         before = _state(stored)
         state = stored.current_workflow_state
-        if state is not None and state.status == WorkflowState.STATUS_IN_PROGRESS:
+        if _in_review(stored):
             raise ValidationError(_("The event is already awaiting review."))
         revision = stored.get_latest_revision() or stored.save_revision(user=actor)
         workflow = None if staff else stored.get_workflow()
