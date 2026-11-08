@@ -39,6 +39,7 @@ from apps.seed.services import (
 from apps.shipping.models import ShippingMethod, ShippingZone, SpecialAreaTreatment
 from apps.tax.models import TaxRate
 from apps.tax.services import current_tax_profile
+from apps.vendors import engine as vendors_engine
 from apps.vendors.models import ContractAcceptance, Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -78,6 +79,7 @@ def test_the_seed_builds_active_vendors_with_every_regime(demo_seed: ChangeSet) 
         profile.full_clean()
         assert ContractAcceptance.objects.filter(vendor=vendor).count() == 1
         assert {t.language for t in vendor.translations.all()} == {"en", "it"}
+        assert vendors_engine.dac7_missing(vendor.legal_identity()) == ()  # VEN.23
     rf20 = vendors[-1]
     assert rf20.fiscal_regime == "RF20"
     assert rf20.cross_border_franchise_number.endswith("EX")

@@ -18,6 +18,7 @@ while a seed runs. No account the seed creates can log in.
 """
 
 import dataclasses
+import datetime as dt
 import io
 from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
@@ -548,6 +549,13 @@ def _identity(index: int, spec: data.VendorSeed) -> dict[str, Any]:
     }
     if spec.share_capital is not None:
         values["share_capital"] = spec.share_capital
+    # DAC7 (VEN.23): the TIN's issuing country, and a registration number or a date of birth.
+    values["tin_country"] = spec.country
+    if spec.legal_form == SOLE_PROPRIETOR:
+        # The date the synthetic codice fiscale encodes (`_codice_fiscale(index + 1)`).
+        values["date_of_birth"] = dt.date(1980, 1, index + 2)
+    else:
+        values["business_registration_number"] = f"DEMO-{spec.letter}-{100_001 + index}"
     if spec.country == data.ITALY:
         vat = _italian_vat(index + 1)
         values.update(
