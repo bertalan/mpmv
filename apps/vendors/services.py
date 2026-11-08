@@ -168,6 +168,33 @@ def change_status(
     return changes
 
 
+def ensure_vendor_can_write(vendor: Vendor) -> str:
+    """Re-read `vendor`'s status inside the caller's write transaction; raise
+    `engine.VendorCannotWrite` unless the vendor is active (CORE.14). Returns the status.
+
+    For writes made on behalf of a vendor's API key. The key's vendor status is checked when the
+    request is authenticated; this closes the window between that check and the write. The row
+    is read `FOR SHARE`: concurrent writes of the same vendor proceed, while `change_status`
+    (`FOR UPDATE`) waits for them to commit, and a write that starts after a status change
+    commits sees the new status. Must run inside `transaction.atomic()`, or the lock would end
+    with the read.
+    """
+    if not connection.in_atomic_block:
+        raise RuntimeError("ensure_vendor_can_write must run inside the write transaction")
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"SELECT status FROM {connection.ops.quote_name(Vendor._meta.db_table)} "  # noqa: S608
+            "WHERE id = %s FOR SHARE",
+            [vendor.pk],
+        )
+        row = cursor.fetchone()
+    if row is None:
+        raise Vendor.DoesNotExist(f"vendor {vendor.public_id} does not exist")
+    status = str(row[0])
+    engine.check_can_write(status)
+    return status
+
+
 # --- Memberships (CORE.2)
 
 MEMBER_MODEL = "vendors.vendormember"

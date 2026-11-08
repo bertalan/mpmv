@@ -16,7 +16,15 @@ from .base import *  # noqa: F403
 # check (tests roll back their writes, so a cached value could leak into the next test).
 FEATURE_FLAGS = {}
 FEATURE_FLAGS_CACHE_SECONDS = 0
+# VIES (TAX.5): the suite never leaves the machine. A check without a fake fails the test, and the
+# URL is the local discard port in case a test builds the real HTTP client from these settings.
+VIES_CLIENT = "apps.tax.tests.fakes.RefusingViesClient"
+VIES_API_URL = "http://127.0.0.1:9/"
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]  # fast hashing in tests only
 
 # Parallel runs (several agents or worktrees) each get their own test database.
 DATABASES["default"]["TEST"] = {"NAME": os.environ.get("MPMV_TEST_DB_NAME", "test_mpmv")}  # noqa: F405
+
+# Transactional email (ARC.16): the in-memory backend, and the templates of the outbox tests.
+EMAIL_SENDER = "apps.core.mail.MemoryEmailSender"
+TEMPLATES[0]["DIRS"] = [*TEMPLATES[0]["DIRS"], BASE_DIR / "apps" / "core" / "tests" / "templates"]  # noqa: F405
