@@ -170,9 +170,9 @@ def test_a_term_card_label_replaces_the_term_name(seeded: SeedReport, model_term
 
 def test_a_term_without_published_texts_gets_no_card(seeded: SeedReport) -> None:
     term = TermFactory.create()
-    TermTranslationFactory.create(term=term, language="en", name="Hidden", slug="hidden")
-    html = _publish(_home(), [_featured(_card("term", term, label="Hidden"))])
-    assert "Hidden" not in html
+    TermTranslationFactory.create(term=term, language="en", name="Withheld", slug="withheld")
+    html = _publish(_home(), [_featured(_card("term", term, label="Withheld"))])
+    assert "Withheld" not in html
 
 
 # --- Vendor cards
