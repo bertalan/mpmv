@@ -118,7 +118,7 @@ _HANDLERS: tuple[tuple[type[Exception], Callable[[HttpRequest, Any], HttpRespons
     (DjangoValidationError, _on_django_validation),
     (Http404, _on_not_found),
     (ObjectDoesNotExist, _on_not_found),
-    (VendorCannotWrite, _on_vendor_cannot_write),  # before PermissionDenied, its base class
+    (VendorCannotWrite, _on_vendor_cannot_write),
     (PermissionDenied, _on_permission_denied),
     (IntegrityError, _on_integrity),
     (ApiProblem, _on_problem),

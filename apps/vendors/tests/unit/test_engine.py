@@ -4,7 +4,6 @@ The registered address is structured fields since VEN.12 (test_engine_legal_iden
 """
 
 import pytest
-from django.core.exceptions import PermissionDenied
 
 from apps.vendors import engine
 from apps.vendors.engine import (
@@ -126,5 +125,6 @@ def test_a_vendor_that_is_not_active_cannot_write(status: str) -> None:
     assert refused.value.status == status
 
 
-def test_a_refused_vendor_write_is_a_permission_denial() -> None:
-    assert issubclass(engine.VendorCannotWrite, PermissionDenied)
+def test_a_refused_vendor_write_needs_no_django_exception() -> None:
+    # Engines import no Django (ARC.18); the API maps the exception to its refusal.
+    assert issubclass(engine.VendorCannotWrite, Exception)

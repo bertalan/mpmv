@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from apps.accounts.tests.factories import UserFactory
 from apps.catalog import engine
-from apps.catalog.models import Product, ProductTranslation, Variant
+from apps.catalog.models import Product, ProductTranslation, StockStatus, Variant
 from apps.catalog.services import (
     duplicate_product_to_vendor,
     set_product_price,
@@ -259,7 +259,9 @@ def make_rich_product() -> Product:
     )
     ProductTranslationFactory.create(product=product, language="en", slug="bag-en")
     ProductTranslationFactory.create(product=product, language="it")
-    variant = VariantFactory.create(product=product, sku="VAR-RED", stock_qty=4)
+    variant = VariantFactory.create(
+        product=product, sku="VAR-RED", stock_qty=4, stock_status=StockStatus.IN_STOCK
+    )
     VariantTranslationFactory.create(variant=variant, language="en", label="Red")
     product.required_companion = ProductFactory.create(vendor=product.vendor)
     product.save()
@@ -296,6 +298,7 @@ def test_staff_duplicate_a_product_to_another_vendor_as_a_draft() -> None:
     assert copied_variant.vendor == target
     assert copied_variant.sku == "VAR-RED"
     assert copied_variant.stock_qty == 0
+    assert copied_variant.stock_status == StockStatus.OUT_OF_STOCK
     assert list(copied_variant.translations.values_list("label", flat=True)) == ["Red"]
 
     original.refresh_from_db()

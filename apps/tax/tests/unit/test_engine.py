@@ -145,27 +145,84 @@ def test_the_tax_engine_has_no_postcode_grammar_of_its_own() -> None:
 
 
 @pytest.mark.parametrize(
-    ("patterns", "postcode", "matches"),
+    ("territory_country", "patterns", "postcode", "matches"),
     [
-        (["9000..9999"], "9500", True),
-        (["9000..9999"], "9000-001", True),  # PT islands: the first 4 characters
-        (["9000..9999"], "8999", False),
-        (["35*", "38*"], "38001", True),
-        (["35*", "38*"], "28001", False),
-        (["23041"], "23041", True),
-        (["9000-001"], "9000-001", True),  # PT postcode with a dash: an exact postcode
-        (["9000-001"], "9000 001", True),
-        (["9000-001"], "9000-002", False),
-        (["00-950"], "00-950", True),  # PL postcode with a dash: an exact postcode
-        (["00-950"], "00-951", False),
-        (["35*"], "", False),
-        ([], "35001", False),
+        ("PT", ["9000..9999"], "9500", True),
+        ("PT", ["9000..9999"], "9000-001", True),  # PT islands: the first 4 characters
+        ("PT", ["9000..9999"], "8999", False),
+        ("ES", ["35*", "38*"], "38001", True),
+        ("ES", ["35*", "38*"], "28001", False),
+        ("IT", ["23041"], "23041", True),
+        ("PT", ["9000-001"], "9000-001", True),  # PT postcode with a dash: an exact postcode
+        ("PT", ["9000-001"], "9000 001", True),
+        ("PT", ["9000-001"], "9000-002", False),
+        ("PL", ["00-950"], "00-950", True),  # PL postcode with a dash: an exact postcode
+        ("PL", ["00-950"], "00-951", False),
+        ("ES", ["35*"], "", False),
+        ("ES", [], "35001", False),
     ],
 )
 def test_territory_postcodes_match_with_the_shared_grammar(
-    patterns: list[str], postcode: str, matches: bool
+    territory_country: str, patterns: list[str], postcode: str, matches: bool
 ) -> None:
-    assert engine.postcode_in_territory(patterns, postcode) is matches
+    assert (
+        engine.postcode_in_territory(territory_country, patterns, territory_country, postcode)
+        is matches
+    )
+
+
+# --- A territory matches only addresses in its own country (TAX.11 review, T15)
+
+CANARY_ISLANDS = ("ES", ["35*", "38*"])
+LIVIGNO = ("IT", ["23041"])
+
+
+@pytest.mark.parametrize("postcode", ["35100", "38100"])  # Padova, Trento
+def test_an_italian_postcode_does_not_match_the_canary_islands(postcode: str) -> None:
+    assert engine.postcode_in_territory(*CANARY_ISLANDS, "IT", postcode) is False
+    assert engine.postcode_in_territory(*CANARY_ISLANDS, "ES", postcode) is True
+
+
+def test_livigno_matches_its_italian_postcode() -> None:
+    assert engine.postcode_in_territory(*LIVIGNO, "IT", "23041") is True
+
+
+def test_livigno_does_not_match_the_same_postcode_in_spain() -> None:
+    assert engine.postcode_in_territory(*LIVIGNO, "ES", "23041") is False
+
+
+def test_the_buyer_country_is_normalised_before_the_comparison() -> None:
+    # EL is the VAT alias of GR (Mount Athos); case and spaces do not matter.
+    assert engine.postcode_in_territory("GR", ["63086"], " el ", "63086") is True
+    assert engine.postcode_in_territory("GR", ["63086"], "it", "63086") is False
+
+
+# --- A bad stored pattern is a typed configuration error, whatever the order and the address
+
+
+@pytest.mark.parametrize("patterns", [["22100-22199", "35*"], ["35*", "22100-22199"]])
+@pytest.mark.parametrize(
+    ("country", "postcode"), [("ES", "35001"), ("ES", "28001"), ("IT", "35001")]
+)
+def test_an_invalid_stored_pattern_raises_a_configuration_error(
+    patterns: list[str], country: str, postcode: str
+) -> None:
+    with pytest.raises(engine.TerritoryConfigError, match=r"22100\.\.22199"):
+        engine.postcode_in_territory("ES", patterns, country, postcode)
+
+
+def test_the_configuration_error_names_the_territory_and_the_pattern() -> None:
+    with pytest.raises(engine.TerritoryConfigError, match=r"ES-CN.*'3\*5'"):
+        engine.parse_territory_patterns(["35*", "3*5"], code="ES-CN")
+
+
+def test_parsed_patterns_match_without_parsing_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    parsed = engine.parse_territory_patterns(["35*", "38*"], code="ES-CN")
+    calls: list[str] = []
+    monkeypatch.setattr(engine, "parse_postcode_pattern", lambda raw: calls.append(raw))
+    for country, postcode in [("ES", "35001"), ("ES", "28001"), ("IT", "38100")]:
+        engine.postcode_in_territory("ES", parsed, country, postcode)
+    assert calls == []
 
 
 def test_territory_statuses_leave_northern_ireland_to_an_explicit_rule() -> None:
