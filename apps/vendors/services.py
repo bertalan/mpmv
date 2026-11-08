@@ -13,7 +13,7 @@ from typing import Any
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection, transaction
 from django.db.models import OuterRef, QuerySet, Subquery
 from django.utils import timezone
@@ -110,6 +110,8 @@ def save_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -> 
             if vendor._state.adding
             else Vendor.objects.select_for_update().filter(pk=vendor.pk).first()
         )
+        if stored is not None:  # a stale instance never undoes a status change or a reopen
+            vendor.status, vendor.onboarding_round = stored.status, stored.onboarding_round
         after = vendor_snapshot(vendor)
         changes = ChangeSet()
         if stored is None:
@@ -157,6 +159,15 @@ def delete_vendor(vendor: Vendor, *, ctx: AuditContext, dry_run: bool = False) -
     return changes
 
 
+def _run_closure_hooks(
+    vendor: Vendor, changes: ChangeSet, *, ctx: AuditContext, dry_run: bool
+) -> None:
+    """Revoke, audited, what only an active vendor may hold (its API keys, CORE.14): each hook
+    in `settings.VENDOR_CLOSURE_HOOKS` returns its changes, added to `changes`."""
+    for path in settings.VENDOR_CLOSURE_HOOKS:
+        changes.changes.extend(import_string(path)(vendor, ctx=ctx, dry_run=dry_run).changes)
+
+
 def change_status(
     vendor: Vendor, target: str, *, ctx: AuditContext, dry_run: bool = False
 ) -> ChangeSet:
@@ -164,8 +175,9 @@ def change_status(
 
     The check runs against the stored status (row locked), never a possibly stale instance.
     Activating an onboarding vendor needs an establishment in an allowed country (CMP.13) and
-    its onboarding checklist (VEN.5): the contract in force must be accepted. Raises
-    `engine.InvalidTransition` (`engine.EstablishmentNotAllowed` for the establishment,
+    its onboarding checklist (VEN.5): the contract in force must be accepted. Closing a vendor
+    revokes its API keys (`VENDOR_CLOSURE_HOOKS`, CORE.14), listed in the returned ChangeSet.
+    Raises `engine.InvalidTransition` (`engine.EstablishmentNotAllowed` for the establishment,
     `engine.ActivationNotAllowed` for the checklist), also on dry-run. Reinstating a suspended
     vendor is a staff decision and is not gated. Every move to active records the
     establishment and whether it is allowed (`establishment_snapshot`) in the audit entry.
@@ -199,6 +211,8 @@ def change_status(
             current.save(update_fields=["status", "updated_at"])
 
         run_mutation(changes, apply, ctx=ctx, action=STATUS_CHANGED, dry_run=dry_run)
+        if target == engine.CLOSED:
+            _run_closure_hooks(current, changes, ctx=ctx, dry_run=dry_run)
 
     if not dry_run:
         vendor.status = target
@@ -734,6 +748,7 @@ def acceptance_snapshot(acceptance: ContractAcceptance) -> dict[str, Any]:
         "text_hash": acceptance.text_hash,
         "accepted_at": acceptance.accepted_at,
         "ip": acceptance.ip,
+        "onboarding_round": acceptance.onboarding_round,
     }
 
 
@@ -783,11 +798,16 @@ def accept_contract(
 
     The acceptance stores the language and hash, and the IP of `ctx` (`audit_context` takes it
     from the request through the trusted proxy, `apps.core.http.client_ip`). Accepting a version
-    again changes nothing. Raises `engine.ContractNotAcceptable` (vendor status, not an owner),
+    again in the same onboarding round changes nothing; after a reopen (VEN.21) it is accepted
+    again. Raises `engine.ContractNotAcceptable` (vendor status, not an owner),
     `engine.NoContract` or `engine.ContractChanged`, also on dry-run.
     """
     with transaction.atomic():
-        locked = Vendor.objects.select_for_update().only("status", "public_id").get(pk=vendor.pk)
+        locked = (
+            Vendor.objects.select_for_update()
+            .only("status", "public_id", "onboarding_round")
+            .get(pk=vendor.pk)
+        )
         role = member_role(user, locked) if user.is_active else None
         engine.check_can_accept_contract(locked.status, role)
         shown = VendorContract.objects.select_for_update().get(pk=contract.pk)
@@ -807,7 +827,10 @@ def accept_contract(
             raise engine.ContractChanged(
                 f"the {language} text of {shown} changed after it was shown; show it again"
             )
-        if ContractAcceptance.objects.filter(vendor=locked, contract=shown).exists():
+        round_ = locked.onboarding_round
+        if ContractAcceptance.objects.filter(
+            vendor=locked, contract=shown, onboarding_round=round_
+        ).exists():
             return ChangeSet()
         acceptance = ContractAcceptance(
             vendor=locked,
@@ -817,6 +840,7 @@ def accept_contract(
             text_hash=text_hash,
             accepted_at=timezone.now(),
             ip=ctx.ip,
+            onboarding_round=round_,
         )
         changes = ChangeSet()
         changes.create(ACCEPTANCE_MODEL, str(acceptance.public_id), acceptance_snapshot(acceptance))
@@ -827,12 +851,15 @@ def accept_contract(
 
 def onboarding_checklist(vendor: Vendor) -> engine.OnboardingChecklist:
     """The stored vendor's onboarding checklist: contract in force accepted (blocks activation),
-    DAC7 dataset and payout data (listed only: VEN.12 gates payouts with them)."""
+    DAC7 dataset and payout data (listed only: VEN.12 gates payouts with them). Only an
+    acceptance of the vendor's current onboarding round counts (VEN.21)."""
     stored = Vendor.objects.get(pk=vendor.pk)
     contract = current_contract()
     accepted = (
         contract is not None
-        and ContractAcceptance.objects.filter(vendor=stored, contract=contract).exists()
+        and ContractAcceptance.objects.filter(
+            vendor=stored, contract=contract, onboarding_round=stored.onboarding_round
+        ).exists()
     )
     return engine.onboarding_checklist(
         contract_version=contract.version if contract is not None and accepted else None,
@@ -840,6 +867,84 @@ def onboarding_checklist(vendor: Vendor) -> engine.OnboardingChecklist:
         dac7_missing=engine.dac7_missing(stored.legal_identity()),
         payout=legal_profile_completeness(stored),
     )
+
+
+# --- Reopening a closed vendor (VEN.21, owner decision Q-17)
+
+REOPENED = "vendor.reopened"
+# Checked here, not only in the admin, so every adapter (admin, API, MCP, shell) is staff-only.
+REOPEN_PERMISSION = "vendors.change_vendor"
+
+
+def can_reopen(actor: User | AnonymousUser) -> bool:
+    """Active platform staff with the vendor change permission; never a vendor member as such."""
+    return bool(actor.is_active and actor.is_staff and actor.has_perm(REOPEN_PERMISSION))
+
+
+def reopen_vendor(
+    vendor: Vendor,
+    *,
+    actor: User | AnonymousUser,
+    reason: str,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Staff move a closed `vendor` back to onboarding, saying why; audited with the reason.
+
+    The vendor's onboarding round goes up, so an acceptance from before the closure no longer
+    counts: an owner accepts the contract in force again, and activation re-runs the checklist
+    and gates through `change_status`. The kept data (owner, ledger, contracts) are reused.
+    No API key comes back: closing revoked them, and a key a closure from before CORE.14 left
+    active is revoked here (`VENDOR_CLOSURE_HOOKS`); an owner issues new keys once the vendor is
+    active again. Checked against the stored vendor (row locked). Raises `PermissionDenied` (see
+    `can_reopen`), `engine.ReasonRequired` (blank reason), `engine.InvalidTransition` (not
+    closed) or `engine.ReopenNotAllowed` (no active owner), also on dry-run.
+    """
+    if not can_reopen(actor):
+        raise PermissionDenied("Only platform staff can reopen a closed vendor.")
+    reason = reason.strip()
+    with transaction.atomic():
+        current = (
+            Vendor.objects.select_for_update()
+            .only("status", "slug", "public_id", "onboarding_round")
+            .get(pk=vendor.pk)
+        )
+        engine.check_reopen(
+            current.status,
+            reason=reason,
+            has_active_owner=VendorMember.objects.filter(
+                vendor=current, role=engine.OWNER, user__is_active=True
+            ).exists(),
+        )
+        round_ = current.onboarding_round + 1
+        changes = ChangeSet()
+        changes.update(
+            MODEL_LABEL,
+            str(current.public_id),
+            before={
+                "status": current.status,
+                "slug": current.slug,
+                "onboarding_round": current.onboarding_round,
+            },
+            after={
+                "status": engine.ONBOARDING,
+                "slug": current.slug,
+                "onboarding_round": round_,
+                "reason": reason,
+            },
+        )
+
+        def apply() -> None:
+            current.status = engine.ONBOARDING
+            current.onboarding_round = round_
+            current.save(update_fields=["status", "onboarding_round", "updated_at"])
+
+        run_mutation(changes, apply, ctx=ctx, action=REOPENED, dry_run=dry_run)
+        _run_closure_hooks(current, changes, ctx=ctx, dry_run=dry_run)
+
+    if not dry_run:
+        vendor.status, vendor.onboarding_round = engine.ONBOARDING, round_
+    return changes
 
 
 # --- Per-vendor feature flag overrides (ARC.8, docs/dev/feature-flags.md)

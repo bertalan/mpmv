@@ -132,6 +132,13 @@ OTP_ADMIN_HIDE_SENSITIVE_DATA = True
 VENDOR_DELETION_AUDIT_HOOKS: list[str] = [
     "apps.api.services.vendor_key_deletions",  # the vendor's API keys (CORE.13)
 ]
+# Vendor closure (CORE.14, VEN.21): each dotted path names a `hook(vendor, *, ctx, dry_run) ->
+# ChangeSet` that revokes, audited, what only an active vendor may hold. Run when a vendor is
+# closed, and again when it is reopened (rows a closure left behind); its changes join the
+# closure's or reopen's ChangeSet.
+VENDOR_CLOSURE_HOOKS: list[str] = [
+    "apps.api.services.revoke_vendor_keys",  # the vendor's API keys
+]
 
 # Allowed vendor countries (CMP.13): `core` cannot import `vendors`, so this names the function
 # that lists the active vendors established outside a new allowed set.
