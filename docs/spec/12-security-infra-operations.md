@@ -64,6 +64,9 @@ flowchart LR
   TLS and `sslmode=verify-full`: the database is not public, so no public certificate is needed,
   and a free internal certificate authority (openssl or step-ca) signs the server certificate;
   the app container mounts its root certificate (owner decision MQ-11, ARC.13).
+
+  STAGE may run as a public demo (ARC.22): published demo accounts without superuser rights or user, permission and key management, exempt from MFA and lockout but rate limited per IP; no outbound email (in-app demo mailbox) and payment test mode only; hourly reset from the synthetic seed with uploads wiped and a banner showing the next reset; no search engine indexing (noindex header, robots meta tag, robots.txt). A `MPMV_DEMO_MODE` setting is off by default and a system check refuses it in LIVE settings.
+
 - **Deploy**: versioned image built by CI, migrations in a dedicated step, rollback by tag; no
   `git pull` on the servers.
 - **Backup**: run by us, since PostgreSQL is self-managed. pgBackRest archives WAL continuously and
