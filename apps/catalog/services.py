@@ -12,7 +12,7 @@ history for the Omnibus rule (CMP.6) can be built from these audit rows.
 import datetime as dt
 import logging
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Any
 
@@ -37,6 +37,7 @@ from .models import (
     Attribute,
     AttributeValue,
     Brand,
+    BrandTranslation,
     Category,
     CategoryTranslation,
     FiscalCategory,
@@ -1605,3 +1606,259 @@ def listing_page(
         selected = products.select_related("vendor", "brand", "category")
         rows = list(selected[window.offset : window.offset + window.limit])
     return ListingPage(params=params, products=rows, window=window, unknown=resolved.unknown)
+
+
+# --- Listing pages (CAT.8): what a category, term, brand or vendor page is about, the page path
+# in every language (D-07 URLs), and filters re-expressed in another language for the canonical
+# and hreflang links.
+
+
+@dataclass(frozen=True)
+class ListingAnchor:
+    """The subject of a listing page and where the page lives in each language.
+
+    `paths` holds the page path in every configured language the page exists in: each slug is
+    the one of the published text in that language, else of the published source text (the
+    explicit fallback, spec 09). `published` are the languages with their own published text,
+    the `hreflang` set; any other language shows the fallback with the source canonical.
+    """
+
+    scope: ListingScope
+    name: str
+    paths: dict[str, str]
+    published: tuple[str, ...]
+
+    def is_fallback(self, language: str) -> bool:
+        return language not in self.published
+
+
+def _languages() -> list[str]:
+    return [str(code) for code, _name in settings.LANGUAGES]
+
+
+def _published_slugs(rows: "QuerySet[Any]", owner: str) -> dict[int, dict[str, str]]:
+    """Published slugs by owner id, then by language."""
+    found: dict[int, dict[str, str]] = {}
+    published = rows.filter(status=translations.PUBLISHED, slug__gt="")
+    for owner_id, language, slug in published.values_list(f"{owner}_id", "language", "slug"):
+        found.setdefault(owner_id, {})[language] = slug
+    return found
+
+
+def _public_slug(slugs_by_language: Mapping[str, str], language: str) -> str | None:
+    return slugs_by_language.get(language) or slugs_by_language.get(translations.source_language())
+
+
+def _public_slug_paths(
+    chain: Sequence[Any], published: Mapping[int, Mapping[str, str]]
+) -> dict[str, tuple[str, ...]]:
+    """The slug path of the last node of `chain` (root first) in every language where each
+    node has a published text in that language or in the source language."""
+    found: dict[str, tuple[str, ...]] = {}
+    for language in _languages():
+        parts = [_public_slug(published.get(node.pk, {}), language) for node in chain]
+        if all(parts):
+            found[language] = tuple(str(part) for part in parts)
+    return found
+
+
+def _published_languages(published: Mapping[str, str]) -> tuple[str, ...]:
+    return tuple(language for language in _languages() if language in published)
+
+
+def _find_tree_path(rows: "QuerySet[Any]", owner: str, value: str, language: str) -> str | None:
+    """The tree path of the node a slug path names in `language` (with the source fallback),
+    else in any other configured language: an other-language URL still finds its page, which
+    then redirects to its own slugs."""
+    for candidate in dict.fromkeys([language, *_languages()]):
+        found = _paths_by_slug_path(rows, owner, [value], candidate).get(value)
+        if found is not None:
+            return found
+    return None
+
+
+def _by_slug(rows: "QuerySet[Any]", slug: str, language: str) -> Any:
+    """The row with `slug`, preferring `language`, then the source language, then any."""
+    order = {language: 0, translations.source_language(): 1}
+    candidates = sorted(rows.filter(slug=slug), key=lambda row: order.get(row.language, 2))
+    return candidates[0] if candidates else None
+
+
+def _translated_name(resolved: Any) -> str:
+    return str(resolved.translation.name) if resolved.translation is not None else ""
+
+
+def category_anchor(slug_path: str, language: str) -> ListingAnchor | None:
+    """The category page at `/product-category/{slug_path}/`; None when there is none."""
+    rows = CategoryTranslation.objects.all()
+    tree_path = _find_tree_path(rows, "category", slug_path, language)
+    if tree_path is None:
+        return None
+    category = Category.objects.get(path=tree_path)
+    chain = [*category.get_ancestors(), category]
+    published = _published_slugs(rows.filter(category__in=chain), "category")
+    paths = {
+        lang: slugs.category_path(lang, parts, default_language=settings.LANGUAGE_CODE)
+        for lang, parts in _public_slug_paths(chain, published).items()
+    }
+    return ListingAnchor(
+        scope=ListingScope(category=category),
+        name=_translated_name(category.translation(language)),
+        paths=paths,
+        published=_published_languages(published.get(category.pk, {})),
+    )
+
+
+def _landing_taxonomy_texts() -> "QuerySet[TaxonomyTranslation]":
+    return TaxonomyTranslation.objects.filter(
+        taxonomy__has_landing=True, status=translations.PUBLISHED
+    )
+
+
+def landing_taxonomy_slug_exists(slug: str) -> bool:
+    """Whether `slug` is the published slug, in some language, of a taxonomy with term pages
+    (an unreviewed text never claims a path)."""
+    return _landing_taxonomy_texts().filter(slug=slug).exists()
+
+
+def term_anchor(taxonomy_slug: str, slug_path: str, language: str) -> ListingAnchor | None:
+    """The term page at `/{taxonomy}/{term}/…` (D-07); None when there is none. The taxonomy
+    segment is a published slug; the views hand any path that names no term page to the CMS."""
+    taxonomy_rows = _landing_taxonomy_texts()
+    found = _by_slug(taxonomy_rows.select_related("taxonomy"), taxonomy_slug, language)
+    if found is None:
+        return None
+    taxonomy = found.taxonomy
+    term_rows = TermTranslation.objects.filter(term__taxonomy=taxonomy)
+    tree_path = _find_tree_path(term_rows, "term", slug_path, language)
+    if tree_path is None:
+        return None
+    term = Term.objects.get(path=tree_path)
+    chain = [*term.get_ancestors(), term]
+    published = _published_slugs(term_rows.filter(term__in=chain), "term")
+    taxonomy_slugs = _published_slugs(taxonomy_rows.filter(taxonomy=taxonomy), "taxonomy")
+    paths: dict[str, str] = {}
+    for lang, parts in _public_slug_paths(chain, published).items():
+        segment = _public_slug(taxonomy_slugs.get(taxonomy.pk, {}), lang)
+        if segment is not None:
+            paths[lang] = slugs.term_path(
+                lang, segment, parts, default_language=settings.LANGUAGE_CODE
+            )
+    return ListingAnchor(
+        scope=ListingScope(term=term),
+        name=_translated_name(term.translation(language)),
+        paths=paths,
+        published=_published_languages(published.get(term.pk, {})),
+    )
+
+
+def brand_anchor(slug: str, language: str) -> ListingAnchor | None:
+    """The brand page at `/brand/{slug}/`; None when there is none."""
+    found = _by_slug(BrandTranslation.objects.select_related("brand"), slug, language)
+    if found is None:
+        return None
+    brand = found.brand
+    published = _published_slugs(BrandTranslation.objects.filter(brand=brand), "brand")
+    brand_slugs = published.get(brand.pk, {})
+    paths: dict[str, str] = {}
+    for lang in _languages():
+        public = _public_slug(brand_slugs, lang)
+        if public is not None:
+            paths[lang] = slugs.brand_path(lang, public, default_language=settings.LANGUAGE_CODE)
+    return ListingAnchor(
+        scope=ListingScope(brand=brand),
+        name=str(brand.name),
+        paths=paths,
+        published=_published_languages(brand_slugs),
+    )
+
+
+def vendor_anchor(slug: str, language: str) -> ListingAnchor | None:
+    """The product listing of an active vendor's storefront at `/shop/{slug}/`.
+
+    The vendor slug is not translated, so the page exists in every language; the languages
+    with a published vendor text are the `hreflang` set (the source language when there is
+    none yet).
+    """
+    vendor = Vendor.objects.filter(slug=slug, status=Vendor.Status.ACTIVE).first()
+    if vendor is None:
+        return None
+    texts = set(
+        vendor.translations.filter(status=translations.PUBLISHED).values_list("language", flat=True)
+    )
+    published = tuple(lang for lang in _languages() if lang in texts)
+    paths = {
+        lang: slugs.vendor_path(lang, vendor.slug, default_language=settings.LANGUAGE_CODE)
+        for lang in _languages()
+    }
+    return ListingAnchor(
+        scope=ListingScope(vendor=vendor),
+        name=str(vendor.display_name),
+        paths=paths,
+        published=published or (translations.source_language(),),
+    )
+
+
+def _filter_slug_paths(
+    rows: "QuerySet[Any]", owner: str, tree_paths: Iterable[str], steplen: int, language: str
+) -> dict[str, str]:
+    """The slug path naming each node of `tree_paths` in a `language` filter: each level's slug
+    in that language, else in the source language (the rule of `_paths_by_slug_path`). One
+    query for all of them; a node with a level that has no such slug is left out."""
+    trees = set(tree_paths)
+    levels = {
+        tree: [tree[:end] for end in range(steplen, len(tree) + 1, steplen)] for tree in trees
+    }
+    prefixes = {prefix for chain in levels.values() for prefix in chain}
+    if not prefixes:
+        return {}
+    source = translations.source_language()
+    found: dict[str, str] = {}
+    matching = rows.filter(
+        **{f"{owner}__path__in": prefixes}, language__in={language, source}
+    ).values_list(f"{owner}__path", "language", "slug")
+    for path, row_language, slug in matching:
+        if row_language == language or path not in found:
+            found[path] = slug
+    return {
+        tree: listings.PATH_SEPARATOR.join(found[prefix] for prefix in chain)
+        for tree, chain in levels.items()
+        if all(prefix in found for prefix in chain)
+    }
+
+
+def listing_params_in(
+    params: listings.ListingParams, from_language: str, to_language: str
+) -> listings.ListingParams | None:
+    """The `params` of a `from_language` page, written for the same listing in `to_language`
+    (taxonomy keys, category and term slug paths depend on the language). None when a value has
+    no equivalent there."""
+    if from_language == to_language or not (params.category or params.terms):
+        return params
+    category = params.category
+    if category:
+        rows = CategoryTranslation.objects.all()
+        tree = _paths_by_slug_path(rows, "category", [category], from_language).get(category)
+        if tree is None:
+            return None
+        written = _filter_slug_paths(rows, "category", [tree], Category.steplen, to_language)
+        category = written.get(tree)
+        if category is None:
+            return None
+    from_keys = listing_term_keys(from_language)
+    to_keys = {taxonomy.pk: key for key, taxonomy in listing_term_keys(to_language).items()}
+    terms: list[tuple[str, tuple[str, ...]]] = []
+    for key, values in params.terms:
+        taxonomy = from_keys.get(key)
+        new_key = to_keys.get(taxonomy.pk) if taxonomy is not None else None
+        if new_key is None:
+            return None
+        term_rows = TermTranslation.objects.filter(term__taxonomy=taxonomy)
+        trees = _paths_by_slug_path(term_rows, "term", values, from_language)
+        if any(value not in trees for value in values):
+            return None
+        written = _filter_slug_paths(term_rows, "term", trees.values(), Term.steplen, to_language)
+        if any(tree not in written for tree in trees.values()):
+            return None
+        terms.append((new_key, tuple(sorted({written[trees[value]] for value in values}))))
+    return replace(params, category=category, terms=tuple(sorted(terms)))
