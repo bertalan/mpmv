@@ -40,8 +40,8 @@ def test_scoping_keeps_the_page_queryset(cross_tenant: CrossTenant) -> None:
     a = cross_tenant.a
     draft = EventPageFactory.create(vendor=a.vendor)
     live = EventPageFactory.create(vendor=a.vendor, live=True)
-    assert list(EventPage.objects.for_member(a.owner).live()) == [live]
-    assert draft in EventPage.objects.for_member(a.owner).not_live()
+    assert list(EventPage.objects.live().for_member(a.owner)) == [live]
+    assert draft in EventPage.objects.not_live().for_member(a.owner)
 
 
 def test_platform_events_are_for_staff_only(cross_tenant: CrossTenant) -> None:

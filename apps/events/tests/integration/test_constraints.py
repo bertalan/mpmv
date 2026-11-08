@@ -43,14 +43,16 @@ def test_a_valid_event_passes_both() -> None:
 
 def test_a_timed_event_ends_after_it_starts() -> None:
     page = EventPageFactory.create()
+    assert page.starts_at is not None
     _refused_by_database(page, ends_at=page.starts_at)
     _refused_by_database(page, ends_at=page.starts_at - dt.timedelta(minutes=1))
     _refused_by_clean(page, "ends_at", ends_at=page.starts_at)
 
 
 def test_an_all_day_event_ends_on_or_after_its_first_day() -> None:
-    page = EventPageFactory.create(all_day=True)
+    page = EventPageFactory.create(all_day_event=True)
     page.full_clean()
+    assert page.start_date is not None
     EventPage.objects.filter(pk=page.pk).update(end_date=page.start_date)  # one day: allowed
     _refused_by_database(page, end_date=page.start_date - dt.timedelta(days=1))
     _refused_by_clean(page, "end_date", end_date=page.start_date - dt.timedelta(days=1))
@@ -60,7 +62,7 @@ def test_timed_events_use_timestamps_and_all_day_events_use_dates() -> None:
     timed = EventPageFactory.create()
     _refused_by_database(timed, starts_at=None)
     _refused_by_database(timed, start_date=dt.date(2027, 3, 10), end_date=dt.date(2027, 3, 10))
-    all_day = EventPageFactory.create(all_day=True)
+    all_day = EventPageFactory.create(all_day_event=True)
     _refused_by_database(all_day, end_date=None)
     _refused_by_database(all_day, starts_at=timed.starts_at, ends_at=timed.ends_at)
     _refused_by_clean(timed, "start_date", all_day=True)
@@ -85,7 +87,7 @@ def test_an_rrule_with_both_count_and_until_is_refused() -> None:
 def test_exclusion_dates_follow_the_kind_of_event() -> None:
     timed = EventPageFactory.create()
     _refused_by_database(timed, exdate_days=[dt.date(2027, 3, 17)])
-    all_day = EventPageFactory.create(all_day=True)
+    all_day = EventPageFactory.create(all_day_event=True)
     _refused_by_database(all_day, exdates=[timed.starts_at])
 
 

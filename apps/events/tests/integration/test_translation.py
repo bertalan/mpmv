@@ -76,6 +76,7 @@ def test_an_italian_page_translates_to_english_with_synchronised_dates(
     assert english.original_locale.language_code == "it"
     assert english.translation_key == italian_event.translation_key
 
+    assert italian_event.starts_at is not None
     new_start = italian_event.starts_at + dt.timedelta(days=7)
     italian_event.starts_at = new_start
     italian_event.ends_at = new_start + dt.timedelta(hours=6)

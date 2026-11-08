@@ -4,7 +4,7 @@ Event pages live in the Wagtail tree: `.create()` adds the page under `parent` w
 `EventPageFactory` makes an unpublished (draft) trade-fair page of a new vendor, written in the
 parent index's language, under the primary language's `EventIndexPage` unless `parent` is
 given; publish it with `page.save_revision().publish()`. Traits: `promotion`, `online`,
-`all_day`, `located` (a venue with coordinates) and `platform` (no vendor, staff only).
+`all_day_event`, `located` (a venue with coordinates) and `platform` (no vendor, staff only).
 
 `EventIndexPageFactory` adds an index under the first home page without one, and creates a
 home in a free language when every home has one. `.build()` stays off the database.
@@ -63,6 +63,7 @@ class _InTree:
 
 
 def _home_without_index() -> HomePage:
+    home: HomePage
     for home in HomePage.objects.order_by("path"):
         if not EventIndexPage.objects.child_of(home).exists():
             return home
@@ -72,7 +73,9 @@ def _home_without_index() -> HomePage:
 
 def primary_index() -> EventIndexPage:
     """The primary language's events index, created when missing."""
-    index = EventIndexPage.objects.filter(locale=Locale.get_default()).first()
+    index: EventIndexPage | None = EventIndexPage.objects.filter(
+        locale=Locale.get_default()
+    ).first()
     if index is not None:
         return index
     home = HomePage.objects.filter(locale=Locale.get_default()).first()
@@ -106,6 +109,7 @@ class EventPageFactory(_InTree, DjangoModelFactory[EventPage]):
             venue_name="",
             city="",
             country="",
+            booth="",
         )
         online = factory.Trait(
             attendance=EventPage.Attendance.ONLINE,
@@ -113,8 +117,9 @@ class EventPageFactory(_InTree, DjangoModelFactory[EventPage]):
             venue_name="",
             city="",
             country="",
+            booth="",
         )
-        all_day = factory.Trait(
+        all_day_event = factory.Trait(
             all_day=True,
             starts_at=None,
             ends_at=None,

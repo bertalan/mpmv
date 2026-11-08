@@ -6,8 +6,9 @@ publish, unpublish and workflow signals.
 """
 
 import pytest
+from django.contrib.auth.models import Group
 from django.utils import timezone
-from wagtail.models import GroupApprovalTask, Workflow, WorkflowPage
+from wagtail.models import GroupApprovalTask, Workflow, WorkflowPage, WorkflowTask
 
 from apps.accounts.tests.factories import UserFactory
 from apps.core.changeset import ChangeSet
@@ -58,7 +59,8 @@ def test_a_first_publication_in_review_is_pending() -> None:
     page = EventPageFactory.create()
     workflow = Workflow.objects.create(name="Event review")
     task = GroupApprovalTask.objects.create(name="Review")
-    workflow.workflow_tasks.create(task=task, sort_order=0)
+    task.groups.add(Group.objects.create(name="Event moderators"))
+    WorkflowTask.objects.create(workflow=workflow, task=task, sort_order=0)
     WorkflowPage.objects.create(workflow=workflow, page=page.get_parent())
     author = UserFactory.create(staff=True)
     page.save_revision(user=author)

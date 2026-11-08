@@ -31,6 +31,7 @@ LOCAL_APPS = [
     "apps.ledger",
     "apps.ingest",
     "apps.cms",
+    "apps.events",  # event pages (EVT.1, spec 15): after cms, whose locales its indexes need
     "apps.themes",  # frontend themes (THM.1, spec 14): imports only core and Wagtail
     "apps.seo",
     "apps.compliance",
