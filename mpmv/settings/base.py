@@ -199,6 +199,15 @@ LANGUAGES = [
 USE_I18N = True
 LOCALE_PATHS = [BASE_DIR / "locale"]
 
+# Transactional email (ARC.16, docs/dev/transactional-email.md). Every email goes through the
+# outbox (`apps.core.services.enqueue_email`) and the `EmailSender` named here: the console
+# backend until ARC.19 adds the EU provider's adapter (provider choice pending, Q-48). The
+# provider webhook (`/webhooks/email/`) is off while MPMV_EMAIL_WEBHOOK_SECRET is empty.
+EMAIL_SENDER = env_str("MPMV_EMAIL_SENDER", "apps.core.mail.ConsoleEmailSender")
+DEFAULT_FROM_EMAIL = env_str("MPMV_EMAIL_FROM", "no-reply@localhost")
+EMAIL_WEBHOOK_SECRET = env_str("MPMV_EMAIL_WEBHOOK_SECRET", "")
+EMAIL_FEEDBACK_PARSER = env_str("MPMV_EMAIL_FEEDBACK_PARSER", "apps.core.mail.SignedJsonFeedback")
+
 # Wagtail (CMS.1, spec 10). Page locales follow LANGUAGES: apps.cms creates a Locale row for each
 # language after every migrate. The editors' admin is at /admin/ (mpmv/urls.py).
 WAGTAIL_SITE_NAME = "MPMV"

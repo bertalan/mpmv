@@ -86,7 +86,11 @@ is open: SHP.12 only stores the choice.
   mixes with countries or groups.
 - `postcode_patterns` and `states` narrow a zone inside its countries: an address in those countries
   matches when its postcode matches a pattern or its province / state is listed. An address without
-  a postcode never matches a postcode-only zone (case 5).
+  a postcode never matches a postcode-only zone (case 5). Each entry belongs to one country: it is
+  written `CC:entry` (`PT:9000..9999`, `GR:84*`, `IT:SS`) and applies to that country only. An
+  entry without `CC:` is allowed only when the zone covers exactly one country (explicit or through
+  its groups); the model validator, `ZoneSnap` and the migration refuse it otherwise. `*` takes no
+  patterns and no provinces.
 
 Postcode pattern grammar (shared validator, `apps.core.postcodes`, used by the models, SHP.2 and the
 SHP.13 import). Postcodes are compared upper case with spaces and dashes removed, so `846 00` =
@@ -170,6 +174,9 @@ Checkout rules:
   quote only, or blocked. The default is an indicative cost subject to quote (`IndicativeRates`).
 
 ### Configuration file format (SHP.13)
+
+A file is refused with a file-level issue above 1 MiB (`config_format.MAX_FILE_BYTES`), when the
+JSON nests too deeply or when a CSV cell exceeds the CSV field limit; the upload adapter reuses the cap.
 
 One versioned format carries a shipping configuration in and out: vendor and platform exports and
 imports, the standard template, and the SHP.5 legacy import (which converts the legacy option into
@@ -331,6 +338,12 @@ and `apps.shipping` from importing `apps.events` (VEN.20, EVT.1).
     a group zone at the same priority.
 19. Sardinia (SHP.14): an indicative cost with a request-quote action; a vendor override to a fixed
     surcharge applies.
+
+20. Entries of a multi-country zone apply to their own country: with `GR:28*`, `GR:85*`,
+    `GR:70000..74999` and `PT:9000..9999` in one zone, PT `2800-001`, `7000-001` and `8500-001`
+    resolve to the PT zone and PT `9000-001` to the zone with the patterns. Unqualified entries in
+    a multi-country zone are refused. SHP.5 does not carry the legacy cross-country match over
+    (owner decision on parity pending, MQ-8).
 
 ## 6.4 Tasks
 

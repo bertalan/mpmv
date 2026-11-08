@@ -1,0 +1,2 @@
+{% load i18n %}{% blocktranslate %}Thank you, {{ customer_name }}. We received order {{ order_number }}.{% endblocktranslate %}
+{% blocktranslate %}Total: {{ total }} EUR{% endblocktranslate %}

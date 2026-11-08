@@ -11,10 +11,13 @@ from wagtail.models import Collection
 from apps.core import flags
 from apps.core.models import (
     AuditLog,
+    EmailSuppression,
     FeatureFlag,
     Heartbeat,
     MediaImage,
     MediaImageRendition,
+    OutboxEmail,
+    OutboxEmailEvent,
     PlatformOperator,
     Throttle,
 )
@@ -160,3 +163,43 @@ class MediaImageRenditionFactory(DjangoModelFactory[MediaImageRendition]):
     filter_spec = factory.Sequence(lambda n: f"width-{n + 10}")
     focal_point_key = ""
     file = factory.django.ImageField(width=10, height=8, color="teal", filename="rendition.png")
+
+
+class OutboxEmailFactory(DjangoModelFactory[OutboxEmail]):
+    """A queued transactional email (ARC.16) for a test template.
+
+    Services write the real ones through `enqueue_email`, which also queues the send job; use
+    this for tests about stored rows (history, admin listings).
+    """
+
+    class Meta:
+        model = OutboxEmail
+
+    recipient = factory.Sequence(lambda n: f"recipient{n}@example.com")
+    template_key = "tests.one_time_code"
+    language = "en"
+    context = factory.LazyFunction(lambda: '{"code": "000000", "minutes": 10}')
+    status = OutboxEmail.Status.QUEUED
+
+
+class OutboxEmailEventFactory(DjangoModelFactory[OutboxEmailEvent]):
+    """One append-only history row of an outbox email."""
+
+    class Meta:
+        model = OutboxEmailEvent
+
+    email = factory.SubFactory(OutboxEmailFactory)
+    status = OutboxEmailEvent.Kind.QUEUED
+    attempt = 0
+    detail = ""
+
+
+class EmailSuppressionFactory(DjangoModelFactory[EmailSuppression]):
+    """An address that receives no more email after a hard bounce (ARC.16)."""
+
+    class Meta:
+        model = EmailSuppression
+
+    address = factory.Sequence(lambda n: f"bounced{n}@example.com")
+    reason = EmailSuppression.Reason.HARD_BOUNCE
+    detail = ""
