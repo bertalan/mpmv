@@ -280,6 +280,6 @@ def test_staff_saves_a_point_through_the_admin_and_the_values_match(client: Clie
     data = _data(page, latitude="45.464204", longitude="9.189982", geo_source="map")
     response = client.post(_edit_url(page), data)
     assert response.status_code == 302, response.content.decode()[:2000]
-    draft = page.get_latest_revision_as_object()
+    draft = EventPage.objects.get(pk=page.pk).get_latest_revision_as_object()
     assert (draft.latitude, draft.longitude) == (Decimal("45.464204"), Decimal("9.189982"))
     assert draft.geo_source == EventPage.GeoSource.MAP

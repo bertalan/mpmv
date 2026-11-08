@@ -12,7 +12,9 @@ from pathlib import Path
 from apps.themes.csp_lint import lint_template
 from apps.themes.vendored import VENDOR_DIR, check_vendored, read_vendored
 
-EVENTS_DIR = Path(__file__).resolve().parents[2]
+# The events app owns the picker; its files are checked here, where the theme gates live
+# (apps.events may not import apps.themes).
+EVENTS_DIR = Path(__file__).resolve().parents[4] / "apps" / "events"
 MAP_JS = EVENTS_DIR / "static" / "events" / "map.js"
 MAP_CSS = EVENTS_DIR / "static" / "events" / "map.css"
 PICKER_TEMPLATE = EVENTS_DIR / "templates" / "events" / "admin" / "map_picker_panel.html"

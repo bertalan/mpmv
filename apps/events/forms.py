@@ -10,18 +10,26 @@
 - **Products.** The chooser offers only the event vendor's products; a crafted request for
   another vendor's product is a field error (spec 15: a vendor event links only to its own
   products).
+- **Point (EVT.13).** The map picker fills `latitude`, `longitude` and `geo_source`; the form
+  never takes geocoding metadata from the request. A "Find coordinates" candidate is confirmed
+  against the cached lookup of the address (`services.resolve_picked_point`) and its provider,
+  precision and confidence come from there; no point clears the metadata.
 """
 
 import datetime as dt
 import zoneinfo
 from typing import Any
 
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from wagtail.admin.forms import WagtailAdminPageForm
 
 from apps.catalog.models import Product, ProductStatus
+from apps.core.geocoding import AddressQuery, GeocodeResult
+
+ADDRESS_QUERY_FIELDS = ("country", "postcode", "city", "street")
 
 LOCAL_TIME_FIELDS = ("starts_at", "ends_at")
 
@@ -49,7 +57,8 @@ class EventPageForm(WagtailAdminPageForm):  # type: ignore[misc]  # Wagtail is u
         if "products" in self.fields:
             offered = ~Q(status=ProductStatus.RETIRED)
             if instance.pk is not None:
-                offered |= Q(pk__in=instance.products.values("pk"))
+                # A draft revision holds its links in memory (modelcluster): no `values()` there.
+                offered |= Q(pk__in=[product.pk for product in instance.products.all()])
             products = Product.objects.filter(offered)
             if instance.pk is not None and instance.vendor_id is not None:
                 products = products.filter(vendor_id=instance.vendor_id)
@@ -79,7 +88,46 @@ class EventPageForm(WagtailAdminPageForm):  # type: ignore[misc]  # Wagtail is u
             and any(product.vendor_id != vendor_id for product in products)
         ):
             self.add_error("products", _("Choose only products of the event's vendor."))
+        self._clean_point(cleaned)
         return cleaned
+
+    _picked_candidate: GeocodeResult | None = None
+    _clear_point = False
+
+    def _clean_point(self, cleaned: dict[str, Any]) -> None:
+        # Imported here: the models module imports this form.
+        from .services import resolve_picked_point
+
+        self._picked_candidate = None
+        self._clear_point = False
+        if "geo_source" not in self.fields:
+            return
+        address = AddressQuery(
+            **{name: str(cleaned.get(name) or "") for name in ADDRESS_QUERY_FIELDS}
+        )
+        try:
+            picked = resolve_picked_point(
+                self.instance,
+                latitude=cleaned.get("latitude"),
+                longitude=cleaned.get("longitude"),
+                source=str(cleaned.get("geo_source") or ""),
+                address=address,
+            )
+        except ValidationError as error:
+            self.add_error(None, error)
+            return
+        cleaned["geo_source"] = picked.source
+        self._picked_candidate = picked.candidate
+        self._clear_point = not picked.source
+
+    def save(self, commit: bool = True) -> Any:
+        """Apply the confirmed candidate's metadata, or clear it with the point (EVT.13)."""
+        page = self.instance
+        if self._clear_point:
+            page.clear_point()
+        if self._picked_candidate is not None:
+            page.set_geocoded_point(self._picked_candidate, at=timezone.now())
+        return super().save(commit=commit)
 
     def _vendor_id(self, cleaned: dict[str, Any]) -> int | None:
         if self.instance.pk is not None or "vendor" not in self.fields:

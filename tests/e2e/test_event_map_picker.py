@@ -160,6 +160,7 @@ def test_staff_place_a_point_by_click_and_drag_and_the_saved_values_match(
     canvas = _open_editor(page, live_server, event)
     marker = canvas.locator(".leaflet-marker-icon")
     expect(marker).to_have_count(1)
+    canvas.scroll_into_view_if_needed()
     box = marker.bounding_box()
     assert box is not None
     start_x, start_y = box["x"] + box["width"] / 2, box["y"] + box["height"] - 4

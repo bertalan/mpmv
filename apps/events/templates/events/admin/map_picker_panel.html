@@ -1,0 +1,36 @@
+{% load i18n %}{% comment %}
+The map picker of the "Where" panel (EVT.13, spec 15 "Map picker"). No inline script: events/map.js
+reads the data attributes. Without JavaScript the map and the button stay hidden and the latitude
+and longitude inputs below are the way to set the point.
+{% endcomment %}
+<div class="mpmv-map-picker" data-map-picker
+    {% for name, input_id in inputs.items %} data-{{ name }}-input="{{ input_id }}"{% endfor %}
+    data-source-input="{{ source_input }}"
+    data-find-url="{{ find_url }}"
+    data-language="{{ language }}"
+    data-tile-url="{{ tile_url }}"
+    data-attribution="{{ attribution }}"
+    data-attribution-url="{{ attribution_url }}"
+    data-default-lat="{{ default_latitude|stringformat:'f' }}"
+    data-default-lng="{{ default_longitude|stringformat:'f' }}"
+    data-default-zoom="{{ default_zoom }}"
+    data-msg-marker="{% translate 'Event point' %}"
+    data-msg-placed="{% translate 'Point placed on the map.' %}"
+    data-msg-typed="{% translate 'The map shows the typed point.' %}"
+    data-msg-searching="{% translate 'Looking up the address…' %}"
+    data-msg-found="{% translate 'Choose the place that matches the address, then adjust the point on the map if needed.' %}"
+    data-msg-none="{% translate 'No place found for this address. Place the point on the map or type it.' %}"
+    data-msg-error="{% translate 'The lookup did not work. Place the point on the map or type it.' %}"
+    data-msg-chosen="{% translate 'Point set from the chosen place.' %}">
+    <p class="help" id="{{ help_id }}">
+        {% translate "Click the map to place the point and drag the marker to move it, or type the latitude and longitude below. “Find coordinates” looks up the address above." %}
+    </p>
+    <button type="button" class="button button-secondary button-small" data-map-find hidden>
+        {% translate "Find coordinates" %}
+    </button>
+    <p class="help" data-map-status role="status"></p>
+    <ul class="mpmv-map-picker__candidates" data-map-candidates aria-label="{% translate 'Places found for the address' %}" hidden></ul>
+    <div class="mpmv-map-picker__map" data-map-canvas role="region"
+        aria-label="{% translate 'Map: click to place the event’s point' %}"
+        aria-describedby="{{ help_id }}" hidden></div>
+</div>

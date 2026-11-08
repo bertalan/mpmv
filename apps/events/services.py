@@ -12,18 +12,27 @@ The authoring, moderation, hiding and cancelling services (`save_event_draft`, `
 - `may_edit_events_in_admin` keeps vendors out of event pages in the Wagtail admin (the
   `apps.vendors.backends` backend already keeps them out of the whole admin), and
   `may_create_events_in_admin` lets only platform staff create events there.
+- `resolve_picked_point` checks the point the map picker sends (EVT.13): a "Find coordinates"
+  candidate is confirmed against the cached lookup, never trusted from the request.
 """
 
+import datetime as dt
 import logging
 import uuid
+from dataclasses import dataclass
+from decimal import Decimal
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
+from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.utils.translation import gettext_lazy as _
 from wagtail.models import Page
 
 from apps.cms.models import HomePage
 from apps.core.changeset import ChangeSet
+from apps.core.geocoding import AddressQuery, GeocodeResult
+from apps.core.geocoding import services as geocoding
 from apps.core.i18n import configured_languages
 from apps.vendors.models import VendorMember
 
@@ -137,3 +146,61 @@ def may_create_events_in_admin(user: AbstractBaseUser | AnonymousUser) -> bool:
     keep editing existing events under Wagtail's own page permissions.
     """
     return bool(user.is_authenticated and user.is_active and getattr(user, "is_staff", False))
+
+
+# --- The map picker (EVT.13, spec 15 "Map picker" and "Confirmation")
+
+
+@dataclass(frozen=True)
+class PickedPoint:
+    """What to store for the point the map picker sent: its source and, for a newly confirmed
+    "Find coordinates" candidate, that candidate (its metadata comes from the cache)."""
+
+    source: str
+    candidate: GeocodeResult | None = None
+
+
+def resolve_picked_point(
+    page: EventPage,
+    *,
+    latitude: Decimal | None,
+    longitude: Decimal | None,
+    source: str,
+    address: AddressQuery,
+    now: dt.datetime | None = None,
+) -> PickedPoint:
+    """Check the point the picker (or a person typing) sent for `page`, before it is applied.
+
+    - No point: no source (the form then clears the geocoding metadata).
+    - A point placed on the map or typed keeps its source; a point without one was typed (the
+      inputs are the keyboard and no-JavaScript alternative).
+    - A "geocoded" point must be a candidate of a cached lookup of the form's address: the
+      request never sets a provider, a precision or a confidence. An unchanged geocoded point
+      of the page stays as it is, even after its cache entry expired.
+
+    Raises `ValidationError` on `geo_source` for a geocoded point that no lookup returned. Half a
+    point is left to the model's validation ("Give both coordinates").
+    """
+    if latitude is None and longitude is None:
+        return PickedPoint(EventPage.GeoSource.NONE)
+    if source != EventPage.GeoSource.GEOCODED:
+        return PickedPoint(source or EventPage.GeoSource.MANUAL)
+    if latitude is None or longitude is None:
+        return PickedPoint(source)
+    unchanged = page.geo_source == EventPage.GeoSource.GEOCODED and (
+        page.latitude,
+        page.longitude,
+    ) == (latitude, longitude)
+    if unchanged:
+        return PickedPoint(source)
+    candidate = geocoding.cached_candidate(address, latitude, longitude, now=now)
+    if candidate is None:
+        raise ValidationError(
+            {
+                "geo_source": _(
+                    "These coordinates are not a “Find coordinates” result for this address: "
+                    "choose “Placed on the map” or “Typed by hand”, or find the coordinates again."
+                )
+            }
+        )
+    return PickedPoint(source, candidate)
