@@ -84,7 +84,12 @@ def test_the_admin_is_never_themed(
     write_theme(
         tmp_path / "themes",
         "alt",
-        templates={"admin/login.html": "themed admin", "wagtailadmin/login.html": "themed"},
+        templates={
+            "admin/login.html": "themed admin",
+            "wagtailadmin/login.html": "themed",
+            # The Django admin's login_template (apps/accounts/admin.py), outside `admin/`.
+            "accounts/admin/login.html": "themed accounts admin login",
+        },
     )
     _, themed = sites
     for path in ("/django-admin/login/", "/admin/login/"):

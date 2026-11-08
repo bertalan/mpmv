@@ -1,0 +1,28 @@
+{% load i18n %}{% get_current_language as LANGUAGE_CODE %}<!doctype html>
+{# Placeholder (CAT.8 2/3): the real listing templates, filter panel and product cards come with CAT.8 3/3 and THM.7. #}
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ name }}</title>
+  <meta name="robots" content="{{ robots }}">
+  <link rel="canonical" href="{{ canonical_url }}">
+  {% for lang, url in alternates %}<link rel="alternate" hreflang="{{ lang }}" href="{{ url }}">
+  {% endfor %}{% if previous_url %}<link rel="prev" href="{{ previous_url }}">{% endif %}
+  {% if next_url %}<link rel="next" href="{{ next_url }}">{% endif %}
+</head>
+<body>
+  <main>
+    <h1>{{ name }}</h1>
+    {% if is_fallback %}<p>{% translate "This page is not available in your language yet." %}</p>{% endif %}
+    <ul>
+      {% for product in products %}<li>{{ product }}</li>{% empty %}<li>{% translate "No products found." %}</li>{% endfor %}
+    </ul>
+    <nav aria-label="{% translate 'Pagination' %}">
+      {% if previous_url %}<a href="{{ previous_url }}" rel="prev">{% translate "Previous" %}</a>{% endif %}
+      {% blocktranslate with page=window.page count=window.page_count %}Page {{ page }} of {{ count }}{% endblocktranslate %}
+      {% if next_url %}<a href="{{ next_url }}" rel="next">{% translate "Next" %}</a>{% endif %}
+    </nav>
+  </main>
+</body>
+</html>

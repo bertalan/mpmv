@@ -149,10 +149,12 @@ Alpine.js, CSS with a lightweight build). Recorded in an ADR in THM.1.
   layers (`@layer reset, tokens, base, layout, components, utilities, overrides`), native nesting,
   logical properties, container queries, `clamp()`. Target: browsers in Baseline "widely
   available".
-- `tools/build_theme.py` (`make assets`): resolves tokens for each theme chain, writes
-  `tokens.css`, concatenates the CSS sources of the chain in layer order, minifies, and writes one
-  `theme.css` per theme. It runs in the Containerfile build stage before `collectstatic`; the
-  output is git-ignored. `CompressedManifestStaticFilesStorage` hashes and compresses it.
+- `python -m apps.themes.build` (`make assets`; a module of the app rather than a `tools/` script,
+  because the image build context leaves `tools/` out): resolves tokens for each theme chain,
+  checks them against the token contract, writes `tokens.css`, concatenates the CSS sources of
+  the chain in layer order, minifies, and writes one `theme.css` per theme under
+  `build/themes/`. It runs in the Containerfile build stage before `collectstatic`; the output is
+  git-ignored. `CompressedManifestStaticFilesStorage` hashes and compresses it.
 - JavaScript: htmx 2 and the **CSP build** of Alpine.js, self-hosted under `static/vendor/`,
   listed in `static/vendor/VENDORED.toml` (version, source URL, SHA-256, licence); a unit test
   checks the hashes. Theme behaviour (disclosure menu, dialog, carousel buttons, quantity stepper,
@@ -498,7 +500,7 @@ is vendor branding. Both `base` and `ride` ship at go-live (Q-60), so THM.6 to T
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
 | THM.1 | Theme framework: `apps/themes` registry and manifest, theme-aware template loader with parent fallback and `(theme, name)` cache, `ThemeSettings` per Wagtail Site with audit, `MPMV_THEME_DEFAULT`, system checks, import-linter rule, ADR for the frontend toolchain | P1 | 8 | CMS.1 | Two sites render different themes in an integration test; a template missing in the child comes from `base`; an unknown theme fails the system check |
-| THM.2 | Design-token pipeline: `tokens.toml` resolution and inheritance, token contract with contrast pairs, `tokens.css` rendering, `tools/build_theme.py` and `make assets`, Containerfile build step | P1 | 6 | THM.1 | Unit tests on `resolve_tokens`, `contrast_ratio` and `check_tokens` (a pair below 4.5:1 fails); the image build produces hashed `theme.css` for every theme |
+| THM.2 | Design-token pipeline: `tokens.toml` resolution and inheritance, token contract with contrast pairs, `tokens.css` rendering, `python -m apps.themes.build` (`make assets`), Containerfile build step | P1 | 6 | THM.1 | Unit tests on `resolve_tokens`, `contrast_ratio` and `check_tokens` (a pair below 4.5:1 fails); the image build produces hashed `theme.css` for every theme |
 | THM.3 | `base` theme: layouts, skip link, header with disclosure navigation, language switcher, consistent help link, footer, typography, form controls, buttons, alerts, focus and target-size rules, reduced motion; vendored htmx and Alpine CSP build with `VENDORED.toml`; CMS.1 and account templates moved onto the layouts | P1 | 10 | THM.2 | Home, standard page and login render with `base`; CSP lint and the hash check of vendored files pass; keyboard-only e2e reaches every control with a visible focus |
 | THM.4 | `base` component library (§14.9) and staff-only styleguide page | P1 | 12 | THM.3 | Every component renders in every state on `/_styleguide/` with no CSP violation; e2e screenshots saved |
 | THM.5 | Theme quality gates, parametrised over registered themes: CSP template lint, axe-core (`wcag22aa`) on the styleguide, visual comparison harness with CI-only baselines, size budgets, `LICENSES.toml` check | P1 | 6 | THM.4, ARC.11 | A theme with a 3:1 text pair, an inline style, an unlicensed font or a 50 KB CSS file fails CI; `base` passes |

@@ -150,6 +150,20 @@ jobs:
           path: build/sbom/mpmv-image.cdx.json
       - name: Runs as a non-root user
         run: test "$(docker run --rm --entrypoint id mpmv-app:ci -u)" = "10001"
+      # THM.2: every theme under themes/ has a hashed theme.css in the collected static files.
+      - name: Hashed theme.css for every theme
+        run: |
+          docker run --rm --entrypoint python mpmv-app:ci -c '
+          import json, pathlib, re
+          paths = json.loads(pathlib.Path("staticfiles/staticfiles.json").read_text())["paths"]
+          slugs = sorted(p.name for p in pathlib.Path("themes").iterdir() if (p / "theme.toml").is_file())
+          assert slugs, "no themes"
+          for slug in slugs:
+              hashed = paths[f"themes/{slug}/theme.css"]
+              assert re.fullmatch(rf"themes/{slug}/theme\.[0-9a-f]{{12}}\.css", hashed), hashed
+              assert pathlib.Path("staticfiles", hashed).is_file(), hashed
+              print(slug, "->", hashed)
+          '
       - name: Migrate, serve and pass the health check
         run: |
           env_file="$RUNNER_TEMP/app.env"
