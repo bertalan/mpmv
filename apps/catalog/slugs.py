@@ -1,4 +1,5 @@
-"""Product slugs and product paths (spec 03 §3.2, CAT.5). Pure functions, no ORM.
+"""Product slugs and the paths of catalog pages (spec 03 §3.2, CAT.5, CAT.8). Pure functions,
+no ORM.
 
 A product slug is the transliterated title plus the language, `{title}-{lang}`, at most 80
 characters. It replicates the legacy permalink rules without the SKU part (owner decisions Q-30,
@@ -86,8 +87,56 @@ def is_slug(value: str, *, max_length: int = SLUG_MAX_LENGTH) -> bool:
 def product_path(lang: str, slug: str, *, default_language: str) -> str:
     """The path of a product page: `/product/{slug}/`, `/it/prodotto/{slug}/`…"""
     segment = PRODUCT_SEGMENTS.get(lang, PRODUCT_SEGMENTS["en"])
-    prefix = "" if lang == default_language else f"/{lang}"
-    return f"{prefix}/{segment}/{slug}/"
+    return f"{language_prefix(lang, default_language=default_language)}/{segment}/{slug}/"
+
+
+# --- Listing pages (CAT.8, D-07). A taxonomy page has no fixed segment: its first segment is the
+# taxonomy's slug in the page language, which can never be one of the fixed segments.
+CATEGORY_SEGMENTS = {"en": "product-category", "it": "categoria-prodotto"}
+BRAND_SEGMENTS = {"en": "brand", "it": "marchio"}
+SHOP_SEGMENTS = {"en": "shop"}
+RESERVED_SEGMENTS = frozenset(
+    segment
+    for segments in (PRODUCT_SEGMENTS, CATEGORY_SEGMENTS, BRAND_SEGMENTS, SHOP_SEGMENTS)
+    for segment in segments.values()
+)
+
+
+def language_prefix(lang: str, *, default_language: str) -> str:
+    """`""` for the primary language, `/it` and so on for the others (I18N.1)."""
+    return "" if lang == default_language else f"/{lang}"
+
+
+def segment_for(segments: dict[str, str], lang: str) -> str:
+    """The fixed path segment of a page type in `lang`; EN when the language has none."""
+    return segments.get(lang, segments["en"])
+
+
+def _listing_path(lang: str, parts: Iterable[str], *, default_language: str) -> str:
+    return f"{language_prefix(lang, default_language=default_language)}/{'/'.join(parts)}/"
+
+
+def category_path(lang: str, slugs: Iterable[str], *, default_language: str) -> str:
+    """`/product-category/{parent}/{child}/`, `/it/categoria-prodotto/…`."""
+    parts = (segment_for(CATEGORY_SEGMENTS, lang), *slugs)
+    return _listing_path(lang, parts, default_language=default_language)
+
+
+def term_path(lang: str, taxonomy: str, slugs: Iterable[str], *, default_language: str) -> str:
+    """`/{taxonomy}/{term}/` and `/{taxonomy}/{term}/{child}/` (D-07), slugs of `lang`."""
+    return _listing_path(lang, (taxonomy, *slugs), default_language=default_language)
+
+
+def brand_path(lang: str, slug: str, *, default_language: str) -> str:
+    """`/brand/{slug}/`, `/it/marchio/{slug}/`."""
+    parts = (segment_for(BRAND_SEGMENTS, lang), slug)
+    return _listing_path(lang, parts, default_language=default_language)
+
+
+def vendor_path(lang: str, slug: str, *, default_language: str) -> str:
+    """`/shop/{vendor}/` in every language (the vendor slug is not translated)."""
+    parts = (segment_for(SHOP_SEGMENTS, lang), slug)
+    return _listing_path(lang, parts, default_language=default_language)
 
 
 def parse_product_path(
