@@ -2,7 +2,9 @@
 
 The category tree, taxonomies, terms and brands (CAT.2) live in `taxonomy.py`; products link
 to them here, and to the typed attributes of `attributes.py` (CAT.3) through `ProductAttribute`
-and `VariantOption`. Fields owned by later tasks are added there: images (CAT.4), `gpsr` (CMP.3).
+and `VariantOption`. Fields owned by later tasks are added there: images (CAT.4). GPSR data
+(CMP.3) lives in `apps.compliance` (`product.gpsr`, a reverse one-to-one); its publication check
+is registered in `publishing.py`, which the publishing services of CAT.10 call.
 Slugs are derived from the title by `services.sync_product_slug` (CAT.5), which keeps the
 replaced ones in `SlugHistory`.
 Prices change only through `services.set_product_price` and `services.set_variant_price`, which

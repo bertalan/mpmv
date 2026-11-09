@@ -59,6 +59,7 @@ def test_vendor_defaults_are_saved_and_audited_with_the_vendor() -> None:
     assert defaults.manufacturer_name == "Example Maker S.r.l."
     entry = AuditLog.objects.get(action=services.VENDOR_DEFAULTS_CREATED)
     assert entry.vendor_key == str(vendor.public_id)
+    assert entry.after is not None
     assert entry.after["manufacturer_country"] == "IT"
 
 
@@ -69,6 +70,7 @@ def test_vendor_defaults_update_audits_only_the_change() -> None:
     )
     assert set(changes.changes[0].fields) == {"manufacturer_contact"}
     entry = AuditLog.objects.get(action=services.VENDOR_DEFAULTS_UPDATED)
+    assert entry.before is not None
     assert entry.before["manufacturer_contact"] == "safety@maker.example"
     defaults.refresh_from_db()
     assert defaults.manufacturer_name == "Example Maker S.r.l."  # untouched
@@ -117,10 +119,13 @@ def test_product_gpsr_is_saved_and_audited() -> None:
     entry = AuditLog.objects.get(action=services.PRODUCT_GPSR_CREATED)
     assert entry.vendor_key == str(product.vendor.public_id)
     assert entry.target_key == str(product.public_id)
+    assert entry.after is not None
     assert entry.after["product"] == str(product.public_id)
 
     services.set_product_gpsr(product, {"batch": "LOT-8"}, ctx=CTX)
     updated = AuditLog.objects.get(action=services.PRODUCT_GPSR_UPDATED)
+    assert updated.before is not None
+    assert updated.after is not None
     assert (updated.before["batch"], updated.after["batch"]) == ("LOT-7", "LOT-8")
 
 
