@@ -42,6 +42,8 @@ dev = [
   "types-pyyaml>=6.0",
   "check-jsonschema>=0.39.0",
   "cyclonedx-bom>=7.6.0,<8",
+  # SEC.5: property-based tests over the hostile-input corpus (tests/hostile_input.py).
+  "hypothesis==6.170.10",
 ]
 
 [tool.uv]

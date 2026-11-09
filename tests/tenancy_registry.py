@@ -261,7 +261,7 @@ ENDPOINTS: dict[str, Access] = {
     "admin:login": NoVendorData("Staff sign-in page."),
     "admin:logout": NoVendorData("Staff sign-out."),
     "admin:jsi18n": NoVendorData("Admin JavaScript translation catalog."),
-    "api-v1:api-root": NoVendorData("API root."),
+    "api-v1:api-root": NoVendorData("API root: links to the API description only."),
     "api-v1:openapi-json": NoVendorData("API description, the same for every caller."),
     "api-v1:openapi-view": NoVendorData("Interactive API documentation page."),
     "api/v1/": NoVendorData(
