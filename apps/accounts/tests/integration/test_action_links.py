@@ -15,6 +15,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from django.contrib.auth.models import Group, Permission
 from django.db import IntegrityError, connection, transaction
 from django.db.models import F
 from django.test import Client
@@ -492,10 +493,27 @@ def test_the_email_helper_dry_run_queues_nothing() -> None:
 # --- Review follow-ups (#140): staff, revocation, version re-check, audit noise, concurrency
 
 
-@pytest.mark.parametrize("trait", ["staff", "superuser"])
-def test_staff_recipients_get_no_passwordless_sign_in(client: Client, trait: str) -> None:
+def privileged_user(kind: str) -> User:
+    """Each way an account gets platform powers, alone: no other flag is set."""
+    if kind == "staff":
+        return UserFactory.create(is_staff=True, is_superuser=False)
+    if kind == "superuser":
+        return UserFactory.create(is_staff=False, is_superuser=True)
+    user = UserFactory.create(is_staff=False, is_superuser=False)
+    if kind == "group":
+        user.groups.add(Group.objects.create(name="Platform role"))
+    else:
+        user.user_permissions.add(Permission.objects.get(codename="change_user"))
+    return user
+
+
+@pytest.mark.parametrize("kind", ["staff", "superuser", "group", "permission"])
+def test_staff_recipients_get_no_passwordless_sign_in(client: Client, kind: str) -> None:
     # Staff sign in with their password and MFA, then continue (lane-a decision on #140).
-    user = UserFactory.create(**{trait: True})
+    # Platform staff are defined by a role group (spec 02, Q-34), not only by `is_staff`.
+    user = privileged_user(kind)
+    assert user.is_staff == (kind == "staff")
+    assert user.is_superuser == (kind == "superuser")
     TOTPDeviceFactory.create(user=user)
     token = token_for(user, owned_document(user))
 
@@ -582,6 +600,58 @@ def test_the_email_helper_reissues_but_its_dry_run_revokes_nothing() -> None:
     assert services.check_action_token(outstanding).refusal is None
     send(dry_run=False)
     assert services.check_action_token(outstanding).refusal == "revoked"
+
+
+def send_link(user: User, *, template_key: str = "tests.reminder", key: str | None = None) -> str:
+    """Email a link for doc-1 to `user`; return the token of the email queued last."""
+    services.send_action_link_email(
+        purpose=APPROVE_PURPOSE,
+        object_key="doc-1",
+        recipient=user,
+        version="1",
+        template_key=template_key,
+        context={"item": "x", "due": "y"},
+        ctx=SYSTEM,
+        idempotency_key=key,
+    )
+    url = json.loads(OutboxEmail.objects.order_by("-pk").first().context)["action_url"]  # type: ignore[union-attr]
+    return str(url).rstrip("/").rsplit("/", 1)[-1]
+
+
+def test_a_retry_with_the_same_idempotency_key_keeps_the_delivered_link() -> None:
+    user = UserFactory.create()
+    owned_document(user)
+    delivered = send_link(user, key="reminder-doc-1")
+
+    send_link(user, key="reminder-doc-1")
+
+    assert OutboxEmail.objects.count() == 1
+    assert services.check_action_token(delivered).refusal is None
+    assert ActionLinkIssue.objects.get(user=user).generation == 1
+    assert AuditLog.objects.filter(action=services.ACTION_LINK_SENT).count() == 1
+
+
+def test_a_failed_enqueue_keeps_the_delivered_link() -> None:
+    user = UserFactory.create()
+    owned_document(user)
+    delivered = send_link(user)
+
+    with pytest.raises(ValueError, match="is incomplete"):
+        send_link(user, template_key="tests.missing")
+
+    assert OutboxEmail.objects.count() == 1
+    assert services.check_action_token(delivered).refusal is None
+    assert ActionLinkIssue.objects.get(user=user).generation == 1
+
+
+def test_a_new_key_still_revokes_the_delivered_link() -> None:
+    user = UserFactory.create()
+    owned_document(user)
+    delivered = send_link(user, key="reminder-1")
+    fresh = send_link(user, key="reminder-2")
+
+    assert services.check_action_token(delivered).refusal == "revoked"
+    assert services.check_action_token(fresh).refusal is None
 
 
 def test_a_password_change_revokes_outstanding_links(client: Client) -> None:
