@@ -20,8 +20,6 @@ from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog, Throttle
-from apps.vendors.models import Vendor
-from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -32,7 +30,7 @@ CTX = AuditContext(actor_label="staff:support", source=AuditLog.Source.ADMIN, ip
 def _platform_staff() -> User:
     """A user holding `vendors.view_all_vendors` directly (the platform staff rule)."""
     permission, _ = Permission.objects.get_or_create(
-        content_type=ContentType.objects.get_for_model(Vendor),
+        content_type=ContentType.objects.get(app_label="vendors", model="vendor"),
         codename="view_all_vendors",
         defaults={"name": "Can view all vendors"},
     )
@@ -66,6 +64,8 @@ def test_the_unlock_is_audited() -> None:
     user = _locked_user()
     services.unlock_account(user, actor=_platform_staff(), ctx=CTX)
     entry = AuditLog.objects.get(action=services.ACCOUNT_UNLOCKED)
+    assert entry.before is not None
+    assert entry.after is not None
     assert entry.target_model == "core.throttle"
     assert entry.before["failures"] > 0
     assert entry.after["failures"] == 0
@@ -90,15 +90,14 @@ def test_unlocking_an_unlocked_account_is_a_no_op() -> None:
 
 def test_the_ip_lock_stays() -> None:
     user = _locked_user()
-    other = UserFactory.create()
     now = timezone.now()
-    for _ in range(services.IP_LOCKOUT.free_attempts + 1):
-        services.record_failed_login(other.email, IP, now=now)
+    for n in range(services.IP_LOCKOUT.free_attempts + 1):
+        services.record_failed_login(f"guess{n}@example.com", IP, now=now)
     services.unlock_account(user, actor=_platform_staff(), ctx=CTX)
     assert services.login_retry_after(user.email, IP)
 
 
-@pytest.mark.parametrize("kind", ["customer", "editor", "user_admin", "vendor_staff", "inactive"])
+@pytest.mark.parametrize("kind", ["customer", "editor", "user_admin", "vendor_editor", "inactive"])
 def test_everyone_but_platform_staff_is_refused(kind: str) -> None:
     user = _locked_user()
     if kind == "customer":
@@ -107,9 +106,8 @@ def test_everyone_but_platform_staff_is_refused(kind: str) -> None:
         actor = UserFactory.create(staff=True)
     elif kind == "user_admin":
         actor = UserFactory.create(staff=True, permissions=["accounts.change_user"])
-    elif kind == "vendor_staff":
-        actor = UserFactory.create()
-        VendorMemberFactory.create(user=actor, vendor=VendorFactory.create())
+    elif kind == "vendor_editor":
+        actor = UserFactory.create(staff=True, permissions=["vendors.change_vendor"])
     else:
         actor = _platform_staff()
         actor.is_active = False
