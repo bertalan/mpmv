@@ -2,12 +2,17 @@
 
 Only Wagtail's image folders and image types are served; anything else is 404, so an uploaded
 file can never come back as HTML. Every response is `Content-Disposition: inline` with
-`nosniff` and its own Content-Security-Policy, which the CSP middleware leaves in place:
-`default-src 'none'; sandbox`, plus `style-src 'unsafe-inline'` for SVG (the only thing a
-logo may use, see `apps.core.svg`), so an SVG opened on its own runs nothing and loads
-nothing.
+`nosniff` and its own Content-Security-Policy, which Django's CSP middleware does not replace:
+`default-src 'none'; frame-ancestors 'none'; sandbox`, plus `style-src 'unsafe-inline'` for SVG
+(the only thing a logo may use, see `apps.core.svg`), so an SVG opened on its own runs nothing,
+loads nothing and cannot be framed. The rest of the SEC.3 set (HSTS, Referrer-Policy, COOP,
+X-Frame-Options, Permissions-Policy) comes from the security middleware, as on any other response
+(tests/integration/test_security_headers_by_response_type.py).
 
-The app serves these until the reverse proxy serves MEDIA_ROOT with the same headers.
+This view is what serves media in development and tests. On STAGE and LIVE, Caddy serves
+MEDIA_ROOT itself (deploy/caddy/Caddyfile, ARC.13) with the same folders, extensions, CSP and
+Cache-Control, and its `security_headers` snippet adds the rest; tests/unit/test_quadlets.py
+checks that the two stay in step with the constants below.
 """
 
 import posixpath
@@ -29,8 +34,9 @@ MEDIA_TYPES = {
     ".gif": "image/gif",
     ".svg": "image/svg+xml",
 }
-SVG_CSP = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
-RASTER_CSP = "default-src 'none'; sandbox"
+SVG_CSP = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; sandbox"
+RASTER_CSP = "default-src 'none'; frame-ancestors 'none'; sandbox"
+CACHE_CONTROL = "public, max-age=86400"
 
 
 def _image_file(path: str) -> Path:
@@ -70,5 +76,5 @@ def serve_media(request: HttpRequest, path: str) -> FileResponse:
     response["Content-Disposition"] = "inline"
     response["X-Content-Type-Options"] = "nosniff"
     response["Content-Security-Policy"] = SVG_CSP if extension == ".svg" else RASTER_CSP
-    response["Cache-Control"] = "public, max-age=86400"
+    response["Cache-Control"] = CACHE_CONTROL
     return response
