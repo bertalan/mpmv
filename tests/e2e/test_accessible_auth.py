@@ -4,7 +4,7 @@ A password and a TOTP code are pasted through the system clipboard (the way a pa
 or an authenticator app hands them over), the show-password toggle works without breaking the
 strict CSP, the `autocomplete` tokens are in place, and axe finds no WCAG 2.2 AA violation on
 any authentication page: staff login, editors' login, failed login, MFA setup, authenticator
-enrolment, recovery codes and verification.
+enrolment, recovery codes, verification and the vendor claim's account step (VEN.24).
 """
 
 import re
@@ -25,8 +25,13 @@ from apps.accounts.tests.factories import (
     UserFactory,
 )
 from apps.accounts.tests.mfa import totp_token
+from apps.core.audit import AuditContext
+from apps.core.models import AuditLog
+from apps.vendors import services as vendor_services
+from apps.vendors.tests.factories import VendorFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
+from tests.e2e.test_vendor_claim import code_from_secret, emailed_link_path
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -186,4 +191,44 @@ def test_mfa_enrolment_pages_pass_axe_and_accept_a_pasted_code(
     expect(page.locator("ol.recovery-codes li")).to_have_count(10)
     _no_axe_violations(page)
     shot("recovery-codes")
+    assert csp_violations(page) == []
+
+
+def test_a_vendor_claimant_pastes_new_passwords_and_a_code(
+    clipboard_page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+) -> None:
+    """The VEN.24 claim's account step: new passwords and the enrolment code can be pasted, each
+    password field has its own show-password toggle, and axe finds no violation."""
+    page = clipboard_page
+    vendor = VendorFactory.create(italian_company=True, contact_email="legal@vendor-a.example")
+    vendor_services.send_claim_link(
+        vendor, ctx=AuditContext(actor_label="system:test", source=AuditLog.Source.SYSTEM)
+    )
+    page.goto(f"{live_server.url}{emailed_link_path()}")
+    page.get_by_role("button", name="Continue").click()
+    page.get_by_label("VAT number or TIN").fill(vendor.vat_number)
+    page.get_by_role("button", name="Confirm").click()
+
+    first = page.get_by_label("Password", exact=True)
+    again = page.get_by_label("Password again")
+    expect(first).to_have_attribute("autocomplete", "new-password")
+    expect(again).to_have_attribute("autocomplete", "new-password")
+    _no_axe_violations(page)
+
+    password = secrets.token_urlsafe(16)
+    _paste(page, first, password)
+    _paste(page, again, password)
+    toggles = page.get_by_role("button", name="Show password")
+    expect(toggles).to_have_count(2)
+    toggles.first.click()
+    expect(first).to_have_attribute("type", "text")
+    expect(again).to_have_attribute("type", "password")
+    toggles.first.click()
+
+    secret = page.get_by_test_id("totp-secret").inner_text()
+    page.get_by_label("Full name").fill("Claimant Example")
+    _paste(page, page.get_by_label("Authentication code"), code_from_secret(secret))
+    shot("claim-account-pasted")
+    page.get_by_role("button", name="Submit the claim").click()
+    expect(page.get_by_text("waiting for approval")).to_be_visible()
     assert csp_violations(page) == []

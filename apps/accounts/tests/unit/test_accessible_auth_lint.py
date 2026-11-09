@@ -102,6 +102,15 @@ def test_the_password_toggle_is_a_module_without_inline_code() -> None:
     assert "aria-pressed" in text
 
 
+@pytest.mark.parametrize("path", TEMPLATE_FILES, ids=lambda p: str(p.relative_to(ROOT)))
+def test_a_page_with_the_captcha_widget_loads_its_script(path: Path) -> None:
+    """Without Cloudflare's script the widget never yields a token and the form can never be
+    submitted: the user would be locked out of an authentication step."""
+    text = path.read_text(encoding="utf-8")
+    if "{% captcha_widget %}" in text:
+        assert "{% captcha_script %}" in text, f"{path.name}: captcha widget without its script"
+
+
 @override_settings(CAPTCHA_ENABLED=True, TURNSTILE_SITE_KEY="site-" + secrets.token_hex(4))
 def test_turnstile_never_asks_for_a_puzzle() -> None:
     """Managed or invisible challenge: the widget appears only when Cloudflare needs a click
