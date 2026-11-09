@@ -18,6 +18,11 @@ Rate limit (CORE.12): `count_api_call` counts each authenticated call on a Postg
 shared by every app process (`ApiRateCounter`); limits come from the `API_RATE_LIMIT*` settings
 and, for one key, from the override staff set with `set_api_client_rate_limit` (CORE.16), which
 wins over them (precedence in `engine.limits_for`).
+
+Refused-key limit (CORE.20): `record_refused_key` logs each 401 answer per client IP bucket
+(`ApiRefusedKey`) and blocks the IP once it reaches `API_REFUSED_KEY_RATE_LIMIT` in a rolling
+window; `refused_key_retry_after` reads the block before any key lookup. The block is a
+`core.Throttle` row, purged nightly with the others.
 """
 
 import datetime as dt
@@ -35,7 +40,9 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
+from apps.core.models import Throttle
 from apps.core.services import run_mutation
+from apps.core.throttling import ip_bucket
 from apps.vendors import engine as vendor_engine
 from apps.vendors.engine import VendorAction
 from apps.vendors.models import Vendor
@@ -51,6 +58,7 @@ from .engine import (
     RateDecision,
     RatePolicy,
     Reason,
+    RefusedKeyPolicy,
     combine_decisions,
     deny,
     evaluate,
@@ -64,10 +72,12 @@ from .engine import (
     platform_only_scopes,
     rate_decision,
     rate_policy,
+    refused_key_policy,
+    seconds_left,
     validate_scopes,
     window_start,
 )
-from .models import ApiClient, ApiMutationLog, ApiRateCounter
+from .models import ApiClient, ApiMutationLog, ApiRateCounter, ApiRefusedKey
 
 logger = logging.getLogger(__name__)
 
@@ -469,3 +479,67 @@ def count_api_call(
                 )
             decisions.append(decision)
     return combine_decisions(decisions)
+
+
+# --- Refused-key limit per client IP (CORE.20)
+
+REFUSED_KEY_BLOCK_PREFIX = "api:refused-key:ip:"
+
+
+def refused_key_policy_from_settings() -> RefusedKeyPolicy:
+    """`API_REFUSED_KEY_RATE_LIMIT` and `API_REFUSED_KEY_BLOCK_SECONDS` (system check api.E004)."""
+    return refused_key_policy(
+        settings.API_REFUSED_KEY_RATE_LIMIT, settings.API_REFUSED_KEY_BLOCK_SECONDS
+    )
+
+
+def refused_key_retry_after(ip: str | None, *, now: dt.datetime | None = None) -> int:
+    """Seconds the IP stays blocked for refused keys; 0 when it is not blocked.
+
+    One indexed read of a `Throttle` row, made before any key lookup.
+    """
+    bucket = ip_bucket(ip)
+    if bucket is None:
+        return 0
+    now = now or timezone.now()
+    until = (
+        Throttle.objects.filter(key=REFUSED_KEY_BLOCK_PREFIX + bucket, locked_until__gt=now)
+        .values_list("locked_until", flat=True)
+        .first()
+    )
+    return seconds_left(until, now) if until is not None else 0
+
+
+def record_refused_key(ip: str | None, *, now: dt.datetime | None = None) -> bool:
+    """Count one refused-key (401) answer to `ip`; True when it starts a block.
+
+    The refusals of the IP bucket in the rolling window, this one included, are counted; the one
+    that reaches the limit blocks the bucket for the policy's block and clears its log, so the
+    IP starts afresh once the block ends. Logged at WARNING with the bucket only (no key
+    material), for the operations dashboard (OPS.6). A request without an IP is not counted.
+    """
+    bucket = ip_bucket(ip)
+    if bucket is None:
+        return False
+    now = now or timezone.now()
+    policy = refused_key_policy_from_settings()
+    since = now - dt.timedelta(seconds=policy.rate.period)
+    ApiRefusedKey.objects.filter(refused_at__lte=since).delete()
+    ApiRefusedKey.objects.create(ip_bucket=bucket, refused_at=now)
+    refused = ApiRefusedKey.objects.filter(ip_bucket=bucket, refused_at__gt=since).count()
+    if refused < policy.rate.limit:
+        return False
+    until = now + dt.timedelta(seconds=policy.block)
+    Throttle.objects.update_or_create(
+        key=REFUSED_KEY_BLOCK_PREFIX + bucket,
+        defaults={"failures": refused, "locked_until": until, "expires_at": until},
+    )
+    ApiRefusedKey.objects.filter(ip_bucket=bucket).delete()
+    logger.warning(
+        "API refused-key limit reached: ip=%s refused=%d window=%ds block=%ds",
+        bucket,
+        refused,
+        policy.rate.period,
+        policy.block,
+    )
+    return True

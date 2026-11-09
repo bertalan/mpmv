@@ -2,16 +2,17 @@
 
 The base cases live next to each feature: login lockout (CORE.5,
 `apps/accounts/tests/integration/test_login_protection.py`), registration (CORE.5,
-`test_registration_protection.py`), the action-link Continue POST (CORE.15, `test_action_links.py`)
-and the API (CORE.12/CORE.16, `apps/api/tests/integration/test_rate_limit*.py`). This module adds
-what those suites leave out: the second login form, counters that must not be reset, the window
-reset over HTTP, the keying of the action-link limit, and neutral answers.
+`test_registration_protection.py`), the action-link Continue POST (CORE.15, `test_action_links.py`),
+the vendor claim flow (VEN.24, `apps/vendors/tests/integration/test_claim.py`), the API per key
+(CORE.12/CORE.16, `apps/api/tests/integration/test_rate_limit*.py`) and refused API keys per IP
+(CORE.20, `apps/api/tests/integration/test_refused_key_limit.py`). This module adds what those
+suites leave out: the second login form, counters that must not be reset or split, the window
+reset over HTTP, the keying of the action-link limit, neutral answers, and an end-to-end check of
+the refused-key limit.
 
 Not on main yet, so nothing to test: password reset (Wagtail's is switched off and no reset
-route exists, guarded below), the vendor claim flow (VEN.24) and the self-service activation
-(CORE.19). Each must come with its own limit tests when it lands.
-
-A refused-key flood on the API is not limited per IP: see the strict xfail at the end.
+route exists, guarded below) and the self-service activation (CORE.19). Each must come with its
+own limit tests when it lands.
 """
 
 import datetime as dt
@@ -20,6 +21,7 @@ from collections.abc import Iterator
 from typing import Any
 
 import pytest
+from django.conf import settings as django_settings
 from django.db.models import F
 from django.test import Client, override_settings
 from django.urls import NoReverseMatch, reverse
@@ -31,7 +33,7 @@ from apps.accounts.models import ActionLinkUse, User
 from apps.accounts.services import ACCOUNT_LOCKOUT, IP_LOCKOUT
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.integration.urls import APPROVE_PURPOSE, DOCUMENTS, Document
-from apps.api.engine import KEY_NAMESPACE, SECRET_BYTES, generate_key
+from apps.api.engine import KEY_NAMESPACE, SECRET_BYTES, generate_key, parse_rate
 from apps.api.models import ApiRateCounter
 from apps.api.tests.factories import ApiClientFactory
 from apps.core.models import Throttle
@@ -120,6 +122,20 @@ def test_a_quiet_period_resets_the_account_counter(
     Throttle.objects.filter(key__startswith="login:").update(expires_at=_past())
     _fail(client, DJANGO_ADMIN_LOGIN, staff.email, ACCOUNT_LOCKOUT.free_attempts - 1)
     assert _login(client, DJANGO_ADMIN_LOGIN, staff.email, password)
+
+
+def test_case_and_whitespace_variants_of_an_email_share_one_account_counter(
+    client: Client, staff: User, password: str
+) -> None:
+    """Changing the letter case or padding the address must not buy a fresh account budget.
+
+    Each failure comes from its own IP, so only the account counter can lock the account.
+    """
+    variants = [staff.email.upper(), f"  {staff.email}  ", staff.email.title(), f"{staff.email} "]
+    for i in range(ACCOUNT_LOCKOUT.free_attempts):
+        variant = variants[i % len(variants)]
+        _fail(client, DJANGO_ADMIN_LOGIN, variant, 1, ip=f"192.0.2.{i + 10}")
+    assert not _login(client, DJANGO_ADMIN_LOGIN, staff.email, password, ip=OTHER_IP)
 
 
 # --- Password reset: none exists yet, so none can be unthrottled
@@ -219,6 +235,32 @@ def test_behind_the_proxy_the_action_link_limit_applies_to_each_client(client: C
 
 
 @ACTION_LINK_URLS
+@override_settings(**BEHIND_PROXY)
+@pytest.mark.usefixtures("two_per_window")
+@pytest.mark.parametrize("header", ["X-Real-IP", "X-Forwarded-For"])
+def test_a_client_outside_the_proxy_cannot_choose_its_action_link_bucket(
+    client: Client, header: str
+) -> None:
+    """Forwarding headers from an address outside TRUSTED_PROXIES are ignored: rotating them
+    does not give a fresh budget."""
+    for i in range(2):
+        spoofed = {header: f"192.0.2.{i}"}
+        assert _continue(client, "not-a-token", REMOTE_ADDR=IP, headers=spoofed).status_code == 302
+    _assert_too_many(
+        _continue(client, "not-a-token", REMOTE_ADDR=IP, headers={header: "192.0.2.99"})
+    )
+
+
+@ACTION_LINK_URLS
+@pytest.mark.usefixtures("two_per_window")
+def test_an_ipv4_mapped_ipv6_client_shares_the_action_link_bucket_of_its_ipv4_address(
+    client: Client,
+) -> None:
+    _use_up_action_links(client, ip=f"::ffff:{IP}")
+    _assert_too_many(_continue(client, "not-a-token", REMOTE_ADDR=IP))
+
+
+@ACTION_LINK_URLS
 @pytest.mark.usefixtures("two_per_window")
 def test_the_action_link_limit_resets_when_the_window_ends(client: Client) -> None:
     _use_up_action_links(client)
@@ -263,17 +305,14 @@ def test_a_wrong_secret_and_an_unknown_key_get_the_same_answer(client: Client) -
 
 
 @API_URLS
-@pytest.mark.xfail(
-    strict=True,
-    reason="SEC.5 finding: refused API keys are not counted, so one IP can try keys without "
-    "limit; a per-IP limit on 401 answers is missing (API_RATE_LIMIT only counts accepted keys)",
-)
-def test_an_ip_flooding_the_api_with_refused_keys_is_rate_limited(
-    client: Client, settings: SettingsWrapper
-) -> None:
-    settings.API_RATE_LIMIT = "5/day"
+def test_an_ip_flooding_the_api_with_refused_keys_is_rate_limited(client: Client) -> None:
+    """CORE.20: the refused answer past `API_REFUSED_KEY_RATE_LIMIT` is a 429, whatever the
+    configured threshold; a valid key from another IP still works."""
+    limit = parse_rate(django_settings.API_REFUSED_KEY_RATE_LIMIT).limit
     statuses = [
         client.get(ME, headers=_bearer(generate_key().key), REMOTE_ADDR=IP).status_code
-        for _ in range(30)
+        for _ in range(limit + 1)
     ]
-    assert 429 in statuses
+    assert statuses == [401] * limit + [429]
+    _, key = ApiClientFactory.create_with_key()
+    assert client.get(ME, headers=_bearer(key), REMOTE_ADDR=OTHER_IP).status_code == 200

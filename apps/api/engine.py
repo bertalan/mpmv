@@ -450,3 +450,30 @@ def combine_decisions(decisions: Sequence[RateDecision]) -> RateDecision:
     if refused:
         return max(refused, key=lambda decision: decision.retry_after)
     return min(decisions, key=lambda decision: decision.remaining)
+
+
+# --- Refused-key limit per client IP (CORE.20)
+#
+# Refused keys (401) never reach the per-key counters. A client IP may get `rate.limit` refused
+# answers in a rolling window of `rate.period` seconds; the answer that reaches the limit starts
+# a block of `block` seconds, during which every call from that IP gets 429 before the key is
+# read. Valid keys never count (they keep the CORE.12/CORE.16 per-key limits).
+
+
+@dataclass(frozen=True)
+class RefusedKeyPolicy:
+    rate: Rate  # refused answers allowed per rolling window
+    block: int  # seconds an IP stays blocked once it reaches the limit
+
+
+def refused_key_policy(rate: str, block_seconds: object) -> RefusedKeyPolicy:
+    """Read `API_REFUSED_KEY_RATE_LIMIT` and `API_REFUSED_KEY_BLOCK_SECONDS`."""
+    if isinstance(block_seconds, bool) or not isinstance(block_seconds, int) or block_seconds < 1:
+        raise InvalidRateLimit(f"{block_seconds!r}: the block must be whole seconds, at least 1")
+    return RefusedKeyPolicy(rate=parse_rate(rate), block=block_seconds)
+
+
+def seconds_left(until: dt.datetime, now: dt.datetime) -> int:
+    """Whole seconds from `now` to `until`, rounded up; 0 once `until` has passed."""
+    left = (until - now).total_seconds()
+    return max(0, math.ceil(left))

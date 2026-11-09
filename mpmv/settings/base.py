@@ -409,6 +409,14 @@ if _MAP_TILE_ORIGIN:
 API_RATE_LIMIT = env_str("MPMV_API_RATE_LIMIT", "") or "120/minute"
 API_RATE_LIMIT_SCOPES: dict[str, str] = {}
 API_RATE_LIMIT_CLIENTS: dict[str, str] = {}
+# Refused API keys (401) per client IP (CORE.20, apps.api.services.record_refused_key): the IP
+# (resolved behind TRUSTED_PROXIES, IPv6 by /64) may get API_REFUSED_KEY_RATE_LIMIT refused
+# answers in a rolling window; the one that reaches it blocks the IP for
+# API_REFUSED_KEY_BLOCK_SECONDS, answered 429 with Retry-After before any key lookup. Valid keys
+# never count. Set per environment with MPMV_API_REFUSED_KEY_RATE_LIMIT and
+# MPMV_API_REFUSED_KEY_BLOCK_SECONDS (system check api.E004).
+API_REFUSED_KEY_RATE_LIMIT = env_str("MPMV_API_REFUSED_KEY_RATE_LIMIT", "") or "30/minute"
+API_REFUSED_KEY_BLOCK_SECONDS = int(env_str("MPMV_API_REFUSED_KEY_BLOCK_SECONDS", "") or "300")
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"

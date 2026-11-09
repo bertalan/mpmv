@@ -1,5 +1,5 @@
 """API keys for API v1 and MCP (CORE.6, spec 02 §2.2), the API mutation log (CORE.7) and the
-per-key rate limit counters (CORE.12)."""
+per-key rate limit counters (CORE.12), and the refused-key log of the per-IP limit (CORE.20)."""
 
 import uuid
 from typing import Any, ClassVar
@@ -169,3 +169,23 @@ class ApiRateCounter(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.client_id} {self.bucket}: {self.hits} since {self.window_start:%H:%M:%S}"
+
+
+class ApiRefusedKey(models.Model):
+    """One refused-key (401) answer to a client IP, for the per-IP limit (CORE.20).
+
+    A log row per refusal gives an exact rolling window: the refusals of an IP bucket since
+    `now - window` are counted (`services.record_refused_key`). Rows older than the window are
+    deleted on the next refusal, and an IP that reaches the limit is blocked (a `core.Throttle`
+    row) and stops writing here, so the table holds at most limit x active IPs rows. No key
+    material is stored: only the IP bucket (`apps.core.throttling.ip_bucket`) and the time.
+    """
+
+    ip_bucket = models.CharField(max_length=64)
+    refused_at = models.DateTimeField(db_index=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["ip_bucket", "refused_at"], name="api_refused_ip_at")]
+
+    def __str__(self) -> str:
+        return f"{self.ip_bucket} at {self.refused_at:%H:%M:%S}"
