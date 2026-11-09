@@ -24,7 +24,7 @@ cheapest solution is a **single cutover, rehearsed several times**, not a prolon
 | Brands | `product_brand` | → `Brand` | |
 | Images | Media Library | → object storage, dedup by hash, cover and gallery, alt text per language | Renditions regenerated |
 | Historical slugs | `_legacy_old_slugs`, redirect mu-plugin maps | → `SlugHistory` + `Redirect` | |
-| Customers | WP users with the customer role | → `User`; WordPress password hashes accepted at first login and then converted | Custom hasher for phpass and for the WP 6.8+ bcrypt format |
+| Customers | WP users with the customer role | → `User` **without a usable password**; the account is activated when its holder sets a new password through a CORE.15 link (CORE.19) | Owner decision 2026-11-09: no legacy password hash is read, loaded or stored, for this migration and for every connector |
 | Historical orders | `shop_order` + `wcfm_marketplace_orders` | → `Order`/`VendorOrder`/`OrderLine` **read-only** with a `legacy` flag | No retroactive tax recalculation |
 | Open quotes | `_legacy_quote_*` meta | Close before cutover, or migrate their status | Decision in the runbook |
 | Vendor ledger | `wcfm_vendor_ledger`, payouts | → opening balance per vendor (one documented `adjustment` row) | Verified against the Stripe reconciliation |
@@ -33,6 +33,74 @@ cheapest solution is a **single cutover, rehearsed several times**, not a prolon
 | SEO texts | `_wpsso_meta`, tag and category descriptions | → SEO fields of the translations | |
 | Shipping zones | option `custom_shipping_vendors_config_v2` | → `shipping` models (see SHP.5) | |
 | Merchant feed | `g:id` = post ID | `legacy_wp_id` used as the id in the new feed | Continuity of Merchant Center history |
+
+### Source connectors (owner decision 2026-11-09)
+
+Our own migration reads the legacy WordPress database (MIG.1). The owner also wants a hook for
+importing from other shops built on known products (WooCommerce, WCFM, later others), used by the
+setup wizard (ARC.26) and by a new operator who moves an existing shop onto the platform. Both
+paths share one design: a **source connector** reads a source and writes the **intermediate
+format**; the loaders (MIG.3, MIG.4 and the following ones) read only the intermediate format and
+never know which connector produced it.
+
+```python
+class ShopConnector(Protocol):                      # apps/ingest/connectors/base.py
+    code: str                                       # "wordpress_db", "woocommerce_rest", "wcfm_rest"
+    def capabilities(self) -> ConnectorCapabilities # entities it delivers, fields it cannot give
+    def check(self, source: ConnectorSource) -> CheckReport        # reachability, version, permissions
+    def extract(self, source: ConnectorSource, entities: set[Entity], *,
+                since: datetime | None = None) -> Iterator[ImportRecord]  # read-only
+
+@register_connector("woocommerce_rest")             # registry: also MPMV_IMPORT_CONNECTORS (dotted paths)
+class WooCommerceRestConnector: ...
+```
+
+- **Intermediate format** `mpmv-import/1`: an evolution of the MIG.1 JSON, with a JSON Schema in
+  the repository and Pydantic models. Entities: vendors, categories, attributes and terms, tags,
+  products, variants, images (URL and hash), customers, historical orders, reviews, slugs and
+  redirects. Every record carries `source` and `source_id`; `fetched_at` is stamped once per run
+  in the run manifest, outside the compared output, so two runs on the same source give the same
+  records. A field the source cannot give is absent and named in the run report, never guessed.
+- **Service and audit.** `ingest.services.import_from_source(source, entities, *, dry_run=True)
+  -> ChangeSet` runs a connector and the loaders; it writes one `AuditLog` entry per run (actor,
+  source, counts, dry-run or not). An import-origin map keeps `(source, source_id)` → target row,
+  so a record seen before is skipped, never updated, and a failed run resumes idempotently.
+  Failures shown in the Manager or the API use RFC 9457 problem details.
+- **Registry.** A connector is a module that registers itself; Shopify, PrestaShop, Magento or a
+  CSV connector are added without touching the loaders or the core.
+- **The MIG.1 extractor is the `wordpress_db` connector**, the second transport. It stays the one
+  used for our own migration, because the APIs cannot give everything (table below).
+- **Rules.** Read-only (connectors send only GET requests to an API, read-only queries to a
+  database); dry-run by default and idempotent (the same source twice gives the same output, in a
+  stable order); every record validated against the schema before it is written (SEC.9 in
+  [12](12-security-infra-operations.md)); secrets only from the environment or a vault, named by
+  reference in the source configuration and never stored, logged or written to the output;
+  outbound calls through one HTTP client (`apps/core/http.py`) with a per-connector rate limit,
+  timeouts, retries with backoff that honour `Retry-After`, HTTPS only, and a log line per call
+  (method, path without credentials, status, duration) in the run log. **SSRF guard:** the client
+  resolves the host itself and refuses loopback, private (RFC 1918 and IPv6 ULA), link-local,
+  CGNAT (100.64.0.0/10) and cloud metadata addresses, connects to the address it checked (no
+  second lookup), and refuses a redirect to such an address. The same client serves connectors,
+  supplier feeds and any URL entered by staff or vendors. Image files go through the ING.6 pipeline and the
+  SEC.2 upload checks. Bank details, KYC documents and payout accounts are never imported: vendors
+  enter them again and onboard with the payment provider.
+- **Relation to the supplier adapters** of [08](08-import-pipelines.md): a `SupplierAdapter`
+  keeps one vendor's catalogue in sync every day (the ING.3 Store API adapter reads a supplier's
+  public WooCommerce store); a connector moves a whole shop once, or a few times during a
+  migration. They can share the HTTP client and the field mappings.
+- **Accounts without passwords** (owner decision 2026-11-09). No connector reads, writes or keeps
+  a legacy password hash. Every migrated or imported account is created without a usable
+  password and is activated when its holder sets a new one through a CORE.15 link (CORE.19);
+  imported vendor members also enrol MFA at first login (CORE.4). The schema has no password
+  field.
+
+First connectors and what their APIs cannot give:
+
+| Connector | Reads | Cannot give (stays with the DB extractor or is re-entered) |
+|---|---|---|
+| `woocommerce_rest` (MIG.13) | WooCommerce REST API v3 with a read-only API key: products, variations, categories, attributes and terms, tags, reviews, images, customers, orders; `per_page=100` pagination with the total-pages header, `modified_after` for incremental runs | WordPress password hashes (never used anyway: every imported account sets a new password, CORE.19), protected meta (keys starting with `_`) and much plugin meta, links between translations unless the multilingual plugin exposes them, SEO plugin fields, slug history and redirects, marketplace ledger |
+| `wcfm_rest` (MIG.14) | WCFM Marketplace REST endpoints (`wcfmmp/v1`, an optional add-on found through the `/wp-json` index): store vendors with profile, address, policies and logo, product to vendor link, vendor orders with the commission split | Without the add-on: vendor data and product attribution (fallback: a CSV map of product id to vendor). Even with it: commission rules, ledger and payout history, store SEO; bank data never. The legacy site does not run the add-on, which is one more reason our migration keeps MIG.1 |
+| `wordpress_db` (MIG.1) | The WordPress database dump in a protected environment | Nothing of the above is missing (password hashes are not read); used for our own migration only |
 
 ## 13.3 Parity reports (automated)
 
@@ -114,7 +182,7 @@ they follow the same staggered switch as product URLs:
 | MIG.1 | Extractor from the WP DB (`kvsa_`) to an intermediate JSON format, with a meta inventory; per-product URL hit counts from the legacy access logs (traffic fallback for MIG.11) | P1 | 10 | — | Complete inventory of the fields in use; hit counts per legacy product URL exported |
 | MIG.2 | Report of duplicate SKUs (same match key, products and variants together), tags without a role, orphan companion products → decisions | P1 | 6 | MIG.1 | Decision list approved |
 | MIG.3 | Loader for vendors, catalog, taxonomies, images (idempotent, dry-run); existing IT texts loaded as published translations (D-18) | P1 | 16 | MIG.1, CAT.1, CAT.2, CAT.3, CAT.4, CAT.13, CAT.14 | Reload with no duplicates; IT texts present where the current site has them |
-| MIG.4 | Loader for customers (WP password hasher) and read-only historical orders | P1 | 10 | MIG.1, ORD.2 | Migrated customer logs in with the old password |
+| MIG.4 | Loader for customers and read-only historical orders; accounts created without a usable password and activated through CORE.19 (owner decision 2026-11-09: no WordPress password hasher, no legacy hash read or stored) | P1 | 8 | MIG.1, ORD.2, CORE.19 | A migrated customer cannot log in until they set a password through the link; no legacy hash is stored anywhere (database, intermediate files, logs); the historical orders are read-only |
 | MIG.5 | Automated parity reports (§13.3) | P1 | 10 | MIG.3 | Report generated on every run |
 | MIG.6 | Complete redirect map in every language + automated check of all WP sitemap URLs; every legacy product URL (SKU permalinks, plain and historical slugs, variant URLs, legacy query-string forms) mapped to the product with its frozen legacy path per language, answering 200 in legacy mode and a single 301 to the SKU-free URL in new mode (Q-91, §13.3); every legacy tag URL (`/tag-product/{slug}/`, `/it/tag-product-it/{slug}-it/`) mapped the same way to its taxonomy term, with a single 301 to `/{taxonomy}/{term}/` in new mode (D-07) | P1 | 8 | CAT.6, MIG.3 | 100% of URLs 200/301; a migrated IT URL serves its IT text, not the EN fallback; on the migration dataset every legacy URL resolves to a 200 page in at most one 301 hop (no chains, no loops), a legacy-mode product or term answers 200 on its old URL with a self-canonical, and the number of legacy product and tag URLs equals the number of mapped URLs |
 | MIG.7 | Pages and blog migration (semi-manual) with StreamField; existing IT versions as published wagtail-localize translations (D-18) | P1 | 16 | CMS.2, I18N.3 | All public pages present, in IT too where the current site has them |
@@ -122,3 +190,6 @@ they follow the same staggered switch as product URLs:
 | MIG.9 | Three dress rehearsals on STAGE + cutover and rollback runbook | P1 | 16 | MIG.5, MIG.6 | Third rehearsal with no blockers |
 | MIG.10 | Cutover and post-go-live monitoring, including the daily 404 report, the Search Console review and the product URL batch schedule and gates of the runbook (Q-91) | P1 | 12 | MIG.9, SEC.6 | Go-live, 72 h with no critical issues; 404 report and Search Console review recorded at T+14 and T+28 |
 | MIG.11 | Staggered product and tag URL switch (owner decisions Q-91 and D-07): per-product and per-term `url_mode` and frozen legacy paths, traffic ranking from analytics (SEO.5) or the MIG.1 legacy access-log counts, configurable batch size and cadence, batch switch and rollback as a management command and staff action with dry-run and audit, sitemap, canonical and hreflang by mode, gate on 404 rate, Search Console impressions and clicks against baseline, and errors with configurable thresholds | P1 | 6 | MIG.6, CAT.5, CAT.8 | A batch switch gives a single 301 hop and an updated sitemap; a rollback leaves no redirect loop; a legacy-mode page is 200 with a self-canonical; a switched legacy tag URL is a single 301 to `/{taxonomy}/{term}/`; the next batch is refused when a gate metric is over threshold; the MIG.6 "no URL lost" count still holds after a switch and a rollback; products and terms created after go-live start in new mode |
+| MIG.12 | Source-connector interface (owner decision 2026-11-09, spec 13 §13.2 "Source connectors"): `ShopConnector` protocol (`capabilities`, `check`, `extract`), registry by decorator and `MPMV_IMPORT_CONNECTORS`, intermediate format `mpmv-import/1` (JSON Schema and Pydantic models, an evolution of the MIG.1 JSON) read by the MIG.3 and MIG.4 loaders only; shared HTTP client `apps/core/http.py` (HTTPS only, per-connector rate limit, timeouts, backoff honouring `Retry-After`, one log line per call without credentials, SSRF guard refusing loopback, private, link-local, CGNAT and metadata addresses and redirects to them); `ingest.services.import_from_source(..., dry_run=True) -> ChangeSet` with one AuditLog entry per run and an import-origin map on `(source, source_id)`; `fetched_at` in the run manifest; RFC 9457 errors; secrets by reference from the environment or a vault; schema validation of every record (SEC.9); read-only, dry-run by default, idempotent; the MIG.1 extractor wrapped as the `wordpress_db` connector; connectors import no app models (import-linter contract) | P1 | 9 | MIG.1 | A fake connector registered from settings appears in the registry and the loaders load its output with no change to their code; a record that fails the schema is rejected with a report and nothing of it is written; a canary secret never appears in logs, output or the database; two runs on the same source give byte-identical records (the manifest aside); a source resolving to 127.0.0.1, 10.x, 169.254.x, 100.64.x or a private IPv6 address is refused, also when reached by a redirect; a run interrupted halfway resumes without duplicates; a dry run writes nothing and returns the ChangeSet; the MIG.1 output validates against `mpmv-import/1`; a connector that sends a non-GET request fails its test |
+| MIG.13 | WooCommerce REST API v3 connector `woocommerce_rest` (owner decision 2026-11-09): read-only consumer key and secret from the environment, HTTPS only; products, variations, categories, attributes and terms, tags, reviews, images, customers, orders; pagination with `per_page=100` and the total-pages header, `modified_after` for incremental runs; capabilities list the gaps (no password hashes, no protected meta, translation links only when the multilingual plugin exposes them, no SEO plugin fields, no slug history, no ledger); CI runs against recorded responses of a test shop, never a live shop | P2 | 12 | MIG.12 | On the recorded fixture every entity comes out schema-valid, across at least three pages; a 429 response is retried after `Retry-After`; missing credentials give an error that names the environment variable, never a value; customers carry no password field and are created without a usable password; an imported customer activates the account through the CORE.19 link; an `http://` source URL is refused |
+| MIG.14 | WCFM Marketplace connector `wcfm_rest` (owner decision 2026-11-09): discovers the `wcfmmp/v1` namespace from the `/wp-json` index; store vendors (profile, address, policies, logo), product to vendor link, vendor orders with the commission split; without the add-on, a run report of the gaps and a CSV map of product id to vendor as fallback; never bank, KYC or payout data; imported vendor members created without a usable password, activated through CORE.19 and enrolling MFA at first login (CORE.4) | P2 | 8 | MIG.13, CORE.19 | A recorded fixture with the add-on gives vendors and product attribution; a fixture without it completes with the gap report and attributes products from the CSV map; the schema has no bank, KYC or payout field, so no such data can be written; an imported vendor member sets a password and enrols MFA before any Manager page |
