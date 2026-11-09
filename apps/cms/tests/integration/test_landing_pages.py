@@ -37,6 +37,7 @@ from apps.catalog.tests.factories import (
 )
 from apps.cms.models import HomePage, StandardPage, TermLandingPage, VendorLandingPage
 from apps.cms.services import SeedReport
+from apps.cms.tests.factories import TermLandingPageFactory, VendorLandingPageFactory
 from apps.core.models import TranslationStatus
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
@@ -439,3 +440,12 @@ def test_an_editor_adds_landing_pages_with_choosers_under_the_csp(
         html = response.content.decode()
         assert f'<script nonce="{nonce[1]}">new Chooser(' in html
         assert not re.search(r"<script>(?!</script>)", html)
+
+
+def test_the_factories_build_landing_pages_under_the_home(seeded: SeedReport) -> None:
+    term_page = TermLandingPageFactory.create()
+    vendor_page = VendorLandingPageFactory.create()
+    assert term_page.term.taxonomy.has_landing
+    assert vendor_page.vendor.status == Vendor.Status.ACTIVE
+    assert term_page.get_parent().specific == _home()
+    assert vendor_page.get_parent().specific == _home()
