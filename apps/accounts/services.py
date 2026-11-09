@@ -13,6 +13,7 @@ import django_otp
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser, Group, Permission
+from django.contrib.sessions.backends.base import SessionBase
 from django.core import signing
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -21,7 +22,9 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.crypto import salted_hmac
 from django.utils.module_loading import import_string
+from django_otp.oath import TOTP as OathTOTP
 from django_otp.plugins.otp_totp.models import TOTPDevice
+from django_otp.util import random_hex
 
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
@@ -387,6 +390,45 @@ def confirm_totp_device(device: TOTPDevice, token: str, *, ctx: AuditContext) ->
         return _after_enrolment(locked, ctx)
 
 
+# An authenticator app enrolled before its account exists (VEN.24: the vendor claim page creates
+# the account and its second factor in one step). The caller keeps the pending key in the
+# session, shows it, checks the first code, then creates the account and enrols the key.
+
+
+def new_totp_key() -> str:
+    """A fresh authenticator-app key (hex, as `TOTPDevice.key` stores it)."""
+    return str(random_hex(20))
+
+
+def pending_totp_device(key: str, email: str) -> TOTPDevice:
+    """An unsaved device for a pending key: its `config_url` and `bin_key` for the QR code."""
+    return TOTPDevice(key=key, user=User(email=email), name="Authenticator app", confirmed=False)
+
+
+def totp_key_time_step(key: str, token: str) -> int | None:
+    """The time step at which a pending key accepts `token` (within the usual tolerance)."""
+    device = TOTPDevice(key=key)
+    try:
+        code = int(token.strip())
+    except ValueError:
+        return None
+    totp = OathTOTP(device.bin_key, device.step, device.t0, device.digits, device.drift)
+    for offset in range(-device.tolerance, device.tolerance + 1):
+        totp.drift = device.drift + offset
+        if totp.token() == code:
+            return int(totp.t())
+    return None
+
+
+def enrol_totp_key(user: User, key: str, *, time_step: int, ctx: AuditContext) -> Enrolment:
+    """Store a pending key whose code was checked at `time_step` as the confirmed device of
+    `user` (no replay of that code), audited, with a first set of recovery codes."""
+    device = TOTPDevice.objects.create(
+        user=user, key=key, name="Authenticator app", confirmed=True, last_t=time_step
+    )
+    return _after_enrolment(device, ctx)
+
+
 def verify_totp(user: User, token: str) -> TOTPDevice | None:
     """The confirmed device of `user` that accepts `token` (throttled, no replay), if any."""
     for device in TOTPDevice.objects.filter(user=user, confirmed=True).order_by("id"):
@@ -684,10 +726,17 @@ def delete_group(group: Group, *, ctx: AuditContext, dry_run: bool = False) -> C
 # Continue POST spends the token's single sign-in use; the action page itself needs a step-up.
 # A link also carries its issue generation and a stamp of the recipient's password: issuing a
 # newer link for the same object and recipient, or a password change, revokes it.
+#
+# Email-bound purposes (VEN.24) serve a recipient who has no account yet (a vendor claimed by
+# its legal email of record). The token binds a digest of the address the purpose names
+# (`email_of`), never an address the caller passes; the Continue POST signs nobody in, it only
+# opens the link in the session (`email_bound_link`), and the owning app spends the single use
+# when its action completes (`spend_email_bound_link`).
 
 ACTION_LINK_SALT = "mpmv.accounts.action-link"
 ACTION_LINK_SIGNED_IN = "accounts.action_link.signed_in"
 ACTION_LINK_REFUSED = "accounts.action_link.refused"
+ACTION_LINK_OPENED = "accounts.action_link.opened"
 ACTION_LINK_SENT = "accounts.action_link.sent"
 # Refusals with no account to attach them to (a bad signature, a recipient that does not exist)
 # are logged here, not audited: anyone can send those, and the Continue POST is rate limited.
@@ -695,8 +744,15 @@ ACTION_LINK_LOGGER = "mpmv.accounts.action_links"
 _log = logging.getLogger(ACTION_LINK_LOGGER)
 # The query parameter that tells the action page which version the link was issued for.
 ACTION_VERSION_PARAM = "version"
+ACTION_LINK_USED = "accounts.action_link.used"
+ACTION_LINK_MODEL = "accounts.actionlinkuse"
+ACTION_LINK_SESSION_KEY = "accounts.action_link.opened"
 ACTION_LINK_RATE_WINDOW = dt.timedelta(minutes=15)
 _ACTION_TOKEN_MAX_LENGTH = 2048
+
+
+def _nobody(object_key: str, user: User) -> bool:
+    return False
 
 
 @dataclass(frozen=True)
@@ -711,13 +767,25 @@ class ActionPurpose:
       call `action_version_matches` and refuse the action when the object changed since.
     - `may_act(object_key, user)`: whether the recipient may still act on the object.
     - `max_age`: seconds a link stays valid; None for `settings.ACTION_LINK_MAX_AGE`.
+    - `email_of(object_key)`: set only for an email-bound purpose (VEN.24): the one address
+      links of the object go to (None or "" when there is none). Such a link has no recipient
+      user, never signs anyone in, and is refused once the object's address changes.
     """
 
     name: str
     version_of: Callable[[str], object | None]
     url_of: Callable[[str], str]
-    may_act: Callable[[str, User], bool]
+    may_act: Callable[[str, User], bool] = _nobody
     max_age: int | None = None
+    email_of: Callable[[str], str | None] | None = None
+
+    @property
+    def email_bound(self) -> bool:
+        return self.email_of is not None
+
+    def address_of(self, object_key: str) -> str:
+        """The email address of record of an email-bound purpose; "" when there is none."""
+        return ((self.email_of(object_key) if self.email_of else None) or "").strip()
 
 
 _ACTION_PURPOSES: dict[str, ActionPurpose] = {}
@@ -730,19 +798,23 @@ def register_action_purpose(purpose: ActionPurpose) -> None:
 
 @dataclass(frozen=True)
 class ActionLinkCheck:
-    """The outcome of checking a link: `refusal` is None when it can be used now."""
+    """The outcome of checking a link: `refusal` is None when it can be used now.
+
+    `email_bound` links (VEN.24) have no `user`: nobody is signed in with them.
+    """
 
     refusal: str | None
     claims: engine.ActionClaims | None = None
     user: User | None = None
     action_url: str | None = None
+    email_bound: bool = False
 
 
 def _issue_action_claims(
     *,
     purpose: str,
     object_key: str,
-    recipient: User,
+    recipient: User | None,
     version: object,
     expires_in: int | None,
     now: float | None,
@@ -751,19 +823,37 @@ def _issue_action_claims(
     registered = _ACTION_PURPOSES.get(purpose)
     if registered is None:
         raise ValueError(f"unknown action link purpose {purpose!r}")
-    generation = _next_generation(purpose, object_key, recipient, dry_run=dry_run)
+    if registered.email_bound:
+        if recipient is not None:
+            raise ValueError(f"{purpose!r} links are email-bound: they take no recipient user")
+        address = registered.address_of(object_key)
+        if not address:
+            raise ValueError(f"no email address of record for {purpose!r} {object_key!r}")
+        bound_to = engine.email_recipient(address)
+        # No account, so no issue record and no password: the owning app revokes these links
+        # (version, address of record, single use), and they never sign anyone in.
+        generation, stamp = _EMAIL_BOUND_GENERATION, ""
+    else:
+        if recipient is None:
+            raise ValueError(f"{purpose!r} links need a recipient user")
+        bound_to = str(recipient.public_id)
+        generation = _next_generation(purpose, object_key, recipient, dry_run=dry_run)
+        stamp = _password_stamp(recipient)
     claims = engine.new_action_claims(
         purpose=purpose,
         object_key=object_key,
-        recipient=str(recipient.public_id),
+        recipient=bound_to,
         version=version,
         now=time.time() if now is None else now,
         max_age=expires_in or registered.max_age or settings.ACTION_LINK_MAX_AGE,
         generation=generation,
-        stamp=_password_stamp(recipient),
+        stamp=stamp,
     )
     payload = engine.action_claims_payload(claims)
     return signing.dumps(payload, salt=ACTION_LINK_SALT, compress=True), claims
+
+
+_EMAIL_BOUND_GENERATION = 1
 
 
 def _password_stamp(user: User) -> str:
@@ -800,8 +890,8 @@ def issue_action_token(
     *,
     purpose: str,
     object_key: str,
-    recipient: User,
     version: object,
+    recipient: User | None = None,
     expires_in: int | None = None,
     now: float | None = None,
 ) -> str:
@@ -809,8 +899,10 @@ def issue_action_token(
 
     It expires after `expires_in` seconds (default: the purpose's, then
     `settings.ACTION_LINK_MAX_AGE`, 72 h). Issuing it revokes the links issued before for the
-    same purpose, object and recipient. Raises ValueError for an unregistered purpose. The
-    token is a credential: never log it; email it with `send_action_link_email`.
+    same purpose, object and recipient. An email-bound purpose (VEN.24) takes no recipient: the
+    token is bound to the address its `email_of` names now. Raises ValueError for an
+    unregistered purpose, a missing or unexpected recipient, or an email-bound object without an
+    address. The token is a credential: never log it; email it with `send_action_link_email`.
     """
     token, _ = _issue_action_claims(
         purpose=purpose,
@@ -854,29 +946,40 @@ def action_page_url(check: ActionLinkCheck) -> str:
     return f"{check.action_url}{separator}{query}"
 
 
-def check_action_token(token: str, *, now: float | None = None) -> ActionLinkCheck:
-    """Check a token without using it: signature, purpose, expiry, version, revocation and
-    recipient.
+def _check_email_bound(
+    purpose: ActionPurpose, claims: engine.ActionClaims, now: float
+) -> ActionLinkCheck:
+    version = purpose.version_of(claims.object_key)
+    address = purpose.address_of(claims.object_key)
+    refusal = engine.action_link_refusal(
+        claims,
+        now=now,
+        current_version=None if version is None else str(version),
+        recipient=engine.email_recipient(address) if address else "",
+    )
+    if (
+        refusal is None
+        and ActionLinkUse.objects.filter(
+            nonce_digest=engine.action_nonce_digest(claims.nonce)
+        ).exists()
+    ):
+        refusal = engine.USED
+    return ActionLinkCheck(
+        refusal, claims, None, purpose.url_of(claims.object_key), email_bound=True
+    )
 
-    Read-only, so safe for GET and HEAD. Single use is checked only when the token is redeemed.
-    """
-    try:
-        if len(token) > _ACTION_TOKEN_MAX_LENGTH:
-            raise signing.BadSignature("token too long")
-        payload = signing.loads(token, salt=ACTION_LINK_SALT)
-    except signing.BadSignature:
-        return ActionLinkCheck(engine.BAD_SIGNATURE)
-    claims = engine.action_claims_from_payload(payload)
-    if claims is None:
-        return ActionLinkCheck(engine.BAD_SIGNATURE)
+
+def _check_claims(claims: engine.ActionClaims, now: float) -> ActionLinkCheck:
     purpose = _ACTION_PURPOSES.get(claims.purpose)
+    if purpose is not None and purpose.email_bound:
+        return _check_email_bound(purpose, claims, now)
     user = _recipient(claims.recipient)
     if purpose is None:
         return ActionLinkCheck(engine.UNKNOWN_PURPOSE, claims, user)
     version = purpose.version_of(claims.object_key)
     refusal = engine.action_link_refusal(
         claims,
-        now=time.time() if now is None else now,
+        now=now,
         current_version=None if version is None else str(version),
         current_generation=None if user is None else _current_generation(claims, user),
         current_stamp=None if user is None else _password_stamp(user),
@@ -888,21 +991,43 @@ def check_action_token(token: str, *, now: float | None = None) -> ActionLinkChe
     return ActionLinkCheck(refusal, claims, user, purpose.url_of(claims.object_key))
 
 
+def check_action_token(token: str, *, now: float | None = None) -> ActionLinkCheck:
+    """Check a token without using it: signature, purpose, expiry, version, revocation and
+    recipient.
+
+    Read-only, so safe for GET and HEAD. Single use is checked only when the token is redeemed
+    (an email-bound link also checks it here: its use is spent by the owning app).
+    """
+    try:
+        if len(token) > _ACTION_TOKEN_MAX_LENGTH:
+            raise signing.BadSignature("token too long")
+        payload = signing.loads(token, salt=ACTION_LINK_SALT)
+    except signing.BadSignature:
+        return ActionLinkCheck(engine.BAD_SIGNATURE)
+    claims = engine.action_claims_from_payload(payload)
+    if claims is None:
+        return ActionLinkCheck(engine.BAD_SIGNATURE)
+    return _check_claims(claims, time.time() if now is None else now)
+
+
 def _link_snapshot(claims: engine.ActionClaims) -> dict[str, str]:
     return {"purpose": claims.purpose, "object": claims.object_key, "version": claims.version}
 
 
 def _audit_refused_link(check: ActionLinkCheck, ctx: AuditContext) -> None:
-    """Audit a refusal against the recipient's account. With no account (a bad signature, a
+    """Audit a refusal against the recipient's account, or against nobody for an email-bound
+    link (VEN.24: signed by us, for a known object). With no account (a bad signature, a
     recipient that does not exist) there is nothing to attach it to and anyone can send one, so
     it is only logged, with the reason and never the token."""
-    if check.user is None:
+    email_bound = check.email_bound and check.claims is not None
+    if check.user is None and not email_bound:
         _log.info("action link refused: %s", check.refusal, extra={"reason": check.refusal})
         return
     after: dict[str, str] = {"reason": check.refusal or ""}
     if check.claims is not None:
         after |= {"purpose": check.claims.purpose, "object": check.claims.object_key}
-    record(ctx, ACTION_LINK_REFUSED, USER_MODEL, str(check.user.public_id), None, after)
+    key = str(check.user.public_id) if check.user is not None else UNKNOWN_ACCOUNT
+    record(ctx, ACTION_LINK_REFUSED, USER_MODEL, key, None, after)
 
 
 def _spend(check: ActionLinkCheck, ctx: AuditContext) -> ActionLinkCheck:
@@ -951,13 +1076,15 @@ def redeem_action_token(
     - No session and a privileged recipient (staff, superuser, a group or a direct permission):
       refused, nothing spent. Staff sign in with their password and MFA, then continue (lane-a
       decision on the CORE.15 review).
+    - An email-bound link (VEN.24): nothing is spent and nobody is signed in; the caller opens
+      it in the session (`open_email_bound_link`) for the action page, which decides.
 
     Every refusal against a known account is audited (reason, purpose and object; never the
     token); the others are only logged. The caller sends a refused visitor to the normal login,
     then on to `action_url` when it is known.
     """
     check = check_action_token(token, now=now)
-    if check.refusal is None:
+    if check.refusal is None and not check.email_bound:
         recipient = check.user
         if session_user is None and recipient is not None and is_privileged(recipient):
             check = replace(check, refusal=engine.STAFF_RECIPIENT)
@@ -970,6 +1097,82 @@ def redeem_action_token(
     if check.refusal is not None:
         _audit_refused_link(check, ctx)
     return check
+
+
+def _session_slot(purpose: str, object_key: str) -> str:
+    return f"{purpose}:{object_key}"
+
+
+def open_email_bound_link(
+    session: SessionBase, check: ActionLinkCheck, *, ctx: AuditContext
+) -> None:
+    """Keep a valid email-bound link's claims in `session` for its action page (VEN.24).
+
+    The session holds the verified claims, never the token: they cannot be replayed as a link.
+    The opening is audited (`ACTION_LINK_OPENED`: purpose, object and version, never the token;
+    nobody is signed in, so the target is the unknown account).
+    """
+    if check.refusal is not None or not check.email_bound or check.claims is None:
+        raise ValueError("only a valid email-bound link can be opened")
+    snapshot = _link_snapshot(check.claims)
+    record(ctx, ACTION_LINK_OPENED, USER_MODEL, UNKNOWN_ACCOUNT, None, snapshot)
+    opened = dict(session.get(ACTION_LINK_SESSION_KEY) or {})
+    slot = _session_slot(check.claims.purpose, check.claims.object_key)
+    opened[slot] = engine.action_claims_payload(check.claims)
+    session[ACTION_LINK_SESSION_KEY] = opened
+
+
+def email_bound_link(
+    session: SessionBase, purpose: str, object_key: str, *, now: float | None = None
+) -> ActionLinkCheck:
+    """The email-bound link opened in `session` for `object_key`, checked again now.
+
+    `refusal` is `engine.NOT_OPENED` when the session holds none; otherwise the same checks as
+    the link itself (expiry, version, address of record, single use). Read-only.
+    """
+    opened = session.get(ACTION_LINK_SESSION_KEY) or {}
+    payload = opened.get(_session_slot(purpose, object_key)) if isinstance(opened, dict) else None
+    claims = engine.action_claims_from_payload(payload)
+    registered = _ACTION_PURPOSES.get(purpose)
+    if claims is None or registered is None or not registered.email_bound:
+        return ActionLinkCheck(engine.NOT_OPENED, email_bound=True)
+    if claims.purpose != purpose or claims.object_key != object_key:
+        return ActionLinkCheck(engine.NOT_OPENED, email_bound=True)
+    return _check_email_bound(registered, claims, time.time() if now is None else now)
+
+
+def forget_email_bound_link(session: SessionBase, purpose: str, object_key: str) -> None:
+    """Drop the link opened in `session` for `object_key`, if any."""
+    opened = dict(session.get(ACTION_LINK_SESSION_KEY) or {})
+    if opened.pop(_session_slot(purpose, object_key), None) is not None:
+        session[ACTION_LINK_SESSION_KEY] = opened
+
+
+class ActionLinkSpent(Exception):
+    """The email-bound link was already used, or is no longer valid."""
+
+
+def spend_email_bound_link(check: ActionLinkCheck, user: User, *, ctx: AuditContext) -> None:
+    """Spend the single use of a valid email-bound link for `user`, the account its action
+    created (VEN.24), in the caller's transaction; audited without the token.
+
+    Raises `ActionLinkSpent` when the check is not valid or a concurrent request spent it first.
+    """
+    claims = check.claims
+    if check.refusal is not None or not check.email_bound or claims is None:
+        raise ActionLinkSpent(check.refusal or "not an email-bound link")
+    try:
+        with transaction.atomic():
+            ActionLinkUse.objects.create(
+                nonce_digest=engine.action_nonce_digest(claims.nonce),
+                purpose=claims.purpose,
+                object_key=claims.object_key,
+                user=user,
+            )
+    except IntegrityError:
+        raise ActionLinkSpent(engine.USED) from None
+    snapshot = _link_snapshot(claims)
+    record(ctx, ACTION_LINK_USED, ACTION_LINK_MODEL, claims.object_key, None, snapshot)
 
 
 def action_link_retry_after(ip: str | None) -> dt.timedelta:
@@ -985,22 +1188,27 @@ def send_action_link_email(
     *,
     purpose: str,
     object_key: str,
-    recipient: User,
     version: object,
     template_key: str,
     context: Mapping[str, Any],
     ctx: AuditContext,
+    recipient: User | None = None,
+    language: str | None = None,
     expires_in: int | None = None,
     idempotency_key: str | None = None,
     dry_run: bool = False,
 ) -> ChangeSet:
-    """Email `recipient` a secure action link through the ARC.16 outbox, in their language.
+    """Email a secure action link through the ARC.16 outbox.
+
+    A user-bound link goes to `recipient`, in their language. An email-bound link (VEN.24) goes
+    only to the address its purpose names for the object (`email_of`), in `language` (default:
+    the site language); the caller never chooses the address.
 
     The template gets `action_url` (absolute, on `settings.SITE_BASE_URL`) and
-    `action_link_expires_at` on top of `context`. The new link revokes the ones emailed before
-    for the same purpose, object and recipient (not on a dry run). The outbox stores the
+    `action_link_expires_at` on top of `context`. A user-bound link revokes the ones emailed
+    before for the same purpose, object and recipient (not on a dry run). The outbox stores the
     context encrypted; the audit entry names the purpose, object, version and generation, never
-    the token.
+    the token or the address.
 
     The revocation commits only together with the queued email: a retry with an
     `idempotency_key` already used queues nothing and keeps the link delivered before, and an
@@ -1016,15 +1224,22 @@ def send_action_link_email(
             now=None,
             dry_run=dry_run,
         )
+        if recipient is not None:
+            address, mail_language = recipient.email, recipient.preferred_language
+            audit_model, audit_key = USER_MODEL, str(recipient.public_id)
+        else:
+            address = _ACTION_PURPOSES[purpose].address_of(object_key)
+            mail_language = language or settings.LANGUAGE_CODE
+            audit_model, audit_key = ACTION_LINK_MODEL, object_key
         values = {
             **context,
             "action_url": settings.SITE_BASE_URL.rstrip("/") + action_link_path(token),
             "action_link_expires_at": dt.datetime.fromtimestamp(claims.expires_at, tz=dt.UTC),
         }
         changes = enqueue_email(
-            recipient=recipient.email,
+            recipient=address,
             template_key=template_key,
-            language=recipient.preferred_language,
+            language=mail_language,
             context=values,
             idempotency_key=idempotency_key,
             dry_run=dry_run,
@@ -1032,6 +1247,8 @@ def send_action_link_email(
         if not dry_run and changes.is_empty:
             transaction.set_rollback(True)  # nothing queued: keep the delivered link usable
         elif not dry_run:
-            snapshot = {**_link_snapshot(claims), "generation": str(claims.generation)}
-            record(ctx, ACTION_LINK_SENT, USER_MODEL, str(recipient.public_id), None, snapshot)
+            snapshot = _link_snapshot(claims)
+            if recipient is not None:  # email-bound links have no issue generation
+                snapshot["generation"] = str(claims.generation)
+            record(ctx, ACTION_LINK_SENT, audit_model, audit_key, None, snapshot)
     return changes

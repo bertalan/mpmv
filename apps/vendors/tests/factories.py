@@ -26,6 +26,7 @@ from apps.vendors.models import (
     CrossVendorConsent,
     LegalFieldRequirement,
     Vendor,
+    VendorClaim,
     VendorContract,
     VendorContractTranslation,
     VendorFeatureFlag,
@@ -351,3 +352,14 @@ class CrossVendorConsentFactory(DjangoModelFactory[CrossVendorConsent]):
     in_bundles = False
     valid_from = factory.LazyFunction(lambda: timezone.now() - dt.timedelta(days=1))
     set_by = "staff:factory"
+
+
+class VendorClaimFactory(DjangoModelFactory[VendorClaim]):
+    """An open claim of an imported vendor (VEN.24); the link itself is sent by the service."""
+
+    class Meta:
+        model = VendorClaim
+
+    vendor = factory.SubFactory(VendorFactory)
+    status = VendorClaim.Status.OPEN
+    version = 1

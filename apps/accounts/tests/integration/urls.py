@@ -6,6 +6,8 @@
 - A stand-in "approve a document" action page reached by secure action links (CORE.15): the
   `tests.approve` purpose, with documents kept in memory (`DOCUMENTS`). Its approve POST
   re-checks the version, as every action page must.
+- A stand-in "claim an invitation" page reached by email-bound links (VEN.24): the
+  `tests.invite` purpose, bound to an email address instead of a user (`INVITATIONS`).
 """
 
 from dataclasses import dataclass
@@ -20,6 +22,7 @@ from apps.accounts.services import (
     ACTION_VERSION_PARAM,
     ActionPurpose,
     action_version_matches,
+    email_bound_link,
     register_action_purpose,
 )
 from mpmv.urls import urlpatterns as project_urlpatterns
@@ -102,10 +105,51 @@ def approve(request: HttpRequest, key: str) -> HttpResponse:
     return HttpResponse(APPROVE_PAGE.render(context))
 
 
+# --- VEN.24: an email-bound purpose (the recipient has no account yet)
+
+
+@dataclass
+class Invitation:
+    email: str
+    version: str
+
+
+INVITATIONS: dict[str, Invitation] = {}
+INVITE_PURPOSE = "tests.invite"
+
+
+def _invitation_version(key: str) -> str | None:
+    invitation = INVITATIONS.get(key)
+    return invitation.version if invitation else None
+
+
+def _invitation_email(key: str) -> str | None:
+    invitation = INVITATIONS.get(key)
+    return invitation.email if invitation else None
+
+
+register_action_purpose(
+    ActionPurpose(
+        name=INVITE_PURPOSE,
+        version_of=_invitation_version,
+        url_of=lambda key: reverse("test-invite", args=[key]),
+        email_of=_invitation_email,
+    )
+)
+
+
+def invite(request: HttpRequest, key: str) -> HttpResponse:
+    check = email_bound_link(request.session, INVITE_PURPOSE, key)
+    if check.refusal is not None:
+        return HttpResponse(f"refused {check.refusal}", status=403)
+    return HttpResponse(f"invitation {key}")
+
+
 urlpatterns = [
     path("register/", register, name="test-register"),
     path("test/sensitive/", sensitive, name="test-sensitive"),
     path("test/very-sensitive/", very_sensitive, name="test-very-sensitive"),
     path("test/approve/<str:key>/", approve, name="test-approve"),
+    path("test/invite/<str:key>/", invite, name="test-invite"),
     *project_urlpatterns,
 ]

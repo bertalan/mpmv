@@ -217,7 +217,12 @@ reusable mechanism: a service in `accounts` plus an email helper on top of the A
   recipient user, and sent only to the vendor's legal email of record. There is no account yet,
   so the claimant sets a password and enrols their own MFA before anything else; the link never
   signs anyone in to an existing account. Regenerating the claim bumps its version, so the old
-  link stops working.
+  link stops working. Implementation: an *email-bound* purpose (`ActionPurpose.email_of`). The
+  token carries a SHA-256 digest of the address the purpose names for the object, never an
+  address the caller passes, and is refused once that address changes. Its Continue POST signs
+  nobody in and spends nothing: it keeps the verified claims (not the token) in the session for
+  the action page (`email_bound_link`), which spends the single use when its action completes
+  (`spend_email_bound_link`, the same unique `ActionLinkUse` row).
 
 ### API v1 (replaces the legacy custom API)
 
