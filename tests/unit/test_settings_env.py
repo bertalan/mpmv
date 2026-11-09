@@ -1,5 +1,6 @@
 """Environment helpers used by the settings modules."""
 
+import re
 import stat
 from pathlib import Path
 
@@ -170,3 +171,21 @@ def test_map_tiles_from_one_https_host_allow_that_origin_only() -> None:
 def test_a_bad_map_tile_url_is_a_configuration_error(url: str) -> None:
     with pytest.raises(ImproperlyConfigured, match="MPMV_MAP_TILE_URL"):
         map_tile_origin(url)
+
+
+# --- The server env template lists every variable the deployed settings read ------------------
+
+ROOT = Path(__file__).resolve().parents[2]
+DEPLOYED_SETTINGS = ("base.py", "live.py", "stage.py")
+
+
+def test_every_setting_read_from_the_environment_is_in_the_env_template() -> None:
+    """Coherence check 7: a variable missing from mpmv.env.example is forgotten on the server."""
+    read = set()
+    for name in DEPLOYED_SETTINGS:
+        text = (ROOT / "mpmv" / "settings" / name).read_text(encoding="utf-8")
+        read |= set(re.findall(r"env_\w+\(\s*\"(MPMV_[A-Z0-9_]+)\"", text))
+    template = (ROOT / "deploy" / "server" / "mpmv.env.example").read_text(encoding="utf-8")
+    listed = set(re.findall(r"^(MPMV_[A-Z0-9_]+)=", template, re.M))
+    assert read, "no MPMV_ variable found: the pattern is stale"
+    assert sorted(read - listed) == []

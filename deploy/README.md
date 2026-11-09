@@ -73,7 +73,8 @@ make dev-reset   # dev-down, then delete the mpmv-net network and the mpmv-media
 - App and worker join the private network `mpmv-net` and the `default` network, where `mpmv-db`
   lives. `container` 1.0 has no DNS between containers, so the script passes the database address
   it reads from `container inspect`.
-- The app runs with `mpmv.settings.live` (as on STAGE) and `DJANGO_SECURE_SSL_REDIRECT=false`.
+- The app runs with `mpmv.settings.stage` (LIVE settings without live data, as on STAGE) and
+  `DJANGO_SECURE_SSL_REDIRECT=false`.
   The secret key is generated once into `build/dev-stack.env` (git-ignored).
 - The script only creates, stops or deletes resources named `mpmv-*`, always with
   `container delete`. A unit test (`tests/unit/test_local_stack.py`) enforces this.
