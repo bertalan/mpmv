@@ -7,7 +7,9 @@ file can never come back as HTML. Every response is `Content-Disposition: inline
 logo may use, see `apps.core.svg`), so an SVG opened on its own runs nothing and loads
 nothing.
 
-The app serves these until the reverse proxy serves MEDIA_ROOT with the same headers.
+On STAGE and LIVE, Caddy serves MEDIA_ROOT itself (deploy/caddy/Caddyfile, ARC.13) with the same
+folders, extensions and headers; tests/unit/test_quadlets.py checks that the two stay in step
+with the constants below.
 """
 
 import posixpath
@@ -31,6 +33,7 @@ MEDIA_TYPES = {
 }
 SVG_CSP = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
 RASTER_CSP = "default-src 'none'; sandbox"
+CACHE_CONTROL = "public, max-age=86400"
 
 
 def _image_file(path: str) -> Path:
@@ -70,5 +73,5 @@ def serve_media(request: HttpRequest, path: str) -> FileResponse:
     response["Content-Disposition"] = "inline"
     response["X-Content-Type-Options"] = "nosniff"
     response["Content-Security-Policy"] = SVG_CSP if extension == ".svg" else RASTER_CSP
-    response["Cache-Control"] = "public, max-age=86400"
+    response["Cache-Control"] = CACHE_CONTROL
     return response

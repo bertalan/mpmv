@@ -45,10 +45,13 @@
 		root * /srv/media
 		header X-Content-Type-Options nosniff
 		header Cache-Control "public, max-age=86400"
-		header Content-Security-Policy "default-src 'none'; sandbox"
-		# Sanitised SVG logos keep their inline styles (THM.12).
+		# Sanitised SVG logos keep their inline styles (THM.12). The two matchers are exclusive on
+		# purpose: the adapter runs a header with a matcher before one without, so an unmatched CSP
+		# would overwrite the SVG one. Values, folders and extensions must match apps/core/media.py.
 		@svg path_regexp svg (?i)\.svg$
+		@not_svg not path_regexp (?i)\.svg$
 		header @svg Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+		header @not_svg Content-Security-Policy "default-src 'none'; sandbox"
 		file_server
 	}
 
