@@ -23,7 +23,7 @@ from apps.cms.models import StandardPage
 from apps.cms.services import SeedReport, seed_site
 from apps.cms.tests.factories import StandardPageFactory
 from apps.core.models import MediaImage
-from apps.core.svg import LOGO_COLLECTION_NAME
+from apps.core.svg import LOGO_COLLECTION_NAME, sanitise_svg
 from apps.core.tests.factories import MediaImageFactory, SvgCollectionFactory
 
 pytestmark = pytest.mark.django_db
@@ -332,6 +332,177 @@ def test_the_admin_refuses_a_scripted_svg_upload(client: Client) -> None:
     assert not MediaImage.objects.filter(title="Evil logo").exists()
 
 
+# --- Every path to storage (lane-a security review of THM.12)
+
+EXPORTED_SVG = (
+    '<?xml version="1.0" encoding="UTF-8"?>\n<!-- exported -->\n'
+    f'<svg {SVG_NS} viewBox="0 0 10 10"><!-- c --><rect width="10" height="10"/></svg>'
+)
+
+
+def _admin(client: Client) -> None:
+    password = secrets.token_urlsafe(16)
+    editor = UserFactory.create(email="editor@example.com", password=password, superuser=True)
+    verified_login(client, editor)
+
+
+def _upload_step_one(client: Client, document: str, collection: Collection) -> int:
+    """Wagtail's multiple upload, step 1: the file is stored as an `UploadedFile` because the
+    licence and author are still missing. The id the step-2 form posts to."""
+    response = client.post(
+        "/admin/images/multiple/add/",
+        {
+            "files[]": ContentFile(document.encode(), name="logo.svg"),
+            "collection": collection.pk,
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"], data
+    upload_id: int = data["uploaded_file_id"]
+    return upload_id
+
+
+def _upload_step_two(client: Client, upload_id: int, collection: Collection) -> dict[str, Any]:
+    licence = MediaImageFactory.create().licence
+    assert licence is not None
+    prefix = f"uploaded-image-{upload_id}"
+    response = client.post(
+        f"/admin/images/multiple/create_from_uploaded_image/{upload_id}/",
+        {
+            f"{prefix}-title": "Multi logo",
+            f"{prefix}-collection": collection.pk,
+            f"{prefix}-licence": licence.pk,
+            f"{prefix}-author": "Vendor A",
+        },
+    )
+    assert response.status_code == 200
+    data: dict[str, Any] = response.json()
+    return data
+
+
+def test_the_multiple_upload_refuses_an_svg_moved_out_of_the_logos_collection(
+    client: Client,
+) -> None:
+    _admin(client)
+    products = Collection.get_first_root_node().add_child(name="Products")
+    upload_id = _upload_step_one(client, EXPORTED_SVG, _logos())
+
+    data = _upload_step_two(client, upload_id, products)
+
+    assert not data["success"]
+    assert LOGO_COLLECTION_NAME in data["form"]
+    assert not MediaImage.objects.filter(title="Multi logo").exists()
+
+
+def test_the_multiple_upload_stores_the_re_serialised_svg(client: Client) -> None:
+    _admin(client)
+    upload_id = _upload_step_one(client, EXPORTED_SVG, _logos())
+
+    data = _upload_step_two(client, upload_id, _logos())
+
+    assert data["success"], data
+    image = MediaImage.objects.get(title="Multi logo")
+    with image.file.open("rb") as f:
+        stored = f.read()
+    assert stored == sanitise_svg(EXPORTED_SVG.encode())
+    assert image.file_size == len(stored)
+
+
+def _stored_raw_svg(document: str, collection: Collection) -> MediaImage:
+    """An image whose file was written to storage before the model saw it, as Wagtail's
+    multiple upload does (`file.save(..., save=False)`), bypassing `clean()`."""
+    image = MediaImage()
+    image.file.save("logo.svg", ContentFile(document.encode()), save=False)
+    image._set_image_file_metadata()
+    image.width = image.height = 10
+    image.title = "Raw logo"
+    image.collection = collection
+    image.licence = MediaImageFactory.create().licence
+    image.author = "Vendor A"
+    return image
+
+
+def test_saving_re_serialises_an_svg_already_in_storage() -> None:
+    image = _stored_raw_svg(EXPORTED_SVG, _logos())
+
+    image.save()
+
+    image.refresh_from_db()
+    with image.file.open("rb") as f:
+        assert f.read() == sanitise_svg(EXPORTED_SVG.encode())
+
+
+def test_saving_refuses_an_svg_outside_the_logos_collection() -> None:
+    products = Collection.get_first_root_node().add_child(name="Products")
+    image = _stored_raw_svg(EXPORTED_SVG, products)
+
+    with pytest.raises(ValidationError):
+        image.save()
+
+    assert not MediaImage.objects.filter(title="Raw logo").exists()
+
+
+def test_saving_refuses_a_scripted_svg_already_in_storage() -> None:
+    image = _stored_raw_svg(SCRIPTED_SVG, _logos())
+
+    with pytest.raises(ValidationError):
+        image.save()
+
+
+def _bulk_add_to_collection(client: Client, images: list[MediaImage], target: Collection) -> Any:
+    ids = "&".join(f"id={image.pk}" for image in images)
+    return client.post(
+        f"/admin/bulk/core/mediaimage/add_to_collection/?next=/admin/images/&{ids}",
+        {"collection": target.pk},
+    )
+
+
+def test_the_bulk_add_to_collection_action_refuses_to_move_an_svg_out_of_logos(
+    client: Client,
+) -> None:
+    _admin(client)
+    products = Collection.get_first_root_node().add_child(name="Products")
+    logo = _svg_image(SAFE_SVG)
+    logo.full_clean()
+    logo.save()
+    photo = _photo()
+
+    response = _bulk_add_to_collection(client, [logo, photo], products)
+
+    assert response.status_code == 302
+    logo.refresh_from_db()
+    photo.refresh_from_db()
+    assert logo.collection_id == _logos().pk
+    assert photo.collection_id != products.pk  # the whole action is refused
+
+
+def test_the_bulk_add_to_collection_action_still_moves_raster_images(client: Client) -> None:
+    _admin(client)
+    products = Collection.get_first_root_node().add_child(name="Products")
+    photo = _photo()
+
+    _bulk_add_to_collection(client, [photo], products)
+
+    photo.refresh_from_db()
+    assert photo.collection_id == products.pk
+
+
+def test_the_bulk_add_to_collection_action_moves_an_svg_within_svg_collections(
+    client: Client,
+) -> None:
+    _admin(client)
+    vendors = _logos().add_child(name="Vendor logos")
+    logo = _svg_image(SAFE_SVG)
+    logo.full_clean()
+    logo.save()
+
+    _bulk_add_to_collection(client, [logo], vendors)
+
+    logo.refresh_from_db()
+    assert logo.collection_id == vendors.pk
+
+
 # --- Serving media
 
 
@@ -382,6 +553,7 @@ def test_a_raster_rendition_is_served_with_its_type(client: Client) -> None:
         "/media/images/..%5cdocuments/secret.png",
         "/media/images//documents/secret.png",
         "/media/documents/secret.png",
+        "/media/original_images/a%00b.png",
     ],
 )
 def test_only_existing_images_under_the_image_folders_are_served(

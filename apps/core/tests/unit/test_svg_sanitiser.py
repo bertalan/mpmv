@@ -7,6 +7,8 @@ to anything but a same-document fragment, and returns a clean re-serialisation (
 processing instructions dropped) that is what gets stored.
 """
 
+import time
+
 import pytest
 from defusedxml.ElementTree import fromstring
 
@@ -161,3 +163,45 @@ def test_the_output_uses_the_default_svg_namespace() -> None:
 
     assert cleaned.decode().startswith('<svg xmlns="http://www.w3.org/2000/svg"')
     assert "ns0:" not in cleaned.decode()
+
+
+# --- Resource limits (lane-a security review of THM.12)
+
+
+def test_many_comments_are_stripped_in_one_pass() -> None:
+    document = f"<svg {SVG}>" + "<!---->" * 74000 + "</svg>"
+    assert len(document) < MAX_SVG_BYTES
+
+    started = time.perf_counter()
+    cleaned = sanitise_svg(document.encode())
+
+    assert time.perf_counter() - started < 2
+    assert "<!--" not in cleaned.decode()
+
+
+def test_text_around_stripped_comments_is_kept_in_order() -> None:
+    document = f"<svg {SVG}><text>a<!-- 1 -->b<!-- 2 -->c<tspan>d</tspan>e<!-- 3 -->f</text></svg>"
+
+    cleaned = sanitise_svg(document.encode()).decode()
+
+    assert "<text>abc<tspan>d</tspan>ef</text>" in cleaned
+
+
+def test_deep_nesting_is_refused_not_a_crash() -> None:
+    document = f"<svg {SVG}>" + "<g>" * 1000 + "</g>" * 1000 + "</svg>"
+
+    with pytest.raises(UnsafeSvgError, match="nested"):
+        sanitise_svg(document.encode())
+
+
+def test_moderate_nesting_is_accepted() -> None:
+    document = f"<svg {SVG}>" + "<g>" * 30 + '<rect width="1"/>' + "</g>" * 30 + "</svg>"
+
+    assert b"<rect" in sanitise_svg(document.encode())
+
+
+def test_an_unknown_encoding_is_refused() -> None:
+    document = f'<?xml version="1.0" encoding="x-foo"?><svg {SVG}/>'
+
+    with pytest.raises(UnsafeSvgError):
+        sanitise_svg(document.encode())
