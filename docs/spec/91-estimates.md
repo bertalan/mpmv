@@ -14,13 +14,13 @@
 
 | Item | Hours | How it is calculated |
 |---|---:|---|
-| P1 micro-tasks | 1,559 | Sum from the generated backlog |
+| P1 micro-tasks | 1,707 | Sum from the generated backlog |
 | Integrated and end-to-end acceptance testing, exploratory tests | 100 | ~10% of P1 |
 | Mandatory human review of tax, payments, ledger, orders, security | 50 | ~15% of the hours for TAX, PAY, VEN, ORD, SEC |
 | Coordination, ADRs, meetings with tax advisor and legal counsel | 80 | ~8% of P1 |
-| **Subtotal** | **1,789** | |
-| Contingency for unforeseen issues (10–25% of P1) | 156–390 | Tax and payment domain, dirty legacy data |
-| **Go-live total** | **≈ 1,945–2,179** | |
+| **Subtotal** | **1,937** | |
+| Contingency for unforeseen issues (10–25% of P1) | 171–427 | Tax and payment domain, dirty legacy data |
+| **Go-live total** | **≈ 2,108–2,364** | |
 
 The SHP.12 implementation (#54) added the SHP.12 row it built and the SHP.13 and SHP.14 rows it
 found missing (+34 h of P1). Coherence check 5 (2026-11-07) added ARC.17 (1 h, e-invoicing
@@ -99,9 +99,18 @@ The owner's answers on editor roles and customer legal pages (Q-58 and Q-42, 202
 P1 by +8 h: CORE.8 grows (13 → 15 h: our own editor roles instead of Wagtail's default groups) and
 the new row I18N.9 (6 h, customer legal and checkout pages in five languages at go-live) is added.
 
-After go-live: P2 = 334 h and P3 = 18 h (MCP, advanced zone editor, OSS report, visitor content
+The owner's decisions on the backoffice, setup and imports (BO-1 to BO-14, 2026-11-09) changed P1
+by +95 h: the Manager shell CORE.17 (18 h), the staff role matrix CORE.18 (13 h), support
+impersonation CORE.10 moved from P2 to P1 and grown (4 → 14 h: policy, full-access grants, hard
+floor), marketplace configuration pages ARC.24 (17 h), the setup wizard ARC.25 (14 h), the
+connector interface MIG.12 (9 h), the operator-owned shop VEN.26 (6 h) and account activation and service messages CORE.19 (12 h); MIG.4 shrinks (10 → 8 h: no WordPress password hasher), CORE.8 shrinks (15 → 12 h) and CORE.9 shrinks (16 → 13 h)
+because the commerce lists and the shell move to CORE.17. P2 gains 24 h net: ARC.26 (8 h, wizard
+imports), the WooCommerce connector MIG.13 (12 h) and the WCFM connector MIG.14 (8 h), less the
+4 h of CORE.10.
+
+After go-live: P2 = 380 h and P3 = 18 h (MCP, advanced zone editor, OSS report, visitor content
 translation, reviews, advanced payouts, vendor branding, customer preferences and event
-notifications, Google geocoder and map layer, cross-vendor bundles…), about **385–440 h**
+notifications, Google geocoder and map layer, cross-vendor bundles…), about **440–500 h**
 including contingency.
 
 ## 91.3 Comparison with the August plan
@@ -109,7 +118,7 @@ including contingency.
 | | August plan | This review |
 |---|---:|---:|
 | Scope | Full WCFM parity + P1 commercial modules | Parity **with what is actually used** + 2026 compliance |
-| Total hours (development, testing, migration) | 1,740–2,540 | 1,945–2,179 to go-live |
+| Total hours (development, testing, migration) | 1,740–2,540 | 2,108–2,364 to go-live |
 | With AI-assisted development | 1,450–2,100 | already included |
 
 Where the difference comes from:
@@ -229,7 +238,7 @@ Work that agents cannot speed up:
 | **Total** | **≈ 109–199** |
 
 **Result:** about **150–250 people hours** plus about two weekly agent budgets, against
-1,945–2,179 hours for a human team (§91.2). Realistic calendar to go-live: **2–3 months**. The
+2,108–2,364 hours for a human team (§91.2). Realistic calendar to go-live: **2–3 months**. The
 pace is set by external waits: legal counsel, the Hetzner account for STAGE, Stripe Connect
 verification, the external penetration test (SEC.6) and the three dress rehearsals (MIG.9).
 
