@@ -9,6 +9,7 @@ class VendorsConfig(AppConfig):
     audited_models = (
         "vendor",
         "vendormember",
+        "vendorclaim",
         "legalfieldrequirement",
         "vendorcontract",
         "contractacceptance",
@@ -22,3 +23,8 @@ class VendorsConfig(AppConfig):
         "then a database trigger refuses any insert, update or delete of them (migration 0011); "
         "each acceptance records the language and the hash of the text accepted",
     }
+
+    def ready(self) -> None:
+        from . import services
+
+        services.register_claim_purpose()  # VEN.24: the email-bound claim link (CORE.15)
