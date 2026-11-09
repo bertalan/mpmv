@@ -143,6 +143,8 @@ def test_only_texts_published_in_the_requested_language_are_searched() -> None:
     ProductTranslationFactory.create(
         product=product, language="en", title="Tank bag", status=ProductTranslation.Status.MACHINE
     )
+    # Saving the EN source sent the IT text back to review (I18N.2); publish it again.
+    product.translations.filter(language="it").update(status=PUBLISHED)
     assert found("serbatoio", "it") == [product.pk]
     assert found("serbatoio", "en") == []
     assert found("tank", "en") == []  # a machine draft is not public
@@ -224,12 +226,25 @@ def test_the_trigram_extension_is_installed() -> None:
 
 @pytest.mark.parametrize("language", ["en", "it", "de", "fr", "es"])
 def test_every_search_query_is_served_by_an_index(language: str) -> None:
+    """With a few rows the planner would rather walk any small index and filter. Here plain
+    sequential and index scans are disabled, so a table is read through an index condition
+    (a bitmap scan) or by a sequential scan that shows in the plan: each text, trigram and SKU
+    query must name its index."""
+    with connection.cursor() as cursor:  # rolled back with the test transaction
+        # Its (product, language) index would answer `language = ...` without the text index.
+        cursor.execute(
+            "ALTER TABLE catalog_producttranslation"
+            " DROP CONSTRAINT catalog_producttranslation_unique"
+        )
     listed(sku="IDX-0001", title="Index probe", language=language)
     with CaptureQueriesContext(connection) as queries:
         list(services.search("idx-0001 probe", language))
     plans = []
     with connection.cursor() as cursor:
         cursor.execute("SET LOCAL enable_seqscan = off")
+        cursor.execute("SET LOCAL enable_indexscan = off")
+        cursor.execute("SET LOCAL enable_indexonlyscan = off")
+        cursor.execute("SET LOCAL enable_nestloop = off")
         for query in queries.captured_queries:
             sql = query["sql"]
             if not sql.lstrip().upper().startswith("SELECT"):
@@ -237,6 +252,8 @@ def test_every_search_query_is_served_by_an_index(language: str) -> None:
             cursor.execute(f"EXPLAIN {sql}")
             plans.append("\n".join(row[0] for row in cursor.fetchall()))
     joined = "\n".join(plans)
+    assert "Seq Scan on catalog_producttranslation" not in joined
+    assert "Seq Scan on catalog_variant" not in joined
     assert f"catalog_ptrans_fts_{language}" in joined
     assert "catalog_ptrans_title_trgm" in joined
     assert "catalog_product_sku_key_like" in joined
