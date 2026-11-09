@@ -2150,9 +2150,9 @@ def search(
 
     A product matches by its SKU or a variant's SKU (on the match key, so `bag 100` finds
     `BAG  100`; a prefix from four characters), or by its text published in `language`, by full
-    text in that language's configuration or by trigram similarity of its title. A SKU is
-    language neutral. A query too short to search returns an empty queryset without touching
-    the database.
+    text in that language's configuration or, when full text finds nothing (a typo), by trigram
+    similarity of its title. A SKU is language neutral. A query too short to search returns an
+    empty queryset without touching the database.
     """
     terms = engine.normalise_search_query(query)
     products = listed_products()
@@ -2167,9 +2167,12 @@ def search(
     hits = [
         *_sku_hits(products, "pk", terms),
         *_sku_hits(Variant.objects.filter(product__in=listed_pks), "product_id", terms),
-        *_text_hits(texts, engine.search_config(language), terms.text),
-        *_trigram_hits(texts, terms.text),
     ]
+    text_hits = _text_hits(texts, engine.search_config(language), terms.text)
+    # Trigram similarity is the typo fallback, run only when full text finds nothing: a common
+    # word would otherwise make PostgreSQL compute it row by row for a large share of the
+    # catalogue (measured at 30k products: hundreds of milliseconds).
+    hits += text_hits or _trigram_hits(texts, terms.text)
     ranked = engine.rank_search_hits(hits, limit=limit)
     if not ranked:
         return products.none()

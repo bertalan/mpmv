@@ -124,6 +124,21 @@ def test_a_typo_still_finds_the_product() -> None:
     assert found("lether") == [product.pk]
 
 
+def _trigram_queries(query: str) -> int:
+    with CaptureQueriesContext(connection) as queries:
+        list(services.search(query, "en"))
+    return sum("STRICT_WORD_SIMILARITY" in q["sql"].upper() for q in queries.captured_queries)
+
+
+def test_the_trigram_fallback_runs_only_when_full_text_finds_nothing() -> None:
+    """Trigram similarity is the typo fallback: computing it for every title sharing a common
+    word costs a row-by-row pass over a large catalogue, so a query that full text already
+    answers skips it."""
+    listed(title="Leather saddlebag")
+    assert _trigram_queries("leather") == 0
+    assert _trigram_queries("lether") == 1
+
+
 def test_the_short_description_and_description_are_searched() -> None:
     product = listed(title="Tank bag")
     product.translations.update(short_description="Magnetic mount", description="<p>Velcro</p>")
@@ -239,6 +254,7 @@ def test_every_search_query_is_served_by_an_index(language: str) -> None:
     listed(sku="IDX-0001", title="Index probe", language=language)
     with CaptureQueriesContext(connection) as queries:
         list(services.search("idx-0001 probe", language))
+        list(services.search("idx-0001 prbe", language))  # no full-text hit: the trigram query
     plans = []
     with connection.cursor() as cursor:
         cursor.execute("SET LOCAL enable_seqscan = off")
