@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     "wagtail.search",
     "wagtail.admin",
     "wagtail.contrib.settings",  # BaseSiteSetting for the per-site theme (THM.1)
+    "wagtail.contrib.routable_page",  # `routablepageurl` for the blog's author pages (CMS.3)
     "wagtail",
     "modelcluster",
     "taggit",
@@ -244,11 +245,15 @@ LOCALE_PATHS = [BASE_DIR / "locale"]
 # Transactional email (ARC.16, docs/dev/transactional-email.md). Every email goes through the
 # outbox (`apps.core.services.enqueue_email`) and the `EmailSender` named here: the console
 # backend until ARC.19 adds the EU provider's adapter (provider choice pending, Q-48). The
-# provider webhook (`/webhooks/email/`) is off while MPMV_EMAIL_WEBHOOK_SECRET is empty.
-EMAIL_SENDER = env_str("MPMV_EMAIL_SENDER", "apps.core.mail.ConsoleEmailSender")
-DEFAULT_FROM_EMAIL = env_str("MPMV_EMAIL_FROM", "no-reply@localhost")
+# provider webhook (`/webhooks/email/`) is off while MPMV_EMAIL_WEBHOOK_SECRET is empty. Empty
+# variables mean the defaults below; settings holding live data refuse the console sender and a
+# localhost address (system checks core.E501, core.E502).
+EMAIL_SENDER = env_str("MPMV_EMAIL_SENDER", "") or "apps.core.mail.ConsoleEmailSender"
+DEFAULT_FROM_EMAIL = env_str("MPMV_EMAIL_FROM", "") or "no-reply@localhost"
 EMAIL_WEBHOOK_SECRET = env_str("MPMV_EMAIL_WEBHOOK_SECRET", "")
-EMAIL_FEEDBACK_PARSER = env_str("MPMV_EMAIL_FEEDBACK_PARSER", "apps.core.mail.SignedJsonFeedback")
+EMAIL_FEEDBACK_PARSER = (
+    env_str("MPMV_EMAIL_FEEDBACK_PARSER", "") or "apps.core.mail.SignedJsonFeedback"
+)
 
 # Wagtail (CMS.1, spec 10). Page locales follow LANGUAGES: apps.cms creates a Locale row for each
 # language after every migrate. The editors' admin is at /admin/ (mpmv/urls.py).
@@ -351,8 +356,9 @@ if CAPTCHA_ENABLED:
 # check with a timeout (retries only in the tax.recheck_vat_number job). Valid and invalid answers
 # are reused for VIES_CACHE_SECONDS, "VIES down" only for VIES_UNAVAILABLE_CACHE_SECONDS.
 VIES_CLIENT = "apps.tax.vies.HttpViesClient"
-VIES_API_URL = env_str(
-    "MPMV_VIES_API_URL", "https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-number"
+VIES_API_URL = (
+    env_str("MPMV_VIES_API_URL", "")
+    or "https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-number"
 )
 VIES_TIMEOUT_SECONDS = 8  # per socket operation (connect, each read), not for the whole check
 VIES_CACHE_SECONDS = 24 * 60 * 60
