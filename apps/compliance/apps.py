@@ -11,8 +11,12 @@ class ComplianceConfig(AppConfig):
 
     def ready(self) -> None:
         from apps.catalog.publishing import register_publication_check
+        from apps.catalog.selling import register_sale_check
 
-        from .services import gpsr_blocking_messages
+        from .services import SALE_CHECK_NAME, gpsr_blocking_messages, warnings_sale_messages
 
         # CMP.3: a product without complete GPSR data cannot be published (CAT.10 asks).
         register_publication_check("gpsr", gpsr_blocking_messages)
+        # CMP.3 (owner decision 2026-11-09): no sale into a country without warnings in one of
+        # its languages; the checkout (ORD.3) asks.
+        register_sale_check(SALE_CHECK_NAME, warnings_sale_messages)

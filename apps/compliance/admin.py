@@ -93,8 +93,25 @@ class GpsrSafetyTextAdmin(_NoDelete, admin.ModelAdmin[GpsrSafetyText]):
     raw_id_fields = ("product",)
     fields = ("product", "language", "warnings", "safety_information")
 
+    def get_fields(self, request: HttpRequest, obj: Any = None) -> tuple[str, ...]:
+        return (*self.fields, "sale_blocked_into") if obj is not None else self.fields
+
     def get_readonly_fields(self, request: HttpRequest, obj: Any = None) -> tuple[str, ...]:
-        return ("product", "language") if obj is not None else ()
+        return ("product", "language", "sale_blocked_into") if obj is not None else ()
+
+    @admin.display(description="Sale blocked into")
+    def sale_blocked_into(self, obj: GpsrSafetyText) -> str:
+        """Countries the product is not sold into until its warnings exist in their language
+        (owner decision 2026-11-09). The vendor's view is the Manager shop space (CORE.17)."""
+        gaps = services.warnings_language_gaps(obj.product)
+        if not gaps:
+            return "None: the warnings cover every destination country's languages."
+        return "; ".join(
+            f"{gap.country} (needs {' or '.join(gap.languages)}"
+            + ("" if gap.offered else ", not offered by the platform yet")
+            + ")"
+            for gap in gaps
+        )
 
     def save_model(self, request: HttpRequest, obj: Any, form: Any, change: bool) -> None:
         data = {name: getattr(obj, name) for name in services.SAFETY_TEXT_FIELDS}

@@ -18,7 +18,7 @@
     {% endfor %}
   </dl>
   {% if gpsr.warnings or gpsr.safety_information %}
-  <div class="product-safety-texts"{% if gpsr.text_language != language %} lang="{{ gpsr.text_language }}"{% endif %}>
+  <div class="product-safety-texts" id="product-safety-texts"{% if gpsr.text_language != language %} lang="{{ gpsr.text_language }}"{% endif %}>
     {% if gpsr.warnings %}<h3>{% translate "Warnings" %}</h3><p>{{ gpsr.warnings|linebreaksbr }}</p>{% endif %}
     {% if gpsr.safety_information %}<h3>{% translate "Safety information" %}</h3><p>{{ gpsr.safety_information|linebreaksbr }}</p>{% endif %}
   </div>

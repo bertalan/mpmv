@@ -17,8 +17,11 @@ from apps.compliance import services, tasks
 from apps.compliance.models import SafetyCase
 from apps.compliance.tests.factories import SafetyCaseFactory
 from apps.core.audit import AuditContext
-from apps.core.models import AuditLog
+from apps.core.mail import html_violations
+from apps.core.models import AuditLog, OutboxEmail
+from apps.core.services import render_email
 from apps.core.tasks import schedules
+from apps.core.tests.factories import PlatformOperatorFactory
 from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
@@ -185,3 +188,103 @@ def test_the_overdue_job_runs_every_hour_and_flags(caplog: pytest.LogCaptureFixt
     case.refresh_from_db()
     assert case.overdue_alerted_at is not None
     assert str(case.public_id) in caplog.text
+
+
+# --- Owner decisions 2026-11-09: working days and the staff alert channel
+
+
+def test_deadlines_skip_weekends_but_not_public_holidays_by_default() -> None:
+    vendor = VendorFactory.create()
+    thursday = dt.datetime(2026, 11, 12, 10, 0, tzinfo=ROME)
+    services.open_safety_case(
+        vendor=vendor,
+        kind=SafetyCase.Kind.AUTHORITY_ORDER,
+        received_at=thursday,
+        summary="Order.",
+        ctx=CTX,
+    )
+    # Thursday + 2 working days: Friday, then Monday (the weekend does not count).
+    assert SafetyCase.objects.get().due_on == dt.date(2026, 11, 16)
+
+    # A public holiday on a weekday counts as a working day: the earliest deadline.
+    christmas_eve = dt.datetime(2026, 12, 24, 10, 0, tzinfo=ROME)  # Thursday
+    services.open_safety_case(
+        vendor=vendor,
+        kind=SafetyCase.Kind.SAFETY_NOTICE,
+        received_at=christmas_eve,
+        summary="Notice.",
+        ctx=CTX,
+    )
+    # Friday 25 (holiday, still counted), Monday 28, Tuesday 29.
+    assert SafetyCase.objects.get(kind=SafetyCase.Kind.SAFETY_NOTICE).due_on == dt.date(
+        2026, 12, 29
+    )
+
+
+def test_configured_public_holidays_are_skipped(settings: object) -> None:
+    settings.COMPLIANCE_PUBLIC_HOLIDAYS = ["2026-12-25"]  # type: ignore[attr-defined]
+    vendor = VendorFactory.create()
+    services.open_safety_case(
+        vendor=vendor,
+        kind=SafetyCase.Kind.SAFETY_NOTICE,
+        received_at=dt.datetime(2026, 12, 24, 10, 0, tzinfo=ROME),
+        summary="Notice.",
+        ctx=CTX,
+    )
+    assert SafetyCase.objects.get().due_on == dt.date(2026, 12, 30)
+
+
+def _operator(**emails: str) -> None:
+    PlatformOperatorFactory.create(
+        open_ended=True, valid_from=dt.datetime(2020, 1, 1, tzinfo=dt.UTC), **emails
+    )
+
+
+WEDNESDAY = dt.datetime(2026, 11, 18, 9, 0, tzinfo=ROME)
+
+
+def test_an_overdue_case_emails_the_compliance_address_once() -> None:
+    _operator(compliance_email="compliance@platform.example", support_email="help@platform.example")
+    case = SafetyCaseFactory.create(due_on=dt.date(2026, 11, 17))
+
+    services.flag_overdue_safety_cases(now=WEDNESDAY, dry_run=True)
+    assert not OutboxEmail.objects.exists()
+
+    services.flag_overdue_safety_cases(now=WEDNESDAY)
+    email = OutboxEmail.objects.get()
+    assert email.recipient == "compliance@platform.example"
+    assert email.template_key == services.OVERDUE_EMAIL_TEMPLATE
+    assert email.idempotency_key == f"compliance:safety_case:{case.public_id}:overdue"
+
+    services.flag_overdue_safety_cases(now=WEDNESDAY)
+    assert OutboxEmail.objects.count() == 1
+
+
+def test_the_alert_falls_back_to_the_support_address() -> None:
+    _operator(support_email="help@platform.example")
+    SafetyCaseFactory.create(due_on=dt.date(2026, 11, 17))
+    services.flag_overdue_safety_cases(now=WEDNESDAY)
+    assert OutboxEmail.objects.get().recipient == "help@platform.example"
+
+
+def test_without_any_address_the_case_is_still_flagged_and_logged(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    _operator()
+    case = SafetyCaseFactory.create(due_on=dt.date(2026, 11, 17))
+    with caplog.at_level(logging.WARNING, logger="apps.compliance.services"):
+        services.flag_overdue_safety_cases(now=WEDNESDAY)
+    case.refresh_from_db()
+    assert case.overdue_alerted_at == WEDNESDAY
+    assert not OutboxEmail.objects.exists()
+    assert "no compliance or support email address" in caplog.text
+
+
+def test_the_alert_email_renders() -> None:
+    case = SafetyCaseFactory.create(due_on=dt.date(2026, 11, 17), reference="REF-1")
+    rendered = render_email(
+        services.OVERDUE_EMAIL_TEMPLATE, "en", services.overdue_email_context(case)
+    )
+    assert "REF-1" in rendered.subject + rendered.text_body
+    assert "2026-11-17" in rendered.text_body
+    assert html_violations(rendered.html_body) == []

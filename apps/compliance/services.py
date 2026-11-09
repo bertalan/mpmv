@@ -7,7 +7,9 @@ publishing services (CAT.10) refuse a product whose GPSR data is incomplete.
 
 Also here: the warnings and safety information per language, the GPSR block of the product page
 (`gpsr_display`, rendered by `{% product_safety %}`), and the article 22 safety cases (authority
-orders, safety notices) with their working-day deadlines and the overdue alert.
+orders, safety notices) with their working-day deadlines and the overdue alert (log, audit and an
+email to the operator's compliance address), and the warnings-language check per destination
+country (owner decisions 2026-11-09).
 """
 
 import datetime as dt
@@ -26,8 +28,16 @@ from django.utils.translation import gettext_lazy as _
 from apps.catalog.models import Product
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
+from apps.core.countries import OFFICIAL_LANGUAGES, InvalidCountry
+from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog
-from apps.core.services import audit_changes, save_audited
+from apps.core.services import (
+    NoPlatformOperator,
+    audit_changes,
+    current_operator,
+    enqueue_email,
+    save_audited,
+)
 from apps.vendors.models import Vendor
 
 from . import engine
@@ -321,6 +331,17 @@ def safety_case_snapshot(case: SafetyCase) -> dict[str, Any]:
     }
 
 
+def public_holidays() -> frozenset[dt.date]:
+    """The public holidays the deadlines skip: `settings.COMPLIANCE_PUBLIC_HOLIDAYS` (ISO dates).
+
+    Empty by default: working days are Monday to Friday, which gives the earliest deadline
+    (owner decision 2026-11-09). The engine still takes a holiday set for when that changes.
+    """
+    return frozenset(
+        dt.date.fromisoformat(day) for day in getattr(settings, "COMPLIANCE_PUBLIC_HOLIDAYS", ())
+    )
+
+
 def _business_date(moment: dt.datetime) -> dt.date:
     """The calendar day of `moment` in business time (settings.BUSINESS_TIME_ZONE)."""
     return timezone.localtime(moment, ZoneInfo(settings.BUSINESS_TIME_ZONE)).date()
@@ -355,7 +376,9 @@ def open_safety_case(
     if product is not None and product.vendor_id != vendor.pk:
         raise ValidationError({"product": "The product belongs to another vendor."})
     if kind in engine.WORKING_DAYS_TO_ACT:
-        case.due_on = engine.safety_case_due_on(kind, _business_date(received_at))
+        case.due_on = engine.safety_case_due_on(
+            kind, _business_date(received_at), public_holidays()
+        )
     case.full_clean(validate_unique=False)
     changes = ChangeSet()
     changes.create(SAFETY_CASE_MODEL, str(case.public_id), safety_case_snapshot(case))
@@ -424,7 +447,9 @@ def safety_case_deadline(case: SafetyCase, *, now: dt.datetime | None = None) ->
     today = _business_date(now or timezone.now())
     return Deadline(
         due_on=case.due_on,
-        working_days_left=engine.working_days_left(case.due_on, today=today),
+        working_days_left=engine.working_days_left(
+            case.due_on, today=today, holidays=public_holidays()
+        ),
         overdue=engine.is_overdue(
             case.due_on, today=today, closed=case.status == SafetyCase.Status.CLOSED
         ),
@@ -437,13 +462,61 @@ def overdue_safety_cases(*, now: dt.datetime | None = None) -> "QuerySet[SafetyC
     return SafetyCase.objects.filter(status=SafetyCase.Status.OPEN, due_on__lt=today)
 
 
+OVERDUE_EMAIL_TEMPLATE: Final = "compliance.safety_case_overdue"
+
+
+def staff_alert_address(at: dt.datetime | None = None) -> str:
+    """Where compliance alerts go: the operator's compliance address, else its support address;
+    "" when neither is set (or no operator is configured)."""
+    try:
+        operator = current_operator(at)
+    except NoPlatformOperator:
+        return ""
+    return (operator.compliance_email or operator.support_email).strip()
+
+
+def overdue_email_context(case: SafetyCase) -> dict[str, Any]:
+    """What the overdue alert email shows: the case, never personal data."""
+    return {
+        "case_id": str(case.public_id),
+        "kind": str(case.get_kind_display()),
+        "reference": case.reference,
+        "authority": case.authority,
+        "vendor_name": case.vendor.display_name,
+        "product_sku": case.product_sku,
+        "received_on": _business_date(case.received_at).isoformat(),
+        "due_on": case.due_on.isoformat(),
+    }
+
+
+def _email_overdue(case: SafetyCase, recipient: str) -> None:
+    if not recipient:
+        logger.warning(
+            "GPSR safety case %s is overdue and no compliance or support email address is "
+            "configured on the platform operator: no email sent",
+            case.public_id,
+        )
+        return
+    enqueue_email(
+        recipient=recipient,
+        template_key=OVERDUE_EMAIL_TEMPLATE,
+        language=settings.LANGUAGE_CODE,
+        context=overdue_email_context(case),
+        idempotency_key=f"compliance:safety_case:{case.public_id}:overdue",
+    )
+
+
 def flag_overdue_safety_cases(
     *, now: dt.datetime | None = None, ctx: AuditContext = SYSTEM_CTX, dry_run: bool = False
 ) -> ChangeSet:
     """Alert staff once about each overdue open case: an error in the log (monitoring alerts on
-    it), `overdue_alerted_at` set and an audit entry. A case already flagged is left alone."""
+    it), an email to the operator's compliance address (else its support address, through the
+    transactional outbox), `overdue_alerted_at` set and an audit entry. A case already flagged
+    is left alone. The in-app notice for the Catalog and moderation role is a follow-up (it
+    needs the Manager notices)."""
     moment = now or timezone.now()
     changes = ChangeSet()
+    recipient = "" if dry_run else staff_alert_address(moment)
     with transaction.atomic():
         cases = (
             overdue_safety_cases(now=moment)
@@ -466,6 +539,96 @@ def flag_overdue_safety_cases(
                 case.vendor.public_id,
                 case.due_on.isoformat(),
             )
+            _email_overdue(case, recipient)
         if not dry_run:
             audit_changes(changes, ctx=ctx, action=SAFETY_CASE_OVERDUE)
     return changes
+
+
+# --- GPSR article 19(c): warnings in a language of the destination country (owner decision
+# 2026-11-09). A product with warnings is not sold into a country until they exist in one of its
+# languages; it stays published and on sale for the other countries.
+
+SALE_CHECK_NAME: Final = "gpsr_warnings"
+
+
+def warning_languages(product: Product) -> frozenset[str]:
+    """The languages `product` has non-empty warnings in."""
+    return frozenset(
+        language
+        for language, warnings in GpsrSafetyText.objects.filter(product_id=product.pk).values_list(
+            "language", "warnings"
+        )
+        if warnings.strip()
+    )
+
+
+def warnings_sale_check(product: Product, country: str) -> engine.WarningsSaleCheck:
+    """May `product` be sold into `country` as far as its warnings' language goes?
+    Raises ValidationError for a value that is not a country code."""
+    try:
+        return engine.warnings_sale_check(warning_languages(product), country, OFFICIAL_LANGUAGES)
+    except InvalidCountry as exc:
+        raise ValidationError({"country": str(exc)}) from exc
+
+
+def warnings_sale_messages(product: Product, country: str) -> list[str]:
+    """The sale check registered with `apps.catalog.selling` (the checkout, ORD.3, asks)."""
+    check = warnings_sale_check(product, country)
+    if check.allowed:
+        return []
+    return [
+        str(
+            _(
+                "This product cannot be shipped to %(country)s: its safety warnings are not "
+                "available in a language of that country (%(languages)s)."
+            )
+            % {"country": check.country, "languages": ", ".join(check.country_languages)}
+        )
+    ]
+
+
+@dataclass(frozen=True)
+class WarningsGap:
+    """A country `product` is not sold into: its `languages` (warnings in one is enough), and
+    those among them the platform offers (`offered`): the vendor can add those right away; the
+    others need the platform to add the language first."""
+
+    country: str
+    languages: tuple[str, ...]
+    offered: tuple[str, ...]
+
+
+def _gaps(languages: frozenset[str]) -> list[WarningsGap]:
+    offered = set(configured_languages())
+    return [
+        WarningsGap(
+            country=country,
+            languages=needed,
+            offered=tuple(code for code in needed if code in offered),
+        )
+        for country, needed in engine.warnings_language_gaps(languages, OFFICIAL_LANGUAGES).items()
+    ]
+
+
+def warnings_language_gaps(product: Product) -> list[WarningsGap]:
+    """The countries `product` cannot be sold into for lack of warnings in their language."""
+    return _gaps(warning_languages(product))
+
+
+def vendor_warnings_language_gaps(vendor: Vendor) -> list[tuple[Product, list[WarningsGap]]]:
+    """Per product of `vendor` with warnings, the countries it is not sold into (Manager shop
+    space, CORE.17): only products with at least one gap."""
+    by_product: dict[int, set[str]] = {}
+    for product_id, language, warnings in GpsrSafetyText.objects.filter(
+        product__vendor=vendor
+    ).values_list("product_id", "language", "warnings"):
+        if warnings.strip():
+            by_product.setdefault(product_id, set()).add(language)
+    products = Product.objects.filter(pk__in=by_product).order_by("sku")
+    rows = []
+    for product in products:
+        gaps = _gaps(frozenset(by_product[product.pk]))
+        if gaps:
+            rows.append((product, gaps))
+    return rows
