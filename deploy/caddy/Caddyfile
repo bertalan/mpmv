@@ -31,8 +31,35 @@
 	header @noindex X-Robots-Tag "noindex, nofollow"
 
 	encode zstd gzip
-	reverse_proxy mpmv-app:8000 {
-		header_up X-Real-IP {client_ip}
+
+	# Public media: only image files in Wagtail's image folders (the THM.12 allow-list), straight
+	# from the mpmv-media volume (read-only). Everything else under /media/ is a 404, so documents
+	# and any private upload never become public by path (Wagtail documents go through their own
+	# serve view with its permission checks; private files belong in ARC.15's private storage).
+	# The files are inert: no listing, no MIME sniffing (the type comes from the allowed extension),
+	# a sandbox CSP if one is opened directly (SEC.4). Renditions are re-encoded by the app;
+	# originals are kept as uploaded.
+	@public_media path_regexp public_media ^/media/(original_images|images)/[^/]+\.(?i:avif|webp|jpe?g|png|gif|svg)$
+	handle @public_media {
+		uri strip_prefix /media
+		root * /srv/media
+		header X-Content-Type-Options nosniff
+		header Cache-Control "public, max-age=86400"
+		header Content-Security-Policy "default-src 'none'; sandbox"
+		# Sanitised SVG logos keep their inline styles (THM.12).
+		@svg path_regexp svg (?i)\.svg$
+		header @svg Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+		file_server
+	}
+
+	handle /media/* {
+		respond 404
+	}
+
+	handle {
+		reverse_proxy mpmv-app:8000 {
+			header_up X-Real-IP {client_ip}
+		}
 	}
 }
 
