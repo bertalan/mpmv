@@ -80,17 +80,24 @@ Run either scheduled workflow by hand from Actions > *Run workflow* (`workflow_d
 `gh workflow run security-nightly.yml` and `gh workflow run security-stage.yml`. Locally,
 `make db` then `make test-security-nightly` runs the nightly test selection.
 
-Repository variables (Settings > Secrets and variables > Actions > Variables), set by lane-a:
+Settings (Settings > Secrets and variables > Actions), set by lane-a on the owner's go:
 
-- `STAGE_URL`: the STAGE base URL. While it is empty the STAGE job is skipped.
-- `LIVE_SCAN_URL` and `ALLOW_LIVE_SCAN`: LIVE is scanned only when both are set and
-  `ALLOW_LIVE_SCAN` is exactly `true`. Both are unset by default; set them only on the owner's go,
-  and unset `ALLOW_LIVE_SCAN` again afterwards.
+- Secret `STAGE_URL`: the STAGE base URL. While it is empty the STAGE job ends green at its first
+  step with a "skipped: no target" notice, and the report counts it as skipped.
+- Secret `LIVE_SCAN_URL` and variable `ALLOW_LIVE_SCAN`: LIVE is scanned only when the secret is
+  set and `ALLOW_LIVE_SCAN` is exactly `true`. Both are unset by default; set them only on the
+  owner's go, and unset `ALLOW_LIVE_SCAN` again afterwards.
 
-The URLs live only in those variables: never in the repository, an issue or a pull request. The
-scan script masks the target in the log, and the ZAP and nuclei reports stay on the runner,
-because the artifacts of a public repository are public. A scan fails on a ZAP alert of medium or
-high risk, a nuclei finding of medium severity or above, or a scanner error.
+The URLs are secrets, never variables: no server detail is visible on GitHub. They are never
+written in the repository, an issue or a pull request. Secrets cannot be read in a job-level `if`,
+so each scan job checks its secret in a first guard step. Only the guard and the scan step get the
+secret, as `TARGET_URL`; it never appears in a job name, a step summary, a cache key, an artifact
+or the report job. GitHub masks the secret in the log, and the scan script masks it again; since a
+mask covers only the full URL, the ZAP and nuclei output goes to files on the runner and the log
+shows exit codes and counts only. The reports stay on the runner as well, because the artifacts of
+a public repository are public: to see the findings, rerun the scan locally against the target. A
+scan fails on a ZAP alert of medium or high risk, a nuclei finding of medium severity or above, or
+a scanner error.
 
 How failures are reported: when a scheduled or manual run on `main` fails, the `report` job
 (`tools/security_report.py`, the only job with `issues: write`) opens one issue labelled

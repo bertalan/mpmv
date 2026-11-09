@@ -2,7 +2,7 @@
 
 `security-nightly` reruns the slow security suites with the full Hypothesis profile and audits the
 dependencies against fresh advisories every night. `security-stage` runs the OWASP ZAP baseline
-and nuclei against STAGE every week, only when lane-a has set the URL variable, and against LIVE
+and nuclei against STAGE every week, only when lane-a has set the URL secret, and against LIVE
 only with a second, explicit opt-in. A failing scheduled run opens or updates one `security`
 issue; a green run closes it. Neither workflow, nor the issue text, ever names a server.
 """
@@ -132,31 +132,82 @@ def test_no_hard_coded_urls_or_hosts() -> None:
         assert not re.search(r"\b\d{1,3}(\.\d{1,3}){3}\b", text), path.name
 
 
-def test_stage_job_runs_only_when_the_stage_variable_is_set() -> None:
+def scan_job_guard(job: dict[str, Any], secret: str) -> None:
+    """The secret reaches only the guard and the scan step; the scan runs only past the guard."""
+    expression = "${{ secrets." + secret + " }}"
+    assert "TARGET_URL" not in job.get("env", {})
+    steps = job["steps"]
+    (guard,) = (step for step in steps if step.get("id") == "target")
+    assert guard["env"]["TARGET_URL"] == expression
+    run = guard["run"]
+    assert '-z "${TARGET_URL}"' in run
+    assert "::notice::skipped: no target" in run
+    assert "scanned=false" in run
+    assert "scanned=true" in run
+    # The guard never prints the target or anything derived from it.
+    for line in run.splitlines():
+        if "echo" in line:
+            assert "TARGET_URL" not in line, line
+    assert "exit 1" not in run
+    (scan,) = (step for step in steps if step.get("id") == "scan")
+    assert scan["if"] == "${{ steps.target.outputs.scanned == 'true' }}"
+    assert scan["env"]["TARGET_URL"] == expression
+    assert job["outputs"]["scanned"] == "${{ steps.target.outputs.scanned }}"
+    for step in steps:
+        if step not in (guard, scan):
+            assert secret not in yaml.safe_dump(step), step
+    assert secret not in str(job.get("name", ""))
+
+
+def test_targets_come_from_secrets_never_from_variables() -> None:
+    text = STAGE.read_text()
+    for name in ("STAGE_URL", "LIVE_SCAN_URL"):
+        assert f"vars.{name}" not in text, name
+        assert f"secrets.{name}" in text, name
+    # Secrets are not available in a job-level `if`: the guard lives inside the job.
+    for name, job in load(STAGE)["jobs"].items():
+        assert "secrets." not in str(job.get("if", "")), name
+
+
+def test_stage_job_guards_on_the_stage_secret() -> None:
     job = load(STAGE)["jobs"]["stage"]
-    assert job["if"] == "${{ vars.STAGE_URL != '' }}"
-    assert job["env"]["TARGET_URL"] == "${{ vars.STAGE_URL }}"
+    assert "if" not in job
+    scan_job_guard(job, "STAGE_URL")
 
 
-def test_live_scan_needs_both_variables() -> None:
+def test_live_scan_needs_the_opt_in_variable_and_the_secret() -> None:
     jobs = load(STAGE)["jobs"]
     job = jobs["live"]
-    condition = job["if"]
-    assert "vars.ALLOW_LIVE_SCAN == 'true'" in condition
-    assert "vars.LIVE_SCAN_URL != ''" in condition
-    assert "&&" in condition
-    assert "||" not in condition
-    assert job["env"]["TARGET_URL"] == "${{ vars.LIVE_SCAN_URL }}"
+    assert job["if"] == "${{ vars.ALLOW_LIVE_SCAN == 'true' }}"
+    scan_job_guard(job, "LIVE_SCAN_URL")
     # No other job ever reads the LIVE URL.
     for name, other in jobs.items():
         if name != "live":
             assert "LIVE_SCAN_URL" not in yaml.safe_dump(other), name
 
 
+def test_report_job_never_sees_a_target() -> None:
+    report = load(STAGE)["jobs"]["report"]
+    dumped = yaml.safe_dump(report)
+    for name in ("STAGE_URL", "LIVE_SCAN_URL", "TARGET_URL"):
+        assert name not in dumped, name
+    # A scan skipped for lack of a target counts as skipped, not as a green scan.
+    assert "needs.stage.outputs.scanned" in dumped
+    assert "needs.live.outputs.scanned" in dumped
+
+
 def test_scans_go_through_the_script_that_masks_the_target() -> None:
     script = SCAN_SCRIPT.read_text()
     assert "::add-mask::${TARGET_URL}" in script
     assert script.index("::add-mask::") < script.index("docker run")
+    assert "set -x" not in script
+    # Scanner logs name hosts and paths that a mask of the full URL would not cover: they go
+    # to files on the runner, and the log shows only counts and exit codes.
+    for command in re.findall(r"^docker run .*(?:\n\s+.*)*", script, re.M):
+        assert '> "$OUT/' in command, command
+    for line in script.splitlines():
+        if line.lstrip().startswith("echo") and "add-mask" not in line:
+            assert "TARGET_URL" not in line, line
     for name in ("stage", "live"):
         runs = [step.get("run", "") for step in load(STAGE)["jobs"][name]["steps"]]
         assert any("deploy/ci/stage-scan.sh" in run for run in runs), name

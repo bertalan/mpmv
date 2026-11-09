@@ -1,9 +1,12 @@
 # SEC.5 (owner request 2026-11-09): weekly external scans of STAGE, OWASP ZAP baseline and nuclei,
-# through deploy/ci/stage-scan.sh. The target URL is a repository variable that lane-a sets
-# (vars.STAGE_URL): it is never written in the repository, and the job is skipped while it is
-# empty. LIVE is scanned only when BOTH vars.ALLOW_LIVE_SCAN is 'true' and vars.LIVE_SCAN_URL is
-# set; by default it is off. Reports stay on the runner: artifacts of a public repository are
-# public. Run it by hand: Actions > Security STAGE scan > Run workflow, or
+# through deploy/ci/stage-scan.sh. The target URL is a repository secret that lane-a sets
+# (secrets.STAGE_URL): it is never written in the repository, and GitHub masks it in the logs.
+# Secrets cannot be read in a job-level `if`, so each scan job starts with a guard step that ends
+# the job green, with a "skipped: no target" notice, while the secret is empty. LIVE is scanned
+# only when BOTH the variable ALLOW_LIVE_SCAN is 'true' and the secret LIVE_SCAN_URL is set; by
+# default it is off. The secret reaches only the guard and the scan step, never a job name, a
+# summary, a cache key, an artifact or the report job. Reports stay on the runner: artifacts of a
+# public repository are public. Run it by hand: Actions > Security STAGE scan > Run workflow, or
 # `gh workflow run security-stage.yml`. See docs/dev/release.md, "Security schedule".
 name: Security STAGE scan
 
@@ -22,40 +25,67 @@ permissions:
 jobs:
   stage:
     name: ZAP baseline and nuclei (STAGE)
-    if: ${{ vars.STAGE_URL != '' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     outputs:
+      scanned: ${{ steps.target.outputs.scanned }}
       zap_high: ${{ steps.scan.outputs.zap_high }}
       zap_medium: ${{ steps.scan.outputs.zap_medium }}
       nuclei_critical: ${{ steps.scan.outputs.nuclei_critical }}
       nuclei_high: ${{ steps.scan.outputs.nuclei_high }}
       nuclei_medium: ${{ steps.scan.outputs.nuclei_medium }}
-    env:
-      TARGET_URL: ${{ vars.STAGE_URL }}
     steps:
+      - name: Check the target
+        id: target
+        env:
+          TARGET_URL: ${{ secrets.STAGE_URL }}
+        run: |
+          if [ -z "${TARGET_URL}" ]; then
+            echo "::notice::skipped: no target (STAGE_URL is not set)"
+            echo "scanned=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "scanned=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v7
+        if: ${{ steps.target.outputs.scanned == 'true' }}
       - name: Scan
         id: scan
+        if: ${{ steps.target.outputs.scanned == 'true' }}
+        env:
+          TARGET_URL: ${{ secrets.STAGE_URL }}
         run: deploy/ci/stage-scan.sh
 
   live:
     name: ZAP baseline and nuclei (LIVE, explicit opt-in)
-    if: ${{ vars.ALLOW_LIVE_SCAN == 'true' && vars.LIVE_SCAN_URL != '' }}
+    if: ${{ vars.ALLOW_LIVE_SCAN == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     outputs:
+      scanned: ${{ steps.target.outputs.scanned }}
       zap_high: ${{ steps.scan.outputs.zap_high }}
       zap_medium: ${{ steps.scan.outputs.zap_medium }}
       nuclei_critical: ${{ steps.scan.outputs.nuclei_critical }}
       nuclei_high: ${{ steps.scan.outputs.nuclei_high }}
       nuclei_medium: ${{ steps.scan.outputs.nuclei_medium }}
-    env:
-      TARGET_URL: ${{ vars.LIVE_SCAN_URL }}
     steps:
+      - name: Check the target
+        id: target
+        env:
+          TARGET_URL: ${{ secrets.LIVE_SCAN_URL }}
+        run: |
+          if [ -z "${TARGET_URL}" ]; then
+            echo "::notice::skipped: no target (LIVE_SCAN_URL is not set)"
+            echo "scanned=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "scanned=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v7
+        if: ${{ steps.target.outputs.scanned == 'true' }}
       - name: Scan
         id: scan
+        if: ${{ steps.target.outputs.scanned == 'true' }}
+        env:
+          TARGET_URL: ${{ secrets.LIVE_SCAN_URL }}
         run: deploy/ci/stage-scan.sh
 
   report:
@@ -71,7 +101,9 @@ jobs:
       GH_REPO: ${{ github.repository }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       STAGE: ${{ needs.stage.result }}
+      STAGE_SCANNED: ${{ needs.stage.outputs.scanned }}
       LIVE: ${{ needs.live.result }}
+      LIVE_SCANNED: ${{ needs.live.outputs.scanned }}
       STAGE_COUNTS: >-
         stage_zap_high=${{ needs.stage.outputs.zap_high || '0' }}
         stage_zap_medium=${{ needs.stage.outputs.zap_medium || '0' }}
@@ -88,6 +120,9 @@ jobs:
       - uses: actions/checkout@v7
       - name: Open, update or close the security issue
         run: |
+          # A green job whose guard found no target did not scan: report it as skipped.
+          if [ "$STAGE" = success ] && [ "$STAGE_SCANNED" != true ]; then STAGE=skipped; fi
+          if [ "$LIVE" = success ] && [ "$LIVE_SCANNED" != true ]; then LIVE=skipped; fi
           counts=()
           if [ "$STAGE" != skipped ]; then
             for c in $STAGE_COUNTS; do counts+=(--count "$c"); done

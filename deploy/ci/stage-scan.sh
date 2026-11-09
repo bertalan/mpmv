@@ -2,10 +2,12 @@
 # SEC.5: external scans of a deployed environment (OWASP ZAP baseline, then nuclei).
 #
 # Runs in the security-stage workflow only. The target comes from TARGET_URL, which the workflow
-# fills from a repository variable (vars.STAGE_URL, or vars.LIVE_SCAN_URL behind a second opt-in):
-# it is never written in the repository. The script masks it before any tool runs, keeps the
-# reports on the runner (artifacts of a public repository are public) and writes only counts to
-# GITHUB_OUTPUT.
+# fills from a repository secret (secrets.STAGE_URL, or secrets.LIVE_SCAN_URL behind a second
+# opt-in): it is never written in the repository. GitHub masks the secret, and the script masks it
+# again before any tool runs. A mask covers only the full URL, while the scanners print hosts and
+# paths on their own, so their output goes to files on the runner, never to the log: the log shows
+# exit codes and counts only. Reports stay on the runner too (artifacts of a public repository are
+# public), and only counts reach GITHUB_OUTPUT. Never turn on shell tracing here.
 #
 # Fails when ZAP reports a medium or high risk alert, when nuclei finds a medium, high or critical
 # issue, or when a scanner itself errors. Both scanners run even when the first one fails.
@@ -29,7 +31,7 @@ status=0
 # risk counts below decide. Exit codes: 0 clean, 1 FAIL rules, 2 warnings, 3 scanner error.
 set +e
 docker run --rm --network host -v "$OUT/zap:/zap/wrk:rw" "$ZAP_IMAGE" \
-  zap-baseline.py -t "$TARGET_URL" -J zap.json -I -m 3
+  zap-baseline.py -t "$TARGET_URL" -J zap.json -I -m 3 > "$OUT/zap/zap.log" 2>&1
 zap_exit=$?
 set -e
 if [ "$zap_exit" -ne 0 ] && [ "$zap_exit" -ne 2 ]; then
@@ -55,7 +57,8 @@ PY
 set +e
 docker run --rm --network host -v "$OUT/nuclei:/out:rw" "$NUCLEI_IMAGE" \
   -u "$TARGET_URL" -severity medium,high,critical -etags dos,fuzz,intrusive \
-  -rate-limit 10 -disable-update-check -no-color -jsonl -o /out/nuclei.jsonl
+  -rate-limit 10 -disable-update-check -no-color -jsonl -o /out/nuclei.jsonl \
+  > "$OUT/nuclei/nuclei.log" 2>&1
 nuclei_exit=$?
 set -e
 if [ "$nuclei_exit" -ne 0 ]; then
@@ -90,7 +93,7 @@ echo "ZAP alerts: high $zap_high, medium $zap_medium, low $zap_low"
 echo "nuclei findings: critical $nuclei_critical, high $nuclei_high, medium $nuclei_medium"
 
 if [ $((zap_high + zap_medium + nuclei_critical + nuclei_high + nuclei_medium)) -gt 0 ]; then
-  echo "::error::the scan found medium or higher issues (see the tool output above)"
+  echo "::error::the scan found medium or higher issues (the reports stay on the runner)"
   status=1
 fi
 exit "$status"
