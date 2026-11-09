@@ -247,6 +247,11 @@ the anonymous page cache on.
 | INP | < 200 ms | SEO.6 |
 | Third-party requests before consent | 0 | SEO.5 e2e |
 
+The CSS and JavaScript budgets are compressed sizes (owner decision MQ-14, 2026-11-09): the
+limit applies to the file as served compressed, not to the raw file. The THM.5 gate measures
+gzip at level 9, an upper bound for Brotli, so a file within the budget in gzip is within it in
+Brotli too.
+
 No preloader, no hero video by default, the LCP image is an `<img>` with `fetchpriority="high"`
 and responsive renditions (`srcset`, AVIF/WebP) from the media pipeline.
 
@@ -503,7 +508,7 @@ is vendor branding. Both `base` and `ride` ship at go-live (Q-60), so THM.6 to T
 | THM.2 | Design-token pipeline: `tokens.toml` resolution and inheritance, token contract with contrast pairs, `tokens.css` rendering, `python -m apps.themes.build` (`make assets`), Containerfile build step | P1 | 6 | THM.1 | Unit tests on `resolve_tokens`, `contrast_ratio` and `check_tokens` (a pair below 4.5:1 fails); the image build produces hashed `theme.css` for every theme |
 | THM.3 | `base` theme: layouts, skip link, header with disclosure navigation, language switcher, consistent help link, footer, typography, form controls, buttons, alerts, focus and target-size rules, reduced motion; vendored htmx and Alpine CSP build with `VENDORED.toml`; CMS.1 and account templates moved onto the layouts | P1 | 10 | THM.2 | Home, standard page and login render with `base`; CSP lint and the hash check of vendored files pass; keyboard-only e2e reaches every control with a visible focus |
 | THM.4 | `base` component library (§14.9) and staff-only styleguide page | P1 | 12 | THM.3 | Every component renders in every state on `/_styleguide/` with no CSP violation; e2e screenshots saved |
-| THM.5 | Theme quality gates, parametrised over registered themes: CSP template lint, axe-core (`wcag22aa`) on the styleguide, visual comparison harness with CI-only baselines, size budgets, `LICENSES.toml` check | P1 | 6 | THM.4, ARC.11 | A theme with a 3:1 text pair, an inline style, an unlicensed font or a 50 KB CSS file fails CI; `base` passes |
+| THM.5 | Theme quality gates, parametrised over registered themes: CSP template lint, axe-core (`wcag22aa`) on the styleguide, visual comparison harness with CI-only baselines, size budgets, `LICENSES.toml` check | P1 | 6 | THM.4, ARC.11 | A theme with a 3:1 text pair, an inline style, an unlicensed font or a CSS file of 50 KB compressed fails CI (the limit applies to the compressed file, owner decision MQ-14); `base` passes |
 | THM.6 | First vertical theme `ride`: colour tokens from the operator palette (§14.4, §14.12), type scale, spacing and shapes from the reference template's visual language, self-hosted Barlow and Barlow Condensed (OFL 1.1, from upstream), SVG icon subset, header, hero and home block overrides, placeholder imagery, `LICENSES.toml` | P1 | 8 | THM.4, CMS.2 | Home page renders with `ride` and passes the THM.5 gates; no file derived from the reference template (PR checklist) |
 | THM.7 | `ride` catalog pages: listings with filters, search results, product card, product page, vendor storefront | P1 | 6 | THM.6, CAT.7, CAT.8, VEN.10, TAX.12 | Catalog key pages pass the THM.5 gates at 360, 768 and 1280 px |
 | THM.8 | `ride` cart, checkout and account pages: cart, checkout steps, Payment Element appearance from tokens, order confirmation, customer area, sign in and up, MFA, password reset | P1 | 6 | THM.6, ORD.5, ORD.7 | A keyboard-only e2e checkout completes in test mode with `ride`; the Payment Element uses the theme's colours and fonts |
