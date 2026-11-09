@@ -35,6 +35,7 @@ from apps.catalog.services import (
 from apps.catalog.tests.factories import (
     ProductFactory,
     ProductTranslationFactory,
+    RedirectFactory,
     SkuAliasFactory,
     SlugHistoryFactory,
     TaxonomyFactory,
@@ -230,6 +231,14 @@ def test_an_off_site_target_stored_without_the_services_is_never_followed(
     still cannot send a visitor to another site."""
     Redirect.objects.create(source_path="/old/", target_kind="path", target_path=target)
     assert client.get("/old/").status_code == 404
+
+
+@pytest.mark.parametrize("path", ["/old/a%00b/", "/media/original_images/a%00b.png"])
+def test_a_path_no_rule_can_match_stays_a_404(client: Client, path: str) -> None:
+    """A NUL byte (or any character a source cannot hold) never reaches the database."""
+    RedirectFactory.create(source_path="/old/", match_prefix=True)
+    assert client.get(path).status_code == 404
+    assert resolve_legacy_path("/old/a\x00b/") is None
 
 
 def test_a_page_that_exists_always_wins(client: Client, tags: dict[str, Any]) -> None:

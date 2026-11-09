@@ -2119,7 +2119,11 @@ def active_redirects(at: dt.datetime | None = None) -> "QuerySet[Redirect]":
 
 
 def resolve_legacy_path(path: str) -> Redirect | None:
-    """The active rule for `path` (spec name): an exact rule first, else the longest prefix."""
+    """The active rule for `path` (spec name): an exact rule first, else the longest prefix.
+    A path no source could hold (a NUL or control character, `..`) matches nothing and never
+    reaches the database."""
+    if engine.redirect_path_error(path, allow_query=False) is not None:
+        return None
     exact, prefixes = engine.redirect_lookup_candidates(path)
     rows = list(
         active_redirects().filter(
