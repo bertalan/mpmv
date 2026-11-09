@@ -2,7 +2,7 @@
 taxonomy queries (CAT.2), the catalogue integrity rules (CAT.14), products created with typed
 attributes, variant axes and variants (CAT.3), product slugs with their history (CAT.5), the
 vendor SKU: audited renames and matching by match key and alias history (CAT.13), the listing
-query (CAT.8) and product search (CAT.9).
+query (CAT.8), product search (CAT.9), and the legacy redirects with their map import (CAT.6).
 
 Every price change goes through here, whatever the adapter (admin, API, import, MCP): it is
 validated, returned as a ChangeSet (dry-run) and written to the audit log. The 30-day price
@@ -11,10 +11,12 @@ history for the Omnibus rule (CMP.6) can be built from these audit rows.
 
 import datetime as dt
 import logging
+import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Any
+from urllib.parse import urlencode, urlsplit
 
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
@@ -25,12 +27,14 @@ from django.db import models, transaction
 from django.db.models import Case, Prefetch, Q, QuerySet, Value, When
 from django.db.models.functions import Length
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from apps.core import translations
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.models import MediaImage
-from apps.core.services import audit_changes, run_mutation
+from apps.core.services import audit_changes, run_mutation, save_audited
+from apps.core.text import ascii_int
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedQuerySet
 from apps.vendors.services import ensure_vendor_can_write, vendors_in_suggestions
@@ -49,6 +53,7 @@ from .models import (
     ProductKind,
     ProductStatus,
     ProductTranslation,
+    Redirect,
     SalesMode,
     SkuAlias,
     SlugHistory,
@@ -2111,6 +2116,328 @@ def store_categories(
             )
         )
     return [option for _, option in sorted(options, key=lambda pair: pair[0])]
+
+
+# --- Redirects (CAT.6, spec 03 §3.1-3.2): the legacy rules of the presentation mu-plugins.
+# Retired SKUs go to the replacement product or to a tag, merged tags to the surviving tag,
+# discontinued categories to a search, `/author/*` home (a prefix rule); a GET `?add-to-cart=`
+# goes to the product page. Rules apply on a 404 only (`middleware.LegacyRedirectMiddleware`).
+
+REDIRECT_MODEL = "catalog.redirect"
+REDIRECT_CREATED = "catalog.redirect.created"
+REDIRECT_UPDATED = "catalog.redirect.updated"
+REDIRECT_DELETED = "catalog.redirect.deleted"
+REDIRECT_FIELDS = (
+    "source_path",
+    "match_prefix",
+    "code",
+    "target_kind",
+    "target_path",
+    "target_query",
+    "origin",
+    "expires_at",
+    "note",
+)
+ADD_TO_CART_PARAMETER = "add-to-cart"
+SEARCH_PARAMETER = "s"  # the legacy `?s=` search, also used in descriptions (spec 03 §3.3)
+_STAFF_REF = re.compile(r"^P-\d+$")
+_LEGACY_ID_MAX_DIGITS = 18  # fits a bigint
+
+
+def redirect_snapshot(redirect: Redirect) -> dict[str, Any]:
+    data = {name: getattr(redirect, name) for name in REDIRECT_FIELDS}
+    product = redirect.target_product if redirect.target_product_id is not None else None
+    data["target_product"] = None if product is None else product.staff_ref
+    data["target_term"] = redirect.target_term_id
+    return data
+
+
+def active_redirects(at: dt.datetime | None = None) -> "QuerySet[Redirect]":
+    """The rules not expired at `at` (default: now)."""
+    at = at or timezone.now()
+    return Redirect.objects.filter(Q(expires_at__isnull=True) | Q(expires_at__gt=at))
+
+
+def resolve_legacy_path(path: str) -> Redirect | None:
+    """The active rule for `path` (spec name): an exact rule first, else the longest prefix.
+    A path no source could hold (a NUL or control character, `..`) matches nothing and never
+    reaches the database."""
+    if engine.redirect_path_error(path, allow_query=False) is not None:
+        return None
+    exact, prefixes = engine.redirect_lookup_candidates(path)
+    rows = list(
+        active_redirects().filter(
+            Q(match_prefix=False, source_path__in=exact)
+            | Q(match_prefix=True, source_path__in=prefixes)
+        )
+    )
+    exact_rows = [row for row in rows if not row.match_prefix]
+    if exact_rows:
+        return exact_rows[0]
+    return max(rows, key=lambda row: len(row.source_path), default=None)
+
+
+def path_language(path: str) -> str:
+    return engine.path_language(path, languages=_languages(), default=settings.LANGUAGE_CODE)
+
+
+def product_page_path(product_id: int, language: str) -> str | None:
+    """A product's page in `language`, else in the default language; None without a slug."""
+    found = dict(
+        ProductTranslation.objects.filter(product_id=product_id)
+        .exclude(slug="")
+        .values_list("language", "slug")
+    )
+    for candidate in (language, settings.LANGUAGE_CODE):
+        if candidate in found:
+            return slugs.product_path(
+                candidate, found[candidate], default_language=settings.LANGUAGE_CODE
+            )
+    return None
+
+
+def search_path(query: str, language: str) -> str:
+    """The search of `query` in `language`: `/?s=…`, `/it/?s=…` (the legacy search URL)."""
+    prefix = slugs.language_prefix(language, default_language=settings.LANGUAGE_CODE)
+    return f"{prefix}/?{urlencode({SEARCH_PARAMETER: query})}"
+
+
+def redirect_target(redirect: Redirect, path: str) -> str | None:
+    """Where a 301 rule sends a request for `path`, in the path's language; None when the
+    product or term has no page (the request then stays a 404)."""
+    language = path_language(path)
+    kind = redirect.target_kind
+    if kind == Redirect.Target.PATH:
+        # Checked again here: a row written around save_redirect never leaves the site.
+        target = redirect.target_path
+        return target if engine.redirect_path_error(target, allow_query=True) is None else None
+    if kind == Redirect.Target.SEARCH:
+        return search_path(redirect.target_query, language)
+    if kind == Redirect.Target.PRODUCT and redirect.target_product_id is not None:
+        return product_page_path(redirect.target_product_id, language)
+    if kind == Redirect.Target.TERM and redirect.target_term is not None:
+        paths = _term_anchor(redirect.target_term, language).paths
+        return paths.get(language) or paths.get(translations.source_language())
+    return None
+
+
+def add_to_cart_target(path: str, value: str) -> str | None:
+    """The product page a legacy GET `?add-to-cart={post id}` stands for, in the language of
+    `path`; None for an unknown id. A GET never adds to the cart."""
+    wp_id = ascii_int(value, max_digits=_LEGACY_ID_MAX_DIGITS)
+    if wp_id is None:
+        return None
+    product_id = (
+        Product.objects.filter(Q(legacy_wp_id_en=wp_id) | Q(legacy_wp_id_it=wp_id))
+        .values_list("pk", flat=True)
+        .first()
+    )
+    return None if product_id is None else product_page_path(product_id, path_language(path))
+
+
+def _checked_rule(
+    source: str, prefix: bool, code: int, kind: str, path: str
+) -> engine.RedirectRule:
+    """Only path targets can chain: a product or term target is its live page, and a rule
+    applies only where there is no page."""
+    moved_to_path = code == Redirect.Code.MOVED and kind == Redirect.Target.PATH
+    return engine.RedirectRule(source=source, prefix=prefix, target=path if moved_to_path else None)
+
+
+def redirect_problems(candidates: Sequence[Redirect]) -> dict[str, str]:
+    """The loops and chains the `candidates` would make with the other active rules and the
+    old product slugs (CAT.5), by source path."""
+    now = timezone.now()
+    live = [row for row in candidates if row.expires_at is None or row.expires_at > now]
+    replaced = [row.pk for row in candidates if row.pk is not None]
+    others = (
+        active_redirects(now)
+        .exclude(pk__in=replaced)
+        .exclude(source_path__in=[row.source_path for row in candidates])
+        .values_list("source_path", "match_prefix", "code", "target_kind", "target_path")
+    )
+    rules = [_checked_rule(*values) for values in others] + [
+        _checked_rule(row.source_path, row.match_prefix, row.code, row.target_kind, row.target_path)
+        for row in live
+    ]
+    problems = engine.redirect_problems(rules, checked={row.source_path for row in live})
+    for row in live:
+        if row.source_path in problems or row.target_kind != Redirect.Target.PATH:
+            continue
+        found = slugs.parse_product_path(
+            urlsplit(row.target_path).path,
+            languages=_languages(),
+            default_language=settings.LANGUAGE_CODE,
+        )
+        if found is not None and SlugHistory.objects.filter(language=found[0], slug=found[1]):
+            problems[row.source_path] = (
+                f"{row.target_path} is an old product slug that already redirects (a chain): "
+                "point the rule at the product instead."
+            )
+    return problems
+
+
+def validate_redirect(redirect: Redirect) -> None:
+    """The rule's shape (`Redirect.clean`, uniqueness), then no loop and no chain."""
+    redirect.full_clean()
+    problems = redirect_problems([redirect])
+    if problems:
+        raise ValidationError({NON_FIELD_ERRORS: list(problems.values())})
+
+
+def save_redirect(redirect: Redirect, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Add or change a rule, validated and audited."""
+    validate_redirect(redirect)
+    return save_audited(
+        redirect,
+        redirect_snapshot,
+        key=redirect.source_path,
+        ctx=ctx,
+        created=REDIRECT_CREATED,
+        updated=REDIRECT_UPDATED,
+        dry_run=dry_run,
+    )
+
+
+def delete_redirect(redirect: Redirect, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    changes = ChangeSet()
+    changes.delete(REDIRECT_MODEL, redirect.source_path, redirect_snapshot(redirect))
+    return run_mutation(changes, redirect.delete, ctx=ctx, action=REDIRECT_DELETED, dry_run=dry_run)
+
+
+def _product_reference(reference: str) -> Product:
+    """`P-000123` (staff_ref) or `{vendor slug}/{SKU}`; the SKU may be an old one (alias)."""
+    if _STAFF_REF.match(reference):
+        product = Product.objects.filter(staff_ref=reference).first()
+        if product is None:
+            raise ValidationError(f"No product {reference}.")
+        return product
+    vendor_slug, _, sku = reference.partition("/")
+    vendor = Vendor.objects.filter(slug=vendor_slug).first()
+    if vendor is None or not sku:
+        raise ValidationError(f"Name a product as P-000123 or vendor-slug/SKU, not {reference!r}.")
+    item = match_skus(vendor, [sku])[sku]
+    if item is None:
+        raise ValidationError(f"No product or variant of {vendor_slug} has the SKU {sku!r}.")
+    return item if isinstance(item, Product) else item.product
+
+
+def _term_reference(reference: str) -> Term:
+    """`{taxonomy code}/{term slug}`, the slug in any language."""
+    code, _, slug = reference.partition("/")
+    term_ids = set(
+        TermTranslation.objects.filter(term__taxonomy__code=code, slug=slug).values_list(
+            "term_id", flat=True
+        )
+    )
+    if len(term_ids) != 1:
+        problem = "No term" if not term_ids else "More than one term"
+        raise ValidationError(f"{problem} {slug!r} in the taxonomy {code!r}.")
+    return Term.objects.get(pk=term_ids.pop())
+
+
+def _expiry(value: str) -> dt.datetime | None:
+    if not value:
+        return None
+    parsed = parse_datetime(value)
+    if parsed is None:
+        raise ValidationError(f"Write the expiry as an ISO date and time, not {value!r}.")
+    return parsed if timezone.is_aware(parsed) else timezone.make_aware(parsed)
+
+
+def _fill_redirect(redirect: Redirect, row: Mapping[str, str]) -> None:
+    """Set every field of `redirect` from a map row (missing columns: the defaults)."""
+
+    def cell(name: str) -> str:
+        return (row.get(name) or "").strip()
+
+    code = cell("code") or str(Redirect.Code.MOVED)
+    if code not in {str(value) for value in Redirect.Code.values}:
+        raise ValidationError(f"The code is 301 or 410, not {code!r}.")
+    match = cell("match") or "exact"
+    if match not in ("exact", "prefix"):
+        raise ValidationError(f"The match is exact or prefix, not {match!r}.")
+    origin = cell("origin") or Redirect.Origin.MANUAL
+    if origin not in Redirect.Origin.values:
+        raise ValidationError(f"Unknown origin {origin!r}.")
+    kind, target = cell("target_kind"), cell("target")
+    if kind and kind not in Redirect.Target.values:
+        raise ValidationError(f"Unknown target kind {kind!r}: path, product, term or search.")
+    redirect.match_prefix = match == "prefix"
+    redirect.code = int(code)
+    redirect.origin = origin
+    redirect.expires_at = _expiry(cell("expires_at"))
+    redirect.note = cell("note")
+    redirect.target_kind = kind
+    redirect.target_path = target if kind == Redirect.Target.PATH else ""
+    redirect.target_query = target if kind == Redirect.Target.SEARCH else ""
+    product = kind == Redirect.Target.PRODUCT
+    redirect.target_product = _product_reference(target) if product else None
+    redirect.target_term = _term_reference(target) if kind == Redirect.Target.TERM else None
+
+
+def import_redirects(
+    rows: Iterable[Mapping[str, str]], *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Create or update the rules of a redirect map (retired SKUs, merged tags, discontinued
+    categories…), one rule per source path.
+
+    Columns: `source_path`, `target_kind` (path, product, term, search; empty for a 410),
+    `target` (a path; `P-000123` or `vendor-slug/SKU`; `taxonomy-code/term-slug`; the search
+    words), and optional `code` (301, 410), `match` (exact, prefix), `origin`, `expires_at`
+    (ISO) and `note`. Every row is checked first, loops and chains included: on any error
+    nothing is written and the error names each row (numbered from 1, the header excluded).
+    """
+    rows = list(rows)
+    sources = [
+        engine.normalise_redirect_source((row.get("source_path") or "").strip()) for row in rows
+    ]
+    stored = {
+        redirect.source_path: redirect
+        for redirect in Redirect.objects.filter(source_path__in=sources).select_related(
+            "target_product"
+        )
+    }
+    errors: list[str] = []
+    seen: dict[str, int] = {}
+    pending: list[tuple[Redirect, dict[str, Any] | None]] = []
+    for number, (source, row) in enumerate(zip(sources, rows, strict=True), start=1):
+        if source in seen:
+            errors.append(f"row {number}: {source} is already on row {seen[source]}.")
+            continue
+        seen[source] = number
+        redirect = stored.get(source) or Redirect(source_path=source)
+        before: dict[str, Any] | None = None if redirect.pk is None else redirect_snapshot(redirect)
+        try:
+            _fill_redirect(redirect, row)
+            redirect.full_clean()
+        except ValidationError as exc:
+            errors.append(f"row {number}: {' '.join(exc.messages)}")
+            continue
+        pending.append((redirect, before))
+    problems = redirect_problems([redirect for redirect, _ in pending])
+    errors += [f"row {seen[source]}: {message}" for source, message in problems.items()]
+    if errors:
+        raise ValidationError(sorted(errors, key=lambda error: int(error.split()[1][:-1])))
+
+    changes = ChangeSet()
+    to_save: list[tuple[Redirect, str]] = []
+    for redirect, before in pending:
+        count = len(changes.changes)
+        after = redirect_snapshot(redirect)
+        if before is None:
+            changes.create(REDIRECT_MODEL, redirect.source_path, after)
+        else:
+            changes.update(REDIRECT_MODEL, redirect.source_path, before, after)
+        if len(changes.changes) > count:
+            to_save.append((redirect, REDIRECT_CREATED if before is None else REDIRECT_UPDATED))
+    if dry_run or changes.is_empty:
+        return changes
+    with transaction.atomic():
+        for (redirect, action), change in zip(to_save, changes.changes, strict=True):
+            redirect.save()
+            record(ctx, action, change.model, change.key, change.before, change.after)
+    return changes
 
 
 # --- Product search (CAT.9, spec 03 §3.1 "Search by SKU" and §3.2). Normalisation, limits and
