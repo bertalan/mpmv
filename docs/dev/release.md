@@ -62,6 +62,10 @@ ssh <stage> '~/.local/bin/mpmv-deploy deploy 0.2.0'
 LIVE gets only a tag that has run on STAGE without incident, and only on the owner's go. The same
 tag, the same image digest: never a rebuild for LIVE.
 
+Launch prerequisite: before the first LIVE launch, and before the account activation batches of
+CORE.19 start, the sending domain has SPF, DKIM and DMARC records in place and verified (ARC.19,
+[transactional email](transactional-email.md)).
+
 ## No hand edits on servers
 
 Units, the Caddyfile and `mpmv-deploy` on a server come from the release it runs. An emergency hand

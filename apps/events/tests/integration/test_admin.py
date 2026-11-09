@@ -321,3 +321,16 @@ def test_an_event_keeps_offering_a_linked_product_that_was_retired() -> None:
     choices = set(_form(page, staff).fields["products"].queryset)
     assert linked in choices
     assert retired not in choices
+
+
+def test_staff_reopen_an_event_after_saving_a_draft(client: Client) -> None:
+    """The edit view builds the form from the draft revision, whose product links live in
+    memory (modelcluster): the product chooser must not query them with `values()`."""
+    _staff(client)
+    page = EventPageFactory.create()
+    linked = ProductFactory.create(vendor=page.vendor)
+    page.products.set([linked])
+    page.save_revision()
+    response = client.get(_edit_url(page))
+    assert response.status_code == 200
+    assert f'value="{linked.pk}"' in response.content.decode()

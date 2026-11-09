@@ -293,6 +293,38 @@ identified by its national TIN in `IdFiscaleIVA`. The platform writes no Fattura
 nothing to SDI: CMP.2 puts these party data in the non-fiscal commission statement export, in a
 structure the operator's invoicing tool can map to FatturaPA.
 
+### Operator-owned shop (VEN.26)
+
+Owner note 2026-11-09: the platform operator may also sell on its own marketplace, as a vendor
+whose legal identity is the operator's. This is allowed, without conflicts:
+
+- **Detection proposes, the platform owner confirms.** A vendor whose VAT number, or TIN with its
+  country, matches the current `PlatformOperator` gets an `operator_owned_proposed` mark when its
+  VEN.12 identity is saved or the operator changes. The mark changes nothing by itself: anyone
+  can type the operator's VAT number into an application. The platform owner confirms
+  `is_operator_owned` in the platform space, with an MFA step-up, a reason and an `AuditLog`
+  entry, and only for a vendor whose identity is verified (VEN.12 checks passed, VIES valid,
+  claim completed where VEN.24 applies). Revoking the flag works the same way. The 0% rule and
+  the operator shown as the seller apply only from that confirmation; until then the vendor stays
+  on its plan's commission and sells under its own identity. The VAT number is compared in clear; `tax_code` is encrypted at rest (SEC.3), so the
+  TIN match decrypts it in the service for the one vendor being checked and never adds a
+  searchable copy. No uniqueness rule refuses a vendor whose identity equals the operator's or
+  another vendor's.
+- **Commission.** After confirmation, no commission: the confirmation writes an explicit 0%
+  commission rule with the reason "operator-owned" (VEN.2 forbids only an implicit zero), under
+  the same step-up as any rate change (MQ-2), and no commission statement (CMP.2), since the
+  platform does not charge itself.
+- **Ledger and payouts** stay separate for accounting: the shop has its own ledger, balance and
+  payout account like any vendor.
+- **Access.** The people who run it use their separate shop accounts (vendor members); a
+  platform-role holder enters its shop space only through such an account or a support
+  impersonation session (CORE.10), as for any vendor.
+- **Storefront.** The seller shown on offers and in the order documents is the operator, with
+  the operator's legal notices (DSA trader data, policies).
+- **DAC7 and invoicing (D-22, decided by the owner 2026-11-09):** the operator's own sales are
+  not reported in DAC7 (CMP.1 leaves operator-owned vendors out of the reportable sellers), and
+  the operator invoices them as the seller, outside the platform, like any vendor.
+
 ### Vendor legal documents and signature (VEN.5, VEN.13 to VEN.17)
 
 Owner decisions of 2026-11-07. The vendor contract and the other legal documents a vendor
@@ -597,7 +629,7 @@ class VendorClosure(Model):                     # vendor-scoped (CORE.3)
 - **Services** (`apps/vendors/services.py`): `add_closure`, `update_closure` and `delete_closure`
   accept `dry_run=True`, return a `ChangeSet` and write an `AuditLog` entry (actor, before and
   after, source: vendor area, admin or API).
-- **Vendor area** (CORE.9, `/vendor/settings/closures/`): list of current and upcoming ranges,
+- **Vendor area** (CORE.9, `/manager/shop/settings/closures/`): list of current and upcoming ranges,
   add, edit and delete forms, a preview of the notice. Staff use a Wagtail admin ViewSet. **API**:
   `/api/v1/vendors/{id}/closures` (list, create, update, delete, `?dry_run=true`, RFC 9457 errors);
   a vendor-scoped key (CORE.13) reaches only its own vendor, anything else is a 404.
@@ -683,6 +715,7 @@ and closure schedule (VEN.20).
 | VEN.23 | DAC7 seller dataset (owner decision MQ-6): the Directive (EU) 2021/514 Annex V section III.B fields on the vendor for individuals and entities (TIN with its issuing country, VAT number only when the vendor has one with its VIES status, date of birth for individuals, place of birth when the issuing country issues no TIN, business registration number), a "same as the VAT number" option, TIN format rules per issuing country in a table, the seeded `LegalFieldRequirement` rows and `engine.dac7_missing()` updated; staff correct or complete the dataset behind an MFA step-up with audit | P1 | 6 | VEN.12, TAX.5, CORE.4 | A test pins the field list to Annex V III.B; a TIN without its issuing country is incomplete for a payout; "same as the VAT number" fills the TIN from a VIES-valid VAT number; a malformed TIN for its country is refused; a vendor whose country issues no TIN is complete with a place of birth; a staff correction without step-up is refused and a saved one is in the AuditLog |
 | VEN.24 | Claim an imported vendor (owner decision MQ-1): a single-use, expiring CORE.15 link sent only to the vendor's legal email of record; the claimant sets a password and their own MFA and confirms the stored VAT number or TIN; staff approve the claim before fiscal or payout data can change; a staff "resend / regenerate" action invalidates the old link, with audit | P1 | 6 | CORE.15, VEN.5, CORE.4 | The link goes only to the legal email of record; a GET does not consume it; a wrong VAT number or TIN is refused and audited; before staff approval the claimant cannot change the legal identity, the tax profile or the payout data; after regenerate the old link is refused and both the regeneration and the invalidation are in the AuditLog; an expired link is refused |
 | VEN.25 | RF20 eligibility (owner decision MQ-5): fiscal regime RF20 only for vendors established in an EU member state, with a mandatory participation number issued under the cross-border SME franchise (suffix `EX`, art. 284(3) of the VAT directive as amended by Directive (EU) 2020/285), a format check per issuing member state and the issuing country matching the establishment country; the number in the FatturaPA party data and the TAX.2 regime-change check | P1 | 3 | VEN.18, CMP.13 | RF20 is refused for a vendor established outside the EU and without an `EX` number; a malformed number or one issued by another member state is refused; a valid EU vendor saves RF20; a regime-change request to RF20 without the number is refused |
+| VEN.26 | Operator-owned shop (owner note 2026-11-09, spec 04 §Operator-owned shop): a VAT number, or TIN with country, matching the current `PlatformOperator` only proposes the shop (`operator_owned_proposed`, re-checked on identity save and on operator change; TIN compared by decrypting in the service, no searchable copy); the platform owner confirms or revokes `is_operator_owned` in the platform space with MFA step-up, reason and AuditLog, only for a vendor with verified identity (VEN.12, VEN.24); after confirmation an explicit 0% commission rule with reason (MQ-2 step-up) and no CMP.2 commission statement; own ledger and payouts; the operator shown as the seller with its legal notices; operator-owned vendors left out of the DAC7 reportable sellers (CMP.1) and their sales invoiced by the operator outside the platform (D-22, decided) | P1 | 6 | VEN.12, VEN.2, VEN.24, ARC.7, CORE.18 | An applicant with the operator's VAT number is proposed, not flagged, and its commission stays on the plan until the owner confirms; a confirmation without step-up or reason is refused, and one for a vendor with unverified identity is refused; a confirmed vendor computes 0 commission from the confirmation on, with the flag change in the AuditLog; a non-owner platform role cannot confirm (404); two vendors with the same name and tax code coexist; changing the operator's VAT number updates the proposal on the next check and never sets the flag by itself; a confirmed operator-owned vendor's sales are not in the DAC7 export |
 
 ## 4.4 Mandatory regression cases
 
