@@ -5,14 +5,20 @@ and every API v1 operation is called as:
 
 - an anonymous visitor: anything not listed in `tests.security_registry.PUBLIC` must refuse
   (401, 403, 404, 405, or a redirect to a sign-in page), to GET and to POST. A new public route
-  that is not listed turns CI red (done-when of SEC.5);
+  that is not listed turns CI red (done-when of SEC.5). A route with an identifier is called
+  with a real object of Vendor B (`probe`), so a detail page that forgot to require sign-in
+  shows that object and fails; called with a placeholder instead, it must refuse before the
+  lookup, as a 404 for a missing object would prove nothing;
 - a signed-in superuser with a verified second factor, sending a POST without the CSRF token:
   refused with 403 unless the view is listed in `CSRF_EXEMPT`; API v1 operations do not accept
   the session cookie at all;
 - the same superuser sending a GET: no row written apart from the session (a GET with side
   effects can be triggered from another site by a plain link or image);
 - a signed-in customer (no staff flag, no vendor): refused on every staff-only endpoint of
-  `tests.tenancy_registry`, and shown none of Vendor B's data anywhere else;
+  `tests.tenancy_registry` and on Vendor B's objects, and shown none of Vendor B's data anywhere
+  else;
+- the CMS page tree: every live page and every sub-route of a routable page, as an anonymous
+  visitor and as a customer; a page with a view restriction refuses the anonymous visitor;
 - API keys: none or an unknown one → 401, a valid key without the operation's scope → 403.
 
 The expected access of each endpoint is declared, never inferred: `tests.tenancy_registry`
@@ -27,22 +33,33 @@ guard fails when it gets routes, so they join this sweep.
 
 import re
 import secrets
-from collections.abc import Iterator
+import uuid
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
-from dataclasses import replace
+from dataclasses import dataclass, replace
+from pathlib import Path
 from urllib.parse import urlsplit
 
 import pytest
-from django.db import connection
+from django.db import connection, models
 from django.http.response import HttpResponseBase
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls import resolve, reverse
+from wagtail.contrib.routable_page.models import RoutablePageMixin
+from wagtail.models import Page, PageViewRestriction
 
 from apps.accounts.models import User
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.api.tests.factories import ApiClientFactory
+from apps.cms.tests.factories import (
+    LegalPageFactory,
+    LegalPageVersionFactory,
+    StandardPageFactory,
+    VendorRecruitmentPageFactory,
+)
+from apps.events.tests.factories import EventPageFactory
 from apps.vendors.models import VendorClaim, VendorMember, VendorMemberRole
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 from apps.vendors.tests.integration.test_claim import (
@@ -58,7 +75,10 @@ from tests.security_registry import (
     GET_WRITES_ALLOWED,
     GET_WRITES_BY_ENDPOINT,
     IDOR_REVIEWED,
+    OBJECT_PATHS,
+    PLACEHOLDER_404,
     PUBLIC,
+    ObjectKwargs,
 )
 from tests.tenancy import (
     ANY_KEY_SCOPE,
@@ -71,9 +91,10 @@ from tests.tenancy import (
     VendorScopedList,
     api_operations,
     check_endpoint,
+    echoed_in_path,
     endpoints,
 )
-from tests.tenancy_registry import API_OPERATIONS, CMS_ADMIN_ROUTE, classify
+from tests.tenancy_registry import API_OPERATIONS, CMS_ADMIN_ROUTE, ENDPOINTS, classify
 
 pytestmark = pytest.mark.django_db
 
@@ -88,16 +109,117 @@ VENDOR_SCOPED_WEB = [
 KEYED_OPERATIONS = [op for op in OPERATIONS if op.scopes]
 
 REFUSED = frozenset({401, 403, 404, 405})
-WRITE = re.compile(r'^\s*(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+"?(\w+)"?', re.IGNORECASE)
+# A write, also behind a `WITH` clause (`WITH ... INSERT INTO`). Writes through other database
+# aliases or caches are not seen: the project has one database and no cached data model.
+WRITE = re.compile(
+    r'^\s*(?:WITH\b.*?\)\s*)?(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+"?(\w+)"?',
+    re.IGNORECASE | re.DOTALL,
+)
 
 
-def sample_path(endpoint: Endpoint) -> str:
-    """A path that routes to `endpoint`, with the sample parameters of its tenancy declaration."""
-    access = classify(endpoint)
+def sample_path(endpoint: Endpoint, access: object = None) -> str:
+    """A path that routes to `endpoint`, with the sample parameters of its tenancy declaration
+    (`access`, default: the one in `tests.tenancy_registry`)."""
+    access = classify(endpoint) if access is None else access
     if isinstance(access, NoVendorData) and access.path:
         return access.path
     kwargs = access.kwargs if isinstance(access, NoVendorData | StaffOnly) else {}
     return endpoint.path(**{name: kwargs.get(name, "0") for name in endpoint.params})
+
+
+Tenants = Callable[[], CrossTenant]  # made on first use: most routes need no object
+
+
+@dataclass(frozen=True)
+class Probe:
+    """The path a check requests, and Vendor B's objects it names (none: a placeholder)."""
+
+    path: str
+    objects: tuple[models.Model, ...] = ()
+    placeholder: bool = False
+
+
+def probe(
+    endpoint: Endpoint,
+    access: object,
+    tenants: Tenants,
+    object_paths: Mapping[str, ObjectKwargs] = OBJECT_PATHS,
+) -> Probe:
+    """The path to request `endpoint` with: a real object of Vendor B wherever it takes one.
+
+    A path with placeholder parameters is a `Probe(placeholder=True)`: a 404 to it would only say
+    that no object "0" exists, so the checks then require a refusal made before the lookup.
+    """
+    if not endpoint.params:
+        return Probe(sample_path(endpoint, access))
+    match access:
+        case VendorScoped():
+            theirs = access.make(tenants().b.vendor)
+            return Probe(endpoint.path(**access.kwargs(theirs)), (theirs,))
+        case StaffOnly(make=make) if make is not None and access.object_param in endpoint.params:
+            theirs = make(tenants().b.vendor)
+            kwargs = {name: access.kwargs.get(name, "0") for name in endpoint.params}
+            return Probe(
+                endpoint.path(**{**kwargs, access.object_param: str(theirs.pk)}), (theirs,)
+            )
+    if endpoint.key in object_paths:
+        return Probe(endpoint.path(**object_paths[endpoint.key](tenants())), (tenants().b.vendor,))
+    return Probe(sample_path(endpoint, access), placeholder=True)
+
+
+def response_body(response: HttpResponseBase) -> str:
+    content = (
+        b"".join(response.streaming_content)  # type: ignore[attr-defined]
+        if response.streaming
+        else response.content  # type: ignore[attr-defined]
+    )
+    return bytes(content).decode(errors="replace") + response.headers.get("Location", "")
+
+
+def leaked_markers(
+    body: str, tenants: CrossTenant, *objects: models.Model, known: str = ""
+) -> list[str]:
+    """Vendor B's identifying values in `body`, except those the caller sent in the path `known`."""
+    return [
+        marker
+        for marker in tenants.markers(*objects)
+        if marker and marker in body and not echoed_in_path(marker, known)
+    ]
+
+
+def check_refused(
+    client: Client,
+    endpoint: Endpoint,
+    access: object,
+    tenants: Tenants,
+    *,
+    method: str = "GET",
+    caller: str = "an anonymous visitor",
+    object_paths: Mapping[str, ObjectKwargs] = OBJECT_PATHS,
+    placeholder_404: Mapping[str, str] = PLACEHOLDER_404,
+) -> None:
+    """`client` is refused by `endpoint` and shown nothing of Vendor B; it writes nothing."""
+    target = probe(endpoint, access, tenants, object_paths)
+    assert routes_to(endpoint, target.path), f"{target.path} does not route to {endpoint.key}"
+    with written_tables() as tables:
+        response = client.generic(method, target.path)
+    assert is_refusal(response), (
+        f"{endpoint.key}: {caller} {method} {target.path} got {describe(response)}. If the page "
+        "is meant to be public, list it in tests.security_registry.PUBLIC with the reason."
+    )
+    if target.placeholder and response.status_code == 404:
+        assert endpoint.key in placeholder_404, (
+            f"{endpoint.key}: {caller} {method} {target.path} got 404 for a placeholder "
+            "identifier, which does not show that the route refuses a real object. Make the path "
+            "from a real object (VendorScoped or StaffOnly(make=...) in tests.tenancy_registry, or "
+            "tests.security_registry.OBJECT_PATHS), or say why in PLACEHOLDER_404."
+        )
+    if target.objects:
+        leaked = leaked_markers(
+            response_body(response), tenants(), *target.objects, known=target.path
+        )
+        assert not leaked, f"{endpoint.key}: {caller} sees Vendor B's data: {leaked}"
+    assert tables <= GET_WRITES_ALLOWED, f"{endpoint.key}: {caller} {method} wrote {tables}"
 
 
 def routes_to(endpoint: Endpoint, path: str) -> bool:
@@ -185,17 +307,18 @@ def test_sign_in_pages_are_public() -> None:
 # --- Anonymous visitors
 
 
+@pytest.fixture
+def tenants(request: pytest.FixtureRequest) -> Tenants:
+    """`cross_tenant`, made only when a check needs Vendor B's objects."""
+    return lambda: request.getfixturevalue("cross_tenant")
+
+
 @pytest.mark.parametrize("method", ["GET", "POST"])
 @pytest.mark.parametrize("endpoint", NON_PUBLIC, ids=lambda e: e.key)
-def test_anonymous_visitor_is_refused(endpoint: Endpoint, method: str, client: Client) -> None:
-    path = sample_path(endpoint)
-    with written_tables() as tables:
-        response = client.generic(method, path)
-    assert is_refusal(response), (
-        f"{endpoint.key}: an anonymous {method} {path} got {describe(response)}. If the page is "
-        "meant to be public, list it in tests.security_registry.PUBLIC with the reason."
-    )
-    assert tables <= GET_WRITES_ALLOWED, f"{endpoint.key}: anonymous {method} wrote {tables}"
+def test_anonymous_visitor_is_refused(
+    endpoint: Endpoint, method: str, client: Client, tenants: Tenants
+) -> None:
+    check_refused(client, endpoint, classify(endpoint), tenants, method=method)
 
 
 @pytest.mark.parametrize("operation", OPERATIONS, ids=lambda op: op.key)
@@ -295,13 +418,19 @@ def customer(db: None) -> User:
 
 @pytest.mark.parametrize("endpoint", STAFF_ONLY, ids=lambda e: e.key)
 def test_staff_only_endpoint_refuses_a_customer(
-    endpoint: Endpoint, client: Client, customer: User
+    endpoint: Endpoint, client: Client, customer: User, tenants: Tenants
 ) -> None:
     client.force_login(customer)
-    response = client.get(sample_path(endpoint))
-    assert is_refusal(response), (
-        f"{endpoint.key} is staff-only, but a signed-in customer got {describe(response)}"
-    )
+    check_refused(client, endpoint, classify(endpoint), tenants, caller="a signed-in customer")
+
+
+@pytest.mark.parametrize("endpoint", VENDOR_SCOPED_WEB, ids=lambda e: e.key)
+def test_a_customer_cannot_open_vendor_b_objects(
+    endpoint: Endpoint, client: Client, customer: User, tenants: Tenants
+) -> None:
+    """CORE.3 runs as Vendor A's member; a user of no vendor may take another code path."""
+    client.force_login(customer)
+    check_refused(client, endpoint, classify(endpoint), tenants, caller="a signed-in customer")
 
 
 NON_OWNER_ROLES = [role for role in VendorMember.Role if role != VendorMember.Role.OWNER]
@@ -335,10 +464,11 @@ def test_a_customer_sees_no_vendor_data(
         access.login(client, as_customer)
     else:
         client.force_login(customer)
-    response = client.get(sample_path(endpoint))
-    body = "" if response.streaming else response.content.decode(errors="replace")
-    body += response.headers.get("Location", "")
-    leaked = [marker for marker in cross_tenant.markers(*seeded) if marker and marker in body]
+    target = probe(endpoint, access, lambda: cross_tenant)
+    response = client.get(target.path)
+    leaked = leaked_markers(
+        response_body(response), cross_tenant, *seeded, *target.objects, known=target.path
+    )
     assert not leaked, f"{endpoint.key}: a customer sees Vendor B's data: {leaked}"
 
 
@@ -409,6 +539,227 @@ def test_a_claim_link_opens_only_its_own_vendor(client: Client) -> None:
     claim_b = VendorClaim.objects.get(vendor=vendor_b)
     assert claim_b.status == VendorClaim.Status.OPEN
     assert claim_b.confirmed_link == ""
+
+
+# --- The sweep catches a detail page that forgot to require sign-in
+
+UNPROTECTED_URLS = "tests.integration.urls_unprotected"
+ZERO_UUID = "00000000-0000-0000-0000-000000000000"
+
+
+def endpoint_named(key: str, urlconf: str) -> Endpoint:
+    return next(e for e in endpoints(urlconf) if e.key == key)
+
+
+@pytest.mark.urls(UNPROTECTED_URLS)
+def test_the_sweep_fails_on_an_unprotected_detail_view(
+    client: Client, customer: User, tenants: Tenants
+) -> None:
+    unprotected = endpoint_named("unprotected_vendor", UNPROTECTED_URLS)
+    declared = VendorScoped(make=lambda vendor: vendor)
+
+    # A missing object answers 404, which the sweep used to count as a refusal.
+    assert client.get(unprotected.path(public_id=str(uuid.uuid4()))).status_code == 404
+    # Now it requests Vendor B's real object, and the page shows it.
+    with pytest.raises(AssertionError, match=r"an anonymous visitor GET .* got 200"):
+        check_refused(client, unprotected, declared, tenants)
+    # Declared with no way to make its object, it gets a placeholder, and the 404 fails too.
+    placeholder = NoVendorData("Placeholder only.", kwargs={"public_id": ZERO_UUID})
+    with pytest.raises(AssertionError, match="404 for a placeholder identifier"):
+        check_refused(client, unprotected, placeholder, tenants)
+    # A signed-in customer is caught the same way.
+    client.force_login(customer)
+    with pytest.raises(AssertionError, match=r"a signed-in customer GET .* got 200"):
+        check_refused(client, unprotected, declared, tenants, caller="a signed-in customer")
+
+
+@pytest.mark.urls(UNPROTECTED_URLS)
+def test_the_sweep_passes_the_same_view_behind_sign_in(client: Client, tenants: Tenants) -> None:
+    """Positive control: the failures above come from the missing check, not the harness."""
+    protected = endpoint_named("protected_vendor", UNPROTECTED_URLS)
+    check_refused(client, protected, VendorScoped(make=lambda vendor: vendor), tenants)
+    by_object_path = {"protected_vendor": lambda t: {"public_id": str(t.b.vendor.public_id)}}
+    check_refused(
+        client, protected, NoVendorData("Staff only."), tenants, object_paths=by_object_path
+    )
+
+
+def test_object_paths_and_placeholder_404_name_real_routes() -> None:
+    keys = {e.key for e in WEB_ENDPOINTS}
+    stale = sorted((set(OBJECT_PATHS) | set(PLACEHOLDER_404)) - keys)
+    assert not stale, "No such endpoint, remove from OBJECT_PATHS/PLACEHOLDER_404: " + ", ".join(
+        stale
+    )
+
+
+# --- Allow-list reasons
+
+REPO = Path(__file__).resolve().parents[2]
+CITED_TEST = re.compile(r"`(test_\w+)`")
+CITED_FILE = re.compile(r"\b((?:apps|tests)/[\w/]+\.py)\b")
+TEST_DEF = re.compile(r"^\s*(?:async\s+)?def\s+(test_\w+)\s*\(", re.MULTILINE)
+MIN_REASON = 15  # characters: a sentence, not a placeholder like "ok" or "TODO"
+
+
+def defined_tests() -> set[str]:
+    files = [*REPO.glob("apps/**/test_*.py"), *REPO.glob("tests/**/test_*.py")]
+    return {name for file in files for name in TEST_DEF.findall(file.read_text())}
+
+
+def allow_list_reasons() -> dict[str, object]:
+    reasons: dict[str, object] = {}
+    for name, entries in {
+        "PUBLIC": PUBLIC,
+        "CSRF_EXEMPT": CSRF_EXEMPT,
+        "IDOR_REVIEWED": IDOR_REVIEWED,
+        "PLACEHOLDER_404": PLACEHOLDER_404,
+    }.items():
+        reasons.update({f"{name}[{key}]": reason for key, reason in entries.items()})
+    for key, tables in GET_WRITES_BY_ENDPOINT.items():
+        reasons.update({f"GET_WRITES_BY_ENDPOINT[{key}][{t}]": r for t, r in tables.items()})
+    for key, access in ENDPOINTS.items():
+        if isinstance(access, NoVendorData | StaffOnly):
+            reasons[f"tenancy_registry.ENDPOINTS[{key}]"] = access.reason
+    reasons["API_CSRF_REASON"] = API_CSRF_REASON
+    return reasons
+
+
+def reason_problems(reasons: Mapping[str, object], tests: set[str]) -> list[str]:
+    problems = []
+    for entry, reason in reasons.items():
+        if not isinstance(reason, str) or len(reason.strip()) < MIN_REASON:
+            problems.append(f"{entry}: give the reason in a sentence")
+            continue
+        problems += [f"{entry}: no test {t}" for t in CITED_TEST.findall(reason) if t not in tests]
+        problems += [
+            f"{entry}: no file {f}" for f in CITED_FILE.findall(reason) if not (REPO / f).is_file()
+        ]
+    return problems
+
+
+def test_every_allow_list_entry_has_a_reason() -> None:
+    problems = reason_problems(allow_list_reasons(), defined_tests())
+    assert not problems, "Allow-list entries without a valid reason: " + "; ".join(problems)
+
+
+def test_the_reason_guard_catches_empty_reasons_and_missing_tests() -> None:
+    tests = defined_tests()
+    assert "test_a_claim_link_opens_only_its_own_vendor" in tests
+    assert (
+        reason_problems(
+            {"ok": "Reviewed: see `test_a_claim_link_opens_only_its_own_vendor`."}, tests
+        )
+        == []
+    )
+    assert reason_problems(
+        {
+            "empty": "",
+            "short": "ok",
+            "ghost": "Proved by `test_that_does_not_exist` in tests/nowhere/test_x.py.",
+        },
+        tests,
+    ) == [
+        "empty: give the reason in a sentence",
+        "short: give the reason in a sentence",
+        "ghost: no test test_that_does_not_exist",
+        "ghost: no file tests/nowhere/test_x.py",
+    ]
+
+
+# --- CMS page tree: `wagtail_serve` with real pages, not only an unknown path
+
+# Parameters of the routable pages' sub-routes, by "<model label>:<route name>".
+SUBPAGE_KWARGS: dict[str, Callable[[Page], dict[str, object]]] = {
+    "cms.LegalPage:archived_version": lambda page: {
+        "number": page.versions.order_by("number").values_list("number", flat=True).first()
+    },
+}
+PASSWORD_FORM = "wagtailcore/password_required.html"
+
+
+def build_page_tree(tenants: CrossTenant) -> Page:
+    """One live page of each type, Vendor B's live event, and a page for signed-in users only."""
+    StandardPageFactory.create(title="About us")
+    legal = LegalPageFactory.create(title="Terms of sale")
+    LegalPageVersionFactory.create(page=legal)
+    VendorRecruitmentPageFactory.create()
+    EventPageFactory.create(platform=True, live=True)
+    EventPageFactory.create(vendor=tenants.b.vendor, live=True)
+    private: Page = StandardPageFactory.create(title="Members only")
+    PageViewRestriction.objects.create(page=private, restriction_type=PageViewRestriction.LOGIN)
+    return private
+
+
+def page_urls() -> tuple[list[tuple[Page, str]], list[str]]:
+    """Every live page's URL and every sub-route of a routable page; and undeclared sub-routes."""
+    urls: list[tuple[Page, str]] = []
+    undeclared: list[str] = []
+    for page in Page.objects.live().filter(depth__gt=1).specific():
+        url = page.get_url()
+        if url is None:
+            continue
+        urls.append((page, url))
+        if not isinstance(page, RoutablePageMixin):
+            continue
+        for pattern in page.get_resolver().url_patterns:
+            key = f"{page._meta.label}:{pattern.name}"
+            if pattern.pattern.regex.groupindex and key not in SUBPAGE_KWARGS:
+                undeclared.append(key)
+                continue
+            kwargs = SUBPAGE_KWARGS[key](page) if pattern.pattern.regex.groupindex else {}
+            urls.append((page, url + page.reverse_subpage(pattern.name, kwargs=kwargs)))
+    return urls, undeclared
+
+
+def is_page_refusal(page: Page, response: HttpResponseBase) -> bool:
+    """A restricted page sends the visitor to sign in, or asks for its password."""
+    if is_refusal(response):
+        return True
+    if 300 <= response.status_code < 400:
+        location = urlsplit(response.headers.get("Location", "")).path
+        return location == reverse("wagtailcore_login")
+    names = {t.name for t in getattr(response, "templates", [])}
+    restrictions = page.get_view_restrictions()
+    return PASSWORD_FORM in names and any(
+        r.restriction_type == PageViewRestriction.PASSWORD for r in restrictions
+    )
+
+
+@pytest.mark.parametrize("caller", ["an anonymous visitor", "a signed-in customer"])
+def test_every_cms_page_and_sub_route_refuses_or_hides_vendor_data(
+    caller: str, client: Client, customer: User, cross_tenant: CrossTenant
+) -> None:
+    seeded = cross_tenant.seed_b()
+    private = build_page_tree(cross_tenant)
+    if caller == "a signed-in customer":
+        client.force_login(customer)
+    urls, undeclared = page_urls()
+    assert not undeclared, "Declare sample parameters in SUBPAGE_KWARGS for: " + ", ".join(
+        undeclared
+    )
+    visited = set()
+    for page, url in urls:
+        response = client.get(url)
+        visited.add(url)
+        assert response.status_code < 500, f"{url}: {caller} got {describe(response)}"
+        if page.get_view_restrictions() and caller == "an anonymous visitor":
+            assert is_page_refusal(page, response), (
+                f"{url} is restricted, but {caller} got {describe(response)}"
+            )
+        leaked = leaked_markers(response_body(response), cross_tenant, *seeded)
+        assert not leaked, f"{url}: {caller} sees Vendor B's data: {leaked}"
+    # The tree really has a private page and a routable sub-route: the loop above reached them.
+    assert private.get_url() in visited
+    assert any("/versions/" in url for url in visited)
+
+
+def test_a_private_cms_page_refuses_an_anonymous_visitor(
+    client: Client, cross_tenant: CrossTenant
+) -> None:
+    private = build_page_tree(cross_tenant)
+    response = client.get(private.get_url())
+    assert is_page_refusal(private, response), describe(response)
+    assert "Members only" not in response_body(response)
 
 
 # --- MCP

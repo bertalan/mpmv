@@ -12,9 +12,22 @@ API v1 operation and fails when an endpoint answers a caller it should refuse. W
   session (`GET_WRITES_ALLOWED`); an exception needs an entry in `GET_WRITES_BY_ENDPOINT` that
   says why a request forged from another site gains nothing from it.
 
+- a route that carries an identifier: the anonymous and customer checks call it with a real
+  object of Vendor B, so a 404 can only mean "not found for this caller". `VendorScoped` and
+  `StaffOnly(make=...)` declarations in `tests.tenancy_registry` say how to make that object;
+  for any other route, `OBJECT_PATHS` builds the URL parameters from Vendor B's data. A route
+  called with placeholder parameters must refuse before it looks anything up (a redirect to
+  sign-in, 401, 403 or 405): a 404 there fails unless `PLACEHOLDER_404` says why it is safe.
+
 Keys are the namespaced URL name, or the route when the pattern has no name (as in
-`tests.tenancy.Endpoint.key`).
+`tests.tenancy.Endpoint.key`). Every reason is a sentence: an empty one fails
+`test_every_allow_list_entry_has_a_reason`, and each test it names in backticks must exist.
 """
+
+from collections.abc import Callable
+
+from apps.accounts.tests.factories import TOTPDeviceFactory
+from tests.tenancy import CrossTenant
 
 PUBLIC_CATALOG = "Public catalog listing (CAT.8): published products of active vendors only."
 PUBLIC_CMS = "Public CMS page (CMS.1)."
@@ -86,6 +99,27 @@ IDOR_REVIEWED: dict[str, str] = {
     "wagtailcore_authenticate_with_password": (
         "Wagtail's password form for a restricted CMS page: the ids only say which page the "
         "password unlocks; the password is the credential."
+    ),
+}
+
+# URL parameters naming a real object of Vendor B (or of its owner), for routes with an identifier
+# that are neither `VendorScoped` nor `StaffOnly(make=...)` in `tests.tenancy_registry`.
+ObjectKwargs = Callable[[CrossTenant], dict[str, str]]
+OBJECT_PATHS: dict[str, ObjectKwargs] = {
+    "mfa:remove_device": lambda tenants: {
+        "kind": "totp",
+        "public_id": str(TOTPDeviceFactory.create(user=tenants.b.owner).pk),
+    },
+    "vendor_claim:claim": lambda tenants: {"vendor_key": str(tenants.b.vendor.public_id)},
+}
+
+# Routes with an identifier, called with placeholder parameters, that may answer 404 to a caller
+# who is not signed in or not allowed, with why that 404 hides nothing.
+PLACEHOLDER_404: dict[str, str] = {
+    "wagtailadmin_password_reset_confirm": (
+        "Password reset confirmation of the editors' admin, public by design (PUBLIC): the uid "
+        "and token in the URL are the credential, not a reference to an object a caller could "
+        "swap; a wrong pair is refused whoever asks."
     ),
 }
 
