@@ -7,7 +7,7 @@
 - **WPSSO Core Premium** + add-ons: JSON-LD Product/Offer/Breadcrumb/MerchantReturnPolicy/
   ShippingDetails/AggregateRating, Open Graph, sitemap, Google Merchant and Meta feeds.
 - SEO mu-plugin: schema.org relations between products and terms (`isRelatedTo` and similar) in the JSON-LD; robots
-  `max-snippet:-1`; noindex on 404s; internal search indexable only when it has results; author redirects;
+  `max-snippet:-1`; noindex on 404s; internal search indexable only when it has results (legacy rule; the new system keeps search pages `noindex`, see SEO.7); author redirects;
   IT breadcrumb fix.
 - `google-feed.php`: EN/IT RSS feed with 6 h cache, **fixed 22%** VAT, hardcoded shipping,
   `g:id` = **WordPress post ID**, Google category from `_wpsso_meta` or by vendor (per-vendor override, generic default),
@@ -127,7 +127,7 @@ def product_jsonld(product, lang) -> dict
     # + isRelatedTo (and sector-specific properties, if configured) + shippingDetails + hasMerchantReturnPolicy
     # + aggregateRating (verified reviews only)
 def breadcrumb_jsonld(obj, lang) -> dict
-def robots_meta(request, obj) -> str            # noindex on 404, empty search, pagination beyond a threshold
+def robots_meta(request, obj) -> str            # noindex on 404, every internal search page (SEO.7), pagination beyond a threshold
 def sitemaps() -> dict[str, Sitemap]           # per language and type; excludes fallbacks;
     # products and taxonomy terms listed on the URL of their current mode (Q-91, D-07, MIG.11)
 def llms_txt(lang) -> str                       # generated from vendors, brands and taxonomy terms, key pages, event feeds
@@ -168,6 +168,34 @@ it and never repeats offers, so a page with three widgets and twenty products st
 page node links the lists through `hasPart` (`mainEntity` on listing pages, where the first list
 is the page's main content). The same product in two widgets is one `@id`, listed in each.
 Hidden, unpublished or other-language items never appear.
+
+**Every page type has a graph (owner, 2026-11-09).** The table below is the coverage SEO.7 must
+reach; a test walks every registered page type and URL pattern and fails when one renders no
+graph.
+
+| Page | Page node | Main content |
+|---|---|---|
+| Home | `WebPage` | `hasPart` lists from its blocks |
+| Product | `ItemPage` | `Product` or `ProductGroup` with offers |
+| Category, term, brand listing | `CollectionPage` | `ItemList` of product `@id`s (`mainEntity`) |
+| Vendor storefront | `ProfilePage` | vendor `Organization` + `ItemList` of its products |
+| Search results | `SearchResultsPage` | `ItemList` of mixed results (products, events, posts, vendors), each item referencing its page `@id` |
+| Event | `WebPage` | `Event` (spec 15) |
+| Event index and calendar | `CollectionPage` | `ItemList` of event `@id`s |
+| Blog index, author page | `CollectionPage`, `ProfilePage` | `ItemList` of posts; `Person` |
+| Blog post | `WebPage` | `BlogPosting` |
+| Standard, legal, about, contact | `WebPage`, `AboutPage`, `ContactPage` | operator `Organization` with `contactPoint` on contact |
+| Cart, checkout, account, Manager | none | not public, `noindex`, no graph |
+
+**Search results are not indexed.** Internal search pages are `noindex, follow` in every case
+(Google asks sites to keep search result pages out of the index); they still carry the graph,
+for AI agents and other machine readers, and the `WebSite` `SearchAction` points to them. This
+replaces the legacy rule "indexable when it has results". Before go-live, MIG.11 lists the legacy
+search URLs that received search-engine traffic (from the access-log hit counts of MIG.1); a
+query with real traffic becomes a curated landing page (CMS.4 term landing or a category) and its
+legacy search URL redirects there, so the traffic is kept without indexing search pages.
+Pagination: page 2 and beyond of a listing is indexable with its own canonical and the same graph
+shape, its `ItemList` holding only the items of that page with their absolute `position`.
 
 **Product node (SEO.1 inside the SEO.7 graph), from a review of the legacy product JSON-LD
 (2026-11-09).** The legacy page already has a linked `@graph` with `Product`, `Offer` with a
@@ -308,7 +336,7 @@ with design tokens, template overrides, CSP-safe components and WCAG 2.2 AA rule
 | SEO.4 | Merchant API sync + Meta feed | P2 | 8 | SEO.3 | Daily delta report |
 | SEO.5 | Cookie consent + Consent Mode v2 + e-commerce events | P1 | 8 | ORD.5 | No tags fire before consent |
 | SEO.6 | Anonymous page cache, responsive renditions, CWV budget | P2 | 6 | THM.3 | LCP < 2.5 s on product page |
-| SEO.7 | Site-wide schema.org `@graph` (owner question 2026-11-09): one JSON-LD block per page from `seo.page_graph`, stable `@id` nodes for the operator `Organization`, `WebSite` + `SearchAction`, `WebPage` subtypes, `BreadcrumbList`, vendor `Organization` as `seller`, shared return and shipping nodes, `Product`/`Offer`/`AggregateOffer`, `CollectionPage` + `ItemList`, `BlogPosting` + `Person`/`ProfilePage`, `Event`; `inLanguage` and no cross-language fallback; SEO.1 and EVT.10 return nodes into it | P1 | 8 | SEO.1, CMS.3, CMS.10, CMS.11 | Each page type has a snapshot test of its graph; every `@id` reference resolves to a node in the same graph or a canonical URL; a schema check (types, required and recommended properties of the Google rich results for Product, Breadcrumb, Article, Event, ProfilePage) runs in CI; a page has exactly one JSON-LD script; a product name containing `</script><img src=x onerror=alert(1)>` is inert inside the JSON-LD and adds no element to the page; a page with a product grid and a product cards block has two named `ItemList`s whose items reference product `@id`s without repeating offers, and a retired product disappears from both; the product node checklist of §"Structured data graph" is covered (vendor as seller, gtin/mpn/productID, variants as ProductGroup, compact shipping, licence fields on images) and a product page's JSON-LD stays under 30 KB |
+| SEO.7 | Site-wide schema.org `@graph` (owner question 2026-11-09): one JSON-LD block per page from `seo.page_graph`, stable `@id` nodes for the operator `Organization`, `WebSite` + `SearchAction`, `WebPage` subtypes, `BreadcrumbList`, vendor `Organization` as `seller`, shared return and shipping nodes, `Product`/`Offer`/`AggregateOffer`, `CollectionPage` + `ItemList`, `BlogPosting` + `Person`/`ProfilePage`, `Event`; `inLanguage` and no cross-language fallback; SEO.1 and EVT.10 return nodes into it | P1 | 8 | SEO.1, CMS.3, CMS.10, CMS.11 | Each page type in the SEO.7 coverage table has a snapshot test of its graph, and a sweep over the registered page types fails on a public page without one; the search results page is a `SearchResultsPage` with an `ItemList` of mixed result types and `noindex, follow`; every `@id` reference resolves to a node in the same graph or a canonical URL; a schema check (types, required and recommended properties of the Google rich results for Product, Breadcrumb, Article, Event, ProfilePage) runs in CI; a page has exactly one JSON-LD script; a product name containing `</script><img src=x onerror=alert(1)>` is inert inside the JSON-LD and adds no element to the page; a page with a product grid and a product cards block has two named `ItemList`s whose items reference product `@id`s without repeating offers, and a retired product disappears from both; the product node checklist of §"Structured data graph" is covered (vendor as seller, gtin/mpn/productID, variants as ProductGroup, compact shipping, licence fields on images) and a product page's JSON-LD stays under 30 KB |
 | AI.1 | MCP server: auth, read tools (catalog, orders, quotes, simulations, reports) | P2 | 12 | CORE.7 | Tools usable from Claude Code with scopes |
 | AI.2 | Mutating MCP tools with dry-run, confirmation and audit | P2 | 10 | AI.1 | Every mutation has a diff and an audit entry |
 | AI.3 | Read-only public catalog API for agents | P3 | 6 | CAT.9 | Search by taxonomy term via API |
