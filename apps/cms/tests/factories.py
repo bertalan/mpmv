@@ -28,6 +28,7 @@ from apps.cms.models import (
     BlogPostPage,
     HomePage,
     LegalPage,
+    LegalPageReview,
     LegalPageVersion,
     NavigationMenu,
     StandardPage,
@@ -179,6 +180,20 @@ class LegalPageVersionFactory(DjangoModelFactory[LegalPageVersion]):
         return model_class._default_manager.create(*args, **kwargs)
 
 
+class LegalPageReviewFactory(DjangoModelFactory[LegalPageReview]):
+    """A review of a recorded version (I18N.9); normally `services.record_legal_review`."""
+
+    class Meta:
+        model = LegalPageReview
+
+    version = factory.SubFactory(LegalPageVersionFactory)
+    stage = LegalPageReview.Stage.COUNSEL_CHECK
+    reviewer = "Example Counsel"
+    reviewed_on = dt.date(2026, 10, 1)
+    recorded_at = factory.LazyFunction(timezone.now)
+    recorded_by = "system"
+
+
 class VendorRecruitmentPageFactory(_InTree, DjangoModelFactory[VendorRecruitmentPage]):
     """A recruitment page under the primary language's home, with two plans and a FAQ.
 
@@ -245,7 +260,7 @@ class BlogAuthorFactory(DjangoModelFactory[BlogAuthor]):
     @classmethod
     def _create(cls, model_class: type[BlogAuthor], *args: Any, **kwargs: Any) -> Any:
         kwargs.setdefault("locale", Locale.get_default())
-        return super()._create(model_class, *args, **kwargs)
+        return super()._create(model_class, *args, **kwargs)  # type: ignore[no-untyped-call]
 
 
 class BlogIndexPageFactory(_InTree, DjangoModelFactory[BlogIndexPage]):
