@@ -129,7 +129,7 @@ def test_a_safe_file_name_never_keeps_a_second_extension() -> None:
 
 
 def _gif_frames(count: int) -> bytes:
-    frames = [Image.new("P", (2, 2), n % 2) for n in range(count)]
+    frames = [Image.new("L", (2, 2), (n % 2) * 255) for n in range(count)]
     buffer = io.BytesIO()
     frames[0].save(buffer, format="GIF", save_all=True, append_images=frames[1:], duration=50)
     return buffer.getvalue()

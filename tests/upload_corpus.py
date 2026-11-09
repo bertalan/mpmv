@@ -146,7 +146,9 @@ def _jpeg_html_polyglot() -> bytes:
 
 
 def _animated_gif(frames: int, size: tuple[int, int]) -> bytes:
-    images = [Image.new("P", size, n % 2) for n in range(frames)]
+    # Grey frames that alternate black and white: Pillow merges consecutive identical frames
+    # (two palette indices of a new "P" image look the same), so they must differ.
+    images = [Image.new("L", size, (n % 2) * 255) for n in range(frames)]
     buffer = io.BytesIO()
     images[0].save(buffer, format="GIF", save_all=True, append_images=images[1:], duration=50)
     return buffer.getvalue()
