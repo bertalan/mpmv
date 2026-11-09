@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **256** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **2146 h** (P1 1748 h · P2 380 h · P3 18 h)
+- Micro-tasks: **257** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **2150 h** (P1 1748 h · P2 384 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -17,7 +17,7 @@
 | ARC | Architecture and foundations | 25 | 160 | 14 | 0 | 174 |
 | CORE | Identity, permissions, API, backoffice | 19 | 162 | 0 | 0 | 162 |
 | CAT | Product catalog | 20 | 150 | 60 | 0 | 210 |
-| VEN | Vendors, commissions, ledger | 26 | 218 | 22 | 0 | 240 |
+| VEN | Vendors, commissions, ledger | 27 | 218 | 26 | 0 | 244 |
 | TAX | Tax engine | 13 | 53 | 28 | 0 | 81 |
 | SHP | Shipping and quotes | 14 | 96 | 28 | 0 | 124 |
 | ORD | Cart, orders, returns | 12 | 102 | 14 | 0 | 116 |
@@ -33,7 +33,7 @@
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 6 | 19 | 23 | 0 | 42 |
 | MIG | Migration and cutover | 14 | 121 | 20 | 0 | 141 |
-| **Total** | | **256** | **1748** | **380** | **18** | **2146** |
+| **Total** | | **257** | **1748** | **384** | **18** | **2150** |
 
 ## By phase
 
@@ -275,7 +275,7 @@
 | MIG.11 | Staggered product and tag URL switch (owner decisions Q-91 and D-07): per-product and per-term `url_mode` and frozen legacy paths, traffic ranking from analytics (SEO.5) or the MIG.1 legacy access-log counts, configurable batch size and cadence, batch switch and rollback as a management command and staff action with dry-run and audit, sitemap, canonical and hreflang by mode, gate on 404 rate, Search Console impressions and clicks against baseline, and errors with configurable thresholds | P1 | 6 | MIG.6, CAT.5, CAT.8 | A batch switch gives a single 301 hop and an updated sitemap; a rollback leaves no redirect loop; a legacy-mode page is 200 with a self-canonical; a switched legacy tag URL is a single 301 to `/{taxonomy}/{term}/`; the next batch is refused when a gate metric is over threshold; the MIG.6 "no URL lost" count still holds after a switch and a rollback; products and terms created after go-live start in new mode |
 | MIG.12 | Source-connector interface (owner decision 2026-11-09, spec 13 §13.2 "Source connectors"): `ShopConnector` protocol (`capabilities`, `check`, `extract`), registry by decorator and `MPMV_IMPORT_CONNECTORS`, intermediate format `mpmv-import/1` (JSON Schema and Pydantic models, an evolution of the MIG.1 JSON) read by the MIG.3 and MIG.4 loaders only; shared HTTP client `apps/core/http.py` (HTTPS only, per-connector rate limit, timeouts, backoff honouring `Retry-After`, one log line per call without credentials, SSRF guard refusing loopback, private, link-local, CGNAT and metadata addresses and redirects to them); `ingest.services.import_from_source(..., dry_run=True) -> ChangeSet` with one AuditLog entry per run and an import-origin map on `(source, source_id)`; `fetched_at` in the run manifest; RFC 9457 errors; secrets by reference from the environment or a vault; schema validation of every record (SEC.9); read-only, dry-run by default, idempotent; the MIG.1 extractor wrapped as the `wordpress_db` connector; connectors import no app models (import-linter contract) | P1 | 9 | MIG.1 | A fake connector registered from settings appears in the registry and the loaders load its output with no change to their code; a record that fails the schema is rejected with a report and nothing of it is written; a canary secret never appears in logs, output or the database; two runs on the same source give byte-identical records (the manifest aside); a source resolving to 127.0.0.1, 10.x, 169.254.x, 100.64.x or a private IPv6 address is refused, also when reached by a redirect; a run interrupted halfway resumes without duplicates; a dry run writes nothing and returns the ChangeSet; the MIG.1 output validates against `mpmv-import/1`; a connector that sends a non-GET request fails its test |
 
-### F6 — After go-live (P2) (46 tasks, 380 h)
+### F6 — After go-live (P2) (47 tasks, 384 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -289,6 +289,7 @@
 | VEN.7 | Payouts: eligibility, block if DAC7 incomplete (`assert_payout_allowed`), history | P2 | 8 | VEN.4, PAY.3, VEN.12 | Tests on every blocking condition |
 | VEN.11 | Tax regime change request by vendor with staff review and email | P2 | 6 | TAX.2, ARC.16 | Parity with VTO 2.4 |
 | VEN.19 | Plan entitlements and plan fees: `plan_allows(vendor, feature)` service over `VendorPlan.features`, plan change with effective date and audit; monthly `plan_fee` ledger debit by a scheduled idempotent job; non-fiscal statement PDF per charge in the vendor's language (no invoice issued by the marketplace; the operator invoices outside the platform) | P2 | 8 | VEN.2, VEN.4, VEN.15, ARC.9 | A vendor whose plan lacks a feature cannot use it and keeps its data; a plan with a monthly fee gets exactly one `plan_fee` entry per period even when the job runs twice; the statement PDF states that it is not a tax invoice and matches the ledger entry; no fiscal document or e-invoice is produced |
+| VEN.28 | Read-only document access for closed vendors (proposed, lane-a decision on #170, not built): the CORE.17 shop space refuses members of a closed vendor with a 403 page; for the legal retention period they may still need to download their own past payout statements, invoices and DAC7 data. A dedicated read-only area for the closed vendor's former members, downloads only through signed URLs, no other shop page, every download in the AuditLog, access ending with the retention period | P2 | 4 | CORE.17, VEN.9, VEN.15, VEN.23 | A member of a closed vendor downloads that vendor's past payout statements, invoices and DAC7 data and opens no other shop page; another vendor's documents answer 404; after the retention period the area answers 403 with the closed-vendor page; each download writes an AuditLog entry |
 | TAX.6 | Rate import from official source + staff review + validity periods | P2 | 8 | TAX.1 | Simulated update without touching past orders |
 | TAX.8 | `distance_sales_eu` + `suggest_regime` from the ledger | P2 | 6 | VEN.4 | T16 green |
 | TAX.9 | Cart tax simulator in admin and API (`/tax/simulate`) | P2 | 6 | TAX.4, SHP.4 | Staff simulate a mixed cart |
