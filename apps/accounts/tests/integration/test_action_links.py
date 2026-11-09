@@ -7,13 +7,15 @@ A GET or HEAD only shows a "Continue" page; the Continue POST signs the recipien
 
 import json
 import logging
+import secrets
+import threading
 import time
 from collections.abc import Iterator
 from typing import Any
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.test import Client
 from django.urls import reverse
 from pytest_django.fixtures import Settings as SettingsWrapper
@@ -76,6 +78,11 @@ def assert_sent_to_login(response: Any, next_path: str) -> None:
     assert parse_qs(parts.query)["next"] == [next_path]
 
 
+def action_page(key: str = "doc-1", version: str = "1") -> str:
+    """Where a usable link leads: the action page, told the version the link was issued for."""
+    return f"{reverse('test-approve', args=[key])}?version={version}"
+
+
 def refusals() -> list[dict[str, Any]]:
     """The refused-link audit entries: their `after` snapshot plus the target key."""
     return [
@@ -128,7 +135,7 @@ def test_a_prefetch_does_not_spend_the_link(client: Client) -> None:
     Client().get(services.action_link_path(token))  # a mail scanner
     Client().head(services.action_link_path(token))
     response = press_continue(client, token)
-    assert response["Location"] == reverse("test-approve", args=["doc-1"])
+    assert response["Location"] == action_page()
     assert signed_in_user(client) == user.pk
 
 
@@ -138,7 +145,7 @@ def test_a_signed_in_recipient_lands_directly_on_the_action_page(client: Client)
     token = token_for(user, owned_document(user))
     response = open_link(client, token)
     assert response.status_code == 302
-    assert response["Location"] == reverse("test-approve", args=["doc-1"])
+    assert response["Location"] == action_page()
     assert not ActionLinkUse.objects.exists()
 
 
@@ -151,7 +158,7 @@ def test_a_valid_token_without_session_leads_to_the_step_up_and_then_to_the_page
     user = UserFactory.create()
     device = TOTPDeviceFactory.create(user=user)
     token = token_for(user, owned_document(user))
-    action_url = reverse("test-approve", args=["doc-1"])
+    action_url = action_page()
 
     response = press_continue(client, token)
     assert response.status_code == 302
@@ -172,7 +179,7 @@ def test_a_valid_token_without_session_leads_to_the_step_up_and_then_to_the_page
     verify = client.post(page["Location"], {"method": "totp", "token": totp_token(device)})
     assert verify["Location"] == action_url
     assert client.get(action_url).status_code == 200
-    assert client.post(action_url).content == b"approved doc-1"
+    assert client.post(action_url, {"version": "1"}).content == b"approved doc-1"
     assert [("doc-1", user.pk)] == APPROVED
 
 
@@ -210,7 +217,7 @@ def test_a_signed_in_recipient_without_a_factor_still_goes_on_to_the_page(
     user = UserFactory.create()
     client.force_login(user)
     response = press_continue(client, token_for(user, owned_document(user)))
-    assert response["Location"] == reverse("test-approve", args=["doc-1"])
+    assert response["Location"] == action_page()
     assert not refusals()
 
 
@@ -219,7 +226,7 @@ def test_an_action_without_step_up_is_refused(client: Client) -> None:
     TOTPDeviceFactory.create(user=user)
     press_continue(client, token_for(user, owned_document(user)))
 
-    response = client.post(reverse("test-approve", args=["doc-1"]))
+    response = client.post(reverse("test-approve", args=["doc-1"]), {"version": "1"})
 
     assert response.status_code == 302
     assert urlsplit(response["Location"]).path == reverse("mfa:verify")
@@ -230,7 +237,7 @@ def test_an_old_step_up_is_not_enough_for_the_action(client: Client) -> None:
     user = UserFactory.create()
     verified_login(client, user, verified_at=time.time() - 3600)
     owned_document(user)
-    response = client.post(reverse("test-approve", args=["doc-1"]))
+    response = client.post(reverse("test-approve", args=["doc-1"]), {"version": "1"})
     assert urlsplit(response["Location"]).path == reverse("mfa:verify")
     assert APPROVED == []
 
@@ -372,9 +379,6 @@ def test_a_tampered_token_is_refused_and_sent_to_plain_login(client: Client) -> 
     response = press_continue(client, tampered)
 
     assert_sent_to_login(response, "/")
-    [entry] = refusals()
-    assert entry["reason"] == "bad_signature"
-    assert entry["target_key"] == services.UNKNOWN_ACCOUNT
 
 
 def test_a_token_signed_for_another_purpose_salt_is_refused() -> None:
@@ -414,7 +418,6 @@ def test_the_continue_post_is_rate_limited_per_ip(
     response = press_continue(client, "not-a-token")
     assert response.status_code == 429
     assert int(response["Retry-After"]) > 0
-    assert len(refusals()) == 2
 
 
 def test_tokens_never_reach_the_audit_log(client: Client) -> None:
@@ -473,3 +476,185 @@ def test_the_email_helper_dry_run_queues_nothing() -> None:
     assert not changes.is_empty
     assert not OutboxEmail.objects.exists()
     assert not AuditLog.objects.exists()
+
+
+# --- Review follow-ups (#140): staff, revocation, version re-check, audit noise, concurrency
+
+
+@pytest.mark.parametrize("trait", ["staff", "superuser"])
+def test_staff_recipients_get_no_passwordless_sign_in(client: Client, trait: str) -> None:
+    # Staff sign in with their password and MFA, then continue (lane-a decision on #140).
+    user = UserFactory.create(**{trait: True})
+    TOTPDeviceFactory.create(user=user)
+    token = token_for(user, owned_document(user))
+
+    response = press_continue(client, token)
+
+    assert_sent_to_login(response, reverse("test-approve", args=["doc-1"]))
+    assert signed_in_user(client) is None
+    assert not ActionLinkUse.objects.exists()
+    [entry] = refusals()
+    assert entry["reason"] == "staff_recipient"
+    assert entry["target_key"] == str(user.public_id)
+    assert services.check_action_token(token).refusal is None  # still usable once signed in
+
+
+def test_a_signed_in_staff_recipient_goes_on_to_the_page(client: Client) -> None:
+    user = UserFactory.create(staff=True)
+    verified_login(client, user)
+    response = press_continue(client, token_for(user, owned_document(user)))
+    assert response["Location"] == action_page()
+    assert not refusals()
+    assert not ActionLinkUse.objects.exists()
+
+
+def test_a_reissued_link_revokes_the_older_one(client: Client) -> None:
+    user = UserFactory.create()
+    TOTPDeviceFactory.create(user=user)
+    first = token_for(user, owned_document(user))
+    second = token_for(user)
+
+    assert services.check_action_token(first).refusal == "revoked"
+    assert services.check_action_token(second).refusal is None
+    response = press_continue(client, first)
+    assert_sent_to_login(response, reverse("test-approve", args=["doc-1"]))
+    assert signed_in_user(client) is None
+    assert refusals()[0]["reason"] == "revoked"
+    assert press_continue(Client(), second)["Location"] == action_page()
+
+
+def test_a_reissue_revokes_only_links_to_the_same_object_and_recipient() -> None:
+    x, y = UserFactory.create(), UserFactory.create()
+    owned_document(x, "doc-1")
+    owned_document(x, "doc-2")
+    first = token_for(x, "doc-1")
+    token_for(x, "doc-2")
+    DOCUMENTS["doc-1"].owner_id = y.pk
+    token_for(y, "doc-1")
+    DOCUMENTS["doc-1"].owner_id = x.pk
+    assert services.check_action_token(first).refusal is None
+
+
+def test_the_email_helper_reissues_but_its_dry_run_revokes_nothing() -> None:
+    user = UserFactory.create()
+    owned_document(user)
+    outstanding = token_for(user)
+
+    def send(*, dry_run: bool) -> None:
+        services.send_action_link_email(
+            purpose=APPROVE_PURPOSE,
+            object_key="doc-1",
+            recipient=user,
+            version="1",
+            template_key="tests.reminder",
+            context={"item": "x", "due": "y"},
+            ctx=SYSTEM,
+            dry_run=dry_run,
+        )
+
+    send(dry_run=True)
+    assert services.check_action_token(outstanding).refusal is None
+    send(dry_run=False)
+    assert services.check_action_token(outstanding).refusal == "revoked"
+
+
+def test_a_password_change_revokes_outstanding_links(client: Client) -> None:
+    user = UserFactory.create()
+    TOTPDeviceFactory.create(user=user)
+    token = token_for(user, owned_document(user))
+    user.set_password(secrets.token_urlsafe(16))
+    user.save(update_fields=["password"])
+
+    assert services.check_action_token(token).refusal == "revoked"
+    assert_sent_to_login(press_continue(client, token), reverse("test-approve", args=["doc-1"]))
+    assert signed_in_user(client) is None
+    assert services.check_action_token(token_for(user)).refusal is None
+
+
+def test_the_action_post_rechecks_the_version(client: Client) -> None:
+    user = UserFactory.create()
+    verified_login(client, user)
+    owned_document(user)
+    page = client.get(action_page())
+    assert page.status_code == 200
+    assert 'name="version" value="1"' in page.content.decode()
+    DOCUMENTS["doc-1"].version = "2"  # the proposal changed while the page was open
+
+    response = client.post(reverse("test-approve", args=["doc-1"]), {"version": "1"})
+
+    assert response.status_code == 409
+    assert APPROVED == []
+    assert client.post(reverse("test-approve", args=["doc-1"])).status_code == 409
+    assert APPROVED == []
+
+
+def test_the_action_page_refuses_a_version_the_link_was_not_issued_for(client: Client) -> None:
+    user = UserFactory.create()
+    verified_login(client, user)
+    owned_document(user, version="2")
+    assert client.get(action_page(version="1")).status_code == 409
+
+
+def test_action_version_matches_compares_with_the_current_version() -> None:
+    user = UserFactory.create()
+    owned_document(user, version="3")
+    assert services.action_version_matches(APPROVE_PURPOSE, "doc-1", "3")
+    assert not services.action_version_matches(APPROVE_PURPOSE, "doc-1", "2")
+    assert not services.action_version_matches(APPROVE_PURPOSE, "doc-1", None)
+    assert not services.action_version_matches(APPROVE_PURPOSE, "doc-9", "3")
+    assert not services.action_version_matches("tests.unknown", "doc-1", "3")
+
+
+def test_a_bad_signature_writes_no_audit_row_but_is_logged(
+    client: Client, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO, logger=services.ACTION_LINK_LOGGER)
+    user = UserFactory.create()
+    token = token_for(user, owned_document(user))
+    tampered = token[:-2] + ("AA" if not token.endswith("AA") else "BB")
+
+    press_continue(client, tampered)
+    press_continue(client, "not-a-token")
+
+    assert not AuditLog.objects.exists()
+    records = [r for r in caplog.records if r.name == services.ACTION_LINK_LOGGER]
+    assert [getattr(r, "reason", None) for r in records] == ["bad_signature", "bad_signature"]
+    assert tampered not in caplog.text
+
+
+def test_a_link_for_an_unknown_account_writes_no_audit_row(client: Client) -> None:
+    user = UserFactory.create()
+    token = token_for(user, owned_document(user))
+    User.objects.filter(pk=user.pk).delete()
+    press_continue(client, token)
+    assert not AuditLog.objects.exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_two_concurrent_continue_posts_sign_in_exactly_once() -> None:
+    user = UserFactory.create()
+    TOTPDeviceFactory.create(user=user)
+    token = token_for(user, owned_document(user))
+    barrier = threading.Barrier(2)
+    clients = [Client(), Client()]
+    locations: list[str] = []
+
+    def continue_once(client: Client) -> None:
+        try:
+            barrier.wait(timeout=10)
+            locations.append(press_continue(client, token)["Location"])
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=continue_once, args=(c,)) for c in clients]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+
+    refused = f"{LOGIN_PATH}?next={quote(reverse('test-approve', args=['doc-1']), safe='')}"
+    assert sorted(locations) == sorted([action_page(), refused])
+    assert [signed_in_user(c) for c in clients].count(user.pk) == 1
+    assert ActionLinkUse.objects.count() == 1
+    assert AuditLog.objects.filter(action=services.ACTION_LINK_SIGNED_IN).count() == 1
+    assert [entry["reason"] for entry in refusals()] == ["used"]
