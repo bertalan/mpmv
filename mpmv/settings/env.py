@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from django.core.exceptions import ImproperlyConfigured
 
@@ -77,3 +78,29 @@ def ensure_key_file(path: Path, *, key_id: str) -> None:
     with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
         handle.write("# MPMV field encryption keys (SEC.3), newest first. Never commit.\n")
         handle.write(generate_key(key_id) + "\n")
+
+
+def map_tile_origin(url: str) -> str | None:
+    """The origin the CSP must allow for the map tile URL template (EVT.13); None for the site.
+
+    `MPMV_MAP_TILE_URL` is a Leaflet template with `{z}`, `{x}` and `{y}`: a path on the site
+    itself (the EVT.14 tile proxy, `/maps/tiles/{z}/{x}/{y}.png`) needs nothing; an absolute URL
+    must be HTTPS on one fixed host, and the CSP then allows that origin only (no `{s}`
+    subdomains, no scheme-relative URL). Empty: maps show no tile layer.
+    """
+    if not url:
+        return None
+    problem = ""
+    if not all(part in url for part in ("{z}", "{x}", "{y}")):
+        problem = "needs the {z}, {x} and {y} placeholders"
+    elif url.startswith("/") and not url.startswith("//"):
+        return None
+    else:
+        parts = urlsplit(url)
+        if parts.scheme != "https" or not parts.netloc:
+            problem = "must be a path on this site or an https:// URL"
+        elif "{" in parts.netloc or "}" in parts.netloc:
+            problem = "must name one fixed host"
+    if problem:
+        raise ImproperlyConfigured(f"MPMV_MAP_TILE_URL {problem}, got {url!r}")
+    return f"https://{urlsplit(url).netloc}"
