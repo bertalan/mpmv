@@ -1,8 +1,10 @@
 """Editors' admin routes of the core app that replace Wagtail's own (THM.12).
 
 mpmv/urls.py includes this module ahead of `wagtail.admin.urls`, so these paths win. Wagtail's
-URL names are kept: its views and templates reverse them, and the shadowed route has the same
-path.
+views and templates still reverse its own names (`wagtailadmin_collections:edit`), which give the
+same path. The name cannot be kept here: a second include under Wagtail's namespace would take
+over the reverse() of the namespace's other routes. tests.tenancy_registry.SHADOWED declares the
+shadowed route.
 """
 
 from django.urls import URLPattern, path
