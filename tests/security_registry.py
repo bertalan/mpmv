@@ -31,6 +31,12 @@ from tests.tenancy import CrossTenant
 
 PUBLIC_CATALOG = "Public catalog listing (CAT.8): published products of active vendors only."
 PUBLIC_CMS = "Public CMS page (CMS.1)."
+MEDIA = (
+    "Public image files (THM.12, apps.core.media): published images and renditions, served to "
+    "anyone as on STAGE/LIVE through Caddy. The path names a file in the image folders only, not "
+    "an object a caller could swap for another tenant's; anything outside them is a 404 "
+    "(tests/integration/test_modern_image_formats.py)."
+)
 SIGN_IN = "Sign-in page: must answer before the visitor is signed in."
 PASSWORD_RESET = "Password reset flow of the editors' admin: answers before sign-in."
 
@@ -39,6 +45,7 @@ PUBLIC: dict[str, str] = {
     "healthz": "Liveness probe with a constant answer.",
     "email_webhook": "Email provider feedback: refused unless the payload is signed (ARC.16).",
     "home": "Public home page.",
+    "media": MEDIA,
     "catalog:category": PUBLIC_CATALOG,
     "catalog:brand": PUBLIC_CATALOG,
     "catalog:term": PUBLIC_CATALOG,
@@ -79,6 +86,7 @@ GET_WRITES_ALLOWED: frozenset[str] = frozenset({"django_session"})
 # where the cross-tenant tests reach it with another vendor's object, or be listed here with what
 # keeps one user from reaching another's object through it.
 IDOR_REVIEWED: dict[str, str] = {
+    "media": MEDIA,
     "mfa:remove_device": (
         "The factor is looked up among the signed-in user's own (CORE.4); another user's factor "
         "answers 404 (`test_a_user_cannot_remove_another_users_second_factor`)."
@@ -116,6 +124,7 @@ OBJECT_PATHS: dict[str, ObjectKwargs] = {
 # Routes with an identifier, called with placeholder parameters, that may answer 404 to a caller
 # who is not signed in or not allowed, with why that 404 hides nothing.
 PLACEHOLDER_404: dict[str, str] = {
+    "media": MEDIA,
     "wagtailadmin_password_reset_confirm": (
         "Password reset confirmation of the editors' admin, public by design (PUBLIC): the uid "
         "and token in the URL are the credential, not a reference to an object a caller could "

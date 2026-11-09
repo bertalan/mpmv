@@ -3,15 +3,18 @@ append-only audit log, the platform operator, the feature flags, the shared imag
 licence allow list, the transactional email outbox."""
 
 import json
+import posixpath
 import uuid
 from typing import Any, ClassVar, Self
 
 from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import ArrayField, DateTimeRangeField, RangeOperators
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.db import models, transaction
 from django.utils import timezone
 from wagtail.images.models import AbstractImage, AbstractRendition, Image
+from wagtail.models import Collection
 
 from . import flags, translations
 from .countries import default_allowed_vendor_countries
@@ -23,6 +26,7 @@ from .image_licences import (
     metadata_errors,
     restricted_licence_error,
 )
+from .svg import LOGO_COLLECTION_NAME, MAX_SVG_BYTES, UnsafeSvgError, sanitise_svg
 
 # The dedicated platform owner permission (spec 02 roles, CMP.13): never implied by staff or
 # admin access, superuser status included. Granted as `core.platform_owner`, directly or through a
@@ -512,6 +516,108 @@ class GeocoderState(BaseModel):
         return f"{self.provider} ({self.failures} failures)"
 
 
+def svg_collection_refusal(collection: Collection | None) -> str | None:
+    """None if an SVG may sit in `collection` (an `SvgCollection` or one below it); the reason
+    it may not otherwise (THM.12)."""
+    if (
+        collection is not None
+        and Collection.objects.ancestor_of(collection, inclusive=True)
+        .filter(svg_policy__isnull=False)
+        .exists()
+    ):
+        return None
+    allowed = Collection.objects.filter(svg_policy__isnull=False).order_by("path")
+    names = ", ".join(repr(c.name) for c in allowed) or repr(LOGO_COLLECTION_NAME)
+    return f"SVG is for logos and icons only: upload it to the {names} collection."
+
+
+def svg_collection_move_refusal(collection: Collection, new_parent: Collection) -> str | None:
+    """None if `collection` may move under `new_parent`; the reason otherwise (THM.12).
+
+    Moving a collection never saves its images, so `MediaImage.save` cannot refuse it: a
+    sub-collection holding SVGs (at any depth) may not leave the SVG collections, while one with
+    raster images only moves freely. An `SvgCollection` inside the subtree (the moved one
+    included) keeps accepting the SVGs below it wherever it goes."""
+    if svg_collection_refusal(new_parent) is None:
+        return None
+    subtree = list(Collection.objects.descendant_of(collection, inclusive=True))
+    svg_roots = tuple(
+        SvgCollection.objects.filter(collection__in=subtree).values_list(
+            "collection__path", flat=True
+        )
+    )
+    uncovered = [c.pk for c in subtree if not c.path.startswith(svg_roots)]
+    svgs = MediaImage.objects.filter(collection__in=uncovered, file__iendswith=".svg")
+    if not svgs.exists():
+        return None
+    return (
+        f"{collection.name!r} holds SVG images, which may stay only in the collections for "
+        "logos and icons: move them elsewhere first, or choose a parent among those collections."
+    )
+
+
+def check_svg(data: bytes, collection: Collection | None) -> tuple[bytes, None] | tuple[None, str]:
+    """(the bytes to store, None) for an SVG allowed in `collection`, else (None, the reason)."""
+    refusal = svg_collection_refusal(collection)
+    if refusal is not None:
+        return None, refusal
+    try:
+        return sanitise_svg(data), None
+    except UnsafeSvgError as error:
+        return None, f"This SVG is refused: {error}"
+
+
+def read_svg(file: Any) -> bytes | None:
+    """The bytes of an image file if it is an SVG (up to one byte over `MAX_SVG_BYTES`, which
+    the sanitiser refuses), None if it is not or is missing from storage.
+
+    A stored file is an SVG if its name ends in `.svg`: Wagtail's upload form checks that the
+    extension matches the content. A new upload is also sniffed, so that an SVG named `.png`
+    is checked before the format check can be relied on.
+    """
+    if not file:
+        return None
+    named_svg = posixpath.splitext(file.name or "")[1].lower() == ".svg"
+    if file._committed:
+        if not named_svg:
+            return None
+        try:
+            with file.storage.open(file.name, "rb") as stored:
+                data: bytes = stored.read(MAX_SVG_BYTES + 1)
+        except OSError:
+            return None  # missing from storage: nothing that could be served
+        return data
+    file.open("rb")
+    head: bytes = file.read(256)
+    if not named_svg and not head.lstrip(b"\xef\xbb\xbf \t\r\n").startswith(b"<"):
+        file.seek(0)
+        return None
+    data = head + file.read(MAX_SVG_BYTES + 1 - len(head))
+    file.seek(0)
+    return data
+
+
+class SvgCollection(BaseModel):
+    """A Wagtail collection that accepts SVG uploads, with its sub-collections (THM.12).
+
+    SVG is for logos and icons only. The collection is identified by this row, not by its
+    display name: Wagtail lets editors rename collections and give two the same name, so a
+    name match would let an SVG into any collection called "Logos and icons" and would stop
+    SVG uploads when the real one is renamed. The row is written by the 0015 data migration
+    only: no admin, no service.
+    """
+
+    collection = models.OneToOneField(
+        Collection, on_delete=models.CASCADE, related_name="svg_policy"
+    )
+
+    class Meta:
+        verbose_name = "SVG collection"
+
+    def __str__(self) -> str:
+        return f"SVG allowed in {self.collection}"
+
+
 class MediaImage(AbstractImage):  # type: ignore[misc]  # Wagtail is untyped
     """The site's image model (`WAGTAILIMAGES_IMAGE_MODEL`, spec 10 §10.2).
 
@@ -571,8 +677,63 @@ class MediaImage(AbstractImage):  # type: ignore[misc]  # Wagtail is untyped
             source_url=self.source_url,
             permission_ref=self.permission_ref,
         )
+        svg_error = self._clean_svg()
+        if svg_error:
+            errors["file"] = svg_error
         if errors:
             raise ValidationError(errors)
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        update_fields = kwargs.get("update_fields")
+        if update_fields is None or {"file", "collection"} & set(update_fields):
+            self._enforce_svg_policy()
+        super().save(*args, **kwargs)
+
+    def _svg_check(self) -> tuple[bytes, bytes | None, str | None] | None:
+        """None if the file is not an SVG; else (its bytes, the bytes to store, the reason it is
+        refused), exactly one of the last two set."""
+        data = read_svg(self.file)
+        if data is None:
+            return None
+        cleaned, refusal = check_svg(data, self.collection if self.collection_id else None)
+        return data, cleaned, refusal
+
+    def _clean_svg(self) -> str | None:
+        """THM.12: an SVG must sit in an `SvgCollection` (the logos collection, or one below
+        it) and pass `apps.core.svg`; a new upload is replaced by its re-serialisation. The
+        reason it is refused, or None."""
+        check = self._svg_check()
+        if check is None:
+            return None
+        _, cleaned, refusal = check
+        file: Any = self.file
+        if cleaned is not None and not file._committed:
+            file.file = ContentFile(cleaned, name=posixpath.basename(file.name))  # saved on save()
+        return refusal
+
+    def _enforce_svg_policy(self) -> None:
+        """The same rule on every save, whatever the path: `clean()` is not called by Wagtail's
+        multiple upload, which writes the uploaded bytes to storage before the model sees them
+        and lets the second step pick another collection, nor by services or the shell. A
+        refused SVG raises; one not stored in its re-serialised form is rewritten."""
+        check = self._svg_check()
+        if check is None:
+            return
+        data, cleaned, refusal = check
+        if cleaned is None:
+            raise ValidationError({"file": refusal})
+        if cleaned == data:
+            return
+        file: Any = self.file
+        if file._committed:
+            name, storage = file.name, file.storage
+            file.close()
+            storage.delete(name)
+            file.name = storage.save(name, ContentFile(cleaned))
+            file._file = None  # reopened from storage on the next read
+        else:
+            file.file = ContentFile(cleaned, name=posixpath.basename(file.name))
+        self._set_image_file_metadata()
 
     @property
     def needs_review(self) -> bool:

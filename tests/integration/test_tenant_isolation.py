@@ -7,12 +7,17 @@ guards fail when something new is not declared in `tests.tenancy_registry`:
 
 - a vendor-owned model (a ForeignKey chain to Vendor) without the scoped manager or an object
   maker;
-- a URL pattern or an API operation without an access class.
+- a URL pattern or an API operation without an access class;
+- a `SHADOWED` entry whose shadowed route is gone, whose replacement is not routed or not
+  declared, or whose path does not resolve to that replacement. Shadowing that is not declared
+  is not detected; such a route stays in the generated tests, whose requests reach whatever
+  view answers its path.
 """
 
 import pytest
 from django.http import Http404
 from django.test import Client
+from django.urls import resolve
 
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import get_vendor_object_or_404, is_vendor_scoped, scope_target
@@ -31,6 +36,7 @@ from tests.tenancy_registry import (
     ENDPOINTS,
     NOT_VENDOR_OWNED,
     OWNED_OBJECTS,
+    SHADOWED,
     classify,
 )
 
@@ -38,6 +44,8 @@ pytestmark = pytest.mark.django_db
 
 WEB_ENDPOINTS = [e for e in endpoints() if not e.is_api_operation]
 API_ENDPOINTS = [e for e in endpoints() if e.is_api_operation]
+# Shadowed routes are answered by their replacement, tested under its own key.
+REACHABLE_ENDPOINTS = [e for e in WEB_ENDPOINTS if e.key not in SHADOWED]
 OPERATIONS = api_operations()
 OWNED_MODELS = vendor_owned_models(exclude=NOT_VENDOR_OWNED)
 
@@ -85,6 +93,22 @@ def test_the_endpoint_registry_has_no_stale_entries() -> None:
     assert not stale, "No such endpoint any more, remove from ENDPOINTS: " + ", ".join(stale)
 
 
+def test_shadowed_endpoints_are_answered_by_their_declared_replacement() -> None:
+    """Each `SHADOWED` entry is current: the shadowed route still exists, its replacement is
+    routed and declared, and the shadowed path resolves to that replacement. It does not look
+    for shadowing that is missing from `SHADOWED`."""
+    by_key = {e.key: e for e in WEB_ENDPOINTS}
+    for shadowed, replacement in SHADOWED.items():
+        assert shadowed in by_key, f"No such endpoint any more, remove from SHADOWED: {shadowed}"
+        assert replacement in by_key, f"{replacement} (replaces {shadowed}) is not routed"
+        assert classify(by_key[replacement]) is not None, f"{replacement} is not declared"
+        endpoint = by_key[shadowed]
+        path = endpoint.path(**dict.fromkeys(endpoint.params, "0"))
+        match = resolve(path)
+        found = match.view_name if match.url_name else match.route
+        assert found == replacement, f"{path} routes to {found}, not to {replacement}"
+
+
 def test_every_api_operation_is_classified() -> None:
     keys = {op.key for op in OPERATIONS}
     missing = sorted(keys - set(API_OPERATIONS))
@@ -119,7 +143,7 @@ def test_scoped_queries_never_return_another_vendors_rows(
         get_vendor_object_or_404(model, a.owner, pk=theirs.pk)
 
 
-@pytest.mark.parametrize("endpoint", WEB_ENDPOINTS, ids=lambda e: e.key)
+@pytest.mark.parametrize("endpoint", REACHABLE_ENDPOINTS, ids=lambda e: e.key)
 def test_a_vendor_member_cannot_reach_another_vendors_data(
     endpoint: Endpoint, client: Client, cross_tenant: CrossTenant
 ) -> None:

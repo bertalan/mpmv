@@ -264,6 +264,22 @@ WAGTAILADMIN_BASE_URL = SITE_BASE_URL
 # One image model for CMS pages, products (CAT.4), vendor logos and banners (spec 10 §10.2). Set
 # before any image exists: the licence and credit fields come with CMS.8.
 WAGTAILIMAGES_IMAGE_MODEL = "core.MediaImage"
+# Modern image formats (THM.12, spec 14 §14.7). Uploads stay open to the common raster formats
+# and keep their original; SVG is for logos and icons only, checked at upload (apps.core.svg).
+WAGTAILIMAGES_EXTENSIONS = ["avif", "gif", "jpg", "jpeg", "png", "webp", "svg"]
+# Shows the SVG refusal in the second step of Wagtail's multiple upload (apps.core.forms).
+WAGTAILIMAGES_IMAGE_FORM_BASE = "apps.core.forms.MediaImageForm"
+# Renditions without an explicit format-* go to WebP. GIF is left out: Wagtail turns a still GIF
+# into PNG and keeps an animated one as GIF, which WebP conversion would flatten to one frame.
+# Templates ask for AVIF, WebP and JPEG explicitly ({% responsive_image %}, apps.core.images).
+WAGTAILIMAGES_FORMAT_CONVERSIONS = {
+    "png": "webp",
+    "jpeg": "webp",
+    "bmp": "webp",
+    "heic": "webp",
+    "webp": "webp",
+    "avif": "avif",
+}
 # wagtail-localize (I18N.3): translations follow their source page; a translator syncs them from
 # the source page's "Sync translated pages" action.
 WAGTAIL_LOCALIZE_DEFAULT_TRANSLATION_MODE = "synced"
