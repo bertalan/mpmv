@@ -50,6 +50,8 @@ from apps.catalog.tests.factories import (
     VariantOptionFactory,
     VariantTranslationFactory,
 )
+from apps.cms.models import VendorLandingPage
+from apps.cms.tests.factories import VendorLandingPageFactory
 from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage, VendorEventPolicy
@@ -180,6 +182,8 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     # EVT.1: a draft event page under the primary language's events index.
     EventPage: lambda vendor: EventPageFactory.create(vendor=vendor),
     VendorEventPolicy: lambda vendor: VendorEventPolicyFactory.create(vendor=vendor),
+    # CMS.4: a vendor's story page under the primary language's home.
+    VendorLandingPage: lambda vendor: VendorLandingPageFactory.create(vendor=vendor),
     TaxRegimeChangeRequest: lambda vendor: TaxRegimeChangeRequestFactory.create(
         # A reviewed request: the vendor may already have its one pending request.
         vendor=vendor,

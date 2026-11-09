@@ -1,0 +1,8 @@
+{% load i18n %}{% comment %}
+Landing page product cards (CMS.4) as base theme product tiles (THM.4), like the product grid
+block. Needs `cards`, `currency` and `heading_level` (the level of the tile names).
+TODO(TAX.12): interim net price "excl. VAT", like catalog/includes/product_card.html; TAX.12
+replaces it with the gross amount for B2C buyers. This net display must not reach LIVE.
+{% endcomment %}<ul class="product-grid" role="list">
+  {% for card in cards %}{% if card.price is not None %}{% blocktranslate asvar price with amount=card.price %}{{ currency }} {{ amount }} excl. VAT{% endblocktranslate %}{% else %}{% firstof "" as price %}{% endif %}<li>{% include "components/product_tile.html" with name=card.title url=card.url image_url=card.image_url image_alt=card.image_alt price=price heading_level=heading_level only %}</li>{% endfor %}
+</ul>
