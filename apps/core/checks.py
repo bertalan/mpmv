@@ -16,6 +16,7 @@
   provider adapter, not the console or test sender (core.E501), from a real address
   (core.E502); without live data (development, tests, STAGE) the console sender stays allowed
   until ARC.19.
+- Image formats (THM.12): a warning when Pillow cannot encode AVIF (core.W501).
 """
 
 import ast
@@ -515,3 +516,26 @@ def check_email_settings(
             )
         )
     return errors
+
+
+# --- Image formats (THM.12, spec 14 §14.7)
+
+
+def check_avif_support(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """Without an AVIF encoder, pictures fall back to WebP and JPEG: say so (core.W501)."""
+    from . import images
+
+    if images.avif_supported():
+        return []
+    return [
+        checks.Warning(
+            "Pillow cannot encode AVIF here: <picture> elements offer WebP and JPEG only.",
+            hint=(
+                "Install the Pillow wheel from uv.lock (it bundles libavif), or a Pillow built "
+                "against libavif."
+            ),
+            id="core.W501",
+        )
+    ]

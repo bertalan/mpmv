@@ -90,6 +90,13 @@ Owner decisions of 2026-11-08:
   law would be for Austrian VAT numbers only. The generic `other` reason carries the country of
   the law its legal note cites (TAX.13).
 
+Owner decision of 2026-11-09:
+
+- **Existing `other` profiles (MQ-15).** No migration guesses the law country of a profile that
+  already uses the `other` reason: staff read its legal note and enter the country. Until they
+  do, the profile is incomplete and stays in the nightly inconsistency report and in the tax
+  admin list (TAX.13).
+
 ### Engine contract
 
 ```python
@@ -195,4 +202,4 @@ Intended differences from today:
 | TAX.10 | Quarterly OSS report per country and per-vendor report | P2 | 8 | ORD.4 | CSV export verified on seed orders |
 | TAX.11 | Shared postcode grammar for tax territories (coherence check 5): `Territory.postcode_patterns` validated and matched with `apps.core.postcodes` (SHP.12), data migration from the `a-b` range form to `a..b`, the tax-only pattern code removed | P1 | 2 | TAX.1, SHP.12 | A `22100-22199` pattern is refused with the `..` hint; stored rows are migrated; `9000..9999` is accepted and matches; Portuguese and Polish postcodes with a dash match as exact postcodes |
 | TAX.12 | Consumer price display, go-live gate (Directive 98/6/EC, national consumer codes): B2C prices on cards, product pages, cart and feeds include VAT. The gross amount uses the destination country's rate through the TAX.3 tax engine; before the buyer picks a country, an estimated country (geo or locale) is used with a clear "VAT included, estimated for <country>" note. A net price shows only to business buyers who opt in. The catalog stays free of tax imports: a tax-side adapter or template tag supplies the gross amount. The owner confirmed the destination rate, the estimated country and the business opt-in on 2026-11-08 (MQ-12) | P1 | 6 | TAX.3, CAT.8 | Regression tests for IT, DE and FR consumers (destination rate, estimated-country note); a business buyer's net view after opt-in; `on_request` products never priced; ROUND_HALF_UP per line; the catalog app has no tax import |
-| TAX.13 | Exemption reasons per country (owner decision MQ-3): each exemption reason declares the country of the law that defines it (IT for `art74_publishing` and `flat_rate_forfettario`; `other` stores the country of the law cited in its legal note), and the profile consistency check refuses a reason whose country differs from the country of the vendor's VAT registration, on the staff direct path and on TAX.2 approval alike; the check also runs on a VAT number change | P1 | 3 | TAX.2, VEN.12 | An Italian vendor saves `art74_publishing`; a German vendor is refused `art74_publishing` and `flat_rate_forfettario`; a staff-added profile and an approved request give the same refusal; changing an exempt Italian vendor's VAT number to another country is reported; `other` without a country is refused |
+| TAX.13 | Exemption reasons per country (owner decision MQ-3): each exemption reason declares the country of the law that defines it (IT for `art74_publishing` and `flat_rate_forfettario`; `other` stores the country of the law cited in its legal note), and the profile consistency check refuses a reason whose country differs from the country of the vendor's VAT registration, on the staff direct path and on TAX.2 approval alike; the check also runs on a VAT number change; staff enter the law country of existing `other` profiles by hand (MQ-15) | P1 | 3 | TAX.2, VEN.12 | An Italian vendor saves `art74_publishing`; a German vendor is refused `art74_publishing` and `flat_rate_forfettario`; a staff-added profile and an approved request give the same refusal; changing an exempt Italian vendor's VAT number to another country is reported; `other` without a country is refused; no data migration fills the country of an existing `other` profile, and such a profile stays in the inconsistency report until staff enter the country (owner decision MQ-15) |

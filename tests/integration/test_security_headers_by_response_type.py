@@ -7,12 +7,16 @@ successes and RFC 9457 problems, the staff and editors' admins and the theme sty
 checks that no response leaks a `Server` or `X-Powered-By` header, and that pages for a signed-in
 user are never cacheable by a shared cache.
 
-Media: no Django view serves `MEDIA_URL` on main; Caddy serves the public image files, and
-`tests/unit/test_proxy_security_headers.py` checks their headers in the Caddyfile.
+Media: `apps.core.media.serve_media` serves image files when Caddy is not in front (THM.12); its
+own CSP (sandbox, `frame-ancestors 'none'`) stays, the middleware adds the rest. On STAGE and LIVE
+Caddy serves them, and `tests/unit/test_proxy_security_headers.py` checks the Caddyfile. The
+`Server` check here sees only Django: gunicorn's `Server` header is dropped by Caddy, which that
+test also checks.
 """
 
 import secrets
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from django.http import HttpRequest, HttpResponse
@@ -25,6 +29,7 @@ from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.api.tests.factories import ApiClientFactory
 from apps.cms.services import seed_site
+from apps.core.media import RASTER_CSP, SVG_CSP
 from mpmv.urls import urlpatterns as _site_urlpatterns
 from tests.integration.test_security_headers import (
     DENIED_FEATURES,
@@ -192,6 +197,26 @@ def test_https_redirect_301_full_header_set(anon: Client) -> None:
     response = anon.get("/django-admin/login/")
     assert response.status_code == 301
     assert_security_headers(response)
+
+
+# --- Media (Django's view, used without Caddy) -------------------------------------------------
+
+
+@pytest.mark.parametrize(("name", "policy"), [("pic.png", RASTER_CSP), ("logo.svg", SVG_CSP)])
+def test_media_file(anon: Client, tmp_path: Path, name: str, policy: str) -> None:
+    (tmp_path / "images").mkdir()
+    (tmp_path / "images" / name).write_bytes(b"not decoded by the view")
+    with override_settings(MEDIA_ROOT=str(tmp_path)):
+        response = anon.get(f"/media/images/{name}", secure=True)
+    assert response.status_code == 200
+    sent = {header: response.headers.get(header) for header in EXPECTED_HEADERS}
+    assert sent == EXPECTED_HEADERS
+    assert response.headers["Content-Security-Policy"] == policy
+    csp = parse_csp(policy)
+    assert csp["default-src"] == ["'none'"]
+    assert csp["frame-ancestors"] == ["'none'"]
+    assert "sandbox" in csp
+    assert_no_leak_headers(response)
 
 
 # --- Static files -------------------------------------------------------------------------------
