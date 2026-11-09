@@ -8,7 +8,7 @@ import apps.cms.blocks
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("cms", "0008_product_grid"),
+        ("cms", "0009_legal_reviews_per_language"),
     ]
 
     operations = [
