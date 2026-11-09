@@ -280,13 +280,17 @@ The first baselines for `base` and `ride` are committed by THM.10.
 `themes/ride/` is the first vertical theme (`parent = "base"`). It was written clean-room from the
 public spec and a brief: no file derives from a reference template (spec 14 §14.8).
 
-- **Tokens** (`tokens.toml`): `color.accent` is the accent as text, link and UI colour
-  (`#C40417`), `color.accent-fill` the red fill for buttons and large surfaces (`#E3051A`, white
-  text 4.88:1), `color.surface-inverse` the dark header and footer. Extra tokens: `color.heading`,
-  `color.border-strong`, `color.overlay`, `scrim.opacity`, `step.display`, `space.section`,
-  `radius.pill`, `radius.round`, `shadow.button-hover`. Every text pair is tested in
-  `apps/themes/tests/unit/test_ride_theme.py`. CSS uses `var(--…)` only, so the operator palette
-  of spec 14 §14.12 overrides the defaults with custom properties.
+- **Tokens** (`tokens.toml`): the colours are the operator palette of spec 14 §14.4 and §14.12
+  (primary `#046BD2` with white, hover `#035AB1`, tint `#EEF6FF`, secondary `#FBA926` with
+  `#1A1A1A` text, secondary text `#BE5900`); the neutrals, the dark surface `#30373F` of header
+  and footer and the navy `#051026` scrim come from the brief. The primary is never text on the
+  dark surface (white there). Extra tokens: `color.heading`, `color.border-strong`,
+  `color.overlay`, `scrim.opacity`, `step.display`, `space.section`, `radius.pill`,
+  `radius.round`, `shadow.button-hover`. Buttons: filled primary (default), amber
+  `.button--secondary`, filled dark `.button--dark`, outline dark `.button--ghost`, outline
+  primary `.button--outline-accent`. Every text pair is tested in
+  `apps/themes/tests/unit/test_ride_theme.py`. CSS uses `var(--…)` only, so a vendor or operator
+  palette overrides the defaults with custom properties.
 - **Fonts**: Barlow 400 and 700, Barlow Condensed 600 and 700, woff2 subset to Latin and Latin
   Extended-A (the gate allows 4 files), `font-display: swap`, one preload in `layouts/base.html`.
   Upstream commit and licence are in `LICENSES.toml`; the OFL text with the copyright notice is

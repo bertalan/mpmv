@@ -80,7 +80,7 @@
     color: var(--color-heading);
   }
 
-  /* --- CTA band on the accent fill: white text (4.88:1) and a dark button. */
+  /* --- CTA band on the primary fill: white text (5.20:1) and an amber button. */
 
   .block-cta {
     padding-block: 0;
@@ -98,7 +98,7 @@
   }
 
   .cta-band--accent {
-    background: var(--color-accent-fill);
+    background: var(--color-accent);
     color: var(--color-on-accent);
   }
 

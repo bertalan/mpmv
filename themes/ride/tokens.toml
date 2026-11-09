@@ -1,17 +1,25 @@
 # Design tokens of the `ride` theme (spec 14 §14.4, THM.6). Only what differs from `base`.
-# The values come from the lane-a brief; every text pair is checked by the token contract and by
+# The palette is the operator palette of spec 14 §14.4 and §14.12; layout, type and shapes
+# follow the lane-a brief. Every text pair is checked by the token contract and by
 # apps/themes/tests/unit/test_ride_theme.py. Operator palette values override the colour defaults
 # (spec 14 §14.12) through custom-property overrides, so CSS uses `var(--…)` for every colour.
 
 # --- Primitive tier
 
-[color.red]
-100 = "#FFE8E8"
-500 = "#E3051A"  # the accent fill: buttons, large surfaces (white on it 4.88:1)
-600 = "#C40417"  # the accent as text, link and UI colour (6.22:1 on white)
-800 = "#A80314"
+[color.brand]
+50 = "#EEF6FF"  # tint: primary text on it 4.77:1
+500 = "#046BD2"  # primary: text, link, UI colour and fill (white on it 5.20:1)
+700 = "#035AB1"  # primary hover (white on it 6.77:1)
+
+[color.amber]
+400 = "#FBA926"  # secondary: background only, always with dark text (8.95:1)
+500 = "#E89A1E"  # secondary hover (dark text on it 7.52:1)
+
+[color.orange]
+700 = "#BE5900"  # secondary as text (4.55:1 on white)
 
 [color.ink]
+950 = "#1A1A1A"
 900 = "#242424"
 800 = "#343434"
 600 = "#646464"
@@ -44,14 +52,14 @@ surface-inverse = "{color.slate.700}"
 border = "{color.gray.200}"
 border-strong = "{color.gray.300}"
 border-control = "{color.gray.500}"
-accent = "{color.red.600}"
-accent-fill = "{color.red.500}"
-accent-hover = "{color.red.800}"
-accent-tint = "{color.red.100}"
-secondary = "{color.slate.700}"
-secondary-hover = "{color.ink.900}"
-secondary-text = "{color.slate.700}"
-link = "{color.red.600}"
+accent = "{color.brand.500}"
+accent-hover = "{color.brand.700}"
+accent-tint = "{color.brand.50}"
+secondary = "{color.amber.400}"
+on-secondary = "{color.ink.950}"
+secondary-hover = "{color.amber.500}"
+secondary-text = "{color.orange.700}"
+link = "{color.brand.500}"
 focus = "{color.blue.500}"
 info = "{color.slate.700}"
 overlay = "{color.navy.950}"
@@ -82,7 +90,7 @@ pill = "999px"
 round = "50%"
 
 [shadow]
-button-hover = "0 6px 16px rgb(227 5 26 / 0.28)"
+button-hover = "0 6px 16px rgb(4 107 210 / 0.28)"
 
 [scrim]
 opacity = "0.82"
@@ -93,8 +101,8 @@ height = "4.5rem"
 # --- Component tier
 
 [button]
-bg = "{color.accent-fill}"
-bg-hover = "{color.accent}"
+bg = "{color.accent}"
+bg-hover = "{color.accent-hover}"
 
 [card]
 padding = "clamp(1.5rem, 1rem + 2vw, 3rem)"

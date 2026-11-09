@@ -78,9 +78,17 @@ def test_the_compressed_css_is_within_the_budget(theme_css: str) -> None:
 # --- Colours (brief): values and every text pair
 
 
-def test_the_palette_values_of_the_brief(tokens: dict[str, str]) -> None:
-    assert tokens["color.accent-fill"].upper() == "#E3051A"
-    assert tokens["color.link"].upper() == "#C40417"
+def test_the_palette_is_the_operator_palette_of_the_spec(tokens: dict[str, str]) -> None:
+    """Spec 14 §14.4 and §14.12; the dark surface, neutrals and scrim come from the brief."""
+    assert tokens["color.accent"].upper() == "#046BD2"
+    assert tokens["color.on-accent"].upper() == "#FFFFFF"
+    assert tokens["color.accent-hover"].upper() == "#035AB1"
+    assert tokens["color.accent-tint"].upper() == "#EEF6FF"
+    assert tokens["color.secondary"].upper() == "#FBA926"
+    assert tokens["color.on-secondary"].upper() == "#1A1A1A"
+    assert tokens["color.secondary-hover"].upper() == "#E89A1E"
+    assert tokens["color.secondary-text"].upper() == "#BE5900"
+    assert tokens["color.link"].upper() == "#046BD2"
     assert tokens["color.surface-inverse"].upper() == "#30373F"
     assert tokens["color.heading"].upper() == "#242424"
     assert tokens["color.text"].upper() == "#343434"
@@ -88,8 +96,14 @@ def test_the_palette_values_of_the_brief(tokens: dict[str, str]) -> None:
     assert tokens["color.border-strong"].upper() == "#D5D5D5"
     assert tokens["color.surface"].upper() == "#FFFFFF"
     assert tokens["color.surface-raised"].upper() == "#F9F9F9"
-    assert tokens["color.accent-tint"].upper() == "#FFE8E8"
     assert tokens["color.overlay"].upper() == "#051026"
+
+
+def test_no_red_is_left(tokens: dict[str, str], sources: str) -> None:
+    for name, value in tokens.items():
+        if name.startswith("color.") and name != "color.danger" and "red" not in name:
+            assert value.upper() not in {"#E3051A", "#C40417", "#FFE8E8"}, name
+    assert "accent-fill" not in sources
 
 
 def test_muted_text_is_no_lighter_than_646464(tokens: dict[str, str]) -> None:
@@ -98,12 +112,13 @@ def test_muted_text_is_no_lighter_than_646464(tokens: dict[str, str]) -> None:
     )
 
 
-# (foreground token, background token, minimum): every text pair the brief allows
+# (foreground token, background token, minimum): the measured pairs of spec 14 §14.12
 TEXT_PAIRS = [
-    ("color.on-accent", "color.accent-fill", AA),  # white on the red fill, 4.88:1
-    ("color.link", "color.surface", AA),  # accent text on white, 6.22:1
+    ("color.on-accent", "color.accent", AA),  # white on the primary, 5.20:1
+    ("color.on-accent", "color.accent-hover", AA),  # 6.77:1
+    ("color.link", "color.surface", AA),
     ("color.link", "color.surface-raised", AA),
-    ("color.link", "color.accent-tint", AA),
+    ("color.link", "color.accent-tint", AA),  # 4.77:1
     ("color.heading", "color.surface", AA),
     ("color.heading", "color.surface-raised", AA),
     ("color.heading", "color.accent-tint", AA),
@@ -113,19 +128,18 @@ TEXT_PAIRS = [
     ("color.text-muted", "color.surface", AA),
     ("color.text-muted", "color.surface-raised", AA),
     ("color.text-muted", "color.accent-tint", AA),
-    ("color.text-inverse", "color.surface-inverse", AA),  # header bar and footer
-    ("color.on-secondary", "color.secondary", AA),  # filled dark button
-    ("color.on-secondary", "color.secondary-hover", AA),
-    ("color.secondary-text", "color.surface", AA),  # outline dark button
-    ("color.link", "color.surface", AA),  # outline accent button
+    ("color.text-inverse", "color.surface-inverse", AA),  # header bar and footer, white
+    ("color.on-secondary", "color.secondary", AA),  # 8.95:1, dark text on the amber
+    ("color.on-secondary", "color.secondary-hover", AA),  # 7.52:1
+    ("color.secondary-text", "color.surface", AA),  # 4.55:1
     ("color.text-inverse", "color.overlay", AA),  # hero text on the scrim
+    ("color.text-inverse", "color.heading", AA),  # filled dark button hover
 ]
 UI_PAIRS = [
-    ("color.accent-fill", "color.surface", UI),
+    ("color.accent", "color.surface", UI),
     ("color.border-control", "color.surface", UI),
     ("color.focus", "color.surface", UI),
     ("color.focus", "color.surface-inverse", UI),
-    ("color.focus", "color.accent-fill", 1.0),
 ]
 
 
@@ -137,17 +151,24 @@ def test_every_pair_of_the_brief_passes(
     assert ratio >= minimum, f"{fg} on {bg}: {ratio:.2f}:1"
 
 
-def test_white_on_the_accent_fill_is_the_measured_488(tokens: dict[str, str]) -> None:
-    assert round(contrast_ratio("#FFFFFF", tokens["color.accent-fill"]), 2) == 4.88
-    assert round(contrast_ratio(tokens["color.link"], "#FFFFFF"), 2) == 6.22
+def test_the_measured_pairs_of_the_spec(tokens: dict[str, str]) -> None:
+    def ratio(fg: str, bg: str) -> float:
+        return round(contrast_ratio(tokens[fg], tokens[bg]), 2)
+
+    assert ratio("color.on-accent", "color.accent") == 5.20
+    assert ratio("color.on-accent", "color.accent-hover") == 6.77
+    assert ratio("color.on-secondary", "color.secondary") == 8.95
+    assert ratio("color.on-secondary", "color.secondary-hover") == 7.52
+    assert ratio("color.secondary-text", "color.surface") == 4.55
+    assert ratio("color.accent", "color.accent-tint") == 4.77
 
 
-def test_the_accent_is_never_text_on_the_dark_surface_or_the_tint(
-    tokens: dict[str, str],
-) -> None:
-    """The link and the fill both fail on the dark surface, so the CSS must not pair them."""
+def test_the_primary_is_never_text_on_the_dark_surface(tokens: dict[str, str]) -> None:
+    """The link colour fails on the dark surface, so the CSS must use white there."""
     assert contrast_ratio(tokens["color.link"], tokens["color.surface-inverse"]) < AA
-    assert contrast_ratio(tokens["color.accent-fill"], tokens["color.accent-tint"]) < AA
+    assert contrast_ratio(tokens["color.on-secondary"], tokens["color.surface-inverse"]) < AA
+    header = "\n".join(read_css_sources(RIDE, "ride"))
+    assert "color-link" not in re.search(r"\.site-header a[^}]*\}", header).group(0)  # type: ignore[union-attr]
 
 
 def test_the_hero_scrim_keeps_white_text_readable_over_the_brightest_image(

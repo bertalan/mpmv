@@ -73,7 +73,7 @@
   }
 
   .subnav__toggle:hover {
-    background: var(--color-secondary-hover);
+    background: var(--color-heading);
   }
 
   .subnav__toggle[aria-expanded="true"] .icon {
@@ -100,7 +100,7 @@
 
   .nav-toggle:hover,
   .nav-toggle[aria-expanded="true"] {
-    background: var(--color-secondary-hover);
+    background: var(--color-heading);
   }
 
   /* Below 64rem the header wraps and the sticky bar would hide focused content (WCAG 2.4.11):
