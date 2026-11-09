@@ -5,7 +5,8 @@
 # the job green, with a "skipped: no target" notice, while the secret is empty. LIVE is scanned
 # only when BOTH the variable ALLOW_LIVE_SCAN is 'true' and the secret LIVE_SCAN_URL is set; by
 # default it is off. The secret reaches only the guard and the scan step, never a job name, a
-# summary, a cache key, an artifact or the report job. Reports stay on the runner: artifacts of a
+# summary, a cache key, an artifact or the report job. Repository secrets are readable from any
+# branch (workflow_dispatch takes any ref), so both scan jobs run only on main. Reports stay on the runner: artifacts of a
 # public repository are public. Run it by hand: Actions > Security STAGE scan > Run workflow, or
 # `gh workflow run security-stage.yml`. See docs/dev/release.md, "Security schedule".
 name: Security STAGE scan
@@ -25,6 +26,7 @@ permissions:
 jobs:
   stage:
     name: ZAP baseline and nuclei (STAGE)
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     outputs:
@@ -57,7 +59,7 @@ jobs:
 
   live:
     name: ZAP baseline and nuclei (LIVE, explicit opt-in)
-    if: ${{ vars.ALLOW_LIVE_SCAN == 'true' }}
+    if: ${{ github.ref == 'refs/heads/main' && vars.ALLOW_LIVE_SCAN == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     outputs:

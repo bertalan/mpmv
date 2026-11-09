@@ -36,8 +36,13 @@ security_report = importlib.util.module_from_spec(_spec)
 sys.modules["security_report"] = security_report
 _spec.loader.exec_module(security_report)
 
-# A tag or an exact version; never a branch or a moving tag.
+# GitHub-owned actions: a version tag, never a branch or a moving tag. Every other action: a full
+# commit SHA (a tag can be moved), with the version in a trailing comment, as in release.yml.
+GITHUB_OWNERS = {"actions", "github"}
 PINNED_ACTION = re.compile(r"^[\w.-]+/[\w./-]+@v\d+(\.\d+)*$")
+SHA_PINNED_ACTION = re.compile(r"^[\w.-]+/[\w./-]+@[0-9a-f]{40}$")
+SHA_PIN_LINE = re.compile(r"uses:\s*([\w.-]+/[\w./-]+)@([0-9a-f]{40}) # v\d+(\.\d+)*\s*$")
+ON_MAIN = "github.ref == 'refs/heads/main'"
 PINNED_IMAGE = re.compile(r"^[\w./-]+:v?\d+(\.\d+)+$")
 MOVING_TAGS = {"latest", "stable", "main", "master", "weekly", "nightly"}
 ALLOWED_PERMISSIONS = {"contents": "read", "issues": "write"}
@@ -111,7 +116,15 @@ def test_actions_and_images_are_pinned(workflow_path: Path) -> None:
     workflow = load(workflow_path)
     for step in all_steps(workflow):
         if "uses" in step:
-            assert PINNED_ACTION.match(step["uses"]), step["uses"]
+            uses = step["uses"]
+            if uses.split("/", 1)[0] in GITHUB_OWNERS:
+                assert PINNED_ACTION.match(uses), uses
+            else:
+                assert SHA_PINNED_ACTION.match(uses), f"{uses}: pin by full commit SHA"
+    for line in workflow_path.read_text().splitlines():
+        owner = line.split("uses:", 1)[1].strip().split("/", 1)[0] if "uses:" in line else ""
+        if owner and owner not in GITHUB_OWNERS:
+            assert SHA_PIN_LINE.search(line), f"{line.strip()}: SHA pin needs a '# vX.Y.Z' comment"
     for job in workflow["jobs"].values():
         for service in job.get("services", {}).values():
             tag = service["image"].rsplit(":", 1)[-1]
@@ -175,16 +188,28 @@ def test_targets_come_from_secrets_never_from_variables() -> None:
         assert "secrets." not in str(job.get("if", "")), name
 
 
+def test_jobs_that_read_target_secrets_run_only_on_main() -> None:
+    """Repository secrets are readable from any branch (workflow_dispatch takes any ref): a job
+    that reads a target URL must not run off `main`, or a branch could print a transformed URL."""
+    readers = []
+    for name, job in load(STAGE)["jobs"].items():
+        dumped = yaml.safe_dump(job)
+        if any(f"secrets.{secret}" in dumped for secret in ("STAGE_URL", "LIVE_SCAN_URL")):
+            readers.append(name)
+            assert ON_MAIN in str(job.get("if", "")), name
+    assert set(readers) == {"stage", "live"}
+
+
 def test_stage_job_guards_on_the_stage_secret() -> None:
     job = load(STAGE)["jobs"]["stage"]
-    assert "if" not in job
+    assert job["if"] == "${{ " + ON_MAIN + " }}"
     scan_job_guard(job, "STAGE_URL")
 
 
 def test_live_scan_needs_the_opt_in_variable_and_the_secret() -> None:
     jobs = load(STAGE)["jobs"]
     job = jobs["live"]
-    assert job["if"] == "${{ vars.ALLOW_LIVE_SCAN == 'true' }}"
+    assert job["if"] == "${{ " + ON_MAIN + " && vars.ALLOW_LIVE_SCAN == 'true' }}"
     scan_job_guard(job, "LIVE_SCAN_URL")
     # No other job ever reads the LIVE URL.
     for name, other in jobs.items():
