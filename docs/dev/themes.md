@@ -275,6 +275,35 @@ To add or update baselines after a reviewed, intentional change:
 
 The first baselines for `base` and `ride` are committed by THM.10.
 
+## The `ride` theme (THM.6)
+
+`themes/ride/` is the first vertical theme (`parent = "base"`). It was written clean-room from the
+public spec and a brief: no file derives from a reference template (spec 14 §14.8).
+
+- **Tokens** (`tokens.toml`): `color.accent` is the accent as text, link and UI colour
+  (`#C40417`), `color.accent-fill` the red fill for buttons and large surfaces (`#E3051A`, white
+  text 4.88:1), `color.surface-inverse` the dark header and footer. Extra tokens: `color.heading`,
+  `color.border-strong`, `color.overlay`, `scrim.opacity`, `step.display`, `space.section`,
+  `radius.pill`, `radius.round`, `shadow.button-hover`. Every text pair is tested in
+  `apps/themes/tests/unit/test_ride_theme.py`. CSS uses `var(--…)` only, so the operator palette
+  of spec 14 §14.12 overrides the defaults with custom properties.
+- **Fonts**: Barlow 400 and 700, Barlow Condensed 600 and 700, woff2 subset to Latin and Latin
+  Extended-A (the gate allows 4 files), `font-display: swap`, one preload in `layouts/base.html`.
+  Upstream commit and licence are in `LICENSES.toml`.
+- **Icons**: `components/icon.html` draws from `static/themes/ride/icons/sprite.svg`, a
+  same-origin sprite of the 13 Lucide icons the components use (ISC).
+- **Assets in the build**: `python -m apps.themes.build` copies every non-CSS, non-JS file under
+  `static/themes/<slug>/` to `build/themes/<slug>/`, so `theme.css` reaches fonts and images with
+  a relative `url()` and `{% static "themes/ride/icons/sprite.svg" %}` resolves.
+- **Templates**: `components/header.html` (dark bar, disclosure sub-menus for links with
+  `children`, search and cart icons when `search_url` and `cart_url` are given, burger below
+  64rem), `components/footer.html` (three columns), `components/hero.html` (scrim over the
+  image), `components/product_tile.html` (title link plus a small button, not one giant link),
+  `components/icon.html`, `cms/blocks/hero.html`, `cms/blocks/cta.html` and `cms/home_page.html`
+  (the first hero block carries the page's one `<h1>`).
+- **Not yet**: catalog, cart, checkout, account and content pages are THM.7 to THM.9. Pages that
+  override the `head` block without `{{ block.super }}` lose the font preload only.
+
 ## System checks
 
 | Id | Fails when |

@@ -1,8 +1,9 @@
 """THM.6: the home page renders with `ride` (spec 14 §14.3, §14.6).
 
-The Wagtail Site's theme is the environment default here. The page keeps one `<h1>` (the hero
-heading when the first block is a hero), the `<main>` landmark and the skip link, links the
-`ride` stylesheet only, preloads one font and makes no external request.
+Lives in cms because themes may not import cms. The environment default theme is `ride`.
+The page keeps one `<h1>` (the hero heading when the first block is a hero), the `<main>`
+landmark and the skip link, links the `ride` stylesheet only, preloads one font and makes no
+external request.
 """
 
 import re
@@ -26,7 +27,7 @@ def _ride(settings: SettingsWrapper) -> None:
 @pytest.fixture
 def home(db: None) -> HomePage:
     seed_site()
-    page = HomePage.objects.get(locale__language_code="en")
+    page: HomePage = HomePage.objects.get(locale__language_code="en")
     banner = MediaImageFactory.create(title="Banner", file__filename="banner.png")
     page.body = [
         (

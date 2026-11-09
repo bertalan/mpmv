@@ -132,3 +132,17 @@ def test_the_icon_component_draws_from_the_same_origin_sprite() -> None:
     assert re.search(r'<use href="[^"]*sprite[^"]*\.svg#search"', html)
     assert "http://" not in html
     assert "https://" not in html
+
+
+def test_a_product_tile_is_not_one_giant_link() -> None:
+    html = render(
+        "components/product_tile.html",
+        name="Touring jacket",
+        url="/p/touring-jacket/",
+        price="EUR 129.00",
+    )
+    assert html.count("<a ") == 2  # the name and the small "View" button
+    assert "product-tile__link" not in html  # base's class covers the whole tile
+    assert re.search(
+        r'class="button button--small[^"]*"[^>]*>View<span class="visually-hidden">', html
+    )

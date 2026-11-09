@@ -63,7 +63,7 @@ def test_ride_is_a_registered_child_of_base() -> None:
 
 
 def test_ride_passes_every_thm5_gate() -> None:
-    failures = [f for f in run_gates(SHIPPED_THEMES) if f.slug == "ride"]
+    failures = [f for f in run_gates(SHIPPED_THEMES) if f.theme == "ride"]
     assert failures == [], "\n".join(str(f) for f in failures)
 
 
@@ -179,7 +179,7 @@ def test_the_body_is_18px_on_desktop_and_16px_on_mobile(tokens: dict[str, str]) 
 
 
 @pytest.mark.parametrize(
-    ("step", "desktop"), [("step.5", 48), ("step.4", 36), ("step.3", 24), ("step.2", 20)]
+    ("step", "desktop"), [("step.4", 48), ("step.3", 36), ("step.2", 24), ("step.1", 20)]
 )
 def test_headings_follow_the_scale_h1_48_h2_36_h3_24_h4_20(
     tokens: dict[str, str], step: str, desktop: int

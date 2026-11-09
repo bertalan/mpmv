@@ -1,0 +1,46 @@
+{% load i18n theme_tags %}{% comment %}
+Site header of the `ride` theme (THM.6, spec 14 §14.6): a dark bar with the logo on the left, the
+main navigation, search and cart icons with text for screen readers, the help link and the
+language switcher. Below 64rem a burger button (a disclosure, `aria-expanded`) opens the menu.
+
+Sub-menus: a link with `children` (label and url each) gets a button next to it. The button
+carries `aria-expanded` and `aria-controls`; nothing opens on hover alone. Both the menu and
+the sub-menus use base's `disclosure` Alpine component (themes/base/js/base.js), so no extra
+script is needed; without JavaScript the buttons stay `hidden` and every link is shown.
+
+Context: `site_name`, `links` (label, url, optional children), `languages`, `search_url` and
+`cart_url` (the icons are left out without them, never rendered as dead links), and the context
+of the help link.
+{% endcomment %}<header class="site-header">
+  <div class="site-header__inner">
+    {% url 'home' as home_url %}<a class="site-name" href="{% firstof home_url '/' %}">{{ site_name }}</a>
+    {% if links %}
+      <div class="site-nav" x-data="disclosure" :class="classes" @keydown.escape="close">
+        <button type="button" class="nav-toggle" aria-controls="site-nav" aria-expanded="false" hidden x-ref="toggle" x-bind:hidden="toggleHidden" :aria-expanded="expanded" @click="toggle">{% include "components/icon.html" with name="menu" only %}{% translate "Menu" %}</button>
+        <nav id="site-nav" aria-label="{% translate 'Main' %}">
+          <ul>
+            {% for link in links %}{% with href=link.url|safe_href %}<li>
+              {% if link.children %}
+                <div class="subnav" x-data="disclosure" :class="classes" @keydown.escape.stop="close">
+                  {% if href %}<a href="{{ href }}">{{ link.label }}</a>{% else %}<span>{{ link.label }}</span>{% endif %}
+                  <button type="button" class="subnav__toggle" aria-controls="subnav-{{ forloop.counter }}" aria-expanded="false" hidden x-ref="toggle" x-bind:hidden="toggleHidden" :aria-expanded="expanded" @click="toggle">{% include "components/icon.html" with name="chevron-down" only %}<span class="visually-hidden">{% blocktranslate with name=link.label %}Show submenu: {{ name }}{% endblocktranslate %}</span></button>
+                  <ul id="subnav-{{ forloop.counter }}" class="subnav__list">
+                    {% for child in link.children %}{% with child_href=child.url|safe_href %}<li>{% if child_href %}<a href="{{ child_href }}">{{ child.label }}</a>{% else %}{{ child.label }}{% endif %}</li>{% endwith %}{% endfor %}
+                  </ul>
+                </div>
+              {% elif href %}<a href="{{ href }}">{{ link.label }}</a>{% else %}{{ link.label }}{% endif %}
+            </li>{% endwith %}{% endfor %}
+          </ul>
+        </nav>
+      </div>
+    {% endif %}
+    <div class="site-header__tools">
+      {% with search_url=search_url|safe_href cart_url=cart_url|safe_href %}
+        {% if search_url %}<a class="tool" href="{{ search_url }}">{% include "components/icon.html" with name="search" only %}<span class="visually-hidden">{% translate "Search" %}</span></a>{% endif %}
+        {% if cart_url %}<a class="tool" href="{{ cart_url }}">{% include "components/icon.html" with name="cart" only %}<span class="visually-hidden">{% translate "Cart" %}</span></a>{% endif %}
+      {% endwith %}
+      {% include "components/help_link.html" %}
+      {% if languages %}{% include "components/language_switcher.html" %}{% endif %}
+    </div>
+  </div>
+</header>
