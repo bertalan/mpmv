@@ -13,7 +13,7 @@ import apps.cms.blocks
 class Migration(migrations.Migration):
     dependencies = [
         ("catalog", "0007_variant_override_sale_positive"),
-        ("cms", "0008_product_grid"),
+        ("cms", "0009_legal_reviews_per_language"),
         ("vendors", "0019_backfill_dac7_seller_dataset"),
         ("wagtailcore", "0098_apitoken"),
     ]

@@ -1,7 +1,8 @@
 """CMS services: locales from settings, the editors' MFA policy, seed pages and menus (CMS.1);
 page translation with wagtail-localize (I18N.3); legal page versions and the link to the vendor
-application (CMS.5); the page's image credits (CMS.8); what term and vendor landing pages show
-(CMS.4).
+application (CMS.5); the page's image credits (CMS.8); the go-live readiness of the customer
+legal and checkout pages, their per-language reviews and placeholders (I18N.9); what term and
+vendor landing pages show (CMS.4).
 
 Pages and menus are edited in the Wagtail admin, which keeps their revisions and its own log of
 every edit, so they are not audited here: `seed_site` only adds sample content where it is
@@ -9,17 +10,19 @@ missing (local development, STAGE and the e2e suite). Translators work in wagtai
 editor; the translation services below do the same steps for scripts and migrations (MIG.7),
 each with a dry run that rolls everything back and reports the pages it would change. Legal
 page versions are the exception to auditing: they are the record of which text applied when,
-so each one is audited.
+so each one is audited, and so is each review of a language's text (I18N.9).
 """
 
+import datetime as dt
 import hashlib
 import json
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser, PermissionsMixin
+from django.core.exceptions import ValidationError
 from django.db import DEFAULT_DB_ALIAS, transaction
 from django.http import HttpRequest
 from django.template.loader import render_to_string
@@ -55,13 +58,14 @@ from .blocks import public_cards
 from .models import (
     HomePage,
     LegalPage,
+    LegalPageReview,
     LegalPageVersion,
     NavigationMenu,
     StandardPage,
     TermLandingPage,
     VendorLandingPage,
 )
-from .seed import PageText, seed_text
+from .seed import PageText, legal_placeholder, seed_text
 
 CMS_ADMIN_PERMISSION = "wagtailadmin.access_admin"
 
@@ -197,8 +201,9 @@ def _ensure_menus(
 
 
 @transaction.atomic
-def seed_site() -> SeedReport:
-    """Make sure every configured language has a home, an About page and its two menus.
+def seed_site(*, legal_placeholders: bool = False) -> SeedReport:
+    """Make sure every configured language has a home, an About page and its two menus, and
+    with `legal_placeholders` the five go-live legal pages (I18N.9, `_seed_legal_placeholders`).
 
     Idempotent: only what is missing is created, and existing pages and menus are never
     changed. The primary-language pages and menus are created first; the other languages get
@@ -227,6 +232,8 @@ def seed_site() -> SeedReport:
         local_home = _translated(home, locale, texts.home, report)
         local_about = _translated(about, locale, texts.about, report)
         _ensure_menus(locale, local_home, local_about, report, sources=primary_menus)
+    if legal_placeholders:
+        _seed_legal_placeholders(home, report)
     return report
 
 
@@ -427,6 +434,174 @@ def record_legal_version(page: LegalPage, *, ctx: AuditContext, dry_run: bool = 
         return run_mutation(
             changeset, version.save, ctx=ctx, action=LEGAL_VERSION_RECORDED, dry_run=dry_run
         )
+
+
+# --- Customer legal and checkout pages per language (I18N.9, Q-42)
+
+LEGAL_REVIEW_RECORDED = "cms.legal_page_review.recorded"
+
+
+def legal_review_snapshot(review: LegalPageReview) -> dict[str, Any]:
+    return {
+        "page": review.version.page_id,
+        "language_code": review.version.language_code,
+        "version": review.version.number,
+        "stage": review.stage,
+        "reviewer": review.reviewer,
+        "reviewed_on": review.reviewed_on.isoformat(),
+        "note": review.note,
+    }
+
+
+def record_legal_review(
+    version: LegalPageVersion,
+    stage: str,
+    *,
+    reviewer: str,
+    reviewed_on: dt.date,
+    ctx: AuditContext,
+    note: str = "",
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Record that `stage` (AI draft, native-speaker review, legal counsel check) was done on
+    one language's published text, by `reviewer` on `reviewed_on`.
+
+    Each version of each language needs its own reviews: a new version is not covered by the
+    reviews of the previous one. Raises ValidationError for an unknown stage, an empty
+    reviewer, a date in the future or a stage already recorded on the version.
+    """
+    reviewer = reviewer.strip()
+    if stage not in LegalPageReview.Stage.values:
+        raise ValidationError({"stage": f"Unknown review stage {stage!r}."})
+    if not reviewer:
+        raise ValidationError({"reviewer": "Say who did the review."})
+    if reviewed_on > timezone.localdate():
+        raise ValidationError({"reviewed_on": "A review cannot be dated in the future."})
+    if version.reviews.filter(stage=stage).exists():
+        raise ValidationError({"stage": f"{stage} is already recorded on this version."})
+    review = LegalPageReview(
+        version=version,
+        stage=stage,
+        reviewer=reviewer,
+        reviewed_on=reviewed_on,
+        note=note,
+        recorded_at=timezone.now(),
+        recorded_by=ctx.actor_label,
+    )
+    changeset = ChangeSet()
+    changeset.create(
+        "cms.legalpagereview",
+        f"{version.page_id}/{version.number}/{stage}",
+        legal_review_snapshot(review),
+    )
+    return run_mutation(
+        changeset, review.save, ctx=ctx, action=LEGAL_REVIEW_RECORDED, dry_run=dry_run
+    )
+
+
+LEGAL_DATE_SET = "cms.legal_page.effective_date_set"
+
+
+def set_legal_effective_date(
+    page: LegalPage,
+    effective_date: dt.date,
+    *,
+    ctx: AuditContext,
+    user: AbstractBaseUser | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Give one language's legal page its own effective date, keeping its wagtail-localize sync.
+
+    The way a translator sets a translation's date (I18N.9): the localize editor cannot show the
+    field. The page's live text is saved with the new date as a revision, published when the
+    page is live (which records the version, `record_legal_version`). Audited. Raises
+    ValidationError for a date before the source text it translates or before its own last
+    version. An unchanged date changes nothing.
+    """
+    page = LegalPage.objects.select_related("locale").get(pk=page.pk)  # the live text
+    latest = page.versions.order_by("-number").first()
+    problem = engine.translation_date_problem(
+        effective_date,
+        source=page.synced_source_date(),
+        latest=latest and latest.effective_date,
+    )
+    if problem == "source":
+        raise ValidationError(
+            {"effective_date": "A translation cannot take effect before the text it translates."}
+        )
+    if problem == "latest":
+        raise ValidationError(
+            {"effective_date": "A new version cannot take effect before the previous one."}
+        )
+    changeset = ChangeSet()
+    if effective_date == page.effective_date:
+        return changeset
+    key = f"{page.pk}"
+    language = page.locale.language_code
+    changeset.update(
+        "cms.legalpage",
+        key,
+        {"language_code": language, "effective_date": page.effective_date.isoformat()},
+        {"language_code": language, "effective_date": effective_date.isoformat()},
+    )
+
+    def apply() -> None:
+        page.effective_date = effective_date
+        revision = page.save_revision(user=user, log_action=True)
+        if page.live:
+            revision.publish(user=user)
+
+    return run_mutation(changeset, apply, ctx=ctx, action=LEGAL_DATE_SET, dry_run=dry_run)
+
+
+def legal_readiness(languages: Sequence[str] | None = None) -> list[engine.ReadinessProblem]:
+    """What stops go-live on the customer legal and checkout pages, in every go-live language
+    (all of settings.LANGUAGES unless `languages` is given): a page without a published
+    translation in a language, or a language's published text without its reviews."""
+    pages = (
+        LegalPage.objects.live()
+        .filter(kind__in=engine.GO_LIVE_LEGAL_KINDS, alias_of__isnull=True)
+        .select_related("locale")
+    )
+    texts = []
+    for page in pages:
+        latest = page.versions.order_by("-number").first()
+        stages = latest.reviews.values_list("stage", flat=True) if latest else []
+        texts.append(
+            engine.PublishedLegalText(
+                kind=page.kind,
+                language=page.locale.language_code,
+                version=latest.number if latest else None,
+                reviews=frozenset(stages),
+            )
+        )
+    return engine.legal_readiness_problems(
+        texts, engine.GO_LIVE_LEGAL_KINDS, languages or configured_languages()
+    )
+
+
+def _seed_legal_placeholders(home: HomePage, report: SeedReport) -> None:
+    """Make sure the five go-live legal pages exist and are published in every language.
+
+    Placeholders only: the texts are human work (Q-42). Each says it is not a legal text, and
+    stays a draft on the site and in `legal_readiness` until a counsel check is recorded.
+    Idempotent: a language that has the page, whatever its text, is left alone.
+    """
+    primary = home.locale
+    today = timezone.localdate()
+    for kind in engine.GO_LIVE_LEGAL_KINDS:
+        source = LegalPage.objects.child_of(home).filter(kind=kind).first()
+        if source is None:
+            source = LegalPage(locale=primary, kind=kind, effective_date=today)
+            _apply_text(source, legal_placeholder(primary.language_code, kind))
+            home.add_child(instance=source)
+            source = _publish(source)
+            report.created.append(f"{primary.language_code} LegalPage {source.url_path}")
+        for code in configured_languages():
+            if code == primary.language_code:
+                continue
+            locale = Locale.objects.get(language_code=code)
+            _translated(source, locale, legal_placeholder(code, kind), report)
 
 
 def vendor_application_url(urlconf: str | None = None) -> str | None:
