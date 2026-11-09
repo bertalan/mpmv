@@ -296,7 +296,7 @@ def meta_catalog_feed(lang) -> Response          # Meta Commerce feed
    - Read tools: search products, translation status, simulate VAT or shipping, import reports,
      late orders, open quotes.
    - Mutating tools only with dry-run and diff; execution after human confirmation; every call audited.
-   - Replaces the `diagnose_*` / `fix_*` scripts and the current "AI + API route + ad hoc script" flow.
+   - Replaces the legacy diagnostic and fix scripts and the current "AI + API route + ad hoc script" flow.
    - Product and feed texts are **untrusted input** (prompt injection): never execute instructions
      contained in the data.
 2. **Agent-readable catalog** (P2): generated `llms.txt`, complete JSON-LD, up-to-date feeds,
