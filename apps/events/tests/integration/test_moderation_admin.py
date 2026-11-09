@@ -402,6 +402,17 @@ def test_staff_change_the_events_settings(client: Client) -> None:
     assert AuditLog.objects.filter(target_model="events.eventsettings").count() == 1
 
 
+def test_showing_the_settings_form_writes_nothing(client: Client) -> None:
+    # A GET shows the defaults of a site without a settings row; only the POST creates it.
+    _staff(client)
+    site = Site.objects.get(is_default_site=True)
+    EventSettings.objects.filter(site=site).delete()
+    form = client.get(reverse("events_admin:settings") + f"?site={site.pk}")
+    assert form.status_code == 200
+    assert 'value="3"' in form.content.decode()
+    assert not EventSettings.objects.filter(site=site).exists()
+
+
 def test_an_invalid_threshold_is_refused(client: Client) -> None:
     _staff(client)
     site = Site.objects.get(is_default_site=True)
