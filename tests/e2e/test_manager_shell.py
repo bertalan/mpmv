@@ -62,7 +62,7 @@ def test_a_member_of_two_vendors_signs_in_and_switches_vendor(
     page.get_by_role("button", name="Shop North").click()
     expect(page).to_have_url(re.compile(r"/manager/shop/$"))
     expect(page.get_by_role("heading", name="Dashboard")).to_be_visible()
-    expect(page.get_by_text("Shop North").first).to_be_visible()
+    expect(page.locator("main")).to_contain_text("Shop North")
     _accessible(page)
     shot("shop-dashboard")
 
