@@ -20,7 +20,11 @@ rather than wrong ones, for the owner to review; staff extend them in the tax ad
 Northern Ireland (XI, `BT*`) is not seeded: its status is the open decision D-02.
 
 Seeding is idempotent and never overwrites a row staff changed: an existing code is left alone.
-The reverse deletes only the seeded rows that still have no tax rate.
+Seeded without an AuditLog entry, by design: it is initial data, not a staff change.
+A staff row under another code with overlapping patterns coexists with the seed; the first
+match by country and code wins, so staff should edit the seeded row instead.
+The reverse deletes only rows that still equal the seed (name, country, status, patterns) and
+have no tax rate.
 """
 
 from typing import Any
@@ -64,7 +68,15 @@ def seed(apps: Any, schema_editor: Any) -> None:
 
 def unseed(apps: Any, schema_editor: Any) -> None:
     Territory = apps.get_model("tax", "Territory")
-    Territory.objects.filter(code__in=[row[0] for row in SEED], rates__isnull=True).delete()
+    for code, name, country, patterns in SEED:
+        Territory.objects.filter(
+            code=code,
+            name=name,
+            country=country,
+            vat_status=OUTSIDE_VAT_AREA,
+            postcode_patterns=patterns,
+            rates__isnull=True,
+        ).delete()
 
 
 class Migration(migrations.Migration):

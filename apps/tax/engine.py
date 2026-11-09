@@ -414,23 +414,29 @@ def postcode_in_territory(
 # The tax reason of a sale to an address in a territory outside the VAT area (spec 05 T15).
 OUTSIDE_VAT_TERRITORY: Final = "outside_vat_territory"
 
-# Territories with an ISO 3166-1 code of their own, written as the country of an address, are
-# part of the country their Territory row belongs to: an address in `AX` is in Finland, one in
-# `GP` is in France. Shipping special areas list the same codes (SHP.14).
-TERRITORY_COUNTRY_ALIASES: Final = {
-    "AX": "FI",
-    "GP": "FR",
-    "MQ": "FR",
-    "GF": "FR",
-    "RE": "FR",
-    "YT": "FR",
+# A territory with an ISO 3166-1 code of its own, written as the country of an address, is named
+# by that code alone: no postcode is needed, and a blank or wrong one cannot send the address to
+# mainland VAT (fail closed). Shipping special areas list the same codes (SHP.14). Saint-Martin
+# (MF) and Saint-Barthelemy (BL) are not in the spec's dataset yet.
+TERRITORY_BY_ALIAS_COUNTRY: Final = {
+    "AX": "FI-01",
+    "GP": "FR-971",
+    "MQ": "FR-972",
+    "GF": "FR-973",
+    "RE": "FR-974",
+    "YT": "FR-976",
 }
+
+# Postcode length (digits) of the countries with territories: a prefix pattern such as `35*`
+# matches a whole postcode only, never a truncated or over-long one.
+POSTCODE_LENGTH: Final = {"DE": 5, "ES": 5, "FI": 5, "FR": 5, "GR": 5, "IT": 5}
 
 
 def territory_country(country: str) -> str:
     """The country a Territory row is filed under for an address written in `country`."""
     code = normalize_country(country)
-    return TERRITORY_COUNTRY_ALIASES.get(code, code)
+    alias = TERRITORY_BY_ALIAS_COUNTRY.get(code)
+    return alias[:2] if alias else code
 
 
 @dataclass(frozen=True)
@@ -463,12 +469,20 @@ def find_territory(
 ) -> TerritoryRule | None:
     """The first rule whose territory contains the address, or None (mainland, no postcode).
 
-    The country must be the territory's own (`territory_country` maps `AX`, `GP`... to theirs):
-    Padova (IT 35100) is not in the Canary Islands (ES `35*`).
+    The country must be the territory's own: Padova (IT 35100) is not in the Canary Islands
+    (ES `35*`). A country with an ISO code of its own (`AX`, `GP`...) names its territory by
+    itself, whatever the postcode (`TERRITORY_BY_ALIAS_COUNTRY`).
     """
-    home = territory_country(country)
+    rules = list(rules)
+    code = normalize_country(country)
+    alias = TERRITORY_BY_ALIAS_COUNTRY.get(code)
+    if alias is not None:
+        return next((rule for rule in rules if rule.code == alias), None)
+    expected = POSTCODE_LENGTH.get(code)
+    if expected is not None and len(normalize_postcode(postcode)) != expected:
+        return None
     for rule in rules:
-        if postcode_in_territory(rule.country, rule.patterns, home, postcode):
+        if postcode_in_territory(rule.country, rule.patterns, code, postcode):
             return rule
     return None
 
