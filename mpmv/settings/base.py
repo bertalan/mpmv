@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     "wagtail.search",
     "wagtail.admin",
     "wagtail.contrib.settings",  # BaseSiteSetting for the per-site theme (THM.1)
+    "wagtail.contrib.routable_page",  # `routablepageurl` for the blog's author pages (CMS.3)
     "wagtail",
     "modelcluster",
     "taggit",
@@ -99,6 +100,8 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
+    # CAT.6: legacy redirect rules on a 404 (after CAT.5) and GET ?add-to-cart= to the product.
+    "apps.catalog.middleware.LegacyRedirectMiddleware",
     # CAT.5: a 404 on a product's old slug becomes a 301 to its current slug.
     "apps.catalog.middleware.OldProductSlugRedirectMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -109,7 +112,13 @@ MIDDLEWARE = [
     "django_otp.middleware.OTPMiddleware",
     "apps.accounts.middleware.MfaRequiredMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    # EVT.3: wagtail-localize's views keep the event moderation rules (hidden, review).
+    "apps.events.middleware.LocalizeEventGuardMiddleware",
 ]
+
+# CAT.5/CAT.6: how long a browser or proxy keeps a 301 (or a 410) of a redirect rule, so a rule
+# staff change, delete or let expire stops applying within a day; capped at the rule's expiry.
+REDIRECT_PERMANENT_MAX_AGE = 24 * 60 * 60
 
 # Custom user from the first migration (CORE.1): email login, preferred language.
 AUTH_USER_MODEL = "accounts.User"
@@ -256,6 +265,8 @@ EMAIL_FEEDBACK_PARSER = (
 # language after every migrate. The editors' admin is at /admin/ (mpmv/urls.py).
 WAGTAIL_SITE_NAME = "MPMV"
 WAGTAIL_I18N_ENABLED = True
+# Approval publishes the reviewed revision, not a later draft (EVT.3): apps/core/workflows.py.
+WAGTAIL_FINISH_WORKFLOW_ACTION = "apps.core.workflows.publish_reviewed_revision"
 WAGTAIL_CONTENT_LANGUAGES = LANGUAGES
 # The public address of the site, in Wagtail's admin emails and previews. The localhost fallback
 # is for a developer machine: `check --deploy` fails on LIVE and STAGE without it (cms.E001).

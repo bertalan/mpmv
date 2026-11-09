@@ -1,6 +1,7 @@
 """Template tags for the public pages (CMS.1): per-language navigation and language switcher;
 the page-level FAQPage structured data (CMS.2); the page's image credits (CMS.8)."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -132,3 +133,12 @@ def faq_jsonld(page: Any) -> SafeString:
     # JSON with <, > and & escaped: it cannot leave its script element (`jsonld_text`).
     data = jsonld_text(faq_page_jsonld(questions))
     return mark_safe(f'<script type="application/ld+json">{data}</script>')  # noqa: S308
+
+
+@register.simple_tag
+def jsonld_script(data: Mapping[str, Any] | None) -> SafeString:
+    """`data` as a `<script type="application/ld+json">` (CMS.3 articles and author pages);
+    "" for none. Escaped by `jsonld_text`, so it cannot leave its script element."""
+    if not data:
+        return mark_safe("")
+    return mark_safe(f'<script type="application/ld+json">{jsonld_text(data)}</script>')  # noqa: S308

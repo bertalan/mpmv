@@ -65,7 +65,7 @@ def test_a_hidden_event_is_hidden() -> None:
 def _start_review(page: EventPage) -> tuple[WorkflowState, User]:
     workflow = Workflow.objects.create(name="Event review")
     task = GroupApprovalTask.objects.create(name="Review")
-    task.groups.add(Group.objects.create(name="Event moderators"))
+    task.groups.add(Group.objects.get_or_create(name="Event moderators")[0])
     WorkflowTask.objects.create(workflow=workflow, task=task, sort_order=0)
     WorkflowPage.objects.create(workflow=workflow, page=page.get_parent())
     author = UserFactory.create(staff=True)

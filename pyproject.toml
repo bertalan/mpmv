@@ -48,6 +48,8 @@ dev = [
   # comes as its own Dependabot PR, so a new failing example points at the bump, not at a change
   # in our code (docs/dev/dependency-updates.md).
   "hypothesis==6.170.10",
+  # tools/build_docs.py renders the HTML spec; tests/unit/test_build_docs_eof.py checks it.
+  "markdown>=3.5",
 ]
 
 [tool.uv]
@@ -127,6 +129,7 @@ markers = [
   "unit: pure functions, no database (ADR-0006)",
   "integration: real Django + PostgreSQL",
   "e2e: Playwright against a live server",
+  "security_slow: slow security cases, run nightly by security-nightly (SEC.5)",
 ]
 
 [tool.coverage.run]

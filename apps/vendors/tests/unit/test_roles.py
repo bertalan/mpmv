@@ -22,7 +22,8 @@ from apps.vendors.engine import (
 
 # Spec 02 §2.2: owner = everything about their own vendor, financial settings included;
 # staff = orders, quotes, products; no payouts, IBAN or tax regime. Vendor API keys act for the
-# whole vendor, so only owners issue them (CORE.13).
+# whole vendor, so only owners issue them (CORE.13). Both roles manage the vendor's events by
+# default (spec 15 "Services", EVT.3).
 EXPECTED: dict[str, dict[VendorAction, bool]] = {
     OWNER: {
         VendorAction.ORDERS: True,
@@ -34,6 +35,7 @@ EXPECTED: dict[str, dict[VendorAction, bool]] = {
         VendorAction.TAX_REGIME: True,
         VendorAction.MEMBERS: True,
         VendorAction.API_KEYS: True,
+        VendorAction.EVENTS: True,
     },
     STAFF: {
         VendorAction.ORDERS: True,
@@ -45,6 +47,7 @@ EXPECTED: dict[str, dict[VendorAction, bool]] = {
         VendorAction.TAX_REGIME: False,
         VendorAction.MEMBERS: False,
         VendorAction.API_KEYS: False,
+        VendorAction.EVENTS: True,
     },
 }
 
@@ -75,7 +78,7 @@ def test_role_matrix_accepts_plain_strings(role: str, action: VendorAction, allo
 
 def test_permissions_for_lists_the_allowed_actions() -> None:
     assert permissions_for(STAFF) == frozenset(
-        {VendorAction.ORDERS, VendorAction.QUOTES, VendorAction.PRODUCTS}
+        {VendorAction.ORDERS, VendorAction.QUOTES, VendorAction.PRODUCTS, VendorAction.EVENTS}
     )
     assert permissions_for(OWNER) == frozenset(VendorAction)
 
