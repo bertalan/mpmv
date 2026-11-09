@@ -25,6 +25,7 @@ from wagtail.models import Locale, Page
 from apps.cms.models import (
     HomePage,
     LegalPage,
+    LegalPageReview,
     LegalPageVersion,
     NavigationMenu,
     StandardPage,
@@ -174,6 +175,20 @@ class LegalPageVersionFactory(DjangoModelFactory[LegalPageVersion]):
         if "number" not in kwargs:
             kwargs["number"] = kwargs["page"].versions.count() + 1
         return model_class._default_manager.create(*args, **kwargs)
+
+
+class LegalPageReviewFactory(DjangoModelFactory[LegalPageReview]):
+    """A review of a recorded version (I18N.9); normally `services.record_legal_review`."""
+
+    class Meta:
+        model = LegalPageReview
+
+    version = factory.SubFactory(LegalPageVersionFactory)
+    stage = LegalPageReview.Stage.COUNSEL_CHECK
+    reviewer = "Example Counsel"
+    reviewed_on = dt.date(2026, 10, 1)
+    recorded_at = factory.LazyFunction(timezone.now)
+    recorded_by = "system"
 
 
 class VendorRecruitmentPageFactory(_InTree, DjangoModelFactory[VendorRecruitmentPage]):
