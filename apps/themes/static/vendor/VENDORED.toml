@@ -1,4 +1,4 @@
-# Third-party JavaScript served from 'self' (THM.3, spec 14 §14.5): no CDN at runtime.
+# Third-party JavaScript and its assets served from 'self' (THM.3, spec 14 §14.5): no CDN at runtime.
 # Every file in this directory has one entry. `sha256` is the hash of the file exactly as
 # downloaded from `source`; apps/themes/tests/unit/test_vendored.py fails on any mismatch, on a
 # file without an entry and on a version that is not an exact x.y.z.
@@ -19,3 +19,79 @@ version = "3.14.8"
 source = "https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.14.8/dist/cdn.min.js"
 sha256 = "c98f46291087f0f93c9cdefb682d120fe1d2b3dcb649de83cfc1ad5b1fac58e4"
 license = "MIT"
+
+# Leaflet 1.9.4 (EVT.13, spec 15 "Maps"): the library, its source map (the hashed static storage
+# rewrites the sourceMappingURL, so the map must exist), its stylesheet and the images that
+# stylesheet references, and the BSD-2-Clause licence text. leaflet.js and leaflet.css match the
+# SRI hashes Leaflet publishes for 1.9.4.
+[[file]]
+path = "leaflet/leaflet.js"
+name = "leaflet"
+version = "1.9.4"
+source = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+sha256 = "db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a"
+license = "BSD-2-Clause"
+
+[[file]]
+path = "leaflet/leaflet.js.map"
+name = "leaflet"
+version = "1.9.4"
+source = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js.map"
+sha256 = "600a10dc5cd110de0699510d322afcbe01c7ca90b4c5f48adc20314c70aac753"
+license = "BSD-2-Clause"
+
+[[file]]
+path = "leaflet/leaflet.css"
+name = "leaflet"
+version = "1.9.4"
+source = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+sha256 = "a7837102824184820dfa198d1ebcd109ff6d0ff9a2672a074b9a1b4d147d04c6"
+license = "BSD-2-Clause"
+
+[[file]]
+path = "leaflet/images/marker-icon.png"
+name = "leaflet"
+version = "1.9.4"
+source = "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png"
+sha256 = "574c3a5cca85f4114085b6841596d62f00d7c892c7b03f28cbfa301deb1dc437"
+license = "BSD-2-Clause"
+
+[[file]]
+path = "leaflet/images/marker-icon-2x.png"
+name = "leaflet"
+version = "1.9.4"
+source = "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png"
+sha256 = "00179c4c1ee830d3a108412ae0d294f55776cfeb085c60129a39aa6fc4ae2528"
+license = "BSD-2-Clause"
+
+[[file]]
+path = "leaflet/images/marker-shadow.png"
+name = "leaflet"
+version = "1.9.4"
+source = "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png"
+sha256 = "264f5c640339f042dd729062cfc04c17f8ea0f29882b538e3848ed8f10edb4da"
+license = "BSD-2-Clause"
+
+[[file]]
+path = "leaflet/images/layers.png"
+name = "leaflet"
+version = "1.9.4"
+source = "https://unpkg.com/leaflet@1.9.4/dist/images/layers.png"
+sha256 = "1dbbe9d028e292f36fcba8f8b3a28d5e8932754fc2215b9ac69e4cdecf5107c6"
+license = "BSD-2-Clause"
+
+[[file]]
+path = "leaflet/images/layers-2x.png"
+name = "leaflet"
+version = "1.9.4"
+source = "https://unpkg.com/leaflet@1.9.4/dist/images/layers-2x.png"
+sha256 = "066daca850d8ffbef007af00b06eac0015728dee279c51f3cb6c716df7c42edf"
+license = "BSD-2-Clause"
+
+[[file]]
+path = "leaflet/LICENSE"
+name = "leaflet"
+version = "1.9.4"
+source = "https://unpkg.com/leaflet@1.9.4/LICENSE"
+sha256 = "53e8dc25862014e4324741ca18fbe3611e11d42ef69f59f86ea8c5389647d4cb"
+license = "BSD-2-Clause"
