@@ -138,6 +138,11 @@ MFA_LOGIN_URL = "admin:login"  # until the site and vendor login pages exist
 # its own, and Continue POSTs allowed per client IP every 15 minutes.
 ACTION_LINK_MAX_AGE = 72 * 3600  # seconds
 ACTION_LINK_RATE_LIMIT = 30
+# Vendor claim (VEN.24): validity of a claim link, wrong VAT numbers or TINs before the claim
+# locks (staff then regenerate the link), and claim-page POSTs allowed per IP every 15 minutes.
+VENDOR_CLAIM_LINK_MAX_AGE = 72 * 3600  # seconds
+VENDOR_CLAIM_MAX_FAILURES = 5
+VENDOR_CLAIM_RATE_LIMIT = 20
 MFA_ISSUER = "MPMV"  # name shown in authenticator apps and passkey prompts
 OTP_TOTP_ISSUER = MFA_ISSUER
 OTP_ADMIN_HIDE_SENSITIVE_DATA = True
