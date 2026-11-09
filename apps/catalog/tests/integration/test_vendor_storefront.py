@@ -92,7 +92,7 @@ def test_a_draft_text_never_shows(client: Client) -> None:
     VendorTranslationFactory.create(
         vendor=vendor,
         language="de",
-        status=TranslationStatus.DRAFT,
+        status=TranslationStatus.MACHINE,
         description="Entwurf nicht veroeffentlichen",
     )
     html = client.get(f"{prefix('de')}/shop/{vendor.slug}/").content.decode()

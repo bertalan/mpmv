@@ -1,0 +1,10 @@
+{% load i18n %}{# The categories of a vendor storefront (VEN.10): plain links on the page's own URL, named in the page language. #}
+<nav class="store-categories" aria-labelledby="store-categories-heading">
+  <h2 id="store-categories-heading">{% translate "Store categories" %}</h2>
+  <ul>
+    <li><a href="{{ location }}"{% if not params.category %} aria-current="page"{% endif %}>{% translate "All products" %}</a></li>
+    {% for option in store_categories %}
+      <li class="filter-depth-{{ option.depth }}"><a href="{{ location }}?category={{ option.value|urlencode }}"{% if option.selected %} aria-current="page"{% endif %}>{{ option.label }}</a></li>
+    {% endfor %}
+  </ul>
+</nav>
