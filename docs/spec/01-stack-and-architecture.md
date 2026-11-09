@@ -147,6 +147,8 @@ when a new mutating service has neither `dry_run` nor a place in this table (ARC
 | `apps.accounts.services.register_passkey` | one-time code | Stores a registration whose one-time WebAuthn challenge is already spent |
 | `apps.accounts.services.authenticate_passkey` | one-time code | Spends the one-time WebAuthn challenge and advances the signature counter |
 | `apps.accounts.services.redeem_action_token` | one-time code | Spends the single sign-in use of a secure action link (CORE.15) |
+| `apps.accounts.services.enrol_totp_key` | one-time code | Stores an authenticator key whose first code was just checked (VEN.24 claim page) |
+| `apps.accounts.services.spend_email_bound_link` | one-time code | Spends the single use of an email-bound secure action link (VEN.24) |
 | `apps.api.services.authenticate` | telemetry | Records when an API key was last used |
 | `apps.cms.services.sync_locales` | migration hook | Post-migrate handler that adds the missing Wagtail locales |
 | `apps.cms.services.seed_site` | migration hook | Idempotent setup seed (`seed_cms`) that only adds missing sample pages |
@@ -158,6 +160,9 @@ when a new mutating service has neither `dry_run` nor a place in this table (ARC
 | `apps.tax.services.record_vat_validation` | telemetry | Append-only record of a VIES answer |
 | `apps.tax.services.verify_vat_number` | telemetry | Asking VIES stores its answer in the append-only validation log; a check is a lookup |
 | `apps.tax.services.recheck_vat_number` | telemetry | Same lookup as `verify_vat_number`, forced past the cache by the background job |
+| `apps.vendors.services.confirm_claim_identity` | throttle counter | Counts a wrong VAT number or TIN against the claim and locks it after too many (VEN.24) |
+| `apps.vendors.services.submit_claim` | one-time code | Spends the claim link and the authenticator code that creates the account (VEN.24) |
+| `apps.vendors.services.submit_claim_as_account` | one-time code | Spends the claim link of an existing account that just signed in (VEN.24) |
 
 ### Marketplace configuration pages (ARC.24)
 

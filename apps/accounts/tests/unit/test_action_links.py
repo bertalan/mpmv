@@ -87,3 +87,34 @@ def test_nonce_digests_are_stable_hex_and_hide_the_nonce() -> None:
     assert digest == engine.action_nonce_digest("abc")
     assert len(digest) == 64
     assert "abc" not in digest
+
+
+# --- Email-bound links (VEN.24: a recipient that has no account yet)
+
+
+def test_an_email_recipient_is_a_digest_of_the_normalized_address() -> None:
+    digest = engine.email_recipient("  Legal@Example.COM ")
+    assert digest == engine.email_recipient("legal@example.com")
+    assert "example" not in digest
+    assert len(digest) == 64
+
+
+def test_different_addresses_give_different_recipients() -> None:
+    assert engine.email_recipient("a@example.com") != engine.email_recipient("b@example.com")
+
+
+def test_an_email_bound_link_is_refused_for_another_address() -> None:
+    issued = claims(recipient=engine.email_recipient("legal@example.com"))
+    other = engine.email_recipient("someone@example.com")
+    assert engine.action_link_refusal(issued, now=NOW, current_version="3", recipient=other) == (
+        engine.WRONG_RECIPIENT
+    )
+    assert (
+        engine.action_link_refusal(
+            issued,
+            now=NOW,
+            current_version="3",
+            recipient=engine.email_recipient("legal@example.com"),
+        )
+        is None
+    )

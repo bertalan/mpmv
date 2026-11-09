@@ -242,6 +242,8 @@ USED: Final = "used"
 # No confirmed second factor: no passwordless sign-in, or whoever holds the link could enrol
 # their own first factor (CORE.4 needs no other proof for it) and pass the step-up.
 NO_SECOND_FACTOR: Final = "no_second_factor"
+# An email-bound link (VEN.24) that was never opened in this session with the Continue POST.
+NOT_OPENED: Final = "not_opened"
 ACTION_NONCE_BYTES: Final = 16  # 128 bits: the single-use key of a link
 
 
@@ -251,7 +253,7 @@ class ActionClaims:
 
     purpose: str
     object_key: str
-    recipient: str  # the recipient user's public id
+    recipient: str  # the recipient user's public id, or `email_recipient` of an address
     version: str
     nonce: str
     expires_at: int  # Unix time
@@ -333,6 +335,12 @@ def action_link_refusal(
     if recipient is not None and not _same(claims.recipient, recipient):
         return WRONG_RECIPIENT
     return None
+
+
+def email_recipient(email: str) -> str:
+    """The recipient of an email-bound link (VEN.24): SHA-256 of the trimmed, lower-cased
+    address, so the token binds the address without showing it."""
+    return hashlib.sha256(email.strip().lower().encode()).hexdigest()
 
 
 def action_nonce_digest(nonce: str) -> str:
