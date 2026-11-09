@@ -14,12 +14,15 @@ PostgreSQL. It replaces a WordPress + WooCommerce + WCFM + WPML stack.
 ```
 mpmv/          Django project: settings per environment (base/dev/test/stage/live), urls, asgi/wsgi
 apps/          One Django app per bounded context (core, accounts, vendors, catalog, tax, shipping,
-               cart, orders, payments, ledger, ingest, cms, seo, compliance, api, mcp)
+               cart, orders, payments, ledger, ingest, cms, events, themes, seo, compliance, api,
+               mcp), plus seed (demo data, ARC.10)
+themes/        Frontend themes, one directory per theme (THM.1, docs/dev/themes.md)
 tests/         Project-level tests: unit/, integration/, e2e/ (ADR-0006)
 docs/
   spec/        Functional and technical specification; README.md is the entry point,
                90-backlog.md and backlog.csv are GENERATED
   adr/         Architecture Decision Records, one file per decision
+  dev/         Developer guides (background jobs, audit trail, email, themes, parallel lanes...)
 tools/
   build_docs.py  Builds the backlog and the HTML spec, validates task IDs/deps/cycles
 build/         Generated output, not versioned (HTML spec)

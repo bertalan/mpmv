@@ -68,6 +68,13 @@ Backends: `apps.core.mail.ConsoleEmailSender` (default; prints the text part) an
 `MemoryEmailSender` (tests; `fail_next(...)` scripts provider failures). Pick one with
 `MPMV_EMAIL_SENDER`. The sender address comes from `MPMV_EMAIL_FROM`.
 
+Neither backend delivers anything, so settings that hold live data (`LIVE_DATA`, the LIVE
+settings) refuse them: `manage.py check` and `migrate` fail with `core.E501` while
+`MPMV_EMAIL_SENDER` is empty or names the console or memory backend, and with `core.E502` while
+`MPMV_EMAIL_FROM` is empty or a `@localhost` address. A forgotten variable stops the start
+instead of dropping every email. Development, tests and STAGE (synthetic data) keep the console
+backend until ARC.19 wires the provider.
+
 ## Bounces and complaints
 
 `POST /webhooks/email/` takes provider feedback. It returns 404 while

@@ -72,6 +72,19 @@ is queued once even with several workers. A worker that starts within 10 minutes
 tick still queues it; older ticks are skipped. `schedules()` lists what the scheduler sees, and
 `Schedule.ticks(since, until)` lists the ticks it would queue in a period.
 
+Jobs on `main` today (cron in Europe/Rome; a new job adds its row here):
+
+| Job | Schedule | Retry | What it does |
+|---|---|---|---|
+| `core.heartbeat` | `*/5 * * * *` | none | Counts a beat in `core_heartbeat`, so monitoring sees the worker is alive (ARC.9) |
+| `core.purge_throttles` | `17 4 * * *` | none | Deletes throttle counters whose lock and quiet period are over (CORE.5; also CORE.20 blocks) |
+| `api.purge_refused_keys` | `22 4 * * *` | none | Deletes refused-key rows older than the window, of every IP (CORE.20) |
+| `core.purge_geocode_cache` | `27 4 * * *` | none | Deletes geocoding cache entries past their 180 days (EVT.12) |
+| `tax.check_profile_consistency` | `41 5 * * *` | none | Logs current tax profiles that disagree with the vendor's fiscal regime (TAX.2) |
+| `vendors.check_establishments` | `47 5 * * *` | none | Logs active vendors established outside the allowed vendor countries (CMP.13); suspends nobody |
+| `core.send_email` | on demand | 5 retries, 1 min doubling to 1 h | Sends one outbox email ([transactional-email.md](transactional-email.md), ARC.16) |
+| `tax.recheck_vat_number` | on demand | 8 retries, 1 min doubling to 1 h | Asks VIES again about a VAT number while VIES is down (TAX.5) |
+
 The two daylight saving time nights follow cron's rules:
 
 - **Spring** (02:00-02:59 does not exist): ticks in that hour run at 03:00, late but not lost.

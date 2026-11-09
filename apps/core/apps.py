@@ -28,6 +28,7 @@ class CoreConfig(AppConfig):
         from .checks import (
             check_audit_policy,
             check_client_ip_settings,
+            check_email_settings,
             check_encrypted_data,
             check_feature_flag_settings,
             check_field_encryption_keys,
@@ -42,3 +43,4 @@ class CoreConfig(AppConfig):
         checks.register(check_field_encryption_keys, checks.Tags.security)
         checks.register(check_encrypted_data, checks.Tags.database)
         checks.register(check_feature_flag_settings)
+        checks.register(check_email_settings)

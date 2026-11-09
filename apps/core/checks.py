@@ -12,6 +12,10 @@
   the configured keys (core.E303, E304); values in clear or on an older key are warnings
   (core.W302, W301) that `manage.py rotate_field_keys` fixes.
 - Feature flags (ARC.8): every environment default names a registered flag (core.E401).
+- Transactional email (ARC.16): settings that hold live data (`LIVE_DATA`) send through a real
+  provider adapter, not the console or test sender (core.E501), from a real address
+  (core.E502); without live data (development, tests, STAGE) the console sender stays allowed
+  until ARC.19.
 """
 
 import ast
@@ -477,3 +481,37 @@ def check_feature_flag_settings(
             id="core.E401",
         )
     ]
+
+
+# Senders that never deliver: development and tests only.
+NON_DELIVERING_SENDERS = frozenset(
+    {"apps.core.mail.ConsoleEmailSender", "apps.core.mail.MemoryEmailSender"}
+)
+
+
+def check_email_settings(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """Where live data is held, a forgotten email variable must stop the start, not drop mail."""
+    if not getattr(settings, "LIVE_DATA", False):
+        return []
+    errors: list[checks.CheckMessage] = []
+    sender = (settings.EMAIL_SENDER or "").strip()
+    if not sender or sender in NON_DELIVERING_SENDERS:
+        errors.append(
+            checks.Error(
+                f"EMAIL_SENDER is {sender or 'empty'!r}: transactional email would not be sent.",
+                hint="Set MPMV_EMAIL_SENDER to the provider adapter (ARC.19).",
+                id="core.E501",
+            )
+        )
+    address = (settings.DEFAULT_FROM_EMAIL or "").strip().lower()
+    if not address or address.endswith("@localhost"):
+        errors.append(
+            checks.Error(
+                f"DEFAULT_FROM_EMAIL is {address or 'empty'!r}: not a real sender address.",
+                hint="Set MPMV_EMAIL_FROM to an address of the platform's sending domain.",
+                id="core.E502",
+            )
+        )
+    return errors
