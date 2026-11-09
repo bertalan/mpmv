@@ -2,7 +2,7 @@
 
 ## 6.1 How it works today
 
-Plugin `legacy-multicarrier-shipping` v2.4.0 (~7,900 lines). Single source of configuration: the
+Plugin `legacy-multicarrier-shipping` (~7,900 lines). Single source of configuration: the
 `custom_shipping_vendors_config_v2` option (JSON). The old `wfcm-price-shipping-weight-wc` plugin has been
 inactive since February 2026 and must not be ported.
 

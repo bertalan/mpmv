@@ -5,7 +5,13 @@ from typing import Any
 from django.http import HttpRequest
 from ninja.security.base import AuthBase
 
-from apps.api.auth import authenticate_request, rate_limit, remember_client
+from apps.api.auth import (
+    authenticate_request,
+    note_refusal,
+    rate_limit,
+    refused_key_block,
+    remember_client,
+)
 from apps.api.engine import RateDecision
 from apps.api.services import AuthResult
 
@@ -20,7 +26,9 @@ class ApiAuthError(Exception):
 
 
 class ApiRateLimited(Exception):
-    """A key over its rate limit (CORE.12); rendered as a 429 problem by `apps.api.v1.errors`."""
+    """A key over its rate limit (CORE.12) or an IP blocked for refused keys (CORE.20).
+
+    Rendered as a 429 problem by `apps.api.v1.errors`."""
 
     def __init__(self, decision: RateDecision) -> None:
         super().__init__("rate_limited")
@@ -34,6 +42,7 @@ class ApiKey(AuthBase):
     accepts any valid key: only for operations about the key itself, such as `GET /me`.
     The scope is published in the operation's OpenAPI `security` requirement. An accepted key
     is then counted against its rate limit (CORE.12): over it, the operation does not run.
+    A client IP blocked for refused keys (CORE.20) gets 429 before the key is read.
     """
 
     openapi_type = "http"
@@ -50,9 +59,13 @@ class ApiKey(AuthBase):
         return [] if self.scope is None else [self.scope]
 
     def __call__(self, request: HttpRequest) -> Any:
+        blocked = refused_key_block(request)
+        if blocked is not None:
+            raise ApiRateLimited(blocked)
         result = authenticate_request(request, self.scope)
         remember_client(request, result.client)
         if not result.ok or result.client is None:
+            note_refusal(request, result)
             raise ApiAuthError(result, self.scope)
         limited = rate_limit(result.client, self.scope)
         if not limited.allowed:

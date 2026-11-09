@@ -1,0 +1,22 @@
+{% extends "layouts/base.html" %}
+{% load i18n %}
+{% comment %}
+The editor's preview of a term landing page (CMS.4). Visitors never see this page: the landing
+page lives on its term's listing page (`/{taxonomy}/{term}/`, D-07), which shows the same parts
+around the listing. The preview shows them with the term's newest products.
+{% endcomment %}
+{% block head %}<meta name="robots" content="noindex">{% endblock %}
+{% block content %}
+  <div class="listing">
+    <header class="listing-header"><h1>{{ name }}</h1></header>
+    {% include "cms/includes/term_landing_before.html" %}
+    {% if cards %}
+      <section class="listing-results" aria-labelledby="term-landing-products-heading">
+        <h2 id="term-landing-products-heading">{% translate "Products" %}</h2>
+        {% include "cms/includes/product_tiles.html" with cards=cards currency=currency heading_level=3 only %}
+      </section>
+    {% endif %}
+    {% include "cms/includes/term_landing_after.html" %}
+  </div>
+{% endblock %}
+{% block image_credits %}{% endblock %}

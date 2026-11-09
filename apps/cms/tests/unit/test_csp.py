@@ -13,6 +13,8 @@ PICKERS = [
     # I18N.3: the main image field of a page (Wagtail's image chooser widget).
     '<script>new ImageChooser("id_image", {"modalUrl": "/admin/images/chooser/"});</script>',
     '<script>new DocumentChooser("id_file", {"modalUrl": "/admin/documents/chooser/"});</script>',
+    # CMS.4: the term and vendor of a landing page (a generic chooser viewset's widget).
+    '<script>new Chooser("id_term", {"modalUrl": "/admin/cms/term-chooser/"});</script>',
 ]
 
 
@@ -35,6 +37,8 @@ def test_picker_initialisers_get_the_nonce(script: str) -> None:
         "<script>new InlinePanel({});</script>",
         '<script>new ImageChooser("a", {"x": alert(1)});</script>',
         '<script>new ImageChooser("a", {});alert(1);</script>',
+        '<script>new Chooser("a", {"x": alert(1)});</script>',
+        '<script>new Chooser("a", {});alert(1);</script>',
         '<script>new Function("a", {});</script>',
     ],
 )
