@@ -9,6 +9,8 @@ RULES = [
     engine.territory_rule("ES-CN", "ES", engine.OUTSIDE_VAT_AREA, ["35*", "38*"]),
     engine.territory_rule("FI-01", "FI", engine.OUTSIDE_VAT_AREA, ["22*"]),
     engine.territory_rule("XI", "GB", engine.SPECIAL, ["BT*"]),
+    engine.territory_rule("FR-971", "FR", engine.OUTSIDE_VAT_AREA, ["971*"]),
+    engine.territory_rule("FR-974", "FR", engine.OUTSIDE_VAT_AREA, ["974*"]),
     engine.territory_rule("PT-20", "PT", engine.OWN_RATES, ["9000..9499"]),
 ]
 
@@ -85,3 +87,54 @@ def test_an_invalid_pattern_fails_loudly() -> None:
 def test_an_unknown_status_is_refused() -> None:
     with pytest.raises(ValueError, match="status"):
         engine.territory_rule("ES-XX", "ES", "elsewhere", ["35*"])
+
+
+# An ISO code of its own names the territory: no postcode needed, none can send it to mainland VAT.
+@pytest.mark.parametrize(
+    ("country", "postcode", "code"),
+    [
+        ("GP", "", "FR-971"),
+        ("GP", "00000", "FR-971"),
+        ("RE", "75001", "FR-974"),
+        ("AX", "00100", "FI-01"),
+        ("AX", "", "FI-01"),
+        ("ax", " ", "FI-01"),
+    ],
+)
+def test_an_alias_country_fails_closed_whatever_the_postcode(
+    country: str, postcode: str, code: str
+) -> None:
+    rule = engine.find_territory(country, postcode, RULES)
+    assert rule is not None
+    assert rule.code == code
+    assert engine.is_outside_vat_territory(country, postcode, RULES) is True
+
+
+def test_an_alias_whose_territory_is_not_configured_is_not_found() -> None:
+    assert engine.find_territory("MQ", "", RULES) is None
+
+
+def test_every_alias_names_a_territory_code() -> None:
+    assert engine.TERRITORY_BY_ALIAS_COUNTRY == {
+        "AX": "FI-01",
+        "GP": "FR-971",
+        "MQ": "FR-972",
+        "GF": "FR-973",
+        "RE": "FR-974",
+        "YT": "FR-976",
+    }
+
+
+@pytest.mark.parametrize(
+    ("country", "postcode"),
+    [
+        ("ES", "3500"),
+        ("ES", "350012"),
+        ("FI", "22"),
+        ("FR", "9711"),
+        ("FR", "971100"),
+        ("ES", "35"),
+    ],
+)
+def test_a_prefix_never_matches_a_postcode_of_the_wrong_length(country: str, postcode: str) -> None:
+    assert engine.find_territory(country, postcode, RULES) is None

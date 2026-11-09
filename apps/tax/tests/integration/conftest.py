@@ -2,7 +2,8 @@
 
 Migration 0006 seeds the special territories (TAX.7); most tests create their own territories
 with the codes the seed uses (`ES-CN`, `IT-LIVIGNO`), so the seed is removed before each test.
-`test_special_territories_seed.py` tests the seed itself and keeps it.
+A test module that works on the seed itself sets `pytest.mark.keep_seeded_territories`.
+Tests marked `django_db(transaction=True)` flush every table, the seed included.
 """
 
 from collections.abc import Iterator
@@ -14,7 +15,7 @@ from apps.tax.models import Territory
 
 @pytest.fixture(autouse=True)
 def _no_seeded_territories(request: pytest.FixtureRequest) -> Iterator[None]:
-    if request.module.__name__.endswith("test_special_territories_seed"):
+    if request.node.get_closest_marker("keep_seeded_territories"):
         yield
         return
     request.getfixturevalue("db")

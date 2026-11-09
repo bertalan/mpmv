@@ -5,7 +5,7 @@ import pytest
 from apps.tax import engine, services
 from apps.tax.models import Territory
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.keep_seeded_territories]
 
 # code -> (country, postcode patterns) of the spec's list (05 §5.2 `Territory`).
 EXPECTED = {
@@ -49,6 +49,9 @@ def test_northern_ireland_is_not_seeded_while_d02_is_open() -> None:
         ("AX", "22100"),
         ("FR", "97110"),  # Guadeloupe
         ("GP", "97100"),
+        ("GP", ""),
+        ("RE", "00000"),
+        ("AX", ""),
         ("FR", "97600"),  # Mayotte
         ("GR", "63086"),
         ("DE", "27498"),
@@ -76,3 +79,26 @@ def test_t15_seeded_territories_are_outside_the_vat_territory(country: str, post
 )
 def test_mainland_addresses_are_in_no_seeded_territory(country: str, postcode: str) -> None:
     assert services.find_territory(country, postcode) is None
+
+
+def test_the_seed_is_idempotent_and_keeps_staff_edits() -> None:
+    from importlib import import_module
+
+    from django.apps import apps
+
+    migration = import_module("apps.tax.migrations.0006_seed_special_territories")
+    Territory.objects.filter(code="ES-CN").update(postcode_patterns=["35001"])
+    migration.seed(apps, None)
+    assert Territory.objects.count() == len(EXPECTED)
+    assert Territory.objects.get(code="ES-CN").postcode_patterns == ["35001"]
+
+
+def test_the_reverse_deletes_only_rows_still_equal_to_the_seed() -> None:
+    from importlib import import_module
+
+    from django.apps import apps
+
+    migration = import_module("apps.tax.migrations.0006_seed_special_territories")
+    Territory.objects.filter(code="ES-CN").update(postcode_patterns=["35001"])
+    migration.unseed(apps, None)
+    assert list(Territory.objects.values_list("code", flat=True)) == ["ES-CN"]
