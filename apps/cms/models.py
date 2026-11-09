@@ -28,18 +28,23 @@ a main image and a body whose featured links also take product cards. Scheduling
 `go_live_at` and `expire_at` in the page settings, applied by the `cms.publish_scheduled` job.
 An author has a name, a translated bio and a photo, and a page per language under the blog,
 `author/<slug>/`, listing their articles (owner answer on PR #156).
+
+Landing pages (CMS.4): a term landing page is the editorial part of a term's D-07 listing page
+and lives on that URL; a vendor landing page tells an active vendor's story with its products.
 """
 
 import datetime as dt
+import uuid
 from typing import Any, ClassVar
 from urllib.parse import urljoin
 
 from django.core.exceptions import ValidationError
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.paginator import Page as PaginatorPage
-from django.core.validators import URLValidator
+from django.core.validators import MaxValueValidator, URLValidator
 from django.db import models
-from django.http import Http404, HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponsePermanentRedirect
+from django.http.response import HttpResponseBase
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.text import slugify
@@ -49,9 +54,12 @@ from wagtail.admin.panels import FieldPanel
 from wagtail.contrib.routable_page.models import RoutablePageMixin, path
 from wagtail.fields import RichTextField, StreamField
 from wagtail.images import get_image_model_string
-from wagtail.models import Page, TranslatableMixin
+from wagtail.models import Page, PageManager, PageQuerySet, TranslatableMixin
 from wagtail_localize.fields import BaseTranslatableField, SynchronizedField, TranslatableField
 from wagtail_localize.models import Translation
+
+from apps.vendors.scoping import VendorScopedManager, VendorScopedQuerySet
+from apps.vendors.services import has_public_storefront
 
 from . import engine
 from .blocks import (
@@ -63,8 +71,10 @@ from .blocks import (
     FigureBlock,
     GalleryBlock,
     HeroBlock,
+    PageCardBlock,
     ProductGridBlock,
 )
+from .choosers import term_chooser, vendor_chooser
 
 
 def body_field(verbose_name: Any = None, *, products: bool = False) -> StreamField:
@@ -102,6 +112,8 @@ class HomePage(Page):  # type: ignore[misc]  # Wagtail is untyped
         "cms.LegalPage",
         "cms.VendorRecruitmentPage",
         "cms.BlogIndexPage",
+        "cms.TermLandingPage",
+        "cms.VendorLandingPage",
         # The `/events/` index (EVT.1): named by string, so cms never imports apps.events.
         "events.EventIndexPage",
     ]
@@ -149,7 +161,11 @@ class StandardPage(Page):  # type: ignore[misc]
         SynchronizedField("image", overridable=True)
     ]
     parent_page_types: ClassVar[list[str]] = ["cms.HomePage", "cms.StandardPage"]
-    subpage_types: ClassVar[list[str]] = ["cms.StandardPage"]
+    subpage_types: ClassVar[list[str]] = [
+        "cms.StandardPage",
+        "cms.TermLandingPage",
+        "cms.VendorLandingPage",
+    ]
     template = "cms/standard_page.html"
 
     class Meta:
@@ -797,4 +813,190 @@ class BlogPostPage(Page):  # type: ignore[misc]
             description=self.summary,
             image=image,
         )
+        return context
+
+
+# --- Term and vendor landing pages (CMS.4)
+
+
+def _unique_in_locale(page: Page, model: type[Page], field: str, target_id: int) -> None:
+    """One landing page per term (or vendor) and language: a second one would never show."""
+    others = model.objects.filter(locale_id=page.locale_id, **{f"{field}_id": target_id})
+    if page.locale_id is not None and others.exclude(pk=page.pk).exists():
+        raise ValidationError({field: _("This language already has a landing page for it.")})
+
+
+class TermLandingPage(Page):  # type: ignore[misc]
+    """The editorial part of a taxonomy term's page (spec 10 §10.2).
+
+    A term page lives on its D-07 listing URL (`/{taxonomy}/{term}/`, CAT.8), so this page adds
+    no URL of its own: its intro, the term's products by category and its related articles show
+    on the listing's first unfiltered page (`services.listing_editorial`), under the listing's
+    canonical and hreflang. Its URL is the term URL in its language, which follows the term's
+    current URL (MIG.11); its place in the page tree answers one 301 there. The editor's preview
+    renders the editorial part with the term's newest products.
+    """
+
+    term = models.ForeignKey(
+        "catalog.Term",
+        verbose_name=_("term"),
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text=_("A term of a taxonomy with term pages."),
+    )
+    body = body_field(_("introduction"))
+    category_products = models.PositiveSmallIntegerField(
+        _("products per category"),
+        default=engine.LANDING_CATEGORY_DEFAULT,
+        validators=[MaxValueValidator(engine.LANDING_CATEGORY_MAX)],
+        help_text=_(
+            "The term's newest products shown for each category; 0 shows no category sections."
+        ),
+    )
+    related = StreamField(
+        [("page", PageCardBlock())], blank=True, verbose_name=_("related articles")
+    )
+
+    content_panels: ClassVar[list[Any]] = [
+        *Page.content_panels,
+        FieldPanel("term", widget=term_chooser.widget_class),
+        FieldPanel("body"),
+        FieldPanel("category_products"),
+        FieldPanel("related"),
+    ]
+    parent_page_types: ClassVar[list[str]] = ["cms.HomePage", "cms.StandardPage"]
+    subpage_types: ClassVar[list[str]] = []
+    template = "cms/term_landing_page.html"
+
+    class Meta:
+        verbose_name = _("term landing page")
+
+    def clean(self) -> None:
+        super().clean()
+        term = self.term
+        if term is None:
+            return  # the field's own "required" error
+        if not term.taxonomy.has_landing:
+            raise ValidationError({"term": _("This term's taxonomy has no term pages.")})
+        _unique_in_locale(self, TermLandingPage, "term", term.pk)
+
+    def listing_path(self) -> str | None:
+        """The term page's path in this page's language; None when the term has none."""
+        from .services import term_listing_path  # services import the models
+
+        if self.term is None:
+            return None
+        return term_listing_path(self.term, self.locale.language_code)
+
+    def get_url_parts(self, request: HttpRequest | None = None) -> Any:
+        parts = super().get_url_parts(request)
+        path = self.listing_path() if parts is not None else None
+        if parts is None or path is None:
+            return None
+        site_id, root_url, _page_path = parts
+        return site_id, root_url, path
+
+    def get_sitemap_urls(self, request: HttpRequest | None = None) -> list[dict[str, Any]]:
+        return []  # the term page is listed once, as a catalog listing
+
+    def serve(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
+        path = self.listing_path()
+        if path is None:
+            raise Http404("This term has no page.")
+        return HttpResponsePermanentRedirect(path)
+
+    def serve_preview(self, request: HttpRequest, mode_name: str) -> HttpResponseBase:
+        # As Wagtail's own serve_preview does; Django's HttpRequest does not declare them.
+        request.is_preview = True  # type: ignore[attr-defined]
+        request.preview_mode = mode_name  # type: ignore[attr-defined]
+        response: HttpResponseBase = super().serve(request)  # render, never redirect
+        return response
+
+    def get_context(self, request: HttpRequest, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        from .services import term_landing_preview
+
+        context: dict[str, Any] = super().get_context(request, *args, **kwargs)
+        context.update(term_landing_preview(self, request))
+        return context
+
+
+class VendorLandingPageQuerySet(PageQuerySet, VendorScopedQuerySet["VendorLandingPage"]):  # type: ignore[misc]
+    """Wagtail's page queryset with the CORE.3 vendor scoping."""
+
+
+class VendorLandingPageManager(PageManager, VendorScopedManager["VendorLandingPage"]):  # type: ignore[misc]
+    """A `PageManager` (Wagtail requires it) that is also the CORE.3 scoped manager."""
+
+    _queryset_class = VendorLandingPageQuerySet
+
+
+class VendorLandingPage(Page):  # type: ignore[misc]
+    """A vendor's story beyond its storefront: heritage, workshop, images and its featured
+    products (spec 10 §10.2), linked from the storefront. Shown only while the vendor is
+    active: otherwise it has no URL and answers 404. Vendor-owned data (CORE.3 scoping).
+    """
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorLandingPageManager()
+
+    # The id the vendor area and the API show (like BaseModel's); each translation has its own,
+    # so a copy for translation gets a new one.
+    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+
+    vendor = models.ForeignKey(
+        "vendors.Vendor",
+        verbose_name=_("vendor"),
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    body = body_field(_("story"), products=True)
+    featured_products = models.PositiveSmallIntegerField(
+        _("featured products"),
+        default=engine.PRODUCT_GRID_DEFAULT,
+        validators=[MaxValueValidator(engine.PRODUCT_GRID_MAX)],
+        help_text=_("The vendor's newest products shown after the story; 0 shows none."),
+    )
+
+    content_panels: ClassVar[list[Any]] = [
+        *Page.content_panels,
+        FieldPanel("vendor", widget=vendor_chooser.widget_class),
+        FieldPanel("body"),
+        FieldPanel("featured_products"),
+    ]
+    parent_page_types: ClassVar[list[str]] = ["cms.HomePage", "cms.StandardPage"]
+    subpage_types: ClassVar[list[str]] = []
+    exclude_fields_in_copy: ClassVar[list[str]] = ["public_id"]
+    template = "cms/vendor_landing_page.html"
+
+    class Meta:
+        verbose_name = _("vendor landing page")
+
+    def clean(self) -> None:
+        super().clean()
+        vendor = self.vendor
+        if vendor is None:
+            return  # the field's own "required" error
+        if not has_public_storefront(vendor):
+            raise ValidationError({"vendor": _("Choose an active vendor.")})
+        _unique_in_locale(self, VendorLandingPage, "vendor", vendor.pk)
+
+    def is_public(self) -> bool:
+        return self.vendor is not None and has_public_storefront(self.vendor)
+
+    def get_url_parts(self, request: HttpRequest | None = None) -> Any:
+        return super().get_url_parts(request) if self.is_public() else None
+
+    def serve(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
+        if not self.is_public():
+            raise Http404("This vendor has no public page.")
+        response: HttpResponseBase = super().serve(request, *args, **kwargs)
+        return response
+
+    def get_context(self, request: HttpRequest, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        from .services import vendor_landing_context
+
+        context: dict[str, Any] = super().get_context(request, *args, **kwargs)
+        context.update(vendor_landing_context(self, request))
         return context

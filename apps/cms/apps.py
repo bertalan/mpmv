@@ -31,6 +31,8 @@ class CmsConfig(AppConfig):
         "blogindexpage": "Wagtail page: editor content with revisions and Wagtail's action log",
         "blogpostpage": "Wagtail page: editor content with revisions and Wagtail's action log",
         "blogauthor": "Wagtail snippet: a byline name, logged in Wagtail's action log",
+        "termlandingpage": "Wagtail page: editor content with revisions and action log",
+        "vendorlandingpage": "Wagtail page: editor content with revisions and action log",
         "navigationmenu": "Wagtail snippet: menu content, logged in Wagtail's action log",
         # Installed only for wagtail-localize's editor (I18N.3); its menu is hidden.
         "wagtaildocs.document": "Wagtail document: editor upload, logged in Wagtail's action log",

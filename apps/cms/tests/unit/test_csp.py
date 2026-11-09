@@ -15,6 +15,8 @@ PICKERS = [
     '<script>new DocumentChooser("id_file", {"modalUrl": "/admin/documents/chooser/"});</script>',
     # CMS.3: the author of a blog article (Wagtail's snippet chooser widget).
     '<script>new SnippetChooser("id_author", {"modalUrl": "/admin/snippets/choose/"});</script>',
+    # CMS.4: the term and vendor of a landing page (a generic chooser viewset's widget).
+    '<script>new Chooser("id_term", {"modalUrl": "/admin/cms/term-chooser/"});</script>',
 ]
 
 
@@ -37,6 +39,8 @@ def test_picker_initialisers_get_the_nonce(script: str) -> None:
         "<script>new InlinePanel({});</script>",
         '<script>new ImageChooser("a", {"x": alert(1)});</script>',
         '<script>new ImageChooser("a", {});alert(1);</script>',
+        '<script>new Chooser("a", {"x": alert(1)});</script>',
+        '<script>new Chooser("a", {});alert(1);</script>',
         '<script>new Function("a", {});</script>',
     ],
 )

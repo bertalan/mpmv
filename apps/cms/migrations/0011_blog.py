@@ -16,7 +16,7 @@ import apps.cms.blocks
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("cms", "0009_legal_reviews_per_language"),
+        ("cms", "0010_term_vendor_landing_pages"),
         ("core", "0014_platform_owner_allowed_vendor_countries"),
         ("wagtailcore", "0098_apitoken"),
     ]

@@ -398,6 +398,15 @@ def _card_targets(
     }
 
 
+def public_cards(values: Iterable[_CardValue], language: str, request: Any) -> list[Card]:
+    """The cards of `values` whose target is public, in order (a landing page's related
+    articles, CMS.4)."""
+    values = list(values)
+    targets = _card_targets(values, language, request)
+    cards = (value.card(targets) for value in values)
+    return [card for card in cards if card is not None]
+
+
 class TermChooserBlock(term_chooser.get_block_class("_TermChooserBlock", __name__)):  # type: ignore[misc]
     """A catalog taxonomy term, chosen in the term chooser modal."""
 

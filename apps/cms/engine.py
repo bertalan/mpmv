@@ -347,3 +347,30 @@ def blog_posting_jsonld(
     if image:
         data["image"] = image
     return data
+
+
+# --- Term landing pages (CMS.4)
+
+LANDING_CATEGORY_DEFAULT = 4
+LANDING_CATEGORY_MAX = 12
+
+
+def landing_category_limit(limit: int | None) -> int:
+    """How many products each category section of a term landing page shows: 0 turns the
+    sections off; a stored value out of bounds is clamped."""
+    if limit is None:
+        return LANDING_CATEGORY_DEFAULT
+    return max(0, min(LANDING_CATEGORY_MAX, limit))
+
+
+def shows_category_sections(categories: int, limit: int) -> bool:
+    """Sections by category only for two categories or more: a single one would repeat the
+    listing right below it."""
+    return limit > 0 and categories >= 2
+
+
+def listing_slug_path(path: str, prefix: str) -> str | None:
+    """The `category` filter value (CAT.8) of a category listing at `path`: its slugs from the
+    top of the tree, after the language `prefix` and the listing segment. None without slugs."""
+    _segment, _sep, slugs = path.removeprefix(prefix).strip("/").partition("/")
+    return slugs or None
