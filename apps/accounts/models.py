@@ -139,3 +139,28 @@ class RecoveryCode(BaseModel):
 
     def __str__(self) -> str:
         return f"recovery code {'used' if self.used_at else 'unused'} ({self.device_id})"
+
+
+# --- Secure action links (CORE.15)
+
+
+class ActionLinkUse(BaseModel):
+    """A secure action link whose one sign-in use is spent (single use, race-safe).
+
+    Written by `apps.accounts.services.redeem_action_token` with a plain insert: the unique
+    nonce digest makes a second, concurrent redemption fail in the database. Only the SHA-256 of
+    the link's random nonce is stored, never the token.
+    """
+
+    nonce_digest = models.CharField(max_length=64, unique=True)
+    purpose = models.CharField(max_length=100)
+    object_key = models.CharField(max_length=200)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="action_link_uses"
+    )
+
+    class Meta:
+        verbose_name = "used action link"
+
+    def __str__(self) -> str:
+        return f"{self.purpose} {self.object_key} (used {self.created_at:%Y-%m-%d %H:%M})"

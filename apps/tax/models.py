@@ -255,6 +255,18 @@ class VatRegime(models.TextChoices):
     EXEMPT = engine.EXEMPT, "Exempt (no VAT charged)"
 
 
+EXEMPT_COUNTRY_HELP = (
+    "'Other' exemption only: the country of the law cited in the legal note (ISO 3166-1 "
+    "alpha-2). It must be the country of the vendor's VAT number, as for the Italian reasons."
+)
+
+
+def vat_registration_country(vendor: Vendor) -> str:
+    """The country of the vendor's VAT registration (TAX.13): see
+    `engine.vat_registration_country`."""
+    return engine.vat_registration_country(vendor.vat_number, vendor.country)
+
+
 class ExemptReason(models.TextChoices):
     ART74_PUBLISHING = engine.ART74_PUBLISHING, "Publishing (IT art. 74)"
     FLAT_RATE_FORFETTARIO = engine.FLAT_RATE_FORFETTARIO, "Flat-rate scheme (IT forfettario, RF19)"
@@ -279,6 +291,9 @@ class VendorTaxProfile(Versioned):
     regime = models.CharField("VAT regime", max_length=16, choices=Regime.choices)
     exempt_reason = models.CharField(
         max_length=24, choices=ExemptReason.choices, blank=True, help_text="Exempt regime only."
+    )
+    exempt_country = CountryField(
+        "country of the exemption law", blank=True, help_text=EXEMPT_COUNTRY_HELP
     )
     oss_registered_since = models.DateField("OSS registered since", null=True, blank=True)
     requested_by = models.ForeignKey(
@@ -333,6 +348,8 @@ class VendorTaxProfile(Versioned):
             self.exempt_reason,
             fiscal_regime=self.vendor.fiscal_regime,
             oss_registered_since=self.oss_registered_since,
+            exempt_country=self.exempt_country,
+            vat_country=vat_registration_country(self.vendor),
         )
         if errors:
             raise ValidationError(errors)
@@ -398,6 +415,9 @@ class TaxRegimeChangeRequest(BaseModel):
     regime = models.CharField("VAT regime", max_length=16, choices=Regime.choices)
     exempt_reason = models.CharField(
         max_length=24, choices=ExemptReason.choices, blank=True, help_text="Exempt regime only."
+    )
+    exempt_country = CountryField(
+        "country of the exemption law", blank=True, help_text=EXEMPT_COUNTRY_HELP
     )
     oss_registered_since = models.DateField("OSS registered since", null=True, blank=True)
     fiscal_regime = models.CharField(
@@ -508,6 +528,8 @@ class TaxRegimeChangeRequest(BaseModel):
             requested_fiscal_regime=self.fiscal_regime,
             current_fiscal_regime=self.vendor.fiscal_regime,
             oss_registered_since=self.oss_registered_since,
+            exempt_country=self.exempt_country,
+            vat_country=vat_registration_country(self.vendor),
         )
         if errors:
             raise ValidationError(errors)

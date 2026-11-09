@@ -33,6 +33,11 @@ AFTER = [("tax", "0004_regime_request_fiscal_regime_rf20")]
 
 
 def _request_to_rf20(vendor: Vendor) -> TaxRegimeChangeRequest:
+    # VEN.25: RF20 needs the EX number issued by the member state of establishment (Italy here).
+    Vendor.objects.filter(pk=vendor.pk).update(
+        cross_border_franchise_number=f"IT{vendor.vat_number.removeprefix('IT')}EX"
+    )
+    vendor.refresh_from_db()
     owner = VendorMemberFactory.create(vendor=vendor).user
     request: TaxRegimeChangeRequest = TaxRegimeChangeRequestFactory.build(
         vendor=vendor,
@@ -151,7 +156,9 @@ def test_the_migration_widens_the_request_constraint_and_is_reversible() -> None
     executor.loader.build_graph()
     executor.migrate(AFTER)
     TaxRegimeChangeRequest.objects.filter(pk=request.pk).update(fiscal_regime=RF20)
-    assert TaxRegimeChangeRequest.objects.get(pk=request.pk).fiscal_regime == RF20
+    # Only the columns of 0004: later migrations add fields to the current model.
+    stored = TaxRegimeChangeRequest.objects.only("fiscal_regime").get(pk=request.pk)
+    assert stored.fiscal_regime == RF20
 
     executor.loader.build_graph()
     executor.migrate(executor.loader.graph.leaf_nodes())
