@@ -10,7 +10,7 @@ production system. The list is **confidential** and is not part of the public re
 | Area | Today | New system |
 |---|---|---|
 | Surface | WP core + WooCommerce + WCFM (7 add-ons) + WPML (4) + WPSSO (15) + ~20 mu-plugins + 132 routes | A single Python codebase, dependencies inventoried (SBOM) and scanned in CI |
-| Admin access | A single `/wp-admin` for all roles | Staff admin behind MFA and a restricted network or proxy; separate vendor area |
+| Admin access | A single `/wp-admin` for all roles | One Manager with a gated shop space for vendors and a gated platform space for staff roles, MFA for everyone; Django admin behind a restricted network ([02](02-core-identity-permissions.md)) |
 | API | Legacy PHP API, to be replaced | `ApiClient` with hash, scopes, expiry, rotation, rate limiting |
 | Executable code | Traditional PHP/WordPress model | No code in media directories; media on object storage |
 | Operational scripts | Ad hoc fix scripts outside version control | Versioned management commands with dry-run and audit, or MCP tools |
@@ -34,7 +34,7 @@ task SEC.1 is HTTP hardening). Renaming the requirements is an open owner questi
 | SEC.6 | Field-level encryption | IBAN, KYC documents, DAC7 data; key in KMS or in a file outside the DB, rotatable |
 | SEC.7 | Audit trail | Logins, credentials, prices, rates, zones, commissions, IBAN, vendor status, payouts, data exports |
 | SEC.8 | Incoming webhooks | Mandatory signature, idempotency, time window |
-| SEC.9 | Untrusted input | Feeds, scraping, AI output and webhooks validated against a schema before reaching the DB; product texts never interpreted as instructions by agents |
+| SEC.9 | Untrusted input | Feeds, scraping, AI output and webhooks validated against a schema before reaching the DB; product texts never interpreted as instructions by agents; outbound fetches of staff- or vendor-entered URLs (connectors, feeds) only through the shared client that refuses loopback, private, link-local, CGNAT and metadata addresses and redirects to them (MIG.12) |
 | SEC.10 | Continuous verification | Security tests in CI, mandatory manual review on payments, tax and permissions, external penetration test before go-live |
 
 ## 12.4 Infrastructure
@@ -113,5 +113,5 @@ flowchart LR
 | OPS.2 | Observability: JSON logs, error tracking, healthchecks, alerts (including database disk space, WAL archiving and backup age) | P1 | 8 | ARC.5 | Alert on a simulated checkout error |
 | OPS.3 | Runbooks: incidents (including 72 h data breach), payouts, rate updates, vendor onboarding | P2 | 8 | — | Runbooks in the repo |
 | OPS.4 | Automated dependency updates (PRs) + SBOM | P2 | 3 | ARC.4 | Weekly update PRs |
-| OPS.5 | Technical Django admin reachable only from a restricted network (owner decision Q-18): allow-list at the reverse proxy plus an app-level check on the Django admin path (defence in depth), the allowed networks as environment configuration, staff operations moved to the Wagtail admin (CORE.8) | P1 | 3 | ARC.13, CORE.8 | On STAGE the Django admin answers 404 from outside the allowed networks and works from inside; a test covers the app-level check |
+| OPS.5 | Technical Django admin reachable only from a restricted network (owner decision Q-18): allow-list at the reverse proxy plus an app-level check on the Django admin path (defence in depth), the allowed networks as environment configuration, staff operations moved to the Manager platform space (CORE.17) and editors to the Wagtail admin (CORE.8) | P1 | 3 | ARC.13, CORE.8 | On STAGE the Django admin answers 404 from outside the allowed networks and works from inside; a test covers the app-level check |
 | OPS.6 | Security operations dashboard (owner idea MQ-4): live view of system actions from the AuditLog, the API mutation log and the rate-limit counters, with anomalies and per-key and per-user spikes, and suggested corrective commands (revoke a key, raise a limit, unlock a user) that staff confirm with an MFA step-up; each command calls the existing audited service | P2 | 12 | SEC.4, CORE.16, CORE.8 | A simulated spike on one key shows up with a "revoke key" or "raise limit" suggestion; a suggestion runs only after step-up and writes the same AuditLog entry as the service it calls; a staff member without the permission sees no dashboard |
