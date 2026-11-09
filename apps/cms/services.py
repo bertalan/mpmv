@@ -605,7 +605,8 @@ def _vendor_story(
 ) -> listings.ListingEditorial | None:
     page = (
         VendorLandingPage.objects.live()
-        .filter(vendor=vendor, locale__language_code=language)
+        .for_vendor(vendor)
+        .filter(locale__language_code=language)
         .select_related("vendor")
         .first()
     )

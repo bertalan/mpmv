@@ -38,9 +38,10 @@ from wagtail.admin.panels import FieldPanel
 from wagtail.contrib.routable_page.models import RoutablePageMixin, path
 from wagtail.fields import StreamField
 from wagtail.images import get_image_model_string
-from wagtail.models import Page, TranslatableMixin
+from wagtail.models import Page, PageManager, PageQuerySet, TranslatableMixin
 from wagtail_localize.fields import SynchronizedField
 
+from apps.vendors.scoping import VendorScopedManager, VendorScopedQuerySet
 from apps.vendors.services import has_public_storefront
 
 from . import engine
@@ -505,11 +506,24 @@ class TermLandingPage(Page):  # type: ignore[misc]
         return context
 
 
+class VendorLandingPageQuerySet(PageQuerySet, VendorScopedQuerySet["VendorLandingPage"]):  # type: ignore[misc]
+    """Wagtail's page queryset with the CORE.3 vendor scoping."""
+
+
+class VendorLandingPageManager(PageManager, VendorScopedManager["VendorLandingPage"]):  # type: ignore[misc]
+    """A `PageManager` (Wagtail requires it) that is also the CORE.3 scoped manager."""
+
+    _queryset_class = VendorLandingPageQuerySet
+
+
 class VendorLandingPage(Page):  # type: ignore[misc]
     """A vendor's story beyond its storefront: heritage, workshop, images and its featured
     products (spec 10 §10.2), linked from the storefront. Shown only while the vendor is
-    active: otherwise it has no URL and answers 404.
+    active: otherwise it has no URL and answers 404. Vendor-owned data (CORE.3 scoping).
     """
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorLandingPageManager()
 
     vendor = models.ForeignKey(
         "vendors.Vendor",
