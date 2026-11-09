@@ -29,6 +29,11 @@ Rules:
 - **Cooldown**: a release is proposed only after 5 days (14 for Python majors; Dependabot has no
   per-semver cooldown for Actions and images), which gives the ecosystem time to spot a broken or
   hijacked release. Security updates skip the cooldown.
+- **Hypothesis is pinned exactly** (`==` in `pyproject.toml`, every other dependency uses
+  `>=`): the derandomized `ci` profile in `conftest.py` replays the same examples only on the
+  same Hypothesis version, and Hypothesis releases several times a week. Its update PR moves the
+  pin; when a property test fails there, the new examples found it, so read the failure as a
+  finding, not as noise.
 - **Labels** `dependencies` plus `python`, `github-actions` or `docker`; commit messages start
   with `OPS.4:`.
 
@@ -104,6 +109,11 @@ the Python environment and one of the image for each architecture (ARC.13):
 |---|---|---|
 | `mpmv-python.cdx.json` | `make sbom` (`cyclonedx-py`) | The production Python environment from `uv.lock`, no dev group, with licenses |
 | `mpmv-image-amd64.cdx.json`, `mpmv-image-arm64.cdx.json` | syft (`anchore/sbom-action`) | The built image for that architecture: Debian packages, Python and every package in the virtualenv |
+
+When `anchore/sbom-action` cannot download syft, CI and the release fall back to the official
+syft image (`anchore/syft:<tag>` through `docker run`, in `ci.yml` and `release.yml`). That tag
+is not in the Dockerfile ecosystem, so Dependabot never bumps it: update it by hand in both
+workflows when you update the action.
 
 Where to find them:
 

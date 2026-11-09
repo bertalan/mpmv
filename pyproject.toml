@@ -21,6 +21,7 @@ dependencies = [
   "cryptography>=50.0.2",
   "wagtail>=8.1,<8.2",
   "wagtail-localize>=1.14.5,<1.15",
+  "defusedxml>=0.7.1",  # SVG logo checks (THM.12)
 ]
 
 [dependency-groups]
@@ -42,7 +43,13 @@ dev = [
   "check-jsonschema>=0.39.0",
   "cyclonedx-bom>=7.6.0,<8",
   # SEC.5: property-based tests over the hostile-input corpus (tests/hostile_input.py).
+  # Exact pin on purpose: the derandomized `ci` profile (conftest.py) replays the same examples
+  # only on the same Hypothesis version, and Hypothesis releases several times a week. A bump
+  # comes as its own Dependabot PR, so a new failing example points at the bump, not at a change
+  # in our code (docs/dev/dependency-updates.md).
   "hypothesis==6.170.10",
+  # tools/build_docs.py renders the HTML spec; tests/unit/test_build_docs_eof.py checks it.
+  "markdown>=3.5",
 ]
 
 [tool.uv]
@@ -74,7 +81,7 @@ untyped_calls_exclude = ["factory"]
 [[tool.mypy.overrides]]
 module = [
   "dj_database_url", "croniter", "django_otp", "django_otp.*", "whitenoise", "whitenoise.*",
-  "gunicorn", "gunicorn.*",
+  "gunicorn", "gunicorn.*", "defusedxml", "defusedxml.*",
 ]
 ignore_missing_imports = true
 
@@ -122,6 +129,7 @@ markers = [
   "unit: pure functions, no database (ADR-0006)",
   "integration: real Django + PostgreSQL",
   "e2e: Playwright against a live server",
+  "security_slow: slow security cases, run nightly by security-nightly (SEC.5)",
 ]
 
 [tool.coverage.run]

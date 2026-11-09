@@ -48,7 +48,7 @@ def login_page(client: Client) -> tuple[str, list[str]]:
 
 
 @pytest.fixture(params=["home", "standard", "login"])
-def page(request: pytest.FixtureRequest, client: Client) -> tuple[str, list[str]]:
+def rendered_page(request: pytest.FixtureRequest, client: Client) -> tuple[str, list[str]]:
     if request.param == "login":
         return login_page(client)
     return render(client, {"home": "/", "standard": "/about/"}[request.param])
@@ -58,8 +58,8 @@ def body(html: str) -> str:
     return html.split("<body", 1)[1]
 
 
-def test_the_page_extends_the_base_layout(page: tuple[str, list[str]]) -> None:
-    html, templates = page
+def test_the_page_extends_the_base_layout(rendered_page: tuple[str, list[str]]) -> None:
+    html, templates = rendered_page
     assert "layouts/base.html" in templates
     assert "cms/base.html" not in templates
     assert "core/base.html" not in templates
@@ -71,14 +71,14 @@ def test_cms_pages_use_the_public_layout_and_login_the_account_layout(client: Cl
     assert "layouts/account.html" in login_page(client)[1]
 
 
-def test_the_built_theme_css_is_linked(page: tuple[str, list[str]]) -> None:
-    html, _ = page
+def test_the_built_theme_css_is_linked(rendered_page: tuple[str, list[str]]) -> None:
+    html, _ = rendered_page
     assert re.search(r'<link rel="stylesheet" href="/static/themes/base/theme\.css"', html)
     assert "cms/site.css" not in html
 
 
-def test_the_skip_link_is_the_first_focusable_element(page: tuple[str, list[str]]) -> None:
-    html, _ = page
+def test_the_skip_link_is_the_first_focusable_element(rendered_page: tuple[str, list[str]]) -> None:
+    html, _ = rendered_page
     first = FOCUSABLE.search(body(html))
     assert first is not None
     assert 'class="skip-link"' in first.group(0)
@@ -87,13 +87,15 @@ def test_the_skip_link_is_the_first_focusable_element(page: tuple[str, list[str]
     assert re.search(r'<main id="main"[^>]*tabindex="-1"', html)
 
 
-def test_one_h1_per_page(page: tuple[str, list[str]]) -> None:
-    html, _ = page
+def test_one_h1_per_page(rendered_page: tuple[str, list[str]]) -> None:
+    html, _ = rendered_page
     assert len(re.findall(r"<h1\b", html)) == 1
 
 
-def test_the_header_has_a_labelled_disclosure_navigation(page: tuple[str, list[str]]) -> None:
-    html, _ = page
+def test_the_header_has_a_labelled_disclosure_navigation(
+    rendered_page: tuple[str, list[str]],
+) -> None:
+    html, _ = rendered_page
     header = html.split('<header class="site-header">', 1)[1].split("</header>", 1)[0]
     nav = re.search(r'<nav id="site-nav"[^>]*aria-label="Main"', header)
     assert nav is not None
@@ -105,16 +107,18 @@ def test_the_header_has_a_labelled_disclosure_navigation(page: tuple[str, list[s
     assert 'x-data="disclosure"' in header
 
 
-def test_the_header_has_the_language_switcher(page: tuple[str, list[str]]) -> None:
-    html, _ = page
+def test_the_header_has_the_language_switcher(rendered_page: tuple[str, list[str]]) -> None:
+    html, _ = rendered_page
     header = html.split('<header class="site-header">', 1)[1].split("</header>", 1)[0]
     assert re.search(r'<nav class="language-switcher" aria-label="Language"', header)
     for code in ("en", "it"):
         assert f'name="language" value="{code}"' in header
 
 
-def test_the_help_link_sits_in_the_header_and_the_footer(page: tuple[str, list[str]]) -> None:
-    html, _ = page
+def test_the_help_link_sits_in_the_header_and_the_footer(
+    rendered_page: tuple[str, list[str]],
+) -> None:
+    html, _ = rendered_page
     header = html.split('<header class="site-header">', 1)[1].split("</header>", 1)[0]
     footer = html.split('<footer class="site-footer">', 1)[1].split("</footer>", 1)[0]
     for part in (header, footer):
@@ -129,8 +133,8 @@ def test_without_a_help_url_no_empty_help_link_is_rendered(
     assert 'class="help-link"' not in html
 
 
-def test_htmx_is_configured_for_the_strict_csp(page: tuple[str, list[str]]) -> None:
-    html, _ = page
+def test_htmx_is_configured_for_the_strict_csp(rendered_page: tuple[str, list[str]]) -> None:
+    html, _ = rendered_page
     meta = re.search(r"<meta name=\"htmx-config\" content='([^']*)'>", html)
     assert meta is not None
     config = json.loads(meta.group(1))
@@ -140,8 +144,8 @@ def test_htmx_is_configured_for_the_strict_csp(page: tuple[str, list[str]]) -> N
     assert config["selfRequestsOnly"] is True
 
 
-def test_only_same_origin_script_files_are_loaded(page: tuple[str, list[str]]) -> None:
-    html, _ = page
+def test_only_same_origin_script_files_are_loaded(rendered_page: tuple[str, list[str]]) -> None:
+    html, _ = rendered_page
     scripts = re.findall(r"<script\b([^>]*)>", html)
     sources = [re.search(r'src="([^"]+)"', attrs) for attrs in scripts]
     assert all(source is not None for source in sources), "inline <script> found"

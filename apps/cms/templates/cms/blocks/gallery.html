@@ -1,10 +1,10 @@
-{% load wagtailimages_tags image_credits %}
+{% load image_credits responsive_images %}
 <ul class="gallery">
   {% for item in images %}
     {% image_credit_of item.image as credit %}
     <li>
       <figure>
-        {% image item.image fill-480x360 alt=item.alt_text %}
+        {% responsive_image item.image "gallery" alt=item.alt_text %}
         {% if item.caption or credit %}<figcaption>{{ item.caption }}{% if credit %} {% include "core/components/image_credit.html" %}{% endif %}</figcaption>{% endif %}
       </figure>
     </li>

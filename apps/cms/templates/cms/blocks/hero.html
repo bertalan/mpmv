@@ -1,6 +1,6 @@
-{% load wagtailimages_tags %}
+{% load responsive_images %}
 <section class="block block-hero">
-  {% if value.image %}{% image value.image width-1600 alt=value.alt_text %}{% endif %}
+  {% responsive_image value.image "hero" alt=value.alt_text priority=True %}
   <h2>{{ value.heading }}</h2>
   {% if value.text %}<p>{{ value.text|linebreaksbr }}</p>{% endif %}
   {% if value.links %}

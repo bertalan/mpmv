@@ -218,6 +218,10 @@ def member_with_landing_taxonomy(client: Client, tenants: CrossTenant) -> dict[s
 ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
     "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
+    "media": NoVendorData(
+        "Public image files (THM.12): published images and their renditions, no vendor data.",
+        kwargs={"path": "images/missing.webp"},
+    ),
     "home": NoVendorData("Public home page."),
     "catalog:category": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "product-category"}),
     "catalog:brand": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "brand"}),
@@ -291,6 +295,17 @@ def _admin_model(endpoint: Endpoint) -> type[models.Model] | None:
             return model
     return None
 
+
+# Wagtail admin routes replaced by a project view on the same path, included ahead of Wagtail's
+# admin URLs, under a URL name of its own: shadowed key -> key of the view that answers instead.
+# The shadowed pattern is never reached, so it gets no request of its own; the replacement is
+# an endpoint like any other and is checked under its own key (staff only, as CMS_ADMIN).
+# A replacement keeps Wagtail's name when it can (apps.cms.admin_urls); a namespaced name cannot
+# be kept, as a second include with Wagtail's namespace would take over its reverse().
+SHADOWED: dict[str, str] = {
+    # THM.12: collection edit refuses moving a collection that holds SVGs out of the SVG tree.
+    "wagtailadmin_collections:edit": "core_collection_edit",
+}
 
 CMS_ADMIN_ROUTE = "admin/"
 CMS_ADMIN = StaffOnly(
