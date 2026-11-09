@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg">
+<!-- Icons from Lucide (https://lucide.dev), ISC, Copyright (c) Lucide Icons and Contributors; some derived from Feather, MIT, Copyright (c) Cole Bemis. Licence text: ../licenses/LUCIDE-LICENSE.txt -->
 <symbol id="close" viewBox="0 0 24 24"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></symbol>
 <symbol id="search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34" /><circle cx="11" cy="11" r="8" /></symbol>
 <symbol id="plus" viewBox="0 0 24 24"><path d="M5 12h14" /><path d="M12 5v14" /></symbol>

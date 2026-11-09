@@ -289,11 +289,15 @@ public spec and a brief: no file derives from a reference template (spec 14 §14
   of spec 14 §14.12 overrides the defaults with custom properties.
 - **Fonts**: Barlow 400 and 700, Barlow Condensed 600 and 700, woff2 subset to Latin and Latin
   Extended-A (the gate allows 4 files), `font-display: swap`, one preload in `layouts/base.html`.
-  Upstream commit and licence are in `LICENSES.toml`.
+  Upstream commit and licence are in `LICENSES.toml`; the OFL text with the copyright notice is
+  `licenses/OFL.txt` (the gate allows only woff2 in `fonts/`). Barlow 500 is not shipped (the
+  4-file cap), so 500 renders as 400.
 - **Icons**: `components/icon.html` draws from `static/themes/ride/icons/sprite.svg`, a
-  same-origin sprite of the 13 Lucide icons the components use (ISC).
-- **Assets in the build**: `python -m apps.themes.build` copies every non-CSS, non-JS file under
-  `static/themes/<slug>/` to `build/themes/<slug>/`, so `theme.css` reaches fonts and images with
+  same-origin sprite of the 13 Lucide icons the components use (ISC, with MIT for the Feather
+  icons; `licenses/LUCIDE-LICENSE.txt`).
+- **Assets in the build**: `python -m apps.themes.build` copies the files under
+  `static/themes/<slug>/` with a suffix of `build.ASSET_SUFFIXES` (woff2, svg, png, jpg, webp, avif,
+  ico, txt), never a symlink or a file outside that directory, to `build/themes/<slug>/`, so `theme.css` reaches fonts and images with
   a relative `url()` and `{% static "themes/ride/icons/sprite.svg" %}` resolves.
 - **Templates**: `components/header.html` (dark bar, disclosure sub-menus for links with
   `children`, search and cart icons when `search_url` and `cart_url` are given, burger below

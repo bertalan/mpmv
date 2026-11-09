@@ -8,9 +8,10 @@ source = "https://github.com/google/fonts/tree/5bb28733cec313b63fbd415b574b5ae35
 author = "Jeremy Tribby"
 license = "OFL-1.1"
 # Subset to Latin and Latin Extended-A (fonttools pyftsubset, woff2) from Barlow-Regular.ttf and
-# Barlow-Bold.ttf of the upstream Google Fonts repository, commit 5bb28733. The licence text is
-# ofl/barlow/OFL.txt in that repository; the reserved font name "Barlow" stays with the files.
-files = ["fonts/barlow-400.woff2", "fonts/barlow-700.woff2"]
+# Barlow-Bold.ttf of the upstream Google Fonts repository, commit 5bb28733. The copyright notice
+# and the licence text are licenses/OFL.txt, a copy of ofl/barlow/OFL.txt at that commit (the
+# upstream file reserves no font name). The subsets keep the font name table.
+files = ["fonts/barlow-400.woff2", "fonts/barlow-700.woff2", "licenses/OFL.txt"]
 
 [[asset]]
 name = "Barlow Condensed"
@@ -18,8 +19,13 @@ kind = "font"
 source = "https://github.com/google/fonts/tree/5bb28733cec313b63fbd415b574b5ae35c8aa8b8/ofl/barlowcondensed"
 author = "Jeremy Tribby"
 license = "OFL-1.1"
-# Subset like Barlow, from BarlowCondensed-SemiBold.ttf and BarlowCondensed-Bold.ttf, same commit.
-files = ["fonts/barlow-condensed-600.woff2", "fonts/barlow-condensed-700.woff2"]
+# Subset like Barlow, from BarlowCondensed-SemiBold.ttf and BarlowCondensed-Bold.ttf, same
+# commit; its OFL.txt has the same copyright line and text as Barlow's.
+files = [
+  "fonts/barlow-condensed-600.woff2",
+  "fonts/barlow-condensed-700.woff2",
+  "licenses/OFL.txt",
+]
 
 [[asset]]
 name = "Lucide"
@@ -29,8 +35,10 @@ author = "Lucide Icons and Contributors"
 license = "ISC"
 # Release 1.70.0, commit b826f0c5. Only the 13 icons the theme draws (x, search, plus, minus,
 # menu, check, star, shopping-cart, chevron-left, chevron-right, chevron-down, zoom-in,
-# arrow-right), joined in one same-origin sprite.
-files = ["icons/sprite.svg"]
+# arrow-right), joined in one same-origin sprite. The sprite ids are our names (`cart` is
+# shopping-cart, `zoom` is zoom-in, `close` is x). licenses/LUCIDE-LICENSE.txt is upstream's
+# LICENSE (ISC, plus the MIT text for the icons derived from Feather) at that commit.
+files = ["icons/sprite.svg", "licenses/LUCIDE-LICENSE.txt"]
 
 [[asset]]
 name = "Ride placeholder artwork"

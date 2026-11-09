@@ -365,3 +365,33 @@ def test_placeholder_images_are_our_own_svg_with_a_licence_entry() -> None:
             svg = (STATIC / file).read_text(encoding="utf-8")
             assert "<image" not in svg  # no embedded raster (stock photo)
             assert "<script" not in svg
+
+
+# --- Licence texts shipped with the assets (OFL-1.1 condition 2, ISC)
+
+
+def test_the_ofl_text_and_copyright_ship_with_the_fonts() -> None:
+    text = (STATIC / "licenses" / "OFL.txt").read_text(encoding="utf-8")
+    assert "Copyright 2017 The Barlow Project Authors" in text
+    assert "SIL OPEN FONT LICENSE Version 1.1" in text
+    data = tomllib.loads((RIDE / "LICENSES.toml").read_text(encoding="utf-8"))
+    for entry in data["asset"]:
+        if entry["kind"] == "font":
+            assert "licenses/OFL.txt" in entry["files"], entry["name"]
+
+
+def test_licences_toml_does_not_claim_a_reserved_font_name() -> None:
+    text = (RIDE / "LICENSES.toml").read_text(encoding="utf-8").lower()
+    assert "reserved font name" not in text
+
+
+def test_the_lucide_notice_ships_with_the_sprite() -> None:
+    licence = (STATIC / "licenses" / "LUCIDE-LICENSE.txt").read_text(encoding="utf-8")
+    assert "ISC License" in licence
+    assert "Lucide Icons and Contributors" in licence
+    assert "Cole Bemis" in licence  # the Feather icons are MIT
+    sprite = (STATIC / "icons" / "sprite.svg").read_text(encoding="utf-8")
+    assert re.match(r"<svg[^>]*>\s*<!--[^>]*Lucide[^>]*ISC", sprite, re.S), sprite[:200]
+    data = tomllib.loads((RIDE / "LICENSES.toml").read_text(encoding="utf-8"))
+    lucide = next(e for e in data["asset"] if e["name"] == "Lucide")
+    assert "licenses/LUCIDE-LICENSE.txt" in lucide["files"]

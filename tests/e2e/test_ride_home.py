@@ -78,46 +78,47 @@ def open_home(page: Page, live_server: LiveServer, width: int, height: int) -> l
     return foreign
 
 
-def test_the_desktop_home_page_renders_with_ride(
-    page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+@pytest.mark.parametrize("width", [360, 768, 1280])
+def test_the_home_page_renders_with_ride_at_every_width(
+    width: int, page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
-    foreign = open_home(page, live_server, 1280, 900)
+    foreign = open_home(page, live_server, width, 900)
     expect(page.locator("html")).to_have_attribute("data-theme", "ride")
     expect(page.locator("main h1")).to_have_count(1)
     expect(page.locator("main h1")).to_have_text("Ride better")
-    expect(page.get_by_role("navigation", name="Main")).to_be_visible()
-    expect(page.locator(".nav-toggle")).to_be_hidden()  # the burger is for < 64rem
     expect(page.locator(".site-footer__col")).to_have_count(3)
     assert page.evaluate("() => document.fonts.check(\"700 1em 'Barlow Condensed'\")")
     assert page.evaluate("() => document.fonts.check(\"400 1em 'Barlow'\")")
     assert page.evaluate(NO_SIDEWAYS_SCROLL)
+    toggle = page.locator(".nav-toggle")
+    if width >= 1024:  # 64rem
+        expect(page.get_by_role("navigation", name="Main")).to_be_visible()
+        expect(toggle).to_be_hidden()
+    else:
+        expect(toggle).to_be_visible()
     violations = run_axe(page)
     assert violations == [], format_violations(violations)
     assert foreign == [], foreign
     assert csp_violations(page) == [], "\n".join(csp_violations(page))
-    shot("desktop")
+    shot(str(width))
 
 
-def test_the_mobile_home_page_has_a_burger_menu_and_no_sideways_scroll(
-    page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+@pytest.mark.parametrize("width", [360, 768])
+def test_the_burger_menu_opens_and_closes_below_64rem(
+    width: int, page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
-    foreign = open_home(page, live_server, 375, 800)
+    open_home(page, live_server, width, 800)
     toggle = page.locator(".nav-toggle")
-    expect(toggle).to_be_visible()
+    first_link = page.get_by_role("navigation", name="Main").get_by_role("link").first
     expect(toggle).to_have_attribute("aria-expanded", "false")
-    expect(page.get_by_role("navigation", name="Main").get_by_role("link").first).to_be_hidden()
+    expect(first_link).to_be_hidden()
     toggle.click()
     expect(toggle).to_have_attribute("aria-expanded", "true")
-    expect(page.get_by_role("navigation", name="Main").get_by_role("link").first).to_be_visible()
-    shot("mobile-menu-open")
+    expect(first_link).to_be_visible()
+    shot(f"{width}-menu-open")
     page.keyboard.press("Escape")
     expect(toggle).to_have_attribute("aria-expanded", "false")
     assert page.evaluate(NO_SIDEWAYS_SCROLL)
-    violations = run_axe(page)
-    assert violations == [], format_violations(violations)
-    assert foreign == [], foreign
-    assert csp_violations(page) == [], "\n".join(csp_violations(page))
-    shot("mobile")
 
 
 def test_buttons_and_links_are_at_least_44px_high_in_the_hero(
@@ -142,3 +143,15 @@ def test_the_skip_link_is_the_first_stop_and_focus_is_visible(
     assert focused["cls"] == "skip-link"
     assert focused["style"] != "none"
     assert float(focused["width"].removesuffix("px")) >= 2
+
+
+def test_header_controls_are_at_least_44px_high(page: Page, live_server: LiveServer) -> None:
+    open_home(page, live_server, 360, 800)
+    box = page.locator(".nav-toggle").bounding_box()
+    assert box is not None
+    assert box["height"] >= 44, box
+    page.set_viewport_size({"width": 1280, "height": 900})
+    for link in page.locator(".site-header .site-nav a, .site-header .help-link").all():
+        box = link.bounding_box()
+        assert box is not None
+        assert box["height"] >= 44, (link.inner_text(), box)

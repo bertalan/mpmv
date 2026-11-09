@@ -104,17 +104,28 @@ def read_js_modules(theme_dir: Path, slug: str) -> dict[str, str]:
     }
 
 
+ASSET_SUFFIXES = frozenset(
+    {".woff2", ".svg", ".png", ".jpg", ".jpeg", ".webp", ".avif", ".ico", ".txt"}
+)  # fonts, icons, images and licence texts; anything else stays out of the served build
+
+
 def read_assets(theme_dir: Path, slug: str) -> dict[str, Path]:
-    """The theme's fonts, icons and images (every file under `static/themes/<slug>/` that is not
-    CSS or JavaScript) by path relative to it. Their licences are checked by the THM.5 gate."""
+    """The theme's fonts, icons, images and licence texts by path relative to
+    `static/themes/<slug>/`: only files with a suffix of `ASSET_SUFFIXES`, never a symlink and
+    never a file whose real path leaves that directory. Their licences are checked by the
+    THM.5 gate."""
     root = theme_dir / "static" / OUTPUT_PREFIX / slug
     if not root.is_dir():
         return {}
-    return {
-        path.relative_to(root).as_posix(): path
-        for path in sorted(root.rglob("*"))
-        if path.is_file() and path.suffix not in {".css", ".js"}
-    }
+    real_root = root.resolve()
+    assets: dict[str, Path] = {}
+    for path in sorted(root.rglob("*")):
+        if path.suffix.lower() not in ASSET_SUFFIXES or path.is_symlink() or not path.is_file():
+            continue
+        if not path.resolve().is_relative_to(real_root):
+            continue
+        assets[path.relative_to(root).as_posix()] = path
+    return assets
 
 
 def render_themes(themes_root: Path, contract: TokenContract = TOKEN_CONTRACT) -> dict[str, str]:
