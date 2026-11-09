@@ -184,7 +184,8 @@ def test_https_redirect_301_carries_the_transport_headers(anon: Client) -> None:
     reason=(
         "Finding: SecurityMiddleware's HTTP-to-HTTPS 301 is returned before the CSP, "
         "Permissions-Policy and X-Frame-Options middleware run. Empty body, and in LIVE the "
-        "reverse proxy redirects plain HTTP first, so the app never sends it there."
+        "reverse proxy redirects plain HTTP first, so the app never sends it there. "
+        "Owned by SEC.12."
     ),
 )
 def test_https_redirect_301_full_header_set(anon: Client) -> None:
