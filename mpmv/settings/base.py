@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     "wagtail.search",
     "wagtail.admin",
     "wagtail.contrib.settings",  # BaseSiteSetting for the per-site theme (THM.1)
+    "wagtail.contrib.routable_page",  # `routablepageurl` for the blog's author pages (CMS.3)
     "wagtail",
     "modelcluster",
     "taggit",
@@ -109,6 +110,8 @@ MIDDLEWARE = [
     "django_otp.middleware.OTPMiddleware",
     "apps.accounts.middleware.MfaRequiredMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    # EVT.3: wagtail-localize's views keep the event moderation rules (hidden, review).
+    "apps.events.middleware.LocalizeEventGuardMiddleware",
 ]
 
 # Custom user from the first migration (CORE.1): email login, preferred language.
@@ -256,6 +259,8 @@ EMAIL_FEEDBACK_PARSER = (
 # language after every migrate. The editors' admin is at /admin/ (mpmv/urls.py).
 WAGTAIL_SITE_NAME = "MPMV"
 WAGTAIL_I18N_ENABLED = True
+# Approval publishes the reviewed revision, not a later draft (EVT.3): apps/core/workflows.py.
+WAGTAIL_FINISH_WORKFLOW_ACTION = "apps.core.workflows.publish_reviewed_revision"
 WAGTAIL_CONTENT_LANGUAGES = LANGUAGES
 # The public address of the site, in Wagtail's admin emails and previews. The localhost fallback
 # is for a developer machine: `check --deploy` fails on LIVE and STAGE without it (cms.E001).

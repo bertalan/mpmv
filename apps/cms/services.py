@@ -1,8 +1,8 @@
 """CMS services: locales from settings, the editors' MFA policy, seed pages and menus (CMS.1);
 page translation with wagtail-localize (I18N.3); legal page versions and the link to the vendor
 application (CMS.5); the page's image credits (CMS.8); the go-live readiness of the customer
-legal and checkout pages, their per-language reviews and placeholders (I18N.9); what term and
-vendor landing pages show (CMS.4).
+legal and checkout pages, their per-language reviews and placeholders (I18N.9); blog articles
+created by scripts and migrations (CMS.3); what term and vendor landing pages show (CMS.4).
 
 Pages and menus are edited in the Wagtail admin, which keeps their revisions and its own log of
 every edit, so they are not audited here: `seed_site` only adds sample content where it is
@@ -29,6 +29,7 @@ from django.template.loader import render_to_string
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.text import slugify
+from django.utils.translation import gettext_lazy as _
 from wagtail import blocks
 from wagtail.fields import StreamField
 from wagtail.images.blocks import ImageChooserBlock
@@ -56,6 +57,9 @@ from apps.vendors.models import Vendor
 from . import engine
 from .blocks import public_cards
 from .models import (
+    BlogAuthor,
+    BlogIndexPage,
+    BlogPostPage,
     HomePage,
     LegalPage,
     LegalPageReview,
@@ -668,6 +672,121 @@ def page_image_credits(page: Page) -> list[Credit]:
         if credit is not None:
             credits.append(credit)
     return credits
+
+
+# --- Blog articles (CMS.3, spec 10 §10.2)
+
+
+SCHEDULE_PROBLEMS = {
+    engine.EXPIRY_IN_PAST: _("The expiry date must be in the future."),
+    engine.EXPIRY_NOT_AFTER_GO_LIVE: _("The expiry date must be after the go-live date."),
+}
+
+
+@dataclass(frozen=True)
+class ArticleData:
+    """An article as a script or a migration (MIG.7) brings it: the legacy date and author name
+    are kept. `body` is StreamField data, [(block type, value), ...], as the page takes it."""
+
+    title: str
+    slug: str
+    date: dt.date
+    body: list[tuple[str, Any]] = field(default_factory=list)
+    summary: str = ""
+    author: str = ""  # the byline; empty for none
+    go_live_at: dt.datetime | None = None
+    expire_at: dt.datetime | None = None
+    seo_title: str = ""
+    search_description: str = ""
+
+
+def article_snapshot(post: BlogPostPage) -> dict[str, Any]:
+    body = json.dumps(post.body.get_prep_value(), sort_keys=True, default=str)
+    return {
+        "title": post.title,
+        "slug": post.slug,
+        "language_code": post.locale.language_code,
+        "date": post.date.isoformat(),
+        "author": post.author.name if post.author else "",
+        "summary": post.summary,
+        "live": post.live,
+        "go_live_at": post.go_live_at and post.go_live_at.isoformat(),
+        "expire_at": post.expire_at and post.expire_at.isoformat(),
+        "body_sha256": hashlib.sha256(body.encode()).hexdigest(),
+    }
+
+
+def _blog_author(name: str, locale: Locale, changes: ChangeSet) -> BlogAuthor:
+    """The author `name` of `locale`. Missing there, it is made a translation of the same author
+    in another language (bio and alt text copied until translated), or created with no bio."""
+    author: BlogAuthor | None = BlogAuthor.objects.filter(name=name, locale=locale).first()
+    if author is not None:
+        return author
+    source: BlogAuthor | None = BlogAuthor.objects.filter(name=name).order_by("pk").first()
+    if source is not None:
+        author = source.copy_for_translation(locale)
+        author.save()
+    else:
+        author = BlogAuthor.objects.create(name=name, locale=locale)
+    changes.create(
+        "cms.blogauthor",
+        f"{locale.language_code}:{author.slug}",
+        {"name": author.name, "slug": author.slug, "language_code": locale.language_code},
+    )
+    return author
+
+
+def import_article(
+    index: BlogIndexPage,
+    article: ArticleData,
+    *,
+    user: AbstractBaseUser | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Create `article` under the blog `index` (so in its language) and publish it.
+
+    With a go-live in the future the article is scheduled, not live, as when an editor
+    schedules it; the `cms.publish_scheduled` job publishes it on time. The author is the
+    `BlogAuthor` of that name in the blog's language: missing there, it becomes a translation
+    of the same author in another language, or a new author without bio or photo, which editors
+    add in the admin. An article whose slug the blog already has
+    is left alone (an empty ChangeSet), so a migration can run again. Raises ValidationError
+    for an invalid schedule or page.
+
+    Wagtail logs the page's creation and publication in its own history, as for an editor.
+    """
+    problem = engine.schedule_problem(article.go_live_at, article.expire_at, timezone.now())
+    if problem is not None:
+        raise ValidationError({"expire_at": SCHEDULE_PROBLEMS[problem]})
+    index = _current(index)
+    if index.get_children().filter(slug=article.slug).exists():
+        return ChangeSet()
+
+    def work(changes: ChangeSet) -> None:
+        author = _blog_author(article.author, index.locale, changes) if article.author else None
+        post = BlogPostPage(
+            title=article.title,
+            slug=article.slug,
+            date=article.date,
+            author=author,
+            summary=article.summary,
+            body=article.body,
+            go_live_at=article.go_live_at,
+            expire_at=article.expire_at,
+            seo_title=article.seo_title,
+            search_description=article.search_description,
+            live=False,
+        )
+        index.add_child(instance=post)
+        post.save_revision(user=user, log_action=True).publish(user=user)
+        post = _current(post)
+        changes.create(
+            "cms.blogpostpage",
+            f"{post.locale.language_code}:{post.slug}",
+            article_snapshot(post),
+        )
+
+    return _in_savepoint(dry_run, work)
 
 
 # --- Term and vendor landing pages (CMS.4, spec 10 §10.2)

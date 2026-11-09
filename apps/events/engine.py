@@ -1,12 +1,14 @@
 """Pure rules of the events module (spec 15). No Django, no ORM (ARC.18).
 
 EVT.1 holds the status derivation and the RRULE check the model needs; EVT.2 adds the RRULE
-subset validator and the expansion of occurrences here.
+subset validator and the expansion of occurrences here; EVT.3 the moderation threshold, the ICS
+SEQUENCE rule, the vendor-safe body rules and the slugs.
 """
 
 import calendar
 import re
-from collections.abc import Sequence
+import unicodedata
+from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
@@ -481,3 +483,141 @@ def _expand_timed(
             if len(result) >= limit:
                 break
     return result
+
+
+# --- Moderation (spec 15 "Moderation with Wagtail workflows", EVT.3) -------------------------
+
+# `VendorEventPolicy.mode`.
+DEFAULT_MODE = "default"
+ALWAYS_REVIEW = "always_review"
+TRUSTED = "trusted"
+POLICY_MODES = (DEFAULT_MODE, ALWAYS_REVIEW, TRUSTED)
+
+
+def needs_review(approved_count: int, threshold: int, mode: str, *, is_staff: bool) -> bool:
+    """Whether a submission goes through "Event review".
+
+    Staff and platform events (`is_staff`): never. `always_review`: always. `trusted`: never.
+    Otherwise while the vendor has fewer than `threshold` approved events.
+    """
+    if mode not in POLICY_MODES:
+        raise ValueError(f"unknown moderation mode {mode!r}")
+    if is_staff or mode == TRUSTED:
+        return False
+    if mode == ALWAYS_REVIEW:
+        return True
+    return approved_count < threshold
+
+
+# --- ICS SEQUENCE (spec 15 "Services") --------------------------------------------------------
+
+# The fields the ICS shows: a published change of any of them bumps `sequence`. `cancelled_at`
+# stands for the status (STATUS:CANCELLED).
+ICS_FIELDS = (
+    "title",
+    "summary",
+    "all_day",
+    "starts_at",
+    "ends_at",
+    "start_date",
+    "end_date",
+    "timezone",
+    "rrule",
+    "exdates",
+    "exdate_days",
+    "attendance",
+    "online_url",
+    "venue_name",
+    "street",
+    "postcode",
+    "city",
+    "region",
+    "country",
+    "booth",
+    "latitude",
+    "longitude",
+    "cancelled_at",
+)
+
+
+def ics_changed(before: Mapping[str, object], after: Mapping[str, object]) -> bool:
+    return any(before.get(name) != after.get(name) for name in ICS_FIELDS)
+
+
+def next_sequence(
+    sequence: int,
+    before: Mapping[str, object],
+    after: Mapping[str, object],
+    *,
+    was_published: bool,
+) -> int:
+    """The ICS SEQUENCE after publishing `after` over the stored `before`.
+
+    Up by one when a field the ICS shows changed on an event that calendars may already hold
+    (`was_published`); unchanged on a no-op publish and on the first publication.
+    """
+    if was_published and ics_changed(before, after):
+        return sequence + 1
+    return sequence
+
+
+# --- Vendor-safe body (spec 15 "How vendors author an `EventPage`") ----------------------------
+
+# The CMS.10 product grid and the CMS.9 countdown join when those tasks add the blocks.
+VENDOR_SAFE_BLOCKS = frozenset({"paragraph", "figure", "gallery", "cta", "faq"})
+
+_HREF = re.compile(r"""\b(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""", re.IGNORECASE)
+_ENTITY = re.compile(r"&#(x[0-9a-f]+|[0-9]+);?", re.IGNORECASE)
+_UNSAFE_SCHEMES = ("javascript:", "data:", "vbscript:")
+
+
+def refused_blocks(block_types: Sequence[str], *, is_staff: bool) -> list[str]:
+    """The block types a vendor may not use, in order; staff get every block."""
+    if is_staff:
+        return []
+    return [name for name in block_types if name not in VENDOR_SAFE_BLOCKS]
+
+
+def _decode_entity(match: re.Match[str]) -> str:
+    code = match.group(1)
+    number = int(code[1:], 16) if code[0] in "xX" else int(code)
+    return chr(number) if number < 0x110000 else ""
+
+
+def _link_scheme(url: str) -> str:
+    text = _ENTITY.sub(_decode_entity, url)
+    # Browsers drop control characters and spaces inside a scheme ("java\tscript:").
+    return "".join(ch for ch in text if ch > " ").lower()
+
+
+def has_unsafe_link(html: str) -> bool:
+    """Whether rich text links to a `javascript:`, `data:` or `vbscript:` URL."""
+    for match in _HREF.finditer(html):
+        url = next(group for group in match.groups() if group is not None)
+        if _link_scheme(url).startswith(_UNSAFE_SCHEMES):
+            return True
+    return False
+
+
+# --- Slugs (spec 15 "Slugs and routes") --------------------------------------------------------
+
+# The route names of `EventIndexPage`: an event never takes one as its slug.
+RESERVED_SLUGS = frozenset({"calendar", "past", "vendor", "type", "feed.rss", "calendar.ics"})
+DEFAULT_SLUG = "event"
+_NOT_SLUG = re.compile(r"[^a-z0-9]+")
+
+
+def _slugify(text: str) -> str:
+    ascii_text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+    return _NOT_SLUG.sub("-", ascii_text.lower()).strip("-")[:200].strip("-")
+
+
+def event_slug(title: str, *, taken: Set[str]) -> str:
+    """A slug from `title` that is neither taken among its siblings nor an index route name."""
+    base = _slugify(title) or DEFAULT_SLUG
+    if base not in taken and base not in RESERVED_SLUGS:
+        return base
+    number = 2
+    while f"{base}-{number}" in taken:
+        number += 1
+    return f"{base}-{number}"

@@ -149,13 +149,16 @@ class VendorAction(StrEnum):
     TAX_REGIME = "tax_regime"  # tax regime change request
     MEMBERS = "members"  # add and remove members, change roles
     API_KEYS = "api_keys"  # issue vendor-bound API keys, which act for the whole vendor (CORE.13)
+    EVENTS = "events"  # the vendor's event pages: drafts, submit, cancel (spec 15, EVT.3)
 
 
 # The role matrix. Owner: everything about their own vendor, financial settings included.
 # Staff: day-to-day operations only; no payouts, IBAN, tax regime, profile or members.
 ROLE_PERMISSIONS: Final[Mapping[str, frozenset[VendorAction]]] = {
     OWNER: frozenset(VendorAction),
-    STAFF: frozenset({VendorAction.ORDERS, VendorAction.QUOTES, VendorAction.PRODUCTS}),
+    STAFF: frozenset(
+        {VendorAction.ORDERS, VendorAction.QUOTES, VendorAction.PRODUCTS, VendorAction.EVENTS}
+    ),
 }
 
 

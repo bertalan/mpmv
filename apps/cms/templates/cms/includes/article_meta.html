@@ -1,0 +1,4 @@
+{% load i18n wagtailroutablepage_tags %}{% comment %}
+An article's date and byline (CMS.3). With `blog` (the article's blog index) and `request`, the
+author's name links to their page on that blog.
+{% endcomment %}<p class="article-meta"><time datetime="{{ post.date|date:'Y-m-d' }}">{{ post.date|date:"DATE_FORMAT" }}</time>{% if post.author %} · <span class="article-author">{% if blog and post.author.slug %}{% routablepageurl blog "author" post.author.slug as author_url %}{% blocktranslate with name=post.author.name url=author_url %}By <a href="{{ url }}">{{ name }}</a>{% endblocktranslate %}{% else %}{% blocktranslate with name=post.author.name %}By {{ name }}{% endblocktranslate %}{% endif %}</span>{% endif %}</p>
