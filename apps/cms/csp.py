@@ -9,6 +9,8 @@ else. Every other inline script stays blocked.
 
 The image and document chooser widgets (I18N.3) start the same way,
 `<script>new ImageChooser("<id>", <JSON config>);</script>`, and get the nonce on the same terms.
+So do the generic chooser widgets of a landing page's term and vendor (CMS.4),
+`<script>new Chooser("<id>", <JSON config>);</script>`.
 """
 
 import json
@@ -16,7 +18,7 @@ import re
 
 PICKER_SCRIPT = re.compile(
     r"<script>(?P<call>(?:initDateChooser|initTimeChooser|initDateTimeChooser"
-    r"|new ImageChooser|new DocumentChooser)"
+    r"|new ImageChooser|new DocumentChooser|new Chooser)"
     r'\("[A-Za-z0-9_-]+", (?P<config>\{[^<]*?\})\);)</script>'
 )
 
