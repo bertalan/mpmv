@@ -28,7 +28,7 @@ from apps.api.services import (
     record_refused_key,
     refused_key_retry_after,
 )
-from apps.api.tests.factories import ApiClientFactory
+from apps.api.tests.factories import ApiClientFactory, ApiRefusedKeyFactory
 from apps.core.models import Throttle
 from apps.core.tasks import schedules
 
@@ -235,7 +235,7 @@ def test_the_nightly_purge_deletes_the_old_refusals_of_every_ip() -> None:
 def test_the_refused_key_purge_runs_every_night() -> None:
     purge = {s.task_name: s for s in schedules()}["api.purge_refused_keys"]
     assert purge.cron == "22 4 * * *"
-    ApiRefusedKey.objects.create(ip_bucket=IP, refused_at=timezone.now() - dt.timedelta(days=1))
+    ApiRefusedKeyFactory.create(ip_bucket=IP, refused_at=timezone.now() - dt.timedelta(days=1))
     api_tasks.purge_refused_keys.func(timestamp=0)
     assert not ApiRefusedKey.objects.exists()
 
