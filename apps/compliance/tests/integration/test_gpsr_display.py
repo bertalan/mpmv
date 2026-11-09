@@ -16,7 +16,11 @@ from apps.catalog.services import save_product
 from apps.catalog.tests.factories import ProductFactory
 from apps.compliance import services
 from apps.compliance.models import GpsrSafetyText
-from apps.compliance.tests.factories import GpsrInfoFactory, VendorGpsrDefaultsFactory
+from apps.compliance.tests.factories import (
+    GpsrInfoFactory,
+    GpsrSafetyTextFactory,
+    VendorGpsrDefaultsFactory,
+)
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 
@@ -77,8 +81,7 @@ def test_display_merges_the_vendor_defaults_and_picks_the_language() -> None:
 
 
 def test_display_falls_back_to_the_primary_language() -> None:
-    product = ProductFactory.create()
-    services.set_product_safety_text(product, "en", {"warnings": "Caution."}, ctx=CTX)
+    product = GpsrSafetyTextFactory.create(language="en", warnings="Caution.").product
     shown = services.gpsr_display(product, "de")
     assert (shown.warnings, shown.text_language) == ("Caution.", "en")
 
