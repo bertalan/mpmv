@@ -9,7 +9,7 @@ from django.utils import timezone
 from factory.django import DjangoModelFactory
 
 from apps.api.engine import KEY_WIDE_BUCKET, generate_key, hash_key
-from apps.api.models import ApiClient, ApiMutationLog, ApiRateCounter
+from apps.api.models import ApiClient, ApiMutationLog, ApiRateCounter, ApiRefusedKey
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -82,3 +82,13 @@ class ApiRateCounterFactory(DjangoModelFactory[ApiRateCounter]):
     bucket = KEY_WIDE_BUCKET
     window_start = factory.LazyFunction(lambda: timezone.now().replace(second=0, microsecond=0))
     hits = 1
+
+
+class ApiRefusedKeyFactory(DjangoModelFactory[ApiRefusedKey]):
+    """One refused-key (401) answer to a client IP bucket, now (CORE.20)."""
+
+    class Meta:
+        model = ApiRefusedKey
+
+    ip_bucket = "203.0.113.77"
+    refused_at = factory.LazyFunction(timezone.now)
