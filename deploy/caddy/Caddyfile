@@ -20,13 +20,43 @@
 #   servers { trusted_proxies static <CDN ranges>
 #             client_ip_headers CF-Connecting-IP }
 # with the CDN's published ranges, and allow only those ranges to reach ports 80 and 443.
+#
+# Security headers (SEC.3, SEC.5): Caddy answers some requests itself (public media, the /media/
+# 404, its error pages, the HTTP-to-HTTPS redirect), so every site and handle_errors imports the
+# `security_headers` snippet. Its headers are defaults (`?`): a value the app already sent is kept,
+# so proxied responses are unchanged. The values must match the app's (settings/base.py,
+# settings/live.py, apps.core.security); tests/unit/test_proxy_security_headers.py checks them.
+# `-Server` drops Caddy's own `Server` header and gunicorn's, passed through reverse_proxy;
+# `-Via` drops the `Via: 1.0 Caddy` that reverse_proxy adds.
 {
 	servers {
 		strict_sni_host on
 	}
 }
 
+(security_headers) {
+	header {
+		-Server
+		-Via
+		?Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		?X-Content-Type-Options "nosniff"
+		?Referrer-Policy "strict-origin-when-cross-origin"
+		?Cross-Origin-Opener-Policy "same-origin"
+		?X-Frame-Options "DENY"
+		?Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+		?Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+	}
+}
+
 {$MPMV_SITE_ADDRESS} {
+	import security_headers
+
+	# Request bodies (SEC.2): one image of up to 25 MiB (WAGTAILIMAGES_MAX_UPLOAD_SIZE) plus its
+	# multipart form. A larger body gets 413 here instead of being spooled to disk by the app.
+	request_body {
+		max_size 26MiB
+	}
+
 	@noindex expression `{env.MPMV_NOINDEX} in ["1", "true", "yes", "on"]`
 	header @noindex X-Robots-Tag "noindex, nofollow"
 
@@ -50,8 +80,8 @@
 		# would overwrite the SVG one. Values, folders and extensions must match apps/core/media.py.
 		@svg path_regexp svg (?i)\.svg$
 		@not_svg not path_regexp (?i)\.svg$
-		header @svg Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; sandbox"
-		header @not_svg Content-Security-Policy "default-src 'none'; sandbox"
+		header @svg Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; sandbox"
+		header @not_svg Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; sandbox"
 		file_server
 	}
 
@@ -64,10 +94,24 @@
 			header_up X-Real-IP {client_ip}
 		}
 	}
+
+	# Caddy's own errors (502 when the app is down, 413 for an oversized body): status only, no
+	# error text, with the security headers.
+	handle_errors {
+		import security_headers
+		respond "{err.status_code}" {err.status_code}
+	}
+}
+
+# The site's own host name over plain HTTP: redirect to HTTPS, with the security headers (Caddy's
+# automatic redirect sends none). ACME HTTP challenges are still answered before this block.
+http://{$MPMV_SITE_ADDRESS} {
+	import security_headers
+	redir https://{host}{uri} 308
 }
 
 # Any other host name or a bare IP over plain HTTP: close the connection, serve nothing.
-# Automatic HTTPS still redirects the site's own host name and answers ACME challenges.
+# The site's own host name has its own block above; ACME HTTP challenges are answered first.
 http:// {
 	abort
 }
