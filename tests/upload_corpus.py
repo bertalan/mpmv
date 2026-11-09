@@ -152,6 +152,23 @@ def _animated_gif(frames: int, size: tuple[int, int]) -> bytes:
     return buffer.getvalue()
 
 
+def _mpo_photo() -> bytes:
+    """A multi-picture JPEG (MPO), as some phones and cameras write: two images and an MP index."""
+    first = Image.new("RGB", (24, 16), (200, 40, 40))
+    second = Image.new("RGB", (24, 16), (40, 40, 200))
+    buffer = io.BytesIO()
+    first.save(buffer, format="MPO", save_all=True, append_images=[second], exif=_exif())
+    return buffer.getvalue()
+
+
+def _icc_with_payload() -> bytes:
+    """An sRGB profile with attacker-chosen bytes after it: the profile must not survive as is."""
+    from PIL import ImageCms
+
+    srgb = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
+    return srgb + SCRIPT + SECRET_PLACE
+
+
 def _minimal_pdf() -> bytes:
     objects = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
@@ -274,6 +291,14 @@ def image_cases() -> list[Case]:
             tags=frozenset({"bomb"}),
         ),
         Case(
+            "gif-many-frames",
+            "anim.gif",
+            _animated_gif(frames=1000, size=(2, 2)),
+            "refuse",
+            "1000 tiny frames: few pixels, but each frame costs CPU to decode and re-encode",
+            tags=frozenset({"bomb"}),
+        ),
+        Case(
             "png-text-bomb",
             "note.png",
             _raw_png(
@@ -322,6 +347,33 @@ def image_cases() -> list[Case]:
             "store",
             "WebP with EXIF and XMP chunks",
             payloads=(SECRET_PLACE, b"EXIF", b"XMP "),
+            tags=frozenset({"metadata"}),
+        ),
+        Case(
+            "mpo-photo",
+            "phone.jpg",
+            _mpo_photo(),
+            "store",
+            "multi-picture JPEG from a phone: stored as a single-frame JPEG, index and EXIF gone",
+            payloads=(b"MPF\x00", SECRET_PLACE, b"Exif\x00\x00"),
+            tags=frozenset({"metadata"}),
+        ),
+        Case(
+            "jpeg-icc-payload",
+            "print.jpg",
+            _image("JPEG", icc_profile=_icc_with_payload()),
+            "store",
+            "ICC profile carrying extra bytes: converted to sRGB, the profile is not kept",
+            payloads=(SCRIPT, SECRET_PLACE),
+            tags=frozenset({"metadata"}),
+        ),
+        Case(
+            "png-icc-payload",
+            "print.png",
+            _image("PNG", icc_profile=_icc_with_payload()),
+            "store",
+            "PNG iCCP chunk carrying extra bytes: converted to sRGB, the profile is not kept",
+            payloads=(SCRIPT, SECRET_PLACE),
             tags=frozenset({"metadata"}),
         ),
     ]
@@ -430,7 +482,15 @@ def document_cases() -> list[Case]:
 # --- Assertions on a stored file -------------------------------------------------------------
 
 EXTENSION_FORMAT = {"jpg": "JPEG", "png": "PNG", "gif": "GIF", "webp": "WEBP", "avif": "AVIF"}
-METADATA_INFO_KEYS = {"exif", "xmp", "XML:com.adobe.xmp", "comment", "Location", "Comment"}
+METADATA_INFO_KEYS = {
+    "exif",
+    "xmp",
+    "XML:com.adobe.xmp",
+    "comment",
+    "Location",
+    "Comment",
+    "icc_profile",
+}
 
 
 def assert_safe_image(name: str, data: bytes, case: Case) -> None:
