@@ -925,8 +925,15 @@ def _spend(check: ActionLinkCheck, ctx: AuditContext) -> ActionLinkCheck:
     return check
 
 
-def _is_staff(user: User) -> bool:
-    return bool(user.is_staff or user.is_superuser)
+def is_privileged(user: User) -> bool:
+    """Whether `user` holds staff or superuser status, a group or a direct permission.
+
+    Platform staff hold their powers through a role group (spec 02, Q-34), so `is_staff`
+    alone does not tell.
+    """
+    return bool(
+        user.is_staff or user.is_superuser or user.groups.exists() or user.user_permissions.exists()
+    )
 
 
 def redeem_action_token(
@@ -941,8 +948,9 @@ def redeem_action_token(
     - No session and no confirmed second factor: refused, nothing spent. The first factor can
       be enrolled without other proof (CORE.4), so a passwordless sign-in would let whoever
       holds only the mailbox bind their own authenticator, pass the step-up and approve.
-    - No session and a staff or superuser recipient: refused, nothing spent. Staff sign in with
-      their password and MFA, then continue (lane-a decision on the CORE.15 review).
+    - No session and a privileged recipient (staff, superuser, a group or a direct permission):
+      refused, nothing spent. Staff sign in with their password and MFA, then continue (lane-a
+      decision on the CORE.15 review).
 
     Every refusal against a known account is audited (reason, purpose and object; never the
     token); the others are only logged. The caller sends a refused visitor to the normal login,
@@ -951,7 +959,7 @@ def redeem_action_token(
     check = check_action_token(token, now=now)
     if check.refusal is None:
         recipient = check.user
-        if session_user is None and recipient is not None and _is_staff(recipient):
+        if session_user is None and recipient is not None and is_privileged(recipient):
             check = replace(check, refusal=engine.STAFF_RECIPIENT)
         elif session_user is None and (recipient is None or not has_second_factor(recipient)):
             check = replace(check, refusal=engine.NO_SECOND_FACTOR)
@@ -993,22 +1001,26 @@ def send_action_link_email(
     for the same purpose, object and recipient (not on a dry run). The outbox stores the
     context encrypted; the audit entry names the purpose, object, version and generation, never
     the token.
+
+    The revocation commits only together with the queued email: a retry with an
+    `idempotency_key` already used queues nothing and keeps the link delivered before, and an
+    error from the outbox rolls the new generation back.
     """
-    token, claims = _issue_action_claims(
-        purpose=purpose,
-        object_key=object_key,
-        recipient=recipient,
-        version=version,
-        expires_in=expires_in,
-        now=None,
-        dry_run=dry_run,
-    )
-    values = {
-        **context,
-        "action_url": settings.SITE_BASE_URL.rstrip("/") + action_link_path(token),
-        "action_link_expires_at": dt.datetime.fromtimestamp(claims.expires_at, tz=dt.UTC),
-    }
     with transaction.atomic():
+        token, claims = _issue_action_claims(
+            purpose=purpose,
+            object_key=object_key,
+            recipient=recipient,
+            version=version,
+            expires_in=expires_in,
+            now=None,
+            dry_run=dry_run,
+        )
+        values = {
+            **context,
+            "action_url": settings.SITE_BASE_URL.rstrip("/") + action_link_path(token),
+            "action_link_expires_at": dt.datetime.fromtimestamp(claims.expires_at, tz=dt.UTC),
+        }
         changes = enqueue_email(
             recipient=recipient.email,
             template_key=template_key,
@@ -1017,7 +1029,9 @@ def send_action_link_email(
             idempotency_key=idempotency_key,
             dry_run=dry_run,
         )
-        if not dry_run and not changes.is_empty:
+        if not dry_run and changes.is_empty:
+            transaction.set_rollback(True)  # nothing queued: keep the delivered link usable
+        elif not dry_run:
             snapshot = {**_link_snapshot(claims), "generation": str(claims.generation)}
             record(ctx, ACTION_LINK_SENT, USER_MODEL, str(recipient.public_id), None, snapshot)
     return changes
