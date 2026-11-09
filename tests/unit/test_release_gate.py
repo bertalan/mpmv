@@ -15,6 +15,8 @@ from typing import Any
 import pytest
 import yaml
 
+from apps.core.media import RASTER_CSP
+
 ROOT = Path(__file__).resolve().parents[2]
 SMOKE = ROOT / "deploy" / "ci" / "parity-smoke.sh"
 SMOKE_RUN = "deploy/ci/parity-smoke.sh"
@@ -175,7 +177,9 @@ def test_the_smoke_checks_pages_media_health_and_rollback() -> None:
         'expect_status "$category" 200',
         "content-type: image/webp",
         "x-content-type-options: nosniff",
-        "content-security-policy: default-src 'none'; sandbox",
+        f"content-security-policy: {RASTER_CSP}",
+        "media without HSTS",
+        "names the server software",
         "lists a media directory",
         "cache-control: public",
         "expect_status /media/documents/parity.pdf 404",
