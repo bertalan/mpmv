@@ -261,7 +261,7 @@ class SignedJsonFeedback:
     def parse(self, body: bytes) -> list[FeedbackEvent]:
         try:
             payload = json.loads(body)
-        except ValueError as exc:
+        except (ValueError, RecursionError) as exc:
             raise InvalidFeedback("the body is not JSON") from exc
         if not isinstance(payload, dict) or not isinstance(payload.get("events"), list):
             raise InvalidFeedback('expected an object with an "events" list')
@@ -272,7 +272,7 @@ def _event(item: object) -> FeedbackEvent:
     if not isinstance(item, dict):
         raise InvalidFeedback("an event must be an object")
     kind, recipient = item.get("type"), item.get("recipient")
-    if kind not in FEEDBACK_KINDS:
+    if not isinstance(kind, str) or kind not in FEEDBACK_KINDS:
         raise InvalidFeedback(f"unknown event type {kind!r}")
     if not isinstance(recipient, str) or "@" not in recipient:
         raise InvalidFeedback("an event needs a recipient address")

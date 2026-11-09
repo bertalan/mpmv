@@ -8,7 +8,10 @@ object, and JSON cannot run code, so injected markup cannot borrow the nonce to 
 else. Every other inline script stays blocked.
 
 The image and document chooser widgets (I18N.3) start the same way,
-`<script>new ImageChooser("<id>", <JSON config>);</script>`, and get the nonce on the same terms.
+`<script>new ImageChooser("<id>", <JSON config>);</script>`, and get the nonce on the same terms;
+so does the snippet chooser of a blog article's author (CMS.3), `new SnippetChooser(...)`.
+So do the generic chooser widgets of a landing page's term and vendor (CMS.4),
+`<script>new Chooser("<id>", <JSON config>);</script>`.
 """
 
 import json
@@ -16,7 +19,7 @@ import re
 
 PICKER_SCRIPT = re.compile(
     r"<script>(?P<call>(?:initDateChooser|initTimeChooser|initDateTimeChooser"
-    r"|new ImageChooser|new DocumentChooser)"
+    r"|new ImageChooser|new DocumentChooser|new SnippetChooser|new Chooser)"
     r'\("[A-Za-z0-9_-]+", (?P<config>\{[^<]*?\})\);)</script>'
 )
 

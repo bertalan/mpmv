@@ -1,7 +1,8 @@
 """CMS services: locales from settings, the editors' MFA policy, seed pages and menus (CMS.1);
 page translation with wagtail-localize (I18N.3); legal page versions and the link to the vendor
 application (CMS.5); the page's image credits (CMS.8); the go-live readiness of the customer
-legal and checkout pages, their per-language reviews and placeholders (I18N.9).
+legal and checkout pages, their per-language reviews and placeholders (I18N.9); blog articles
+created by scripts and migrations (CMS.3); what term and vendor landing pages show (CMS.4).
 
 Pages and menus are edited in the Wagtail admin, which keeps their revisions and its own log of
 every edit, so they are not audited here: `seed_site` only adds sample content where it is
@@ -23,9 +24,12 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser, PermissionsMixin
 from django.core.exceptions import ValidationError
 from django.db import DEFAULT_DB_ALIAS, transaction
+from django.http import HttpRequest
+from django.template.loader import render_to_string
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.text import slugify
+from django.utils.translation import gettext_lazy as _
 from wagtail import blocks
 from wagtail.fields import StreamField
 from wagtail.images.blocks import ImageChooserBlock
@@ -38,20 +42,32 @@ from wagtail_localize.models import (
 )
 from wagtail_localize.operations import TranslationCreator
 
+from apps.catalog import listings, slugs
+from apps.catalog import services as catalog
+from apps.catalog.models import Category, Term
+from apps.core import translations
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.i18n import configured_languages
 from apps.core.image_licences import Credit
+from apps.core.money import CURRENCY
 from apps.core.services import run_mutation
+from apps.vendors.models import Vendor
 
 from . import engine
+from .blocks import public_cards
 from .models import (
+    BlogAuthor,
+    BlogIndexPage,
+    BlogPostPage,
     HomePage,
     LegalPage,
     LegalPageReview,
     LegalPageVersion,
     NavigationMenu,
     StandardPage,
+    TermLandingPage,
+    VendorLandingPage,
 )
 from .seed import PageText, legal_placeholder, seed_text
 
@@ -656,3 +672,287 @@ def page_image_credits(page: Page) -> list[Credit]:
         if credit is not None:
             credits.append(credit)
     return credits
+
+
+# --- Blog articles (CMS.3, spec 10 §10.2)
+
+
+SCHEDULE_PROBLEMS = {
+    engine.EXPIRY_IN_PAST: _("The expiry date must be in the future."),
+    engine.EXPIRY_NOT_AFTER_GO_LIVE: _("The expiry date must be after the go-live date."),
+}
+
+
+@dataclass(frozen=True)
+class ArticleData:
+    """An article as a script or a migration (MIG.7) brings it: the legacy date and author name
+    are kept. `body` is StreamField data, [(block type, value), ...], as the page takes it."""
+
+    title: str
+    slug: str
+    date: dt.date
+    body: list[tuple[str, Any]] = field(default_factory=list)
+    summary: str = ""
+    author: str = ""  # the byline; empty for none
+    go_live_at: dt.datetime | None = None
+    expire_at: dt.datetime | None = None
+    seo_title: str = ""
+    search_description: str = ""
+
+
+def article_snapshot(post: BlogPostPage) -> dict[str, Any]:
+    body = json.dumps(post.body.get_prep_value(), sort_keys=True, default=str)
+    return {
+        "title": post.title,
+        "slug": post.slug,
+        "language_code": post.locale.language_code,
+        "date": post.date.isoformat(),
+        "author": post.author.name if post.author else "",
+        "summary": post.summary,
+        "live": post.live,
+        "go_live_at": post.go_live_at and post.go_live_at.isoformat(),
+        "expire_at": post.expire_at and post.expire_at.isoformat(),
+        "body_sha256": hashlib.sha256(body.encode()).hexdigest(),
+    }
+
+
+def _blog_author(name: str, locale: Locale, changes: ChangeSet) -> BlogAuthor:
+    """The author `name` of `locale`. Missing there, it is made a translation of the same author
+    in another language (bio and alt text copied until translated), or created with no bio."""
+    author: BlogAuthor | None = BlogAuthor.objects.filter(name=name, locale=locale).first()
+    if author is not None:
+        return author
+    source: BlogAuthor | None = BlogAuthor.objects.filter(name=name).order_by("pk").first()
+    if source is not None:
+        author = source.copy_for_translation(locale)
+        author.save()
+    else:
+        author = BlogAuthor.objects.create(name=name, locale=locale)
+    changes.create(
+        "cms.blogauthor",
+        f"{locale.language_code}:{author.slug}",
+        {"name": author.name, "slug": author.slug, "language_code": locale.language_code},
+    )
+    return author
+
+
+def import_article(
+    index: BlogIndexPage,
+    article: ArticleData,
+    *,
+    user: AbstractBaseUser | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Create `article` under the blog `index` (so in its language) and publish it.
+
+    With a go-live in the future the article is scheduled, not live, as when an editor
+    schedules it; the `cms.publish_scheduled` job publishes it on time. The author is the
+    `BlogAuthor` of that name in the blog's language: missing there, it becomes a translation
+    of the same author in another language, or a new author without bio or photo, which editors
+    add in the admin. An article whose slug the blog already has
+    is left alone (an empty ChangeSet), so a migration can run again. Raises ValidationError
+    for an invalid schedule or page.
+
+    Wagtail logs the page's creation and publication in its own history, as for an editor.
+    """
+    problem = engine.schedule_problem(article.go_live_at, article.expire_at, timezone.now())
+    if problem is not None:
+        raise ValidationError({"expire_at": SCHEDULE_PROBLEMS[problem]})
+    index = _current(index)
+    if index.get_children().filter(slug=article.slug).exists():
+        return ChangeSet()
+
+    def work(changes: ChangeSet) -> None:
+        author = _blog_author(article.author, index.locale, changes) if article.author else None
+        post = BlogPostPage(
+            title=article.title,
+            slug=article.slug,
+            date=article.date,
+            author=author,
+            summary=article.summary,
+            body=article.body,
+            go_live_at=article.go_live_at,
+            expire_at=article.expire_at,
+            seo_title=article.seo_title,
+            search_description=article.search_description,
+            live=False,
+        )
+        index.add_child(instance=post)
+        post.save_revision(user=user, log_action=True).publish(user=user)
+        post = _current(post)
+        changes.create(
+            "cms.blogpostpage",
+            f"{post.locale.language_code}:{post.slug}",
+            article_snapshot(post),
+        )
+
+    return _in_savepoint(dry_run, work)
+
+
+# --- Term and vendor landing pages (CMS.4, spec 10 §10.2)
+#
+# A term landing page shows on its term's listing page (D-07, CAT.8): the catalog view asks the
+# `listings.EDITORIAL_HOOK` Wagtail hook (registered in `wagtail_hooks`) for it, so catalog never
+# imports cms. Products come from the CAT.8 listing query: published, of active vendors.
+
+
+@dataclass(frozen=True)
+class CategorySection:
+    """The term's newest products in one top-level category, and the term listing narrowed to
+    that category (its canonical filtered URL)."""
+
+    name: str
+    cards: list[catalog.ProductCard]
+    see_all_url: str
+
+
+def term_listing_path(term: Term, language: str) -> str | None:
+    """The path of the term's page in `language` (its current URL, D-07); None without one."""
+    anchor = catalog.scope_anchor(catalog.ListingScope(term=term), language)
+    return anchor.paths.get(language) if anchor is not None else None
+
+
+def term_category_sections(
+    term: Term, language: str, limit: int, term_path: str
+) -> list[CategorySection]:
+    """The term's products by top-level category of their main category, in tree order, up to
+    `limit` each. None for a single category (`engine.shows_category_sections`). A query for the
+    categories, then a bounded number per category."""
+    limit = engine.landing_category_limit(limit)
+    if limit == 0:
+        return []
+    listed = catalog.listing_products(catalog.ListingScope(term=term)).order_by()
+    paths = listed.exclude(category=None).values_list("category__path", flat=True).distinct()
+    roots = {path[: Category.steplen] for path in paths}
+    prefix = slugs.language_prefix(language, default_language=settings.LANGUAGE_CODE)
+    sections: list[CategorySection] = []
+    for category in Category.objects.filter(path__in=roots).order_by("path"):
+        anchor = catalog.scope_anchor(catalog.ListingScope(category=category), language)
+        path = anchor.paths.get(language) if anchor is not None else None
+        value = engine.listing_slug_path(path, prefix) if path else None
+        if anchor is None or value is None:
+            continue  # no public slug in this language: no filter link to build
+        grid = catalog.product_grid(
+            catalog.ListingScope(term=term, category=category),
+            language,
+            limit=limit,
+            with_anchor=False,
+        )
+        if grid.cards:
+            see_all = listings.listing_url(term_path, listings.ListingParams(category=value))
+            sections.append(CategorySection(anchor.name, grid.cards, see_all))
+    return sections if engine.shows_category_sections(len(sections), limit) else []
+
+
+def _term_landing_parts(page: Any, request: HttpRequest | None, term_path: str) -> dict[str, Any]:
+    language = page.locale.language_code
+    return {
+        "page": page,
+        "request": request,
+        "currency": CURRENCY,
+        "sections": term_category_sections(page.term, language, page.category_products, term_path),
+        "related": public_cards([child.value for child in page.related], language, request),
+    }
+
+
+def term_landing_preview(page: Any, request: HttpRequest | None) -> dict[str, Any]:
+    """What the editor's preview shows: the editorial part, the term's name and its newest
+    products (the listing's first page)."""
+    if page.term is None:
+        return {"name": page.title, "cards": [], "sections": [], "related": []}
+    language = page.locale.language_code
+    term_path = term_listing_path(page.term, language) or ""
+    grid = catalog.product_grid(
+        catalog.ListingScope(term=page.term), language, limit=catalog.LISTING_PER_PAGE
+    )
+    text = page.term.translation(language).translation
+    return {
+        **_term_landing_parts(page, request, term_path),
+        "name": str(text.name) if text is not None else page.title,
+        "cards": grid.cards,
+    }
+
+
+def _term_editorial(
+    request: HttpRequest, term: Term, language: str
+) -> listings.ListingEditorial | None:
+    page = (
+        TermLandingPage.objects.live()
+        .filter(term=term, locale__language_code=language)
+        .select_related("term", "locale")
+        .first()
+    )
+    term_path = term_listing_path(term, language) if page is not None else None
+    if page is None or term_path is None:
+        return None
+    context = _term_landing_parts(page, request, term_path)
+    return listings.ListingEditorial(
+        before=render_to_string("cms/includes/term_landing_before.html", context, request),
+        after=render_to_string("cms/includes/term_landing_after.html", context, request),
+        title=page.seo_title,
+        description=page.search_description,
+    )
+
+
+def _vendor_story(
+    request: HttpRequest, vendor: Vendor, language: str
+) -> listings.ListingEditorial | None:
+    page = (
+        VendorLandingPage.objects.live()
+        .for_vendor(vendor)
+        .filter(locale__language_code=language)
+        .select_related("vendor")
+        .first()
+    )
+    url = page.get_url(request) if page is not None else None
+    if not url:
+        return None
+    context = {"url": url, "vendor_name": vendor.display_name}
+    return listings.ListingEditorial(
+        before=render_to_string("cms/includes/vendor_story_link.html", context, request)
+    )
+
+
+def listing_editorial(
+    request: HttpRequest, scope: catalog.ListingScope, language: str
+) -> listings.ListingEditorial | None:
+    """The editorial content of a listing's first page (the catalog's `EDITORIAL_HOOK`): a term
+    page's landing page, or the link from a vendor storefront to the vendor's story."""
+    if scope.term is not None:
+        return _term_editorial(request, scope.term, language)
+    if scope.vendor is not None:
+        return _vendor_story(request, scope.vendor, language)
+    return None
+
+
+def vendor_landing_context(page: Any, request: HttpRequest | None) -> dict[str, Any]:
+    """The vendor's featured products (its storefront listing's newest) and the page's own
+    canonical and `hreflang` links: its live translations of a public vendor."""
+    language = page.locale.language_code
+    grid = None
+    if page.is_public() and page.featured_products > 0:
+        grid = catalog.product_grid(
+            catalog.ListingScope(vendor=page.vendor),
+            language,
+            limit=engine.grid_limit(page.featured_products),
+        )
+
+    def absolute(url: str | None) -> str | None:
+        if not url:
+            return None
+        return request.build_absolute_uri(url) if request is not None else url
+
+    found: dict[str, str] = {}
+    for translation in page.get_translations(inclusive=True).live().specific():
+        url = absolute(translation.get_url(request))
+        if url is not None:
+            found[translation.locale.language_code] = url
+    alternates = [(code, found[code]) for code in configured_languages() if code in found]
+    source = translations.source_language()
+    alternates.extend(("x-default", url) for code, url in list(alternates) if code == source)
+    return {
+        "featured": grid,
+        "currency": CURRENCY,
+        "canonical_url": absolute(page.get_url(request)),
+        "alternates": alternates,
+    }

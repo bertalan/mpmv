@@ -1,5 +1,5 @@
 """Admin choosers for catalog terms, categories, brands, products and vendors (CMS.2 part 2/2,
-CMS.9, CMS.10, spec 10 §10.2).
+CMS.10, CMS.3, CMS.9, spec 10 §10.2).
 
 Wagtail's `ChooserViewSet` gives each model a chooser modal under `/admin/` and a StreamField
 block (`apps.cms.blocks.TermChooserBlock`, `VendorChooserBlock` and so on). Editors never type a
@@ -8,8 +8,9 @@ URL.
 - Terms are platform data with no vendor scope: every term is offered, labelled
   "taxonomy code: name" like the staff admin. Categories and brands (the product grid, CMS.10)
   are platform data too: all of them are offered, labelled as in the staff admin.
-- Products (CMS.9): only those a visitor may see (`apps.catalog.services.listed_products`),
-  labelled by SKU like the staff admin.
+- Products (the blog's product cards, CMS.3, and the launch countdown, CMS.9): only listed
+  products, published and of an active vendor (`apps.catalog.services.listed_products`), in the
+  list and in the "chosen" step alike, labelled by SKU.
 - Vendors: only those with a public storefront (`apps.vendors.services.storefront_vendors`), in
   the list and in the "chosen" step alike, so a crafted request cannot pick another vendor.
 
@@ -67,24 +68,6 @@ class BrandChooserViewSet(ChooserViewSet):  # type: ignore[misc]
         return Brand.objects.order_by("name")
 
 
-class VendorChosenView(ChosenView):  # type: ignore[misc]
-    def get_object(self, pk: Any) -> Vendor:
-        return storefront_vendors().get(pk=pk)
-
-
-class VendorChooserViewSet(ChooserViewSet):  # type: ignore[misc]
-    model = Vendor
-    icon = "group"
-    choose_one_text = _("Choose a vendor")
-    choose_another_text = _("Choose another vendor")
-    register_widget = False
-    chosen_view_class = VendorChosenView
-    per_page = 50
-
-    def get_object_list(self) -> QuerySet[Vendor]:
-        return storefront_vendors().order_by("display_name")
-
-
 class ProductChosenView(ChosenView):  # type: ignore[misc]
     def get_object(self, pk: Any) -> Product:
         return listed_products().get(pk=pk)
@@ -101,6 +84,24 @@ class ProductChooserViewSet(ChooserViewSet):  # type: ignore[misc]
 
     def get_object_list(self) -> QuerySet[Product]:
         return listed_products().order_by("sku")
+
+
+class VendorChosenView(ChosenView):  # type: ignore[misc]
+    def get_object(self, pk: Any) -> Vendor:
+        return storefront_vendors().get(pk=pk)
+
+
+class VendorChooserViewSet(ChooserViewSet):  # type: ignore[misc]
+    model = Vendor
+    icon = "group"
+    choose_one_text = _("Choose a vendor")
+    choose_another_text = _("Choose another vendor")
+    register_widget = False
+    chosen_view_class = VendorChosenView
+    per_page = 50
+
+    def get_object_list(self) -> QuerySet[Vendor]:
+        return storefront_vendors().order_by("display_name")
 
 
 term_chooser = TermChooserViewSet("cms_term_chooser", url_prefix="cms/term-chooser")

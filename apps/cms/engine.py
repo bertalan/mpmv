@@ -23,6 +23,9 @@ Launch countdown (CMS.9, spec 10 §10.2): the state of the block at a given inst
 longest a cache may keep a page whose countdown is still running.
 
 Product grid (CMS.10, spec 10 §10.2): how many products a grid shows.
+
+Blog (CMS.3, spec 10 §10.2): an article's schedule, Wagtail's `go_live_at` and `expire_at`, and
+the schema.org data of articles and author pages (Person, ProfilePage, BlogPosting).
 """
 
 import datetime as dt
@@ -30,6 +33,7 @@ import json
 import math
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from html.parser import HTMLParser
 from typing import Any
 
 NEUTRAL = ""  # the `language` of an image shown in every language without dedicated images
@@ -282,3 +286,151 @@ def capped_max_age(
     if not ahead:
         return max_age
     return min(max_age, math.floor(min(ahead).total_seconds()))
+
+
+# --- Blog schedule (CMS.3)
+
+
+EXPIRY_IN_PAST = "expiry_in_past"
+EXPIRY_NOT_AFTER_GO_LIVE = "expiry_not_after_go_live"
+
+
+def schedule_problem(
+    go_live_at: dt.datetime | None, expire_at: dt.datetime | None, now: dt.datetime
+) -> str | None:
+    """Why an article's schedule cannot be saved (one of the codes above), or None. The rules of
+    Wagtail's own publishing form, for articles created outside it (`services.import_article`):
+    an expiry must be in the future and after the go-live."""
+    if expire_at is None:
+        return None
+    if expire_at <= now:
+        return EXPIRY_IN_PAST
+    if go_live_at is not None and expire_at <= go_live_at:
+        return EXPIRY_NOT_AFTER_GO_LIVE
+    return None
+
+
+# --- Blog structured data (CMS.3, owner answers on PR #156)
+
+SCHEMA_ORG = "https://schema.org"
+
+
+_BLOCK_TAGS = frozenset({"p", "li", "h2", "h3", "h4", "blockquote", "div"})
+
+
+class _TextOf(HTMLParser):
+    """Collects the text of HTML, entities decoded; the end of a block separates words."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+
+    def handle_data(self, data: str) -> None:
+        self.parts.append(data)
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "br":
+            self.parts.append(" ")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in _BLOCK_TAGS:
+            self.parts.append(" ")
+
+
+def plain_text(html: str) -> str:
+    """Rich text as one line of plain text, for a structured-data description."""
+    parser = _TextOf()
+    parser.feed(html)
+    parser.close()
+    return " ".join("".join(parser.parts).split())
+
+
+def person_jsonld(
+    *,
+    person_id: str,
+    name: str,
+    url: str,
+    image: str = "",
+    description: str = "",
+    same_as: Sequence[str] = (),
+    job_title: str = "",
+) -> dict[str, Any]:
+    """schema.org Person of a blog author. `person_id` is stable (the author page URL plus
+    `#person`) so every BlogPosting can point at it; the empty fields are left out."""
+    data: dict[str, Any] = {"@type": "Person", "@id": person_id, "name": name, "url": url}
+    optional = {
+        "image": image,
+        "description": description,
+        "sameAs": list(same_as),
+        "jobTitle": job_title,
+    }
+    data.update({key: value for key, value in optional.items() if value})
+    return data
+
+
+def profile_page_jsonld(*, url: str, person: Mapping[str, Any], language: str) -> dict[str, Any]:
+    """schema.org ProfilePage of an author page: its main entity is the author's Person."""
+    return {
+        "@context": SCHEMA_ORG,
+        "@type": "ProfilePage",
+        "url": url,
+        "inLanguage": language,
+        "mainEntity": dict(person),
+    }
+
+
+def blog_posting_jsonld(
+    *,
+    url: str,
+    headline: str,
+    date_published: dt.date,
+    language: str,
+    author_id: str = "",
+    author_name: str = "",
+    description: str = "",
+    image: str = "",
+) -> dict[str, Any]:
+    """schema.org BlogPosting of an article; its `author` points at the author's Person `@id`."""
+    data: dict[str, Any] = {
+        "@context": SCHEMA_ORG,
+        "@type": "BlogPosting",
+        "headline": headline,
+        "datePublished": date_published.isoformat(),
+        "url": url,
+        "mainEntityOfPage": url,
+        "inLanguage": language,
+    }
+    if author_id:
+        data["author"] = {"@type": "Person", "@id": author_id, "name": author_name}
+    if description:
+        data["description"] = description
+    if image:
+        data["image"] = image
+    return data
+
+
+# --- Term landing pages (CMS.4)
+
+LANDING_CATEGORY_DEFAULT = 4
+LANDING_CATEGORY_MAX = 12
+
+
+def landing_category_limit(limit: int | None) -> int:
+    """How many products each category section of a term landing page shows: 0 turns the
+    sections off; a stored value out of bounds is clamped."""
+    if limit is None:
+        return LANDING_CATEGORY_DEFAULT
+    return max(0, min(LANDING_CATEGORY_MAX, limit))
+
+
+def shows_category_sections(categories: int, limit: int) -> bool:
+    """Sections by category only for two categories or more: a single one would repeat the
+    listing right below it."""
+    return limit > 0 and categories >= 2
+
+
+def listing_slug_path(path: str, prefix: str) -> str | None:
+    """The `category` filter value (CAT.8) of a category listing at `path`: its slugs from the
+    top of the tree, after the language `prefix` and the listing segment. None without slugs."""
+    _segment, _sep, slugs = path.removeprefix(prefix).strip("/").partition("/")
+    return slugs or None

@@ -6,12 +6,16 @@ on users would change them without an audit entry, so their registrations are wi
 they get no URL, no menu item and no admin link.
 
 The term and vendor choosers of the page cards (CMS.2) and the category and brand choosers of
-the product grid (CMS.10) are admin viewsets (`choosers`).
+the product grid (CMS.10) and the product chooser of the blog cards (CMS.3) are admin viewsets
+(`choosers`). Blog authors (CMS.3) are translatable snippets.
 
 Documents are installed only for wagtail-localize (I18N.3): their menu item is hidden.
 
 Images (CMS.8): the chooser offers only images with their licence and author; the others are
 listed under "Images to classify" until staff classify them.
+
+Landing pages (CMS.4): the catalog's listing pages ask the `catalog_listing_editorial` hook for
+editorial content, which this app gives from its term and vendor landing pages.
 """
 
 from collections.abc import Callable
@@ -26,6 +30,8 @@ from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet
 from wagtail.users import wagtail_hooks as wagtail_users_hooks
 
+from apps.catalog.listings import EDITORIAL_HOOK, ListingEditorial
+from apps.catalog.services import ListingScope
 from apps.core.services import classified
 
 from .admin_views import can_classify_images, image_review
@@ -36,7 +42,8 @@ from .choosers import (
     term_chooser,
     vendor_chooser,
 )
-from .models import NavigationMenu
+from .models import BlogAuthor, NavigationMenu
+from .services import listing_editorial
 
 
 class NavigationMenuViewSet(SnippetViewSet):  # type: ignore[misc]  # Wagtail is untyped
@@ -49,6 +56,20 @@ class NavigationMenuViewSet(SnippetViewSet):  # type: ignore[misc]  # Wagtail is
 
 
 register_snippet(NavigationMenuViewSet)
+
+
+class BlogAuthorViewSet(SnippetViewSet):  # type: ignore[misc]
+    """The blog's authors (CMS.3): a byline with bio and photo, not a user account."""
+
+    model = BlogAuthor
+    icon = "user"
+    menu_label = _("Blog authors")
+    add_to_admin_menu = True
+    list_display = ("name",)
+    search_fields = ("name",)
+
+
+register_snippet(BlogAuthorViewSet)
 
 
 def _withdraw(hook_name: str, registered_by: Callable[[Any], bool]) -> None:
@@ -119,3 +140,12 @@ def register_product_chooser() -> Any:
 @hooks.register("register_admin_viewset")  # type: ignore[untyped-decorator]
 def register_brand_chooser() -> Any:
     return brand_chooser
+
+
+@hooks.register(EDITORIAL_HOOK)  # type: ignore[untyped-decorator]
+def landing_page_editorial(
+    request: HttpRequest, scope: ListingScope, language: str
+) -> ListingEditorial | None:
+    """A term landing page on its term's listing page; the vendor story link on a storefront
+    (CMS.4)."""
+    return listing_editorial(request, scope, language)

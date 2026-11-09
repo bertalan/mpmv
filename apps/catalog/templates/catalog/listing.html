@@ -4,8 +4,11 @@
   Listing page (CAT.8): category, taxonomy term, brand, vendor storefront. Minimal and semantic;
   THM.3 and THM.7 restyle it. No inline script or style (the CSP has no 'unsafe-inline'): the
   filter form is a plain GET form, and the server answers a 301 to the canonical URL.
+  `editorial` (CMS.4): an editorial landing page's content on the first unfiltered page, rendered
+  by the CMS before and after the listing, with its SEO title and description.
 {% endcomment %}
-{% block title %}{{ name }}{% if window.page > 1 %} · {% blocktranslate with page=window.page %}Page {{ page }}{% endblocktranslate %}{% endif %}{% if current_site.site_name %} · {{ current_site.site_name }}{% endif %}{% endblock %}
+{% block title %}{% if editorial.title %}{{ editorial.title }}{% else %}{{ name }}{% endif %}{% if window.page > 1 %} · {% blocktranslate with page=window.page %}Page {{ page }}{% endblocktranslate %}{% endif %}{% if current_site.site_name %} · {{ current_site.site_name }}{% endif %}{% endblock %}
+{% block description %}{% if editorial.description %}<meta name="description" content="{{ editorial.description }}">{% endif %}{% endblock %}
 {% block head %}
   <meta name="robots" content="{{ robots }}">
   <link rel="canonical" href="{{ canonical_url }}">
@@ -21,6 +24,7 @@
       {% if is_fallback %}<p class="listing-notice">{% translate "This page is not available in your language yet." %}</p>{% endif %}
       <p class="listing-count">{% blocktranslate count counter=window.total %}{{ counter }} product{% plural %}{{ counter }} products{% endblocktranslate %}</p>
     </header>
+    {% if editorial.before %}{{ editorial.before }}{% endif %}
 
     {% include "catalog/includes/listing_filters.html" %}
 
@@ -61,5 +65,6 @@
         </nav>
       {% endif %}
     </section>
+    {% if editorial.after %}{{ editorial.after }}{% endif %}
   </div>
 {% endblock %}

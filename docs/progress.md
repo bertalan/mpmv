@@ -51,6 +51,51 @@ part of the done-when still open) · `not started`.
 | SHP.13 | done | #77 | Shipping configuration file format v1 (JSON and CSV), audited export/import with per-row report and all-or-nothing writes, `ShippingTemplate` with one standard template, `shipping_config` command |
 | CORE.14 | done | #75 | Vendor API keys limited to vendor-grantable scopes, suspended vendors read-only and closed vendors refused, per-key audit when a vendor is deleted. Security code, flagged for careful human review |
 | CAT.12 | done | #76 | Audited product and variant edit and delete services (fiscal category, sales mode, weight, dimensions), vendor and price rules enforced in the service, admin routed through them |
+| CAT.14 | done | #80, #94, #116 | Catalogue integrity rules |
+| CAT.3 | done | #84, #96, #116 | Typed attributes, translated values and variant axes |
+| CAT.5 | done | #81, #116 | SKU-free product slugs, SlugHistory and 301 redirects |
+| THM.1 | done | #88 | Theme registry, loader and per-site theme |
+| ARC.18 | done | #106 | Engine purity contract and dry-run exception guard |
+| TAX.5 | done | #92 | VIES client with cache, timeout and fail-closed check. Tax code, flagged for careful human review |
+| CAT.13 | done | #83 | Internal product identity; the vendor SKU is a label |
+| CORE.12 | done | #102 | Per-API-key rate limit with a shared PostgreSQL counter |
+| ORD.1 | done | #100 | Cart, guest and user carts, merge on sign-in |
+| CMS.5 | partial: the recruitment page's link to the application waits for VEN.22 | #87 | Versioned legal pages per language and the Sell with us page |
+| ARC.16 | done | #112 | Transactional email outbox, `EmailSender`, bounce suppression (ARC.19 split off) |
+| VEN.18 | done | #107 | Fiscal regime RF20 (cross-border VAT franchise) |
+| SHP.14 | done | #93 | Special areas and per-method treatments; seed gaps are follow-ups (check 6) |
+| VEN.21 | done | #101 | Staff reopen a closed vendor to onboarding |
+| CMP.13 | done | #91 | Vendor establishment gate on the allowed vendor countries |
+| I18N.3 | done | #89 | wagtail-localize for CMS pages, images per locale |
+| CMS.2 | done | #109, #117 | Hero, CTA, FAQ and rich text blocks; page, term and vendor choosers |
+| EVT.12 | done | #82 | Geocoder chain and Find coordinates endpoint |
+| CAT.8 | done | #103, #110, #118, #134 | Listing engine, views, templates and e2e; interim net price marked on cards until TAX.12 |
+| THM.2 | done | #108 | Design-token pipeline |
+| CMS.8 | done | #113 | Image source, licence and credit |
+| THM.3 | done | #114, #119 | Base layouts, skip link, header, footer, page shells, error pages |
+| THM.4 | done | #121, #122, #123, #135 | Form, button, card, badge, alert and navigation components, styleguide page |
+| EVT.1 | done | #125, #127 | Event page models, constraints, tenancy, admin panels and templates |
+| CORE.16 | done | #136 | API rate limit defaults and per-key override |
+| EVT.2 | done | #130 | Recurrence engine |
+| ARC.13 | partial: the done-when is proven on STAGE (lane-a) | #146, #148, #152 | Multi-arch release image, database env file and root CA mount, site-only Caddy, media volume |
+| THM.5 | done | #128 | Theme quality gates |
+| VEN.25 | partial: the EX number is not in the FatturaPA party data yet (tax advisor) | #139 | RF20 only for EU-established vendors with an EX number |
+| TAX.13 | done | #138 | Exemption reasons tied to their law's country. Tax code, flagged for careful human review |
+| VEN.23 | done | #137 | DAC7 seller dataset |
+| ARC.20 | done | #132 | Trusted input for AI agents |
+| ARC.10 | done | #150 | Synthetic data seed (`make seed`) |
+| CMS.10 | done | #126 | Product grid block |
+| CORE.15 | done | #140, #163 | Secure action links, review follow-ups |
+| ARC.23 | done | #153 | Release gate with production parity |
+| EVT.13 | done | #144 | Map picker for event locations |
+| I18N.9 | done | #142 | Customer legal and checkout pages per language |
+| CAT.19 | done | #154 | Vendor products in the Manager shop space |
+| VEN.24 | done | #141 | Claim an imported vendor (legal email or registered PEC) |
+| SEC.5 | partial: items 6, 7, 9 and 10 of the security wave open | #162, #169, #166, #171 | Security headers by response type, endpoint sweep, hostile-input corpus, rate-limit tests |
+| CAT.9 | done | #167 | Product search: full-text per language, trigram, SKU prefix |
+| CORE.20 | done | #171 | Per-IP limit on refused API keys |
+| CMS.4 | done | #168 | Term and vendor landing pages |
+| THM.12 | done | #151 | WebP and AVIF renditions, sanitised SVG logos |
 
 ## Owner decisions 2026-11-07
 
@@ -560,6 +605,93 @@ Follow-ups:
 
 Audit chunk 4 (#98): 0 blocker, 0 major, 5 minor (the five rows marked above).
 
+## Merges after wave 8 (2026-11-08 and 2026-11-09)
+
+One line per merged PR, in merge order within each group. #91, #93, #101 and #107, listed above as
+not merged, merged on 2026-11-08 after their fixes. Task status is in the [Tasks](#tasks) table.
+
+Spec and process:
+
+| PR | Task | What |
+|---|---|---|
+| #124 | TAX.12 | Spec: VAT-inclusive consumer prices as a go-live gate |
+| #131 | VEN.24 | Spec: owner decisions MQ-1 to MQ-12, VEN.24 and two P2 rows |
+| #143 | ARC.13, ARC.21 | Spec: single STAGE VPS, multi-arch image, STAGE abuse tests |
+| #145 | ARC.22 | Spec: public STAGE demo mode |
+| #132 | ARC.20 | Trusted input for AI agents (rule and docs) |
+| #155 | CORE.18 | Spec: Manager backoffice, staff roles, setup wizard, import connectors |
+| #157 | SEO.7, CMS.11, CAT.20 | Spec: schema.org graph, product cards, linked brands |
+| #158 | — | Coherence check 6: generic wording for the legacy system in the spec |
+
+Commerce (catalogue, vendors, tax, shipping):
+
+| PR | Task | What |
+|---|---|---|
+| #107 | VEN.18 | Fiscal regime RF20 |
+| #93 | SHP.14 | Special areas and per-method treatments |
+| #101 | VEN.21 | Staff reopen a closed vendor to onboarding |
+| #91 | CMP.13 | Vendor establishment gate on the allowed vendor countries |
+| #110 | CAT.8 | Listing views and URLs (2/3) |
+| #118 | CAT.8 | Listing templates and e2e (3/3) |
+| #134 | CAT.8 | Interim net price marked on product cards |
+| #139 | VEN.25 | RF20 only for EU-established vendors with an EX number |
+| #138 | TAX.13 | Exemption reasons tied to their law's country |
+| #137 | VEN.23 | DAC7 seller dataset |
+| #154 | CAT.19 | Vendor products in the Manager shop space |
+| #141 | VEN.24 | Claim an imported vendor |
+| #167 | CAT.9 | Product search: full-text per language, trigram, SKU prefix |
+
+Themes, CMS, languages and events:
+
+| PR | Task | What |
+|---|---|---|
+| #89 | I18N.3 | wagtail-localize for CMS pages, images per locale |
+| #109 | CMS.2 | Hero, CTA, FAQ and rich text blocks (1/2) |
+| #117 | CMS.2 | Page, term and vendor choosers (2/2) |
+| #82 | EVT.12 | Geocoder chain and Find coordinates endpoint |
+| #108 | THM.2 | Design-token pipeline |
+| #113 | CMS.8 | Image source, licence and credit |
+| #114 | THM.3 | Base layouts, skip link, header and navigation (1/2) |
+| #119 | THM.3 | Footer, page shells, error pages, base form styles (2/2) |
+| #121 | THM.4 | Form and button components, styleguide page (1/3) |
+| #122 | THM.4 | Cards, product tiles, badges and alerts (2/3) |
+| #123 | THM.4 | Navigation components (3/3) |
+| #125 | EVT.1 | Event page models, constraints and tenancy (1/2) |
+| #127 | EVT.1 | Event admin panels and page templates (2/2) |
+| #135 | THM.4 | Safe hrefs and heading levels in card and product tile |
+| #130 | EVT.2 | Recurrence engine |
+| #128 | THM.5 | Theme quality gates |
+| #126 | CMS.10 | Product grid block |
+| #144 | EVT.13 | Map picker for event locations |
+| #142 | I18N.9 | Customer legal and checkout pages per language |
+| #168 | CMS.4 | Term and vendor landing pages |
+| #151 | THM.12 | WebP and AVIF renditions, sanitised SVG logos |
+
+Core, accounts, API and security:
+
+| PR | Task | What |
+|---|---|---|
+| #111 | CORE.4 | Block privilege escalation in the user and group admin (audit #98 chunk 3) |
+| #136 | CORE.16 | API rate limit defaults and per-key override |
+| #140 | CORE.15 | Secure action links |
+| #162 | SEC.5 | Security headers on static files and redirects |
+| #163 | CORE.15 | Review follow-ups from #140 |
+| #169 | SEC.5 | Endpoint security sweep |
+| #166 | SEC.5 | Hostile-input corpus and property-based tests |
+| #171 | SEC.5, CORE.20 | Rate-limit tests and a per-IP limit on refused API keys |
+
+Infrastructure and CI:
+
+| PR | Task | What |
+|---|---|---|
+| #133 | OPS.4 | SBOM fallback to the syft container |
+| #146 | ARC.13 | Multi-arch release image (amd64 and arm64, native arm64 runner) |
+| #148 | ARC.13 | Database env file, DB root CA mount, site-only Caddy for STAGE and LIVE |
+| #150 | ARC.10 | Synthetic data seed |
+| #152 | ARC.13 | Media volume for uploads, served read-only by Caddy |
+| #153 | ARC.23 | Release gate with production parity |
+| #161 | OPS.4 | Dependabot: uv image 0.10.11 to 0.13.7 |
+
 ## Coherence checks
 
 Run at least every 5 completed tasks: code vs spec and ADRs, done-when criteria, docs drift,
@@ -998,3 +1130,97 @@ Owner questions (Q-85 to Q-89 in the private register):
    activation, and say whether the Stripe account must be enabled too, given D-19.
 5. Confirm the rows added by this check: ARC.17, ARC.18, CAT.12, CORE.14, TAX.11 and CMP.25, and the
    VEN.18 and SHP.2 changes (+15 h of P1).
+
+### Check 6 (2026-11-09, after waves 8 and 9, #63 to #157)
+
+Scope: main at 8e9a525, then 51a8878. Six read-only reviewers: commerce code vs spec, platform and
+content code vs spec, done-when and tests, module dependency graph, docs drift, redaction. About 40
+tasks had merged since check 5. Fix PR: #158 (redaction).
+
+| Area | Result |
+|---|---|
+| Done-when criteria | Met for the merged tasks, with tests, except the partial ones in the Tasks table (CMS.5, VEN.25) and finding 4 |
+| Spec 01 conventions | Engines pure, services with dry-run and AuditLog, money in Decimal; two guard gaps (finding 3) |
+| App dependency graph | import-linter 8/8 kept; the contracts are looser than spec 01 §1.3 (finding 3) |
+| Redaction | Specs described the live legacy system in too much detail (finding 2) |
+| Docs drift | progress.md, README, spec README and spec 91 stale (findings 1 and 6) |
+| Gates | `make check` green. The local `make test` was not conclusive: 5499 passed, 1 xfailed (TAX.12), 684 errors, all "connection is closed" from PostgreSQL on a saturated machine (load 35 on 12 cores); CI on main was green. The markdown test skipped (fixed by the check 7 follow-up) |
+
+Findings and actions:
+
+1. Major. `docs/progress.md` stopped at wave 8 (#120): no task rows after CAT.12 and a stale "not
+   merged" line. Action: caught up by the check 7 follow-up.
+2. Major (redaction). Specs 00, 02, 05, 06, 08, 10 and 12 described weaknesses and internals of
+   the live legacy system. Action: generic wording in #158, details moved to the private folder.
+   Git history keeps the old text; rewriting it is an owner decision.
+3. Minor (graph). `apps.seed` and the planned `apps.manager` are missing from the spec 01 §1.3
+   tree; the "Domain layers" contract lets ingest, seo, ledger, payments, events and api import
+   more than §1.3 draws; the engine-purity contract (`apps.*.engine`) and the dry-run guard miss
+   the nested `apps/core/geocoding/`. Action: lane-a at the next spec 01 edit; contract and guard
+   changes as a lane-b follow-up.
+4. Minor (done-when). ARC.10's seed is used only by its own tests; the I18N.9 readiness command
+   runs in no gate; the CMS.5 recruitment link waits for VEN.22; the VEN.25 EX number is not in
+   the FatturaPA party data. Action: recorded in the Tasks table; the gates go in the MIG cutover
+   checklist.
+5. Minor (code vs spec). The CORE.15 Continue page and the CORE.4 MFA templates are English only
+   (spec 09); `MPMV_MAP_TILE_URL` accepts any https host while spec 15 forbids third-party tiles;
+   model labels in themes, core, accounts and api are not translatable. Action: lane-b follow-ups.
+6. Minor (docs). Spec README totals and decision count, spec 91 cross-cutting formulas, the media
+   storage text after #152, the README status line, ADR-0002's orchestration note and the branch
+   naming in parallel-lanes.md are stale. Action: lane-a, next spec edit (the syft fallback and
+   the README layout were fixed in #172).
+7. Earlier follow-ups now resolved: TAX.5 test VIES client and `HTTPException`; CORE.12 scoped
+   buckets (#136); the THM.2 and THM.3 notes (#108, #114, #119); release images amd64 only
+   (#146); the SEC.1 `/healthz` redirect. Still open: SHP.14 seed gaps, area lower-casing and
+   dry-run delete; ORD.1 orphaned guest cart; TAX.5 full VAT number in the log; TAX.2
+   `requested_by`; CAT.12 non-atomic admin deletes; the CAT.3 docstring; the CMP.13 constraint
+   test; the SHP.2 error without the zone; SHP.13 float refusal and formula escaping (Q-95). The
+   SHP.14 rows above name migration 0009; the seed is 0010.
+
+### Check 7 (2026-11-09, after #141, #162, #163, #169, #167, #166, #171)
+
+Scope: main at 46d586b. Four read-only reviewers: code vs spec and done-when, spec vs spec and docs
+drift, redaction, hygiene and migrations, gates. Fix PR: #172. Follow-up with lane-a's decisions:
+"Coherence check 7 follow-up" (this progress update).
+
+| Area | Result |
+|---|---|
+| Done-when criteria | Met for VEN.24, CORE.15 and its follow-ups, CAT.9, CORE.20 and the merged SEC.5 items; every item has a test |
+| Spec 01 conventions and ADRs | Held; lint-imports 8/8; the new dry-run exceptions are in the spec 01 §1.3 table. ADR-0006 does not mention Hypothesis or the per-topic test files |
+| Spec vs spec | `make docs-check` clean. The SEC.5 row did not describe the merged work; strict xfails cited rows that did not exist; VEN.24 and MQ-1 said "legal email only" while the code also allows the PEC |
+| Docs drift | audit-trail.md, background-jobs.md, dependency-updates.md and `mpmv.env.example` (10 variables) behind the code |
+| Redaction and hygiene | Clean in all 7 diffs and PR texts; secret scans pass; one leaf per app; lock and ruff clean; unused claim constants and one key-shaped test literal |
+| Migrations | #129, #156 and #168 each added `cms/0010`; #168 merged first, #156 and #129 renumber |
+| Gates | `make check` green. `make test` 9579 passed, 30 skipped, 7 strict xfails, 0 failed (37 min locally, 19.5 min in CI, same counts as CI). `make test-e2e` 82 passed, 3 skipped |
+
+Findings and actions:
+
+1. Major. The SEC.5 row and the strict xfails had no owning rows. Action: SEC.5 rewritten; SEC.11,
+   SEC.12, CMS.12 and I18N.10 registered in #172.
+2. Major. VEN.24 destination. Action (lane-a decision): keep the code; the claim link may go to
+   the legal email or the registered PEC. VEN.24, MQ-1 and specs 02 and 04 updated by the
+   follow-up.
+3. Major. Docs drift (audit trail, background jobs, env example). Action: fixed in #172, with
+   system checks `core.E501` and `core.E502` refusing a console mail sender or a localhost sender
+   on LIVE.
+4. Major. Open PRs colliding on one migration number. Action (lane-a decision): the rule is in
+   [parallel-lanes.md](dev/parallel-lanes.md): the PR merged later renumbers.
+5. Major. progress.md about 55 PRs behind, check 6 not recorded. Action: this update.
+6. Minor (hygiene). The integration fixture `page` shadowed pytest-playwright's `page`, and
+   `tests/unit/test_build_docs_eof.py` never ran (`markdown` was not a dev dependency). Action:
+   fixed by the follow-up. Deprecations (Django 2028 `MAILERS`, action-tuple indexing, Wagtail 9
+   image permission policy) and the slow seed and migration tests: proposed row OPS.7.
+7. Minor, for lane-a: the dry-run exception categories (`issue_action_token`,
+   `confirm_claim_identity`); a new language needs a search configuration entry; D-14 should block
+   CAT.19; MQ-12 and D-01 do not cross-reference; spec 91 and README totals; the CAT.9 follow-ups
+   (stored tsvector, `SkuAlias` search, typo threshold); which database role runs `migrate`
+   (`pg_trgm`); SEC.5 hours.
+8. Minor, for lane-b: adapters that run read queries in the vendor views and admin; the CORE.20
+   done-when on non-numeric block seconds; a developer doc for rate limits and the SEC.5
+   registries; the vertical-specific styleguide sample.
+
+Earlier findings still open: the SEC requirement and task ID collision (checks 2 and 3, owner
+question); 3.5 compromised-password check has no row; 3.6 spec 02 sketch fields; 3.7 no system
+check on `MFA_REQUIRED_POLICIES`; 4.3 ADR-0005 citations in deploy files; 4.5 OPS.2 dependencies;
+5.5 `einvoice_channel` (ARC.17); the SEC.3 row binding (check 5 cleanup item 7, Q-93); the
+check 6 items above.

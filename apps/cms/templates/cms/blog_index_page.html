@@ -1,0 +1,12 @@
+{% extends "layouts/content.html" %}
+{% load i18n wagtailcore_tags %}
+{% comment %}
+Blog index (CMS.3): the live articles of this language, newest first, twelve per page, one
+`<article>` each with its date, author and summary. Pagination is the base theme's component.
+{% endcomment %}
+{% block page_content %}
+  <h1>{{ page.title }}</h1>
+  {% if page.intro %}{{ page.intro|richtext }}{% endif %}
+  {% translate "No articles have been published yet." as empty %}
+  {% include "cms/includes/post_list.html" with empty=empty %}
+{% endblock %}

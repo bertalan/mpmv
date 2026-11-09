@@ -23,31 +23,52 @@ and so per language, since a translation is its own page (Q-42). A translation k
 effective date through wagtail-localize syncs, and the reviews of each language's text (AI draft,
 native-speaker review, legal counsel check) are recorded on its versions (I18N.9). The "Sell
 with us" page shows the plans and a FAQ and leads to the VEN.22 application form.
+
+The blog (CMS.3): one `BlogIndexPage` per language under its home, with `BlogPostPage` articles.
+An article keeps its own publication date (a migrated article keeps the legacy one), an optional
+author (a `BlogAuthor` snippet: legacy authors are not platform users), a summary for the index,
+a main image and a body whose featured links also take product cards. Scheduling is Wagtail's:
+`go_live_at` and `expire_at` in the page settings, applied by the `cms.publish_scheduled` job.
+An author has a name, a translated bio and a photo, and a page per language under the blog,
+`author/<slug>/`, listing their articles (owner answer on PR #156).
+
+Landing pages (CMS.4): a term landing page is the editorial part of a term's D-07 listing page
+and lives on that URL; a vendor landing page tells an active vendor's story with its products.
 """
 
 import datetime as dt
+import uuid
 from typing import Any, ClassVar
+from urllib.parse import urljoin
 
 from django.core.exceptions import ValidationError
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.core.paginator import Page as PaginatorPage
+from django.core.validators import MaxValueValidator, URLValidator
 from django.db import models
-from django.http import HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponsePermanentRedirect
 from django.http.response import HttpResponseBase
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.cache import get_max_age, patch_cache_control
+from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from wagtail import blocks
 from wagtail.admin.panels import FieldPanel
 from wagtail.contrib.routable_page.models import RoutablePageMixin, path
-from wagtail.fields import StreamField
+from wagtail.fields import RichTextField, StreamField
 from wagtail.images import get_image_model_string
-from wagtail.models import Page, TranslatableMixin
-from wagtail_localize.fields import BaseTranslatableField, SynchronizedField
+from wagtail.models import Page, PageManager, PageQuerySet, TranslatableMixin
+from wagtail_localize.fields import BaseTranslatableField, SynchronizedField, TranslatableField
 from wagtail_localize.models import Translation
+
+from apps.vendors.scoping import VendorScopedManager, VendorScopedQuerySet
+from apps.vendors.services import has_public_storefront
 
 from . import engine
 from .blocks import (
     RICH_TEXT_FEATURES,
+    ArticleLinksBlock,
     CallToActionBlock,
     FaqBlock,
     FeaturedLinksBlock,
@@ -55,9 +76,11 @@ from .blocks import (
     GalleryBlock,
     HeroBlock,
     LaunchCountdownBlock,
+    PageCardBlock,
     ProductGridBlock,
     countdown_targets,
 )
+from .choosers import term_chooser, vendor_chooser
 
 
 def body_field(
@@ -140,6 +163,9 @@ class HomePage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is u
         "cms.StandardPage",
         "cms.LegalPage",
         "cms.VendorRecruitmentPage",
+        "cms.BlogIndexPage",
+        "cms.TermLandingPage",
+        "cms.VendorLandingPage",
         # The `/events/` index (EVT.1): named by string, so cms never imports apps.events.
         "events.EventIndexPage",
     ]
@@ -187,7 +213,11 @@ class StandardPage(CountdownCacheMixin, Page):  # type: ignore[misc]
         SynchronizedField("image", overridable=True)
     ]
     parent_page_types: ClassVar[list[str]] = ["cms.HomePage", "cms.StandardPage"]
-    subpage_types: ClassVar[list[str]] = ["cms.StandardPage"]
+    subpage_types: ClassVar[list[str]] = [
+        "cms.StandardPage",
+        "cms.TermLandingPage",
+        "cms.VendorLandingPage",
+    ]
     template = "cms/standard_page.html"
 
     class Meta:
@@ -532,4 +562,493 @@ class VendorRecruitmentPage(Page):  # type: ignore[misc]
 
         context: dict[str, Any] = super().get_context(request, *args, **kwargs)
         context["application_url"] = vendor_application_url()
+        return context
+
+
+# --- Blog (CMS.3)
+
+
+AUTHOR_BIO_FEATURES = ["bold", "italic", "link"]
+PROFILE_URL = URLValidator(schemes=["https", "http"])
+AUTHOR_PHOTO_FILTER = "fill-240x240"  # the author page's photo (`blog_author_page.html`)
+ARTICLE_IMAGE_FILTER = "width-1200"  # an article's main image (`blog_post_page.html`)
+
+
+class BlogAuthor(TranslatableMixin, models.Model):  # type: ignore[misc]  # Wagtail is untyped
+    """The byline of articles: a name, not a user account (legacy authors have none), with a
+    bio, a photo and an author page. A translatable snippet: each language has its own copy, the
+    bio and the photo's alt text are translated, the name, slug and photo are the source's."""
+
+    name = models.CharField(_("name"), max_length=120)
+    slug = models.SlugField(
+        _("slug"),
+        max_length=120,
+        blank=True,
+        help_text=_("The author page's address; made from the name when left empty."),
+    )
+    bio = RichTextField(_("bio"), features=AUTHOR_BIO_FEATURES, blank=True)
+    photo = models.ForeignKey(
+        get_image_model_string(),
+        verbose_name=_("photo"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    photo_alt_text = models.CharField(
+        _("photo alt text"),
+        max_length=250,
+        blank=True,
+        help_text=_("Describes the photo for people who cannot see it."),
+    )
+    job_title = models.CharField(_("job title"), max_length=120, blank=True)
+    same_as = StreamField(
+        [("url", blocks.URLBlock(label=_("Profile URL"), validators=[PROFILE_URL]))],
+        blank=True,
+        verbose_name=_("profile links"),
+        help_text=_("The author's profiles elsewhere (a social network, a personal site)."),
+    )
+
+    panels: ClassVar[list[Any]] = [
+        FieldPanel("name"),
+        FieldPanel("slug"),
+        FieldPanel("job_title"),
+        FieldPanel("bio"),
+        FieldPanel("photo"),
+        FieldPanel("photo_alt_text"),
+        FieldPanel("same_as"),
+    ]
+    translatable_fields: ClassVar[list[Any]] = [
+        SynchronizedField("name"),
+        SynchronizedField("slug"),
+        TranslatableField("job_title"),
+        TranslatableField("bio"),
+        SynchronizedField("photo"),
+        TranslatableField("photo_alt_text"),
+        SynchronizedField("same_as"),
+    ]
+
+    class Meta(TranslatableMixin.Meta):  # type: ignore[misc]
+        verbose_name = _("blog author")
+        verbose_name_plural = _("blog authors")
+        ordering: ClassVar[list[str]] = ["name"]
+        constraints: ClassVar[list[models.BaseConstraint]] = [
+            models.UniqueConstraint(
+                fields=["locale", "name"], name="cms_blog_author_name_per_locale"
+            ),
+            models.UniqueConstraint(
+                fields=["locale", "slug"], name="cms_blog_author_slug_per_locale"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self.slug:
+            self.slug = slugify(self.name)[:120]
+        super().save(*args, **kwargs)
+
+    def clean(self) -> None:
+        super().clean()
+        if self.photo_id is not None and not self.photo_alt_text.strip():
+            raise ValidationError({"photo_alt_text": _("Describe the photo.")})
+
+    def translated(self, field: str, locale_id: int) -> str:
+        """`field` (the bio or the job title) as shown in the language `locale_id`: empty when
+        this copy is of another language or the text is still the original's (a translation
+        copy keeps the source text until translated), never another language's text."""
+        value: str = getattr(self, field)
+        if not value or self.locale_id != locale_id:
+            return ""
+        original: BlogAuthor | None = (
+            BlogAuthor.objects.filter(translation_key=self.translation_key).order_by("pk").first()
+        )
+        if original is not None and original.pk != self.pk and getattr(original, field) == value:
+            return ""
+        return value
+
+    def profile_urls(self) -> list[str]:
+        return [str(block.value) for block in self.same_as]
+
+
+class BlogIndexPage(RoutablePageMixin, Page):  # type: ignore[misc]
+    """`/blog/` of one language: its live articles, newest first, a page of them at a time.
+
+    `author/<slug>/` is an author's page in this language: their bio and photo and their live
+    articles here, paginated the same way. An author without articles gets an empty list.
+    """
+
+    PER_PAGE = 12
+
+    intro = RichTextField(_("introduction"), features=RICH_TEXT_FEATURES, blank=True)
+
+    content_panels: ClassVar[list[Any]] = [*Page.content_panels, FieldPanel("intro")]
+    parent_page_types: ClassVar[list[str]] = ["cms.HomePage"]
+    subpage_types: ClassVar[list[str]] = ["cms.BlogPostPage"]
+    max_count_per_parent = 1
+    template = "cms/blog_index_page.html"
+
+    class Meta:
+        verbose_name = _("blog index")
+
+    def posts(self) -> Any:
+        return (
+            BlogPostPage.objects.child_of(self)
+            .live()
+            .public()
+            .select_related("author")
+            .order_by("-date", "-first_published_at", "-pk")
+        )
+
+    def author_named(self, slug: str) -> BlogAuthor:
+        """The author of this language with `slug`; else another language's (an article may
+        name an author not translated yet). Raises Http404 for none."""
+        authors = BlogAuthor.objects.filter(slug=slug).select_related("photo")
+        author: BlogAuthor | None = (
+            authors.filter(locale_id=self.locale_id).first() or authors.order_by("pk").first()
+        )
+        if author is None:
+            raise Http404
+        return author
+
+    def get_context(self, request: HttpRequest, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        context: dict[str, Any] = super().get_context(request, *args, **kwargs)
+        author: BlogAuthor | None = kwargs.get("author")
+        queryset = self.posts()
+        if author is not None:
+            # Any language's copy of the author: the articles point at the copy they were given.
+            queryset = queryset.filter(author__translation_key=author.translation_key)
+        context["author"] = author
+        if author is not None:
+            context["author_bio"] = author.translated("bio", self.locale_id)
+            context["author_job_title"] = author.translated("job_title", self.locale_id)
+            context["jsonld"] = engine.profile_page_jsonld(
+                url=self.author_url(author, request),
+                person=self.person(author, request),
+                language=self.locale.language_code,
+            )
+        paginator = Paginator(queryset, self.PER_PAGE)
+        try:
+            posts: PaginatorPage[Any] = paginator.page(request.GET.get("page", 1))
+        except (EmptyPage, PageNotAnInteger) as error:
+            raise Http404 from error
+        context["posts"] = posts
+        context["previous_url"] = (
+            f"?page={posts.previous_page_number()}" if posts.has_previous() else ""
+        )
+        context["next_url"] = f"?page={posts.next_page_number()}" if posts.has_next() else ""
+        context["blog"] = self
+        return context
+
+    def author_url(self, author: BlogAuthor, request: HttpRequest | None) -> str:
+        """The absolute URL of `author`'s page on this blog."""
+        base = self.get_full_url(request) or ""
+        return f"{base}{self.reverse_subpage('author', args=[author.slug])}"
+
+    def person(self, author: BlogAuthor, request: HttpRequest | None) -> dict[str, Any]:
+        """schema.org Person of `author` in this blog's language; its `@id` is the author page
+        URL plus `#person`, the same on the author page and on every article."""
+        url = self.author_url(author, request)
+        image = ""
+        if author.photo is not None:
+            image = urljoin(url, author.photo.get_rendition(AUTHOR_PHOTO_FILTER).url)
+        return engine.person_jsonld(
+            person_id=f"{url}#person",
+            name=author.name,
+            url=url,
+            image=image,
+            description=engine.plain_text(author.translated("bio", self.locale_id)),
+            same_as=author.profile_urls(),
+            job_title=author.translated("job_title", self.locale_id),
+        )
+
+    @path("author/<slug:slug>/", name="author")  # type: ignore[untyped-decorator]
+    def author_page(self, request: HttpRequest, slug: str) -> HttpResponse:
+        response: HttpResponse = self.render(
+            request, template="cms/blog_author_page.html", author=self.author_named(slug)
+        )
+        return response
+
+
+class BlogPostPage(Page):  # type: ignore[misc]
+    """An article: date, author, summary, main image and body (spec 10 §10.2)."""
+
+    date = models.DateField(
+        _("publication date"),
+        default=timezone.localdate,
+        help_text=_("Shown on the article; a migrated article keeps its original date."),
+    )
+    author = models.ForeignKey(
+        BlogAuthor,
+        verbose_name=_("author"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    summary = models.TextField(
+        _("summary"), max_length=300, blank=True, help_text=_("Shown on the blog index.")
+    )
+    image = models.ForeignKey(
+        get_image_model_string(),
+        verbose_name=_("main image"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    image_alt_text = models.CharField(
+        _("alt text"),
+        max_length=250,
+        blank=True,
+        help_text=_("Describes the main image for people who cannot see it."),
+    )
+    image_caption = models.CharField(_("caption"), max_length=250, blank=True)
+    body = StreamField(
+        [
+            ("paragraph", blocks.RichTextBlock(features=RICH_TEXT_FEATURES, label=_("Rich text"))),
+            ("figure", FigureBlock()),
+            ("gallery", GalleryBlock()),
+            ("cta", CallToActionBlock()),
+            ("faq", FaqBlock()),
+            ("featured", ArticleLinksBlock()),
+        ],
+        blank=True,
+        verbose_name=_("body"),
+    )
+
+    content_panels: ClassVar[list[Any]] = [
+        *Page.content_panels,
+        FieldPanel("date"),
+        FieldPanel("author"),
+        FieldPanel("summary"),
+        FieldPanel("image"),
+        FieldPanel("image_alt_text"),
+        FieldPanel("image_caption"),
+        FieldPanel("body"),
+    ]
+    override_translatable_fields: ClassVar[list[Any]] = [
+        SynchronizedField("image", overridable=True)
+    ]
+    parent_page_types: ClassVar[list[str]] = ["cms.BlogIndexPage"]
+    subpage_types: ClassVar[list[str]] = []
+    template = "cms/blog_post_page.html"
+
+    class Meta:
+        verbose_name = _("blog article")
+
+    def clean(self) -> None:
+        super().clean()
+        if self.image_id is not None and not self.image_alt_text.strip():
+            raise ValidationError({"image_alt_text": _("Describe the main image.")})
+
+    def get_context(self, request: HttpRequest, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        context: dict[str, Any] = super().get_context(request, *args, **kwargs)
+        parent = self.get_parent()
+        blog = parent.specific if parent is not None else None
+        context["blog"] = blog  # the byline's link
+        url = self.get_full_url(request) or ""
+        author_id = ""
+        if self.author is not None and isinstance(blog, BlogIndexPage) and self.author.slug:
+            author_id = f"{blog.author_url(self.author, request)}#person"
+        image = ""
+        if self.image is not None:
+            image = urljoin(url, self.image.get_rendition(ARTICLE_IMAGE_FILTER).url)
+        context["jsonld"] = engine.blog_posting_jsonld(
+            url=url,
+            headline=self.title,
+            date_published=self.date,
+            language=self.locale.language_code,
+            author_id=author_id,
+            author_name=self.author.name if self.author is not None else "",
+            description=self.summary,
+            image=image,
+        )
+        return context
+
+
+# --- Term and vendor landing pages (CMS.4)
+
+
+def _unique_in_locale(page: Page, model: type[Page], field: str, target_id: int) -> None:
+    """One landing page per term (or vendor) and language: a second one would never show."""
+    others = model.objects.filter(locale_id=page.locale_id, **{f"{field}_id": target_id})
+    if page.locale_id is not None and others.exclude(pk=page.pk).exists():
+        raise ValidationError({field: _("This language already has a landing page for it.")})
+
+
+class TermLandingPage(Page):  # type: ignore[misc]
+    """The editorial part of a taxonomy term's page (spec 10 §10.2).
+
+    A term page lives on its D-07 listing URL (`/{taxonomy}/{term}/`, CAT.8), so this page adds
+    no URL of its own: its intro, the term's products by category and its related articles show
+    on the listing's first unfiltered page (`services.listing_editorial`), under the listing's
+    canonical and hreflang. Its URL is the term URL in its language, which follows the term's
+    current URL (MIG.11); its place in the page tree answers one 301 there. The editor's preview
+    renders the editorial part with the term's newest products.
+    """
+
+    term = models.ForeignKey(
+        "catalog.Term",
+        verbose_name=_("term"),
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text=_("A term of a taxonomy with term pages."),
+    )
+    body = body_field(_("introduction"))
+    category_products = models.PositiveSmallIntegerField(
+        _("products per category"),
+        default=engine.LANDING_CATEGORY_DEFAULT,
+        validators=[MaxValueValidator(engine.LANDING_CATEGORY_MAX)],
+        help_text=_(
+            "The term's newest products shown for each category; 0 shows no category sections."
+        ),
+    )
+    related = StreamField(
+        [("page", PageCardBlock())], blank=True, verbose_name=_("related articles")
+    )
+
+    content_panels: ClassVar[list[Any]] = [
+        *Page.content_panels,
+        FieldPanel("term", widget=term_chooser.widget_class),
+        FieldPanel("body"),
+        FieldPanel("category_products"),
+        FieldPanel("related"),
+    ]
+    parent_page_types: ClassVar[list[str]] = ["cms.HomePage", "cms.StandardPage"]
+    subpage_types: ClassVar[list[str]] = []
+    template = "cms/term_landing_page.html"
+
+    class Meta:
+        verbose_name = _("term landing page")
+
+    def clean(self) -> None:
+        super().clean()
+        term = self.term
+        if term is None:
+            return  # the field's own "required" error
+        if not term.taxonomy.has_landing:
+            raise ValidationError({"term": _("This term's taxonomy has no term pages.")})
+        _unique_in_locale(self, TermLandingPage, "term", term.pk)
+
+    def listing_path(self) -> str | None:
+        """The term page's path in this page's language; None when the term has none."""
+        from .services import term_listing_path  # services import the models
+
+        if self.term is None:
+            return None
+        return term_listing_path(self.term, self.locale.language_code)
+
+    def get_url_parts(self, request: HttpRequest | None = None) -> Any:
+        parts = super().get_url_parts(request)
+        path = self.listing_path() if parts is not None else None
+        if parts is None or path is None:
+            return None
+        site_id, root_url, _page_path = parts
+        return site_id, root_url, path
+
+    def get_sitemap_urls(self, request: HttpRequest | None = None) -> list[dict[str, Any]]:
+        return []  # the term page is listed once, as a catalog listing
+
+    def serve(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
+        path = self.listing_path()
+        if path is None:
+            raise Http404("This term has no page.")
+        return HttpResponsePermanentRedirect(path)
+
+    def serve_preview(self, request: HttpRequest, mode_name: str) -> HttpResponseBase:
+        # As Wagtail's own serve_preview does; Django's HttpRequest does not declare them.
+        request.is_preview = True  # type: ignore[attr-defined]
+        request.preview_mode = mode_name  # type: ignore[attr-defined]
+        response: HttpResponseBase = super().serve(request)  # render, never redirect
+        return response
+
+    def get_context(self, request: HttpRequest, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        from .services import term_landing_preview
+
+        context: dict[str, Any] = super().get_context(request, *args, **kwargs)
+        context.update(term_landing_preview(self, request))
+        return context
+
+
+class VendorLandingPageQuerySet(PageQuerySet, VendorScopedQuerySet["VendorLandingPage"]):  # type: ignore[misc]
+    """Wagtail's page queryset with the CORE.3 vendor scoping."""
+
+
+class VendorLandingPageManager(PageManager, VendorScopedManager["VendorLandingPage"]):  # type: ignore[misc]
+    """A `PageManager` (Wagtail requires it) that is also the CORE.3 scoped manager."""
+
+    _queryset_class = VendorLandingPageQuerySet
+
+
+class VendorLandingPage(Page):  # type: ignore[misc]
+    """A vendor's story beyond its storefront: heritage, workshop, images and its featured
+    products (spec 10 §10.2), linked from the storefront. Shown only while the vendor is
+    active: otherwise it has no URL and answers 404. Vendor-owned data (CORE.3 scoping).
+    """
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorLandingPageManager()
+
+    # The id the vendor area and the API show (like BaseModel's); each translation has its own,
+    # so a copy for translation gets a new one.
+    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+
+    vendor = models.ForeignKey(
+        "vendors.Vendor",
+        verbose_name=_("vendor"),
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    body = body_field(_("story"), products=True)
+    featured_products = models.PositiveSmallIntegerField(
+        _("featured products"),
+        default=engine.PRODUCT_GRID_DEFAULT,
+        validators=[MaxValueValidator(engine.PRODUCT_GRID_MAX)],
+        help_text=_("The vendor's newest products shown after the story; 0 shows none."),
+    )
+
+    content_panels: ClassVar[list[Any]] = [
+        *Page.content_panels,
+        FieldPanel("vendor", widget=vendor_chooser.widget_class),
+        FieldPanel("body"),
+        FieldPanel("featured_products"),
+    ]
+    parent_page_types: ClassVar[list[str]] = ["cms.HomePage", "cms.StandardPage"]
+    subpage_types: ClassVar[list[str]] = []
+    exclude_fields_in_copy: ClassVar[list[str]] = ["public_id"]
+    template = "cms/vendor_landing_page.html"
+
+    class Meta:
+        verbose_name = _("vendor landing page")
+
+    def clean(self) -> None:
+        super().clean()
+        vendor = self.vendor
+        if vendor is None:
+            return  # the field's own "required" error
+        if not has_public_storefront(vendor):
+            raise ValidationError({"vendor": _("Choose an active vendor.")})
+        _unique_in_locale(self, VendorLandingPage, "vendor", vendor.pk)
+
+    def is_public(self) -> bool:
+        return self.vendor is not None and has_public_storefront(self.vendor)
+
+    def get_url_parts(self, request: HttpRequest | None = None) -> Any:
+        return super().get_url_parts(request) if self.is_public() else None
+
+    def serve(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
+        if not self.is_public():
+            raise Http404("This vendor has no public page.")
+        response: HttpResponseBase = super().serve(request, *args, **kwargs)
+        return response
+
+    def get_context(self, request: HttpRequest, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        from .services import vendor_landing_context
+
+        context: dict[str, Any] = super().get_context(request, *args, **kwargs)
+        context.update(vendor_landing_context(self, request))
         return context

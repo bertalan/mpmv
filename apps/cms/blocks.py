@@ -20,6 +20,10 @@ zone and stored in UTC, `engine.countdown_state` decides between the countdown a
 state, and its links default to the chosen product or category. The theme component renders
 it; the theme's `countdown.js` module adds the live counter.
 
+The blog's "featured links" (CMS.3, `ArticleLinksBlock`) also take product cards: a published
+product of an active vendor, linked to its page in the reader's language (or in the language of
+the text it shows). Other bodies keep the page, term and vendor cards.
+
 The product grid (CMS.10) shows the newest products of one category, term, brand or vendor with
 the CAT.8 listing query (`apps.catalog.services.product_grid`), as the base theme's product
 tiles (THM.4), and an optional "See all" link to that listing page, named after the listing for
@@ -286,6 +290,10 @@ class VendorCardValue(_CardValue):
     target_kind = "vendor"
 
 
+class ProductCardValue(_CardValue):
+    target_kind = "product"
+
+
 def _page_targets(pages: list[Page], language: str, request: Any) -> dict[int, _Target]:
     """Each page in `language` when that translation is live, else itself when it is live (the
     `live_page` rule): one query for all the translations."""
@@ -377,6 +385,16 @@ def _vendor_targets(vendors: list[Vendor], language: str) -> dict[int, _Target]:
     return targets
 
 
+def _product_targets(products: list[Any], language: str) -> dict[int, _Target]:
+    """Each listed product's title and page URL (spec 09 fallback for both): two queries."""
+    shown = list(listed_products().filter(pk__in={product.pk for product in products}))
+    targets: dict[int, _Target] = {}
+    for product, card in zip(shown, product_cards(shown, language), strict=True):
+        if card.url:
+            targets[product.pk] = _Target(card.title, card.url)
+    return targets
+
+
 def _card_targets(
     values: Iterable[_CardValue], language: str, request: Any
 ) -> dict[tuple[str, int], _Target]:
@@ -390,10 +408,20 @@ def _card_targets(
         "page": _page_targets(chosen["page"], language, request) if chosen["page"] else {},
         "term": _term_targets(chosen["term"], language) if chosen["term"] else {},
         "vendor": _vendor_targets(chosen["vendor"], language) if chosen["vendor"] else {},
+        "product": _product_targets(chosen["product"], language) if chosen["product"] else {},
     }
     return {
         (kind, pk): target for kind, targets in resolved.items() for pk, target in targets.items()
     }
+
+
+def public_cards(values: Iterable[_CardValue], language: str, request: Any) -> list[Card]:
+    """The cards of `values` whose target is public, in order (a landing page's related
+    articles, CMS.4)."""
+    values = list(values)
+    targets = _card_targets(values, language, request)
+    cards = (value.card(targets) for value in values)
+    return [card for card in cards if card is not None]
 
 
 class TermChooserBlock(term_chooser.get_block_class("_TermChooserBlock", __name__)):  # type: ignore[misc]
@@ -408,6 +436,10 @@ class VendorChooserBlock(vendor_chooser.get_block_class("_VendorChooserBlock", _
         if value is not None and not has_public_storefront(value):
             raise ValidationError(_("Choose an active vendor."))
         return value
+
+
+class ProductChooserBlock(product_chooser.get_block_class("_ProductChooserBlock", __name__)):  # type: ignore[misc]
+    """A published product of an active vendor, chosen in the product chooser modal."""
 
 
 def _card_label() -> blocks.CharBlock:
@@ -459,6 +491,19 @@ class VendorCardBlock(blocks.StructBlock):  # type: ignore[misc]
         value_class = VendorCardValue
 
 
+class ProductCardBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A card to a product page (CMS.3), with its title in the reader's language."""
+
+    product = ProductChooserBlock()
+    label = _card_label()
+    text = _card_text()
+
+    class Meta:
+        icon = "pick"
+        label = _("Product")
+        value_class = ProductCardValue
+
+
 class FeaturedLinksBlock(blocks.StructBlock):  # type: ignore[misc]
     """A heading and cards to pages, terms and vendors; left out when no card is public."""
 
@@ -482,6 +527,26 @@ class FeaturedLinksBlock(blocks.StructBlock):  # type: ignore[misc]
         cards = (card_value.card(targets) for card_value in values)
         context["cards"] = [card for card in cards if card is not None]
         return context
+
+
+class ArticleLinksBlock(FeaturedLinksBlock):
+    """The blog's featured links (CMS.3): cards to pages, terms, vendors and products."""
+
+    cards = blocks.StreamBlock(
+        [
+            ("page", PageCardBlock()),
+            ("term", TermCardBlock()),
+            ("vendor", VendorCardBlock()),
+            ("product", ProductCardBlock()),
+        ],
+        min_num=1,
+        label=_("Cards"),
+    )
+
+    class Meta:
+        icon = "list-ul"
+        label = _("Featured links")
+        template = "cms/blocks/featured.html"
 
 
 # --- Product grid (CMS.10)
@@ -577,12 +642,6 @@ class OperatorDateTimeBlock(blocks.DateTimeBlock):  # type: ignore[misc]
         return OperatorDateTimeField(
             widget=AdminDateTimeInput(format=self.format), **self.field_options
         )
-
-
-class ProductChooserBlock(
-    product_chooser.get_block_class("_ProductChooserBlock", __name__)  # type: ignore[misc]
-):
-    """A product a visitor may see, chosen in the product chooser modal."""
 
 
 def _default_link(value: blocks.StructValue, language: str) -> str:

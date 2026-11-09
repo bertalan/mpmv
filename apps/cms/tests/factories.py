@@ -23,15 +23,21 @@ from factory.django import DjangoModelFactory
 from wagtail.models import Locale, Page
 
 from apps.cms.models import (
+    BlogAuthor,
+    BlogIndexPage,
+    BlogPostPage,
     HomePage,
     LegalPage,
     LegalPageReview,
     LegalPageVersion,
     NavigationMenu,
     StandardPage,
+    TermLandingPage,
+    VendorLandingPage,
     VendorRecruitmentPage,
 )
 from apps.core.i18n import configured_languages
+from apps.vendors.models import Vendor
 
 
 def _locale_without_home() -> Locale:
@@ -104,6 +110,55 @@ class StandardPageFactory(_InTree, DjangoModelFactory[StandardPage]):
     image = None
     image_alt_text = ""
     image_caption = ""
+
+    @classmethod
+    def _default_parent(cls) -> Page:
+        return _primary_home()
+
+
+class TermLandingPageFactory(_InTree, DjangoModelFactory[TermLandingPage]):
+    """A term landing page (CMS.4) under the primary language's home, for a new term of a
+    taxonomy with term pages unless `term` is given."""
+
+    class Meta:
+        model = TermLandingPage
+
+    title = factory.Sequence(lambda n: f"Term guide {n}")
+    slug = factory.LazyAttribute(lambda page: slugify(page.title))
+    parent = None
+    term = factory.SubFactory(
+        "apps.catalog.tests.factories.TermFactory",
+        taxonomy=factory.SubFactory(
+            "apps.catalog.tests.factories.TaxonomyFactory", has_landing=True
+        ),
+    )
+    body = factory.LazyFunction(lambda: [("paragraph", "<p>Sample intro.</p>")])
+
+    @classmethod
+    def _default_parent(cls) -> Page:
+        return _primary_home()
+
+
+class VendorLandingPageFactory(_InTree, DjangoModelFactory[VendorLandingPage]):
+    """A vendor landing page (CMS.4) under the primary language's home, for an active vendor
+    unless `vendor` is given. A page outlives its vendor's active status (a suspension), so the
+    factory makes one for a vendor in any status."""
+
+    class Meta:
+        model = VendorLandingPage
+
+    title = factory.Sequence(lambda n: f"Our story {n}")
+    slug = factory.LazyAttribute(lambda page: slugify(page.title))
+    parent = None
+    vendor = factory.SubFactory(
+        "apps.vendors.tests.factories.VendorFactory", status=Vendor.Status.ACTIVE
+    )
+    body = factory.LazyFunction(lambda: [("paragraph", "<p>Sample story.</p>")])
+
+    @classmethod
+    def _create(cls, model_class: type[Page], *args: Any, **kwargs: Any) -> Page:
+        with mock.patch("apps.cms.models.has_public_storefront", return_value=True):
+            return super()._create(model_class, *args, **kwargs)
 
     @classmethod
     def _default_parent(cls) -> Page:
@@ -241,3 +296,66 @@ class VendorRecruitmentPageFactory(_InTree, DjangoModelFactory[VendorRecruitment
     @classmethod
     def _default_parent(cls) -> Page:
         return _primary_home()
+
+
+class BlogAuthorFactory(DjangoModelFactory[BlogAuthor]):
+    """An author of the default language unless `locale` is given; the slug follows the name.
+    Translate one with `author.copy_for_translation(locale)`."""
+
+    class Meta:
+        model = BlogAuthor
+        django_get_or_create = ("name", "locale")
+
+    name = factory.Sequence(lambda n: f"Author {n}")
+    bio = "<p>Writes about the workshops.</p>"
+
+    @classmethod
+    def _create(cls, model_class: type[BlogAuthor], *args: Any, **kwargs: Any) -> Any:
+        kwargs.setdefault("locale", Locale.get_default())
+        return super()._create(model_class, *args, **kwargs)  # type: ignore[no-untyped-call]
+
+
+class BlogIndexPageFactory(_InTree, DjangoModelFactory[BlogIndexPage]):
+    """A language's blog (CMS.3), `/blog/` under its home: the primary language's first, then
+    the first language whose home has no blog yet (one blog per home)."""
+
+    class Meta:
+        model = BlogIndexPage
+
+    title = "Blog"
+    slug = "blog"
+    parent = None
+    intro = "<p>News from the workshops.</p>"
+
+    @classmethod
+    def _default_parent(cls) -> Page:
+        home = _primary_home()
+        if not BlogIndexPage.objects.child_of(home).exists():
+            return home
+        for other in HomePage.objects.exclude(pk=home.pk):
+            if not BlogIndexPage.objects.child_of(other).exists():
+                return other
+        return HomePageFactory.create()
+
+
+class BlogPostPageFactory(_InTree, DjangoModelFactory[BlogPostPage]):
+    """An article under `parent`, by default the primary language's blog (created if missing).
+    Pass `live=False` for a draft and publish it with `page.save_revision().publish()`."""
+
+    class Meta:
+        model = BlogPostPage
+
+    title = factory.Sequence(lambda n: f"Article {n}")
+    slug = factory.LazyAttribute(lambda page: slugify(page.title))
+    parent = None
+    date = dt.date(2026, 3, 1)
+    summary = "A short summary."
+    body = factory.LazyFunction(lambda: [("paragraph", "<p>Article text.</p>")])
+    image = None
+    image_alt_text = ""
+    image_caption = ""
+
+    @classmethod
+    def _default_parent(cls) -> Page:
+        blog: BlogIndexPage | None = BlogIndexPage.objects.child_of(_primary_home()).first()
+        return blog if blog is not None else BlogIndexPageFactory.create()
