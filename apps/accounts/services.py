@@ -1,10 +1,13 @@
 """Account services: business logic shared by views, API and commands."""
 
 import datetime as dt
+import hmac
+import logging
 import time
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Any
+from urllib.parse import urlencode
 
 import django_otp
 from django.conf import settings
@@ -16,6 +19,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Model
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.crypto import salted_hmac
 from django.utils.module_loading import import_string
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
@@ -37,6 +41,7 @@ from apps.core.throttling import BackoffPolicy, ThrottleState, ip_bucket
 
 from . import engine
 from .models import (
+    ActionLinkIssue,
     ActionLinkUse,
     PasskeyDevice,
     RecoveryCode,
@@ -677,11 +682,19 @@ def delete_group(group: Group, *, ctx: AuditContext, dry_run: bool = False) -> C
 # object version. The app that owns the object registers its purpose (`register_action_purpose`)
 # in its AppConfig.ready, so accounts never imports it. A GET only shows a "Continue" page; the
 # Continue POST spends the token's single sign-in use; the action page itself needs a step-up.
+# A link also carries its issue generation and a stamp of the recipient's password: issuing a
+# newer link for the same object and recipient, or a password change, revokes it.
 
 ACTION_LINK_SALT = "mpmv.accounts.action-link"
 ACTION_LINK_SIGNED_IN = "accounts.action_link.signed_in"
 ACTION_LINK_REFUSED = "accounts.action_link.refused"
 ACTION_LINK_SENT = "accounts.action_link.sent"
+# Refusals with no account to attach them to (a bad signature, a recipient that does not exist)
+# are logged here, not audited: anyone can send those, and the Continue POST is rate limited.
+ACTION_LINK_LOGGER = "mpmv.accounts.action_links"
+_log = logging.getLogger(ACTION_LINK_LOGGER)
+# The query parameter that tells the action page which version the link was issued for.
+ACTION_VERSION_PARAM = "version"
 ACTION_LINK_RATE_WINDOW = dt.timedelta(minutes=15)
 _ACTION_TOKEN_MAX_LENGTH = 2048
 
@@ -692,7 +705,10 @@ class ActionPurpose:
 
     - `version_of(object_key)`: the object's current version (None when it is gone); a link
       issued for another version is refused.
-    - `url_of(object_key)`: the path of the action page (which needs `step_up_required`).
+    - `url_of(object_key)`: the path of the action page (which needs `step_up_required`). A
+      usable link leads there with `?version=<the link's version>` (`ACTION_VERSION_PARAM`).
+      The page shows that version and puts it in its form; its approve or decline POST must
+      call `action_version_matches` and refuse the action when the object changed since.
     - `may_act(object_key, user)`: whether the recipient may still act on the object.
     - `max_age`: seconds a link stays valid; None for `settings.ACTION_LINK_MAX_AGE`.
     """
@@ -730,10 +746,12 @@ def _issue_action_claims(
     version: object,
     expires_in: int | None,
     now: float | None,
+    dry_run: bool = False,
 ) -> tuple[str, engine.ActionClaims]:
     registered = _ACTION_PURPOSES.get(purpose)
     if registered is None:
         raise ValueError(f"unknown action link purpose {purpose!r}")
+    generation = _next_generation(purpose, object_key, recipient, dry_run=dry_run)
     claims = engine.new_action_claims(
         purpose=purpose,
         object_key=object_key,
@@ -741,9 +759,41 @@ def _issue_action_claims(
         version=version,
         now=time.time() if now is None else now,
         max_age=expires_in or registered.max_age or settings.ACTION_LINK_MAX_AGE,
+        generation=generation,
+        stamp=_password_stamp(recipient),
     )
     payload = engine.action_claims_payload(claims)
     return signing.dumps(payload, salt=ACTION_LINK_SALT, compress=True), claims
+
+
+def _password_stamp(user: User) -> str:
+    """A keyed digest of the user's password hash: it changes with every password change, so a
+    link issued before a reset stops working. Keyed, so the token reveals nothing about it."""
+    return salted_hmac(
+        f"{ACTION_LINK_SALT}.password", user.password, algorithm="sha256"
+    ).hexdigest()[:32]
+
+
+def _next_generation(purpose: str, object_key: str, user: User, *, dry_run: bool) -> int:
+    """Count one more link for (purpose, object, user); the older links are then revoked."""
+    lookup: dict[str, Any] = {"purpose": purpose, "object_key": object_key, "user": user}
+    if dry_run:
+        current = ActionLinkIssue.objects.filter(**lookup).values_list("generation", flat=True)
+        return (current.first() or 0) + 1
+    with transaction.atomic():
+        # ON CONFLICT DO NOTHING: two concurrent first issues do not fail on the unique key.
+        ActionLinkIssue.objects.bulk_create([ActionLinkIssue(**lookup)], ignore_conflicts=True)
+        issue = ActionLinkIssue.objects.select_for_update().get(**lookup)
+        issue.generation += 1
+        issue.save(update_fields=["generation", "updated_at"])
+    return issue.generation
+
+
+def _current_generation(claims: engine.ActionClaims, user: User) -> int:
+    current = ActionLinkIssue.objects.filter(
+        purpose=claims.purpose, object_key=claims.object_key, user=user
+    ).values_list("generation", flat=True)
+    return current.first() or 0
 
 
 def issue_action_token(
@@ -758,7 +808,8 @@ def issue_action_token(
     """A signed token for `recipient` to act on `object_key` at `version` (CORE.15).
 
     It expires after `expires_in` seconds (default: the purpose's, then
-    `settings.ACTION_LINK_MAX_AGE`, 72 h). Raises ValueError for an unregistered purpose. The
+    `settings.ACTION_LINK_MAX_AGE`, 72 h). Issuing it revokes the links issued before for the
+    same purpose, object and recipient. Raises ValueError for an unregistered purpose. The
     token is a credential: never log it; email it with `send_action_link_email`.
     """
     token, _ = _issue_action_claims(
@@ -784,8 +835,28 @@ def _recipient(public_id: str) -> User | None:
         return None
 
 
+def action_version_matches(purpose: str, object_key: str, version: str | None) -> bool:
+    """Whether `version` is still the object's current version: the re-check an action page's
+    approve or decline POST makes, so a change after the link was opened is never acted on."""
+    registered = _ACTION_PURPOSES.get(purpose)
+    if registered is None or version is None:
+        return False
+    current = registered.version_of(object_key)
+    return current is not None and hmac.compare_digest(str(current).encode(), version.encode())
+
+
+def action_page_url(check: ActionLinkCheck) -> str:
+    """Where a usable link leads: its action page, told the version the link was issued for."""
+    if check.action_url is None or check.claims is None:
+        raise ValueError("only a usable link has an action page")
+    separator = "&" if "?" in check.action_url else "?"
+    query = urlencode({ACTION_VERSION_PARAM: check.claims.version})
+    return f"{check.action_url}{separator}{query}"
+
+
 def check_action_token(token: str, *, now: float | None = None) -> ActionLinkCheck:
-    """Check a token without using it: signature, purpose, expiry, version and recipient.
+    """Check a token without using it: signature, purpose, expiry, version, revocation and
+    recipient.
 
     Read-only, so safe for GET and HEAD. Single use is checked only when the token is redeemed.
     """
@@ -807,6 +878,8 @@ def check_action_token(token: str, *, now: float | None = None) -> ActionLinkChe
         claims,
         now=time.time() if now is None else now,
         current_version=None if version is None else str(version),
+        current_generation=None if user is None else _current_generation(claims, user),
+        current_stamp=None if user is None else _password_stamp(user),
     )
     if refusal is None and (user is None or not purpose.may_act(claims.object_key, user)):
         refusal = engine.WRONG_RECIPIENT
@@ -820,11 +893,16 @@ def _link_snapshot(claims: engine.ActionClaims) -> dict[str, str]:
 
 
 def _audit_refused_link(check: ActionLinkCheck, ctx: AuditContext) -> None:
+    """Audit a refusal against the recipient's account. With no account (a bad signature, a
+    recipient that does not exist) there is nothing to attach it to and anyone can send one, so
+    it is only logged, with the reason and never the token."""
+    if check.user is None:
+        _log.info("action link refused: %s", check.refusal, extra={"reason": check.refusal})
+        return
     after: dict[str, str] = {"reason": check.refusal or ""}
     if check.claims is not None:
         after |= {"purpose": check.claims.purpose, "object": check.claims.object_key}
-    key = str(check.user.public_id) if check.user is not None else UNKNOWN_ACCOUNT
-    record(ctx, ACTION_LINK_REFUSED, USER_MODEL, key, None, after)
+    record(ctx, ACTION_LINK_REFUSED, USER_MODEL, str(check.user.public_id), None, after)
 
 
 def _spend(check: ActionLinkCheck, ctx: AuditContext) -> ActionLinkCheck:
@@ -847,6 +925,10 @@ def _spend(check: ActionLinkCheck, ctx: AuditContext) -> ActionLinkCheck:
     return check
 
 
+def _is_staff(user: User) -> bool:
+    return bool(user.is_staff or user.is_superuser)
+
+
 def redeem_action_token(
     token: str, *, session_user: User | None, ctx: AuditContext, now: float | None = None
 ) -> ActionLinkCheck:
@@ -859,13 +941,19 @@ def redeem_action_token(
     - No session and no confirmed second factor: refused, nothing spent. The first factor can
       be enrolled without other proof (CORE.4), so a passwordless sign-in would let whoever
       holds only the mailbox bind their own authenticator, pass the step-up and approve.
+    - No session and a staff or superuser recipient: refused, nothing spent. Staff sign in with
+      their password and MFA, then continue (lane-a decision on the CORE.15 review).
 
-    Every refusal is audited (reason, purpose and object; never the token). The caller sends a
-    refused visitor to the normal login, then on to `action_url` when it is known.
+    Every refusal against a known account is audited (reason, purpose and object; never the
+    token); the others are only logged. The caller sends a refused visitor to the normal login,
+    then on to `action_url` when it is known.
     """
     check = check_action_token(token, now=now)
     if check.refusal is None:
-        if session_user is None and (check.user is None or not has_second_factor(check.user)):
+        recipient = check.user
+        if session_user is None and recipient is not None and _is_staff(recipient):
+            check = replace(check, refusal=engine.STAFF_RECIPIENT)
+        elif session_user is None and (recipient is None or not has_second_factor(recipient)):
             check = replace(check, refusal=engine.NO_SECOND_FACTOR)
         elif session_user is None:
             check = _spend(check, ctx)
@@ -901,8 +989,10 @@ def send_action_link_email(
     """Email `recipient` a secure action link through the ARC.16 outbox, in their language.
 
     The template gets `action_url` (absolute, on `settings.SITE_BASE_URL`) and
-    `action_link_expires_at` on top of `context`. The outbox stores the context encrypted; the
-    audit entry names the purpose, object and version, never the token.
+    `action_link_expires_at` on top of `context`. The new link revokes the ones emailed before
+    for the same purpose, object and recipient (not on a dry run). The outbox stores the
+    context encrypted; the audit entry names the purpose, object, version and generation, never
+    the token.
     """
     token, claims = _issue_action_claims(
         purpose=purpose,
@@ -911,6 +1001,7 @@ def send_action_link_email(
         version=version,
         expires_in=expires_in,
         now=None,
+        dry_run=dry_run,
     )
     values = {
         **context,
@@ -927,6 +1018,6 @@ def send_action_link_email(
             dry_run=dry_run,
         )
         if not dry_run and not changes.is_empty:
-            snapshot = _link_snapshot(claims)
+            snapshot = {**_link_snapshot(claims), "generation": str(claims.generation)}
             record(ctx, ACTION_LINK_SENT, USER_MODEL, str(recipient.public_id), None, snapshot)
     return changes

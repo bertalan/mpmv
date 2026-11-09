@@ -12,17 +12,23 @@ import threading
 import time
 from collections.abc import Iterator
 from typing import Any
-from urllib.parse import parse_qs, quote, urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from django.db import IntegrityError, connection, transaction
+from django.db.models import F
 from django.test import Client
 from django.urls import reverse
 from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.accounts import services
-from apps.accounts.models import ActionLinkUse, User
-from apps.accounts.tests.factories import ActionLinkUseFactory, TOTPDeviceFactory, UserFactory
+from apps.accounts.models import ActionLinkIssue, ActionLinkUse, User
+from apps.accounts.tests.factories import (
+    ActionLinkIssueFactory,
+    ActionLinkUseFactory,
+    TOTPDeviceFactory,
+    UserFactory,
+)
 from apps.accounts.tests.integration.urls import APPROVE_PURPOSE, APPROVED, DOCUMENTS, Document
 from apps.accounts.tests.mfa import totp_token, verified_login
 from apps.core.audit import AuditContext
@@ -456,7 +462,12 @@ def test_the_email_helper_queues_the_link_through_the_outbox(settings: SettingsW
     token = context["action_url"].removeprefix("https://shop.example.com/account/link/").strip("/")
     assert services.check_action_token(token).refusal is None
     entry = AuditLog.objects.get(action=services.ACTION_LINK_SENT)
-    assert entry.after == {"purpose": APPROVE_PURPOSE, "object": "doc-1", "version": "1"}
+    assert entry.after == {
+        "purpose": APPROVE_PURPOSE,
+        "object": "doc-1",
+        "version": "1",
+        "generation": "1",
+    }
     assert token not in json.dumps(entry.after)
 
 
@@ -521,6 +532,21 @@ def test_a_reissued_link_revokes_the_older_one(client: Client) -> None:
     assert signed_in_user(client) is None
     assert refusals()[0]["reason"] == "revoked"
     assert press_continue(Client(), second)["Location"] == action_page()
+
+
+def test_the_issue_record_is_unique_per_object_and_recipient() -> None:
+    issue = ActionLinkIssueFactory.create()
+    with pytest.raises(IntegrityError), transaction.atomic():
+        ActionLinkIssueFactory.create(
+            purpose=issue.purpose, object_key=issue.object_key, user=issue.user
+        )
+
+
+def test_a_link_whose_issue_record_moved_on_is_revoked() -> None:
+    user = UserFactory.create()
+    token = token_for(user, owned_document(user))
+    ActionLinkIssue.objects.filter(user=user).update(generation=F("generation") + 1)
+    assert services.check_action_token(token).refusal == "revoked"
 
 
 def test_a_reissue_revokes_only_links_to_the_same_object_and_recipient() -> None:
@@ -652,7 +678,7 @@ def test_two_concurrent_continue_posts_sign_in_exactly_once() -> None:
     for thread in threads:
         thread.join(timeout=30)
 
-    refused = f"{LOGIN_PATH}?next={quote(reverse('test-approve', args=['doc-1']), safe='')}"
+    refused = f"{LOGIN_PATH}?next={reverse('test-approve', args=['doc-1'])}"
     assert sorted(locations) == sorted([action_page(), refused])
     assert [signed_in_user(c) for c in clients].count(user.pk) == 1
     assert ActionLinkUse.objects.count() == 1

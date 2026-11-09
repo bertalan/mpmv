@@ -146,6 +146,7 @@ when a new mutating service has neither `dry_run` nor a place in this table (ARC
 | `apps.accounts.services.use_recovery_code` | one-time code | Verifying a recovery code consumes it |
 | `apps.accounts.services.register_passkey` | one-time code | Stores a registration whose one-time WebAuthn challenge is already spent |
 | `apps.accounts.services.authenticate_passkey` | one-time code | Spends the one-time WebAuthn challenge and advances the signature counter |
+| `apps.accounts.services.issue_action_token` | one-time code | Issues a single-use link; recording its generation is what revokes the older links |
 | `apps.accounts.services.redeem_action_token` | one-time code | Spends the single sign-in use of a secure action link (CORE.15) |
 | `apps.api.services.authenticate` | telemetry | Records when an API key was last used |
 | `apps.cms.services.sync_locales` | migration hook | Post-migrate handler that adds the missing Wagtail locales |

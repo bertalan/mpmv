@@ -6,9 +6,12 @@
 - The Continue POST (CSRF, rate limited per IP) carries the token in its body, not its URL. It
   spends the token's single sign-in use and signs the recipient in without a password; the
   action page then asks for the MFA step-up before its own POST. A recipient with no confirmed
-  second factor gets no passwordless sign-in.
-- A refused link (expired, used, another user's, an old version, no second factor) leads to the
-  normal login, then to the same action page; the service audits the attempt.
+  second factor, and a staff or superuser recipient, gets no passwordless sign-in.
+- A usable link leads to the action page with the link's version (`?version=`); the page's own
+  POST re-checks it with `services.action_version_matches`.
+- A refused link (expired, used, revoked, another user's, an old version, no second factor, a
+  staff recipient) leads to the normal login, then to the same action page; the service audits
+  the attempt when it names a known account.
 
 Every response carries `Referrer-Policy: strict-origin` (a Referer is only ever the bare origin,
 never the path with the token) and is never cached, so the token does not leak to another site,
@@ -60,7 +63,7 @@ def open_link(request: HttpRequest, token: str) -> HttpResponse:
     if user is not None:
         check = services.check_action_token(token)
         if check.refusal is None and check.user == user and check.action_url:
-            return _private(HttpResponseRedirect(check.action_url))
+            return _private(HttpResponseRedirect(services.action_page_url(check)))
     return _private(render(request, "accounts/action_link/continue.html", {"token": token}))
 
 
@@ -80,4 +83,4 @@ def continue_link(request: HttpRequest) -> HttpResponse:
         return _private(redirect_to_login(check.action_url or "/", login_url))
     if session_user is None:
         login(request, check.user, backend=MAGIC_SIGN_IN_BACKEND)
-    return _private(HttpResponseRedirect(check.action_url))
+    return _private(HttpResponseRedirect(services.action_page_url(check)))
