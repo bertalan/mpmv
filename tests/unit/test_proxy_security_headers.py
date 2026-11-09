@@ -30,7 +30,7 @@ def public_media_block() -> str:
 def test_media_is_not_sniffed_and_runs_no_scripts() -> None:
     body = public_media_block()
     assert re.search(r"^\t\theader X-Content-Type-Options nosniff$", body, re.M)
-    csp = re.findall(r"^\t\theader(?: @svg)? Content-Security-Policy \"([^\"]*)\"$", body, re.M)
+    csp = re.findall(r"^\t\theader(?: @\w+)? Content-Security-Policy \"([^\"]*)\"$", body, re.M)
     assert csp
     for policy in csp:
         assert "default-src 'none'" in policy
@@ -61,6 +61,6 @@ def test_media_carries_the_transport_and_framing_headers() -> None:
     body = public_media_block()
     assert re.search(r"^\t\theader Strict-Transport-Security ", body, re.M)
     assert re.search(r"^\t\theader Referrer-Policy ", body, re.M)
-    csp = re.findall(r"^\t\theader(?: @svg)? Content-Security-Policy \"([^\"]*)\"$", body, re.M)
+    csp = re.findall(r"^\t\theader(?: @\w+)? Content-Security-Policy \"([^\"]*)\"$", body, re.M)
     assert csp
     assert all("frame-ancestors 'none'" in policy for policy in csp)
