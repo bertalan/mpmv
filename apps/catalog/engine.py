@@ -61,6 +61,12 @@ def sku_warnings(raw: str) -> list[str]:
     return warnings
 
 
+# A price column is MoneyField = DecimalField(12, 2): at most 10 digits before the point.
+MAX_PRICE = Decimal(10) ** 10
+# A stock column is IntegerField (PostgreSQL integer).
+MAX_STOCK = 2**31 - 1
+
+
 def to_price(value: object) -> Decimal:
     """An exact, non-negative amount with 2 decimals.
 
@@ -70,6 +76,8 @@ def to_price(value: object) -> Decimal:
     amount = to_decimal(value)
     if not amount.is_finite():
         raise ValueError(f"{value!r} is not a finite amount")
+    if abs(amount) >= MAX_PRICE:  # before quantize, which fails past the context precision
+        raise ValueError(f"{value!r} is too large for a price")
     if amount != amount.quantize(CENT):
         raise ValueError(f"{value!r} has more than 2 decimals")
     if amount < 0:

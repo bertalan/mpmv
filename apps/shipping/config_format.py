@@ -29,6 +29,10 @@ A JSON document:
 
 A CSV file holds the same rows, one per line, in the `CSV_COLUMNS` order; the `record` column
 says what a line is, and the first line after the header is the `format` record.
+A text cell that a spreadsheet would read as a formula (it starts with `=`, `+`, `-`, `@`, a tab
+or a carriage return, after any apostrophes) is written with one more leading apostrophe, which
+the reader removes again (SEC.5, OWASP "CSV injection"); plain numbers such as `-1.50` are left
+as they are.
 
 The weight bands a file gives for a method replace the method's stored bands; a method that gives
 none keeps them (`ParsedConfig.band_methods`). In JSON that is a method row without a `bands` key
@@ -40,6 +44,7 @@ the same rule (`ParsedConfig.treatment_methods`).
 import csv
 import io
 import json
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Final
@@ -370,7 +375,7 @@ def _parse_csv(text: str, parsed: ParsedConfig) -> ParsedConfig:
         if name not in CSV_COLUMNS:
             parsed.issue(FILE, name, f"Unknown column {name!r}.")
     lines = [
-        (f"line {reader.line_num}", dict(zip(header, cells, strict=False)))
+        (f"line {reader.line_num}", dict(zip(header, map(_unescape_formula, cells), strict=False)))
         for cells in reader
         if any(cell.strip() for cell in cells)
     ]
@@ -487,10 +492,19 @@ def _add_row(
                 parsed.issue(ref, name, "Must be a list of text values.")
         elif isinstance(value, list | dict):
             parsed.issue(ref, name, "Must be a single value, not a list or an object.")
+        if any(_unstorable(item) for item in (value if isinstance(value, list) else [value])):
+            parsed.issue(ref, name, "Contains a null or unpaired surrogate character.")
     scope = values.get("zone_scope")
     if record == METHOD and scope is not None and scope not in ZONE_SCOPES:
         parsed.issue(ref, "zone_scope", f"Must be one of {', '.join(ZONE_SCOPES)}.")
     parsed.rows.append(Row(record, ref, values, method))
+
+
+def _unstorable(value: Any) -> bool:
+    """Text PostgreSQL cannot store: a NUL or a lone surrogate (SEC.5)."""
+    return isinstance(value, str) and any(
+        char == "\x00" or "\ud800" <= char <= "\udfff" for char in value
+    )
 
 
 def _check_identities(parsed: ParsedConfig) -> None:
@@ -579,7 +593,24 @@ def dump_csv(document: Mapping[str, Any]) -> str:
 
 
 def _csv_line(record: str, values: Mapping[str, Any]) -> list[str]:
-    return [record, *(_csv_cell(values.get(name)) for name in CSV_COLUMNS[1:])]
+    cells = (_csv_cell(values.get(name)) for name in CSV_COLUMNS[1:])
+    return [record, *map(_escape_formula, cells)]
+
+
+# A cell a spreadsheet evaluates: a formula sign first, after any apostrophes we added.
+_FORMULA = re.compile(r"'*[=+\-@\t\r]")
+_ESCAPED_FORMULA = re.compile(r"'+[=+\-@\t\r]")
+_PLAIN_NUMBER = re.compile(r"-?\d+(\.\d+)?", re.ASCII)
+
+
+def _escape_formula(cell: str) -> str:
+    if _FORMULA.match(cell) and not _PLAIN_NUMBER.fullmatch(cell):
+        return "'" + cell
+    return cell
+
+
+def _unescape_formula(cell: str) -> str:
+    return cell[1:] if _ESCAPED_FORMULA.match(cell) else cell
 
 
 def _csv_cell(value: Any) -> str:

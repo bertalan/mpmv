@@ -877,6 +877,8 @@ def _product_errors(
             _add_error(errors, "variants", f"{variant.sku}: the weight override {weight_error}")
         if variant.stock_qty < 0:
             _add_error(errors, "variants", f"{variant.sku}: the stock cannot be negative.")
+        elif variant.stock_qty > engine.MAX_STOCK:
+            _add_error(errors, "variants", f"{variant.sku}: the stock is too large.")
 
     _sku_namespace_errors(errors, vendor, data)
     return errors
