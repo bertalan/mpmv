@@ -12,10 +12,12 @@ if [ "$#" -gt 0 ]; then shift; fi
 
 case "$role" in
   web)
+    # No control socket: unused, and its default path is under the read-only /app (ARC.23).
     exec gunicorn mpmv.wsgi:application \
       --bind "0.0.0.0:${MPMV_HTTP_PORT:-8000}" \
       --workers "${WEB_CONCURRENCY:-3}" \
       --worker-tmp-dir /dev/shm \
+      --no-control-socket \
       --access-logfile - \
       --logger-class mpmv.gunicorn_logging.RedactingLogger \
       --error-logfile - \

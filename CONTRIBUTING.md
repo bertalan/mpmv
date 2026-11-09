@@ -62,3 +62,8 @@ vendors. No credential-like literals: generate passwords and keys at runtime wit
 - Human line-by-line review for anything touching tax, payments, ledger, orders or security.
 - No secrets in code, fixtures or docs. Config comes from environment variables only.
 - Spec and ADRs are updated if behaviour or decisions changed.
+
+## Releases
+
+Tag only a green `main` commit by its full SHA; STAGE first, LIVE on the owner's go, no hand edits
+on servers. The rules are in [docs/dev/release.md](docs/dev/release.md).
