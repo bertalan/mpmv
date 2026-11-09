@@ -416,3 +416,9 @@ def test_the_lucide_notice_ships_with_the_sprite() -> None:
     data = tomllib.loads((RIDE / "LICENSES.toml").read_text(encoding="utf-8"))
     lucide = next(e for e in data["asset"] if e["name"] == "Lucide")
     assert "licenses/LUCIDE-LICENSE.txt" in lucide["files"]
+
+
+def test_the_dark_mode_primary_is_defined_and_measured(tokens: dict[str, str]) -> None:
+    """Spec 14 §14.12: `#0580FA` on `#121417` is 4.81:1. Dark mode itself is not wired yet."""
+    assert tokens["color.accent-dark"].upper() == "#0580FA"
+    assert round(contrast_ratio(tokens["color.accent-dark"], "#121417"), 2) == 4.81

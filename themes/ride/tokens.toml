@@ -8,6 +8,7 @@
 
 [color.brand]
 50 = "#EEF6FF"  # tint: primary text on it 4.77:1
+400 = "#0580FA"  # primary in dark mode (4.81:1 on #121417), not wired yet
 500 = "#046BD2"  # primary: text, link, UI colour and fill (white on it 5.20:1)
 700 = "#035AB1"  # primary hover (white on it 6.77:1)
 
@@ -55,6 +56,7 @@ border-control = "{color.gray.500}"
 accent = "{color.brand.500}"
 accent-hover = "{color.brand.700}"
 accent-tint = "{color.brand.50}"
+accent-dark = "{color.brand.400}"
 secondary = "{color.amber.400}"
 on-secondary = "{color.ink.950}"
 secondary-hover = "{color.amber.500}"
