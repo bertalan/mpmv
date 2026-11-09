@@ -30,8 +30,9 @@ def env_bool(name: str, default: bool = False) -> bool:
 
 
 def env_int(name: str, default: int) -> int:
-    raw = os.environ.get(name)
-    if raw is None:
+    """An integer; unset or empty means `default`."""
+    raw = os.environ.get(name, "")
+    if not raw.strip():
         return default
     try:
         return int(raw.strip())
@@ -40,8 +41,9 @@ def env_int(name: str, default: int) -> int:
 
 
 def env_float(name: str, default: float) -> float:
-    raw = os.environ.get(name)
-    if raw is None:
+    """A number; unset or empty means `default`."""
+    raw = os.environ.get(name, "")
+    if not raw.strip():
         return default
     try:
         return float(raw.strip())

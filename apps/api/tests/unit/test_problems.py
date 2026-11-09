@@ -1,6 +1,7 @@
 """CORE.7: RFC 9457 problem details, built without Django or the database."""
 
 import http
+import secrets
 
 import pytest
 
@@ -74,12 +75,14 @@ def test_problem_is_immutable() -> None:
 
 
 def test_validation_problem_keeps_location_message_and_type_only() -> None:
+    # A key-shaped input built at run time: no credential-like literal in the repository.
+    echoed = f"mpmv_{secrets.token_hex(4)}_should-never-be-echoed"
     errors = [
         {
             "loc": ["body", "payload", "quantity"],
             "msg": "Input should be greater than 0",
             "type": "greater_than",
-            "input": "mpmv_deadbeef_should-never-be-echoed",
+            "input": echoed,
             "ctx": {"gt": 0},
         }
     ]
@@ -93,6 +96,7 @@ def test_validation_problem_keeps_location_message_and_type_only() -> None:
             "type": "greater_than",
         }
     ]
+    assert echoed not in repr(body)
     assert "should-never-be-echoed" not in repr(body)
 
 

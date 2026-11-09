@@ -1,5 +1,6 @@
 """Environment helpers used by the settings modules."""
 
+import re
 import stat
 from pathlib import Path
 
@@ -178,13 +179,16 @@ def test_env_int_and_env_float_read_numbers_or_the_default(monkeypatch: pytest.M
     monkeypatch.delenv("MPMV_TEST_VALUE", raising=False)
     assert env_int("MPMV_TEST_VALUE", 7) == 7
     assert env_float("MPMV_TEST_VALUE", 1.5) == 1.5
+    monkeypatch.setenv("MPMV_TEST_VALUE", " ")  # empty in mpmv.env: the default
+    assert env_int("MPMV_TEST_VALUE", 7) == 7
+    assert env_float("MPMV_TEST_VALUE", 1.5) == 1.5
     monkeypatch.setenv("MPMV_TEST_VALUE", " 60_000_000 ")
     assert env_int("MPMV_TEST_VALUE", 7) == 60_000_000
     monkeypatch.setenv("MPMV_TEST_VALUE", "2.5")
     assert env_float("MPMV_TEST_VALUE", 1.5) == 2.5
 
 
-@pytest.mark.parametrize("raw", ["", "many", "1.5e"])
+@pytest.mark.parametrize("raw", ["many", "1.5e", "7 MB"])
 def test_env_int_and_env_float_refuse_what_is_not_a_number(
     monkeypatch: pytest.MonkeyPatch, raw: str
 ) -> None:
@@ -193,3 +197,21 @@ def test_env_int_and_env_float_refuse_what_is_not_a_number(
         env_int("MPMV_TEST_VALUE", 7)
     with pytest.raises(ImproperlyConfigured, match="MPMV_TEST_VALUE"):
         env_float("MPMV_TEST_VALUE", 1.5)
+
+
+# --- The server env template lists every variable the deployed settings read ------------------
+
+ROOT = Path(__file__).resolve().parents[2]
+DEPLOYED_SETTINGS = ("base.py", "live.py", "stage.py")
+
+
+def test_every_setting_read_from_the_environment_is_in_the_env_template() -> None:
+    """Coherence check 7: a variable missing from mpmv.env.example is forgotten on the server."""
+    read = set()
+    for name in DEPLOYED_SETTINGS:
+        text = (ROOT / "mpmv" / "settings" / name).read_text(encoding="utf-8")
+        read |= set(re.findall(r"env_\w+\(\s*\"(MPMV_[A-Z0-9_]+)\"", text))
+    template = (ROOT / "deploy" / "server" / "mpmv.env.example").read_text(encoding="utf-8")
+    listed = set(re.findall(r"^(MPMV_[A-Z0-9_]+)=", template, re.M))
+    assert read, "no MPMV_ variable found: the pattern is stale"
+    assert sorted(read - listed) == []
