@@ -416,8 +416,8 @@ OUTSIDE_VAT_TERRITORY: Final = "outside_vat_territory"
 
 # A territory with an ISO 3166-1 code of its own, written as the country of an address, is named
 # by that code alone: no postcode is needed, and a blank or wrong one cannot send the address to
-# mainland VAT (fail closed). Shipping special areas list the same codes (SHP.14). Saint-Martin
-# (MF) and Saint-Barthelemy (BL) are not in the spec's dataset yet.
+# mainland VAT (fail closed). Written as France, Saint-Martin (97150) and Saint-Barthelemy (97133)
+# are found by their postcode.
 TERRITORY_BY_ALIAS_COUNTRY: Final = {
     "AX": "FI-01",
     "GP": "FR-971",
@@ -425,6 +425,8 @@ TERRITORY_BY_ALIAS_COUNTRY: Final = {
     "GF": "FR-973",
     "RE": "FR-974",
     "YT": "FR-976",
+    "MF": "FR-MF",
+    "BL": "FR-BL",
 }
 
 # Postcode length (digits) of the countries with territories: a prefix pattern such as `35*`

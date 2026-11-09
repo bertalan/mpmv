@@ -19,6 +19,8 @@ EXPECTED = {
     "FR-973": ("FR", ["973*"]),
     "FR-974": ("FR", ["974*"]),
     "FR-976": ("FR", ["976*"]),
+    "FR-MF": ("FR", ["97150"]),
+    "FR-BL": ("FR", ["97133"]),
     "FI-01": ("FI", ["22*"]),
     "GR-69": ("GR", ["63086"]),
     "DE-HELGOLAND": ("DE", ["27498"]),
@@ -52,6 +54,10 @@ def test_northern_ireland_is_not_seeded_while_d02_is_open() -> None:
         ("GP", ""),
         ("RE", "00000"),
         ("AX", ""),
+        ("FR", "97150"),  # Saint-Martin
+        ("FR", "97133"),  # Saint-Barthelemy
+        ("MF", ""),
+        ("BL", "00000"),
         ("FR", "97600"),  # Mayotte
         ("GR", "63086"),
         ("DE", "27498"),

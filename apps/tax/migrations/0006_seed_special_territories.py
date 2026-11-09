@@ -11,10 +11,12 @@ rather than wrong ones, for the owner to review; staff extend them in the tax ad
 
 - Livigno 23041 and Campione d'Italia 22061 (IT).
 - Canary Islands 35* (Las Palmas) and 38* (Santa Cruz de Tenerife), Ceuta 51*, Melilla 52* (ES).
+- Saint-Martin 97150 and Saint-Barthelemy 97133 (FR): French overseas collectivities of
+  Article 349 TFEU, also written with the ISO countries MF and BL.
 - Guadeloupe 971*, Martinique 972*, French Guiana 973*, Reunion 974*, Mayotte 976* (FR): the
   first three digits are the INSEE department code.
 - Aland 22* (FI): 22xxx is used by Aland only. Addresses written with country AX count as FI
-  (`engine.TERRITORY_COUNTRY_ALIASES`).
+  (`engine.TERRITORY_BY_ALIAS_COUNTRY`).
 - Mount Athos 63086 (GR, Karyes), Heligoland 27498 and Buesingen am Hochrhein 78266 (DE).
 
 Northern Ireland (XI, `BT*`) is not seeded: its status is the open decision D-02.
@@ -45,6 +47,8 @@ SEED = [
     ("FR-973", "French Guiana", "FR", ["973*"]),
     ("FR-974", "Réunion", "FR", ["974*"]),
     ("FR-976", "Mayotte", "FR", ["976*"]),
+    ("FR-MF", "Saint-Martin", "FR", ["97150"]),
+    ("FR-BL", "Saint-Barthélemy", "FR", ["97133"]),
     ("FI-01", "Åland", "FI", ["22*"]),
     ("GR-69", "Mount Athos", "GR", ["63086"]),
     ("DE-HELGOLAND", "Heligoland", "DE", ["27498"]),

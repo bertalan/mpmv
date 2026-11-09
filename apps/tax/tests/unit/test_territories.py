@@ -11,6 +11,8 @@ RULES = [
     engine.territory_rule("XI", "GB", engine.SPECIAL, ["BT*"]),
     engine.territory_rule("FR-971", "FR", engine.OUTSIDE_VAT_AREA, ["971*"]),
     engine.territory_rule("FR-974", "FR", engine.OUTSIDE_VAT_AREA, ["974*"]),
+    engine.territory_rule("FR-MF", "FR", engine.OUTSIDE_VAT_AREA, ["97150"]),
+    engine.territory_rule("FR-BL", "FR", engine.OUTSIDE_VAT_AREA, ["97133"]),
     engine.territory_rule("PT-20", "PT", engine.OWN_RATES, ["9000..9499"]),
 ]
 
@@ -65,7 +67,16 @@ def test_only_the_outside_status_is_outside_the_vat_territory() -> None:
 
 @pytest.mark.parametrize(
     ("alias", "home"),
-    [("AX", "FI"), ("GP", "FR"), ("MQ", "FR"), ("GF", "FR"), ("RE", "FR"), ("YT", "FR")],
+    [
+        ("AX", "FI"),
+        ("GP", "FR"),
+        ("MQ", "FR"),
+        ("GF", "FR"),
+        ("RE", "FR"),
+        ("YT", "FR"),
+        ("MF", "FR"),
+        ("BL", "FR"),
+    ],
 )
 def test_a_territory_with_an_iso_code_of_its_own_is_part_of_its_country(
     alias: str, home: str
@@ -99,6 +110,10 @@ def test_an_unknown_status_is_refused() -> None:
         ("AX", "00100", "FI-01"),
         ("AX", "", "FI-01"),
         ("ax", " ", "FI-01"),
+        ("MF", "", "FR-MF"),
+        ("MF", "75001", "FR-MF"),
+        ("BL", "", "FR-BL"),
+        ("bl", "00000", "FR-BL"),
     ],
 )
 def test_an_alias_country_fails_closed_whatever_the_postcode(
@@ -122,6 +137,8 @@ def test_every_alias_names_a_territory_code() -> None:
         "GF": "FR-973",
         "RE": "FR-974",
         "YT": "FR-976",
+        "MF": "FR-MF",
+        "BL": "FR-BL",
     }
 
 
@@ -138,3 +155,15 @@ def test_every_alias_names_a_territory_code() -> None:
 )
 def test_a_prefix_never_matches_a_postcode_of_the_wrong_length(country: str, postcode: str) -> None:
     assert engine.find_territory(country, postcode, RULES) is None
+
+
+@pytest.mark.parametrize("postcode", ["97150", "97133"])
+def test_saint_martin_and_saint_barthelemy_are_outside_as_france_with_their_postcode(
+    postcode: str,
+) -> None:
+    # Both also fall under the 971* prefix of Guadeloupe: whichever rule matches first, the
+    # status is the same.
+    assert engine.find_territory("FR", postcode, RULES) is not None
+    assert engine.is_outside_vat_territory("FR", postcode, RULES) is True
+    only = [r for r in RULES if r.code in {"FR-MF", "FR-BL"}]
+    assert engine.is_outside_vat_territory("FR", postcode, only) is True
