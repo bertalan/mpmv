@@ -134,6 +134,33 @@ def llms_txt(lang) -> str                       # generated from vendors, brands
 def event_jsonld(page, lang) -> dict | None     # schema.org Event with Place, PostalAddress, GeoCoordinates (spec 15, EVT.10)
 ```
 
+### Structured data graph (SEO.7)
+
+Every public page carries ONE JSON-LD block (`<script type="application/ld+json">`) holding a
+schema.org `@graph`, built by one builder in the `seo` app (`page_graph(request, obj, lang)`).
+The per-type functions above return graph nodes, not separate scripts. Nodes have stable `@id`s
+(the canonical URL of the thing plus a fragment, for example `/it/shop/<vendor>/#organization`)
+and reference each other by `@id`, so one entity is described once per site and linked
+everywhere:
+
+- `Organization` for the platform operator (from `current_operator()`), with logo, legal name,
+  VAT ID and contact point; `WebSite` with a `SearchAction`; every page's `WebPage` (or the
+  subtype `CollectionPage`, `ProfilePage`, `ItemPage`, `AboutPage`), its `BreadcrumbList` and
+  primary image.
+- Vendors as `Organization` nodes on their storefront, used as `seller` in every `Offer`;
+  shared `MerchantReturnPolicy` and `OfferShippingDetails` nodes per vendor.
+- `Product` with `Offer` or `AggregateOffer` (variants), `brand`, `gtin`/`mpn`, ratings from
+  verified reviews only; listings and taxonomy pages as `CollectionPage` with an `ItemList`.
+- Blog: `BlogPosting` with `author` pointing to a `Person` node (`ProfilePage` on the author
+  page, CMS.3), `publisher` pointing to the operator `Organization`; events as `Event` (spec 15).
+- Language: `inLanguage` on every node, the text in the page language only, never a fallback in
+  another language; no node for content that is not published in that language.
+
+JSON-LD is the only format (no microdata or RDFa, which Google and other consumers do not need
+in addition). GraphQL is not used for SEO: search engines and AI crawlers read JSON-LD, sitemaps,
+feeds and `llms.txt`; machine clients use the REST API and the MCP server. A GraphQL API would
+add a second API surface (query cost limits, its own permission layer) for no current consumer.
+
 ### Feeds and Merchant
 
 ```python
@@ -207,6 +234,7 @@ with design tokens, template overrides, CSP-safe components and WCAG 2.2 AA rule
 | SEO.4 | Merchant API sync + Meta feed | P2 | 8 | SEO.3 | Daily delta report |
 | SEO.5 | Cookie consent + Consent Mode v2 + e-commerce events | P1 | 8 | ORD.5 | No tags fire before consent |
 | SEO.6 | Anonymous page cache, responsive renditions, CWV budget | P2 | 6 | THM.3 | LCP < 2.5 s on product page |
+| SEO.7 | Site-wide schema.org `@graph` (owner question 2026-11-09): one JSON-LD block per page from `seo.page_graph`, stable `@id` nodes for the operator `Organization`, `WebSite` + `SearchAction`, `WebPage` subtypes, `BreadcrumbList`, vendor `Organization` as `seller`, shared return and shipping nodes, `Product`/`Offer`/`AggregateOffer`, `CollectionPage` + `ItemList`, `BlogPosting` + `Person`/`ProfilePage`, `Event`; `inLanguage` and no cross-language fallback; SEO.1 and EVT.10 return nodes into it | P1 | 8 | SEO.1, CMS.3 | Each page type has a snapshot test of its graph; every `@id` reference resolves to a node in the same graph or a canonical URL; a schema check (types, required and recommended properties of the Google rich results for Product, Breadcrumb, Article, Event, ProfilePage) runs in CI; a page has exactly one JSON-LD script |
 | AI.1 | MCP server: auth, read tools (catalog, orders, quotes, simulations, reports) | P2 | 12 | CORE.7 | Tools usable from Claude Code with scopes |
 | AI.2 | Mutating MCP tools with dry-run, confirmation and audit | P2 | 10 | AI.1 | Every mutation has a diff and an audit entry |
 | AI.3 | Read-only public catalog API for agents | P3 | 6 | CAT.9 | Search by taxonomy term via API |
