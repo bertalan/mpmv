@@ -241,6 +241,9 @@ def _walk(
     patterns: Iterable[URLPattern | URLResolver], regex: str, route: str, namespace: str
 ) -> Iterable[Endpoint]:
     for pattern in patterns:
+        # `i18n_patterns` (LocalePrefixPattern) resolve in the language active at import time, so
+        # only the unprefixed, primary-language paths are walked: the other languages' prefixes
+        # route to the same views.
         full_regex = regex + pattern.pattern.regex.pattern.removeprefix("^")
         full_route = _join_route(route, str(pattern.pattern))
         if isinstance(pattern, URLResolver):
