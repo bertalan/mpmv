@@ -2,7 +2,7 @@
 
 ## 5.1 How it works today
 
-Plugin `legacy-vendor-tax-override` v2.4.1 (~2,100 lines) on top of the WooCommerce tax classes and the
+Plugin `legacy-vendor-tax-override` (~2,100 lines) on top of the WooCommerce tax classes and the
 WPFactory EU VAT plugin (VIES validation).
 
 | PHP class | Role |
