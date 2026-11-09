@@ -236,7 +236,10 @@ echo "$headers"
 grep -qiE '^HTTP/[0-9.]+ 200' <<<"$headers" || fail "GET $media_url did not answer 200"
 grep -qix 'content-type: image/webp' <<<"$headers" || fail "media not served as image/webp"
 grep -qix 'x-content-type-options: nosniff' <<<"$headers" || fail "media without nosniff"
-grep -qix "content-security-policy: default-src 'none'; sandbox" <<<"$headers" || fail "media without the sandbox CSP"
+grep -qix "content-security-policy: default-src 'none'; frame-ancestors 'none'; sandbox" <<<"$headers" ||
+  fail "media without the sandbox CSP"
+grep -qi '^strict-transport-security: max-age=' <<<"$headers" || fail "media without HSTS"
+grep -qix 'x-frame-options: deny' <<<"$headers" || fail "media without X-Frame-Options"
 grep -qix 'x-robots-tag: noindex, nofollow' <<<"$headers" || fail "MPMV_NOINDEX did not add X-Robots-Tag"
 grep -qi '^cache-control: public' <<<"$headers" || fail "media without its Cache-Control"
 for listing in /media/ "$(dirname "$media_url")/"; do
@@ -250,6 +253,15 @@ podman exec mpmv-app sh -c 'mkdir -p /app/media/documents /app/media/images &&
   echo x > /app/media/documents/parity.pdf && echo x > /app/media/images/parity.html'
 expect_status /media/documents/parity.pdf 404
 expect_status /media/images/parity.html 404
+# Caddy's own responses carry the security headers too, and nothing names the server software
+# (SEC.5): the media 404 here, and a proxied page from gunicorn.
+for url in /media/documents/parity.pdf /; do
+  headers="$(curl_site -D - -o /dev/null "https://$site$url" | tr -d '\r')"
+  grep -qix 'x-content-type-options: nosniff' <<<"$headers" || fail "GET $url without nosniff"
+  grep -qi '^content-security-policy: ' <<<"$headers" || fail "GET $url without a CSP"
+  grep -qi '^strict-transport-security: max-age=' <<<"$headers" || fail "GET $url without HSTS"
+  ! grep -qiE '^(server|via):' <<<"$headers" || fail "GET $url names the server software"
+done
 podman exec mpmv-app rm /app/media/documents/parity.pdf /app/media/images/parity.html
 "$deployer" check || fail "mpmv-deploy check failed on a good release"
 "$deployer" doctor || fail "mpmv-deploy doctor failed on a good release"
