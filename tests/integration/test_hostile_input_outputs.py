@@ -82,7 +82,7 @@ def test_a_hostile_import_is_reported_per_row_or_stored(vendor: Vendor, value: s
 
 @pytest.mark.parametrize("formula", hi.CSV_FORMULAS)
 def test_a_stored_formula_is_exported_as_an_inert_cell(vendor: Vendor, formula: str) -> None:
-    document = _with(export_config(vendor), formula.strip() or formula)
+    document = _with(export_config(vendor), formula)
     other = VendorFactory.create()
     result = import_config(fmt.parse_json(document), vendor=other, ctx=CTX)
     if not result.ok:
@@ -183,7 +183,8 @@ def test_the_editor_keeps_only_the_allowed_rich_text_features(value: str) -> Non
 @pytest.mark.xfail(
     strict=True,
     reason="F1: rich text written outside the editor (import, seed, MIG.7) is rendered as "
-    "stored: no server-side sanitiser yet (owner: 'the same sanitiser as MIG.7')",
+    "stored: no server-side sanitiser yet (owner: 'the same sanitiser as MIG.7'); proposed "
+    "backlog row CMS.12 in PR #166 Follow-ups",
 )
 def test_stored_rich_text_is_sanitised_on_output() -> None:
     from wagtail.rich_text import expand_db_html
@@ -193,18 +194,25 @@ def test_stored_rich_text_is_sanitised_on_output() -> None:
 
 @pytest.mark.xfail(
     strict=True,
-    raises=AssertionError,
     reason="F2: the Draftail converter raises on stored HTML it did not write (an <img>), so "
-    "the editor of such a page fails; reachable only through non-editor writes",
+    "the editor of such a page fails; reachable only through non-editor writes; proposed "
+    "backlog row CMS.12 in PR #166 Follow-ups",
 )
 def test_the_editor_opens_rich_text_it_did_not_write() -> None:
-    ContentstateConverter(RICH_TEXT_FEATURES).from_database_format("<p><img src=x></p>")
+    contentstate = ContentstateConverter(RICH_TEXT_FEATURES).from_database_format(
+        "<p>before</p><p><img src=x></p><p>after</p>"
+    )
+
+    texts = [block["text"] for block in json.loads(contentstate)["blocks"]]
+    assert "before" in texts
+    assert "after" in texts
 
 
 @pytest.mark.xfail(
     strict=True,
     reason="F3: text is stored as typed, not NFC (owner: 'non-NFC forms (store NFC)'); "
-    "spec 03 normalises only the SKU match key (NFKC)",
+    "spec 03 normalises only the SKU match key (NFKC); proposed backlog row I18N.10 in "
+    "PR #166 Follow-ups",
 )
 def test_pasted_text_is_stored_in_nfc(vendor: Vendor) -> None:
     from apps.shipping.models import ShippingZone

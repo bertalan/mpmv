@@ -45,6 +45,7 @@ import csv
 import io
 import json
 import re
+import unicodedata
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Final
@@ -597,20 +598,29 @@ def _csv_line(record: str, values: Mapping[str, Any]) -> list[str]:
     return [record, *map(_escape_formula, cells)]
 
 
-# A cell a spreadsheet evaluates: a formula sign first, after any apostrophes we added.
-_FORMULA = re.compile(r"'*[=+\-@\t\r]")
-_ESCAPED_FORMULA = re.compile(r"'+[=+\-@\t\r]")
+# A cell a spreadsheet evaluates: a formula sign first, after any apostrophes we added. Tab and
+# CR count as signs; otherwise leading Unicode whitespace is skipped (spreadsheets trim it) and
+# the first significant character is NFKC-folded, so full-width signs (U+FF1D...) count too.
+_FORMULA_SIGNS = ("=", "+", "-", "@")
 _PLAIN_NUMBER = re.compile(r"-?\d+(\.\d+)?", re.ASCII)
 
 
+def _formula_like(cell: str) -> bool:
+    text = cell.lstrip("'")
+    if text.startswith(("\t", "\r")):
+        return True
+    text = text.lstrip()
+    return bool(text) and unicodedata.normalize("NFKC", text[0])[:1] in _FORMULA_SIGNS
+
+
 def _escape_formula(cell: str) -> str:
-    if _FORMULA.match(cell) and not _PLAIN_NUMBER.fullmatch(cell):
+    if _formula_like(cell) and not _PLAIN_NUMBER.fullmatch(cell):
         return "'" + cell
     return cell
 
 
 def _unescape_formula(cell: str) -> str:
-    return cell[1:] if _ESCAPED_FORMULA.match(cell) else cell
+    return cell[1:] if cell.startswith("'") and _formula_like(cell) else cell
 
 
 def _csv_cell(value: Any) -> str:

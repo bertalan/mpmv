@@ -10,40 +10,17 @@ cell, no CR/LF in an email header, no path in a stored filename.
   `at_and_over(n)` gives strings of exactly `n` and `n + 1` characters for every `max_length`.
 - `active_markup(html)` lists what would run in a browser (script, handler, `javascript:` URL);
   `formula_cell(cell)` tells whether a spreadsheet would read a CSV cell as a formula.
-- `PROFILES`: Hypothesis profiles. `ci` (modest example count, a deadline, no example database)
-  is the default; `HYPOTHESIS_PROFILE=dev` runs more examples locally.
+- The Hypothesis profiles (`ci` by default, `HYPOTHESIS_PROFILE=dev` locally) are registered and
+  loaded in the root `conftest.py`, so every `@given` test gets them.
 
 Only fake values: no credential-like literals (gitleaks runs on every PR).
 """
 
-import os
 import re
-from datetime import timedelta
+import unicodedata
 from typing import Final
 
-from hypothesis import HealthCheck, settings
 from hypothesis import strategies as st
-
-# --- Hypothesis profiles --------------------------------------------------------------------
-
-PROFILES: Final = {
-    "ci": settings(
-        max_examples=30,
-        deadline=timedelta(milliseconds=2000),
-        database=None,
-        derandomize=True,
-        suppress_health_check=[HealthCheck.function_scoped_fixture, HealthCheck.too_slow],
-    ),
-    "dev": settings(
-        max_examples=200,
-        deadline=timedelta(milliseconds=5000),
-        database=None,
-        suppress_health_check=[HealthCheck.function_scoped_fixture, HealthCheck.too_slow],
-    ),
-}
-for _name, _profile in PROFILES.items():
-    settings.register_profile(_name, _profile)
-settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "ci"))
 
 # --- Pasted code ----------------------------------------------------------------------------
 
@@ -270,6 +247,16 @@ CSV_FORMULAS: Final = (
     "\t=1+1",
     "\r=1+1",
     "=cmd|' /C calc'!A0",
+    # Leading blanks: some spreadsheets trim them and then see the sign.
+    " =1+1",
+    "\xa0=1+1",
+    "\n=1+1",
+    "\u3000=1+1",
+    # Full-width signs: CJK spreadsheet locales read them as formula signs.
+    "\uff1d1+1",
+    "\uff0b1+1",
+    "\uff0d1+1",
+    "\uff20SUM(A1:A2)",
 )
 
 HEADER_INJECTION: Final = (
@@ -411,8 +398,15 @@ FORMULA_STARTS: Final = ("=", "+", "-", "@", "\t", "\r")
 
 
 def formula_cell(cell: str) -> bool:
-    """True when a spreadsheet would evaluate `cell` (OWASP CSV injection)."""
-    return cell.startswith(FORMULA_STARTS)
+    """True when a spreadsheet would evaluate `cell` (OWASP CSV injection).
+
+    The first character counts after any leading Unicode whitespace, folded with NFKC, so a
+    blank before the sign or a full-width sign (U+FF1D and friends) is a formula too.
+    """
+    if cell.startswith(FORMULA_STARTS):
+        return True
+    significant = cell.lstrip()
+    return bool(significant) and unicodedata.normalize("NFKC", significant[0])[:1] in FORMULA_STARTS
 
 
 def header_safe(value: str) -> bool:

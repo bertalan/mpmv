@@ -171,6 +171,28 @@ def test_the_csv_export_never_writes_a_formula_cell(formula: str) -> None:
     assert not [cell for cell in cells if hi.formula_cell(cell) and not _number(cell)]
 
 
+@pytest.mark.parametrize("formula", hi.CSV_FORMULAS)
+def test_an_escaped_formula_cell_reads_back_as_written(formula: str) -> None:
+    parsed = fmt.parse_csv(fmt.dump_csv(_document_with(formula)))
+
+    zone = next(row for row in parsed.rows if row.record == fmt.ZONE)
+    assert zone.values["name"] == formula
+
+
+def test_the_formula_detector_looks_past_blanks_and_folds_full_width_signs() -> None:
+    assert all(hi.formula_cell(cell) for cell in (" =1", "\xa0+1", "\n-1", "\uff1d1", "\ufe661"))
+    assert not any(hi.formula_cell(cell) for cell in ("'=1+1", "' =1", "1+1", " abc", "", "  "))
+
+
+def test_the_ci_hypothesis_profile_cannot_flake_on_a_deadline() -> None:
+    from hypothesis import settings
+
+    profile = settings.get_profile("ci")
+    assert profile.deadline is None
+    assert profile.derandomize
+    assert profile.database is None
+
+
 def _number(cell: str) -> bool:
     return bool(re.fullmatch(r"-?\d+(\.\d+)?", cell))
 

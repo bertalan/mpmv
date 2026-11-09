@@ -12,9 +12,12 @@ from typing import Any
 
 import pytest
 from django.test import Client
+from django.urls import reverse
 from hypothesis import given
 from hypothesis import strategies as st
 
+from apps.accounts.tests.factories import UserFactory
+from apps.accounts.tests.mfa import password_login
 from apps.api.tests.factories import ApiClientFactory
 from apps.catalog.models import Attribute
 from apps.catalog.tests.factories import clothing_attributes
@@ -159,6 +162,20 @@ def test_malformed_or_nested_json_bodies_are_refused(
 ) -> None:
     response = _post(client, body.encode("utf-8", "surrogatepass"), headers)
     assert response.status_code in REFUSED, response.content[:300]
+
+
+@pytest.mark.parametrize("view", ["mfa:passkey_register", "mfa:passkey_auth"])
+@pytest.mark.parametrize("body", hi.JSON_TEXT, ids=range(len(hi.JSON_TEXT)))
+def test_the_passkey_endpoints_refuse_malformed_or_nested_json(
+    view: str, body: str, client: Client
+) -> None:
+    password_login(client, UserFactory.create(staff=True))
+
+    response = client.post(
+        reverse(view), body.encode("utf-8", "surrogatepass"), content_type="application/json"
+    )
+
+    assert response.status_code == 400, response.content[:300]
 
 
 @given(
