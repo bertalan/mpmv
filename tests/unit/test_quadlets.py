@@ -189,7 +189,13 @@ def caddy_sites() -> list[str]:
 
 def test_caddy_serves_only_the_configured_site_name() -> None:
     """ARC.13: the host name comes from the environment; any other name or an IP gets no site."""
-    assert caddy_sites() == ["", "{$MPMV_SITE_ADDRESS}", "http://"]
+    assert caddy_sites() == [
+        "",
+        "(security_headers)",
+        "{$MPMV_SITE_ADDRESS}",
+        "http://{$MPMV_SITE_ADDRESS}",
+        "http://",
+    ]
     text = CADDYFILE.read_text()
     assert re.search(r"^http:// \{\n\tabort\n\}$", text, re.M), "catch-all must serve nothing"
     assert re.search(r"^\t\tstrict_sni_host on$", text, re.M)
