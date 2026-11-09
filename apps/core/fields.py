@@ -190,6 +190,7 @@ def image_limits() -> ImageLimits:
         max_pixels=settings.WAGTAILIMAGES_MAX_IMAGE_PIXELS,
         max_side=settings.MPMV_MAX_IMAGE_SIDE,
         max_frames=settings.MPMV_MAX_IMAGE_FRAMES,
+        max_stored_pixels=settings.MPMV_MAX_STORED_IMAGE_PIXELS,
     )
 
 

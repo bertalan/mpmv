@@ -26,7 +26,14 @@ from tests.upload_corpus import (
     name_cases,
 )
 
-LIMITS = ImageLimits(max_bytes=10 * 1024 * 1024, max_pixels=40_000_000, max_side=16_000)
+# The defaults decided for SEC.2 (lane-a on #164): 25 MB, 100 megapixels decoded (all frames),
+# 16000 px a side, originals stored within 40 megapixels.
+LIMITS = ImageLimits(
+    max_bytes=25 * 1024 * 1024,
+    max_pixels=100_000_000,
+    max_side=16_000,
+    max_stored_pixels=40_000_000,
+)
 MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
 
 
@@ -80,6 +87,54 @@ def test_the_caps_are_the_limits_given() -> None:
     with pytest.raises(UploadRefused) as refusal:
         sanitise_image(buffer.getvalue(), "wide.png", tiny)
     assert refusal.value.code == "too_large"
+
+
+def _png(size: tuple[int, int]) -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", size, (10, 120, 200)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+SMALL = ImageLimits(max_bytes=100_000, max_pixels=10_000, max_side=1000, max_stored_pixels=2_500)
+
+
+def test_an_original_over_the_stored_cap_is_downscaled_keeping_its_aspect_ratio() -> None:
+    """Accepted up to the decode cap, stored within the stored cap (lane-a decision on #164)."""
+    clean = sanitise_image(_png((100, 60)), "wide.png", SMALL)
+    assert (clean.width, clean.height) == (64, 38)  # 6000 px scaled by sqrt(2500 / 6000)
+    assert clean.width * clean.height <= SMALL.max_stored_pixels
+    with Image.open(io.BytesIO(clean.data)) as stored:
+        assert stored.size == (64, 38)
+
+
+def test_an_original_within_the_stored_cap_keeps_its_size() -> None:
+    clean = sanitise_image(_png((50, 50)), "square.png", SMALL)
+    assert (clean.width, clean.height) == (50, 50)
+
+
+def test_an_animation_over_the_stored_cap_is_downscaled_frame_by_frame() -> None:
+    frames = [Image.new("RGB", (40, 30), (80 * n, 0, 0)) for n in range(3)]
+    buffer = io.BytesIO()
+    frames[0].save(buffer, format="GIF", save_all=True, append_images=frames[1:], duration=80)
+    limits = ImageLimits(
+        max_bytes=100_000, max_pixels=10_000, max_side=1000, max_stored_pixels=1_200
+    )
+    clean = sanitise_image(buffer.getvalue(), "anim.gif", limits)
+    with Image.open(io.BytesIO(clean.data)) as stored:
+        assert getattr(stored, "n_frames", 1) == 3
+        assert stored.size == (clean.width, clean.height) == (23, 17)
+    assert clean.width * clean.height * 3 <= limits.max_stored_pixels
+
+
+def test_pillows_bomb_guard_follows_the_decode_cap(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pillow's own threshold (about 89 megapixels by default) must not refuse what the cap
+    accepts; above the cap the image is refused before Pillow's guard is reached."""
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 1_000)
+    clean = sanitise_image(_png((100, 60)), "wide.png", SMALL)
+    assert (clean.width, clean.height) == (64, 38)
+    with pytest.raises(UploadRefused) as refusal:
+        sanitise_image(_png((200, 60)), "wide.png", SMALL)
+    assert refusal.value.code == "too_many_pixels"
 
 
 def test_an_animation_keeps_its_frames_and_a_png_its_transparency() -> None:

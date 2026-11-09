@@ -11,7 +11,8 @@ stored safely; "safely" means (see `assert_safe_image`):
 - its format matches its extension, and its pixels are within the caps.
 
 Image cases come from `image_cases()`, file-name cases from `name_cases()`, document cases from
-`document_cases()`. Generating them takes well under a second; the largest file is a few KB.
+`document_cases()`. Generating them takes about a second; the largest file is about 60 KB (the
+60-megapixel PNG, all zeros).
 """
 
 import functools
@@ -155,6 +156,11 @@ def _animated_gif(frames: int, size: tuple[int, int]) -> bytes:
     return buffer.getvalue()
 
 
+def _on_screen(gif: bytes, size: tuple[int, int]) -> bytes:
+    """`gif` with its logical screen set to `size`: what Pillow reports as the image size."""
+    return gif[:6] + struct.pack("<HH", *size) + gif[10:]
+
+
 def _mpo_photo() -> bytes:
     """A multi-picture JPEG (MPO), as some phones and cameras write: two images and an MP index."""
     first = Image.new("RGB", (24, 16), (200, 40, 40))
@@ -278,10 +284,27 @@ def _image_cases() -> tuple[Case, ...]:
         Case(
             "deeply-compressed-png",
             "bomb.png",
-            _raw_png(8000, 8000, _zeros_compressed(8000 * 1001, 1001), depth=1),
+            _raw_png(12_000, 10_000, _zeros_compressed(10_000 * 1501, 1501), depth=1),
             "refuse",
-            "valid 1-bit PNG: 64 megapixels from about 8 KB of zlib",
+            "valid 1-bit PNG: 120 megapixels from about 15 KB of zlib",
             tags=frozenset({"bomb"}),
+        ),
+        Case(
+            "png-101-megapixels",
+            "poster.png",
+            _raw_png(10_100, 10_000, _zeros_compressed(10_000 * 1264, 1264), depth=1),
+            "refuse",
+            "101 megapixels: just over the decode cap, refused before decoding",
+            tags=frozenset({"bomb"}),
+        ),
+        Case(
+            "png-60-megapixels",
+            "poster.png",
+            _raw_png(10_000, 6_000, _zeros_compressed(6_000 * 10_001, 10_001)),
+            "store",
+            "60 megapixels: under the decode cap, downscaled to fit 40 megapixels, same aspect",
+            expect_size=(8164, 4898),
+            tags=frozenset({"downscale"}),
         ),
         Case(
             "too-wide",
@@ -294,9 +317,9 @@ def _image_cases() -> tuple[Case, ...]:
         Case(
             "gif-frame-bomb",
             "anim.gif",
-            _animated_gif(frames=12, size=(2000, 2000)),
+            _on_screen(_animated_gif(frames=26, size=(2, 2)), (2000, 2000)),
             "refuse",
-            "12 frames of 2000x2000: 48 megapixels in all",
+            "26 frames on a 2000x2000 screen: 104 megapixels in all",
             tags=frozenset({"bomb"}),
         ),
         Case(

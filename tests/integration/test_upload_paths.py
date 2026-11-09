@@ -39,6 +39,7 @@ from wagtail.utils.file import hash_filelike
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.api.v1.api import api
+from apps.core.fields import image_limits
 from apps.core.models import ImageLicence, MediaImage
 from apps.core.services import save_image
 from apps.core.tests.factories import MediaImageFactory
@@ -321,6 +322,17 @@ def test_every_document_upload_path_refuses_or_safely_stores_the_corpus(
 
 
 # --- Coverage of the paths ------------------------------------------------------------------
+
+
+def test_the_upload_caps_are_the_decided_defaults() -> None:
+    """Lane-a's decision on #164: 25 MB a file, 100 megapixels decoded (all frames), 16000 px a
+    side, originals stored within 40 megapixels; at most 300 frames."""
+    limits = image_limits()
+    assert limits.max_bytes == 25 * 1024 * 1024
+    assert limits.max_pixels == 100_000_000
+    assert limits.max_side == 16_000
+    assert limits.max_stored_pixels == 40_000_000
+    assert limits.max_frames == 300
 
 
 def test_every_stored_file_field_is_declared() -> None:

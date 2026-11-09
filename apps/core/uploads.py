@@ -11,7 +11,10 @@ Images:
 - the format comes from the content (Pillow, restricted to the accepted formats), never from the
   name, and the name's extension must agree with it;
 - the size, the number of frames, the pixels of all frames together and each side are capped
-  *before* decoding, and Pillow's decompression-bomb warning is an error;
+  *before* decoding, and Pillow's decompression-bomb warning is an error (its threshold follows
+  the pixel cap);
+- an original over the stored-pixel cap (all frames together) is downscaled while re-encoded,
+  keeping its aspect ratio, so the stored original fits that cap;
 - the original is re-encoded: whatever is not pixels (EXIF and GPS, XMP, comments, text chunks,
   bytes after the end of the image, a second format in a polyglot) is not copied. The EXIF
   orientation is applied to the pixels first, so a photo keeps its orientation. An ICC colour
@@ -28,6 +31,7 @@ no second format a browser or an unzip tool would find.
 """
 
 import io
+import math
 import re
 import unicodedata
 import warnings
@@ -66,10 +70,11 @@ FALLBACK_STEM = "image"
 
 @dataclass(frozen=True)
 class ImageLimits:
-    max_bytes: int
-    max_pixels: int  # all frames together
-    max_side: int
+    max_bytes: int  # settings.WAGTAILIMAGES_MAX_UPLOAD_SIZE
+    max_pixels: int  # decoded, all frames together; settings.WAGTAILIMAGES_MAX_IMAGE_PIXELS
+    max_side: int  # settings.MPMV_MAX_IMAGE_SIDE
     max_frames: int = 300  # settings.MPMV_MAX_IMAGE_FRAMES
+    max_stored_pixels: int = 40_000_000  # stored original; settings.MPMV_MAX_STORED_IMAGE_PIXELS
 
 
 @dataclass(frozen=True)
@@ -144,6 +149,11 @@ def _open(data: bytes, limits: ImageLimits) -> Image.Image:
         raise UploadRefused("empty", "The file is empty.")
     if len(data) > limits.max_bytes:
         raise UploadRefused("too_large", "The file is too large.")
+    # Pillow warns above MAX_IMAGE_PIXELS (about 89 megapixels by default); the warning stays an
+    # error, so its threshold must not be below the cap or it would refuse what the cap accepts.
+    # Only ever raised: the same value for every upload of a process.
+    if Image.MAX_IMAGE_PIXELS is not None and limits.max_pixels > Image.MAX_IMAGE_PIXELS:
+        Image.MAX_IMAGE_PIXELS = limits.max_pixels
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
@@ -239,11 +249,30 @@ def _strip(image: Image.Image) -> Image.Image:
     return image
 
 
-def _encode(image: Image.Image, fmt: str, source: Image.Image, data: bytes) -> bytes:
+def stored_size(width: int, height: int, frames: int, max_pixels: int) -> tuple[int, int]:
+    """The frame size to store: as it is, or scaled down (same aspect) to fit `max_pixels`."""
+    if width * height * frames <= max_pixels:
+        return width, height
+    scale = math.sqrt(max_pixels / (width * height * frames))
+    new_width, new_height = max(1, int(width * scale)), max(1, int(height * scale))
+    while new_width * new_height * frames > max_pixels and min(new_width, new_height) > 1:
+        new_width, new_height = (
+            (new_width - 1, new_height) if new_width >= new_height else (new_width, new_height - 1)
+        )
+    return new_width, new_height
+
+
+def _fit(image: Image.Image, size: tuple[int, int]) -> Image.Image:
+    return image if image.size == size else image.resize(size, Image.Resampling.LANCZOS)
+
+
+def _encode(
+    image: Image.Image, fmt: str, source: Image.Image, data: bytes, size: tuple[int, int]
+) -> bytes:
     buffer = io.BytesIO()
     frames = getattr(source, "n_frames", 1)
     if frames > 1 and fmt in ANIMATED_FORMATS:
-        sequence = [_strip(frame.copy()) for frame in ImageSequence.Iterator(source)]
+        sequence = [_fit(_strip(frame.copy()), size) for frame in ImageSequence.Iterator(source)]
         durations = [frame.info.get("duration", 100) for frame in ImageSequence.Iterator(source)]
         sequence[0].save(
             buffer,
@@ -254,6 +283,7 @@ def _encode(image: Image.Image, fmt: str, source: Image.Image, data: bytes) -> b
             loop=source.info.get("loop", 0),
         )
         return buffer.getvalue()
+    image = _fit(image, size)
     params: dict[str, object] = {}
     if fmt == "JPEG":
         if (
@@ -282,16 +312,18 @@ def sanitise_image(
     fmt = check_image(data, name, limits, check_name=check_name)
     with Image.open(io.BytesIO(data), formats=[fmt]) as source:
         image: Image.Image
+        frames = 1
         if fmt in ANIMATED_FORMATS and getattr(source, "n_frames", 1) > 1:
             image = source  # animations keep their frames; EXIF orientation is a photo matter
+            frames = int(getattr(source, "n_frames", 1))
         else:
             source.load()  # the first frame: an MPO's other pictures are not kept
             image = _strip(ImageOps.exif_transpose(source) or source.copy())
+        width, height = stored_size(*image.size, frames, limits.max_stored_pixels)
         try:
-            encoded = _encode(image, fmt, source, data)
+            encoded = _encode(image, fmt, source, data, (width, height))
         except Exception as exc:  # e.g. a mode the format cannot write
             raise UploadRefused("invalid", "The image could not be processed.") from exc
-        width, height = image.size
     return CleanImage(
         data=encoded,
         name=safe_filename(name, IMAGE_FORMATS[fmt]),
