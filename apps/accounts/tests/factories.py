@@ -35,8 +35,6 @@ class UserFactory(DjangoModelFactory[User]):
     class Params:
         staff = factory.Trait(is_staff=True)
         superuser = factory.Trait(is_staff=True, is_superuser=True)
-        # `staff` is admin login only. Platform staff (spec 02, Q-34) hold the permission below.
-        platform_staff = factory.Trait(is_staff=True, permissions=["vendors.view_all_vendors"])
 
     email = factory.Sequence(lambda n: f"user{n}@example.com")
     full_name = factory.Faker("name")
@@ -59,6 +57,18 @@ class UserFactory(DjangoModelFactory[User]):
             obj.user_permissions.add(
                 Permission.objects.get(content_type__app_label=app_label, codename=codename)
             )
+
+    @factory.post_generation
+    def platform_staff(obj: User, create: bool, extracted: bool | None, **kwargs: Any) -> None:
+        """`platform_staff=True`: admin login plus `vendors.view_all_vendors` (spec 02, Q-34).
+
+        Plain `staff=True` is Wagtail/Django admin login only and sees no vendor's data.
+        """
+        if not create or not extracted:
+            return
+        obj.is_staff = True
+        obj.save(update_fields=["is_staff"])
+        obj.user_permissions.add(Permission.objects.get(codename="view_all_vendors"))
 
 
 class TOTPDeviceFactory(DjangoModelFactory[TOTPDevice]):

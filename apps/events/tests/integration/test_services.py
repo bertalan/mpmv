@@ -243,7 +243,7 @@ def test_a_vendor_event_links_only_its_own_products(owner: User) -> None:
 
 
 def test_a_platform_event_may_link_any_product() -> None:
-    staff = UserFactory.create(staff=True)
+    staff = UserFactory.create(platform_staff=True)
     product = ProductFactory.create()
     page = _create(staff, products=[product.pk])
     assert page.vendor is None
@@ -374,7 +374,7 @@ def _approve_events(owner: User, moderator: User, count: int) -> None:
 
 def test_regression_3_a_higher_threshold_reviews_again(owner: User, moderator: User) -> None:
     _approve_events(owner, moderator, 3)
-    staff = UserFactory.create(staff=True)
+    staff = UserFactory.create(platform_staff=True)
     site = Site.objects.get(is_default_site=True)
     audits = AuditLog.objects.count()
     set_event_settings(staff, site, moderation_threshold=5)
@@ -390,7 +390,7 @@ def test_regression_3_a_higher_threshold_reviews_again(owner: User, moderator: U
 
 
 def test_regression_3_always_review_and_trusted(moderator: User) -> None:
-    staff = UserFactory.create(staff=True)
+    staff = UserFactory.create(platform_staff=True)
     reviewed, trusted = _owner(), _owner()
     _approve_events(reviewed, moderator, 3)
     set_vendor_policy(staff, _vendor_of(reviewed), VendorEventPolicy.Mode.ALWAYS_REVIEW)
@@ -406,7 +406,7 @@ def test_regression_3_always_review_and_trusted(moderator: User) -> None:
 
 
 def test_regression_3_staff_and_platform_events_are_never_reviewed() -> None:
-    staff = UserFactory.create(staff=True)
+    staff = UserFactory.create(platform_staff=True)
     platform = _create(staff, title="Platform event")
     submit_event(staff, platform)
     assert _fresh(platform).status == EventPage.Status.PUBLISHED
@@ -441,7 +441,7 @@ def test_reading_the_threshold_writes_no_settings_row(owner: User) -> None:
 
 
 def test_set_vendor_policy_is_audited_and_staff_only(owner: User) -> None:
-    staff = UserFactory.create(staff=True)
+    staff = UserFactory.create(platform_staff=True)
     vendor = _vendor_of(owner)
     with pytest.raises(PermissionDenied):
         set_vendor_policy(owner, vendor, VendorEventPolicy.Mode.TRUSTED)
@@ -561,7 +561,7 @@ def test_submit_writes_one_audit_entry_and_dry_run_none(owner: User) -> None:
 
 def _published(owner: User) -> EventPage:
     services.set_vendor_policy(
-        UserFactory.create(staff=True), _vendor_of(owner), VendorEventPolicy.Mode.TRUSTED
+        UserFactory.create(platform_staff=True), _vendor_of(owner), VendorEventPolicy.Mode.TRUSTED
     )
     page = _create(owner)
     submit_event(owner, page)
@@ -603,7 +603,7 @@ def test_a_body_only_change_keeps_the_sequence(owner: User) -> None:
 
 
 def test_a_hide_without_a_reason_is_refused(owner: User) -> None:
-    staff = UserFactory.create(staff=True)
+    staff = UserFactory.create(platform_staff=True)
     page = _published(owner)
     for reason in ("", "   "):
         with pytest.raises(ValidationError) as excinfo:
@@ -619,7 +619,7 @@ def test_only_staff_hide_events(owner: User) -> None:
 
 
 def test_hiding_unpublishes_and_records_the_reason(owner: User) -> None:
-    staff = UserFactory.create(staff=True)
+    staff = UserFactory.create(platform_staff=True)
     page = _published(owner)
     audits = _audits()
     hide_event(staff, page, "Misleading offer", dsa_notice_ref="N-1")
@@ -634,7 +634,7 @@ def test_hiding_unpublishes_and_records_the_reason(owner: User) -> None:
 
 
 def test_a_hide_dry_run_changes_nothing(owner: User) -> None:
-    staff = UserFactory.create(staff=True)
+    staff = UserFactory.create(platform_staff=True)
     page = _published(owner)
     audits = _audits()
     changes = hide_event(staff, page, "Misleading offer", dry_run=True)
@@ -645,7 +645,7 @@ def test_a_hide_dry_run_changes_nothing(owner: User) -> None:
 
 
 def test_a_hidden_page_cannot_be_resubmitted_by_the_vendor(owner: User) -> None:
-    staff = UserFactory.create(staff=True)
+    staff = UserFactory.create(platform_staff=True)
     page = _published(owner)
     hide_event(staff, page, "Misleading offer")
     with pytest.raises(EventRefused):
@@ -657,7 +657,7 @@ def test_a_hidden_page_cannot_be_resubmitted_by_the_vendor(owner: User) -> None:
 
 def test_a_vendor_edit_does_not_clear_the_hiding(owner: User) -> None:
     """Hiding lives on the page row: no revision carries it back or clears it."""
-    staff = UserFactory.create(staff=True)
+    staff = UserFactory.create(platform_staff=True)
     page = _published(owner)
     hide_event(staff, page, "Misleading offer")
     hidden = _fresh(page)
@@ -666,7 +666,7 @@ def test_a_vendor_edit_does_not_clear_the_hiding(owner: User) -> None:
 
 
 def test_restore_republishes_the_approved_revision(owner: User) -> None:
-    staff = UserFactory.create(staff=True)
+    staff = UserFactory.create(platform_staff=True)
     page = _published(owner)
     approved = page.live_revision
     hide_event(staff, page, "Misleading offer")
@@ -683,7 +683,7 @@ def test_restore_republishes_the_approved_revision(owner: User) -> None:
 
 
 def test_only_staff_restore_and_only_hidden_events(owner: User) -> None:
-    staff = UserFactory.create(staff=True)
+    staff = UserFactory.create(platform_staff=True)
     page = _published(owner)
     with pytest.raises(ValidationError):
         restore_event(staff, page)
