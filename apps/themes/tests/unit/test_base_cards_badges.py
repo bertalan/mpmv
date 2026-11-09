@@ -131,6 +131,13 @@ def test_a_tile_links_the_product_name_only() -> None:
     ), html
 
 
+def test_a_tile_without_a_url_shows_the_name_without_a_link() -> None:
+    """A product with no slug in any language yet (CMS.10 grid, CAT.8 card) has no page."""
+    html = tile(url=None)
+    assert len(INTERACTIVE.findall(html)) == 0
+    assert re.search(r'<h3 class="product-tile__name">\s*Touring jacket\s*</h3>', html), html
+
+
 def test_a_tile_image_has_its_alt_text_size_and_lazy_loading() -> None:
     img = re.search(r"<img[^>]*>", tile())
     assert img is not None

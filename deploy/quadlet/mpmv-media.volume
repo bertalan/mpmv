@@ -1,0 +1,9 @@
+# Uploaded media and image renditions (MEDIA_ROOT); survives container replacement. The app and
+# the worker write to it, Caddy serves it read-only under /media/. Object storage replaces it
+# later (spec 12 §12.4); until then it is part of the host backup.
+[Volume]
+VolumeName=mpmv-media
+# Owned by the image's non-root user (Containerfile, uid/gid 10001) from creation, so the mounts
+# need no `:U` (a recursive chown on every start).
+User=10001
+Group=10001

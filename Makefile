@@ -1,6 +1,6 @@
 # MPMV task runner. Local containers use Apple `container` (ADR-0002); no Docker, no compose.
 .DEFAULT_GOAL := help
-.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell image dev dev-down dev-reset dev-status dev-logs migrate run assets worker test test-unit test-e2e test-all check lint fmt typecheck imports audit sbom
+.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell image dev dev-down dev-reset dev-status dev-logs migrate seed run assets worker test test-unit test-e2e e2e-baselines test-all check lint fmt typecheck imports theme-gates audit sbom
 
 DB_NAME      := mpmv-db
 DB_IMAGE     := docker.io/library/postgres:17
@@ -83,6 +83,9 @@ dev-logs: ## Follow the app logs (WHAT=worker for the worker)
 migrate: db ## Apply migrations to the local database
 	$(MANAGE) migrate
 
+seed: migrate ## Seed the synthetic demo data (ARC.10); RESET=1 takes it out, docs/dev/demo-seed.md
+	$(MANAGE) seed $(if $(RESET),--reset)
+
 run: migrate assets ## Run the development server
 	$(MANAGE) runserver
 
@@ -106,6 +109,11 @@ test: db ## Unit + integration suites
 test-e2e: db ## E2E suite in headless Chromium; screenshots in build/e2e/screenshots/
 	uv run pytest -m e2e --junitxml=$(REPORTS)/junit-e2e.xml
 
+# THM.5, spec 14 §14.10: baselines come from the CI runner only (Linux Chromium); the manual
+# "Visual baselines" workflow runs this target there and uploads the PNGs.
+e2e-baselines: db ## Rewrite the visual baselines in tests/e2e/baselines/ (CI: the Visual baselines workflow)
+	MPMV_VISUAL=update uv run pytest -m e2e -k visual_baseline
+
 test-all: test test-e2e ## All three suites
 
 lint: ## Lint with ruff
@@ -122,6 +130,9 @@ typecheck: ## Static type check with mypy
 imports: ## Enforce the app dependency graph (spec 01 §1.3)
 	uv run lint-imports
 
+theme-gates: ## Theme quality gates: contract, CSP lint, size budgets, fonts, licences (THM.5)
+	uv run python -m apps.themes.gates
+
 audit: ## Scan pinned dependencies for known vulnerabilities (pip-audit)
 	@mkdir -p build
 	uv export --no-emit-project --format requirements-txt > build/requirements.txt
@@ -134,6 +145,6 @@ sbom: ## CycloneDX SBOM of the production Python environment (no dev group) in b
 	uv run cyclonedx-py environment --pyproject pyproject.toml --mc-type application \
 		--of JSON --output-file build/sbom/mpmv-python.cdx.json build/sbom/venv/bin/python
 
-check: lint typecheck imports docs-check ## All static checks (no database needed)
+check: lint typecheck imports theme-gates docs-check ## All static checks (no database needed)
 	$(MANAGE) check --settings=mpmv.settings.test
 	$(MANAGE) makemigrations --check --dry-run --settings=mpmv.settings.test

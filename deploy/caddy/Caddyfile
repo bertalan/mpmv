@@ -1,17 +1,70 @@
-# Reverse proxy for a STAGE/LIVE host (ARC.5). Copy to ~/.config/mpmv/Caddyfile on the server.
-# The site address comes from MPMV_SITE_ADDRESS in ~/.config/mpmv/caddy.env. Caddy sets
-# X-Forwarded-Proto, which Django trusts through SECURE_PROXY_SSL_HEADER (settings/live.py).
+# Reverse proxy for a STAGE/LIVE host (ARC.5, ARC.13). Copy to ~/.config/mpmv/Caddyfile on the
+# server. Settings come from ~/.config/mpmv/caddy.env (deploy/server/caddy.env.example):
+#
+# - MPMV_SITE_ADDRESS: the public host name, nothing else (no scheme, port or IP). Caddy obtains
+#   and renews its certificate from Let's Encrypt (automatic HTTPS) and redirects HTTP to HTTPS.
+# - MPMV_NOINDEX: "true" adds `X-Robots-Tag: noindex, nofollow` to every response (STAGE).
+#   Off when empty or unset, as on LIVE.
+#
+# Only the configured host name gets the site. A request by IP address or for another host name
+# gets no site: plain HTTP is dropped without an answer; HTTPS fails the TLS handshake (no
+# certificate for that name), and a Host header that differs from the TLS server name gets 421.
+#
+# Caddy sets X-Forwarded-Proto, which Django trusts through SECURE_PROXY_SSL_HEADER
+# (settings/live.py).
 #
 # Client IP (CORE.5): Caddy overwrites X-Real-IP with the client address, so a value sent by the
 # client never reaches the app. Django reads it only from the mpmv-net subnet
 # (MPMV_TRUSTED_PROXY_HEADER and MPMV_TRUSTED_PROXIES in mpmv.env). If a CDN proxies the site,
-# {client_ip} is the CDN's address unless Caddy trusts it: add a global options block such as
-#   { servers { trusted_proxies static <CDN ranges>
-#               client_ip_headers CF-Connecting-IP } }
+# {client_ip} is the CDN's address unless Caddy trusts it: add to the global options block
+#   servers { trusted_proxies static <CDN ranges>
+#             client_ip_headers CF-Connecting-IP }
 # with the CDN's published ranges, and allow only those ranges to reach ports 80 and 443.
-{$MPMV_SITE_ADDRESS} {
-	encode zstd gzip
-	reverse_proxy mpmv-app:8000 {
-		header_up X-Real-IP {client_ip}
+{
+	servers {
+		strict_sni_host on
 	}
+}
+
+{$MPMV_SITE_ADDRESS} {
+	@noindex expression `{env.MPMV_NOINDEX} in ["1", "true", "yes", "on"]`
+	header @noindex X-Robots-Tag "noindex, nofollow"
+
+	encode zstd gzip
+
+	# Public media: only image files in Wagtail's image folders (the THM.12 allow-list), straight
+	# from the mpmv-media volume (read-only). Everything else under /media/ is a 404, so documents
+	# and any private upload never become public by path (Wagtail documents go through their own
+	# serve view with its permission checks; private files belong in ARC.15's private storage).
+	# The files are inert: no listing, no MIME sniffing (the type comes from the allowed extension),
+	# a sandbox CSP if one is opened directly (SEC.4). Renditions are re-encoded by the app;
+	# originals are kept as uploaded.
+	@public_media path_regexp public_media ^/media/(original_images|images)/[^/]+\.(?i:avif|webp|jpe?g|png|gif|svg)$
+	handle @public_media {
+		uri strip_prefix /media
+		root * /srv/media
+		header X-Content-Type-Options nosniff
+		header Cache-Control "public, max-age=86400"
+		header Content-Security-Policy "default-src 'none'; sandbox"
+		# Sanitised SVG logos keep their inline styles (THM.12).
+		@svg path_regexp svg (?i)\.svg$
+		header @svg Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+		file_server
+	}
+
+	handle /media/* {
+		respond 404
+	}
+
+	handle {
+		reverse_proxy mpmv-app:8000 {
+			header_up X-Real-IP {client_ip}
+		}
+	}
+}
+
+# Any other host name or a bare IP over plain HTTP: close the connection, serve nothing.
+# Automatic HTTPS still redirects the site's own host name and answers ACME challenges.
+http:// {
+	abort
 }

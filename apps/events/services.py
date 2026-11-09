@@ -19,6 +19,8 @@ moderation (EVT.3, spec 15 "Services").
 - Moderation: `EventPage.get_workflow()` returns "Event review" (`ensure_event_review_workflow`)
   while the vendor needs review (`engine.needs_review`), and `EventPage.publish` bumps the ICS
   `sequence` (`engine.next_sequence`) on every publish, whoever publishes.
+- `resolve_picked_point` checks the point the map picker sends (EVT.13): a "Find coordinates"
+  candidate is confirmed against the cached lookup, never trusted from the request.
 """
 
 import datetime as dt
@@ -55,6 +57,8 @@ from apps.catalog.models import Category, Product
 from apps.cms.models import HomePage
 from apps.core.audit import AuditContext, record, user_context
 from apps.core.changeset import ChangeSet, to_jsonable
+from apps.core.geocoding import AddressQuery, GeocodeResult
+from apps.core.geocoding import services as geocoding
 from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog
 from apps.core.services import save_audited
@@ -829,3 +833,72 @@ def set_event_settings(
 def ensure_event_review_workflow() -> Workflow:
     """The "Event review" workflow, created when missing (after `migrate` and on first use)."""
     return event_review_workflow()
+
+
+# --- The map picker (EVT.13, spec 15 "Map picker" and "Confirmation")
+
+
+@dataclass(frozen=True)
+class PickedPoint:
+    """What to store for the point the map picker sent: its source and, for a newly confirmed
+    "Find coordinates" candidate (as chosen, or moved after choosing it), that candidate (its
+    metadata comes from the cache). With a source other than "geocoded" the sent point is kept
+    and only the candidate's metadata is stored."""
+
+    source: str
+    candidate: GeocodeResult | None = None
+
+
+def resolve_picked_point(
+    page: EventPage,
+    *,
+    latitude: Decimal | None,
+    longitude: Decimal | None,
+    source: str,
+    address: AddressQuery,
+    chosen: tuple[Decimal, Decimal] | None = None,
+    now: dt.datetime | None = None,
+) -> PickedPoint:
+    """Check the point the picker (or a person typing) sent for `page`, before it is applied.
+
+    - No point: no source (the form then clears the geocoding metadata).
+    - A point placed on the map or typed keeps its source; a point without one was typed (the
+      inputs are the keyboard and no-JavaScript alternative).
+    - A "Find coordinates" candidate the author chose and then moved (`chosen`, the candidate's
+      own point): the moved point keeps its source and gets the candidate's metadata when a
+      cached lookup of the form's address has a candidate there (spec 15 "Confirmation": the
+      author may adjust the point before confirming). A `chosen` point no lookup returned adds
+      no metadata. The same rule as moving the geocoded point of a saved page.
+    - A "geocoded" point must be a candidate of a cached lookup of the form's address: the
+      request never sets a provider, a precision or a confidence. An unchanged geocoded point
+      of the page stays as it is, even after its cache entry expired.
+
+    Raises `ValidationError` on `geo_source` for a geocoded point that no lookup returned. Half a
+    point is left to the model's validation ("Give both coordinates").
+    """
+    if latitude is None and longitude is None:
+        return PickedPoint(EventPage.GeoSource.NONE)
+    if source != EventPage.GeoSource.GEOCODED:
+        moved_from = None
+        if chosen is not None and latitude is not None and longitude is not None:
+            moved_from = geocoding.cached_candidate(address, chosen[0], chosen[1], now=now)
+        return PickedPoint(source or EventPage.GeoSource.MANUAL, moved_from)
+    if latitude is None or longitude is None:
+        return PickedPoint(source)
+    unchanged = page.geo_source == EventPage.GeoSource.GEOCODED and (
+        page.latitude,
+        page.longitude,
+    ) == (latitude, longitude)
+    if unchanged:
+        return PickedPoint(source)
+    candidate = geocoding.cached_candidate(address, latitude, longitude, now=now)
+    if candidate is None:
+        raise ValidationError(
+            {
+                "geo_source": _(
+                    "These coordinates are not a “Find coordinates” result for this address: "
+                    "choose “Placed on the map” or “Typed by hand”, or find the coordinates again."
+                )
+            }
+        )
+    return PickedPoint(source, candidate)

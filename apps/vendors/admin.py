@@ -18,8 +18,10 @@ from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import URLPattern, path, reverse
 from django.utils.html import format_html, format_html_join
+from django.utils.http import urlencode
 from django.utils.safestring import SafeString
 
+from apps.accounts.mfa_session import is_recently_verified
 from apps.accounts.models import User
 from apps.core.admin import step_up
 from apps.core.audit import audit_context
@@ -42,6 +44,7 @@ from .services import (
     can_reopen,
     change_status,
     check_contract_start,
+    correct_dac7_dataset,
     delete_requirement,
     delete_vendor,
     delete_vendor_flag,
@@ -170,7 +173,17 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         ("Payout readiness", {"fields": ("missing_for_payout",)}),
         (
             "Legal identity",
-            {"fields": ("legal_name", "country", "legal_form", "first_name", "last_name")},
+            {
+                "fields": (
+                    "legal_name",
+                    "country",
+                    "legal_form",
+                    "first_name",
+                    "last_name",
+                    "date_of_birth",
+                    "place_of_birth",
+                )
+            },
         ),
         ("Registered office", {"fields": _address("registered")}),
         (
@@ -181,8 +194,11 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
                     "vies_status",
                     "vies_checked_at",
                     "tax_code",
+                    "tin_country",
+                    "tin_same_as_vat",
                     "tax_residence_country",
                     "fiscal_regime",
+                    "cross_border_franchise_number",
                     "ateco_code",
                     "eori",
                 )
@@ -192,6 +208,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
             "Company register (REA)",
             {
                 "fields": (
+                    "business_registration_number",
                     "rea_office",
                     "rea_number",
                     "share_capital",
@@ -212,7 +229,10 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
             "Permanent establishment",
             {"classes": ("collapse",), "fields": _address("establishment")},
         ),
-        ("Invoicing bank details", {"fields": ("iban", "bic", "bank_name")}),
+        (
+            "Invoicing bank details",
+            {"fields": ("iban", "bic", "bank_name", "account_holder_name")},
+        ),
         ("Contact", {"fields": ("contact_email", "phone")}),
         ("Sales", {"fields": ("sales_mode_default", "enquiries_enabled")}),
         ("Migration", {"fields": ("legacy_wp_user_id",)}),
@@ -342,8 +362,38 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         url = f"{reverse('admin:core_auditlog_changelist')}?vendor={obj.public_id}"
         return format_html('<a href="{}">Changes to this vendor</a>', url)
 
+    def get_form(
+        self, request: HttpRequest, obj: Vendor | None = None, change: bool = False, **kwargs: Any
+    ) -> type[forms.ModelForm[Vendor]]:
+        """The add and change forms refuse DAC7 data (a new vendor's, or a change to it) unless
+        the staff member verified a second factor recently (VEN.23, CORE.4): the page stays
+        open, nothing is saved."""
+        form: type[forms.ModelForm[Vendor]] = super().get_form(request, obj, change, **kwargs)
+        if is_recently_verified(request):
+            return form
+        verify_url = reverse("mfa:verify") + "?" + urlencode({"next": request.get_full_path()})
+
+        class StepUpForm(form):  # type: ignore[valid-type,misc]
+            def clean(self) -> dict[str, Any]:
+                cleaned: dict[str, Any] = super().clean() or {}
+                if engine.DAC7_FIELDS & set(self.changed_data):
+                    raise ValidationError(
+                        format_html(
+                            "Correcting the DAC7 dataset needs a fresh second-factor "
+                            'verification: <a href="{}">verify</a>, then save again.',
+                            verify_url,
+                        )
+                    )
+                return cleaned
+
+        return StepUpForm
+
     def save_model(self, request: HttpRequest, obj: Vendor, form: Any, change: bool) -> None:
-        changes = save_vendor(obj, ctx=audit_context(request))
+        ctx = audit_context(request)
+        if engine.DAC7_FIELDS & set(form.changed_data):
+            changes = correct_dac7_dataset(obj, ctx=ctx, stepped_up=is_recently_verified(request))
+        else:
+            changes = save_vendor(obj, ctx=ctx)
         warn_about_establishment(self, request, obj, changes)
 
     def delete_model(self, request: HttpRequest, obj: Vendor) -> None:

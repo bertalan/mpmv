@@ -182,3 +182,10 @@ def test_worker_role_runs_the_procrastinate_worker(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "python manage.py procrastinate worker"
+
+
+def test_gunicorn_writes_nothing_under_the_read_only_app_directory() -> None:
+    """Gunicorn's control socket defaults to a path under /app, read-only at runtime (ARC.23)."""
+    web = ENTRYPOINT.read_text().split("web)", 1)[1].split(";;", 1)[0]
+    assert "--no-control-socket" in web
+    assert "--worker-tmp-dir /dev/shm" in web

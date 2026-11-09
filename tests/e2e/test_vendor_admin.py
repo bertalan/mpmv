@@ -94,7 +94,9 @@ def test_staff_complete_an_incomplete_legal_profile(
 
     vendor.refresh_from_db()
     assert vendor.iban == "IT60X0542811101000000123456"
-    assert AuditLog.objects.filter(action="vendor.updated").count() == 2
+    # The PEC is not DAC7 data; the IBAN is, so that save is a DAC7 correction (VEN.23).
+    assert AuditLog.objects.filter(action="vendor.updated").count() == 1
+    assert AuditLog.objects.filter(action="vendor.dac7_corrected").count() == 1
 
 
 def test_staff_activate_a_vendor_once_the_contract_is_accepted(

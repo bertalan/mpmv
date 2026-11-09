@@ -1,19 +1,43 @@
 #!/bin/sh
-# Release management on a STAGE/LIVE host (ARC.5, ADR-0005): rootless Podman with the systemd
-# --user Quadlet units from deploy/quadlet. A release is an immutable image tag built by CI from a
-# git tag; rollback means switching back to the previous tag.
+# Release management on a STAGE/LIVE host (ARC.5, ARC.23, ADR-0005): rootless Podman with the
+# systemd --user Quadlet units from deploy/quadlet. A release is an immutable image tag built by CI
+# from a git tag; rollback means switching back to the previous tag.
 #
-#   mpmv-deploy deploy <version>   pull, migrate, restart, health check; rolls back if unhealthy
-#   mpmv-deploy rollback           back to the previous release (migrations are not reverted)
+#   mpmv-deploy deploy <version>   doctor, pull, install the release's units, migrate, restart,
+#                                  check; rolls back (image and units) if the check fails
+#   mpmv-deploy rollback           back to the previous release and its units (migrations are not
+#                                  reverted)
+#   mpmv-deploy doctor             check that this host can run the live release
+#   mpmv-deploy check              the post-deploy check, on demand
 #   mpmv-deploy status             current and previous release
+#
+# Every release image carries its own units, Caddyfile and this script under /app/deploy (ARC.23):
+# a deploy installs that set, a rollback reinstalls the previous one, so the host always runs the
+# units of the release it runs. Env files and the CA certificate are never touched. Call the
+# script by its absolute path (~/.local/bin/mpmv-deploy): a non-interactive ssh session does not
+# have ~/.local/bin on PATH.
 set -eu
 
 REGISTRY_IMAGE="${MPMV_IMAGE:-ghcr.io/bertalan/mpmv-app}"
 LOCAL_IMAGE=localhost/mpmv-app:current
 STATE_DIR="${MPMV_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/mpmv}"
 RELEASES="$STATE_DIR/releases"
-HEALTH_RETRIES="${MPMV_HEALTH_RETRIES:-30}"
-HEALTH_INTERVAL="${MPMV_HEALTH_INTERVAL:-2}"
+UNIT_SETS="$STATE_DIR/units"
+CONFIG_DIR="${MPMV_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/mpmv}"
+QUADLET_DIR="${MPMV_QUADLET_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/containers/systemd}"
+BIN_PATH="${MPMV_BIN:-$HOME/.local/bin/mpmv-deploy}"
+# Total time the post-deploy check may take before the release counts as bad (ARC.23: detection
+# and rollback stay under a minute).
+CHECK_BUDGET="${MPMV_CHECK_BUDGET:-40}"
+CHECK_INTERVAL="${MPMV_CHECK_INTERVAL:-2}"
+# Optional CA bundle for the check's HTTPS requests; empty uses the system trust store.
+CHECK_CACERT="${MPMV_CHECK_CACERT:-}"
+MIN_FREE_MB="${MPMV_MIN_FREE_MB:-2048}"
+IMAGE_UID="${MPMV_IMAGE_UID:-10001}"
+KEEP_SETS=5
+ENV_FILES="mpmv database caddy"
+# Podman subcommands this script runs; the doctor checks the host's Podman has each of them.
+PODMAN_COMMANDS="pull|image exists|tag|create|cp|rm|exec|healthcheck run|info|volume exists|volume inspect|unshare"
 
 log() { echo "mpmv-deploy: $*" >&2; }
 die() {
@@ -37,21 +61,262 @@ validate() {
   esac
 }
 
-healthy() {
-  i=0
-  while [ "$i" -lt "$HEALTH_RETRIES" ]; do
-    if podman healthcheck run mpmv-app >/dev/null 2>&1; then return 0; fi
-    i=$((i + 1))
-    sleep "$HEALTH_INTERVAL"
+# --- Unit sets: deploy/quadlet, deploy/caddy/Caddyfile and deploy/server of one release.
+
+# Copy the units, Caddyfile and script baked into a release image to $UNIT_SETS/<version>.
+extract() {
+  dest="$UNIT_SETS/$1"
+  tmp="$dest.tmp.$$"
+  rm -rf "$tmp"
+  mkdir -p "$tmp"
+  cid="$(podman create "$REGISTRY_IMAGE:$1")" || return 1
+  copied=yes
+  for part in quadlet caddy server; do
+    podman cp "$cid:/app/deploy/$part" "$tmp/$part" >/dev/null || copied=no
+  done
+  podman rm "$cid" >/dev/null || true
+  if [ "$copied" = no ] || [ ! -f "$tmp/quadlet/mpmv-app.container" ] || [ ! -f "$tmp/caddy/Caddyfile" ]; then
+    rm -rf "$tmp"
+    log "release $1 carries no deploy units under /app/deploy"
+    return 1
+  fi
+  rm -rf "$dest"
+  mv "$tmp" "$dest"
+}
+
+# Save what is installed now as the set of a release that predates baked-in units, so a rollback
+# to it restores exactly what ran.
+snapshot_installed() {
+  dest="$UNIT_SETS/$1"
+  mkdir -p "$dest/quadlet" "$dest/caddy" "$dest/server"
+  for f in "$QUADLET_DIR"/mpmv*; do
+    if [ -f "$f" ]; then cp "$f" "$dest/quadlet/"; fi
+  done
+  if [ -f "$CONFIG_DIR/Caddyfile" ]; then cp "$CONFIG_DIR/Caddyfile" "$dest/caddy/Caddyfile"; fi
+  if [ -f "$BIN_PATH" ]; then cp "$BIN_PATH" "$dest/server/mpmv-deploy"; fi
+}
+
+put() { # put <source> <target> <mode>: replace atomically, so a reader never sees half a file
+  cp "$1" "$2.new.$$" && chmod "$3" "$2.new.$$" && mv -f "$2.new.$$" "$2"
+}
+
+proxy_fingerprint() {
+  cat "$CONFIG_DIR/Caddyfile" "$QUADLET_DIR/mpmv-caddy.container" 2>/dev/null | cksum
+}
+
+# Install a unit set: Quadlet units (stale mpmv* units removed), the Caddyfile, this script.
+install_set() {
+  set_dir="$UNIT_SETS/$1"
+  [ -d "$set_dir/quadlet" ] || {
+    log "no saved units for release $1: keeping the installed ones"
+    return 0
+  }
+  mkdir -p "$QUADLET_DIR" "$CONFIG_DIR" "$(dirname "$BIN_PATH")"
+  for f in "$QUADLET_DIR"/mpmv*; do
+    if [ -f "$f" ] && [ ! -f "$set_dir/quadlet/${f##*/}" ]; then rm -f "$f"; fi
+  done
+  for f in "$set_dir"/quadlet/*; do put "$f" "$QUADLET_DIR/${f##*/}" 0644 || return 1; done
+  if [ -f "$set_dir/caddy/Caddyfile" ]; then put "$set_dir/caddy/Caddyfile" "$CONFIG_DIR/Caddyfile" 0644 || return 1; fi
+  if [ -f "$set_dir/server/mpmv-deploy" ]; then put "$set_dir/server/mpmv-deploy" "$BIN_PATH" 0755 || return 1; fi
+  systemctl --user daemon-reload || return 1
+  log "installed the units of $1"
+}
+
+prune_sets() {
+  [ -d "$UNIT_SETS" ] || return 0
+  keep="$(tail -n "$KEEP_SETS" "$RELEASES" 2>/dev/null || true)"
+  for d in "$UNIT_SETS"/*; do
+    [ -d "$d" ] || continue
+    printf '%s\n' "$keep" | grep -qxF "${d##*/}" || rm -rf "$d"
+  done
+}
+
+# --- Doctor: refuse to touch a host that cannot run the release.
+
+find_quadlet() {
+  for q in "${MPMV_QUADLET:-}" /usr/libexec/podman/quadlet /usr/lib/podman/quadlet; do
+    if [ -n "$q" ] && [ -x "$q" ]; then
+      echo "$q"
+      return 0
+    fi
   done
   return 1
 }
 
-# Point the local tag at a release and restart onto it. Callers test the result: a unit that fails to
-# start is handled like an unhealthy release, never left behind by `set -e`.
+# Podman's own generator converts the units in a directory; every unit must come out as a service.
+quadlet_dry_run() {
+  q="$(find_quadlet)" || return 1
+  out="$(QUADLET_UNIT_DIRS="$1" "$q" -dryrun -user 2>&1)" || return 1
+  for f in "$1"/*.container "$1"/*.volume "$1"/*.network; do
+    [ -f "$f" ] || continue
+    name="${f##*/}"
+    case "$name" in
+      *.container) service="${name%.container}.service" ;;
+      *.volume) service="${name%.volume}-volume.service" ;;
+      *.network) service="${name%.network}-network.service" ;;
+    esac
+    printf '%s\n' "$out" | grep -qxF -- "---$service---" || {
+      log "quadlet did not generate $service from $name"
+      return 1
+    }
+  done
+}
+
+FAILURES=0
+pass() { log "ok: $*"; }
+fail() {
+  log "FAIL: $*"
+  FAILURES=$((FAILURES + 1))
+}
+
+doctor_host() {
+  if command -v podman >/dev/null 2>&1; then
+    pass "podman present"
+    old_ifs="$IFS"
+    IFS='|'
+    set -f
+    # shellcheck disable=SC2086 # split the list on '|'
+    set -- $PODMAN_COMMANDS
+    set +f
+    IFS="$old_ifs"
+    for sub in "$@"; do
+      # shellcheck disable=SC2086 # split the subcommand into its words
+      podman $sub --help >/dev/null 2>&1 || fail "the host's podman has no '$sub'"
+    done
+  else
+    fail "podman not found"
+  fi
+  systemctl --user show-environment >/dev/null 2>&1 || fail "systemctl --user does not answer"
+  if find_quadlet >/dev/null; then pass "quadlet generator present"; else fail "quadlet generator not found (set MPMV_QUADLET)"; fi
+  command -v curl >/dev/null 2>&1 || fail "curl not found (post-deploy check)"
+  for name in $ENV_FILES; do
+    [ -r "$CONFIG_DIR/$name.env" ] || fail "$name.env missing or unreadable in $CONFIG_DIR"
+  done
+  ca="$CONFIG_DIR/pg-root-ca.crt"
+  if [ -r "$ca" ] && grep -q "BEGIN CERTIFICATE" "$ca"; then pass "database root CA readable"; else fail "pg-root-ca.crt missing, unreadable or not a certificate"; fi
+  if podman volume exists mpmv-media >/dev/null 2>&1; then
+    mount="$(podman volume inspect --format '{{.Mountpoint}}' mpmv-media)"
+    owner="$(podman unshare stat -c %u:%g "$mount" 2>/dev/null || true)"
+    if [ "$owner" = "$IMAGE_UID:$IMAGE_UID" ]; then pass "media volume owned by the image user"; else fail "media volume owned by '$owner', not $IMAGE_UID:$IMAGE_UID"; fi
+  else
+    pass "media volume not created yet (its unit creates it owned by the image user)"
+  fi
+  store="$(podman info --format '{{.Store.GraphRoot}}' 2>/dev/null || echo "$HOME")"
+  [ -d "$store" ] || store="$HOME"
+  free_kb="$(df -Pk "$store" | awk 'NR == 2 { print $4 }')"
+  if [ "$((free_kb / 1024))" -ge "$MIN_FREE_MB" ]; then pass "free disk above ${MIN_FREE_MB} MB"; else fail "free disk $((free_kb / 1024)) MB, below ${MIN_FREE_MB} MB"; fi
+  if ls "$QUADLET_DIR"/mpmv*.container >/dev/null 2>&1; then
+    if quadlet_dry_run "$QUADLET_DIR"; then pass "installed units convert"; else fail "installed units do not convert (quadlet -dryrun)"; fi
+  fi
+}
+
+# Names only: a value is never read into a message.
+env_names() { sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$1"; }
+
+doctor_release() {
+  set_dir="$UNIT_SETS/$1"
+  if quadlet_dry_run "$set_dir/quadlet"; then pass "units of $1 convert on this host's podman"; else fail "units of $1 do not convert on this host's podman (quadlet -dryrun)"; fi
+  for name in $ENV_FILES; do
+    example="$set_dir/server/$name.env.example"
+    [ -f "$example" ] || continue
+    [ -r "$CONFIG_DIR/$name.env" ] || continue
+    present="$(env_names "$CONFIG_DIR/$name.env")"
+    missing=""
+    for var in $(env_names "$example"); do
+      printf '%s\n' "$present" | grep -qxF "$var" || missing="$missing $var"
+    done
+    if [ -z "$missing" ]; then pass "$name.env has every variable of $1"; else fail "$name.env lacks:$missing"; fi
+  done
+}
+
+doctor() {
+  FAILURES=0
+  doctor_host
+  live="$(current)"
+  if [ -n "$live" ] && [ -d "$UNIT_SETS/$live/quadlet" ]; then doctor_release "$live"; fi
+  [ "$FAILURES" -eq 0 ] || die "doctor: $FAILURES check(s) failed"
+  log "doctor: all checks passed"
+}
+
+# --- Post-deploy check: health, home page and a media file through Caddy, within a time budget.
+
+site_name() { sed -n 's/^MPMV_SITE_ADDRESS=["'\'']\{0,1\}\([^"'\'' ]*\).*/\1/p' "$CONFIG_DIR/caddy.env" 2>/dev/null | tail -n 1; }
+
+http_ok() { # http_ok <site> <path>: 200 from Caddy on this host, by the site's name
+  code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 --resolve "$1:443:127.0.0.1" \
+    ${CHECK_CACERT:+--cacert "$CHECK_CACERT"} "https://$1$2" 2>/dev/null || true)"
+  [ "$code" = 200 ]
+}
+
+app_restarts() { systemctl --user show -p NRestarts --value mpmv-app.service 2>/dev/null || echo 0; }
+
+media_path() {
+  # An image from a folder Caddy serves publicly (deploy/caddy/Caddyfile, @public_media).
+  path="$(podman exec mpmv-app find /app/media/original_images /app/media/images -maxdepth 1 \
+    -type f -name '*.webp' -print -quit 2>/dev/null || true)"
+  case "$path" in
+    /app/media/*) ;;
+    *) return 0 ;;
+  esac
+  case "$path" in *[!A-Za-z0-9._/-]*) return 0 ;; esac
+  echo "/media/${path#/app/media/}"
+}
+
+check() {
+  site="$(site_name)"
+  [ -n "$site" ] || {
+    log "MPMV_SITE_ADDRESS is empty in caddy.env"
+    return 1
+  }
+  restarts="$(app_restarts)"
+  deadline=$(($(date +%s) + CHECK_BUDGET))
+  while :; do
+    if podman healthcheck run mpmv-app >/dev/null 2>&1 && http_ok "$site" /healthz && http_ok "$site" /; then
+      media="$(media_path)"
+      if [ -z "$media" ]; then
+        log "check passed (no media file yet to fetch)"
+        return 0
+      fi
+      if http_ok "$site" "$media"; then
+        log "check passed"
+        return 0
+      fi
+    fi
+    if [ "$(app_restarts)" != "$restarts" ]; then
+      log "mpmv-app restarted on its own: the release crashes"
+      return 1
+    fi
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      log "check failed within ${CHECK_BUDGET}s"
+      return 1
+    fi
+    sleep "$CHECK_INTERVAL"
+  done
+}
+
+# --- Releases.
+
+# Restart onto the image tagged current. Caddy restarts only when its Caddyfile or unit changed,
+# or when it is not running (first deploy).
+restart_services() {
+  services="mpmv-app.service mpmv-worker.service"
+  if [ "$1" != "$(proxy_fingerprint)" ] || ! systemctl --user is-active --quiet mpmv-caddy.service; then
+    services="$services mpmv-caddy.service"
+  fi
+  # A unit that hit its start limit (a crash-looping release) refuses a plain restart.
+  # shellcheck disable=SC2086 # one word per unit
+  systemctl --user reset-failed $services >/dev/null 2>&1 || true
+  # shellcheck disable=SC2086 # one word per unit
+  systemctl --user restart $services
+}
+
+# Switch the host to a release: its units, its image, restarted. Callers test the result: a unit
+# that fails to start is handled like an unhealthy release, never left behind by `set -e`.
 activate() {
-  podman tag "$REGISTRY_IMAGE:$1" "$LOCAL_IMAGE" &&
-    systemctl --user restart mpmv-app.service mpmv-worker.service
+  before="$(proxy_fingerprint)"
+  install_set "$1" &&
+    podman tag "$REGISTRY_IMAGE:$1" "$LOCAL_IMAGE" &&
+    restart_services "$before"
 }
 
 deploy() {
@@ -59,34 +324,54 @@ deploy() {
   validate "$version"
   live="$(current)"
 
-  podman pull "$REGISTRY_IMAGE:$version" >/dev/null
+  FAILURES=0
+  doctor_host
+  [ "$FAILURES" -eq 0 ] || die "doctor: $FAILURES check(s) failed; nothing changed"
+
+  # Release tags are immutable, so an image already in local storage is the release: reuse it
+  # (redeploys and rollback drills work without the registry).
+  if ! podman image exists "$REGISTRY_IMAGE:$version"; then
+    podman pull "$REGISTRY_IMAGE:$version" >/dev/null
+  fi
+  extract "$version" || die "cannot read the units of $version; nothing changed"
+  doctor_release "$version"
+  [ "$FAILURES" -eq 0 ] || die "doctor: $version does not fit this host; nothing changed"
+  if [ -n "$live" ] && [ ! -d "$UNIT_SETS/$live" ]; then snapshot_installed "$live"; fi
+
+  before="$(proxy_fingerprint)"
+  install_set "$version" || die "cannot install the units of $version"
   podman tag "$REGISTRY_IMAGE:$version" "$LOCAL_IMAGE"
   if ! systemctl --user start mpmv-migrate.service; then
-    # The running containers were never restarted: put the tag back so a reboot keeps them.
-    if [ -n "$live" ]; then podman tag "$REGISTRY_IMAGE:$live" "$LOCAL_IMAGE"; fi
+    # The running containers were never restarted: put the live units and tag back so a reboot
+    # keeps them.
+    if [ -n "$live" ]; then
+      install_set "$live" || log "could not reinstall the units of $live"
+      podman tag "$REGISTRY_IMAGE:$live" "$LOCAL_IMAGE"
+    fi
     die "migrations failed; $version not activated"
   fi
 
-  if systemctl --user restart mpmv-app.service mpmv-worker.service && healthy; then
+  if restart_services "$before" && check; then
     record "$version" deploy
+    prune_sets
     log "release $version is live"
     return 0
   fi
   if [ -n "$live" ]; then
-    log "release $version failed to start or is unhealthy; rolling back to $live"
-    if ! { activate "$live" && healthy; }; then
+    log "release $version failed to start or failed its check; rolling back to $live"
+    if ! { activate "$live" && check; }; then
       log "release $live is unhealthy too: check journalctl --user -u mpmv-app"
     fi
   fi
-  die "release $version failed to start or failed its health check"
+  die "release $version failed to start or failed its check"
 }
 
 rollback() {
   target="$(previous)"
   [ -n "$target" ] || die "no previous release to roll back to"
   from="$(current)"
-  if ! { activate "$target" && healthy; }; then
-    # Put the live release back so the tag, the services and the history agree again.
+  if ! { activate "$target" && check; }; then
+    # Put the live release back so the units, the tag, the services and the history agree again.
     activate "$from" || log "could not restart $from either"
     die "release $target is unhealthy: check journalctl --user -u mpmv-app; back on $from"
   fi
@@ -107,6 +392,8 @@ case "${1:-}" in
     deploy "$2"
     ;;
   rollback) rollback ;;
+  doctor) doctor ;;
+  check) check || exit 1 ;;
   status) status ;;
-  *) die "usage: mpmv-deploy deploy <version> | rollback | status" ;;
+  *) die "usage: mpmv-deploy deploy <version> | rollback | doctor | check | status" ;;
 esac

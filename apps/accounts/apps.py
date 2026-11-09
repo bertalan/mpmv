@@ -14,6 +14,7 @@ class AccountsConfig(AppConfig):
         "recoverycode",
         "auth.group",  # managed in the user admin's audited GroupAdmin
         "otp_totp.totpdevice",  # written only by the audited MFA services
+        "actionlinkuse",  # CORE.15: each spent link writes `accounts.action_link.signed_in`
     )
 
     def ready(self) -> None:
