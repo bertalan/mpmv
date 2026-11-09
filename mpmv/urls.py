@@ -41,6 +41,7 @@ urlpatterns = [
     path("api/v1/", include("apps.api.urls")),
     path("account/mfa/", include("apps.accounts.urls")),
     path("account/link/", include("apps.accounts.action_link_urls")),  # CORE.15
+    path("vendor/claim/", include("apps.vendors.urls")),  # claim an imported vendor (VEN.24)
     path("geocoding/", include("apps.core.geocoding.urls")),  # "Find coordinates" (EVT.12)
     # Staff-only styleguide of the active theme (THM.4); a string, as no app imports themes.
     path("_styleguide/", include("apps.themes.urls")),
