@@ -16,6 +16,8 @@ PublishPort=443:443/udp
 EnvironmentFile=%h/.config/mpmv/caddy.env
 Volume=%h/.config/mpmv/Caddyfile:/etc/caddy/Caddyfile:ro,Z
 Volume=mpmv-caddy-data.volume:/data
+# Media files, served as static files under /media/ (read-only).
+Volume=mpmv-media.volume:/srv/media:ro,noexec,nosuid,nodev
 Tmpfs=/config
 ReadOnly=true
 NoNewPrivileges=true

@@ -1,0 +1,30 @@
+/* Maps of the events app (EVT.13, spec 15 "Maps"): the picker of the "Where" panel.
+   Loaded after the vendored leaflet.css; no inline style anywhere (CSP style-src 'self'). */
+
+.mpmv-map-picker__map {
+  block-size: 22rem;
+  max-inline-size: 48rem;
+  margin-block: 0.75rem;
+  border: 1px solid currentcolor;
+  border-radius: 0.25rem;
+}
+
+.mpmv-map-picker__candidates {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  margin-block: 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.mpmv-map-picker__detail {
+  font-weight: normal;
+}
+
+/* Zoom buttons and the marker stay at least 24 px (WCAG 2.2 SC 2.5.8). */
+.mpmv-map-picker .leaflet-control-zoom a {
+  min-inline-size: 30px;
+  min-block-size: 30px;
+}

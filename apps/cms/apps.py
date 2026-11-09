@@ -22,7 +22,7 @@ class CmsConfig(AppConfig):
 
     # Audit policy (SEC.4, docs/dev/audit-trail.md). Wagtail keeps a revision of every page edit
     # and logs page and snippet actions in its own history (Reports > Site history).
-    audited_models = ("legalpageversion",)
+    audited_models = ("legalpageversion", "legalpagereview")
     unaudited_models = {
         "homepage": "Wagtail page: editor content with revisions and Wagtail's action log",
         "legalpage": "Wagtail page: each published text is an audited LegalPageVersion",

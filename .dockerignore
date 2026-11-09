@@ -2,8 +2,12 @@
 # Docker BuildKit alike). Secrets and local state never enter the image.
 .env
 .env.*
+**/*.env
 *.pem
 *.key
+**/*.pem
+**/*.key
+**/*.crt
 private
 CLAUDE.local.md
 .claude
@@ -31,10 +35,10 @@ tests
 tools
 *.md
 .pre-commit-config.yaml
-# Only deploy/container (the entry point) is part of the image. No `!` re-includes: the
-# `container build` context transfer rejects them ("changes out of order").
-deploy/caddy
+# deploy/container (the entry point) and, read-only under /app/deploy, the release's own Quadlet
+# units, Caddyfile, mpmv-deploy and env examples (ARC.23: the server installs the units of the tag
+# it runs). They hold no secrets. No `!` re-includes: the `container build` context transfer
+# rejects them ("changes out of order").
+deploy/ci
 deploy/local
-deploy/quadlet
-deploy/server
 deploy/README.md
