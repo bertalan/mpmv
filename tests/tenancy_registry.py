@@ -84,6 +84,7 @@ from apps.vendors.models import (
     ContractAcceptance,
     CrossVendorConsent,
     Vendor,
+    VendorClaim,
     VendorFeatureFlag,
     VendorMember,
     VendorTranslation,
@@ -91,6 +92,7 @@ from apps.vendors.models import (
 from apps.vendors.tests.factories import (
     ContractAcceptanceFactory,
     CrossVendorConsentFactory,
+    VendorClaimFactory,
     VendorFeatureFlagFactory,
     VendorMemberFactory,
     VendorTranslationFactory,
@@ -128,6 +130,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     ContractAcceptance: lambda vendor: ContractAcceptanceFactory.create(vendor=vendor),
     VendorFeatureFlag: lambda vendor: VendorFeatureFlagFactory.create(vendor=vendor),
     CrossVendorConsent: lambda vendor: CrossVendorConsentFactory.create(vendor=vendor),
+    VendorClaim: lambda vendor: VendorClaimFactory.create(vendor=vendor),
     Product: lambda vendor: ProductFactory.create(vendor=vendor),
     ProductTranslation: lambda vendor: ProductTranslationFactory.create(
         product=ProductFactory.create(vendor=vendor)
@@ -246,6 +249,11 @@ ENDPOINTS: dict[str, Access] = {
     "action_link:continue": NoVendorData(
         "Secure action link Continue POST (CORE.15): a token of another user or object is "
         "refused before anything is shown."
+    ),
+    "vendor_claim:claim": NoVendorData(
+        "Vendor claim page (VEN.24): without a claim link opened in the session for that vendor "
+        "it shows only the generic 'link not valid' page, whoever is signed in.",
+        kwargs={"vendor_key": "00000000-0000-0000-0000-000000000000"},
     ),
     "geocoding_find": NoVendorData(
         "Find coordinates (EVT.12): geocodes the typed address; reads no vendor data."

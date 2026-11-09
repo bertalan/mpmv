@@ -7,6 +7,8 @@
   spends the token's single sign-in use and signs the recipient in without a password; the
   action page then asks for the MFA step-up before its own POST. A recipient with no confirmed
   second factor gets no passwordless sign-in.
+- An email-bound link (VEN.24, no account yet) signs nobody in: the Continue POST opens it in
+  the session and leads to its page, which checks it again (`services.email_bound_link`).
 - A refused link (expired, used, another user's, an old version, no second factor) leads to the
   normal login, then to the same action page; the service audits the attempt.
 
@@ -57,11 +59,11 @@ def _session_user(request: HttpRequest) -> User | None:
 @require_http_methods(["GET", "HEAD"])
 def open_link(request: HttpRequest, token: str) -> HttpResponse:
     user = _session_user(request)
-    if user is not None:
-        check = services.check_action_token(token)
-        if check.refusal is None and check.user == user and check.action_url:
-            return _private(HttpResponseRedirect(check.action_url))
-    return _private(render(request, "accounts/action_link/continue.html", {"token": token}))
+    check = services.check_action_token(token)
+    if user is not None and check.refusal is None and check.user == user and check.action_url:
+        return _private(HttpResponseRedirect(check.action_url))
+    context = {"token": token, "email_bound": check.email_bound}
+    return _private(render(request, "accounts/action_link/continue.html", context))
 
 
 @mfa_exempt
@@ -72,9 +74,17 @@ def continue_link(request: HttpRequest) -> HttpResponse:
         retry = str(max(1, math.ceil(wait.total_seconds())))
         return _private(HttpResponse(TOO_MANY_ATTEMPTS, status=429, headers={"Retry-After": retry}))
     session_user = _session_user(request)
+    ctx = audit_context(request)
     check = services.redeem_action_token(
-        request.POST.get("token", ""), session_user=session_user, ctx=audit_context(request)
+        request.POST.get("token", ""), session_user=session_user, ctx=ctx
     )
+    if check.email_bound and check.action_url:
+        # VEN.24: nobody is signed in. A valid link is opened in the session; a refused one
+        # (audited) still leads to its page, which explains that the link is no longer valid.
+        # Opening is audited too, never with the token.
+        if check.refusal is None:
+            services.open_email_bound_link(request.session, check, ctx=ctx)
+        return _private(HttpResponseRedirect(check.action_url))
     if check.refusal is not None or check.user is None or not check.action_url:
         login_url = resolve_url(settings.MFA_LOGIN_URL)
         return _private(redirect_to_login(check.action_url or "/", login_url))

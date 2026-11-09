@@ -1,0 +1,9 @@
+{% extends "layouts/account.html" %}
+{% block title %}Claim submitted · MPMV{% endblock %}
+{% block account_content %}
+<h1>Claim submitted</h1>
+<p>Your account is ready and your claim of {{ vendor.legal_name }} is waiting for approval by
+the platform staff. You will be able to manage the vendor, its tax data and its payouts once
+they approve it.</p>
+{% include "accounts/mfa/_recovery_codes_list.html" with next="/" %}
+{% endblock %}

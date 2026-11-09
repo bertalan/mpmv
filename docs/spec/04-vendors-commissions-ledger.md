@@ -147,6 +147,31 @@ def payout_eligibility(vendor) -> Eligibility               # DAC7 complete, acc
    data (legal identity, tax profile) or payout data. Links expire, so staff have a "resend /
    regenerate" action: it issues a new link and invalidates the old one, and both steps are in
    the AuditLog.
+   Implementation (VEN.24): the legal email of record is `Vendor.contact_email`; a vendor that
+   already has a member, or has neither a VAT number nor a TIN, cannot be claimed. The claim
+   page asks for the VAT number or TIN first (spaces, dots, dashes and the country prefix are
+   ignored); each wrong answer is audited without the typed value, claim-page POSTs are rate
+   limited per IP, and the claim locks after `VENDOR_CLAIM_MAX_FAILURES` (5) wrong answers
+   until staff regenerate the link. The password and the authenticator app (TOTP, the key kept
+   in the session until its first code checks out) come next; the account, its second factor,
+   the spent link and the submitted claim are written in one transaction. An existing account
+   with the legal email is never taken over or changed: when one exists (a claimant whose claim
+   was rejected and who got a new link, or who already claimed another vendor with the same
+   legal email), the claim page asks for that account's own password (the login lockout and
+   captcha apply) and a code from its own authenticator app instead, then submits the claim for
+   it. The link alone never signs anyone in. The claimant gets no membership until staff approve
+   the claim (`VendorClaim`, admin actions on the vendor list), so before approval they reach no
+   vendor data at all. Sending or regenerating a link, approving and rejecting need a fresh
+   second factor (step-up), and approval is refused when the vendor meanwhile got a member or
+   the claimant's email is no longer the address the link went to.
+   Destination (decision by lane A, delegated by the owner, on PR #141): when the vendor has a
+   PEC address on file, the staff send / regenerate dialog may pick it instead of the legal
+   email; no other address can be chosen. The link is then bound to the PEC, the claimant's
+   account uses it, and the AuditLog entry names the channel and the masked address.
+   After a reject: rejecting a claim invalidates every open claim link of the vendor (audited
+   `vendor.claim_link_invalidated`, reason `rejected`). Only staff start a new claim afterwards,
+   through the regenerate action behind step-up; its audit entry references the reject (claim,
+   time and audit entry). The claimant has no self-service resend.
 2. **Paid order**: for each `VendorOrder` the rule snapshot is frozen, `compute_commission` is
    computed, and the ledger rows are written (`sale`, `shipping`, `commission`, `payment_fee`).
 3. **Transfer**: with *separate charges and transfers* (see [07](07-cart-orders-payments.md)) a Stripe
