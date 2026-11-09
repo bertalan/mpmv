@@ -1,0 +1,15 @@
+{% extends "layouts/account.html" %}
+{% block title %}Claim your vendor · MPMV{% endblock %}
+{% block account_content %}
+<h1>Claim {{ vendor.legal_name }}</h1>
+<p>This vendor was set up for you on the platform. To claim it, first confirm the VAT number
+or the tax identification number (TIN) of the business.</p>
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="step" value="identity">
+  {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+  <p><label for="id_tax_id">VAT number or TIN</label>
+    <input id="id_tax_id" name="tax_id" autocomplete="off" maxlength="40" required autofocus></p>
+  <button type="submit">Confirm</button>
+</form>
+{% endblock %}
