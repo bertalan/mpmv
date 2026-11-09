@@ -9,7 +9,8 @@ import datetime as dt
 import logging
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
@@ -99,6 +100,37 @@ def _cached(query: AddressQuery, language: str, now: dt.datetime) -> GeocodeOutc
         return None
     results = tuple(GeocodeResult.from_dict(item) for item in entry.candidates)
     return GeocodeOutcome(results=results, provider=entry.provider, attempts=(), cached=True)
+
+
+def cached_candidate(
+    query: AddressQuery,
+    latitude: Decimal,
+    longitude: Decimal,
+    *,
+    now: dt.datetime | None = None,
+) -> GeocodeResult | None:
+    """The candidate an unexpired lookup of `query` (in any language) returned at this point.
+
+    The map picker (EVT.13) confirms a "Find coordinates" candidate by sending its point back;
+    the form takes the provider, precision and confidence from here, never from the request.
+    Points compare at the page's precision (six decimal places). No provider is called.
+    """
+    entries = GeocodeCacheEntry.objects.filter(
+        key=engine.cache_key(query), expires_at__gt=now or timezone.now()
+    ).order_by("-expires_at")
+    for entry in entries:
+        for item in entry.candidates:
+            result = GeocodeResult.from_dict(item)
+            try:
+                point = (
+                    engine.coordinate(result.latitude),
+                    engine.coordinate(result.longitude, limit=180),
+                )
+            except ValueError:
+                continue
+            if point == (latitude, longitude):
+                return replace(result, latitude=point[0], longitude=point[1])
+    return None
 
 
 def _store(

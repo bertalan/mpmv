@@ -157,3 +157,18 @@ class EncryptedCharField(EncryptedFieldMixin, models.CharField[Any, Any]):
 
 class EncryptedTextField(EncryptedFieldMixin, models.TextField[Any, Any]):
     """A TextField encrypted at rest."""
+
+
+class EncryptedDateField(EncryptedFieldMixin, models.DateField[Any, Any]):
+    """A DateField encrypted at rest (e.g. a date of birth). The plaintext is the ISO date; the
+    column is `text`. Store "no date" as NULL (`null=True`), never as an empty string."""
+
+    def get_internal_type(self) -> str:
+        return "TextField"
+
+    def get_db_prep_value(self, value: Any, connection: Any, prepared: bool = False) -> Any:
+        return value if prepared else self.get_prep_value(value)
+
+    def from_db_value(self, value: Any, expression: Any, connection: Any) -> Any:
+        plain = super().from_db_value(value, expression, connection)
+        return None if plain is None or plain == "" else self.to_python(plain)

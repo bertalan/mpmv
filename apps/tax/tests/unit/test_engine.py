@@ -22,9 +22,12 @@ def test_a_taxable_regime_without_exemption_reason_is_consistent(regime: str) ->
     assert engine.profile_errors(regime, "", fiscal_regime="") == {}
 
 
-@pytest.mark.parametrize("reason", ["art74_publishing", "other"])
-def test_an_exempt_regime_with_a_reason_is_consistent(reason: str) -> None:
-    assert engine.profile_errors("exempt", reason, fiscal_regime="RF01") == {}
+@pytest.mark.parametrize(("reason", "law_country"), [("art74_publishing", ""), ("other", "AT")])
+def test_an_exempt_regime_with_a_reason_is_consistent(reason: str, law_country: str) -> None:
+    errors = engine.profile_errors(
+        "exempt", reason, fiscal_regime="RF01", exempt_country=law_country
+    )
+    assert errors == {}
 
 
 def test_an_exempt_regime_needs_a_reason() -> None:
@@ -56,7 +59,10 @@ def test_the_flat_rate_exemption_matches_rf19() -> None:
     [("oss", ""), ("domestic_only", ""), ("exempt", "art74_publishing"), ("exempt", "other")],
 )
 def test_a_flat_rate_vendor_is_exempt_as_flat_rate_only(regime: str, reason: str) -> None:
-    errors = engine.profile_errors(regime, reason, fiscal_regime=FLAT_RATE_REGIME)
+    law_country = "AT" if reason == "other" else ""
+    errors = engine.profile_errors(
+        regime, reason, fiscal_regime=FLAT_RATE_REGIME, exempt_country=law_country
+    )
     assert set(errors) == {"regime"}
     assert FLAT_RATE_REGIME in errors["regime"]
 

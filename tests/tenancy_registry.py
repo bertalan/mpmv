@@ -235,6 +235,14 @@ ENDPOINTS: dict[str, Access] = {
         OWN_ACCOUNT + " The factor is looked up among the user's own.",
         kwargs={"kind": "totp", "public_id": "0"},
     ),
+    "action_link:open": NoVendorData(
+        "Secure action link (CORE.15): a Continue page for a signed token; shows no object.",
+        kwargs={"token": "not-a-token"},
+    ),
+    "action_link:continue": NoVendorData(
+        "Secure action link Continue POST (CORE.15): a token of another user or object is "
+        "refused before anything is shown."
+    ),
     "geocoding_find": NoVendorData(
         "Find coordinates (EVT.12): geocodes the typed address; reads no vendor data."
     ),

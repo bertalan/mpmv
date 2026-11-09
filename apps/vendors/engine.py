@@ -1,14 +1,16 @@
 """Pure vendor rules (no ORM): status state machine, slug generation, member roles and their
 permissions, and the legal and e-invoicing identity (validators, required fields, FatturaPA
-party block), onboarding and the establishment gate (CMP.13)."""
+party block, RF20 eligibility), onboarding and the establishment gate (CMP.13)."""
 
 import dataclasses
+import datetime as dt
 import re
 from collections.abc import Collection, Container, Iterable, Mapping, Sequence
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Final
 
+from apps.core.countries import EU_MEMBER_STATES as EU_MEMBER_STATES  # TIN_FORMATS covers them
 from apps.core.countries import ISO_3166_ALPHA2, is_eu
 from apps.core.text import slugify
 
@@ -319,6 +321,74 @@ IBAN_LENGTHS: Final[Mapping[str, int]] = {
     """.split()  # noqa: SIM905 - compact, reviewable table
 }
 
+# TIN formats per issuing Member State (DAC7, owner decision MQ-6, VEN.23), after the structures
+# the Member States publish on the European Commission's "TIN on the web" for individuals and
+# entities. Checked on the TIN without separators (dots, slashes, hyphens). The Italian TIN is
+# the codice fiscale, checked with its check character instead.
+TIN_FORMATS: Final[Mapping[str, re.Pattern[str]]] = {
+    country: re.compile(pattern, re.ASCII)
+    for country, pattern in {
+        "AT": r"\d{9}",
+        "BE": r"\d{10,11}",
+        "BG": r"\d{9,10}",
+        "CY": r"\d{8}[A-Z]",
+        "CZ": r"\d{8,10}",
+        "DE": r"\d{10,13}",
+        "DK": r"\d{8}|\d{10}",
+        "EE": r"\d{8}|\d{11}",
+        "ES": r"[0-9A-Z]\d{7}[0-9A-Z]",
+        "FI": r"\d{6}[-+A-FUVWXY]?\d{3}[0-9A-Y]|\d{8}",
+        "FR": r"\d{9}|[0-3]\d{12}",
+        "GR": r"\d{9}",
+        "HR": r"\d{11}",
+        "HU": r"\d{10,11}",
+        "IE": r"\d{7}[A-W][A-IW]?",
+        ITALY: r"[A-Z0-9]{11}|[A-Z0-9]{16}",  # checked as a codice fiscale (is_valid_tin)
+        "LT": r"\d{9,11}",
+        "LU": r"\d{11}|\d{13}",
+        "LV": r"\d{11}",
+        "MT": r"\d{7}[MGAPLHBZ]|\d{9}",
+        "NL": r"\d{9}",
+        "PL": r"\d{10,11}",
+        "PT": r"\d{9}",
+        "RO": r"\d{2,10}|\d{13}",
+        "SE": r"\d{10}|\d{12}",
+        "SI": r"\d{8}",
+        "SK": r"\d{9,10}",
+    }.items()
+}
+# Any other country: a plausible identifier (letters and digits, with the usual separators).
+_ANY_TIN = re.compile(r"[A-Z0-9][A-Z0-9./-]{0,29}", re.ASCII)
+_TIN_SEPARATORS = re.compile(r"[./-]")
+# Jurisdictions that issue no TIN (in their absence DAC7 asks an individual's place of birth).
+# A reviewable list, kept short on purpose: staff can still record a TIN when there is one.
+NO_TIN_COUNTRIES: Final = frozenset({"AE", "BM", "BS", "KY", "MC", "VG"})
+# Member States where an entity's VAT number, without its prefix, is also its TIN: only there is
+# "same as the VAT number" offered. Elsewhere the two differ (AT "U" + 8 digits, DE, FR, NL, SE
+# "01" suffix, EE, HU, LT, LU, MT): the vendor enters the TIN. A test derives a valid TIN for
+# every country listed here.
+SAME_AS_VAT_COUNTRIES: Final = frozenset(
+    {
+        "BE",
+        "BG",
+        "CY",
+        "CZ",
+        "DK",
+        "ES",
+        "FI",
+        "GR",
+        "HR",
+        "IE",
+        ITALY,
+        "LV",
+        "PL",
+        "PT",
+        "RO",
+        "SI",
+        "SK",
+    }
+)
+
 _ITALIAN_VAT = re.compile(r"\d{11}", re.ASCII)
 _OMOCODIA_DIGIT = "[0-9LMNPQRSTUV]"
 _CODICE_FISCALE = re.compile(
@@ -466,6 +536,75 @@ def is_valid_ateco(value: str) -> bool:
     return bool(_ATECO.fullmatch(value.strip()))
 
 
+def is_valid_tin(tin: str, country: str) -> bool:
+    """`tin` has the format of the TINs issued by `country` (`TIN_FORMATS`); a country without a
+    format in the table only needs a plausible identifier. Italy: a valid codice fiscale."""
+    code = compact(tin)
+    if not _ANY_TIN.fullmatch(code):
+        return False
+    if country == ITALY:
+        return is_valid_codice_fiscale(code)
+    pattern = TIN_FORMATS.get(country)
+    return pattern is None or bool(pattern.fullmatch(_TIN_SEPARATORS.sub("", code)))
+
+
+# --- Cross-border SME franchise number (VEN.25, owner decision MQ-5)
+#
+# A small enterprise using the VAT franchise of another member state (art. 284(2) of the VAT
+# directive as amended by Directive (EU) 2020/285) gets from its member state of establishment
+# an individual identification number with the suffix "EX" (art. 284(3)). The national part
+# follows the issuing member state's VAT number format, after its VAT prefix (EL for Greece).
+
+FRANCHISE_NUMBER_SUFFIX: Final = "EX"
+
+# National part of the number, by issuing member state (ISO code): the VIES VAT number formats.
+CROSS_BORDER_FRANCHISE_NUMBER_FORMATS: Final[Mapping[str, str]] = {
+    "AT": r"U\d{8}",
+    "BE": r"[01]\d{9}",
+    "BG": r"\d{9,10}",
+    "CY": r"\d{8}[A-Z]",
+    "CZ": r"\d{8,10}",
+    "DE": r"\d{9}",
+    "DK": r"\d{8}",
+    "EE": r"\d{9}",
+    "ES": r"[A-Z0-9]\d{7}[A-Z0-9]",
+    "FI": r"\d{8}",
+    "FR": r"[A-HJ-NP-Z0-9]{2}\d{9}",
+    "GR": r"\d{9}",
+    "HR": r"\d{11}",
+    "HU": r"\d{8}",
+    "IE": r"\d{7}[A-W][A-I]?|\d[A-Z+*]\d{5}[A-W]",
+    "IT": r"\d{11}",  # country-literal: the Italian issuer format, one EU member state of 27
+    "LT": r"\d{9}|\d{12}",
+    "LU": r"\d{8}",
+    "LV": r"\d{11}",
+    "MT": r"\d{8}",
+    "NL": r"\d{9}B\d{2}",
+    "PL": r"\d{10}",
+    "PT": r"\d{9}",
+    "RO": r"[1-9]\d{1,9}",
+    "SE": r"\d{12}",
+    "SI": r"\d{8}",
+    "SK": r"\d{10}",
+}
+_FRANCHISE_NUMBER_ISSUERS: Final = {
+    vat_prefix(country): (country, re.compile(pattern, re.ASCII))
+    for country, pattern in CROSS_BORDER_FRANCHISE_NUMBER_FORMATS.items()
+}
+
+
+def franchise_number_issuer(number: str) -> str | None:
+    """The member state (ISO code) that issued a well-formed `EX` number; None otherwise."""
+    code = compact(number)
+    if not code.endswith(FRANCHISE_NUMBER_SUFFIX):
+        return None
+    issuer = _FRANCHISE_NUMBER_ISSUERS.get(code[:2])
+    if issuer is None:
+        return None
+    country, national = issuer
+    return country if national.fullmatch(code[2 : -len(FRANCHISE_NUMBER_SUFFIX)]) else None
+
+
 @dataclasses.dataclass(frozen=True)
 class LegalIdentity:
     """A vendor's legal and e-invoicing identity, as plain values (field names = model fields)."""
@@ -475,12 +614,17 @@ class LegalIdentity:
     legal_form: str = ""
     first_name: str = ""
     last_name: str = ""
+    date_of_birth: dt.date | None = None
+    place_of_birth: str = ""
     vat_number: str = ""
     tax_code: str = ""
+    tin_country: str = ""
     tax_residence_country: str = ""
     fiscal_regime: str = ""
+    cross_border_franchise_number: str = ""
     ateco_code: str = ""
     eori: str = ""
+    business_registration_number: str = ""
     registered_street: str = ""
     registered_street_number: str = ""
     registered_postal_code: str = ""
@@ -505,8 +649,12 @@ class LegalIdentity:
     iban: str = ""
     bic: str = ""
     bank_name: str = ""
+    account_holder_name: str = ""
     contact_email: str = ""
     phone: str = ""
+    # Not fields a requirement can name: an option and the VIES state of the VAT number.
+    tin_same_as_vat: bool = False
+    vies_status: str = VIES_UNCHECKED
 
     def values(self) -> dict[str, Any]:
         return dataclasses.asdict(self)
@@ -517,7 +665,8 @@ class LegalIdentity:
 LEGAL_FIELDS: Final = tuple(
     f.name
     for f in dataclasses.fields(LegalIdentity)
-    if f.name not in {"country", "legal_name", "contact_email", "phone"}
+    if f.name
+    not in {"country", "legal_name", "contact_email", "phone", "tin_same_as_vat", "vies_status"}
 )
 
 # Identifiers stored compact (upper case, no spaces).
@@ -528,14 +677,66 @@ COMPACT_FIELDS: Final = (
     "rea_number",
     "sdi_recipient_code",
     "fiscal_representative_vat_number",
+    "cross_border_franchise_number",
     "iban",
     "bic",
 )
+
+FRANCHISE_NUMBER_FIELD: Final = "cross_border_franchise_number"
 
 
 def _address_country(identity: LegalIdentity, prefix: str) -> str:
     country: str = getattr(identity, f"{prefix}_country")
     return country or (identity.country if prefix == "registered" else "")
+
+
+def rf20_seat_country(identity: LegalIdentity) -> str:
+    """The member state where the vendor's registered office (seat) is, as the CMP.13
+    `vendor_establishment` reads it; "" when the seat is outside the EU.
+
+    Owner interim decision MQ-17: until the tax advisor answers, a permanent establishment alone
+    does not qualify for RF20, so only the seat counts. Revisit when MQ-17 is answered.
+    """
+    seat = vendor_establishment(identity).registered_office
+    return seat if seat in EU_MEMBER_STATES else ""
+
+
+def cross_border_franchise_errors(identity: LegalIdentity) -> dict[str, list[str]]:
+    """Who may declare RF20 (VEN.25, owner decision MQ-5), by field.
+
+    A vendor declaring RF20 must have its registered office (seat) in an EU member state and hold
+    the `EX` number (art. 284(3) of the VAT directive). A number, when given, must be well formed
+    for its issuing member state and issued by the seat's member state. A permanent
+    establishment alone does not qualify (owner interim decision MQ-17).
+    """
+    errors: dict[str, list[str]] = {}
+    number = compact(identity.cross_border_franchise_number)
+    seat = rf20_seat_country(identity)
+    if number:
+        issuer = franchise_number_issuer(number)
+        if issuer is None:
+            errors[FRANCHISE_NUMBER_FIELD] = [
+                "Not a valid cross-border franchise number: the issuing member state's VAT "
+                "prefix, its national number and the suffix EX (e.g. DE123456789EX)."
+            ]
+        elif issuer != seat:
+            where = seat or "no EU member state"
+            errors[FRANCHISE_NUMBER_FIELD] = [
+                f"The number was issued by {issuer}, but the vendor's registered office is in "
+                f"{where}: it must be issued by the member state of the registered office."
+            ]
+    if identity.fiscal_regime == CROSS_BORDER_FRANCHISE_REGIME:
+        if not seat:
+            errors["fiscal_regime"] = [
+                "RF20 (cross-border VAT franchise) is only for vendors whose registered office "
+                "is in an EU member state; a permanent establishment alone does not qualify."
+            ]
+        if not number:
+            errors[FRANCHISE_NUMBER_FIELD] = [
+                "RF20 needs the cross-border franchise number (suffix EX) issued by the member "
+                "state of the registered office."
+            ]
+    return errors
 
 
 def normalized(identity: LegalIdentity) -> LegalIdentity:
@@ -546,6 +747,8 @@ def normalized(identity: LegalIdentity) -> LegalIdentity:
         if _address_country(identity, prefix) == ITALY:
             changes[f"{prefix}_province"] = compact(province)
     changes["pec"] = identity.pec.strip()
+    changes["place_of_birth"] = identity.place_of_birth.strip()
+    changes["business_registration_number"] = identity.business_registration_number.strip()
     return dataclasses.replace(identity, **changes)
 
 
@@ -578,14 +781,27 @@ def identity_errors(identity: LegalIdentity) -> dict[str, list[str]]:
             is_valid_italian_vat(ident.vat_number),
             "Not a valid Italian VAT number (11 digits with a check digit).",
         )
-        check(
-            "tax_code",
-            is_valid_codice_fiscale(ident.tax_code),
-            "Not a valid codice fiscale (16 characters, or 11 digits for entities).",
-        )
     else:
         _, number = split_vat_number(ident.vat_number, ident.country)
         check("vat_number", bool(_VAT_CODE.fullmatch(number)), "Not a valid VAT number.")
+    tin_country = ident.tin_country or ident.country
+    check(
+        "tax_code",
+        is_valid_tin(ident.tax_code, tin_country),
+        "Not a valid codice fiscale (16 characters, or 11 digits for entities)."
+        if tin_country == ITALY
+        else f"Not a valid TIN for {tin_country}.",
+    )
+    if ident.tin_same_as_vat:
+        if ident.legal_form == SOLE_PROPRIETORSHIP:
+            errors["tin_same_as_vat"] = ["Only an entity's TIN can be its VAT number."]
+        elif not ident.vat_number:
+            errors["tin_same_as_vat"] = ["There is no VAT number to use as the TIN."]
+        elif _vat_number_as_tin(ident) is None:
+            errors["tin_same_as_vat"] = [
+                f"In {ident.country or 'this country'} the VAT number is not the TIN: "
+                "enter the TIN instead."
+            ]
     check("fiscal_regime", ident.fiscal_regime in FISCAL_REGIMES, "Unknown fiscal regime.")
     check("legal_form", ident.legal_form in LEGAL_FORMS, "Unknown legal form.")
     check("ateco_code", is_valid_ateco(ident.ateco_code), "An ATECO code looks like 47.91.10.")
@@ -617,6 +833,8 @@ def identity_errors(identity: LegalIdentity) -> dict[str, list[str]]:
         errors["share_capital"] = ["The share capital cannot be negative."]
     errors.update(_address_errors(ident, "registered"))
     errors.update(_address_errors(ident, "establishment"))
+    for name, messages in cross_border_franchise_errors(ident).items():
+        errors.setdefault(name, []).extend(messages)
     return errors
 
 
@@ -736,35 +954,178 @@ def completeness(
     return Completeness(missing=tuple(missing), invalid=tuple(invalid))
 
 
-# --- DAC7 dataset (spec 11 CMP.1). The seeded payout requirements include it for every vendor.
+# --- DAC7 seller dataset (owner decision MQ-6, VEN.23; spec 11 CMP.1)
+#
+# Directive (EU) 2021/514, Annex V, section III.B.2: for each reportable seller, (a) the data
+# collected under section II.B.1 (individuals) or II.B.2 (entities), then (b) the financial
+# account identifier, (c) the account holder's name where it differs from the seller's and
+# (d) the Member State of residence. (e) and (f), the consideration, activities and fees per
+# quarter, come from the ledger (CMP.1), not from the vendor. A test pins both lists.
 
-VAT_OR_TIN: Final = "vat_number or tax_code"
+_PRIMARY_ADDRESS: Final = (
+    "registered_street",
+    "registered_street_number",
+    "registered_postal_code",
+    "registered_city",
+    "registered_province",
+    "registered_country",
+)
+_ACCOUNT_AND_RESIDENCE: Final = (
+    ("III.B.2(b)", "financial account identifier", ("iban",)),
+    (
+        "III.B.2(c)",
+        "name of the financial account holder, where different",
+        ("account_holder_name",),
+    ),
+    ("III.B.2(d)", "Member State of residence", ("tax_residence_country",)),
+)
+DAC7_INDIVIDUAL_DATASET: Final = (
+    ("II.B.1(a)", "first and last name", ("first_name", "last_name")),
+    ("II.B.1(b)", "primary address", _PRIMARY_ADDRESS),
+    (
+        "II.B.1(c)",
+        "TIN with its Member State of issuance, or the place of birth without a TIN",
+        ("tax_code", "tin_country", "place_of_birth"),
+    ),
+    ("II.B.1(d)", "VAT identification number, where available", ("vat_number",)),
+    ("II.B.1(e)", "date of birth", ("date_of_birth",)),
+    *_ACCOUNT_AND_RESIDENCE,
+)
+DAC7_ENTITY_DATASET: Final = (
+    ("II.B.2(a)", "legal name", ("legal_name",)),
+    ("II.B.2(b)", "primary address", _PRIMARY_ADDRESS),
+    ("II.B.2(c)", "TIN with its Member State of issuance", ("tax_code", "tin_country")),
+    ("II.B.2(d)", "VAT identification number, where available", ("vat_number",)),
+    ("II.B.2(e)", "business registration number", ("business_registration_number",)),
+    (
+        "II.B.2(f)",
+        "permanent establishment in the Union, where available",
+        tuple(name.replace("registered", "establishment") for name in _PRIMARY_ADDRESS),
+    ),
+    *_ACCOUNT_AND_RESIDENCE,
+)
+# Every vendor field that is part of the dataset, or decides which part applies: staff change
+# them only behind an MFA step-up (`services.correct_dac7_dataset`).
+DAC7_FIELDS: Final = frozenset(
+    {
+        "legal_form",
+        "tin_same_as_vat",
+        *(name for _, _, names in DAC7_INDIVIDUAL_DATASET + DAC7_ENTITY_DATASET for name in names),
+    }
+)
+# Order of the field names in a `Completeness`.
+_FIELD_ORDER: Final = ("legal_name", *LEGAL_FIELDS)
 
 
-def dac7_missing(identity: LegalIdentity) -> tuple[str, ...]:
-    """What the vendor's DAC7 dataset still lacks: legal name, VAT number or TIN, country of tax
-    residence, registered office (street, postal code, city, country; province in Italy), IBAN.
+def _in_field_order(names: Iterable[str]) -> tuple[str, ...]:
+    wanted = set(names)
+    return tuple(name for name in _FIELD_ORDER if name in wanted)
 
-    A permanent establishment is reported only when the vendor has one, so it is never missing.
+
+def is_individual(identity: LegalIdentity) -> bool:
+    """A sole proprietor is an individual seller for DAC7; every other legal form an entity."""
+    return identity.legal_form == SOLE_PROPRIETORSHIP
+
+
+def tin_from_vat(identity: LegalIdentity) -> LegalIdentity:
+    """Apply "same as the VAT number": the TIN is the VAT number (without its prefix) issued by
+    the vendor's country once VIES says it is valid, and nothing until then. Without the option
+    the identity is returned unchanged.
+
+    Only in `SAME_AS_VAT_COUNTRIES`, and only when the derived value is a valid TIN there:
+    otherwise no TIN is derived (and `identity_errors` refuses the option). While VIES is
+    unavailable, a TIN already derived from this VAT number is kept: only a definite answer
+    changes it.
+    """
+    if not identity.tin_same_as_vat:
+        return identity
+    derived = _vat_number_as_tin(identity)
+    if derived is None:
+        return dataclasses.replace(identity, tax_code="", tin_country="")
+    country, number = derived
+    if identity.vies_status == VIES_VALID or (
+        identity.vies_status == VIES_UNAVAILABLE
+        and (compact(identity.tax_code), identity.tin_country) == (number, country)
+    ):
+        return dataclasses.replace(identity, tax_code=number, tin_country=country)
+    return dataclasses.replace(identity, tax_code="", tin_country="")
+
+
+def _vat_number_as_tin(identity: LegalIdentity) -> tuple[str, str] | None:
+    """(country, TIN) taken from the VAT number, where that number is a valid TIN; else None."""
+    if not identity.vat_number or identity.country not in SAME_AS_VAT_COUNTRIES:
+        return None
+    country, number = split_vat_number(identity.vat_number, identity.country)
+    return (country, number) if is_valid_tin(number, country) else None
+
+
+def dac7_check(identity: LegalIdentity) -> Completeness:
+    """The DAC7 dataset of `identity`: fields that are missing, and present ones that are
+    invalid (a TIN malformed for its country, a VAT number VIES found invalid, ...).
+
+    The parts depend on the legal form: names and date of birth for an individual, legal name
+    and business registration number for an entity. The TIN is always needed with its issuing
+    country; when that country issues no TIN, an individual gives the place of birth instead.
+    An entity always needs a TIN (or the identifier its country uses as one), so every entity
+    that passes has a tax identifier for FatturaPA.
+    The VAT number, the account holder's name and a permanent establishment are reported only
+    when there is one, so they are never missing.
     """
     ident = normalized(identity)
     missing: list[str] = []
-    if not ident.legal_name.strip():
-        missing.append("legal_name")
-    if not (ident.vat_number or ident.tax_code):
-        missing.append(VAT_OR_TIN)
-    if not ident.tax_residence_country:
-        missing.append("tax_residence_country")
-    for name in ("street", "postal_code", "city"):
-        if not str(getattr(ident, f"registered_{name}")).strip():
-            missing.append(f"registered_{name}")
-    if ident.registered_country == ITALY and not ident.registered_province:
-        missing.append("registered_province")
-    if not ident.registered_country:
-        missing.append("registered_country")
-    if not ident.iban:
-        missing.append("iban")
-    return tuple(missing)
+
+    def need(*names: str) -> None:
+        missing.extend(name for name in names if not is_filled(name, ident.values()))
+
+    if not ident.legal_form:
+        need("legal_form")
+    if is_individual(ident):
+        need("first_name", "last_name", "date_of_birth")
+    else:
+        need("legal_name")
+        if ident.legal_form:
+            need("business_registration_number")
+    need("registered_street", "registered_postal_code", "registered_city", "registered_country")
+    if ident.registered_country == ITALY:
+        need("registered_province")
+    need("tin_country")
+    if ident.tin_country in NO_TIN_COUNTRIES and is_individual(ident):
+        if not ident.tax_code:
+            need("place_of_birth")
+    else:
+        need("tax_code")  # an entity always: the place of birth is no fallback for it
+    need("tax_residence_country", "iban")
+
+    errors = identity_errors(ident)
+    invalid = {name for name in DAC7_FIELDS if name in errors and name not in missing}
+    if ident.vat_number and ident.vies_status == VIES_INVALID:
+        invalid.add("vat_number")
+    return Completeness(missing=_in_field_order(missing), invalid=_in_field_order(invalid))
+
+
+def dac7_missing(identity: LegalIdentity) -> tuple[str, ...]:
+    """The DAC7 fields still missing or invalid, in field order (see `dac7_check`)."""
+    result = dac7_check(identity)
+    return _in_field_order((*result.missing, *result.invalid))
+
+
+def payout_completeness(identity: LegalIdentity, rules: Iterable[Requirement]) -> Completeness:
+    """What a payout still needs: the staff-editable rules plus the DAC7 dataset.
+
+    The DAC7 check is not a rule: deactivating requirement rows relaxes only what the rows add,
+    never the dataset the platform must report.
+    """
+    by_rules = completeness(identity, rules, purpose=PAYOUT)
+    dac7 = dac7_check(identity)
+    missing = _in_field_order((*by_rules.missing, *dac7.missing))
+    invalid = _in_field_order(
+        name for name in (*by_rules.invalid, *dac7.invalid) if name not in missing
+    )
+    return Completeness(missing=missing, invalid=invalid)
+
+
+class StepUpRequired(PermissionError):
+    """Staff change the DAC7 dataset only right after a second-factor verification (CORE.4)."""
 
 
 class PayoutNotAllowed(ValueError):
@@ -1031,6 +1392,11 @@ def mask_tax_code(tax_code: str) -> str:
     is not half readable: for audit rows and screens (SEC.3)."""
     shown = min(4, len(tax_code) // 3)
     return "*" * (len(tax_code) - shown) + tax_code[len(tax_code) - shown :]
+
+
+def mask_personal(value: object) -> str:
+    """Personal data (date and place of birth): only whether a value is there."""
+    return "" if value is None or value == "" else "********"
 
 
 def mask_iban(iban: str) -> str:

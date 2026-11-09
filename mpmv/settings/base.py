@@ -6,7 +6,7 @@ import dj_database_url
 import django_stubs_ext
 from django.utils.csp import CSP
 
-from .env import env_bool, env_flags, env_list, env_secret_list, env_str
+from .env import env_bool, env_flags, env_list, env_secret_list, env_str, map_tile_origin
 
 # Allows `models.DecimalField[Any]`-style generics at runtime (django-stubs).
 django_stubs_ext.monkeypatch()
@@ -37,7 +37,14 @@ LOCAL_APPS = [
     "apps.compliance",
     "apps.api",
     "apps.mcp",
+    "apps.seed",  # demo data seed (ARC.10): above every app, imported by none
 ]
+
+# Demo data seed (ARC.10, docs/dev/demo-seed.md): off unless allowed. Dev and test allow it;
+# STAGE opts in with MPMV_ALLOW_SEED=1. LIVE_DATA marks an environment holding real data
+# (live.py): the seed never runs there, and the `seed.E001` check fails if it is allowed.
+ALLOW_SEED = env_bool("MPMV_ALLOW_SEED", default=False)
+LIVE_DATA = False
 
 INSTALLED_APPS = [
     # Django's admin with the self-service password change audited (SEC.4).
@@ -124,6 +131,10 @@ MFA_STEP_UP_MAX_AGE = 300  # seconds a verification counts as fresh for sensitiv
 # Step-up for sensitive views of apps that cannot import accounts (the core audit log view, SEC.4).
 STEP_UP_DECORATOR = "apps.accounts.decorators.step_up_required"
 MFA_LOGIN_URL = "admin:login"  # until the site and vendor login pages exist
+# Secure action links in emails (CORE.15, spec 02): validity of a link unless its purpose sets
+# its own, and Continue POSTs allowed per client IP every 15 minutes.
+ACTION_LINK_MAX_AGE = 72 * 3600  # seconds
+ACTION_LINK_RATE_LIMIT = 30
 MFA_ISSUER = "MPMV"  # name shown in authenticator apps and passkey prompts
 OTP_TOTP_ISSUER = MFA_ISSUER
 OTP_ADMIN_HIDE_SENSITIVE_DATA = True
@@ -239,7 +250,8 @@ WAGTAIL_FINISH_WORKFLOW_ACTION = "apps.core.workflows.publish_reviewed_revision"
 WAGTAIL_CONTENT_LANGUAGES = LANGUAGES
 # The public address of the site, in Wagtail's admin emails and previews. The localhost fallback
 # is for a developer machine: `check --deploy` fails on LIVE and STAGE without it (cms.E001).
-WAGTAILADMIN_BASE_URL = env_str("MPMV_BASE_URL", "") or "http://localhost:8000"
+SITE_BASE_URL = env_str("MPMV_BASE_URL", "") or "http://localhost:8000"
+WAGTAILADMIN_BASE_URL = SITE_BASE_URL
 # One image model for CMS pages, products (CAT.4), vendor logos and banners (spec 10 §10.2). Set
 # before any image exists: the licence and credit fields come with CMS.8.
 WAGTAILIMAGES_IMAGE_MODEL = "core.MediaImage"
@@ -364,6 +376,24 @@ GEOCODING_USER_WINDOW = 60  # seconds
 # does not import the vendors app.
 GEOCODING_ACCESS_POLICIES: list[str] = ["apps.vendors.services.is_vendor_member"]
 
+# Maps (EVT.13, spec 15 "Maps"): the Leaflet tile URL template, its attribution and the view of
+# a map without a point (latitude, longitude, zoom). The tiles come from the EVT.14 proxy on the
+# site itself (`/maps/tiles/{z}/{x}/{y}.png`) once it exists; until then empty means no tile
+# layer (the picker still works: click, drag and the inputs). An absolute https URL is allowed in
+# the CSP for that one origin only, and never in tests (no third-party network).
+MAP_TILE_URL = env_str("MPMV_MAP_TILE_URL", "")
+MAP_TILE_ATTRIBUTION = env_str("MPMV_MAP_TILE_ATTRIBUTION", "") or "© OpenStreetMap contributors"
+MAP_TILE_ATTRIBUTION_URL = (
+    env_str("MPMV_MAP_TILE_ATTRIBUTION_URL", "") or "https://www.openstreetmap.org/copyright"
+)
+MAP_DEFAULT_VIEW = (48.0, 10.0, 4)
+_MAP_TILE_ORIGIN = map_tile_origin(MAP_TILE_URL)
+if _MAP_TILE_ORIGIN:
+    SECURE_CSP = {
+        **SECURE_CSP,
+        "img-src": [*SECURE_CSP["img-src"], _MAP_TILE_ORIGIN],  # type: ignore[misc]
+    }
+
 # Per-API-key rate limit (CORE.12, CORE.16, apps.api.engine): fixed windows counted in PostgreSQL,
 # so every app process shares one counter per key. API_RATE_LIMIT is the key-wide limit of every
 # key, set per environment with MPMV_API_RATE_LIMIT (default 120/minute, owner decision MQ-4);
@@ -395,9 +425,15 @@ PERMISSIONS_POLICY: dict[str, list[str]] = {
     "usb": [],
 }
 
+# A secure action link holds its token in the URL path (CORE.15): request logs redact it. The
+# filter on `django.request` runs before propagation, so Django's own handlers get it too.
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "filters": {"redact_secret_paths": {"()": "mpmv.log_redaction.RedactSecretPaths"}},
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "filters": ["redact_secret_paths"]},
+    },
+    "loggers": {"django.request": {"filters": ["redact_secret_paths"]}},
     "root": {"handlers": ["console"], "level": "INFO"},
 }

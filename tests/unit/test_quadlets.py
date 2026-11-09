@@ -142,3 +142,161 @@ def test_the_app_trusts_the_client_ip_header_only_from_the_proxy_network() -> No
     header = env["MPMV_TRUSTED_PROXY_HEADER"]
     caddyfile = (ROOT / "deploy" / "caddy" / "Caddyfile").read_text()
     assert re.search(rf"^\s*header_up {re.escape(header)} \{{client_ip\}}$", caddyfile, re.M)
+
+
+DB_ROOT_CA = "/etc/mpmv/pg-root-ca.crt"
+
+
+@pytest.mark.parametrize("name", APP_UNITS)
+def test_app_units_read_the_environment_then_the_database_connection(name: str) -> None:
+    """ARC.13: the database setup writes DATABASE_URL into its own file; it is read last."""
+    files = values(load(name), "Container", "EnvironmentFile")
+    assert files == ["%h/.config/mpmv/mpmv.env", "%h/.config/mpmv/database.env"]
+
+
+@pytest.mark.parametrize("name", APP_UNITS)
+def test_app_units_mount_the_database_root_ca_read_only(name: str) -> None:
+    """MQ-11: sslmode=verify-full against the internal CA, whose root the container mounts."""
+    mounts = [v.split(":") for v in values(load(name), "Container", "Volume")]
+    ca = [m for m in mounts if len(m) == 3 and m[1] == DB_ROOT_CA]
+    assert len(ca) == 1, mounts
+    assert "ro" in ca[0][2].split(",")
+
+
+def test_database_url_lives_only_in_the_database_env_example() -> None:
+    server = ROOT / "deploy" / "server"
+    assert "DATABASE_URL" not in env_example(), "with two env files the later one wins"
+    database = (server / "database.env.example").read_text()
+    assert re.search(r"^DATABASE_URL=$", database, re.M)
+    assert f"sslrootcert={DB_ROOT_CA}" in database
+    assert "sslmode=verify-full" in database
+
+
+CADDYFILE = ROOT / "deploy" / "caddy" / "Caddyfile"
+
+
+def caddy_sites() -> list[str]:
+    """Top-level block headers of the Caddyfile (an empty string is the global options block)."""
+    heads = []
+    for line in CADDYFILE.read_text().splitlines():
+        if line and not line[0].isspace() and line.rstrip().endswith("{"):
+            heads.append(line.rstrip()[:-1].strip())
+    return heads
+
+
+def test_caddy_serves_only_the_configured_site_name() -> None:
+    """ARC.13: the host name comes from the environment; any other name or an IP gets no site."""
+    assert caddy_sites() == ["", "{$MPMV_SITE_ADDRESS}", "http://"]
+    text = CADDYFILE.read_text()
+    assert re.search(r"^http:// \{\n\tabort\n\}$", text, re.M), "catch-all must serve nothing"
+    assert re.search(r"^\t\tstrict_sni_host on$", text, re.M)
+    assert "tls internal" not in text, "Let's Encrypt only"
+    assert "on_demand" not in text, "Let's Encrypt only, for the configured name"
+
+
+def test_caddy_noindex_header_is_behind_a_flag_that_is_off_by_default() -> None:
+    text = CADDYFILE.read_text()
+    flag = re.search(r"^\t@noindex expression `\{env\.MPMV_NOINDEX\} in \[(.*)\]`$", text, re.M)
+    assert flag, "X-Robots-Tag must depend on MPMV_NOINDEX"
+    assert '""' not in flag.group(1), "an empty or unset flag means off (LIVE)"
+    assert re.search(r'^\theader @noindex X-Robots-Tag "noindex, nofollow"$', text, re.M)
+    example = (ROOT / "deploy" / "server" / "caddy.env.example").read_text()
+    assert re.search(r"^MPMV_NOINDEX=$", example, re.M)
+    assert re.search(r"^MPMV_SITE_ADDRESS=$", example, re.M)
+
+
+MEDIA_UNITS = ("mpmv-app.container", "mpmv-worker.container")
+
+
+def mounts_of(name: str) -> list[list[str]]:
+    return [v.split(":") for v in values(load(name), "Container", "Volume")]
+
+
+def test_media_volume_is_named_and_prefixed() -> None:
+    """ARC.13: uploads and renditions survive container replacement, until object storage."""
+    unit = load("mpmv-media.volume")
+    assert values(unit, "Volume", "VolumeName") == ["mpmv-media"]
+    assert values(unit, "Volume", "User") == ["10001"], "the image user (Containerfile)"
+    assert values(unit, "Volume", "Group") == ["10001"]
+
+
+@pytest.mark.parametrize("name", MEDIA_UNITS)
+def test_app_and_worker_write_media_only_to_the_media_volume(name: str) -> None:
+    """The root file system stays read-only; MEDIA_ROOT is the one writable mount, no exec."""
+    media = [m for m in mounts_of(name) if m[0] == "mpmv-media.volume"]
+    assert len(media) == 1, mounts_of(name)
+    assert media[0][1] == "/app/media"
+    options = set(media[0][2].split(",")) if len(media[0]) == 3 else set()
+    assert "ro" not in options
+    assert {"noexec", "nosuid", "nodev"} <= options
+    assert "U" not in options, "ownership comes from the volume unit, no chown on every start"
+
+
+def test_caddy_mounts_media_read_only() -> None:
+    media = [m for m in mounts_of("mpmv-caddy.container") if m[0] == "mpmv-media.volume"]
+    assert len(media) == 1
+    assert media[0][1] == "/srv/media"
+    assert set(media[0][2].split(",")) == {"ro", "noexec", "nosuid", "nodev"}
+
+
+PUBLIC_MEDIA = re.compile(r"^\t@public_media path_regexp public_media (\S+)$", re.M)
+
+
+def public_media_regex() -> re.Pattern[str]:
+    found = PUBLIC_MEDIA.search(CADDYFILE.read_text())
+    assert found, "public media must be an explicit allow-list"
+    # Caddy uses Go RE2; this pattern is also valid Python syntax.
+    return re.compile(found.group(1))
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/media/images/demo-home-hero.width-1600.webp",
+        "/media/images/logo.svg",
+        "/media/original_images/photo.JPG",
+        "/media/original_images/photo.avif",
+    ],
+)
+def test_caddy_serves_image_files_from_the_image_folders(path: str) -> None:
+    assert public_media_regex().match(path)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/media/documents/contract.pdf",
+        "/media/documents/image.png",
+        "/media/images/page.html",
+        "/media/images/noext",
+        "/media/images/a.webp.html",
+        "/media/images/sub/dir.webp",
+        "/media/images/",
+        "/media/kyc/id.jpg",
+        "/media/original_images/../documents/x.png",
+    ],
+)
+def test_caddy_never_serves_other_media_paths(path: str) -> None:
+    """lane-b review of #152: documents and private uploads must not become public by path."""
+    assert not public_media_regex().match(path)
+
+
+def test_caddy_serves_media_as_inert_static_files() -> None:
+    """SEC.4: nothing under /media/ is executed, sniffed or able to run scripts."""
+    text = CADDYFILE.read_text()
+    block = re.search(r"^\thandle @public_media \{\n(.*?)\n\t\}$", text, re.M | re.S)
+    assert block, "allowed media must be served by Caddy from the volume"
+    body = block.group(1)
+    assert re.search(r"^\t\turi strip_prefix /media$", body, re.M)
+    assert re.search(r"^\t\troot \* /srv/media$", body, re.M)
+    assert re.search(r"^\t\tfile_server$", body, re.M), "no browse, no templates"
+    for directive in ("browse", "templates", "php"):
+        assert directive not in body
+    assert re.search(r"^\t\theader X-Content-Type-Options nosniff$", body, re.M)
+    csp = r"^\t\theader Content-Security-Policy \"default-src 'none'; sandbox\"$"
+    assert re.search(csp, body, re.M)
+    assert re.search(r"^\t\theader Cache-Control \"public, max-age=86400\"$", body, re.M)
+    assert re.search(r"^\thandle /media/\* \{\n\t\trespond 404\n\t\}$", text, re.M), (
+        "every other media path must be a 404, never the app or file_server"
+    )
+    assert re.search(r"^\thandle \{\n\t\treverse_proxy mpmv-app:8000 \{$", text, re.M)
