@@ -214,7 +214,8 @@ reusable mechanism: a service in `accounts` plus an email helper on top of the A
   the token segment of the link path.
 - **Vendor claim (VEN.24, owner decision MQ-1).** A vendor imported without an account holder is
   claimed through the same kind of link, bound to the vendor and to a claim version instead of a
-  recipient user, and sent only to the vendor's legal email of record. There is no account yet,
+  recipient user, and sent only to the vendor's legal email of record or its registered PEC
+  (certified email, Italian vendors). There is no account yet,
   so the claimant sets a password and enrols their own MFA before anything else; the link never
   signs anyone in to an existing account. Regenerating the claim bumps its version, so the old
   link stops working. Implementation: an *email-bound* purpose (`ActionPurpose.email_of`). The

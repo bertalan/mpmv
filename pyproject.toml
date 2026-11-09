@@ -44,6 +44,8 @@ dev = [
   "cyclonedx-bom>=7.6.0,<8",
   # SEC.5: property-based tests over the hostile-input corpus (tests/hostile_input.py).
   "hypothesis==6.170.10",
+  # tools/build_docs.py renders the HTML spec; tests/unit/test_build_docs_eof.py checks it.
+  "markdown>=3.5",
 ]
 
 [tool.uv]
