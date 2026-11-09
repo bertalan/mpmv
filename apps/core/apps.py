@@ -25,6 +25,8 @@ class CoreConfig(AppConfig):
     }
 
     def ready(self) -> None:
+        from django.conf import settings
+
         from .checks import (
             check_audit_policy,
             check_client_ip_settings,
@@ -42,3 +44,11 @@ class CoreConfig(AppConfig):
         checks.register(check_field_encryption_keys, checks.Tags.security)
         checks.register(check_encrypted_data, checks.Tags.database)
         checks.register(check_feature_flag_settings)
+
+        # Pillow's decompression-bomb threshold is process-wide: set once here, to the upload
+        # decode cap (SEC.2), so every Pillow use of the process (uploads, renditions, imports)
+        # sees the same value whatever ran before. Uploads above the cap are refused by
+        # apps.core.uploads itself.
+        from .uploads import configure_pillow
+
+        configure_pillow(settings.WAGTAILIMAGES_MAX_IMAGE_PIXELS)

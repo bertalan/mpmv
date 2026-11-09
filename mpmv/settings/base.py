@@ -262,11 +262,15 @@ WAGTAILADMIN_BASE_URL = SITE_BASE_URL
 WAGTAILIMAGES_IMAGE_MODEL = "core.MediaImage"
 # Upload limits (SEC.2, apps.core.uploads; values decided on PR #164). Wagtail's form checks the
 # size and the pixels; MediaImage checks all of them on every path and re-encodes the stored
-# original. 100 megapixels (all frames of an animation together) is the most one upload decodes,
-# about 400 MB of RGBA; above it the image is refused. An original over 40 megapixels is
-# downscaled (same aspect ratio) when re-encoded, so stored originals and their renditions stay
-# within 40. 300 frames bound the CPU an animation of tiny frames costs (each frame is decoded
-# and re-encoded).
+# original. 100 megapixels (all frames of an animation together) is the most one upload decodes;
+# above it the image is refused. An original over 40 megapixels is downscaled (same aspect ratio)
+# when re-encoded, so stored originals and their renditions stay within 40. 300 frames bound the
+# CPU an animation of tiny frames costs (each frame is decoded and re-encoded).
+# Memory: Pillow holds 4 bytes a pixel, so one 100-megapixel still image peaks at about 600 MB
+# of RSS while re-encoded (the decoded original, 400 MB, plus the stored 40-megapixel copy,
+# 160 MB; measured on PR #164). An animated WebP at the cap peaks at about 1 GB (libwebp keeps
+# two full canvases). Size the web workers' memory and upload concurrency for that, e.g. one
+# upload at a time per worker. CoreConfig.ready sets Pillow's bomb threshold to this cap.
 WAGTAILIMAGES_EXTENSIONS = ["avif", "gif", "jpg", "jpeg", "png", "webp"]
 WAGTAILIMAGES_MAX_UPLOAD_SIZE = 25 * 1024 * 1024
 WAGTAILIMAGES_MAX_IMAGE_PIXELS = 100_000_000

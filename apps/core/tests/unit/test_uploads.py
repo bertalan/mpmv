@@ -5,6 +5,7 @@ cases through every upload path of the site.
 """
 
 import io
+from pathlib import Path
 
 import pytest
 from PIL import Image
@@ -127,14 +128,29 @@ def test_an_animation_over_the_stored_cap_is_downscaled_frame_by_frame() -> None
 
 
 def test_pillows_bomb_guard_follows_the_decode_cap(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Pillow's own threshold (about 89 megapixels by default) must not refuse what the cap
-    accepts; above the cap the image is refused before Pillow's guard is reached."""
-    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 1_000)
+    """Pillow's own threshold, set to the cap at startup (`CoreConfig.ready`), does not refuse
+    what the cap accepts; above the cap the image is refused."""
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", SMALL.max_pixels)
     clean = sanitise_image(_png((100, 60)), "wide.png", SMALL)
     assert (clean.width, clean.height) == (64, 38)
     with pytest.raises(UploadRefused) as refusal:
         sanitise_image(_png((200, 60)), "wide.png", SMALL)
     assert refusal.value.code == "too_many_pixels"
+
+
+def test_an_upload_never_changes_pillows_process_wide_threshold(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The threshold is set once at startup, so it does not depend on whether an upload ran."""
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 7_000)
+    sanitise_image(_png((50, 50)), "square.png", SMALL)
+    assert Image.MAX_IMAGE_PIXELS == 7_000
+
+
+def test_pillows_threshold_is_the_decode_cap_from_startup() -> None:
+    from django.conf import settings
+
+    assert Image.MAX_IMAGE_PIXELS == settings.WAGTAILIMAGES_MAX_IMAGE_PIXELS
 
 
 def test_an_animation_keeps_its_frames_and_a_png_its_transparency() -> None:
@@ -346,3 +362,173 @@ def test_an_unreadable_or_oversized_profile_is_dropped() -> None:
     with Image.open(io.BytesIO(clean.data)) as stored:
         assert "icc_profile" not in stored.info
         assert stored.convert("RGB").getpixel((8, 8)) == (200, 40, 40)
+
+
+def _animation(fmt: str, count: int) -> bytes:
+    frames = [Image.new("RGB", (4, 4), (n % 2 * 255, 0, 0)) for n in range(count)]
+    buffer = io.BytesIO()
+    frames[0].save(buffer, format=fmt, save_all=True, append_images=frames[1:], duration=50)
+    return buffer.getvalue()
+
+
+@pytest.mark.parametrize(("fmt", "name"), [("GIF", "a.gif"), ("PNG", "a.png"), ("WEBP", "a.webp")])
+def test_the_frame_cap_holds_for_every_animated_format(fmt: str, name: str) -> None:
+    limits = ImageLimits(max_bytes=10_000_000, max_pixels=1_000_000, max_side=1000, max_frames=10)
+    with pytest.raises(UploadRefused) as refusal:
+        sanitise_image(_animation(fmt, 11), name, limits)
+    assert refusal.value.code == "too_many_frames"
+    clean = sanitise_image(_animation(fmt, 10), name, limits)
+    with Image.open(io.BytesIO(clean.data)) as stored:
+        assert getattr(stored, "n_frames", 1) == 10
+
+
+def test_gif_frames_are_counted_only_up_to_the_cap(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A GIF's frame count walks every frame header: the walk stops one frame past the cap."""
+    from PIL import GifImagePlugin
+
+    seen: list[int] = []
+    original = GifImagePlugin.GifImageFile._seek
+
+    def counting(self: GifImagePlugin.GifImageFile, frame: int, update_image: bool = True) -> None:
+        seen.append(frame)
+        original(self, frame, update_image)
+
+    monkeypatch.setattr(GifImagePlugin.GifImageFile, "_seek", counting)
+    limits = ImageLimits(max_bytes=10_000_000, max_pixels=1_000_000, max_side=1000, max_frames=10)
+    with pytest.raises(UploadRefused) as refusal:
+        sanitise_image(_gif_frames(200), "anim.gif", limits)
+    assert refusal.value.code == "too_many_frames"
+    assert max(seen) <= limits.max_frames + 1
+
+
+def test_an_animation_builds_one_colour_transform_and_decodes_each_frame_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from PIL import ImageCms
+
+    built: list[object] = []
+    original = ImageCms.buildTransform
+
+    def counting(*args: object, **kwargs: object) -> object:
+        built.append(args)
+        return original(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(ImageCms, "buildTransform", counting)
+    frames = [Image.new("RGB", (8, 8), (n * 40, 0, 0)) for n in range(6)]
+    buffer = io.BytesIO()
+    frames[0].save(
+        buffer,
+        format="PNG",
+        save_all=True,
+        append_images=frames[1:],
+        duration=[10, 20, 30, 40, 50, 60],
+        icc_profile=_srgb_bytes(),
+    )
+    clean = sanitise_image(buffer.getvalue(), "anim.png", LIMITS)
+    assert len(built) == 1
+    with Image.open(io.BytesIO(clean.data)) as stored:
+        assert getattr(stored, "n_frames", 1) == 6
+        durations = []
+        for index in range(6):
+            stored.seek(index)
+            durations.append(stored.info.get("duration"))
+    assert durations == [10, 20, 30, 40, 50, 60]
+
+
+def _mpo(primary: tuple[int, int], second: tuple[int, int]) -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", primary, (200, 40, 40)).save(
+        buffer,
+        format="MPO",
+        save_all=True,
+        append_images=[Image.new("RGB", second, (40, 40, 200))],
+    )
+    return buffer.getvalue()
+
+
+def test_an_mpo_counts_and_decodes_only_its_first_picture(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Two pictures over the decode cap together, the first one alone within it: stored, scaled
+    down to the stored cap, and the second picture is never decoded."""
+    from PIL import MpoImagePlugin
+
+    sought: list[int] = []
+    original = MpoImagePlugin.MpoImageFile.seek
+
+    def recording(self: MpoImagePlugin.MpoImageFile, frame: int) -> None:
+        sought.append(frame)
+        original(self, frame)
+
+    monkeypatch.setattr(MpoImagePlugin.MpoImageFile, "seek", recording)
+    data = _mpo((100, 60), (100, 60))  # 6000 px each, 12000 together; SMALL decodes 10000
+    clean = sanitise_image(data, "phone.jpg", SMALL)
+    assert clean.format == "JPEG"
+    assert (clean.width, clean.height) == (64, 38)
+    assert all(frame == 0 for frame in sought)
+
+
+PEAK_SCRIPT = """
+import sys
+from apps.core.uploads import ImageLimits, sanitise_image
+
+
+def high_water_mark():
+    # VmHWM: this process's resident peak, reset by exec (ru_maxrss keeps the parent's).
+    with open("/proc/self/status") as status:
+        line = next(line for line in status if line.startswith("VmHWM:"))
+    return int(line.split()[1]) * 1024
+
+
+data = open(sys.argv[1], "rb").read()
+limits = ImageLimits(
+    max_bytes=25 * 1024 * 1024, max_pixels=30_000_000, max_side=16_000,
+    max_stored_pixels=10_000_000,
+)
+before = high_water_mark()
+clean = sanitise_image(data, sys.argv[2], limits)
+print(high_water_mark() - before, clean.width, clean.height)
+"""
+
+
+@pytest.mark.skipif(
+    not Path("/proc/self/status").exists(), reason="reads the peak from Linux's /proc"
+)
+@pytest.mark.parametrize(
+    ("mode", "fmt", "name"),
+    [("RGBA", "PNG", "big.png"), ("RGB", "JPEG", "big.jpg")],
+)
+def test_one_upload_peaks_at_its_decoded_size_plus_the_stored_size(
+    tmp_path: Path, mode: str, fmt: str, name: str
+) -> None:
+    """Peak memory of one re-encoding, measured in its own process: the decoded original
+    (4 bytes a pixel in Pillow) and the stored copy, no full-size intermediate copies.
+
+    25 megapixels decode to 100 MB and are stored at 10 (40 MB). The budget, 1.8 times the
+    decoded size, holds the original, the stored copy, one resampling band and the encoder's
+    buffers (measured: about 1.6). Before the fix this peaked at 3 (JPEG) to 4 (RGBA PNG) times
+    the decoded size.
+    """
+    import os
+    import subprocess
+    import sys
+
+    path = tmp_path / name
+    exif = Image.Exif()
+    exif[0x0112] = 6  # rotated: the orientation must not cost a full-size copy
+    Image.new(mode, (5000, 5000), (10, 120, 200, 255)[: len(mode)]).save(
+        path, format=fmt, exif=exif, icc_profile=_srgb_bytes()
+    )
+    result = subprocess.run(  # noqa: S603 (fixed script, test-controlled arguments)
+        [sys.executable, "-c", PEAK_SCRIPT, str(path), name],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=Path(__file__).resolve().parents[4],
+        # A fixed mmap threshold makes glibc return each freed image block at once, so the
+        # resident peak is the live peak and does not depend on earlier allocations.
+        env={**os.environ, "MALLOC_MMAP_THRESHOLD_": "131072"},
+    )
+    peak, width, height = (int(value) for value in result.stdout.split())
+    assert width * height <= 10_000_000
+    decoded = 5000 * 5000 * 4
+    print(f"peak {peak / 2**20:.0f} MiB for {decoded / 2**20:.0f} MiB decoded")
+    assert peak <= 1.8 * decoded, f"peak {peak / 2**20:.0f} MiB"
