@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **256** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **2146 h** (P1 1748 h · P2 380 h · P3 18 h)
+- Micro-tasks: **257** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **2149 h** (P1 1751 h · P2 380 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -33,7 +33,7 @@
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 6 | 19 | 23 | 0 | 42 |
 | MIG | Migration and cutover | 14 | 121 | 20 | 0 | 141 |
-| **Total** | | **256** | **1748** | **380** | **18** | **2146** |
+| **Total** | | **257** | **1751** | **380** | **18** | **2149** |
 
 ## By phase
 

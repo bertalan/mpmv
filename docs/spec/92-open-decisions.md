@@ -55,7 +55,7 @@ text and add one row; the items marked "open" still wait for the accountant and 
 
 | ID | Area | Decision | Recorded in |
 |---|---|---|---|
-| MQ-14 | Themes | The 50 KB theme CSS limit applies to the compressed file, not the raw one (the THM.5 gate already measures compressed sizes) | [14](14-frontend-themes.md) (§14.7, THM.5) |
+| MQ-14 | Themes | The theme CSS size limit applies to the compressed file, not the raw one (the THM.5 gate already measures compressed sizes). The budget is 45 KB compressed (§14.7, `CSS_BUDGET` in `apps/themes/gates.py`); the owner's wording said 50 KB, which is the size of the THM.5 failing case, so the 45 KB budget stands | [14](14-frontend-themes.md) (§14.7, THM.5) |
 | MQ-15 | Tax | No automatic fill of the law country on existing profiles with the `other` exemption reason: staff enter it, and those profiles stay flagged as incomplete until they do | [05](05-tax.md) (TAX.13) |
 | MQ-16 | Compliance | DAC7: the list of jurisdictions that issue no TIN becomes staff-editable data with audit, not a code constant (VEN.27); the REA number is accepted as the business registration number of an Italian company. Open: the accountant confirms the initial no-TIN list and the TIN formats per country | [04](04-vendors-commissions-ledger.md) (VEN.23, VEN.27) |
 | MQ-17 | Vendors, tax | RF20: a permanent establishment alone does not qualify, the registered office must be in the member state; RF20 profiles stay flagged for manual review. Open: the accountant confirms the `EX` number format | [04](04-vendors-commissions-ledger.md) (VEN.25) |
