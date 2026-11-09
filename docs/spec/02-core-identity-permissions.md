@@ -2,13 +2,14 @@
 
 ## 2.1 How it works today
 
-- A single WordPress login for customers, vendors and staff; a single `/wp-admin` for all roles.
-- WCFM vendors have the `manage_woocommerce` capability: every "admin" check must use
-  `manage_options` (bug documented in the VAT plugin).
-- WCFM staff and groups are not configured; the only use is the `wcfmgs_user_capability` filter for
-  Vendor E, which broke with the WCFM update.
-- API: `api.php` with routes included dynamically from `routes/{route}.php`; the authentication
-  model must be redone (details in the restricted document).
+- A single WordPress login for customers, vendors and staff, with one shared admin area.
+- The legacy role and capability model is not reused. The new system must keep vendor and
+  platform permissions strictly separate: no vendor role may ever satisfy a platform-admin check,
+  and every permission is explicit, tested and enforced server-side.
+- Staff roles and groups are not used in the legacy system; the new system defines them from
+  scratch (§2.2).
+- API: the legacy PHP API is replaced, not ported. The new API has its own authentication model
+  (scoped, expiring, rotatable clients) and a fixed, versioned route table.
 - Customer support via "Login as User".
 
 ## 2.2 How it will work
@@ -206,29 +207,29 @@ reusable mechanism: a service in `accounts` plus an email helper on top of the A
   signs anyone in to an existing account. Regenerating the claim bumps its version, so the old
   link stops working.
 
-### API v1 (replaces `api.php`)
+### API v1 (replaces the legacy custom API)
 
-The ~85 "recurring" routes are consolidated into ~15 REST resources:
+The recurring legacy routes are consolidated into a small set of REST resources:
 
 | Resource | Operations | Replaces |
 |---|---|---|
-| `/products` | bulk upsert matched by vendor and SKU match key (import matching only, [03](03-catalog.md)), get by `public_id`, paginated export, delisting | `create_product_full`, `update_product_*_relationships`, `get_all_product_*`, `export_vendor_products`, `delete_product`, `trash_products` |
-| `/products/{id}/variants` | variant upsert, axes, default (`{id}` is the product `public_id`, never the SKU) | `convert_to_variable_product` |
-| `/stock`, `/prices` | bulk update with thresholds | `batch_update_stock`, `get_vendor_product_stock/prices` |
-| `/media` | direct upload (presigned URL), cover/gallery assignment | `upload_media`, `upload_images_from_folder`, `convert_images_webp`, `regenerate_product_thumbnails` |
-| `/taxonomy/{categories,taxonomies,terms,brands}` | CRUD with translations and SEO copy | `create_categories`, `create_tags`, `*_tag_translations`, `update_*_descriptions`, `assign_*` |
-| `/taxonomy/assign-by-content` | keyword-based assignment with dry-run | `assign_brand_tags_by_content` |
-| `/shipping/config`, `/shipping/simulate` | validated read/write, simulation | `*_custom_shipping_vendors_config*`, `manage_gls_shipping_zones`, `test` |
-| `/tax/rates`, `/tax/simulate` | rates with validity, cart simulation | `sync_eu_standard_vat_rates`, `simulate_cart_tax` |
-| `/vendors/{id}` | profile, policies, logo (per language) | `update_vendor_*` |
-| `/reviews` | supplier review import | `manage_product_reviews` |
-| `/content/posts` | blog drafts | `create_post`, `update_post` |
+| `/products` | bulk upsert matched by vendor and SKU match key (import matching only, [03](03-catalog.md)), get by `public_id`, paginated export, delisting | legacy product import, read, export and removal routes |
+| `/products/{id}/variants` | variant upsert, axes, default (`{id}` is the product `public_id`, never the SKU) | legacy variant conversion route |
+| `/stock`, `/prices` | bulk update with thresholds | legacy stock and price routes |
+| `/media` | direct upload (presigned URL), cover/gallery assignment | legacy image upload and image processing routes |
+| `/taxonomy/{categories,taxonomies,terms,brands}` | CRUD with translations and SEO copy | legacy category, tag, translation and assignment routes |
+| `/taxonomy/assign-by-content` | keyword-based assignment with dry-run | legacy content-based tagging route |
+| `/shipping/config`, `/shipping/simulate` | validated read/write, simulation | legacy shipping configuration, carrier zone and test routes |
+| `/tax/rates`, `/tax/simulate` | rates with validity, cart simulation | legacy VAT rate sync and cart tax simulation routes |
+| `/vendors/{id}` | profile, policies, logo (per language) | legacy vendor profile routes |
+| `/reviews` | supplier review import | legacy review import route |
+| `/content/posts` | blog drafts | legacy blog post routes |
 | `/vendors/{id}/closures` | holiday and closure schedule: CRUD, dry-run, audit (VEN.20, [04](04-vendors-commissions-ledger.md)) | new |
 | `/events` | vendor events (promotions, trade fairs and meetings, other) as `EventPage` drafts in any enabled language, with translations: CRUD, submit, cancel, dry-run ([15](15-events.md)) | new |
 
 Common rules: every mutating POST accepts `?dry_run=true` and returns the diff; bulk operations
 are idempotent (same request twice = same state); errors in RFC 9457 format.
-The diagnostic and fix routes (`diagnose_*`, `fix_*`, `debug_*`) **are not migrated**: they become
+The legacy diagnostic, fix and debug routes **are not migrated**: they become
 admin reports or read-only MCP tools.
 
 ### Backoffice

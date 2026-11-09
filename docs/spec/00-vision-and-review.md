@@ -61,9 +61,8 @@ Structural problems that emerged from the audits (details in the domain document
 3. **Duplicate data representation**: custom-plugin zones and WCFM zones that must be kept in sync; EN and IT products
    as separate WPML posts, with many IT products ending up in EN categories; per-store taxonomy cache
    populated only in EN.
-4. **Heavy operations**: 132 PHP routes (~35% one-off fixes or diagnostics), dozens of
-   `fix_*` / `diagnose_*` scripts uploaded to the servers, cross-DB STAGE→LIVE cloning, blocked WPML
-   premium updates, WCFM tested only up to WP 7.0.7.
+4. **Heavy operations**: many ad hoc fix and diagnostic scripts outside version control,
+   environments synced from production data, and update debt on third-party plugins.
 5. **Compliance gaps**: no GPSR fields; publishing VAT indistinguishable from export and reverse
    charge (same `zero-rate` class); EU special territories not handled.
 
@@ -74,7 +73,7 @@ Structural problems that emerged from the audits (details in the domain document
 | P1 | **A single source of truth** for every piece of data | One product with translations (not two posts); shipping zones in one place; our own ledger |
 | P2 | **Business logic in pure, tested functions** | `resolve_tax()`, `quote_shipping()`, `compute_commission()` are functions without I/O, covered by the regression cases from the audits |
 | P3 | **Few components in production** | Django + PostgreSQL + object storage. No Redis, Celery or Elasticsearch until they are needed: queues and search live on Postgres |
-| P4 | **Every operation is a versioned command with dry-run** | The `fix_*.php` scripts become management commands or MCP tools with a diff preview and audit |
+| P4 | **Every operation is a versioned command with dry-run** | Ad hoc fix scripts become management commands or MCP tools with a diff preview and audit |
 | P5 | **Configuration, not constants** | Rates, platform country, thresholds, plans, bands: all in the DB with time validity |
 | P6 | **Immutable snapshots on orders** | Prices, rates, shipping and commission frozen at order time; recalculations only explicit and tracked |
 | P7 | **Parity first, new features later** | Cutover only at P1 functional parity; promotions, reviews, affiliation and the like come later |
