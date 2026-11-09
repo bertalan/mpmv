@@ -109,6 +109,7 @@ def test_a_migrated_article_is_published_with_its_date_and_author(blog: BlogInde
         ("create", "cms.blogpostpage"),
     ]
     page = _html(post.url)
+    assert page.h1 is not None
     assert page.h1.get_text(strip=True) == "A visit to the workshop"
     assert page.find("time", attrs={"datetime": "2023-04-12"}) is not None
     assert "Ada Example" in page.get_text()
@@ -188,17 +189,17 @@ def test_an_article_with_a_future_go_live_is_scheduled_not_live(blog: BlogIndexP
     assert "A visit to the workshop" not in _html(blog.url).get_text()
 
 
-def test_a_scheduled_article_goes_live_at_its_time(blog: BlogIndexPage) -> None:
-    import_article(blog, _legacy_article(go_live_at=timezone.now() + dt.timedelta(days=3)))
-    post = BlogPostPage.objects.get()
-    past = timezone.now() - dt.timedelta(minutes=1)
-    post.get_latest_revision().__class__.objects.filter(pk=post.get_latest_revision().pk).update(
-        approved_go_live_at=past
-    )
+def test_a_scheduled_article_goes_live_at_its_time(
+    blog: BlogIndexPage, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    go_live = timezone.now() + dt.timedelta(days=3)
+    import_article(blog, _legacy_article(go_live_at=go_live))
+    later = go_live + dt.timedelta(minutes=1)
+    monkeypatch.setattr("django.utils.timezone.now", lambda: later)
 
     call_command("publish_scheduled")
 
-    post.refresh_from_db()
+    post = BlogPostPage.objects.get()
     assert post.live
     assert "A visit to the workshop" in _html(blog.url).get_text()
 
@@ -312,3 +313,17 @@ def test_the_product_chooser_lists_only_listed_products(
     assert draft.sku not in html
     chosen = client.get(reverse("cms_product_chooser:chosen", args=(draft.pk,)))
     assert chosen.status_code == 404
+
+
+def test_the_worker_applies_the_schedules_every_five_minutes(blog: BlogIndexPage) -> None:
+    from apps.cms import tasks
+    from apps.core.tasks import schedules
+
+    crons = {schedule.task_name: schedule.cron for schedule in schedules()}
+    assert crons["cms.publish_scheduled"] == "*/5 * * * *"
+    import_article(blog, _legacy_article(expire_at=timezone.now() + dt.timedelta(days=30)))
+    BlogPostPage.objects.update(expire_at=timezone.now() - dt.timedelta(minutes=1))
+
+    tasks.publish_scheduled.func(timestamp=0)
+
+    assert BlogPostPage.objects.get().expired

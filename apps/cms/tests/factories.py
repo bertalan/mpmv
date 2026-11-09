@@ -240,7 +240,8 @@ class BlogAuthorFactory(DjangoModelFactory[BlogAuthor]):
 
 
 class BlogIndexPageFactory(_InTree, DjangoModelFactory[BlogIndexPage]):
-    """The blog of the primary language (CMS.3): `/blog/` under its home page."""
+    """A language's blog (CMS.3), `/blog/` under its home: the primary language's first, then
+    the first language whose home has no blog yet (one blog per home)."""
 
     class Meta:
         model = BlogIndexPage
@@ -252,12 +253,18 @@ class BlogIndexPageFactory(_InTree, DjangoModelFactory[BlogIndexPage]):
 
     @classmethod
     def _default_parent(cls) -> Page:
-        return _primary_home()
+        home = _primary_home()
+        if not BlogIndexPage.objects.child_of(home).exists():
+            return home
+        for other in HomePage.objects.exclude(pk=home.pk):
+            if not BlogIndexPage.objects.child_of(other).exists():
+                return other
+        return HomePageFactory.create()
 
 
 class BlogPostPageFactory(_InTree, DjangoModelFactory[BlogPostPage]):
-    """An article under `parent` (a `BlogIndexPage`, required). Pass `live=False` for a draft
-    and publish it with `page.save_revision().publish()`."""
+    """An article under `parent`, by default the primary language's blog (created if missing).
+    Pass `live=False` for a draft and publish it with `page.save_revision().publish()`."""
 
     class Meta:
         model = BlogPostPage
@@ -274,4 +281,5 @@ class BlogPostPageFactory(_InTree, DjangoModelFactory[BlogPostPage]):
 
     @classmethod
     def _default_parent(cls) -> Page:
-        raise LookupError("Pass the BlogIndexPage as `parent`")
+        blog: BlogIndexPage | None = BlogIndexPage.objects.child_of(_primary_home()).first()
+        return blog if blog is not None else BlogIndexPageFactory.create()

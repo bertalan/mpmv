@@ -2,7 +2,7 @@
 
 Done when: "Migrated article published". An article created by `import_article` with its legacy
 date and author is listed on the blog and readable under the strict CSP (SEC.1); an editor adds
-an article in the Wagtail admin, where the schedule fields and the author chooser are offered.
+an article in the Wagtail admin and picks its author in the snippet chooser.
 """
 
 import datetime as dt
@@ -19,7 +19,7 @@ from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from apps.cms.models import BlogIndexPage, BlogPostPage
 from apps.cms.services import ArticleData, import_article
-from apps.cms.tests.factories import BlogIndexPageFactory
+from apps.cms.tests.factories import BlogAuthorFactory, BlogIndexPageFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.login import verify_with_totp
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
@@ -72,6 +72,7 @@ def test_editor_adds_an_article_in_the_admin(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
     blog = _blog()
+    BlogAuthorFactory.create(name="Ada Example")
     password = secrets.token_urlsafe(16)  # generated: no credential literals in git
     user = UserFactory.create(email="editor@example.com", password=password, superuser=True)
     device = TOTPDeviceFactory.create(user=user)
@@ -86,7 +87,10 @@ def test_editor_adds_an_article_in_the_admin(
     page.goto(f"{live_server.url}/admin/pages/add/cms/blogpostpage/{blog.pk}/")
     page.locator("#id_title").fill("Spring news")
     page.locator("#id_date").fill("2026-03-01")
-    expect(page.get_by_role("button", name="Choose a blog author")).to_be_visible()
+    page.get_by_role("button", name="Choose blog author").click()
+    modal = page.locator(".modal")
+    modal.get_by_role("link", name="Ada Example").click()
+    expect(modal).to_be_hidden()
     shot("admin-add-article")
     page.get_by_role("button", name="More actions").click()
     page.get_by_role("button", name="Publish").click()
@@ -95,4 +99,6 @@ def test_editor_adds_an_article_in_the_admin(
     post = BlogPostPage.objects.get(title="Spring news")
     assert post.live
     assert post.date == dt.date(2026, 3, 1)
+    assert post.author is not None
+    assert post.author.name == "Ada Example"
     assert csp_violations(page) == [], "\n".join(csp_violations(page))

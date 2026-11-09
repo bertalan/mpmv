@@ -15,6 +15,8 @@ FAQ block (CMS.2, spec 10 §10.2): the FAQPage structured data.
 Featured cards (CMS.2, spec 10 §10.2, spec 03 "URLs"): the URLs of the term and vendor cards.
 
 Product grid (CMS.10, spec 10 §10.2): how many products a grid shows.
+
+Blog (CMS.3, spec 10 §10.2): an article's schedule, Wagtail's `go_live_at` and `expire_at`.
 """
 
 import datetime as dt
@@ -127,3 +129,25 @@ def grid_limit(limit: int | None) -> int:
     if limit is None:
         return PRODUCT_GRID_DEFAULT
     return max(1, min(PRODUCT_GRID_MAX, limit))
+
+
+# --- Blog schedule (CMS.3)
+
+
+EXPIRY_IN_PAST = "expiry_in_past"
+EXPIRY_NOT_AFTER_GO_LIVE = "expiry_not_after_go_live"
+
+
+def schedule_problem(
+    go_live_at: dt.datetime | None, expire_at: dt.datetime | None, now: dt.datetime
+) -> str | None:
+    """Why an article's schedule cannot be saved (one of the codes above), or None. The rules of
+    Wagtail's own publishing form, for articles created outside it (`services.import_article`):
+    an expiry must be in the future and after the go-live."""
+    if expire_at is None:
+        return None
+    if expire_at <= now:
+        return EXPIRY_IN_PAST
+    if go_live_at is not None and expire_at <= go_live_at:
+        return EXPIRY_NOT_AFTER_GO_LIVE
+    return None

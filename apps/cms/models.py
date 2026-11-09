@@ -18,20 +18,28 @@ from the source, and a translator may override one for a single locale (D-18).
 Legal pages (CMS.5) keep an append-only archive of every published text: one history per page,
 and so per language, since a translation is its own page (Q-42). The "Sell with us" page shows
 the plans and a FAQ and leads to the VEN.22 application form.
+
+The blog (CMS.3): one `BlogIndexPage` per language under its home, with `BlogPostPage` articles.
+An article keeps its own publication date (a migrated article keeps the legacy one), an optional
+author (a `BlogAuthor` snippet: legacy authors are not platform users), a summary for the index,
+a main image and a body whose featured links also take product cards. Scheduling is Wagtail's:
+`go_live_at` and `expire_at` in the page settings, applied by the `cms.publish_scheduled` job.
 """
 
 from typing import Any, ClassVar
 
 from django.core.exceptions import ValidationError
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.core.paginator import Page as PaginatorPage
 from django.db import models
-from django.http import HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from wagtail import blocks
 from wagtail.admin.panels import FieldPanel
 from wagtail.contrib.routable_page.models import RoutablePageMixin, path
-from wagtail.fields import StreamField
+from wagtail.fields import RichTextField, StreamField
 from wagtail.images import get_image_model_string
 from wagtail.models import Page, TranslatableMixin
 from wagtail_localize.fields import SynchronizedField
@@ -39,6 +47,7 @@ from wagtail_localize.fields import SynchronizedField
 from . import engine
 from .blocks import (
     RICH_TEXT_FEATURES,
+    ArticleLinksBlock,
     CallToActionBlock,
     FaqBlock,
     FeaturedLinksBlock,
@@ -83,6 +92,7 @@ class HomePage(Page):  # type: ignore[misc]  # Wagtail is untyped
         "cms.StandardPage",
         "cms.LegalPage",
         "cms.VendorRecruitmentPage",
+        "cms.BlogIndexPage",
         # The `/events/` index (EVT.1): named by string, so cms never imports apps.events.
         "events.EventIndexPage",
     ]
@@ -383,3 +393,135 @@ class VendorRecruitmentPage(Page):  # type: ignore[misc]
         context: dict[str, Any] = super().get_context(request, *args, **kwargs)
         context["application_url"] = vendor_application_url()
         return context
+
+
+# --- Blog (CMS.3)
+
+
+class BlogAuthor(models.Model):
+    """The byline of articles: a name, not a user account (legacy authors have none)."""
+
+    name = models.CharField(_("name"), max_length=120, unique=True)
+
+    panels: ClassVar[list[Any]] = [FieldPanel("name")]
+
+    class Meta:
+        verbose_name = _("blog author")
+        verbose_name_plural = _("blog authors")
+        ordering: ClassVar[list[str]] = ["name"]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class BlogIndexPage(Page):  # type: ignore[misc]
+    """`/blog/` of one language: its live articles, newest first, a page of them at a time."""
+
+    PER_PAGE = 12
+
+    intro = RichTextField(_("introduction"), features=RICH_TEXT_FEATURES, blank=True)
+
+    content_panels: ClassVar[list[Any]] = [*Page.content_panels, FieldPanel("intro")]
+    parent_page_types: ClassVar[list[str]] = ["cms.HomePage"]
+    subpage_types: ClassVar[list[str]] = ["cms.BlogPostPage"]
+    max_count_per_parent = 1
+    template = "cms/blog_index_page.html"
+
+    class Meta:
+        verbose_name = _("blog index")
+
+    def posts(self) -> Any:
+        return (
+            BlogPostPage.objects.child_of(self)
+            .live()
+            .public()
+            .select_related("author")
+            .order_by("-date", "-first_published_at", "-pk")
+        )
+
+    def get_context(self, request: HttpRequest, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        context: dict[str, Any] = super().get_context(request, *args, **kwargs)
+        paginator = Paginator(self.posts(), self.PER_PAGE)
+        try:
+            posts: PaginatorPage[Any] = paginator.page(request.GET.get("page", 1))
+        except (EmptyPage, PageNotAnInteger) as error:
+            raise Http404 from error
+        context["posts"] = posts
+        context["previous_url"] = (
+            f"?page={posts.previous_page_number()}" if posts.has_previous() else ""
+        )
+        context["next_url"] = f"?page={posts.next_page_number()}" if posts.has_next() else ""
+        return context
+
+
+class BlogPostPage(Page):  # type: ignore[misc]
+    """An article: date, author, summary, main image and body (spec 10 §10.2)."""
+
+    date = models.DateField(
+        _("publication date"),
+        default=timezone.localdate,
+        help_text=_("Shown on the article; a migrated article keeps its original date."),
+    )
+    author = models.ForeignKey(
+        BlogAuthor,
+        verbose_name=_("author"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    summary = models.TextField(
+        _("summary"), max_length=300, blank=True, help_text=_("Shown on the blog index.")
+    )
+    image = models.ForeignKey(
+        get_image_model_string(),
+        verbose_name=_("main image"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    image_alt_text = models.CharField(
+        _("alt text"),
+        max_length=250,
+        blank=True,
+        help_text=_("Describes the main image for people who cannot see it."),
+    )
+    image_caption = models.CharField(_("caption"), max_length=250, blank=True)
+    body = StreamField(
+        [
+            ("paragraph", blocks.RichTextBlock(features=RICH_TEXT_FEATURES, label=_("Rich text"))),
+            ("figure", FigureBlock()),
+            ("gallery", GalleryBlock()),
+            ("cta", CallToActionBlock()),
+            ("faq", FaqBlock()),
+            ("featured", ArticleLinksBlock()),
+        ],
+        blank=True,
+        verbose_name=_("body"),
+    )
+
+    content_panels: ClassVar[list[Any]] = [
+        *Page.content_panels,
+        FieldPanel("date"),
+        FieldPanel("author"),
+        FieldPanel("summary"),
+        FieldPanel("image"),
+        FieldPanel("image_alt_text"),
+        FieldPanel("image_caption"),
+        FieldPanel("body"),
+    ]
+    override_translatable_fields: ClassVar[list[Any]] = [
+        SynchronizedField("image", overridable=True)
+    ]
+    parent_page_types: ClassVar[list[str]] = ["cms.BlogIndexPage"]
+    subpage_types: ClassVar[list[str]] = []
+    template = "cms/blog_post_page.html"
+
+    class Meta:
+        verbose_name = _("blog article")
+
+    def clean(self) -> None:
+        super().clean()
+        if self.image_id is not None and not self.image_alt_text.strip():
+            raise ValidationError({"image_alt_text": _("Describe the main image.")})

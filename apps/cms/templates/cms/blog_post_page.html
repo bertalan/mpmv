@@ -1,0 +1,20 @@
+{% extends "layouts/content.html" %}
+{% load wagtailcore_tags wagtailimages_tags image_credits %}
+{% comment %}
+Blog article (CMS.3): title, date and author, the main image and the body. The featured links
+of the body also show product cards.
+{% endcomment %}
+{% block page_content %}
+  <article>
+    <h1>{{ page.title }}</h1>
+    {% include "cms/includes/article_meta.html" with post=page only %}
+    {% if page.image %}
+      {% image_credit_of page.image as credit %}
+      <figure>
+        {% image page.image width-1200 alt=page.image_alt_text %}
+        {% if page.image_caption or credit %}<figcaption>{{ page.image_caption }}{% if credit %} {% include "core/components/image_credit.html" %}{% endif %}</figcaption>{% endif %}
+      </figure>
+    {% endif %}
+    {% for block in page.body %}{% include_block block %}{% endfor %}
+  </article>
+{% endblock %}

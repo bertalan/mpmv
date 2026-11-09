@@ -1,0 +1,1 @@
+{% load i18n %}<p class="article-meta"><time datetime="{{ post.date|date:'Y-m-d' }}">{{ post.date|date:"DATE_FORMAT" }}</time>{% if post.author %} · <span class="article-author">{% blocktranslate with name=post.author.name %}By {{ name }}{% endblocktranslate %}</span>{% endif %}</p>

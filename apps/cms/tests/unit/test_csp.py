@@ -13,6 +13,8 @@ PICKERS = [
     # I18N.3: the main image field of a page (Wagtail's image chooser widget).
     '<script>new ImageChooser("id_image", {"modalUrl": "/admin/images/chooser/"});</script>',
     '<script>new DocumentChooser("id_file", {"modalUrl": "/admin/documents/chooser/"});</script>',
+    # CMS.3: the author of a blog article (Wagtail's snippet chooser widget).
+    '<script>new SnippetChooser("id_author", {"modalUrl": "/admin/snippets/choose/"});</script>',
 ]
 
 
