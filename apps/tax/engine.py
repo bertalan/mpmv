@@ -429,7 +429,14 @@ TERRITORY_BY_ALIAS_COUNTRY: Final = {
 
 # Postcode length (digits) of the countries with territories: a prefix pattern such as `35*`
 # matches a whole postcode only, never a truncated or over-long one.
-POSTCODE_LENGTH: Final = {"DE": 5, "ES": 5, "FI": 5, "FR": 5, "GR": 5, "IT": 5}
+POSTCODE_LENGTH: Final = {
+    "DE": 5,
+    "ES": 5,
+    "FI": 5,
+    "FR": 5,
+    "GR": 5,
+    "IT": 5,  # country-literal: postcode shape of the territory data, not the platform country
+}
 
 
 def territory_country(country: str) -> str:
