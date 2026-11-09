@@ -495,6 +495,77 @@ class VendorMember(BaseModel):
         return f"{self.user} @ {self.vendor} ({self.role})"
 
 
+class ClaimStatus(models.TextChoices):
+    OPEN = engine.CLAIM_OPEN, "Link sent, waiting for the claimant"
+    LOCKED = engine.CLAIM_LOCKED, "Locked after too many wrong answers"
+    SUBMITTED = engine.CLAIM_SUBMITTED, "Submitted, waiting for approval"
+    APPROVED = engine.CLAIM_APPROVED, "Approved"
+    REJECTED = engine.CLAIM_REJECTED, "Rejected"
+
+
+class ClaimChannel(models.TextChoices):
+    EMAIL = engine.CLAIM_CHANNEL_EMAIL, "Legal email of record"
+    PEC = engine.CLAIM_CHANNEL_PEC, "PEC address"
+
+
+class VendorClaim(BaseModel):
+    """The claim of a vendor imported without an account holder (VEN.24, owner decision MQ-1).
+
+    Written only by `services.send_claim_link`, `confirm_claim_identity`, `submit_claim`,
+    `approve_claim` and `reject_claim`, which audit every step. `version` is the version the
+    claim link is bound to (CORE.15): each new link raises it, so older links are refused.
+    """
+
+    Status = ClaimStatus
+    Channel = ClaimChannel
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
+
+    vendor = models.OneToOneField(Vendor, on_delete=models.CASCADE, related_name="claim")
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.OPEN, editable=False
+    )
+    version = models.PositiveIntegerField(default=1, editable=False)
+    # Where the current link went: the legal email of record, or the PEC staff picked instead.
+    # The link stays bound to that address, and the claimant's account uses it.
+    channel = models.CharField(
+        max_length=8, choices=Channel.choices, default=Channel.EMAIL, editable=False
+    )
+    failed_attempts = models.PositiveIntegerField(
+        default=0, editable=False, help_text="Wrong VAT numbers or TINs typed with this link."
+    )
+    # SHA-256 of the nonce of the link with which the VAT number or TIN was confirmed: the
+    # account step needs it, and a new link clears it.
+    confirmed_link = models.CharField(max_length=64, blank=True, editable=False)
+    # PROTECT: the account that submitted the claim stays as long as the claim's history.
+    claimant = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="vendor_claims",
+    )
+    link_sent_at = models.DateTimeField(null=True, blank=True, editable=False)
+    submitted_at = models.DateTimeField(null=True, blank=True, editable=False)
+    decided_at = models.DateTimeField(null=True, blank=True, editable=False)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(status__in=ClaimStatus.values),
+                name="vendors_claim_status_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(channel__in=ClaimChannel.values),
+                name="vendors_claim_channel_valid",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"claim of {self.vendor} ({self.get_status_display().lower()})"
+
+
 class RequirementPurpose(models.TextChoices):
     PAYOUT = engine.PAYOUT, "Payout request"
 

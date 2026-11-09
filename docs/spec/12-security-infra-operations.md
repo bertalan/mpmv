@@ -9,20 +9,21 @@ production system. The list is **confidential** and is not part of the public re
 
 | Area | Today | New system |
 |---|---|---|
-| Surface | WP core + WooCommerce + WCFM (7 add-ons) + WPML (4) + WPSSO (15) + ~20 mu-plugins + 132 routes | A single Python codebase, dependencies inventoried (SBOM) and scanned in CI |
-| Admin access | A single `/wp-admin` for all roles | One Manager with a gated shop space for vendors and a gated platform space for staff roles, MFA for everyone; Django admin behind a restricted network ([02](02-core-identity-permissions.md)) |
+| Surface | A CMS with a commerce plugin, a marketplace plugin, translation and SEO plugins, custom plugins and a legacy PHP API | A single Python codebase, dependencies inventoried (SBOM) and scanned in CI |
+| Admin access | One shared admin area | One Manager with a gated shop space for vendors and a gated platform space for staff roles, MFA for everyone; Django admin behind a restricted network ([02](02-core-identity-permissions.md)) |
 | API | Legacy PHP API, to be replaced | `ApiClient` with hash, scopes, expiry, rotation, rate limiting |
-| Executable code | Traditional PHP/WordPress model | No code in media directories; media on object storage |
-| Operational scripts | Ad hoc fix scripts outside version control | Versioned management commands with dry-run and audit, or MCP tools |
-| Data at rest | No field-level encryption | Field-level encryption for IBAN and KYC documents, keys outside the DB |
+| Executable code | Traditional PHP CMS model | No code in media directories; media on object storage |
+| Operational scripts | Ad hoc scripts | Versioned management commands with dry-run and audit, or MCP tools |
+| Data at rest | Legacy model (see private spec) | Field-level encryption for IBAN and KYC documents, keys outside the DB |
 | Traceability | No audit on prices, VAT, shipping | Append-only `AuditLog` |
-| Environments | STAGE synced from LIVE | Synthetic or anonymized data |
+| Environments | Legacy model (see private spec) | Synthetic or anonymized data |
 
 ## 12.3 Security requirements
 
-The IDs below are requirement IDs, not task IDs: the tasks are in §12.6 (SEC.0 to SEC.6), and
-the same number means different things in the two tables (requirement SEC.1 is the access model,
-task SEC.1 is HTTP hardening). Renaming the requirements is an open owner question.
+The IDs below are requirement IDs, not task IDs: the tasks are in §12.6 (SEC.0 to SEC.6, then
+SEC.11 and up, which skip the requirement numbers), and the same number means different things in
+the two tables (requirement SEC.1 is the access model, task SEC.1 is HTTP hardening). Renaming the
+requirements is an open owner question.
 
 | ID | Requirement | Detail |
 |---|---|---|
@@ -92,11 +93,11 @@ flowchart LR
 
 | Today | Tomorrow |
 |---|---|
-| `refresh_stage_from_live.sh`, `legacy-stage-safety` | `make seed-stage` with synthetic data; no LIVE clone |
-| `disable_live_checkout_location.sh` and other option patches | Settings in the DB with audit, editable from admin |
-| `diagnose_*` / `fix_*` (dozens) | Admin reports, health checks, read-only MCP tools; fixes as commands with dry-run |
-| WP/WCFM/WPML plugin updates with a test matrix | Python dependency updates via automated PRs + CI |
-| WP-Optimize cache to be disabled on STAGE | Application cache controlled by settings |
+| Scripts that refresh the test environment from production, plus a safety plugin | `make seed-stage` with synthetic data; no LIVE clone |
+| Shell scripts that patch configuration options | Settings in the DB with audit, editable from admin |
+| Legacy diagnostic and fix scripts | Admin reports, health checks, read-only MCP tools; fixes as commands with dry-run |
+| CMS, marketplace and translation plugin updates with a test matrix | Python dependency updates via automated PRs + CI |
+| A caching plugin to be disabled on the test environment | Application cache controlled by settings |
 
 ## 12.6 Tasks
 
@@ -107,8 +108,10 @@ flowchart LR
 | SEC.2 | Secure uploads and image re-encoding | P1 | 4 | CAT.4, ARC.15 | Tests with malicious files |
 | SEC.3 | Field-level encryption (IBAN, KYC, DAC7) with key rotation | P1 | 8 | VEN.1 | DB dump with no cleartext data |
 | SEC.4 | AuditLog extended to all sensitive mutations + staff view with filters | P1 | 6 | ARC.6 | Rate change visible with before/after |
-| SEC.5 | Security tests in CI (permissions by role and tenant, unauthenticated endpoints) | P1 | 8 | CORE.3 | Undeclared public endpoint → CI red |
+| SEC.5 | Security tests in CI, run on every PR (the security wave planned by lane-a on the Lane board, items 1 to 10): (1-3) an endpoint sweep over every URL pattern and API v1 operation against a declared matrix (`tests/security_registry.py`): anonymous access, CSRF on state-changing views, GET without side effects, staff-only routes refused to a customer, tenant confinement, API key scopes, IDOR review of every route carrying an identifier (#169); (4) rate limits of login, action links and API keys, including the per-IP limit on refused keys of CORE.20 (#171); (5) the security header set on every response type: pages, 403, 404, 500, redirects, static files, API JSON and problem+json, both admins, the health check, plus the Caddy media block (#162); (6) supply chain: pip-audit, ruff `S` rules and the secret scan in CI; (7) no settings module falls back to a hard-coded secret on STAGE or LIVE; (8) a hostile-input corpus with Hypothesis property tests over every admin and page form, the API v1 schemas, the shipping importers and the email, JSON-LD and CSV outputs (#166); (9) nightly and weekly scheduled security runs that report failures as an issue (#160); (10) an attack-scenario suite in `tests/security/`. Findings that need other work are strict xfails owned by SEC.11, SEC.12, CMS.12 and I18N.10 | P1 | 8 | CORE.3 | An undeclared public, CSRF-exempt, GET-writing or untested-identifier endpoint turns CI red (`tests/integration/test_endpoint_security.py`, with a meta-test that proves the sweep catches an unprotected view); every response type carries the LIVE header set and no `Server` or `X-Powered-By` (`tests/integration/test_security_headers_by_response_type.py`); each rate limit triggers and resets (`tests/integration/test_rate_limits.py`); the hostile-input corpus never gives a 500, active markup or a formula cell, with the derandomized Hypothesis `ci` profile (`tests/unit/test_hostile_input.py`, `tests/integration/test_hostile_input_*.py`); a known-vulnerable dependency, a bandit finding or a committed secret fails CI; a settings module with a hard-coded secret fallback fails a test; a failing scheduled run opens or updates one `security` issue |
 | SEC.6 | External penetration test and remediation | P1 | 16 | MIG.5 | Report with no open critical findings |
+| SEC.11 | Admin routes per vendor member role and CSRF tightening (proposed as SEC.5b on PR #169, registered by coherence check 7; needed before vendor members get `wagtailadmin.access_admin`): the staff-only refusal check of the SEC.5 sweep runs for every `VendorMember.Role`, not only as a customer; hook-registered `csrf_exempt` admin views are no longer accepted wholesale but declared one by one with their reason; the vendor-role confinement test stops skipping silently | P1 | 6 | SEC.5, CORE.3 | Each vendor member role is refused on every staff-only admin route; an undeclared `csrf_exempt` admin view turns CI red; `test_every_vendor_role_is_confined_to_its_vendor` fails when a `VendorScoped` web endpoint exists and its parameter set is still empty |
+| SEC.12 | Reverse proxy security headers (SEC.5 header findings, recorded as strict xfails on PR #162, registered by coherence check 7): Caddy drops the `Server` header (its own and the app server's) on every response; public media served by Caddy carry HSTS, Referrer-Policy and `frame-ancestors 'none'`; the app's own HTTP-to-HTTPS 301 either carries the full header set or is tested as the documented exception (in LIVE the proxy redirects plain HTTP first). Open PR #159 covers the Caddy part; lane-a may fold this row into ARC.13 | P1 | 2 | ARC.13, SEC.5 | The strict xfails `test_proxy_drops_the_server_header` and `test_media_carries_the_transport_and_framing_headers` (`tests/unit/test_proxy_security_headers.py`) pass with their marks removed; `test_https_redirect_301_full_header_set` (`tests/integration/test_security_headers_by_response_type.py`) passes or is replaced by a plain test of the documented behaviour |
 | OPS.1 | Self-managed PITR with pgBackRest (continuous WAL archiving + base backups) to Hetzner Object Storage, encrypted, with retention + restore test; least-privilege DB roles (app role without DDL or TRUNCATE, so the audit log stays append-only) | P1 | 8 | ARC.13 | Documented point-in-time restore on an empty database VPS; app role cannot TRUNCATE `core_auditlog` |
 | OPS.2 | Observability: JSON logs, error tracking, healthchecks, alerts (including database disk space, WAL archiving and backup age) | P1 | 8 | ARC.5 | Alert on a simulated checkout error |
 | OPS.3 | Runbooks: incidents (including 72 h data breach), payouts, rate updates, vendor onboarding | P2 | 8 | — | Runbooks in the repo |

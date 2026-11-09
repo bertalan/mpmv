@@ -242,6 +242,13 @@ USED: Final = "used"
 # No confirmed second factor: no passwordless sign-in, or whoever holds the link could enrol
 # their own first factor (CORE.4 needs no other proof for it) and pass the step-up.
 NO_SECOND_FACTOR: Final = "no_second_factor"
+# Staff and superusers never get the passwordless sign-in: they sign in with their password and
+# MFA, then continue (lane-a decision on the CORE.15 review).
+STAFF_RECIPIENT: Final = "staff_recipient"
+# A newer link was issued for the same object and recipient, or the recipient's password changed.
+REVOKED: Final = "revoked"
+# An email-bound link (VEN.24) that was never opened in this session with the Continue POST.
+NOT_OPENED: Final = "not_opened"
 ACTION_NONCE_BYTES: Final = 16  # 128 bits: the single-use key of a link
 
 
@@ -251,10 +258,12 @@ class ActionClaims:
 
     purpose: str
     object_key: str
-    recipient: str  # the recipient user's public id
+    recipient: str  # the recipient user's public id, or `email_recipient` of an address
     version: str
     nonce: str
     expires_at: int  # Unix time
+    generation: int  # the issue count for (purpose, object, recipient); a reissue bumps it
+    stamp: str  # a keyed digest of the recipient's password hash when the link was issued
 
 
 _CLAIM_FIELDS: Final = {
@@ -263,6 +272,7 @@ _CLAIM_FIELDS: Final = {
     "r": "recipient",
     "v": "version",
     "n": "nonce",
+    "a": "stamp",
 }
 
 
@@ -274,8 +284,13 @@ def new_action_claims(
     version: object,
     now: float,
     max_age: int,
+    generation: int,
+    stamp: str,
 ) -> ActionClaims:
-    """Claims for a new link, valid for `max_age` seconds from `now`, with a fresh nonce."""
+    """Claims for a new link, valid for `max_age` seconds from `now`, with a fresh nonce.
+
+    `generation` and `stamp` bind it to the latest issue and to the recipient's current
+    password: a reissue or a password change revokes it."""
     return ActionClaims(
         purpose=purpose,
         object_key=object_key,
@@ -283,6 +298,8 @@ def new_action_claims(
         version=str(version),
         nonce=secrets.token_urlsafe(ACTION_NONCE_BYTES),
         expires_at=int(now) + max_age,
+        generation=generation,
+        stamp=stamp,
     )
 
 
@@ -292,6 +309,7 @@ def action_claims_payload(claims: ActionClaims) -> dict[str, str | int]:
         short: getattr(claims, name) for short, name in _CLAIM_FIELDS.items()
     }
     payload["e"] = claims.expires_at
+    payload["g"] = claims.generation
     return payload
 
 
@@ -300,12 +318,16 @@ def action_claims_from_payload(payload: object) -> ActionClaims | None:
     if not isinstance(payload, dict):
         return None
     values = {name: payload.get(short) for short, name in _CLAIM_FIELDS.items()}
-    expires_at = payload.get("e")
+    expires_at, generation = payload.get("e"), payload.get("g")
     if not all(isinstance(value, str) for value in values.values()):
         return None
-    if not isinstance(expires_at, int) or isinstance(expires_at, bool):
+    if not all(_is_int(number) for number in (expires_at, generation)):
         return None
-    return ActionClaims(expires_at=expires_at, **values)  # type: ignore[arg-type]
+    return ActionClaims(expires_at=expires_at, generation=generation, **values)  # type: ignore[arg-type]
+
+
+def _is_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
 
 
 def _same(left: str, right: str) -> bool:
@@ -318,11 +340,15 @@ def action_link_refusal(
     now: float,
     current_version: str | None,
     recipient: str | None = None,
+    current_generation: int | None = None,
+    current_stamp: str | None = None,
 ) -> str | None:
     """Why the link cannot be used now, or None when it can.
 
     `current_version` is the object's version now (None: the object is gone); `recipient`, when
-    given, is the public id of the user the link must belong to. Comparisons run in constant time.
+    given, is the public id of the user the link must belong to; `current_generation` and
+    `current_stamp`, when given, are the latest issue for the object and recipient and the
+    recipient's password stamp now. Comparisons run in constant time.
     """
     if now > claims.expires_at:
         return EXPIRED
@@ -330,9 +356,19 @@ def action_link_refusal(
         return OBJECT_GONE
     if not _same(claims.version, current_version):
         return OLD_VERSION
+    if current_generation is not None and claims.generation != current_generation:
+        return REVOKED
+    if current_stamp is not None and not _same(claims.stamp, current_stamp):
+        return REVOKED
     if recipient is not None and not _same(claims.recipient, recipient):
         return WRONG_RECIPIENT
     return None
+
+
+def email_recipient(email: str) -> str:
+    """The recipient of an email-bound link (VEN.24): SHA-256 of the trimmed, lower-cased
+    address, so the token binds the address without showing it."""
+    return hashlib.sha256(email.strip().lower().encode()).hexdigest()
 
 
 def action_nonce_digest(nonce: str) -> str:

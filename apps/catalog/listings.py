@@ -255,6 +255,31 @@ def listing_robots(params: ListingParams, *, total: int, indexed_pages: int = IN
     return ROBOTS_INDEX
 
 
+# --- Editorial content (CMS.4): a listing's first page may carry an editorial landing page
+
+# The Wagtail hook a content app registers to add it: `fn(request, scope, language)` returns a
+# `ListingEditorial` or None. A hook keeps the dependency one way (cms reads catalog).
+EDITORIAL_HOOK = "catalog_listing_editorial"
+
+
+@dataclass(frozen=True)
+class ListingEditorial:
+    """What an editorial landing page adds to its listing's page, on the listing's own URL:
+    rendered HTML (already escaped) before and after the products, and the SEO title and
+    description that replace the listing's defaults."""
+
+    before: str = ""
+    after: str = ""
+    title: str = ""
+    description: str = ""
+
+
+def shows_editorial(params: ListingParams) -> bool:
+    """Editorial content shows on the first page without filters only: one indexable page holds
+    it, and paginated or filtered pages stay plain listings."""
+    return params == ListingParams()
+
+
 # --- Pagination
 
 

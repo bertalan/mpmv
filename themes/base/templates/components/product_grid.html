@@ -10,5 +10,5 @@ Context:
   `url`, `image_url`, `image_alt`, `price`, `price_before`, `vendor`, `badges`).
 - `heading_level`: the level of the tile names, 2 to 6 (default 3).
 {% endcomment %}<ul class="product-grid" role="list">
-  {% for product in products %}<li>{% include "components/product_tile.html" with name=product.name url=product.url heading_level=heading_level image_url=product.image_url image_alt=product.image_alt image_width=product.image_width image_height=product.image_height price=product.price price_before=product.price_before vendor=product.vendor badges=product.badges only %}</li>{% endfor %}
+  {% for product in products %}<li>{% include "components/product_tile.html" with name=product.name url=product.url heading_level=heading_level image=product.image image_url=product.image_url image_alt=product.image_alt image_width=product.image_width image_height=product.image_height price=product.price price_before=product.price_before vendor=product.vendor badges=product.badges only %}</li>{% endfor %}
 </ul>

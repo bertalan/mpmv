@@ -164,3 +164,29 @@ class ActionLinkUse(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.purpose} {self.object_key} (used {self.created_at:%Y-%m-%d %H:%M})"
+
+
+class ActionLinkIssue(BaseModel):
+    """How many secure action links were issued for one purpose, object and recipient.
+
+    Each link carries the generation it was issued at; issuing another bumps it, so only the
+    latest link stays usable (a reissue revokes the older ones, spec 02 "Secure action links").
+    """
+
+    purpose = models.CharField(max_length=100)
+    object_key = models.CharField(max_length=200)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="action_link_issues"
+    )
+    generation = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "issued action link"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["purpose", "object_key", "user"], name="action_link_issue_unique"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.purpose} {self.object_key} (generation {self.generation})"

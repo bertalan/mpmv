@@ -1,4 +1,4 @@
-{% load theme_tags %}{% comment %}
+{% load theme_tags responsive_images %}{% comment %}
 Logo strip (THM.4, spec 14 §14.9): a row of brand or vendor logos that wraps on narrow screens.
 Every logo's alt text is the name it shows; a logo with a `url` is a link to that brand or
 vendor (its only content is the image, so the alt text names the link).
@@ -8,7 +8,8 @@ vendor (its only content is the image, so the alt text names the link).
 Context:
 - `label` (required): the accessible name of the list.
 - `logos`: a list of `name`, `image_url`, optional `url`, `width` and `height` (default
-  160 x 80).
+  160 x 80); or `image`, a Wagtail image (an SVG logo stays SVG, a raster one comes as
+  AVIF/WebP/JPEG renditions, THM.12).
 {% endcomment %}<ul class="logo-strip" role="list" aria-label="{{ label }}">
-  {% for logo in logos %}<li class="logo-strip__item">{% with href=logo.url|safe_href %}{% if href %}<a href="{{ href }}">{% endif %}<img src="{{ logo.image_url }}" alt="{{ logo.name }}" width="{{ logo.width|default:160 }}" height="{{ logo.height|default:80 }}" loading="lazy">{% if href %}</a>{% endif %}{% endwith %}</li>{% endfor %}
+  {% for logo in logos %}<li class="logo-strip__item">{% with href=logo.url|safe_href %}{% if href %}<a href="{{ href }}">{% endif %}{% if logo.image %}{% responsive_image logo.image "logo" alt=logo.name %}{% else %}<img src="{{ logo.image_url }}" alt="{{ logo.name }}" width="{{ logo.width|default:160 }}" height="{{ logo.height|default:80 }}" loading="lazy">{% endif %}{% if href %}</a>{% endif %}{% endwith %}</li>{% endfor %}
 </ul>

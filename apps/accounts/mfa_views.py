@@ -54,7 +54,7 @@ def _with_next(name: str, next_url: str) -> str:
 def _json_body(request: HttpRequest) -> dict[str, Any]:
     try:
         body = json.loads(request.body or b"{}")
-    except ValueError:
+    except (ValueError, RecursionError):  # RecursionError: deeply nested arrays/objects
         return {}
     return body if isinstance(body, dict) else {}
 

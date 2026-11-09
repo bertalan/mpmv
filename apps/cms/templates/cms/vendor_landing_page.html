@@ -1,0 +1,24 @@
+{% extends "layouts/content.html" %}
+{% load i18n wagtailcore_tags %}
+{% comment %}
+A vendor's story (CMS.4, spec 10 §10.2): the story blocks, then the vendor's newest products with
+a link to its storefront. Its own canonical, and `hreflang` for its live translations.
+{% endcomment %}
+{% block head %}
+  {% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}
+  {% for lang, url in alternates %}<link rel="alternate" hreflang="{{ lang }}" href="{{ url }}">
+  {% endfor %}
+{% endblock %}
+{% block page_content %}
+  <article class="vendor-landing">
+    <h1>{{ page.title }}</h1>
+    {% for block in page.body %}{% include_block block %}{% endfor %}
+    {% if featured.cards %}
+      <section class="vendor-landing-products" aria-labelledby="vendor-landing-products-heading">
+        <h2 id="vendor-landing-products-heading">{% translate "Featured products" %}</h2>
+        {% include "cms/includes/product_tiles.html" with cards=featured.cards currency=currency heading_level=3 only %}
+        {% if featured.see_all_url %}<p class="block-links"><a class="product-grid-all" href="{{ featured.see_all_url }}">{% blocktranslate with name=featured.name %}See all<span class="visually-hidden"> products: {{ name }}</span>{% endblocktranslate %}</a></p>{% endif %}
+      </section>
+    {% endif %}
+  </article>
+{% endblock %}

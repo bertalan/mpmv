@@ -42,6 +42,14 @@ def test_prices_with_more_than_two_decimals_are_refused_not_rounded() -> None:
         engine.to_price("10.005")
 
 
+@pytest.mark.parametrize("raw", ["10000000000.00", "9" * 40, "1e30"])
+def test_prices_too_large_for_the_money_column_are_refused(raw: str) -> None:
+    """SEC.5: a price past MoneyField(12, 2) is a ValueError, not a database error."""
+    with pytest.raises(ValueError, match="too large"):
+        engine.to_price(raw)
+    assert engine.to_price("9999999999.99") == Decimal("9999999999.99")
+
+
 def test_negative_prices_are_refused() -> None:
     with pytest.raises(ValueError, match="negative"):
         engine.to_price("-0.01")
