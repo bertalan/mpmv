@@ -302,15 +302,35 @@ def test_the_trigram_extension_is_installed() -> None:
         assert cursor.fetchone() is not None
 
 
+def _search_query_kind(sql: str) -> str | None:
+    """The search query `sql` is: SKU of products or variants, full text or trigram. None for
+    the final ranked fetch of the products, which reads them by primary key."""
+    upper = sql.upper()
+    if "%>>" in sql:
+        return "trigram"
+    if "TSQUERY" in upper:
+        return "text"
+    if "SKU_KEY" in upper and "LIKE" in upper:
+        return "variant_sku" if 'FROM "CATALOG_VARIANT"' in upper else "product_sku"
+    return None
+
+
 @pytest.mark.parametrize("language", ["en", "it", "de", "fr", "es"])
 def test_every_search_query_is_served_by_an_index(language: str) -> None:
-    """Each text, trigram and SKU query expression matches its index. With a few rows the
-    planner would rather walk any small index and filter, so plain sequential and index scans
-    and nested loops are disabled and the (product, language) unique constraint is dropped: a
-    table is then read through an index condition (a bitmap scan) or by a sequential scan that
-    shows in the plan. This proves the expressions can use the indexes, not that a production
-    planner with real statistics picks them."""
-    with connection.cursor() as cursor:  # rolled back with the test transaction
+    """Each SKU, text and trigram query expression matches its own index, checked on that
+    query's plan. With a few rows the planner would rather walk any small index and filter, so:
+    the seeded tables are analysed (statistics do not depend on what autovacuum last saw),
+    plain sequential and index scans and nested loops are disabled, and the (product, language)
+    unique constraint is dropped, so a table is read through an index condition (a bitmap scan)
+    or by a sequential scan that shows in the plan.
+
+    The trigram query filters on `language` and `status`, which is exactly the predicate of the
+    partial full-text index of that language: the planner may then bitmap-scan that whole
+    (tiny) index instead of the trigram one, depending on costs. That index is dropped before
+    the trigram query is explained, so its plan can only use the trigram index or a sequential
+    scan. Everything is rolled back with the test transaction. This proves the expressions can
+    use the indexes, not that a production planner with real statistics picks them."""
+    with connection.cursor() as cursor:
         # Its (product, language) index would answer `language = ...` without the text index.
         cursor.execute(
             "ALTER TABLE catalog_producttranslation"
@@ -320,22 +340,33 @@ def test_every_search_query_is_served_by_an_index(language: str) -> None:
     with CaptureQueriesContext(connection) as queries:
         list(services.search("idx-0001 probe", language))
         list(services.search("idx-0001 prbe", language))  # no full-text hit: the trigram query
-    plans = []
+    by_kind: dict[str, list[str]] = {}
+    for query in queries.captured_queries:
+        kind = _search_query_kind(query["sql"])
+        if kind is not None:
+            by_kind.setdefault(kind, []).append(query["sql"])
+    # A typo never matches full text, so the trigram fallback ran (spec 03 §3.2).
+    assert set(by_kind) == {"product_sku", "variant_sku", "text", "trigram"}, list(by_kind)
+    expected = {
+        "product_sku": "catalog_product_sku_key_like",
+        "variant_sku": "catalog_variant_sku_key_like",
+        "text": f"catalog_ptrans_fts_{language}",
+        "trigram": "catalog_ptrans_title_trgm",
+    }
     with connection.cursor() as cursor:
+        cursor.execute(
+            "ANALYZE vendors_vendor, catalog_product, catalog_variant, catalog_producttranslation"
+        )
         cursor.execute("SET LOCAL enable_seqscan = off")
         cursor.execute("SET LOCAL enable_indexscan = off")
         cursor.execute("SET LOCAL enable_indexonlyscan = off")
         cursor.execute("SET LOCAL enable_nestloop = off")
-        for query in queries.captured_queries:
-            sql = query["sql"]
-            if not sql.lstrip().upper().startswith("SELECT"):
-                continue
-            cursor.execute(f"EXPLAIN {sql}")
-            plans.append("\n".join(row[0] for row in cursor.fetchall()))
-    joined = "\n".join(plans)
-    assert "Seq Scan on catalog_producttranslation" not in joined
-    assert "Seq Scan on catalog_variant" not in joined
-    assert f"catalog_ptrans_fts_{language}" in joined
-    assert "catalog_ptrans_title_trgm" in joined
-    assert "catalog_product_sku_key_like" in joined
-    assert "catalog_variant_sku_key_like" in joined
+        for kind in ("product_sku", "variant_sku", "text", "trigram"):
+            if kind == "trigram":
+                cursor.execute(f"DROP INDEX catalog_ptrans_fts_{language}")
+            for sql in by_kind[kind]:
+                cursor.execute(f"EXPLAIN {sql}")
+                plan = "\n".join(row[0] for row in cursor.fetchall())
+                assert "Seq Scan on catalog_producttranslation" not in plan, plan
+                assert "Seq Scan on catalog_variant" not in plan, plan
+                assert f"Index Scan on {expected[kind]} " in plan, f"{kind}:\n{plan}"
