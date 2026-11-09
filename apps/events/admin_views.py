@@ -293,7 +293,7 @@ def event_settings(request: HttpRequest) -> HttpResponse:
         )
         initial: dict[str, Any] = {}
         if site is not None:
-            current = EventSettings.for_site(site)
+            current = EventSettings.current(site)
             initial = {
                 "site": site.pk,
                 "moderation_threshold": current.moderation_threshold,
