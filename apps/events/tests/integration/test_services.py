@@ -735,3 +735,48 @@ def test_a_vendor_cannot_cancel_another_vendors_event(owner: User) -> None:
     other = _published(_owner())
     with pytest.raises(Http404):
         cancel_event(owner, other)
+
+
+# --- CORE.8: `is_staff` (Wagtail admin login) alone is not platform staff
+
+
+def test_an_admin_login_without_the_permission_cannot_hide_events(owner: User) -> None:
+    editor = UserFactory.create(staff=True)
+    page = _published(owner)
+    with pytest.raises(PermissionDenied):
+        hide_event(editor, page, "Not allowed")
+    assert _fresh(page).live
+
+
+def test_an_admin_login_without_the_permission_cannot_set_a_vendor_policy(owner: User) -> None:
+    editor = UserFactory.create(staff=True)
+    with pytest.raises(PermissionDenied):
+        set_vendor_policy(editor, _vendor_of(owner), VendorEventPolicy.Mode.TRUSTED)
+    assert not VendorEventPolicy.objects.filter(vendor=_vendor_of(owner)).exists()
+
+
+def test_an_admin_login_without_the_permission_cannot_edit_another_vendors_event() -> None:
+    editor = UserFactory.create(staff=True)
+    theirs = EventPageFactory.create()
+    with pytest.raises((Http404, PermissionDenied)):
+        save_event_draft(editor, {"title": "Mine now"}, theirs)
+
+
+def test_moderation_rights_need_the_permission() -> None:
+    from apps.events.services import may_moderate_events
+
+    assert not may_moderate_events(UserFactory.create(staff=True))
+    assert may_moderate_events(UserFactory.create(platform_staff=True))
+
+
+def test_a_vendor_members_staff_flag_does_not_open_the_admin_or_other_vendors(
+    owner: User,
+) -> None:
+    from apps.events.services import may_create_events_in_admin
+
+    owner.is_staff = True
+    owner.save(update_fields=["is_staff"])
+    assert not may_create_events_in_admin(owner)
+    theirs = EventPageFactory.create()
+    with pytest.raises(Http404):
+        save_event_draft(owner, {"title": "Mine now"}, theirs)

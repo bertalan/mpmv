@@ -110,3 +110,12 @@ def test_platform_staff_see_every_vendor(
     staff = UserFactory.create(platform_staff=True)
     assert set(Vendor.objects.for_actor(staff)) == {owner_a.vendor, owner_b.vendor}
     assert get_for_actor_or_404(Vendor, staff, pk=owner_b.vendor.pk) == owner_b.vendor
+
+
+def test_the_permission_without_is_staff_sees_every_vendor(
+    two_vendors: tuple[VendorMember, VendorMember],
+) -> None:
+    owner_a, owner_b = two_vendors
+    user = UserFactory.create(permissions=[PLATFORM_STAFF_PERMISSION])
+    assert not user.is_staff
+    assert set(Vendor.objects.for_actor(user)) == {owner_a.vendor, owner_b.vendor}

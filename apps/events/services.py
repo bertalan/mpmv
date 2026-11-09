@@ -69,6 +69,7 @@ from apps.core.models import AuditLog
 from apps.core.services import save_audited
 from apps.vendors.engine import VendorAction
 from apps.vendors.models import Vendor, VendorMember
+from apps.vendors.scoping import is_platform_staff
 from apps.vendors.services import has_vendor_permission
 
 from . import engine
@@ -175,7 +176,7 @@ def may_edit_events_in_admin(user: AbstractBaseUser | AnonymousUser) -> bool:
     """
     if not user.is_authenticated:
         return False
-    if getattr(user, "is_staff", False):
+    if is_platform_staff(user):
         return True
     return not VendorMember.objects.filter(user_id=user.pk).exists()
 
@@ -188,7 +189,7 @@ def may_create_events_in_admin(user: AbstractBaseUser | AnonymousUser) -> bool:
     only platform staff create platform events (spec 15 "Permissions"). Other Wagtail editors
     keep editing existing events under Wagtail's own page permissions.
     """
-    return bool(user.is_authenticated and user.is_active and getattr(user, "is_staff", False))
+    return bool(is_platform_staff(user))
 
 
 # --- The Wagtail admin's moderation UI (EVT.3 part 2/2, spec 15 "Staff admin")
@@ -388,7 +389,7 @@ class EventRefused(PermissionDenied):
 
 
 def _is_staff(user: AbstractBaseUser | AnonymousUser) -> bool:
-    return bool(user.is_authenticated and user.is_active and getattr(user, "is_staff", False))
+    return bool(is_platform_staff(user))
 
 
 def _require_staff(user: AbstractBaseUser | AnonymousUser) -> None:
