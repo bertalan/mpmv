@@ -4,7 +4,7 @@ Functional and technical specification for replacing the WordPress + WooCommerce
 with a **Django + Wagtail** system that is simpler to run.
 
 The document was derived from an analysis of the current code: custom VAT and shipping plugins,
-mu-plugins, 132 API routes, Python import pipelines, audit reports and LIVE configurations.
+mu-plugins, the legacy API routes, Python import pipelines, audit reports and LIVE configurations.
 It also reviews the August 2026 rebuild plan.
 
 ## How to read this spec

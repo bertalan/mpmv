@@ -2,13 +2,14 @@
 
 ## 2.1 How it works today
 
-- A single WordPress login for customers, vendors and staff; a single `/wp-admin` for all roles.
-- WCFM vendors have the `manage_woocommerce` capability: every "admin" check must use
-  `manage_options` (bug documented in the VAT plugin).
-- WCFM staff and groups are not configured; the only use is the `wcfmgs_user_capability` filter for
-  Vendor E, which broke with the WCFM update.
-- API: `api.php` with routes included dynamically from `routes/{route}.php`; the authentication
-  model must be redone (details in the restricted document).
+- A single WordPress login for customers, vendors and staff, with one shared admin area.
+- The legacy role and capability model is not reused. The new system must keep vendor and
+  platform permissions strictly separate: no vendor role may ever satisfy a platform-admin check,
+  and every permission is explicit, tested and enforced server-side.
+- Staff roles and groups are not used in the legacy system; the new system defines them from
+  scratch (§2.2).
+- API: the legacy PHP API is replaced, not ported. The new API has its own authentication model
+  (scoped, expiring, rotatable clients) and a fixed, versioned route table.
 - Customer support via "Login as User".
 
 ## 2.2 How it will work
@@ -228,7 +229,7 @@ The ~85 "recurring" routes are consolidated into ~15 REST resources:
 
 Common rules: every mutating POST accepts `?dry_run=true` and returns the diff; bulk operations
 are idempotent (same request twice = same state); errors in RFC 9457 format.
-The diagnostic and fix routes (`diagnose_*`, `fix_*`, `debug_*`) **are not migrated**: they become
+The legacy diagnostic, fix and debug routes **are not migrated**: they become
 admin reports or read-only MCP tools.
 
 ### Backoffice

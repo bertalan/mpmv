@@ -81,11 +81,11 @@ class Attribute(Model):  code ("color", "material", "size", "bag_width"…); kin
 class AttributeValue(Model): attribute; value; position;  + AttributeValueTranslation(label)
 class ProductAttribute(Model): product; attribute; values = M2M; numeric_value; text_value
 
-class Category(LEGACY_Node):          # tree (treebeard), + CategoryTranslation(name, slug, seo, description)
+class Category(MP_Node):              # tree (treebeard), + CategoryTranslation(name, slug, seo, description)
 class Taxonomy(Model):           # configurable per vertical; + translation (name, slug)
     code; hierarchical: bool; filterable: bool; has_landing: bool
     # e.g. "compatibility" (brand → model), "occasion", "technique", "season"
-class Term(LEGACY_Node):             # tree per taxonomy; + translation (slug, SEO text, legacy_path); url_mode (D-07)
+class Term(MP_Node):                 # tree per taxonomy; + translation (slug, SEO text, legacy_path); url_mode (D-07)
     taxonomy = FK(Taxonomy); attributes (JSON, extra fields defined by the taxonomy)
 class Brand(Model):               # manufacturer; + translation
 
