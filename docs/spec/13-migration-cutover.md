@@ -34,6 +34,59 @@ cheapest solution is a **single cutover, rehearsed several times**, not a prolon
 | Shipping zones | option `custom_shipping_vendors_config_v2` | → `shipping` models (see SHP.5) | |
 | Merchant feed | `g:id` = post ID | `legacy_wp_id` used as the id in the new feed | Continuity of Merchant Center history |
 
+### Source connectors (owner decision 2026-11-09)
+
+Our own migration reads the legacy WordPress database (MIG.1). The owner also wants a hook for
+importing from other shops built on known products (WooCommerce, WCFM, later others), used by the
+setup wizard (ARC.26) and by a new operator who moves an existing shop onto the platform. Both
+paths share one design: a **source connector** reads a source and writes the **intermediate
+format**; the loaders (MIG.3, MIG.4 and the following ones) read only the intermediate format and
+never know which connector produced it.
+
+```python
+class ShopConnector(Protocol):                      # apps/ingest/connectors/base.py
+    code: str                                       # "wordpress_db", "woocommerce_rest", "wcfm_rest"
+    def capabilities(self) -> ConnectorCapabilities # entities it delivers, fields it cannot give
+    def check(self, source: ConnectorSource) -> CheckReport        # reachability, version, permissions
+    def extract(self, source: ConnectorSource, entities: set[Entity], *,
+                since: datetime | None = None) -> Iterator[ImportRecord]  # read-only
+
+@register_connector("woocommerce_rest")             # registry: also MPMV_IMPORT_CONNECTORS (dotted paths)
+class WooCommerceRestConnector: ...
+```
+
+- **Intermediate format** `mpmv-import/1`: an evolution of the MIG.1 JSON, with a JSON Schema in
+  the repository and Pydantic models. Entities: vendors, categories, attributes and terms, tags,
+  products, variants, images (URL and hash), customers, historical orders, reviews, slugs and
+  redirects. Every record carries `source`, `source_id` and `fetched_at`; a field the source
+  cannot give is absent and named in the run report, never guessed.
+- **Registry.** A connector is a module that registers itself; Shopify, PrestaShop, Magento or a
+  CSV connector are added without touching the loaders or the core.
+- **The MIG.1 extractor is the `wordpress_db` connector**, the second transport. It stays the one
+  used for our own migration, because the APIs cannot give everything (table below).
+- **Rules.** Read-only (connectors send only GET requests to an API, read-only queries to a
+  database); dry-run by default and idempotent (the same source twice gives the same output, in a
+  stable order); every record validated against the schema before it is written (SEC.9 in
+  [12](12-security-infra-operations.md)); secrets only from the environment or a vault, named by
+  reference in the source configuration and never stored, logged or written to the output;
+  outbound calls through one HTTP client with a per-connector rate limit, timeouts, retries with
+  backoff that honour `Retry-After`, HTTPS only, and a log line per call (method, path without
+  credentials, status, duration) in the run log. Image files go through the ING.6 pipeline and the
+  SEC.2 upload checks. Bank details, KYC documents and payout accounts are never imported: vendors
+  enter them again and onboard with the payment provider.
+- **Relation to the supplier adapters** of [08](08-import-pipelines.md): a `SupplierAdapter`
+  keeps one vendor's catalogue in sync every day (the ING.3 Store API adapter reads a supplier's
+  public WooCommerce store); a connector moves a whole shop once, or a few times during a
+  migration. They can share the HTTP client and the field mappings.
+
+First connectors and what their APIs cannot give:
+
+| Connector | Reads | Cannot give (stays with the DB extractor or is re-entered) |
+|---|---|---|
+| `woocommerce_rest` (MIG.13) | WooCommerce REST API v3 with a read-only API key: products, variations, categories, attributes and terms, tags, reviews, images, customers, orders; `per_page=100` pagination with the total-pages header, `modified_after` for incremental runs | WordPress password hashes (migrated customers get a password reset link at first login), protected meta (keys starting with `_`) and much plugin meta, links between translations unless the multilingual plugin exposes them, SEO plugin fields, slug history and redirects, marketplace ledger |
+| `wcfm_rest` (MIG.14) | WCFM Marketplace REST endpoints (`wcfmmp/v1`, an optional add-on found through the `/wp-json` index): store vendors with profile, address, policies and logo, product to vendor link, vendor orders with the commission split | Without the add-on: vendor data and product attribution (fallback: a CSV map of product id to vendor). Even with it: commission rules, ledger and payout history, store SEO; bank data never. The legacy site does not run the add-on, which is one more reason our migration keeps MIG.1 |
+| `wordpress_db` (MIG.1) | The WordPress database dump in a protected environment | Nothing of the above is missing; used for our own migration only |
+
 ## 13.3 Parity reports (automated)
 
 - Counts by vendor, language, category, taxonomy term, status.
@@ -122,3 +175,6 @@ they follow the same staggered switch as product URLs:
 | MIG.9 | Three dress rehearsals on STAGE + cutover and rollback runbook | P1 | 16 | MIG.5, MIG.6 | Third rehearsal with no blockers |
 | MIG.10 | Cutover and post-go-live monitoring, including the daily 404 report, the Search Console review and the product URL batch schedule and gates of the runbook (Q-91) | P1 | 12 | MIG.9, SEC.6 | Go-live, 72 h with no critical issues; 404 report and Search Console review recorded at T+14 and T+28 |
 | MIG.11 | Staggered product and tag URL switch (owner decisions Q-91 and D-07): per-product and per-term `url_mode` and frozen legacy paths, traffic ranking from analytics (SEO.5) or the MIG.1 legacy access-log counts, configurable batch size and cadence, batch switch and rollback as a management command and staff action with dry-run and audit, sitemap, canonical and hreflang by mode, gate on 404 rate, Search Console impressions and clicks against baseline, and errors with configurable thresholds | P1 | 6 | MIG.6, CAT.5, CAT.8 | A batch switch gives a single 301 hop and an updated sitemap; a rollback leaves no redirect loop; a legacy-mode page is 200 with a self-canonical; a switched legacy tag URL is a single 301 to `/{taxonomy}/{term}/`; the next batch is refused when a gate metric is over threshold; the MIG.6 "no URL lost" count still holds after a switch and a rollback; products and terms created after go-live start in new mode |
+| MIG.12 | Source-connector interface (owner decision 2026-11-09, spec 13 §13.2 "Source connectors"): `ShopConnector` protocol (`capabilities`, `check`, `extract`), registry by decorator and `MPMV_IMPORT_CONNECTORS`, intermediate format `mpmv-import/1` (JSON Schema and Pydantic models, an evolution of the MIG.1 JSON) read by the MIG.3 and MIG.4 loaders only; shared HTTP client (HTTPS only, per-connector rate limit, timeouts, backoff honouring `Retry-After`, one log line per call without credentials); secrets by reference from the environment or a vault; schema validation of every record (SEC.9); read-only, dry-run by default, idempotent; the MIG.1 extractor wrapped as the `wordpress_db` connector; connectors import no app models (import-linter contract) | P1 | 8 | MIG.1 | A fake connector registered from settings appears in the registry and the loaders load its output with no change to their code; a record that fails the schema is rejected with a report and nothing of it is written; a canary secret never appears in logs, output or the database; two runs on the same source give byte-identical output; the MIG.1 output validates against `mpmv-import/1`; a connector that sends a non-GET request fails its test |
+| MIG.13 | WooCommerce REST API v3 connector `woocommerce_rest` (owner decision 2026-11-09): read-only consumer key and secret from the environment, HTTPS only; products, variations, categories, attributes and terms, tags, reviews, images, customers, orders; pagination with `per_page=100` and the total-pages header, `modified_after` for incremental runs; capabilities list the gaps (no password hashes, no protected meta, translation links only when the multilingual plugin exposes them, no SEO plugin fields, no slug history, no ledger); CI runs against recorded responses of a test shop, never a live shop | P2 | 12 | MIG.12 | On the recorded fixture every entity comes out schema-valid, across at least three pages; a 429 response is retried after `Retry-After`; missing credentials give an error that names the environment variable, never a value; customers carry no password field and the report says a password reset is needed; an `http://` source URL is refused |
+| MIG.14 | WCFM Marketplace connector `wcfm_rest` (owner decision 2026-11-09): discovers the `wcfmmp/v1` namespace from the `/wp-json` index; store vendors (profile, address, policies, logo), product to vendor link, vendor orders with the commission split; without the add-on, a run report of the gaps and a CSV map of product id to vendor as fallback; never bank, KYC or payout data | P2 | 8 | MIG.13 | A recorded fixture with the add-on gives vendors and product attribution; a fixture without it completes with the gap report and attributes products from the CSV map; the schema has no bank, KYC or payout field, so no such data can be written |

@@ -597,7 +597,7 @@ class VendorClosure(Model):                     # vendor-scoped (CORE.3)
 - **Services** (`apps/vendors/services.py`): `add_closure`, `update_closure` and `delete_closure`
   accept `dry_run=True`, return a `ChangeSet` and write an `AuditLog` entry (actor, before and
   after, source: vendor area, admin or API).
-- **Vendor area** (CORE.9, `/vendor/settings/closures/`): list of current and upcoming ranges,
+- **Vendor area** (CORE.9, `/manager/shop/settings/closures/`): list of current and upcoming ranges,
   add, edit and delete forms, a preview of the notice. Staff use a Wagtail admin ViewSet. **API**:
   `/api/v1/vendors/{id}/closures` (list, create, update, delete, `?dry_run=true`, RFC 9457 errors);
   a vendor-scoped key (CORE.13) reaches only its own vendor, anything else is a 404.

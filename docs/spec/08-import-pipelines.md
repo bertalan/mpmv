@@ -105,6 +105,14 @@ policy says so; rows match an existing product by vendor plus SKU match key, the
 ([03](03-catalog.md), CAT.13); uniqueness of the match key per vendor is enforced by the DB (the
 29 current duplicate SKUs are resolved during migration, see [13](13-migration-cutover.md)).
 
+A supplier adapter keeps one vendor's catalogue in sync. Moving a whole shop (vendors,
+catalogue, customers, orders) from another platform is the job of a **source connector**
+(`ShopConnector`, MIG.12 to MIG.14, owner decision 2026-11-09): it writes the intermediate
+import format that the migration loaders read ([13](13-migration-cutover.md), "Source
+connectors"). The setup wizard offers both as initial data sources (ARC.26,
+[01](01-stack-and-architecture.md)), and the Manager platform space hosts the import pages
+for the Catalog and moderation role ([02](02-core-identity-permissions.md)).
+
 ### Recurring jobs
 
 | Job | Current schedule | In the new system |
