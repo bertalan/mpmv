@@ -176,7 +176,7 @@ def _deploy_check(module: str, **extra: str) -> subprocess.CompletedProcess[str]
     inherited = {
         name: value
         for name, value in os.environ.items()
-        if not name.startswith(("DJANGO_", "MPMV_TRUSTED_"))
+        if not name.startswith(("DJANGO_", "MPMV_TRUSTED_", "MPMV_EMAIL_"))
     }
     env = {
         **inherited,
@@ -185,6 +185,10 @@ def _deploy_check(module: str, **extra: str) -> subprocess.CompletedProcess[str]
         "DJANGO_ALLOWED_HOSTS": "shop.example.com",
         "DATABASE_URL": "postgres://mpmv@127.0.0.1:55432/mpmv",
         "MPMV_BASE_URL": "https://shop.example.com",
+        # LIVE refuses the console sender and a localhost address (core.E501, core.E502); the
+        # provider adapter comes with ARC.19, so the check sees only its dotted path here.
+        "MPMV_EMAIL_SENDER": "apps.example.ProviderEmailSender",
+        "MPMV_EMAIL_FROM": "no-reply@shop.example.com",
         **extra,
     }
     return subprocess.run(
@@ -216,6 +220,32 @@ def test_deploy_check_fails_without_the_public_base_url() -> None:
     )
     assert result.returncode != 0
     assert "cms.E001" in result.stdout + result.stderr
+
+
+def test_live_refuses_to_start_without_a_real_email_sender() -> None:
+    """Coherence check 7: a forgotten email variable must stop LIVE, not drop every email."""
+    result = _deploy_check(
+        "mpmv.settings.live",
+        MPMV_TRUSTED_PROXY_HEADER="X-Real-IP",
+        MPMV_TRUSTED_PROXIES="10.89.250.0/24",
+        MPMV_EMAIL_SENDER="",
+        MPMV_EMAIL_FROM="",
+    )
+    assert result.returncode != 0
+    assert "core.E501" in result.stdout + result.stderr
+    assert "core.E502" in result.stdout + result.stderr
+
+
+def test_stage_keeps_the_console_sender_until_the_provider_is_wired() -> None:
+    """STAGE holds synthetic data only: the console sender is allowed there until ARC.19."""
+    result = _deploy_check(
+        "mpmv.settings.stage",
+        MPMV_TRUSTED_PROXY_HEADER="X-Real-IP",
+        MPMV_TRUSTED_PROXIES="10.89.250.0/24",
+        MPMV_EMAIL_SENDER="",
+        MPMV_EMAIL_FROM="",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_deploy_check_warns_without_a_trusted_proxy_header() -> None:

@@ -43,7 +43,13 @@ dev = [
   "check-jsonschema>=0.39.0",
   "cyclonedx-bom>=7.6.0,<8",
   # SEC.5: property-based tests over the hostile-input corpus (tests/hostile_input.py).
+  # Exact pin on purpose: the derandomized `ci` profile (conftest.py) replays the same examples
+  # only on the same Hypothesis version, and Hypothesis releases several times a week. A bump
+  # comes as its own Dependabot PR, so a new failing example points at the bump, not at a change
+  # in our code (docs/dev/dependency-updates.md).
   "hypothesis==6.170.10",
+  # tools/build_docs.py renders the HTML spec; tests/unit/test_build_docs_eof.py checks it.
+  "markdown>=3.5",
 ]
 
 [tool.uv]
@@ -123,6 +129,7 @@ markers = [
   "unit: pure functions, no database (ADR-0006)",
   "integration: real Django + PostgreSQL",
   "e2e: Playwright against a live server",
+  "security_slow: slow security cases, run nightly by security-nightly (SEC.5)",
 ]
 
 [tool.coverage.run]

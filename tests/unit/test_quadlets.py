@@ -1,9 +1,12 @@
 """Lint rules for the Podman Quadlet units that run STAGE and LIVE (ARC.5, ADR-0005)."""
 
+import mimetypes
 import re
 from pathlib import Path
 
 import pytest
+
+from apps.core.media import CACHE_CONTROL, MEDIA_FOLDERS, MEDIA_TYPES, RASTER_CSP, SVG_CSP
 
 ROOT = Path(__file__).resolve().parents[2]
 QUADLET_DIR = ROOT / "deploy" / "quadlet"
@@ -186,7 +189,13 @@ def caddy_sites() -> list[str]:
 
 def test_caddy_serves_only_the_configured_site_name() -> None:
     """ARC.13: the host name comes from the environment; any other name or an IP gets no site."""
-    assert caddy_sites() == ["", "{$MPMV_SITE_ADDRESS}", "http://"]
+    assert caddy_sites() == [
+        "",
+        "(security_headers)",
+        "{$MPMV_SITE_ADDRESS}",
+        "http://{$MPMV_SITE_ADDRESS}",
+        "http://",
+    ]
     text = CADDYFILE.read_text()
     assert re.search(r"^http:// \{\n\tabort\n\}$", text, re.M), "catch-all must serve nothing"
     assert re.search(r"^\t\tstrict_sni_host on$", text, re.M)
@@ -293,10 +302,87 @@ def test_caddy_serves_media_as_inert_static_files() -> None:
     for directive in ("browse", "templates", "php"):
         assert directive not in body
     assert re.search(r"^\t\theader X-Content-Type-Options nosniff$", body, re.M)
-    csp = r"^\t\theader Content-Security-Policy \"default-src 'none'; sandbox\"$"
-    assert re.search(csp, body, re.M)
-    assert re.search(r"^\t\theader Cache-Control \"public, max-age=86400\"$", body, re.M)
+    assert re.search(rf"^\t\theader Cache-Control \"{re.escape(CACHE_CONTROL)}\"$", body, re.M)
     assert re.search(r"^\thandle /media/\* \{\n\t\trespond 404\n\t\}$", text, re.M), (
         "every other media path must be a 404, never the app or file_server"
     )
     assert re.search(r"^\thandle \{\n\t\treverse_proxy mpmv-app:8000 \{$", text, re.M)
+
+
+def public_media_block() -> str:
+    block = re.search(
+        r"^\thandle @public_media \{\n(.*?)\n\t\}$", CADDYFILE.read_text(), re.M | re.S
+    )
+    assert block, "allowed media must be served by Caddy from the volume"
+    return block.group(1)
+
+
+def test_caddy_media_folders_match_the_app_view() -> None:
+    """THM.12/ARC.13 parity: Caddy serves exactly the folders apps.core.media serves."""
+    folders = re.search(r"\^/media/\(([^)]*)\)/", public_media_regex().pattern)
+    assert folders, public_media_regex().pattern
+    assert {f"{name}/" for name in folders.group(1).split("|")} == set(MEDIA_FOLDERS)
+
+
+CANDIDATE_EXTENSIONS = {
+    *MEDIA_TYPES,
+    *mimetypes.types_map,
+    ".htm",
+    ".svgz",
+    ".jpe",
+    ".jfif",
+    ".pjpeg",
+    ".heic",
+    ".tif",
+    ".bmp",
+    ".ico",
+    ".xml",
+    ".js",
+    ".pdf",
+}
+
+
+@pytest.mark.parametrize("extension", sorted(CANDIDATE_EXTENSIONS))
+def test_caddy_media_extensions_match_the_app_view(extension: str) -> None:
+    """Caddy serves an extension (any case) if and only if apps.core.media does."""
+    pattern = public_media_regex()
+    allowed = extension in MEDIA_TYPES
+    for folder in MEDIA_FOLDERS:
+        for spelling in (extension, extension.upper()):
+            assert bool(pattern.match(f"/media/{folder}file{spelling}")) is allowed, spelling
+
+
+def header_lines(body: str, name: str) -> list[tuple[str, str]]:
+    """(matcher, value) for every `header [@matcher] <name> "<value>"` line in a block."""
+    found = re.findall(rf"^\t\theader (?:(@\w+) )?{name} \"([^\"]*)\"$", body, re.M)
+    return [(matcher, value) for matcher, value in found]
+
+
+def test_caddy_media_csp_matches_the_app_view() -> None:
+    """lane-b re-check of #152: two exclusive CSP headers, SVG and everything else, with the
+    same values as apps.core.media. An unmatched CSP would overwrite the SVG one, because the
+    Caddyfile adapter runs a header with a matcher before the header without one."""
+    body = public_media_block()
+    assert sorted(header_lines(body, "Content-Security-Policy")) == sorted(
+        [("@not_svg", RASTER_CSP), ("@svg", SVG_CSP)]
+    )
+    assert re.search(r"^\t\t@svg path_regexp svg \(\?i\)\\\.svg\$$", body, re.M)
+    assert re.search(r"^\t\t@not_svg not path_regexp \(\?i\)\\\.svg\$$", body, re.M)
+    assert [ext for ext, kind in MEDIA_TYPES.items() if kind == "image/svg+xml"] == [".svg"]
+
+
+def test_caddy_media_svg_matchers_are_exclusive() -> None:
+    """Every allowed path matches exactly one of @svg and @not_svg."""
+    body = public_media_block()
+    svg = re.search(r"^\t\t@svg path_regexp svg (\S+)$", body, re.M)
+    assert svg
+    svg_pattern = re.compile(svg.group(1))
+    for folder in MEDIA_FOLDERS:
+        for extension in MEDIA_TYPES:
+            for spelling in (extension, extension.upper()):
+                path = f"/{folder}logo{spelling}"
+                assert bool(svg_pattern.search(path)) is (extension == ".svg"), path
+
+
+def test_caddy_media_cache_control_matches_the_app_view() -> None:
+    assert header_lines(public_media_block(), "Cache-Control") == [("", CACHE_CONTROL)]

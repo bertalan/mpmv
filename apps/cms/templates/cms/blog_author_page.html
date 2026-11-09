@@ -1,0 +1,32 @@
+{% extends "layouts/content.html" %}
+{% load i18n wagtailcore_tags wagtailimages_tags image_credits cms_tags %}
+{% comment %}
+Author page (CMS.3), `author/<slug>/` under a language's blog: the author's name, photo (with its
+CMS.8 credit), job title and bio in this language (hidden while untranslated, never another
+language's), profile links, then their live articles here, newest first, twelve per page.
+`page` is the blog index; the head carries the ProfilePage of the author's Person.
+{% endcomment %}
+{% block title %}{{ author.name }} · {{ page.title }} · {{ site_name }}{% endblock %}
+{% block description %}{% endblock %}
+{% block head %}{% jsonld_script jsonld %}{% endblock %}
+{% block page_content %}
+  <section class="author-profile">
+    <h1>{{ author.name }}</h1>
+    {% if author_job_title %}<p class="author-job-title">{{ author_job_title }}</p>{% endif %}
+    {% if author.photo %}
+      {% image_credit_of author.photo as credit %}
+      <figure>
+        {% image author.photo fill-240x240 alt=author.photo_alt_text %}
+        {% if credit %}<figcaption>{% include "core/components/image_credit.html" %}</figcaption>{% endif %}
+      </figure>
+    {% endif %}
+    {% if author_bio %}{{ author_bio|richtext }}{% endif %}
+    {% with links=author.profile_urls %}{% if links %}
+      <ul class="author-links">
+        {% for url in links %}<li><a href="{{ url }}" rel="me noopener">{{ url }}</a></li>{% endfor %}
+      </ul>
+    {% endif %}{% endwith %}
+  </section>
+  {% translate "No articles by this author yet." as empty %}
+  {% include "cms/includes/post_list.html" with empty=empty %}
+{% endblock %}

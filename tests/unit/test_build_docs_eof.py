@@ -4,8 +4,6 @@ import importlib.util
 import sys
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).resolve().parents[2]
 _spec = importlib.util.spec_from_file_location("build_docs", ROOT / "tools" / "build_docs.py")
 assert _spec is not None
@@ -23,7 +21,6 @@ def test_generated_text_ends_with_exactly_one_newline() -> None:
 
 
 def test_html_spec_ends_with_exactly_one_newline(tmp_path: Path) -> None:
-    pytest.importorskip("markdown")
     out = tmp_path / "spec.html"
     build_docs.build_html([build_docs.SPEC / "README.md"], out)
     text = out.read_text(encoding="utf-8")

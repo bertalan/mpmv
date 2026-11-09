@@ -38,6 +38,10 @@ lane board.
 - `make check` and `make test` must be green, and `make test-e2e` too when the UI changes.
 - Never hand-edit `docs/spec/90-backlog.md` or `backlog.csv`. Run `make docs`. On a rebase, take
   main's version of the generated files and run `make docs` again.
+- **Migration number collisions.** When two open PRs add the same migration number in one app,
+  the PR merged later renumbers: merge main in, regenerate or rename its migration to the next
+  free number, and point its dependencies at the migration that merged first (no merge
+  migration). When the merge order is not obvious, lane-a names it on the Lane board (#86).
 - **Do not edit `docs/progress.md`.** List follow-ups in the PR under "Follow-ups"; lane-a records them.
 - The repository is public. CLAUDE.md's redaction rules apply to PR bodies, comments and the lane
   board too: no real vendor names, legacy hostnames, order numbers or credentials.
