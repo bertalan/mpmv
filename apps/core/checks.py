@@ -501,3 +501,52 @@ def check_avif_support(
             id="core.W501",
         )
     ]
+
+
+# --- Upload limits (SEC.2)
+
+UPLOAD_LIMIT_SETTINGS = (
+    "WAGTAILIMAGES_MAX_UPLOAD_SIZE",
+    "WAGTAILIMAGES_MAX_IMAGE_PIXELS",
+    "MPMV_MAX_ANIMATION_PIXELS",
+    "MPMV_MAX_STORED_IMAGE_PIXELS",
+    "MPMV_MAX_IMAGE_SIDE",
+    "MPMV_MAX_IMAGE_FRAMES",
+    "MPMV_IMAGE_DECODE_WAIT_SECONDS",
+)
+
+
+def check_image_upload_limits(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """Every upload cap is a positive number (core.E601), and the stored and animation caps fit
+    within the still-image decode cap (core.E602)."""
+    values = {name: getattr(settings, name, None) for name in UPLOAD_LIMIT_SETTINGS}
+    wrong = [
+        name
+        for name, value in values.items()
+        if isinstance(value, bool) or not isinstance(value, int | float) or value <= 0
+    ]
+    if wrong:
+        return [
+            checks.Error(
+                f"Upload limits must be positive numbers: {', '.join(wrong)}.",
+                hint="Fix the MPMV_MAX_* variables in the environment (mpmv.env).",
+                id="core.E601",
+            )
+        ]
+    decode = values["WAGTAILIMAGES_MAX_IMAGE_PIXELS"]
+    above = [
+        name
+        for name in ("MPMV_MAX_STORED_IMAGE_PIXELS", "MPMV_MAX_ANIMATION_PIXELS")
+        if values[name] > decode  # type: ignore[operator]
+    ]
+    if above:
+        return [
+            checks.Error(
+                f"{', '.join(above)} must not exceed WAGTAILIMAGES_MAX_IMAGE_PIXELS ({decode}).",
+                hint="Lower them, or raise MPMV_MAX_IMAGE_PIXELS.",
+                id="core.E602",
+            )
+        ]
+    return []

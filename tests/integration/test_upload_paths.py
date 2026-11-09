@@ -546,14 +546,56 @@ def test_every_document_upload_path_refuses_or_safely_stores_the_corpus(
 
 
 def test_the_upload_caps_are_the_decided_defaults() -> None:
-    """Lane-a's decision on #164: 25 MB a file, 100 megapixels decoded (all frames), 16000 px a
-    side, originals stored within 40 megapixels; at most 300 frames."""
+    """Lane-a's decision on #164: 25 MB a file, 60 megapixels decoded for a still image, 16 for
+    an animation (all frames together), 16000 px a side, originals stored within 40
+    megapixels; at most 300 frames; one image decoded at a time, a second upload waiting 30 s."""
     limits = image_limits()
     assert limits.max_bytes == 25 * 1024 * 1024
-    assert limits.max_pixels == 100_000_000
+    assert limits.max_pixels == 60_000_000
+    assert limits.max_animation_pixels == 16_000_000
     assert limits.max_side == 16_000
     assert limits.max_stored_pixels == 40_000_000
     assert limits.max_frames == 300
+    assert limits.decode_wait == 30
+    assert limits.max_pixels == Image.MAX_IMAGE_PIXELS
+
+
+@pytest.mark.parametrize("path", ["admin-single", "admin-multiple", "service-save-image"])
+def test_an_upload_that_waits_too_long_for_the_decoder_gets_a_try_again_error(
+    editor: Client, root: Collection, path: str, settings: Any
+) -> None:
+    """One image is decoded at a time per process: a second upload that cannot get the slot in
+    time is a validation error asking to try again, never a server error."""
+    from apps.core.uploads import decode_slot
+
+    settings.MPMV_IMAGE_DECODE_WAIT_SECONDS = 0.05
+    case = next(c for c in image_cases() if c.id == "valid-png")
+    with decode_slot(1.0):
+        if path == "admin-multiple":
+            response = editor.post(
+                reverse("wagtailimages:add_multiple"),
+                {"files[]": _upload(case), "collection": root.pk},
+            )
+            assert response.status_code == 200
+            assert not response.json()["success"]
+            assert "try again" in response.content.decode().lower()
+            return
+        if path == "admin-single":
+            title = f"busy {next(_titles)}"
+            response = editor.post(
+                reverse("wagtailimages:add"), {**_image_fields(title, root), "file": _upload(case)}
+            )
+            assert response.status_code == 200
+            assert "try again" in response.content.decode().lower()
+            assert _new_image(title) is None
+            return
+        image = MediaImage(
+            title="busy", file=_upload(case), collection=root, licence=_licence(), author="A"
+        )
+        with pytest.raises(ValidationError) as refusal:
+            save_image(image)
+    assert set(refusal.value.message_dict) == {"file"}
+    assert "try again" in " ".join(refusal.value.message_dict["file"]).lower()
 
 
 def test_every_stored_file_field_is_declared() -> None:

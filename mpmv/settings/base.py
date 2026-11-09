@@ -6,7 +6,16 @@ import dj_database_url
 import django_stubs_ext
 from django.utils.csp import CSP
 
-from .env import env_bool, env_flags, env_list, env_secret_list, env_str, map_tile_origin
+from .env import (
+    env_bool,
+    env_flags,
+    env_float,
+    env_int,
+    env_list,
+    env_secret_list,
+    env_str,
+    map_tile_origin,
+)
 
 # Allows `models.DecimalField[Any]`-style generics at runtime (django-stubs).
 django_stubs_ext.monkeypatch()
@@ -262,24 +271,33 @@ WAGTAILADMIN_BASE_URL = SITE_BASE_URL
 WAGTAILIMAGES_IMAGE_MODEL = "core.MediaImage"
 # Upload limits (SEC.2, apps.core.uploads; values decided on PR #164). Wagtail's form checks the
 # size and the pixels; MediaImage checks all of them on every path and re-encodes the stored
-# original. 100 megapixels (all frames of an animation together) is the most one upload decodes;
-# above it the image is refused. An original over 40 megapixels is downscaled (same aspect ratio)
-# when re-encoded, so stored originals and their renditions stay within 40. 300 frames bound the
-# CPU an animation of tiny frames costs (each frame is decoded and re-encoded).
-# Memory: Pillow holds 4 bytes a pixel, so one 100-megapixel still image peaks at about 600 MB
-# of RSS while re-encoded (the decoded original, 400 MB, plus the stored 40-megapixel copy,
-# 160 MB; measured on PR #164). An animated WebP at the cap peaks at about 1 GB (libwebp keeps
-# two full canvases). Size the web workers' memory and upload concurrency for that, e.g. one
-# upload at a time per worker. CoreConfig.ready sets Pillow's bomb threshold to this cap.
+# original. A still image decodes at most 60 megapixels (45-60 MP camera originals); above it,
+# it is refused. An animation (GIF, WebP, APNG: logos and banners, not photos) decodes at most 16
+# megapixels, all its frames together. Both are checked on the headers, before any frame is
+# decoded. An original over 40 megapixels is downscaled (same aspect ratio) when re-encoded, so
+# stored originals and their renditions stay within 40. 300 frames bound the CPU an animation of
+# tiny frames costs (each frame is decoded and re-encoded).
+# Memory: Pillow holds 4 bytes a pixel. Measured on PR #164: a 100-megapixel still image peaked
+# at about 600 MB of RSS while re-encoded (the decoded original, 400 MB, plus the stored
+# 40-megapixel copy, 160 MB), an animated WebP of 100 megapixels at about 1 GB (libwebp keeps
+# two full canvases). At these caps that is about 450 MB for a 60-megapixel still image (240 MB
+# decoded plus the 160 MB stored copy) and about 160 MB for a 16-megapixel animation. Each
+# process decodes one image at a time (apps.core.uploads.decode_slot): a second upload waits
+# MPMV_IMAGE_DECODE_WAIT_SECONDS, then gets a "try again" error, never a server error. So a web
+# worker process needs about 450 MB above its baseline for uploads, whatever its thread count.
+# CoreConfig.ready sets Pillow's bomb threshold to the still-image cap. Every cap can be set
+# from the environment (deploy/server/mpmv.env.example); core.E601/E602 check them at startup.
 # Raster formats are checked and re-encoded (apps.core.uploads); SVG is for logos and icons only,
 # in an SvgCollection, and goes through apps.core.svg instead (THM.12). The branch is chosen by
 # content, never by the extension, and the extension must agree with the content.
 WAGTAILIMAGES_EXTENSIONS = ["avif", "gif", "jpg", "jpeg", "png", "webp", "svg"]
-WAGTAILIMAGES_MAX_UPLOAD_SIZE = 25 * 1024 * 1024
-WAGTAILIMAGES_MAX_IMAGE_PIXELS = 100_000_000
-MPMV_MAX_IMAGE_SIDE = 16_000
-MPMV_MAX_STORED_IMAGE_PIXELS = 40_000_000
-MPMV_MAX_IMAGE_FRAMES = 300
+WAGTAILIMAGES_MAX_UPLOAD_SIZE = env_int("MPMV_MAX_IMAGE_UPLOAD_BYTES", 25 * 1024 * 1024)
+WAGTAILIMAGES_MAX_IMAGE_PIXELS = env_int("MPMV_MAX_IMAGE_PIXELS", 60_000_000)
+MPMV_MAX_ANIMATION_PIXELS = env_int("MPMV_MAX_ANIMATION_PIXELS", 16_000_000)
+MPMV_MAX_IMAGE_SIDE = env_int("MPMV_MAX_IMAGE_SIDE", 16_000)
+MPMV_MAX_STORED_IMAGE_PIXELS = env_int("MPMV_MAX_STORED_IMAGE_PIXELS", 40_000_000)
+MPMV_MAX_IMAGE_FRAMES = env_int("MPMV_MAX_IMAGE_FRAMES", 300)
+MPMV_IMAGE_DECODE_WAIT_SECONDS = env_float("MPMV_IMAGE_DECODE_WAIT_SECONDS", 30.0)
 # Safe parsing of the upload field (SEC.2) and the SVG refusal in the second step of Wagtail's
 # multiple upload (THM.12).
 WAGTAILIMAGES_IMAGE_FORM_BASE = "apps.core.forms.MediaImageForm"

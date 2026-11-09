@@ -192,6 +192,8 @@ def image_limits() -> ImageLimits:
         max_side=settings.MPMV_MAX_IMAGE_SIDE,
         max_frames=settings.MPMV_MAX_IMAGE_FRAMES,
         max_stored_pixels=settings.MPMV_MAX_STORED_IMAGE_PIXELS,
+        max_animation_pixels=settings.MPMV_MAX_ANIMATION_PIXELS,
+        decode_wait=settings.MPMV_IMAGE_DECODE_WAIT_SECONDS,
     )
 
 

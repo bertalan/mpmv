@@ -10,10 +10,13 @@ Images:
 
 - the format comes from the content (Pillow, restricted to the accepted formats), never from the
   name, and the name's extension must agree with it;
-- the size, the number of frames, the pixels of all frames together and each side are capped
-  *before* decoding (a GIF's frame headers are walked one past the frame cap at most), and
-  Pillow's decompression-bomb warning is an error (its threshold is the pixel cap, set once at
-  startup by `configure_pillow`);
+- the size, the number of frames, the pixels and each side are capped *before* decoding (a
+  GIF's frame headers are walked one past the frame cap at most): a still image has its decode
+  cap, an animation a lower one on all its frames together. Pillow's decompression-bomb warning
+  is an error (its threshold is the still-image cap, set once at startup by `configure_pillow`);
+- one image is decoded at a time per process (`decode_slot`): a second upload waits for the
+  first, a bounded time, then is refused with a "try again" message, so a worker's peak memory
+  is one image's;
 - an original over the stored-pixel cap (all frames together) is downscaled while re-encoded,
   keeping its aspect ratio, so the stored original fits that cap;
 - the original is re-encoded: whatever is not pixels (EXIF and GPS, XMP, comments, text chunks,
@@ -42,9 +45,12 @@ no second format a browser or an unzip tool would find.
 import io
 import math
 import re
+import threading
 import unicodedata
 import warnings
 import zipfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Literal
 
@@ -81,10 +87,14 @@ FALLBACK_STEM = "image"
 @dataclass(frozen=True)
 class ImageLimits:
     max_bytes: int  # settings.WAGTAILIMAGES_MAX_UPLOAD_SIZE
-    max_pixels: int  # decoded, all frames together; settings.WAGTAILIMAGES_MAX_IMAGE_PIXELS
+    max_pixels: int  # decoded, a still image; settings.WAGTAILIMAGES_MAX_IMAGE_PIXELS
     max_side: int  # settings.MPMV_MAX_IMAGE_SIDE
     max_frames: int = 300  # settings.MPMV_MAX_IMAGE_FRAMES
     max_stored_pixels: int = 40_000_000  # stored original; settings.MPMV_MAX_STORED_IMAGE_PIXELS
+    # Decoded, an animation's frames together; settings.MPMV_MAX_ANIMATION_PIXELS.
+    max_animation_pixels: int = 16_000_000
+    # Seconds a second upload waits for the decoder; settings.MPMV_IMAGE_DECODE_WAIT_SECONDS.
+    decode_wait: float = 30.0
 
 
 @dataclass(frozen=True)
@@ -203,6 +213,28 @@ def _refuse_name(name: str) -> str:
     return IMAGE_EXTENSIONS[extension]
 
 
+# One image decoded at a time in this process (lane-a on PR #164): a worker's peak memory is then
+# one image's, whatever the number of threads serving uploads.
+_DECODE_LOCK = threading.Lock()
+
+
+@contextmanager
+def decode_slot(wait: float) -> Iterator[None]:
+    """Hold this process's image decoder; refuse with a "try again" after `wait` seconds.
+
+    The lock is released however the block ends (a refusal, an unexpected error).
+    """
+    if not _DECODE_LOCK.acquire(timeout=max(wait, 0.0)):
+        raise UploadRefused(
+            "busy",
+            "The server is busy processing another image. Please try again in a moment.",
+        )
+    try:
+        yield
+    finally:
+        _DECODE_LOCK.release()
+
+
 def _open(data: bytes, limits: ImageLimits) -> Image.Image:
     if not data:
         raise UploadRefused("empty", "The file is empty.")
@@ -223,7 +255,8 @@ def _open(data: bytes, limits: ImageLimits) -> Image.Image:
 
 
 def configure_pillow(max_pixels: int) -> None:
-    """Set Pillow's process-wide bomb threshold to the decode cap; called once at startup.
+    """Set Pillow's process-wide bomb threshold to the still-image decode cap; called once at
+    startup. An animation's frames are each smaller than its own, lower cap.
 
     Pillow warns above `MAX_IMAGE_PIXELS` (about 89 megapixels by default) and errors above
     twice that. Setting it at startup, rather than on the first upload, keeps every Pillow use of
@@ -280,7 +313,13 @@ def _check_size(image: Image.Image, fmt: str, limits: ImageLimits) -> int:
             "too_many_frames",
             f"The animation has too many frames: at most {limits.max_frames}.",
         )
-    if width * height * frames > limits.max_pixels:
+    if frames > 1 and width * height * frames > limits.max_animation_pixels:
+        raise UploadRefused(
+            "too_many_pixels",
+            "The animation has too many pixels: at most "
+            f"{limits.max_animation_pixels // 1_000_000} megapixels, all frames together.",
+        )
+    if width * height > limits.max_pixels:
         raise UploadRefused("too_many_pixels", "The image has too many pixels.")
     return frames
 
@@ -327,7 +366,7 @@ def check_image(data: bytes, name: str, limits: ImageLimits, *, check_name: bool
     rewritten).
     """
     image, fmt, frames = _open_checked(data, name, limits, check_name)
-    with image:
+    with image, decode_slot(limits.decode_wait):
         _load(image, frames)
         return fmt
 
@@ -557,10 +596,11 @@ def sanitise_image(
     """Check `data` and re-encode it without its metadata; raises `UploadRefused`.
 
     The file is opened once: the caps are checked on its headers, then each frame kept is
-    decoded once (the decode is also the check that the data is a valid image).
+    decoded once (the decode is also the check that the data is a valid image), holding the
+    process's decoder (`decode_slot`).
     """
     source, fmt, frames = _open_checked(data, name, limits, check_name)
-    with source:
+    with source, decode_slot(limits.decode_wait):
         if fmt in ANIMATED_FORMATS and frames > 1:
             clean = _animation(source, fmt, frames, limits)
         else:

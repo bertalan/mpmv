@@ -5,6 +5,8 @@ cases through every upload path of the site.
 """
 
 import io
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -14,6 +16,8 @@ from apps.core.uploads import (
     ImageLimits,
     UploadRefused,
     check_document,
+    check_image,
+    decode_slot,
     extension_of,
     safe_filename,
     sanitise_image,
@@ -30,13 +34,15 @@ from tests.upload_corpus import (
     png,
 )
 
-# The defaults decided for SEC.2 (lane-a on #164): 25 MB, 100 megapixels decoded (all frames),
-# 16000 px a side, originals stored within 40 megapixels.
+# The defaults decided for SEC.2 (lane-a on #164): 25 MB, 60 megapixels decoded for a still
+# image, 16 megapixels for an animation (all its frames together), 16000 px a side, originals
+# stored within 40 megapixels.
 LIMITS = ImageLimits(
     max_bytes=25 * 1024 * 1024,
-    max_pixels=100_000_000,
+    max_pixels=60_000_000,
     max_side=16_000,
     max_stored_pixels=40_000_000,
+    max_animation_pixels=16_000_000,
 )
 MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
 
@@ -383,6 +389,149 @@ def test_the_frame_cap_holds_for_every_animated_format(fmt: str, name: str) -> N
     clean = sanitise_image(_animation(fmt, 10), name, limits)
     with Image.open(io.BytesIO(clean.data)) as stored:
         assert getattr(stored, "n_frames", 1) == 10
+
+
+def _frames_of(fmt: str, count: int, size: tuple[int, int]) -> bytes:
+    frames = [Image.new("RGB", size, (n % 2 * 255, 0, 0)) for n in range(count)]
+    buffer = io.BytesIO()
+    frames[0].save(buffer, format=fmt, save_all=True, append_images=frames[1:], duration=50)
+    return buffer.getvalue()
+
+
+@pytest.mark.parametrize(("fmt", "name"), [("GIF", "a.gif"), ("PNG", "a.png"), ("WEBP", "a.webp")])
+def test_the_animation_cap_sums_the_pixels_of_every_kept_frame(
+    fmt: str, name: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Lane-a on #164: an animation is capped at 16 megapixels over all its frames (here 3000
+    pixels), checked on the headers: no frame is decoded before the refusal."""
+    import apps.core.uploads as uploads
+
+    limits = ImageLimits(
+        max_bytes=10_000_000, max_pixels=1_000_000, max_side=1000, max_animation_pixels=3_000
+    )
+    assert sanitise_image(_frames_of(fmt, 3, (40, 25)), name, limits).width == 40  # 3000 px
+
+    def no_decoding(*args: object, **kwargs: object) -> None:
+        raise AssertionError("a frame was decoded before the refusal")
+
+    monkeypatch.setattr(uploads, "_load", no_decoding)
+    monkeypatch.setattr(uploads, "_animation", no_decoding)
+    with pytest.raises(UploadRefused) as refusal:
+        sanitise_image(_frames_of(fmt, 4, (40, 25)), name, limits)  # 4000 px
+    assert refusal.value.code == "too_many_pixels"
+    assert "animation" in refusal.value.message
+
+
+def test_a_still_image_is_capped_by_the_still_cap_not_the_animation_cap() -> None:
+    limits = ImageLimits(
+        max_bytes=10_000_000, max_pixels=5_000, max_side=1000, max_animation_pixels=1_000
+    )
+    assert sanitise_image(_png((100, 50)), "still.png", limits).width == 100  # 5000 px
+    with pytest.raises(UploadRefused) as refusal:
+        sanitise_image(_png((101, 50)), "still.png", limits)
+    assert refusal.value.code == "too_many_pixels"
+
+
+# --- One image decoded at a time per process (lane-a on #164) --------------------------------
+
+QUICK = ImageLimits(max_bytes=100_000, max_pixels=10_000, max_side=1000, decode_wait=5.0)
+
+
+def _in_thread(target: object) -> tuple[threading.Thread, dict[str, object]]:
+    result: dict[str, object] = {}
+
+    def run() -> None:
+        started = time.monotonic()
+        try:
+            result["value"] = target()  # type: ignore[operator]
+        except Exception as exc:  # reported to the test thread
+            result["error"] = exc
+        result["elapsed"] = time.monotonic() - started
+
+    thread = threading.Thread(target=run)
+    thread.start()
+    return thread, result
+
+
+def test_a_second_upload_waits_for_the_one_being_decoded() -> None:
+    holding = threading.Event()
+    release = threading.Event()
+
+    def first() -> None:
+        with decode_slot(1.0):
+            holding.set()
+            release.wait(5)
+
+    holder, _ = _in_thread(first)
+    assert holding.wait(5)
+    waiter, result = _in_thread(lambda: sanitise_image(_png((50, 50)), "square.png", QUICK))
+    time.sleep(0.3)
+    assert waiter.is_alive(), "the second upload did not wait"
+    release.set()
+    holder.join(5)
+    waiter.join(5)
+    assert "error" not in result, result.get("error")
+    assert result["elapsed"] >= 0.25  # type: ignore[operator]
+    assert result["value"].width == 50  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize("check", [sanitise_image, check_image])
+def test_a_second_upload_that_waits_too_long_is_asked_to_try_again(check: object) -> None:
+    holding = threading.Event()
+    release = threading.Event()
+
+    def first() -> None:
+        with decode_slot(1.0):
+            holding.set()
+            release.wait(5)
+
+    holder, _ = _in_thread(first)
+    assert holding.wait(5)
+    impatient = ImageLimits(max_bytes=100_000, max_pixels=10_000, max_side=1000, decode_wait=0.1)
+    try:
+        with pytest.raises(UploadRefused) as refusal:
+            check(_png((50, 50)), "square.png", impatient)  # type: ignore[operator]
+    finally:
+        release.set()
+        holder.join(5)
+    assert refusal.value.code == "busy"
+    assert "try again" in refusal.value.message.lower()
+
+
+def test_a_refusal_on_the_headers_does_not_wait_for_the_slot() -> None:
+    """A bomb is refused at once: the slot is taken only to decode."""
+    with decode_slot(1.0), pytest.raises(UploadRefused) as refusal:
+        sanitise_image(_png((200, 60)), "wide.png", QUICK)
+    assert refusal.value.code == "too_many_pixels"
+
+
+def _slot_is_free() -> bool:
+    try:
+        with decode_slot(0.01):
+            return True
+    except UploadRefused:
+        return False
+
+
+def test_the_slot_is_released_on_every_exception_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    import apps.core.uploads as uploads
+
+    def refuse(*args: object, **kwargs: object) -> None:
+        raise UploadRefused("invalid", "The file is not a valid image.")
+
+    def crash(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("boom")
+
+    for target, check in (("_still", sanitise_image), ("_load", check_image)):
+        for failure, error in ((refuse, UploadRefused), (crash, RuntimeError)):
+            with monkeypatch.context() as patch:
+                patch.setattr(uploads, target, failure)
+                with pytest.raises(error):  # a refusal or an unexpected error while decoding
+                    check(_png((50, 50)), "square.png", QUICK)  # type: ignore[operator]
+            assert _slot_is_free()
+    with pytest.raises(RuntimeError), decode_slot(0.01):
+        raise RuntimeError("inside the slot")
+    assert _slot_is_free()
 
 
 def test_gif_frames_are_counted_only_up_to_the_cap(monkeypatch: pytest.MonkeyPatch) -> None:

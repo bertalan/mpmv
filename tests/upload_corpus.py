@@ -288,11 +288,11 @@ def _image_cases() -> tuple[Case, ...]:
             tags=frozenset({"bomb"}),
         ),
         Case(
-            "png-101-megapixels",
+            "png-61-megapixels",
             "poster.png",
-            _raw_png(10_100, 10_000, _zeros_compressed(10_000 * 1264, 1264), depth=1),
+            _raw_png(10_000, 6_100, _zeros_compressed(6_100 * 1251, 1251), depth=1),
             "refuse",
-            "101 megapixels: just over the decode cap, refused before decoding",
+            "61 megapixels: just over the still-image decode cap, refused before decoding",
             tags=frozenset({"bomb"}),
         ),
         Case(
@@ -300,7 +300,7 @@ def _image_cases() -> tuple[Case, ...]:
             "poster.png",
             _raw_png(10_000, 6_000, _zeros_compressed(6_000 * 10_001, 10_001)),
             "store",
-            "60 megapixels: under the decode cap, downscaled to fit 40 megapixels, same aspect",
+            "60 megapixels: at the decode cap, downscaled to fit 40 megapixels, same aspect",
             expect_size=(8164, 4898),
             tags=frozenset({"downscale"}),
         ),
@@ -318,6 +318,14 @@ def _image_cases() -> tuple[Case, ...]:
             _on_screen(_animated_gif(frames=26, size=(2, 2)), (2000, 2000)),
             "refuse",
             "26 frames on a 2000x2000 screen: 104 megapixels in all",
+            tags=frozenset({"bomb"}),
+        ),
+        Case(
+            "gif-over-16-megapixels",
+            "banner.gif",
+            _on_screen(_animated_gif(frames=5, size=(2, 2)), (2000, 2000)),
+            "refuse",
+            "5 frames of 4 megapixels: 20 in all, over the animation cap of 16",
             tags=frozenset({"bomb"}),
         ),
         Case(
