@@ -37,12 +37,13 @@ def _image_file(path: str) -> Path:
     """The file `path` names, if it is inside one of the image folders; 404 otherwise.
 
     `path` is already percent-decoded, so `%2e%2e` and `%2f` arrive as `..` and `/`. Any `.` or
-    `..` segment (or a backslash) is refused before the folder is looked at, and the resolved
+    `..` segment (or a backslash, or a NUL byte, which the filesystem calls reject with a
+    ValueError) is refused before the folder is looked at, and the resolved
     file must still lie inside that folder: `images/../documents/x.png` stays inside MEDIA_ROOT
     but reaches Wagtail documents, which only their permission-checked view may serve.
     """
     segments = path.split("/")
-    if "\\" in path or any(segment in ("", ".", "..") for segment in segments):
+    if "\\" in path or "\x00" in path or any(segment in ("", ".", "..") for segment in segments):
         raise Http404("not an image")
     folder = segments[0] + "/"
     if folder not in MEDIA_FOLDERS or len(segments) < 2:
@@ -50,7 +51,7 @@ def _image_file(path: str) -> Path:
     media_root = Path(settings.MEDIA_ROOT).resolve()
     try:
         full_path = Path(safe_join(media_root, path)).resolve()
-    except SuspiciousFileOperation as error:
+    except (SuspiciousFileOperation, ValueError) as error:
         raise Http404("not an image") from error
     if not full_path.is_relative_to((media_root / folder).resolve()) or not full_path.is_file():
         raise Http404("not an image")

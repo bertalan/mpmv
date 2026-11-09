@@ -28,6 +28,9 @@ from defusedxml.ElementTree import XMLParser
 LOGO_COLLECTION_NAME = "Logos and icons"
 
 MAX_SVG_BYTES = 512 * 1024
+# Deepest element nesting accepted. A logo needs a handful of levels; the limit keeps the
+# recursive serialiser far from Python's recursion limit.
+MAX_SVG_DEPTH = 64
 
 SVG_NS = "http://www.w3.org/2000/svg"
 XLINK_NS = "http://www.w3.org/1999/xlink"
@@ -99,11 +102,23 @@ class UnsafeSvgError(ValueError):
 
 
 class _TreeBuilder(ET.TreeBuilder):
-    """Keeps comments (stripped later) and refuses every processing instruction, including
-    those before the root element, which a plain TreeBuilder drops without a word."""
+    """Keeps comments (stripped later), refuses every processing instruction, including
+    those before the root element, which a plain TreeBuilder drops without a word, and refuses
+    nesting deeper than `MAX_SVG_DEPTH`."""
 
     def __init__(self) -> None:
         super().__init__(insert_comments=True)
+        self._depth = 0
+
+    def start(self, tag: str, attrs: dict[str, str]) -> ET.Element:
+        self._depth += 1
+        if self._depth > MAX_SVG_DEPTH:
+            raise UnsafeSvgError(f"The SVG is nested more than {MAX_SVG_DEPTH} levels deep.")
+        return super().start(tag, attrs)
+
+    def end(self, tag: str) -> ET.Element:
+        self._depth -= 1
+        return super().end(tag)
 
     def pi(self, target: str, text: str | None = None) -> ET.Element:
         raise UnsafeSvgError(f"The processing instruction <?{target}?> is refused.")
@@ -169,20 +184,36 @@ def _check_element(element: ET.Element) -> None:
             raise UnsafeSvgError("<style> may contain only CSS.")
 
 
-def _strip_comments(element: ET.Element) -> None:
-    for child in list(element):
-        if not isinstance(child.tag, str):  # a comment
-            # Keep the text that followed the comment.
-            index = list(element).index(child)
-            if child.tail:
-                if index == 0:
-                    element.text = (element.text or "") + child.tail
-                else:
-                    previous = element[index - 1]
-                    previous.tail = (previous.tail or "") + child.tail
-            element.remove(child)
-        else:
-            _strip_comments(child)
+def _strip_comments(root: ET.Element) -> None:
+    """Drops every comment node in one pass over the tree, keeping the text that followed each
+    comment in order. Each element's children are rebuilt once, never removed one by one."""
+    stack = [root]
+    while stack:
+        element = stack.pop()
+        kept: list[ET.Element] = []
+        # The text pieces that end up before the next kept child (or at the end).
+        pieces = [element.text or ""]
+        dropped = False
+        for child in element:
+            if isinstance(child.tag, str):
+                _join_text(element, kept, pieces)
+                kept.append(child)
+                pieces = [child.tail or ""]
+            else:  # a comment
+                dropped = True
+                pieces.append(child.tail or "")
+        _join_text(element, kept, pieces)
+        if dropped:
+            element[:] = kept
+        stack.extend(kept)
+
+
+def _join_text(element: ET.Element, kept: list[ET.Element], pieces: list[str]) -> None:
+    text = "".join(pieces) or None
+    if kept:
+        kept[-1].tail = text
+    else:
+        element.text = text
 
 
 def _serialise(root: ET.Element) -> bytes:
@@ -196,16 +227,26 @@ def sanitise_svg(data: bytes) -> bytes:
     """The re-serialised document if it passes the allow-list; `UnsafeSvgError` otherwise."""
     if len(data) > MAX_SVG_BYTES:
         raise UnsafeSvgError(f"The SVG is too large (over {MAX_SVG_BYTES // 1024} KB).")
-    parser = XMLParser(target=_TreeBuilder(), forbid_dtd=True, forbid_entities=True)
     try:
-        parser.feed(data)
-        root = parser.close()
+        return _sanitise(data)
+    except UnsafeSvgError:
+        raise
     except DefusedXmlException as error:
         raise UnsafeSvgError(
             "DTDs, entities and external references are refused in SVG."
         ) from error
     except ET.ParseError as error:
         raise UnsafeSvgError(f"The file is not well-formed XML: {error}.") from error
+    except LookupError as error:  # an unknown encoding in the XML declaration
+        raise UnsafeSvgError(f"The file's encoding is not supported: {error}.") from error
+    except (RecursionError, ValueError) as error:  # never a 500 for an odd document
+        raise UnsafeSvgError(f"The SVG cannot be read: {error}.") from error
+
+
+def _sanitise(data: bytes) -> bytes:
+    parser = XMLParser(target=_TreeBuilder(), forbid_dtd=True, forbid_entities=True)
+    parser.feed(data)
+    root = parser.close()
     if not isinstance(root.tag, str) or root.tag != f"{{{SVG_NS}}}svg":
         raise UnsafeSvgError("The document is not an SVG: its root must be an SVG <svg>.")
     for element in root.iter():

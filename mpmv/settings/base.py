@@ -254,6 +254,8 @@ WAGTAILIMAGES_IMAGE_MODEL = "core.MediaImage"
 # Modern image formats (THM.12, spec 14 §14.7). Uploads stay open to the common raster formats
 # and keep their original; SVG is for logos and icons only, checked at upload (apps.core.svg).
 WAGTAILIMAGES_EXTENSIONS = ["avif", "gif", "jpg", "jpeg", "png", "webp", "svg"]
+# Shows the SVG refusal in the second step of Wagtail's multiple upload (apps.core.forms).
+WAGTAILIMAGES_IMAGE_FORM_BASE = "apps.core.forms.MediaImageForm"
 # Renditions without an explicit format-* go to WebP. GIF is left out: Wagtail turns a still GIF
 # into PNG and keeps an animated one as GIF, which WebP conversion would flatten to one frame.
 # Templates ask for AVIF, WebP and JPEG explicitly ({% responsive_image %}, apps.core.images).
