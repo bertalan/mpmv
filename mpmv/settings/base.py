@@ -100,6 +100,8 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
+    # CAT.6: legacy redirect rules on a 404 (after CAT.5) and GET ?add-to-cart= to the product.
+    "apps.catalog.middleware.LegacyRedirectMiddleware",
     # CAT.5: a 404 on a product's old slug becomes a 301 to its current slug.
     "apps.catalog.middleware.OldProductSlugRedirectMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -113,6 +115,10 @@ MIDDLEWARE = [
     # EVT.3: wagtail-localize's views keep the event moderation rules (hidden, review).
     "apps.events.middleware.LocalizeEventGuardMiddleware",
 ]
+
+# CAT.5/CAT.6: how long a browser or proxy keeps a 301 (or a 410) of a redirect rule, so a rule
+# staff change, delete or let expire stops applying within a day; capped at the rule's expiry.
+REDIRECT_PERMANENT_MAX_AGE = 24 * 60 * 60
 
 # Custom user from the first migration (CORE.1): email login, preferred language.
 AUTH_USER_MODEL = "accounts.User"

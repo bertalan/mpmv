@@ -24,6 +24,8 @@ from django.utils.html import format_html
 from django.utils.http import urlencode
 from treebeard.forms import MoveNodeForm
 
+from apps.core.text import ascii_int
+
 from .models import Product
 from .taxonomy import (
     Brand,
@@ -156,7 +158,7 @@ class TermForm(TreeNodeForm):
             return int(self.instance.taxonomy_id)
         chosen = self.data.get("taxonomy") if self.is_bound else self.initial.get("taxonomy")
         chosen = str(getattr(chosen, "pk", chosen) or "")
-        return int(chosen) if chosen.isdigit() else None
+        return ascii_int(chosen)
 
     def clean(self) -> dict[str, Any]:
         cleaned: dict[str, Any] = super().clean()
@@ -276,9 +278,10 @@ class TermAdmin(TreeNodeAdmin[Term]):
         taxonomy = request.GET.get(TAXONOMY_PARAM)
         if match is None or match.url_name != "autocomplete" or taxonomy is None:
             return queryset, may_have_duplicates
-        if not taxonomy.isdigit():
+        taxonomy_id = ascii_int(taxonomy)
+        if taxonomy_id is None:
             return queryset.none(), may_have_duplicates
-        return queryset.filter(taxonomy_id=int(taxonomy)), may_have_duplicates
+        return queryset.filter(taxonomy_id=taxonomy_id), may_have_duplicates
 
     def get_readonly_fields(self, request: HttpRequest, obj: Term | None = None) -> Any:
         # A term changes taxonomy only by being recreated: its children would be left behind.
