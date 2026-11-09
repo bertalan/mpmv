@@ -531,6 +531,31 @@ def svg_collection_refusal(collection: Collection | None) -> str | None:
     return f"SVG is for logos and icons only: upload it to the {names} collection."
 
 
+def svg_collection_move_refusal(collection: Collection, new_parent: Collection) -> str | None:
+    """None if `collection` may move under `new_parent`; the reason otherwise (THM.12).
+
+    Moving a collection never saves its images, so `MediaImage.save` cannot refuse it: a
+    sub-collection holding SVGs (at any depth) may not leave the SVG collections, while one with
+    raster images only moves freely. An `SvgCollection` inside the subtree (the moved one
+    included) keeps accepting the SVGs below it wherever it goes."""
+    if svg_collection_refusal(new_parent) is None:
+        return None
+    subtree = list(Collection.objects.descendant_of(collection, inclusive=True))
+    svg_roots = tuple(
+        SvgCollection.objects.filter(collection__in=subtree).values_list(
+            "collection__path", flat=True
+        )
+    )
+    uncovered = [c.pk for c in subtree if not c.path.startswith(svg_roots)]
+    svgs = MediaImage.objects.filter(collection__in=uncovered, file__iendswith=".svg")
+    if not svgs.exists():
+        return None
+    return (
+        f"{collection.name!r} holds SVG images, which may stay only in the collections for "
+        "logos and icons: move them elsewhere first, or choose a parent among those collections."
+    )
+
+
 def check_svg(data: bytes, collection: Collection | None) -> tuple[bytes, None] | tuple[None, str]:
     """(the bytes to store, None) for an SVG allowed in `collection`, else (None, the reason)."""
     refusal = svg_collection_refusal(collection)

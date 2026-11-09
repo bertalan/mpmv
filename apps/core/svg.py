@@ -12,7 +12,8 @@ Refused: a DTD, entities or external references (defusedxml), processing instruc
 the attribute allow-list (so no `on*` event handlers), an `href` that is not a same-document
 fragment, a `url()` to anything but a fragment, and in CSS `@import`, `@font-face`, escapes,
 `image-set()`, `image()`, `src()`, `cross-fade()`, `element()`, `expression()` and any quoted
-string that looks like a URL (a scheme or `//`).
+string that looks like a URL (a scheme or `//`). "CSS" is `<style>`, `style=` and every other
+attribute value except free text (`aria-label`), because presentation attributes are CSS too.
 
 Pure Python, no Django: unit-tested on a corpus of malicious documents.
 """
@@ -80,12 +81,22 @@ ATTRIBUTES = frozenset(
     }
 )  # fmt: skip
 
+# Free text for people, never parsed as CSS: "image (logo)" in a label is not `image(`. Every
+# other attribute value goes through the same check as `style`, since browsers parse presentation
+# attributes (fill, mask, filter, clip-path...) as CSS, escapes included.
+TEXT_ATTRIBUTES = frozenset({"aria-label"})
+
 NAMESPACED_ATTRIBUTES = frozenset(
     {f"{{{XLINK_NS}}}href", f"{{{XML_NS}}}space", f"{{{XML_NS}}}lang"}
 )
 
 _FRAGMENT = re.compile(r"#[A-Za-z_][\w.:-]*")
-_URL = re.compile(r"url\(\s*(['\"]?)(.*?)\1\s*\)", re.IGNORECASE | re.DOTALL)
+# Where a `url(` starts, with any spacing before the parenthesis (which is refused). Scanned with
+# `str.find` from there, never with a lazy `.*?` that rescans the rest of the value for every
+# unclosed `url(` (quadratic: lane-b second security review of THM.12).
+_URL_OPEN = re.compile(r"url\s*\(", re.IGNORECASE)
+# The most `url(` references one attribute value or one stylesheet may hold; a logo needs a few.
+MAX_URLS_PER_VALUE = 256
 _CSS_FORBIDDEN = re.compile(
     r"@import|@font-face|@namespace|image-set|expression\s*\(|javascript:|behavior\s*:|\\"
     # Functions that load a resource from a URL given as a string, or paint another element.
@@ -93,7 +104,9 @@ _CSS_FORBIDDEN = re.compile(
     re.IGNORECASE,
 )
 # A quoted CSS string: a URL in one (a scheme or `//`) is refused whatever function takes it.
-_CSS_STRING = re.compile(r"(['\"])(.*?)\1", re.DOTALL)
+# A negated class instead of a lazy `.*?`: same matches, and only the last unclosed quote of each
+# kind scans to the end of the stylesheet.
+_CSS_STRING = re.compile(r"'([^']*)'|\"([^\"]*)\"")
 _URL_LIKE = re.compile(r"//|^\s*[a-z][a-z0-9+.-]*:", re.IGNORECASE)
 
 
@@ -133,13 +146,25 @@ def _local(tag: str) -> tuple[str, str]:
 
 
 def _check_urls(value: str, where: str) -> None:
-    for match in _URL.finditer(value):
-        target = match.group(2).strip()
+    """Every `url(...)` in `value` must be `url(#fragment)`, optionally quoted and spaced.
+
+    One pass: each `url(` is read up to the next `)`. A `url(` with no `)`, with spacing before
+    the parenthesis or with a quote that is not closed right before the `)` cannot be checked and
+    is refused, as is a value with more than `MAX_URLS_PER_VALUE` of them."""
+    opens = list(_URL_OPEN.finditer(value))
+    if len(opens) > MAX_URLS_PER_VALUE:
+        raise UnsafeSvgError(f"{where} has more than {MAX_URLS_PER_VALUE} url() references.")
+    for match in opens:
+        close = value.find(")", match.end())
+        if match.group(0).lower() != "url(" or close == -1:
+            raise UnsafeSvgError(f"{where} has a url() that cannot be checked.")
+        target = value[match.end() : close].strip()
+        if target[:1] in ("'", '"'):
+            if len(target) < 2 or target[-1] != target[0]:
+                raise UnsafeSvgError(f"{where} has a url() that cannot be checked.")
+            target = target[1:-1].strip()
         if not _FRAGMENT.fullmatch(target):
             raise UnsafeSvgError(f"{where} references {target!r}: only #fragments are allowed.")
-    # A `url(` the pattern cannot read (unbalanced, odd spacing) is refused too.
-    if len(re.findall(r"url\s*\(", value, re.IGNORECASE)) != len(_URL.findall(value)):
-        raise UnsafeSvgError(f"{where} has a url() that cannot be checked.")
 
 
 def _check_css(css: str, where: str) -> None:
@@ -147,7 +172,7 @@ def _check_css(css: str, where: str) -> None:
     if forbidden:
         raise UnsafeSvgError(f"{where} uses {forbidden.group(0)!r}, which is not allowed.")
     for match in _CSS_STRING.finditer(css):
-        if _URL_LIKE.search(match.group(2)):
+        if _URL_LIKE.search(match.group(1) or match.group(2) or ""):
             raise UnsafeSvgError(f"{where} has the string {match.group(0)!r}, a URL.")
     _check_urls(css, where)
 
@@ -174,10 +199,13 @@ def _check_element(element: ET.Element) -> None:
             raise UnsafeSvgError(f"href={value!r}: only #fragments are allowed.")
         if attr_name == "style":
             _check_css(value, f"The style of <{name}>")
-        else:
+        elif attr_name in TEXT_ATTRIBUTES:
             _check_urls(value, f"The attribute {attr_name}")
             if "javascript:" in value.lower():
                 raise UnsafeSvgError(f"The attribute {attr_name} holds a javascript: URL.")
+        else:
+            # Presentation attributes are parsed as CSS: `u\72l(` there is a `url(`.
+            _check_css(value, f"The attribute {attr_name}")
     if name == "style":
         _check_css(element.text or "", "<style>")
         if len(element):

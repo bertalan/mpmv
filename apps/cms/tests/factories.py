@@ -29,9 +29,12 @@ from apps.cms.models import (
     LegalPageVersion,
     NavigationMenu,
     StandardPage,
+    TermLandingPage,
+    VendorLandingPage,
     VendorRecruitmentPage,
 )
 from apps.core.i18n import configured_languages
+from apps.vendors.models import Vendor
 
 
 def _locale_without_home() -> Locale:
@@ -104,6 +107,55 @@ class StandardPageFactory(_InTree, DjangoModelFactory[StandardPage]):
     image = None
     image_alt_text = ""
     image_caption = ""
+
+    @classmethod
+    def _default_parent(cls) -> Page:
+        return _primary_home()
+
+
+class TermLandingPageFactory(_InTree, DjangoModelFactory[TermLandingPage]):
+    """A term landing page (CMS.4) under the primary language's home, for a new term of a
+    taxonomy with term pages unless `term` is given."""
+
+    class Meta:
+        model = TermLandingPage
+
+    title = factory.Sequence(lambda n: f"Term guide {n}")
+    slug = factory.LazyAttribute(lambda page: slugify(page.title))
+    parent = None
+    term = factory.SubFactory(
+        "apps.catalog.tests.factories.TermFactory",
+        taxonomy=factory.SubFactory(
+            "apps.catalog.tests.factories.TaxonomyFactory", has_landing=True
+        ),
+    )
+    body = factory.LazyFunction(lambda: [("paragraph", "<p>Sample intro.</p>")])
+
+    @classmethod
+    def _default_parent(cls) -> Page:
+        return _primary_home()
+
+
+class VendorLandingPageFactory(_InTree, DjangoModelFactory[VendorLandingPage]):
+    """A vendor landing page (CMS.4) under the primary language's home, for an active vendor
+    unless `vendor` is given. A page outlives its vendor's active status (a suspension), so the
+    factory makes one for a vendor in any status."""
+
+    class Meta:
+        model = VendorLandingPage
+
+    title = factory.Sequence(lambda n: f"Our story {n}")
+    slug = factory.LazyAttribute(lambda page: slugify(page.title))
+    parent = None
+    vendor = factory.SubFactory(
+        "apps.vendors.tests.factories.VendorFactory", status=Vendor.Status.ACTIVE
+    )
+    body = factory.LazyFunction(lambda: [("paragraph", "<p>Sample story.</p>")])
+
+    @classmethod
+    def _create(cls, model_class: type[Page], *args: Any, **kwargs: Any) -> Page:
+        with mock.patch("apps.cms.models.has_public_storefront", return_value=True):
+            return super()._create(model_class, *args, **kwargs)
 
     @classmethod
     def _default_parent(cls) -> Page:
