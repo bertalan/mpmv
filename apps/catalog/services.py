@@ -1,8 +1,8 @@
 """Catalog services: audited price changes (CAT.1), audited product and variant edits (CAT.12),
 taxonomy queries (CAT.2), the catalogue integrity rules (CAT.14), products created with typed
 attributes, variant axes and variants (CAT.3), product slugs with their history (CAT.5), the
-vendor SKU: audited renames and matching by match key and alias history (CAT.13), and the listing
-query (CAT.8).
+vendor SKU: audited renames and matching by match key and alias history (CAT.13), the listing
+query (CAT.8) and product search (CAT.9).
 
 Every price change goes through here, whatever the adapter (admin, API, import, MCP): it is
 validated, returned as a ChangeSet (dry-run) and written to the audit log. The 30-day price
@@ -19,9 +19,11 @@ from typing import Any
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
+from django.contrib.postgres.search import SearchQuery, SearchRank, TrigramStrictWordSimilarity
 from django.core.exceptions import NON_FIELD_ERRORS, PermissionDenied, ValidationError
 from django.db import models, transaction
-from django.db.models import Prefetch, Q, QuerySet
+from django.db.models import Case, Prefetch, Q, QuerySet, Value, When
+from django.db.models.functions import Length
 from django.utils import timezone
 
 from apps.core import translations
@@ -56,6 +58,7 @@ from .models import (
     TermTranslation,
     Variant,
     VariantOption,
+    product_text_vector,
     sku_owner,
     sku_taken_message,
 )
@@ -2064,3 +2067,125 @@ def listing_vendor_options(
         FilterOption(value=v.slug, label=v.display_name, selected=v.slug == params.vendor)
         for v in vendors.order_by("display_name", "pk")
     ]
+
+
+# --- Product search (CAT.9, spec 03 §3.1 "Search by SKU" and §3.2). Normalisation, limits and
+# ranking are pure (`engine`); here are the four bounded queries that collect the hits, each
+# served by an index (migration 0008): the SKU match key prefix of products and of variants
+# (pattern index), the full-text vector of the published texts in the language (one partial GIN
+# index per language) and the trigram word similarity of their titles (GIN trigram).
+
+# Each query returns at most this many hits; the ranking keeps `limit` products of their union.
+SEARCH_CANDIDATES = engine.SEARCH_RESULT_LIMIT
+
+
+@dataclass(frozen=True)
+class SearchFilter:
+    """Narrows a search; `vendor` keeps it inside one tenant (a vendor storefront)."""
+
+    vendor: Vendor | None = None
+
+
+NO_SEARCH_FILTER = SearchFilter()
+
+
+def _sku_hits(
+    rows: "QuerySet[Any]", owner: str, terms: engine.SearchTerms
+) -> list[engine.SearchHit]:
+    """Hits of the products, or the variants' products, whose SKU match key equals the query
+    or, for four characters or more, starts with it. `startswith` escapes LIKE wildcards."""
+    key = terms.sku_key
+    if key is None:
+        return []
+    lookup = "sku_key__startswith" if terms.sku_prefix else "sku_key"
+    matches = (
+        rows.filter(**{lookup: key})
+        .order_by(Length("sku_key"), "sku_key", "pk")
+        .values_list(owner, "sku_key")[:SEARCH_CANDIDATES]
+    )
+    return [
+        engine.SearchHit(product_id=pk, sku_exact=sku_key == key, sku_prefix=sku_key != key)
+        for pk, sku_key in matches
+    ]
+
+
+def _text_hits(
+    texts: "QuerySet[ProductTranslation]", config: str, text: str
+) -> list[engine.SearchHit]:
+    """Full-text hits in the language's configuration, ranked 0 to 1 (title above
+    descriptions). `plain` syntax (`plainto_tsquery`): every word is required and nothing is an
+    operator, so a visitor's `-word` cannot become a NOT query, which no index serves and which
+    would read, vectorise and rank every published text of the language."""
+    query = SearchQuery(text, config=config, search_type="plain")
+    vector = product_text_vector(config)
+    matches = (
+        texts.annotate(document=vector, rank=SearchRank(vector, query, normalization=32))
+        .filter(document=query)
+        .order_by("-rank", "-product_id")
+        .values_list("product_id", "rank")[:SEARCH_CANDIDATES]
+    )
+    return [engine.SearchHit(product_id=pk, text_rank=float(rank)) for pk, rank in matches]
+
+
+def _trigram_hits(texts: "QuerySet[ProductTranslation]", text: str) -> list[engine.SearchHit]:
+    """Titles with words similar to the query (typos): the strict word similarity of pg_trgm
+    (`%>>`, threshold `pg_trgm.strict_word_similarity_threshold`, 0.5 by default), which
+    compares whole words, so a one-letter typo in a short word still matches."""
+    matches = (
+        texts.filter(title__trigram_strict_word_similar=text)
+        .annotate(similarity=TrigramStrictWordSimilarity(text, "title"))
+        .order_by("-similarity", "-product_id")
+        .values_list("product_id", "similarity")[:SEARCH_CANDIDATES]
+    )
+    return [engine.SearchHit(product_id=pk, similarity=float(sim)) for pk, sim in matches]
+
+
+def search(
+    query: str,
+    language: str,
+    filters: SearchFilter = NO_SEARCH_FILTER,
+    *,
+    limit: int = engine.SEARCH_RESULT_LIMIT,
+) -> "QuerySet[Product]":
+    """The listed products (published, of an active vendor) matching `query`, best first, at
+    most `limit` of them.
+
+    A product matches by its SKU or a variant's SKU (on the match key, so `bag 100` finds
+    `BAG  100`; a prefix from four characters), or by its text published in `language`, by full
+    text in that language's configuration or, when full text finds nothing (a typo), by trigram
+    similarity of its title. A SKU is language neutral. A query too short to search returns an
+    empty queryset without touching the database.
+    """
+    terms = engine.normalise_search_query(query)
+    products = listed_products()
+    if filters.vendor is not None:
+        products = products.for_vendor(filters.vendor)  # the tenant scope (CORE.3)
+    if terms.error is not None:
+        return products.none()
+    listed_pks = products.values("pk")
+    texts = ProductTranslation.objects.filter(
+        language=language, status=translations.PUBLISHED, product__in=listed_pks
+    )
+    hits = [
+        *_sku_hits(products, "pk", terms),
+        *_sku_hits(Variant.objects.filter(product__in=listed_pks), "product_id", terms),
+    ]
+    if not terms.has_words:  # punctuation only: nothing for full text or trigram to match
+        return _ranked(products, hits, limit)
+    text_hits = _text_hits(texts, engine.search_config(language), terms.text)
+    # Trigram similarity is the typo fallback, run only when full text finds nothing: a common
+    # word would otherwise make PostgreSQL compute it row by row for a large share of the
+    # catalogue (measured at 30k products: hundreds of milliseconds).
+    hits += text_hits or _trigram_hits(texts, terms.text)
+    return _ranked(products, hits, limit)
+
+
+def _ranked(
+    products: "QuerySet[Product]", hits: list[engine.SearchHit], limit: int
+) -> "QuerySet[Product]":
+    """The products of `hits`, best first, at most `limit` of them."""
+    ranked = engine.rank_search_hits(hits, limit=limit)
+    if not ranked:
+        return products.none()
+    position = Case(*(When(pk=pk, then=Value(i)) for i, pk in enumerate(ranked)))
+    return products.filter(pk__in=ranked).order_by(position)
