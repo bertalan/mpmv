@@ -52,6 +52,10 @@ DRY_RUN_EXCEPTIONS: Final[dict[str, tuple[str, str]]] = {
         ONE_TIME_CODE,
         "spends the one-time WebAuthn challenge and advances the signature counter",
     ),
+    "apps.accounts.services.issue_action_token": (
+        ONE_TIME_CODE,
+        "issues a single-use link; recording its generation is what revokes the older links",
+    ),
     "apps.accounts.services.redeem_action_token": (
         ONE_TIME_CODE,
         "spends the single sign-in use of a secure action link (CORE.15)",
