@@ -146,10 +146,13 @@ when a new mutating service has neither `dry_run` nor a place in this table (ARC
 | `apps.accounts.services.use_recovery_code` | one-time code | Verifying a recovery code consumes it |
 | `apps.accounts.services.register_passkey` | one-time code | Stores a registration whose one-time WebAuthn challenge is already spent |
 | `apps.accounts.services.authenticate_passkey` | one-time code | Spends the one-time WebAuthn challenge and advances the signature counter |
+| `apps.accounts.services.issue_action_token` | one-time code | Issues a single-use link; recording its generation is what revokes the older links |
 | `apps.accounts.services.redeem_action_token` | one-time code | Spends the single sign-in use of a secure action link (CORE.15) |
 | `apps.accounts.services.enrol_totp_key` | one-time code | Stores an authenticator key whose first code was just checked (VEN.24 claim page) |
 | `apps.accounts.services.spend_email_bound_link` | one-time code | Spends the single use of an email-bound secure action link (VEN.24) |
 | `apps.api.services.authenticate` | telemetry | Records when an API key was last used |
+| `apps.api.services.record_refused_key` | throttle counter | Counts one refused-key (401) answer per client IP, blocking it past the limit (CORE.20) |
+| `apps.api.services.purge_expired_refused_keys` | throttle counter | Deletes refused-key rows older than the window (CORE.20) |
 | `apps.cms.services.sync_locales` | migration hook | Post-migrate handler that adds the missing Wagtail locales |
 | `apps.cms.services.seed_site` | migration hook | Idempotent setup seed (`seed_cms`) that only adds missing sample pages |
 | `apps.core.services.record_heartbeat` | telemetry | Operational heartbeat of a scheduled job |

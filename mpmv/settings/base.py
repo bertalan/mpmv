@@ -92,6 +92,9 @@ MIDDLEWARE = [
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "apps.cms.middleware.WagtailAdminPickerNonceMiddleware",  # Wagtail's inline pickers (CMS.1)
     "apps.core.middleware.PermissionsPolicyMiddleware",
+    # With the other header middleware, so responses returned early by an inner middleware
+    # (CommonMiddleware's APPEND_SLASH redirect, LIVE's static files) carry it too (SEC.5).
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "apps.themes.middleware.ThemeMiddleware",  # the site's theme for the template loader (THM.1)
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
@@ -100,11 +103,12 @@ MIDDLEWARE = [
     "apps.catalog.middleware.OldProductSlugRedirectMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # SEC.5: pages for a signed-in user are never stored by a shared cache.
+    "apps.core.middleware.PrivateCacheForSignedInUsersMiddleware",
     # CORE.4: which device verified the session, then confine required roles to the MFA pages.
     "django_otp.middleware.OTPMiddleware",
     "apps.accounts.middleware.MfaRequiredMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 # Custom user from the first migration (CORE.1): email login, preferred language.
@@ -421,6 +425,18 @@ if _MAP_TILE_ORIGIN:
 API_RATE_LIMIT = env_str("MPMV_API_RATE_LIMIT", "") or "120/minute"
 API_RATE_LIMIT_SCOPES: dict[str, str] = {}
 API_RATE_LIMIT_CLIENTS: dict[str, str] = {}
+# Refused API keys (401) per client IP (CORE.20, apps.api.services.record_refused_key): the IP
+# (resolved behind TRUSTED_PROXIES, IPv6 by /64) may get API_REFUSED_KEY_RATE_LIMIT refused
+# answers in a rolling window; the one that reaches it blocks the IP for
+# API_REFUSED_KEY_BLOCK_SECONDS, answered 429 with Retry-After before any key lookup. Valid keys
+# never count. Set per environment with MPMV_API_REFUSED_KEY_RATE_LIMIT and
+# MPMV_API_REFUSED_KEY_BLOCK_SECONDS (system check api.E004).
+# Trade-off: the block covers the whole IP (or /64), valid keys included, so one client behind a
+# NAT shared with other API clients can keep them out; and if TRUSTED_PROXY_HEADER or
+# TRUSTED_PROXIES is wrong in production every client resolves to the proxy address, and one bad
+# client blocks the API for everyone. Check the proxy settings before going live.
+API_REFUSED_KEY_RATE_LIMIT = env_str("MPMV_API_REFUSED_KEY_RATE_LIMIT", "") or "30/minute"
+API_REFUSED_KEY_BLOCK_SECONDS = int(env_str("MPMV_API_REFUSED_KEY_BLOCK_SECONDS", "") or "300")
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
