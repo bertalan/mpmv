@@ -43,7 +43,7 @@ from django.conf import settings
 from django.contrib.auth.models import Group
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.fields import ArrayField
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models, transaction
 from django.db.models import F, Q
 from django.http import Http404, HttpRequest
@@ -338,6 +338,10 @@ def _constraints() -> list[models.BaseConstraint]:
     ]
 
 
+class HiddenEventPublishRefused(PermissionDenied):
+    """A hidden event is published again only through `restore_event` (spec 15 "Hiding")."""
+
+
 class EventPage(Page):  # type: ignore[misc]  # Wagtail is untyped
     """One event in one language (spec 15 "Page models"); its translations share the
     `translation_key`. Written by vendors through the EVT.3 services and by staff in the admin."""
@@ -543,9 +547,13 @@ class EventPage(Page):  # type: ignore[misc]  # Wagtail is untyped
     ) -> Any:
         """Publish `revision`, bumping `sequence` first when it changes a field the ICS shows.
 
-        Every publish goes through here: the services, Wagtail's admin, the workflow approval
-        and scheduled publishing.
+        Every publish goes through here: the services, Wagtail's admin, the workflow approval,
+        scheduled publishing and wagtail-localize. A hidden page is published again only by
+        `restore_event` (spec 15 "Hiding"), whatever path the publish takes: the stored row
+        decides, and only `restore_event` clears `hidden_at` before it republishes.
         """
+        if EventPage.objects.filter(pk=self.pk, hidden_at__isnull=False).exists():
+            raise HiddenEventPublishRefused("a hidden event is restored by platform staff only")
         self._bump_sequence(revision)
         return super().publish(
             revision,

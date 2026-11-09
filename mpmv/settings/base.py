@@ -110,6 +110,8 @@ MIDDLEWARE = [
     "django_otp.middleware.OTPMiddleware",
     "apps.accounts.middleware.MfaRequiredMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    # EVT.3: wagtail-localize's views keep the event moderation rules (hidden, review).
+    "apps.events.middleware.LocalizeEventGuardMiddleware",
 ]
 
 # Custom user from the first migration (CORE.1): email login, preferred language.
