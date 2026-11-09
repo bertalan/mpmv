@@ -225,7 +225,7 @@ def test_the_nightly_check_lists_published_products_failing_gpsr(
     failing = ProductFactory.create(gtin="", status=Product.Status.PUBLISHED)
     _published_complete()
     ProductFactory.create(gtin="")  # a draft: not checked
-    preview = services.flag_published_products_failing_gpsr(dry_run=True)
+    preview = services.flag_published_products_failing_gpsr(notify=False)
     assert [product.pk for product, _codes in preview] == [failing.pk]
     assert not OutboxEmail.objects.exists()
 

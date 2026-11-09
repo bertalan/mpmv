@@ -896,13 +896,13 @@ def published_incomplete_email_context(
 
 
 def flag_published_products_failing_gpsr(
-    *, now: dt.datetime | None = None, dry_run: bool = False
+    *, now: dt.datetime | None = None, notify: bool = True
 ) -> list[tuple[Product, tuple[str, ...]]]:
-    """List the published products failing the GPSR check: an error in the log per product
-    (monitoring alerts on it) and one email a day to the staff alert address. Nothing is
-    unpublished automatically: staff decide. Dry-run only lists them."""
+    """List the published products failing the GPSR check and, with `notify`, alert staff: an
+    error in the log per product (monitoring alerts on it) and one email a day to the staff
+    alert address. No data changes: nothing is unpublished automatically, staff decide."""
     rows = published_products_failing_gpsr()
-    if dry_run or not rows:
+    if not notify or not rows:
         return rows
     moment = now or timezone.now()
     for product, missing in rows:

@@ -17,7 +17,10 @@ from apps.accounts.models import User
 from apps.catalog.tests.factories import ProductFactory
 from apps.compliance import services
 from apps.compliance.models import CountryWarningLanguages
-from apps.compliance.tests.factories import GpsrSafetyTextFactory
+from apps.compliance.tests.factories import (
+    CountryWarningLanguagesFactory,
+    GpsrSafetyTextFactory,
+)
 from apps.core.audit import AuditContext
 from apps.core.countries import EU_MEMBER_STATES, OFFICIAL_LANGUAGES
 from apps.core.models import AuditLog
@@ -127,3 +130,8 @@ def test_staff_edit_the_map_in_the_admin_through_the_audited_service(
     assert AuditLog.objects.filter(action=services.COUNTRY_LANGUAGES_UPDATED).exists()
     delete = reverse("admin:compliance_countrywarninglanguages_delete", args=[row.pk])
     assert staff_client.post(delete, {"post": "yes"}).status_code == 403
+
+
+def test_a_row_overrides_the_official_languages() -> None:
+    CountryWarningLanguagesFactory.create(country="CH", languages=["it"])
+    assert services.country_warning_languages()["CH"] == ("it",)

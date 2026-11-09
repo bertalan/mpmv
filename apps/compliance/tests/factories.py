@@ -10,7 +10,13 @@ from django.utils import timezone
 from factory.django import DjangoModelFactory
 
 from apps.catalog.tests.factories import ProductFactory
-from apps.compliance.models import GpsrInfo, GpsrSafetyText, SafetyCase, VendorGpsrDefaults
+from apps.compliance.models import (
+    CountryWarningLanguages,
+    GpsrInfo,
+    GpsrSafetyText,
+    SafetyCase,
+    VendorGpsrDefaults,
+)
 from apps.vendors.tests.factories import VendorFactory
 
 
@@ -61,3 +67,14 @@ class SafetyCaseFactory(DjangoModelFactory[SafetyCase]):
     received_at = factory.LazyFunction(timezone.now)
     due_on = factory.LazyFunction(lambda: timezone.localdate() + dt.timedelta(days=3))
     summary = "A buyer reports a safety problem."
+
+
+class CountryWarningLanguagesFactory(DjangoModelFactory[CountryWarningLanguages]):
+    """A country outside the seeded EU and EEA rows, with one accepted language."""
+
+    class Meta:
+        model = CountryWarningLanguages
+        django_get_or_create = ("country",)
+
+    country = "CH"
+    languages = factory.LazyFunction(lambda: ["de"])
