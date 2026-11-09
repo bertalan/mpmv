@@ -256,9 +256,9 @@ def save_product(product: Product, *, ctx: AuditContext, dry_run: bool = False) 
 
     The change is computed against the stored row (locked), never a possibly stale instance.
     Other fields are saved but not audited. Raises ValidationError when the owning vendor or a
-    price would change, a value is invalid, or the product becomes published while a
-    registered publication check fails (`publishing.check_publishable`, GPSR: CMP.3), also on
-    dry-run.
+    price would change, a value is invalid, the product becomes published while a registered
+    publication check fails (`publishing.check_publishable`, GPSR: CMP.3), or an edit of a
+    published product adds a blocker (`publishing.check_still_publishable`), also on dry-run.
     """
     _validate(product)
     changes = ChangeSet()
@@ -277,7 +277,10 @@ def save_product(product: Product, *, ctx: AuditContext, dry_run: bool = False) 
             if stored.vendor_id != product.vendor_id:
                 raise ValidationError({"vendor": VENDOR_NEVER_CHANGES})
             _refuse_price_changes(stored, product, PRODUCT_PRICE_FIELDS)
-            publishing_now = publishing_now and stored.status != ProductStatus.PUBLISHED
+            if publishing_now and stored.status == ProductStatus.PUBLISHED:
+                # Already live: the edit may not remove data a publication check requires.
+                publishing.check_still_publishable(stored, product)
+                publishing_now = False
             changes.update(PRODUCT_MODEL, key, product_snapshot(stored), product_snapshot(product))
             action = PRODUCT_UPDATED
         if publishing_now:

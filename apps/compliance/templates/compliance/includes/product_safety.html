@@ -18,9 +18,10 @@
     {% endfor %}
   </dl>
   {% if gpsr.warnings or gpsr.safety_information %}
-  <div class="product-safety-texts" id="product-safety-texts"{% if gpsr.text_language != language %} lang="{{ gpsr.text_language }}"{% endif %}>
-    {% if gpsr.warnings %}<h3>{% translate "Warnings" %}</h3><p>{{ gpsr.warnings|linebreaksbr }}</p>{% endif %}
-    {% if gpsr.safety_information %}<h3>{% translate "Safety information" %}</h3><p>{{ gpsr.safety_information|linebreaksbr }}</p>{% endif %}
+  <div class="product-safety-texts" id="product-safety-texts">
+    {% if gpsr.text_language != language %}<p class="product-safety-language">{% blocktranslate with name=gpsr.text_language_name %}Not available in your language: shown in {{ name }}.{% endblocktranslate %}</p>{% endif %}
+    {% if gpsr.warnings %}<h3>{% translate "Warnings" %}</h3><p{% if gpsr.text_language != language %} lang="{{ gpsr.text_language }}"{% endif %}>{{ gpsr.warnings|linebreaksbr }}</p>{% endif %}
+    {% if gpsr.safety_information %}<h3>{% translate "Safety information" %}</h3><p{% if gpsr.text_language != language %} lang="{{ gpsr.text_language }}"{% endif %}>{{ gpsr.safety_information|linebreaksbr }}</p>{% endif %}
   </div>
   {% endif %}
 </section>

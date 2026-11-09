@@ -8,11 +8,14 @@ the audited services in `services.py`.
 GTIN and MPN stay on `catalog.Product` and count as product identifiers here; `GpsrInfo` adds the
 model number and the batch. `GpsrSafetyText` holds the warnings and safety information per
 language; `SafetyCase` an authority order or a safety notice with its working-day deadline
-(article 22). Every model is vendor-owned (CORE.3 scoped managers).
+(article 22). Every model is vendor-owned (CORE.3 scoped managers), except
+`CountryWarningLanguages`: the platform's map of the languages each destination country accepts
+for warnings, edited by staff.
 """
 
 from typing import ClassVar
 
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
 from apps.catalog.models import Product
@@ -178,3 +181,33 @@ class SafetyCase(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.get_kind_display()} {self.reference or self.public_id}"
+
+
+class CountryWarningLanguages(BaseModel):
+    """The languages (ISO 639-1) in which a destination country accepts a product's warnings
+    (GPSR art. 19(c), CMP.3). Platform data, not vendor-owned.
+
+    Seeded from the official languages of the EU and EEA states (`apps.core.countries`) and
+    edited by staff through `services.set_country_warning_languages` (validated, audited). A
+    country without a row uses its official languages; a country outside both is not checked.
+    """
+
+    country = CountryField(unique=True)
+    languages = ArrayField(
+        models.CharField(max_length=3),
+        help_text="ISO 639-1 codes; warnings in any one of them are enough.",
+    )
+
+    class Meta:
+        ordering = ("country",)
+        verbose_name = "warnings languages of a country"
+        verbose_name_plural = "warnings languages per country"
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(languages__len__gt=0),
+                name="compliance_country_languages_not_empty",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.country}: {', '.join(self.languages)}"

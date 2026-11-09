@@ -29,6 +29,8 @@ pytestmark = pytest.mark.django_db
 CTX = AuditContext(actor_label="staff:compliance", source="admin", ip="127.0.0.1")
 ROME = dt.timezone(dt.timedelta(hours=1))
 FRIDAY_NOON = dt.datetime(2026, 11, 13, 12, 0, tzinfo=ROME)
+#: "Now" for the cases opened here: after every receipt date the tests use.
+LATER = dt.datetime(2027, 1, 4, 9, 0, tzinfo=ROME)
 
 
 def test_opening_an_authority_order_stores_its_two_working_day_deadline() -> None:
@@ -38,6 +40,7 @@ def test_opening_an_authority_order_stores_its_two_working_day_deadline() -> Non
         product=product,
         kind=SafetyCase.Kind.AUTHORITY_ORDER,
         received_at=FRIDAY_NOON,
+        now=LATER,
         reference="ORDER-1",
         authority="Example market surveillance authority",
         summary="Withdraw the product from sale.",
@@ -59,6 +62,7 @@ def test_a_safety_notice_has_three_working_days() -> None:
         vendor=vendor,
         kind=SafetyCase.Kind.SAFETY_NOTICE,
         received_at=FRIDAY_NOON,
+        now=LATER,
         summary="A buyer reports the charger overheating.",
         ctx=CTX,
     )
@@ -73,6 +77,7 @@ def test_the_deadline_counts_in_business_time() -> None:
         vendor=vendor,
         kind=SafetyCase.Kind.AUTHORITY_ORDER,
         received_at=late,
+        now=LATER,
         summary="Order.",
         ctx=CTX,
     )
@@ -85,6 +90,7 @@ def test_dry_run_writes_nothing() -> None:
         vendor=vendor,
         kind=SafetyCase.Kind.SAFETY_NOTICE,
         received_at=FRIDAY_NOON,
+        now=LATER,
         summary="Notice.",
         ctx=CTX,
         dry_run=True,
@@ -102,11 +108,36 @@ def test_the_product_must_belong_to_the_vendor() -> None:
             product=product,
             kind=SafetyCase.Kind.SAFETY_NOTICE,
             received_at=FRIDAY_NOON,
+            now=LATER,
             summary="Notice.",
             ctx=CTX,
             dry_run=True,
         )
     assert "product" in exc.value.message_dict
+
+
+def test_a_receipt_in_the_future_is_refused() -> None:
+    with pytest.raises(ValidationError) as exc:
+        services.open_safety_case(
+            vendor=VendorFactory.create(),
+            kind=SafetyCase.Kind.AUTHORITY_ORDER,
+            received_at=FRIDAY_NOON,
+            now=FRIDAY_NOON - dt.timedelta(hours=1),
+            summary="Order.",
+            ctx=CTX,
+            dry_run=True,
+        )
+    assert "received_at" in exc.value.message_dict
+    # A small clock skew is tolerated.
+    services.open_safety_case(
+        vendor=VendorFactory.create(),
+        kind=SafetyCase.Kind.AUTHORITY_ORDER,
+        received_at=FRIDAY_NOON,
+        now=FRIDAY_NOON - dt.timedelta(minutes=1),
+        summary="Order.",
+        ctx=CTX,
+        dry_run=True,
+    )
 
 
 def test_a_summary_is_required() -> None:
@@ -115,6 +146,7 @@ def test_a_summary_is_required() -> None:
             vendor=VendorFactory.create(),
             kind=SafetyCase.Kind.SAFETY_NOTICE,
             received_at=FRIDAY_NOON,
+            now=LATER,
             summary="  ",
             ctx=CTX,
         )
@@ -200,6 +232,7 @@ def test_deadlines_skip_weekends_but_not_public_holidays_by_default() -> None:
         vendor=vendor,
         kind=SafetyCase.Kind.AUTHORITY_ORDER,
         received_at=thursday,
+        now=LATER,
         summary="Order.",
         ctx=CTX,
     )
@@ -212,6 +245,7 @@ def test_deadlines_skip_weekends_but_not_public_holidays_by_default() -> None:
         vendor=vendor,
         kind=SafetyCase.Kind.SAFETY_NOTICE,
         received_at=christmas_eve,
+        now=LATER,
         summary="Notice.",
         ctx=CTX,
     )
@@ -228,6 +262,7 @@ def test_configured_public_holidays_are_skipped(settings: object) -> None:
         vendor=vendor,
         kind=SafetyCase.Kind.SAFETY_NOTICE,
         received_at=dt.datetime(2026, 12, 24, 10, 0, tzinfo=ROME),
+        now=LATER,
         summary="Notice.",
         ctx=CTX,
     )

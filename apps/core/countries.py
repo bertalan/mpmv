@@ -29,6 +29,8 @@ EU_MEMBER_STATES: Final = frozenset(
 #: Official national languages (ISO 639-1) of the EU and EEA states, where GPSR applies: product
 #: warnings must be in a language consumers of the destination understand (art. 19(c), CMP.3).
 #: Reference data like the tables above, not the platform's country (that is `current_operator()`).
+#: These are the defaults: the live map, which staff can extend, is
+#: `apps.compliance.services.country_warning_languages()`.
 _OFFICIAL_LANGUAGES_TABLE: Final = """
     AT de; BE nl fr de; BG bg; CY el tr; CZ cs; DE de; DK da; EE et; ES es; FI fi sv; FR fr;
     GR el; HR hr; HU hu; IE en ga; IT it; LT lt; LU lb fr de; LV lv; MT mt en; NL nl; PL pl;

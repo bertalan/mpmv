@@ -2,7 +2,9 @@
 
 Every write goes through the audited compliance services, never a plain model save. GPSR data
 is never deleted here (empty a block to use the vendor defaults again), and safety cases are
-never deleted or edited after the fact: staff open one, then close it with what was done.
+never deleted or edited after the fact: staff open one, then close it with what was done. The
+country -> warnings languages map is edited here too, never deleted (a country leaves the check
+only through a code change).
 """
 
 import datetime as dt
@@ -16,7 +18,13 @@ from django.http import HttpRequest
 from apps.core.audit import audit_context
 
 from . import engine, services
-from .models import GpsrInfo, GpsrSafetyText, SafetyCase, VendorGpsrDefaults
+from .models import (
+    CountryWarningLanguages,
+    GpsrInfo,
+    GpsrSafetyText,
+    SafetyCase,
+    VendorGpsrDefaults,
+)
 
 
 class _GpsrPartyForm(forms.ModelForm[Any]):
@@ -224,3 +232,49 @@ class SafetyCaseAdmin(_NoDelete, admin.ModelAdmin[SafetyCase]):
             obj.pk, obj.public_id, obj.due_on = saved.pk, saved.public_id, saved.due_on
         elif form.cleaned_data.get("close"):
             services.close_safety_case(obj, resolution=obj.resolution, ctx=ctx)
+
+
+class CountryWarningLanguagesForm(forms.ModelForm[CountryWarningLanguages]):
+    """Languages as one comma-separated field; the service validates them again."""
+
+    languages = forms.CharField(
+        help_text="ISO 639-1 codes separated by commas, e.g. fr, nl, de. Warnings in any one "
+        "of them unblock sale into the country."
+    )
+
+    class Meta:
+        model = CountryWarningLanguages
+        fields = ("country",)
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        if self.instance.pk is not None and not self.is_bound:
+            self.initial["languages"] = ", ".join(self.instance.languages)
+
+    def clean_languages(self) -> list[str]:
+        return services.clean_languages(
+            part for part in str(self.cleaned_data["languages"]).split(",") if part.strip()
+        )
+
+
+@admin.register(CountryWarningLanguages)
+class CountryWarningLanguagesAdmin(_NoDelete, admin.ModelAdmin[CountryWarningLanguages]):
+    """The languages each destination accepts for warnings (CMP.3, owner clarification)."""
+
+    form = CountryWarningLanguagesForm
+    list_display = ("country", "languages_list", "updated_at")
+    search_fields = ("country",)
+
+    @admin.display(description="Accepted languages")
+    def languages_list(self, obj: CountryWarningLanguages) -> str:
+        return ", ".join(obj.languages)
+
+    def get_readonly_fields(self, request: HttpRequest, obj: Any = None) -> tuple[str, ...]:
+        return ("country",) if obj is not None else ()
+
+    def save_model(self, request: HttpRequest, obj: Any, form: Any, change: bool) -> None:
+        services.set_country_warning_languages(
+            obj.country, form.cleaned_data["languages"], ctx=audit_context(request)
+        )
+        saved = CountryWarningLanguages.objects.get(country=obj.country)
+        obj.pk, obj.public_id = saved.pk, saved.public_id

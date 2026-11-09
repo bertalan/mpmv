@@ -70,3 +70,10 @@ def test_the_language_table_covers_every_member_state_in_lower_case() -> None:
     for country, languages in OFFICIAL_LANGUAGES.items():
         assert languages, country
         assert all(code == code.lower() and len(code) == 2 for code in languages), country
+
+
+def test_one_text_unblocks_every_country_that_accepts_its_language() -> None:
+    # The owner's example: one German text unblocks DE, AT and LU at once.
+    table = {"DE": ("de",), "AT": ("de",), "LU": ("fr", "de", "lb"), "FR": ("fr",)}
+    gaps = engine.warnings_language_gaps(frozenset({"de"}), table)
+    assert gaps == {"FR": ("fr",)}

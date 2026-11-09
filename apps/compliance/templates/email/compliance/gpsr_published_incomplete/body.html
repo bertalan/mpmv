@@ -1,0 +1,10 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate %}These published products lack mandatory GPSR data. Complete their data or unpublish them in the staff admin.{% endblocktranslate %}</p>
+<ul>
+{% for item in products %}<li>{{ item.sku }} ({{ item.vendor_name }}): {{ item.missing }}</li>
+{% endfor %}</ul>
+{% if more %}<p>{% blocktranslate %}And {{ more }} more.{% endblocktranslate %}</p>{% endif %}
+</body>
+</html>

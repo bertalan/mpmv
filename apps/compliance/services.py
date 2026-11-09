@@ -9,12 +9,18 @@ Also here: the warnings and safety information per language, the GPSR block of t
 (`gpsr_display`, rendered by `{% product_safety %}`), and the article 22 safety cases (authority
 orders, safety notices) with their working-day deadlines and the overdue alert (log, audit and an
 email to the operator's compliance address), and the warnings-language check per destination
-country (owner decisions 2026-11-09).
+country (owner decisions 2026-11-09) with its staff-edited country -> languages map.
+
+A published product never silently loses its GPSR data: a product edit, a product GPSR write or a
+vendor defaults write that would make a published product incomplete is refused, and a nightly
+job flags any published product that fails the check anyway
+(`flag_published_products_failing_gpsr`).
 """
 
 import datetime as dt
 import logging
-from collections.abc import Mapping
+import re
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
 from zoneinfo import ZoneInfo
@@ -23,12 +29,14 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
+from django.utils.translation import get_language_info
 from django.utils.translation import gettext_lazy as _
 
-from apps.catalog.models import Product
+from apps.catalog.models import Product, ProductStatus
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
-from apps.core.countries import OFFICIAL_LANGUAGES, InvalidCountry
+from apps.core.countries import OFFICIAL_LANGUAGES, InvalidCountry, normalize_country
+from apps.core.flags import TtlCache
 from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog
 from apps.core.services import (
@@ -41,7 +49,13 @@ from apps.core.services import (
 from apps.vendors.models import Vendor
 
 from . import engine
-from .models import GpsrInfo, GpsrSafetyText, SafetyCase, VendorGpsrDefaults
+from .models import (
+    CountryWarningLanguages,
+    GpsrInfo,
+    GpsrSafetyText,
+    SafetyCase,
+    VendorGpsrDefaults,
+)
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
@@ -120,13 +134,15 @@ def set_vendor_gpsr_defaults(
     """Create or update `vendor`'s GPSR defaults with the fields in `data` (others are kept).
 
     Raises ValidationError for unknown fields, an invalid country or a contact that is not an
-    email or web address, also on dry-run.
+    email or web address, or when a published product that uses the defaults would lose
+    mandatory GPSR data, also on dry-run.
     """
     with transaction.atomic():
-        defaults = VendorGpsrDefaults.objects.select_for_update().filter(
-            vendor=vendor
-        ).first() or VendorGpsrDefaults(vendor=vendor)
+        stored = VendorGpsrDefaults.objects.select_for_update().filter(vendor=vendor).first()
+        defaults = stored or VendorGpsrDefaults(vendor=vendor)
+        before = _parties(stored)
         _assign(defaults, data, VENDOR_DEFAULTS_FIELDS)
+        _refuse_breaking_published_products(vendor, before, _parties(defaults))
         return save_audited(
             defaults,
             vendor_defaults_snapshot,
@@ -144,7 +160,8 @@ def set_product_gpsr(
     """Create or update `product`'s own GPSR data with the fields in `data` (others are kept).
 
     Leave a whole block empty to use the vendor defaults for it. Raises ValidationError as
-    `set_vendor_gpsr_defaults`, also on dry-run.
+    `set_vendor_gpsr_defaults`, and when `product` is published and would lose mandatory GPSR
+    data, also on dry-run.
     """
     with transaction.atomic():
         info = (
@@ -153,7 +170,14 @@ def set_product_gpsr(
             .filter(product=product)
             .first()
         ) or GpsrInfo(product=product)
+        published = Product.objects.filter(pk=product.pk, status=ProductStatus.PUBLISHED).exists()
+        if published:
+            stored_defaults = VendorGpsrDefaults.objects.filter(vendor_id=product.vendor_id)
+            defaults = _parties(stored_defaults.first())
+            before = gpsr_facts(product, info if info.pk else None, defaults)
         _assign(info, data, PRODUCT_GPSR_FIELDS)
+        if published:
+            _refuse_new_gaps(before, gpsr_facts(product, info, defaults))
         changes = save_audited(
             info,
             gpsr_snapshot,
@@ -174,17 +198,79 @@ def _parties(row: VendorGpsrDefaults | GpsrInfo | None) -> engine.GpsrParties | 
     return engine.GpsrParties(**{name: getattr(row, name) for name in engine.PARTY_FIELDS})
 
 
-def effective_gpsr(product: Product) -> engine.GpsrFacts:
-    """The GPSR data `product` would be published with: its own, then its vendor's defaults."""
-    info = GpsrInfo.objects.filter(product_id=product.pk).first()
-    defaults = VendorGpsrDefaults.objects.filter(vendor_id=product.vendor_id).first()
+def gpsr_facts(
+    product: Product, info: GpsrInfo | None, defaults: engine.GpsrParties | None
+) -> engine.GpsrFacts:
+    """The GPSR data of `product` with its own row `info` and its vendor's `defaults`."""
     identifiers = [product.gtin, product.mpn]
     if info is not None:
         identifiers += [info.model_number, info.batch]
     return engine.GpsrFacts(
-        parties=engine.merge_parties(_parties(info), _parties(defaults)),
-        identifiers=tuple(identifiers),
+        parties=engine.merge_parties(_parties(info), defaults), identifiers=tuple(identifiers)
     )
+
+
+def effective_gpsr(product: Product) -> engine.GpsrFacts:
+    """The GPSR data `product` would be published with: its own, then its vendor's defaults."""
+    info = GpsrInfo.objects.filter(product_id=product.pk).first()
+    defaults = VendorGpsrDefaults.objects.filter(vendor_id=product.vendor_id).first()
+    return gpsr_facts(product, info, _parties(defaults))
+
+
+PUBLISHED_LOSES_GPSR: Final = _(
+    "This product is published: the change would remove mandatory GPSR data. Unpublish it "
+    "first or keep the data complete."
+)
+MAX_SKUS_IN_MESSAGE: Final = 20
+
+
+def _new_gaps(before: engine.GpsrFacts, after: engine.GpsrFacts) -> tuple[str, ...]:
+    """The mandatory GPSR data `after` lacks that `before` had."""
+    had = set(engine.gpsr_missing(before))
+    return tuple(code for code in engine.gpsr_missing(after) if code not in had)
+
+
+def _refuse_new_gaps(before: engine.GpsrFacts, after: engine.GpsrFacts) -> None:
+    gaps = _new_gaps(before, after)
+    if gaps:
+        raise ValidationError(
+            {
+                "gpsr": [
+                    ValidationError(str(PUBLISHED_LOSES_GPSR), code="gpsr_published"),
+                    *(ValidationError(str(MISSING_MESSAGES[code])) for code in gaps),
+                ]
+            }
+        )
+
+
+def _refuse_breaking_published_products(
+    vendor: Vendor, before: engine.GpsrParties | None, after: engine.GpsrParties | None
+) -> None:
+    """Refuse new vendor defaults that would leave a published product of `vendor` without
+    mandatory GPSR data it has now (products already incomplete are the nightly check's)."""
+    products = list(Product.objects.filter(vendor=vendor, status=ProductStatus.PUBLISHED))
+    infos = {info.product_id: info for info in GpsrInfo.objects.filter(product__in=products)}
+    broken = sorted(
+        product.sku
+        for product in products
+        if _new_gaps(
+            gpsr_facts(product, infos.get(product.pk), before),
+            gpsr_facts(product, infos.get(product.pk), after),
+        )
+    )
+    if broken:
+        shown = ", ".join(broken[:MAX_SKUS_IN_MESSAGE])
+        more = len(broken) - MAX_SKUS_IN_MESSAGE
+        raise ValidationError(
+            {
+                "gpsr": _(
+                    "These defaults would remove mandatory GPSR data from published products "
+                    "that use them: %(skus)s%(more)s. Complete those products' own GPSR data or "
+                    "unpublish them first."
+                )
+                % {"skus": shown, "more": f" (+{more})" if more > 0 else ""}
+            }
+        )
 
 
 def gpsr_publication_blockers(product: Product) -> tuple[str, ...]:
@@ -263,7 +349,7 @@ def set_product_safety_text(
 @dataclass(frozen=True)
 class GpsrDisplay:
     """The GPSR block of a product page: who answers for the product, how to identify it, and
-    its warnings in `text_language` ("" when it has none)."""
+    its warnings in `text_language` ("" when it has none), named `text_language_name`."""
 
     parties: engine.GpsrParties
     identifiers: tuple[tuple[str, str], ...]
@@ -271,11 +357,32 @@ class GpsrDisplay:
     warnings: str = ""
     safety_information: str = ""
     text_language: str = ""
+    text_language_name: str = ""
 
 
-def gpsr_display(product: Product, language: str) -> GpsrDisplay:
-    """The GPSR data shown on `product`'s page in `language`: its own data, then its vendor's
-    defaults; texts in `language`, else in the primary language."""
+def _language_name(code: str) -> str:
+    try:
+        return str(get_language_info(code)["name_local"])
+    except KeyError:
+        return code
+
+
+def display_language(
+    available: frozenset[str] | set[str], language: str, accepted: tuple[str, ...] = ()
+) -> str:
+    """Which of the `available` text languages the page shows: `language`, else one the
+    destination accepts (`accepted`, in order), else the primary language, else the first
+    available one; "" when there is none. The warnings always show when they exist (art. 19(c))."""
+    for code in (language, *accepted, settings.LANGUAGE_CODE):
+        if code in available:
+            return code
+    return min(available, default="")
+
+
+def gpsr_display(product: Product, language: str, country: str = "") -> GpsrDisplay:
+    """The GPSR data shown on `product`'s page in `language` for a visitor shipping to
+    `country` (optional): its own data, then its vendor's defaults; texts as `display_language`
+    picks them."""
     facts = effective_gpsr(product)
     info = GpsrInfo.objects.filter(product_id=product.pk).first()
     labelled = [("GTIN", product.gtin), ("MPN", product.mpn)]
@@ -283,11 +390,16 @@ def gpsr_display(product: Product, language: str) -> GpsrDisplay:
         labelled += [("Model", info.model_number), ("Batch", info.batch)]
     texts = {
         row.language: row
-        for row in GpsrSafetyText.objects.filter(
-            product_id=product.pk, language__in={language, settings.LANGUAGE_CODE}
-        )
+        for row in GpsrSafetyText.objects.filter(product_id=product.pk)
+        if row.warnings.strip() or row.safety_information.strip()
     }
-    text = texts.get(language) or texts.get(settings.LANGUAGE_CODE)
+    accepted: tuple[str, ...] = ()
+    if country:
+        try:
+            accepted = country_warning_languages().get(normalize_country(country), ())
+        except InvalidCountry:
+            accepted = ()
+    text = texts.get(display_language(set(texts), language, accepted))
     return GpsrDisplay(
         parties=facts.parties,
         identifiers=tuple((label, value) for label, value in labelled if value.strip()),
@@ -295,6 +407,7 @@ def gpsr_display(product: Product, language: str) -> GpsrDisplay:
         warnings=text.warnings if text else "",
         safety_information=text.safety_information if text else "",
         text_language=text.language if text else "",
+        text_language_name=_language_name(text.language) if text else "",
     )
 
 
@@ -347,6 +460,10 @@ def _business_date(moment: dt.datetime) -> dt.date:
     return timezone.localtime(moment, ZoneInfo(settings.BUSINESS_TIME_ZONE)).date()
 
 
+#: How far in the future a receipt time may be (clocks of different machines).
+RECEIPT_CLOCK_SKEW: Final = dt.timedelta(minutes=5)
+
+
 def open_safety_case(
     *,
     vendor: Vendor,
@@ -357,12 +474,17 @@ def open_safety_case(
     product: Product | None = None,
     reference: str = "",
     authority: str = "",
+    now: dt.datetime | None = None,
     dry_run: bool = False,
 ) -> ChangeSet:
     """Record an authority order or a safety notice about `vendor` (and `product`), with its
     deadline: the 2nd (order) or 3rd (notice) working day after the day of receipt in business
-    time. Raises ValidationError for another vendor's product or missing data, also on dry-run.
+    time. Raises ValidationError for another vendor's product, a receipt later than `now` (plus
+    `RECEIPT_CLOCK_SKEW`: a future receipt would push the deadline out) or missing data, also on
+    dry-run.
     """
+    if received_at > (now or timezone.now()) + RECEIPT_CLOCK_SKEW:
+        raise ValidationError({"received_at": "The receipt cannot be in the future."})
     case = SafetyCase(
         vendor=vendor,
         product=product,
@@ -512,8 +634,9 @@ def flag_overdue_safety_cases(
     """Alert staff once about each overdue open case: an error in the log (monitoring alerts on
     it), an email to the operator's compliance address (else its support address, through the
     transactional outbox), `overdue_alerted_at` set and an audit entry. A case already flagged
-    is left alone. The in-app notice for the Catalog and moderation role is a follow-up (it
-    needs the Manager notices)."""
+    is left alone. With no compliance or support address configured the case is still flagged
+    (the log error is the alert): setting an address later does not resend it. The in-app
+    notice for the Catalog and moderation role is a follow-up (it needs the Manager notices)."""
     moment = now or timezone.now()
     changes = ChangeSet()
     recipient = "" if dry_run else staff_alert_address(moment)
@@ -551,6 +674,90 @@ def flag_overdue_safety_cases(
 
 SALE_CHECK_NAME: Final = "gpsr_warnings"
 
+COUNTRY_LANGUAGES_MODEL: Final = "compliance.countrywarninglanguages"
+COUNTRY_LANGUAGES_CREATED: Final = "compliance.country_languages.created"
+COUNTRY_LANGUAGES_UPDATED: Final = "compliance.country_languages.updated"
+_LANGUAGE_CODE: Final = re.compile(r"[a-z]{2,3}")
+
+CountryLanguages = Mapping[str, tuple[str, ...]]
+# This process's copy of the map, kept COMPLIANCE_COUNTRY_LANGUAGES_CACHE_SECONDS (0: no cache).
+COUNTRY_LANGUAGES_CACHE: TtlCache[CountryLanguages] = TtlCache()
+
+
+def load_country_warning_languages() -> CountryLanguages:
+    """The stored map, over the official languages for a country without a row."""
+    stored = {
+        country: tuple(languages)
+        for country, languages in CountryWarningLanguages.objects.values_list(
+            "country", "languages"
+        )
+    }
+    return {**OFFICIAL_LANGUAGES, **stored}
+
+
+def country_warning_languages() -> CountryLanguages:
+    """Country -> the languages its consumers accept warnings in (one is enough). Staff edit it
+    (`set_country_warning_languages`); cached per process."""
+    return COUNTRY_LANGUAGES_CACHE.get(
+        load_country_warning_languages,
+        ttl=getattr(settings, "COMPLIANCE_COUNTRY_LANGUAGES_CACHE_SECONDS", 0),
+    )
+
+
+def country_languages_changed_now() -> None:
+    """Drop this process's cached map now (tests; the services wait for the commit)."""
+    COUNTRY_LANGUAGES_CACHE.clear()
+
+
+def country_languages_snapshot(row: CountryWarningLanguages) -> dict[str, Any]:
+    return {"country": row.country, "languages": list(row.languages)}
+
+
+def clean_languages(raw: Iterable[str]) -> list[str]:
+    """ISO 639-1 codes, lower case, in the given order, without duplicates. Raises
+    ValidationError for an empty list or a value that is not a language code."""
+    languages: list[str] = []
+    for value in raw:
+        code = str(value).strip().lower()
+        if not _LANGUAGE_CODE.fullmatch(code):
+            raise ValidationError({"languages": f"{value!r} is not an ISO 639-1 language code."})
+        if code not in languages:
+            languages.append(code)
+    if not languages:
+        raise ValidationError({"languages": "Give at least one language."})
+    return languages
+
+
+def set_country_warning_languages(
+    country: str, languages: Iterable[str], *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Set the languages `country` accepts warnings in (staff only; audited). Warnings in any
+    one of them unblock sale into `country`. Raises ValidationError for an invalid country or
+    language list, also on dry-run."""
+    try:
+        code = normalize_country(country)
+    except InvalidCountry as exc:
+        raise ValidationError({"country": str(exc)}) from exc
+    cleaned = clean_languages(languages)
+    with transaction.atomic():
+        row = CountryWarningLanguages.objects.select_for_update().filter(
+            country=code
+        ).first() or CountryWarningLanguages(country=code)
+        row.languages = cleaned
+        row.full_clean(validate_unique=False, validate_constraints=False)
+        changes = save_audited(
+            row,
+            country_languages_snapshot,
+            key=code,
+            ctx=ctx,
+            created=COUNTRY_LANGUAGES_CREATED,
+            updated=COUNTRY_LANGUAGES_UPDATED,
+            dry_run=dry_run,
+        )
+        if not dry_run:
+            transaction.on_commit(COUNTRY_LANGUAGES_CACHE.clear)
+    return changes
+
 
 def warning_languages(product: Product) -> frozenset[str]:
     """The languages `product` has non-empty warnings in."""
@@ -567,7 +774,9 @@ def warnings_sale_check(product: Product, country: str) -> engine.WarningsSaleCh
     """May `product` be sold into `country` as far as its warnings' language goes?
     Raises ValidationError for a value that is not a country code."""
     try:
-        return engine.warnings_sale_check(warning_languages(product), country, OFFICIAL_LANGUAGES)
+        return engine.warnings_sale_check(
+            warning_languages(product), country, country_warning_languages()
+        )
     except InvalidCountry as exc:
         raise ValidationError({"country": str(exc)}) from exc
 
@@ -607,7 +816,9 @@ def _gaps(languages: frozenset[str]) -> list[WarningsGap]:
             languages=needed,
             offered=tuple(code for code in needed if code in offered),
         )
-        for country, needed in engine.warnings_language_gaps(languages, OFFICIAL_LANGUAGES).items()
+        for country, needed in engine.warnings_language_gaps(
+            languages, country_warning_languages()
+        ).items()
     ]
 
 
@@ -631,4 +842,89 @@ def vendor_warnings_language_gaps(vendor: Vendor) -> list[tuple[Product, list[Wa
         gaps = _gaps(frozenset(by_product[product.pk]))
         if gaps:
             rows.append((product, gaps))
+    return rows
+
+
+# --- Nightly consistency check: no published product without complete GPSR data
+
+
+PUBLISHED_INCOMPLETE_EMAIL_TEMPLATE: Final = "compliance.gpsr_published_incomplete"
+MAX_PRODUCTS_IN_EMAIL: Final = 200
+
+
+def published_products_failing_gpsr() -> list[tuple[Product, tuple[str, ...]]]:
+    """Every published product whose GPSR data is incomplete, with the missing codes. The
+    publication gate and the write guards keep this empty; products published another way
+    (an import that bypassed `save_product`, a raw write) show up here."""
+    products = list(
+        Product.objects.filter(status=ProductStatus.PUBLISHED)
+        .select_related("vendor")
+        .order_by("vendor_id", "sku")
+    )
+    infos = {info.product_id: info for info in GpsrInfo.objects.filter(product__in=products)}
+    defaults = {
+        row.vendor_id: _parties(row)
+        for row in VendorGpsrDefaults.objects.filter(
+            vendor_id__in={product.vendor_id for product in products}
+        )
+    }
+    rows = []
+    for product in products:
+        missing = engine.gpsr_missing(
+            gpsr_facts(product, infos.get(product.pk), defaults.get(product.vendor_id))
+        )
+        if missing:
+            rows.append((product, missing))
+    return rows
+
+
+def published_incomplete_email_context(
+    rows: list[tuple[Product, tuple[str, ...]]],
+) -> dict[str, Any]:
+    return {
+        "count": len(rows),
+        "products": [
+            {
+                "sku": product.sku,
+                "vendor_name": product.vendor.display_name,
+                "missing": ", ".join(missing),
+            }
+            for product, missing in rows[:MAX_PRODUCTS_IN_EMAIL]
+        ],
+        "more": max(0, len(rows) - MAX_PRODUCTS_IN_EMAIL),
+    }
+
+
+def flag_published_products_failing_gpsr(
+    *, now: dt.datetime | None = None, dry_run: bool = False
+) -> list[tuple[Product, tuple[str, ...]]]:
+    """List the published products failing the GPSR check: an error in the log per product
+    (monitoring alerts on it) and one email a day to the staff alert address. Nothing is
+    unpublished automatically: staff decide. Dry-run only lists them."""
+    rows = published_products_failing_gpsr()
+    if dry_run or not rows:
+        return rows
+    moment = now or timezone.now()
+    for product, missing in rows:
+        logger.error(
+            "Published product %s (vendor %s) fails the GPSR check: missing %s",
+            product.sku,
+            product.vendor.public_id,
+            ", ".join(missing),
+        )
+    recipient = staff_alert_address(moment)
+    if not recipient:
+        logger.warning(
+            "%d published product(s) fail the GPSR check and no compliance or support email "
+            "address is configured on the platform operator: no email sent",
+            len(rows),
+        )
+        return rows
+    enqueue_email(
+        recipient=recipient,
+        template_key=PUBLISHED_INCOMPLETE_EMAIL_TEMPLATE,
+        language=settings.LANGUAGE_CODE,
+        context=published_incomplete_email_context(rows),
+        idempotency_key=f"compliance:gpsr_published_incomplete:{_business_date(moment).isoformat()}",
+    )
     return rows
