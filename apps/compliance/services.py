@@ -681,6 +681,10 @@ _LANGUAGE_CODE: Final = re.compile(r"[a-z]{2,3}")
 
 CountryLanguages = Mapping[str, tuple[str, ...]]
 # This process's copy of the map, kept COMPLIANCE_COUNTRY_LANGUAGES_CACHE_SECONDS (0: no cache).
+# An edit clears only the editing process's copy (on commit). Other web and worker processes
+# keep the old map until their copy expires, so an edit takes effect everywhere within that
+# TTL (300 s by default). Removing a language is the only harmful direction: for that window
+# other processes may still allow sale into the country. Edits are rare; accepted as is.
 COUNTRY_LANGUAGES_CACHE: TtlCache[CountryLanguages] = TtlCache()
 
 
