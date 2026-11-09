@@ -7,7 +7,7 @@
 # is that of the multi-arch image index, so the same file builds every release architecture
 # (ARC.13); nothing below downloads an architecture-specific binary.
 
-FROM ghcr.io/astral-sh/uv:0.10.11@sha256:3472e43b4e738cf911c99d41bb34331280efad54c73b1def654a6227bb59b2b4 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.7@sha256:96f40d3904aad8d0bd010539001d36c8e2188b981e1334471a90c4a1d93bb490 AS uv
 
 # --- Build stage: resolve dependencies from uv.lock and collect static files.
 FROM docker.io/library/python:3.13.18-slim-trixie@sha256:09a17cad02668ae61ece136b4fd36ac3849e14f670ebedb637ea3e15580525bc AS build
