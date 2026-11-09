@@ -280,3 +280,54 @@ def test_malformed_or_external_urls_are_still_refused(value: str) -> None:
 
     with pytest.raises(UnsafeSvgError):
         sanitise_svg(document.encode())
+
+
+# Presentation attributes are parsed as CSS by browsers, so a CSS escape there is a `url(` the
+# url() check cannot see (lane-b security re-check of #151).
+@pytest.mark.parametrize(
+    ("attribute", "value"),
+    [
+        ("mask", r"u\72l(https://e.x/m.svg#m)"),
+        ("fill", r"\75rl(//e.x/a#b)"),
+        ("fill", "image-set('https://e.x' 1x)"),
+        ("stroke", r"u\72l(https://e.x/s#s)"),
+        ("filter", r"\000075rl(//e.x/f#f)"),
+        ("clip-path", r"U\52L(https://e.x/c#c)"),
+        ("marker-start", r"u\72l(https://e.x/m#m)"),
+        ("cursor", r"u\72l(https://e.x/c.cur), auto"),
+        ("fill", "IMAGE-SET('https://e.x' 1x)"),
+        ("fill", "image-set ( 'https://e.x' 1x )"),
+        ("stroke", "image('https://e.x/i.png')"),
+        ("mask", "element(#x)"),
+        ("fill", "src('https://e.x/a')"),
+        ("fill", "cross-fade(url(#a), url(#b), 50%)"),
+        ("fill", r"\ u\72l(//e.x/a#b)"),
+        ("stroke", r"#000\9"),
+    ],
+)
+def test_css_escapes_and_forbidden_functions_in_attributes_are_refused(
+    attribute: str, value: str
+) -> None:
+    escaped = value.replace("&", "&amp;").replace(chr(34), "&quot;")
+    document = f'<svg {SVG}><rect {attribute}="{escaped}"/></svg>'
+
+    with pytest.raises(UnsafeSvgError):
+        sanitise_svg(document.encode())
+
+
+@pytest.mark.parametrize(
+    ("attribute", "value"),
+    [
+        ("mask", "url(#m)"),
+        ("clip-path", "url( '#c' )"),
+        ("filter", "url(#f)"),
+        ("stroke", "url(#g)"),
+        ("aria-label", "Brand image (logo)"),
+    ],
+)
+def test_fragment_references_and_plain_text_still_pass_in_attributes(
+    attribute: str, value: str
+) -> None:
+    document = f'<svg {SVG}><rect {attribute}="{value}"/></svg>'
+
+    sanitise_svg(document.encode())
