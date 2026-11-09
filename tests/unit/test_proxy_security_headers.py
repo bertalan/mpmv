@@ -111,9 +111,21 @@ def test_caddy_error_pages_carry_the_snippet() -> None:
     )
 
 
+def test_caddy_error_pages_are_never_cached() -> None:
+    """A 404 for a missing image must not inherit the media handler's public Cache-Control.
+
+    Otherwise a rendition fetched before its file exists stays a 404 in shared caches for a day.
+    """
+    errors = re.search(r"^\thandle_errors \{\n(.*?)\n\t\}$", site_block(), re.M | re.S)
+    assert errors
+    assert '\t\theader Cache-Control "no-store"' in errors.group(1).splitlines()
+
+
 def test_plain_http_redirects_to_https_for_the_site_only() -> None:
     redirect = top_level_block("http://{$MPMV_SITE_ADDRESS}")
-    assert re.search(r"^\tredir https://\{host\}\{uri\} 308$", redirect, re.M)
+    # The target is the configured host, never the client's Host spelling.
+    assert re.search(r"^\tredir https://\{\$MPMV_SITE_ADDRESS\}\{uri\} 308$", redirect, re.M)
+    assert "{host}" not in redirect
 
 
 def test_media_carries_the_transport_and_framing_headers() -> None:

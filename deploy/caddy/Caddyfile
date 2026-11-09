@@ -9,6 +9,9 @@
 # Only the configured host name gets the site. A request by IP address or for another host name
 # gets no site: plain HTTP is dropped without an answer; HTTPS fails the TLS handshake (no
 # certificate for that name), and a Host header that differs from the TLS server name gets 421.
+# That 421 comes from strict_sni_host before any route runs, so the snippet below cannot reach it:
+# it has an empty body but still carries `Server: Caddy` and none of the security headers. Caddy
+# has no option to change it; the only thing it discloses is the proxy software.
 #
 # Caddy sets X-Forwarded-Proto, which Django trusts through SECURE_PROXY_SSL_HEADER
 # (settings/live.py).
@@ -95,10 +98,13 @@
 		}
 	}
 
-	# Caddy's own errors (502 when the app is down, 413 for an oversized body): status only, no
-	# error text, with the security headers.
+	# Caddy's own errors (502 when the app is down, 413 for an oversized body, the media 404s):
+	# status only, no error text, with the security headers. Never cached: a 404 for an image
+	# would otherwise keep the media handler's public Cache-Control, and a rendition fetched before
+	# its file exists would stay missing in shared caches.
 	handle_errors {
 		import security_headers
+		header Cache-Control "no-store"
 		respond "{err.status_code}" {err.status_code}
 	}
 }
@@ -107,7 +113,8 @@
 # automatic redirect sends none). ACME HTTP challenges are still answered before this block.
 http://{$MPMV_SITE_ADDRESS} {
 	import security_headers
-	redir https://{host}{uri} 308
+	# The configured host, not the client's Host spelling: the target is fixed by construction.
+	redir https://{$MPMV_SITE_ADDRESS}{uri} 308
 }
 
 # Any other host name or a bare IP over plain HTTP: close the connection, serve nothing.

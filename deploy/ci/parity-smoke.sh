@@ -263,6 +263,26 @@ for url in /media/documents/parity.pdf /; do
   ! grep -qiE '^(server|via):' <<<"$headers" || fail "GET $url names the server software"
 done
 podman exec mpmv-app rm /app/media/documents/parity.pdf /app/media/images/parity.html
+# A missing image in a public folder is a 404 that no shared cache may keep (the media handler's
+# public Cache-Control must not leak into Caddy's error response).
+headers="$(curl_site -D - -o /dev/null "https://$site/media/images/parity-missing.png" | tr -d '\r')"
+grep -qiE '^HTTP/[0-9.]+ 404' <<<"$headers" || fail "a missing media file did not answer 404"
+grep -qix 'cache-control: no-store' <<<"$headers" || fail "the media 404 is cacheable"
+# Request body cap (SEC.2): an oversized body gets Caddy's own 413, with the security headers,
+# against the real gunicorn upstream. Caddy may close the connection before curl has sent the
+# whole body, so curl's exit code is not the check; the response headers are.
+head -c $((27 * 1024 * 1024)) /dev/zero >"$work/oversized.bin"
+curl_site -D "$work/oversized.headers" -o /dev/null -X POST -H 'Content-Type: application/octet-stream' \
+  --data-binary @"$work/oversized.bin" "https://$site/admin/login/" || true
+rm -f "$work/oversized.bin"
+headers="$(tr -d '\r' <"$work/oversized.headers" 2>/dev/null || true)"
+echo "$headers"
+grep -qiE '^HTTP/[0-9.]+ 413' <<<"$headers" || fail "an oversized body did not answer 413"
+grep -qix 'x-content-type-options: nosniff' <<<"$headers" || fail "the 413 without nosniff"
+grep -qi '^content-security-policy: ' <<<"$headers" || fail "the 413 without a CSP"
+grep -qi '^strict-transport-security: max-age=' <<<"$headers" || fail "the 413 without HSTS"
+grep -qix 'cache-control: no-store' <<<"$headers" || fail "the 413 is cacheable"
+! grep -qiE '^(server|via):' <<<"$headers" || fail "the 413 names the server software"
 "$deployer" check || fail "mpmv-deploy check failed on a good release"
 "$deployer" doctor || fail "mpmv-deploy doctor failed on a good release"
 endgroup
