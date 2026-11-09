@@ -119,7 +119,7 @@ def test_switching_to_a_closed_vendor_is_refused(
     assert client.post(PICKER, {"vendor": str(vendor.public_id)}).status_code == 302
 
     _assert_closed_page(client.post(PICKER, {"vendor": str(third.public_id)}), third)
-    assert SESSION_KEY not in client.session
+    assert client.session[SESSION_KEY] == str(vendor.public_id)  # the open choice is kept
 
 
 def test_a_closed_vendor_is_not_offered_in_the_picker_or_the_switcher(
