@@ -133,5 +133,6 @@ def test_staff_edit_the_map_in_the_admin_through_the_audited_service(
 
 
 def test_a_row_overrides_the_official_languages() -> None:
+    CountryWarningLanguages.objects.filter(country="CH").delete()
     CountryWarningLanguagesFactory.create(country="CH", languages=["it"])
     assert services.country_warning_languages()["CH"] == ("it",)

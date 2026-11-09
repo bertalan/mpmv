@@ -74,7 +74,6 @@ class CountryWarningLanguagesFactory(DjangoModelFactory[CountryWarningLanguages]
 
     class Meta:
         model = CountryWarningLanguages
-        django_get_or_create = ("country",)
 
-    country = "CH"
+    country = factory.Iterator(["CH", "GB", "TR", "AL", "RS", "UA", "MD", "ME", "MK", "BA"])
     languages = factory.LazyFunction(lambda: ["de"])

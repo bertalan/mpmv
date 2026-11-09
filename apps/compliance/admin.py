@@ -252,9 +252,12 @@ class CountryWarningLanguagesForm(forms.ModelForm[CountryWarningLanguages]):
             self.initial["languages"] = ", ".join(self.instance.languages)
 
     def clean_languages(self) -> list[str]:
-        return services.clean_languages(
-            part for part in str(self.cleaned_data["languages"]).split(",") if part.strip()
-        )
+        try:
+            return services.clean_languages(
+                part for part in str(self.cleaned_data["languages"]).split(",") if part.strip()
+            )
+        except ValidationError as exc:
+            raise ValidationError(exc.messages) from exc
 
 
 @admin.register(CountryWarningLanguages)
