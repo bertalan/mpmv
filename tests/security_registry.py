@@ -74,6 +74,11 @@ IDOR_REVIEWED: dict[str, str] = {
         "The signed token is bound to one user and one object (CORE.15); a token of another "
         "user or object is refused (apps/accounts/tests/integration/test_action_links.py)."
     ),
+    "vendor_claim:claim": (
+        "The page answers only for the vendor whose email-bound claim link was opened in this "
+        "session (VEN.24); another vendor's public id is refused with 403 "
+        "(`test_a_claim_link_opens_only_its_own_vendor`)."
+    ),
     "catalog:category": "Public listing: the slugs name public categories.",
     "catalog:brand": "Public listing: the slug names a public brand.",
     "catalog:vendor": "Public storefront: the slug names an active vendor's public shop.",

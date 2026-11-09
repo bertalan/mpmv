@@ -43,8 +43,15 @@ from apps.accounts.models import User
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.api.tests.factories import ApiClientFactory
-from apps.vendors.models import VendorMember, VendorMemberRole
-from apps.vendors.tests.factories import VendorMemberFactory
+from apps.vendors.models import VendorClaim, VendorMember, VendorMemberRole
+from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
+from apps.vendors.tests.integration.test_claim import (
+    claim_url,
+    confirm_identity,
+    imported_vendor,
+    open_link,
+    send_link,
+)
 from tests.security_registry import (
     API_CSRF_REASON,
     CSRF_EXEMPT,
@@ -384,6 +391,24 @@ def test_a_user_cannot_remove_another_users_second_factor(client: Client) -> Non
 
     assert response.status_code == 404
     assert type(theirs).objects.filter(pk=theirs.pk).exists()
+
+
+def test_a_claim_link_opens_only_its_own_vendor(client: Client) -> None:
+    """A claimant of Vendor A who swaps Vendor B's public id into the claim URL is refused."""
+    vendor_a = imported_vendor()
+    vendor_b = VendorFactory.create(italian_company=True, contact_email="legal@vendor-b.example")
+    send_link(vendor_b)
+    open_link(client, send_link(vendor_a))
+
+    page = client.get(claim_url(vendor_b))
+    answer = confirm_identity(client, vendor_b, vendor_b.vat_number)
+
+    assert page.status_code == 403
+    assert vendor_b.legal_name not in page.content.decode()
+    assert answer.status_code == 403
+    claim_b = VendorClaim.objects.get(vendor=vendor_b)
+    assert claim_b.status == VendorClaim.Status.OPEN
+    assert claim_b.confirmed_link == ""
 
 
 # --- MCP
