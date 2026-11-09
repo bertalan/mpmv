@@ -14,6 +14,7 @@ Image cases come from `image_cases()`, file-name cases from `name_cases()`, docu
 `document_cases()`. Generating them takes well under a second; the largest file is a few KB.
 """
 
+import functools
 import io
 import re
 import struct
@@ -202,8 +203,14 @@ LOGOS_NEED_151 = "SVG logos are THM.12 (PR #151), not on main yet"
 
 
 def image_cases() -> list[Case]:
+    return list(_image_cases())
+
+
+@functools.cache
+def _image_cases() -> tuple[Case, ...]:
+    """Built once per test run: the frame bombs take about a second to encode."""
     zip_bytes = _zip_archive()
-    return [
+    return (
         Case("valid-png", "lake.png", png(), "store", "control: a plain PNG is stored"),
         Case("valid-jpeg", "lake.jpg", _image("JPEG"), "store", "control: a plain JPEG"),
         Case("valid-webp", "lake.webp", _image("WEBP"), "store", "control: a plain WebP"),
@@ -378,7 +385,7 @@ def image_cases() -> list[Case]:
             payloads=(SCRIPT, SECRET_PLACE),
             tags=frozenset({"metadata"}),
         ),
-    ]
+    )
 
 
 def _png_text() -> object:

@@ -10,11 +10,14 @@ Images:
 
 - the format comes from the content (Pillow, restricted to the accepted formats), never from the
   name, and the name's extension must agree with it;
-- the size, the pixels of all frames together and each side are capped *before* decoding, and
-  Pillow's decompression-bomb warning is an error;
+- the size, the number of frames, the pixels of all frames together and each side are capped
+  *before* decoding, and Pillow's decompression-bomb warning is an error;
 - the original is re-encoded: whatever is not pixels (EXIF and GPS, XMP, comments, text chunks,
   bytes after the end of the image, a second format in a polyglot) is not copied. The EXIF
-  orientation is applied to the pixels first, so a photo keeps its orientation;
+  orientation is applied to the pixels first, so a photo keeps its orientation. An ICC colour
+  profile is applied to the pixels (converted to sRGB) and not stored, so a profile cannot carry
+  extra bytes; a profile that is too large or unreadable is dropped;
+- a multi-picture JPEG (MPO, from some phones and cameras) is a JPEG: its first picture is kept;
 - the stored name is rebuilt: ASCII, lowercase, no path, no second extension, no control or
   bidirectional characters, no Windows device name, the extension of the detected format.
 
@@ -31,7 +34,7 @@ import warnings
 import zipfile
 from dataclasses import dataclass
 
-from PIL import Image, ImageOps, ImageSequence, JpegImagePlugin
+from PIL import Image, ImageCms, ImageOps, ImageSequence, JpegImagePlugin
 
 # Format (as Pillow names it) → stored extension; and the extensions accepted for each format.
 IMAGE_FORMATS = {"JPEG": "jpg", "PNG": "png", "GIF": "gif", "WEBP": "webp", "AVIF": "avif"}
@@ -43,10 +46,16 @@ IMAGE_EXTENSIONS = {
     "webp": "WEBP",
     "avif": "AVIF",
 }
+# Formats Pillow reports for content it reads with an accepted format's plugin.
+SAME_AS = {"MPO": "JPEG"}  # a JPEG with a multi-picture index (phones, cameras)
+ANIMATED_FORMATS = frozenset({"GIF", "WEBP", "AVIF", "PNG"})
 DOCUMENT_EXTENSIONS = ("pdf",)
 
 # Image metadata kept by the re-encoding: what the pixels need to look right, nothing personal.
-KEPT_INFO = ("transparency", "duration", "loop", "background", "icc_profile")
+# The ICC profile is applied to the pixels instead (`_to_srgb`).
+KEPT_INFO = ("transparency", "duration", "loop", "background")
+MAX_ICC_BYTES = 64 * 1024  # display profiles are a few KB; larger ones are dropped unread
+ICC_MODES = {"RGB": "RGB", "RGBA": "RGBA", "CMYK": "RGB"}  # source mode → mode after conversion
 
 WINDOWS_DEVICE_NAMES = frozenset(
     {"con", "prn", "aux", "nul"} | {f"{p}{n}" for p in ("com", "lpt") for n in range(10)}
@@ -60,6 +69,7 @@ class ImageLimits:
     max_bytes: int
     max_pixels: int  # all frames together
     max_side: int
+    max_frames: int = 300  # settings.MPMV_MAX_IMAGE_FRAMES
 
 
 @dataclass(frozen=True)
@@ -145,13 +155,30 @@ def _open(data: bytes, limits: ImageLimits) -> Image.Image:
     return image
 
 
+def _format_of(image: Image.Image) -> str:
+    """The accepted format of an opened image; an unexpected one is a refusal, never a crash."""
+    fmt = SAME_AS.get(str(image.format), str(image.format))
+    if fmt not in IMAGE_FORMATS:
+        raise UploadRefused("invalid", "The file is not a supported image.")
+    return fmt
+
+
 def _check_size(image: Image.Image, limits: ImageLimits) -> None:
     width, height = image.size
     if max(width, height) > limits.max_side:
         raise UploadRefused(
             "too_wide", f"The image is too large: at most {limits.max_side} px a side."
         )
-    frames = getattr(image, "n_frames", 1)
+    try:
+        # Counted from the frame headers: no frame is decoded.
+        frames = getattr(image, "n_frames", 1)
+    except Exception as exc:  # a corrupt frame header
+        raise UploadRefused("invalid", "The file is not a valid image.") from exc
+    if frames > limits.max_frames:
+        raise UploadRefused(
+            "too_many_frames",
+            f"The animation has too many frames: at most {limits.max_frames}.",
+        )
     if width * height * frames > limits.max_pixels:
         raise UploadRefused("too_many_pixels", "The image has too many pixels.")
 
@@ -176,25 +203,46 @@ def check_image(data: bytes, name: str, limits: ImageLimits, *, check_name: bool
     named_format = _refuse_name(name) if check_name else None
     image = _open(data, limits)
     with image:
-        if named_format is not None and image.format != named_format:
+        fmt = _format_of(image)
+        if named_format is not None and fmt != named_format:
             raise UploadRefused(
                 "mismatch",
-                f"The file name says {named_format} but the content is {image.format}.",
+                f"The file name says {named_format} but the content is {fmt}.",
             )
         _check_size(image, limits)
         _load(image)
-        return str(image.format)
+        return fmt
+
+
+def _to_srgb(image: Image.Image, profile: object) -> Image.Image:
+    """`image` with its ICC profile applied (sRGB pixels), or as it is if that cannot be done."""
+    if not isinstance(profile, bytes) or not profile or len(profile) > MAX_ICC_BYTES:
+        return image
+    if image.mode not in ICC_MODES:
+        return image  # palette and grey images: the profile is dropped
+    try:
+        source = ImageCms.ImageCmsProfile(io.BytesIO(profile))
+        converted = ImageCms.profileToProfile(
+            image, source, ImageCms.createProfile("sRGB"), outputMode=ICC_MODES[image.mode]
+        )
+    except Exception:  # an unreadable or unusable profile: dropped, the pixels as they are
+        return image
+    return converted if converted is not None else image
 
 
 def _strip(image: Image.Image) -> Image.Image:
-    image.info = {key: image.info[key] for key in KEPT_INFO if key in image.info}
+    """`image` with only the metadata in KEPT_INFO, its ICC profile applied to the pixels."""
+    kept = {key: image.info[key] for key in KEPT_INFO if key in image.info}
+    image = _to_srgb(image, image.info.get("icc_profile"))
+    image.info.clear()
+    image.info.update(kept)
     return image
 
 
 def _encode(image: Image.Image, fmt: str, source: Image.Image, data: bytes) -> bytes:
     buffer = io.BytesIO()
     frames = getattr(source, "n_frames", 1)
-    if frames > 1 and fmt in {"GIF", "WEBP", "AVIF", "PNG"}:
+    if frames > 1 and fmt in ANIMATED_FORMATS:
         sequence = [_strip(frame.copy()) for frame in ImageSequence.Iterator(source)]
         durations = [frame.info.get("duration", 100) for frame in ImageSequence.Iterator(source)]
         sequence[0].save(
@@ -208,7 +256,11 @@ def _encode(image: Image.Image, fmt: str, source: Image.Image, data: bytes) -> b
         return buffer.getvalue()
     params: dict[str, object] = {}
     if fmt == "JPEG":
-        if isinstance(source, JpegImagePlugin.JpegImageFile) and image.size == source.size:
+        if (
+            isinstance(source, JpegImagePlugin.JpegImageFile)
+            and image.size == source.size
+            and image.mode == source.mode
+        ):
             # The source's own quantisation tables: no visible loss from the re-encoding.
             params["qtables"] = source.quantization
             params["subsampling"] = JpegImagePlugin.get_sampling(source)
@@ -219,8 +271,6 @@ def _encode(image: Image.Image, fmt: str, source: Image.Image, data: bytes) -> b
         params["quality"] = 92
     elif fmt == "AVIF":
         params["quality"] = 92
-    if "icc_profile" in image.info:
-        params["icc_profile"] = image.info["icc_profile"]
     image.save(buffer, format=fmt, **params)
     return buffer.getvalue()
 
@@ -232,10 +282,10 @@ def sanitise_image(
     fmt = check_image(data, name, limits, check_name=check_name)
     with Image.open(io.BytesIO(data), formats=[fmt]) as source:
         image: Image.Image
-        if getattr(source, "n_frames", 1) > 1:
+        if fmt in ANIMATED_FORMATS and getattr(source, "n_frames", 1) > 1:
             image = source  # animations keep their frames; EXIF orientation is a photo matter
         else:
-            source.load()
+            source.load()  # the first frame: an MPO's other pictures are not kept
             image = _strip(ImageOps.exif_transpose(source) or source.copy())
         try:
             encoded = _encode(image, fmt, source, data)

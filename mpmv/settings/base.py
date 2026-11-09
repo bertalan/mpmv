@@ -252,12 +252,14 @@ WAGTAILADMIN_BASE_URL = SITE_BASE_URL
 # before any image exists: the licence and credit fields come with CMS.8.
 WAGTAILIMAGES_IMAGE_MODEL = "core.MediaImage"
 # Upload limits (SEC.2, apps.core.uploads). Wagtail's form checks the first two; MediaImage checks
-# all three on every path and re-encodes the stored original. 40 megapixels (all frames of an
-# animation together) bound the memory one decode takes to about 160 MB.
+# all of them on every path and re-encodes the stored original. 40 megapixels (all frames of an
+# animation together) bound the memory one decode takes to about 160 MB; 300 frames bound the
+# CPU an animation of tiny frames costs (each frame is decoded and re-encoded).
 WAGTAILIMAGES_EXTENSIONS = ["avif", "gif", "jpg", "jpeg", "png", "webp"]
 WAGTAILIMAGES_MAX_UPLOAD_SIZE = 10 * 1024 * 1024
 WAGTAILIMAGES_MAX_IMAGE_PIXELS = 40_000_000
 MPMV_MAX_IMAGE_SIDE = 16_000
+MPMV_MAX_IMAGE_FRAMES = 300
 WAGTAILIMAGES_IMAGE_FORM_BASE = "apps.core.image_forms.ImageForm"
 # Wagtail documents exist for wagtail-localize only (I18N.3): PDF only, checked by content.
 WAGTAILDOCS_EXTENSIONS = ["pdf"]

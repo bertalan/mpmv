@@ -189,6 +189,7 @@ def image_limits() -> ImageLimits:
         max_bytes=settings.WAGTAILIMAGES_MAX_UPLOAD_SIZE,
         max_pixels=settings.WAGTAILIMAGES_MAX_IMAGE_PIXELS,
         max_side=settings.MPMV_MAX_IMAGE_SIDE,
+        max_frames=settings.MPMV_MAX_IMAGE_FRAMES,
     )
 
 
