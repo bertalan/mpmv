@@ -47,11 +47,17 @@ def test_a_member_logs_in_and_is_asked_for_the_second_factor(
     assert follow["Location"].startswith(reverse("mfa:verify"))
 
 
-@pytest.mark.parametrize(("role", "home"), [("member", SHOP), ("staff", PLATFORM)])
+@pytest.mark.parametrize(
+    ("role", "home"), [("member", SHOP), ("platform_owner", PLATFORM), ("admin_only", "/")]
+)
 def test_without_next_the_login_leads_to_the_actor_space(
     client: Client, vendor: Vendor, password: str, role: str, home: str
 ) -> None:
-    user = UserFactory.create(password=password, staff=role == "staff")
+    """An `is_staff` user without a platform role is not platform staff (spec 02 Q-34)."""
+    permissions = ["core.platform_owner"] if role == "platform_owner" else []
+    user = UserFactory.create(
+        password=password, staff=role == "admin_only", permissions=permissions
+    )
     if role == "member":
         VendorMemberFactory.create(vendor=vendor, user=user)
     response = client.post(LOGIN, {"username": user.email, "password": password})

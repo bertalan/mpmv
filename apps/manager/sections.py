@@ -7,11 +7,18 @@ whose role checks CORE.18 defines.
 
 from django.utils.translation import gettext_lazy as _
 
-from .navigation import Registry, Section
+from .navigation import Registry, Section, anyone
 from .spaces import Space
 
 BUILT_IN = (
-    Section("shop.dashboard", Space.SHOP, _("Dashboard"), "manager:shop:dashboard", order=10),
+    Section(
+        "shop.dashboard",
+        Space.SHOP,
+        _("Dashboard"),
+        "manager:shop:dashboard",
+        order=10,
+        allowed=anyone,
+    ),
     # The vendor picker: reached from the header, so not in the menu, and before any choice.
     Section(
         "shop.vendor",
@@ -21,9 +28,15 @@ BUILT_IN = (
         order=0,
         in_menu=False,
         needs_vendor=False,
+        allowed=anyone,
     ),
     Section(
-        "platform.dashboard", Space.PLATFORM, _("Dashboard"), "manager:platform:dashboard", order=10
+        "platform.dashboard",
+        Space.PLATFORM,
+        _("Dashboard"),
+        "manager:platform:dashboard",
+        order=10,
+        allowed=anyone,
     ),
 )
 

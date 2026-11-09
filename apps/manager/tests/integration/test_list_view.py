@@ -26,6 +26,7 @@ from .conftest import PICKER
 pytestmark = pytest.mark.django_db
 
 LIST = "/manager/shop/test-members/"
+UNSCOPED = "/manager/shop/test-unscoped-members/"
 
 
 @pytest.fixture(autouse=True)
@@ -193,4 +194,47 @@ def test_an_empty_selection_asks_for_rows_and_runs_nothing(
     response = client.post(LIST, {"action": "touch"})
     assert response.status_code == 200
     assert "Select at least one row." in response.text
+    assert views.CALLS == []
+
+
+# --- Vendor scoping is enforced by the base class, not left to each list
+
+
+def test_a_list_that_forgets_scoping_still_shows_only_the_selected_vendor_rows(
+    client: Client,
+    owner: User,
+    vendor: Vendor,
+    members: list[VendorMember],
+    other_member: VendorMember,
+) -> None:
+    stranger = VendorMemberFactory.create(user__email="stranger@shop-four.example.com")
+    verified_login(client, owner)
+    client.post(PICKER, {"vendor": str(vendor.public_id)})
+    page = client.get(UNSCOPED, {"page": "1"}).text + client.get(UNSCOPED, {"page": "2"}).text
+    assert members[0].user.email in page
+    assert "hidden@shop-three.example.com" not in page
+    assert stranger.user.email not in page
+
+
+@pytest.mark.parametrize("confirm", [False, True])
+@pytest.mark.parametrize("foreign", ["member_vendor", "stranger_vendor"])
+def test_a_list_that_forgets_scoping_refuses_ids_of_another_vendor(
+    client: Client,
+    owner: User,
+    vendor: Vendor,
+    members: list[VendorMember],
+    other_member: VendorMember,
+    foreign: str,
+    confirm: bool,
+) -> None:
+    """Ids from another vendor (one the user also belongs to, or a stranger's) answer 404."""
+    stranger = VendorMemberFactory.create()
+    theirs = other_member if foreign == "member_vendor" else stranger
+    verified_login(client, owner)
+    client.post(PICKER, {"vendor": str(vendor.public_id)})
+    for selected in (_ids(theirs), _ids(members[1], theirs)):
+        data = {"action": "touch", "selected": selected}
+        if confirm:
+            data["confirm"] = "1"
+        assert client.post(UNSCOPED, data).status_code == 404
     assert views.CALLS == []

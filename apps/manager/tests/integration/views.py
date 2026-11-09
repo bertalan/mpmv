@@ -9,7 +9,7 @@ from django.http import HttpRequest, HttpResponse
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.manager.lists import BulkAction, Column, ListFilter, ManagerListView
-from apps.manager.navigation import Section, vendor_action
+from apps.manager.navigation import Section, anyone, vendor_action
 from apps.manager.spaces import Space
 from apps.manager.views import ManagerView
 from apps.vendors.models import VendorMember
@@ -40,8 +40,8 @@ class MemberList(ManagerListView):
     )
     filters = (ListFilter("role", "Role", (("owner", "Owner"), ("staff", "Staff")), lookup="role"),)
     bulk_actions = (
-        BulkAction("touch", "Touch", _touch("touch")),
-        BulkAction("sensitive", "Sensitive", _touch("sensitive"), step_up=True),
+        BulkAction("touch", "Touch", _touch("touch"), allowed=anyone),
+        BulkAction("sensitive", "Sensitive", _touch("sensitive"), step_up=True, allowed=anyone),
         BulkAction(
             "owners_only", "Owners only", _touch("owners_only"), allowed=vendor_action("members")
         ),
@@ -49,6 +49,15 @@ class MemberList(ManagerListView):
 
     def get_queryset(self) -> QuerySet[VendorMember]:
         return self.scoped(VendorMember).select_related("user").order_by("user__email")
+
+
+class UnscopedMemberList(MemberList):
+    """A list that forgets `scoped()`: the base class must still keep other vendors' rows out."""
+
+    section = "test.unscoped_members"
+
+    def get_queryset(self) -> QuerySet[VendorMember]:
+        return VendorMember.objects.select_related("user").order_by("user__email")
 
 
 class OwnerOnly(ManagerView):
@@ -71,7 +80,15 @@ class UnknownSection(ManagerView):
 
 
 TEST_SECTIONS = (
-    Section("test.members", Space.SHOP, "Test members", "test_members", order=900),
+    Section("test.members", Space.SHOP, "Test members", "test_members", order=900, allowed=anyone),
+    Section(
+        "test.unscoped_members",
+        Space.SHOP,
+        "Test unscoped members",
+        "test_unscoped_members",
+        order=905,
+        allowed=anyone,
+    ),
     Section(
         "test.owner_only",
         Space.SHOP,

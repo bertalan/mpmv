@@ -5,7 +5,8 @@ from typing import Any
 
 import pytest
 
-from apps.manager.navigation import Registry, Section, anyone, vendor_action
+from apps.manager.lists import BulkAction, ManagerListView
+from apps.manager.navigation import Registry, Section, anyone, registry, vendor_action
 from apps.manager.spaces import Space
 
 
@@ -14,6 +15,7 @@ def _ctx(space: Space, *, role: str | None = None, vendor: object | None = None)
 
 
 def _section(key: str, space: Space = Space.SHOP, **kwargs: Any) -> Section:
+    kwargs.setdefault("allowed", anyone)
     return Section(key=key, space=space, label=key, url_name=f"x:{key}", **kwargs)
 
 
@@ -79,3 +81,45 @@ def test_vendor_action_refuses_an_unknown_action_when_declared() -> None:
 
 def test_anyone_lets_every_actor_of_the_space_in() -> None:
     assert anyone(_ctx(Space.PLATFORM))
+
+
+# --- Deny by default: every section and bulk action declares who may use it
+
+
+def _run(objects: object, **kwargs: object) -> Any:
+    raise AssertionError("never run")
+
+
+def test_a_section_without_a_permission_check_cannot_be_declared() -> None:
+    with pytest.raises(TypeError, match="allowed"):
+        Section("platform.x", Space.PLATFORM, "X", "x:x")  # type: ignore[call-arg]
+
+
+def test_a_bulk_action_without_a_permission_check_cannot_be_declared() -> None:
+    with pytest.raises(TypeError, match="allowed"):
+        BulkAction("x", "X", _run)  # type: ignore[call-arg]
+
+
+@pytest.mark.parametrize("allowed", [None, True, "anyone"])
+def test_the_registry_refuses_a_section_whose_check_is_not_callable(allowed: object) -> None:
+    section = Section("shop.x", Space.SHOP, "X", "x:x", allowed=allowed)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match=r"shop\.x"):
+        Registry().register(section)
+
+
+def _list_views(cls: type[ManagerListView]) -> list[type[ManagerListView]]:
+    found = []
+    for sub in cls.__subclasses__():
+        found += [sub, *_list_views(sub)]
+    return found
+
+
+def test_every_registered_section_and_bulk_action_declares_a_permission_check() -> None:
+    """Guard: nothing registered falls back to a default that lets every actor in."""
+    sections = registry.all()
+    assert sections, "the built-in sections are registered when the app is ready"
+    for section in sections:
+        assert callable(section.allowed), section.key
+    for view in _list_views(ManagerListView):
+        for action in view.bulk_actions:
+            assert callable(action.allowed), f"{view.__qualname__}.{action.name}"

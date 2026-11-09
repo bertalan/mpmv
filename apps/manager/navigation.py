@@ -10,9 +10,10 @@ mounting the views under the space's URLconf:
     registry.register(Section("shop.orders", Space.SHOP, _("Orders and quotes"),
                               "manager:shop:orders", order=20, allowed=vendor_action("orders")))
 
-`allowed` receives the request's `ManagerContext` (`access.py`). In the shop space
-`vendor_action` reads the vendor role matrix (CORE.2); in the platform space CORE.18 adds the
-role checks from `roles.py`.
+`allowed` receives the request's `ManagerContext` (`access.py`). It is required, with no default:
+a section that forgets it cannot be declared, and `anyone` must be named on purpose. In the shop
+space `vendor_action` reads the vendor role matrix (CORE.2); in the platform space CORE.18 adds
+the role checks from `roles.py`.
 """
 
 import contextlib
@@ -42,7 +43,7 @@ type Check = Callable[[Any], bool]
 
 
 def anyone(ctx: Actor) -> bool:
-    """Every actor the space's gate let in."""
+    """Every actor the space's gate let in: declare it explicitly, it is never a default."""
     return True
 
 
@@ -63,7 +64,7 @@ class Section:
     label: StrOrPromise  # a lazy translation
     url_name: str
     order: int = 100
-    allowed: Check = field(default=anyone)
+    allowed: Check = field(kw_only=True)  # no default: deny unless a check is declared
     in_menu: bool = True
     # Shop sections work on the selected vendor; the vendor picker is the exception.
     needs_vendor: bool = True
@@ -81,6 +82,8 @@ class Registry:
         self._sections: dict[str, Section] = {}
 
     def register(self, section: Section) -> Section:
+        if not callable(section.allowed):
+            raise TypeError(f"Manager section {section.key!r} declares no permission check")
         if section.key in self._sections:
             raise ValueError(f"Manager section {section.key!r} is already registered")
         self._sections[section.key] = section

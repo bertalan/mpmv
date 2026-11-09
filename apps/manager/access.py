@@ -1,13 +1,17 @@
 """Who may enter which Manager space, and the per-request actor (CORE.17, spec 02 §Backoffice).
 
 - Shop space: vendor members (owner or staff, CORE.2), on one selected vendor.
-- Platform space: platform staff. Until CORE.18 adds the staff roles, platform staff means what
-  tenant scoping already counts as platform staff (`is_staff`, superusers included, spec 02
-  "Tenant (vendor) isolation"), plus the platform owner permission (`core.platform_owner`).
-  CORE.18 replaces `is_platform_staff` with the role membership of `roles.py`.
+- Platform space: platform staff, meaning a user who holds a dedicated platform permission
+  (spec 02 Q-34). Wagtail or Django admin access (`is_staff`) never counts, and neither does
+  superuser status (spec 02 CORE.18: the technical superuser holds no Manager section without a
+  role). Until CORE.18 adds the staff roles, the only such permission is the platform owner's
+  (`core.platform_owner`); CORE.18 replaces `is_platform_staff` with the role membership of
+  `roles.py`.
 
 Platform roles and vendor membership never mix (spec 02 Roles): a user who is both is let into
-neither space, so a data error never opens a side door between them.
+neither space, so a data error never opens a side door between them. A vendor member with admin
+access (`is_staff` or superuser) is kept out of the shop space too: admin accounts stay on the
+platform side.
 """
 
 from dataclasses import dataclass, field
@@ -25,9 +29,14 @@ type AnyUser = AbstractBaseUser | AnonymousUser
 
 
 def is_platform_staff(user: AnyUser) -> bool:
+    """Holds a dedicated platform permission; `is_staff` and superuser status do not count."""
     if not (user.is_authenticated and user.is_active):
         return False
-    return bool(getattr(user, "is_staff", False)) or is_platform_owner(user)
+    return is_platform_owner(user)
+
+
+def _has_admin_access(user: AnyUser) -> bool:
+    return bool(getattr(user, "is_staff", False) or getattr(user, "is_superuser", False))
 
 
 def may_enter(space: Space, user: AnyUser) -> bool:
@@ -36,7 +45,7 @@ def may_enter(space: Space, user: AnyUser) -> bool:
         return False
     staff, member = is_platform_staff(user), is_vendor_member(user)
     if space is Space.SHOP:
-        return member and not staff
+        return member and not staff and not _has_admin_access(user)
     return staff and not member
 
 

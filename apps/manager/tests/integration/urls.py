@@ -8,6 +8,11 @@ from . import views
 
 urlpatterns = [
     path("manager/shop/test-members/", views.MemberList.as_view(), name="test_members"),
+    path(
+        "manager/shop/test-unscoped-members/",
+        views.UnscopedMemberList.as_view(),
+        name="test_unscoped_members",
+    ),
     path("manager/shop/test-owner-only/", views.OwnerOnly.as_view(), name="test_owner_only"),
     path("manager/shop/test-wrong-space/", views.PlatformSectionOnShop.as_view()),
     path("manager/shop/test-no-section/", views.no_section),

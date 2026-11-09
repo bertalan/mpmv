@@ -1,13 +1,19 @@
 """The Manager's base list view: filters, pagination and bulk actions with dry-run (CORE.17).
 
-A section's list declares its rows (`get_queryset`, through `scoped()` so tenant isolation holds),
-its columns, its filters and its bulk actions:
+A section's list declares its rows (`get_queryset`), its columns, its filters and its bulk
+actions. The base class passes `get_queryset()` through `scoped()` for the listing and for the
+bulk selection alike, so a list that forgets it still shows and accepts only the selected
+vendor's rows (tenant isolation, CORE.3). Every bulk action declares who may run it (`allowed`,
+no default):
 
     class OrderList(ManagerListView):
         section = "shop.orders"
         columns = (Column(_("Order"), lambda o: o.number), Column(_("Total"), money, numeric=True))
         filters = (ListFilter("status", _("Status"), OrderStatus.choices, lookup="status"),)
-        bulk_actions = (BulkAction("ship", _("Mark shipped"), ship_orders, step_up=True),)
+        bulk_actions = (
+            BulkAction("ship", _("Mark shipped"), ship_orders, step_up=True,
+                       allowed=vendor_action("orders")),
+        )
 
         def get_queryset(self):
             return self.scoped(Order).order_by("-placed_at")
@@ -40,7 +46,7 @@ from apps.accounts.services import has_second_factor
 from apps.core.audit import audit_context
 from apps.core.changeset import ChangeSet
 
-from .navigation import Check, anyone
+from .navigation import Check
 from .views import ManagerView
 
 type BulkRun = Callable[..., ChangeSet]
@@ -74,7 +80,7 @@ class BulkAction:
     label: StrOrPromise
     run: BulkRun
     step_up: bool = False  # sensitive: the confirmation needs a recent second factor
-    allowed: Check = field(default=anyone)
+    allowed: Check = field(kw_only=True)  # no default: deny unless a check is declared
 
 
 class ManagerListView(ManagerView):
@@ -88,10 +94,14 @@ class ManagerListView(ManagerView):
     def get_queryset(self) -> QuerySet[Any]:
         raise NotImplementedError
 
+    def rows(self) -> QuerySet[Any]:
+        """`get_queryset()` narrowed by `scoped()` again, whatever the subclass returned."""
+        return self.scoped(self.get_queryset())
+
     # --- Listing
 
     def filtered(self) -> QuerySet[Any]:
-        rows = self.get_queryset()
+        rows = self.rows()
         for list_filter in self.filters:
             rows = list_filter.apply(rows, self.request.GET.get(list_filter.name, ""))
         return rows
@@ -177,7 +187,7 @@ class ManagerListView(ManagerView):
             wanted = {uuid.UUID(value) for value in ids}
         except ValueError:
             raise Http404("No such row.") from None
-        objects = list(self.get_queryset().filter(public_id__in=wanted))
+        objects = list(self.rows().filter(public_id__in=wanted))
         if len(objects) != len(wanted):
             raise Http404("No such row.")
         return objects

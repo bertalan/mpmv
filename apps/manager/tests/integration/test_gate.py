@@ -65,9 +65,22 @@ def test_platform_staff_get_404_on_every_shop_url(
         assert getattr(client, method)(path).status_code == 404, path
 
 
-def test_a_superuser_is_platform_staff(client: Client) -> None:
+@pytest.mark.parametrize("method", METHODS)
+def test_a_bare_is_staff_user_without_a_platform_role_gets_404_on_the_platform_space(
+    client: Client, method: str
+) -> None:
+    """Spec 02 Q-34: Wagtail or Django admin access (`is_staff`) does not make platform staff."""
+    editor = UserFactory.create(staff=True)
+    verified_login(client, editor)
+    for path in sample_paths(Space.PLATFORM):
+        assert getattr(client, method)(path).status_code == 404, path
+    assert client.get(SHOP).status_code == 404
+
+
+def test_a_superuser_without_a_platform_role_gets_404_on_both_spaces(client: Client) -> None:
+    """Spec 02 CORE.18: the technical superuser holds no Manager section without a role."""
     verified_login(client, UserFactory.create(superuser=True))
-    assert client.get(PLATFORM).status_code == 200
+    assert client.get(PLATFORM).status_code == 404
     assert client.get(SHOP).status_code == 404
 
 
@@ -98,10 +111,21 @@ def test_an_anonymous_visitor_is_sent_to_the_login(client: Client, method: str, 
         assert _location(response) == (LOGIN, path)
 
 
-def test_a_staff_member_who_is_also_a_vendor_member_gets_neither_space(
+def test_platform_staff_who_are_also_vendor_members_get_neither_space(
     client: Client, vendor: Vendor
 ) -> None:
     """Platform roles and vendor membership never mix (spec 02 Roles): such a user is refused."""
+    user = UserFactory.create(permissions=["core.platform_owner"])
+    VendorMemberFactory.create(vendor=vendor, user=user)
+    verified_login(client, user)
+    assert client.get(SHOP).status_code == 404
+    assert client.get(PLATFORM).status_code == 404
+
+
+def test_an_admin_user_who_is_also_a_vendor_member_gets_neither_space(
+    client: Client, vendor: Vendor
+) -> None:
+    """An `is_staff` member is still kept out of the shop space, and is not platform staff."""
     user = UserFactory.create(staff=True)
     VendorMemberFactory.create(vendor=vendor, user=user)
     verified_login(client, user)
