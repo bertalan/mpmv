@@ -501,3 +501,125 @@ def variant_order(
 def variant_label(labels: Sequence[str]) -> str:
     """A variant's name from its option labels in axis order, e.g. "M / Red"."""
     return VARIANT_LABEL_SEPARATOR.join(labels)
+
+
+# --- Product search (CAT.9, spec 03 §3.1 "Search by SKU" and §3.2): query normalisation, the
+# text search configuration of each language, and the ranking of the hits. The queries are in
+# `services.search`.
+
+SEARCH_MIN_LENGTH = 2
+SEARCH_MAX_LENGTH = 100  # characters kept from a query, cut on a word boundary
+# Raw characters read before any normalisation: NFKC can expand a code point up to 18 times, so
+# a huge input is cut first. Leading spaces and control characters count against it.
+SEARCH_RAW_MAX_LENGTH = SEARCH_MAX_LENGTH * 4
+SEARCH_MAX_WORDS = 8
+SKU_PREFIX_MIN_LENGTH = 4  # a shorter query matches a whole SKU only (legacy rule)
+SEARCH_RESULT_LIMIT = 200
+# A trigram hit (a typo) weighs less than a full-text hit of the same strength.
+SEARCH_TRIGRAM_WEIGHT = 0.5
+
+# PostgreSQL text search configuration (stemming, stop words) of each site language. A language
+# added to settings.LANGUAGES needs a row here and its index (catalog_ptrans_fts_<code>).
+SEARCH_LANGUAGE_CONFIGS: Mapping[str, str] = {
+    "en": "english",
+    "it": "italian",
+    "de": "german",
+    "fr": "french",
+    "es": "spanish",
+}
+SEARCH_FALLBACK_CONFIG = "simple"
+
+SEARCH_TOO_SHORT = "Type at least two characters to search."
+
+
+def search_config(language: str) -> str:
+    """The PostgreSQL text search configuration of `language` ("simple" when unknown)."""
+    return SEARCH_LANGUAGE_CONFIGS.get(language, SEARCH_FALLBACK_CONFIG)
+
+
+@dataclass(frozen=True)
+class SearchTerms:
+    """A visitor's query ready for the database.
+
+    `text` feeds full-text and trigram search; `sku_key` is the SKU match key of the whole query
+    (None when no SKU can be that long); `sku_prefix` allows a prefix match on it. A query with
+    an `error` searches nothing. The text is plain words: `-`, quotes and OR are no operators.
+    """
+
+    text: str = ""
+    sku_key: str | None = None
+    sku_prefix: bool = False
+    error: str | None = None
+
+    @property
+    def has_words(self) -> bool:
+        """Whether the text has a letter or digit; punctuation only ("--", quotes) gives full
+        text and trigram search nothing to match, so they are skipped."""
+        return any(char.isalnum() for char in self.text)
+
+
+def _search_char(char: str) -> str:
+    category = unicodedata.category(char)
+    if category == "Cc":  # tabs, newlines, NUL: a word break
+        return " "
+    if category.startswith("C"):  # format and unassigned characters (zero-width, soft hyphen)
+        return ""
+    return char
+
+
+def normalise_search_query(raw: str) -> SearchTerms:
+    """NFKC, control characters dropped, whitespace collapsed, at most SEARCH_MAX_WORDS words
+    and SEARCH_MAX_LENGTH characters (a longer query is cut on a word boundary, not refused).
+    The raw input is cut to SEARCH_RAW_MAX_LENGTH characters before any of this."""
+    raw = raw[:SEARCH_RAW_MAX_LENGTH]
+    text = "".join(_search_char(char) for char in unicodedata.normalize("NFKC", raw))
+    text = " ".join(text.split()[:SEARCH_MAX_WORDS])
+    if len(text) > SEARCH_MAX_LENGTH:
+        head = text[: SEARCH_MAX_LENGTH + 1]
+        text = head.rsplit(" ", 1)[0] if " " in head else text[:SEARCH_MAX_LENGTH]
+    if len(text) < SEARCH_MIN_LENGTH:
+        return SearchTerms(error=SEARCH_TOO_SHORT)
+    key = sku_match_key(text)
+    if len(key) > SKU_MAX_LENGTH:
+        return SearchTerms(text=text)
+    return SearchTerms(text=text, sku_key=key, sku_prefix=len(key) >= SKU_PREFIX_MIN_LENGTH)
+
+
+@dataclass(frozen=True)
+class SearchHit:
+    """What one query found about a product: a SKU of it (or of one of its variants) equal to or
+    starting with the query, its full-text rank and its trigram word similarity (0 to 1)."""
+
+    product_id: int
+    sku_exact: bool = False
+    sku_prefix: bool = False
+    text_rank: float = 0.0
+    similarity: float = 0.0
+
+
+def _merged(a: SearchHit, b: SearchHit) -> SearchHit:
+    return SearchHit(
+        product_id=a.product_id,
+        sku_exact=a.sku_exact or b.sku_exact,
+        sku_prefix=a.sku_prefix or b.sku_prefix,
+        text_rank=max(a.text_rank, b.text_rank),
+        similarity=max(a.similarity, b.similarity),
+    )
+
+
+def search_score(hit: SearchHit) -> float:
+    return hit.text_rank + SEARCH_TRIGRAM_WEIGHT * hit.similarity
+
+
+def rank_search_hits(hits: Iterable[SearchHit], *, limit: int = SEARCH_RESULT_LIMIT) -> list[int]:
+    """Product ids, best first: an exact SKU, then a SKU prefix, then by text score; the newest
+    product (highest id) first on a tie. The hits of one product are merged first."""
+    best: dict[int, SearchHit] = {}
+    for hit in hits:
+        known = best.get(hit.product_id)
+        best[hit.product_id] = hit if known is None else _merged(known, hit)
+
+    def key(hit: SearchHit) -> tuple[bool, bool, float, int]:
+        return (not hit.sku_exact, not hit.sku_prefix, -search_score(hit), -hit.product_id)
+
+    return [hit.product_id for hit in sorted(best.values(), key=key)[:limit]]
