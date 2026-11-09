@@ -10,6 +10,7 @@ class ApiConfig(AppConfig):
     unaudited_models = {
         "apimutationlog": "the API call log itself (append-only)",
         "apiratecounter": "per-key request counters of the rate limit, not a domain change",
+        "apirefusedkey": "per-IP log of refused keys for the CORE.20 limit, not a domain change",
     }
 
     def ready(self) -> None:

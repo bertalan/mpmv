@@ -31,6 +31,8 @@ the rename services, never with `QuerySet.update()`, which skips the match key.
 from typing import Any, ClassVar
 
 from django.conf import settings
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVector
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
@@ -38,7 +40,7 @@ from django.db.models.functions import Now
 from django.utils import timezone
 
 from apps.core.fields import LanguageField, MoneyField
-from apps.core.models import BaseModel, TranslationModel, resolve_translation
+from apps.core.models import BaseModel, TranslationModel, TranslationStatus, resolve_translation
 from apps.core.translations import Resolved
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager
@@ -156,6 +158,22 @@ def _sku_key_field() -> "models.CharField[Any, Any]":
         max_length=64,
         editable=False,
         help_text="The SKU normalised for matching; unique per vendor.",
+    )
+
+
+def _sku_key_prefix_index(name: str) -> models.Index:
+    """Serves the SKU prefix search (CAT.9): `sku_key LIKE 'prefix%'` in any collation."""
+    return models.Index(fields=["sku_key"], opclasses=["varchar_pattern_ops"], name=name)
+
+
+def product_text_vector(config: str) -> models.Expression:
+    """The full-text vector of a product text in the text search `config` (CAT.9): title
+    weighted A, short description B, description C. The search query and the per-language GIN
+    indexes of `ProductTranslation` use this same expression, so the planner matches them."""
+    return (
+        SearchVector("title", weight="A", config=config)
+        + SearchVector("short_description", weight="B", config=config)
+        + SearchVector("description", weight="C", config=config)
     )
 
 
@@ -371,6 +389,7 @@ class Product(BaseModel):
 
     class Meta:
         ordering = ["sku", "id"]
+        indexes = [_sku_key_prefix_index("catalog_product_sku_key_like")]
         constraints = [
             _vendor_sku_unique("catalog_product_vendor_sku_key_unique", "product"),
             # Target of the variants' composite foreign key (product, vendor).
@@ -527,6 +546,21 @@ class ProductTranslation(TranslationModel):
 
     class Meta(TranslationModel.Meta):
         ordering = ["product", "language"]
+        # Product search (CAT.9): one full-text index per language, on its published texts, and
+        # a trigram index on the title for typos.
+        indexes = [
+            *(
+                GinIndex(
+                    product_text_vector(config),
+                    condition=models.Q(language=code, status=TranslationStatus.PUBLISHED),
+                    name=f"catalog_ptrans_fts_{code}",
+                )
+                for code, config in engine.SEARCH_LANGUAGE_CONFIGS.items()
+            ),
+            GinIndex(
+                fields=["title"], opclasses=["gin_trgm_ops"], name="catalog_ptrans_title_trgm"
+            ),
+        ]
         constraints = [
             *TranslationModel.Meta.constraints,
             models.UniqueConstraint(
@@ -621,7 +655,7 @@ class Redirect(BaseModel):
     source_path = models.CharField(
         max_length=engine.REDIRECT_PATH_MAX_LENGTH,
         unique=True,
-        help_text="The old path, e.g. /tag-product/old-tag/ or /it/prodotto/old-slug/.",
+        help_text="The old path, e.g. /tag-product/old-tag/.",
     )
     match_prefix = models.BooleanField(
         "match everything below", default=False, help_text="E.g. /author/ for /author/anyone/."
@@ -661,7 +695,7 @@ class Redirect(BaseModel):
                     )
                 ),
                 name="catalog_redirect_one_target",
-                violation_error_message="A 301 names exactly one target of its kind; a 410 none.",
+                violation_error_message="A 301 has exactly one target; a 410 has none.",
             ),
         ]
 
@@ -749,6 +783,7 @@ class Variant(BaseModel):
 
     class Meta:
         ordering = ["product", "position", "id"]
+        indexes = [_sku_key_prefix_index("catalog_variant_sku_key_like")]
         constraints = [
             _vendor_sku_unique("catalog_variant_vendor_sku_key_unique", "variant"),
             models.UniqueConstraint(

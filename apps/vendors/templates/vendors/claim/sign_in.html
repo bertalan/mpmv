@@ -1,0 +1,21 @@
+{% extends "layouts/account.html" %}
+{% load captcha %}
+{% block title %}Claim your vendor · MPMV{% endblock %}
+{% block account_content %}
+<h1>Claim {{ vendor.legal_name }}</h1>
+<p>Thank you, the business is confirmed. An account already uses <strong>{{ email }}</strong>:
+sign in with it to submit the claim. Enter its password and a code from its authenticator app.</p>
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="step" value="sign_in">
+  {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+  <p><label for="id_password">Password</label>
+    <input id="id_password" name="password" type="password" autocomplete="current-password" required></p>
+  <p><label for="id_code">Authentication code</label>
+    <input id="id_code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="8" required></p>
+  {% captcha_widget %}
+  <p>The platform staff review your claim before you can manage the vendor. If you cannot sign
+  in with this account, contact the platform staff.</p>
+  <button type="submit">Submit the claim</button>
+</form>
+{% endblock %}

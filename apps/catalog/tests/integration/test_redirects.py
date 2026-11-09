@@ -222,6 +222,16 @@ def test_an_expired_rule_no_longer_applies(client: Client) -> None:
     assert resolve_legacy_path("/old/") is None
 
 
+@pytest.mark.parametrize("target", ["//evil.example/", "https://evil.example/", "/\\evil"])
+def test_an_off_site_target_stored_without_the_services_is_never_followed(
+    client: Client, target: str
+) -> None:
+    """Defence in depth: a row written around `save_redirect` (bulk SQL, a data migration)
+    still cannot send a visitor to another site."""
+    Redirect.objects.create(source_path="/old/", target_kind="path", target_path=target)
+    assert client.get("/old/").status_code == 404
+
+
 def test_a_page_that_exists_always_wins(client: Client, tags: dict[str, Any]) -> None:
     add(source_path="/tags/bags/", target_kind="path", target_path="/elsewhere/")
     assert client.get("/tags/bags/").status_code == 200

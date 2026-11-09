@@ -1,4 +1,4 @@
-{% load i18n l10n %}{# A product card (CAT.8); THM.7 restyles it. Needs `card` and `currency`. #}{% comment %}
+{% load i18n l10n responsive_images %}{# A product card (CAT.8); THM.7 restyles it. Needs `card` and `currency`. #}{% comment %}
 TODO(TAX.12): interim net price. This card shows the net price with "excl. VAT"; B2C prices
 must include VAT (Directive 98/6/EC). TAX.12 replaces it with the gross amount at the delivery
 country's rate (an estimated country until the buyer picks one) and keeps the net price only
@@ -6,7 +6,7 @@ for business buyers who opt in. This net display must not reach LIVE. The xfail 
 apps/catalog/tests/integration/test_listing_templates.py flips once TAX.12 lands.
 {% endcomment %}
 <article class="product-card">
-  {% if card.image_url %}<img src="{{ card.image_url }}" alt="{{ card.image_alt }}" loading="lazy">{% endif %}
+  {% if card.image %}{% responsive_image card.image "card" alt=card.image_alt %}{% elif card.image_url %}<img src="{{ card.image_url }}" alt="{{ card.image_alt }}" loading="lazy">{% endif %}
   <h3 class="product-card-title">{% if card.url %}<a href="{{ card.url }}">{{ card.title }}</a>{% else %}{{ card.title }}{% endif %}</h3>
   <p class="product-card-price">{% if card.price is not None %}<data value="{{ card.price|unlocalize }}">{{ currency }} {{ card.price }}</data> <small>{% translate "excl. VAT" %}</small>{% else %}{% translate "Price on request" %}{% endif %}</p>
 </article>

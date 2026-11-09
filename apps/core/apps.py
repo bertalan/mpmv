@@ -17,6 +17,8 @@ class CoreConfig(AppConfig):
         "mediaimage": "Wagtail image: editor upload, logged in Wagtail's action log; its licence "
         "metadata is validated by the model (CMS.8)",
         "mediaimagerendition": "a resized copy of an image, made by templates",
+        "svgcollection": "which collection accepts SVG logos; written by a data migration only, "
+        "not editable in the admin",
         "outboxemail": "delivery queue of transactional email; its history is outboxemailevent",
         "outboxemailevent": "append-only delivery history of the outbox",
         # The job queue (ADR-0004) is used only through apps.core.tasks; its admin is read-only.
@@ -27,6 +29,7 @@ class CoreConfig(AppConfig):
     def ready(self) -> None:
         from .checks import (
             check_audit_policy,
+            check_avif_support,
             check_client_ip_settings,
             check_encrypted_data,
             check_feature_flag_settings,
@@ -42,3 +45,4 @@ class CoreConfig(AppConfig):
         checks.register(check_field_encryption_keys, checks.Tags.security)
         checks.register(check_encrypted_data, checks.Tags.database)
         checks.register(check_feature_flag_settings)
+        checks.register(check_avif_support)

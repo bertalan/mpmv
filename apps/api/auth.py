@@ -9,7 +9,10 @@ The client IP comes from `apps.core.http.client_ip`: the trusted reverse proxy's
 
 Once the key is accepted, the call is counted against the key's rate limit (CORE.12,
 `services.count_api_call`); over the limit the answer is a 429 problem with `Retry-After`.
-Refused keys (401/403) are not counted: they never reach an operation.
+Refused keys (401/403) are not counted there: they never reach an operation.
+
+Refused keys are limited per client IP instead (CORE.20): `refused_key_block` runs before the
+key is read and answers 429 to an IP that got too many 401s; `note_refusal` counts each 401.
 """
 
 import functools
@@ -20,11 +23,18 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 
 from apps.core.http import client_ip
 
-from .engine import RateDecision, bearer_challenge, is_write
+from .engine import AuthStatus, RateDecision, bearer_challenge, is_write
 from .models import ApiClient
 from .problems import auth_problem, rate_limit_problem
 from .responses import problem_response
-from .services import AuthResult, authenticate, count_api_call
+from .services import (
+    AuthResult,
+    authenticate,
+    count_api_call,
+    record_refused_key,
+    refused_key_policy_from_settings,
+    refused_key_retry_after,
+)
 
 REALM = "api"
 _REQUEST_ATTR = "api_client"
@@ -38,6 +48,25 @@ def authenticate_request(request: HttpRequest, required_scope: str | None) -> Au
         required_scope=required_scope,
         write=request.method is None or is_write(request.method),
     )
+
+
+def refused_key_block(request: HttpRequest) -> RateDecision | None:
+    """A 429 decision when the client IP is blocked for refused keys (CORE.20), else None.
+
+    Call it before `authenticate_request`: a blocked IP gets no key lookup at all.
+    """
+    retry_after = refused_key_retry_after(client_ip(request))
+    if not retry_after:
+        return None
+    limit = refused_key_policy_from_settings().rate.limit
+    return RateDecision(allowed=False, limit=limit, remaining=0, retry_after=retry_after)
+
+
+def note_refusal(request: HttpRequest, result: AuthResult) -> None:
+    """Count a 401 answer against the client IP (CORE.20); 403 answers a valid key and does
+    not count."""
+    if result.decision.status is AuthStatus.UNAUTHENTICATED:
+        record_refused_key(client_ip(request))
 
 
 def denial_response(
@@ -92,8 +121,12 @@ def require_api_key[**P](
     ) -> Callable[Concatenate[HttpRequest, P], HttpResponse]:
         @functools.wraps(view)
         def wrapped(request: HttpRequest, /, *args: P.args, **kwargs: P.kwargs) -> HttpResponse:
+            blocked = refused_key_block(request)
+            if blocked is not None:
+                return rate_limited_response(request, blocked)
             result = authenticate_request(request, scope)
             if not result.ok:
+                note_refusal(request, result)
                 return denial_response(request, result, scope)
             remember_client(request, result.client)
             limited = rate_limit(api_client_of(request), scope)

@@ -1,0 +1,44 @@
+{% extends "admin/base_site.html" %}
+{% load admin_urls %}
+{% comment %}VEN.24: staff send or regenerate the claim link, to the legal email or the PEC.{% endcomment %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Home</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; <a href="{{ change_url }}">{{ original }}</a>
+  &rsaquo; Claim link
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <p>
+    The link goes to the legal email of record, or to the PEC address on file if you pick it.
+    A new link invalidates the one sent before. After a rejected claim this starts a new claim;
+    the audit log references the reject.
+  </p>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <p class="errornote">The claim link was not sent.</p>
+      {{ form.non_field_errors }}
+    {% endif %}
+    <fieldset class="module aligned">
+      <div class="form-row{% if form.channel.errors %} errors{% endif %}">
+        {{ form.channel.errors }}
+        <div class="flex-container">
+          <label class="required">{{ form.channel.label }}:</label>
+          {{ form.channel }}
+        </div>
+      </div>
+    </fieldset>
+    <div class="submit-row">
+      <input type="submit" value="Send the claim link" class="default">
+      <a href="{{ change_url }}" class="closelink">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
