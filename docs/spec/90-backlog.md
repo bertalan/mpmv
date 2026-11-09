@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **242** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **1994 h** (P1 1620 h · P2 356 h · P3 18 h)
+- Micro-tasks: **243** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **2000 h** (P1 1626 h · P2 356 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -24,7 +24,7 @@
 | PAY | Payments (Stripe Connect) | 4 | 40 | 0 | 0 | 40 |
 | ING | Supplier import and pipelines | 13 | 92 | 26 | 0 | 118 |
 | I18N | Multilingual | 9 | 50 | 6 | 0 | 56 |
-| CMS | Wagtail content | 9 | 52 | 10 | 0 | 62 |
+| CMS | Wagtail content | 10 | 58 | 10 | 0 | 68 |
 | EVT | Events, feeds and maps | 17 | 111 | 12 | 0 | 123 |
 | THM | Frontend themes | 11 | 70 | 12 | 0 | 82 |
 | SEO | SEO, feeds, analytics | 7 | 38 | 14 | 0 | 52 |
@@ -33,7 +33,7 @@
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 6 | 19 | 23 | 0 | 42 |
 | MIG | Migration and cutover | 11 | 114 | 0 | 0 | 114 |
-| **Total** | | **242** | **1620** | **356** | **18** | **1994** |
+| **Total** | | **243** | **1626** | **356** | **18** | **2000** |
 
 ## By phase
 
@@ -210,7 +210,7 @@
 | CMP.24 | Approval of (L) legal wording: per text and language a version hash, draft author (person or agent) and counsel approval (approver name or role, date, approved hash) for gettext keys with an `(L)` context and database texts; release check and production system check refuse unapproved texts; STAGE shows a pending marker; approvals audited | P1 | 6 | I18N.7, ARC.16, SEC.4 | Changing an approved (L) text in any language makes the release check fail until a new approval matches its hash; production refuses to start with an unapproved text; STAGE shows the marker; each approval is in the audit log |
 | CMP.25 | Activation gate for platform duties (coherence check 5): an `activation` purpose in `LegalFieldRequirement` seeded with the DSA article 30 trader data (name, address, telephone, email, trade register entry where registered), the article 30(1)(e) self-certification recorded as an append-only acceptance with text hash, both checked by the VEN.5 activation next to the CMP.13 gate; DAC7 data still blocks payouts only; CMP.11 keeps the checks, display on offers and EPR | P1 | 4 | VEN.5, VEN.12, CMP.13 | An EU vendor missing its telephone, its trade register entry (when registered) or the self-certification cannot be activated and gets the reason; a complete vendor is activated; missing DAC7 data does not block activation; the self-certification row stores version, language and hash |
 
-### F4 — Content, SEO, feeds (31 tasks, 213 h)
+### F4 — Content, SEO, feeds (32 tasks, 219 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -221,6 +221,7 @@
 | CMS.8 | Image source, licence and credit: custom Wagtail image model `MediaImage` in `core` with licence, source, author, credit and permission fields, staff-editable `ImageLicence` allow list seeded per §10.2, upload validation in admin and services, `image_credit` component and per-page image credits disclosure, review list for migrated images without metadata; works with local storage, ARC.15 later moves only the storage backend | P1 | 5 | CMS.1 | An upload without licence or author is refused; an NC licence cannot be added to the allow list; a CC BY image shows its credit in the caption, a CC BY hero in the page credits disclosure; a CC0 image shows none; `WAGTAILIMAGES_IMAGE_MODEL` points to `MediaImage` before CAT.4 |
 | CMS.9 | Launch countdown StreamField block: fields per §10.2, `countdown_state` pure function, server-rendered absolute date and expired state, page cache capped at the target, CSP-safe ES module with visitor time zone, minute updates and pause button, single polite announcement at expiry | P1 | 4 | CMS.2, THM.4 | Without JavaScript the block shows the absolute date and the CTA; with it the remaining time updates once a minute in the visitor's time zone and the pause button stops it; after the target the server and the module both show the expired text and link; no `aria-live` on the counter; no CSP violation and no axe violation on a page with the block |
 | CMS.10 | Product grid block (StreamField): products by category, term, brand or vendor, using the CAT.8 listing query | P1 | 3 | CMS.2, CAT.8 | An editor places a product grid filtered by a term on a page and it renders the CAT.8 results |
+| CMS.11 | Reusable product card block on every page type (owner decision 2026-11-09): one `product_cards` StreamField block (one or more chosen products, optional heading, layout grid or row) offered in the home, standard, landing and blog bodies through a shared block registry; shows published products in the page language only, the live VAT-inclusive price from the TAX.12 adapter (no price for `on_request` and `catalog_only`), hides a retired product, adds the products to the page's SEO.7 `ItemList`; migration of the existing page bodies | P1 | 6 | CMS.3, CAT.8, TAX.12 | The same block works on all four page types; a retired or unpublished product disappears from every page without editing it; an `on_request` product shows no price; the page graph lists the cards in an `ItemList` |
 | EVT.1 | `events` app: `EventIndexPage` and `EventPage` page types on the CMS.1 conventions (structured fields, attendance, venue and address, latitude and longitude with geocoding metadata, StreamField body from the CMS.2 library, ParentalManyToMany links, vendor-scoped page manager, denormalised `status` with its sync function, `original_locale`, synchronised and translatable fields), an `EventIndexPage` in every enabled locale, `VendorEventPolicy`, `EventSettings`; `"events.EventIndexPage"` in the home page's subpage types; import-linter layer between `cart` and `catalog`, `apps.events` forbidden for `tax`, `shipping`, `cart` and `orders`; factories | P1 | 9 | CMS.2, CMS.8, CORE.3, CAT.2, I18N.3 | Constraints tested (end after start, one of COUNT or UNTIL, no `closure` type, regression case 19); vendor A cannot see vendor B's draft page (cross-tenant fixture); a test import of `apps.events` from `apps.shipping` or `apps.cart` fails `make check`; an IT page translates to EN with dates synchronised |
 | EVT.2 | Recurrence engine in `events/engine.py`: RRULE subset validator, `expand` in the event's zone with DST handling, exdates, all-day spans, horizon and limit | P1 | 8 | EVT.1 | Regression cases 5–8 green (DST end 2026-10-25 and start 2027-03-28, non-existent and ambiguous local times, "every August", refused parts) |
 | EVT.3 | Services and moderation: `save_event_draft` through revisions, `submit_event`, hide, restore, cancel, vendor policy, with dry-run `ChangeSet` and `AuditLog`; "Event review" workflow with a `GroupApprovalTask`, `get_workflow()` driven by `needs_review` and the configurable threshold; signal handlers for approval, changes requested and status sync; `sequence` bump rule; same-vendor link and vendor-safe block validation | P1 | 10 | EVT.2, ARC.6 | Regression cases 1–4 green; every mutation writes one audit entry and `dry_run` writes no revision; `sequence` grows on a date change and stays on a no-op publish; a hide without a reason is refused; a hidden page cannot be resubmitted by the vendor |
