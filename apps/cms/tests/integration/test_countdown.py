@@ -242,7 +242,11 @@ def test_a_logged_in_page_without_a_lifetime_gets_none(seeded: SeedReport, clien
     page.save_revision().publish()
     client.force_login(UserFactory.create())
     response = client.get(page.url)
-    assert get_max_age(response) is None
+    # The countdown adds no lifetime; SEC.5's PrivateCacheForSignedInUsersMiddleware then marks
+    # the page never-cache (max-age=0, private).
+    assert get_max_age(response) == 0
+    assert "private" in response["Cache-Control"]
+    assert "s-maxage" not in response["Cache-Control"]
 
 
 def test_the_cta_and_the_expired_link_default_to_the_category_or_the_product(
