@@ -65,7 +65,7 @@ def _about(code: str = "en") -> StandardPage:
     return about
 
 
-def _html(path: str) -> BeautifulSoup:
+def _html(path: str) -> Any:  # BeautifulSoup, untyped lookups
     response = Client().get(path)
     assert response.status_code == 200, (path, response.status_code)
     return BeautifulSoup(response.content, "html.parser")
@@ -346,7 +346,7 @@ def test_the_preview_renders_the_editorial_and_the_products(
     page = term_landing(maker, publish=False)
     response = page.make_preview_request()
     assert response.status_code == 200
-    html = BeautifulSoup(response.content, "html.parser")
+    html: Any = BeautifulSoup(response.content, "html.parser")
     assert "Everything about the maker." in html.get_text()
     assert "Steel bag" in html.get_text()
 
