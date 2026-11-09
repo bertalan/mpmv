@@ -527,7 +527,7 @@ def test_the_slot_is_released_on_every_exception_path(monkeypatch: pytest.Monkey
             with monkeypatch.context() as patch:
                 patch.setattr(uploads, target, failure)
                 with pytest.raises(error):  # a refusal or an unexpected error while decoding
-                    check(_png((50, 50)), "square.png", QUICK)  # type: ignore[operator]
+                    check(_png((50, 50)), "square.png", QUICK)
             assert _slot_is_free()
     with pytest.raises(RuntimeError), decode_slot(0.01):
         raise RuntimeError("inside the slot")
