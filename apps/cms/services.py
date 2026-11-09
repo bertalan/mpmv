@@ -532,6 +532,26 @@ def article_snapshot(post: BlogPostPage) -> dict[str, Any]:
     }
 
 
+def _blog_author(name: str, locale: Locale, changes: ChangeSet) -> BlogAuthor:
+    """The author `name` of `locale`. Missing there, it is made a translation of the same author
+    in another language (bio and alt text copied until translated), or created with no bio."""
+    author: BlogAuthor | None = BlogAuthor.objects.filter(name=name, locale=locale).first()
+    if author is not None:
+        return author
+    source: BlogAuthor | None = BlogAuthor.objects.filter(name=name).order_by("pk").first()
+    if source is not None:
+        author = source.copy_for_translation(locale)
+        author.save()
+    else:
+        author = BlogAuthor.objects.create(name=name, locale=locale)
+    changes.create(
+        "cms.blogauthor",
+        f"{locale.language_code}:{author.slug}",
+        {"name": author.name, "slug": author.slug, "language_code": locale.language_code},
+    )
+    return author
+
+
 def import_article(
     index: BlogIndexPage,
     article: ArticleData,
@@ -543,7 +563,9 @@ def import_article(
 
     With a go-live in the future the article is scheduled, not live, as when an editor
     schedules it; the `cms.publish_scheduled` job publishes it on time. The author is the
-    `BlogAuthor` of that name, created when missing. An article whose slug the blog already has
+    `BlogAuthor` of that name in the blog's language: missing there, it becomes a translation
+    of the same author in another language, or a new author without bio or photo, which editors
+    add in the admin. An article whose slug the blog already has
     is left alone (an empty ChangeSet), so a migration can run again. Raises ValidationError
     for an invalid schedule or page.
 
@@ -557,11 +579,7 @@ def import_article(
         return ChangeSet()
 
     def work(changes: ChangeSet) -> None:
-        author = None
-        if article.author:
-            author, created = BlogAuthor.objects.get_or_create(name=article.author)
-            if created:
-                changes.create("cms.blogauthor", author.name, {"name": author.name})
+        author = _blog_author(article.author, index.locale, changes) if article.author else None
         post = BlogPostPage(
             title=article.title,
             slug=article.slug,

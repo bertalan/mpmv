@@ -240,8 +240,12 @@ class BlogAuthorFactory(DjangoModelFactory[BlogAuthor]):
         django_get_or_create = ("name", "locale")
 
     name = factory.Sequence(lambda n: f"Author {n}")
-    locale = factory.LazyFunction(Locale.get_default)
     bio = "<p>Writes about the workshops.</p>"
+
+    @classmethod
+    def _create(cls, model_class: type[BlogAuthor], *args: Any, **kwargs: Any) -> Any:
+        kwargs.setdefault("locale", Locale.get_default())
+        return super()._create(model_class, *args, **kwargs)
 
 
 class BlogIndexPageFactory(_InTree, DjangoModelFactory[BlogIndexPage]):

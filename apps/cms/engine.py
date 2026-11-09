@@ -16,14 +16,18 @@ Featured cards (CMS.2, spec 10 §10.2, spec 03 "URLs"): the URLs of the term and
 
 Product grid (CMS.10, spec 10 §10.2): how many products a grid shows.
 
-Blog (CMS.3, spec 10 §10.2): an article's schedule, Wagtail's `go_live_at` and `expire_at`.
+Blog (CMS.3, spec 10 §10.2): an article's schedule, Wagtail's `go_live_at` and `expire_at`, and
+the schema.org data of articles and author pages (Person, ProfilePage, BlogPosting).
 """
 
 import datetime as dt
 import json
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from html import unescape
 from typing import Any
+
+from django.utils.html import strip_tags
 
 NEUTRAL = ""  # the `language` of an image shown in every language without dedicated images
 
@@ -151,3 +155,77 @@ def schedule_problem(
     if go_live_at is not None and expire_at <= go_live_at:
         return EXPIRY_NOT_AFTER_GO_LIVE
     return None
+
+
+# --- Blog structured data (CMS.3, owner answers on PR #156)
+
+SCHEMA_ORG = "https://schema.org"
+
+
+def plain_text(html: str) -> str:
+    """Rich text as one line of plain text, for a structured-data description."""
+    return " ".join(unescape(strip_tags(html)).split())
+
+
+def person_jsonld(
+    *,
+    person_id: str,
+    name: str,
+    url: str,
+    image: str = "",
+    description: str = "",
+    same_as: Sequence[str] = (),
+    job_title: str = "",
+) -> dict[str, Any]:
+    """schema.org Person of a blog author. `person_id` is stable (the author page URL plus
+    `#person`) so every BlogPosting can point at it; the empty fields are left out."""
+    data: dict[str, Any] = {"@type": "Person", "@id": person_id, "name": name, "url": url}
+    optional = {
+        "image": image,
+        "description": description,
+        "sameAs": list(same_as),
+        "jobTitle": job_title,
+    }
+    data.update({key: value for key, value in optional.items() if value})
+    return data
+
+
+def profile_page_jsonld(*, url: str, person: Mapping[str, Any], language: str) -> dict[str, Any]:
+    """schema.org ProfilePage of an author page: its main entity is the author's Person."""
+    return {
+        "@context": SCHEMA_ORG,
+        "@type": "ProfilePage",
+        "url": url,
+        "inLanguage": language,
+        "mainEntity": dict(person),
+    }
+
+
+def blog_posting_jsonld(
+    *,
+    url: str,
+    headline: str,
+    date_published: dt.date,
+    language: str,
+    author_id: str = "",
+    author_name: str = "",
+    description: str = "",
+    image: str = "",
+) -> dict[str, Any]:
+    """schema.org BlogPosting of an article; its `author` points at the author's Person `@id`."""
+    data: dict[str, Any] = {
+        "@context": SCHEMA_ORG,
+        "@type": "BlogPosting",
+        "headline": headline,
+        "datePublished": date_published.isoformat(),
+        "url": url,
+        "mainEntityOfPage": url,
+        "inLanguage": language,
+    }
+    if author_id:
+        data["author"] = {"@type": "Person", "@id": author_id, "name": author_name}
+    if description:
+        data["description"] = description
+    if image:
+        data["image"] = image
+    return data

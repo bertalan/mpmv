@@ -7,7 +7,7 @@ they get no URL, no menu item and no admin link.
 
 The term and vendor choosers of the page cards (CMS.2) and the category and brand choosers of
 the product grid (CMS.10) and the product chooser of the blog cards (CMS.3) are admin viewsets
-(`choosers`). Blog authors (CMS.3) are snippets.
+(`choosers`). Blog authors (CMS.3) are translatable snippets.
 
 Documents are installed only for wagtail-localize (I18N.3): their menu item is hidden.
 
@@ -53,7 +53,7 @@ register_snippet(NavigationMenuViewSet)
 
 
 class BlogAuthorViewSet(SnippetViewSet):  # type: ignore[misc]
-    """The blog's authors (CMS.3): a byline, not a user account."""
+    """The blog's authors (CMS.3): a byline with bio and photo, not a user account."""
 
     model = BlogAuthor
     icon = "user"

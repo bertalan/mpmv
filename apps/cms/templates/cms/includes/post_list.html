@@ -1,0 +1,14 @@
+{% load wagtailcore_tags %}{% comment %}
+A page of blog articles (CMS.3), one `<article>` each with its date, author and summary, then the
+base theme's pagination. Context: `posts` (a paginator page), `blog`, `request`, `previous_url`,
+`next_url` and `empty` (the text when there are none).
+{% endcomment %}{% for post in posts %}
+  <article class="post-summary">
+    <h2><a href="{% pageurl post %}">{{ post.title }}</a></h2>
+    {% include "cms/includes/article_meta.html" with post=post blog=blog request=request only %}
+    {% if post.summary %}<p>{{ post.summary }}</p>{% endif %}
+  </article>
+{% empty %}
+  <p>{{ empty }}</p>
+{% endfor %}
+{% include "components/pagination.html" with page=posts.number page_count=posts.paginator.num_pages previous_url=previous_url next_url=next_url only %}

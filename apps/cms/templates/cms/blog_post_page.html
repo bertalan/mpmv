@@ -1,13 +1,15 @@
 {% extends "layouts/content.html" %}
-{% load wagtailcore_tags wagtailimages_tags image_credits %}
+{% load wagtailcore_tags wagtailimages_tags image_credits cms_tags %}
 {% comment %}
 Blog article (CMS.3): title, date and author, the main image and the body. The featured links
-of the body also show product cards.
+of the body also show product cards. The head carries the BlogPosting, its author pointing at
+the Person of the author page.
 {% endcomment %}
+{% block head %}{% jsonld_script jsonld %}{% endblock %}
 {% block page_content %}
   <article>
     <h1>{{ page.title }}</h1>
-    {% include "cms/includes/article_meta.html" with post=page only %}
+    {% include "cms/includes/article_meta.html" with post=page blog=blog request=request only %}
     {% if page.image %}
       {% image_credit_of page.image as credit %}
       <figure>

@@ -7,14 +7,6 @@ Blog index (CMS.3): the live articles of this language, newest first, twelve per
 {% block page_content %}
   <h1>{{ page.title }}</h1>
   {% if page.intro %}{{ page.intro|richtext }}{% endif %}
-  {% for post in posts %}
-    <article class="post-summary">
-      <h2><a href="{% pageurl post %}">{{ post.title }}</a></h2>
-      {% include "cms/includes/article_meta.html" with post=post only %}
-      {% if post.summary %}<p>{{ post.summary }}</p>{% endif %}
-    </article>
-  {% empty %}
-    <p>{% translate "No articles have been published yet." %}</p>
-  {% endfor %}
-  {% include "components/pagination.html" with page=posts.number page_count=posts.paginator.num_pages previous_url=previous_url next_url=next_url only %}
+  {% translate "No articles have been published yet." as empty %}
+  {% include "cms/includes/post_list.html" with empty=empty %}
 {% endblock %}

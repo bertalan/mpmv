@@ -1,7 +1,8 @@
 """E2E (CMS.3): the blog index and a migrated article, and an editor adding an article.
 
 Done when: "Migrated article published". An article created by `import_article` with its legacy
-date and author is listed on the blog and readable under the strict CSP (SEC.1); an editor adds
+date and author is listed on the blog and readable under the strict CSP (SEC.1), and its byline
+leads to the author's page with bio, photo and articles; an editor adds
 an article in the Wagtail admin and picks its author in the snippet chooser.
 """
 

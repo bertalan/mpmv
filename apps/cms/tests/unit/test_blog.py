@@ -22,7 +22,13 @@ from apps.cms.blocks import (
     TermCardBlock,
     VendorCardBlock,
 )
-from apps.cms.engine import schedule_problem
+from apps.cms.engine import (
+    blog_posting_jsonld,
+    person_jsonld,
+    plain_text,
+    profile_page_jsonld,
+    schedule_problem,
+)
 from apps.cms.models import BlogAuthor, BlogIndexPage, BlogPostPage, HomePage
 
 NOW = dt.datetime(2026, 11, 9, 12, 0, tzinfo=dt.UTC)
@@ -113,5 +119,96 @@ def test_the_bio_and_alt_text_are_translated_the_name_and_slug_are_not() -> None
 
 def test_the_blog_index_serves_an_author_page() -> None:
     assert issubclass(BlogIndexPage, RoutablePageMixin)
-    index = BlogIndexPage(slug="blog")
-    assert index.reverse_subpage("author", args=["ada-example"]) == "author/ada-example/"
+    resolver = BlogIndexPage.get_resolver()
+    assert resolver.reverse("author", "ada-example") == "author/ada-example/"
+
+
+# --- Author structured data (owner answers of 2026-11-09 on PR #156)
+
+
+def test_an_author_has_profile_links_and_a_translated_job_title() -> None:
+    names = {field.name for field in BlogAuthor._meta.get_fields()}
+    assert {"same_as", "job_title"} <= names
+    fields = {field.field_name: field for field in get_translatable_fields(BlogAuthor)}
+    assert isinstance(fields["same_as"], SynchronizedField)
+    assert isinstance(fields["job_title"], TranslatableField)
+
+
+PERSON_ID = "https://shop.example/blog/author/ada-example/#person"
+
+
+def test_the_person_has_a_stable_id_and_only_the_fields_that_are_set() -> None:
+    person = person_jsonld(
+        person_id=PERSON_ID,
+        name="Ada Example",
+        url="https://shop.example/blog/author/ada-example/",
+    )
+    assert person == {
+        "@type": "Person",
+        "@id": PERSON_ID,
+        "name": "Ada Example",
+        "url": "https://shop.example/blog/author/ada-example/",
+    }
+
+
+def test_the_person_carries_image_bio_profiles_and_job_title() -> None:
+    person = person_jsonld(
+        person_id=PERSON_ID,
+        name="Ada Example",
+        url="https://shop.example/blog/author/ada-example/",
+        image="https://shop.example/media/ada.png",
+        description="Ada throws bowls.",
+        same_as=["https://social.example/ada"],
+        job_title="Potter",
+    )
+    assert person["image"] == "https://shop.example/media/ada.png"
+    assert person["description"] == "Ada throws bowls."
+    assert person["sameAs"] == ["https://social.example/ada"]
+    assert person["jobTitle"] == "Potter"
+
+
+def test_the_profile_page_has_the_person_as_main_entity() -> None:
+    person = person_jsonld(person_id=PERSON_ID, name="Ada Example", url="https://x.example/a/")
+    data = profile_page_jsonld(url="https://x.example/a/", person=person, language="it")
+    assert data["@context"] == "https://schema.org"
+    assert data["@type"] == "ProfilePage"
+    assert data["url"] == "https://x.example/a/"
+    assert data["inLanguage"] == "it"
+    assert data["mainEntity"] == person
+
+
+def test_a_blog_posting_points_its_author_to_the_person_id() -> None:
+    data = blog_posting_jsonld(
+        url="https://x.example/blog/spring/",
+        headline="Spring news",
+        date_published=dt.date(2025, 6, 1),
+        language="en",
+        author_id=PERSON_ID,
+        author_name="Ada Example",
+        description="Bowls and more.",
+        image="https://x.example/media/spring.png",
+    )
+    assert data["@context"] == "https://schema.org"
+    assert data["@type"] == "BlogPosting"
+    assert data["headline"] == "Spring news"
+    assert data["datePublished"] == "2025-06-01"
+    assert data["inLanguage"] == "en"
+    assert data["mainEntityOfPage"] == "https://x.example/blog/spring/"
+    assert data["author"] == {"@type": "Person", "@id": PERSON_ID, "name": "Ada Example"}
+    assert data["description"] == "Bowls and more."
+    assert data["image"] == "https://x.example/media/spring.png"
+
+
+def test_a_blog_posting_without_author_has_none() -> None:
+    data = blog_posting_jsonld(
+        url="https://x.example/b/", headline="T", date_published=dt.date(2025, 1, 1), language="en"
+    )
+    assert "author" not in data
+    assert "image" not in data
+    assert "description" not in data
+
+
+def test_a_bio_becomes_plain_text_for_the_description() -> None:
+    assert plain_text("<p>Ada throws <b>bowls</b> &amp; cups.</p>\n<p>Since 1990.</p>") == (
+        "Ada throws bowls & cups. Since 1990."
+    )

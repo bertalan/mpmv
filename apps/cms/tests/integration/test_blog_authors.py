@@ -8,6 +8,8 @@ on articles and in the lists links to it.
 """
 
 import datetime as dt
+import json
+from typing import Any
 
 import pytest
 from bs4 import BeautifulSoup
@@ -201,6 +203,117 @@ def test_the_import_reuses_an_author_of_another_language_as_its_translation(
     assert it_ada is not None
     assert it_ada.locale.language_code == "it"
     assert it_ada.translation_key == ada.translation_key
-    assert it_ada.bio == ada.bio  # the source bio until translated
+    assert it_ada.bio == ada.bio  # stored until translated, but not shown (owner answer)
     assert [c.model for c in changes.changes] == ["cms.blogauthor", "cms.blogpostpage"]
     assert _titles(_html("/it/blog/author/ada-example/")) == ["Una visita"]
+    it_page = _html("/it/blog/author/ada-example/")
+    assert it_page.find("b", string="bowls") is None  # never the English bio in Italian
+
+
+def test_an_author_of_another_language_shows_no_bio(seeded: SeedReport, ada: BlogAuthor) -> None:
+    it_blog: BlogIndexPage = BlogIndexPageFactory.create(
+        parent=HomePage.objects.get(locale__language_code="it")
+    )
+    BlogPostPageFactory.create(parent=it_blog, title="Una visita", author=ada)
+
+    page = _html("/it/blog/author/ada-example/")
+    assert page.find("b", string="bowls") is None
+    assert _titles(page) == ["Una visita"]
+    assert "description" not in _jsonld(page, "ProfilePage")["mainEntity"]
+
+
+# --- Structured data (owner answers of 2026-11-09): Person, ProfilePage, BlogPosting
+
+
+def _jsonld(page: BeautifulSoup, kind: str) -> dict[str, Any]:
+    found = [
+        json.loads(script.string or "")
+        for script in page.find_all("script", attrs={"type": "application/ld+json"})
+    ]
+    matching = [data for data in found if data.get("@type") == kind]
+    assert len(matching) == 1, found
+    data: dict[str, Any] = matching[0]
+    assert data["@context"] == "https://schema.org"
+    return data
+
+
+def _person_id(blog: BlogIndexPage) -> str:
+    return f"{blog.get_full_url()}author/ada-example/#person"
+
+
+@pytest.fixture
+def profiled_ada(ada: BlogAuthor) -> BlogAuthor:
+    ada.photo = MediaImageFactory.create(file__filename="ada-portrait.png")
+    ada.photo_alt_text = "Ada at the wheel"
+    ada.job_title = "Potter"
+    ada.same_as = [("url", "https://social.example/ada"), ("url", "https://code.example/ada")]
+    ada.save()
+    return ada
+
+
+def test_the_author_page_is_a_profile_page_of_the_person(
+    blog: BlogIndexPage, profiled_ada: BlogAuthor
+) -> None:
+    data = _jsonld(_html("/blog/author/ada-example/"), "ProfilePage")
+    author_url = f"{blog.get_full_url()}author/ada-example/"
+    assert data["url"] == author_url
+    assert data["inLanguage"] == "en"
+    person = data["mainEntity"]
+    assert person["@type"] == "Person"
+    assert person["@id"] == _person_id(blog)
+    assert person["name"] == "Ada Example"
+    assert person["url"] == author_url
+    assert person["description"] == "Ada throws bowls on the wheel."
+    assert person["jobTitle"] == "Potter"
+    assert person["sameAs"] == ["https://social.example/ada", "https://code.example/ada"]
+    assert person["image"].startswith("http")
+    assert "ada-portrait" in person["image"]
+
+
+def test_an_article_points_its_author_to_the_person(
+    blog: BlogIndexPage, profiled_ada: BlogAuthor
+) -> None:
+    post = BlogPostPageFactory.create(
+        parent=blog,
+        title="Spring news",
+        author=profiled_ada,
+        date=dt.date(2025, 6, 1),
+        summary="Bowls & cups.",
+    )
+
+    data = _jsonld(_html(post.url), "BlogPosting")
+    assert data["headline"] == "Spring news"
+    assert data["datePublished"] == "2025-06-01"
+    assert data["url"] == post.get_full_url()
+    assert data["description"] == "Bowls & cups."
+    assert data["author"]["@id"] == _person_id(blog)
+
+
+def test_an_article_without_author_has_no_author_in_its_data(blog: BlogIndexPage) -> None:
+    post = BlogPostPageFactory.create(parent=blog, title="Anonymous", author=None)
+    assert "author" not in _jsonld(_html(post.url), "BlogPosting")
+
+
+def test_the_person_speaks_the_page_language(blog: BlogIndexPage, profiled_ada: BlogAuthor) -> None:
+    post = BlogPostPageFactory.create(parent=blog, title="Spring news", author=profiled_ada)
+    translate_page(blog, ["it"])
+    translate_page(post, ["it"])
+    it_blog = BlogIndexPage.objects.get(translation_key=blog.translation_key, locale=_locale("it"))
+    it_ada = BlogAuthor.objects.get(
+        translation_key=profiled_ada.translation_key, locale=_locale("it")
+    )
+
+    untranslated = _jsonld(_html("/it/blog/author/ada-example/"), "ProfilePage")["mainEntity"]
+    assert "description" not in untranslated  # the English bio is not shown in Italian
+    assert "jobTitle" not in untranslated
+    assert untranslated["@id"] == _person_id(it_blog)
+    assert untranslated["sameAs"] == ["https://social.example/ada", "https://code.example/ada"]
+
+    it_ada.bio = "<p>Ada modella <i>ciotole</i>.</p>"
+    it_ada.job_title = "Ceramista"
+    it_ada.save()
+    person = _jsonld(_html("/it/blog/author/ada-example/"), "ProfilePage")["mainEntity"]
+    assert person["description"] == "Ada modella ciotole."
+    assert person["jobTitle"] == "Ceramista"
+    it_post = BlogPostPage.objects.get(translation_key=post.translation_key, locale=_locale("it"))
+    assert _jsonld(_html(it_post.url), "BlogPosting")["author"]["@id"] == _person_id(it_blog)
