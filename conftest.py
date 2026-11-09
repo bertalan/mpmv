@@ -5,11 +5,13 @@ Test data comes from factory_boy factories, reseeded before every test (ARC.12).
 """
 
 import os
+from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import factory.random
 import pytest
+from hypothesis import HealthCheck, settings
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -24,6 +26,29 @@ if TYPE_CHECKING:
 FACTORY_SEED = int(os.environ.get("MPMV_TEST_SEED", "20271"))
 
 SUITES = ("unit", "integration", "e2e")
+
+# Hypothesis profiles for every `@given` test (SEC.5). `ci` is the default: a fixed example
+# sequence, no example database and no per-example deadline, because one slow example on a
+# loaded runner would otherwise fail as `Flaky`. `HYPOTHESIS_PROFILE=dev` runs more random
+# examples locally, with a deadline to spot slow code.
+HYPOTHESIS_PROFILES = {
+    "ci": settings(
+        max_examples=30,
+        deadline=None,
+        database=None,
+        derandomize=True,
+        suppress_health_check=[HealthCheck.function_scoped_fixture, HealthCheck.too_slow],
+    ),
+    "dev": settings(
+        max_examples=200,
+        deadline=timedelta(milliseconds=5000),
+        database=None,
+        suppress_health_check=[HealthCheck.function_scoped_fixture, HealthCheck.too_slow],
+    ),
+}
+for _name, _profile in HYPOTHESIS_PROFILES.items():
+    settings.register_profile(_name, _profile)
+settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "ci"))
 
 
 def suite_for(path: Path) -> str | None:

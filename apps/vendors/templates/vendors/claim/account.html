@@ -1,0 +1,26 @@
+{% extends "layouts/account.html" %}
+{% block title %}Claim your vendor · MPMV{% endblock %}
+{% block account_content %}
+<h1>Claim {{ vendor.legal_name }}</h1>
+<p>Thank you, the business is confirmed. Now create your account: it signs in with
+<strong>{{ email }}</strong>, a password and an authenticator app.</p>
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="step" value="account">
+  {% for error in errors %}<p role="alert">{{ error }}</p>{% endfor %}
+  <p><label for="id_full_name">Full name</label>
+    <input id="id_full_name" name="full_name" value="{{ full_name }}" autocomplete="name" maxlength="150" required></p>
+  <p><label for="id_password1">Password</label>
+    <input id="id_password1" name="password1" type="password" autocomplete="new-password" required></p>
+  <p><label for="id_password2">Password again</label>
+    <input id="id_password2" name="password2" type="password" autocomplete="new-password" required></p>
+  <h2>Authenticator app</h2>
+  <p>Scan this QR code with your authenticator app, then enter the 6-digit code it shows.</p>
+  <figure>{{ qr_svg|safe }}</figure>
+  <p>Cannot scan? Enter this key: <code data-testid="totp-secret">{{ secret }}</code></p>
+  <p><label for="id_code">Authentication code</label>
+    <input id="id_code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="8" required></p>
+  <p>The platform staff review your claim before you can manage the vendor.</p>
+  <button type="submit">Submit the claim</button>
+</form>
+{% endblock %}
