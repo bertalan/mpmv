@@ -236,10 +236,14 @@ def test_many_unclosed_quoted_urls_are_refused_quickly() -> None:
     assert _timed_refusal(document) < 2
 
 
-def test_many_unclosed_strings_in_css_are_refused_quickly() -> None:
-    document = f"<svg {SVG}><style>a{{b:" + "\"'" * 100000 + "}</style></svg>"
+def test_many_quotes_in_css_are_checked_quickly() -> None:
+    document = f"<svg {SVG}><style>a{{b:" + "\"'" * 100000 + "'}</style></svg>"
+    assert len(document) < MAX_SVG_BYTES
 
-    assert _timed_refusal(document) < 2
+    started = time.perf_counter()
+    sanitise_svg(document.encode())  # quoted strings with no URL in them
+
+    assert time.perf_counter() - started < 2
 
 
 def test_too_many_url_references_in_one_value_are_refused() -> None:

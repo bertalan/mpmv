@@ -579,6 +579,19 @@ def test_moving_a_sub_collection_with_svgs_within_svg_collections_still_works(
     assert vendors.get_parent() == brands
 
 
+def test_moving_the_logos_collection_itself_keeps_its_svgs_allowed(client: Client) -> None:
+    _admin(client)
+    logo = _svg_image(SAFE_SVG)
+    logo.full_clean()
+    logo.save()
+    brand = Collection.get_first_root_node().add_child(name="Brand")
+
+    response = _move_collection(client, _logos(), brand)
+
+    assert response.status_code == 302
+    assert _logos().get_parent() == brand
+
+
 def test_renaming_a_sub_collection_with_svgs_still_works(client: Client) -> None:
     _admin(client)
     vendors = _logos().add_child(name="Vendor logos")

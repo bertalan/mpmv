@@ -36,6 +36,7 @@ urlpatterns = [
     path("media/<path:path>", serve_media, name="media"),
     path("django-admin/", admin.site.urls),
     path("admin/", include("apps.cms.admin_urls")),  # replaces Wagtail's account page (CMS.1)
+    path("admin/", include("apps.core.admin_urls")),  # collection moves keep SVG (THM.12)
     path("admin/", include(wagtailadmin_urls)),  # editors' admin (Wagtail, CMS.1)
     path("i18n/switch/", switch_language, name="switch_language"),
     path("api/v1/", include("apps.api.urls")),
