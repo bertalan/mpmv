@@ -26,6 +26,7 @@ and lives on that URL; a vendor landing page tells an active vendor's story with
 """
 
 import datetime as dt
+import uuid
 from typing import Any, ClassVar
 
 from django.core.exceptions import ValidationError
@@ -622,6 +623,10 @@ class VendorLandingPage(Page):  # type: ignore[misc]
     vendor_scope: ClassVar[str] = "vendor"
     objects = VendorLandingPageManager()
 
+    # The id the vendor area and the API show (like BaseModel's); each translation has its own,
+    # so a copy for translation gets a new one.
+    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+
     vendor = models.ForeignKey(
         "vendors.Vendor",
         verbose_name=_("vendor"),
@@ -645,6 +650,7 @@ class VendorLandingPage(Page):  # type: ignore[misc]
     ]
     parent_page_types: ClassVar[list[str]] = ["cms.HomePage", "cms.StandardPage"]
     subpage_types: ClassVar[list[str]] = []
+    exclude_fields_in_copy: ClassVar[list[str]] = ["public_id"]
     template = "cms/vendor_landing_page.html"
 
     class Meta:
