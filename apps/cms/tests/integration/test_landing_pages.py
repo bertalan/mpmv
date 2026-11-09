@@ -445,6 +445,8 @@ def test_an_editor_adds_landing_pages_with_choosers_under_the_csp(
 def test_the_factories_build_landing_pages_under_the_home(seeded: SeedReport) -> None:
     term_page = TermLandingPageFactory.create()
     vendor_page = VendorLandingPageFactory.create()
+    assert term_page.term is not None
+    assert vendor_page.vendor is not None
     assert term_page.term.taxonomy.has_landing
     assert vendor_page.vendor.status == Vendor.Status.ACTIVE
     assert term_page.get_parent().specific == _home()
