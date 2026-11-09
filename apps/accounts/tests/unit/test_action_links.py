@@ -16,6 +16,8 @@ def claims(**overrides: object) -> engine.ActionClaims:
         "version": "3",
         "now": NOW,
         "max_age": 3 * DAY,
+        "generation": 2,
+        "stamp": "stamp-a",
     }
     values.update(overrides)
     return engine.new_action_claims(**values)  # type: ignore[arg-type]
@@ -26,6 +28,11 @@ def test_new_claims_expire_after_max_age_and_carry_a_random_nonce() -> None:
     assert first.expires_at == int(NOW) + 3 * DAY
     assert first.nonce != second.nonce
     assert len(first.nonce) >= 22  # at least 128 bits
+
+
+def test_new_claims_carry_the_issue_generation_and_the_account_stamp() -> None:
+    link = claims()
+    assert (link.generation, link.stamp) == (2, "stamp-a")
 
 
 def test_versions_are_compared_as_text() -> None:
@@ -47,6 +54,11 @@ def test_claims_round_trip_through_their_payload() -> None:
         {"p": 1, "o": "doc-1", "r": "user-x", "v": "3", "n": "abc", "e": 1},
         {"p": "tests.approve", "o": "doc-1", "r": "user-x", "v": "3", "n": "abc", "e": "1"},
         {"p": "tests.approve", "o": "doc-1", "r": "user-x", "v": "3", "n": "abc", "e": True},
+        # Links issued before the generation and the account stamp existed are not accepted.
+        {"p": "tests.approve", "o": "doc-1", "r": "user-x", "v": "3", "n": "abc", "e": 1},
+        {"p": "a", "o": "b", "r": "c", "v": "3", "n": "d", "e": 1, "g": True, "a": "s"},
+        {"p": "a", "o": "b", "r": "c", "v": "3", "n": "d", "e": 1, "g": "1", "a": "s"},
+        {"p": "a", "o": "b", "r": "c", "v": "3", "n": "d", "e": 1, "g": 1, "a": 2},
     ],
 )
 def test_malformed_payloads_give_no_claims(payload: object) -> None:
@@ -80,6 +92,22 @@ def test_the_recipient_must_match_when_one_is_given() -> None:
     assert ok is None
     wrong = engine.action_link_refusal(link, now=NOW, current_version="3", recipient="user-y")
     assert wrong == engine.WRONG_RECIPIENT
+
+
+def test_a_reissued_link_revokes_the_older_one() -> None:
+    link = claims()
+    ok = engine.action_link_refusal(link, now=NOW, current_version="3", current_generation=2)
+    assert ok is None
+    older = engine.action_link_refusal(link, now=NOW, current_version="3", current_generation=3)
+    assert older == engine.REVOKED
+
+
+def test_a_changed_account_stamp_revokes_the_link() -> None:
+    link = claims()
+    ok = engine.action_link_refusal(link, now=NOW, current_version="3", current_stamp="stamp-a")
+    assert ok is None
+    reset = engine.action_link_refusal(link, now=NOW, current_version="3", current_stamp="stamp-b")
+    assert reset == engine.REVOKED
 
 
 def test_nonce_digests_are_stable_hex_and_hide_the_nonce() -> None:
