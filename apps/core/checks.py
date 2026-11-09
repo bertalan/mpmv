@@ -12,6 +12,7 @@
   the configured keys (core.E303, E304); values in clear or on an older key are warnings
   (core.W302, W301) that `manage.py rotate_field_keys` fixes.
 - Feature flags (ARC.8): every environment default names a registered flag (core.E401).
+- Image formats (THM.12): a warning when Pillow cannot encode AVIF (core.W501).
 """
 
 import ast
@@ -475,5 +476,28 @@ def check_feature_flag_settings(
             f"FEATURE_FLAGS names flags that are not registered: {', '.join(unknown)}.",
             hint=f"Fix MPMV_FEATURE_FLAGS; registered flags: {known}.",
             id="core.E401",
+        )
+    ]
+
+
+# --- Image formats (THM.12, spec 14 §14.7)
+
+
+def check_avif_support(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """Without an AVIF encoder, pictures fall back to WebP and JPEG: say so (core.W501)."""
+    from . import images
+
+    if images.avif_supported():
+        return []
+    return [
+        checks.Warning(
+            "Pillow cannot encode AVIF here: <picture> elements offer WebP and JPEG only.",
+            hint=(
+                "Install the Pillow wheel from uv.lock (it bundles libavif), or a Pillow built "
+                "against libavif."
+            ),
+            id="core.W501",
         )
     ]

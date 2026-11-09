@@ -10,7 +10,9 @@ The upload paths on main, found from every `FileField` of every installed model
 
 - images (`core.MediaImage.file`): the Wagtail admin's single upload, multiple upload (with the
   metadata completed afterwards), file replacement and the chooser's upload (page blocks, event
-  listing images), and `services.save_image` (CMS.8: imports and the vendor area);
+  listing images), and `services.save_image` (CMS.8: imports and the vendor area). Each takes
+  raster images through the raster checks and SVG logos (THM.12) through the SVG sanitiser,
+  chosen by content;
 - documents (`wagtaildocs.Document.file`): the Wagtail admin's single, multiple and chooser
   uploads.
 
@@ -20,6 +22,7 @@ tests/unit/test_quadlets.py); `assert_safe_image` checks that every stored name 
 
 import io
 import itertools
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -42,14 +45,18 @@ from apps.api.v1.api import api
 from apps.core.fields import image_limits
 from apps.core.models import ImageLicence, MediaImage
 from apps.core.services import save_image
+from apps.core.svg import sanitise_svg
 from apps.core.tests.factories import MediaImageFactory
 from tests.upload_corpus import (
+    SVG_WITH_SCRIPT,
+    UNIQUE_SUFFIX,
     Case,
     assert_safe_document,
     assert_safe_image,
     document_cases,
     image_cases,
     name_cases,
+    png,
 )
 
 pytestmark = pytest.mark.django_db
@@ -126,6 +133,8 @@ def _stored_image(image: MediaImage) -> Stored:
     stored = _read(image.file)
     assert image.file_size == len(stored.data)  # size and hash are those of the stored file
     assert image.file_hash == hash_filelike(io.BytesIO(stored.data))
+    if image.is_svg():
+        return stored  # no pixels: its width and height come from the document
     with Image.open(io.BytesIO(stored.data)) as pixels:
         assert (image.width, image.height) == pixels.size
     return stored
@@ -158,7 +167,8 @@ def admin_multiple_upload(client: Client, root: Collection, case: Case) -> Store
         _image_fields(title, root, prefix),
     )
     assert response.status_code == 200
-    assert response.json()["success"], response.json()
+    if not response.json()["success"]:  # refused in step 2 (an SVG's collection or content)
+        return None
     return _new_image(title)
 
 
@@ -232,15 +242,156 @@ def test_every_image_upload_path_refuses_or_safely_stores_the_corpus(
     assert_safe_image(stored.name, stored.data, case)
 
 
-@pytest.mark.xfail(reason="needs #151 (THM.12: sanitised SVG logos)", strict=False)
-def test_a_sanitised_svg_is_accepted_in_the_logos_collection_only(
+def test_a_refused_replacement_makes_no_rendition_from_the_refused_file(
     editor: Client, root: Collection
 ) -> None:
-    logos = Collection.objects.get(name="Logos and icons")
-    svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect/></svg>'
-    data = {**_image_fields("logo", logos), "file": SimpleUploadedFile("logo.svg", svg)}
-    editor.post(reverse("wagtailimages:add"), data)
-    assert MediaImage.objects.filter(title="logo").exists()
+    """The edit page shown again after a refused replacement previews the stored image: a
+    rendition is never made from the refused upload (which would be kept as the image's)."""
+    image = MediaImageFactory.create(collection=root, licence=_licence())
+    case = next(c for c in image_cases() if c.id == "too-wide")
+    data = {**_image_fields(image.title, root), "file": _upload(case)}
+
+    response = editor.post(reverse("wagtailimages:edit", args=(image.pk,)), data)
+
+    assert response.status_code == 200
+    for rendition in image.renditions.all():
+        assert max(rendition.width, rendition.height) <= max(image.width, image.height)
+
+
+# --- SVG logos (THM.12 with SEC.2) ---------------------------------------------------------
+# The branch is chosen by content on every path: markup named .svg goes to the SVG sanitiser
+# (apps.core.svg) and is allowed only in an SVG collection; anything else goes to the raster
+# checks and re-encoding.
+
+LOGO_SVG = (
+    b'<?xml version="1.0"?>\n<!-- exported -->\n'
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="10" height="10">'
+    b'<!-- c --><rect width="10" height="10" fill="#0a4"/></svg>'
+)
+
+
+@pytest.fixture
+def logos() -> Collection:
+    collection: Collection = Collection.objects.get(svg_policy__isnull=False)
+    return collection
+
+
+def _logo_case(case_id: str, filename: str, data: bytes, verdict: str, why: str) -> Case:
+    return Case(case_id, filename, data, verdict, why)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("path", IMAGE_PATHS.values(), ids=IMAGE_PATHS.keys())
+def test_an_svg_logo_upload_is_sanitised_and_stored(
+    editor: Client, logos: Collection, path: ImagePath
+) -> None:
+    stored = path(editor, logos, _logo_case("svg-logo", "Logo Ä.svg", LOGO_SVG, "store", ""))
+
+    assert stored is not None
+    assert stored.data == sanitise_svg(LOGO_SVG)  # re-serialised: no comment, no declaration
+    assert b"<!--" not in stored.data
+    assert re.fullmatch(rf"original_images/logo[-_]a{UNIQUE_SUFFIX}\.svg", stored.name)
+
+
+REFUSED_IN_LOGOS = [
+    ("svg-scripted", "logo.svg", SVG_WITH_SCRIPT, "a scripted SVG, in the logos collection"),
+    ("svg-as-png", "logo.png", LOGO_SVG, "a clean SVG renamed .png"),
+    ("png-as-svg", "logo.svg", png(), "a PNG renamed .svg: checked as the PNG it is"),
+]
+
+
+@pytest.mark.parametrize(
+    ("path", "case"),
+    [
+        pytest.param(path, case, id=f"{path_id}:{case[0]}")
+        for path_id, path in IMAGE_PATHS.items()
+        for case in REFUSED_IN_LOGOS
+    ],
+)
+def test_the_logos_collection_refuses_unsafe_or_misnamed_svgs(
+    editor: Client, logos: Collection, path: ImagePath, case: tuple[str, str, bytes, str]
+) -> None:
+    case_id, filename, data, why = case
+    images_before = MediaImage.objects.count()
+
+    stored = path(editor, logos, _logo_case(case_id, filename, data, "refuse", why))
+
+    assert stored is None, f"{why}: stored as {stored and stored.name}"
+    assert MediaImage.objects.count() <= images_before + (path is admin_replace_file)
+
+
+@pytest.mark.parametrize("path", IMAGE_PATHS.values(), ids=IMAGE_PATHS.keys())
+def test_a_clean_svg_outside_an_svg_collection_is_refused(
+    editor: Client, root: Collection, path: ImagePath
+) -> None:
+    stored = path(editor, root, _logo_case("svg-root", "logo.svg", LOGO_SVG, "refuse", ""))
+
+    assert stored is None
+
+
+def test_a_png_renamed_svg_is_never_given_to_the_svg_sanitiser(
+    logos: Collection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """By content: the raster checks refuse it for its name, the sanitiser never sees it."""
+    from apps.core import fields, models
+
+    def unexpected(data: bytes) -> bytes:
+        raise AssertionError("a PNG was sent to the SVG sanitiser")
+
+    monkeypatch.setattr(fields, "sanitise_svg", unexpected)
+    monkeypatch.setattr(models, "sanitise_svg", unexpected)
+    image = MediaImage(
+        title="png as svg",
+        file=SimpleUploadedFile("logo.svg", png()),
+        collection=logos,
+        licence=_licence(),
+        author="Test author",
+    )
+
+    with pytest.raises(ValidationError) as refusal:
+        image.full_clean()
+    assert refusal.value.message_dict["file"] == ["The file name says SVG but the content is PNG."]
+    # A direct save (no clean: services, the shell) checks content only, as for every raster
+    # image: it is stored as the PNG it is, re-encoded, under a .png name.
+    image.save()
+    image.refresh_from_db()
+    assert not image.is_svg()
+    assert image.file.name.endswith(".png")
+    with Image.open(io.BytesIO(_stored_image(image).data)) as pixels:
+        assert pixels.format == "PNG"
+
+
+def test_an_svg_renamed_png_is_refused_as_an_svg(logos: Collection) -> None:
+    image = MediaImage(
+        title="svg as png",
+        file=SimpleUploadedFile("logo.png", LOGO_SVG),
+        collection=logos,
+        licence=_licence(),
+        author="Test author",
+    )
+
+    with pytest.raises(ValidationError) as refusal:
+        image.full_clean()
+    assert "must keep its .svg file name" in " ".join(refusal.value.message_dict["file"])
+    with pytest.raises(ValidationError):
+        image.save()
+    assert not MediaImage.objects.filter(title="svg as png").exists()
+
+
+def test_a_direct_save_of_an_svg_logo_stores_it_sanitised(logos: Collection) -> None:
+    image = MediaImage(
+        title="direct logo",
+        file=SimpleUploadedFile("logo.svg", LOGO_SVG),
+        collection=logos,
+        licence=_licence(),
+        author="Test author",
+    )
+
+    image.save()  # no clean(): services, the shell, imports
+
+    image.refresh_from_db()
+    stored = _stored_image(image)
+    assert stored.data == sanitise_svg(LOGO_SVG)
+    assert (image.width, image.height) == (10, 10)
 
 
 @pytest.mark.xfail(

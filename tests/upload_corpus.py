@@ -205,8 +205,6 @@ PDF = _minimal_pdf()
 
 # --- Cases ----------------------------------------------------------------------------------
 
-LOGOS_NEED_151 = "SVG logos are THM.12 (PR #151), not on main yet"
-
 
 def image_cases() -> list[Case]:
     return list(_image_cases())

@@ -18,6 +18,11 @@ Rate limit (CORE.12): `count_api_call` counts each authenticated call on a Postg
 shared by every app process (`ApiRateCounter`); limits come from the `API_RATE_LIMIT*` settings
 and, for one key, from the override staff set with `set_api_client_rate_limit` (CORE.16), which
 wins over them (precedence in `engine.limits_for`).
+
+Refused-key limit (CORE.20): `record_refused_key` logs each 401 answer per client IP bucket
+(`ApiRefusedKey`) and blocks the IP once it reaches `API_REFUSED_KEY_RATE_LIMIT` in a rolling
+window; `refused_key_retry_after` reads the block before any key lookup. The block is a
+`core.Throttle` row, purged nightly with the others.
 """
 
 import datetime as dt
@@ -29,13 +34,15 @@ from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import PermissionDenied
-from django.db import connection
+from django.db import connection, transaction
 from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
+from apps.core.models import Throttle
 from apps.core.services import run_mutation
+from apps.core.throttling import ip_bucket
 from apps.vendors import engine as vendor_engine
 from apps.vendors.engine import VendorAction
 from apps.vendors.models import Vendor
@@ -51,6 +58,7 @@ from .engine import (
     RateDecision,
     RatePolicy,
     Reason,
+    RefusedKeyPolicy,
     combine_decisions,
     deny,
     evaluate,
@@ -64,10 +72,12 @@ from .engine import (
     platform_only_scopes,
     rate_decision,
     rate_policy,
+    refused_key_policy,
+    seconds_left,
     validate_scopes,
     window_start,
 )
-from .models import ApiClient, ApiMutationLog, ApiRateCounter
+from .models import ApiClient, ApiMutationLog, ApiRateCounter, ApiRefusedKey
 
 logger = logging.getLogger(__name__)
 
@@ -469,3 +479,104 @@ def count_api_call(
                 )
             decisions.append(decision)
     return combine_decisions(decisions)
+
+
+# --- Refused-key limit per client IP (CORE.20)
+
+REFUSED_KEY_BLOCK_PREFIX = "api:refused-key:ip:"
+
+
+def refused_key_policy_from_settings() -> RefusedKeyPolicy:
+    """`API_REFUSED_KEY_RATE_LIMIT` and `API_REFUSED_KEY_BLOCK_SECONDS` (system check api.E004)."""
+    return refused_key_policy(
+        settings.API_REFUSED_KEY_RATE_LIMIT, settings.API_REFUSED_KEY_BLOCK_SECONDS
+    )
+
+
+def refused_key_retry_after(ip: str | None, *, now: dt.datetime | None = None) -> int:
+    """Seconds the IP stays blocked for refused keys; 0 when it is not blocked.
+
+    One indexed read of a `Throttle` row, made before any key lookup.
+    """
+    bucket = ip_bucket(ip)
+    if bucket is None:
+        return 0
+    now = now or timezone.now()
+    until = (
+        Throttle.objects.filter(key=REFUSED_KEY_BLOCK_PREFIX + bucket, locked_until__gt=now)
+        .values_list("locked_until", flat=True)
+        .first()
+    )
+    return seconds_left(until, now) if until is not None else 0
+
+
+def record_refused_key(ip: str | None, *, now: dt.datetime | None = None) -> bool:
+    """Count one refused-key (401) answer to `ip`; True when it starts a block.
+
+    The refusals of the IP bucket in the rolling window, this one included, are counted; the one
+    that reaches the limit blocks the bucket for the policy's block and clears its log, so the
+    IP starts afresh once the block ends. Only the bucket's own old rows are deleted here (the
+    `(ip_bucket, refused_at)` index); the other buckets' old rows go in the nightly
+    `api.purge_refused_keys`, so a flood never sweeps the whole table on each 401.
+
+    The block is started once: concurrent 401s that all count past the limit lock the same
+    `Throttle` row, and only the one that finds it unlocked starts the block and logs it, at
+    WARNING with the bucket only (no key material), for the operations dashboard (OPS.6). A
+    request without an IP is not counted.
+    """
+    bucket = ip_bucket(ip)
+    if bucket is None:
+        return False
+    now = now or timezone.now()
+    policy = refused_key_policy_from_settings()
+    since = now - dt.timedelta(seconds=policy.rate.period)
+    ApiRefusedKey.objects.filter(ip_bucket=bucket, refused_at__lte=since).delete()
+    ApiRefusedKey.objects.create(ip_bucket=bucket, refused_at=now)
+    refused = ApiRefusedKey.objects.filter(ip_bucket=bucket, refused_at__gt=since).count()
+    if refused < policy.rate.limit:
+        return False
+    if not _start_refused_key_block(bucket, refused, now=now, block=policy.block):
+        return False
+    logger.warning(
+        "API refused-key limit reached: ip=%s refused=%d window=%ds block=%ds",
+        bucket,
+        refused,
+        policy.rate.period,
+        policy.block,
+    )
+    return True
+
+
+def _start_refused_key_block(bucket: str, refused: int, *, now: dt.datetime, block: int) -> bool:
+    """Block `bucket` unless a block is already running; True when this call started it.
+
+    The `Throttle` row is created or locked (`select_for_update`), so of two concurrent callers
+    the second waits, then sees the first one's block and leaves it alone.
+    """
+    until = now + dt.timedelta(seconds=block)
+    fields = {"failures": refused, "locked_until": until, "expires_at": until}
+    with transaction.atomic():
+        row, created = Throttle.objects.select_for_update().get_or_create(
+            key=REFUSED_KEY_BLOCK_PREFIX + bucket, defaults=fields
+        )
+        if not created:
+            if row.locked_until is not None and row.locked_until > now:
+                return False
+            for name, value in fields.items():
+                setattr(row, name, value)
+            row.save(update_fields=[*fields, "updated_at"])
+        ApiRefusedKey.objects.filter(ip_bucket=bucket).delete()
+    return True
+
+
+def purge_expired_refused_keys(*, now: dt.datetime | None = None) -> int:
+    """Delete the refusals of every IP older than the window; return how many were deleted.
+
+    Run nightly by `api.purge_refused_keys`: `record_refused_key` cleans only its own bucket.
+    """
+    now = now or timezone.now()
+    period = refused_key_policy_from_settings().rate.period
+    deleted, _ = ApiRefusedKey.objects.filter(
+        refused_at__lte=now - dt.timedelta(seconds=period)
+    ).delete()
+    return deleted

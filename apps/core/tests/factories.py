@@ -1,6 +1,7 @@
 """factory_boy factories for core models (ARC.12). Synthetic values only."""
 
 import datetime as dt
+import uuid
 from typing import Any
 
 import factory
@@ -22,6 +23,7 @@ from apps.core.models import (
     OutboxEmail,
     OutboxEmailEvent,
     PlatformOperator,
+    SvgCollection,
     Throttle,
 )
 
@@ -219,6 +221,24 @@ class MediaImageFactory(DjangoModelFactory[MediaImage]):
             kwargs["collection"] = root
         image: MediaImage = model_class._default_manager.create(*args, **kwargs)
         return image
+
+
+class SvgCollectionFactory(DjangoModelFactory[SvgCollection]):
+    """A collection that accepts SVG (THM.12): a new top-level one unless `collection` is
+    given. `.build()` leaves the collection empty, as Wagtail collections live in a tree."""
+
+    class Meta:
+        model = SvgCollection
+
+    collection = None
+
+    @classmethod
+    def _create(cls, model_class: type[SvgCollection], *args: Any, **kwargs: Any) -> SvgCollection:
+        if kwargs.get("collection") is None:
+            root = Collection.get_first_root_node() or Collection.add_root(name="Root")
+            kwargs["collection"] = root.add_child(name=f"SVG collection {uuid.uuid4().hex[:8]}")
+        row: SvgCollection = model_class._default_manager.create(*args, **kwargs)
+        return row
 
 
 class MediaImageRenditionFactory(DjangoModelFactory[MediaImageRendition]):

@@ -53,6 +53,9 @@ class Migration(migrations.Migration):
     dependencies = [
         ("events", "0001_initial"),
         ("wagtailcore", "0098_apitoken"),
+        # The reverse step deletes revisions, and the delete cascades to the translation logs:
+        # the state it runs in must know their current `revision` column.
+        ("wagtail_localize", "0016_rename_page_revision_translationlog_revision"),
     ]
 
     operations = [

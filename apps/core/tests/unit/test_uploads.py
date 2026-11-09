@@ -17,14 +17,17 @@ from apps.core.uploads import (
     extension_of,
     safe_filename,
     sanitise_image,
+    upload_kind,
 )
 from tests.upload_corpus import (
+    SVG_WITH_SCRIPT,
     Case,
     assert_safe_document,
     assert_safe_image,
     document_cases,
     image_cases,
     name_cases,
+    png,
 )
 
 # The defaults decided for SEC.2 (lane-a on #164): 25 MB, 100 megapixels decoded (all frames),
@@ -532,3 +535,45 @@ def test_one_upload_peaks_at_its_decoded_size_plus_the_stored_size(
     decoded = 5000 * 5000 * 4
     print(f"peak {peak / 2**20:.0f} MiB for {decoded / 2**20:.0f} MiB decoded")
     assert peak <= 1.8 * decoded, f"peak {peak / 2**20:.0f} MiB"
+
+
+# --- SVG or raster, by content (THM.12 with SEC.2) -------------------------------------------
+
+LOGO_SVG = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><rect/></svg>'
+
+
+@pytest.mark.parametrize(
+    ("name", "data"),
+    [
+        ("logo.svg", LOGO_SVG),
+        ("LOGO.SVG", b"\xef\xbb\xbf\n  " + LOGO_SVG),  # a byte order mark and blank lines
+        ("logo.svg", SVG_WITH_SCRIPT),  # markup named .svg: the sanitiser decides
+    ],
+)
+def test_markup_named_svg_goes_to_the_svg_sanitiser(name: str, data: bytes) -> None:
+    assert upload_kind(data, name) == "svg"
+
+
+@pytest.mark.parametrize("name", ["lake.png", "lake.svg", "lake.jpg", "lake"])
+def test_a_raster_image_goes_to_the_raster_checks_whatever_its_name(name: str) -> None:
+    assert upload_kind(png(), name) == "raster"
+
+
+def test_a_png_named_svg_is_refused_by_the_raster_checks_for_its_name() -> None:
+    with pytest.raises(UploadRefused) as refusal:
+        sanitise_image(png(), "logo.svg", LIMITS)
+    assert refusal.value.code == "mismatch"
+    assert refusal.value.message == "The file name says SVG but the content is PNG."
+
+
+@pytest.mark.parametrize("name", ["logo.png", "logo.jpg", "logo", "logo.svg.png"])
+def test_an_svg_under_another_name_is_refused(name: str) -> None:
+    with pytest.raises(UploadRefused) as refusal:
+        upload_kind(LOGO_SVG, name)
+    assert refusal.value.code == "svg_misnamed"
+
+
+def test_other_markup_is_never_an_image() -> None:
+    with pytest.raises(UploadRefused) as refusal:
+        upload_kind(b"<!DOCTYPE html><html></html>", "page.png")
+    assert refusal.value.code == "invalid"

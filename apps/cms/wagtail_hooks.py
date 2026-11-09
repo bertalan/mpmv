@@ -12,6 +12,9 @@ Documents are installed only for wagtail-localize (I18N.3): their menu item is h
 
 Images (CMS.8): the chooser offers only images with their licence and author; the others are
 listed under "Images to classify" until staff classify them.
+
+Landing pages (CMS.4): the catalog's listing pages ask the `catalog_listing_editorial` hook for
+editorial content, which this app gives from its term and vendor landing pages.
 """
 
 from collections.abc import Callable
@@ -26,11 +29,14 @@ from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet
 from wagtail.users import wagtail_hooks as wagtail_users_hooks
 
+from apps.catalog.listings import EDITORIAL_HOOK, ListingEditorial
+from apps.catalog.services import ListingScope
 from apps.core.services import classified
 
 from .admin_views import can_classify_images, image_review
 from .choosers import brand_chooser, category_chooser, term_chooser, vendor_chooser
 from .models import NavigationMenu
+from .services import listing_editorial
 
 
 class NavigationMenuViewSet(SnippetViewSet):  # type: ignore[misc]  # Wagtail is untyped
@@ -108,3 +114,12 @@ def register_category_chooser() -> Any:
 @hooks.register("register_admin_viewset")  # type: ignore[untyped-decorator]
 def register_brand_chooser() -> Any:
     return brand_chooser
+
+
+@hooks.register(EDITORIAL_HOOK)  # type: ignore[untyped-decorator]
+def landing_page_editorial(
+    request: HttpRequest, scope: ListingScope, language: str
+) -> ListingEditorial | None:
+    """A term landing page on its term's listing page; the vendor story link on a storefront
+    (CMS.4)."""
+    return listing_editorial(request, scope, language)

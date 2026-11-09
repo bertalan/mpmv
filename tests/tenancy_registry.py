@@ -50,6 +50,8 @@ from apps.catalog.tests.factories import (
     VariantOptionFactory,
     VariantTranslationFactory,
 )
+from apps.cms.models import VendorLandingPage
+from apps.cms.tests.factories import VendorLandingPageFactory
 from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage, VendorEventPolicy
@@ -179,6 +181,8 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     # EVT.1: a draft event page under the primary language's events index.
     EventPage: lambda vendor: EventPageFactory.create(vendor=vendor),
     VendorEventPolicy: lambda vendor: VendorEventPolicyFactory.create(vendor=vendor),
+    # CMS.4: a vendor's story page under the primary language's home.
+    VendorLandingPage: lambda vendor: VendorLandingPageFactory.create(vendor=vendor),
     TaxRegimeChangeRequest: lambda vendor: TaxRegimeChangeRequestFactory.create(
         # A reviewed request: the vendor may already have its one pending request.
         vendor=vendor,
@@ -214,6 +218,10 @@ def member_with_landing_taxonomy(client: Client, tenants: CrossTenant) -> dict[s
 ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
     "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
+    "media": NoVendorData(
+        "Public image files (THM.12): published images and their renditions, no vendor data.",
+        kwargs={"path": "images/missing.webp"},
+    ),
     "home": NoVendorData("Public home page."),
     "catalog:category": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "product-category"}),
     "catalog:brand": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "brand"}),
@@ -257,7 +265,7 @@ ENDPOINTS: dict[str, Access] = {
     "admin:login": NoVendorData("Staff sign-in page."),
     "admin:logout": NoVendorData("Staff sign-out."),
     "admin:jsi18n": NoVendorData("Admin JavaScript translation catalog."),
-    "api-v1:api-root": NoVendorData("API root."),
+    "api-v1:api-root": NoVendorData("API root: links to the API description only."),
     "api-v1:openapi-json": NoVendorData("API description, the same for every caller."),
     "api-v1:openapi-view": NoVendorData("Interactive API documentation page."),
     "api/v1/": NoVendorData(
@@ -287,6 +295,17 @@ def _admin_model(endpoint: Endpoint) -> type[models.Model] | None:
             return model
     return None
 
+
+# Wagtail admin routes replaced by a project view on the same path, included ahead of Wagtail's
+# admin URLs, under a URL name of its own: shadowed key -> key of the view that answers instead.
+# The shadowed pattern is never reached, so it gets no request of its own; the replacement is
+# an endpoint like any other and is checked under its own key (staff only, as CMS_ADMIN).
+# A replacement keeps Wagtail's name when it can (apps.cms.admin_urls); a namespaced name cannot
+# be kept, as a second include with Wagtail's namespace would take over its reverse().
+SHADOWED: dict[str, str] = {
+    # THM.12: collection edit refuses moving a collection that holds SVGs out of the SVG tree.
+    "wagtailadmin_collections:edit": "core_collection_edit",
+}
 
 CMS_ADMIN_ROUTE = "admin/"
 CMS_ADMIN = StaffOnly(

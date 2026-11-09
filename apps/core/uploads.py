@@ -30,7 +30,10 @@ Images:
 - the stored name is rebuilt: ASCII, lowercase, no path, no second extension, no control or
   bidirectional characters, no Windows device name, the extension of the detected format.
 
-SVG is not accepted here: THM.12 adds sanitised SVG logos in one collection.
+SVG (THM.12) does not go through the raster checks: `upload_kind` sends an upload whose content
+is markup to `apps.core.svg` (sanitised and re-serialised, in an SVG collection only) and every
+other upload here. The branch comes from the content: an SVG must be named `.svg`, and a raster
+image named `.svg` is checked as the raster image it is (and refused, its name disagreeing).
 
 Documents (Wagtail documents, installed for wagtail-localize): PDF only, checked by content, with
 no second format a browser or an unzip tool would find.
@@ -43,6 +46,7 @@ import unicodedata
 import warnings
 import zipfile
 from dataclasses import dataclass
+from typing import Literal
 
 from PIL import GifImagePlugin, Image, ImageCms, JpegImagePlugin
 
@@ -138,10 +142,48 @@ def safe_filename(name: str, extension: str) -> str:
 # --- Images ----------------------------------------------------------------------------------
 
 
+SVG_EXTENSION = "svg"
+# A UTF-8 byte order mark and white space, before the first tag.
+_MARKUP_LEAD = b"\xef\xbb\xbf \t\r\n"
+_SVG_TAG = re.compile(rb"<(?:[A-Za-z_][\w.-]*:)?svg[\s>/]")
+
+
+def is_markup(data: bytes) -> bool:
+    """Whether `data` starts like an XML document (an SVG, or HTML, or anything tagged).
+
+    No raster format starts with `<`: their signatures are binary. So an upload that does is
+    never a raster image, whatever its name says.
+    """
+    return data.lstrip(_MARKUP_LEAD).startswith(b"<")
+
+
+def upload_kind(data: bytes, name: str) -> Literal["svg", "raster"]:
+    """Which checks an uploaded image goes through, from its content (THM.12 with SEC.2).
+
+    "svg": the content is markup and the name ends in `.svg` (`apps.core.svg` decides whether
+    it is a safe SVG). "raster": anything else, a raster image named `.svg` included, which the
+    raster checks refuse for its name. Markup under another name is refused here: an SVG
+    renamed `.png` must not be stored, and HTML is never an image.
+    """
+    if not is_markup(data):
+        return "raster"
+    if extension_of(name) == SVG_EXTENSION:
+        return "svg"
+    if _SVG_TAG.search(data[:4096]):
+        raise UploadRefused(
+            "svg_misnamed", "The file is an SVG: an SVG logo must keep its .svg file name."
+        )
+    raise UploadRefused("invalid", "The file is not a valid image.")
+
+
+def safe_svg_name(name: str) -> str:
+    return safe_filename(name, SVG_EXTENSION)
+
+
 def _refuse_name(name: str) -> str:
     extension = extension_of(name)
-    if extension == "svg":
-        raise UploadRefused("svg", "SVG images are not accepted here.")
+    if extension == SVG_EXTENSION:
+        return "SVG"  # the content decides: a raster image here disagrees with its name
     if extension not in IMAGE_EXTENSIONS:
         accepted = ", ".join(sorted({e.upper() for e in IMAGE_FORMATS.values()}))
         raise UploadRefused(

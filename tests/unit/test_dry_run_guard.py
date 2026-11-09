@@ -84,6 +84,14 @@ DRY_RUN_EXCEPTIONS: Final[dict[str, tuple[str, str]]] = {
         TELEMETRY,
         "records when an API key was last used",
     ),
+    "apps.api.services.record_refused_key": (
+        THROTTLE,
+        "counts one refused-key (401) answer per client IP, blocking it past the limit (CORE.20)",
+    ),
+    "apps.api.services.purge_expired_refused_keys": (
+        THROTTLE,
+        "deletes refused-key rows older than the window (CORE.20)",
+    ),
     "apps.cms.services.sync_locales": (
         MIGRATION_HOOK,
         "post-migrate handler that adds the missing Wagtail locales",

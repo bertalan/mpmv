@@ -271,13 +271,18 @@ WAGTAILIMAGES_IMAGE_MODEL = "core.MediaImage"
 # 160 MB; measured on PR #164). An animated WebP at the cap peaks at about 1 GB (libwebp keeps
 # two full canvases). Size the web workers' memory and upload concurrency for that, e.g. one
 # upload at a time per worker. CoreConfig.ready sets Pillow's bomb threshold to this cap.
-WAGTAILIMAGES_EXTENSIONS = ["avif", "gif", "jpg", "jpeg", "png", "webp"]
+# Raster formats are checked and re-encoded (apps.core.uploads); SVG is for logos and icons only,
+# in an SvgCollection, and goes through apps.core.svg instead (THM.12). The branch is chosen by
+# content, never by the extension, and the extension must agree with the content.
+WAGTAILIMAGES_EXTENSIONS = ["avif", "gif", "jpg", "jpeg", "png", "webp", "svg"]
 WAGTAILIMAGES_MAX_UPLOAD_SIZE = 25 * 1024 * 1024
 WAGTAILIMAGES_MAX_IMAGE_PIXELS = 100_000_000
 MPMV_MAX_IMAGE_SIDE = 16_000
 MPMV_MAX_STORED_IMAGE_PIXELS = 40_000_000
 MPMV_MAX_IMAGE_FRAMES = 300
-WAGTAILIMAGES_IMAGE_FORM_BASE = "apps.core.image_forms.ImageForm"
+# Safe parsing of the upload field (SEC.2) and the SVG refusal in the second step of Wagtail's
+# multiple upload (THM.12).
+WAGTAILIMAGES_IMAGE_FORM_BASE = "apps.core.forms.MediaImageForm"
 # Wagtail documents exist for wagtail-localize only (I18N.3): PDF only, checked by content.
 WAGTAILDOCS_EXTENSIONS = ["pdf"]
 WAGTAILDOCS_MAX_UPLOAD_SIZE = 10 * 1024 * 1024
@@ -286,6 +291,17 @@ WAGTAILDOCS_DOCUMENT_FORM_BASE = "apps.core.document_forms.DocumentForm"
 # with 404 (deploy/caddy/Caddyfile). Without this, the admin's document pages fail on the
 # missing `wagtaildocs_serve` route.
 WAGTAILDOCS_SERVE_METHOD = "direct"
+# Renditions without an explicit format-* go to WebP. GIF is left out: Wagtail turns a still GIF
+# into PNG and keeps an animated one as GIF, which WebP conversion would flatten to one frame.
+# Templates ask for AVIF, WebP and JPEG explicitly ({% responsive_image %}, apps.core.images).
+WAGTAILIMAGES_FORMAT_CONVERSIONS = {
+    "png": "webp",
+    "jpeg": "webp",
+    "bmp": "webp",
+    "heic": "webp",
+    "webp": "webp",
+    "avif": "avif",
+}
 # wagtail-localize (I18N.3): translations follow their source page; a translator syncs them from
 # the source page's "Sync translated pages" action.
 WAGTAIL_LOCALIZE_DEFAULT_TRANSLATION_MODE = "synced"
@@ -435,6 +451,18 @@ if _MAP_TILE_ORIGIN:
 API_RATE_LIMIT = env_str("MPMV_API_RATE_LIMIT", "") or "120/minute"
 API_RATE_LIMIT_SCOPES: dict[str, str] = {}
 API_RATE_LIMIT_CLIENTS: dict[str, str] = {}
+# Refused API keys (401) per client IP (CORE.20, apps.api.services.record_refused_key): the IP
+# (resolved behind TRUSTED_PROXIES, IPv6 by /64) may get API_REFUSED_KEY_RATE_LIMIT refused
+# answers in a rolling window; the one that reaches it blocks the IP for
+# API_REFUSED_KEY_BLOCK_SECONDS, answered 429 with Retry-After before any key lookup. Valid keys
+# never count. Set per environment with MPMV_API_REFUSED_KEY_RATE_LIMIT and
+# MPMV_API_REFUSED_KEY_BLOCK_SECONDS (system check api.E004).
+# Trade-off: the block covers the whole IP (or /64), valid keys included, so one client behind a
+# NAT shared with other API clients can keep them out; and if TRUSTED_PROXY_HEADER or
+# TRUSTED_PROXIES is wrong in production every client resolves to the proxy address, and one bad
+# client blocks the API for everyone. Check the proxy settings before going live.
+API_REFUSED_KEY_RATE_LIMIT = env_str("MPMV_API_REFUSED_KEY_RATE_LIMIT", "") or "30/minute"
+API_REFUSED_KEY_BLOCK_SECONDS = int(env_str("MPMV_API_REFUSED_KEY_BLOCK_SECONDS", "") or "300")
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"

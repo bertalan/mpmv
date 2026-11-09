@@ -16,7 +16,8 @@ from .countries import InvalidCountry, normalize_country
 from .crypto import DecryptionError
 from .encryption import configured_keyring, encryption_context
 from .i18n import language_choices
-from .uploads import ImageLimits, UploadRefused, sanitise_image
+from .svg import MAX_SVG_BYTES, UnsafeSvgError, sanitise_svg
+from .uploads import ImageLimits, UploadRefused, safe_svg_name, sanitise_image, upload_kind
 
 
 class MoneyField(models.DecimalField[Any, Any]):
@@ -222,20 +223,46 @@ class SanitisedImageFieldFile(WagtailImageFieldFile):  # type: ignore[misc]  # W
 
     def save(self, name: str, content: Any, save: bool = True) -> None:
         # The name was checked with the content in `MediaImage.clean`; here it may already be
-        # a storage rewrite (Wagtail's pending multiple uploads), so only the content counts.
+        # a storage rewrite (Wagtail's pending multiple uploads), which keeps the extension, so
+        # the content decides the branch and an SVG must still be named `.svg`.
         limits = image_limits()
+        data = read_upload(content, max(limits.max_bytes, MAX_SVG_BYTES))
         try:
-            clean = sanitise_image(
-                read_upload(content, limits.max_bytes), name or "", limits, check_name=False
-            )
+            if upload_kind(data, name or "") == "svg":
+                self._save_svg(name or "", data[: MAX_SVG_BYTES + 1])
+            else:
+                self._save_raster(name or "", data[: limits.max_bytes + 1], limits)
         except UploadRefused as refusal:
             raise ValidationError({self.field.name: refusal.message}, code=refusal.code) from None
-        super().save(clean.name, ContentFile(clean.data), save=False)
-        self.instance.file_size = len(clean.data)
-        self.instance.file_hash = hash_filelike(io.BytesIO(clean.data))
-        self.instance.width, self.instance.height = clean.width, clean.height
         if save:
             self.instance.save()
+
+    def _save_raster(self, name: str, data: bytes, limits: ImageLimits) -> None:
+        clean = sanitise_image(data, name, limits, check_name=False)
+        self._store(clean.name, clean.data)
+        self.instance.width, self.instance.height = clean.width, clean.height
+
+    def _save_svg(self, name: str, data: bytes) -> None:
+        """THM.12: only the sanitiser's re-serialisation is stored. Which collection may hold
+        an SVG is the model's rule (`MediaImage.clean` and `save`): the collection may not be
+        set yet when Wagtail's multiple upload stores the file."""
+        try:
+            cleaned = sanitise_svg(data)
+        except UnsafeSvgError as error:
+            raise UploadRefused("svg_unsafe", f"This SVG is refused: {error}") from None
+        self._store(safe_svg_name(name), cleaned)
+        width, height = self.get_image_dimensions()
+        if not width or not height:
+            self.delete(save=False)
+            raise UploadRefused(
+                "svg_size", "This SVG has no size: give it a width and height or a viewBox."
+            )
+        self.instance.width, self.instance.height = width, height
+
+    def _store(self, name: str, data: bytes) -> None:
+        super().save(name, ContentFile(data), save=False)
+        self.instance.file_size = len(data)
+        self.instance.file_hash = hash_filelike(io.BytesIO(data))
 
 
 class SanitisedImageField(WagtailImageField):  # type: ignore[misc]  # Wagtail is untyped
