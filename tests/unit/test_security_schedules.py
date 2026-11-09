@@ -85,6 +85,12 @@ def test_nightly_runs_every_day_and_stage_every_week() -> None:
     assert day_of_week.isdigit()
 
 
+def test_stage_scan_runs_on_tuesday_at_three_utc() -> None:
+    """Owner request (2026-11-09): the weekly STAGE scan runs on Tuesdays at 03:00 UTC."""
+    (weekly,) = (entry["cron"] for entry in triggers(load(STAGE))["schedule"])
+    assert weekly == "0 3 * * 2"
+
+
 def test_permissions_are_minimal(workflow_path: Path) -> None:
     workflow = load(workflow_path)
     assert workflow["permissions"] == {"contents": "read"}
