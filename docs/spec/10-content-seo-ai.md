@@ -7,7 +7,7 @@
 - **WPSSO Core Premium** + add-ons: JSON-LD Product/Offer/Breadcrumb/MerchantReturnPolicy/
   ShippingDetails/AggregateRating, Open Graph, sitemap, Google Merchant and Meta feeds.
 - SEO mu-plugin: schema.org relations between products and terms (`isRelatedTo` and similar) in the JSON-LD; robots
-  `max-snippet:-1`; noindex on 404s; internal search indexable only when it has results; author redirects;
+  `max-snippet:-1`; noindex on 404s; internal search indexable only when it has results (legacy rule; the new system keeps search pages `noindex`, see SEO.7); author redirects;
   IT breadcrumb fix.
 - `google-feed.php`: EN/IT RSS feed with 6 h cache, **fixed 22%** VAT, hardcoded shipping,
   `g:id` = **WordPress post ID**, Google category from `_wpsso_meta` or by vendor (per-vendor override, generic default),
@@ -127,12 +127,140 @@ def product_jsonld(product, lang) -> dict
     # + isRelatedTo (and sector-specific properties, if configured) + shippingDetails + hasMerchantReturnPolicy
     # + aggregateRating (verified reviews only)
 def breadcrumb_jsonld(obj, lang) -> dict
-def robots_meta(request, obj) -> str            # noindex on 404, empty search, pagination beyond a threshold
+def robots_meta(request, obj) -> str            # noindex on 404, every internal search page (SEO.7), pagination beyond a threshold
 def sitemaps() -> dict[str, Sitemap]           # per language and type; excludes fallbacks;
     # products and taxonomy terms listed on the URL of their current mode (Q-91, D-07, MIG.11)
 def llms_txt(lang) -> str                       # generated from vendors, brands and taxonomy terms, key pages, event feeds
 def event_jsonld(page, lang) -> dict | None     # schema.org Event with Place, PostalAddress, GeoCoordinates (spec 15, EVT.10)
 ```
+
+### Structured data graph (SEO.7)
+
+Every public page carries ONE JSON-LD block (`<script type="application/ld+json">`) holding a
+schema.org `@graph`, built by one builder in the `seo` app (`page_graph(request, obj, lang)`).
+The per-type functions above return graph nodes, not separate scripts. Nodes have stable `@id`s
+(the canonical URL of the thing plus a fragment, for example `/it/shop/<vendor>/#organization`)
+and reference each other by `@id`, so one entity is described once per site and linked
+everywhere:
+
+- `Organization` for the platform operator (from `current_operator()`), with logo, legal name,
+  VAT ID and contact point; `WebSite` with a `SearchAction`; every page's `WebPage` (or the
+  subtype `CollectionPage`, `ProfilePage`, `ItemPage`, `AboutPage`), its `BreadcrumbList` and
+  primary image.
+- Vendors as `Organization` nodes on their storefront, used as `seller` in every `Offer`;
+  shared `MerchantReturnPolicy` and `OfferShippingDetails` nodes per vendor.
+- `Product` with `Offer` or `AggregateOffer` (variants), `brand`, `gtin`/`mpn`, ratings from
+  verified reviews only; listings and taxonomy pages as `CollectionPage` with an `ItemList`.
+- Blog: `BlogPosting` with `author` pointing to a `Person` node (`ProfilePage` on the author
+  page, CMS.3), `publisher` pointing to the operator `Organization`; events as `Event` (spec 15).
+- Language: `inLanguage` on every node, the text in the page language only, never a fallback in
+  another language; no node for content that is not published in that language.
+
+**Widgets feed the graph (owner, 2026-11-09).** Every block or widget that shows a list of
+things on a page adds to the page's `@graph`, instead of being invisible to it: the product grid
+(CMS.10), product cards (CMS.11), related and compatible products, "other sellers" (CAT.15),
+event lists, blog post lists and vendor lists. The contract: each such StreamField block or
+template widget implements `graph_nodes(context) -> list[dict]` and returns one `ItemList` with
+a `name` (the block heading in the page language), `numberOfItems` and ordered `ListItem`s
+(`position`, `item` = the `@id` of the product, event, post or vendor page, plus `name`, `url`
+and `image`). Full `Product` nodes appear only on the product's own page; a list item references
+it and never repeats offers, so a page with three widgets and twenty products stays small. The
+page node links the lists through `hasPart` (`mainEntity` on listing pages, where the first list
+is the page's main content). The same product in two widgets is one `@id`, listed in each.
+Hidden, unpublished or other-language items never appear.
+
+**Every page type has a graph (owner, 2026-11-09).** The table below is the coverage SEO.7 must
+reach; a test walks every registered page type and URL pattern and fails when one renders no
+graph.
+
+| Page | Page node | Main content |
+|---|---|---|
+| Home | `WebPage` | `hasPart` lists from its blocks |
+| Product | `ItemPage` | `Product` or `ProductGroup` with offers |
+| Category, term, brand listing | `CollectionPage` | `ItemList` of product `@id`s (`mainEntity`) |
+| Vendor storefront | `ProfilePage` | vendor `Organization` + `ItemList` of its products |
+| Search results | `SearchResultsPage` | `ItemList` of mixed results (products, events, posts, vendors), each item referencing its page `@id` |
+| Event | `WebPage` | `Event` (spec 15) |
+| Event index and calendar | `CollectionPage` | `ItemList` of event `@id`s |
+| Blog index, author page | `CollectionPage`, `ProfilePage` | `ItemList` of posts; `Person` |
+| Blog post | `WebPage` | `BlogPosting` |
+| Standard, legal, about, contact | `WebPage`, `AboutPage`, `ContactPage` | operator `Organization` with `contactPoint` on contact |
+| Cart, checkout, account, Manager | none | not public, `noindex`, no graph |
+
+**Search results are not indexed.** Internal search pages are `noindex, follow` in every case
+(Google asks sites to keep search result pages out of the index); they still carry the graph,
+for AI agents and other machine readers, and the `WebSite` `SearchAction` points to them. This
+replaces the legacy rule "indexable when it has results". Before go-live, MIG.11 lists the legacy
+search URLs that received search-engine traffic (from the access-log hit counts of MIG.1); a
+query with real traffic becomes a curated landing page (CMS.4 term landing or a category) and its
+legacy search URL redirects there, so the traffic is kept without indexing search pages.
+Pagination: page 2 and beyond of a listing is indexable with its own canonical and the same graph
+shape, its `ItemList` holding only the items of that page with their absolute `position`.
+
+**Product node (SEO.1 inside the SEO.7 graph), from a review of the legacy product JSON-LD
+(2026-11-09).** The legacy page already has a linked `@graph` with `Product`, `Offer` with a
+VAT-inclusive `UnitPriceSpecification`, a `MerchantReturnPolicy`, `Brand`, breadcrumbs,
+compatibility links (`isAccessoryOrSparePartFor`, `isRelatedTo`) and per-country
+`OfferShippingDetails`. Keep all of that, and fix or add:
+
+- **Keep and improve:** compatibility and related links from the taxonomy (the strongest part
+  of the legacy data); the type of a compatibility target is configurable per taxonomy (a
+  vertical maps its targets to a fitting schema.org type, otherwise `Product`).
+- **Seller:** the `Offer.seller` is the vendor's `Organization` node, never the operator (the
+  legacy graph names the site's own organization, which is wrong for a marketplace); the operator
+  stays the `WebSite` publisher.
+- **Brand and manufacturer as shared linked entities (owner, 2026-11-09):** the same article
+  sold by several vendors must point to the SAME brand and manufacturer nodes, so search engines
+  and AI agents see one brand with many offers, not many unrelated products. `brand` references
+  the site-wide `Brand` node (`@id` = the brand listing page URL + `#brand`; the brand page is the CAT.8 brand listing at `/brand/{slug}/`) with `name`, `logo`,
+  `url` (official site), `description` in the page language and `sameAs` (Wikidata item,
+  Wikipedia, official profiles); `manufacturer` references an `Organization` node when the maker
+  differs from the brand. Products from different vendors with the same GTIN, or brand + MPN
+  (Q-33, CAT.15), share the brand and manufacturer `@id`s and carry the same `gtin`/`mpn`; each
+  vendor page keeps its own `Product` and `Offer` (seller = that vendor). The "other sellers"
+  block (CAT.15) lists the other vendors' pages; their offers are not copied into this page's
+  graph. Data from CAT.20.
+- **Identifiers:** `gtin` (8/12/13/14 by length) and `mpn` from the product fields (CAT.14),
+  `productID` with the internal `public_id`; `sku` stays the vendor SKU label. The legacy data
+  has none of the first three, and they are what Google and comparison engines match on.
+- **Physical data:** `weight`, `depth`, `width`, `height` as `QuantitativeValue` with UN/CEFACT
+  unit codes from the CAT.12 fields; `material`, `color`, `pattern`, `size` and other filterable
+  attributes as the matching properties or `additionalProperty` (`PropertyValue` with
+  `propertyID`), only when the product has them; `countryOfOrigin` when known.
+- **Variants:** a product with variants is a `ProductGroup` with `productGroupID`, `variesBy` and
+  `hasVariant`; each variant is a `Product` with its own `sku`, `gtin`, image and `Offer`
+  (Google's variant structured data). The legacy page has no variant markup.
+- **Offer:** `price` and `priceCurrency` on the `Offer` plus the VAT-inclusive
+  `priceSpecification`; `availability` from stock; `priceValidUntil` only when a sale price has an
+  end date (never a made-up date); `itemCondition` once.
+- **Shipping:** compact `OfferShippingDetails` per shipping zone and service, not per country
+  (the legacy page has 56 of them in about 100 KB of JSON-LD); countries grouped in one
+  `DefinedRegion` list per rate; handling time from the vendor's dispatch settings and VEN.20
+  closures; the full matrix goes to the Merchant feed (SEO.3/SEO.4), not into every page.
+- **Returns:** one `MerchantReturnPolicy` node per vendor, with `applicableCountry` and
+  `returnPolicyCountry`, referenced by `@id`.
+- **Reviews:** `aggregateRating` and up to five `review` nodes from verified purchases only
+  (CMS.6); none until reviews exist (the legacy page has none).
+- **Images:** every `ImageObject` with `contentUrl`, size, caption in the page language and the
+  licence fields from CMS.8 (`license`, `acquireLicensePage`, `creditText`, `creator`,
+  `copyrightNotice`), which Google shows as "Licensable" on image results.
+- **Page context:** `ItemPage` with `inLanguage`, `dateModified`, `primaryImageOfPage` and
+  `breadcrumb`; `WebSite` with `SearchAction` (both missing on the legacy page).
+- **Drop:** audience and size fields filled with defaults, and any property without a real value
+  in the catalogue.
+- **Budget:** the JSON-LD of a product page stays under 30 KB; a test fails above it.
+
+**Safe output.** The graph carries vendor- and staff-entered text (names, headings, captions,
+brand descriptions), so the block is rendered only through one helper that escapes like Django's
+`json_script` (`<`, `>`, `&`, U+2028, U+2029); no template writes JSON-LD by hand. The block is
+`<script type="application/ld+json">`, which the CSP does not execute and the csp_lint exception
+from THM.3 already allows. SEO.7 also moves the existing JSON-LD (THM.3, EVT.10 `event_jsonld`)
+into the graph, so a page has exactly one block.
+
+JSON-LD is the only format (no microdata or RDFa, which Google and other consumers do not need
+in addition). GraphQL is not used for SEO: search engines and AI crawlers read JSON-LD, sitemaps,
+feeds and `llms.txt`; machine clients use the REST API and the MCP server. A GraphQL API would
+add a second API surface (query cost limits, its own permission layer) for no current consumer.
 
 ### Feeds and Merchant
 
@@ -200,6 +328,7 @@ with design tokens, template overrides, CSP-safe components and WCAG 2.2 AA rule
 | CMS.5 | Versioned LegalPage + VendorRecruitmentPage (plans, FAQ) leading to the VEN.22 application form | P1 | 6 | CMS.1, VEN.5 | Legal page versions kept per language, so a translated legal page has its own version and effective date (Q-42); the recruitment page shows the plans and links to the application |
 | CMS.8 | Image source, licence and credit: custom Wagtail image model `MediaImage` in `core` with licence, source, author, credit and permission fields, staff-editable `ImageLicence` allow list seeded per §10.2, upload validation in admin and services, `image_credit` component and per-page image credits disclosure, review list for migrated images without metadata; works with local storage, ARC.15 later moves only the storage backend | P1 | 5 | CMS.1 | An upload without licence or author is refused; an NC licence cannot be added to the allow list; a CC BY image shows its credit in the caption, a CC BY hero in the page credits disclosure; a CC0 image shows none; `WAGTAILIMAGES_IMAGE_MODEL` points to `MediaImage` before CAT.4 |
 | CMS.9 | Launch countdown StreamField block: fields per §10.2, `countdown_state` pure function, server-rendered absolute date and expired state, page cache capped at the target, CSP-safe ES module with visitor time zone, minute updates and pause button, single polite announcement at expiry | P1 | 4 | CMS.2, THM.4 | Without JavaScript the block shows the absolute date and the CTA; with it the remaining time updates once a minute in the visitor's time zone and the pause button stops it; after the target the server and the module both show the expired text and link; no `aria-live` on the counter; no CSP violation and no axe violation on a page with the block |
+| CMS.11 | Reusable product card block on every page type (owner decision 2026-11-09): one `product_cards` StreamField block (one or more chosen products, optional heading, layout grid or row) offered in the home, standard, landing and blog bodies through a shared block registry; shows published products in the page language only, the price as TAX.12 displays it (MQ-12: VAT-inclusive at the destination rate, net only for business buyers who opt in) (no price for `on_request` and `catalog_only`), hides a retired product, implements the SEO.7 `graph_nodes(context)` contract (a named `ItemList` of product `@id`s); the landing bodies get the block when CMS.4 lands; migration of the existing page bodies | P1 | 6 | CMS.3, CMS.4, CAT.8, TAX.12 | The same block works on all four page types; a retired or unpublished product disappears from every page without editing it; an `on_request` product shows no price; `graph_nodes` returns a named `ItemList` whose items are product `@id`s without offers |
 | CMS.6 | Reviews: model, purchase verification, supplier import, moderation, vendor reply | P2 | 10 | ORD.2 | AggregateRating schema only with valid reviews |
 | SEO.1 | JSON-LD Product/Offer/Breadcrumb/ReturnPolicy/ShippingDetails, robots, canonical; GTIN and MPN from the product fields, no price for on-request and catalogue-only products (Q-31, Q-33) | P1 | 10 | CAT.7, SHP.3 | Rich Results Test with no errors; an on-request product's JSON-LD has no price |
 | SEO.2 | Per-language and per-type sitemaps, generated `llms.txt` | P1 | 4 | I18N.6 | Valid sitemaps |
@@ -207,6 +336,7 @@ with design tokens, template overrides, CSP-safe components and WCAG 2.2 AA rule
 | SEO.4 | Merchant API sync + Meta feed | P2 | 8 | SEO.3 | Daily delta report |
 | SEO.5 | Cookie consent + Consent Mode v2 + e-commerce events | P1 | 8 | ORD.5 | No tags fire before consent |
 | SEO.6 | Anonymous page cache, responsive renditions, CWV budget | P2 | 6 | THM.3 | LCP < 2.5 s on product page |
+| SEO.7 | Site-wide schema.org `@graph` (owner question 2026-11-09): one JSON-LD block per page from `seo.page_graph`, stable `@id` nodes for the operator `Organization`, `WebSite` + `SearchAction`, `WebPage` subtypes, `BreadcrumbList`, vendor `Organization` as `seller`, shared return and shipping nodes, `Product`/`Offer`/`AggregateOffer`, `CollectionPage` + `ItemList`, `BlogPosting` + `Person`/`ProfilePage`, `Event`; `inLanguage` and no cross-language fallback; SEO.1 and EVT.10 return nodes into it | P1 | 8 | SEO.1, CMS.3, CMS.10, CMS.11 | Each page type in the SEO.7 coverage table has a snapshot test of its graph, and a sweep over the registered page types fails on a public page without one; the search results page is a `SearchResultsPage` with an `ItemList` of mixed result types and `noindex, follow`; every `@id` reference resolves to a node in the same graph or a canonical URL; a schema check (types, required and recommended properties of the Google rich results for Product, Breadcrumb, Article, Event, ProfilePage) runs in CI; a page has exactly one JSON-LD script; a product name containing `</script><img src=x onerror=alert(1)>` is inert inside the JSON-LD and adds no element to the page; a page with a product grid and a product cards block has two named `ItemList`s whose items reference product `@id`s without repeating offers, and a retired product disappears from both; the product node checklist of §"Structured data graph" is covered (vendor as seller, gtin/mpn/productID, variants as ProductGroup, compact shipping, licence fields on images) and a product page's JSON-LD stays under 30 KB |
 | AI.1 | MCP server: auth, read tools (catalog, orders, quotes, simulations, reports) | P2 | 12 | CORE.7 | Tools usable from Claude Code with scopes |
 | AI.2 | Mutating MCP tools with dry-run, confirmation and audit | P2 | 10 | AI.1 | Every mutation has a diff and an audit entry |
 | AI.3 | Read-only public catalog API for agents | P3 | 6 | CAT.9 | Search by taxonomy term via API |
