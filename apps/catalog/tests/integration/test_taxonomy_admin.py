@@ -721,3 +721,12 @@ def test_term_autocomplete_is_narrowed_to_one_taxonomy(staff_client: Client) -> 
     term_of(TaxonomyFactory.create(), "Summit")
     assert autocomplete(staff_client, term="sum", taxonomy=season.pk) == [str(summer.pk)]
     assert autocomplete(staff_client, term="sum", taxonomy="not-a-number") == []
+
+
+@pytest.mark.parametrize("taxonomy", ["\u00b2", "\u0661", "9" * 30, "1" * 5000])
+def test_term_autocomplete_with_a_hostile_taxonomy_id_finds_nothing(
+    staff_client: Client, taxonomy: str
+) -> None:
+    """Unicode digits pass `str.isdigit` but not `int()`; a huge id overflows the column."""
+    term_of(TaxonomyFactory.create(), "Summer")
+    assert autocomplete(staff_client, term="sum", taxonomy=taxonomy) == []
