@@ -57,6 +57,14 @@ ssh <stage> '~/.local/bin/mpmv-deploy deploy 0.2.0'
 
 `~/.local/bin/mpmv-deploy doctor` and `~/.local/bin/mpmv-deploy check` run steps 1 and 5 on demand.
 
+### Platform staff permission (CORE.8)
+
+Platform staff is the model permission `vendors.view_all_vendors`, not `is_staff`. No data
+migration grants it: on every environment, existing staff accounts must get it explicitly (admin
+user page, or the CORE.18 role groups once they exist), otherwise they lose the all-vendor view
+after the deploy (fail closed). Superusers keep it. STAGE has only seed users: the next seed run
+grants the permission to the seed operator.
+
 ## Promoting to LIVE
 
 LIVE gets only a tag that has run on STAGE without incident, and only on the owner's go. The same
