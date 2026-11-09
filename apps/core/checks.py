@@ -21,6 +21,7 @@
 
 import ast
 import inspect
+import math
 import textwrap
 from collections.abc import Iterable, Mapping
 from typing import Any
@@ -557,18 +558,29 @@ UPLOAD_LIMIT_SETTINGS = (
 def check_image_upload_limits(
     app_configs: Iterable[AppConfig] | None, **kwargs: Any
 ) -> list[checks.CheckMessage]:
-    """Every upload cap is a positive number (core.E601), and the stored and animation caps fit
-    within the still-image decode cap (core.E602)."""
+    """Every upload cap is a finite positive number, the decode wait at most
+    MAX_DECODE_WAIT_SECONDS (core.E601), and the stored and animation caps fit within the
+    still-image decode cap (core.E602). A value that is not a number at all stops the settings
+    import (ImproperlyConfigured, mpmv.settings.env), before any check runs."""
+    from .uploads import MAX_DECODE_WAIT_SECONDS
+
     values = {name: getattr(settings, name, None) for name in UPLOAD_LIMIT_SETTINGS}
     wrong = [
         name
         for name, value in values.items()
-        if isinstance(value, bool) or not isinstance(value, int | float) or value <= 0
+        if isinstance(value, bool)
+        or not isinstance(value, int | float)
+        or not math.isfinite(value)
+        or value <= 0
     ]
+    wait = values["MPMV_IMAGE_DECODE_WAIT_SECONDS"]
+    if "MPMV_IMAGE_DECODE_WAIT_SECONDS" not in wrong and wait > MAX_DECODE_WAIT_SECONDS:  # type: ignore[operator]
+        wrong.append("MPMV_IMAGE_DECODE_WAIT_SECONDS")
     if wrong:
         return [
             checks.Error(
-                f"Upload limits must be positive numbers: {', '.join(wrong)}.",
+                f"Upload limits must be finite positive numbers: {', '.join(wrong)}"
+                f" (MPMV_IMAGE_DECODE_WAIT_SECONDS at most {MAX_DECODE_WAIT_SECONDS:g}).",
                 hint="Fix the MPMV_MAX_* variables in the environment (mpmv.env).",
                 id="core.E601",
             )

@@ -216,6 +216,17 @@ def _refuse_name(name: str) -> str:
 # One image decoded at a time in this process (lane-a on PR #164): a worker's peak memory is then
 # one image's, whatever the number of threads serving uploads.
 _DECODE_LOCK = threading.Lock()
+# The longest MPMV_IMAGE_DECODE_WAIT_SECONDS accepted (core.E601): far below the lock's
+# threading.TIMEOUT_MAX, and longer than any proxy keeps a request open.
+MAX_DECODE_WAIT_SECONDS = 300.0
+
+
+def _bounded_wait(wait: float) -> float:
+    """`wait` within 0..MAX_DECODE_WAIT_SECONDS: `inf`, `nan` or a huge number would make the
+    lock raise (OverflowError, ValueError), a server error on every upload."""
+    if math.isnan(wait):
+        return 0.0
+    return min(max(wait, 0.0), MAX_DECODE_WAIT_SECONDS)
 
 
 @contextmanager
@@ -224,7 +235,7 @@ def decode_slot(wait: float) -> Iterator[None]:
 
     The lock is released however the block ends (a refusal, an unexpected error).
     """
-    if not _DECODE_LOCK.acquire(timeout=max(wait, 0.0)):
+    if not _DECODE_LOCK.acquire(timeout=_bounded_wait(wait)):
         raise UploadRefused(
             "busy",
             "The server is busy processing another image. Please try again in a moment.",

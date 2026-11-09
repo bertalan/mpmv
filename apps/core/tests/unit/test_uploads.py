@@ -534,6 +534,15 @@ def test_the_slot_is_released_on_every_exception_path(monkeypatch: pytest.Monkey
     assert _slot_is_free()
 
 
+@pytest.mark.parametrize("wait", [float("inf"), float("nan"), float("-inf"), 1e10, -5.0])
+def test_a_bad_wait_never_breaks_the_slot(wait: float) -> None:
+    """The system check refuses these waits; if one gets through anyway, the slot still works
+    (the lock would raise OverflowError or ValueError, a server error on every upload)."""
+    with decode_slot(wait):
+        pass
+    assert _slot_is_free()
+
+
 def test_gif_frames_are_counted_only_up_to_the_cap(monkeypatch: pytest.MonkeyPatch) -> None:
     """A GIF's frame count walks every frame header: the walk stops one frame past the cap."""
     from PIL import GifImagePlugin

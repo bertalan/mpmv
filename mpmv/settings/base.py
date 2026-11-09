@@ -286,12 +286,16 @@ WAGTAILIMAGES_IMAGE_MODEL = "core.MediaImage"
 # at about 600 MB of RSS while re-encoded (the decoded original, 400 MB, plus the stored
 # 40-megapixel copy, 160 MB), an animated WebP of 100 megapixels at about 1 GB (libwebp keeps
 # two full canvases). At these caps that is about 450 MB for a 60-megapixel still image (240 MB
-# decoded plus the 160 MB stored copy) and about 160 MB for a 16-megapixel animation. Each
-# process decodes one image at a time (apps.core.uploads.decode_slot): a second upload waits
-# MPMV_IMAGE_DECODE_WAIT_SECONDS, then gets a "try again" error, never a server error. So a web
-# worker process needs about 450 MB above its baseline for uploads, whatever its thread count.
+# decoded plus the 160 MB stored copy) and about 160 MB for a 16-megapixel animation: about
+# 450 MB per worker process for uploads, WEB_CONCURRENCY times that per host. Production runs
+# gunicorn sync workers (one request per process), so the per-process decode lock
+# (apps.core.uploads.decode_slot) is never contended there: it guards threaded or async workers
+# and management commands, where a second upload waits MPMV_IMAGE_DECODE_WAIT_SECONDS (at most
+# 300), then gets a "try again" error, never a server error. Wagtail renditions (up to the
+# 40-megapixel stored original, about 160 MB) decode outside the lock.
 # CoreConfig.ready sets Pillow's bomb threshold to the still-image cap. Every cap can be set
-# from the environment (deploy/server/mpmv.env.example); core.E601/E602 check them at startup.
+# from the environment (deploy/server/mpmv.env.example); core.E601/E602 check them at startup,
+# and a value that is not a number stops the settings import (ImproperlyConfigured).
 # Raster formats are checked and re-encoded (apps.core.uploads); SVG is for logos and icons only,
 # in an SvgCollection, and goes through apps.core.svg instead (THM.12). The branch is chosen by
 # content, never by the extension, and the extension must agree with the content.

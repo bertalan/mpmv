@@ -6,6 +6,7 @@ import pytest
 from django.test import override_settings
 
 from apps.core.checks import check_image_upload_limits
+from apps.core.uploads import MAX_DECODE_WAIT_SECONDS
 
 DEFAULTS = {
     "WAGTAILIMAGES_MAX_UPLOAD_SIZE": 25 * 1024 * 1024,
@@ -34,6 +35,23 @@ def test_the_decided_defaults_pass() -> None:
 @pytest.mark.parametrize("value", [0, -1, None, "60"])
 def test_every_cap_must_be_a_positive_number(name: str, value: object) -> None:
     assert check_ids(**{name: value}) == ["core.E601"]
+
+
+@pytest.mark.parametrize("name", [name for name in DEFAULTS])
+@pytest.mark.parametrize("value", [float("inf"), float("nan"), float("-inf")])
+def test_every_cap_must_be_finite(name: str, value: float) -> None:
+    """`inf` and `nan` parse as floats and compare oddly (`nan <= 0` is False): refused."""
+    assert check_ids(**{name: value}) == ["core.E601"]
+
+
+@pytest.mark.parametrize("value", [MAX_DECODE_WAIT_SECONDS + 1, 1e10])
+def test_the_decode_wait_has_an_upper_bound(value: float) -> None:
+    """A huge wait overflows the lock's timeout: every raster upload would be a server error."""
+    assert check_ids(MPMV_IMAGE_DECODE_WAIT_SECONDS=value) == ["core.E601"]
+
+
+def test_the_longest_decode_wait_passes() -> None:
+    assert check_ids(MPMV_IMAGE_DECODE_WAIT_SECONDS=MAX_DECODE_WAIT_SECONDS) == []
 
 
 @pytest.mark.parametrize(
