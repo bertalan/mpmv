@@ -2113,8 +2113,10 @@ def _text_hits(
     texts: "QuerySet[ProductTranslation]", config: str, text: str
 ) -> list[engine.SearchHit]:
     """Full-text hits in the language's configuration, ranked 0 to 1 (title above
-    descriptions). `websearch` syntax never fails on what a visitor types."""
-    query = SearchQuery(text, config=config, search_type="websearch")
+    descriptions). `plain` syntax (`plainto_tsquery`): every word is required and nothing is an
+    operator, so a visitor's `-word` cannot become a NOT query, which no index serves and which
+    would read, vectorise and rank every published text of the language."""
+    query = SearchQuery(text, config=config, search_type="plain")
     vector = product_text_vector(config)
     matches = (
         texts.annotate(document=vector, rank=SearchRank(vector, query, normalization=32))
@@ -2168,11 +2170,20 @@ def search(
         *_sku_hits(products, "pk", terms),
         *_sku_hits(Variant.objects.filter(product__in=listed_pks), "product_id", terms),
     ]
+    if not terms.has_words:  # punctuation only: nothing for full text or trigram to match
+        return _ranked(products, hits, limit)
     text_hits = _text_hits(texts, engine.search_config(language), terms.text)
     # Trigram similarity is the typo fallback, run only when full text finds nothing: a common
     # word would otherwise make PostgreSQL compute it row by row for a large share of the
     # catalogue (measured at 30k products: hundreds of milliseconds).
     hits += text_hits or _trigram_hits(texts, terms.text)
+    return _ranked(products, hits, limit)
+
+
+def _ranked(
+    products: "QuerySet[Product]", hits: list[engine.SearchHit], limit: int
+) -> "QuerySet[Product]":
+    """The products of `hits`, best first, at most `limit` of them."""
     ranked = engine.rank_search_hits(hits, limit=limit)
     if not ranked:
         return products.none()

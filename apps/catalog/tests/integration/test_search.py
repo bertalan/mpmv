@@ -139,6 +139,69 @@ def test_the_trigram_fallback_runs_only_when_full_text_finds_nothing() -> None:
     assert _trigram_queries("lether") == 1
 
 
+# --- Query syntax: no operators. A visitor's `-word`, quotes or OR are plain text, so no query
+# can turn into "every product except ..." (a NOT query reads the whole catalogue).
+
+
+def _catalogue() -> list[Product]:
+    return [listed(title="Leather bag"), listed(title="Rain cover"), listed(title="Tank bag")]
+
+
+@pytest.mark.parametrize("query", ["-zzzz", "-zzzz -yyyy", '"" -zzzz', "OR", "bag OR cover"])
+def test_negation_or_operator_queries_never_match_the_whole_catalogue(query: str) -> None:
+    _catalogue()
+    assert found(query) == []
+
+
+def test_a_leading_minus_is_ignored_not_a_negation() -> None:
+    leather, _, tank = _catalogue()
+    assert set(found("-bag")) == {leather.pk, tank.pk}
+
+
+def _text_queries(query: str) -> list[str]:
+    with CaptureQueriesContext(connection) as queries:
+        list(services.search(query, "en"))
+    return [q["sql"] for q in queries.captured_queries if "TSQUERY" in q["sql"].upper()]
+
+
+@pytest.mark.parametrize("query", ["--", '""', '"" -', "- -"])
+def test_a_query_without_words_never_reaches_text_or_trigram_search(query: str) -> None:
+    _catalogue()
+    with CaptureQueriesContext(connection) as queries:
+        assert found(query) == []
+    sql = " ".join(q["sql"].upper() for q in queries.captured_queries)
+    assert "TSQUERY" not in sql
+    assert "STRICT_WORD_SIMILARITY" not in sql
+
+
+def test_the_full_text_query_parses_plain_text_without_operators() -> None:
+    _catalogue()
+    texts = _text_queries("-zzzz")
+    assert texts
+    assert all("PLAINTO_TSQUERY" in sql.upper() for sql in texts)
+    assert not any("WEBSEARCH_TO_TSQUERY" in sql.upper() for sql in texts)
+
+
+def test_a_negation_query_reads_no_product_text_row() -> None:
+    """EXPLAIN ANALYZE guard: the scan of the product texts returns no row for `-zzzz`. Under
+    `websearch` syntax it was `!'zzzz'`, so every published text came back, each with its vector
+    and rank recomputed."""
+    _catalogue()
+    with connection.cursor() as cursor:
+        for sql in _text_queries("-zzzz -yyyy"):
+            cursor.execute(f"EXPLAIN (ANALYZE, FORMAT TEXT) {sql}")
+            plan = [row[0] for row in cursor.fetchall()]
+            scans = [
+                line
+                for line in plan
+                if "(actual" in line and ("catalog_producttranslation" in line or "fts" in line)
+            ]
+            assert scans
+            for line in scans:
+                actual = line.rsplit("(actual", 1)[1]
+                assert " rows=0 " in actual, "\n".join(plan)
+
+
 def test_the_short_description_and_description_are_searched() -> None:
     product = listed(title="Tank bag")
     product.translations.update(short_description="Magnetic mount", description="<p>Velcro</p>")
@@ -241,10 +304,12 @@ def test_the_trigram_extension_is_installed() -> None:
 
 @pytest.mark.parametrize("language", ["en", "it", "de", "fr", "es"])
 def test_every_search_query_is_served_by_an_index(language: str) -> None:
-    """With a few rows the planner would rather walk any small index and filter. Here plain
-    sequential and index scans are disabled, so a table is read through an index condition
-    (a bitmap scan) or by a sequential scan that shows in the plan: each text, trigram and SKU
-    query must name its index."""
+    """Each text, trigram and SKU query expression matches its index. With a few rows the
+    planner would rather walk any small index and filter, so plain sequential and index scans
+    and nested loops are disabled and the (product, language) unique constraint is dropped: a
+    table is then read through an index condition (a bitmap scan) or by a sequential scan that
+    shows in the plan. This proves the expressions can use the indexes, not that a production
+    planner with real statistics picks them."""
     with connection.cursor() as cursor:  # rolled back with the test transaction
         # Its (product, language) index would answer `language = ...` without the text index.
         cursor.execute(

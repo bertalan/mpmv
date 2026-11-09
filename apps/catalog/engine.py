@@ -501,6 +501,9 @@ def variant_label(labels: Sequence[str]) -> str:
 
 SEARCH_MIN_LENGTH = 2
 SEARCH_MAX_LENGTH = 100  # characters kept from a query, cut on a word boundary
+# Raw characters read before any normalisation: NFKC can expand a code point up to 18 times, so
+# a huge input is cut first. Leading spaces and control characters count against it.
+SEARCH_RAW_MAX_LENGTH = SEARCH_MAX_LENGTH * 4
 SEARCH_MAX_WORDS = 8
 SKU_PREFIX_MIN_LENGTH = 4  # a shorter query matches a whole SKU only (legacy rule)
 SEARCH_RESULT_LIMIT = 200
@@ -532,13 +535,19 @@ class SearchTerms:
 
     `text` feeds full-text and trigram search; `sku_key` is the SKU match key of the whole query
     (None when no SKU can be that long); `sku_prefix` allows a prefix match on it. A query with
-    an `error` searches nothing.
+    an `error` searches nothing. The text is plain words: `-`, quotes and OR are no operators.
     """
 
     text: str = ""
     sku_key: str | None = None
     sku_prefix: bool = False
     error: str | None = None
+
+    @property
+    def has_words(self) -> bool:
+        """Whether the text has a letter or digit; punctuation only ("--", quotes) gives full
+        text and trigram search nothing to match, so they are skipped."""
+        return any(char.isalnum() for char in self.text)
 
 
 def _search_char(char: str) -> str:
@@ -552,7 +561,9 @@ def _search_char(char: str) -> str:
 
 def normalise_search_query(raw: str) -> SearchTerms:
     """NFKC, control characters dropped, whitespace collapsed, at most SEARCH_MAX_WORDS words
-    and SEARCH_MAX_LENGTH characters (a longer query is cut on a word boundary, not refused)."""
+    and SEARCH_MAX_LENGTH characters (a longer query is cut on a word boundary, not refused).
+    The raw input is cut to SEARCH_RAW_MAX_LENGTH characters before any of this."""
+    raw = raw[:SEARCH_RAW_MAX_LENGTH]
     text = "".join(_search_char(char) for char in unicodedata.normalize("NFKC", raw))
     text = " ".join(text.split()[:SEARCH_MAX_WORDS])
     if len(text) > SEARCH_MAX_LENGTH:

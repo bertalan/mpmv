@@ -1,6 +1,9 @@
 """CAT.9: the pure side of product search (spec 03 §3.1 and §3.2): query normalisation, length
 limits, the text search configuration of each language, and the ranking of the hits."""
 
+import unicodedata
+
+import pytest
 from django.conf import settings
 
 from apps.catalog import engine
@@ -47,6 +50,31 @@ def test_a_long_query_is_cut_at_the_length_limit_on_a_word_boundary() -> None:
     assert len(terms.text) <= engine.SEARCH_MAX_LENGTH
     assert terms.text.split() == ["leather"] * len(terms.text.split())
     assert terms.error is None
+
+
+def test_a_huge_query_is_cut_before_any_normalisation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """NFKC can expand a code point up to 18 times: the raw input is cut first, so an API or
+    MCP caller cannot make the normalisation work on megabytes."""
+    seen: list[int] = []
+    normalize = unicodedata.normalize
+
+    def spy(form: str, text: str) -> str:
+        seen.append(len(text))
+        return normalize(form, text)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(unicodedata, "normalize", spy)
+    terms = engine.normalise_search_query("bag " + "ﷺ" * 1_000_000)
+    assert max(seen) <= engine.SEARCH_RAW_MAX_LENGTH
+    assert terms.text.startswith("bag")
+    assert len(terms.text) <= engine.SEARCH_MAX_LENGTH
+
+
+def test_a_query_without_letters_or_digits_has_no_words_for_text_search() -> None:
+    # Punctuation only ("--", quotes): nothing for full text or trigram to match.
+    for raw in ("--", '""', "- -", '"" -', "%%%%"):
+        assert engine.normalise_search_query(raw).has_words is False
+    for raw in ("-zzzz", '"" -x1', "OR", "bag 100"):
+        assert engine.normalise_search_query(raw).has_words is True
 
 
 def test_a_query_keeps_at_most_the_maximum_number_of_words() -> None:
