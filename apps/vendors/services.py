@@ -1550,8 +1550,17 @@ def submit_claim_as_account(link: ActionLinkCheck, user: User, *, ctx: AuditCont
 
 
 def _decide(
-    claim: VendorClaim, status: str, action: str, *, ctx: AuditContext, dry_run: bool
+    claim: VendorClaim,
+    status: str,
+    action: str,
+    *,
+    ctx: AuditContext,
+    reviewed_version: int | None,
+    reviewed_claimant_id: int | None,
+    dry_run: bool,
 ) -> ChangeSet:
+    version = claim.version if reviewed_version is None else reviewed_version
+    claimant_id = claim.claimant_id if reviewed_claimant_id is None else reviewed_claimant_id
     with transaction.atomic():
         locked = (
             VendorClaim.objects.select_for_update(of=("self",))
@@ -1560,6 +1569,12 @@ def _decide(
         )
         if locked.status != VendorClaim.Status.SUBMITTED or locked.claimant is None:
             raise engine.ClaimError(f"{locked.vendor} has no claim waiting for approval")
+        if locked.version != version or locked.claimant_id != claimant_id:
+            # Another staff member decided, resent, or someone else claimed meanwhile: the
+            # decision applies only to the claim (link version and claimant) that was reviewed.
+            raise engine.ClaimError(
+                f"{locked.vendor}: the claim changed since it was reviewed; review it again"
+            )
         if status == VendorClaim.Status.APPROVED:
             _check_claim_still_approvable(locked.vendor, locked.claimant)
         before = claim_snapshot(locked)
@@ -1597,19 +1612,55 @@ def _check_claim_still_approvable(vendor: Vendor, claimant: User) -> None:
         )
 
 
-def approve_claim(claim: VendorClaim, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+def approve_claim(
+    claim: VendorClaim,
+    *,
+    ctx: AuditContext,
+    reviewed_version: int | None = None,
+    reviewed_claimant_id: int | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
     """Staff approve a submitted claim: the claimant becomes the vendor's owner, and only now
     may change its legal identity, tax profile and payout data. Raises `engine.ClaimError`
     when no claim waits for approval, the vendor meanwhile got an account holder, or the
-    claimant's email is no longer the legal email of record (or the account is inactive)."""
-    return _decide(claim, VendorClaim.Status.APPROVED, CLAIM_APPROVED, ctx=ctx, dry_run=dry_run)
+    claimant's email is no longer the legal email of record (or the account is inactive).
+
+    The decision is bound to the claim staff reviewed: `reviewed_version` and
+    `reviewed_claimant_id` (by default those of `claim` as loaded) must still match under the
+    row lock, or `engine.ClaimError` is raised and nothing changes."""
+    return _decide(
+        claim,
+        VendorClaim.Status.APPROVED,
+        CLAIM_APPROVED,
+        ctx=ctx,
+        reviewed_version=reviewed_version,
+        reviewed_claimant_id=reviewed_claimant_id,
+        dry_run=dry_run,
+    )
 
 
-def reject_claim(claim: VendorClaim, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+def reject_claim(
+    claim: VendorClaim,
+    *,
+    ctx: AuditContext,
+    reviewed_version: int | None = None,
+    reviewed_claimant_id: int | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
     """Staff reject a submitted claim: nothing is granted, and every open claim link of the
     vendor stops working (audited `CLAIM_LINK_INVALIDATED`, reason "rejected").
 
     Only staff start a new claim afterwards (`send_claim_link` from the admin, behind step-up);
     the claimant cannot re-trigger one. The claimant's account stays: with a new link it claims
-    again by signing in with its own password and second factor (`submit_claim_as_account`)."""
-    return _decide(claim, VendorClaim.Status.REJECTED, CLAIM_REJECTED, ctx=ctx, dry_run=dry_run)
+    again by signing in with its own password and second factor (`submit_claim_as_account`).
+
+    Bound to the reviewed claim like `approve_claim`."""
+    return _decide(
+        claim,
+        VendorClaim.Status.REJECTED,
+        CLAIM_REJECTED,
+        ctx=ctx,
+        reviewed_version=reviewed_version,
+        reviewed_claimant_id=reviewed_claimant_id,
+        dry_run=dry_run,
+    )

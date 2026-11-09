@@ -729,6 +729,7 @@ def delete_group(group: Group, *, ctx: AuditContext, dry_run: bool = False) -> C
 ACTION_LINK_SALT = "mpmv.accounts.action-link"
 ACTION_LINK_SIGNED_IN = "accounts.action_link.signed_in"
 ACTION_LINK_REFUSED = "accounts.action_link.refused"
+ACTION_LINK_OPENED = "accounts.action_link.opened"
 ACTION_LINK_SENT = "accounts.action_link.sent"
 ACTION_LINK_USED = "accounts.action_link.used"
 ACTION_LINK_MODEL = "accounts.actionlinkuse"
@@ -996,13 +997,19 @@ def _session_slot(purpose: str, object_key: str) -> str:
     return f"{purpose}:{object_key}"
 
 
-def open_email_bound_link(session: SessionBase, check: ActionLinkCheck) -> None:
+def open_email_bound_link(
+    session: SessionBase, check: ActionLinkCheck, *, ctx: AuditContext
+) -> None:
     """Keep a valid email-bound link's claims in `session` for its action page (VEN.24).
 
     The session holds the verified claims, never the token: they cannot be replayed as a link.
+    The opening is audited (`ACTION_LINK_OPENED`: purpose, object and version, never the token;
+    nobody is signed in, so the target is the unknown account).
     """
     if check.refusal is not None or not check.email_bound or check.claims is None:
         raise ValueError("only a valid email-bound link can be opened")
+    snapshot = _link_snapshot(check.claims)
+    record(ctx, ACTION_LINK_OPENED, USER_MODEL, UNKNOWN_ACCOUNT, None, snapshot)
     opened = dict(session.get(ACTION_LINK_SESSION_KEY) or {})
     slot = _session_slot(check.claims.purpose, check.claims.object_key)
     opened[slot] = engine.action_claims_payload(check.claims)

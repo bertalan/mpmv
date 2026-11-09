@@ -74,14 +74,16 @@ def continue_link(request: HttpRequest) -> HttpResponse:
         retry = str(max(1, math.ceil(wait.total_seconds())))
         return _private(HttpResponse(TOO_MANY_ATTEMPTS, status=429, headers={"Retry-After": retry}))
     session_user = _session_user(request)
+    ctx = audit_context(request)
     check = services.redeem_action_token(
-        request.POST.get("token", ""), session_user=session_user, ctx=audit_context(request)
+        request.POST.get("token", ""), session_user=session_user, ctx=ctx
     )
     if check.email_bound and check.action_url:
         # VEN.24: nobody is signed in. A valid link is opened in the session; a refused one
         # (audited) still leads to its page, which explains that the link is no longer valid.
+        # Opening is audited too, never with the token.
         if check.refusal is None:
-            services.open_email_bound_link(request.session, check)
+            services.open_email_bound_link(request.session, check, ctx=ctx)
         return _private(HttpResponseRedirect(check.action_url))
     if check.refusal is not None or check.user is None or not check.action_url:
         login_url = resolve_url(settings.MFA_LOGIN_URL)

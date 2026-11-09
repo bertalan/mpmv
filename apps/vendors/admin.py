@@ -5,6 +5,7 @@ Vendor writes go through the audited services (SEC.4); the change page links to 
 audit trail.
 """
 
+import functools
 from collections.abc import Callable
 from typing import Any, cast
 
@@ -21,10 +22,11 @@ from django.utils.html import format_html, format_html_join
 from django.utils.http import urlencode
 from django.utils.safestring import SafeString
 
+from apps.accounts.decorators import step_up_required
 from apps.accounts.mfa_session import is_recently_verified
 from apps.accounts.models import User
 from apps.core.admin import step_up
-from apps.core.audit import AuditContext, audit_context
+from apps.core.audit import audit_context
 from apps.core.changeset import ChangeSet
 
 from . import engine
@@ -153,53 +155,157 @@ def _address(prefix: str) -> tuple[str, ...]:
     )
 
 
-def _submitted_claim(vendor: Vendor) -> VendorClaim:
-    claim = VendorClaim.objects.filter(vendor=vendor).first()
-    if claim is None or claim.status != VendorClaim.Status.SUBMITTED:
-        raise engine.ClaimError("no claim is waiting for approval")
-    return claim
+ClaimAction = Callable[
+    [admin.ModelAdmin[Vendor], HttpRequest, QuerySet[Vendor]], HttpResponse | None
+]
+_STEP_UP_PASSED = HttpResponse()
 
 
-def _run_claim_step(name: str, vendor: Vendor, ctx: AuditContext) -> str:
-    if name == "send_claim_link":
+def _step_up_passed(request: HttpRequest) -> HttpResponse:
+    return _STEP_UP_PASSED
+
+
+def step_up_action(action: ClaimAction) -> ClaimAction:
+    """Run `action` only behind a fresh second factor (CORE.4), checked on the request by the
+    action itself: whatever `action` values the changelist POST carries, a stale factor gets
+    the verify (or setup) redirect and nothing changes."""
+
+    @functools.wraps(action)
+    def guarded(
+        modeladmin: admin.ModelAdmin[Vendor], request: HttpRequest, queryset: QuerySet[Vendor]
+    ) -> HttpResponse | None:
+        refused = step_up_required()(_step_up_passed)(request)
+        if refused is not _STEP_UP_PASSED:
+            return refused
+        return action(modeladmin, request, queryset)
+
+    return guarded
+
+
+def _claim_admin_action(name: str, description: str, action: ClaimAction) -> ClaimAction:
+    action.__name__ = name
+    # TODO(CORE.18): granting the owner role (approve) needs its own permission from the
+    # staff role matrix, not just `vendors.change_vendor`.
+    return admin.action(description=description, permissions=["change"])(step_up_action(action))
+
+
+def send_claim_link_action(
+    modeladmin: admin.ModelAdmin[Vendor], request: HttpRequest, queryset: QuerySet[Vendor]
+) -> None:
+    """Send the claim link (VEN.24) of each selected vendor to its legal email of record."""
+    ctx = audit_context(request)
+    for vendor in queryset:
         resent = VendorClaim.objects.filter(vendor=vendor).exists()
-        send_claim_link(vendor, ctx=ctx)
+        try:
+            send_claim_link(vendor, ctx=ctx)
+        except engine.ClaimError as exc:
+            modeladmin.message_user(request, f"{vendor}: {exc}", messages.ERROR)
+            continue
+        done = "the claim link was sent to the legal email of record."
         if resent:
-            return "a new claim link was sent; the previous link no longer works."
-        return "the claim link was sent to the legal email of record."
-    if name == "approve_claim":
-        approve_claim(_submitted_claim(vendor), ctx=ctx)
-        return "claim approved: the claimant is now the owner."
-    reject_claim(_submitted_claim(vendor), ctx=ctx)
-    return "claim rejected: nothing was granted."
+            done = "a new claim link was sent; the previous link no longer works."
+        modeladmin.message_user(request, f"{vendor}: {done}", messages.SUCCESS)
 
 
-def claim_action(name: str, description: str) -> StatusAction:
-    """An admin action that runs one claim step (VEN.24) on each selected vendor."""
+CLAIM_DECISION_TEMPLATE = "admin/vendors/vendor/claim_decision.html"
+DECISIONS = {
+    "approve_claim": (approve_claim, "Approve", "claim approved: the claimant is now the owner."),
+    "reject_claim": (reject_claim, "Reject", "claim rejected: nothing was granted."),
+}
+
+
+def _reviewed_field(vendor: Vendor) -> str:
+    return f"reviewed-{vendor.pk}"
+
+
+def _reviewed_value(claim: VendorClaim) -> str:
+    return f"{claim.version}:{claim.claimant_id}"
+
+
+def _parse_reviewed(value: str) -> tuple[int, int] | None:
+    version, _, claimant = value.partition(":")
+    if not (version.isdigit() and claimant.isdigit()):
+        return None
+    return int(version), int(claimant)
+
+
+def _review_page(
+    modeladmin: admin.ModelAdmin[Vendor],
+    request: HttpRequest,
+    queryset: QuerySet[Vendor],
+    name: str,
+) -> HttpResponse:
+    """The claims staff are about to decide, each with its claimant and link version; the
+    confirmation posts back what was shown, and the decision is bound to it."""
+    rows: list[dict[str, Any]] = []
+    reviewed: dict[str, str] = {}
+    for vendor in queryset:
+        claim = VendorClaim.objects.filter(vendor=vendor).select_related("claimant").first()
+        if claim is None or claim.status != VendorClaim.Status.SUBMITTED or claim.claimant is None:
+            rows.append({"vendor": vendor, "error": "no claim is waiting for approval"})
+            continue
+        reviewed[_reviewed_field(vendor)] = _reviewed_value(claim)
+        rows.append({"vendor": vendor, "claim": claim})
+    context = {
+        **modeladmin.admin_site.each_context(request),
+        "opts": modeladmin.opts,
+        "title": f"{DECISIONS[name][1]} claims",
+        "verb": DECISIONS[name][1],
+        "action": name,
+        "rows": rows,
+        "selected": [vendor.pk for vendor in queryset],
+        "reviewed_fields": reviewed,
+    }
+    return TemplateResponse(request, CLAIM_DECISION_TEMPLATE, context)
+
+
+def decision_action(name: str) -> ClaimAction:
+    """Approve or reject the submitted claims (VEN.24) of the selected vendors: a review page
+    first, then the decision on exactly the claims that page showed."""
 
     def action(
         modeladmin: admin.ModelAdmin[Vendor], request: HttpRequest, queryset: QuerySet[Vendor]
-    ) -> None:
+    ) -> HttpResponse | None:
+        if request.POST.get("post") != "yes":
+            return _review_page(modeladmin, request, queryset, name)
+        decide, _verb, done = DECISIONS[name]
         ctx = audit_context(request)
         for vendor in queryset:
+            reviewed = _parse_reviewed(request.POST.get(_reviewed_field(vendor), ""))
+            claim = VendorClaim.objects.filter(vendor=vendor).first()
+            if reviewed is None or claim is None:
+                modeladmin.message_user(
+                    request, f"{vendor}: review the claim before deciding it.", messages.ERROR
+                )
+                continue
+            version, claimant_id = reviewed
             try:
-                done = _run_claim_step(name, vendor, ctx)
+                decide(claim, ctx=ctx, reviewed_version=version, reviewed_claimant_id=claimant_id)
             except engine.ClaimError as exc:
                 modeladmin.message_user(request, f"{vendor}: {exc}", messages.ERROR)
             else:
                 modeladmin.message_user(request, f"{vendor}: {done}", messages.SUCCESS)
+        return None
 
-    action.__name__ = name
-    return admin.action(description=description, permissions=["change"])(action)
+    return action
 
 
 CLAIM_ACTIONS = (
-    claim_action("send_claim_link", "Send or regenerate the claim link (imported vendors)"),
-    claim_action("approve_claim", "Approve the submitted claim"),
-    claim_action("reject_claim", "Reject the submitted claim"),
+    _claim_admin_action(
+        "send_claim_link",
+        "Send or regenerate the claim link (imported vendors)",
+        send_claim_link_action,
+    ),
+    _claim_admin_action(
+        "approve_claim", "Approve the submitted claim", decision_action("approve_claim")
+    ),
+    _claim_admin_action(
+        "reject_claim", "Reject the submitted claim", decision_action("reject_claim")
+    ),
 )
 # Sending a link restarts a claim (after a reject only staff may), deciding one grants or
-# refuses the owner role: all behind a fresh second factor.
+# refuses the owner role: all behind a fresh second factor, checked by each action itself and,
+# before Django picks the action, for every `action` value the POST carries.
 STEP_UP_CLAIM_ACTIONS = frozenset({"send_claim_link", "approve_claim", "reject_claim"})
 CLAIM_LINK_TEMPLATE = "admin/vendors/vendor/claim_link.html"
 
@@ -402,7 +508,10 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         """Deciding a claim (it grants the owner role, or refuses it) needs a fresh second
         factor, like the other sensitive staff pages (CORE.4); browsing the list does not."""
         parent = super().changelist_view
-        if request.method == "POST" and request.POST.get("action") in STEP_UP_CLAIM_ACTIONS:
+        # Django runs `getlist("action")[index]`: guard on every value, not just one of them.
+        if request.method == "POST" and STEP_UP_CLAIM_ACTIONS.intersection(
+            request.POST.getlist("action")
+        ):
             return step_up(lambda req: parent(req, extra_context))(request)
         return parent(request, extra_context)
 

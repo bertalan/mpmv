@@ -1,7 +1,7 @@
 """VEN.24: staff send, resend / regenerate, approve and reject vendor claims from the admin."""
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlsplit
 
 import pytest
@@ -297,7 +297,7 @@ def test_each_claim_action_checks_the_step_up_itself(
     request.user = superuser
     SessionMiddleware(lambda req: HttpResponse()).process_request(request)
     model_admin = VendorAdmin(Vendor, admin.site)
-    action = model_admin.get_actions(request)[name][0]
+    action = cast(Any, model_admin.get_actions(request)[name])[0]
     response = action(model_admin, request, Vendor.objects.filter(pk=vendor.pk))
     assert response is not None
     assert response.status_code == 302
