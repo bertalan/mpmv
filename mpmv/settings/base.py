@@ -6,7 +6,7 @@ import dj_database_url
 import django_stubs_ext
 from django.utils.csp import CSP
 
-from .env import env_bool, env_flags, env_list, env_secret_list, env_str
+from .env import env_bool, env_flags, env_list, env_secret_list, env_str, map_tile_origin
 
 # Allows `models.DecimalField[Any]`-style generics at runtime (django-stubs).
 django_stubs_ext.monkeypatch()
@@ -371,6 +371,24 @@ GEOCODING_USER_WINDOW = 60  # seconds
 # Who may use "Find coordinates" besides staff: dotted `check(user) -> bool` paths, so that core
 # does not import the vendors app.
 GEOCODING_ACCESS_POLICIES: list[str] = ["apps.vendors.services.is_vendor_member"]
+
+# Maps (EVT.13, spec 15 "Maps"): the Leaflet tile URL template, its attribution and the view of
+# a map without a point (latitude, longitude, zoom). The tiles come from the EVT.14 proxy on the
+# site itself (`/maps/tiles/{z}/{x}/{y}.png`) once it exists; until then empty means no tile
+# layer (the picker still works: click, drag and the inputs). An absolute https URL is allowed in
+# the CSP for that one origin only, and never in tests (no third-party network).
+MAP_TILE_URL = env_str("MPMV_MAP_TILE_URL", "")
+MAP_TILE_ATTRIBUTION = env_str("MPMV_MAP_TILE_ATTRIBUTION", "") or "© OpenStreetMap contributors"
+MAP_TILE_ATTRIBUTION_URL = (
+    env_str("MPMV_MAP_TILE_ATTRIBUTION_URL", "") or "https://www.openstreetmap.org/copyright"
+)
+MAP_DEFAULT_VIEW = (48.0, 10.0, 4)
+_MAP_TILE_ORIGIN = map_tile_origin(MAP_TILE_URL)
+if _MAP_TILE_ORIGIN:
+    SECURE_CSP = {
+        **SECURE_CSP,
+        "img-src": [*SECURE_CSP["img-src"], _MAP_TILE_ORIGIN],  # type: ignore[misc]
+    }
 
 # Per-API-key rate limit (CORE.12, CORE.16, apps.api.engine): fixed windows counted in PostgreSQL,
 # so every app process shares one counter per key. API_RATE_LIMIT is the key-wide limit of every

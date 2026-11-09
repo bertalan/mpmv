@@ -14,6 +14,7 @@ from mpmv.settings.env import (
     env_list,
     env_secret_list,
     env_str,
+    map_tile_origin,
 )
 
 
@@ -140,3 +141,32 @@ def test_env_flags_rejects_entries_without_a_clear_value(
 
 def env_lines(text: str) -> list[str]:
     return [line for line in text.splitlines() if line and not line.startswith("#")]
+
+
+# --- Map tiles (EVT.13): the CSP allows only the origin of the configured tile URL
+
+
+@pytest.mark.parametrize("url", ["", "/maps/tiles/{z}/{x}/{y}.png"])
+def test_map_tiles_from_the_site_itself_need_no_extra_origin(url: str) -> None:
+    assert map_tile_origin(url) is None
+
+
+def test_map_tiles_from_one_https_host_allow_that_origin_only() -> None:
+    url = "https://tiles.example.eu:8443/osm/{z}/{x}/{y}.png"
+    assert map_tile_origin(url) == "https://tiles.example.eu:8443"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://tiles.example.eu/{z}/{x}/{y}.png",  # not HTTPS
+        "https://{s}.tile.example.org/{z}/{x}/{y}.png",  # several hosts: no single origin
+        "https://tiles.example.eu/tile.png",  # no z, x, y placeholders
+        "/maps/tiles/{z}/{x}.png",
+        "//tiles.example.eu/{z}/{x}/{y}.png",  # scheme-relative: a third-party host in disguise
+        "javascript:{z}{x}{y}",
+    ],
+)
+def test_a_bad_map_tile_url_is_a_configuration_error(url: str) -> None:
+    with pytest.raises(ImproperlyConfigured, match="MPMV_MAP_TILE_URL"):
+        map_tile_origin(url)
