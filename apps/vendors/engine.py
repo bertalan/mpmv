@@ -1539,8 +1539,6 @@ CLAIM_SUBMITTED: Final = "submitted"  # account created, waiting for staff appro
 CLAIM_APPROVED: Final = "approved"  # the claimant is the vendor's owner
 CLAIM_REJECTED: Final = "rejected"  # staff refused it: nothing granted, a new link may follow
 
-CLAIM_STATUSES: Final = (CLAIM_OPEN, CLAIM_LOCKED, CLAIM_SUBMITTED, CLAIM_APPROVED, CLAIM_REJECTED)
-
 
 class ClaimError(ValueError):
     """A claim step the rules refuse (the message is safe to show to staff)."""
@@ -1550,7 +1548,6 @@ class ClaimError(ValueError):
 # has one on file, the PEC address staff pick instead. No other address can be chosen.
 CLAIM_CHANNEL_EMAIL: Final = "email"
 CLAIM_CHANNEL_PEC: Final = "pec"
-CLAIM_CHANNELS: Final = (CLAIM_CHANNEL_EMAIL, CLAIM_CHANNEL_PEC)
 
 
 def check_claim_link_can_be_sent(status: str | None, *, by_staff: bool) -> None:

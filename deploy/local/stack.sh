@@ -60,7 +60,7 @@ run_image() {
   db_ip=$(db_address)
   container run --network "$NETWORK" --network default \
     --env-file "$ENV_FILE" \
-    -e DJANGO_SETTINGS_MODULE=mpmv.settings.live \
+    -e DJANGO_SETTINGS_MODULE=mpmv.settings.stage \
     -e "DATABASE_URL=postgres://mpmv@$db_ip:5432/mpmv" \
     -e DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1 \
     -e DJANGO_SECURE_SSL_REDIRECT=false \
