@@ -33,7 +33,7 @@ from . import services
 from .decorators import step_up_required
 from .mfa_session import is_recently_verified
 from .models import User
-from .services import has_second_factor, reset_mfa
+from .services import has_second_factor, is_privileged, reset_mfa
 
 # Second factors are enrolled only through the audited MFA pages (CORE.4): the raw device admin
 # would let staff create or read authenticator secrets for other users.
@@ -71,13 +71,6 @@ PRIVILEGED = (
 
 def _is_superuser(request: HttpRequest) -> bool:
     return bool(getattr(request.user, "is_superuser", False))
-
-
-def is_privileged(user: User) -> bool:
-    """Whether `user` holds staff or superuser status, a group or a direct permission."""
-    return (
-        user.is_staff or user.is_superuser or user.groups.exists() or user.user_permissions.exists()
-    )
 
 
 def may_manage_account(request: HttpRequest, target: User) -> bool:
