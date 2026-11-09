@@ -10,8 +10,11 @@ import json
 import secrets
 
 import pytest
+from django.core import checks
+from django.test import override_settings
 
 from apps.core import mail
+from apps.core.checks import check_email_settings
 from apps.core.tasks import Retry
 
 
@@ -188,3 +191,54 @@ def test_signed_feedback_refuses_malformed_payloads(body: bytes) -> None:
 
 def test_addresses_are_normalised_for_suppression() -> None:
     assert mail.normalise_address("  Customer@Example.COM ") == "customer@example.com"
+
+
+# --- Settings where live data is held (coherence check 7) ---------------------------------------
+
+REAL_SENDER = "apps.example.ProviderEmailSender"  # a provider adapter (ARC.19), never imported
+
+
+@pytest.mark.parametrize(
+    "sender", ["apps.core.mail.ConsoleEmailSender", "apps.core.mail.MemoryEmailSender", ""]
+)
+def test_live_data_refuses_the_console_and_test_senders(sender: str) -> None:
+
+    with override_settings(
+        LIVE_DATA=True, EMAIL_SENDER=sender, DEFAULT_FROM_EMAIL="no-reply@example.com"
+    ):
+        messages = check_email_settings(None)
+    assert [m.id for m in messages] == ["core.E501"]
+    assert isinstance(messages[0], checks.Error)
+
+
+@pytest.mark.parametrize("address", ["no-reply@localhost", "", "No-Reply@LOCALHOST "])
+def test_live_data_refuses_a_localhost_or_empty_sender_address(address: str) -> None:
+
+    with override_settings(LIVE_DATA=True, EMAIL_SENDER=REAL_SENDER, DEFAULT_FROM_EMAIL=address):
+        messages = check_email_settings(None)
+    assert [m.id for m in messages] == ["core.E502"]
+
+
+def test_live_data_with_a_provider_and_a_real_address_passes() -> None:
+
+    with override_settings(
+        LIVE_DATA=True, EMAIL_SENDER=REAL_SENDER, DEFAULT_FROM_EMAIL="no-reply@example.com"
+    ):
+        assert check_email_settings(None) == []
+
+
+def test_without_live_data_the_console_sender_is_allowed() -> None:
+    """Development, tests and STAGE (synthetic data) keep the console sender until ARC.19."""
+
+    with override_settings(
+        LIVE_DATA=False,
+        EMAIL_SENDER="apps.core.mail.ConsoleEmailSender",
+        DEFAULT_FROM_EMAIL="no-reply@localhost",
+    ):
+        assert check_email_settings(None) == []
+
+
+def test_the_email_check_is_registered() -> None:
+
+    registered: list[object] = list(checks.registry.registry.get_checks())
+    assert check_email_settings in registered

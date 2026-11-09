@@ -6,7 +6,8 @@ on users would change them without an audit entry, so their registrations are wi
 they get no URL, no menu item and no admin link.
 
 The term and vendor choosers of the page cards (CMS.2) and the category and brand choosers of
-the product grid (CMS.10) are admin viewsets (`choosers`).
+the product grid (CMS.10) and the product chooser of the blog cards (CMS.3) are admin viewsets
+(`choosers`). Blog authors (CMS.3) are translatable snippets.
 
 Documents are installed only for wagtail-localize (I18N.3): their menu item is hidden.
 
@@ -34,8 +35,14 @@ from apps.catalog.services import ListingScope
 from apps.core.services import classified
 
 from .admin_views import can_classify_images, image_review
-from .choosers import brand_chooser, category_chooser, term_chooser, vendor_chooser
-from .models import NavigationMenu
+from .choosers import (
+    brand_chooser,
+    category_chooser,
+    product_chooser,
+    term_chooser,
+    vendor_chooser,
+)
+from .models import BlogAuthor, NavigationMenu
 from .services import listing_editorial
 
 
@@ -49,6 +56,20 @@ class NavigationMenuViewSet(SnippetViewSet):  # type: ignore[misc]  # Wagtail is
 
 
 register_snippet(NavigationMenuViewSet)
+
+
+class BlogAuthorViewSet(SnippetViewSet):  # type: ignore[misc]
+    """The blog's authors (CMS.3): a byline with bio and photo, not a user account."""
+
+    model = BlogAuthor
+    icon = "user"
+    menu_label = _("Blog authors")
+    add_to_admin_menu = True
+    list_display = ("name",)
+    search_fields = ("name",)
+
+
+register_snippet(BlogAuthorViewSet)
 
 
 def _withdraw(hook_name: str, registered_by: Callable[[Any], bool]) -> None:
@@ -114,6 +135,11 @@ def register_category_chooser() -> Any:
 @hooks.register("register_admin_viewset")  # type: ignore[untyped-decorator]
 def register_brand_chooser() -> Any:
     return brand_chooser
+
+
+@hooks.register("register_admin_viewset")  # type: ignore[untyped-decorator]
+def register_product_chooser() -> Any:
+    return product_chooser
 
 
 @hooks.register(EDITORIAL_HOOK)  # type: ignore[untyped-decorator]

@@ -1,0 +1,26 @@
+{% extends "wagtailadmin/generic/base.html" %}
+{% load i18n %}
+{% block main_content %}
+  <p><a class="button" href="{% url 'events_admin:policy_set' %}">{% translate "Set a vendor's policy" %}</a></p>
+  {% if policies %}
+    <table class="listing">
+      <caption class="w-sr-only">{% translate "Vendor moderation policies" %}</caption>
+      <thead>
+        <tr>
+          <th scope="col">{% translate "Vendor" %}</th>
+          <th scope="col">{% translate "Moderation" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for policy in policies %}
+          <tr>
+            <td><a href="{% url 'events_admin:policy_set' %}?vendor={{ policy.vendor.public_id }}">{{ policy.vendor }}</a></td>
+            <td>{{ policy.get_mode_display }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>{% translate "Every vendor follows the default threshold." %}</p>
+  {% endif %}
+{% endblock %}
