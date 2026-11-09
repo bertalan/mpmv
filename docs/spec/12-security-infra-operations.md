@@ -34,7 +34,7 @@ task SEC.1 is HTTP hardening). Renaming the requirements is an open owner questi
 | SEC.6 | Field-level encryption | IBAN, KYC documents, DAC7 data; key in KMS or in a file outside the DB, rotatable |
 | SEC.7 | Audit trail | Logins, credentials, prices, rates, zones, commissions, IBAN, vendor status, payouts, data exports |
 | SEC.8 | Incoming webhooks | Mandatory signature, idempotency, time window |
-| SEC.9 | Untrusted input | Feeds, scraping, AI output and webhooks validated against a schema before reaching the DB; product texts never interpreted as instructions by agents |
+| SEC.9 | Untrusted input | Feeds, scraping, AI output and webhooks validated against a schema before reaching the DB; product texts never interpreted as instructions by agents; outbound fetches of staff- or vendor-entered URLs (connectors, feeds) only through the shared client that refuses loopback, private, link-local, CGNAT and metadata addresses and redirects to them (MIG.12) |
 | SEC.10 | Continuous verification | Security tests in CI, mandatory manual review on payments, tax and permissions, external penetration test before go-live |
 
 ## 12.4 Infrastructure
