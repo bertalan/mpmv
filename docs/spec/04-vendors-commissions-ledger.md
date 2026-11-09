@@ -293,6 +293,35 @@ identified by its national TIN in `IdFiscaleIVA`. The platform writes no Fattura
 nothing to SDI: CMP.2 puts these party data in the non-fiscal commission statement export, in a
 structure the operator's invoicing tool can map to FatturaPA.
 
+### Operator-owned shop (VEN.26)
+
+Owner note 2026-11-09: the platform operator may also sell on its own marketplace, as a vendor
+whose legal identity is the operator's. This is allowed, without conflicts:
+
+- **Detection.** A vendor whose VAT number, or TIN with its country, matches the current
+  `PlatformOperator` is flagged automatically as `is_operator_owned` when its VEN.12 identity is
+  saved or the operator changes; the flag is visible to staff and every change of it is in the
+  `AuditLog`. The VAT number is compared in clear; `tax_code` is encrypted at rest (SEC.3), so the
+  TIN match decrypts it in the service for the one vendor being checked and never adds a
+  searchable copy. No uniqueness rule refuses a vendor whose identity equals the operator's or
+  another vendor's.
+- **Commission.** No commission: the vendor gets an explicit 0% commission rule with the reason
+  "operator-owned" (VEN.2 forbids only an implicit zero), and no commission statement (CMP.2),
+  since the platform does not charge itself.
+- **Ledger and payouts** stay separate for accounting: the shop has its own ledger, balance and
+  payout account like any vendor.
+- **Access.** The people who run it use their separate shop accounts (vendor members); a
+  platform-role holder enters its shop space only through such an account or a support
+  impersonation session (CORE.10), as for any vendor.
+- **Storefront.** The seller shown on offers and in the order documents is the operator, with
+  the operator's legal notices (DSA trader data, policies).
+- **Open accountant questions (D-22 ⚖️):** whether the operator's own sales are reportable under
+  DAC7, and how the operator invoices its own sales made through the marketplace. Default
+  proposal: no DAC7 reporting for operator-owned sales (the operator is not a seller using
+  another platform operator's platform); the operator issues normal sales invoices as the seller,
+  outside the platform, like any vendor. The DAC7 and invoice parts of VEN.26 wait for D-22; the
+  rest does not.
+
 ### Vendor legal documents and signature (VEN.5, VEN.13 to VEN.17)
 
 Owner decisions of 2026-11-07. The vendor contract and the other legal documents a vendor
@@ -683,6 +712,7 @@ and closure schedule (VEN.20).
 | VEN.23 | DAC7 seller dataset (owner decision MQ-6): the Directive (EU) 2021/514 Annex V section III.B fields on the vendor for individuals and entities (TIN with its issuing country, VAT number only when the vendor has one with its VIES status, date of birth for individuals, place of birth when the issuing country issues no TIN, business registration number), a "same as the VAT number" option, TIN format rules per issuing country in a table, the seeded `LegalFieldRequirement` rows and `engine.dac7_missing()` updated; staff correct or complete the dataset behind an MFA step-up with audit | P1 | 6 | VEN.12, TAX.5, CORE.4 | A test pins the field list to Annex V III.B; a TIN without its issuing country is incomplete for a payout; "same as the VAT number" fills the TIN from a VIES-valid VAT number; a malformed TIN for its country is refused; a vendor whose country issues no TIN is complete with a place of birth; a staff correction without step-up is refused and a saved one is in the AuditLog |
 | VEN.24 | Claim an imported vendor (owner decision MQ-1): a single-use, expiring CORE.15 link sent only to the vendor's legal email of record; the claimant sets a password and their own MFA and confirms the stored VAT number or TIN; staff approve the claim before fiscal or payout data can change; a staff "resend / regenerate" action invalidates the old link, with audit | P1 | 6 | CORE.15, VEN.5, CORE.4 | The link goes only to the legal email of record; a GET does not consume it; a wrong VAT number or TIN is refused and audited; before staff approval the claimant cannot change the legal identity, the tax profile or the payout data; after regenerate the old link is refused and both the regeneration and the invalidation are in the AuditLog; an expired link is refused |
 | VEN.25 | RF20 eligibility (owner decision MQ-5): fiscal regime RF20 only for vendors established in an EU member state, with a mandatory participation number issued under the cross-border SME franchise (suffix `EX`, art. 284(3) of the VAT directive as amended by Directive (EU) 2020/285), a format check per issuing member state and the issuing country matching the establishment country; the number in the FatturaPA party data and the TAX.2 regime-change check | P1 | 3 | VEN.18, CMP.13 | RF20 is refused for a vendor established outside the EU and without an `EX` number; a malformed number or one issued by another member state is refused; a valid EU vendor saves RF20; a regime-change request to RF20 without the number is refused |
+| VEN.26 | Operator-owned shop (owner note 2026-11-09, spec 04 §Operator-owned shop): `is_operator_owned` set automatically when a vendor's VAT number, or TIN with country, matches the current `PlatformOperator` (re-checked on identity save and on operator change, audited, staff-visible; TIN compared by decrypting in the service, no searchable copy); explicit 0% commission rule with reason and no CMP.2 commission statement; own ledger and payouts; the operator shown as the seller with its legal notices; the DAC7 treatment (CMP.1) and the invoice wording wait for D-22 ⚖️, everything else does not | P1 | 5 | VEN.12, VEN.2, ARC.7 | A vendor with the operator's VAT number is created and is flagged, and the flag change is in the AuditLog; its orders compute 0 commission; two accounts with the same name and two vendors with the same tax code coexist; a second account with the same email (any letter case) is refused with a message that suggests a second mailbox or plus addressing, and `name+shop@` is accepted as a distinct address; changing the operator's VAT number clears or sets the flag on the next check; the DAC7 and invoice checks are added once D-22 is decided |
 
 ## 4.4 Mandatory regression cases
 
