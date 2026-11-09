@@ -99,11 +99,11 @@ The owner's answers on editor roles and customer legal pages (Q-58 and Q-42, 202
 P1 by +8 h: CORE.8 grows (13 → 15 h: our own editor roles instead of Wagtail's default groups) and
 the new row I18N.9 (6 h, customer legal and checkout pages in five languages at go-live) is added.
 
-The owner's decisions on the backoffice, setup and imports (BO-1 to BO-13, 2026-11-09) changed P1
-by +80 h: the Manager shell CORE.17 (18 h), the staff role matrix CORE.18 (10 h), support
+The owner's decisions on the backoffice, setup and imports (BO-1 to BO-14, 2026-11-09) changed P1
+by +90 h: the Manager shell CORE.17 (18 h), the staff role matrix CORE.18 (10 h), support
 impersonation CORE.10 moved from P2 to P1 and grown (4 → 14 h: policy, full-access grants, hard
 floor), marketplace configuration pages ARC.24 (17 h), the setup wizard ARC.25 (14 h), the
-connector interface MIG.12 (8 h) and the operator-owned shop VEN.26 (5 h); CORE.8 shrinks (15 → 12 h) and CORE.9 shrinks (16 → 13 h)
+connector interface MIG.12 (8 h), the operator-owned shop VEN.26 (5 h) and account activation and service messages CORE.19 (12 h); MIG.4 shrinks (10 → 8 h: no WordPress password hasher), CORE.8 shrinks (15 → 12 h) and CORE.9 shrinks (16 → 13 h)
 because the commerce lists and the shell move to CORE.17. P2 gains 24 h net: ARC.26 (8 h, wizard
 imports), the WooCommerce connector MIG.13 (12 h) and the WCFM connector MIG.14 (8 h), less the
 4 h of CORE.10.
