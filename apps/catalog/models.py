@@ -4,7 +4,8 @@ The category tree, taxonomies, terms and brands (CAT.2) live in `taxonomy.py`; p
 to them here, and to the typed attributes of `attributes.py` (CAT.3) through `ProductAttribute`
 and `VariantOption`. Fields owned by later tasks are added there: images (CAT.4), `gpsr` (CMP.3).
 Slugs are derived from the title by `services.sync_product_slug` (CAT.5), which keeps the
-replaced ones in `SlugHistory`.
+replaced ones in `SlugHistory`. `Redirect` (CAT.6) holds the staff-managed legacy redirects; it
+belongs to the platform, not to a vendor, and changes only through the audited services.
 Prices change only through `services.set_product_price` and `services.set_variant_price`, which
 audit them; the status changes through the publishing services of CAT.10.
 
@@ -29,6 +30,7 @@ the rename services, never with `QuerySet.update()`, which skips the match key.
 
 from typing import Any, ClassVar
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
@@ -77,6 +79,7 @@ __all__ = [
     "ProductKind",
     "ProductStatus",
     "ProductTranslation",
+    "Redirect",
     "SalesMode",
     "SkuAlias",
     "SlugHistory",
@@ -572,6 +575,140 @@ class SlugHistory(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.slug} [{self.language}]"
+
+
+def _only(kind: str, field: str | None) -> models.Q:
+    """The target columns of a 301 to `kind`: `field` set, every other one empty."""
+    empty = {
+        "target_path": models.Q(target_path=""),
+        "target_product": models.Q(target_product__isnull=True),
+        "target_term": models.Q(target_term__isnull=True),
+        "target_query": models.Q(target_query=""),
+    }
+    condition = models.Q(code=301, target_kind=kind)
+    for name, is_empty in empty.items():
+        condition &= ~is_empty if name == field else is_empty
+    return condition
+
+
+class Redirect(BaseModel):
+    """A legacy URL that moves (301) or is gone (410), CAT.6, spec 03 §3.1-3.2.
+
+    Applies only when the path answers 404, so a live page always wins. The target is a path on
+    this site, a product, a taxonomy term or a search, resolved in the source path's language at
+    request time (a product or a term keeps its current URL). Write through
+    `services.save_redirect` and `services.delete_redirect`, which validate (no off-site target,
+    no loop, no chain) and audit.
+    """
+
+    class Code(models.IntegerChoices):
+        MOVED = 301, "301 moved permanently"
+        GONE = 410, "410 gone"
+
+    class Target(models.TextChoices):
+        PATH = "path", "Path on this site"
+        PRODUCT = "product", "Product"
+        TERM = "term", "Taxonomy term"
+        SEARCH = "search", "Search"
+
+    class Origin(models.TextChoices):
+        MANUAL = "manual", "Manual"
+        RETIRED_SKU = "retired_sku", "Retired SKU"
+        MERGED_TAG = "merged_tag", "Merged tag"
+        DISCONTINUED_CATEGORY = "discontinued_category", "Discontinued category"
+        LEGACY_RULE = "legacy_rule", "Legacy site rule"
+
+    source_path = models.CharField(
+        max_length=engine.REDIRECT_PATH_MAX_LENGTH,
+        unique=True,
+        help_text="The old path, e.g. /tag-product/old-tag/ or /it/prodotto/old-slug/.",
+    )
+    match_prefix = models.BooleanField(
+        "match everything below", default=False, help_text="E.g. /author/ for /author/anyone/."
+    )
+    code = models.PositiveSmallIntegerField(choices=Code.choices, default=Code.MOVED)
+    target_kind = models.CharField(max_length=16, choices=Target.choices, blank=True)
+    target_path = models.CharField(
+        max_length=engine.REDIRECT_PATH_MAX_LENGTH,
+        blank=True,
+        help_text="A path on this site, e.g. /it/. Never another site.",
+    )
+    target_product = models.ForeignKey(
+        Product, on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    target_term = models.ForeignKey(
+        Term, on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    target_query = models.CharField("search words", max_length=200, blank=True)
+    origin = models.CharField(max_length=32, choices=Origin.choices, default=Origin.MANUAL)
+    expires_at = models.DateTimeField(
+        null=True, blank=True, help_text="Empty: the rule never expires."
+    )
+    note = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        ordering = ["source_path"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    _only("path", "target_path")
+                    | _only("product", "target_product")
+                    | _only("term", "target_term")
+                    | _only("search", "target_query")
+                    | (
+                        models.Q(code=410, target_kind="", target_path="", target_query="")
+                        & models.Q(target_product__isnull=True, target_term__isnull=True)
+                    )
+                ),
+                name="catalog_redirect_one_target",
+                violation_error_message="A 301 names exactly one target of its kind; a 410 none.",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.source_path}{'*' if self.match_prefix else ''} ({self.code})"
+
+    def clean(self) -> None:
+        """The shape of the rule; loops and chains need the other rules (the services)."""
+        errors: dict[str, str] = {}
+        source_error = engine.redirect_path_error(self.source_path, allow_query=False)
+        if source_error is None and self.match_prefix:
+            source_error = engine.prefix_source_error(
+                self.source_path, languages=[code for code, _ in settings.LANGUAGES]
+            )
+        if source_error:
+            errors["source_path"] = source_error
+        if self.code == self.Code.GONE:
+            has_target = bool(self.target_kind or self.target_path or self.target_query) or (
+                self.target_product_id is not None or self.target_term_id is not None
+            )
+            if has_target:
+                errors["target_kind"] = "A 410 (gone) rule has no target."
+        elif not self.target_kind:
+            errors["target_kind"] = "Choose what the old path moves to."
+        else:
+            errors.update(self._target_errors())
+        if errors:
+            raise ValidationError(errors)
+
+    def _target_errors(self) -> dict[str, str]:
+        errors: dict[str, str] = {}
+        needed = {
+            self.Target.PATH: ("target_path", bool(self.target_path)),
+            self.Target.PRODUCT: ("target_product", self.target_product_id is not None),
+            self.Target.TERM: ("target_term", self.target_term_id is not None),
+            self.Target.SEARCH: ("target_query", bool(self.target_query.strip())),
+        }
+        for kind, (field, present) in needed.items():
+            if kind == self.target_kind and not present:
+                errors[field] = "Required for this kind of target."
+            elif kind != self.target_kind and present:
+                errors[field] = "Leave empty: the rule moves to another kind of target."
+        if self.target_kind == self.Target.PATH and self.target_path:
+            path_error = engine.redirect_path_error(self.target_path, allow_query=True)
+            if path_error:
+                errors["target_path"] = path_error
+        return errors
 
 
 class Variant(BaseModel):

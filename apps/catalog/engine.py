@@ -1,7 +1,7 @@
 """Pure catalog rules (spec 03 §3.2): the vendor SKU match key and warnings (CAT.13), price
 validation, the rules of the category and term trees and of the attributes a taxonomy declares for
-its terms, and the shape of a product's typed attributes, variant axes and variants (CAT.3). No ORM
-here."""
+its terms, the shape of a product's typed attributes, variant axes and variants (CAT.3), and the
+redirect rules: safe same-site paths, matching, loops and chains (CAT.6). No ORM here."""
 
 import datetime as dt
 import re
@@ -10,6 +10,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Protocol, cast
+from urllib.parse import urlsplit
 
 from apps.core.money import CENT, to_decimal
 
@@ -493,3 +494,135 @@ def variant_order(
 def variant_label(labels: Sequence[str]) -> str:
     """A variant's name from its option labels in axis order, e.g. "M / Red"."""
     return VARIANT_LABEL_SEPARATOR.join(labels)
+
+
+# --- Redirects (CAT.6, spec 03 §3.1-3.2)
+
+REDIRECT_PATH_MAX_LENGTH = 500
+_OFF_SITE = 'Enter a path on this site that starts with a single "/", e.g. /old-page/.'
+
+
+def redirect_path_error(path: str, *, allow_query: bool) -> str | None:
+    """Why `path` cannot be a redirect source (`allow_query=False`) or target; None when it can.
+
+    Only same-site paths: an absolute URL, a scheme-relative `//host`, a backslash (which
+    browsers read as a slash), whitespace or control characters (header injection with CR/LF)
+    and dot segments are refused, so a redirect can never send a visitor off the site.
+    """
+    if not path:
+        return "Enter a path."
+    if len(path) > REDIRECT_PATH_MAX_LENGTH:
+        return f"A path cannot be longer than {REDIRECT_PATH_MAX_LENGTH} characters."
+    if any(char.isspace() or unicodedata.category(char)[0] == "C" for char in path):
+        return "A path cannot contain spaces or control characters."
+    if "\\" in path:
+        return "A path cannot contain backslashes."
+    if not path.startswith("/") or path.startswith("//"):
+        return _OFF_SITE
+    parts = urlsplit(path)
+    if parts.scheme or parts.netloc:
+        return _OFF_SITE
+    if not allow_query and ("?" in path or "#" in path):
+        return "A source is a path only, without a query (?) or a fragment (#)."
+    if any(segment in (".", "..") for segment in parts.path.split("/")):
+        return 'A path cannot contain "." or ".." segments.'
+    return None
+
+
+def prefix_source_error(path: str, *, languages: Iterable[str]) -> str | None:
+    """Why `path` cannot be the source of a prefix rule: it must end with "/" and never cover a
+    whole site (the root or a language root), or every 404 would redirect. None when it can."""
+    if not path.endswith("/"):
+        return 'A prefix ends with "/", e.g. /author/.'
+    if path == "/" or path.strip("/") in set(languages):
+        return "A prefix cannot cover the whole site or a whole language."
+    return None
+
+
+def path_language(path: str, *, languages: Iterable[str], default: str) -> str:
+    """The language of a site path: its `/xx/` prefix when configured, else the default."""
+    first = path.lstrip("/").split("/", 1)[0]
+    return first if first in set(languages) else default
+
+
+def _slash_variants(path: str) -> tuple[str, ...]:
+    """A path as requested, and with the trailing slash added when it has none."""
+    return (path,) if path.endswith("/") else (path, f"{path}/")
+
+
+def rule_matches(source: str, *, prefix: bool, path: str) -> bool:
+    """Whether a rule on `source` (exact, or everything below it) applies to `path`."""
+    if prefix:
+        return any(candidate.startswith(source) for candidate in _slash_variants(path))
+    return source in _slash_variants(path)
+
+
+def redirect_lookup_candidates(path: str) -> tuple[list[str], list[str]]:
+    """The sources an exact rule and a prefix rule would need to match `path`, so the lookup
+    is a single indexed query. Prefixes come longest first."""
+    exact = list(_slash_variants(path))
+    full = exact[-1]
+    prefixes = [full[: index + 1] for index, char in enumerate(full) if char == "/"]
+    return exact, sorted(set(prefixes), key=len, reverse=True)
+
+
+def with_query(target: str, query: str) -> str:
+    """The redirect location: the request's query string is kept, unless the target has its
+    own (a search)."""
+    if not query or "?" in target:
+        return target
+    return f"{target}?{query}"
+
+
+@dataclass(frozen=True)
+class RedirectRule:
+    """An active redirect for the loop and chain check: its source, whether it is a prefix,
+    and its target path (None for a 410 or a target outside the check)."""
+
+    source: str
+    prefix: bool
+    target: str | None
+
+
+class _RuleIndex:
+    def __init__(self, rules: Iterable[RedirectRule]) -> None:
+        self.exact = {rule.source for rule in rules if not rule.prefix}
+        self.prefixes = {rule.source for rule in rules if rule.prefix}
+
+    def match(self, path: str) -> list[str]:
+        exact, prefixes = redirect_lookup_candidates(path)
+        return [s for s in exact if s in self.exact] + [s for s in prefixes if s in self.prefixes]
+
+
+def redirect_problems(rules: Sequence[RedirectRule], *, checked: Iterable[str]) -> dict[str, str]:
+    """The loops and chains that involve the `checked` sources, by source.
+
+    A rule loops when its target falls under its own source; it chains when its target falls
+    under another rule's source (a 410 included), or when another rule's target falls under it.
+    Every legacy URL must reach its page in a single hop (spec 13, MIG.6).
+    """
+    wanted = set(checked)
+    index = _RuleIndex(rules)
+    problems: dict[str, str] = {}
+    for rule in rules:
+        if rule.target is None:
+            continue
+        target = urlsplit(rule.target).path
+        for source in index.match(target):
+            if source == rule.source:
+                if rule.source in wanted:
+                    problems.setdefault(rule.source, f"{rule.source} redirects to itself (a loop).")
+                continue
+            if rule.source in wanted:
+                problems.setdefault(
+                    rule.source,
+                    f"{rule.source} leads to {rule.target}, which the rule on {source} redirects "
+                    "again (a chain): point it at the final page.",
+                )
+            if source in wanted:
+                problems.setdefault(
+                    source,
+                    f"The rule on {rule.source} already leads to {rule.target}: a rule on "
+                    f"{source} would make a chain; point that rule at the final page instead.",
+                )
+    return problems

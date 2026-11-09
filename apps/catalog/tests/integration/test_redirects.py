@@ -197,6 +197,12 @@ def test_an_unknown_add_to_cart_id_only_drops_the_parameter(client: Client) -> N
     assert response["Location"] == "/"
 
 
+def test_dropping_add_to_cart_never_leaves_the_site(client: Client) -> None:
+    response = client.get("//example.com/?add-to-cart=1")
+    assert response.status_code == 302
+    assert response["Location"] == "/"
+
+
 def test_a_post_with_add_to_cart_is_not_redirected(client: Client, bag: Product) -> None:
     assert client.post("/?add-to-cart=1001").status_code != 302
 
@@ -247,11 +253,14 @@ def test_saving_a_rule_is_audited_and_dry_run_writes_nothing() -> None:
     entry = entries().get()
     assert entry.action == "catalog.redirect.created"
     assert entry.target_key == "/old/"
+    assert entry.after is not None
     assert entry.after["target_path"] == "/new/"
 
     redirect.target_path = "/newer/"
     save_redirect(redirect, ctx=CTX)
     update = entries().get(action="catalog.redirect.updated")
+    assert update.before is not None
+    assert update.after is not None
     assert update.before["target_path"] == "/new/"
     assert update.after["target_path"] == "/newer/"
 

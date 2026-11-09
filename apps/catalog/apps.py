@@ -9,7 +9,8 @@ class CatalogConfig(AppConfig):
     # Every write goes through the audited services: prices (CAT.1), edits (CAT.12),
     # duplicates to another vendor (CAT.14), URL changes (CAT.5: services.sync_product_slug and
     # services.record_old_slugs).
-    audited_models = ("product", "variant", "slughistory")
+    # CAT.6: redirects through services.save_redirect, delete_redirect and import_redirects.
+    audited_models = ("product", "variant", "slughistory", "redirect")
     unaudited_models = {
         "producttranslation": "storefront texts under the translation workflow",
         "varianttranslation": "storefront texts under the translation workflow",
