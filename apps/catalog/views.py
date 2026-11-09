@@ -7,6 +7,10 @@ not canonical, gets a single 301 to the canonical URL (tracking parameters kept)
 last one and a filter value that matches nothing answer 404. A language without a published text
 shows the fallback, with the source-language page as canonical and `hreflang` listing only the
 published languages (spec 09).
+
+An editorial landing page (CMS.4) adds its content to the first unfiltered page of its listing,
+through the `listings.EDITORIAL_HOOK` Wagtail hook: the page lives on the listing's URL and adds
+no second one (D-07).
 """
 
 from decimal import Decimal
@@ -18,6 +22,7 @@ from django.http.response import HttpResponseBase
 from django.shortcuts import render
 from django.utils import translation
 from django.views.decorators.http import require_safe
+from wagtail import hooks
 from wagtail.views import serve
 
 from apps.core import translations
@@ -101,6 +106,17 @@ def _foreign_redirect(
     )
 
 
+def _editorial(
+    request: HttpRequest, scope: services.ListingScope, language: str
+) -> listings.ListingEditorial | None:
+    """The first editorial content a registered hook gives for this listing, if any."""
+    for hook in hooks.get_hooks(listings.EDITORIAL_HOOK):
+        found: listings.ListingEditorial | None = hook(request, scope, language)
+        if found is not None:
+            return found
+    return None
+
+
 def _listing(
     request: HttpRequest, anchor: services.ListingAnchor | None, language: str
 ) -> HttpResponseBase:
@@ -151,6 +167,11 @@ def _listing(
     labels.update({(listings.VENDOR, option.value): option.label for option in vendors})
 
     context: dict[str, Any] = {
+        "editorial": (
+            _editorial(request, anchor.scope, language)
+            if listings.shows_editorial(params)
+            else None
+        ),
         "anchor": anchor,
         "location": location,
         "cards": services.product_cards(page.products, language),
