@@ -5,6 +5,9 @@
     <h1>{{ page.title }}</h1>
     {% if current_version %}
       {% include "cms/includes/legal_version_meta.html" with version=current_version %}
+      {% if not counsel_checked %}
+        <p class="legal-notice legal-draft">{% translate "Draft: this text has not been checked by legal counsel yet and is not final." %}</p>
+      {% endif %}
       {% if not in_force or in_force.number != current_version.number %}
         <p class="legal-notice">
           {% blocktranslate trimmed with date=current_version.effective_date|date:"DATE_FORMAT" %}
