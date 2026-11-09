@@ -176,29 +176,41 @@ reusable mechanism: a service in `accounts` plus an email helper on top of the A
 
 - **The link** carries a signed token, bound to the action object ID, the recipient user and the
   object version. It expires after a configurable time (default 72 h) and is single-use for
-  sign-in. A new version of the object invalidates older tokens.
+  sign-in. A new version of the object invalidates older tokens. Issuing a new link for the same
+  object and recipient revokes the older ones (VEN.24 "regenerate", CMP.10 reminders), and so
+  does a change of the recipient's password.
 - **Prefetch.** Mail scanners (Outlook Safe Links, antivirus) prefetch GET and HEAD links. A GET or
   HEAD never consumes the token and never changes state: it shows an intermediate page whose
   "Continue" button POSTs, and only that POST consumes the sign-in use.
 - **Valid session:** the user lands directly on the action page.
 - **No session:** the token is a one-time sign-in step (a magic link that proves control of the
-  mailbox), so no password is asked. It never replaces MFA: before the approve or decline POST
+  mailbox), so no password is asked; never for staff or superusers, who sign in with their
+  password and MFA and then continue. It never replaces MFA: before the approve or decline POST
   the page requires an MFA step-up (TOTP or passkey, step-up window 300 s, CORE.4). Someone who
   holds only the mailbox cannot approve.
-- **Approval** is always a POST with CSRF from the action page, never a GET.
+- **Approval** is always a POST with CSRF from the action page, never a GET. The link leads to
+  the action page with the version it was issued for; the page puts that version in its form
+  and the POST re-checks it, so an object that changed after the link was opened is not acted
+  on.
 - **Misuse.** An expired, used or mismatched token (another user, an old version) sends the user
-  to the normal login and then to the same action page; the attempt is written to the AuditLog.
+  to the normal login and then to the same action page; the attempt is written to the AuditLog
+  when the token names an existing account. A bad signature or an unknown account is only logged
+  (reason, never the token): anyone can send one, and the Continue POST is rate limited.
 - **Implementation (CORE.15).** The app that owns the action object registers a purpose in
   `accounts` (`register_action_purpose`: current version, action page URL, who may act) and
   emails links with `send_action_link_email` through the ARC.16 outbox. The token is signed with
   Django signing under its own salt; the Continue POST carries it in the form body, is rate
   limited per IP and records the single use as a unique row (`ActionLinkUse`, nonce digest
-  only). Link pages send `Referrer-Policy: strict-origin` (never the path, which holds the token;
+  only). Each link carries its issue generation (`ActionLinkIssue`, bumped by every issue for
+  the purpose, object and recipient) and a keyed digest of the recipient's password hash; a
+  mismatch on either refuses it as revoked. A usable link redirects to the action page with
+  `?version=`, and the action POST calls `action_version_matches`. Link pages send `Referrer-Policy: strict-origin` (never the path, which holds the token;
   `no-referrer` would make browsers send `Origin: null` and fail the CSRF check) and are never
   cached. A user signed in as someone else is refused, never switched. A recipient with no
   confirmed second factor gets no passwordless sign-in (the first factor can be enrolled without
   other proof, so the link alone would be enough to bind an attacker's authenticator): the link
-  sends them to the normal login. Request logs (`django.request`, gunicorn's access log) redact
+  sends them to the normal login. A staff or superuser recipient without a session is sent to
+  the normal login too. Request logs (`django.request`, gunicorn's access log) redact
   the token segment of the link path.
 - **Vendor claim (VEN.24, owner decision MQ-1).** A vendor imported without an account holder is
   claimed through the same kind of link, bound to the vendor and to a claim version instead of a

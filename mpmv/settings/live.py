@@ -25,11 +25,14 @@ SECURE_CSP = {**SECURE_CSP, "upgrade-insecure-requests": True}
 # Static files are collected into the image at build time (ARC.5) and served by WhiteNoise with
 # hashed, compressed names (apps.cms.staticfiles: WhiteNoise's storage, tolerant only of
 # Wagtail's references to Wagtail apps left out). A new list, so the base settings stay untouched.
-_SECURITY = _BASE_MIDDLEWARE.index("django.middleware.security.SecurityMiddleware") + 1
+# WhiteNoise answers static requests itself, so it comes right after the middleware that only add
+# security headers (Security, CSP, picker nonces, Permissions-Policy, X-Frame-Options): static
+# files get the same headers as pages (SEC.5).
+_HEADERS_END = _BASE_MIDDLEWARE.index("django.middleware.clickjacking.XFrameOptionsMiddleware") + 1
 MIDDLEWARE = [
-    *_BASE_MIDDLEWARE[:_SECURITY],
+    *_BASE_MIDDLEWARE[:_HEADERS_END],
     "whitenoise.middleware.WhiteNoiseMiddleware",
-    *_BASE_MIDDLEWARE[_SECURITY:],
+    *_BASE_MIDDLEWARE[_HEADERS_END:],
 ]
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
