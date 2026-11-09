@@ -55,6 +55,15 @@ def test_errors_are_documented_as_problem_details(schema: dict[str, Any]) -> Non
     }
 
 
+def test_the_per_ip_block_on_refused_keys_is_documented(schema: dict[str, Any]) -> None:
+    """CORE.20, confirmed by lane-a: a blocked IP gets 429 even with a valid key."""
+    description = schema["info"]["description"]
+    assert "429" in description
+    assert "Retry-After" in description
+    assert "valid key" in description
+    assert "shared" in description
+
+
 @pytest.mark.urls("apps.api.tests.integration.urls_v1")
 def test_test_api_schema_shows_dry_run_and_required_scopes(client: Client) -> None:
     schema = client.get("/api/v1-test/openapi.json").json()

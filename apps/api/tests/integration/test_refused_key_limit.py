@@ -20,11 +20,17 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from pytest_django.fixtures import Settings as SettingsWrapper
 
+from apps.api import tasks as api_tasks
 from apps.api.engine import generate_key, parse_rate
 from apps.api.models import ApiClient, ApiRefusedKey
-from apps.api.services import record_refused_key, refused_key_retry_after
+from apps.api.services import (
+    purge_expired_refused_keys,
+    record_refused_key,
+    refused_key_retry_after,
+)
 from apps.api.tests.factories import ApiClientFactory
 from apps.core.models import Throttle
+from apps.core.tasks import schedules
 
 pytestmark = [pytest.mark.django_db, pytest.mark.urls("apps.api.tests.integration.urls_v1")]
 
@@ -203,11 +209,56 @@ def test_refusals_older_than_the_window_are_forgotten() -> None:
 
 
 @pytest.mark.usefixtures("three_a_minute")
-def test_old_refusals_are_purged() -> None:
+def test_a_refusal_cleans_only_the_old_rows_of_its_own_ip() -> None:
+    """Under a flood each 401 must not sweep the whole table (lane-b re-check finding 1)."""
+    record_refused_key(IP, now=NOON)
+    record_refused_key(OTHER_IP, now=NOON)
+    with CaptureQueriesContext(connection) as queries:
+        record_refused_key(IP, now=NOON + dt.timedelta(minutes=5))
+    deletes = [q["sql"] for q in queries.captured_queries if q["sql"].startswith("DELETE")]
+    assert deletes
+    assert all('"ip_bucket" =' in sql and IP in sql for sql in deletes)
+    assert set(ApiRefusedKey.objects.values_list("ip_bucket", flat=True)) == {IP, OTHER_IP}
+    assert ApiRefusedKey.objects.filter(ip_bucket=IP).count() == 1
+
+
+@pytest.mark.usefixtures("three_a_minute")
+def test_the_nightly_purge_deletes_the_old_refusals_of_every_ip() -> None:
     record_refused_key(IP, now=NOON)
     record_refused_key(OTHER_IP, now=NOON)
     record_refused_key(IP, now=NOON + dt.timedelta(minutes=5))
-    assert ApiRefusedKey.objects.count() == 1
+    deleted = purge_expired_refused_keys(now=NOON + dt.timedelta(minutes=5))
+    assert deleted == 1  # the IP cleaned its own old row; OTHER_IP waited for the purge
+    assert list(ApiRefusedKey.objects.values_list("ip_bucket", flat=True)) == [IP]
+
+
+def test_the_refused_key_purge_runs_every_night() -> None:
+    purge = {s.task_name: s for s in schedules()}["api.purge_refused_keys"]
+    assert purge.cron == "22 4 * * *"
+    ApiRefusedKey.objects.create(ip_bucket=IP, refused_at=timezone.now() - dt.timedelta(days=1))
+    api_tasks.purge_refused_keys.func(timestamp=0)
+    assert not ApiRefusedKey.objects.exists()
+
+
+@pytest.mark.usefixtures("three_a_minute")
+def test_a_block_is_started_and_logged_once(caplog: pytest.LogCaptureFixture) -> None:
+    """Two 401s that both count past the limit (in flight together) start one block.
+
+    The second one sees the refusals it raced with: they are re-inserted here, as they would be
+    when both requests insert before either clears the bucket (lane-b re-check finding 2).
+    """
+    with caplog.at_level(logging.WARNING, logger="apps.api.services"):
+        record_refused_key(IP, now=NOON)
+        record_refused_key(IP, now=NOON)
+        assert record_refused_key(IP, now=NOON)
+        ApiRefusedKey.objects.bulk_create(
+            [ApiRefusedKey(ip_bucket=IP, refused_at=NOON) for _ in range(2)]
+        )
+        assert not record_refused_key(IP, now=NOON + dt.timedelta(seconds=1))
+    events = [r for r in caplog.records if "refused-key limit" in r.getMessage()]
+    assert len(events) == 1
+    block = Throttle.objects.get(key__startswith="api:refused-key:")
+    assert block.locked_until == NOON + dt.timedelta(seconds=300)
 
 
 def test_the_block_lasts_the_configured_time(settings: SettingsWrapper) -> None:

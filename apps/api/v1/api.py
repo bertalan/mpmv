@@ -27,7 +27,12 @@ DESCRIPTION = (
     "`Authorization: Bearer <API key>`; each operation requires the scope listed in its "
     "security requirement. Mutating operations accept `?dry_run=true` and return the "
     "ChangeSet without applying it. Errors are RFC 9457 problem details "
-    "(`application/problem+json`)."
+    "(`application/problem+json`).\n\n"
+    "Refused keys are limited per client IP (IPv6 by /64): by default, after 30 answers 401 "
+    "in a minute the IP is blocked for 5 minutes. While it is blocked every request from it "
+    "gets 429, even one with a valid key, because the block is checked before the key. "
+    "An address shared behind a NAT can therefore be blocked by someone else's bad keys; "
+    "wait for the seconds in `Retry-After` and retry."
 )
 
 

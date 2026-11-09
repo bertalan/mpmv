@@ -175,9 +175,10 @@ class ApiRefusedKey(models.Model):
     """One refused-key (401) answer to a client IP, for the per-IP limit (CORE.20).
 
     A log row per refusal gives an exact rolling window: the refusals of an IP bucket since
-    `now - window` are counted (`services.record_refused_key`). Rows older than the window are
-    deleted on the next refusal, and an IP that reaches the limit is blocked (a `core.Throttle`
-    row) and stops writing here, so the table holds at most limit x active IPs rows. No key
+    `now - window` are counted (`services.record_refused_key`). A refusal deletes its own bucket's
+    rows older than the window, the nightly `api.purge_refused_keys` those of every other bucket
+    (the `refused_at` index), and an IP that reaches the limit is blocked (a `core.Throttle`
+    row) and stops writing here. No key
     material is stored: only the IP bucket (`apps.core.throttling.ip_bucket`) and the time.
     """
 

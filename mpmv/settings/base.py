@@ -415,6 +415,10 @@ API_RATE_LIMIT_CLIENTS: dict[str, str] = {}
 # API_REFUSED_KEY_BLOCK_SECONDS, answered 429 with Retry-After before any key lookup. Valid keys
 # never count. Set per environment with MPMV_API_REFUSED_KEY_RATE_LIMIT and
 # MPMV_API_REFUSED_KEY_BLOCK_SECONDS (system check api.E004).
+# Trade-off: the block covers the whole IP (or /64), valid keys included, so one client behind a
+# NAT shared with other API clients can keep them out; and if TRUSTED_PROXY_HEADER or
+# TRUSTED_PROXIES is wrong in production every client resolves to the proxy address, and one bad
+# client blocks the API for everyone. Check the proxy settings before going live.
 API_REFUSED_KEY_RATE_LIMIT = env_str("MPMV_API_REFUSED_KEY_RATE_LIMIT", "") or "30/minute"
 API_REFUSED_KEY_BLOCK_SECONDS = int(env_str("MPMV_API_REFUSED_KEY_BLOCK_SECONDS", "") or "300")
 
