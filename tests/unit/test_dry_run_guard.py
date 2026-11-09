@@ -52,6 +52,10 @@ DRY_RUN_EXCEPTIONS: Final[dict[str, tuple[str, str]]] = {
         ONE_TIME_CODE,
         "spends the one-time WebAuthn challenge and advances the signature counter",
     ),
+    "apps.accounts.services.issue_action_token": (
+        ONE_TIME_CODE,
+        "issues a single-use link; recording its generation is what revokes the older links",
+    ),
     "apps.accounts.services.redeem_action_token": (
         ONE_TIME_CODE,
         "spends the single sign-in use of a secure action link (CORE.15)",
@@ -79,6 +83,14 @@ DRY_RUN_EXCEPTIONS: Final[dict[str, tuple[str, str]]] = {
     "apps.api.services.authenticate": (
         TELEMETRY,
         "records when an API key was last used",
+    ),
+    "apps.api.services.record_refused_key": (
+        THROTTLE,
+        "counts one refused-key (401) answer per client IP, blocking it past the limit (CORE.20)",
+    ),
+    "apps.api.services.purge_expired_refused_keys": (
+        THROTTLE,
+        "deletes refused-key rows older than the window (CORE.20)",
     ),
     "apps.cms.services.sync_locales": (
         MIGRATION_HOOK,

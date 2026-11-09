@@ -15,6 +15,8 @@ class AccountsConfig(AppConfig):
         "auth.group",  # managed in the user admin's audited GroupAdmin
         "otp_totp.totpdevice",  # written only by the audited MFA services
         "actionlinkuse",  # CORE.15: each spent link writes `accounts.action_link.signed_in`
+        # CORE.15: an emailed link writes `accounts.action_link.sent` with its generation
+        "actionlinkissue",
     )
 
     def ready(self) -> None:
