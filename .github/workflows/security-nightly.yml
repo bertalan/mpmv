@@ -1,0 +1,126 @@
+# SEC.5 (owner request 2026-11-09): nightly security run on main. The slow security suites with the
+# full Hypothesis profile (ReDoS sweep, malicious-upload corpus, hostile-input runs), and a
+# dependency audit against the advisories of the day, even when no code changed. The fast suites
+# stay in ci.yml on every pull request. Run it by hand: Actions > Security nightly > Run workflow,
+# or `gh workflow run security-nightly.yml`. See docs/dev/release.md, "Security schedule".
+name: Security nightly
+
+on:
+  schedule:
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: security-nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  UV_FROZEN: "1"
+  DJANGO_SETTINGS_MODULE: mpmv.settings.test
+  # Throwaway service database with trust auth: no credentials in the repository.
+  DATABASE_URL: postgres://mpmv@localhost:5432/mpmv
+  HYPOTHESIS_PROFILE: nightly
+
+jobs:
+  tests:
+    name: Slow security suites
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mpmv
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: mpmv
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mpmv -d mpmv"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+      - run: uv sync
+      - name: Pytest (security_slow and tests/security, nightly Hypothesis profile)
+        run: make test-security-nightly
+      - name: Store reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: security-nightly-junit
+          path: build/reports/junit-security*.xml
+          if-no-files-found: ignore
+
+  audit:
+    name: Dependency audit (fresh advisories)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      osv_vulns: ${{ steps.osv.outputs.osv_vulns }}
+    env:
+      OSV_IMAGE: ghcr.io/google/osv-scanner:v2.6.0
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - name: pip-audit (exported requirements)
+        id: pip_audit
+        continue-on-error: true
+        run: make audit
+      - name: osv-scanner (uv.lock)
+        id: osv
+        continue-on-error: true
+        run: |
+          mkdir -p build/osv && chmod 0777 build/osv
+          set +e
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/build/osv:/out" "$OSV_IMAGE" \
+            scan source --lockfile=/src/uv.lock --format=json --output=/out/osv.json
+          code=$?
+          set -e
+          count=$(python3 -c '
+          import json, pathlib, sys
+          path = pathlib.Path("build/osv/osv.json")
+          data = json.loads(path.read_text()) if path.is_file() else {}
+          print(sum(len(p.get("vulnerabilities", [])) for r in data.get("results", [])
+                    for p in r.get("packages", [])))
+          ')
+          echo "osv_vulns=$count" >> "$GITHUB_OUTPUT"
+          echo "osv-scanner: $count known vulnerabilities (exit $code)"
+          exit "$code"
+      - name: Both audits passed
+        env:
+          PIP_AUDIT: ${{ steps.pip_audit.outcome }}
+          OSV: ${{ steps.osv.outcome }}
+        run: test "$PIP_AUDIT" = success && test "$OSV" = success
+
+  report:
+    name: Report to the security issue
+    needs: [tests, audit]
+    if: ${{ always() && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      TESTS: ${{ needs.tests.result }}
+      AUDIT: ${{ needs.audit.result }}
+      OSV_VULNS: ${{ needs.audit.outputs.osv_vulns || '0' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: security-nightly-junit
+          path: build/reports
+      - name: Open, update or close the security issue
+        run: >-
+          python3 tools/security_report.py --workflow security-nightly --run-url "$RUN_URL"
+          --result "tests=$TESTS" --result "audit=$AUDIT" --count "osv_vulns=$OSV_VULNS"
+          --junit build/reports/junit-security-slow.xml --junit build/reports/junit-security.xml
