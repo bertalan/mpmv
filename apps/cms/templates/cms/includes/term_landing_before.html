@@ -1,0 +1,21 @@
+{% load i18n wagtailcore_tags cms_tags %}{% comment %}
+A term landing page's intro and the term's products by category (CMS.4), shown under the term
+page's heading on its first unfiltered page (catalog/listing.html) and in the editor's preview.
+The FAQ blocks of the intro give the page's FAQPage data (in the preview the layout's head has
+it already). No inline script or style.
+{% endcomment %}<div class="term-landing">
+  {% if not request.is_preview %}{% faq_jsonld page %}{% endif %}
+  {% for block in page.body %}{% include_block block %}{% endfor %}
+  {% if sections %}
+    <section class="term-landing-categories" aria-labelledby="term-landing-categories-heading">
+      <h2 id="term-landing-categories-heading">{% translate "Shop by category" %}</h2>
+      {% for section in sections %}
+        <section class="term-landing-category" aria-labelledby="term-landing-category-{{ forloop.counter }}">
+          <h3 id="term-landing-category-{{ forloop.counter }}">{{ section.name }}</h3>
+          {% include "cms/includes/product_tiles.html" with cards=section.cards currency=currency heading_level=4 only %}
+          <p class="block-links"><a class="term-landing-see-all" href="{{ section.see_all_url }}">{% blocktranslate with name=section.name %}See all<span class="visually-hidden"> products: {{ name }}</span>{% endblocktranslate %}</a></p>
+        </section>
+      {% endfor %}
+    </section>
+  {% endif %}
+</div>
