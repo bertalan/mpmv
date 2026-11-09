@@ -15,7 +15,7 @@ from django.http import HttpRequest
 
 from apps.core.audit import audit_context
 
-from . import services
+from . import engine, services
 from .models import Redirect
 
 TIMESTAMPS = ("public_id", "created_at", "updated_at")
@@ -43,7 +43,7 @@ class RedirectForm(forms.ModelForm[Redirect]):
         cleaned = super().clean() or {}
         candidate = Redirect(
             pk=self.instance.pk,
-            source_path=cleaned.get("source_path") or "",
+            source_path=engine.normalise_redirect_source(cleaned.get("source_path") or ""),
             match_prefix=bool(cleaned.get("match_prefix")),
             code=cleaned.get("code") or Redirect.Code.MOVED,
             target_kind=cleaned.get("target_kind") or "",

@@ -10,7 +10,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Protocol, cast
-from urllib.parse import urlsplit
+from urllib.parse import unquote_to_bytes, urlsplit
 
 from apps.core.money import CENT, to_decimal
 
@@ -532,18 +532,58 @@ def redirect_path_error(path: str, *, allow_query: bool) -> str | None:
         return _OFF_SITE
     if not allow_query and ("?" in path or "#" in path):
         return "A source is a path only, without a query (?) or a fragment (#)."
+    if not allow_query and "%" in path:
+        # Sources are stored decoded (`normalise_redirect_source`), as request paths arrive.
+        return 'A source cannot hold "%" once decoded: it is double-encoded or not UTF-8.'
     if any(segment in (".", "..") for segment in parts.path.split("/")):
         return 'A path cannot contain "." or ".." segments.'
     return None
 
 
+# Paths a prefix rule never covers: there a 404 is an API, asset or sign-in answer, not a page.
+RESERVED_PREFIXES = (
+    "/admin/",
+    "/django-admin/",
+    "/api/",
+    "/media/",
+    "/static/",
+    "/manager/",
+    "/account/",
+    "/login/",
+    "/logout/",
+    "/webhooks/",
+    "/i18n/",
+    "/geocoding/",
+    "/vendor/claim/",
+    "/_styleguide/",
+)
+
+
+def normalise_redirect_source(path: str) -> str:
+    """A source as Django hands over a request path: percent-decoded once, as UTF-8.
+
+    Legacy maps often hold encoded URLs (`/caf%C3%A9/`), but `request.path_info` is decoded
+    (`/café/`), so an encoded source would never match. Bytes that are not UTF-8 stay encoded,
+    and `redirect_path_error` refuses a source still holding "%", so decoding is idempotent and
+    the checks then run on what is stored.
+    """
+    try:
+        return unquote_to_bytes(path).decode("utf-8")
+    except UnicodeDecodeError:
+        return path
+
+
 def prefix_source_error(path: str, *, languages: Iterable[str]) -> str | None:
-    """Why `path` cannot be the source of a prefix rule: it must end with "/" and never cover a
-    whole site (the root or a language root), or every 404 would redirect. None when it can."""
+    """Why `path` cannot be the source of a prefix rule: it must end with "/", never cover a
+    whole site (the root or a language root), or every 404 would redirect, and never cover a
+    reserved path (`RESERVED_PREFIXES`). None when it can."""
     if not path.endswith("/"):
         return 'A prefix ends with "/", e.g. /author/.'
     if path == "/" or path.strip("/") in set(languages):
         return "A prefix cannot cover the whole site or a whole language."
+    reserved = next((root for root in RESERVED_PREFIXES if path.startswith(root)), None)
+    if reserved is not None:
+        return f"A prefix cannot cover {reserved}: it is reserved (admin, API, files, sign-in)."
     return None
 
 

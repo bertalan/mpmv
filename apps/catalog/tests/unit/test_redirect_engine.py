@@ -8,6 +8,7 @@ import pytest
 
 from apps.catalog.engine import (
     RedirectRule,
+    normalise_redirect_source,
     path_language,
     prefix_source_error,
     redirect_path_error,
@@ -29,7 +30,7 @@ LANGUAGES = ("en", "it", "de")
         "/product/bag-en-sku-1/",
         "/it/tag-product-it/borsa-it/",
         "/author/someone/",
-        "/caf%C3%A9/",
+        "/café/",
     ],
 )
 def test_same_site_paths_are_accepted(path: str) -> None:
@@ -78,6 +79,76 @@ def test_a_prefix_never_covers_a_whole_site_and_ends_with_a_slash(path: str) -> 
 @pytest.mark.parametrize("path", ["/author/", "/it/author/", "/old-blog/2019/"])
 def test_a_prefix_below_a_language_root_is_accepted(path: str) -> None:
     assert prefix_source_error(path, languages=LANGUAGES) is None
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/admin/",
+        "/admin/pages/",
+        "/django-admin/",
+        "/api/",
+        "/api/v1/products/",
+        "/media/",
+        "/media/original_images/",
+        "/static/",
+        "/manager/",
+        "/manager/shop/",
+        "/account/",
+        "/account/mfa/",
+        "/login/",
+        "/webhooks/",
+    ],
+)
+def test_a_prefix_never_covers_the_admin_api_assets_manager_or_login(path: str) -> None:
+    """A prefix rule there would turn JSON, asset and sign-in 404s into HTML redirects."""
+    assert prefix_source_error(path, languages=LANGUAGES) is not None
+
+
+@pytest.mark.parametrize("path", ["/administration-old/", "/apis-blog/", "/static-pages/"])
+def test_a_prefix_that_only_starts_like_a_reserved_one_is_accepted(path: str) -> None:
+    assert prefix_source_error(path, languages=LANGUAGES) is None
+
+
+# --- Percent-encoded sources (legacy maps): stored decoded, as Django decodes request.path
+
+
+@pytest.mark.parametrize(
+    ("raw", "stored"),
+    [
+        ("/caf%C3%A9/", "/café/"),
+        ("/caf%c3%a9/", "/café/"),
+        ("/café/", "/café/"),
+        ("/old-page/", "/old-page/"),
+        ("/a%2Fb/", "/a/b/"),
+    ],
+)
+def test_a_source_is_stored_decoded(raw: str, stored: str) -> None:
+    assert normalise_redirect_source(raw) == stored
+
+
+def test_decoding_is_idempotent_on_a_valid_source() -> None:
+    once = normalise_redirect_source("/caf%C3%A9/")
+    assert normalise_redirect_source(once) == once
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "/%2F%2Fevil.example/",  # decodes to //evil.example/
+        "/a%0D%0ASet-Cookie:x/",  # CR/LF
+        "/a%00b/",  # NUL
+        "/%2E%2E/etc/",  # dot segment
+        "/a%3Fq=1/",  # a query once decoded
+        "/a%5Cb/",  # backslash
+        "/a%FFb/",  # not UTF-8
+        "/a%2525b/",  # still holds "%" once decoded: double encoding
+        "/100%/",  # a stray "%"
+    ],
+)
+def test_a_source_that_is_unsafe_once_decoded_is_refused(raw: str) -> None:
+    decoded = normalise_redirect_source(raw)
+    assert redirect_path_error(decoded, allow_query=False) is not None
 
 
 # --- Language of a path

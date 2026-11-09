@@ -113,6 +113,10 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
 ]
 
+# CAT.5/CAT.6: how long a browser or proxy keeps a 301 (or a 410) of a redirect rule, so a rule
+# staff change, delete or let expire stops applying within a day; capped at the rule's expiry.
+REDIRECT_PERMANENT_MAX_AGE = 24 * 60 * 60
+
 # Custom user from the first migration (CORE.1): email login, preferred language.
 AUTH_USER_MODEL = "accounts.User"
 # Lockout and captcha checks run first, before any password is checked (CORE.5).

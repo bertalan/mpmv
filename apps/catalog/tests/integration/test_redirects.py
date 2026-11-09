@@ -492,3 +492,108 @@ def test_the_import_command(csv_file: Path) -> None:
     assert gone.code == Redirect.Code.GONE
     assert gone.expires_at is not None
     assert entries().get(target_key="/author/").actor_label == "command:import_redirects"
+
+
+# --- Second security review: hostile input, encoded sources, cache lifetime, reserved prefixes
+
+ADD_TO_CART_CORPUS = [
+    "²",  # superscript two: str.isdigit() is True, int() raises
+    "①",  # circled one
+    "١٢",  # Arabic-Indic digits
+    chr(0xFF11),  # fullwidth one (written as chr: ruff RUF001)
+    "1²",
+    "9" * 19,  # beyond a bigint
+    "1" * 5000,  # beyond int()'s digit limit
+    "-1",
+    "+1",
+    " 1",
+    "1_0",
+    "",
+    "1%00",
+    "<script>",
+]
+
+
+@pytest.mark.parametrize("value", ADD_TO_CART_CORPUS)
+def test_a_hostile_add_to_cart_value_only_drops_the_parameter(
+    client: Client, bag: Product, value: str
+) -> None:
+    """An anonymous GET runs this before authentication and CSRF: never a 500."""
+    response = client.get("/somewhere/", {"add-to-cart": value, "utm_source": "x"})
+    assert response.status_code == 302
+    assert response["Location"] == "/somewhere/?utm_source=x"
+
+
+@pytest.mark.parametrize("source", ["/caf%C3%A9/", "/café/"])
+def test_a_percent_encoded_source_matches_the_decoded_and_the_encoded_request(
+    client: Client, source: str
+) -> None:
+    """Legacy maps often hold percent-encoded URLs; Django decodes the request path, so the
+    source is stored decoded and a request either way finds the rule."""
+    add(source_path=source, target_kind="path", target_path="/coffee/")
+    assert Redirect.objects.get().source_path == "/café/"
+    assert_301(client.get("/café/"), "/coffee/")
+    assert_301(client.get("/caf%C3%A9/"), "/coffee/")
+
+
+def test_an_imported_percent_encoded_source_is_stored_decoded(client: Client) -> None:
+    rows = [{"source_path": "/it/caff%C3%A8/", "target_kind": "path", "target": "/it/"}]
+    import_redirects(rows, ctx=CTX)
+    assert Redirect.objects.get().source_path == "/it/caffè/"
+    assert_301(client.get("/it/caff%C3%A8/"), "/it/")
+    # Importing the same map again finds the stored rule instead of adding a duplicate.
+    assert import_redirects(rows, ctx=CTX).is_empty
+
+
+@pytest.mark.parametrize(
+    "source", ["/%2F%2Fevil.example/", "/a%0D%0Ab/", "/a%FFb/", "/a%2525b/", "/%2E%2E/x/"]
+)
+def test_a_source_unsafe_once_decoded_is_refused(source: str) -> None:
+    with pytest.raises(ValidationError):
+        add(source_path=source, target_kind="path", target_path="/new/")
+    with pytest.raises(ValidationError):
+        import_redirects(
+            [{"source_path": source, "target_kind": "path", "target": "/new/"}], ctx=CTX
+        )
+    assert not Redirect.objects.exists()
+
+
+def test_a_permanent_redirect_is_cached_for_a_bounded_time(
+    client: Client, settings: Any, bag: Product
+) -> None:
+    settings.REDIRECT_PERMANENT_MAX_AGE = 3600
+    add(source_path="/old/", target_kind="path", target_path="/new/")
+    add(source_path="/withdrawn/", code=Redirect.Code.GONE)
+    SlugHistoryFactory.create(product=bag, language="en", slug="bag-en-sku-1")
+    for path in ("/old/", "/withdrawn/", "/product/bag-en-sku-1/"):
+        assert client.get(path)["Cache-Control"] == "max-age=3600", path
+
+
+def test_a_redirect_that_expires_soon_is_cached_no_longer_than_the_rule(
+    client: Client, settings: Any
+) -> None:
+    settings.REDIRECT_PERMANENT_MAX_AGE = 86400
+    soon = timezone.now() + dt.timedelta(minutes=10)
+    add(source_path="/old/", target_kind="path", target_path="/new/", expires_at=soon)
+    max_age = int(client.get("/old/")["Cache-Control"].removeprefix("max-age="))
+    assert 0 < max_age <= 600
+
+
+def test_the_add_to_cart_redirect_is_never_cached(client: Client, bag: Product) -> None:
+    for url in ("/?add-to-cart=1001", "/somewhere/?add-to-cart=999999"):
+        cache_control = client.get(url)["Cache-Control"]
+        assert "no-cache" in cache_control, url
+        assert "no-store" in cache_control, url
+
+
+@pytest.mark.parametrize(
+    "source", ["/admin/", "/api/v1/", "/media/", "/static/", "/manager/", "/account/"]
+)
+def test_a_prefix_rule_cannot_cover_reserved_paths(source: str) -> None:
+    with pytest.raises(ValidationError, match="reserved"):
+        add(source_path=source, match_prefix=True, target_kind="path", target_path="/")
+    with pytest.raises(ValidationError, match="reserved"):
+        import_redirects(
+            [{"source_path": source, "match": "prefix", "target_kind": "path", "target": "/"}],
+            ctx=CTX,
+        )

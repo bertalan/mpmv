@@ -34,6 +34,7 @@ from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.models import MediaImage
 from apps.core.services import audit_changes, run_mutation, save_audited
+from apps.core.text import ascii_int
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedQuerySet
 from apps.vendors.services import ensure_vendor_can_write, vendors_in_suggestions
@@ -2184,9 +2185,9 @@ def redirect_target(redirect: Redirect, path: str) -> str | None:
 def add_to_cart_target(path: str, value: str) -> str | None:
     """The product page a legacy GET `?add-to-cart={post id}` stands for, in the language of
     `path`; None for an unknown id. A GET never adds to the cart."""
-    if not value.isdigit() or len(value) > _LEGACY_ID_MAX_DIGITS:
+    wp_id = ascii_int(value, max_digits=_LEGACY_ID_MAX_DIGITS)
+    if wp_id is None:
         return None
-    wp_id = int(value)
     product_id = (
         Product.objects.filter(Q(legacy_wp_id_en=wp_id) | Q(legacy_wp_id_it=wp_id))
         .values_list("pk", flat=True)
@@ -2349,7 +2350,9 @@ def import_redirects(
     nothing is written and the error names each row (numbered from 1, the header excluded).
     """
     rows = list(rows)
-    sources = [(row.get("source_path") or "").strip() for row in rows]
+    sources = [
+        engine.normalise_redirect_source((row.get("source_path") or "").strip()) for row in rows
+    ]
     stored = {
         redirect.source_path: redirect
         for redirect in Redirect.objects.filter(source_path__in=sources).select_related(

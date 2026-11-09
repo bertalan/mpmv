@@ -705,6 +705,8 @@ class Redirect(BaseModel):
     def clean(self) -> None:
         """The shape of the rule; loops and chains need the other rules (the services)."""
         errors: dict[str, str] = {}
+        # Stored decoded, as Django decodes request paths: an encoded legacy URL still matches.
+        self.source_path = engine.normalise_redirect_source(self.source_path)
         source_error = engine.redirect_path_error(self.source_path, allow_query=False)
         if source_error is None and self.match_prefix:
             source_error = engine.prefix_source_error(
