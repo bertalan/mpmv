@@ -2,7 +2,7 @@
 requirements) and the article 30(1)(e) self-certification, next to the CMP.13 gate."""
 
 import pytest
-from django.db import DatabaseError, transaction
+from django.db import DatabaseError, IntegrityError, transaction
 
 from apps.accounts.tests.factories import UserFactory
 from apps.core.audit import AuditContext
@@ -13,10 +13,12 @@ from apps.vendors.models import LegalFieldRequirement, SelfCertification, Vendor
 from apps.vendors.services import (
     certify_platform_duties,
     change_status,
+    is_self_certified,
     onboarding_checklist,
 )
 from apps.vendors.tests.factories import (
     ContractAcceptanceFactory,
+    SelfCertificationFactory,
     VendorFactory,
     VendorMemberFactory,
 )
@@ -169,6 +171,14 @@ def test_a_certification_of_an_older_round_does_not_count_after_a_reopen() -> No
     )
     with pytest.raises(engine.ActivationNotAllowed, match=engine.SELF_CERTIFICATION):
         change_status(vendor, Vendor.Status.ACTIVE, ctx=STAFF_CTX)
+
+
+def test_a_self_certification_is_unique_per_version_and_round() -> None:
+    vendor = onboarding(eu_company=True)
+    SelfCertificationFactory.create(vendor=vendor)
+    with pytest.raises(IntegrityError), transaction.atomic():
+        SelfCertificationFactory.create(vendor=vendor)
+    assert is_self_certified(vendor)
 
 
 def test_the_self_certification_table_is_append_only() -> None:
