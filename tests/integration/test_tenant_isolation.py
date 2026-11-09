@@ -8,7 +8,10 @@ guards fail when something new is not declared in `tests.tenancy_registry`:
 - a vendor-owned model (a ForeignKey chain to Vendor) without the scoped manager or an object
   maker;
 - a URL pattern or an API operation without an access class;
-- a URL pattern shadowed by another one on the same path, unless declared in `SHADOWED`.
+- a `SHADOWED` entry whose shadowed route is gone, whose replacement is not routed or not
+  declared, or whose path does not resolve to that replacement. Shadowing that is not declared
+  is not detected; such a route stays in the generated tests, whose requests reach whatever
+  view answers its path.
 """
 
 import pytest
@@ -91,7 +94,9 @@ def test_the_endpoint_registry_has_no_stale_entries() -> None:
 
 
 def test_shadowed_endpoints_are_answered_by_their_declared_replacement() -> None:
-    """A shadowed route is skipped below only because its replacement answers on its path."""
+    """Each `SHADOWED` entry is current: the shadowed route still exists, its replacement is
+    routed and declared, and the shadowed path resolves to that replacement. It does not look
+    for shadowing that is missing from `SHADOWED`."""
     by_key = {e.key: e for e in WEB_ENDPOINTS}
     for shadowed, replacement in SHADOWED.items():
         assert shadowed in by_key, f"No such endpoint any more, remove from SHADOWED: {shadowed}"

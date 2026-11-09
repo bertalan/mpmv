@@ -12,7 +12,8 @@ Refused: a DTD, entities or external references (defusedxml), processing instruc
 the attribute allow-list (so no `on*` event handlers), an `href` that is not a same-document
 fragment, a `url()` to anything but a fragment, and in CSS `@import`, `@font-face`, escapes,
 `image-set()`, `image()`, `src()`, `cross-fade()`, `element()`, `expression()` and any quoted
-string that looks like a URL (a scheme or `//`).
+string that looks like a URL (a scheme or `//`). "CSS" is `<style>`, `style=` and every other
+attribute value except free text (`aria-label`), because presentation attributes are CSS too.
 
 Pure Python, no Django: unit-tested on a corpus of malicious documents.
 """
@@ -79,6 +80,11 @@ ATTRIBUTES = frozenset(
         "media",
     }
 )  # fmt: skip
+
+# Free text for people, never parsed as CSS: "image (logo)" in a label is not `image(`. Every
+# other attribute value goes through the same check as `style`, since browsers parse presentation
+# attributes (fill, mask, filter, clip-path...) as CSS, escapes included.
+TEXT_ATTRIBUTES = frozenset({"aria-label"})
 
 NAMESPACED_ATTRIBUTES = frozenset(
     {f"{{{XLINK_NS}}}href", f"{{{XML_NS}}}space", f"{{{XML_NS}}}lang"}
@@ -193,10 +199,13 @@ def _check_element(element: ET.Element) -> None:
             raise UnsafeSvgError(f"href={value!r}: only #fragments are allowed.")
         if attr_name == "style":
             _check_css(value, f"The style of <{name}>")
-        else:
+        elif attr_name in TEXT_ATTRIBUTES:
             _check_urls(value, f"The attribute {attr_name}")
             if "javascript:" in value.lower():
                 raise UnsafeSvgError(f"The attribute {attr_name} holds a javascript: URL.")
+        else:
+            # Presentation attributes are parsed as CSS: `u\72l(` there is a `url(`.
+            _check_css(value, f"The attribute {attr_name}")
     if name == "style":
         _check_css(element.text or "", "<style>")
         if len(element):
