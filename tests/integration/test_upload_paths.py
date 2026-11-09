@@ -394,6 +394,76 @@ def test_a_direct_save_of_an_svg_logo_stores_it_sanitised(logos: Collection) -> 
     assert (image.width, image.height) == (10, 10)
 
 
+# Names a browser or file manager shows as `.svg` although the raw suffix is not exactly `.svg`:
+# the SVG decision and the collection rule must read them the same way (`uploads.extension_of`).
+DISGUISED_SVG_NAMES = {
+    "bidi-mark": "logo.svg\u200e",
+    "trailing-dot": "logo.svg.",
+    "upper-trailing-space": "logo.SVG ",
+    "nul": "logo.svg\x00",
+    "soft-hyphen": "logo.s\u00advg",
+    "fullwidth": "logo.\uff33\uff36\uff27",
+}
+
+
+def _direct_save(client: Client, collection: Collection, case: Case) -> Stored | None:
+    """A model save without `clean()`: the shell, imports, any code not using the service."""
+    title = f"direct {next(_titles)}"
+    image = MediaImage(
+        title=title, file=_upload(case), collection=collection, licence=_licence(), author="A"
+    )
+    errors: dict[str, list[str]] = {}
+    try:
+        image.save()
+    except ValidationError as refusal:
+        errors = refusal.message_dict
+    assert set(errors) <= {"file"}, errors  # refused for its file, never for anything else
+    return _new_image(title)
+
+
+DISGUISED_PATHS: dict[str, ImagePath] = {**IMAGE_PATHS, "direct-save": _direct_save}
+
+
+@pytest.mark.parametrize(
+    ("path", "filename"),
+    [
+        pytest.param(path, name, id=f"{path_id}:{name_id}")
+        for path_id, path in DISGUISED_PATHS.items()
+        for name_id, name in DISGUISED_SVG_NAMES.items()
+    ],
+)
+def test_a_disguised_svg_name_is_refused_outside_an_svg_collection(
+    editor: Client, root: Collection, path: ImagePath, filename: str
+) -> None:
+    images_before = MediaImage.objects.count()
+
+    stored = path(editor, root, _logo_case("svg-disguised", filename, LOGO_SVG, "refuse", ""))
+
+    assert stored is None, f"{filename!r} stored outside the logos collection as {stored}"
+    assert MediaImage.objects.count() <= images_before + (path is admin_replace_file)
+
+
+@pytest.mark.parametrize(
+    ("path", "filename"),
+    [
+        pytest.param(path, name, id=f"{path_id}:{name_id}")
+        for path_id, path in {
+            "service-save-image": service_save_image,
+            "direct-save": _direct_save,
+        }.items()
+        for name_id, name in DISGUISED_SVG_NAMES.items()
+    ],
+)
+def test_a_disguised_svg_name_in_the_logos_collection_is_stored_sanitised_as_svg(
+    editor: Client, logos: Collection, path: ImagePath, filename: str
+) -> None:
+    stored = path(editor, logos, _logo_case("svg-disguised", filename, LOGO_SVG, "store", ""))
+
+    assert stored is not None
+    assert stored.data == sanitise_svg(LOGO_SVG)
+    assert re.fullmatch(rf"original_images/logo{UNIQUE_SUFFIX}\.svg", stored.name), stored.name
+
+
 @pytest.mark.xfail(
     reason="Finding: Wagtail keeps a pending multiple upload as uploaded (wagtail_uploads/, not "
     "served) until the editor completes or deletes it; nothing purges abandoned ones",

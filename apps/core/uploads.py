@@ -115,16 +115,27 @@ def _plain(name: str) -> str:
     return "".join(ch for ch in base if unicodedata.category(ch)[0] not in {"C", "M"})
 
 
+def _visible(name: str) -> str:
+    """The name a browser or a file manager would show: `_plain`, without the surrounding
+    spaces and the trailing dots that Windows drops."""
+    return _plain(name).strip().rstrip(".")
+
+
 def extension_of(name: str) -> str:
     """The extension a browser or a file manager would see, lowercase ('' if none)."""
-    base = _plain(name).strip().rstrip(".")
-    stem, dot, extension = base.rpartition(".")
+    stem, dot, extension = _visible(name).rpartition(".")
     return extension.lower() if dot and stem.strip(".") else ""
+
+
+def is_svg_name(name: str) -> bool:
+    """Whether `name` is an SVG file name: the one test for the SVG branch and the SVG
+    collection rule, so that no spelling of `.svg` passes one and skips the other."""
+    return extension_of(name) == SVG_EXTENSION
 
 
 def safe_stem(name: str) -> str:
     """A storage-safe stem: ASCII letters, digits, `-` and `_`; every dot becomes a dash."""
-    base = _plain(name)
+    base = _visible(name)
     stem = base.rpartition(".")[0] if extension_of(name) else base
     ascii_stem = stem.encode("ascii", "ignore").decode()
     stem = re.sub(r"[^a-z0-9_]+", "-", ascii_stem.lower()).strip("-_")[:MAX_STEM].strip("-_")
@@ -167,7 +178,7 @@ def upload_kind(data: bytes, name: str) -> Literal["svg", "raster"]:
     """
     if not is_markup(data):
         return "raster"
-    if extension_of(name) == SVG_EXTENSION:
+    if is_svg_name(name):
         return "svg"
     if _SVG_TAG.search(data[:4096]):
         raise UploadRefused(
@@ -181,9 +192,9 @@ def safe_svg_name(name: str) -> str:
 
 
 def _refuse_name(name: str) -> str:
-    extension = extension_of(name)
-    if extension == SVG_EXTENSION:
+    if is_svg_name(name):
         return "SVG"  # the content decides: a raster image here disagrees with its name
+    extension = extension_of(name)
     if extension not in IMAGE_EXTENSIONS:
         accepted = ", ".join(sorted({e.upper() for e in IMAGE_FORMATS.values()}))
         raise UploadRefused(

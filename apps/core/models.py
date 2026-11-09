@@ -580,9 +580,11 @@ def read_svg(file: Any) -> bytes | None:
 
     An SVG is markup named `.svg` (`apps.core.uploads.upload_kind`, SEC.2): the content decides,
     so a raster image named `.svg` goes to the raster checks (which refuse its name), and markup
-    under another name is refused by them too, never stored.
+    under another name is refused by them too, never stored. "Named `.svg`" is
+    `uploads.is_svg_name`, the same test as the field's, so `logo.svg.` or a `.svg` followed by
+    an invisible character cannot be stored as an SVG while skipping the collection rule.
     """
-    if not file or posixpath.splitext(file.name or "")[1].lower() != ".svg":
+    if not file or not uploads.is_svg_name(file.name or ""):
         return None
     data: bytes
     if file._committed:
