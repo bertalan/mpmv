@@ -7,7 +7,7 @@ class ComplianceConfig(AppConfig):
 
     # Audit policy (SEC.4, docs/dev/audit-trail.md). GPSR data is a legal fact shown to
     # consumers and authorities: written only through the audited services (CMP.3).
-    audited_models = ("gpsrinfo", "vendorgpsrdefaults")
+    audited_models = ("gpsrinfo", "vendorgpsrdefaults", "gpsrsafetytext", "safetycase")
 
     def ready(self) -> None:
         from apps.catalog.publishing import register_publication_check

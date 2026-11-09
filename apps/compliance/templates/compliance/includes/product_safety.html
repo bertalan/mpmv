@@ -1,0 +1,26 @@
+{% load i18n %}{# GPSR block of a product page (CMP.3, GPSR art. 19). Needs `gpsr` (services.GpsrDisplay). #}
+<section class="product-safety" aria-labelledby="product-safety-title">
+  <h2 id="product-safety-title">{% translate "Product safety" %}</h2>
+  <dl>
+    {% with p=gpsr.parties %}
+    {% if p.manufacturer_name %}
+    <dt>{% translate "Manufacturer" %}</dt>
+    <dd><address>{{ p.manufacturer_name }}<br>{{ p.manufacturer_address|linebreaksbr }}{% if p.manufacturer_contact %}<br>{{ p.manufacturer_contact|urlize }}{% endif %}</address></dd>
+    {% endif %}
+    {% if p.eu_responsible_name %}
+    <dt>{% translate "Responsible person in the EU" %}</dt>
+    <dd><address>{{ p.eu_responsible_name }}<br>{{ p.eu_responsible_address|linebreaksbr }}{% if p.eu_responsible_contact %}<br>{{ p.eu_responsible_contact|urlize }}{% endif %}</address></dd>
+    {% endif %}
+    {% endwith %}
+    {% for label, value in gpsr.identifiers %}
+    <dt>{% if label == "GTIN" %}{% translate "GTIN" %}{% elif label == "MPN" %}{% translate "Manufacturer part number" %}{% elif label == "Model" %}{% translate "Model or type" %}{% else %}{% translate "Batch or serial number" %}{% endif %}</dt>
+    <dd>{{ value }}</dd>
+    {% endfor %}
+  </dl>
+  {% if gpsr.warnings or gpsr.safety_information %}
+  <div class="product-safety-texts"{% if gpsr.text_language != language %} lang="{{ gpsr.text_language }}"{% endif %}>
+    {% if gpsr.warnings %}<h3>{% translate "Warnings" %}</h3><p>{{ gpsr.warnings|linebreaksbr }}</p>{% endif %}
+    {% if gpsr.safety_information %}<h3>{% translate "Safety information" %}</h3><p>{{ gpsr.safety_information|linebreaksbr }}</p>{% endif %}
+  </div>
+  {% endif %}
+</section>

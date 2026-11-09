@@ -4,23 +4,39 @@ Every write is validated, returned as a ChangeSet (dry-run) and audited: GPSR da
 fact shown to consumers and to market surveillance authorities. The publication block is
 registered with `apps.catalog.publishing` by `ComplianceConfig.ready()`, so the catalog
 publishing services (CAT.10) refuse a product whose GPSR data is incomplete.
+
+Also here: the warnings and safety information per language, the GPSR block of the product page
+(`gpsr_display`, rendered by `{% product_safety %}`), and the article 22 safety cases (authority
+orders, safety notices) with their working-day deadlines and the overdue alert.
 """
 
+import datetime as dt
+import logging
 from collections.abc import Mapping
-from typing import Any, Final
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Final
+from zoneinfo import ZoneInfo
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from apps.catalog.models import Product
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
-from apps.core.services import save_audited
+from apps.core.models import AuditLog
+from apps.core.services import audit_changes, save_audited
 from apps.vendors.models import Vendor
 
 from . import engine
-from .models import GpsrInfo, VendorGpsrDefaults
+from .models import GpsrInfo, GpsrSafetyText, SafetyCase, VendorGpsrDefaults
+
+if TYPE_CHECKING:
+    from django.db.models import QuerySet
+
+logger = logging.getLogger(__name__)
 
 VENDOR_DEFAULTS_CREATED: Final = "compliance.gpsr_defaults.created"
 VENDOR_DEFAULTS_UPDATED: Final = "compliance.gpsr_defaults.updated"
@@ -178,3 +194,278 @@ def check_gpsr_publishable(product: Product) -> None:
         raise ValidationError(
             {"gpsr": [ValidationError(message, code="gpsr_missing") for message in messages]}
         )
+
+
+# --- Warnings and safety information, per language (GPSR art. 19(c))
+
+SAFETY_TEXT_CREATED: Final = "compliance.gpsr_text.created"
+SAFETY_TEXT_UPDATED: Final = "compliance.gpsr_text.updated"
+SAFETY_TEXT_FIELDS: Final = ("warnings", "safety_information")
+
+
+def safety_text_snapshot(text: GpsrSafetyText) -> dict[str, Any]:
+    return {
+        "product": str(text.product.public_id),
+        "vendor": str(text.product.vendor.public_id),
+        "language": text.language,
+        **{name: getattr(text, name) for name in SAFETY_TEXT_FIELDS},
+    }
+
+
+def set_product_safety_text(
+    product: Product,
+    language: str,
+    data: Mapping[str, Any],
+    *,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Create or update `product`'s warnings and safety information in `language` with the
+    fields in `data` (others are kept). Raises ValidationError for an unknown field or a language
+    that is not configured, also on dry-run."""
+    unknown = sorted(set(data) - set(SAFETY_TEXT_FIELDS))
+    if unknown:
+        raise ValidationError({name: "This field cannot be set here." for name in unknown})
+    with transaction.atomic():
+        text = (
+            GpsrSafetyText.objects.select_for_update()
+            .select_related("product__vendor")
+            .filter(product=product, language=language)
+            .first()
+        ) or GpsrSafetyText(product=product, language=language)
+        for name, value in data.items():
+            setattr(text, name, "" if value is None else str(value).strip())
+        text.full_clean(validate_unique=False, validate_constraints=False)
+        return save_audited(
+            text,
+            safety_text_snapshot,
+            key=f"{product.public_id}:{language}",
+            ctx=ctx,
+            created=SAFETY_TEXT_CREATED,
+            updated=SAFETY_TEXT_UPDATED,
+            dry_run=dry_run,
+        )
+
+
+# --- What the product page shows (GPSR art. 19; the page is CAT.7)
+
+
+@dataclass(frozen=True)
+class GpsrDisplay:
+    """The GPSR block of a product page: who answers for the product, how to identify it, and
+    its warnings in `text_language` ("" when it has none)."""
+
+    parties: engine.GpsrParties
+    identifiers: tuple[tuple[str, str], ...]
+    needs_eu_responsible: bool
+    warnings: str = ""
+    safety_information: str = ""
+    text_language: str = ""
+
+
+def gpsr_display(product: Product, language: str) -> GpsrDisplay:
+    """The GPSR data shown on `product`'s page in `language`: its own data, then its vendor's
+    defaults; texts in `language`, else in the primary language."""
+    facts = effective_gpsr(product)
+    info = GpsrInfo.objects.filter(product_id=product.pk).first()
+    labelled = [("GTIN", product.gtin), ("MPN", product.mpn)]
+    if info is not None:
+        labelled += [("Model", info.model_number), ("Batch", info.batch)]
+    texts = {
+        row.language: row
+        for row in GpsrSafetyText.objects.filter(
+            product_id=product.pk, language__in={language, settings.LANGUAGE_CODE}
+        )
+    }
+    text = texts.get(language) or texts.get(settings.LANGUAGE_CODE)
+    return GpsrDisplay(
+        parties=facts.parties,
+        identifiers=tuple((label, value) for label, value in labelled if value.strip()),
+        needs_eu_responsible=engine.needs_eu_responsible(facts.parties.manufacturer_country),
+        warnings=text.warnings if text else "",
+        safety_information=text.safety_information if text else "",
+        text_language=text.language if text else "",
+    )
+
+
+# --- GPSR article 22: authority orders and safety notices with working-day deadlines
+
+SAFETY_CASE_OPENED: Final = "compliance.safety_case.opened"
+SAFETY_CASE_CLOSED: Final = "compliance.safety_case.closed"
+SAFETY_CASE_OVERDUE: Final = "compliance.safety_case.overdue"
+SAFETY_CASE_MODEL: Final = "compliance.safetycase"
+SAFETY_CASE_FIELDS: Final = (
+    "kind",
+    "product_sku",
+    "reference",
+    "authority",
+    "summary",
+    "received_at",
+    "due_on",
+    "status",
+    "closed_at",
+    "resolution",
+    "overdue_alerted_at",
+)
+#: The overdue check runs as a background job (`compliance.flag_overdue_safety_cases`).
+SYSTEM_CTX: Final = AuditContext(
+    actor_label="task:compliance.flag_overdue_safety_cases", source=AuditLog.Source.TASK
+)
+
+
+def safety_case_snapshot(case: SafetyCase) -> dict[str, Any]:
+    return {
+        "vendor": str(case.vendor.public_id),
+        "product": str(case.product.public_id) if case.product else None,
+        **{name: getattr(case, name) for name in SAFETY_CASE_FIELDS},
+    }
+
+
+def _business_date(moment: dt.datetime) -> dt.date:
+    """The calendar day of `moment` in business time (settings.BUSINESS_TIME_ZONE)."""
+    return timezone.localtime(moment, ZoneInfo(settings.BUSINESS_TIME_ZONE)).date()
+
+
+def open_safety_case(
+    *,
+    vendor: Vendor,
+    kind: str,
+    received_at: dt.datetime,
+    summary: str,
+    ctx: AuditContext,
+    product: Product | None = None,
+    reference: str = "",
+    authority: str = "",
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Record an authority order or a safety notice about `vendor` (and `product`), with its
+    deadline: the 2nd (order) or 3rd (notice) working day after the day of receipt in business
+    time. Raises ValidationError for another vendor's product or missing data, also on dry-run.
+    """
+    case = SafetyCase(
+        vendor=vendor,
+        product=product,
+        product_sku=product.sku if product is not None else "",
+        kind=kind,
+        reference=reference.strip(),
+        authority=authority.strip(),
+        summary=summary.strip(),
+        received_at=received_at,
+    )
+    if product is not None and product.vendor_id != vendor.pk:
+        raise ValidationError({"product": "The product belongs to another vendor."})
+    if kind in engine.WORKING_DAYS_TO_ACT:
+        case.due_on = engine.safety_case_due_on(kind, _business_date(received_at))
+    case.full_clean(validate_unique=False)
+    changes = ChangeSet()
+    changes.create(SAFETY_CASE_MODEL, str(case.public_id), safety_case_snapshot(case))
+    if dry_run:
+        return changes
+    with transaction.atomic():
+        case.save()
+        audit_changes(changes, ctx=ctx, action=SAFETY_CASE_OPENED)
+    return changes
+
+
+def _locked(case: SafetyCase) -> SafetyCase:
+    return (
+        SafetyCase.objects.select_for_update(of=("self",))
+        .select_related("vendor", "product")
+        .get(pk=case.pk)
+    )
+
+
+def close_safety_case(
+    case: SafetyCase,
+    *,
+    resolution: str,
+    ctx: AuditContext,
+    now: dt.datetime | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Close an open case with what was done. Raises ValidationError when it is already closed
+    or the resolution is empty, also on dry-run."""
+    if not resolution.strip():
+        raise ValidationError({"resolution": "Say what was done."})
+    changes = ChangeSet()
+    with transaction.atomic():
+        stored = _locked(case)
+        if stored.status == SafetyCase.Status.CLOSED:
+            raise ValidationError("The case is already closed.")
+        before = safety_case_snapshot(stored)
+        stored.status = SafetyCase.Status.CLOSED
+        stored.closed_at = now or timezone.now()
+        stored.resolution = resolution.strip()
+        changes.update(
+            SAFETY_CASE_MODEL, str(stored.public_id), before, safety_case_snapshot(stored)
+        )
+        if dry_run:
+            return changes
+        stored.save(update_fields=["status", "closed_at", "resolution", "updated_at"])
+        audit_changes(changes, ctx=ctx, action=SAFETY_CASE_CLOSED)
+    case.status, case.closed_at, case.resolution = (
+        stored.status,
+        stored.closed_at,
+        stored.resolution,
+    )
+    return changes
+
+
+@dataclass(frozen=True)
+class Deadline:
+    """A case's deadline as staff see it."""
+
+    due_on: dt.date
+    working_days_left: int
+    overdue: bool
+
+
+def safety_case_deadline(case: SafetyCase, *, now: dt.datetime | None = None) -> Deadline:
+    today = _business_date(now or timezone.now())
+    return Deadline(
+        due_on=case.due_on,
+        working_days_left=engine.working_days_left(case.due_on, today=today),
+        overdue=engine.is_overdue(
+            case.due_on, today=today, closed=case.status == SafetyCase.Status.CLOSED
+        ),
+    )
+
+
+def overdue_safety_cases(*, now: dt.datetime | None = None) -> "QuerySet[SafetyCase]":
+    """Open cases whose due day has passed (business time)."""
+    today = _business_date(now or timezone.now())
+    return SafetyCase.objects.filter(status=SafetyCase.Status.OPEN, due_on__lt=today)
+
+
+def flag_overdue_safety_cases(
+    *, now: dt.datetime | None = None, ctx: AuditContext = SYSTEM_CTX, dry_run: bool = False
+) -> ChangeSet:
+    """Alert staff once about each overdue open case: an error in the log (monitoring alerts on
+    it), `overdue_alerted_at` set and an audit entry. A case already flagged is left alone."""
+    moment = now or timezone.now()
+    changes = ChangeSet()
+    with transaction.atomic():
+        cases = (
+            overdue_safety_cases(now=moment)
+            .filter(overdue_alerted_at__isnull=True)
+            .select_for_update(of=("self",))
+            .select_related("vendor", "product")
+        )
+        for case in cases:
+            before = safety_case_snapshot(case)
+            case.overdue_alerted_at = moment
+            key = str(case.public_id)
+            changes.update(SAFETY_CASE_MODEL, key, before, safety_case_snapshot(case))
+            if dry_run:
+                continue
+            case.save(update_fields=["overdue_alerted_at", "updated_at"])
+            logger.error(
+                "GPSR safety case %s (%s, vendor %s) is overdue: due on %s",
+                key,
+                case.kind,
+                case.vendor.public_id,
+                case.due_on.isoformat(),
+            )
+        if not dry_run:
+            audit_changes(changes, ctx=ctx, action=SAFETY_CASE_OVERDUE)
+    return changes

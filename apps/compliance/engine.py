@@ -9,8 +9,12 @@ product page part of CMP.3.
 Per-vendor defaults fill what the product leaves empty one whole block at a time (the
 manufacturer block, the EU responsible person block), never field by field, so a product never
 shows one manufacturer's name with another's address.
+
+The article 22 deadlines are counted in working days, Monday to Friday. Public holidays can be
+passed in; none are by default, which gives the earliest deadline (owner question in CMP.3).
 """
 
+import datetime as dt
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
@@ -112,3 +116,65 @@ def contact_error(value: str) -> str | None:
     if not value or _EMAIL.match(value) or _WEB.match(value):
         return None
     return "Enter an email address or a web address starting with https://."
+
+
+# --- GPSR article 22: deadlines of the marketplace's safety duties
+
+AUTHORITY_ORDER: Final = "authority_order"
+SAFETY_NOTICE: Final = "safety_notice"
+
+#: Working days to act on an authority order (art. 22(12)) and to handle a product safety
+#: notice (art. 22(9)) received through the notice channel (DSA art. 16, CMP.5).
+WORKING_DAYS_TO_ACT: Final = {AUTHORITY_ORDER: 2, SAFETY_NOTICE: 3}
+
+_SATURDAY: Final = 5
+
+
+def is_working_day(day: dt.date, holidays: frozenset[dt.date] = frozenset()) -> bool:
+    """Monday to Friday, except the given public holidays."""
+    return day.weekday() < _SATURDAY and day not in holidays
+
+
+def add_working_days(
+    start: dt.date, days: int, holidays: frozenset[dt.date] = frozenset()
+) -> dt.date:
+    """The `days`-th working day after `start` (the day of receipt is day 0, `start` itself
+    for 0 days). Without holidays the result is the earliest possible deadline."""
+    if days < 0:
+        raise ValueError(f"days must not be negative, got {days}")
+    day = start
+    for _ in range(days):
+        day += dt.timedelta(days=1)
+        while not is_working_day(day, holidays):
+            day += dt.timedelta(days=1)
+    return day
+
+
+def safety_case_due_on(
+    kind: str, received_on: dt.date, holidays: frozenset[dt.date] = frozenset()
+) -> dt.date:
+    """The last day to act on a case of `kind` received on `received_on`."""
+    try:
+        days = WORKING_DAYS_TO_ACT[kind]
+    except KeyError:
+        raise ValueError(f"unknown safety case kind {kind!r}") from None
+    return add_working_days(received_on, days, holidays)
+
+
+def is_overdue(due_on: dt.date, *, today: dt.date, closed: bool) -> bool:
+    """An open case is overdue from the day after its due day."""
+    return not closed and today > due_on
+
+
+def working_days_left(
+    due_on: dt.date, *, today: dt.date, holidays: frozenset[dt.date] = frozenset()
+) -> int:
+    """Working days from `today` to `due_on`: 0 on the due day, negative once it has passed."""
+    sign, start, end = (1, today, due_on) if today <= due_on else (-1, due_on, today)
+    count = 0
+    day = start
+    while day < end:
+        day += dt.timedelta(days=1)
+        if is_working_day(day, holidays):
+            count += 1
+    return sign * count

@@ -66,17 +66,28 @@ own responsibility (CMP.10).
 
 ### CMP.3 — GPSR `[P1]`
 ```python
-class GpsrInfo(Model):
+class GpsrInfo(Model):                 # apps.compliance; product.gpsr (one-to-one)
     manufacturer_name
     manufacturer_address
-    manufacturer_contact
+    manufacturer_contact                # email or http(s) web address
+    manufacturer_country                # outside the EU: EU responsible person mandatory
     eu_responsible_name
     eu_responsible_address
     eu_responsible_contact  # mandatory if the manufacturer is outside the EU
-    product_identifiers(batch, model, GTIN)
-    warnings(translated)
-    safety_documents(file)
+    product_identifiers(batch, model)   # plus Product.gtin and Product.mpn
+    safety_documents(file)              # follow-up (private document storage, ARC.15)
+
+class VendorGpsrDefaults(Model):        # same manufacturer and EU person blocks, per vendor
+class GpsrSafetyText(Model):            # warnings and safety information, one row per language
+class SafetyCase(Model):                # article 22: authority order or safety notice,
+    kind; vendor; product; received_at; due_on; status; resolution; overdue_alerted_at
 ```
+- Vendor defaults fill a block (manufacturer, EU responsible person) the product leaves empty,
+  one whole block at a time, never field by field. The catalog never imports compliance:
+  compliance registers its check in `apps.catalog.publishing`, which the publishing services
+  run before a product becomes published.
+- Working days are Monday to Friday; the day of receipt is day 0 and counts in business time
+  (Europe/Rome). Public holidays are not skipped yet, which gives the earliest deadline.
 - Visible on the product page with at least one product picture (article 19); **publication
   blocked** if mandatory fields are missing; the import contract requires them. Per-vendor defaults
   (the manufacturer often is the vendor). Warnings and safety information in the language of the

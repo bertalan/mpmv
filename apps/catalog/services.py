@@ -35,7 +35,7 @@ from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedQuerySet
 from apps.vendors.services import ensure_vendor_can_write, vendors_in_suggestions
 
-from . import engine, listings, slugs
+from . import engine, listings, publishing, slugs
 from .models import (
     Attribute,
     AttributeValue,
@@ -256,11 +256,14 @@ def save_product(product: Product, *, ctx: AuditContext, dry_run: bool = False) 
 
     The change is computed against the stored row (locked), never a possibly stale instance.
     Other fields are saved but not audited. Raises ValidationError when the owning vendor or a
-    price would change, or a value is invalid, also on dry-run.
+    price would change, a value is invalid, or the product becomes published while a
+    registered publication check fails (`publishing.check_publishable`, GPSR: CMP.3), also on
+    dry-run.
     """
     _validate(product)
     changes = ChangeSet()
     key = str(product.public_id)
+    publishing_now = product.status == ProductStatus.PUBLISHED
     with transaction.atomic():
         if product._state.adding:
             changes.create(PRODUCT_MODEL, key, product_snapshot(product))
@@ -274,8 +277,13 @@ def save_product(product: Product, *, ctx: AuditContext, dry_run: bool = False) 
             if stored.vendor_id != product.vendor_id:
                 raise ValidationError({"vendor": VENDOR_NEVER_CHANGES})
             _refuse_price_changes(stored, product, PRODUCT_PRICE_FIELDS)
+            publishing_now = publishing_now and stored.status != ProductStatus.PUBLISHED
             changes.update(PRODUCT_MODEL, key, product_snapshot(stored), product_snapshot(product))
             action = PRODUCT_UPDATED
+        if publishing_now:
+            # Until CAT.10's publishing services exist this is the way to publish: the checks
+            # other apps register (GPSR, CMP.3) must pass first.
+            publishing.check_publishable(product)
         if dry_run:
             return changes
         product.save()
