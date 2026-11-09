@@ -258,6 +258,9 @@ WAGTAILSEARCH_BACKENDS = {"default": {"BACKEND": "wagtail.search.backends.databa
 # Passwords, email addresses, users and groups are managed where changes are audited (SEC.4),
 # not from Wagtail's account and user pages.
 WAGTAIL_PASSWORD_MANAGEMENT_ENABLED = False
+# Editors' login with autocomplete tokens and the show-password toggle (CMP.9, WCAG 2.2 SC 3.3.8);
+# its template (cms/admin/login.html, routed in apps.cms.admin_urls) renders the captcha.
+WAGTAILADMIN_USER_LOGIN_FORM = "apps.cms.admin_forms.EditorLoginForm"
 WAGTAIL_PASSWORD_RESET_ENABLED = False
 WAGTAIL_EMAIL_MANAGEMENT_ENABLED = False
 WAGTAILUSERS_PASSWORD_ENABLED = False

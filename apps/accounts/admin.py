@@ -31,6 +31,7 @@ from apps.core.audit import audit_context
 
 from . import services
 from .decorators import step_up_required
+from .forms import StaffLoginForm
 from .mfa_session import is_recently_verified
 from .models import User
 from .services import has_second_factor, reset_mfa
@@ -95,8 +96,10 @@ def _refuses_batch(request: HttpRequest, queryset: QuerySet[User]) -> bool:
     return not _is_superuser(request) and queryset.filter(PRIVILEGED).exists()
 
 
-# The admin login renders the Turnstile widget when the captcha is enabled (CORE.5).
+# The admin login renders the Turnstile widget when the captcha is enabled (CORE.5), and its
+# form lets password managers fill it (CMP.9, WCAG 2.2 SC 3.3.8).
 admin.site.login_template = "accounts/admin/login.html"
+admin.site.login_form = StaffLoginForm
 
 
 @admin.register(User)

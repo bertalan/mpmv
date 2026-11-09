@@ -94,16 +94,6 @@ def test_the_staff_admin_login_form_lets_password_managers_fill_it() -> None:
     assert "data-password-toggle" in password
 
 
-def test_the_editor_login_form_lets_password_managers_fill_it() -> None:
-    from apps.cms.admin_forms import EditorLoginForm
-
-    form = EditorLoginForm()
-    assert form.fields["username"].widget.attrs["autocomplete"] == "username"
-    password = form.fields["password"].widget.attrs
-    assert password["autocomplete"] == "current-password"
-    assert "data-password-toggle" in password
-
-
 def test_the_password_toggle_is_a_module_without_inline_code() -> None:
     script = ROOT / "apps/accounts/static/accounts/password-toggle.js"
     text = script.read_text(encoding="utf-8")

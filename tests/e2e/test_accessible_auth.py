@@ -18,7 +18,12 @@ from django_otp.oath import totp
 from playwright.sync_api import Locator, Page, expect
 from pytest_django.live_server_helper import LiveServer
 
-from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
+from apps.accounts.tests.factories import (
+    RecoveryCodeDeviceFactory,
+    RecoveryCodeFactory,
+    TOTPDeviceFactory,
+    UserFactory,
+)
 from apps.accounts.tests.mfa import totp_token
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
@@ -70,6 +75,7 @@ def test_staff_paste_a_password_and_a_totp_code(
     password = secrets.token_urlsafe(16)  # generated: no credential literals in git
     user = UserFactory.create(email="staff@example.com", password=password, superuser=True)
     device = TOTPDeviceFactory.create(user=user)
+    RecoveryCodeFactory.create(device=RecoveryCodeDeviceFactory.create(user=user))
 
     page.goto(f"{live_server.url}/django-admin/login/")
     email = page.get_by_label("Email")
