@@ -428,6 +428,18 @@ def test_get_workflow_follows_the_threshold(owner: User, moderator: User) -> Non
     assert _fresh(page).get_workflow() is None
 
 
+def test_reading_the_threshold_writes_no_settings_row(owner: User) -> None:
+    # Wagtail asks for the workflow when it shows a page (a GET): the default threshold applies
+    # without creating the site's settings row (SEC.5 "a GET has no side effects").
+    page = _create(owner)
+    EventSettings.objects.all().delete()
+    assert page.get_workflow() is not None
+    assert not EventSettings.objects.exists()
+    site = Site.objects.get(is_default_site=True)
+    assert EventSettings.current(site).moderation_threshold == 3
+    assert not EventSettings.objects.exists()
+
+
 def test_set_vendor_policy_is_audited_and_staff_only(owner: User) -> None:
     staff = UserFactory.create(staff=True)
     vendor = _vendor_of(owner)

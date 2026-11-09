@@ -496,7 +496,7 @@ class EventPage(Page):  # type: ignore[misc]  # Wagtail is untyped
             .values_list("mode", flat=True)
             .first()
         ) or PolicyMode.DEFAULT
-        threshold = EventSettings.for_site(self._settings_site()).moderation_threshold
+        threshold = EventSettings.current(self._settings_site()).moderation_threshold
         approved = approved_event_count(self.vendor_id) if mode == PolicyMode.DEFAULT else 0
         return engine.needs_review(approved, threshold, mode, is_staff=False)
 
@@ -784,6 +784,16 @@ class EventSettings(BaseSiteSetting):  # type: ignore[misc]  # Wagtail is untype
     class Meta:
         verbose_name = _("events settings")
         verbose_name_plural = _("events settings")
+
+    @classmethod
+    def current(cls, site: Site) -> "EventSettings":
+        """The settings of `site`, or unsaved defaults: a read never creates the row.
+
+        Wagtail's `for_site` creates it, which would make a GET (an admin page, the workflow
+        lookup) write. Only `set_event_settings` saves it.
+        """
+        found: EventSettings | None = cls.objects.filter(site=site).first()
+        return found if found is not None else cls(site=site)
 
 
 # --- The "Event review" workflow (spec 15 "Moderation with Wagtail workflows")
