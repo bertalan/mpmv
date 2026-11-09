@@ -66,6 +66,40 @@ Launch prerequisite: before the first LIVE launch, and before the account activa
 CORE.19 start, the sending domain has SPF, DKIM and DMARC records in place and verified (ARC.19,
 [transactional email](transactional-email.md)).
 
+## Security schedule
+
+The security checks run at three cadences (SEC.5, owner request of 2026-11-09).
+
+| When | Workflow | What runs |
+| --- | --- | --- |
+| Every pull request and push to `main` | `ci.yml` (required checks) | The fast suites (unit and integration, `tests/security` included), `make audit` (pip-audit), ruff with the `S` rules, the gitleaks secret scan |
+| Every night, 02:30 UTC, on `main` | `security-nightly.yml` | `make test-security-nightly`: the `security_slow` tests (ReDoS sweep, malicious-upload corpus, long hostile-input runs) and `tests/security` again with `HYPOTHESIS_PROFILE=nightly`, against a PostgreSQL service; then pip-audit and osv-scanner on `uv.lock` against the advisories of the day, even when no code changed |
+| Every Monday, 03:00 UTC | `security-stage.yml` | OWASP ZAP baseline and nuclei (pinned container images, no intrusive, fuzzing or denial-of-service templates) through `deploy/ci/stage-scan.sh`, against STAGE |
+
+Run either scheduled workflow by hand from Actions > *Run workflow* (`workflow_dispatch`), or with
+`gh workflow run security-nightly.yml` and `gh workflow run security-stage.yml`. Locally,
+`make db` then `make test-security-nightly` runs the nightly test selection.
+
+Repository variables (Settings > Secrets and variables > Actions > Variables), set by lane-a:
+
+- `STAGE_URL`: the STAGE base URL. While it is empty the STAGE job is skipped.
+- `LIVE_SCAN_URL` and `ALLOW_LIVE_SCAN`: LIVE is scanned only when both are set and
+  `ALLOW_LIVE_SCAN` is exactly `true`. Both are unset by default; set them only on the owner's go,
+  and unset `ALLOW_LIVE_SCAN` again afterwards.
+
+The URLs live only in those variables: never in the repository, an issue or a pull request. The
+scan script masks the target in the log, and the ZAP and nuclei reports stay on the runner,
+because the artifacts of a public repository are public. A scan fails on a ZAP alert of medium or
+high risk, a nuclei finding of medium severity or above, or a scanner error.
+
+How failures are reported: when a scheduled or manual run on `main` fails, the `report` job
+(`tools/security_report.py`, the only job with `issues: write`) opens one issue labelled
+`security` per workflow, titled `[security-nightly] ...` or `[security-stage] ...`, with the job
+results, finding counts and failing test names (no URL, host or address), and posts one line on the
+lane board, issue #86: `to lane-a: security-nightly failed: <run link>`. While that issue stays
+open, later failures update its text and add a comment instead of a new line on #86. The next green
+run comments and closes it.
+
 ## No hand edits on servers
 
 Units, the Caddyfile and `mpmv-deploy` on a server come from the release it runs. An emergency hand

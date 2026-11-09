@@ -1,0 +1,99 @@
+# SEC.5 (owner request 2026-11-09): weekly external scans of STAGE, OWASP ZAP baseline and nuclei,
+# through deploy/ci/stage-scan.sh. The target URL is a repository variable that lane-a sets
+# (vars.STAGE_URL): it is never written in the repository, and the job is skipped while it is
+# empty. LIVE is scanned only when BOTH vars.ALLOW_LIVE_SCAN is 'true' and vars.LIVE_SCAN_URL is
+# set; by default it is off. Reports stay on the runner: artifacts of a public repository are
+# public. Run it by hand: Actions > Security STAGE scan > Run workflow, or
+# `gh workflow run security-stage.yml`. See docs/dev/release.md, "Security schedule".
+name: Security STAGE scan
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: security-stage
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  stage:
+    name: ZAP baseline and nuclei (STAGE)
+    if: ${{ vars.STAGE_URL != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    outputs:
+      zap_high: ${{ steps.scan.outputs.zap_high }}
+      zap_medium: ${{ steps.scan.outputs.zap_medium }}
+      nuclei_critical: ${{ steps.scan.outputs.nuclei_critical }}
+      nuclei_high: ${{ steps.scan.outputs.nuclei_high }}
+      nuclei_medium: ${{ steps.scan.outputs.nuclei_medium }}
+    env:
+      TARGET_URL: ${{ vars.STAGE_URL }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Scan
+        id: scan
+        run: deploy/ci/stage-scan.sh
+
+  live:
+    name: ZAP baseline and nuclei (LIVE, explicit opt-in)
+    if: ${{ vars.ALLOW_LIVE_SCAN == 'true' && vars.LIVE_SCAN_URL != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    outputs:
+      zap_high: ${{ steps.scan.outputs.zap_high }}
+      zap_medium: ${{ steps.scan.outputs.zap_medium }}
+      nuclei_critical: ${{ steps.scan.outputs.nuclei_critical }}
+      nuclei_high: ${{ steps.scan.outputs.nuclei_high }}
+      nuclei_medium: ${{ steps.scan.outputs.nuclei_medium }}
+    env:
+      TARGET_URL: ${{ vars.LIVE_SCAN_URL }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Scan
+        id: scan
+        run: deploy/ci/stage-scan.sh
+
+  report:
+    name: Report to the security issue
+    needs: [stage, live]
+    if: ${{ always() && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      STAGE: ${{ needs.stage.result }}
+      LIVE: ${{ needs.live.result }}
+      STAGE_COUNTS: >-
+        stage_zap_high=${{ needs.stage.outputs.zap_high || '0' }}
+        stage_zap_medium=${{ needs.stage.outputs.zap_medium || '0' }}
+        stage_nuclei_critical=${{ needs.stage.outputs.nuclei_critical || '0' }}
+        stage_nuclei_high=${{ needs.stage.outputs.nuclei_high || '0' }}
+        stage_nuclei_medium=${{ needs.stage.outputs.nuclei_medium || '0' }}
+      LIVE_COUNTS: >-
+        live_zap_high=${{ needs.live.outputs.zap_high || '0' }}
+        live_zap_medium=${{ needs.live.outputs.zap_medium || '0' }}
+        live_nuclei_critical=${{ needs.live.outputs.nuclei_critical || '0' }}
+        live_nuclei_high=${{ needs.live.outputs.nuclei_high || '0' }}
+        live_nuclei_medium=${{ needs.live.outputs.nuclei_medium || '0' }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Open, update or close the security issue
+        run: |
+          counts=()
+          if [ "$STAGE" != skipped ]; then
+            for c in $STAGE_COUNTS; do counts+=(--count "$c"); done
+          fi
+          if [ "$LIVE" != skipped ]; then
+            for c in $LIVE_COUNTS; do counts+=(--count "$c"); done
+          fi
+          python3 tools/security_report.py --workflow security-stage --run-url "$RUN_URL" \
+            --result "stage=$STAGE" --result "live=$LIVE" "${counts[@]}"

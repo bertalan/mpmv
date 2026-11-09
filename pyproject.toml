@@ -120,6 +120,7 @@ markers = [
   "unit: pure functions, no database (ADR-0006)",
   "integration: real Django + PostgreSQL",
   "e2e: Playwright against a live server",
+  "security_slow: slow security cases, run nightly by security-nightly (SEC.5)",
 ]
 
 [tool.coverage.run]
