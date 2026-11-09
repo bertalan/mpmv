@@ -66,6 +66,56 @@ Launch prerequisite: before the first LIVE launch, and before the account activa
 CORE.19 start, the sending domain has SPF, DKIM and DMARC records in place and verified (ARC.19,
 [transactional email](transactional-email.md)).
 
+## Security schedule
+
+The security checks run at three cadences (SEC.5, owner request of 2026-11-09).
+
+| When | Workflow | What runs |
+| --- | --- | --- |
+| Every pull request and push to `main` | `ci.yml` (required checks) | The fast suites (unit and integration, `tests/security` included), `make audit` (pip-audit), ruff with the `S` rules, the gitleaks secret scan |
+| Every night, 02:30 UTC, on `main` | `security-nightly.yml` | `make test-security-nightly`: the `security_slow` tests (ReDoS sweep, malicious-upload corpus, long hostile-input runs) and `tests/security` again with `HYPOTHESIS_PROFILE=nightly`, against a PostgreSQL service; then pip-audit and osv-scanner on `uv.lock` against the advisories of the day, even when no code changed |
+| Every Tuesday, 03:00 UTC | `security-stage.yml` | OWASP ZAP baseline and nuclei (pinned container images, no intrusive, fuzzing or denial-of-service templates) through `deploy/ci/stage-scan.sh`, against STAGE |
+
+Run either scheduled workflow by hand from Actions > *Run workflow* (`workflow_dispatch`), or with
+`gh workflow run security-nightly.yml` and `gh workflow run security-stage.yml`. Locally,
+`make db` then `make test-security-nightly` runs the nightly test selection.
+
+Settings (Settings > Secrets and variables > Actions), set by lane-a on the owner's go:
+
+- Secret `STAGE_URL`: the STAGE base URL. While it is empty the STAGE job ends green at its first
+  step with a "skipped: no target" notice, and the report counts it as skipped.
+- Secret `LIVE_SCAN_URL` and variable `ALLOW_LIVE_SCAN`: LIVE is scanned only when the secret is
+  set and `ALLOW_LIVE_SCAN` is exactly `true`. Both are unset by default; set them only on the
+  owner's go, and unset `ALLOW_LIVE_SCAN` again afterwards.
+
+The URLs are secrets, never variables: no server detail is visible on GitHub. They are never
+written in the repository, an issue or a pull request. Secrets cannot be read in a job-level `if`,
+so each scan job checks its secret in a first guard step. Repository secrets are readable by a run
+on any branch, and `workflow_dispatch` accepts any ref, so both scan jobs run only on `main`
+(`github.ref == 'refs/heads/main'`): a manual run from another branch skips them. Only the guard and the scan step get the
+secret, as `TARGET_URL`; it never appears in a job name, a step summary, a cache key, an artifact
+or the report job. GitHub masks the secret in the log, and the scan script masks it again; since a
+mask covers only the full URL, the ZAP and nuclei output goes to files on the runner and the log
+shows exit codes and counts only. The reports stay on the runner as well, because the artifacts of
+a public repository are public: to see the findings, rerun the scan locally against the target. A
+scan fails on a ZAP alert of medium or high risk, a nuclei finding of medium severity or above, or
+a scanner error.
+
+The nuclei engine image is pinned, but its template set is not: the image downloads the current
+public templates at run time (`-disable-update-check` covers only the engine). Findings can
+therefore change between two weekly runs with no change on our side; check the template release
+before treating a new finding as a regression.
+
+How failures are reported: when a scheduled or manual run on `main` fails, the `report` job
+(`tools/security_report.py`, the only job with `issues: write`) opens one issue labelled
+`security` per workflow, titled `[security-nightly] ...` or `[security-stage] ...`, with the job
+results, finding counts and failing test names (no URL, host or address), and posts one line on the
+lane board, issue #86: `to lane-a: security-nightly failed: <run link>`. While that issue stays
+open, later failures update its text and add a comment instead of a new line on #86. The next green
+run comments and closes it. A skipped run (no target secret, or a run off `main`) never closes
+it: if `STAGE_URL` is removed while a `[security-stage]` issue is open, the issue stays open until
+a scan runs again or someone closes it by hand.
+
 ## No hand edits on servers
 
 Units, the Caddyfile and `mpmv-deploy` on a server come from the release it runs. An emergency hand
