@@ -156,6 +156,19 @@ everywhere:
 - Language: `inLanguage` on every node, the text in the page language only, never a fallback in
   another language; no node for content that is not published in that language.
 
+**Widgets feed the graph (owner, 2026-11-09).** Every block or widget that shows a list of
+things on a page adds to the page's `@graph`, instead of being invisible to it: the product grid
+(CMS.10), product cards (CMS.11), related and compatible products, "other sellers" (CAT.15),
+event lists, blog post lists and vendor lists. The contract: each such StreamField block or
+template widget implements `graph_nodes(context) -> list[dict]` and returns one `ItemList` with
+a `name` (the block heading in the page language), `numberOfItems` and ordered `ListItem`s
+(`position`, `item` = the `@id` of the product, event, post or vendor page, plus `name`, `url`
+and `image`). Full `Product` nodes appear only on the product's own page; a list item references
+it and never repeats offers, so a page with three widgets and twenty products stays small. The
+page node links the lists through `hasPart` (`mainEntity` on listing pages, where the first list
+is the page's main content). The same product in two widgets is one `@id`, listed in each.
+Hidden, unpublished or other-language items never appear.
+
 **Product node (SEO.1 inside the SEO.7 graph), from a review of the legacy product JSON-LD
 (2026-11-09).** The legacy page already has a linked `@graph` with `Product`, `Offer` with a
 VAT-inclusive `UnitPriceSpecification`, a `MerchantReturnPolicy`, `Brand`, breadcrumbs,
@@ -288,7 +301,7 @@ with design tokens, template overrides, CSP-safe components and WCAG 2.2 AA rule
 | SEO.4 | Merchant API sync + Meta feed | P2 | 8 | SEO.3 | Daily delta report |
 | SEO.5 | Cookie consent + Consent Mode v2 + e-commerce events | P1 | 8 | ORD.5 | No tags fire before consent |
 | SEO.6 | Anonymous page cache, responsive renditions, CWV budget | P2 | 6 | THM.3 | LCP < 2.5 s on product page |
-| SEO.7 | Site-wide schema.org `@graph` (owner question 2026-11-09): one JSON-LD block per page from `seo.page_graph`, stable `@id` nodes for the operator `Organization`, `WebSite` + `SearchAction`, `WebPage` subtypes, `BreadcrumbList`, vendor `Organization` as `seller`, shared return and shipping nodes, `Product`/`Offer`/`AggregateOffer`, `CollectionPage` + `ItemList`, `BlogPosting` + `Person`/`ProfilePage`, `Event`; `inLanguage` and no cross-language fallback; SEO.1 and EVT.10 return nodes into it | P1 | 8 | SEO.1, CMS.3 | Each page type has a snapshot test of its graph; every `@id` reference resolves to a node in the same graph or a canonical URL; a schema check (types, required and recommended properties of the Google rich results for Product, Breadcrumb, Article, Event, ProfilePage) runs in CI; a page has exactly one JSON-LD script; the product node checklist of §"Structured data graph" is covered (vendor as seller, gtin/mpn/productID, variants as ProductGroup, compact shipping, licence fields on images) and a product page's JSON-LD stays under 30 KB |
+| SEO.7 | Site-wide schema.org `@graph` (owner question 2026-11-09): one JSON-LD block per page from `seo.page_graph`, stable `@id` nodes for the operator `Organization`, `WebSite` + `SearchAction`, `WebPage` subtypes, `BreadcrumbList`, vendor `Organization` as `seller`, shared return and shipping nodes, `Product`/`Offer`/`AggregateOffer`, `CollectionPage` + `ItemList`, `BlogPosting` + `Person`/`ProfilePage`, `Event`; `inLanguage` and no cross-language fallback; SEO.1 and EVT.10 return nodes into it | P1 | 8 | SEO.1, CMS.3 | Each page type has a snapshot test of its graph; every `@id` reference resolves to a node in the same graph or a canonical URL; a schema check (types, required and recommended properties of the Google rich results for Product, Breadcrumb, Article, Event, ProfilePage) runs in CI; a page has exactly one JSON-LD script; a page with a product grid and a product cards block has two named `ItemList`s whose items reference product `@id`s without repeating offers, and a retired product disappears from both; the product node checklist of §"Structured data graph" is covered (vendor as seller, gtin/mpn/productID, variants as ProductGroup, compact shipping, licence fields on images) and a product page's JSON-LD stays under 30 KB |
 | AI.1 | MCP server: auth, read tools (catalog, orders, quotes, simulations, reports) | P2 | 12 | CORE.7 | Tools usable from Claude Code with scopes |
 | AI.2 | Mutating MCP tools with dry-run, confirmation and audit | P2 | 10 | AI.1 | Every mutation has a diff and an audit entry |
 | AI.3 | Read-only public catalog API for agents | P3 | 6 | CAT.9 | Search by taxonomy term via API |
