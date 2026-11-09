@@ -128,6 +128,24 @@ def test_continue_opens_the_link_in_the_session_and_signs_nobody_in(client: Clie
     assert token not in json.dumps(dict(client.session.items()), default=str)
 
 
+def test_opening_a_valid_link_is_audited_without_the_token(client: Client) -> None:
+    token = invite_token()
+    press_continue(client, token)
+    entry = AuditLog.objects.get(action=services.ACTION_LINK_OPENED)
+    assert entry.after == {"purpose": INVITE_PURPOSE, "object": "inv-1", "version": "1"}
+    assert entry.target_key == services.UNKNOWN_ACCOUNT  # nobody is signed in
+    stored = json.dumps([entry.before, entry.after, entry.target_key, entry.actor_label])
+    assert token not in stored
+
+
+def test_a_refused_link_is_not_audited_as_opened(client: Client) -> None:
+    token = invite_token()
+    INVITATIONS["inv-1"] = Invitation(email=EMAIL, version="2")
+    press_continue(client, token)
+    assert not AuditLog.objects.filter(action=services.ACTION_LINK_OPENED).exists()
+    assert AuditLog.objects.filter(action=services.ACTION_LINK_REFUSED).count() == 1
+
+
 def test_the_action_page_without_an_opened_link_is_refused(client: Client) -> None:
     response = client.get(reverse("test-invite", args=["inv-1"]))
     assert response.status_code == 403

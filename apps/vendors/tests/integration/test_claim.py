@@ -544,6 +544,47 @@ def test_approval_is_refused_when_the_vendor_already_has_a_member(client: Client
     assert not actions(services.CLAIM_APPROVED)
 
 
+@pytest.mark.parametrize("decide", [services.approve_claim, services.reject_claim])
+def test_a_decision_on_another_link_version_is_refused(client: Client, decide: Any) -> None:
+    vendor = imported_vendor()
+    full_claim(client, vendor)
+    claim = VendorClaim.objects.get(vendor=vendor)
+    with pytest.raises(engine.ClaimError, match="changed"):
+        decide(claim, ctx=STAFF, reviewed_version=claim.version - 1)
+    assert VendorClaim.objects.get(vendor=vendor).status == VendorClaim.Status.SUBMITTED
+    assert not VendorMember.objects.filter(vendor=vendor).exists()
+
+
+@pytest.mark.parametrize("decide", [services.approve_claim, services.reject_claim])
+def test_a_decision_on_another_claimant_is_refused(client: Client, decide: Any) -> None:
+    vendor = imported_vendor()
+    full_claim(client, vendor)
+    claim = VendorClaim.objects.get(vendor=vendor)
+    other = UserFactory.create()
+    with pytest.raises(engine.ClaimError, match="changed"):
+        decide(claim, ctx=STAFF, reviewed_claimant_id=other.pk)
+    assert VendorClaim.objects.get(vendor=vendor).status == VendorClaim.Status.SUBMITTED
+    assert not VendorMember.objects.filter(vendor=vendor).exists()
+
+
+def test_a_stale_claim_instance_cannot_approve_a_newer_claimant(client: Client) -> None:
+    """Staff A loaded the claim; meanwhile it was rejected, resent and claimed by someone
+    else. A's (stale) claim must not approve the new claimant."""
+    vendor = imported_vendor()
+    full_claim(client, vendor)
+    seen_by_a = VendorClaim.objects.get(vendor=vendor)
+    services.reject_claim(VendorClaim.objects.get(vendor=vendor), ctx=STAFF)
+    services.send_claim_link(vendor, ctx=STAFF, channel=engine.CLAIM_CHANNEL_PEC)
+    newcomer = UserFactory.create(email=vendor.pec)
+    VendorClaim.objects.filter(vendor=vendor).update(
+        status=VendorClaim.Status.SUBMITTED, claimant=newcomer
+    )
+    with pytest.raises(engine.ClaimError, match="changed"):
+        services.approve_claim(seen_by_a, ctx=STAFF)
+    assert not VendorMember.objects.filter(vendor=vendor).exists()
+    assert not actions(services.CLAIM_APPROVED)
+
+
 def test_approval_is_refused_when_the_legal_email_changed(client: Client) -> None:
     vendor = imported_vendor()
     full_claim(client, vendor)
