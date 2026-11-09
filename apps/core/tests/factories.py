@@ -202,7 +202,9 @@ class MediaImageFactory(DjangoModelFactory[MediaImage]):
         model = MediaImage
 
     title = factory.Sequence(lambda n: f"Image {n}")
-    file = factory.django.ImageField(width=64, height=48, color="teal", filename="image.png")
+    file = factory.django.ImageField(
+        width=64, height=48, color="teal", filename="image.png", format="PNG"
+    )
     collection = None
     licence = factory.SubFactory(
         ImageLicenceFactory, code="own-work", name="Own work", source_required=False
