@@ -9,14 +9,14 @@ production system. The list is **confidential** and is not part of the public re
 
 | Area | Today | New system |
 |---|---|---|
-| Surface | WP core + WooCommerce + WCFM (7 add-ons) + WPML (4) + WPSSO (15) + ~20 mu-plugins + 132 routes | A single Python codebase, dependencies inventoried (SBOM) and scanned in CI |
-| Admin access | A single `/wp-admin` for all roles | One Manager with a gated shop space for vendors and a gated platform space for staff roles, MFA for everyone; Django admin behind a restricted network ([02](02-core-identity-permissions.md)) |
+| Surface | A CMS with a commerce plugin, a marketplace plugin, translation and SEO plugins, custom plugins and a legacy PHP API | A single Python codebase, dependencies inventoried (SBOM) and scanned in CI |
+| Admin access | One shared admin area | One Manager with a gated shop space for vendors and a gated platform space for staff roles, MFA for everyone; Django admin behind a restricted network ([02](02-core-identity-permissions.md)) |
 | API | Legacy PHP API, to be replaced | `ApiClient` with hash, scopes, expiry, rotation, rate limiting |
-| Executable code | Traditional PHP/WordPress model | No code in media directories; media on object storage |
-| Operational scripts | Ad hoc fix scripts outside version control | Versioned management commands with dry-run and audit, or MCP tools |
-| Data at rest | No field-level encryption | Field-level encryption for IBAN and KYC documents, keys outside the DB |
+| Executable code | Traditional PHP CMS model | No code in media directories; media on object storage |
+| Operational scripts | Ad hoc scripts | Versioned management commands with dry-run and audit, or MCP tools |
+| Data at rest | Legacy model (see private spec) | Field-level encryption for IBAN and KYC documents, keys outside the DB |
 | Traceability | No audit on prices, VAT, shipping | Append-only `AuditLog` |
-| Environments | STAGE synced from LIVE | Synthetic or anonymized data |
+| Environments | Legacy model (see private spec) | Synthetic or anonymized data |
 
 ## 12.3 Security requirements
 
@@ -92,11 +92,11 @@ flowchart LR
 
 | Today | Tomorrow |
 |---|---|
-| `refresh_stage_from_live.sh`, `legacy-stage-safety` | `make seed-stage` with synthetic data; no LIVE clone |
-| `disable_live_checkout_location.sh` and other option patches | Settings in the DB with audit, editable from admin |
-| `diagnose_*` / `fix_*` (dozens) | Admin reports, health checks, read-only MCP tools; fixes as commands with dry-run |
-| WP/WCFM/WPML plugin updates with a test matrix | Python dependency updates via automated PRs + CI |
-| WP-Optimize cache to be disabled on STAGE | Application cache controlled by settings |
+| Scripts that refresh the test environment from production, plus a safety plugin | `make seed-stage` with synthetic data; no LIVE clone |
+| Shell scripts that patch configuration options | Settings in the DB with audit, editable from admin |
+| Legacy diagnostic and fix scripts | Admin reports, health checks, read-only MCP tools; fixes as commands with dry-run |
+| CMS, marketplace and translation plugin updates with a test matrix | Python dependency updates via automated PRs + CI |
+| A caching plugin to be disabled on the test environment | Application cache controlled by settings |
 
 ## 12.6 Tasks
 

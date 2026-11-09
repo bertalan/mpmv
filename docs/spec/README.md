@@ -4,7 +4,7 @@ Functional and technical specification for replacing the WordPress + WooCommerce
 with a **Django + Wagtail** system that is simpler to run.
 
 The document was derived from an analysis of the current code: custom VAT and shipping plugins,
-mu-plugins, 132 API routes, Python import pipelines, audit reports and LIVE configurations.
+mu-plugins, the legacy API routes, Python import pipelines, audit reports and LIVE configurations.
 It also reviews the August 2026 rebuild plan.
 
 ## How to read this spec
@@ -32,7 +32,7 @@ It also reviews the August 2026 rebuild plan.
 |---|---|---|
 | 00 | [Vision and review](00-vision-and-review.md) | Idea, principles, delta from the August plan |
 | 01 | [Stack and architecture](01-stack-and-architecture.md) | Wagtail and alternatives compared, modular monolith, conventions |
-| 02 | [Identity, permissions, API, backoffice](02-core-identity-permissions.md) | Roles, vendor isolation, API v1 replacing `api.php` |
+| 02 | [Identity, permissions, API, backoffice](02-core-identity-permissions.md) | Roles, vendor isolation, API v1 replacing the legacy custom API |
 | 03 | [Catalog](03-catalog.md) | Products, variants, navigation taxonomies, SKU slugs, redirects, search |
 | 04 | [Vendors, commissions, ledger](04-vendors-commissions-ledger.md) | Plans, commission rules, ledger, payouts |
 | 05 | [Tax engine](05-tax.md) | VAT regimes, decision tree, special territories, tests |
