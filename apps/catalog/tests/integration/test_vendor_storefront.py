@@ -10,7 +10,9 @@ public and unpublished products never show.
 from typing import Any
 
 import pytest
+from django.db import connection
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
 
 from apps.catalog.models import Product
 from apps.catalog.tests.factories import CategoryFactory, CategoryTranslationFactory
@@ -164,3 +166,67 @@ def test_other_listings_have_no_store_categories(client: Client) -> None:
     response = client.get("/product-category/vases/")
     assert response.context["store_categories"] == []
     assert response.context["vendor_profile"] is None
+
+
+def test_tagline_and_policies_are_escaped(client: Client) -> None:
+    vendor = _vendor()
+    vendor.translations.filter(language="en").update(
+        tagline="<b>tag</b>",
+        shipping_policy="<script>ship()</script>",
+        refund_policy="<img src=x onerror=r()>",
+        cancellation_policy="<script>cancel()</script>",
+    )
+    html = client.get(f"/shop/{vendor.slug}/").content.decode()
+    for raw in ("<b>tag</b>", "<script>ship()", "<img src=x", "<script>cancel()"):
+        assert raw not in html
+    assert "&lt;script&gt;ship()" in html
+    assert "&lt;b&gt;tag&lt;/b&gt;" in html
+
+
+def test_a_vendor_that_is_not_active_is_a_404_in_italian_too(client: Client) -> None:
+    vendor = VendorFactory.create(status=Vendor.Status.SUSPENDED)
+    VendorTranslationFactory.create(vendor=vendor, language="it", status=PUBLISHED)
+    assert client.get(f"{prefix('it')}/shop/{vendor.slug}/").status_code == 404
+
+
+def test_a_draft_category_name_is_not_offered(client: Client) -> None:
+    vendor = _vendor()
+    category = CategoryFactory.create()
+    CategoryTranslationFactory.create(
+        category=category,
+        language="en",
+        name="Hidden draft",
+        slug="hidden",
+        status=TranslationStatus.MACHINE,
+    )
+    listed(vendor=vendor, category=category)
+    response = client.get(f"/shop/{vendor.slug}/")
+    assert response.context["store_categories"] == []
+    assert "Hidden draft" not in response.content.decode()
+
+
+def test_the_storefront_with_only_the_source_text_points_its_canonical_at_it(
+    client: Client,
+) -> None:
+    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    VendorTranslationFactory.create(vendor=vendor, language="en", status=PUBLISHED)
+    html = client.get(f"{prefix('it')}/shop/{vendor.slug}/").content.decode()
+    assert f'rel="canonical" href="http://testserver/shop/{vendor.slug}/"' in html
+    assert f'hreflang="en" href="http://testserver/shop/{vendor.slug}/"' in html
+    assert f'hreflang="x-default" href="http://testserver/shop/{vendor.slug}/"' in html
+    assert 'hreflang="it"' not in html
+
+
+def test_the_query_count_does_not_grow_with_the_categories(
+    client: Client, django_assert_max_num_queries: Any
+) -> None:
+    vendor = _vendor()
+    listed(vendor=vendor, category=_category("Cat0", "Cat0"))
+    client.get(f"/shop/{vendor.slug}/")  # warm caches (content types, site, languages)
+    with CaptureQueriesContext(connection) as small:
+        client.get(f"/shop/{vendor.slug}/")
+    for number in range(1, 11):
+        listed(vendor=vendor, category=_category(f"Cat{number}", f"Cat{number}"))
+    with django_assert_max_num_queries(len(small) + 1):
+        response = client.get(f"/shop/{vendor.slug}/")
+    assert len(response.context["store_categories"]) == 11
