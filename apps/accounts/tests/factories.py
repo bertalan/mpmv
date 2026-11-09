@@ -11,6 +11,7 @@ from factory.django import DjangoModelFactory
 
 from apps.accounts import engine
 from apps.accounts.models import (
+    ActionLinkIssue,
     ActionLinkUse,
     PasskeyDevice,
     RecoveryCode,
@@ -119,3 +120,15 @@ class ActionLinkUseFactory(DjangoModelFactory[ActionLinkUse]):
     purpose = "tests.approve"
     object_key = factory.Sequence(lambda n: f"doc-{n}")
     user = factory.SubFactory(UserFactory)
+
+
+class ActionLinkIssueFactory(DjangoModelFactory[ActionLinkIssue]):
+    """The issue count of secure action links for one purpose, object and recipient (CORE.15)."""
+
+    class Meta:
+        model = ActionLinkIssue
+
+    purpose = "tests.approve"
+    object_key = factory.Sequence(lambda n: f"doc-{n}")
+    user = factory.SubFactory(UserFactory)
+    generation = 1
