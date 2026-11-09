@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **243** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **2000 h** (P1 1626 h · P2 356 h · P3 18 h)
+- Micro-tasks: **244** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **2008 h** (P1 1634 h · P2 356 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -16,7 +16,7 @@
 |---|---|---:|---:|---:|---:|---:|
 | ARC | Architecture and foundations | 22 | 129 | 6 | 0 | 135 |
 | CORE | Identity, permissions, API, backoffice | 15 | 108 | 4 | 0 | 112 |
-| CAT | Product catalog | 18 | 126 | 60 | 0 | 186 |
+| CAT | Product catalog | 19 | 134 | 60 | 0 | 194 |
 | VEN | Vendors, commissions, ledger | 25 | 212 | 22 | 0 | 234 |
 | TAX | Tax engine | 13 | 53 | 28 | 0 | 81 |
 | SHP | Shipping and quotes | 14 | 96 | 28 | 0 | 124 |
@@ -33,7 +33,7 @@
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 6 | 19 | 23 | 0 | 42 |
 | MIG | Migration and cutover | 11 | 114 | 0 | 0 | 114 |
-| **Total** | | **243** | **1626** | **356** | **18** | **2000** |
+| **Total** | | **244** | **1634** | **356** | **18** | **2008** |
 
 ## By phase
 
@@ -85,7 +85,7 @@
 | OPS.2 | Observability: JSON logs, error tracking, healthchecks, alerts (including database disk space, WAL archiving and backup age) | P1 | 8 | ARC.5 | Alert on a simulated checkout error |
 | OPS.5 | Technical Django admin reachable only from a restricted network (owner decision Q-18): allow-list at the reverse proxy plus an app-level check on the Django admin path (defence in depth), the allowed networks as environment configuration, staff operations moved to the Wagtail admin (CORE.8) | P1 | 3 | ARC.13, CORE.8 | On STAGE the Django admin answers 404 from outside the allowed networks and works from inside; a test covers the app-level check |
 
-### F1 — Catalog, import, base frontend (37 tasks, 326 h)
+### F1 — Catalog, import, base frontend (38 tasks, 334 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -102,6 +102,7 @@
 | CAT.12 | Audited product edit service (coherence check 5): changes to `fiscal_category`, `sales_mode`, weight and dimensions go through a `catalog.services` function (the owning vendor never changes, Q-33 and CAT.14) with dry-run, ChangeSet and AuditLog; the product and variant admins call it instead of saving directly | P1 | 4 | CAT.1, SEC.4 | A fiscal category change made in the admin shows in the audit view with before and after; a dry run writes nothing; `core.E203` passes without the price-only exemption |
 | CAT.13 | Internal identity and the vendor SKU as a label (owner decisions Q-30, Q-33): raw `sku` plus `sku_key` match key on Product and Variant, one per-vendor namespace across products and variants enforced in the database, `SkuAlias` history on rename, non-blocking SKU warnings, staff-only `staff_ref` sequence; drop the upper-case SKU normalisation of CAT.1 | P1 | 8 | CAT.1 | The §3.3 SKU cases are green; a product and a variant of one vendor cannot share a match key; the vendor never sees `staff_ref` |
 | CAT.14 | Catalogue integrity rules (owner decisions Q-29, Q-31, Q-32, Q-33): nullable `price_net` with a check (required for `buy`, never 0.00) and `public_price`; `mpn` field; vendor immutable after creation and staff `duplicate_product_to_vendor` as a draft with audit; variants only on variable products; required companion of the same vendor; cross-vendor upsells only to vendors whose versioned `CrossVendorConsent` has `in_suggestions` (vendor setting with audit) | P1 | 8 | CAT.1 | PRICE-ON-REQUEST green; changing a product's vendor is refused and a staff duplicate keeps the original's history; a simple product cannot get a variant; another vendor's companion is refused; an upsell to a vendor without opt-in is refused |
+| CAT.20 | Brand and manufacturer as linked entities (owner, 2026-11-09; SEO.7): `Brand` gains logo (sanitised SVG or raster, THM.12), official URL, `sameAs` links (Wikidata item ID validated by format, Wikipedia per language, official profiles) and an optional `Manufacturer` (legal name, URL, `sameAs`, country); brands are one shared list for all vendors: a vendor picks an existing brand or proposes a new one, which Catalog and moderation approves or merges into an existing brand (duplicate detection on normalised name and Wikidata ID), every change audited; merging two brands moves their products and keeps a redirect from the old brand page | P1 | 8 | CAT.2 | Two vendors selling the same GTIN show the same brand `@id` and `sameAs` in their JSON-LD; a vendor's proposed brand is not public until approved; a merged brand's old URL redirects and its products moved; an invalid Wikidata ID is refused |
 | ING.1 | `ingest` app: staging models, ImportRun, ReviewItem, MappingTable; staging rows keyed by vendor and SKU match key, products referenced by internal identity | P1 | 10 | CAT.1, CAT.13 | Migrations + admin; an ambiguous SKU match becomes a blocking ReviewItem |
 | ING.2 | Port of `state.py` (source state, change history, stock state) to Django models + existing tests | P1 | 12 | ING.1 | Current pytest suite passes on the new storage |
 | ING.3 | HTML adapter (Vendor A) + generic Store API adapter | P1 | 12 | ING.2 | Dry-run equivalent to the current one |
@@ -245,7 +246,7 @@
 | SEO.2 | Per-language and per-type sitemaps, generated `llms.txt` | P1 | 4 | I18N.6 | Valid sitemaps |
 | SEO.3 | Google feed (EN for every product, IT for products with a published IT translation, D-18) with legacy IDs, prices from the tax engine, shipping from tables; GTIN, brand and MPN from the product fields; on-request and catalogue-only products left out (Q-31, Q-33) | P1 | 8 | TAX.3, SHP.11 | Feed validated in STAGE Merchant Center; no item carries the vendor SKU as MPN; no on-request product is in the feed |
 | SEO.5 | Cookie consent + Consent Mode v2 + e-commerce events | P1 | 8 | ORD.5 | No tags fire before consent |
-| SEO.7 | Site-wide schema.org `@graph` (owner question 2026-11-09): one JSON-LD block per page from `seo.page_graph`, stable `@id` nodes for the operator `Organization`, `WebSite` + `SearchAction`, `WebPage` subtypes, `BreadcrumbList`, vendor `Organization` as `seller`, shared return and shipping nodes, `Product`/`Offer`/`AggregateOffer`, `CollectionPage` + `ItemList`, `BlogPosting` + `Person`/`ProfilePage`, `Event`; `inLanguage` and no cross-language fallback; SEO.1 and EVT.10 return nodes into it | P1 | 8 | SEO.1, CMS.3 | Each page type has a snapshot test of its graph; every `@id` reference resolves to a node in the same graph or a canonical URL; a schema check (types, required and recommended properties of the Google rich results for Product, Breadcrumb, Article, Event, ProfilePage) runs in CI; a page has exactly one JSON-LD script; the product node checklist of §\"Structured data graph\" is covered (vendor as seller, gtin/mpn/productID, variants as ProductGroup, compact shipping, licence fields on images) and a product page's JSON-LD stays under 30 KB |
+| SEO.7 | Site-wide schema.org `@graph` (owner question 2026-11-09): one JSON-LD block per page from `seo.page_graph`, stable `@id` nodes for the operator `Organization`, `WebSite` + `SearchAction`, `WebPage` subtypes, `BreadcrumbList`, vendor `Organization` as `seller`, shared return and shipping nodes, `Product`/`Offer`/`AggregateOffer`, `CollectionPage` + `ItemList`, `BlogPosting` + `Person`/`ProfilePage`, `Event`; `inLanguage` and no cross-language fallback; SEO.1 and EVT.10 return nodes into it | P1 | 8 | SEO.1, CMS.3 | Each page type has a snapshot test of its graph; every `@id` reference resolves to a node in the same graph or a canonical URL; a schema check (types, required and recommended properties of the Google rich results for Product, Breadcrumb, Article, Event, ProfilePage) runs in CI; a page has exactly one JSON-LD script; the product node checklist of §"Structured data graph" is covered (vendor as seller, gtin/mpn/productID, variants as ProductGroup, compact shipping, licence fields on images) and a product page's JSON-LD stays under 30 KB |
 
 ### F5 — Migration, acceptance testing, go-live (12 tasks, 130 h)
 
