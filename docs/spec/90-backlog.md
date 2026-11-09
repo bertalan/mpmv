@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **256** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **2146 h** (P1 1748 h · P2 380 h · P3 18 h)
+- Micro-tasks: **257** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **2152 h** (P1 1754 h · P2 380 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -26,14 +26,14 @@
 | I18N | Multilingual | 9 | 50 | 6 | 0 | 56 |
 | CMS | Wagtail content | 10 | 58 | 10 | 0 | 68 |
 | EVT | Events, feeds and maps | 17 | 111 | 12 | 0 | 123 |
-| THM | Frontend themes | 11 | 70 | 12 | 0 | 82 |
+| THM | Frontend themes | 12 | 76 | 12 | 0 | 88 |
 | SEO | SEO, feeds, analytics | 7 | 38 | 14 | 0 | 52 |
 | AI | AI channels (MCP, agents) | 4 | 0 | 22 | 18 | 40 |
 | CMP | Compliance | 25 | 157 | 69 | 0 | 226 |
 | SEC | Security | 7 | 51 | 0 | 0 | 51 |
 | OPS | Operations | 6 | 19 | 23 | 0 | 42 |
 | MIG | Migration and cutover | 14 | 121 | 20 | 0 | 141 |
-| **Total** | | **256** | **1748** | **380** | **18** | **2146** |
+| **Total** | | **257** | **1754** | **380** | **18** | **2152** |
 
 ## By phase
 
@@ -92,7 +92,7 @@
 | OPS.2 | Observability: JSON logs, error tracking, healthchecks, alerts (including database disk space, WAL archiving and backup age) | P1 | 8 | ARC.5 | Alert on a simulated checkout error |
 | OPS.5 | Technical Django admin reachable only from a restricted network (owner decision Q-18): allow-list at the reverse proxy plus an app-level check on the Django admin path (defence in depth), the allowed networks as environment configuration, staff operations moved to the Manager platform space (CORE.17) and editors to the Wagtail admin (CORE.8) | P1 | 3 | ARC.13, CORE.8 | On STAGE the Django admin answers 404 from outside the allowed networks and works from inside; a test covers the app-level check |
 
-### F1 — Catalog, import, base frontend (39 tasks, 350 h)
+### F1 — Catalog, import, base frontend (40 tasks, 356 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -135,6 +135,7 @@
 | THM.4 | `base` component library (§14.9) and staff-only styleguide page | P1 | 12 | THM.3 | Every component renders in every state on `/_styleguide/` with no CSP violation; e2e screenshots saved |
 | THM.5 | Theme quality gates, parametrised over registered themes: CSP template lint, axe-core (`wcag22aa`) on the styleguide, visual comparison harness with CI-only baselines, size budgets, `LICENSES.toml` check | P1 | 6 | THM.4, ARC.11 | A theme with a 3:1 text pair, an inline style, an unlicensed font or a 50 KB CSS file fails CI; `base` passes |
 | THM.6 | First vertical theme `ride`: colour tokens from the operator palette (§14.4, §14.12), type scale, spacing and shapes from the reference template's visual language, self-hosted Barlow and Barlow Condensed (OFL 1.1, from upstream), SVG icon subset, header, hero and home block overrides, placeholder imagery, `LICENSES.toml` | P1 | 8 | THM.4, CMS.2 | Home page renders with `ride` and passes the THM.5 gates; no file derived from the reference template (PR checklist) |
+| THM.12 | Modern image formats: `WAGTAILIMAGES_FORMAT_CONVERSIONS` sends raster renditions to WebP (animated GIFs keep their format), `<picture>` renditions in AVIF, WebP and JPEG with `srcset`, `sizes`, width and height in CMS, catalog and theme templates, `fetchpriority="high"` on the LCP hero, AVIF dropped with a warning when the image library cannot encode it; uploads open to JPEG, PNG, WebP, AVIF and GIF, originals re-encoded without metadata (SEC.2); SVG only for logos and icons, checked at upload against an allow-list with a safe parser (no scripts, event handlers, `foreignObject`, external references, `url()` in styles, DTD or entities) and served same-origin as `image/svg+xml` with a restrictive CSP | P1 | 6 | THM.4, CMS.8 | Pages serve AVIF and WebP with a JPEG fallback and correct `srcset` and `sizes`; a PNG upload renders as WebP; a scripted SVG is refused; unit tests run the sanitiser on a corpus of malicious SVGs, integration tests cover the renditions, and an e2e test finds AVIF and WebP sources in a page's `<picture>` with no CSP violation |
 
 ### F2 — Checkout: tax, shipping, orders, payments (34 tasks, 301 h)
 

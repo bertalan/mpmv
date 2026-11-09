@@ -29,6 +29,7 @@ from django.utils import timezone
 from apps.core import translations
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
+from apps.core.models import MediaImage
 from apps.core.services import audit_changes, run_mutation
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedQuerySet
@@ -1914,6 +1915,8 @@ class ProductCard:
     price: Decimal | None  # the public net price; None shows "Price on request" (Q-31)
     image_url: str | None = None  # product images come with CAT.4
     image_alt: str = ""
+    # A Wagtail image: rendered as AVIF/WebP/JPEG renditions (THM.12) instead of `image_url`.
+    image: MediaImage | None = None
 
 
 def product_cards(products: Sequence[Product], language: str) -> list[ProductCard]:
