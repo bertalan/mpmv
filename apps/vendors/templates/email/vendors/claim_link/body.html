@@ -1,0 +1,8 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate %}{{ vendor_name }} has been set up on the platform for you. To claim it, open this link, confirm the VAT number or TIN of the business, and create your account with a password and an authenticator app.{% endblocktranslate %}</p>
+<p><a href="{{ action_url }}">{% translate "Claim the vendor" %}</a></p>
+<p>{% blocktranslate with expires=action_link_expires_at %}The link works once and expires on {{ expires }} (UTC). The platform staff review your claim before you can manage the vendor. If you did not expect this email, ignore it.{% endblocktranslate %}</p>
+</body>
+</html>
