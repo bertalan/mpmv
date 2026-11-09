@@ -20,6 +20,7 @@ from apps.accounts.tests.mfa import totp_token
 from apps.cms.models import BlogIndexPage, BlogPostPage
 from apps.cms.services import ArticleData, import_article
 from apps.cms.tests.factories import BlogAuthorFactory, BlogIndexPageFactory
+from apps.core.tests.factories import MediaImageFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.login import verify_with_totp
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
@@ -37,6 +38,12 @@ def _blog() -> BlogIndexPage:
 def test_visitor_reads_a_migrated_article_from_the_blog(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
+    BlogAuthorFactory.create(
+        name="Ada Example",
+        bio="<p>Ada throws bowls on the wheel.</p>",
+        photo=MediaImageFactory.create(),
+        photo_alt_text="Ada at the wheel",
+    )
     import_article(
         _blog(),
         ArticleData(
@@ -63,6 +70,14 @@ def test_visitor_reads_a_migrated_article_from_the_blog(
     expect(page.get_by_text("Ada Example")).to_be_visible()
     expect(page.get_by_text("We spent a day at the wheel.")).to_be_visible()
     shot("blog-article")
+    assert run_axe(page) == [], format_violations(run_axe(page))
+
+    page.get_by_role("link", name="Ada Example").click()
+    expect(page).to_have_url(re.compile(r"/blog/author/ada-example/$"))
+    expect(page.get_by_role("heading", level=1)).to_have_text("Ada Example")
+    expect(page.get_by_text("Ada throws bowls on the wheel.")).to_be_visible()
+    expect(page.get_by_role("link", name="A visit to the workshop")).to_be_visible()
+    shot("blog-author")
     assert run_axe(page) == [], format_violations(run_axe(page))
 
     assert csp_violations(page) == [], "\n".join(csp_violations(page))

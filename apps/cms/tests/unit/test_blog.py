@@ -10,7 +10,10 @@ import datetime as dt
 
 from django.db import models
 from wagtail import blocks
-from wagtail.models import Page
+from wagtail.contrib.routable_page.models import RoutablePageMixin
+from wagtail.fields import RichTextField
+from wagtail.models import Page, TranslatableMixin
+from wagtail_localize.fields import SynchronizedField, TranslatableField, get_translatable_fields
 
 from apps.cms.blocks import (
     PageCardBlock,
@@ -79,3 +82,36 @@ def test_the_expiry_must_follow_the_go_live() -> None:
 
 def test_an_expiry_in_the_past_is_refused() -> None:
     assert schedule_problem(None, NOW - dt.timedelta(minutes=1), NOW) is not None
+
+
+# --- Authors (owner answer on PR #156: name, bio, photo and an author page; the bio translated)
+
+
+def test_an_author_is_a_translatable_snippet_with_bio_photo_and_slug() -> None:
+    assert issubclass(BlogAuthor, TranslatableMixin)
+    names = {field.name for field in BlogAuthor._meta.get_fields()}
+    assert {"name", "slug", "bio", "photo", "photo_alt_text", "locale"} <= names
+    photo = BlogAuthor._meta.get_field("photo")
+    assert photo.null
+    assert photo.remote_field.on_delete is models.SET_NULL
+
+
+def test_the_bio_is_rich_text_with_bold_italic_and_links_only() -> None:
+    bio = BlogAuthor._meta.get_field("bio")
+    assert isinstance(bio, RichTextField)
+    assert bio.blank
+    assert sorted(bio.features) == ["bold", "italic", "link"]
+
+
+def test_the_bio_and_alt_text_are_translated_the_name_and_slug_are_not() -> None:
+    fields = {field.field_name: field for field in get_translatable_fields(BlogAuthor)}
+    assert isinstance(fields["bio"], TranslatableField)
+    assert isinstance(fields["photo_alt_text"], TranslatableField)
+    for synced in ("name", "slug", "photo"):
+        assert isinstance(fields[synced], SynchronizedField), synced
+
+
+def test_the_blog_index_serves_an_author_page() -> None:
+    assert issubclass(BlogIndexPage, RoutablePageMixin)
+    index = BlogIndexPage(slug="blog")
+    assert index.reverse_subpage("author", args=["ada-example"]) == "author/ada-example/"

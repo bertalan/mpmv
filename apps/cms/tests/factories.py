@@ -232,11 +232,16 @@ class VendorRecruitmentPageFactory(_InTree, DjangoModelFactory[VendorRecruitment
 
 
 class BlogAuthorFactory(DjangoModelFactory[BlogAuthor]):
+    """An author of the default language unless `locale` is given; the slug follows the name.
+    Translate one with `author.copy_for_translation(locale)`."""
+
     class Meta:
         model = BlogAuthor
-        django_get_or_create = ("name",)
+        django_get_or_create = ("name", "locale")
 
     name = factory.Sequence(lambda n: f"Author {n}")
+    locale = factory.LazyFunction(Locale.get_default)
+    bio = "<p>Writes about the workshops.</p>"
 
 
 class BlogIndexPageFactory(_InTree, DjangoModelFactory[BlogIndexPage]):
