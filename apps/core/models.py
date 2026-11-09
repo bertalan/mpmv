@@ -11,11 +11,18 @@ from django.contrib.postgres.fields import ArrayField, DateTimeRangeField, Range
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils import timezone
-from wagtail.images.models import AbstractImage, AbstractRendition, Image
+from wagtail.images.models import AbstractImage, AbstractRendition, Image, get_upload_to
 
-from . import flags, translations
+from . import flags, translations, uploads
 from .countries import default_allowed_vendor_countries
-from .fields import CountryField, EncryptedTextField, LanguageField
+from .fields import (
+    CountryField,
+    EncryptedTextField,
+    LanguageField,
+    SanitisedImageField,
+    image_limits,
+    read_upload,
+)
 from .image_licences import (
     Credit,
     LicenceTerms,
@@ -523,8 +530,14 @@ class MediaImage(AbstractImage):  # type: ignore[misc]  # Wagtail is untyped
     without them, in the Wagtail admin and in `services.save_image`. The columns accept empty
     values so that images migrated without known metadata can exist: they are listed for
     review and cannot be chosen for new content until classified.
+
+    SEC.2: a new file is checked by its content (`apps.core.uploads`) in `clean`, and the file
+    field stores only its re-encoding, without metadata, under a name the app makes.
     """
 
+    file = SanitisedImageField(
+        verbose_name="file", upload_to=get_upload_to, width_field="width", height_field="height"
+    )
     licence = models.ForeignKey(
         ImageLicence,
         on_delete=models.PROTECT,
@@ -571,8 +584,31 @@ class MediaImage(AbstractImage):  # type: ignore[misc]  # Wagtail is untyped
             source_url=self.source_url,
             permission_ref=self.permission_ref,
         )
+        file_error = self._new_file_error()
+        if file_error:
+            errors["file"] = file_error
         if errors:
             raise ValidationError(errors)
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        # Store a new upload (re-encoded, `SanitisedImageFieldFile.save`) before Django collects
+        # the column values, so that size, hash and dimensions are those of the stored file.
+        if self.file and not getattr(self.file, "_committed", True):
+            self.file.save(self.file.name, self.file.file, save=False)
+        super().save(*args, **kwargs)
+
+    def _new_file_error(self) -> str | None:
+        """Why a newly uploaded file is refused (SEC.2); None when it is fine or not new."""
+        if not self.file or getattr(self.file, "_committed", True):
+            return None
+        limits = image_limits()
+        try:
+            uploads.check_image(
+                read_upload(self.file.file, limits.max_bytes), self.file.name, limits
+            )
+        except uploads.UploadRefused as refusal:
+            return refusal.message
+        return None
 
     @property
     def needs_review(self) -> bool:

@@ -251,6 +251,22 @@ WAGTAILADMIN_BASE_URL = SITE_BASE_URL
 # One image model for CMS pages, products (CAT.4), vendor logos and banners (spec 10 §10.2). Set
 # before any image exists: the licence and credit fields come with CMS.8.
 WAGTAILIMAGES_IMAGE_MODEL = "core.MediaImage"
+# Upload limits (SEC.2, apps.core.uploads). Wagtail's form checks the first two; MediaImage checks
+# all three on every path and re-encodes the stored original. 40 megapixels (all frames of an
+# animation together) bound the memory one decode takes to about 160 MB.
+WAGTAILIMAGES_EXTENSIONS = ["avif", "gif", "jpg", "jpeg", "png", "webp"]
+WAGTAILIMAGES_MAX_UPLOAD_SIZE = 10 * 1024 * 1024
+WAGTAILIMAGES_MAX_IMAGE_PIXELS = 40_000_000
+MPMV_MAX_IMAGE_SIDE = 16_000
+WAGTAILIMAGES_IMAGE_FORM_BASE = "apps.core.image_forms.ImageForm"
+# Wagtail documents exist for wagtail-localize only (I18N.3): PDF only, checked by content.
+WAGTAILDOCS_EXTENSIONS = ["pdf"]
+WAGTAILDOCS_MAX_UPLOAD_SIZE = 10 * 1024 * 1024
+WAGTAILDOCS_DOCUMENT_FORM_BASE = "apps.core.document_forms.DocumentForm"
+# No document serve view is mounted: a document's URL is its media path, which Caddy answers
+# with 404 (deploy/caddy/Caddyfile). Without this, the admin's document pages fail on the
+# missing `wagtaildocs_serve` route.
+WAGTAILDOCS_SERVE_METHOD = "direct"
 # wagtail-localize (I18N.3): translations follow their source page; a translator syncs them from
 # the source page's "Sync translated pages" action.
 WAGTAIL_LOCALIZE_DEFAULT_TRANSLATION_MODE = "synced"

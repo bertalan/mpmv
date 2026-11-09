@@ -1,16 +1,22 @@
 """Shared model fields."""
 
+import io
 from typing import Any
 
+from django.conf import settings
 from django.core.exceptions import FieldError, ValidationError
+from django.core.files.base import ContentFile
 from django.db import models
 from django.db.models import lookups
 from django.db.models.expressions import Col
+from wagtail.images.models import WagtailImageField, WagtailImageFieldFile
+from wagtail.utils.file import hash_filelike
 
 from .countries import InvalidCountry, normalize_country
 from .crypto import DecryptionError
 from .encryption import configured_keyring, encryption_context
 from .i18n import language_choices
+from .uploads import ImageLimits, UploadRefused, sanitise_image
 
 
 class MoneyField(models.DecimalField[Any, Any]):
@@ -172,3 +178,72 @@ class EncryptedDateField(EncryptedFieldMixin, models.DateField[Any, Any]):
     def from_db_value(self, value: Any, expression: Any, connection: Any) -> Any:
         plain = super().from_db_value(value, expression, connection)
         return None if plain is None or plain == "" else self.to_python(plain)
+
+
+# --- Uploaded images (SEC.2) -----------------------------------------------------------------
+
+
+def image_limits() -> ImageLimits:
+    """The upload caps from settings (WAGTAILIMAGES_MAX_UPLOAD_SIZE and friends)."""
+    return ImageLimits(
+        max_bytes=settings.WAGTAILIMAGES_MAX_UPLOAD_SIZE,
+        max_pixels=settings.WAGTAILIMAGES_MAX_IMAGE_PIXELS,
+        max_side=settings.MPMV_MAX_IMAGE_SIDE,
+    )
+
+
+def read_upload(content: Any, limit: int) -> bytes:
+    """Up to `limit + 1` bytes of an uploaded or stored file, from its start; rewinds it after."""
+    if hasattr(content, "open") and getattr(content, "closed", False):
+        content.open("rb")
+    content.seek(0)
+    data = content.read(limit + 1)
+    content.seek(0)
+    return bytes(data)
+
+
+class SanitisedImageFieldFile(WagtailImageFieldFile):  # type: ignore[misc]  # Wagtail is untyped
+    """Stores only the re-encoded image under a safe name (`apps.core.uploads.sanitise_image`).
+
+    `FieldFile.save` is the one place every new original goes through: a model save of a new
+    upload (Wagtail's single and chooser uploads, file replacement, `services.save_image`, the
+    seed) and Wagtail's multiple upload, which saves the file itself before the image. Size and
+    hash are set from the stored bytes, so Wagtail's duplicate check compares stored files.
+    """
+
+    def get_image_dimensions(self) -> Any:
+        """None for a file Willow cannot read (it may raise anything): `clean` refuses it."""
+        try:
+            return super().get_image_dimensions()
+        except Exception:  # an XML parse error for "<?php", OSError for a truncated PNG...
+            return (None, None)
+
+    def save(self, name: str, content: Any, save: bool = True) -> None:
+        # The name was checked with the content in `MediaImage.clean`; here it may already be
+        # a storage rewrite (Wagtail's pending multiple uploads), so only the content counts.
+        limits = image_limits()
+        try:
+            clean = sanitise_image(
+                read_upload(content, limits.max_bytes), name or "", limits, check_name=False
+            )
+        except UploadRefused as refusal:
+            raise ValidationError({self.field.name: refusal.message}, code=refusal.code) from None
+        super().save(clean.name, ContentFile(clean.data), save=False)
+        self.instance.file_size = len(clean.data)
+        self.instance.file_hash = hash_filelike(io.BytesIO(clean.data))
+        self.instance.width, self.instance.height = clean.width, clean.height
+        if save:
+            self.instance.save()
+
+
+class SanitisedImageField(WagtailImageField):  # type: ignore[misc]  # Wagtail is untyped
+    """Wagtail's image file field whose files are re-encoded when stored (SEC.2).
+
+    Behaviour only: it deconstructs as Wagtail's field, so it needs no migration.
+    """
+
+    attr_class = SanitisedImageFieldFile
+
+    def deconstruct(self) -> Any:
+        name, _path, args, kwargs = super().deconstruct()
+        return name, "wagtail.images.models.WagtailImageField", args, kwargs
