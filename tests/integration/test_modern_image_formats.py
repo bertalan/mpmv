@@ -503,6 +503,98 @@ def test_the_bulk_add_to_collection_action_moves_an_svg_within_svg_collections(
     assert logo.collection_id == vendors.pk
 
 
+def _move_collection(client: Client, collection: Collection, parent: Collection) -> Any:
+    return client.post(
+        f"/admin/collections/{collection.pk}/", {"name": collection.name, "parent": parent.pk}
+    )
+
+
+def test_moving_a_sub_collection_with_svgs_out_of_logos_is_refused(client: Client) -> None:
+    _admin(client)
+    vendors = _logos().add_child(name="Vendor logos")
+    logo = _svg_image(SAFE_SVG, vendors)
+    logo.full_clean()
+    logo.save()
+    root = Collection.get_first_root_node()
+
+    response = _move_collection(client, vendors, root)
+
+    assert response.status_code == 200  # the form again, with the error
+    assert "SVG" in response.content.decode()
+    vendors.refresh_from_db()
+    assert vendors.get_parent() == _logos()
+    logo.refresh_from_db()
+    assert (
+        Collection.objects.ancestor_of(logo.collection, inclusive=True)
+        .filter(pk=_logos().pk)
+        .exists()
+    )
+
+
+def test_moving_a_collection_with_an_svg_deeper_down_out_of_logos_is_refused(
+    client: Client,
+) -> None:
+    _admin(client)
+    vendors = _logos().add_child(name="Vendor logos")
+    deeper = vendors.add_child(name="Vendor A")
+    logo = _svg_image(SAFE_SVG, deeper)
+    logo.full_clean()
+    logo.save()
+
+    _move_collection(client, vendors, Collection.get_first_root_node())
+
+    vendors.refresh_from_db()
+    assert vendors.get_parent() == _logos()
+
+
+def test_moving_a_raster_only_sub_collection_out_of_logos_still_works(client: Client) -> None:
+    _admin(client)
+    vendors = _logos().add_child(name="Vendor logos")
+    photo = _photo()
+    photo.collection = vendors
+    photo.save()
+    root = Collection.get_first_root_node()
+
+    response = _move_collection(client, vendors, root)
+
+    assert response.status_code == 302
+    vendors.refresh_from_db()
+    assert vendors.get_parent() == root
+
+
+def test_moving_a_sub_collection_with_svgs_within_svg_collections_still_works(
+    client: Client,
+) -> None:
+    _admin(client)
+    vendors = _logos().add_child(name="Vendor logos")
+    brands = _logos().add_child(name="Brand logos")
+    logo = _svg_image(SAFE_SVG, vendors)
+    logo.full_clean()
+    logo.save()
+
+    response = _move_collection(client, vendors, brands)
+
+    assert response.status_code == 302
+    vendors.refresh_from_db()
+    assert vendors.get_parent() == brands
+
+
+def test_renaming_a_sub_collection_with_svgs_still_works(client: Client) -> None:
+    _admin(client)
+    vendors = _logos().add_child(name="Vendor logos")
+    logo = _svg_image(SAFE_SVG, vendors)
+    logo.full_clean()
+    logo.save()
+
+    response = client.post(
+        f"/admin/collections/{vendors.pk}/", {"name": "Partner logos", "parent": _logos().pk}
+    )
+
+    assert response.status_code == 302
+    vendors.refresh_from_db()
+    assert vendors.name == "Partner logos"
+
+
 # --- Serving media
 
 

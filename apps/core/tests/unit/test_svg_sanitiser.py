@@ -205,3 +205,74 @@ def test_an_unknown_encoding_is_refused() -> None:
 
     with pytest.raises(UnsafeSvgError):
         sanitise_svg(document.encode())
+
+
+# --- Regex backtracking (lane-b second security review of THM.12)
+
+
+def _timed_refusal(document: str) -> float:
+    assert len(document) < MAX_SVG_BYTES
+    started = time.perf_counter()
+    with pytest.raises(UnsafeSvgError):
+        sanitise_svg(document.encode())
+    return time.perf_counter() - started
+
+
+def test_many_unclosed_urls_in_a_style_element_are_refused_quickly() -> None:
+    document = f"<svg {SVG}><style>" + "url(" * 100000 + "</style></svg>"
+
+    assert _timed_refusal(document) < 2
+
+
+def test_many_unclosed_urls_in_an_attribute_are_refused_quickly() -> None:
+    document = f'<svg {SVG}><rect fill="' + "url(" * 100000 + '"/></svg>'
+
+    assert _timed_refusal(document) < 2
+
+
+def test_many_unclosed_quoted_urls_are_refused_quickly() -> None:
+    document = f"<svg {SVG}><style>" + "url('" * 80000 + "</style></svg>"
+
+    assert _timed_refusal(document) < 2
+
+
+def test_many_unclosed_strings_in_css_are_refused_quickly() -> None:
+    document = f"<svg {SVG}><style>a{{b:" + "\"'" * 100000 + "}</style></svg>"
+
+    assert _timed_refusal(document) < 2
+
+
+def test_too_many_url_references_in_one_value_are_refused() -> None:
+    style = " ".join(f".c{n} {{ fill: url(#g); }}" for n in range(300))
+    document = f'<svg {SVG}><defs><linearGradient id="g"/></defs><style>{style}</style></svg>'
+
+    with pytest.raises(UnsafeSvgError, match="url"):
+        sanitise_svg(document.encode())
+
+
+@pytest.mark.parametrize(
+    "value", ["url(#g)", "url( #g )", "url('#g')", 'url( "#g" )', "url(#a) url(#b)"]
+)
+def test_fragment_urls_are_still_accepted(value: str) -> None:
+    document = f'<svg {SVG}><rect fill="{value.replace(chr(34), "&quot;")}"/></svg>'
+
+    sanitise_svg(document.encode())
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "url(#g",
+        "url('#g)",
+        "url('#g\")",
+        "url(url(#g))",
+        "url(#g')",
+        "url (#g)",
+        "url(https://example.com/x)",
+    ],
+)
+def test_malformed_or_external_urls_are_still_refused(value: str) -> None:
+    document = f'<svg {SVG}><rect fill="{value.replace(chr(34), "&quot;")}"/></svg>'
+
+    with pytest.raises(UnsafeSvgError):
+        sanitise_svg(document.encode())
