@@ -27,6 +27,7 @@ from apps.vendors.scoping import get_for_actor_or_404
 
 from .mutations import ChangeSetOut, DryRun, audit_context, changeset_out
 from .security import ApiKey
+from .text import PlainText
 
 router = Router(tags=["catalog"])
 
@@ -95,25 +96,29 @@ def list_attributes(
 
 
 class TranslationIn(Schema):
-    language: str
-    title: str = Field(min_length=1, max_length=255)
-    short_description: str = ""
-    description: str = ""
+    language: PlainText
+    title: PlainText = Field(min_length=1, max_length=255)
+    short_description: PlainText = ""
+    description: PlainText = ""
 
 
 class ProductAttributeIn(Schema):
-    attribute: str = Field(description="Attribute code, e.g. size.")
-    values: list[str] = Field(default_factory=list, description="Value codes (choice attributes).")
+    attribute: PlainText = Field(description="Attribute code, e.g. size.")
+    values: list[PlainText] = Field(
+        default_factory=list, description="Value codes (choice attributes)."
+    )
     number: Decimal | None = Field(None, description="Number attributes, in the attribute's unit.")
-    text: str = Field("", max_length=255, description="Text attributes (language-neutral).")
+    text: PlainText = Field("", max_length=255, description="Text attributes (language-neutral).")
     variant_axis: bool = Field(
         False, description="The variants vary on it; axes are ordered as listed."
     )
 
 
 class VariantIn(Schema):
-    sku: str = Field(min_length=1, max_length=engine.SKU_MAX_LENGTH)
-    options: dict[str, str] = Field(description="Value code per variant axis, e.g. {size: m}.")
+    sku: PlainText = Field(min_length=1, max_length=engine.SKU_MAX_LENGTH)
+    options: dict[PlainText, PlainText] = Field(
+        description="Value code per variant axis, e.g. {size: m}."
+    )
     price_net_override: Decimal | None = None
     weight_kg_override: Decimal | None = Field(None, ge=0, max_digits=8, decimal_places=3)
     stock_qty: int = Field(0, ge=0)
@@ -124,7 +129,7 @@ class ProductIn(Schema):
     vendor: uuid.UUID | None = Field(
         None, description="Required with a platform key; a vendor key may only name its own."
     )
-    sku: str = Field(min_length=1, max_length=engine.SKU_MAX_LENGTH)
+    sku: PlainText = Field(min_length=1, max_length=engine.SKU_MAX_LENGTH)
     kind: Literal["simple", "variable"] = "simple"
     sales_mode: Literal["buy", "catalog_only", "on_request"] = "buy"
     fiscal_category: Literal["standard", "reduced", "book_art74"] = "standard"

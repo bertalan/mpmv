@@ -14,10 +14,21 @@ def live_settings() -> dict[str, Any]:
     return runpy.run_module("mpmv.settings.live")
 
 
-def test_whitenoise_runs_right_after_the_security_middleware() -> None:
+# The middleware that only add security headers (SEC.1). WhiteNoise answers static files itself,
+# so it runs inside all of them and static responses carry the headers too (SEC.5).
+HEADER_MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "django.middleware.csp.ContentSecurityPolicyMiddleware",
+    "apps.cms.middleware.WagtailAdminPickerNonceMiddleware",
+    "apps.core.middleware.PermissionsPolicyMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+
+def test_whitenoise_runs_right_after_the_security_header_middleware() -> None:
     middleware = live_settings()["MIDDLEWARE"]
-    security = middleware.index("django.middleware.security.SecurityMiddleware")
-    assert middleware[security + 1] == "whitenoise.middleware.WhiteNoiseMiddleware"
+    whitenoise = middleware.index("whitenoise.middleware.WhiteNoiseMiddleware")
+    assert middleware[:whitenoise] == HEADER_MIDDLEWARE
 
 
 def test_static_files_use_hashed_compressed_storage() -> None:

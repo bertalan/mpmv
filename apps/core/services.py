@@ -18,6 +18,7 @@ from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser, Permission, PermissionsMixin
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.validators import validate_email
 from django.db import IntegrityError, connection, transaction
 from django.db.models import F, Model, Q, QuerySet
 from django.template import Context, TemplateDoesNotExist
@@ -758,6 +759,16 @@ def _email_event(email: OutboxEmail, status: str, detail: str = "") -> None:
     )
 
 
+def _check_recipient(recipient: str) -> None:
+    address = recipient.strip()
+    if any(not char.isprintable() for char in address):
+        raise ValueError("invalid email recipient: control characters or line breaks")
+    try:
+        validate_email(address)
+    except ValidationError as exc:
+        raise ValueError(f"invalid email recipient {address!r}") from exc
+
+
 def enqueue_email(
     *,
     recipient: str,
@@ -773,10 +784,12 @@ def enqueue_email(
     `context` is stored as a snapshot (JSON, encrypted at rest), so the email shows the values
     of the moment it was requested. An email to a suppressed address is stored as `suppressed`
     and never sent. With `idempotency_key`, a second request with the same key changes nothing.
-    Raises ValueError for an unknown or incomplete template.
+    Raises ValueError for an unknown or incomplete template, and for a recipient that is not one
+    plain address (a line break in it would add an email header, SEC.5).
     """
     from . import tasks  # tasks imports services
 
+    _check_recipient(recipient)
     language = email_language(language)
     _email_templates(template_key, language)
     payload = json.dumps(to_jsonable(context), sort_keys=True)
