@@ -35,6 +35,8 @@ class UserFactory(DjangoModelFactory[User]):
     class Params:
         staff = factory.Trait(is_staff=True)
         superuser = factory.Trait(is_staff=True, is_superuser=True)
+        # `staff` is admin login only. Platform staff (spec 02, Q-34) hold the permission below.
+        platform_staff = factory.Trait(is_staff=True, permissions=["vendors.view_all_vendors"])
 
     email = factory.Sequence(lambda n: f"user{n}@example.com")
     full_name = factory.Faker("name")
