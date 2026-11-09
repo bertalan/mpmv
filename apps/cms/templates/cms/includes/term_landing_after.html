@@ -1,0 +1,16 @@
+{% load i18n cms_tags image_credits %}{% comment %}
+A term landing page's related articles and its image credits (CMS.4, CMS.8), after the term
+page's products. Cards to pages that are not live are left out.
+{% endcomment %}{% if related %}
+<section class="term-landing-related" aria-labelledby="term-landing-related-heading">
+  <h2 id="term-landing-related-heading">{% translate "Related articles" %}</h2>
+  <ul class="cards">
+    {% for card in related %}
+      <li class="card">
+        <a href="{{ card.href }}">{{ card.label }}</a>
+        {% if card.text %}<p>{{ card.text|linebreaksbr }}</p>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}{% page_image_credits page as image_credits %}{% image_credits_disclosure image_credits %}

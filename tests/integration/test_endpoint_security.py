@@ -94,12 +94,20 @@ from tests.tenancy import (
     echoed_in_path,
     endpoints,
 )
-from tests.tenancy_registry import API_OPERATIONS, CMS_ADMIN_ROUTE, ENDPOINTS, classify
+from tests.tenancy_registry import (
+    API_OPERATIONS,
+    CMS_ADMIN_ROUTE,
+    ENDPOINTS,
+    SHADOWED,
+    classify,
+)
 
 pytestmark = pytest.mark.django_db
 
 ALL_ENDPOINTS = endpoints()
-WEB_ENDPOINTS = [e for e in ALL_ENDPOINTS if not e.is_api_operation]
+# A shadowed route is never reached: its replacement answers on its path and is swept under its
+# own key (tests.tenancy_registry.SHADOWED; test_tenant_isolation checks the replacement).
+WEB_ENDPOINTS = [e for e in ALL_ENDPOINTS if not e.is_api_operation and e.key not in SHADOWED]
 OPERATIONS = api_operations()
 NON_PUBLIC = [e for e in WEB_ENDPOINTS if e.key not in PUBLIC]
 STAFF_ONLY = [e for e in WEB_ENDPOINTS if isinstance(classify(e), StaffOnly)]
