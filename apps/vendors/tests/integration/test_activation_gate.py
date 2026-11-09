@@ -38,7 +38,7 @@ def onboarding(**fields: object) -> Vendor:
     """An onboarding vendor that accepted the contract; the acceptance's user is its owner."""
     seed_legal_requirements()
     vendor = VendorFactory.create(status=Vendor.Status.ONBOARDING, **fields)
-    ContractAcceptanceFactory.create(vendor=vendor)
+    ContractAcceptanceFactory.create(vendor=vendor, certified=False)
     return vendor
 
 
@@ -164,7 +164,9 @@ def test_a_certification_of_an_older_round_does_not_count_after_a_reopen() -> No
     certify(vendor)
     contract = vendor.contract_acceptances.get().contract
     Vendor.objects.filter(pk=vendor.pk).update(onboarding_round=vendor.onboarding_round + 1)
-    ContractAcceptanceFactory.create(vendor=Vendor.objects.get(pk=vendor.pk), contract=contract)
+    ContractAcceptanceFactory.create(
+        vendor=Vendor.objects.get(pk=vendor.pk), contract=contract, certified=False
+    )
     with pytest.raises(engine.ActivationNotAllowed, match=engine.SELF_CERTIFICATION):
         change_status(vendor, Vendor.Status.ACTIVE, ctx=STAFF_CTX)
 

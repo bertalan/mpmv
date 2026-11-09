@@ -549,6 +549,7 @@ def _identity(index: int, spec: data.VendorSeed) -> dict[str, Any]:
     }
     if spec.share_capital is not None:
         values["share_capital"] = spec.share_capital
+    values["phone"] = f"+39 06 5550{index + 1:04d}"  # DSA article 30 (CMP.25), a fictional number
     # DAC7 (VEN.23): the TIN's issuing country, and a registration number or a date of birth.
     values["tin_country"] = spec.country
     if spec.legal_form == SOLE_PROPRIETOR:
@@ -645,6 +646,11 @@ def _vendor(run: _Run, index: int, spec: data.VendorSeed, contract: VendorContra
                     ctx=run.ctx,
                 )
             )
+        run.add(
+            vendors_services.certify_platform_duties(
+                vendor, owner, language=SOURCE_LANGUAGE, ctx=run.ctx
+            )
+        )
         run.add(vendors_services.change_status(vendor, vendors_engine.ACTIVE, ctx=run.ctx))
     if not tax_services.has_tax_profile(vendor):
         profile = VendorTaxProfile(

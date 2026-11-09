@@ -36,7 +36,7 @@ def test_missing_telephone_and_trade_register_entry_are_named() -> None:
     result = engine.platform_duties_missing(
         values(registered_city="Berlin"), ACTIVATION_RULES, certified=True
     )
-    assert result == ("phone", "business_registration_number")
+    assert result == ("business_registration_number", "phone")
 
 
 def test_trade_register_entry_is_only_required_where_registered() -> None:

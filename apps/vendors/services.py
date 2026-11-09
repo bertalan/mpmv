@@ -55,6 +55,7 @@ from .models import (
     ContractAcceptance,
     CrossVendorConsent,
     LegalFieldRequirement,
+    SelfCertification,
     Vendor,
     VendorClaim,
     VendorContract,
@@ -927,10 +928,96 @@ def accept_contract(
         )
 
 
+SELF_CERTIFIED = "vendor.self_certified"
+SELF_CERTIFICATION_MODEL = "vendors.selfcertification"
+
+
+def is_self_certified(vendor: Vendor) -> bool:
+    """The vendor's owner certified the current text version in the vendor's current round."""
+    return SelfCertification.objects.filter(
+        vendor=vendor,
+        version=engine.SELF_CERTIFICATION_VERSION,
+        onboarding_round=vendor.onboarding_round,
+    ).exists()
+
+
+def platform_duties_missing(vendor: Vendor) -> tuple[str, ...]:
+    """What the stored vendor still lacks for activation under CMP.25: the `activation`
+    requirement fields, then the self-certification (`engine.platform_duties_missing`)."""
+    stored = Vendor.objects.get(pk=vendor.pk)
+    return engine.platform_duties_missing(
+        stored.legal_identity().values(),
+        requirement_rules(engine.ACTIVATION),
+        certified=is_self_certified(stored),
+    )
+
+
+def certify_platform_duties(
+    vendor: Vendor,
+    user: User,
+    *,
+    language: str,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Record that `user`, an owner, certifies for `vendor` the DSA article 30(1)(e) statement
+    shown in `language` (CMP.25).
+
+    Stores the text version, the language and the hash of the text, and the IP of `ctx`.
+    Certifying again in the same onboarding round changes nothing. Raises
+    `engine.SelfCertificationError` (vendor status, not an owner, no text in `language`), also
+    on dry-run.
+    """
+    with transaction.atomic():
+        locked = (
+            Vendor.objects.select_for_update()
+            .only("status", "public_id", "onboarding_round")
+            .get(pk=vendor.pk)
+        )
+        role = member_role(user, locked) if user.is_active else None
+        engine.check_can_certify(locked.status, role)
+        text_hash = engine.self_certification_hash(language)
+        if SelfCertification.objects.filter(
+            vendor=locked,
+            version=engine.SELF_CERTIFICATION_VERSION,
+            onboarding_round=locked.onboarding_round,
+        ).exists():
+            return ChangeSet()
+        certification = SelfCertification(
+            vendor=locked,
+            user=user,
+            version=engine.SELF_CERTIFICATION_VERSION,
+            language=language,
+            text_hash=text_hash,
+            accepted_at=timezone.now(),
+            ip=ctx.ip,
+            onboarding_round=locked.onboarding_round,
+        )
+        changes = ChangeSet()
+        changes.create(
+            SELF_CERTIFICATION_MODEL,
+            str(certification.public_id),
+            {
+                "vendor": str(locked.public_id),
+                "user": str(user.public_id),
+                "version": certification.version,
+                "language": language,
+                "text_hash": text_hash,
+                "accepted_at": certification.accepted_at,
+                "ip": ctx.ip,
+                "onboarding_round": certification.onboarding_round,
+            },
+        )
+        return run_mutation(
+            changes, certification.save, ctx=ctx, action=SELF_CERTIFIED, dry_run=dry_run
+        )
+
+
 def onboarding_checklist(vendor: Vendor) -> engine.OnboardingChecklist:
-    """The stored vendor's onboarding checklist: contract in force accepted (blocks activation),
-    DAC7 dataset and payout data (listed only: VEN.12 gates payouts with them). Only an
-    acceptance of the vendor's current onboarding round counts (VEN.21)."""
+    """The stored vendor's onboarding checklist: contract in force accepted and the platform
+    duties (CMP.25: DSA article 30 data and self-certification) block activation; DAC7 dataset
+    and payout data are listed only (VEN.12 gates payouts with them). Only an acceptance of the
+    vendor's current onboarding round counts (VEN.21)."""
     stored = Vendor.objects.get(pk=vendor.pk)
     contract = current_contract()
     accepted = (
@@ -944,6 +1031,7 @@ def onboarding_checklist(vendor: Vendor) -> engine.OnboardingChecklist:
         current_contract_version=contract.version if contract is not None else None,
         dac7_missing=engine.dac7_missing(stored.legal_identity()),
         payout=legal_profile_completeness(stored),
+        platform_duties_missing=platform_duties_missing(stored),
     )
 
 
