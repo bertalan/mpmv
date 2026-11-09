@@ -1,6 +1,6 @@
 # MPMV task runner. Local containers use Apple `container` (ADR-0002); no Docker, no compose.
 .DEFAULT_GOAL := help
-.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell image dev dev-down dev-reset dev-status dev-logs migrate seed run assets worker test test-unit test-e2e e2e-baselines test-all check lint fmt typecheck imports theme-gates audit sbom
+.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell image dev dev-down dev-reset dev-status dev-logs migrate seed run assets worker test test-unit test-security-nightly test-e2e e2e-baselines test-all check lint fmt typecheck imports theme-gates audit sbom
 
 DB_NAME      := mpmv-db
 DB_IMAGE     := docker.io/library/postgres:17
@@ -105,6 +105,17 @@ test-unit: ## Unit suite only (no database, no container)
 test: db ## Unit + integration suites
 	uv run pytest -m "unit or integration" --junitxml=$(REPORTS)/junit.xml \
 		--cov --cov-report=term-missing:skip-covered --cov-report=html:$(REPORTS)/coverage
+
+# SEC.5: the security-nightly workflow runs this on CI against its PostgreSQL service. The slow
+# cases (ReDoS sweep, malicious-upload corpus, long Hypothesis runs) carry the security_slow
+# marker; tests/security reruns with the nightly Hypothesis profile. Exit 5 (nothing collected)
+# passes until the first security_slow test lands.
+test-security-nightly: ## Slow security suites with the nightly Hypothesis profile (no db target)
+	@mkdir -p $(REPORTS)
+	HYPOTHESIS_PROFILE=nightly uv run pytest -m security_slow \
+		--junitxml=$(REPORTS)/junit-security-slow.xml || [ $$? -eq 5 ]
+	if [ -d tests/security ]; then HYPOTHESIS_PROFILE=nightly uv run pytest tests/security \
+		-m "unit or integration" --junitxml=$(REPORTS)/junit-security.xml; fi
 
 test-e2e: db ## E2E suite in headless Chromium; screenshots in build/e2e/screenshots/
 	uv run pytest -m e2e --junitxml=$(REPORTS)/junit-e2e.xml
