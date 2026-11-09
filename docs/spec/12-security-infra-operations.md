@@ -92,11 +92,11 @@ flowchart LR
 
 | Today | Tomorrow |
 |---|---|
-| `refresh_stage_from_live.sh`, `legacy-stage-safety` | `make seed-stage` with synthetic data; no LIVE clone |
-| `disable_live_checkout_location.sh` and other option patches | Settings in the DB with audit, editable from admin |
+| Scripts that refresh the test environment from production, plus a safety plugin | `make seed-stage` with synthetic data; no LIVE clone |
+| Shell scripts that patch configuration options | Settings in the DB with audit, editable from admin |
 | Legacy diagnostic and fix scripts | Admin reports, health checks, read-only MCP tools; fixes as commands with dry-run |
-| WP/WCFM/WPML plugin updates with a test matrix | Python dependency updates via automated PRs + CI |
-| WP-Optimize cache to be disabled on STAGE | Application cache controlled by settings |
+| CMS, marketplace and translation plugin updates with a test matrix | Python dependency updates via automated PRs + CI |
+| A caching plugin to be disabled on the test environment | Application cache controlled by settings |
 
 ## 12.6 Tasks
 

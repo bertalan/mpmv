@@ -3,7 +3,7 @@
 ## 8.1 How it works today
 
 The pipelines are already written in Python and run on the DEV server with a dedicated
-PostgreSQL; they publish to WordPress through the PHP routes in `api.php`.
+PostgreSQL; they publish to WordPress through the legacy custom API.
 
 **Vendor A** (dedicated pipeline folder, extensive manual, 35 pytest files):
 

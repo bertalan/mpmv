@@ -32,7 +32,7 @@ It also reviews the August 2026 rebuild plan.
 |---|---|---|
 | 00 | [Vision and review](00-vision-and-review.md) | Idea, principles, delta from the August plan |
 | 01 | [Stack and architecture](01-stack-and-architecture.md) | Wagtail and alternatives compared, modular monolith, conventions |
-| 02 | [Identity, permissions, API, backoffice](02-core-identity-permissions.md) | Roles, vendor isolation, API v1 replacing `api.php` |
+| 02 | [Identity, permissions, API, backoffice](02-core-identity-permissions.md) | Roles, vendor isolation, API v1 replacing the legacy custom API |
 | 03 | [Catalog](03-catalog.md) | Products, variants, navigation taxonomies, SKU slugs, redirects, search |
 | 04 | [Vendors, commissions, ledger](04-vendors-commissions-ledger.md) | Plans, commission rules, ledger, payouts |
 | 05 | [Tax engine](05-tax.md) | VAT regimes, decision tree, special territories, tests |
