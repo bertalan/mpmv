@@ -94,6 +94,12 @@ def test_seed_accounts_cannot_log_in(demo_seed: ChangeSet) -> None:
     assert not operator.is_active
 
 
+def test_the_seed_operator_holds_the_platform_staff_permission(demo_seed: ChangeSet) -> None:
+    """CORE.8: platform staff is a permission; `is_staff` alone sees no vendor's data."""
+    operator = User.objects.get(email=data.OPERATOR_EMAIL)
+    assert operator.user_permissions.filter(codename="view_all_vendors").exists()
+
+
 def test_the_seed_builds_a_published_bilingual_catalog(demo_seed: ChangeSet) -> None:
     products = Product.objects.filter(vendor__in=seed_vendors())
     assert products.count() == sum(len(items) for items in data.PRODUCTS.values())

@@ -153,6 +153,10 @@ Intended differences from today:
 - The product's **fiscal category** (`standard`, `reduced`, `books`) selects the rate per country;
   no "below 15% = reduced" mapping.
 - **Special territories** handled by postcode; Northern Ireland (`XI`) follows EU goods rules (D-02).
+- **Outside-VAT-territory dataset** (TAX.7, needs human review): each territory is matched by an ISO-code form and by a French postcode form, because a buyer may supply either. Legal basis: Directive 2006/112/EC art. 6 (territories excluded from the Union VAT territory).
+  - Saint-Martin: ISO `MF`; French postcode `97150`. The French part is an outermost region excluded from the VAT territory.
+  - Saint-Barthélemy: ISO `BL`; French postcode `97133`. An overseas country and territory outside the EU since 2012.
+  - Both resolve to 0% with reason `outside_vat_territory` (case T15).
 - Country basis: **delivery country** for B2C distance sales (EU rule on distance sales of
   goods), with the billing country used only for B2B. Today the billing country is used: **to be confirmed with the
   tax advisor** (D-01).
@@ -192,7 +196,7 @@ Intended differences from today:
 |---|---|---|---|---|---|
 | TAX.1 | TaxRate, Territory, versioned VendorTaxProfile, VatValidation models | P1 | 8 | ARC.7, VEN.1 | Migrations + admin |
 | TAX.2 | Regime change workflow (vendor request → staff approval), history | P1 | 6 | TAX.1 | Parity with VTO review |
-| TAX.3 | `resolve_goods_tax` pure function + T1–T18 case table as parametrized tests | P1 | 12 | TAX.1 | 100% of cases green, 100% module coverage |
+| TAX.3 | `resolve_goods_tax` pure function + T1–T18 case table as parametrized tests | P1 | 12 | TAX.1 | 100% of cases green (T15 included: territories outside the VAT territory resolve to 0% with reason `outside_vat_territory`, using `is_outside_vat_territory` from TAX.7), 100% module coverage |
 | TAX.4 | `resolve_shipping_tax` with proportional split | P1 | 6 | TAX.3 | T8–T13 green |
 | TAX.5 | VIES client with cache, timeout, fail-closed | P1 | 6 | TAX.1 | Test with simulated VIES down |
 | TAX.6 | Rate import from official source + staff review + validity periods | P2 | 8 | TAX.1 | Simulated update without touching past orders |
