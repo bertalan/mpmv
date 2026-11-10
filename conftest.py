@@ -30,13 +30,21 @@ SUITES = ("unit", "integration", "e2e")
 # Hypothesis profiles for every `@given` test (SEC.5). `ci` is the default: a fixed example
 # sequence, no example database and no per-example deadline, because one slow example on a
 # loaded runner would otherwise fail as `Flaky`. `HYPOTHESIS_PROFILE=dev` runs more random
-# examples locally, with a deadline to spot slow code.
+# examples locally, with a deadline to spot slow code. `nightly` (security-nightly.yml) runs 1000
+# fresh random examples per test, no deadline.
 HYPOTHESIS_PROFILES = {
     "ci": settings(
         max_examples=30,
         deadline=None,
         database=None,
         derandomize=True,
+        suppress_health_check=[HealthCheck.function_scoped_fixture, HealthCheck.too_slow],
+    ),
+    "nightly": settings(
+        max_examples=1000,
+        deadline=None,
+        database=None,
+        derandomize=False,
         suppress_health_check=[HealthCheck.function_scoped_fixture, HealthCheck.too_slow],
     ),
     "dev": settings(
