@@ -8,6 +8,7 @@ processing instructions dropped) that is what gets stored.
 """
 
 import time
+import xml.etree.ElementTree as ET
 
 import pytest
 from defusedxml.ElementTree import fromstring
@@ -168,15 +169,34 @@ def test_the_output_uses_the_default_svg_namespace() -> None:
 # --- Resource limits (lane-a security review of THM.12)
 
 
-def test_many_comments_are_stripped_in_one_pass() -> None:
-    document = f"<svg {SVG}>" + "<!---->" * 74000 + "</svg>"
-    assert len(document) < MAX_SVG_BYTES
+def test_many_comments_are_stripped_in_one_pass(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Deterministic linear-complexity check: the work counted for 4n comments is 4x the work for
+    n (a quadratic strip, such as removing comments one by one, would give 16x)."""
+    from apps.core import svg
 
-    started = time.perf_counter()
-    cleaned = sanitise_svg(document.encode())
+    work = {"calls": 0, "pieces": 0}
+    real_join = svg._join_text
 
-    assert time.perf_counter() - started < 2
-    assert "<!--" not in cleaned.decode()
+    def counting_join(element: ET.Element, kept: list[ET.Element], pieces: list[str]) -> None:
+        work["calls"] += 1
+        work["pieces"] += len(pieces)
+        real_join(element, kept, pieces)
+
+    monkeypatch.setattr(svg, "_join_text", counting_join)
+
+    def measure(n: int) -> tuple[int, int]:
+        work.update(calls=0, pieces=0)
+        document = f"<svg {SVG}>" + "<!---->x<g/>" * n + "</svg>"
+        assert len(document) < MAX_SVG_BYTES
+        cleaned = sanitise_svg(document.encode()).decode()
+        assert "<!--" not in cleaned
+        return work["calls"], work["pieces"]
+
+    small_calls, small_pieces = measure(1000)
+    large_calls, large_pieces = measure(4000)
+
+    assert large_calls <= 4 * small_calls + 4
+    assert large_pieces <= 4 * small_pieces + 4
 
 
 def test_text_around_stripped_comments_is_kept_in_order() -> None:
