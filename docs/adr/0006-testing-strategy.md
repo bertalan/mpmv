@@ -74,8 +74,8 @@ Every task follows red → green → refactor:
 
 ### CI (GitHub Actions)
 
-- Job **tests**: unit and integration against a PostgreSQL service container, with JUnit XML and
-  a coverage report. When the job fails, `build/reports/` is uploaded as an artifact.
+- Job **tests**: unit and integration against a PostgreSQL service container, with JUnit XML, run in
+  parallel (pytest-xdist). Coverage is reported by `make test`, not in CI. When the job fails, `build/reports/` is uploaded as an artifact.
 - Job **e2e**: Playwright with headless Chromium. Screenshots are **always** uploaded, and reports
   are uploaded on failure.
 - Both jobs are required to merge.

@@ -1,0 +1,56 @@
+{% extends "layouts/base.html" %}
+{% load i18n %}
+{% comment %}
+The Manager shell (CORE.17, spec 02 §Backoffice): one layout for both spaces, on the active
+theme's components (THM.3, THM.4). The header holds the site name (the space's dashboard), the
+vendor switcher for members of several vendors, the signed-in user, sign-out and the language
+switcher; under it the section menu from the navigation registry lists only the sections the
+actor may open, the current one marked `aria-current`. Pages fill `manager_content`.
+
+The Manager has no language prefix and no CMS page, like the account area. Strict CSP: no inline
+script or style.
+{% endcomment %}
+{% block title %}{{ title }} · {{ site_name }}{% endblock %}
+{% block description %}<meta name="robots" content="noindex">{% endblock %}
+{% block header %}
+  {% get_current_language as current_language %}{% get_available_languages as available %}{% get_language_info_list for available as languages %}
+  <header class="site-header manager-header">
+    <div class="site-header__inner">
+      <a class="site-name" href="{{ manager_home }}">{{ site_name }}<span class="manager-header__space">{% if manager.space == "shop" %}{% translate "Shop" %}{% else %}{% translate "Platform" %}{% endif %}</span></a>
+      {% if vendor_switcher %}
+        <form class="manager-switcher" action="{% url 'manager:shop:vendor' %}" method="post">
+          {% csrf_token %}
+          <label for="manager-vendor">{% translate "Vendor" %}</label>
+          <select id="manager-vendor" name="vendor">
+            {% for vendor in vendor_switcher %}<option value="{{ vendor.public_id }}"{% if vendor == manager.vendor %} selected{% endif %}>{{ vendor.display_name }}</option>{% endfor %}
+          </select>
+          {% include "components/button.html" with label=_("Switch") type="submit" variant="secondary" size="small" only %}
+        </form>
+      {% endif %}
+      <div class="site-header__tools">
+        <span class="manager-header__user">{{ manager.user.get_username }}</span>
+        <form action="{% url 'logout' %}" method="post">
+          {% csrf_token %}
+          {% include "components/button.html" with label=_("Sign out") type="submit" variant="ghost" size="small" only %}
+        </form>
+        {% include "components/language_switcher.html" with languages=languages current_language=current_language next_url=request.get_full_path only %}
+      </div>
+    </div>
+    {% if manager_menu %}
+      <nav class="manager-nav" aria-label="{% translate 'Manager sections' %}">
+        <ul>
+          {% for item in manager_menu %}<li><a href="{{ item.url }}"{% if item.current %} aria-current="page"{% endif %}>{{ item.label }}</a></li>{% endfor %}
+        </ul>
+      </nav>
+    {% endif %}
+  </header>
+{% endblock %}
+{% block content %}
+  <div class="manager-page">
+    {% if messages %}
+      {% for message in messages %}{% include "components/alert.html" with level=message.level_tag|default:"info" message=message.message live="polite" only %}{% endfor %}
+    {% endif %}
+    {% block manager_content %}{% endblock %}
+  </div>
+{% endblock %}
+{% block footer %}{% endblock %}

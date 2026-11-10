@@ -53,6 +53,7 @@ PUBLIC: dict[str, str] = {
     "switch_language": "Stores the visitor's language choice in a cookie.",
     "action_link:open": "Secure action link (CORE.15): the signed token is the credential.",
     "action_link:continue": "Secure action link (CORE.15): the signed token is the credential.",
+    "login": SIGN_IN,  # the Manager's one login (CORE.17)
     "admin:login": SIGN_IN,
     "admin:logout": "Sign-out: without a session it only redirects to the admin home.",
     "api-v1:api-root": "API root: links only.",

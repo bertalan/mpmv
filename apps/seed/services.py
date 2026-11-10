@@ -103,7 +103,11 @@ SOLE_PROPRIETOR = vendors_engine.SOLE_PROPRIETORSHIP
 # The audit context of the `demo_seed` test fixture (root conftest); the command has its own.
 TEST_CONTEXT = AuditContext(actor_label="test:demo_seed", source="system")
 OWN_WORK_LICENCE = "own-work"  # seeded by core migration 0013
-OPERATOR_PERMISSIONS = (tax_services.REVIEW_PERMISSION, vendors_services.REOPEN_PERMISSION)
+OPERATOR_PERMISSIONS = (
+    tax_services.REVIEW_PERMISSION,
+    vendors_services.REOPEN_PERMISSION,
+    "vendors.view_all_vendors",  # CORE.8: platform staff is a permission, not is_staff
+)
 
 
 @dataclasses.dataclass

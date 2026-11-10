@@ -30,7 +30,7 @@ vendor's change page links to its trail (`?vendor=<public id>`).
 
 | Area | Actions |
 |---|---|
-| Logins (CORE.5) | `accounts.login.succeeded`, `accounts.login.failed`, `accounts.login.locked_out`, `accounts.registration.rate_limited` |
+| Logins (CORE.5) | `accounts.login.succeeded`, `accounts.login.failed`, `accounts.login.locked_out`, `accounts.registration.rate_limited`; `accounts.user.unlocked` (platform staff lift a lockout), `accounts.user.unlocked_by_reset` (a completed password reset clears it) |
 | Second factors (CORE.4) | `accounts.mfa.enrolled`, `.verified`, `.verification_failed`, `.recovery_code_used`, `.recovery_codes_generated`, `.device_removed`, `.disabled` |
 | Secure action links (CORE.15) | `accounts.action_link.sent` (the link's purpose, object and version, never the token), `.opened`, `.signed_in`, `.used`, `.refused` (refusals against a known account: expired, old version, wrong user; refusals with no account to attach them to, such as a bad signature, are only logged, without the token) |
 | Users and permissions (admin) | `accounts.user.created`, `.updated`, `.deleted`, `.password_changed`, `.access_changed`; `auth.group.created`, `.updated`, `.deleted`, `.access_changed` |
@@ -54,6 +54,8 @@ vendor's change page links to its trail (`?vendor=<public id>`).
 | Vendor SKUs (CAT.13) | `catalog.product.sku_renamed`, `catalog.variant.sku_renamed` (the old SKU kept as an alias), `catalog.sku_rows_updated` (stock updates by SKU) |
 | Catalogue integrity (CAT.14) | `catalog.product.duplicated_to_vendor` (a product copied to another vendor, with the reason) |
 | Shipping configuration (SHP.1) | `shipping.<model>.created`, `.updated`, `.deleted` for carriers, zones, vendor rates, weight bands and pickup options, through `shipping.services.save_config` and `delete_config`; deleting a rate also audits each of its bands |
+| Compliance (CMP.3) | `compliance.gpsr_defaults.created`, `.updated` (a vendor's default GPSR data); `compliance.gpsr.created`, `.updated` (a product's GPSR data); `compliance.gpsr_text.created`, `.updated` (a per-language safety text); `compliance.country_languages.created`, `.updated` (the warnings languages of a country); `compliance.safety_case.opened`, `.closed` (staff actions on a safety case), `.overdue` (written once by the hourly `compliance.flag_overdue_safety_cases` job, actor `task:`). Through `compliance.services`, with `dry_run` |
+| Shipping templates (SHP.13) | `shipping.shippingtemplate.created`, `.updated` (a shipping template saved through `shipping.config_io`, besides the `shipping.<model>.*` entries above) |
 | Shipping configuration import (SHP.13, SHP.14) | `shipping.config.imported` (one entry per import run, besides the per-row `shipping.<model>.*` entries) |
 | Tax configuration (TAX.1) | `tax.rate.configured`, `tax.vendor_tax_profile.configured` (versioned: the replaced row is `before`), `tax.territory.created`, `.updated`, `tax.legal_note.created`, `.updated`; VIES answers (`tax.vatvalidation`) are an append-only cache, not audited |
 | Site themes (THM.1) | `themes.theme_settings.configured` (the site's hostname and theme, before and after; see [themes.md](themes.md)) |

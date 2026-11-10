@@ -10,6 +10,7 @@ from typing import Any
 
 from django import forms
 from django.contrib.admin.forms import AdminAuthenticationForm
+from django.contrib.auth.forms import AuthenticationForm
 from django.utils.translation import gettext_lazy as _
 
 # The id of the element that shows a failed login's error, in every login template.
@@ -37,3 +38,7 @@ class AccessibleLoginMixin(forms.Form):
 
 class StaffLoginForm(AccessibleLoginMixin, AdminAuthenticationForm):
     """The Django admin login (`admin.site.login_form`)."""
+
+
+class ManagerLoginForm(AccessibleLoginMixin, AuthenticationForm):
+    """The Manager login (`manager.views.LoginView`): the same tokens, toggle and error ties."""
