@@ -343,7 +343,7 @@ def test_a_stored_file_is_removed_when_a_later_step_fails(
     original = MediaImage.save
 
     def spying_save(self: MediaImage, *args: object, **kwargs: object) -> None:
-        original(self, *args, **kwargs)  # type: ignore[arg-type]
+        original(self, *args, **kwargs)
         stored.append((self.file.storage, self.file.name))
 
     def failing_notice(*args: object, **kwargs: object) -> None:
