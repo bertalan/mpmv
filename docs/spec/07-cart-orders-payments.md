@@ -170,6 +170,23 @@ refund, withdrawal registered. Vendor: new order (only after payment), quote to 
 fulfillment reminder, return requested, payout. Staff: anomalies (payment without transfer, failed
 webhooks, quotes about to expire).
 
+### Proof of intra-EU dispatch (ORD.13, owner decision D-28, needs human review)
+
+A reverse-charge intra-EU supply (spec [05](05-tax.md), nature code `N3.2`) is exempt only if the
+goods really left for another member state. For every vendor order taxed that way the platform
+collects at least **two non-contradictory proofs issued by independent parties** (Implementing
+Regulation (EU) 282/2011 art. 45a): a signed CMR, the carrier's invoice, a transport insurance
+document, or the carrier's tracking record. Two proofs from the same party count as one, and two
+proofs that disagree on destination or date count as none.
+
+When the **buyer arranges the transport**, the buyer also sends a written receipt declaration
+(goods received, date, destination member state), due by the **10th day of the month following the
+dispatch**. The platform sends reminders before and after the deadline. The vendor sees a status
+per vendor order (`proof_missing`, `proof_partial`, `proof_complete`, `declaration_pending`,
+`declaration_overdue`); a vendor order without complete proof is flagged for the vendor and for
+staff. The proofs are stored as private documents on the vendor order, with the party that issued
+each of them.
+
 ## 7.3 Tasks
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
@@ -190,3 +207,4 @@ webhooks, quotes about to expire).
 | ORD.10 | Checkout and payments kill-switch, alert on payment without transfer | P1 | 4 | ARC.8, PAY.3 | Kill-switch verified on STAGE |
 | ORD.11 | Customer account: preferences and request history (scope to be defined with the owner): one section listing the customer's product information and quote requests and holding preferences such as followed vendors and event notifications; placeholder, hours to be re-estimated once the scope is agreed | P2 | 4 | ORD.7, SHP.10 | The owner has agreed the scope, this row is re-estimated and the section is detailed in §7.2 before any code is written |
 | ORD.12 | Free-gift promotion (owner decision MQ-9): triggered by a coupon code or a cart condition; adds the gift product at full price plus a 100% discount line; discount funding by the bundle funding rules (vendor, marketplace or split), gift stock reserved like any line, a per-customer limit; VAT and commission per line; the gift VAT treatment confirmed by the accountant (⚖️) | P2 | 10 | ORD.4, CAT.17 | A qualifying cart gets the gift line at full price and a 100% discount line; no line is priced 0.00; a vendor-funded and a marketplace-funded gift give the expected ledger rows; a customer over the limit gets no second gift; an out-of-stock gift is not added; VAT and commission are computed per line |
+| ORD.13 | Proof of intra-EU dispatch (owner decision D-28, art. 45a Reg. 282/2011): for every reverse-charge vendor order, at least two non-contradictory proofs from independent parties (signed CMR, carrier invoice, transport insurance, tracking) stored as private documents with the issuing party; when the buyer arranges transport, the buyer's written receipt declaration is due by the 10th of the following month, with reminders and a vendor-visible status | P1 | 10 | ORD.2, TAX.3, ARC.16 | A reverse-charge vendor order with one proof, or two from the same party, or two contradictory ones, shows `proof_partial` to the vendor; two independent consistent proofs give `proof_complete`; a buyer-arranged order without the declaration shows `declaration_pending`, gets reminders and is `declaration_overdue` after the 10th of the next month; a domestic or VAT-charged order needs none |

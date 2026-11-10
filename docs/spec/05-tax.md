@@ -167,6 +167,25 @@ Intended differences from today:
 - Rates are updated from an official source (the Commission's TEDB) with staff review and validity
   periods; past orders keep the rates in their snapshot.
 
+### Triangulation and declaration of intent (TAX.14, TAX.15, owner decision D-28, needs human review)
+
+**Triangulation, art. 58 c.1 D.L. 331/93 (TAX.14).** Italian vendors only, never any other
+country, where the first leg is a domestic taxable supply. The case is a vendor IT1 selling to
+an Italian buyer IT2 who has the goods shipped directly to a consignee in another member state. It
+applies only when the transport is **by or on behalf of IT1, or by platform logistics**. Pickup by
+IT2, or a carrier that takes free orders from IT2, means Italian VAT. Checkout collects a tracked
+declaration from IT2: the final consignee's name, the delivery address in the other member state,
+a VIES-valid VAT number of the consignee, and an explicit request that IT1 ships there directly.
+The decision carries nature code `N3.2` and IT1 keeps the proof of the direct transport (ORD.13).
+
+**Declaration of intent, Italy (TAX.15).** Art. 8 c.1 lett. c D.P.R. 633/72, nature code `N3.5`.
+The buyer (a habitual exporter) holds a status on the buyer side; checkout captures the
+**telematic protocol number** of the buyer's declaration. Available to Italian vendors only.
+
+**VIES validation log (TAX.5, D-28).** The log kept with the order holds date, time and the
+consultation number (`requestIdentifier`), which VIES returns only when the requester's own VAT
+number is sent, so the vendor's number is sent as requester. Fail closed stays.
+
 ## 5.3 Mandatory regression cases (from the audits)
 
 | # | Case | Expected |
@@ -207,3 +226,5 @@ Intended differences from today:
 | TAX.11 | Shared postcode grammar for tax territories (coherence check 5): `Territory.postcode_patterns` validated and matched with `apps.core.postcodes` (SHP.12), data migration from the `a-b` range form to `a..b`, the tax-only pattern code removed | P1 | 2 | TAX.1, SHP.12 | A `22100-22199` pattern is refused with the `..` hint; stored rows are migrated; `9000..9999` is accepted and matches; Portuguese and Polish postcodes with a dash match as exact postcodes |
 | TAX.12 | Consumer price display, go-live gate (Directive 98/6/EC, national consumer codes): B2C prices on cards, product pages, cart and feeds include VAT. The gross amount uses the destination country's rate through the TAX.3 tax engine; before the buyer picks a country, an estimated country (geo or locale) is used with a clear "VAT included, estimated for <country>" note. A net price shows only to business buyers who opt in. The catalog stays free of tax imports: a tax-side adapter or template tag supplies the gross amount. The owner confirmed the destination rate, the estimated country and the business opt-in on 2026-11-08 (MQ-12) | P1 | 6 | TAX.3, CAT.8 | Regression tests for IT, DE and FR consumers (destination rate, estimated-country note); a business buyer's net view after opt-in; `on_request` products never priced; ROUND_HALF_UP per line; the catalog app has no tax import |
 | TAX.13 | Exemption reasons per country (owner decision MQ-3): each exemption reason declares the country of the law that defines it (IT for `art74_publishing` and `flat_rate_forfettario`; `other` stores the country of the law cited in its legal note), and the profile consistency check refuses a reason whose country differs from the country of the vendor's VAT registration, on the staff direct path and on TAX.2 approval alike; the check also runs on a VAT number change; staff enter the law country of existing `other` profiles by hand (MQ-15) | P1 | 3 | TAX.2, VEN.12 | An Italian vendor saves `art74_publishing`; a German vendor is refused `art74_publishing` and `flat_rate_forfettario`; a staff-added profile and an approved request give the same refusal; changing an exempt Italian vendor's VAT number to another country is reported; `other` without a country is refused; no data migration fills the country of an existing `other` profile, and such a profile stays in the inconsistency report until staff enter the country (owner decision MQ-15) |
+| TAX.14 | Triangulation, art. 58 c.1 D.L. 331/93 (owner decision D-28): Italian vendors only; only when transport is by or on behalf of the vendor or by platform logistics; checkout collects a tracked declaration from the buyer (final consignee name, delivery address in the other member state, VIES-valid VAT number, explicit request for direct shipping); nature code `N3.2`; the vendor keeps proof of the direct transport (ORD.13) | P1 | 10 | TAX.3, TAX.5, ORD.5, ORD.13 | A non-Italian vendor never gets the triangulation outcome; buyer pickup or a carrier taking free orders from the buyer gives Italian VAT; a complete declaration with a VIES-valid consignee number gives 0% with `N3.2`; an invalid VAT number or a missing direct-shipping request gives Italian VAT; the declaration is stored with the order |
+| TAX.15 | Declaration of intent, Italy (owner decision D-28, art. 8 c.1 lett. c D.P.R. 633/72): buyer-side status, checkout captures the telematic protocol number of the buyer's declaration; nature code `N3.5`; Italian vendors only | P2 | 6 | TAX.3, ORD.5 | An Italian vendor order with a protocol number gets 0% with `N3.5` and stores the number in the snapshot; a missing number gives Italian VAT; a non-Italian vendor never gets it |
