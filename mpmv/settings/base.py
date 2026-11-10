@@ -563,3 +563,14 @@ LOGGING = {
     "loggers": {"django.request": {"filters": ["redact_secret_paths"]}},
     "root": {"handlers": ["console"], "level": "INFO"},
 }
+
+# SEC.13 (apps/core/public_forms.py): URL prefixes the anonymous-POST sweep does not walk, each
+# with the reason an anonymous request is refused there. A login form under one of them (the
+# admins' sign-in) is declared on its own view and listed in docs/dev/public-forms.md.
+PUBLIC_FORM_GATED_PREFIXES = {
+    "manager/": "the Manager gate answers 404 to anyone without a space (manager.E001, E002)",
+    "admin/": "the editors' admin requires a signed-in editor; its sign-in form is declared",
+    "django-admin/": "the staff admin requires a signed-in staff user; its sign-in is declared",
+    "api/": "API v1 authenticates every operation (API key or session)",
+    "_styleguide/": "staff only (THM.4)",
+}

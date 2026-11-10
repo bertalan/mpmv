@@ -16,10 +16,18 @@ from . import mail, services
 from .audit import AuditContext
 from .http import client_ip
 from .models import AuditLog
+from .public_forms import Protection, public_form
 
 WEBHOOK_ACTOR = "webhook:email"
 
 
+@public_form(
+    protection=Protection.ALLOW,
+    purpose="Email provider delivery feedback (bounces, complaints)",
+    task="ARC.16",
+    reason="machine to machine: the provider's signature and a replay window are checked first",
+    no_rate_limit="an unsigned request is refused before any work; off (404) with no secret",
+)
 @csrf_exempt  # the provider signs the request; it has no session or CSRF token
 @require_POST
 def email_webhook(request: HttpRequest) -> HttpResponse:

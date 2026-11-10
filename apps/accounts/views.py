@@ -8,10 +8,18 @@ from django.utils.translation import gettext
 from django.views.decorators.http import require_POST
 
 from apps.core.i18n import configured_languages, translate_path
+from apps.core.public_forms import Protection, public_form
 
 from .services import set_preferred_language
 
 
+@public_form(
+    protection=Protection.ALLOW,
+    purpose="Language switcher (redirect to the same page in another language)",
+    task="I18N.1",
+    reason="stores nothing for an anonymous visitor and redirects only to this host",
+    no_rate_limit="a redirect that does no work for a stranger",
+)
 @require_POST
 def switch_language(request: HttpRequest) -> HttpResponseRedirect:
     """Language switcher: redirect to the current page in the chosen language (I18N.1).

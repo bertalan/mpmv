@@ -600,3 +600,16 @@ def check_image_upload_limits(
             )
         ]
     return []
+
+
+def check_public_forms(app_configs: Any = None, **kwargs: Any) -> list[checks.CheckMessage]:
+    """The anonymous POST form sweep (SEC.13, apps/core/public_forms.py)."""
+    from .public_forms import public_form_report
+
+    report = public_form_report()
+    messages: list[checks.CheckMessage] = [
+        checks.Error(message, hint="See docs/dev/public-forms.md.", id=check_id)
+        for check_id, message in report.errors
+    ]
+    messages += [checks.Warning(message, id=check_id) for check_id, message in report.warnings]
+    return messages
