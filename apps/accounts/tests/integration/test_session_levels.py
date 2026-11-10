@@ -7,6 +7,7 @@ authenticator is fake. Needs human review: security code.
 import datetime as dt
 import json
 import re
+import secrets
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -750,3 +751,95 @@ def test_a_factory_grant_is_live_and_unspent() -> None:
     grant = ElevationGrantFactory.create()
     assert grant.used_at is None
     assert grant.expires_at > timezone.now()
+
+
+# Security re-check findings (PR 234)
+
+
+def _owner_group() -> Any:
+    from django.contrib.auth.models import Group
+
+    from apps.core.models import PLATFORM_OWNER_CODENAME
+
+    group = Group.objects.create(name="Owners")
+    group.permissions.add(
+        Permission.objects.get(content_type__app_label="core", codename=PLATFORM_OWNER_CODENAME)
+    )
+    return group
+
+
+def test_joining_a_group_that_holds_platform_owner_needs_the_group_3_passkey(
+    client: Client,
+) -> None:
+    root = UserFactory.create(superuser=True)
+    verified_login(client, root)  # operational, TOTP only
+    target = UserFactory.create(staff=True)
+    group = _owner_group()
+    response = client.post(
+        reverse("admin:accounts_user_change", args=[target.pk]), {"groups": [group.pk]}
+    )
+    assert response.status_code == 302
+    assert response["Location"].startswith(reverse("mfa:verify"))
+    assert "factor=passkey" in response["Location"]
+    assert not target.groups.exists()
+
+
+def test_joining_an_ordinary_group_needs_no_group_3_passkey(client: Client) -> None:
+    from django.contrib.auth.models import Group
+
+    root = UserFactory.create(superuser=True)
+    verified_login(client, root)
+    target = UserFactory.create(staff=True)
+    group = Group.objects.create(name="Support")
+    response = client.post(
+        reverse("admin:accounts_user_change", args=[target.pk]), {"groups": [group.pk]}
+    )
+    assert response.status_code != 403
+
+
+def test_adding_a_user_straight_into_an_owner_group_needs_the_group_3_passkey(
+    client: Client,
+) -> None:
+    root = UserFactory.create(superuser=True)
+    verified_login(client, root)
+    group = _owner_group()
+    response = client.post(reverse("admin:accounts_user_add"), {"groups": [group.pk]})
+    assert response.status_code == 302
+    assert "factor=passkey" in response["Location"]
+
+
+def test_a_malformed_client_digest_is_a_400_not_a_500(client: Client) -> None:
+    user, _ = _staff_with_passkey()
+    _restricted_session(client, user)
+    for digest in ("x" * 65, "g" * 64, "A" * 64, "a" * 63):
+        response = _post(client, "levels:once_options", {"action": "export", "digest": digest})
+        assert response.status_code == 400, digest
+    ok = _post(client, "levels:once_options", {"action": "export", "digest": "a" * 64})
+    assert ok.status_code == 200
+
+
+def test_bulk_user_delete_is_a_group_2_action(client: Client) -> None:
+    root = UserFactory.create(superuser=True)
+    verified_login(client, root, level=levels.RESTRICTED)
+    victim = UserFactory.create()
+    response = client.post(
+        reverse("admin:accounts_user_changelist"),
+        {"action": "delete_selected", "_selected_action": [victim.pk], "post": "yes"},
+    )
+    assert response.status_code == 403
+    assert User.objects.filter(pk=victim.pk).exists()
+
+
+def test_changing_the_password_ends_operational_mode(client: Client) -> None:
+    old = secrets.token_urlsafe(16)
+    user = UserFactory.create(staff=True, password=old)
+    verified_login(client, user)
+    assert client.session.get(levels.STARTED_KEY) is not None
+    new = secrets.token_urlsafe(16)
+    response = client.post(
+        reverse("admin:password_change"),
+        {"old_password": old, "new_password1": new, "new_password2": new},
+    )
+    assert response.status_code == 302
+    assert client.session.get(levels.STARTED_KEY) is None
+    assert _after(_actions(levels.SESSION_ENDED)[-1])["reason"] == "password"

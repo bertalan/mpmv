@@ -150,6 +150,7 @@ class UserAdmin(DjangoUserAdmin[User]):
         description=gettext_lazy("Delete selected %(verbose_name_plural)s"),
         permissions=["delete"],
     )
+    @level_gated_action("role_grant")  # same level as deleting one user
     def delete_selected(self, request: HttpRequest, queryset: QuerySet[User]) -> Any:
         """Django's bulk delete behind step-up, refused as a whole for privileged accounts."""
         if not is_recently_verified(request):
@@ -277,7 +278,20 @@ def _posts_owner_grant(request: HttpRequest, target: User | None) -> bool:
         return False
     if request.POST.get("is_superuser") and not (target is not None and target.is_superuser):
         return True
-    return _posts_platform_owner_permission(request)
+    return _posts_platform_owner_permission(request) or _posts_owner_group(request)
+
+
+def _posts_owner_group(request: HttpRequest) -> bool:
+    """The form puts the user in a group that holds the platform owner permission."""
+    ids = [i for i in request.POST.getlist("groups") if i.isdigit()]
+    return (
+        bool(ids)
+        and Group.objects.filter(
+            pk__in=ids,
+            permissions__content_type__app_label="core",
+            permissions__codename=PLATFORM_OWNER_CODENAME,
+        ).exists()
+    )
 
 
 def _posts_platform_owner_permission(request: HttpRequest) -> bool:

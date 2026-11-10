@@ -5,6 +5,7 @@ verification required; the challenge is kept in the session and used once. A ses
 passkey (a stolen cookie) cannot pass it, and a code is never accepted.
 """
 
+import re
 import time
 
 from django.core.exceptions import PermissionDenied
@@ -69,6 +70,9 @@ def _require_elevate(request: HttpRequest) -> None:
         raise PermissionDenied
 
 
+DIGEST = re.compile(r"[0-9a-f]{64}")
+
+
 @not_anonymous(
     reason="signed in, a verified second factor and the elevate permission are required",
     purpose="Passkey options to start operational mode",
@@ -113,6 +117,8 @@ def once_options(request: HttpRequest) -> JsonResponse:
     action, digest = body.get("action"), body.get("digest")
     if not isinstance(action, str) or not isinstance(digest, str) or not action or not digest:
         return _bad_request("an action and its parameters digest are required")
+    if not DIGEST.fullmatch(digest):
+        return _bad_request("the parameters digest must be 64 lowercase hex characters")
     if levels.policy().group_of(action) != 2:
         return _bad_request("this action cannot be done once")
     return _options(request, levels.SINGLE_CHALLENGE_KEY, {"action": action, "digest": digest})
