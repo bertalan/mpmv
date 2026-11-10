@@ -32,11 +32,11 @@ def metas(response: Any) -> list[str]:
 def category_url() -> str:
     category = CategoryFactory.create()
     CategoryTranslationFactory.create(category=category, language="en", status="published")
-    product = ProductFactory.create(
+    ProductFactory.create(
         vendor=VendorFactory.create(status=Vendor.Status.ACTIVE),
+        category=category,
         status=Product.Status.PUBLISHED,
     )
-    product.categories.add(category)
     translation = category.translations.get(language="en")
     return f"/product-category/{translation.slug}/"
 

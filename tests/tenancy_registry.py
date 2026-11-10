@@ -253,6 +253,7 @@ def vendor_display_name(vendor: models.Model) -> str:
 
 ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
+    "robots_txt": NoVendorData("robots.txt (SEO.8): constant text for crawlers; no vendor data."),
     "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
     "media": NoVendorData(
         "Public image files (THM.12): published images and their renditions, no vendor data.",
