@@ -12,6 +12,7 @@ from django.views.decorators.http import require_GET
 
 from apps.accounts.captcha import captcha_passes
 from apps.core.http import client_ip
+from apps.core.public_forms import Protection, public_form
 from apps.core.services import NoPlatformOperator
 
 from . import services
@@ -62,6 +63,13 @@ def _render_form(request: HttpRequest, form: NoticeForm) -> HttpResponse:
     return response
 
 
+@public_form(
+    protection=Protection.CAPTCHA,
+    purpose="Report illegal content (DSA notice)",
+    task="CMP.5",
+    rate_limit="per IP (notice and captcha-failure budgets)",
+    templates=("compliance/notice_form.html",),
+)
 def notice_form(request: HttpRequest) -> HttpResponse:
     """The public report form: no account needed, captcha and a per-address rate limit on POST.
 

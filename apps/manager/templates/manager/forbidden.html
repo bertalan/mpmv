@@ -6,7 +6,7 @@ space's right gets this page with status 403 instead of a bare 404. It says who 
 why the page is closed; anonymous visitors still go to the login. No section or data is listed.
 {% endcomment %}
 {% block title %}{% translate "No access" %} · {{ site_name }}{% endblock %}
-{% block description %}<meta name="robots" content="noindex">{% endblock %}
+{% block description %}{% robots_meta "noindex" %}{% endblock %}
 {% block account_content %}
   <h1>{% translate "No access" %}</h1>
   <p>{% blocktranslate with user=request.user.get_username %}You are signed in as {{ user }}, and you do not have access to this part of the site.{% endblocktranslate %}</p>

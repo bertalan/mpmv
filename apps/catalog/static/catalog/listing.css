@@ -58,6 +58,11 @@
   font-weight: bold;
 }
 
+.listing-logo {
+  max-width: 12rem;
+  height: auto;
+}
+
 /* Vendor storefront (VEN.10): base theme tokens, no new colours. */
 .vendor-profile {
   margin-block: var(--space-m);

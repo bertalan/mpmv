@@ -35,6 +35,8 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.core.audit import audit_context
 from apps.core.http import client_ip
+from apps.core.i18n import language_switch_home
+from apps.core.public_forms import Protection, public_form
 
 from . import services
 from .decorators import mfa_exempt
@@ -59,6 +61,7 @@ def _session_user(request: HttpRequest) -> User | None:
     return user if isinstance(user, User) and user.is_authenticated else None
 
 
+@language_switch_home
 @mfa_exempt
 @require_http_methods(["GET", "HEAD"])
 def open_link(request: HttpRequest, token: str) -> HttpResponse:
@@ -70,6 +73,13 @@ def open_link(request: HttpRequest, token: str) -> HttpResponse:
     return _private(render(request, "accounts/action_link/continue.html", context))
 
 
+@public_form(
+    protection=Protection.SIGNED_TOKEN,
+    purpose="Continue from an emailed action link (spends the token's one sign-in use)",
+    task="CORE.15",
+    reason="the one-time signed token in the POST body is checked before anything else",
+    rate_limit="per IP",
+)
 @mfa_exempt
 @require_POST
 def continue_link(request: HttpRequest) -> HttpResponse:

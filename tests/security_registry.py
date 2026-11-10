@@ -44,6 +44,7 @@ PASSWORD_RESET = "Password reset flow of the editors' admin: answers before sign
 # Endpoints an anonymous visitor may reach (a 2xx, or a redirect that is not to a sign-in page).
 PUBLIC: dict[str, str] = {
     "healthz": "Liveness probe with a constant answer.",
+    "robots_txt": "robots.txt (SEO.8): constant text for crawlers, no vendor data.",
     "email_webhook": "Email provider feedback: refused unless the payload is signed (ARC.16).",
     "home": "Public home page.",
     "media": MEDIA,
