@@ -147,7 +147,9 @@ type = "layers"
 layers = [
   "apps.seed",  # the demo seed (ARC.10) writes every app's data through its services
   "apps.mcp",
-  "apps.api",
+  # Adapters (spec 01 §1.3): the API and the Manager backoffice (CORE.17) call the services of
+  # the apps below and never import each other.
+  "apps.api | apps.manager",
   "apps.compliance | apps.seo | apps.ingest",
   "apps.ledger",
   "apps.payments",
@@ -204,6 +206,7 @@ forbidden_modules = [
   "apps.api",
   "apps.seed",  # the demo seed (ARC.10) writes every app's data through its services
   "apps.mcp",
+  "apps.manager",  # uses the theme's templates only, never its Python (CORE.17)
 ]
 
 [[tool.importlinter.contracts]]
@@ -228,6 +231,7 @@ source_modules = [
   "apps.api",
   "apps.seed",  # the demo seed (ARC.10) writes every app's data through its services
   "apps.mcp",
+  "apps.manager",
   "mpmv",
 ]
 forbidden_modules = ["apps.themes"]

@@ -112,6 +112,7 @@ from tests.tenancy import (
     ObjectMaker,
     StaffOnly,
     VendorScoped,
+    VendorScopedList,
     member_session,
 )
 
@@ -235,6 +236,15 @@ def member_with_landing_taxonomy(client: Client, tenants: CrossTenant) -> dict[s
     return member_session(client, tenants)
 
 
+def manager_vendor(vendor: Vendor) -> Vendor:
+    """The Manager's shop pages show the selected vendor itself (CORE.17)."""
+    return vendor
+
+
+def vendor_display_name(vendor: models.Model) -> str:
+    return str(vendor.display_name)  # type: ignore[attr-defined]
+
+
 ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
     "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
@@ -281,6 +291,15 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "geocoding_find": NoVendorData(
         "Find coordinates (EVT.12): geocodes the typed address; reads no vendor data."
+    ),
+    # The Manager (CORE.17): one login, a shop space for vendor members (the selected vendor
+    # only, chosen among the member's own vendors) and a platform space for platform staff.
+    "login": NoVendorData("Manager sign-in page."),
+    "logout": NoVendorData("Sign-out of the Manager."),
+    "manager:shop:dashboard": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    "manager:platform:dashboard": StaffOnly(
+        "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
     ),
     "admin:login": NoVendorData("Staff sign-in page."),
     "admin:logout": NoVendorData("Staff sign-out."),
