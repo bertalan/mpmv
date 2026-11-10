@@ -1,11 +1,11 @@
 """The public "Sell with us" application form (VEN.22).
 
-Only what the application needs (data minimisation): the applicant's name and email, a password,
-and the name of the business. Everything else is collected later, during onboarding (VEN.5).
-Every field has a length cap, so a request cannot make us store or hash a huge value. The
+Only what the application needs (data minimisation): the applicant's name and email, the name
+of the business and its country. Everything else is collected later, during onboarding (VEN.5).
+The form takes no password: the person who opens the emailed link chooses it on the confirm
+page. Every field has a length cap, so a request cannot make us store or hash a huge value. The
 widgets carry the `autocomplete` tokens password managers and browsers fill from (CMP.9, WCAG
-2.2 SC 3.3.8) and no paste handler; the password has the show-password toggle and is asked once
-(SC 3.3.7, redundant entry).
+2.2 SC 3.3.8) and no paste handler; the password is asked once (SC 3.3.7, redundant entry).
 """
 
 from typing import Any
@@ -54,15 +54,6 @@ class ApplicationForm(forms.Form):
         label="Country where your business is established",
         widget=forms.Select(attrs={"autocomplete": "country"}),
     )
-    # Not stripped: a password may start or end with a space.
-    password = forms.CharField(
-        label="Password",
-        max_length=PASSWORD_MAX,
-        strip=False,
-        widget=forms.PasswordInput(
-            attrs={"autocomplete": "new-password", "data-password-toggle": "Show password"}
-        ),
-    )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -72,3 +63,17 @@ class ApplicationForm(forms.Form):
         )
         choices = [("", "---------"), *names]
         self.fields["country"].choices = choices  # type: ignore[attr-defined]
+
+
+class ConfirmForm(forms.Form):
+    """The confirm page: whoever opens the emailed link chooses the password (VEN.22)."""
+
+    # Not stripped: a password may start or end with a space.
+    password = forms.CharField(
+        label="Choose a password",
+        max_length=PASSWORD_MAX,
+        strip=False,
+        widget=forms.PasswordInput(
+            attrs={"autocomplete": "new-password", "data-password-toggle": "Show password"}
+        ),
+    )

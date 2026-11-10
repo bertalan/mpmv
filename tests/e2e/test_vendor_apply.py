@@ -40,7 +40,6 @@ def test_a_visitor_applies_and_confirms_the_email(
     page.get_by_label("Email address").fill("ada@example.com")
     page.get_by_label("Name of your business or shop").fill("Ada Workshop")
     page.get_by_label("Country where your business is established").select_option("IT")
-    page.get_by_label("Password").fill(secrets.token_urlsafe(18))
     page.get_by_role("button", name="Send my application").click()
     expect(page.get_by_role("heading", name="Check your email")).to_be_visible()
     shot("apply-sent")
@@ -52,7 +51,11 @@ def test_a_visitor_applies_and_confirms_the_email(
     page.goto(f"{live_server.url}{emailed_link_path()}")
     page.get_by_role("button", name="Continue").click()
     expect(page.get_by_role("heading", name="Confirm your email address")).to_be_visible()
+    violations = run_axe(page)
+    assert violations == [], format_violations(violations)
     shot("apply-confirm")
+    assert User.objects.get(email="ada@example.com").has_usable_password() is False
+    page.get_by_label("Choose a password").fill(secrets.token_urlsafe(18))
     page.get_by_role("button", name="Confirm my email").click()
     expect(page.get_by_role("heading", name="Your email is confirmed")).to_be_visible()
     shot("apply-confirmed")
@@ -60,6 +63,32 @@ def test_a_visitor_applies_and_confirms_the_email(
     user.refresh_from_db()
     assert user.is_active is True
     assert Vendor.objects.get(contact_email="ada@example.com").status == engine.APPLICANT
+
+
+def test_the_address_owner_cancels_with_the_this_was_not_me_link(
+    page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+) -> None:
+    page.goto(f"{live_server.url}/vendor/apply/")
+    page.get_by_label("Your full name").fill("Ada Example")
+    page.get_by_label("Email address").fill("ada@example.com")
+    page.get_by_label("Name of your business or shop").fill("Ada Workshop")
+    page.get_by_label("Country where your business is established").select_option("IT")
+    page.get_by_role("button", name="Send my application").click()
+    expect(page.get_by_role("heading", name="Check your email")).to_be_visible()
+
+    email = OutboxEmail.objects.filter(template_key="vendors.application_confirm").first()
+    assert email is not None
+    cancel_url = str(json.loads(email.context)["cancel_url"])
+    page.goto(f"{live_server.url}/{cancel_url.split('/', 3)[3]}")
+    page.get_by_role("button", name="Continue").click()
+    expect(page.get_by_role("heading", name="Cancel this application")).to_be_visible()
+    assert User.objects.filter(email="ada@example.com").exists()  # a GET deletes nothing
+    shot("apply-cancel")
+    page.get_by_role("button", name="Cancel the application, this was not me").click()
+    expect(page.get_by_role("heading", name="Nothing is waiting")).to_be_visible()
+    shot("apply-cancelled")
+    assert not User.objects.filter(email="ada@example.com").exists()
+    assert not Vendor.objects.filter(contact_email="ada@example.com").exists()
 
 
 def test_a_form_with_errors_lists_them_in_a_summary(

@@ -11,26 +11,31 @@ state) decides what a link may activate, and every step is rate limited and audi
 
 import datetime as dt
 import json
+import re
 import secrets
 from collections.abc import Iterator
+from html import escape
 from html.parser import HTMLParser
+from typing import Any
 
 import pytest
 from django.core.exceptions import ValidationError
 from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.accounts.models import ActionLinkUse, User
 from apps.accounts.services import REGISTRATION_LIMIT, mfa_required
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.fakes import FakeCaptchaVerifier
 from apps.core.audit import AuditContext
+from apps.core.changeset import ChangeSet
 from apps.core.models import AuditLog, OutboxEmail
 from apps.core.services import render_email
 from apps.vendors import engine, services
 from apps.vendors.models import Vendor, VendorApplication, VendorMember
-from apps.vendors.tests.factories import VendorFactory
+from apps.vendors.tests.factories import VendorApplicationFactory, VendorFactory
 from apps.vendors.tests.integration.test_claim import open_link
 
 pytestmark = pytest.mark.django_db
@@ -574,28 +579,44 @@ def test_the_rate_limit_is_audited(client: Client) -> None:
     assert AuditLog.objects.filter(action="accounts.registration.rate_limited").exists()
 
 
-# --- Retention of unconfirmed applications (M2; the period awaits the owner's decision)
+# --- Retention, reminder and cancel link (owner decision D-24)
 
 
-def age(user: User, *, days: float) -> None:
-    """Make the application's link `days` days older than the moment it was sent."""
-    when = timezone.now() - dt.timedelta(days=days)
+def age(user: User, *, hours: float) -> None:
+    """Make the application `hours` hours older (the request and its link)."""
+    when = timezone.now() - dt.timedelta(hours=hours)
     VendorApplication.objects.filter(user=user).update(created_at=when, link_sent_at=when)
 
 
-def test_the_retention_defaults_to_seven_days_after_the_link_expires(settings) -> None:  # type: ignore[no-untyped-def]
-    assert settings.VENDOR_APPLICATION_RETENTION_DAYS == 7
+def cancel_path(email: OutboxEmail) -> str:
+    url = str(json.loads(email.context)["cancel_url"])
+    return "/" + url.split("/", 3)[3]
 
 
-def test_the_purge_deletes_unconfirmed_applications_past_link_expiry_plus_retention(
-    client: Client, settings
-) -> None:  # type: ignore[no-untyped-def]
+def page(response: Any) -> str:
+    """The page without its CSRF tokens, which differ on every response."""
+    return re.sub(r"csrfmiddlewaretoken\" value=\"[^\"]*", "", response.content.decode())
+
+
+def cancel_url(user: User) -> str:
+    return reverse("vendors:apply_cancel", args=[user.public_id])
+
+
+def test_d24_defaults_are_three_days_and_a_reminder_at_48_hours(
+    settings: SettingsWrapper,
+) -> None:
+    assert settings.VENDOR_APPLICATION_RETENTION_DAYS == 3
+    assert settings.VENDOR_APPLICATION_REMINDER_HOURS == 48
+
+
+def test_the_purge_deletes_unconfirmed_applications_three_days_after_the_request(
+    client: Client,
+) -> None:
     old_data, old_user, _ = applied(client)
     fresh_data, fresh_user, _ = applied(Client())
-    grace_data, grace_user, _ = applied(Client())
-    link_days = settings.VENDOR_APPLICATION_LINK_MAX_AGE / 86400
-    age(old_user, days=link_days + 7 + 0.1)
-    age(grace_user, days=link_days + 6)  # expired, still inside the retention period
+    young_data, young_user, _ = applied(Client())
+    age(old_user, hours=72 + 1)
+    age(young_user, hours=71)
     confirmed = UserFactory.create()  # an ordinary account is never touched
 
     changes = services.purge_unconfirmed_applications(ctx=SYSTEM)
@@ -606,33 +627,43 @@ def test_the_purge_deletes_unconfirmed_applications_past_link_expiry_plus_retent
     assert not VendorMember.objects.filter(user_id=old_user.pk).exists()
     assert not VendorApplication.objects.filter(user_id=old_user.pk).exists()
     assert User.objects.filter(pk=fresh_user.pk).exists()
-    assert User.objects.filter(pk=grace_user.pk).exists()
+    assert User.objects.filter(pk=young_user.pk).exists()
     assert User.objects.filter(pk=confirmed.pk).exists()
-    assert Vendor.objects.filter(contact_email=grace_data["email"]).exists()
+    assert Vendor.objects.filter(contact_email=young_data["email"]).exists()
     assert Vendor.objects.filter(contact_email=fresh_data["email"]).exists()
 
 
-def test_the_purge_never_touches_a_confirmed_applicant(client: Client, settings) -> None:  # type: ignore[no-untyped-def]
+def test_a_new_link_does_not_extend_the_three_days(client: Client) -> None:
+    data, user, _ = applied(client)
+    age(user, hours=60)
+    apply(Client(), data, ip="198.51.100.9")  # a re-application: a new link
+    VendorApplication.objects.filter(user=user).update(
+        created_at=timezone.now() - dt.timedelta(hours=73)
+    )
+    services.purge_unconfirmed_applications(ctx=SYSTEM)
+    assert not User.objects.filter(pk=user.pk).exists()
+
+
+def test_the_purge_never_touches_a_confirmed_applicant(client: Client) -> None:
     _, user, path = applied(client)
     open_link(client, path)
     client.post(confirm_url(user), {"password": new_password()}, REMOTE_ADDR=IP)
-    VendorApplication.objects.filter(user=user).delete()
     services.purge_unconfirmed_applications(ctx=SYSTEM)
     assert User.objects.filter(pk=user.pk, is_active=True).exists()
 
 
-def test_the_purge_is_audited_by_count_only(client: Client, settings) -> None:  # type: ignore[no-untyped-def]
+def test_the_purge_is_audited_by_count_only(client: Client) -> None:
     data, user, _ = applied(client)
-    age(user, days=settings.VENDOR_APPLICATION_LINK_MAX_AGE / 86400 + 8)
+    age(user, hours=80)
     services.purge_unconfirmed_applications(ctx=SYSTEM)
     [entry] = AuditLog.objects.filter(action=services.APPLICATION_PURGED)
-    assert entry.after == {"deleted": 1, "retention_days": 7}
+    assert entry.after == {"deleted": 1, "retention_days": 3}
     assert data["email"] not in json.dumps([entry.before, entry.after, entry.target_key])
 
 
-def test_the_purge_supports_dry_run(client: Client, settings) -> None:  # type: ignore[no-untyped-def]
+def test_the_purge_supports_dry_run(client: Client) -> None:
     _, user, _ = applied(client)
-    age(user, days=settings.VENDOR_APPLICATION_LINK_MAX_AGE / 86400 + 8)
+    age(user, hours=80)
     changes = services.purge_unconfirmed_applications(ctx=SYSTEM, dry_run=True)
     assert not changes.is_empty
     assert User.objects.filter(pk=user.pk).exists()
@@ -640,14 +671,211 @@ def test_the_purge_supports_dry_run(client: Client, settings) -> None:  # type: 
 
 
 @override_settings(VENDOR_APPLICATION_RETENTION_DAYS=1)
-def test_the_retention_period_is_a_setting(client: Client, settings) -> None:  # type: ignore[no-untyped-def]
+def test_the_retention_period_is_a_setting(client: Client) -> None:
     _, user, _ = applied(client)
-    age(user, days=settings.VENDOR_APPLICATION_LINK_MAX_AGE / 86400 + 1.5)
+    age(user, hours=25)
     services.purge_unconfirmed_applications(ctx=SYSTEM)
     assert not User.objects.filter(pk=user.pk).exists()
 
 
-def test_the_purge_runs_as_a_nightly_job() -> None:
+def test_the_jobs_exist() -> None:
     from apps.vendors import tasks
 
     assert tasks.purge_unconfirmed_applications is not None
+    assert tasks.remind_unconfirmed_applications is not None
+
+
+# --- The reminder: exactly one, at 48 hours
+
+
+def test_one_reminder_is_sent_at_48_hours_and_never_a_second(client: Client) -> None:
+    data, user, _ = applied(client)
+    assert services.send_application_reminders(ctx=SYSTEM).is_empty  # too early
+    age(user, hours=49)
+
+    changes = services.send_application_reminders(ctx=SYSTEM)
+
+    assert not changes.is_empty
+    [reminder] = emails("vendors.application_reminder")
+    assert reminder.recipient == data["email"]
+    assert "action_url" in json.loads(reminder.context)
+    assert VendorApplication.objects.get(user=user).reminder_sent_at is not None
+    assert services.send_application_reminders(ctx=SYSTEM).is_empty
+    assert len(emails("vendors.application_reminder")) == 1
+
+
+def test_the_reminder_goes_only_to_pending_applications(client: Client) -> None:
+    _, confirmed, path = applied(client)
+    open_link(client, path)
+    client.post(confirm_url(confirmed), {"password": new_password()}, REMOTE_ADDR=IP)
+    _, closed, _ = applied(Client())
+    services.change_status(VendorMember.objects.get(user=closed).vendor, engine.CLOSED, ctx=SYSTEM)
+    _, pending, _ = applied(Client())
+    VendorApplication.objects.update(created_at=timezone.now() - dt.timedelta(hours=49))
+    services.send_application_reminders(ctx=SYSTEM)
+    [reminder] = emails("vendors.application_reminder")
+    assert reminder.recipient == pending.email
+
+
+def test_the_reminder_supports_dry_run(client: Client) -> None:
+    _, user, _ = applied(client)
+    age(user, hours=49)
+    changes = services.send_application_reminders(ctx=SYSTEM, dry_run=True)
+    assert not changes.is_empty
+    assert not emails("vendors.application_reminder")
+    assert VendorApplication.objects.get(user=user).reminder_sent_at is None
+
+
+def test_the_reminder_link_confirms_and_the_first_link_keeps_working(client: Client) -> None:
+    _, user, first = applied(client)
+    age(user, hours=49)
+    services.send_application_reminders(ctx=SYSTEM)
+    second = link_path(emails("vendors.application_reminder")[0])
+    assert second != first
+    for path in (first, second):
+        opened = Client()
+        open_link(opened, path)
+        assert opened.get(confirm_url(user)).status_code == 200
+
+
+# --- The cancel link in every email: GET shows a button, POST deletes, nothing blocks
+
+
+def test_the_confirmation_and_the_reminder_carry_a_cancel_link(client: Client) -> None:
+    _, user, _ = applied(client)
+    age(user, hours=49)
+    services.send_application_reminders(ctx=SYSTEM)
+    for email in (emails()[0], emails("vendors.application_reminder")[0]):
+        context = json.loads(email.context)
+        assert context["cancel_url"] != context["action_url"]
+        assert "/account/link/" in context["cancel_url"]
+        rendered = render_email(email.template_key, email.language, email.context_data)
+        assert context["cancel_url"] in rendered.text_body
+        assert escape(context["cancel_url"]) in rendered.html_body
+
+
+def test_a_get_on_the_cancel_link_changes_nothing_and_keeps_the_token_valid(
+    client: Client,
+) -> None:
+    _, user, _ = applied(client)
+    path = cancel_path(emails()[0])
+    # The mail scanner: GET and HEAD of the emailed link, then of the page it leads to.
+    assert client.get(path).status_code == 200
+    assert client.head(path).status_code == 200
+    open_link(client, path)
+    for method in (client.get, client.head):
+        assert method(cancel_url(user)).status_code == 200
+    assert User.objects.filter(pk=user.pk).exists()
+    assert Vendor.objects.filter(contact_email=user.email).exists()
+    assert VendorApplication.objects.filter(user=user).exists()
+    assert not ActionLinkUse.objects.exists()
+    fresh = Client()  # the token is still valid: another browser can open it
+    open_link(fresh, path)
+    assert b"<button" in fresh.get(cancel_url(user)).content
+
+
+def test_a_get_on_the_confirm_link_never_confirms_it(client: Client) -> None:
+    _, user, path = applied(client)
+    assert client.get(path).status_code == 200
+    assert client.head(path).status_code == 200
+    open_link(client, path)
+    assert client.get(confirm_url(user)).status_code == 200
+    assert client.head(confirm_url(user)).status_code == 200
+    user.refresh_from_db()
+    assert user.is_active is False
+    assert not ActionLinkUse.objects.exists()
+    assert VendorApplication.objects.filter(user=user).exists()
+
+
+def test_a_post_on_the_cancel_page_deletes_the_application_at_once(client: Client) -> None:
+    data, user, _ = applied(client)
+    open_link(client, cancel_path(emails()[0]))
+
+    response = client.post(cancel_url(user), REMOTE_ADDR=IP)
+
+    assert response.status_code == 200
+    assert not User.objects.filter(email=data["email"]).exists()
+    assert not Vendor.objects.filter(contact_email=data["email"]).exists()
+    assert not VendorMember.objects.exists()
+    assert not VendorApplication.objects.exists()
+    [entry] = AuditLog.objects.filter(action=services.APPLICATION_CANCELLED)
+    dumped = json.dumps([entry.before, entry.after, entry.target_key, entry.actor_label])
+    assert data["email"] not in dumped
+    assert "Ada" not in dumped
+
+
+def test_a_second_post_and_a_new_visit_are_idempotent_and_neutral(client: Client) -> None:
+    _, user, _ = applied(client)
+    path = cancel_path(emails()[0])
+    open_link(client, path)
+    first = client.post(cancel_url(user), REMOTE_ADDR=IP)
+    second = client.post(cancel_url(user), REMOTE_ADDR=IP)
+    other = Client()
+    open_link(other, path)
+    third = other.post(cancel_url(user), REMOTE_ADDR=IP)
+    never = Client().get(cancel_url(user))
+    assert {first.status_code, second.status_code, third.status_code, never.status_code} == {200}
+    assert page(first) == page(second) == page(third) == page(never)
+    assert AuditLog.objects.filter(action=services.APPLICATION_CANCELLED).count() == 1
+
+
+def test_the_cancel_link_never_deletes_a_confirmed_account(client: Client) -> None:
+    _, user, path = applied(client)
+    cancel = cancel_path(emails()[0])
+    open_link(client, path)
+    client.post(confirm_url(user), {"password": new_password()}, REMOTE_ADDR=IP)
+    other = Client()
+    open_link(other, cancel)
+    response = other.post(cancel_url(user), REMOTE_ADDR=IP)
+    assert response.status_code == 200  # the same neutral page
+    assert User.objects.filter(pk=user.pk, is_active=True).exists()
+    assert Vendor.objects.filter(contact_email=user.email).exists()
+
+
+def test_the_cancel_link_survives_a_new_confirmation_link(client: Client) -> None:
+    data, user, _ = applied(client)
+    cancel = cancel_path(emails()[0])
+    apply(Client(), data, ip="198.51.100.9")  # a re-application kills the older confirm link
+    open_link(client, cancel)
+    client.post(cancel_url(user), REMOTE_ADDR=IP)
+    assert not User.objects.filter(pk=user.pk).exists()
+
+
+def test_a_cancel_does_not_block_a_new_application_for_the_address(client: Client) -> None:
+    data, user, _ = applied(client)
+    open_link(client, cancel_path(emails()[0]))
+    client.post(cancel_url(user), REMOTE_ADDR=IP)
+    apply(Client(), data, ip="198.51.100.9")
+    assert User.objects.filter(email=data["email"], is_active=False).exists()
+    assert len(emails()) == 2  # a new confirmation mail
+
+
+def test_the_cancel_page_gives_nothing_away_for_a_random_key(client: Client) -> None:
+    neutral = client.get(reverse("vendors:apply_cancel", args=["not-a-uuid"]))
+    random_key = client.get(
+        reverse("vendors:apply_cancel", args=["00000000-0000-0000-0000-000000000000"])
+    )
+    assert neutral.status_code == random_key.status_code == 200
+    assert page(neutral) == page(random_key)
+
+
+def test_cancel_posts_are_rate_limited_per_ip(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refuse(*args: object, **kwargs: object) -> ChangeSet:
+        return ChangeSet()  # nothing cancelled: the link stays usable
+
+    monkeypatch.setattr(services, "cancel_application", refuse)
+    _, user, _ = applied(client)
+    open_link(client, cancel_path(emails()[0]))
+    for _ in range(20):
+        client.post(cancel_url(user), REMOTE_ADDR="198.51.100.77")
+    response = client.post(cancel_url(user), REMOTE_ADDR="198.51.100.77")
+    assert response.status_code == 429
+
+
+def test_a_marker_without_a_vendor_is_not_pending() -> None:
+    orphan = VendorApplicationFactory.create(owns_applicant_vendor=False)
+    pending = VendorApplicationFactory.create()
+    assert services._pending_application(str(orphan.user.public_id)) is None
+    assert services._pending_application(str(pending.user.public_id)) is not None

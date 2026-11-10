@@ -1,0 +1,14 @@
+{% extends "layouts/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Cancel the application" %} · {{ site_name }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block content %}
+<article class="apply">
+  <h1>{% translate "Cancel this application" %}</h1>
+  <p>{% translate "If you did not apply to sell with us, cancel here. We delete the application and the account created with it right away, and keep nothing. You can apply again later if you wish." %}</p>
+  <form method="post">
+    {% csrf_token %}
+    {% include "components/button.html" with label=_("Cancel the application, this was not me") type="submit" variant="danger" only %}
+  </form>
+</article>
+{% endblock %}

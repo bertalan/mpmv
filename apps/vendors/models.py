@@ -904,3 +904,36 @@ class CrossVendorConsent(BaseModel):
         if not self._state.adding:
             raise PermissionError("CrossVendorConsent is append-only")
         super().save(*args, **kwargs)
+
+
+class VendorApplication(BaseModel):
+    """The pending marker of a public "Sell with us" application (VEN.22).
+
+    Written only by `services.apply_to_sell`, and deleted when the applicant confirms the email
+    (`confirm_application`) or by the retention job (`purge_unconfirmed_applications`). Its
+    existence is what makes an inactive account eligible for the emailed confirmation link: a
+    staff-blocked, migrated or staff-created applicant owner has none, so no form submission can
+    reactivate it. `version` is the version the link is bound to (CORE.15): every new link
+    raises it, so older links are refused. It has no foreign key to the vendor: the vendor is
+    the one the account owns, so this is not vendor-owned data.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="vendor_application",
+        editable=False,
+    )
+    version = models.PositiveIntegerField(default=1, editable=False)
+    link_sent_at = models.DateTimeField(
+        null=True, blank=True, editable=False, help_text="When the current link was queued."
+    )
+    reminder_sent_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+        help_text="When the one reminder was queued; never more than one (D-24).",
+    )
+
+    def __str__(self) -> str:
+        return f"application of {self.user_id} (link v{self.version})"

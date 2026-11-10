@@ -26,6 +26,7 @@ from apps.vendors.models import (
     CrossVendorConsent,
     LegalFieldRequirement,
     Vendor,
+    VendorApplication,
     VendorClaim,
     VendorContract,
     VendorContractTranslation,
@@ -363,3 +364,24 @@ class VendorClaimFactory(DjangoModelFactory[VendorClaim]):
     vendor = factory.SubFactory(VendorFactory)
     status = VendorClaim.Status.OPEN
     version = 1
+
+
+class VendorApplicationFactory(DjangoModelFactory[VendorApplication]):
+    """The pending marker of a "Sell with us" application (VEN.22): an inactive account that
+    owns an applicant vendor. The mails come from the service, not from this factory."""
+
+    class Meta:
+        model = VendorApplication
+        skip_postgeneration_save = True
+
+    user: Any = factory.SubFactory(UserFactory, is_active=False)
+    version = 1
+    link_sent_at = factory.LazyFunction(timezone.now)
+
+    @factory.post_generation
+    def owns_applicant_vendor(
+        self: VendorApplication, create: bool, extracted: object, **kwargs: object
+    ) -> None:
+        if create and extracted is not False:
+            vendor = VendorFactory.create(contact_email=self.user.email)
+            VendorMember.objects.create(vendor=vendor, user=self.user, role=engine.OWNER)

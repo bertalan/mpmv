@@ -11,4 +11,5 @@ urlpatterns = [
     path("", views.apply, name="apply"),
     path("sent/", views.sent, name="apply_sent"),
     path("confirm/<str:user_key>/", views.confirm, name="apply_confirm"),
+    path("cancel/<str:user_key>/", views.cancel, name="apply_cancel"),
 ]

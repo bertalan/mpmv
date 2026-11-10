@@ -10,6 +10,7 @@ class VendorsConfig(AppConfig):
         "vendor",
         "vendormember",
         "vendorclaim",
+        "vendorapplication",
         "legalfieldrequirement",
         "vendorcontract",
         "contractacceptance",

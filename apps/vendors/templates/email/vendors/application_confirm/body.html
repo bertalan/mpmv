@@ -1,8 +1,10 @@
 {% load i18n %}<!doctype html>
 <html lang="{{ email_language }}">
 <body>
-<p>{% blocktranslate %}Thank you for applying to sell with us with {{ business_name }}. To activate your account, open this link and confirm your email address.{% endblocktranslate %}</p>
+<p>{% translate "Someone, probably you, used this email address to apply to sell with us. To go on, open this link, confirm your email address and choose a password." %}</p>
 <p><a href="{{ action_url }}">{% translate "Confirm my email address" %}</a></p>
-<p>{% blocktranslate with expires=action_link_expires_at %}The link works once and expires on {{ expires }} (UTC). Our team reviews your application afterwards. If you did not apply, ignore this email: nothing happens without the link.{% endblocktranslate %}</p>
+<p>{% blocktranslate with expires=action_link_expires_at %}The link works once and expires on {{ expires }} (UTC). Our team reviews your application afterwards. If you do not confirm, the application is deleted after a few days.{% endblocktranslate %}</p>
+<p>{% translate "This was not me: open this link to cancel the application and delete the data created with it." %}</p>
+<p><a href="{{ cancel_url }}">{% translate "Cancel the application" %}</a></p>
 </body>
 </html>

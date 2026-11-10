@@ -170,6 +170,10 @@ VENDOR_CLAIM_RATE_LIMIT = 20
 # confirm-page POSTs allowed per IP every 15 minutes (the form uses the registration limit).
 VENDOR_APPLICATION_LINK_MAX_AGE = 72 * 3600  # seconds
 VENDOR_APPLICATION_RATE_LIMIT = 20
+# Unconfirmed applications (owner decision D-24, VEN.22): the account and its applicant vendor
+# are deleted this many days after the request, and one reminder goes out after this many hours.
+VENDOR_APPLICATION_RETENTION_DAYS = 3
+VENDOR_APPLICATION_REMINDER_HOURS = 48
 MFA_ISSUER = "MPMV"  # name shown in authenticator apps and passkey prompts
 OTP_TOTP_ISSUER = MFA_ISSUER
 OTP_ADMIN_HIDE_SENSITIVE_DATA = True

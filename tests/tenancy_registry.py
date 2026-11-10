@@ -294,6 +294,11 @@ ENDPOINTS: dict[str, Access] = {
         "applicant's own new records; it reads no vendor data."
     ),
     "vendors:apply_sent": NoVendorData("Static 'check your email' page (VEN.22)."),
+    "vendors:apply_cancel": NoVendorData(
+        "Application cancel page (VEN.22): without a link opened in the session for that "
+        "account it shows only a neutral page and changes nothing.",
+        kwargs={"user_key": "00000000-0000-0000-0000-000000000000"},
+    ),
     "vendors:apply_confirm": NoVendorData(
         "Application email confirmation (VEN.22): without a link opened in the session for "
         "that account it shows only the generic 'link not valid' page.",

@@ -1,13 +1,12 @@
 {% extends "layouts/base.html" %}
-{% load i18n static captcha %}
+{% load i18n captcha %}
 {% block title %}{% translate "Sell with us" %} · {{ site_name }}{% endblock %}
 {% block head %}<meta name="robots" content="noindex, nofollow">
-{% captcha_script %}<link rel="stylesheet" href="{% static 'accounts/password-toggle.css' %}">
-<script type="module" src="{% static 'accounts/password-toggle.js' %}"></script>{% endblock %}
+{% captcha_script %}{% endblock %}
 {% block content %}
 <article class="apply">
   <h1>{% translate "Apply to sell with us" %}</h1>
-  <p>{% translate "Tell us who you are and the name of your business. We create your account and send you an email to confirm your address. Our team then reviews your application before you can sell. We ask for nothing else now." %}</p>
+  <p>{% translate "Tell us who you are and the name of your business. We send you an email to confirm your address; you choose your password there. Our team then reviews your application before you can sell. We ask for nothing else now." %}</p>
   {% include "components/error_summary.html" with form=form autofocus=True only %}
   <form method="post" novalidate>
     {% csrf_token %}
@@ -16,6 +15,6 @@
     <p class="helptext">{% translate "After you confirm your email you sign in and set up an authenticator app: it is required for every seller." %}</p>
     {% include "components/button.html" with label=_("Send my application") type="submit" only %}
   </form>
-  <p class="helptext">{% translate "We use your name and email only to handle this application and, if you are accepted, your seller account." %}</p>
+  <p class="helptext">{% translate "We use your name and email only to handle this application and, if you are accepted, your seller account. An application nobody confirms is deleted after a few days." %}</p>
 </article>
 {% endblock %}

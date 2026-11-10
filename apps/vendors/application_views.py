@@ -29,7 +29,7 @@ from apps.core.audit import audit_context
 from apps.core.http import client_ip
 
 from . import services
-from .forms import MAX_BODY_BYTES, ApplicationForm
+from .forms import MAX_BODY_BYTES, ApplicationForm, ConfirmForm
 
 TOO_MANY_ATTEMPTS = "Too many attempts. Please try again later."
 TOO_LARGE = "The request is too large."
@@ -40,6 +40,7 @@ FORM_FIELD_OF = {
     "display_name": "business_name",
     "contact_email": "email",
     "country": "country",
+    "slug": "business_name",
 }
 
 type View = Callable[..., HttpResponse]
@@ -87,17 +88,13 @@ def apply(request: HttpRequest) -> HttpResponse:
                 email=data["email"],
                 business_name=data["business_name"],
                 country=data["country"],
-                password=data["password"],
                 language=get_language() or "",
                 ctx=audit_context(request),
             )
         except ValidationError as exc:
             # Raised before the address is looked up: it never depends on an account existing.
-            if hasattr(exc, "error_dict"):  # the vendor record: show it on the closest field
-                for name, errors in exc.error_dict.items():
-                    form.add_error(FORM_FIELD_OF.get(name), errors)
-            else:
-                form.add_error("password", exc)
+            for name, errors in exc.update_error_dict({}).items():
+                form.add_error(FORM_FIELD_OF.get(name), errors)
         else:
             return _private(HttpResponseRedirect(reverse("vendors:apply_sent")))
     return _page(request, "form", {"form": form}, status=200)
@@ -112,7 +109,7 @@ def _refused(request: HttpRequest) -> HttpResponse:
     return _page(request, "invalid", {}, status=403)
 
 
-@require_http_methods(["GET", "POST"])
+@require_http_methods(["GET", "HEAD", "POST"])
 def confirm(request: HttpRequest, user_key: str) -> HttpResponse:
     """Where the emailed link leads, after its Continue page opened it in this session."""
     link = services.application_link(request.session, user_key)
@@ -126,10 +123,37 @@ def confirm(request: HttpRequest, user_key: str) -> HttpResponse:
             retry = str(max(1, math.ceil(wait.total_seconds())))
             response = HttpResponse(TOO_MANY_ATTEMPTS, status=429, headers={"Retry-After": retry})
             return _private(response)
-    if request.method == "GET":
-        return _page(request, "confirm", {})
-    try:
-        services.confirm_application(link, ctx=audit_context(request))
-    except services.ApplicationLinkInvalid:
-        return _refused(request)
-    return _page(request, "confirmed", {"sign_in_url": reverse("login")})
+    form = ConfirmForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            services.confirm_application(
+                link, password=form.cleaned_data["password"], ctx=audit_context(request)
+            )
+        except ValidationError as exc:  # a weak password: the link stays usable
+            form.add_error("password", exc)
+        except services.ApplicationLinkInvalid:
+            return _refused(request)
+        else:
+            return _page(request, "confirmed", {"sign_in_url": reverse("login")})
+    return _page(request, "confirm", {"form": form})
+
+
+@require_http_methods(["GET", "HEAD", "POST"])
+def cancel(request: HttpRequest, user_key: str) -> HttpResponse:
+    """ "This was not me": the page the cancel link of every application mail leads to.
+
+    A GET (or HEAD, or a mail scanner's prefetch) only shows a button; the deletion runs on the
+    POST, with CSRF. Whatever the state (no link opened, already cancelled, confirmed, purged,
+    a random key) the answer is the same neutral page, so nothing is learned from it."""
+    link = services.application_cancel_link(request.session, user_key)
+    if link.refusal is not None:
+        return _page(request, "cancelled", {})
+    if request.method != "POST":
+        return _page(request, "cancel", {})
+    wait = services.application_retry_after(client_ip(request))
+    if wait:
+        retry = str(max(1, math.ceil(wait.total_seconds())))
+        response = HttpResponse(TOO_MANY_ATTEMPTS, status=429, headers={"Retry-After": retry})
+        return _private(response)
+    services.cancel_application(link, ctx=audit_context(request))
+    return _page(request, "cancelled", {})
