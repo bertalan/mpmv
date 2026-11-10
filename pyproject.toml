@@ -130,6 +130,7 @@ markers = [
   "unit: pure functions, no database (ADR-0006)",
   "integration: real Django + PostgreSQL",
   "e2e: Playwright against a live server",
+  "keep_seeded_territories: tax integration test that runs against the territories seeded by migration 0006 (TAX.7)",
   "security_slow: slow security cases, run nightly by security-nightly (SEC.5)",
 ]
 
