@@ -50,6 +50,7 @@ MACRO = {
     "I18N": "Multilingual",
     "CMS": "Wagtail content",
     "EVT": "Events, feeds and maps",
+    "TRU": "Trust, reviews and community",
     "THM": "Frontend themes",
     "SEO": "SEO, feeds, analytics",
     "AI": "AI channels (MCP, agents)",
@@ -88,6 +89,7 @@ PHASE_BY_PREFIX = {
     "EVT": "F4",
     "THM": "F1",
     "SEO": "F4",
+    "TRU": "F6",
     "AI": "F4",
     "MIG": "F5",
 }
