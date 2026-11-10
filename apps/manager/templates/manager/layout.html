@@ -1,5 +1,7 @@
 {% extends "layouts/base.html" %}
-{% load i18n %}
+{% load i18n cms_tags %}
+{# This page shows its messages in place; the base layout must not repeat them. #}
+{% block messages %}{% endblock %}
 {% comment %}
 The Manager shell (CORE.17, spec 02 §Backoffice): one layout for both spaces, on the active
 theme's components (THM.3, THM.4). The header holds the site name (the space's dashboard), the
@@ -13,7 +15,7 @@ script or style.
 {% block title %}{{ title }} · {{ site_name }}{% endblock %}
 {% block description %}<meta name="robots" content="noindex">{% endblock %}
 {% block header %}
-  {% get_current_language as current_language %}{% get_available_languages as available %}{% get_language_info_list for available as languages %}
+  {% switch_next_url as next_url %}{% get_current_language as current_language %}{% get_available_languages as available %}{% get_language_info_list for available as languages %}
   <header class="site-header manager-header">
     <div class="site-header__inner">
       <a class="site-name" href="{{ manager_home }}">{{ site_name }}<span class="manager-header__space">{% if manager.space == "shop" %}{% translate "Shop" %}{% else %}{% translate "Platform" %}{% endif %}</span></a>
