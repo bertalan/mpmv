@@ -555,6 +555,7 @@ RESERVED_PREFIXES = (
     "/i18n/",
     "/geocoding/",
     "/vendor/claim/",
+    "/vendor/apply/",
     "/_styleguide/",
 )
 

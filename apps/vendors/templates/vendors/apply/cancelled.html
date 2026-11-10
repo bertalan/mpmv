@@ -1,0 +1,10 @@
+{% extends "layouts/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Application cancelled" %} · {{ site_name }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block content %}
+<article class="apply">
+  <h1>{% translate "Nothing is waiting" %}</h1>
+  <p>{% translate "There is no pending application for this link: it was cancelled, confirmed or has expired. Nothing more to do." %}</p>
+</article>
+{% endblock %}

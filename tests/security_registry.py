@@ -53,6 +53,17 @@ PUBLIC: dict[str, str] = {
     "switch_language": "Stores the visitor's language choice in a cookie.",
     "action_link:open": "Secure action link (CORE.15): the signed token is the credential.",
     "action_link:continue": "Secure action link (CORE.15): the signed token is the credential.",
+    "vendors:apply": (
+        "Public 'Sell with us' application form (VEN.22): the page is public by design; the POST "
+        "is CSRF-checked, rate limited per IP and behind Turnstile, and it creates an inactive "
+        "account that only the emailed link activates."
+    ),
+    "vendors:apply_sent": "Static 'check your email' page of the application (VEN.22).",
+    "vendors:apply_cancel": (
+        "'This was not me' page of the application mails (VEN.22, D-24): a GET shows a button "
+        "or the same neutral page whatever the state; only a POST with CSRF acts, and only for "
+        "the account whose email-bound cancel link was opened in this session."
+    ),
     "login": SIGN_IN,  # the Manager's one login (CORE.17)
     "admin:login": SIGN_IN,
     "admin:logout": "Sign-out: without a session it only redirects to the admin home.",
@@ -101,6 +112,16 @@ IDOR_REVIEWED: dict[str, str] = {
         "session (VEN.24); another vendor's public id is refused with 403 "
         "(`test_a_claim_link_opens_only_its_own_vendor`)."
     ),
+    "vendors:apply_cancel": (
+        "Acts only for the account whose email-bound cancel link was opened in this session "
+        "(VEN.22); any other key gets the same neutral page and nothing changes "
+        "(`test_the_cancel_page_gives_nothing_away_for_a_random_key`)."
+    ),
+    "vendors:apply_confirm": (
+        "The page answers only for the account whose email-bound confirmation link was opened in "
+        "this session (VEN.22); any other key is refused with 403 "
+        "(`test_the_confirm_page_gives_nothing_away_for_a_random_key`)."
+    ),
     "catalog:category": "Public listing: the slugs name public categories.",
     "catalog:brand": "Public listing: the slug names a public brand.",
     "catalog:vendor": "Public storefront: the slug names an active vendor's public shop.",
@@ -120,6 +141,8 @@ OBJECT_PATHS: dict[str, ObjectKwargs] = {
         "public_id": str(TOTPDeviceFactory.create(user=tenants.b.owner).pk),
     },
     "vendor_claim:claim": lambda tenants: {"vendor_key": str(tenants.b.vendor.public_id)},
+    "vendors:apply_confirm": lambda tenants: {"user_key": str(tenants.b.owner.public_id)},
+    "vendors:apply_cancel": lambda tenants: {"user_key": str(tenants.b.owner.public_id)},
 }
 
 # Routes with an identifier, called with placeholder parameters, that may answer 404 to a caller

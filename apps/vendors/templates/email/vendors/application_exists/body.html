@@ -1,0 +1,7 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% translate "Someone used this email address to apply to sell with us, but it already has an account. Nothing was changed. If it was you, sign in with your existing account or reset its password instead. If it was not you, ignore this email." %}</p>
+<p><a href="{{ sign_in_url }}">{% translate "Sign in" %}</a></p>
+</body>
+</html>

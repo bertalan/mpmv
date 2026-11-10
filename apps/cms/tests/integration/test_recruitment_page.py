@@ -43,16 +43,13 @@ def test_the_page_shows_the_faq(client: Client, seeded: SeedReport) -> None:
     assert "Independent makers." in html
 
 
-def test_without_the_application_form_the_page_shows_a_notice_not_a_link(
-    client: Client, seeded: SeedReport
-) -> None:
-    assert vendor_application_url() is None  # VEN.22 not merged yet
+def test_the_page_links_to_the_application_form(client: Client, seeded: SeedReport) -> None:
+    assert vendor_application_url() == "/vendor/apply/"  # VEN.22
     VendorRecruitmentPageFactory.create(title="Sell with us", cta_label="Apply now")
 
     html = client.get("/sell-with-us/").content.decode()
-    assert 'class="recruitment-cta"' in html
-    assert "Applications open soon." in html
-    assert ">Apply now</a>" not in html
+    assert '<a class="button" href="/vendor/apply/">Apply now</a>' in html
+    assert "Applications open soon." not in html
 
 
 @pytest.mark.parametrize(

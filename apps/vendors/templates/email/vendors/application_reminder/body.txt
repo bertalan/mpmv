@@ -1,0 +1,9 @@
+{% load i18n %}{% translate "This is the only reminder: an application to sell with us was made with this email address and is still waiting for your confirmation. To go on, open this link, confirm your email address and choose a password." %}
+
+{{ action_url }}
+
+{% blocktranslate with expires=action_link_expires_at %}The link works once and expires on {{ expires }} (UTC). If you do not confirm, the application is deleted after a few days.{% endblocktranslate %}
+
+{% translate "This was not me: open this link to cancel the application and delete the data created with it." %}
+
+{{ cancel_url }}
