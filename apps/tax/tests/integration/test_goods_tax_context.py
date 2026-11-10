@@ -14,6 +14,7 @@ from apps.tax.tests.factories import (
     TerritoryFactory,
     VatValidationFactory,
     VendorTaxProfileFactory,
+    VendorTaxProfileTranslationFactory,
 )
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
@@ -205,3 +206,20 @@ def test_q3_a_vendor_established_in_an_own_rates_territory_is_not_supported() ->
     VendorTaxProfileFactory.create(vendor=vendor, oss=True, valid_from=utc(2027, 1, 1))
     with pytest.raises(engine.UnresolvedTerritory):
         services.build_tax_context(vendor, destination_country="PT", at=AT)
+
+
+def test_d26_the_legal_note_of_an_other_exemption_comes_from_the_profile() -> None:
+    PlatformOperatorFactory.create(open_ended=True, valid_from=utc(2026, 1, 1), country="IT")
+    profile = VendorTaxProfileFactory.create(
+        regime=engine.EXEMPT,
+        exempt_reason=engine.OTHER_EXEMPTION,
+        exempt_country="DE",
+        vendor=VendorFactory.create(country="DE"),
+        valid_from=utc(2027, 1, 1),
+    )
+    ctx = services.build_tax_context(profile.vendor, destination_country="FR", at=AT)
+    with pytest.raises(engine.IncompleteTaxProfile):
+        engine.resolve_goods_tax(ctx, engine.STANDARD)
+    VendorTaxProfileTranslationFactory.create(profile=profile, language="en")
+    ctx = services.build_tax_context(profile.vendor, destination_country="FR", at=AT)
+    assert engine.resolve_goods_tax(ctx, engine.STANDARD).reason == "exempt_other"

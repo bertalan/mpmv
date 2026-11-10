@@ -251,9 +251,23 @@ def test_d01_a_business_delivered_in_the_vendor_country_pays_vendor_country_vat(
     assert (d.rate, d.reason) == (D("22"), "domestic_vendor_country")
 
 
-def test_d01_a_vendor_country_number_delivered_abroad_is_not_reverse_charge() -> None:
+def test_d26_a_vendor_country_number_delivered_abroad_pays_vendor_country_vat() -> None:
+    """D-26 (advisor to confirm): departure is the place of supply (art. 32) and art. 138 needs a
+    number of another member state."""
     d = engine.resolve_goods_tax(ctx(destination="DE", customer=b2b("IT")), engine.STANDARD)
-    assert (d.rate, d.reason) == (D("19"), "standard_destination")
+    assert (d.rate, d.reason, d.country_of_taxation) == (D("22"), "domestic_vendor_country", "IT")
+
+
+def test_d26_a_foreign_number_delivered_in_the_vendor_country_pays_vendor_country_vat() -> None:
+    d = engine.resolve_goods_tax(ctx(destination="IT", customer=b2b("DE")), engine.STANDARD)
+    assert (d.rate, d.reason) == (D("22"), "domestic_vendor_country")
+
+
+def test_d26_the_other_exemption_needs_a_non_empty_legal_note() -> None:
+    for notes in ((), (("en", "  "),)):
+        profile = dataclasses.replace(OTHER, legal_notes=notes)
+        with pytest.raises(engine.IncompleteTaxProfile):
+            engine.resolve_goods_tax(ctx(profile=profile), engine.STANDARD)
 
 
 def test_a_business_number_outside_the_eu_is_not_reverse_charge() -> None:
@@ -398,7 +412,10 @@ def test_m2_an_exempt_vendor_is_still_exempt_in_northern_ireland() -> None:
 
 # M4: `other` exemptions have a reason of their own and carry the law country
 OTHER = engine.VendorTaxProfileSnapshot(
-    regime=engine.EXEMPT, exempt_reason=engine.OTHER_EXEMPTION, exempt_country="DE"
+    regime=engine.EXEMPT,
+    exempt_reason=engine.OTHER_EXEMPTION,
+    exempt_country="DE",
+    legal_notes=(("en", "VAT exempt under the law cited."),),
 )
 
 

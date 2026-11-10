@@ -1105,6 +1105,9 @@ def build_tax_context(
             regime=profile.regime,
             exempt_reason=profile.exempt_reason,
             exempt_country=profile.exempt_country,
+            legal_notes=tuple(
+                (n.language, n.legal_note) for n in profile.translations.all() if n.legal_note
+            ),
         ),
         platform=engine.PlatformOperatorSnapshot(country=operator.country),
         destination_country=destination_country,

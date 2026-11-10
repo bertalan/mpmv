@@ -773,7 +773,8 @@ class MissingTaxRate(BlockingTaxError, LookupError):
 
 class IncompleteTaxProfile(BlockingTaxError, ValueError):
     """The vendor's exempt profile lacks what the decision needs (an unknown reason, or `other`
-    without its law country, which exists after migration, MQ-15): checkout shows a message."""
+    without its law country or its legal note, which exists after migration, MQ-15): checkout
+    shows a message."""
 
 
 class UnresolvedTerritory(BlockingTaxError):
@@ -789,6 +790,9 @@ class VendorTaxProfileSnapshot:
     regime: str
     exempt_reason: str = ""
     exempt_country: str = ""
+    # The profile's translated legal notes as (language, text) pairs (D-26): the wording of an
+    # `other` exemption, which must not be empty.
+    legal_notes: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -917,6 +921,18 @@ def resolve_goods_tax(ctx: TaxContext, category: FiscalCategory) -> TaxDecision:
     # A territory with rates of its own is keyed by its code, in every branch below.
     own_rates = territory is not None and territory.vat_status == OWN_RATES
     rate_code = territory.code if territory is not None and own_rates else destination
+    if (
+        customer != "b2c"
+        and destination != vendor_country
+        and customer.vat_country == vendor_country
+    ):
+        # D-26: place of supply is departure (art. 32) and the intra-community exemption needs a
+        # number of another member state (art. 138): vendor-country VAT, advisor to confirm.
+        return _taxed(
+            ctx.rates.rate(vendor_country, category),
+            REASON_DOMESTIC_VENDOR_COUNTRY,
+            vendor_country,
+        )
     if destination == vendor_country or profile.regime == DOMESTIC_ONLY:
         # Delivered at home, or a domestic_only vendor: the vendor country's rate; an own-rates
         # territory inside the delivery country keeps its own rate.
@@ -943,7 +959,11 @@ def _exempt(profile: VendorTaxProfileSnapshot) -> TaxDecision:
         return _zero(REASON_ART74_PUBLISHING, NOTE_EXEMPT_PREFIX + reason)
     if reason == FLAT_RATE_FORFETTARIO:
         return _zero(REASON_FLAT_RATE_VENDOR, NOTE_EXEMPT_PREFIX + reason)
-    if reason == OTHER_EXEMPTION and profile.exempt_country:
+    if (
+        reason == OTHER_EXEMPTION
+        and profile.exempt_country
+        and any(text.strip() for _, text in profile.legal_notes)
+    ):
         return _zero(REASON_EXEMPT_OTHER, f"{NOTE_EXEMPT_PREFIX}{reason}:{profile.exempt_country}")
     raise IncompleteTaxProfile(
         f"an exempt vendor profile needs a known exemption reason ({reason!r})"
