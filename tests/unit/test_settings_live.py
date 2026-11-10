@@ -21,6 +21,7 @@ HEADER_MIDDLEWARE = [
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "apps.cms.middleware.WagtailAdminPickerNonceMiddleware",
     "apps.core.middleware.PermissionsPolicyMiddleware",
+    "apps.core.middleware.CrossOriginResourcePolicyMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
