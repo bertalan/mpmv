@@ -123,5 +123,7 @@ def test_the_logo_form_has_no_inline_script_or_style(client: Client, owner: User
     _post_logo(client, logo=_upload(), logo_alt="Mark")
     _, _, content = client.get(PROFILE).text.partition('class="manager-page"')
     assert content
-    assert "<script" not in content
+    # The rich text editor's scripts are external files (`src`) and its config is a JSON data
+    # block (not executed): no inline script may run.
+    assert not re.search(r'<script(?![^>]*(?:\bsrc=|type="application/json"))', content)
     assert 'style="' not in content

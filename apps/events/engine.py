@@ -14,6 +14,8 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from apps.vendors.engine import vendor_collection_name as vendor_collection_name  # moved (D-34)
+
 # Event types (spec 15 "Page models"). There is deliberately no closure type: a vendor's
 # holiday or shop closure is a vendor setting (owner decision Q-73, VEN.20).
 PROMOTION = "promotion"
@@ -610,12 +612,6 @@ MAX_DEPTH = 8  # nesting of one block value (a gallery item is 4 deep)
 _FOREIGN_REFERENCE = re.compile(
     r"""<embed\b|\blinktype\s*=\s*["']?(?:document|image)\b""", re.IGNORECASE
 )
-
-
-def vendor_collection_name(vendor_public_id: str) -> str:
-    """The name of a vendor's own Wagtail image collection (a child of the root collection);
-    the vendor-area upload stores there and the services accept only images from it."""
-    return f"vendor-{vendor_public_id}"
 
 
 def has_foreign_reference(html: str) -> bool:

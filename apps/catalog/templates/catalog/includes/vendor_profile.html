@@ -1,12 +1,12 @@
-{% load i18n %}{% comment %}
+{% load i18n wagtailcore_tags %}{% comment %}
 The vendor's public texts on its storefront (VEN.10): tagline, bio and policies in the page
-language (the source language as a fallback, announced by the page notice). Escaped plain text
-with line breaks kept; policies use the accordion component. Needs `vendor_profile` and
+language (the source language as a fallback, announced by the page notice). Tagline: escaped plain text. Bio and policies: rich text (D-34), cleaned
+and media-checked in `storefront_profile`, shown with `richtext`; policies use the accordion component. Needs `vendor_profile` and
 `policy_items`.
 {% endcomment %}<section class="vendor-profile" aria-labelledby="vendor-profile-heading"{% if vendor_profile.is_fallback %} lang="{{ vendor_profile.language }}"{% endif %}>
   <h2 id="vendor-profile-heading" class="visually-hidden">{% translate "About this vendor" %}</h2>
   {% if vendor_profile.tagline %}<p class="vendor-profile__tagline">{{ vendor_profile.tagline }}</p>{% endif %}
-  {% if vendor_profile.description %}<div class="vendor-profile__bio">{{ vendor_profile.description|linebreaks }}</div>{% endif %}
+  {% if vendor_profile.description %}<div class="vendor-profile__bio">{{ vendor_profile.description|richtext }}</div>{% endif %}
   {% if policy_items %}
     <h3>{% translate "Store policies" %}</h3>
     {% include "components/accordion.html" with items=policy_items only %}
