@@ -2,7 +2,9 @@
 {% block title %}Verify it is you · MPMV{% endblock %}
 {% block account_content %}
 <h1>Verify it is you</h1>
-{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+{% comment %}CMP.9 (WCAG 2.2 SC 3.3.8): codes can be pasted and filled by the browser
+(autocomplete="one-time-code"); the error is tied to the field that was used.{% endcomment %}
+{% if error %}<p id="mfa-error" role="alert">{{ error }}</p>{% endif %}
 
 {% if has_passkey %}
 <form data-passkey="authenticate" data-csrf-token="{{ csrf_token }}" data-options-url="{{ auth_options_url }}" data-finish-url="{{ auth_url }}">
@@ -19,7 +21,7 @@
   <input type="hidden" name="method" value="totp">
   <input type="hidden" name="next" value="{{ next }}">
   <p><label for="id_token">Authentication code</label>
-    <input id="id_token" name="token" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="8" required{% if not has_passkey %} autofocus{% endif %}></p>
+    <input id="id_token" name="token" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="8" required{% if not has_passkey %} autofocus{% endif %}{% if error_method == "totp" %} aria-invalid="true" aria-describedby="mfa-error"{% endif %}></p>
   <button type="submit">Verify</button>
 </form>
 {% endif %}
@@ -32,7 +34,7 @@
     <input type="hidden" name="method" value="recovery">
     <input type="hidden" name="next" value="{{ next }}">
     <p><label for="id_code">Recovery code</label>
-      <input id="id_code" name="code" autocomplete="off" spellcheck="false" required></p>
+      <input id="id_code" name="code" autocomplete="one-time-code" autocapitalize="none" spellcheck="false" required{% if error_method == "recovery" %} aria-invalid="true" aria-describedby="mfa-error"{% endif %}></p>
     <button type="submit">Use recovery code</button>
   </form>
 </section>
