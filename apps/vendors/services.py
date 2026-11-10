@@ -45,9 +45,11 @@ from apps.core.audit import AuditContext, record
 from apps.core.changeset import Change, ChangeSet
 from apps.core.models import AuditLog, resolve_translation
 from apps.core.services import (
+    NoPlatformOperator,
     allowed_vendor_countries,
     audit_changes,
     consume_rate_limit,
+    current_operator,
     enqueue_email,
     flags_changed,
     run_mutation,
@@ -68,6 +70,7 @@ from .models import (
     VendorContractTranslation,
     VendorFeatureFlag,
     VendorMember,
+    VendorTranslation,
 )
 from .vies import VatNumberValidator
 
@@ -1811,6 +1814,175 @@ def reject_claim(
         reviewed_version=reviewed_version,
         reviewed_claimant_id=reviewed_claimant_id,
         dry_run=dry_run,
+    )
+
+
+# --- Storefront profile (CORE.9)
+
+PROFILE_CHANGED = "vendor.profile_changed"
+PROFILE_TRANSLATION_STALE = "vendor.profile_translation_stale"
+PROFILE_LABEL = "vendors.vendortranslation"
+PROFILE_FIELDS = VendorTranslation.translated_fields
+PROFILE_EMAIL_TEMPLATE = "vendors.profile_changed"
+PROFILE_LOCKED = (Vendor.Status.SUSPENDED, Vendor.Status.CLOSED)
+PROFILE_RATE_WINDOW = dt.timedelta(hours=1)
+
+
+def _profile_texts(row: VendorTranslation) -> dict[str, str]:
+    return {name: getattr(row, name) for name in PROFILE_FIELDS}
+
+
+def _profile_identity(row: VendorTranslation, **extra: Any) -> dict[str, Any]:
+    # `vendor` names the vendor in the audit trail (and the filter on it).
+    return {"vendor": str(row.vendor.public_id), "language": row.language, **extra}
+
+
+def save_storefront_profile(
+    vendor: Vendor,
+    language: str,
+    values: Mapping[str, str],
+    *,
+    actor: User,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """The vendor owner changes the storefront texts and policies in one language (CORE.9).
+
+    Only an owner of `vendor` may (`profile` in the role matrix, CORE.2); staff, members of other
+    vendors and strangers get `PermissionDenied` before anything is read, and so does a suspended
+    or closed vendor. The texts are plain text with length caps (`engine.PROFILE_MAX_LENGTH`):
+    HTML is refused with a `ValidationError`, never stripped, and every consumer must escape on
+    output. The change is live at once (post-moderation): the row becomes `published` only when a
+    text really changes (saving a machine draft unchanged leaves it a draft). One
+    `vendor.profile_changed` audit entry holds the changed fields before and after (so staff can
+    revert); when the source-language row changes, the other languages sent back to review get a
+    `vendor.profile_translation_stale` entry each. The moderators are told through the email
+    outbox (the operator's support address until CORE.18; none configured only logs a warning).
+    A save that changes nothing writes and sends nothing; a real change counts against the
+    owner's hourly limit (`settings.VENDOR_PROFILE_SAVE_LIMIT`). `values` holds only
+    `PROFILE_FIELDS`; a missing field is left as it is.
+    """
+    if not has_vendor_permission(actor, vendor, "profile"):
+        raise PermissionDenied("Only the vendor owner edits the storefront profile.")
+    if language not in dict(settings.LANGUAGES):
+        raise ValidationError({"language": "Unknown language."})
+    unknown = sorted(set(values) - set(PROFILE_FIELDS))
+    if unknown:
+        raise ValidationError(f"Not storefront profile fields: {', '.join(unknown)}.")
+    problems = engine.profile_text_errors(values)
+    if problems:
+        raise ValidationError(problems)
+    with transaction.atomic():
+        # Read under lock: a suspension or closure that commits first is seen. Applicants and
+        # vendors in onboarding may set up their shop page.
+        status = (
+            Vendor.objects.select_for_update().values_list("status", flat=True).get(pk=vendor.pk)
+        )
+        if status in PROFILE_LOCKED:
+            raise PermissionDenied("A suspended or closed vendor cannot change its profile.")
+        stored = (
+            VendorTranslation.objects.select_for_update()
+            .filter(vendor=vendor, language=language)
+            .first()
+        )
+        row = stored or VendorTranslation(vendor=vendor, language=language)
+        before = _profile_texts(row)
+        for name, value in values.items():
+            setattr(row, name, value)
+        after = _profile_texts(row)
+        changed = [name for name in PROFILE_FIELDS if before[name] != after[name]]
+        changes = ChangeSet()
+        if changed:
+            # The audit keeps the changed fields only: bounded, and enough to revert.
+            key = f"{vendor.public_id}/{language}"
+            old_status = None if stored is None else stored.status
+            row.status = VendorTranslation.Status.PUBLISHED  # the owner's own words, live now
+            row.full_clean()
+            identity = _profile_identity(row)
+            new = {**identity, "status": row.status, **{n: after[n] for n in changed}}
+            if stored is None:
+                changes.create(PROFILE_LABEL, key, new)
+            else:
+                old = {**identity, "status": old_status, **{n: before[n] for n in changed}}
+                changes.update(PROFILE_LABEL, key, old, new)
+        if dry_run or changes.is_empty:
+            return changes
+        # Per owner, and per vendor so that several owners cannot multiply the moderator emails.
+        waits = (
+            consume_rate_limit(
+                f"vendor-profile:user:{actor.pk}",
+                limit=settings.VENDOR_PROFILE_SAVE_LIMIT,
+                window=PROFILE_RATE_WINDOW,
+            ),
+            consume_rate_limit(
+                f"vendor-profile:vendor:{vendor.pk}",
+                limit=settings.VENDOR_PROFILE_VENDOR_SAVE_LIMIT,
+                window=PROFILE_RATE_WINDOW,
+            ),
+        )
+        wait = max(waits)
+        if wait:
+            raise ValidationError(
+                f"Too many changes: try again in {max(1, int(wait.total_seconds() // 60))} minutes."
+            )
+        siblings = dict(
+            VendorTranslation.objects.filter(vendor=vendor)
+            .exclude(language=language)
+            .values_list("language", "status")
+        )
+        try:
+            with transaction.atomic():  # a savepoint: a lost race must not poison the outer one
+                row.save()
+        except IntegrityError as error:  # two first saves of one language at once
+            raise ValidationError("The profile was changed at the same time: try again.") from error
+        audit_changes(changes, ctx=ctx, action=PROFILE_CHANGED)
+        _audit_stale_translations(vendor, language, siblings, ctx=ctx)
+        _notify_profile_changed(vendor, language, changed)
+    return changes
+
+
+def _audit_stale_translations(
+    vendor: Vendor, language: str, siblings: Mapping[str, str], *, ctx: AuditContext
+) -> None:
+    """Saving the source-language texts sends reviewed and published translations back to
+    review with a queryset update (no audit): record each of those status changes."""
+    stale = ChangeSet()
+    now = VendorTranslation.objects.filter(vendor=vendor).exclude(language=language)
+    for other, new_status in now.values_list("language", "status"):
+        old_status = siblings.get(other)
+        if old_status is not None and old_status != new_status:
+            identity = {"vendor": str(vendor.public_id), "language": other}
+            stale.update(
+                PROFILE_LABEL,
+                f"{vendor.public_id}/{other}",
+                {**identity, "status": old_status},
+                {**identity, "status": new_status},
+            )
+    audit_changes(stale, ctx=ctx, action=PROFILE_TRANSLATION_STALE)
+
+
+def _notify_profile_changed(vendor: Vendor, language: str, changed: list[str]) -> None:
+    """Post-moderation notice through the outbox, in the caller's transaction."""
+    try:
+        recipient = current_operator().support_email.strip()
+    except NoPlatformOperator:
+        recipient = ""
+    if not recipient:
+        logger.warning(
+            "vendor %s changed its storefront profile and no platform support email is "
+            "configured: no moderator notice sent",
+            vendor.public_id,
+        )
+        return
+    enqueue_email(
+        recipient=recipient,
+        template_key=PROFILE_EMAIL_TEMPLATE,
+        language=settings.LANGUAGE_CODE,
+        context={
+            "vendor_name": vendor.display_name,
+            "language": language,
+            "fields": ", ".join(changed),
+        },
     )
 
 
