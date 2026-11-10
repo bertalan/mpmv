@@ -1,17 +1,17 @@
 {% extends "layouts/account.html" %}
-{% block title %}Continue · MPMV{% endblock %}
+{% load i18n %}
+{% block title %}{% translate "Continue" %} · MPMV{% endblock %}
 {% block account_content %}
-<h1>Continue to your request</h1>
-<p>This link was sent to you by email. Press Continue to open the page it leads to.</p>
+<h1>{% translate "Continue to your request" %}</h1>
+<p>{% translate "This link was sent to you by email. Press Continue to open the page it leads to." %}</p>
 {% if email_bound %}
-<p>Continue does not sign you in: the page it opens asks you to confirm who you are.</p>
+<p>{% translate "Continue does not sign you in: the page it opens asks you to confirm who you are." %}</p>
 {% else %}
-<p>If you are not signed in, Continue signs you in once with this link; you will still confirm
-it is you with your second factor before approving or declining anything.</p>
+<p>{% translate "If you are not signed in, Continue signs you in once with this link; you will still confirm it is you with your second factor before approving or declining anything." %}</p>
 {% endif %}
 <form method="post" action="{% url 'action_link:continue' %}">
   {% csrf_token %}
   <input type="hidden" name="token" value="{{ token }}">
-  <button type="submit">Continue</button>
+  <button type="submit">{% translate "Continue" %}</button>
 </form>
 {% endblock %}

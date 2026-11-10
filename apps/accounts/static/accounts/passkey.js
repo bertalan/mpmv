@@ -30,7 +30,7 @@
       body: JSON.stringify(body || {}),
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || "The request failed.");
+    if (!response.ok) throw new Error(data.error || form.dataset.textRequestFailed || "The request failed.");
     return data;
   };
 
@@ -111,7 +111,8 @@
   for (const form of document.querySelectorAll("form[data-passkey]")) {
     const error = form.querySelector("[data-passkey-error]");
     if (!window.PublicKeyCredential) {
-      error.textContent = "This browser does not support passkeys.";
+      error.textContent =
+        form.dataset.textUnsupported || "This browser does not support passkeys.";
       error.hidden = false;
       continue;
     }
@@ -124,7 +125,9 @@
       try {
         await ceremonies[form.dataset.passkey](form);
       } catch (err) {
-        error.textContent = err && err.message ? err.message : "The passkey did not work.";
+        error.textContent = err && err.message
+          ? err.message
+          : form.dataset.textFailed || "The passkey did not work.";
         error.hidden = false;
       } finally {
         running = false;

@@ -102,6 +102,14 @@ def _every_page_in_every_language(*, reviewed: bool = True) -> dict[tuple[str, s
     return pages
 
 
+@pytest.fixture(autouse=True)
+def _only_the_cms_checks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests are about the customer legal pages: the other apps' go-live checks (CMP.5)
+    are tested where they live."""
+    monkeypatch.setattr("apps.cms.services.GOLIVE_CHECKS", [])
+    monkeypatch.setattr("apps.cms.engine.DSA_LEGAL_KINDS", ())
+
+
 def _readiness() -> str:
     out = io.StringIO()
     call_command("golive_readiness", stdout=out)
