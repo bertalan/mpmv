@@ -411,6 +411,121 @@ def postcode_in_territory(
     return bool(code) and any(pattern.matches_normalized(code) for pattern in parsed)
 
 
+# The tax reason of a sale to an address in a territory outside the VAT area (spec 05 T15).
+OUTSIDE_VAT_TERRITORY: Final = "outside_vat_territory"
+
+# A territory with an ISO 3166-1 code of its own, written as the country of an address, is named
+# by that code alone: no postcode is needed, and a blank or wrong one cannot send the address to
+# mainland VAT (fail closed). Written as France, Saint-Martin (97150) and Saint-Barthelemy (97133)
+# are found by their postcode.
+TERRITORY_BY_ALIAS_COUNTRY: Final = {
+    "AX": "FI-01",
+    "GP": "FR-971",
+    "MQ": "FR-972",
+    "GF": "FR-973",
+    "RE": "FR-974",
+    "YT": "FR-976",
+    "MF": "FR-MF",
+    "BL": "FR-BL",
+}
+
+# Postcode length (digits) of the countries with territories: a prefix pattern such as `35*`
+# matches a whole postcode only, never a truncated or over-long one.
+POSTCODE_LENGTH: Final = {
+    "DE": 5,
+    "ES": 5,
+    "FI": 5,
+    "FR": 5,
+    "GR": 5,
+    "IT": 5,  # country-literal: postcode shape of the territory data, not the platform country
+}
+
+
+def territory_country(country: str) -> str:
+    """The country a Territory row is filed under for an address written in `country`."""
+    code = normalize_country(country)
+    alias = TERRITORY_BY_ALIAS_COUNTRY.get(code)
+    return alias[:2] if alias else code
+
+
+@dataclass(frozen=True)
+class TerritoryRule:
+    """A territory as the engine reads it: code, country, VAT status, parsed postcode patterns."""
+
+    code: str
+    country: str
+    vat_status: str
+    patterns: tuple[PostcodePattern, ...]
+
+
+def territory_rule(
+    code: str, country: str, vat_status: str, patterns: Iterable[str | PostcodePattern]
+) -> TerritoryRule:
+    """Build a rule; raises TerritoryConfigError for an invalid pattern, ValueError for an
+    unknown status."""
+    if vat_status not in TERRITORY_STATUSES:
+        raise ValueError(f"territory {code}: {vat_status!r} is not a VAT status")
+    return TerritoryRule(
+        code=code,
+        country=normalize_country(country),
+        vat_status=vat_status,
+        patterns=parse_territory_patterns(patterns, code=code),
+    )
+
+
+_EXACT_SPECIFICITY: Final = 1000  # above any prefix or range length
+
+
+def _specificity(pattern: PostcodePattern) -> int:
+    """How narrow a pattern is: an exact postcode beats any prefix or range, and a longer
+    prefix (or range bound) beats a shorter one."""
+    return _EXACT_SPECIFICITY if pattern.kind == "exact" else len(pattern.low)
+
+
+def find_territory(
+    country: str, postcode: str, rules: Iterable[TerritoryRule]
+) -> TerritoryRule | None:
+    """The territory that contains the address, or None (mainland, no postcode).
+
+    The country must be the territory's own: Padova (IT 35100) is not in the Canary Islands
+    (ES `35*`). A country with an ISO code of its own (`AX`, `GP`...) names its territory by
+    itself, whatever the postcode (`TERRITORY_BY_ALIAS_COUNTRY`).
+
+    Territories may overlap (Saint-Martin 97150 lies inside Guadeloupe's `971*`): the most
+    specific matching pattern wins, whatever the order of the rules (`_specificity`). Equally
+    specific rules keep the order given.
+    """
+    rules = list(rules)
+    code = normalize_country(country)
+    alias = TERRITORY_BY_ALIAS_COUNTRY.get(code)
+    if alias is not None:
+        return next((rule for rule in rules if rule.code == alias), None)
+    expected = POSTCODE_LENGTH.get(code)
+    normalized = normalize_postcode(postcode)
+    if not normalized or (expected is not None and len(normalized) != expected):
+        return None
+    best: TerritoryRule | None = None
+    best_score = -1
+    for rule in rules:
+        if rule.country != code:
+            continue
+        score = max(
+            (_specificity(p) for p in rule.patterns if p.matches_normalized(normalized)),
+            default=-1,
+        )
+        if score > best_score:
+            best, best_score = rule, score
+    return best
+
+
+def is_outside_vat_territory(country: str, postcode: str, rules: Iterable[TerritoryRule]) -> bool:
+    """True when the address lies in a territory outside the VAT area: the sale is 0% with the
+    reason `outside_vat_territory` (T15). `own_rates` and `special` (XI, D-02) territories are not
+    outside: their rule is for the tax decision."""
+    rule = find_territory(country, postcode, rules)
+    return rule is not None and rule.vat_status == OUTSIDE_VAT_AREA
+
+
 # --- VIES answers (VatValidation), the results of VEN.12's VatNumberValidator
 
 VAT_VALID: Final = vendors.VIES_VALID

@@ -25,6 +25,7 @@ from apps.vendors.models import (
     ContractAcceptance,
     CrossVendorConsent,
     LegalFieldRequirement,
+    SelfCertification,
     Vendor,
     VendorApplication,
     VendorClaim,
@@ -81,6 +82,7 @@ class VendorFactory(DjangoModelFactory[Vendor]):
 
     class Params:
         italian_company = factory.Trait(
+            phone="+39 06 55501234",
             country="IT",
             legal_form=Vendor.LegalForm.SRL,
             vat_number=factory.Sequence(italian_vat),
@@ -109,6 +111,7 @@ class VendorFactory(DjangoModelFactory[Vendor]):
             bank_name="Example Bank",
         )
         italian_sole_proprietor = factory.Trait(
+            phone="+39 06 55501234",
             country="IT",
             legal_form=Vendor.LegalForm.SOLE_PROPRIETORSHIP,
             first_name=factory.Faker("first_name"),
@@ -131,6 +134,7 @@ class VendorFactory(DjangoModelFactory[Vendor]):
             iban=factory.Sequence(lambda n: iban("IT", f"X0300003200{n:012d}")),
         )
         eu_company = factory.Trait(
+            phone="+39 06 55501234",
             country="DE",
             legal_form=Vendor.LegalForm.OTHER,
             legal_name=factory.LazyAttribute(lambda o: f"{o.display_name} GmbH"),
@@ -152,6 +156,7 @@ class VendorFactory(DjangoModelFactory[Vendor]):
             bank_name="Example Bank",
         )
         non_eu_company = factory.Trait(
+            phone="+39 06 55501234",
             country="CH",
             legal_form=Vendor.LegalForm.OTHER,
             legal_name=factory.LazyAttribute(lambda o: f"{o.display_name} AG"),
@@ -327,6 +332,30 @@ class ContractAcceptanceFactory(DjangoModelFactory[ContractAcceptance]):
     def owner(obj: ContractAcceptance, create: bool, extracted: Any, **kwargs: Any) -> None:
         if create and not VendorMember.objects.filter(vendor=obj.vendor, user=obj.user).exists():
             VendorMemberFactory.create(vendor=obj.vendor, user=obj.user)
+
+    @factory.post_generation
+    def certified(obj: ContractAcceptance, create: bool, extracted: Any, **kwargs: Any) -> None:
+        """Also record the CMP.25 self-certification (the other activation step) unless
+        `certified=False`: tests of the activation gate itself certify through the service."""
+        if create and extracted is not False:
+            SelfCertificationFactory.create(
+                vendor=obj.vendor, user=obj.user, onboarding_round=obj.onboarding_round
+            )
+
+
+class SelfCertificationFactory(DjangoModelFactory[SelfCertification]):
+    """The owner certified the English article 30(1)(e) text in force."""
+
+    class Meta:
+        model = SelfCertification
+
+    vendor = factory.SubFactory(VendorFactory, status=Vendor.Status.ONBOARDING)
+    user = factory.SubFactory(UserFactory)
+    version = engine.SELF_CERTIFICATION_VERSION
+    language = "en"
+    text_hash = factory.LazyAttribute(lambda o: engine.self_certification_hash(o.language))
+    accepted_at = factory.LazyFunction(timezone.now)
+    onboarding_round = factory.SelfAttribute("vendor.onboarding_round")
 
 
 class VendorFeatureFlagFactory(DjangoModelFactory[VendorFeatureFlag]):

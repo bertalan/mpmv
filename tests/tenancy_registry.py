@@ -90,6 +90,7 @@ from apps.tax.tests.factories import (
 from apps.vendors.models import (
     ContractAcceptance,
     CrossVendorConsent,
+    SelfCertification,
     Vendor,
     VendorClaim,
     VendorFeatureFlag,
@@ -99,6 +100,7 @@ from apps.vendors.models import (
 from apps.vendors.tests.factories import (
     ContractAcceptanceFactory,
     CrossVendorConsentFactory,
+    SelfCertificationFactory,
     VendorClaimFactory,
     VendorFeatureFlagFactory,
     VendorMemberFactory,
@@ -135,7 +137,10 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         vendor=vendor, role=VendorMember.Role.STAFF
     ),
     VendorTranslation: lambda vendor: VendorTranslationFactory.create(vendor=vendor, language="it"),
-    ContractAcceptance: lambda vendor: ContractAcceptanceFactory.create(vendor=vendor),
+    ContractAcceptance: lambda vendor: ContractAcceptanceFactory.create(
+        vendor=vendor, certified=False
+    ),
+    SelfCertification: lambda vendor: SelfCertificationFactory.create(vendor=vendor),
     VendorFeatureFlag: lambda vendor: VendorFeatureFlagFactory.create(vendor=vendor),
     CrossVendorConsent: lambda vendor: CrossVendorConsentFactory.create(vendor=vendor),
     VendorClaim: lambda vendor: VendorClaimFactory.create(vendor=vendor),

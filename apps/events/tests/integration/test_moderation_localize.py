@@ -23,6 +23,7 @@ from wagtail_localize.models import Translation, TranslationSource
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
+from apps.cms import roles
 from apps.cms.services import translate_page
 from apps.events.models import EventPage, PolicyMode, VendorEventPolicy
 from apps.events.services import hide_event, restore_event, save_event_draft, submit_event
@@ -85,10 +86,10 @@ def _hidden_translated() -> tuple[EventPage, EventPage]:
 
 
 def _editor() -> User:
-    """A plain member of Wagtail's "Editors" group: wagtail_localize.submit_translation, no
+    """A plain member of the "Page editors" role: wagtail_localize.submit_translation, no
     staff status, no publish permission."""
     user: User = UserFactory.create(password=secrets.token_urlsafe(16))
-    user.groups.add(Group.objects.get(name="Editors"))
+    user.groups.add(Group.objects.get(name=roles.PAGE_EDITORS))
     assert user.has_perm("wagtail_localize.submit_translation")
     return user
 

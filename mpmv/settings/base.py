@@ -99,11 +99,12 @@ INSTALLED_APPS = [
 PROCRASTINATE_ON_APP_READY = "apps.core.tasks.on_app_ready"
 
 MIDDLEWARE = [
+    # Outermost, so it wraps SecurityMiddleware's own HTTPS 301 too (SEC.5 triage, SEC.12).
+    "apps.core.middleware.CrossOriginResourcePolicyMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "apps.cms.middleware.WagtailAdminPickerNonceMiddleware",  # Wagtail's inline pickers (CMS.1)
     "apps.core.middleware.PermissionsPolicyMiddleware",
-    "apps.core.middleware.CrossOriginResourcePolicyMiddleware",  # SEC.5 triage
     # With the other header middleware, so responses returned early by an inner middleware
     # (CommonMiddleware's APPEND_SLASH redirect, LIVE's static files) carry it too (SEC.5).
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
