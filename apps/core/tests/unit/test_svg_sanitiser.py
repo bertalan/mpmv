@@ -7,7 +7,9 @@ to anything but a same-document fragment, and returns a clean re-serialisation (
 processing instructions dropped) that is what gets stored.
 """
 
+import contextlib
 import time
+from collections.abc import Callable
 
 import pytest
 from defusedxml.ElementTree import fromstring
@@ -168,15 +170,38 @@ def test_the_output_uses_the_default_svg_namespace() -> None:
 # --- Resource limits (lane-a security review of THM.12)
 
 
-def test_many_comments_are_stripped_in_one_pass() -> None:
-    document = f"<svg {SVG}>" + "<!---->" * 74000 + "</svg>"
-    assert len(document) < MAX_SVG_BYTES
+def _best_of(run: Callable[[], object], repeats: int = 5) -> float:
+    best = float("inf")
+    for _ in range(repeats):
+        started = time.perf_counter()
+        run()
+        best = min(best, time.perf_counter() - started)
+    return best
 
-    started = time.perf_counter()
-    cleaned = sanitise_svg(document.encode())
 
-    assert time.perf_counter() - started < 2
-    assert "<!--" not in cleaned.decode()
+def assert_scales_linearly(make_document: Callable[[int], str], n: int) -> None:
+    """Time the strip on sizes n and 4n (best of 5 each, so load spikes drop out) and assert the
+    ratio is at most 8: linear work gives about 4, quadratic about 16. Unlike counting calls, this
+    also catches quadratic work done inside the C regex or XML engines. Choose n so that the n run
+    takes about 20 ms or more, which keeps timer noise small."""
+    small, large = make_document(n).encode(), make_document(4 * n).encode()
+    assert len(large) < MAX_SVG_BYTES
+
+    def strip(document: bytes) -> Callable[[], object]:
+        def run() -> None:
+            with contextlib.suppress(UnsafeSvgError):  # a refusal is also a full pass
+                sanitise_svg(document)
+
+        return run
+
+    t_small, t_large = _best_of(strip(small)), _best_of(strip(large))
+    assert t_large <= 8 * t_small, f"4n took {t_large / t_small:.1f}x the time of n (limit 8x)"
+
+
+def test_many_comments_are_stripped_in_linear_time() -> None:
+    assert_scales_linearly(lambda n: f"<svg {SVG}>" + "<!---->x<g/>" * n + "</svg>", 8000)
+    cleaned = sanitise_svg((f"<svg {SVG}>" + "<!---->x<g/>" * 10 + "</svg>").encode()).decode()
+    assert "<!--" not in cleaned
 
 
 def test_text_around_stripped_comments_is_kept_in_order() -> None:
@@ -210,40 +235,22 @@ def test_an_unknown_encoding_is_refused() -> None:
 # --- Regex backtracking (lane-b second security review of THM.12)
 
 
-def _timed_refusal(document: str) -> float:
-    assert len(document) < MAX_SVG_BYTES
-    started = time.perf_counter()
-    with pytest.raises(UnsafeSvgError):
-        sanitise_svg(document.encode())
-    return time.perf_counter() - started
+def test_many_unclosed_urls_in_a_style_element_are_refused_in_linear_time() -> None:
+    assert_scales_linearly(lambda n: f"<svg {SVG}><style>" + "url(" * n + "</style></svg>", 30000)
 
 
-def test_many_unclosed_urls_in_a_style_element_are_refused_quickly() -> None:
-    document = f"<svg {SVG}><style>" + "url(" * 100000 + "</style></svg>"
-
-    assert _timed_refusal(document) < 2
+def test_many_unclosed_urls_in_an_attribute_are_refused_in_linear_time() -> None:
+    assert_scales_linearly(lambda n: f'<svg {SVG}><rect fill="' + "url(" * n + '"/></svg>', 30000)
 
 
-def test_many_unclosed_urls_in_an_attribute_are_refused_quickly() -> None:
-    document = f'<svg {SVG}><rect fill="' + "url(" * 100000 + '"/></svg>'
-
-    assert _timed_refusal(document) < 2
+def test_many_unclosed_quoted_urls_are_refused_in_linear_time() -> None:
+    assert_scales_linearly(lambda n: f"<svg {SVG}><style>" + "url('" * n + "</style></svg>", 24000)
 
 
-def test_many_unclosed_quoted_urls_are_refused_quickly() -> None:
-    document = f"<svg {SVG}><style>" + "url('" * 80000 + "</style></svg>"
-
-    assert _timed_refusal(document) < 2
-
-
-def test_many_quotes_in_css_are_checked_quickly() -> None:
-    document = f"<svg {SVG}><style>a{{b:" + "\"'" * 100000 + "'}</style></svg>"
-    assert len(document) < MAX_SVG_BYTES
-
-    started = time.perf_counter()
-    sanitise_svg(document.encode())  # quoted strings with no URL in them
-
-    assert time.perf_counter() - started < 2
+def test_many_quotes_in_css_are_checked_in_linear_time() -> None:
+    assert_scales_linearly(
+        lambda n: f"<svg {SVG}><style>a{{b:" + "\"'" * n + "'}</style></svg>", 60000
+    )
 
 
 def test_too_many_url_references_in_one_value_are_refused() -> None:
