@@ -103,3 +103,52 @@ def test_the_page_has_no_inline_script_or_style(client: Client, owner: User) -> 
     assert content
     assert "<script" not in content
     assert 'style="' not in content
+
+
+def test_a_suspended_vendor_sees_the_reason_and_no_form(
+    client: Client, owner: User, vendor: Vendor
+) -> None:
+    Vendor.objects.filter(pk=vendor.pk).update(status=Vendor.Status.SUSPENDED)
+    verified_login(client, owner)
+    page = client.get(PROFILE)
+    assert page.status_code == 200
+    assert "suspended" in page.text.lower()
+    assert 'name="tagline"' not in page.text
+    refused = client.post(PROFILE, {"language": "en", "tagline": "Sneaky"})
+    assert refused.status_code == 403
+    assert "suspended" in refused.text.lower()
+    assert 'name="tagline"' not in refused.text
+    assert not VendorTranslation.objects.filter(vendor=vendor).exists()
+
+
+def test_a_machine_draft_is_marked_on_the_form(client: Client, owner: User, vendor: Vendor) -> None:
+    VendorTranslationFactory.create(vendor=vendor, language="it", tagline="Bozza", status="machine")
+    verified_login(client, owner)
+    assert "not public" in client.get(f"{PROFILE}?language=it").text.lower()
+
+
+def test_html_in_a_field_shows_an_error_and_is_not_stored(client: Client, owner: User) -> None:
+    verified_login(client, owner)
+    response = client.post(PROFILE, {"language": "en", "description": "<script>x</script>"})
+    assert response.status_code == 200
+    assert 'href="#id_description"' in response.text
+    assert not VendorTranslation.objects.exists()
+
+
+def test_stored_text_is_escaped_on_output(client: Client, owner: User, vendor: Vendor) -> None:
+    VendorTranslationFactory.create(
+        vendor=vendor, language="en", tagline="Fish & <chips>", status="published"
+    )
+    verified_login(client, owner)
+    page = client.get(PROFILE).text
+    assert "Fish &amp; &lt;chips&gt;" in page
+    assert "<chips>" not in page
+
+
+def test_too_many_saves_show_a_form_error(client: Client, owner: User, settings: object) -> None:
+    settings.VENDOR_PROFILE_SAVE_LIMIT = 1  # type: ignore[attr-defined]
+    verified_login(client, owner)
+    assert client.post(PROFILE, {"language": "en", "tagline": "one"}).status_code == 302
+    response = client.post(PROFILE, {"language": "en", "tagline": "two"})
+    assert response.status_code == 200
+    assert 'class="error-summary"' in response.text

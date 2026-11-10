@@ -158,3 +158,155 @@ def test_another_vendors_translation_is_untouched(vendor: Vendor, owner: User) -
     save_storefront_profile(vendor, "en", {"tagline": "Mine"}, actor=owner, ctx=CTX)
     other.refresh_from_db()
     assert other.tagline == "Theirs"
+
+
+# --- Review fixes (#204): caps, rate limit, plain text, drafts, cascade, races
+
+
+@pytest.mark.parametrize(
+    ("field", "limit"),
+    [
+        ("description", 10_000),
+        ("shipping_policy", 5_000),
+        ("refund_policy", 5_000),
+        ("cancellation_policy", 5_000),
+    ],
+)
+def test_long_texts_are_capped_at_the_service(
+    vendor: Vendor, owner: User, field: str, limit: int
+) -> None:
+    save_storefront_profile(vendor, "en", {field: "x" * limit}, actor=owner, ctx=CTX)
+    with pytest.raises(ValidationError):
+        save_storefront_profile(vendor, "en", {field: "x" * (limit + 1)}, actor=owner, ctx=CTX)
+
+
+def test_the_audit_entry_holds_only_the_changed_fields(vendor: Vendor, owner: User) -> None:
+    VendorTranslationFactory.create(
+        vendor=vendor, language="en", description="d" * 9000, refund_policy="Old"
+    )
+    save_storefront_profile(vendor, "en", {"refund_policy": "New"}, actor=owner, ctx=CTX)
+    entry = AuditLog.objects.get(action=ACTION)
+    assert entry.before is not None
+    assert entry.after is not None
+    assert "description" not in entry.before
+    assert "description" not in entry.after
+    assert (entry.before["refund_policy"], entry.after["refund_policy"]) == ("Old", "New")
+    assert entry.vendor_key == str(vendor.public_id)
+
+
+def test_saves_are_rate_limited_per_owner(vendor: Vendor, owner: User, settings: object) -> None:
+    settings.VENDOR_PROFILE_SAVE_LIMIT = 3  # type: ignore[attr-defined]
+    _operator(support_email="help@platform.example")
+    for n in range(3):
+        save_storefront_profile(vendor, "en", {"tagline": f"v{n}"}, actor=owner, ctx=CTX)
+    with pytest.raises(ValidationError):
+        save_storefront_profile(vendor, "en", {"tagline": "v4"}, actor=owner, ctx=CTX)
+    assert OutboxEmail.objects.count() == 3
+    assert VendorTranslation.objects.get(vendor=vendor, language="en").tagline == "v2"
+
+
+def test_unchanged_saves_and_dry_runs_do_not_use_the_rate_limit(
+    vendor: Vendor, owner: User, settings: object
+) -> None:
+    settings.VENDOR_PROFILE_SAVE_LIMIT = 1  # type: ignore[attr-defined]
+    for _ in range(3):
+        save_storefront_profile(vendor, "en", {"tagline": "a"}, actor=owner, ctx=CTX, dry_run=True)
+    save_storefront_profile(vendor, "en", {"tagline": "a"}, actor=owner, ctx=CTX)
+    save_storefront_profile(vendor, "en", {"tagline": "a"}, actor=owner, ctx=CTX)  # no change
+
+
+@pytest.mark.parametrize("text", ["<script>alert(1)</script>", "Hello <b>world</b>", "<!-- x -->"])
+def test_html_is_refused_and_nothing_is_stored(vendor: Vendor, owner: User, text: str) -> None:
+    for field in ("tagline", "description", "refund_policy"):
+        with pytest.raises(ValidationError):
+            save_storefront_profile(vendor, "en", {field: text}, actor=owner, ctx=CTX)
+    assert not VendorTranslation.objects.filter(vendor=vendor).exists()
+    assert not AuditLog.objects.filter(action=ACTION).exists()
+
+
+def test_plain_text_with_angle_brackets_is_kept_as_typed(vendor: Vendor, owner: User) -> None:
+    text = "Orders under 5 kg < 20 EUR & over 2 > 1 ship free"
+    save_storefront_profile(vendor, "en", {"refund_policy": text}, actor=owner, ctx=CTX)
+    assert VendorTranslation.objects.get(vendor=vendor, language="en").refund_policy == text
+
+
+def test_saving_a_machine_draft_without_edits_does_not_publish_it(
+    vendor: Vendor, owner: User
+) -> None:
+    _operator(support_email="help@platform.example")
+    VendorTranslationFactory.create(vendor=vendor, language="it", tagline="Bozza", status="machine")
+    changes = save_storefront_profile(vendor, "it", {"tagline": "Bozza"}, actor=owner, ctx=CTX)
+    assert changes.is_empty
+    assert VendorTranslation.objects.get(vendor=vendor, language="it").status == "machine"
+    assert not OutboxEmail.objects.exists()
+
+
+def test_an_edit_publishes_the_draft_and_notifies(vendor: Vendor, owner: User) -> None:
+    _operator(support_email="help@platform.example")
+    VendorTranslationFactory.create(vendor=vendor, language="it", tagline="Bozza", status="machine")
+    save_storefront_profile(vendor, "it", {"tagline": "Nuovo"}, actor=owner, ctx=CTX)
+    assert VendorTranslation.objects.get(vendor=vendor, language="it").status == "published"
+    assert OutboxEmail.objects.count() == 1
+
+
+def test_a_source_language_edit_that_stales_other_languages_is_audited(
+    vendor: Vendor, owner: User
+) -> None:
+    it = VendorTranslationFactory.create(
+        vendor=vendor, language="it", tagline="Ciao", status="published", source_hash="old"
+    )
+    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Hi", status="published")
+    save_storefront_profile(vendor, "en", {"tagline": "Hello"}, actor=owner, ctx=CTX)
+    it.refresh_from_db()
+    assert it.status == "machine"
+    entry = AuditLog.objects.get(action="vendor.profile_translation_stale")
+    assert entry.before is not None
+    assert entry.after is not None
+    assert (entry.before["status"], entry.after["status"]) == ("published", "machine")
+    assert entry.target_key == f"{vendor.public_id}/it"
+    assert entry.vendor_key == str(vendor.public_id)
+
+
+def test_no_stale_entry_when_other_languages_are_untouched(vendor: Vendor, owner: User) -> None:
+    VendorTranslationFactory.create(vendor=vendor, language="it", status="machine")
+    save_storefront_profile(vendor, "en", {"tagline": "Hello"}, actor=owner, ctx=CTX)
+    assert not AuditLog.objects.filter(action="vendor.profile_translation_stale").exists()
+
+
+def test_platform_staff_without_a_membership_cannot_edit(vendor: Vendor) -> None:
+    staff = UserFactory.create(superuser=True)
+    platform = UserFactory.create(permissions=["core.platform_owner"])
+    for actor in (staff, platform):
+        with pytest.raises(PermissionDenied):
+            save_storefront_profile(vendor, "en", {"tagline": "x"}, actor=actor, ctx=CTX)
+
+
+def test_an_inactive_owner_cannot_edit(vendor: Vendor, owner: User) -> None:
+    owner.is_active = False
+    owner.save()
+    with pytest.raises(PermissionDenied):
+        save_storefront_profile(vendor, "en", {"tagline": "x"}, actor=owner, ctx=CTX)
+
+
+def test_staff_are_refused_on_a_dry_run_too(vendor: Vendor) -> None:
+    staff = VendorMemberFactory.create(vendor=vendor, role="staff").user
+    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Secret draft")
+    with pytest.raises(PermissionDenied):
+        save_storefront_profile(vendor, "en", {"tagline": "x"}, actor=staff, ctx=CTX, dry_run=True)
+
+
+def test_a_concurrent_first_save_gives_a_clean_error_not_a_500(
+    vendor: Vendor, owner: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = VendorTranslation.save
+
+    def racing_save(self: VendorTranslation, *args: object, **kwargs: object) -> None:
+        if self._state.adding:  # another request inserted the row first
+            VendorTranslation.objects.bulk_create(
+                [VendorTranslation(vendor=self.vendor, language=self.language)]
+            )
+        original(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(VendorTranslation, "save", racing_save)
+    with pytest.raises(ValidationError):
+        save_storefront_profile(vendor, "it", {"tagline": "x"}, actor=owner, ctx=CTX)
