@@ -1,5 +1,7 @@
 {% extends "layouts/base.html" %}
 {% load i18n cms_tags %}
+{# This page shows its messages in place; the base layout must not repeat them. #}
+{% block messages %}{% endblock %}
 {% comment %}
 The Manager shell (CORE.17, spec 02 §Backoffice): one layout for both spaces, on the active
 theme's components (THM.3, THM.4). The header holds the site name (the space's dashboard), the
