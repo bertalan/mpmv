@@ -52,6 +52,13 @@ from apps.catalog.tests.factories import (
 )
 from apps.cms.models import VendorLandingPage
 from apps.cms.tests.factories import VendorLandingPageFactory
+from apps.compliance.models import GpsrInfo, GpsrSafetyText, SafetyCase, VendorGpsrDefaults
+from apps.compliance.tests.factories import (
+    GpsrInfoFactory,
+    GpsrSafetyTextFactory,
+    SafetyCaseFactory,
+    VendorGpsrDefaultsFactory,
+)
 from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage, VendorEventPolicy
@@ -105,6 +112,7 @@ from tests.tenancy import (
     ObjectMaker,
     StaffOnly,
     VendorScoped,
+    VendorScopedList,
     member_session,
 )
 
@@ -155,6 +163,14 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
             product=ProductFactory.create(vendor=vendor, kind=Product.Kind.VARIABLE)
         )
     ),
+    GpsrInfo: lambda vendor: GpsrInfoFactory.create(product=ProductFactory.create(vendor=vendor)),
+    VendorGpsrDefaults: lambda vendor: VendorGpsrDefaultsFactory.create(vendor=vendor),
+    GpsrSafetyText: lambda vendor: GpsrSafetyTextFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
+    SafetyCase: lambda vendor: SafetyCaseFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
     ShippingZone: lambda vendor: ShippingZoneFactory.create(vendor=vendor),  # a vendor zone
     ShippingMethod: lambda vendor: ShippingMethodFactory.create(vendor=vendor),
     ShippingMethodTranslation: lambda vendor: ShippingMethodTranslationFactory.create(
@@ -191,8 +207,13 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
 }
 
 # Models with a ForeignKey chain to Vendor that are deliberately not vendor-scoped, by label,
-# with the reason. Empty: every vendor-owned model is scoped.
-NOT_VENDOR_OWNED: dict[str, str] = {}
+# with the reason.
+NOT_VENDOR_OWNED: dict[str, str] = {
+    "catalog.Redirect": (
+        "Platform SEO rule managed by staff only (CAT.6): its optional target product is where a "
+        "legacy URL lands, not an owner; no vendor endpoint lists or edits redirects."
+    ),
+}
 
 
 # --- Web endpoints (URL name, or route when unnamed)
@@ -213,6 +234,15 @@ def member_with_landing_taxonomy(client: Client, tenants: CrossTenant) -> dict[s
         taxonomy=taxonomy, slug=SAMPLE_TAXONOMY, status=TranslationStatus.PUBLISHED
     )
     return member_session(client, tenants)
+
+
+def manager_vendor(vendor: Vendor) -> Vendor:
+    """The Manager's shop pages show the selected vendor itself (CORE.17)."""
+    return vendor
+
+
+def vendor_display_name(vendor: models.Model) -> str:
+    return str(vendor.display_name)  # type: ignore[attr-defined]
 
 
 ENDPOINTS: dict[str, Access] = {
@@ -261,6 +291,15 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "geocoding_find": NoVendorData(
         "Find coordinates (EVT.12): geocodes the typed address; reads no vendor data."
+    ),
+    # The Manager (CORE.17): one login, a shop space for vendor members (the selected vendor
+    # only, chosen among the member's own vendors) and a platform space for platform staff.
+    "login": NoVendorData("Manager sign-in page."),
+    "logout": NoVendorData("Sign-out of the Manager."),
+    "manager:shop:dashboard": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    "manager:platform:dashboard": StaffOnly(
+        "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
     ),
     "admin:login": NoVendorData("Staff sign-in page."),
     "admin:logout": NoVendorData("Staff sign-out."),

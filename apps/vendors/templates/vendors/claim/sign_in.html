@@ -1,6 +1,8 @@
 {% extends "layouts/account.html" %}
-{% load captcha %}
+{% load static captcha %}
 {% block title %}Claim your vendor · MPMV{% endblock %}
+{% block head %}{% captcha_script %}<link rel="stylesheet" href="{% static 'accounts/password-toggle.css' %}">
+<script type="module" src="{% static 'accounts/password-toggle.js' %}"></script>{% endblock %}
 {% block account_content %}
 <h1>Claim {{ vendor.legal_name }}</h1>
 <p>Thank you, the business is confirmed. An account already uses <strong>{{ email }}</strong>:
@@ -10,7 +12,7 @@ sign in with it to submit the claim. Enter its password and a code from its auth
   <input type="hidden" name="step" value="sign_in">
   {% if error %}<p role="alert">{{ error }}</p>{% endif %}
   <p><label for="id_password">Password</label>
-    <input id="id_password" name="password" type="password" autocomplete="current-password" required></p>
+    <input id="id_password" name="password" type="password" autocomplete="current-password" data-password-toggle="Show password" required></p>
   <p><label for="id_code">Authentication code</label>
     <input id="id_code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="8" required></p>
   {% captcha_widget %}

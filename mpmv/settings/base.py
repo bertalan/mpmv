@@ -6,7 +6,16 @@ import dj_database_url
 import django_stubs_ext
 from django.utils.csp import CSP
 
-from .env import env_bool, env_flags, env_list, env_secret_list, env_str, map_tile_origin
+from .env import (
+    env_bool,
+    env_flags,
+    env_float,
+    env_int,
+    env_list,
+    env_secret_list,
+    env_str,
+    map_tile_origin,
+)
 
 # Allows `models.DecimalField[Any]`-style generics at runtime (django-stubs).
 django_stubs_ext.monkeypatch()
@@ -37,6 +46,7 @@ LOCAL_APPS = [
     "apps.compliance",
     "apps.api",
     "apps.mcp",
+    "apps.manager",  # the Manager backoffice (CORE.17): an adapter like api, no models
     "apps.seed",  # demo data seed (ARC.10): above every app, imported by none
 ]
 
@@ -100,6 +110,8 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
+    # CAT.6: legacy redirect rules on a 404 (after CAT.5) and GET ?add-to-cart= to the product.
+    "apps.catalog.middleware.LegacyRedirectMiddleware",
     # CAT.5: a 404 on a product's old slug becomes a 301 to its current slug.
     "apps.catalog.middleware.OldProductSlugRedirectMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -109,10 +121,16 @@ MIDDLEWARE = [
     # CORE.4: which device verified the session, then confine required roles to the MFA pages.
     "django_otp.middleware.OTPMiddleware",
     "apps.accounts.middleware.MfaRequiredMiddleware",
+    # CORE.17: one gate per Manager space (404, login or MFA) for every URL under /manager/.
+    "apps.manager.middleware.ManagerGateMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     # EVT.3: wagtail-localize's views keep the event moderation rules (hidden, review).
     "apps.events.middleware.LocalizeEventGuardMiddleware",
 ]
+
+# CAT.5/CAT.6: how long a browser or proxy keeps a 301 (or a 410) of a redirect rule, so a rule
+# staff change, delete or let expire stops applying within a day; capped at the rule's expiry.
+REDIRECT_PERMANENT_MAX_AGE = 24 * 60 * 60
 
 # Custom user from the first migration (CORE.1): email login, preferred language.
 AUTH_USER_MODEL = "accounts.User"
@@ -135,6 +153,8 @@ MFA_REQUIRED_POLICIES: list[str] = [
 MFA_STEP_UP_MAX_AGE = 300  # seconds a verification counts as fresh for sensitive actions
 # Step-up for sensitive views of apps that cannot import accounts (the core audit log view, SEC.4).
 STEP_UP_DECORATOR = "apps.accounts.decorators.step_up_required"
+# The Manager login (CORE.17): where the Manager gate sends anonymous visitors.
+LOGIN_URL = "login"
 MFA_LOGIN_URL = "admin:login"  # until the site and vendor login pages exist
 # Secure action links in emails (CORE.15, spec 02): validity of a link unless its purpose sets
 # its own, and Continue POSTs allowed per client IP every 15 minutes.
@@ -269,11 +289,50 @@ WAGTAILADMIN_BASE_URL = SITE_BASE_URL
 # One image model for CMS pages, products (CAT.4), vendor logos and banners (spec 10 §10.2). Set
 # before any image exists: the licence and credit fields come with CMS.8.
 WAGTAILIMAGES_IMAGE_MODEL = "core.MediaImage"
-# Modern image formats (THM.12, spec 14 §14.7). Uploads stay open to the common raster formats
-# and keep their original; SVG is for logos and icons only, checked at upload (apps.core.svg).
+# Upload limits (SEC.2, apps.core.uploads; values decided on PR #164). Wagtail's form checks the
+# size and the pixels; MediaImage checks all of them on every path and re-encodes the stored
+# original. A still image decodes at most 60 megapixels (45-60 MP camera originals); above it,
+# it is refused. An animation (GIF, WebP, APNG: logos and banners, not photos) decodes at most 16
+# megapixels, all its frames together. Both are checked on the headers, before any frame is
+# decoded. An original over 40 megapixels is downscaled (same aspect ratio) when re-encoded, so
+# stored originals and their renditions stay within 40. 300 frames bound the CPU an animation of
+# tiny frames costs (each frame is decoded and re-encoded).
+# Memory: Pillow holds 4 bytes a pixel. Measured on PR #164: a 100-megapixel still image peaked
+# at about 600 MB of RSS while re-encoded (the decoded original, 400 MB, plus the stored
+# 40-megapixel copy, 160 MB), an animated WebP of 100 megapixels at about 1 GB (libwebp keeps
+# two full canvases). At these caps that is about 450 MB for a 60-megapixel still image (240 MB
+# decoded plus the 160 MB stored copy) and about 160 MB for a 16-megapixel animation: about
+# 450 MB per worker process for uploads, WEB_CONCURRENCY times that per host. Production runs
+# gunicorn sync workers (one request per process), so the per-process decode lock
+# (apps.core.uploads.decode_slot) is never contended there: it guards threaded or async workers
+# and management commands, where a second upload waits MPMV_IMAGE_DECODE_WAIT_SECONDS (at most
+# 300), then gets a "try again" error, never a server error. Wagtail renditions (up to the
+# 40-megapixel stored original, about 160 MB) decode outside the lock.
+# CoreConfig.ready sets Pillow's bomb threshold to the still-image cap. Every cap can be set
+# from the environment (deploy/server/mpmv.env.example); core.E601/E602 check them at startup,
+# and a value that is not a number stops the settings import (ImproperlyConfigured).
+# Raster formats are checked and re-encoded (apps.core.uploads); SVG is for logos and icons only,
+# in an SvgCollection, and goes through apps.core.svg instead (THM.12). The branch is chosen by
+# content, never by the extension, and the extension must agree with the content.
 WAGTAILIMAGES_EXTENSIONS = ["avif", "gif", "jpg", "jpeg", "png", "webp", "svg"]
-# Shows the SVG refusal in the second step of Wagtail's multiple upload (apps.core.forms).
+WAGTAILIMAGES_MAX_UPLOAD_SIZE = env_int("MPMV_MAX_IMAGE_UPLOAD_BYTES", 25 * 1024 * 1024)
+WAGTAILIMAGES_MAX_IMAGE_PIXELS = env_int("MPMV_MAX_IMAGE_PIXELS", 60_000_000)
+MPMV_MAX_ANIMATION_PIXELS = env_int("MPMV_MAX_ANIMATION_PIXELS", 16_000_000)
+MPMV_MAX_IMAGE_SIDE = env_int("MPMV_MAX_IMAGE_SIDE", 16_000)
+MPMV_MAX_STORED_IMAGE_PIXELS = env_int("MPMV_MAX_STORED_IMAGE_PIXELS", 40_000_000)
+MPMV_MAX_IMAGE_FRAMES = env_int("MPMV_MAX_IMAGE_FRAMES", 300)
+MPMV_IMAGE_DECODE_WAIT_SECONDS = env_float("MPMV_IMAGE_DECODE_WAIT_SECONDS", 30.0)
+# Safe parsing of the upload field (SEC.2) and the SVG refusal in the second step of Wagtail's
+# multiple upload (THM.12).
 WAGTAILIMAGES_IMAGE_FORM_BASE = "apps.core.forms.MediaImageForm"
+# Wagtail documents exist for wagtail-localize only (I18N.3): PDF only, checked by content.
+WAGTAILDOCS_EXTENSIONS = ["pdf"]
+WAGTAILDOCS_MAX_UPLOAD_SIZE = 10 * 1024 * 1024
+WAGTAILDOCS_DOCUMENT_FORM_BASE = "apps.core.document_forms.DocumentForm"
+# No document serve view is mounted: a document's URL is its media path, which Caddy answers
+# with 404 (deploy/caddy/Caddyfile). Without this, the admin's document pages fail on the
+# missing `wagtaildocs_serve` route.
+WAGTAILDOCS_SERVE_METHOD = "direct"
 # Renditions without an explicit format-* go to WebP. GIF is left out: Wagtail turns a still GIF
 # into PNG and keeps an animated one as GIF, which WebP conversion would flatten to one frame.
 # Templates ask for AVIF, WebP and JPEG explicitly ({% responsive_image %}, apps.core.images).
@@ -292,6 +351,9 @@ WAGTAILSEARCH_BACKENDS = {"default": {"BACKEND": "wagtail.search.backends.databa
 # Passwords, email addresses, users and groups are managed where changes are audited (SEC.4),
 # not from Wagtail's account and user pages.
 WAGTAIL_PASSWORD_MANAGEMENT_ENABLED = False
+# Editors' login with autocomplete tokens and the show-password toggle (CMP.9, WCAG 2.2 SC 3.3.8);
+# its template (cms/admin/login.html, routed in apps.cms.admin_urls) renders the captcha.
+WAGTAILADMIN_USER_LOGIN_FORM = "apps.cms.admin_forms.EditorLoginForm"
 WAGTAIL_PASSWORD_RESET_ENABLED = False
 WAGTAIL_EMAIL_MANAGEMENT_ENABLED = False
 WAGTAILUSERS_PASSWORD_ENABLED = False
@@ -303,6 +365,12 @@ WAGTAIL_ENABLE_UPDATE_CHECK = False
 USE_TZ = True
 TIME_ZONE = "UTC"
 BUSINESS_TIME_ZONE = "Europe/Rome"
+# Public holidays (ISO dates) the GPSR article 22 deadlines skip (CMP.3). Empty: working days are
+# Monday to Friday, the earliest deadline (owner decision 2026-11-09).
+COMPLIANCE_PUBLIC_HOLIDAYS: list[str] = []
+# The country -> accepted warnings languages map (CMP.3) is cached per process this long; a staff
+# edit drops this process's copy at once, other processes reload within this time.
+COMPLIANCE_COUNTRY_LANGUAGES_CACHE_SECONDS = 300
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"

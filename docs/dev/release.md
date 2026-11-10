@@ -8,7 +8,20 @@ How a commit becomes a release and reaches STAGE and LIVE. The mechanics are in
 - Tag only a commit on `main` whose CI run is green, and name it by its full SHA:
   `git tag -a v0.2.0 <full SHA> -m v0.2.0 && git push origin v0.2.0`. Never tag a branch name
   or `HEAD`: by the time the tag is pushed, either may point elsewhere.
+- Tag only the merge commit of the coherence PR described in the next section.
 - Release tags are immutable. A broken release gets a new patch version, never a re-tag.
+
+## Coherence check before a release candidate
+
+Owner rule: every STAGE release is preceded by a coherence check on the exact commit being
+released.
+
+1. lane-a announces "release candidate" on the Lane board issue (#86). lane-b runs the
+   coherence check on current `main` and opens one PR (docs and tests only).
+2. lane-a merges that PR with no other merge in between, then cuts the pre-release from that
+   merge commit, named by its full SHA, after green CI.
+3. A major finding that the PR does not fix blocks the tag until lane-a decides. If anything
+   else merges after the check, the next tag needs a new check.
 
 ## What the release workflow does
 
@@ -75,6 +88,12 @@ The security checks run at three cadences (SEC.5, owner request of 2026-11-09).
 | Every pull request and push to `main` | `ci.yml` (required checks) | The fast suites (unit and integration, `tests/security` included), `make audit` (pip-audit), ruff with the `S` rules, the gitleaks secret scan |
 | Every night, 02:30 UTC, on `main` | `security-nightly.yml` | `make test-security-nightly`: the `security_slow` tests (ReDoS sweep, malicious-upload corpus, long hostile-input runs) and `tests/security` again with `HYPOTHESIS_PROFILE=nightly`, against a PostgreSQL service; then pip-audit and osv-scanner on `uv.lock` against the advisories of the day, even when no code changed |
 | Every Tuesday, 03:00 UTC | `security-stage.yml` | OWASP ZAP baseline and nuclei (pinned container images, no intrusive, fuzzing or denial-of-service templates) through `deploy/ci/stage-scan.sh`, against STAGE |
+
+The nuclei templates are pinned like the images: `deploy/ci/stage-scan.sh` clones the
+nuclei-templates repository at `NUCLEI_TEMPLATES_TAG` and fails as a scanner error unless the
+checkout equals `NUCLEI_TEMPLATES_SHA`. Bump the tag and the SHA together, monthly, in a PR. The
+scan exits 0 when clean, 1 on findings only, 3 on a scanner error (an unreadable ZAP report, a
+failed template clone, zero templates, a nonzero nuclei exit).
 
 Run either scheduled workflow by hand from Actions > *Run workflow* (`workflow_dispatch`), or with
 `gh workflow run security-nightly.yml` and `gh workflow run security-stage.yml`. Locally,

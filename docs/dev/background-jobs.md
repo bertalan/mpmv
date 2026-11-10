@@ -82,6 +82,9 @@ Jobs on `main` today (cron in Europe/Rome; a new job adds its row here):
 | `core.purge_geocode_cache` | `27 4 * * *` | none | Deletes geocoding cache entries past their 180 days (EVT.12) |
 | `tax.check_profile_consistency` | `41 5 * * *` | none | Logs current tax profiles that disagree with the vendor's fiscal regime (TAX.2) |
 | `vendors.check_establishments` | `47 5 * * *` | none | Logs active vendors established outside the allowed vendor countries (CMP.13); suspends nobody |
+| `cms.publish_scheduled` | `*/5 * * * *` | none | Publishes pages whose go-live has come and unpublishes expired ones (Wagtail's `publish_scheduled`), so scheduled blog articles appear on time (CMS.3) |
+| `compliance.flag_overdue_safety_cases` | `5 * * * *` | none | Alerts staff about each open GPSR safety case past its working-day deadline: an error in the log, one email to the operator's compliance address (else its support address) and an audit entry (CMP.3). Each case is flagged once (`overdue_alerted_at`), so reruns send nothing new |
+| `compliance.check_published_gpsr` | `15 3 * * *` | none | Logs one error per published product whose GPSR data is incomplete and enqueues at most one email a day to the staff alert address (idempotency key per business date) (CMP.3); unpublishes nothing |
 | `core.send_email` | on demand | 5 retries, 1 min doubling to 1 h | Sends one outbox email ([transactional-email.md](transactional-email.md), ARC.16) |
 | `tax.recheck_vat_number` | on demand | 8 retries, 1 min doubling to 1 h | Asks VIES again about a VAT number while VIES is down (TAX.5) |
 

@@ -1,0 +1,93 @@
+{% extends "wagtailadmin/login.html" %}
+{% load i18n static wagtailadmin_tags captcha %}
+{% comment %}
+The editors' login (CMP.9, WCAG 2.2 SC 3.3.8), routed in apps/cms/admin_urls.py. The furniture
+block repeats Wagtail's own wagtailadmin/login.html with three changes; keep it in sync on
+upgrades:
+- no autocomplete="off" on the form, so password managers fill it (the fields' tokens come from
+  apps.cms.admin_forms.EditorLoginForm);
+- the error list carries the id the fields point to (`accounts.forms.LOGIN_ERROR_ID`);
+- the Turnstile widget sits inside the form, like on the staff login (CORE.5).
+The show-password toggle and the Turnstile script are static scripts: no inline code.
+{% endcomment %}
+
+{% block extra_css %}{{ block.super }}
+<link rel="stylesheet" href="{% static 'accounts/password-toggle.css' %}">
+{% endblock %}
+
+{% block extra_js %}{{ block.super }}{% captcha_script %}
+<script type="module" src="{% static 'accounts/password-toggle.js' %}" nonce="{{ csp_nonce }}"></script>
+{% endblock %}
+
+{% block furniture %}
+    <main class="content-wrapper" id="main">
+        <h1>{% block branding_login %}{% trans "Sign in to Wagtail" %}{% endblock %}</h1>
+
+        <div class="messages" role="status">
+            {# Always show messages div so it can be appended to by JS #}
+            {% if messages or form.errors %}
+                <ul{% if form.errors %} id="login-error"{% endif %}>
+                    {% if form.errors %}
+                        {% for error in form.non_field_errors %}
+                            <li class="error">{{ error }}</li>
+                        {% endfor %}
+                    {% endif %}
+                    {% for message in messages %}
+                        <li class="{{ message.tags }}">{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+
+        {% block above_login %}{% endblock %}
+
+        <form class="login-form" action="{% url 'wagtailadmin_login' %}" method="post" novalidate>
+            {% block login_form %}
+                {% csrf_token %}
+
+                {% url 'wagtailadmin_home' as home_url %}
+                <input type="hidden" name="next" value="{{ next|default:home_url }}" />
+
+                {% block fields %}
+                    {% formattedfield form.username %}
+                    {% formattedfield form.password %}
+
+                    {% if show_password_reset %}
+                        <a class="reset-password" href="{% url 'wagtailadmin_password_reset' %}">{% trans "Forgotten password?" %}</a>
+                    {% endif %}
+
+                    {% block extra_fields %}
+                        {% for field_name, field in form.extra_fields %}
+                            {% formattedfield field %}
+                        {% endfor %}
+                    {% endblock extra_fields %}
+
+                    {% include "wagtailadmin/shared/forms/single_checkbox.html" with label_classname="remember-me" name="remember" text=_("Remember me") %}
+                    {% captcha_widget %}
+                {% endblock %}
+            {% endblock %}
+            <footer class="form-actions">
+                {% block submit_buttons %}
+                    <button
+                        type="submit"
+                        class="button button-longrunning"
+                        data-controller="w-progress"
+                        data-action="w-progress#activate"
+                        data-w-progress-active-value="{% trans 'Signing in…' %}"
+                    >
+                        {% icon name="spinner" %}
+                        <em data-w-progress-target="label">{% trans 'Sign in' %}</em>
+                    </button>
+                {% endblock %}
+            </footer>
+        </form>
+
+        {% block below_login %}{% endblock %}
+
+        {% block branding_logo %}
+            <div class="login-logo">
+                {% include "wagtailadmin/logo.html" with wordmark="True" %}
+            </div>
+        {% endblock %}
+    </main>
+{% endblock %}

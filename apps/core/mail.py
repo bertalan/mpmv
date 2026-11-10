@@ -26,6 +26,8 @@ from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from typing import Final, Protocol, TextIO, runtime_checkable
 
+from apps.core.text import ascii_int
+
 # --- Messages and senders -------------------------------------------------------------------
 
 
@@ -252,9 +254,10 @@ class SignedJsonFeedback:
     def verify(self, headers: Mapping[str, str], body: bytes, *, now: float) -> bool:
         stamp = headers.get(TIMESTAMP_HEADER, "")
         signature = headers.get(SIGNATURE_HEADER, "")
-        if not stamp.isdigit() or not signature:
+        when = ascii_int(stamp)
+        if when is None or not signature:
             return False
-        if abs(now - int(stamp)) > self.tolerance:
+        if abs(now - when) > self.tolerance:
             return False
         return hmac.compare_digest(signature, self._signature(body, stamp))
 

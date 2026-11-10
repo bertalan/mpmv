@@ -1,0 +1,13 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Shop space dashboard (CORE.17): the selected vendor and the member's role. CORE.9 adds the KPIs.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Dashboard" %}</h1>
+  <p class="manager-lead">{% blocktranslate with vendor=manager.vendor.display_name %}You are working on {{ vendor }}.{% endblocktranslate %}</p>
+  <dl class="manager-facts">
+    <dt>{% translate "Vendor" %}</dt><dd>{{ manager.vendor.display_name }}</dd>
+    <dt>{% translate "Your role" %}</dt><dd>{% if manager.role == "owner" %}{% translate "Owner" %}{% else %}{% translate "Staff" %}{% endif %}</dd>
+  </dl>
+{% endblock %}
