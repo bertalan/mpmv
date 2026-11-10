@@ -30,7 +30,7 @@ vendor's change page links to its trail (`?vendor=<public id>`).
 
 | Area | Actions |
 |---|---|
-| Logins (CORE.5) | `accounts.login.succeeded`, `accounts.login.failed`, `accounts.login.locked_out`, `accounts.registration.rate_limited` |
+| Logins (CORE.5) | `accounts.login.succeeded`, `accounts.login.failed`, `accounts.login.locked_out`, `accounts.registration.rate_limited`; `accounts.user.unlocked` (platform staff lift a lockout), `accounts.user.unlocked_by_reset` (a completed password reset clears it) |
 | Second factors (CORE.4) | `accounts.mfa.enrolled`, `.verified`, `.verification_failed`, `.recovery_code_used`, `.recovery_codes_generated`, `.device_removed`, `.disabled` |
 | Secure action links (CORE.15) | `accounts.action_link.sent` (the link's purpose, object and version, never the token), `.opened`, `.signed_in`, `.used`, `.refused` (refusals against a known account: expired, old version, wrong user; refusals with no account to attach them to, such as a bad signature, are only logged, without the token) |
 | Users and permissions (admin) | `accounts.user.created`, `.updated`, `.deleted`, `.password_changed`, `.access_changed`; `auth.group.created`, `.updated`, `.deleted`, `.access_changed` |

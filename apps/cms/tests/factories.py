@@ -26,6 +26,7 @@ from apps.cms.models import (
     BlogAuthor,
     BlogIndexPage,
     BlogPostPage,
+    EditorRoleSeed,
     HomePage,
     LegalPage,
     LegalPageReview,
@@ -298,6 +299,16 @@ class VendorRecruitmentPageFactory(_InTree, DjangoModelFactory[VendorRecruitment
         return _primary_home()
 
 
+class EditorRoleSeedFactory(DjangoModelFactory[EditorRoleSeed]):
+    """A role marked as seeded (`apps.cms.roles` names): the marker only, no group or grants."""
+
+    class Meta:
+        model = EditorRoleSeed
+        django_get_or_create = ("role",)
+
+    role = factory.Sequence(lambda n: f"Test role {n}")
+
+
 class BlogAuthorFactory(DjangoModelFactory[BlogAuthor]):
     """An author of the default language unless `locale` is given; the slug follows the name.
     Translate one with `author.copy_for_translation(locale)`."""
@@ -359,3 +370,17 @@ class BlogPostPageFactory(_InTree, DjangoModelFactory[BlogPostPage]):
     def _default_parent(cls) -> Page:
         blog: BlogIndexPage | None = BlogIndexPage.objects.child_of(_primary_home()).first()
         return blog if blog is not None else BlogIndexPageFactory.create()
+
+
+def editor_user(*roles: str) -> Any:
+    """A non-staff user in the given editor roles (`apps.cms.roles` names), who can sign in to
+    the Wagtail admin. The role groups exist after every `migrate`."""
+    import secrets
+
+    from django.contrib.auth.models import Group
+
+    from apps.accounts.tests.factories import UserFactory
+
+    user = UserFactory.create(password=secrets.token_urlsafe(16))
+    user.groups.add(*Group.objects.filter(name__in=roles))
+    return user
