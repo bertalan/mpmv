@@ -137,6 +137,8 @@ def translation_date_problem(
 
 GO_LIVE_LEGAL_KINDS: tuple[str, ...] = ("terms", "privacy", "withdrawal", "shipping", "returns")
 REQUIRED_LEGAL_REVIEWS: tuple[str, ...] = ("native_review", "counsel_check")
+# D-27: the platform terms and the ranking page (CMP.5) are go-live pages in every language too.
+DSA_LEGAL_KINDS: tuple[str, ...] = ("platform_terms", "ranking")
 MISSING_TRANSLATION = "translation"
 
 
