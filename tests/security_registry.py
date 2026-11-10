@@ -63,6 +63,10 @@ PUBLIC: dict[str, str] = {
         "Thanks page after a report (CMP.5): shows only the reference kept in the visitor's "
         "own session, a 404 without one."
     ),
+    "dsa_contact_points": (
+        "DSA points of contact (CMP.5): the operator's own contact data, read-only, public by law "
+        "(DSA art. 11 and 12)."
+    ),
     "vendors:apply": (
         "Public 'Sell with us' application form (VEN.22): the page is public by design; the POST "
         "is CSRF-checked, rate limited per IP and behind Turnstile, and it creates an inactive "
