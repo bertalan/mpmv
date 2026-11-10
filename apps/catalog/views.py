@@ -21,12 +21,14 @@ from django.http import Http404, HttpRequest, HttpResponse, HttpResponsePermanen
 from django.http.response import HttpResponseBase
 from django.shortcuts import render
 from django.utils import translation
+from django.utils.html import linebreaks
 from django.views.decorators.http import require_safe
 from wagtail import hooks
 from wagtail.views import serve
 
 from apps.core import translations
 from apps.core.money import CURRENCY
+from apps.vendors import services as vendors_services
 
 from . import listings, services, slugs
 
@@ -161,6 +163,9 @@ def _listing(
 
     groups = services.listing_filter_groups(anchor.scope, params, language)
     vendors = services.listing_vendor_options(anchor.scope, params)
+    store_categories = services.store_categories(anchor.scope, params, language)
+    vendor = anchor.scope.vendor
+    vendor_profile = vendors_services.storefront_profile(vendor, language) if vendor else None
     labels = {
         (group.key, option.value): option.label for group in groups for option in group.options
     }
@@ -181,6 +186,12 @@ def _listing(
             params, {(group.key, option.value) for group in groups for option in group.options}
         ),
         "vendor_options": vendors,
+        "store_categories": store_categories,
+        "vendor_profile": vendor_profile,
+        "policy_items": [
+            {"title": title, "content": linebreaks(text)}
+            for title, text in (vendor_profile.policies if vendor_profile else ())
+        ],
         "price_min": _amount(params.price_min),
         "price_max": _amount(params.price_max),
         "chips": listings.filter_chips(params, location, labels),

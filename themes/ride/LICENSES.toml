@@ -1,0 +1,51 @@
+# Licences of the `ride` theme's third-party and own assets (spec 14 §14.8, THM.5 gate).
+# Format: see themes/base/LICENSES.toml.
+
+[[asset]]
+name = "Barlow"
+kind = "font"
+source = "https://github.com/google/fonts/tree/5bb28733cec313b63fbd415b574b5ae35c8aa8b8/ofl/barlow"
+author = "Jeremy Tribby"
+license = "OFL-1.1"
+# Subset to Latin and Latin Extended-A (fonttools pyftsubset, woff2) from Barlow-Regular.ttf and
+# Barlow-Bold.ttf of the upstream Google Fonts repository, commit 5bb28733. The copyright notice
+# and the licence text are licenses/OFL.txt, a copy of ofl/barlow/OFL.txt at that commit (the
+# upstream file reserves no font name). The subsets keep the font name table.
+files = ["fonts/barlow-400.woff2", "fonts/barlow-700.woff2", "licenses/OFL.txt"]
+
+[[asset]]
+name = "Barlow Condensed"
+kind = "font"
+source = "https://github.com/google/fonts/tree/5bb28733cec313b63fbd415b574b5ae35c8aa8b8/ofl/barlowcondensed"
+author = "Jeremy Tribby"
+license = "OFL-1.1"
+# Subset like Barlow, from BarlowCondensed-SemiBold.ttf and BarlowCondensed-Bold.ttf, same
+# commit; its OFL.txt has the same copyright line and text as Barlow's.
+files = [
+  "fonts/barlow-condensed-600.woff2",
+  "fonts/barlow-condensed-700.woff2",
+  "licenses/OFL.txt",
+]
+
+[[asset]]
+name = "Lucide"
+kind = "icons"
+source = "https://github.com/lucide-icons/lucide/tree/b826f0c527e1498f5e46f41ca0277ccab144bf31/icons"
+author = "Lucide Icons and Contributors"
+license = "ISC"
+# Release 1.70.0, commit b826f0c5. Only the 13 icons the theme draws (x, search, plus, minus,
+# menu, check, star, shopping-cart, chevron-left, chevron-right, chevron-down, zoom-in,
+# arrow-right), joined in one same-origin sprite. The sprite ids are our names (`cart` is
+# shopping-cart, `zoom` is zoom-in, `close` is x). licenses/LUCIDE-LICENSE.txt is upstream's
+# LICENSE (ISC, plus the MIT text for the icons derived from Feather) at that commit.
+files = ["icons/sprite.svg", "licenses/LUCIDE-LICENSE.txt"]
+
+[[asset]]
+name = "Ride placeholder artwork"
+kind = "image"
+source = "https://github.com/bertalan/mpmv"
+author = "MPMV project"
+license = "CC0-1.0"
+# Our own work: simple vector shapes, no photograph. Shown behind the hero until an editor
+# chooses a hero image.
+files = ["images/hero-placeholder.svg"]

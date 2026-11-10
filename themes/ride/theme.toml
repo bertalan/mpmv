@@ -1,0 +1,9 @@
+# The first vertical theme (spec 14 §14.2, THM.6): a bold, condensed-type look on top of `base`.
+# Written clean-room from the public spec and the lane-a brief; no file derives from a
+# reference template (spec 14 §14.8).
+slug = "ride"
+name = "Ride"
+version = "0.1.0"
+parent = "base"
+description = "Bold vertical theme: dark header, condensed display type, blue accent."
+direction = "ltr"

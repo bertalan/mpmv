@@ -1,0 +1,20 @@
+{% load theme_tags responsive_images %}{% comment %}
+Hero of the `ride` theme (THM.6): a full-width image under a navy scrim, a large condensed
+heading, a short lead, one primary and one secondary button. Nothing moves on its own.
+The scrim keeps white text readable over any image (tested for the brightest case); without an
+image the CSS shows the theme's own placeholder artwork. Same context as base's
+components/hero.html:
+
+- `title` (required), `heading_level` (1 on a home page whose hero carries the page title),
+  `text`, `url` and `action`, `secondary_url` and `secondary_action`;
+- `image` (a Wagtail image) or `image_url`, `image_alt`, `image_width`, `image_height`: the
+  image is decorative unless `image_alt` says what it adds; it is the LCP image.
+{% endcomment %}{% with url=url|safe_href secondary_url=secondary_url|safe_href %}<div class="hero{% if image or image_url %} hero--image{% endif %} full-bleed">
+  {% if image %}{% responsive_image image "hero" alt=image_alt class="hero__image" priority=True %}{% elif image_url %}<img class="hero__image" src="{{ image_url }}" alt="{{ image_alt|default:'' }}" width="{{ image_width|default:1600 }}" height="{{ image_height|default:900 }}" fetchpriority="high">{% endif %}
+  <div class="hero__scrim" aria-hidden="true"></div>
+  <div class="hero__content">
+    <h{{ heading_level|default:2 }} class="hero__title">{{ title }}</h{{ heading_level|default:2 }}>
+    {% if text %}<p class="hero__text">{{ text }}</p>{% endif %}
+    {% if url and action or secondary_url and secondary_action %}<div class="hero__actions">{% if url and action %}<a class="button button--large" href="{{ url }}">{{ action }}</a>{% endif %}{% if secondary_url and secondary_action %}<a class="button button--large button--secondary" href="{{ secondary_url }}">{{ secondary_action }}</a>{% endif %}</div>{% endif %}
+  </div>
+</div>{% endwith %}

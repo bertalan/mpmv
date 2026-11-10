@@ -90,8 +90,7 @@ def test_visitor_sees_the_plans_and_how_to_apply(
     expect(plans.get_by_role("heading", name="Starter")).to_be_visible()
     expect(plans.get_by_role("heading", name="Workshop")).to_be_visible()
     expect(page.get_by_text("Who can sell?")).to_be_visible()
-    # VEN.22 is not merged yet: a notice instead of a broken link.
-    expect(page.get_by_text("Applications open soon.")).to_be_visible()
+    expect(page.get_by_role("link", name="Apply now")).to_have_attribute("href", "/vendor/apply/")
     shot("sell-with-us")
 
     assert csp_violations(page) == [], "\n".join(csp_violations(page))

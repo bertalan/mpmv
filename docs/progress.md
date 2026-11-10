@@ -78,7 +78,7 @@ part of the done-when still open) · `not started`.
 | EVT.1 | done | #125, #127 | Event page models, constraints, tenancy, admin panels and templates |
 | CORE.16 | done | #136 | API rate limit defaults and per-key override |
 | EVT.2 | done | #130 | Recurrence engine |
-| EVT.3 | done | #147, #149 | Event services, Event review workflow, moderation UI (hide, restore, cancel, policies) |
+| EVT.3 | done | #147, #149, #205 | Event services, Event review workflow, moderation UI (hide, restore, cancel, policies). #205 security fixes: platform staff exempt from the vendor scope check, recheck on submit, depth cap, no userinfo in CTA URLs. Event code, needs human review |
 | ARC.13 | partial: the done-when is proven on STAGE (lane-a) | #146, #148, #152 | Multi-arch release image, database env file and root CA mount, site-only Caddy, media volume |
 | THM.5 | done | #128 | Theme quality gates |
 | VEN.25 | partial: the EX number is not in the FatturaPA party data yet (tax advisor) | #139 | RF20 only for EU-established vendors with an EX number |
@@ -104,9 +104,13 @@ part of the done-when still open) · `not started`.
 | CMS.9 | done | #129 | Launch countdown block: pure `countdown_state`, server-rendered absolute date and expired state, page cache capped at the target, CSP-safe ES module with visitor time zone, minute updates, pause button, single polite announcement |
 | CMP.9 | done | #177 | WCAG 2.2 SC 3.3.8 on the authentication templates: paste allowed, `autocomplete` tokens, passkeys offered, Turnstile without a puzzle |
 | CORE.17 | done | #170 | Manager shell (`apps/manager/`): two gated spaces by URL prefix, deny-by-default gate with 404s, navigation registry, vendor picker and switcher, base list view with bulk actions (dry-run preview), closed vendors refused in the shop space, sign-in page meeting CMP.9, URL sweep test. Staff access to the shop space through impersonation is CORE.10 |
-| CORE.8 | partial: 1 of 3 (platform staff permission); Wagtail admin trimming, editor roles and unlock service open | #185 | Platform staff is the model permission `vendors.view_all_vendors`, not `is_staff` (migration vendors 0021, no data grant; release note in release.md). Cross-vendor grants in catalog and events use `is_platform_staff` |
+| CORE.8 | done | #185, #188, #189, #209 | 1/3 platform staff is the model permission `vendors.view_all_vendors`, not `is_staff` (migration vendors 0021, no data grant; release note in release.md). 2/3 account unlock service with audit (`accounts.user.unlocked`, `accounts.user.unlocked_by_reset`) and a completed password reset clears the lockout. 3/3 own editor roles per page-tree part replace Wagtail's default Editors and Moderators groups (migration cms 0013, edit-only editor roles, empty publisher roles, nobody approves their own submission), Wagtail admin menu limited to CMS entries (`docs/dev/editor-roles.md`). #209 makes the seeding safe during partial migrations (main was red). Permissions code, needs human review |
 | SEC.12 | done | #199 | Reverse proxy header ownership: Caddy drops `Server`, media carry the transport and framing headers, CORP on the HTTPS 301; the three strict xfails are plain tests; documented in security-headers.md |
 | OPS.9 | partial: triage decided and rules file merged, no STAGE scan run on the new main yet | #197 | STAGE scan triage (SEC.5): no wildcard CORS, CORP header, ZAP rules file with documented accepts |
+| TAX.7 | done | #179 | Special territories by postcode (initial dataset, T15 green): most specific pattern wins (FR 97150 is Saint-Martin, not Guadeloupe), alias countries (MF, BL, AX) fail closed, seed migration tax 0006 never overwrites staff rows, Northern Ireland not seeded (D-02). Tax code, needs human review |
+| CMP.25 | done | #181 | Activation gate for platform duties: `activation` purpose in `LegalFieldRequirement` seeded with the DSA article 30 trader data, append-only `SelfCertification` (version, language, text hash, no IP), checked by the VEN.5 activation next to CMP.13; DAC7 data still blocks payouts only (migrations vendors 0022, 0023). Compliance code, needs human review |
+| VEN.10 | done | #182 | Public vendor storefront per language: bio, policies, products and store categories, category sidebar correct in IT |
+| THM.6 | done | #184 | First vertical theme `ride`: operator palette tokens (light and dark), type scale and shapes, self-hosted Barlow and Barlow Condensed (OFL 1.1), Lucide icon subset (ISC), header, hero and home blocks, placeholder art, `LICENSES.toml` complete |
 
 ## Owner decisions 2026-11-07
 
@@ -734,6 +738,15 @@ Compliance, security and content:
 | #196 | none | Spec: rows accepted by lane-a (CORE.21, CORE.22, CMP.27, MIG.15, OPS.8, OPS.9, SEC-R2 rename) |
 | #203 | ARC | Unit and integration tests in parallel with pytest-xdist (CI and `make test`) |
 | #199 | SEC.12 | Proxy header ownership between Caddy and the app |
+| #207 | none | Coherence check 10 |
+| #205 | EVT.3 | Security fixes: platform staff exemption, recheck on submit, depth cap, no userinfo in CTA URLs |
+| #188 | CORE.8 | Account unlock service and unlock after a completed password reset (2 of 3) |
+| #189 | CORE.8 | Editor roles replace the default groups, CMS-only Wagtail menu (3 of 3) |
+| #179 | TAX.7 | Special territories by postcode, initial dataset |
+| #209 | CORE.8 | Editor-role seeding safe during partial migrations (main red fix) |
+| #181 | CMP.25 | Activation gate for platform duties, self-certification |
+| #182 | VEN.10 | Public vendor storefront |
+| #184 | THM.6 | `ride` theme |
 
 ## Coherence checks
 
@@ -1333,3 +1346,27 @@ Findings and actions:
 3. Minor. OPS.9 needs a STAGE scan run on main after #197 to close. Action: for lane-a (run the workflow).
 4. Minor. The progress.md PR tables skip about 25 older PRs (mostly spec and docs, numbers under 100). Action: none, they are listed by task where it matters.
 Open from check 9: items 1 to 3 closed; dev docs, SEC.2 caps and the ID collision became OPS.8, spec 12 and SEC-R2 (#196); CMP.3 remainder is CMP.27.
+
+### Check 11 (2026-11-10, release candidate v0.1.3, main at bd01f8e)
+
+Scope: main at exactly bd01f8e (the release candidate), eight merges since check 10 (#205, #188, #189,
+#179, #209, #181, #182, #184; 89 files, about 5.5k lines, counted from a20c9e7). Review by lane-b in four
+dimensions. Fix PR: the one that carries this entry.
+
+| Area | Result |
+|---|---|
+| Code vs spec | Done-when met for CORE.8 (all three parts: platform staff permission, unlock service with audit and reset clearing the lockout, editor roles with a CMS-only admin menu), TAX.7 (T15 green, most specific pattern wins, alias countries fail closed), CMP.25 (activation purpose seeded, append-only self-certification, DAC7 still payout-only), VEN.10, THM.6 (no file under `themes/ride` references `private/`; `LICENSES.toml` lists Barlow, Barlow Condensed, Lucide and the placeholder art with their licence texts, all files present). Services/engine split, `dry_run`, AuditLog and the operator-country rule kept: the only `"IT"` literal in `tax` is the postcode-length table, marked as territory data; `tax` and `shipping` import nothing from `orders` |
+| Gates | `make check` pass (ruff, mypy strict, import contracts, backlog freshness, Django checks), `makemigrations --check` clean. One leaf per app, contiguous: cms 0013, vendors 0023, tax 0006, events 0003, core 0017, catalog 0009, api 0007, accounts 0005, compliance 0002, shipping 0010, themes 0001, cart 0001. Main CI on bd01f8e: success (and on 9bc1acf, dc8a025, 48bbd24). Full suite not run locally (CI is the gate). Security nightly: failure on 29bed6d, green on a99d71e, no run since. Security STAGE scan: still the two failures (2c09781, d46ce88) from before #197; no run on the new main, so OPS.9 stays open |
+| Docs | progress.md lacked CORE.8 3/3, TAX.7, CMP.25, VEN.10, THM.6, the EVT.3 fix and eight PR rows (added here). audit-trail.md already has `accounts.user.unlocked`, `accounts.user.unlocked_by_reset` and `vendor.self_certified`; `docs/dev/editor-roles.md` and `themes.md` exist. release.md lacked notes for the editor-role migration, the activation gate and the new tax territories (added here) |
+| Hygiene | No credential-like literals, vendor names, hostnames, new TODOs, prints or sleeps in the diff. Still the `RemovedInWagtail90Warning` at `apps/cms/admin_views.py:30` (OPS.7) |
+
+Findings and actions:
+
+1. Minor. progress.md missed the merges above. Action: this update.
+2. Minor. release.md had no STAGE effects for v0.1.3 (editor roles, activation gate, territories). Action: added here.
+3. Minor, ops. OPS.9: no STAGE scan and no nightly since the last green gate; run both on bd01f8e before the tag if lane-a wants them as evidence. Action: for lane-a.
+4. Minor. The seeded special-territory postcodes are marked for owner review (fewer rather than wrong); the platform owner extends them in the tax admin. Action: none.
+5. Minor. The home page belongs to no editor role (a page grant inherits downwards), so only superusers edit it until CORE.18. Action: documented in editor-roles.md already.
+
+Release candidate verdict: GO for v0.1.3 from bd01f8e. No blocker or major finding in the code, gates are green, and the STAGE effects are in release.md. Conditions: no other merge between this PR and the tag; apply the release notes on STAGE (grant `vendors.view_all_vendors` to existing staff, assign publisher roles after the migrate).
+Open from check 10: item 1 closed; item 2 (Manager developer docs) still a proposed row; item 3 (OPS.9) open.

@@ -589,6 +589,7 @@ class VendorClaim(BaseModel):
 
 class RequirementPurpose(models.TextChoices):
     PAYOUT = engine.PAYOUT, "Payout request"
+    ACTIVATION = engine.ACTIVATION, "Vendor activation"
 
 
 class RequirementRegion(models.TextChoices):
@@ -603,7 +604,7 @@ def legal_field_label(name: str) -> str:
 
 LEGAL_FIELD_CHOICES = [
     (name, legal_field_label(name)[:1].upper() + legal_field_label(name)[1:])
-    for name in engine.LEGAL_FIELDS
+    for name in engine.REQUIREMENT_FIELDS
 ]
 
 
@@ -641,7 +642,7 @@ class LegalFieldRequirement(BaseModel):
                 name="vendors_requirement_unique",
             ),
             models.CheckConstraint(
-                condition=models.Q(field_name__in=engine.LEGAL_FIELDS),
+                condition=models.Q(field_name__in=engine.REQUIREMENT_FIELDS),
                 name="vendors_requirement_field_valid",
             ),
             models.CheckConstraint(
@@ -834,6 +835,46 @@ class ContractAcceptance(BaseModel):
         super().save(*args, **kwargs)
 
 
+class SelfCertification(BaseModel):
+    """An owner certified, for a vendor, the DSA article 30(1)(e) statement (CMP.25).
+
+    The vendor offers only products and services that comply with Union law. Append-only (DB
+    trigger, migration 0022), like `ContractAcceptance`: stores the text version, the language
+    shown and the hash of that text (`engine.self_certification_hash`), and the onboarding round
+    of the vendor (VEN.21). Written by `services.certify_platform_duties`.
+    """
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
+
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="self_certifications")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="self_certifications"
+    )
+    version = models.PositiveIntegerField()
+    language = LanguageField()
+    text_hash = models.CharField(max_length=64, help_text="SHA-256 of the certified text.")
+    accepted_at = models.DateTimeField()
+    onboarding_round = models.PositiveIntegerField(default=1, editable=False)
+
+    class Meta:
+        ordering = ["-accepted_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["vendor", "version", "onboarding_round"],
+                name="vendors_selfcertification_vendor_version_round_unique",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.vendor} self-certified (v{self.version})"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self._state.adding:
+            raise PermissionError("SelfCertification is append-only")
+        super().save(*args, **kwargs)
+
+
 class VendorFeatureFlag(BaseModel):
     """One vendor's override of a feature flag (ARC.8, `apps.core.flags`).
 
@@ -922,3 +963,36 @@ class CrossVendorConsent(BaseModel):
         if not self._state.adding:
             raise PermissionError("CrossVendorConsent is append-only")
         super().save(*args, **kwargs)
+
+
+class VendorApplication(BaseModel):
+    """The pending marker of a public "Sell with us" application (VEN.22).
+
+    Written only by `services.apply_to_sell`, and deleted when the applicant confirms the email
+    (`confirm_application`) or by the retention job (`purge_unconfirmed_applications`). Its
+    existence is what makes an inactive account eligible for the emailed confirmation link: a
+    staff-blocked, migrated or staff-created applicant owner has none, so no form submission can
+    reactivate it. `version` is the version the link is bound to (CORE.15): every new link
+    raises it, so older links are refused. It has no foreign key to the vendor: the vendor is
+    the one the account owns, so this is not vendor-owned data.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="vendor_application",
+        editable=False,
+    )
+    version = models.PositiveIntegerField(default=1, editable=False)
+    link_sent_at = models.DateTimeField(
+        null=True, blank=True, editable=False, help_text="When the current link was queued."
+    )
+    reminder_sent_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+        help_text="When the one reminder was queued; never more than one (D-24).",
+    )
+
+    def __str__(self) -> str:
+        return f"application of {self.user_id} (link v{self.version})"

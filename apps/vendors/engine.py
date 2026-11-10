@@ -4,6 +4,7 @@ party block, RF20 eligibility), onboarding and the establishment gate (CMP.13)."
 
 import dataclasses
 import datetime as dt
+import hashlib
 import hmac
 import re
 from collections.abc import Collection, Container, Iterable, Mapping, Sequence
@@ -842,7 +843,12 @@ def identity_errors(identity: LegalIdentity) -> dict[str, list[str]]:
 # --- Required legal fields (rules are data: `LegalFieldRequirement`)
 
 PAYOUT: Final = "payout"
-PURPOSES: Final = (PAYOUT,)
+ACTIVATION: Final = "activation"  # CMP.25: the DSA article 30 trader data, checked at activation
+PURPOSES: Final = (PAYOUT, ACTIVATION)
+
+# What a requirement can name: the legal fields and the phone (a DSA article 30 datum, not a
+# legal field of the identity).
+REQUIREMENT_FIELDS: Final = (*LEGAL_FIELDS, "phone")
 
 # Regions a rule can target instead of one country (empty: every vendor).
 EU: Final = "eu"
@@ -876,7 +882,7 @@ class Requirement:
 def required_fields(
     values: Mapping[str, Any], rules: Iterable[Requirement], *, purpose: str = PAYOUT
 ) -> list[str]:
-    """The fields the rules require from this vendor, in `LEGAL_FIELDS` order.
+    """The fields the rules require from this vendor, in `REQUIREMENT_FIELDS` order.
 
     Rules are additive: every rule matching the vendor's country and legal form applies (there
     is no "most specific wins"); staff relax a requirement by deactivating its rule. While the
@@ -887,7 +893,7 @@ def required_fields(
     legal_form = str(values.get("legal_form") or "")
     required: set[str] = set()
     for rule in rules:
-        if rule.field not in LEGAL_FIELDS:
+        if rule.field not in REQUIREMENT_FIELDS:
             raise UnknownLegalField(f"{rule.field!r} is not a legal field")
         if rule.purpose != purpose or rule.country not in ("", country):
             continue
@@ -897,7 +903,7 @@ def required_fields(
             required.add("legal_form")
         elif rule.legal_form in ("", legal_form):
             required.add(rule.field)
-    return [name for name in LEGAL_FIELDS if name in required]
+    return [name for name in REQUIREMENT_FIELDS if name in required]
 
 
 def delivery_channel_ok(values: Mapping[str, Any]) -> bool:
@@ -1416,6 +1422,7 @@ def mask_iban(iban: str) -> str:
 
 CONTRACT: Final = "contract"
 DAC7: Final = "dac7"
+PLATFORM_DUTIES: Final = "platform_duties"  # CMP.25
 PAYOUT_DATA: Final = "payout_data"
 
 # Statuses whose owners may accept the contract: approved vendors, also to accept a new version.
@@ -1489,12 +1496,14 @@ def onboarding_checklist(
     current_contract_version: int | None,
     dac7_missing: Sequence[str],
     payout: Completeness,
+    platform_duties_missing: Sequence[str] = (),
 ) -> OnboardingChecklist:
     """The onboarding checklist of a vendor.
 
     `contract_version` is the version the vendor accepted, if it accepted the one in force
     (`current_contract_version`); the DAC7 and payout items come from `dac7_missing` and the
-    payout `completeness` of the legal profile.
+    payout `completeness` of the legal profile. `platform_duties_missing` (CMP.25, see
+    `platform_duties_missing`) blocks activation; DAC7 and payout data never do.
     """
     if current_contract_version is None:
         contract = ChecklistItem(CONTRACT, False, True, ("no contract is in force",))
@@ -1505,11 +1514,73 @@ def onboarding_checklist(
     return OnboardingChecklist(
         items=(
             contract,
+            ChecklistItem(
+                PLATFORM_DUTIES, not platform_duties_missing, True, tuple(platform_duties_missing)
+            ),
             ChecklistItem(DAC7, not dac7_missing, False, tuple(dac7_missing)),
             ChecklistItem(PAYOUT_DATA, payout.complete, False, payout.missing + payout.invalid),
         ),
         current_contract_version=current_contract_version,
     )
+
+
+# --- Platform duties at activation (CMP.25)
+#
+# DSA article 30: before a vendor can sell, the platform holds its name, address, telephone and
+# email and its trade register entry where registered (the `activation` requirement rows), and
+# article 30(1)(e): the vendor's self-certification that it offers only products that comply
+# with Union law. Unlike a self-attestation (CMP.10) it blocks activation. DAC7 data does not.
+
+SELF_CERTIFICATION: Final = "self_certification"
+# Bump when a text changes: acceptances keep the version and hash they were given.
+# The wording is a placeholder until the one-off legal review (CMP.24).
+SELF_CERTIFICATION_VERSION: Final = 1
+SELF_CERTIFICATION_TEXTS: Final[Mapping[str, str]] = {
+    "en": (
+        "I certify, on behalf of the vendor, that it will offer on this marketplace only "
+        "products and services that comply with the applicable rules of Union law."
+    ),
+    "it": (
+        "Certifico, a nome del venditore, che offrirà su questo marketplace solo prodotti e "
+        "servizi conformi alle norme applicabili del diritto dell'Unione."
+    ),
+}
+
+
+class SelfCertificationError(ValueError):
+    """The self-certification cannot be recorded (the message is safe to show)."""
+
+
+def self_certification_text(language: str) -> str:
+    try:
+        return SELF_CERTIFICATION_TEXTS[language]
+    except KeyError:
+        raise SelfCertificationError(
+            f"there is no self-certification text in {language!r}"
+        ) from None
+
+
+def self_certification_hash(language: str) -> str:
+    """SHA-256 of the version, the language code and the text, as stored with the acceptance."""
+    text = self_certification_text(language)
+    return hashlib.sha256(f"{SELF_CERTIFICATION_VERSION}\n{language}\n{text}".encode()).hexdigest()
+
+
+def check_can_certify(status: str, role: str | None) -> None:
+    """An owner of a vendor still in onboarding certifies on the vendor's behalf."""
+    if status not in ACCEPTING_STATUSES:
+        raise SelfCertificationError(f"a vendor in status {status} cannot certify")
+    if role != OWNER:
+        raise SelfCertificationError("only an owner of the vendor can certify")
+
+
+def platform_duties_missing(
+    values: Mapping[str, Any], rules: Iterable[Requirement], *, certified: bool
+) -> tuple[str, ...]:
+    """What activation still needs: the `activation` fields the rules require and the vendor has
+    not filled in (in field order), then `SELF_CERTIFICATION` unless `certified`. Pure."""
+    missing = missing_required_fields(values, rules, purpose=ACTIVATION)
+    return (*missing, *(() if certified else (SELF_CERTIFICATION,)))
 
 
 class ActivationNotAllowed(InvalidTransition):

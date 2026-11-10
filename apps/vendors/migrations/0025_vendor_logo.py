@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         ("core", "0017_operator_alert_emails"),
-        ("vendors", "0021_platform_staff_permission"),
+        ("vendors", "0024_vendor_application"),
     ]
 
     operations = [
