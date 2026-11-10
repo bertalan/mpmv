@@ -31,7 +31,7 @@ from apps.vendors.models import VendorTranslation
 from apps.vendors.scoping import Source, VendorScopedQuerySet
 from apps.vendors.services import PROFILE_LOCKED, save_storefront_profile
 
-from .access import ManagerContext, may_enter
+from .access import ManagerContext, home_url
 from .forms import StorefrontProfileForm
 from .middleware import manager_context
 from .navigation import Section, registry
@@ -197,14 +197,6 @@ class VendorPickerView(ManagerView):
 
 
 # --- Sign-in and sign-out: outside /manager/, so the sweep keeps every Manager URL gated
-
-
-def home_url(user: Any) -> str:
-    """Where a user lands after signing in without `next`: their Manager space, else the site."""
-    for space in (Space.PLATFORM, Space.SHOP):
-        if may_enter(space, user):
-            return reverse(f"manager:{space}:dashboard")
-    return "/"
 
 
 class LoginView(auth_views.LoginView):
