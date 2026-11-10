@@ -359,10 +359,15 @@ def test_raw_anonymise_with_the_right_placeholders_works_on_an_old_order() -> No
     scrub_sql(
         order,
         "anonymise",
-        "email = %s, customer_name = %s, billing_address = %s::jsonb,"
+        "email = %s, customer_name = %s, customer_vat_number = %s, customer_tax_id = %s,"
+        " billing_address = %s::jsonb, shipping_address = %s::jsonb, vat_validation = %s::jsonb,"
         " privacy_status = 'anonymized', anonymised_at = now()",
         engine.ANONYMISED_EMAIL,
         engine.ANONYMISED,
+        engine.ANONYMISED,
+        engine.ANONYMISED,
+        '{"anonymised": true}',
+        '{"anonymised": true}',
         '{"anonymised": true}',
     )
     order.refresh_from_db()
@@ -487,12 +492,116 @@ def test_restricting_for_an_account_erasure_needs_no_waiting() -> None:
     assert order.email == "buyer@example.com"  # still in the snapshot, masked by the UI later
 
 
-def test_an_order_never_paid_is_anonymised_at_once() -> None:
-    order = place()  # checkout: nothing was ever paid
+def cancelled_order(**kwargs: Any) -> Order:
+    order = place(**kwargs)
+    for state in ("awaiting_payment", "cancelled"):
+        services.transition_order(order, state, ctx=CTX)
+    return order
+
+
+def test_a_cancelled_order_never_paid_is_anonymised_at_once() -> None:
+    order = cancelled_order()
+    assert order.paid_at is None
     services.anonymise_order(order, ctx=CTX)
     order.refresh_from_db()
     assert (order.privacy_status, order.email) == ("anonymized", engine.ANONYMISED_EMAIL)
     assert order.grand_total == Decimal("12.20")
+
+
+def test_a_live_checkout_is_not_anonymised() -> None:
+    for state in ("checkout", "awaiting_payment"):
+        order = place()
+        if state == "awaiting_payment":
+            services.transition_order(order, state, ctx=CTX)
+        with pytest.raises(ScrubNotDue):
+            services.anonymise_order(order, ctx=CTX)
+        with pytest.raises(IntegrityError):
+            scrub_sql(
+                order,
+                "anonymise",
+                "email = %s, privacy_status = 'anonymized'",
+                engine.ANONYMISED_EMAIL,
+            )
+
+
+def test_an_abandoned_checkout_is_anonymised_after_the_frozen_delay() -> None:
+    order = place(created=ago(days=engine.ABANDONED_AFTER_DAYS + 1))
+    services.transition_order(order, "awaiting_payment", ctx=CTX)
+    services.anonymise_order(order, ctx=CTX)
+    order.refresh_from_db()
+    assert order.privacy_status == "anonymized"
+
+
+def test_an_anonymised_order_can_never_change_state_again() -> None:
+    order = place(created=ago(days=engine.ABANDONED_AFTER_DAYS + 1))
+    services.transition_order(order, "awaiting_payment", ctx=CTX)
+    services.anonymise_order(order, ctx=CTX)
+    with pytest.raises(IntegrityError):
+        services.transition_order(order, "paid", ctx=CTX)
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Order.objects.filter(pk=order.pk).update(state="paid")
+    with pytest.raises(IntegrityError):
+        run_sql(("UPDATE orders_order SET state = 'cancelled' WHERE id = %s", [order.pk]))
+
+
+def test_paid_at_is_set_by_the_trigger_when_the_order_is_first_paid() -> None:
+    order = place()
+    assert order.paid_at is None
+    for state in ("awaiting_payment", "paid"):
+        services.transition_order(order, state, ctx=CTX)
+    paid_at = order.paid_at
+    assert paid_at is not None
+    for sql in (
+        "UPDATE orders_order SET paid_at = NULL WHERE id = %s",
+        "UPDATE orders_order SET paid_at = now() + interval '1 day' WHERE id = %s",
+    ):
+        with pytest.raises(IntegrityError):
+            run_sql((sql, [order.pk]))
+    young = place()
+    with pytest.raises(IntegrityError):
+        run_sql(("UPDATE orders_order SET paid_at = now() WHERE id = %s", [young.pk]))
+
+
+def test_a_new_order_cannot_choose_paid_at_but_a_legacy_one_can() -> None:
+    with pytest.raises(ValueError, match="legacy"):
+        place(paid_at=dt.datetime(2020, 1, 1, tzinfo=dt.UTC))
+    when = dt.datetime(2024, 3, 1, tzinfo=dt.UTC)
+    order = place(
+        state="cancelled",
+        legacy_wp_order_id=950,
+        placed_at=dt.datetime(2024, 2, 1, tzinfo=dt.UTC),
+        paid_at=when,
+    )
+    assert order.paid_at == when
+    paid_legacy = place(
+        state="closed", legacy_wp_order_id=951, placed_at=dt.datetime(2024, 2, 1, tzinfo=dt.UTC)
+    )
+    assert paid_legacy.paid_at is not None  # a paid-or-later legacy state implies it was paid
+
+
+def test_a_legacy_order_paid_then_cancelled_is_not_anonymisable_before_its_date() -> None:
+    order = place(
+        state="cancelled",
+        legacy_wp_order_id=952,
+        placed_at=dt.datetime(2024, 2, 1, tzinfo=dt.UTC),
+        paid_at=dt.datetime(2024, 2, 2, tzinfo=dt.UTC),
+    )
+    with pytest.raises(ScrubNotDue):
+        services.anonymise_order(order, ctx=CTX)
+    with pytest.raises(IntegrityError):
+        scrub_sql(
+            order, "anonymise", "email = %s, privacy_status = 'anonymized'", engine.ANONYMISED_EMAIL
+        )
+
+
+def test_anonymized_without_every_placeholder_is_refused() -> None:
+    order = cancelled_order()
+    with pytest.raises(IntegrityError):
+        scrub_sql(order, "anonymise", "privacy_status = 'anonymized'")
+    with pytest.raises(IntegrityError):
+        scrub_sql(
+            order, "anonymise", "email = %s, privacy_status = 'anonymized'", engine.ANONYMISED_EMAIL
+        )
 
 
 def test_a_paid_order_is_not_anonymised_early() -> None:
@@ -510,15 +619,23 @@ def test_a_paid_order_is_not_anonymised_early() -> None:
         )
 
 
-def test_raw_sql_anonymises_an_unpaid_order_but_only_to_placeholders() -> None:
-    order = place()
+def test_raw_sql_anonymises_a_cancelled_order_but_only_to_placeholders() -> None:
+    order = cancelled_order()
     with pytest.raises(IntegrityError):
         scrub_sql(order, "anonymise", "email = %s, privacy_status = 'anonymized'", "x@example.com")
     scrub_sql(
         order,
         "anonymise",
-        "email = %s, privacy_status = 'anonymized', anonymised_at = now()",
+        "email = %s, customer_name = %s, customer_vat_number = %s, customer_tax_id = %s,"
+        " billing_address = %s::jsonb, shipping_address = %s::jsonb, vat_validation = %s::jsonb,"
+        " privacy_status = 'anonymized', anonymised_at = now()",
         engine.ANONYMISED_EMAIL,
+        engine.ANONYMISED,
+        engine.ANONYMISED,
+        engine.ANONYMISED,
+        '{"anonymised": true}',
+        '{"anonymised": true}',
+        '{"anonymised": true}',
     )
 
 

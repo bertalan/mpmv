@@ -251,5 +251,17 @@ def test_privacy_transitions_go_forward_only() -> None:
             engine.check_privacy_transition(source, target)
 
 
-def test_unpaid_states_are_the_ones_that_never_reached_paid() -> None:
-    assert {"checkout", "quote_flow", "awaiting_payment", "cancelled"} == engine.UNPAID_STATES
+def test_immediate_anonymisation_needs_an_order_never_paid_and_abandoned_or_cancelled() -> None:
+    import datetime as dt
+
+    now = dt.datetime(2027, 6, 1, tzinfo=dt.UTC)
+    old = now - dt.timedelta(days=engine.ABANDONED_AFTER_DAYS + 1)
+    new = now - dt.timedelta(days=1)
+    allowed = engine.anonymisable_at_once
+    assert allowed("cancelled", None, new, now)
+    assert not allowed("cancelled", now, new, now)  # paid, then cancelled
+    assert not allowed("awaiting_payment", None, new, now)  # a live checkout
+    assert allowed("awaiting_payment", None, old, now)
+    assert allowed("checkout", None, old, now)
+    assert not allowed("paid", None, old, now)
+    assert not allowed("closed", None, old, now)
