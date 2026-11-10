@@ -137,7 +137,7 @@ def test_for_actor_gives_platform_staff_every_vendor(
     two_vendors: tuple[VendorMember, VendorMember],
 ) -> None:
     owner_a, owner_b = two_vendors
-    staff = UserFactory.create(staff=True)
+    staff = UserFactory.create(platform_staff=True)
     assert set(Vendor.objects.for_actor(staff)) == {owner_a.vendor, owner_b.vendor}
     assert list(Vendor.objects.for_actor(owner_a.user)) == [owner_a.vendor]
     assert not Vendor.objects.for_actor(AnonymousUser()).exists()
@@ -146,7 +146,7 @@ def test_for_actor_gives_platform_staff_every_vendor(
 def test_for_actor_gives_inactive_staff_nothing(
     two_vendors: tuple[VendorMember, VendorMember],
 ) -> None:
-    staff = UserFactory.create(staff=True, is_active=False)
+    staff = UserFactory.create(platform_staff=True, is_active=False)
     assert not Vendor.objects.for_actor(staff).exists()
 
 
@@ -260,7 +260,7 @@ def test_get_for_actor_lets_staff_reach_any_vendor(
     two_vendors: tuple[VendorMember, VendorMember],
 ) -> None:
     owner_a, owner_b = two_vendors
-    staff = UserFactory.create(staff=True)
+    staff = UserFactory.create(platform_staff=True)
     assert get_for_actor_or_404(Vendor, staff, pk=owner_b.vendor.pk) == owner_b.vendor
     assert get_for_actor_or_404(Vendor, owner_a.user, pk=owner_a.vendor.pk) == owner_a.vendor
     with pytest.raises(Http404):

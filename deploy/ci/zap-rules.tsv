@@ -1,0 +1,5 @@
+# ZAP baseline rules (SEC.5): only the documented accepts, one line per plugin id.
+# Reasons and how to re-triage: docs/dev/security-scans.md. Tab-separated: id, action, name.
+# Anything not listed here is reported and fails the scan at medium or higher.
+90004	IGNORE	(Insufficient Site Isolation Against Spectre: COEP accepted, see docs)
+10110	IGNORE	(Dangerous JS Functions: vendored htmx, eval disabled by config, see docs)

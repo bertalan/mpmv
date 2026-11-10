@@ -90,6 +90,7 @@ from apps.tax.tests.factories import (
 from apps.vendors.models import (
     ContractAcceptance,
     CrossVendorConsent,
+    SelfCertification,
     Vendor,
     VendorClaim,
     VendorFeatureFlag,
@@ -99,6 +100,7 @@ from apps.vendors.models import (
 from apps.vendors.tests.factories import (
     ContractAcceptanceFactory,
     CrossVendorConsentFactory,
+    SelfCertificationFactory,
     VendorClaimFactory,
     VendorFeatureFlagFactory,
     VendorMemberFactory,
@@ -136,7 +138,10 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         vendor=vendor, role=VendorMember.Role.STAFF
     ),
     VendorTranslation: lambda vendor: VendorTranslationFactory.create(vendor=vendor, language="it"),
-    ContractAcceptance: lambda vendor: ContractAcceptanceFactory.create(vendor=vendor),
+    ContractAcceptance: lambda vendor: ContractAcceptanceFactory.create(
+        vendor=vendor, certified=False
+    ),
+    SelfCertification: lambda vendor: SelfCertificationFactory.create(vendor=vendor),
     VendorFeatureFlag: lambda vendor: VendorFeatureFlagFactory.create(vendor=vendor),
     CrossVendorConsent: lambda vendor: CrossVendorConsentFactory.create(vendor=vendor),
     VendorClaim: lambda vendor: VendorClaimFactory.create(vendor=vendor),
@@ -289,6 +294,21 @@ ENDPOINTS: dict[str, Access] = {
         "Vendor claim page (VEN.24): without a claim link opened in the session for that vendor "
         "it shows only the generic 'link not valid' page, whoever is signed in.",
         kwargs={"vendor_key": "00000000-0000-0000-0000-000000000000"},
+    ),
+    "vendors:apply": NoVendorData(
+        "Public 'Sell with us' application (VEN.22): shows a form and creates only the "
+        "applicant's own new records; it reads no vendor data."
+    ),
+    "vendors:apply_sent": NoVendorData("Static 'check your email' page (VEN.22)."),
+    "vendors:apply_cancel": NoVendorData(
+        "Application cancel page (VEN.22): without a link opened in the session for that "
+        "account it shows only a neutral page and changes nothing.",
+        kwargs={"user_key": "00000000-0000-0000-0000-000000000000"},
+    ),
+    "vendors:apply_confirm": NoVendorData(
+        "Application email confirmation (VEN.22): without a link opened in the session for "
+        "that account it shows only the generic 'link not valid' page.",
+        kwargs={"user_key": "00000000-0000-0000-0000-000000000000"},
     ),
     "geocoding_find": NoVendorData(
         "Find coordinates (EVT.12): geocodes the typed address; reads no vendor data."

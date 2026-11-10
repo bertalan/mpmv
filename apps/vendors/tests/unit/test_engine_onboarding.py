@@ -43,10 +43,15 @@ def checklist(
     )
 
 
-def test_the_checklist_lists_contract_dac7_and_payout_data_in_order() -> None:
+def test_the_checklist_lists_contract_platform_duties_dac7_and_payout_data_in_order() -> None:
     items = checklist().items
-    assert [item.key for item in items] == [engine.CONTRACT, engine.DAC7, engine.PAYOUT_DATA]
-    assert [item.blocking for item in items] == [True, False, False]
+    assert [item.key for item in items] == [
+        engine.CONTRACT,
+        engine.PLATFORM_DUTIES,
+        engine.DAC7,
+        engine.PAYOUT_DATA,
+    ]
+    assert [item.blocking for item in items] == [True, True, False, False]
 
 
 def test_a_vendor_that_accepted_the_current_contract_is_ready_even_with_data_missing() -> None:

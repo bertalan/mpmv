@@ -1,0 +1,5 @@
+{% comment %}
+Call to action block of the `ride` theme (THM.6): the theme's CTA band on the accent fill.
+{% endcomment %}<section class="block block-cta">
+  {% include "components/cta_band.html" with title=value.heading text=value.text url=value.link.href action=value.link.label variant="accent" only %}
+</section>

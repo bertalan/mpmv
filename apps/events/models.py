@@ -67,6 +67,7 @@ from wagtail.models import (
 )
 from wagtail_localize.fields import SynchronizedField
 
+from apps.cms import roles
 from apps.cms.blocks import (
     RICH_TEXT_FEATURES,
     CallToActionBlock,
@@ -808,7 +809,7 @@ class EventSettings(BaseSiteSetting):  # type: ignore[misc]  # Wagtail is untype
 # --- The "Event review" workflow (spec 15 "Moderation with Wagtail workflows")
 
 EVENT_REVIEW = "Event review"
-EVENT_MODERATORS = "Event moderators"
+EVENT_MODERATORS = roles.EVENT_MODERATORS
 
 
 def event_review_workflow() -> Workflow:
