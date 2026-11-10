@@ -565,3 +565,10 @@ LOGGING = {
     "loggers": {"django.request": {"filters": ["redact_secret_paths"]}},
     "root": {"handlers": ["console"], "level": "INFO"},
 }
+
+# Optional prefix of order numbers, e.g. "MP-" gives "MP-2027-000123" (ORD.2). Empty by default.
+ORDER_NUMBER_PREFIX = ""
+
+# Months after an order during which its non-fiscal data is kept; then `minimise_order` may
+# drop it (D-29). The fiscal snapshot is kept 10 years from the end of the order's year.
+ORDER_ACTIVE_PHASE_MONTHS = 24  # can only lengthen the 24-month floor enforced in the database
