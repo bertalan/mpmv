@@ -2543,3 +2543,31 @@ def _ranked(
         return products.none()
     position = Case(*(When(pk=pk, then=Value(i)) for i, pk in enumerate(ranked)))
     return products.filter(pk__in=ranked).order_by(position)
+
+
+@dataclass(frozen=True)
+class ProductKpis:
+    """Product counts for a vendor's dashboard (CORE.9)."""
+
+    published: int
+    draft: int
+    retired: int
+    out_of_stock: int  # published products a customer could buy but cannot: no stock
+
+    @property
+    def total(self) -> int:
+        return self.published + self.draft + self.retired
+
+
+def product_kpis(products: "QuerySet[Product]") -> ProductKpis:
+    """The counts for `products`, which the caller has already scoped to the vendor (CORE.3)."""
+    counts = products.aggregate(
+        published=models.Count("pk", filter=Q(status=ProductStatus.PUBLISHED)),
+        draft=models.Count("pk", filter=Q(status=ProductStatus.DRAFT)),
+        retired=models.Count("pk", filter=Q(status=ProductStatus.RETIRED)),
+        out_of_stock=models.Count(
+            "pk",
+            filter=Q(status=ProductStatus.PUBLISHED, stock_status=StockStatus.OUT_OF_STOCK),
+        ),
+    )
+    return ProductKpis(**counts)

@@ -18,6 +18,8 @@ from django.views.generic import TemplateView
 
 from apps.accounts.decorators import mfa_exempt
 from apps.accounts.forms import ManagerLoginForm
+from apps.catalog.models import Product
+from apps.catalog.services import product_kpis
 from apps.vendors.scoping import Source, VendorScopedQuerySet
 
 from .access import ManagerContext, may_enter
@@ -81,6 +83,11 @@ def shell_context(ctx: ManagerContext, current: Section) -> dict[str, Any]:
 class ShopDashboardView(ManagerView):
     section = "shop.dashboard"
     template_name = "manager/shop/dashboard.html"
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context["products"] = product_kpis(self.scoped(Product))
+        return context
 
 
 class PlatformDashboardView(ManagerView):
