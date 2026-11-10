@@ -107,7 +107,9 @@ def get_for_actor_or_404(qs, actor, **lookup):  # 404 (not 403) to prevent enume
   MFA** for everyone who reaches a management area, progressive lockout per account and IP.
 - Unlocking (owner decision Q-18): the Support role unlocks a locked account from the Manager
   platform space, with an `AuditLog` entry, and a completed password reset clears the account's
-  lockout (CORE.8).
+  lockout (CORE.8). Platform staff unlock customers and vendor members only; only a superuser
+  unlocks a staff or superuser account (the lockout protects privileged accounts from brute
+  force, same rule as the staff password and MFA reset).
 - Step-up (re-authentication) for: IBAN change, payout, rate changes (commission rates and VAT
   rates alike, owner decision MQ-2), customer data export, configuration changes (ARC.24), role
   assignment and revocation (CORE.18), vendor approval, suspension and closure, operator-owned
@@ -541,6 +543,8 @@ policies carry legal weight towards customers. A change is published at once and
 moderators (post-moderation). Every change writes an `AuditLog` entry with before and after, and
 staff (catalog and moderation role) can revert a change to an earlier version from the
 platform space. This is part of CORE.9.
+
+**Vendor uploads.** The shop space stores every image a vendor uploads (logo, events, products) in the vendor's own Wagtail collection, `vendor-<vendor public id>` at the root and below (spec [15](15-events.md), SEC.2 in spec [12](12-security-infra-operations.md)); the services refuse images from any other collection.
 
 ## 2.3 Tasks
 
