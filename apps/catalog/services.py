@@ -36,7 +36,7 @@ from apps.core.models import MediaImage
 from apps.core.services import audit_changes, run_mutation, save_audited
 from apps.core.text import ascii_int
 from apps.vendors.models import Vendor
-from apps.vendors.scoping import VendorScopedQuerySet
+from apps.vendors.scoping import VendorScopedQuerySet, is_platform_staff
 from apps.vendors.services import ensure_vendor_can_write, vendors_in_suggestions
 
 from . import engine, listings, publishing, slugs
@@ -654,7 +654,7 @@ def duplicate_product_to_vendor(
     Raises PermissionDenied for non-staff and ValidationError for an empty reason, the same
     vendor or a SKU the target vendor already uses.
     """
-    if not getattr(actor, "is_staff", False):
+    if not is_platform_staff(actor):
         raise PermissionDenied("Only staff can duplicate a product to another vendor.")
     reason = reason.strip()
     if not reason:
