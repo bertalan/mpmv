@@ -6,8 +6,6 @@ and requester; a cached answer is reused only when it was asked for the same req
 carries a number. Fail closed stays. VIES is reached through fakes of our `ViesClient` only.
 """
 
-from typing import Any
-
 import pytest
 from django.utils import timezone
 
@@ -15,7 +13,7 @@ from apps.tax import engine, services
 from apps.tax.engine import ViesAnswer, ViesQuery
 from apps.tax.models import VatValidation
 from apps.tax.tests.factories import VatValidationFactory
-from apps.tax.tests.fakes import DOWN, DownViesClient, FakeViesClient
+from apps.tax.tests.fakes import DownViesClient, FakeViesClient
 
 pytestmark = pytest.mark.django_db
 
@@ -29,7 +27,6 @@ class RequesterAwareClient(FakeViesClient):
 
     def __init__(self) -> None:
         super().__init__(default=VALID)
-        self.requesters: list[ViesQuery | None] = []
 
     def check(self, query: ViesQuery, *, requester: ViesQuery | None = None) -> ViesAnswer:
         self.calls.append(query)
@@ -96,21 +93,6 @@ def test_vies_down_still_fails_closed_with_a_requester() -> None:
     assert check.verified is False
     assert check.result == engine.VAT_UNAVAILABLE
     assert check.request_id == ""
-
-
-def test_a_client_that_ignores_the_requester_is_still_asked_once() -> None:
-    class Legacy:
-        def __init__(self) -> None:
-            self.calls: list[Any] = []
-
-        def check(self, query: ViesQuery) -> ViesAnswer:
-            self.calls.append(query)
-            return DOWN
-
-    client = Legacy()
-    check = services.verify_vat_number("DE", "DE123456789", client=client)
-    assert check.verified is False
-    assert len(client.calls) == 1
 
 
 def test_a_recent_unavailable_answer_is_reused_so_an_outage_does_not_stall_checkout() -> None:

@@ -248,6 +248,7 @@ def test_the_snapshot_holds_what_an_order_keeps() -> None:
         "reason": engine.VAT_REASON_VALID,
         "detail": "",
         "request_id": "WAPIAAAAZ1x2y3",
+        "requester": "",
         "checked_at": check.checked_at.isoformat() if check.checked_at else None,
         "validation": str(check.validation.public_id) if check.validation else None,
     }

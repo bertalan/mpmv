@@ -564,6 +564,11 @@ class VatValidation(BaseModel):
     request_id = models.CharField(
         max_length=64, blank=True, help_text="VIES consultation number, when given."
     )
+    requester = models.CharField(
+        max_length=32,
+        blank=True,
+        help_text=("VAT number with prefix sent to VIES as requester (the vendor's)."),
+    )
     checked_at = models.DateTimeField()
 
     class Meta:

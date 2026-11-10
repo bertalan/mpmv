@@ -141,7 +141,22 @@ def test_the_reverse_deletes_only_rows_still_equal_to_the_seed() -> None:
     migration = import_module("apps.tax.migrations.0006_seed_special_territories")
     Territory.objects.filter(code="ES-CN").update(postcode_patterns=["35001"])
     migration.unseed(apps, None)
-    assert list(Territory.objects.values_list("code", flat=True)) == ["ES-CN"]
+    assert set(Territory.objects.values_list("code", flat=True)) == {"ES-CN", *OWN_RATES_EXPECTED}
+
+
+def test_the_madeira_azores_seed_is_idempotent_and_reversible() -> None:
+    from importlib import import_module
+
+    from django.apps import apps
+
+    from apps.tax.models import TaxRate
+
+    migration = import_module("apps.tax.migrations.0008_seed_madeira_azores")
+    migration.seed(apps, None)
+    assert TaxRate.objects.filter(territory__isnull=False).count() == 2
+    migration.unseed(apps, None)
+    assert not Territory.objects.filter(vat_status=engine.OWN_RATES).exists()
+    assert not TaxRate.objects.exists()
 
 
 @pytest.mark.parametrize(
