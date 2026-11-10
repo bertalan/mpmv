@@ -1,0 +1,867 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: MPMV\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: apps/manager/lists.py
+msgid "%(action)s: %(count)d row done."
+msgid_plural "%(action)s: %(count)d rows done."
+msgstr[0] "%(action)s: %(count)d riga completata."
+msgstr[1] "%(action)s: %(count)d righe completate."
+
+#: apps/accounts/templates/accounts/mfa/overview.html
+msgid "%(counter)s unused."
+msgid_plural "%(counter)s unused."
+msgstr[0] "%(counter)s non usato."
+msgstr[1] "%(counter)s non usati."
+
+#: apps/accounts/mfa_views.py
+msgid "%(name)s removed."
+msgstr "%(name)s rimosso."
+
+#: apps/manager/forms.py
+msgid "About the shop"
+msgstr "Informazioni sul negozio"
+
+#: themes/base/templates/403.html
+msgid "Access denied"
+msgstr "Accesso negato"
+
+#: apps/manager/templates/manager/list.html
+msgid "Action on the selected rows"
+msgstr "Azione sulle righe selezionate"
+
+#: apps/accounts/templates/accounts/mfa/overview.html
+msgid "Add a factor"
+msgstr "Aggiungi un fattore"
+
+#: apps/accounts/templates/accounts/mfa/overview.html
+msgid "Add an authenticator app"
+msgstr "Aggiungi un’app di autenticazione"
+
+#: apps/accounts/mfa_views.py
+msgid "Add another factor before removing your last one."
+msgstr "Aggiungi un altro fattore prima di rimuovere l’ultimo."
+
+#: apps/manager/templates/manager/list.html
+#: apps/manager/templates/manager/platform/notices.html
+msgid "All"
+msgstr "Tutti"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Anonymous"
+msgstr "Anonimo"
+
+#: apps/accounts/templates/accounts/mfa/totp.html
+#: apps/accounts/templates/accounts/mfa/verify.html
+msgid "Authentication code"
+msgstr "Codice di autenticazione"
+
+#: apps/accounts/templates/accounts/mfa/overview.html
+msgid "authenticator app"
+msgstr "app di autenticazione"
+
+#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/totp.html
+msgid "Authenticator app"
+msgstr "App di autenticazione"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Back to the notices"
+msgstr "Torna alle segnalazioni"
+
+#: apps/manager/templates/manager/forbidden.html
+msgid "Back to the site"
+msgstr "Torna al sito"
+
+#: apps/accounts/templates/accounts/mfa/recovery_codes.html
+msgid "Back to two-factor settings"
+msgstr "Torna alle impostazioni della verifica in due passaggi"
+
+#: themes/base/templates/400.html
+msgid "Bad request"
+msgstr "Richiesta non valida"
+
+#: apps/manager/templates/manager/bulk_preview.html
+msgid "Cancel"
+msgstr "Annulla"
+
+#: apps/manager/forms.py
+msgid "Cancellation policy"
+msgstr "Condizioni di annullamento"
+
+#: apps/accounts/templates/accounts/mfa/totp.html
+msgid "Cannot scan? Enter this key:"
+msgstr "Non riesci a scansionare? Inserisci questa chiave:"
+
+#: apps/manager/sections.py
+#: apps/manager/templates/manager/shop/vendor_picker.html
+msgid "Choose a vendor"
+msgstr "Scegli un venditore"
+
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "Choose how you will confirm it is you after your password."
+msgstr "Scegli come confermare la tua identità dopo la password."
+
+#: apps/accounts/templates/accounts/mfa/totp.html
+#: apps/manager/templates/manager/bulk_preview.html
+msgid "Confirm"
+msgstr "Conferma"
+
+#: apps/accounts/templates/accounts/action_link/continue.html
+#: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
+#: apps/accounts/templates/accounts/mfa/recovery_codes_new.html
+msgid "Continue"
+msgstr "Continua"
+
+#: apps/accounts/templates/accounts/action_link/continue.html
+msgid ""
+"Continue does not sign you in: the page it opens asks you to confirm who you"
+" are."
+msgstr ""
+"Continua non ti fa accedere: la pagina che si apre ti chiede di confermare "
+"la tua identità."
+
+#: apps/accounts/templates/accounts/action_link/continue.html
+msgid "Continue to your request"
+msgstr "Continua con la tua richiesta"
+
+#: apps/manager/forms.py
+msgid ""
+"Customers see this text. A change is live at once and the moderators are "
+"told."
+msgstr ""
+"I clienti vedono questo testo. Una modifica è visibile subito e i moderatori"
+" vengono avvisati."
+
+#: apps/manager/sections.py
+#: apps/manager/templates/manager/platform/dashboard.html
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid "Dashboard"
+msgstr "Dashboard"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Decided"
+msgstr "Deciso"
+
+#: apps/accounts/admin.py
+msgid "Delete selected %(verbose_name_plural)s"
+msgstr "Elimina %(verbose_name_plural)s selezionati"
+
+#: apps/manager/forms.py
+msgid "Description of the logo"
+msgstr "Descrizione del logo"
+
+#: themes/base/templates/components/alert.html
+msgid "Dismiss"
+msgstr "Chiudi"
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid "Drafts"
+msgstr "Bozze"
+
+#: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
+msgid ""
+"Each code signs you in once if you lose your authenticator or passkey. Store"
+" them somewhere safe now: they are shown only this time."
+msgstr ""
+"Ogni codice ti fa accedere una sola volta se perdi l’app di autenticazione o"
+" la passkey. Conservali subito in un luogo sicuro: vengono mostrati solo "
+"questa volta."
+
+#: apps/manager/templates/manager/login.html
+msgid "Email"
+msgstr "Email"
+
+#: themes/base/templates/components/alert.html
+msgid "Error"
+msgstr "Errore"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Exact location"
+msgstr "Posizione esatta"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Explanation"
+msgstr "Spiegazione"
+
+#: apps/manager/templates/manager/list.html
+#: apps/manager/templates/manager/platform/notices.html
+msgid "Filter"
+msgstr "Filtra"
+
+#: apps/manager/templates/manager/list.html
+#: apps/manager/templates/manager/platform/notices.html
+msgid "Filters"
+msgstr "Filtri"
+
+#: themes/base/templates/components/footer.html
+msgid "Footer"
+msgstr "Piè di pagina"
+
+#: apps/accounts/templates/accounts/admin/login.html
+msgid "Forgotten your login credentials?"
+msgstr "Hai dimenticato le credenziali di accesso?"
+
+#: themes/base/templates/403_csrf.html
+msgid "Form expired"
+msgstr "Modulo scaduto"
+
+#: apps/accounts/templates/accounts/mfa/recovery_codes.html
+msgid "Generate new codes"
+msgstr "Genera nuovi codici"
+
+#: apps/accounts/templates/accounts/mfa/recovery_codes.html
+msgid "Generating new codes makes every previous code stop working."
+msgstr ""
+"Generando nuovi codici, tutti i codici precedenti smettono di funzionare."
+
+#: themes/base/templates/layouts/error.html
+msgid "Go to the home page"
+msgstr "Vai alla home page"
+
+#: apps/accounts/templates/accounts/action_link/continue.html
+msgid ""
+"If you are not signed in, Continue signs you in once with this link; you "
+"will still confirm it is you with your second factor before approving or "
+"declining anything."
+msgstr ""
+"Se non hai effettuato l’accesso, Continua ti fa accedere una volta con "
+"questo link; prima di approvare o rifiutare qualsiasi cosa dovrai comunque "
+"confermare la tua identità con il secondo fattore."
+
+#: themes/base/templates/components/alert.html
+msgid "Information"
+msgstr "Informazione"
+
+#: apps/accounts/mfa_views.py
+msgid "Invalid code. Check the time on your device and try again."
+msgstr "Codice non valido. Controlla l’ora del tuo dispositivo e riprova."
+
+#: apps/accounts/mfa_views.py
+msgid "Invalid code. Try again."
+msgstr "Codice non valido. Riprova."
+
+#: themes/base/templates/components/language_switcher.html
+msgid "Language"
+msgstr "Lingua"
+
+#: apps/manager/templates/manager/shop/profile.html
+msgid "Language of the texts"
+msgstr "Lingua dei testi"
+
+#: themes/base/templates/components/footer.html
+msgid "Legal"
+msgstr "Note legali"
+
+#: themes/base/templates/components/button.html
+msgid "Loading"
+msgstr "Caricamento"
+
+#: apps/accounts/templates/accounts/admin/login.html
+msgid "Log in"
+msgstr "Accedi"
+
+#: apps/manager/templates/manager/shop/profile.html
+msgid "Logo"
+msgstr "Logo"
+
+#: apps/manager/forms.py
+msgid "Logo image"
+msgstr "Immagine del logo"
+
+#: apps/manager/views.py
+msgid "Logo saved."
+msgstr "Logo salvato."
+
+#: apps/accounts/templates/accounts/mfa/verify.html
+msgid "Lost your device?"
+msgstr "Hai perso il dispositivo?"
+
+#: themes/base/templates/components/header.html
+msgid "Main"
+msgstr "Principale"
+
+#: apps/accounts/templates/accounts/mfa/overview.html
+msgid "Manage recovery codes"
+msgstr "Gestisci i codici di recupero"
+
+#: apps/manager/templates/manager/layout.html
+msgid "Manager sections"
+msgstr "Sezioni del Manager"
+
+#: apps/manager/templates/manager/platform/dashboard.html
+msgid ""
+"Marketplace work across vendors. The menu lists the sections you may open."
+msgstr ""
+"Attività del marketplace che riguardano tutti i venditori. Il menu elenca le"
+" sezioni che puoi aprire."
+
+#: themes/base/templates/components/header.html
+msgid "Menu"
+msgstr "Menu"
+
+#: apps/accounts/templates/accounts/mfa/recovery_codes_new.html
+msgid "New recovery codes"
+msgstr "Nuovi codici di recupero"
+
+#: themes/base/templates/components/pagination.html
+msgid "Next"
+msgstr "Avanti"
+
+#: apps/manager/templates/manager/forbidden.html
+msgid "No access"
+msgstr "Nessun accesso"
+
+#: apps/manager/templates/manager/shop/profile.html
+msgid "No logo yet."
+msgstr "Nessun logo per ora."
+
+#: apps/accounts/mfa_views.py
+msgid "no passkey registered"
+msgstr "nessuna passkey registrata"
+
+#: apps/accounts/mfa_views.py
+msgid "no pending passkey authentication"
+msgstr "nessuna autenticazione con passkey in corso"
+
+#: apps/accounts/mfa_views.py
+msgid "no pending passkey registration"
+msgstr "nessuna registrazione di passkey in corso"
+
+#: apps/accounts/templates/accounts/mfa/overview.html
+msgid "No second factor yet."
+msgstr "Nessun secondo fattore per ora."
+
+#: apps/manager/views.py
+msgid "Nothing changed."
+msgstr "Nessuna modifica."
+
+#: apps/manager/views.py
+msgid "Nothing changed: this text is still a draft. Edit it to publish it."
+msgstr ""
+"Nessuna modifica: questo testo è ancora una bozza. Modificalo per "
+"pubblicarlo."
+
+#: apps/manager/templates/manager/bulk_preview.html
+msgid "Nothing has changed yet. Check the changes below, then confirm."
+msgstr ""
+"Non è stato ancora modificato nulla. Controlla le modifiche qui sotto, poi "
+"conferma."
+
+#: apps/manager/templates/manager/list.html
+#: apps/manager/templates/manager/platform/notices.html
+msgid "Nothing to show."
+msgstr "Niente da mostrare."
+
+#: apps/manager/notice_views.py
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Notice"
+msgstr "Segnalazione"
+
+#: apps/manager/sections.py
+msgid "Notices"
+msgstr "Segnalazioni"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Notifier"
+msgstr "Segnalante"
+
+#: apps/manager/forms.py
+msgid "One line under the shop name. Plain text."
+msgstr "Una riga sotto il nome del negozio. Testo semplice."
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid "Out of stock"
+msgstr "Esaurito"
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid "Owner"
+msgstr "Titolare"
+
+#: themes/base/templates/components/pagination.html
+msgid "Page %(number)s"
+msgstr "Pagina %(number)s"
+
+#: themes/base/templates/components/pagination.html
+msgid "Page %(page)s of %(count)s"
+msgstr "Pagina %(page)s di %(count)s"
+
+#: themes/base/templates/404.html
+msgid "Page not found"
+msgstr "Pagina non trovata"
+
+#: themes/base/templates/components/pagination.html
+msgid "Pagination"
+msgstr "Paginazione"
+
+#: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "Passkey"
+msgstr "Passkey"
+
+#: apps/accounts/templates/accounts/mfa/overview.html
+msgid "passkey"
+msgstr "passkey"
+
+#: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
+msgid "Passkey name"
+msgstr "Nome della passkey"
+
+#: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
+#: apps/accounts/templates/accounts/mfa/verify.html
+msgid "Passkeys need JavaScript."
+msgstr "Le passkey richiedono JavaScript."
+
+#: apps/manager/templates/manager/login.html
+msgid "Password"
+msgstr "Password"
+
+#: apps/manager/forms.py
+msgid ""
+"Plain text for people who cannot see the image, for example the shop name."
+msgstr ""
+"Testo semplice per chi non vede l’immagine, per esempio il nome del negozio."
+
+#: apps/manager/forms.py
+msgid "Plain text, no HTML."
+msgstr "Testo semplice, senza HTML."
+
+#: apps/manager/templates/manager/layout.html
+msgid "Platform"
+msgstr "Piattaforma"
+
+#: apps/accounts/templates/accounts/admin/login.html
+msgid "Please correct the error below."
+msgid_plural "Please correct the errors below."
+msgstr[0] "Correggi l’errore qui sotto."
+msgstr[1] "Correggi gli errori qui sotto."
+
+#: apps/manager/forms.py
+msgid "PNG, JPEG or WebP. Leave empty to keep the current image."
+msgstr "PNG, JPEG o WebP. Lascia vuoto per mantenere l’immagine attuale."
+
+#: apps/manager/templates/manager/list.html
+msgid "Preview"
+msgstr "Anteprima"
+
+#: apps/manager/templates/manager/bulk_preview.html
+msgid "Preview: %(action)s"
+msgstr "Anteprima: %(action)s"
+
+#: themes/base/templates/components/pagination.html
+msgid "Previous"
+msgstr "Indietro"
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid "Products"
+msgstr "Prodotti"
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid "Published"
+msgstr "Pubblicati"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Reason"
+msgstr "Motivazione"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+#: apps/manager/templates/manager/platform/notices.html
+msgid "Received"
+msgstr "Ricevuta"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Record the decision"
+msgstr "Registra la decisione"
+
+#: apps/accounts/templates/accounts/mfa/verify.html
+msgid "Recovery code"
+msgstr "Codice di recupero"
+
+#: apps/accounts/templates/accounts/mfa/overview.html
+#: apps/accounts/templates/accounts/mfa/recovery_codes.html
+#: apps/accounts/templates/accounts/mfa/recovery_codes_new.html
+msgid "Recovery codes"
+msgstr "Codici di recupero"
+
+#: apps/manager/templates/manager/platform/notices.html
+msgid "Reference"
+msgstr "Riferimento"
+
+#: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
+msgid "Register a passkey"
+msgstr "Registra una passkey"
+
+#: apps/accounts/templates/accounts/mfa/overview.html
+msgid "Remove"
+msgstr "Rimuovi"
+
+#: apps/manager/forms.py
+msgid "Remove the logo"
+msgstr "Rimuovi il logo"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+#: apps/manager/templates/manager/platform/notices.html
+msgid "Reported"
+msgstr "Segnalato"
+
+#: themes/base/templates/components/field.html
+msgid "required"
+msgstr "obbligatorio"
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid "Retired"
+msgstr "Ritirati"
+
+#: apps/manager/forms.py
+msgid "Returns and refunds policy"
+msgstr "Condizioni di reso e rimborso"
+
+#: apps/manager/templates/manager/shop/profile.html
+msgid "Save"
+msgstr "Salva"
+
+#: apps/manager/templates/manager/shop/profile.html
+msgid "Save logo"
+msgstr "Salva logo"
+
+#: apps/accounts/templates/accounts/mfa/totp.html
+msgid ""
+"Scan this QR code with your authenticator app, then enter the 6-digit code "
+"it shows."
+msgstr ""
+"Scansiona questo codice QR con la tua app di autenticazione, poi inserisci "
+"il codice a 6 cifre che mostra."
+
+#: apps/manager/templates/manager/list.html
+msgid "Select"
+msgstr "Seleziona"
+
+#: apps/manager/lists.py
+msgid "Select at least one row."
+msgstr "Seleziona almeno una riga."
+
+#: apps/accounts/templates/accounts/mfa/totp.html
+msgid "Set up an authenticator app"
+msgstr "Configura un’app di autenticazione"
+
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "Set up two-factor authentication"
+msgstr "Configura la verifica in due passaggi"
+
+#: apps/manager/forms.py
+msgid "Shipping policy"
+msgstr "Condizioni di spedizione"
+
+#: apps/manager/templates/manager/layout.html
+msgid "Shop"
+msgstr "Negozio"
+
+#: apps/accounts/forms.py apps/manager/templates/manager/login.html
+msgid "Show password"
+msgstr "Mostra password"
+
+#: apps/manager/templates/manager/login.html
+msgid "Sign in"
+msgstr "Accedi"
+
+#: apps/manager/templates/manager/forbidden.html
+#: apps/manager/templates/manager/layout.html
+#: apps/manager/templates/manager/shop/vendor_closed.html
+msgid "Sign out"
+msgstr "Esci"
+
+#: themes/base/templates/components/skip_link.html
+msgid "Skip to main content"
+msgstr "Vai al contenuto principale"
+
+#: themes/base/templates/500.html
+msgid "Something went wrong"
+msgstr "Qualcosa è andato storto"
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid "Staff"
+msgstr "Staff"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Start review"
+msgstr "Avvia la revisione"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+#: apps/manager/templates/manager/platform/notices.html
+msgid "Status"
+msgstr "Stato"
+
+#: apps/manager/sections.py apps/manager/templates/manager/shop/profile.html
+msgid "Storefront profile"
+msgstr "Profilo del negozio"
+
+#: apps/manager/views.py
+msgid "Storefront profile saved."
+msgstr "Profilo del negozio salvato."
+
+#: themes/base/templates/components/alert.html
+msgid "Success"
+msgstr "Operazione riuscita"
+
+#: apps/manager/templates/manager/layout.html
+msgid "Switch"
+msgstr "Cambia"
+
+#: apps/manager/forms.py
+msgid "Tagline"
+msgstr "Slogan"
+
+#: apps/manager/notice_views.py
+msgid "The decision is recorded and the notifier is told."
+msgstr "La decisione è registrata e il segnalante ne viene informato."
+
+#: apps/manager/templates/manager/login.html
+msgid ""
+"The email or the password is not correct, or the account is locked for a "
+"while. Please try again."
+msgstr ""
+"L’email o la password non sono corrette, oppure l’account è bloccato per un "
+"po’. Riprova."
+
+#: themes/base/templates/403_csrf.html
+msgid ""
+"The form was sent from an old or expired page. Go back, reload the page and "
+"send it again."
+msgstr ""
+"Il modulo è stato inviato da una pagina vecchia o scaduta. Torna indietro, "
+"ricarica la pagina e invialo di nuovo."
+
+#: apps/manager/templates/manager/forbidden.html
+msgid ""
+"The Manager is for platform staff and for vendor members. If you need "
+"access, ask the platform staff, or sign in with another account."
+msgstr ""
+"Il Manager è riservato allo staff della piattaforma e ai membri dei "
+"venditori. Se ti serve l’accesso, chiedilo allo staff della piattaforma "
+"oppure accedi con un altro account."
+
+#: apps/manager/notice_views.py
+msgid "The notice is under review."
+msgstr "La segnalazione è in revisione."
+
+#: themes/base/templates/404.html
+msgid "The page you asked for does not exist or has moved."
+msgstr "La pagina richiesta non esiste o è stata spostata."
+
+#: apps/accounts/mfa_views.py
+msgid "the passkey could not be registered"
+msgstr "non è stato possibile registrare la passkey"
+
+#: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
+#: apps/accounts/templates/accounts/mfa/verify.html
+msgid "The passkey did not work."
+msgstr "La passkey non ha funzionato."
+
+#: apps/accounts/mfa_views.py
+msgid "the passkey was not accepted"
+msgstr "la passkey non è stata accettata"
+
+#: themes/base/templates/400.html
+msgid "The request could not be understood. Check the address and try again."
+msgstr ""
+"Non è stato possibile comprendere la richiesta. Controlla l’indirizzo e "
+"riprova."
+
+#: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
+#: apps/accounts/templates/accounts/mfa/verify.html
+msgid "The request failed."
+msgstr "La richiesta non è riuscita."
+
+#: apps/manager/templates/manager/shop/profile.html
+msgid ""
+"The text in this language is a machine draft and is not public yet. Edit and"
+" save it to publish it."
+msgstr ""
+"Il testo in questa lingua è una bozza automatica e non è ancora pubblico. "
+"Modificalo e salvalo per pubblicarlo."
+
+#: apps/manager/templates/manager/shop/profile.html
+msgid ""
+"The texts and policies customers read on the page of %(vendor)s, one "
+"language at a time."
+msgstr ""
+"I testi e le condizioni che i clienti leggono nella pagina di %(vendor)s, "
+"una lingua alla volta."
+
+#: apps/accounts/decorators.py
+msgid "The verification failed. Please reload the page and try again."
+msgstr "La verifica non è riuscita. Ricarica la pagina e riprova."
+
+#: themes/base/templates/components/error_summary.html
+msgid "There is a problem"
+msgstr "Si è verificato un problema"
+
+#: apps/manager/templates/manager/bulk_preview.html
+msgid "This action changes nothing."
+msgstr "Questa azione non modifica nulla."
+
+#: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
+#: apps/accounts/templates/accounts/mfa/verify.html
+msgid "This browser does not support passkeys."
+msgstr "Questo browser non supporta le passkey."
+
+#: apps/accounts/views.py
+msgid "This content is not available in this language."
+msgstr "Questo contenuto non è disponibile in questa lingua."
+
+#: apps/accounts/templates/accounts/action_link/continue.html
+msgid ""
+"This link was sent to you by email. Press Continue to open the page it leads"
+" to."
+msgstr ""
+"Questo link ti è stato inviato per email. Premi Continua per aprire la "
+"pagina a cui porta."
+
+#: apps/manager/notice_views.py
+msgid "This step is not possible for the notice in its status."
+msgstr ""
+"Questo passaggio non è possibile per la segnalazione nel suo stato attuale."
+
+#: apps/manager/templates/manager/shop/vendor_closed.html
+msgid "This vendor is closed, so its shop pages are no longer available."
+msgstr ""
+"Questo venditore è chiuso, quindi le pagine del suo negozio non sono più "
+"disponibili."
+
+#: apps/manager/templates/manager/shop/profile.html
+msgid ""
+"This vendor is suspended or closed, so the storefront profile cannot be "
+"changed. Contact support to have it reopened."
+msgstr ""
+"Questo venditore è sospeso o chiuso, quindi il profilo del negozio non può "
+"essere modificato. Contatta l’assistenza per farlo riaprire."
+
+#: apps/manager/templates/manager/shop/vendor_closed.html
+msgid ""
+"To ask to reopen it, write to the platform staff. Staff reopen a closed "
+"vendor after a review; it then goes through onboarding again, including the "
+"acceptance of the contract in force."
+msgstr ""
+"Per chiederne la riapertura, scrivi allo staff della piattaforma. Lo staff "
+"riapre un venditore chiuso dopo una verifica; il venditore ripete poi "
+"l’onboarding, compresa l’accettazione del contratto in vigore."
+
+#: apps/accounts/action_link_views.py apps/accounts/decorators.py
+msgid "Too many attempts. Please try again later."
+msgstr "Troppi tentativi. Riprova più tardi."
+
+#: apps/accounts/templates/accounts/mfa/overview.html
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "Two-factor authentication"
+msgstr "Verifica in due passaggi"
+
+#: apps/accounts/templates/accounts/mfa/recovery_codes_new.html
+msgid "Two-factor authentication is on"
+msgstr "La verifica in due passaggi è attiva"
+
+#: apps/accounts/templates/accounts/mfa/overview.html
+msgid "Two-factor settings"
+msgstr "Impostazioni della verifica in due passaggi"
+
+#: apps/accounts/templates/accounts/mfa/verify.html
+msgid "Use a passkey"
+msgstr "Usa una passkey"
+
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "Use an authenticator app"
+msgstr "Usa un’app di autenticazione"
+
+#: apps/accounts/templates/accounts/mfa/verify.html
+msgid "Use recovery code"
+msgstr "Usa un codice di recupero"
+
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "Use this device's screen lock or a security key."
+msgstr ""
+"Usa il blocco schermo di questo dispositivo o una chiave di sicurezza."
+
+#: apps/manager/templates/manager/layout.html
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid "Vendor"
+msgstr "Venditore"
+
+#: apps/manager/templates/manager/shop/vendor_closed.html
+msgid "Vendor closed"
+msgstr "Venditore chiuso"
+
+#: apps/accounts/templates/accounts/mfa/verify.html
+msgid "Verify"
+msgstr "Verifica"
+
+#: apps/accounts/templates/accounts/mfa/verify.html
+msgid "Verify it is you"
+msgstr "Verifica la tua identità"
+
+#: themes/base/templates/components/alert.html
+msgid "Warning"
+msgstr "Attenzione"
+
+#: themes/base/templates/500.html
+msgid "We could not complete your request. Please try again in a few minutes."
+msgstr ""
+"Non siamo riusciti a completare la richiesta. Riprova tra qualche minuto."
+
+#: apps/manager/templates/manager/shop/vendor_picker.html
+msgid ""
+"You are a member of several vendors. Choose the one to work on; you can "
+"switch from the header later."
+msgstr ""
+"Sei membro di più venditori. Scegli quello su cui lavorare; potrai cambiarlo"
+" in seguito dall’intestazione."
+
+#: apps/accounts/templates/accounts/admin/login.html
+msgid ""
+"You are authenticated as %(username)s, but are not authorized to access this"
+" page. Would you like to login to a different account?"
+msgstr ""
+"Hai effettuato l’accesso come %(username)s, ma non sei autorizzato ad "
+"accedere a questa pagina. Vuoi accedere con un altro account?"
+
+#: apps/manager/templates/manager/forbidden.html
+msgid ""
+"You are signed in as %(user)s, and you do not have access to this part of "
+"the site."
+msgstr ""
+"Hai effettuato l’accesso come %(user)s e non hai accesso a questa parte del "
+"sito."
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid "You are working on %(vendor)s."
+msgstr "Stai lavorando su %(vendor)s."
+
+#: themes/base/templates/403.html
+msgid "You do not have permission to open this page."
+msgstr "Non hai il permesso di aprire questa pagina."
+
+#: apps/accounts/templates/accounts/mfa/recovery_codes.html
+msgid "You have %(counter)s unused recovery code."
+msgid_plural "You have %(counter)s unused recovery codes."
+msgstr[0] "Hai %(counter)s codice di recupero non usato."
+msgstr[1] "Hai %(counter)s codici di recupero non usati."
+
+#: apps/accounts/templates/accounts/mfa/overview.html
+msgid "Your factors"
+msgstr "I tuoi fattori"
+
+#: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
+msgid "Your recovery codes"
+msgstr "I tuoi codici di recupero"
+
+#: apps/manager/templates/manager/shop/dashboard.html
+msgid "Your role"
+msgstr "Il tuo ruolo"
+
+#: apps/accounts/templates/accounts/mfa/setup.html
+msgid "Your role requires a second factor before you can continue."
+msgstr "Il tuo ruolo richiede un secondo fattore prima di poter continuare."
