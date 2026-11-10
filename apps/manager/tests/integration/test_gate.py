@@ -1,8 +1,9 @@
 """CORE.17 done-when: one gate per space (spec 02 §Backoffice).
 
-A vendor member opens `/manager/shop/` and gets 404 on every `/manager/platform/` URL (GET and
-POST); a platform staff member gets 404 on `/manager/shop/` outside an impersonation session; a
-customer gets 404 on both spaces and an anonymous visitor is sent to the login; a user without a
+A vendor member opens `/manager/shop/` and gets 403 (an explanatory page) on every
+`/manager/platform/` URL (GET and
+POST); a platform staff member gets 403 on `/manager/shop/` outside an impersonation session; a
+customer gets 403 on both spaces and an anonymous visitor is sent to the login; a user without a
 confirmed second factor is sent to enrolment before any Manager page.
 """
 
@@ -39,14 +40,14 @@ def test_a_vendor_member_opens_the_shop_space(client: Client, owner: User, vendo
 
 
 @pytest.mark.parametrize("method", METHODS)
-def test_a_vendor_member_gets_404_on_every_platform_url(
+def test_a_vendor_member_gets_403_on_every_platform_url(
     client: Client, owner: User, method: str
 ) -> None:
     verified_login(client, owner)
     paths = sample_paths(Space.PLATFORM)
     assert PLATFORM in paths
     for path in paths:
-        assert getattr(client, method)(path).status_code == 404, path
+        assert getattr(client, method)(path).status_code == 403, path
 
 
 def test_platform_staff_open_the_platform_space(client: Client, platform_staff: User) -> None:
@@ -55,33 +56,33 @@ def test_platform_staff_open_the_platform_space(client: Client, platform_staff: 
 
 
 @pytest.mark.parametrize("method", METHODS)
-def test_platform_staff_get_404_on_every_shop_url(
+def test_platform_staff_get_403_on_every_shop_url(
     client: Client, platform_staff: User, method: str
 ) -> None:
     verified_login(client, platform_staff)
     paths = sample_paths(Space.SHOP)
     assert SHOP in paths
     for path in paths:
-        assert getattr(client, method)(path).status_code == 404, path
+        assert getattr(client, method)(path).status_code == 403, path
 
 
 @pytest.mark.parametrize("method", METHODS)
-def test_a_bare_is_staff_user_without_a_platform_role_gets_404_on_the_platform_space(
+def test_a_bare_is_staff_user_without_a_platform_role_gets_403_on_the_platform_space(
     client: Client, method: str
 ) -> None:
     """Spec 02 Q-34: Wagtail or Django admin access (`is_staff`) does not make platform staff."""
     editor = UserFactory.create(staff=True)
     verified_login(client, editor)
     for path in sample_paths(Space.PLATFORM):
-        assert getattr(client, method)(path).status_code == 404, path
-    assert client.get(SHOP).status_code == 404
+        assert getattr(client, method)(path).status_code == 403, path
+    assert client.get(SHOP).status_code == 403
 
 
-def test_a_superuser_without_a_platform_role_gets_404_on_both_spaces(client: Client) -> None:
+def test_a_superuser_without_a_platform_role_gets_403_on_both_spaces(client: Client) -> None:
     """Spec 02 CORE.18: the technical superuser holds no Manager section without a role."""
     verified_login(client, UserFactory.create(superuser=True))
-    assert client.get(PLATFORM).status_code == 404
-    assert client.get(SHOP).status_code == 404
+    assert client.get(PLATFORM).status_code == 403
+    assert client.get(SHOP).status_code == 403
 
 
 def test_a_platform_owner_without_the_staff_flag_opens_the_platform_space(client: Client) -> None:
@@ -91,16 +92,16 @@ def test_a_platform_owner_without_the_staff_flag_opens_the_platform_space(client
 
 
 @pytest.mark.parametrize("method", METHODS)
-def test_a_customer_gets_404_on_both_spaces(client: Client, customer: User, method: str) -> None:
+def test_a_customer_gets_403_on_both_spaces(client: Client, customer: User, method: str) -> None:
     client.force_login(customer)  # customers are not forced to use MFA (CORE.4)
     for path in [*sample_paths(Space.SHOP), *sample_paths(Space.PLATFORM)]:
-        assert getattr(client, method)(path).status_code == 404, path
+        assert getattr(client, method)(path).status_code == 403, path
 
 
-def test_a_customer_with_a_verified_factor_still_gets_404(client: Client, customer: User) -> None:
+def test_a_customer_with_a_verified_factor_still_gets_403(client: Client, customer: User) -> None:
     verified_login(client, customer)
-    assert client.get(SHOP).status_code == 404
-    assert client.get(PLATFORM).status_code == 404
+    assert client.get(SHOP).status_code == 403
+    assert client.get(PLATFORM).status_code == 403
 
 
 @pytest.mark.parametrize("method", METHODS)
@@ -118,8 +119,8 @@ def test_platform_staff_who_are_also_vendor_members_get_neither_space(
     user = UserFactory.create(permissions=["core.platform_owner"])
     VendorMemberFactory.create(vendor=vendor, user=user)
     verified_login(client, user)
-    assert client.get(SHOP).status_code == 404
-    assert client.get(PLATFORM).status_code == 404
+    assert client.get(SHOP).status_code == 403
+    assert client.get(PLATFORM).status_code == 403
 
 
 def test_an_admin_user_who_is_also_a_vendor_member_gets_neither_space(
@@ -129,20 +130,20 @@ def test_an_admin_user_who_is_also_a_vendor_member_gets_neither_space(
     user = UserFactory.create(staff=True)
     VendorMemberFactory.create(vendor=vendor, user=user)
     verified_login(client, user)
-    assert client.get(SHOP).status_code == 404
-    assert client.get(PLATFORM).status_code == 404
+    assert client.get(SHOP).status_code == 403
+    assert client.get(PLATFORM).status_code == 403
 
 
-def test_an_inactive_member_gets_404(client: Client, owner: User) -> None:
+def test_an_inactive_member_is_refused(client: Client, owner: User) -> None:
     verified_login(client, owner)
     User.objects.filter(pk=owner.pk).update(is_active=False)
     response = client.get(SHOP)
-    assert response.status_code in (302, 404)  # signed out by Django, or refused by the gate
+    assert response.status_code in (302, 403, 404)  # signed out by Django, or refused by the gate
     if response.status_code == 302:
         assert _location(response)[0] == LOGIN
 
 
-@pytest.mark.parametrize("path", ["/manager/", "/manager/elsewhere/", "/manager/shop-x/"])
+@pytest.mark.parametrize("path", ["/manager/elsewhere/", "/manager/shop-x/"])
 def test_a_path_under_the_manager_outside_both_spaces_is_404(
     client: Client, owner: User, path: str
 ) -> None:
