@@ -1,5 +1,8 @@
 {% extends "layouts/account.html" %}
+{% load static %}
 {% block title %}Claim your vendor · MPMV{% endblock %}
+{% block head %}<link rel="stylesheet" href="{% static 'accounts/password-toggle.css' %}">
+<script type="module" src="{% static 'accounts/password-toggle.js' %}"></script>{% endblock %}
 {% block account_content %}
 <h1>Claim {{ vendor.legal_name }}</h1>
 <p>Thank you, the business is confirmed. Now create your account: it signs in with
@@ -11,9 +14,9 @@
   <p><label for="id_full_name">Full name</label>
     <input id="id_full_name" name="full_name" value="{{ full_name }}" autocomplete="name" maxlength="150" required></p>
   <p><label for="id_password1">Password</label>
-    <input id="id_password1" name="password1" type="password" autocomplete="new-password" required></p>
+    <input id="id_password1" name="password1" type="password" autocomplete="new-password" data-password-toggle="Show password" required></p>
   <p><label for="id_password2">Password again</label>
-    <input id="id_password2" name="password2" type="password" autocomplete="new-password" required></p>
+    <input id="id_password2" name="password2" type="password" autocomplete="new-password" data-password-toggle="Show password" required></p>
   <h2>Authenticator app</h2>
   <p>Scan this QR code with your authenticator app, then enter the 6-digit code it shows.</p>
   <figure>{{ qr_svg|safe }}</figure>
