@@ -1,5 +1,6 @@
 """JSON logs, request id and redaction (OPS.2)."""
 
+import hashlib
 import json
 import logging
 import re
@@ -51,8 +52,13 @@ def test_an_exception_is_logged_as_type_and_redacted_traceback() -> None:
     assert "Traceback" in str(out["exc_text"])
 
 
-_PW = secrets.token_hex(6)
-_TOK = secrets.token_hex(5)
+def _fake(label: str, length: int) -> str:
+    """A stable, credential-free-looking test value built at run time (no literal in the source)."""
+    return hashlib.sha256(label.encode()).hexdigest()[:length]
+
+
+_PW = _fake("pw", 12)
+_TOK = _fake("tok", 10)
 _API_KEY = secrets.token_hex(8)  # random per run; the parametrize id is fixed
 
 

@@ -1,6 +1,7 @@
 """The redaction regexes run in the request thread: linear time, bounded input (OPS.2 re-check)."""
 
 import base64
+import hashlib
 import json
 import secrets
 import time
@@ -10,8 +11,14 @@ import pytest
 
 from apps.core.observability import MAX_TEXT, redact_text, redact_unbounded
 
-_PW = secrets.token_hex(6)  # random per run: no credential-like literal in the source
-_T8 = secrets.token_hex(4)
+
+def _fake(label: str, length: int) -> str:
+    """A stable, credential-free-looking test value built at run time (no literal in the source)."""
+    return hashlib.sha256(label.encode()).hexdigest()[:length]
+
+
+_PW = _fake("pw", 12)  # derived at run time, stable across xdist workers
+_T8 = _fake("t8", 8)
 
 
 def _random_jwt() -> str:

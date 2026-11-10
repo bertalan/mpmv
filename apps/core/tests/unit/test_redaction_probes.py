@@ -1,9 +1,9 @@
 """Security review probes for the redaction filter (OPS.2, PR 219)."""
 
 import copy
+import hashlib
 import json
 import logging
-import secrets
 
 import pytest
 
@@ -11,8 +11,14 @@ from apps.core.observability import JsonFormatter, RedactSensitiveData, redact_t
 
 KEY_SHAPE = "abcdefghijklmnopqrstuvwxyz0123456789"
 
-_PW = secrets.token_hex(6)  # random per run: no credential-like literal in the source
-_TOK = secrets.token_hex(4)
+
+def _fake(label: str, length: int) -> str:
+    """A stable, credential-free-looking test value built at run time (no literal in the source)."""
+    return hashlib.sha256(label.encode()).hexdigest()[:length]
+
+
+_PW = _fake("pw", 12)  # derived at run time, stable across xdist workers
+_TOK = _fake("tok", 8)
 
 
 def _emit(record: logging.LogRecord) -> str:
