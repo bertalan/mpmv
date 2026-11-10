@@ -135,3 +135,34 @@ def test_the_command_succeeds_when_all_is_well(tracker: MemoryTracker) -> None:
     out = StringIO()
     call_command("check_ops", stdout=out)
     assert "ok" in out.getvalue().lower()
+
+
+def test_different_messages_of_one_exception_class_are_mailed_separately(
+    tracker: MemoryTracker, operator: None
+) -> None:
+    report_checkout_error(RuntimeError("payment provider timeout"), context={})
+    report_checkout_error(RuntimeError("stock reservation failed"), context={})
+    report_checkout_error(RuntimeError("payment provider timeout"), context={})
+    assert OutboxEmail.objects.count() == 2
+
+
+def test_ids_in_the_message_do_not_defeat_the_de_duplication(
+    tracker: MemoryTracker, operator: None
+) -> None:
+    report_checkout_error(RuntimeError("cart 1001 failed"), context={})
+    report_checkout_error(RuntimeError("cart 2002 failed"), context={})
+    assert OutboxEmail.objects.count() == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_alert_mail_survives_a_rolled_back_checkout(
+    tracker: MemoryTracker, operator: None
+) -> None:
+    from django.db import transaction
+
+    try:
+        with transaction.atomic():
+            raise RuntimeError("checkout failed")
+    except RuntimeError as exc:
+        report_checkout_error(exc, context={})  # after the rollback, as the docs say
+    assert OutboxEmail.objects.count() == 1
