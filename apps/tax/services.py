@@ -1069,6 +1069,11 @@ def verify_vat_number(
 ) -> VatCheck:
     """Check a customer's VAT number for reverse charge; fails closed (spec 05 §5.2, T2).
 
+    FOR CART DISPLAY AND GENERIC CHECKS ONLY. An order's reverse-charge decision must use
+    `verify_vat_number_for_order` (fresh, vendor as requester, consultation number required);
+    this function may serve a cached answer up to 24 h old and, without `requester`, falls back
+    to the operator's number, which is never an order's proof.
+
     A recent answer is reused (`_cached_vat_validation`) unless `refresh`; otherwise VIES is
     asked once through `client` (default: `get_vies_client()`), with its timeout and no retry,
     and the answer is stored. A number VIES cannot be asked about (country outside VIES,
@@ -1130,8 +1135,7 @@ def verify_vat_number_for_order(
     country: str,
     vat_number: str,
     *,
-    vendor_country: str,
-    vendor_vat_number: str,
+    vendor: Vendor,
     client: ViesClient | None = None,
 ) -> VatCheck:
     """The VIES check an order's reverse-charge decision rests on (D-28, owner answers on #224).
@@ -1141,9 +1145,11 @@ def verify_vat_number_for_order(
     vendor's. A vendor without a VAT number VIES can use cannot make an intra-EU supply
     (art. 138): the check is not verified with `VAT_REASON_NO_VENDOR_VAT`, VIES is not asked,
     and the operator's number is never substituted. VIES down: fails closed like
-    `verify_vat_number`.
+    `verify_vat_number`. The requester is derived from the vendor record (`country`,
+    `vat_number`), never from caller strings. A `valid` answer without a consultation number is
+    not verified (`VAT_REASON_NO_CONSULTATION_NUMBER`): the order has no proof.
     """
-    requester = vendor_requester(vendor_country, vendor_vat_number)
+    requester = vendor_requester(str(vendor.country), vendor.vat_number)
     if requester is None:
         return VatCheck(
             country=country.strip().upper(),
@@ -1154,7 +1160,16 @@ def verify_vat_number_for_order(
                 engine.VAT_REASON_NO_VENDOR_VAT, country=country.strip().upper()
             ),
         )
-    return verify_vat_number(country, vat_number, client=client, refresh=True, requester=requester)
+    check = verify_vat_number(country, vat_number, client=client, refresh=True, requester=requester)
+    if check.verified and not check.request_id:
+        reason = engine.VAT_REASON_NO_CONSULTATION_NUMBER
+        return dataclasses.replace(
+            check,
+            verified=False,
+            reason=reason,
+            message=engine.vat_check_message(reason, country=check.country),
+        )
+    return check
 
 
 def recheck_vat_number(country: str, vat_number: str) -> VatCheck:

@@ -559,6 +559,8 @@ VAT_REASON_PREFIX_MISMATCH: Final = "prefix_mismatch"
 VAT_REASON_NOT_IN_VIES: Final = "country_not_in_vies"
 #: The vendor has no VAT number VIES can use as requester: no reverse-charge supply (art. 138).
 VAT_REASON_NO_VENDOR_VAT: Final = "no_vendor_vat_number"
+#: VIES said valid but gave no consultation number: no usable proof for an order.
+VAT_REASON_NO_CONSULTATION_NUMBER: Final = "no_consultation_number"
 
 # Why VIES gave no answer, when it is not one of VIES's own error codes (MS_UNAVAILABLE…).
 DETAIL_TIMEOUT: Final = "timeout"
@@ -582,6 +584,7 @@ _MESSAGES: Final = {
     VAT_REASON_PREFIX_MISMATCH: "The VAT number's prefix is not the one of {country}",
     VAT_REASON_NOT_IN_VIES: "VIES does not cover {country}",
     VAT_REASON_NO_VENDOR_VAT: "The seller has no VAT number for an intra-EU supply",
+    VAT_REASON_NO_CONSULTATION_NUMBER: "VIES gave no consultation number for this check",
 }
 _NOT_VERIFIED = ": the VAT number is not verified and VAT is charged."
 

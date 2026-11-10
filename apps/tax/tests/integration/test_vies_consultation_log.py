@@ -21,6 +21,7 @@ from apps.tax.engine import ViesAnswer, ViesQuery
 from apps.tax.models import VatValidation
 from apps.tax.tests.factories import VatValidationFactory
 from apps.tax.tests.fakes import DownViesClient, FakeViesClient
+from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -159,8 +160,7 @@ def test_a_vendor_without_a_valid_vat_number_cannot_make_a_reverse_charge_check(
         check = services.verify_vat_number_for_order(
             "DE",
             "DE123456789",
-            vendor_country="IT",
-            vendor_vat_number=vendor_vat,
+            vendor=VendorFactory.create(country="IT", vat_number=vendor_vat),
             client=client,
         )
         assert check.verified is False
@@ -172,12 +172,9 @@ def test_a_vendor_without_a_valid_vat_number_cannot_make_a_reverse_charge_check(
 
 def test_an_order_check_is_always_fresh_and_sent_as_the_vendor() -> None:
     client = RequesterAwareClient()
-    first = services.verify_vat_number_for_order(
-        "DE", "DE123456789", vendor_country="IT", vendor_vat_number="IT01234567897", client=client
-    )
-    second = services.verify_vat_number_for_order(
-        "DE", "DE123456789", vendor_country="IT", vendor_vat_number="IT01234567897", client=client
-    )
+    vendor = VendorFactory.create(country="IT", vat_number="IT01234567897")
+    first = services.verify_vat_number_for_order("DE", "DE123456789", vendor=vendor, client=client)
+    second = services.verify_vat_number_for_order("DE", "DE123456789", vendor=vendor, client=client)
     assert first.verified
     assert second.verified
     assert second.from_cache is False
@@ -192,8 +189,7 @@ def test_an_order_check_fails_closed_when_vies_is_down_even_with_a_cached_valid_
     check = services.verify_vat_number_for_order(
         "DE",
         "DE123456789",
-        vendor_country="IT",
-        vendor_vat_number="IT01234567897",
+        vendor=VendorFactory.create(country="IT", vat_number="IT01234567897"),
         client=DownViesClient(),
     )
     assert check.verified is False
@@ -309,4 +305,53 @@ def test_a_service_down_row_is_still_shared_between_requesters() -> None:
     client = RequesterAwareClient()
     check = services.verify_vat_number("DE", "DE123456789", client=client, requester=VENDOR)
     assert check.from_cache is True
+    assert client.calls == []
+
+
+def _order_check(client: Any, number: str = "DE123456789") -> Any:
+    vendor = VendorFactory.create(country="IT", vat_number="IT01234567897")
+    return services.verify_vat_number_for_order("DE", number, vendor=vendor, client=client)
+
+
+def test_a_valid_answer_without_a_consultation_number_is_not_verified_for_an_order() -> None:
+    """Minor 1: the proof needs the number; a valid answer without one fails closed."""
+
+    class NoNumber(RequesterAwareClient):
+        def check(self, query: ViesQuery, *, requester: ViesQuery | None = None) -> ViesAnswer:
+            return ViesAnswer(result=engine.VAT_VALID)
+
+    check = _order_check(NoNumber())
+    assert check.verified is False
+    assert check.reason == engine.VAT_REASON_NO_CONSULTATION_NUMBER
+    assert check.result == engine.VAT_VALID
+
+
+def test_the_requester_comes_from_the_vendor_record() -> None:
+    client = RequesterAwareClient()
+    _order_check(client)
+    assert client.requesters == [VENDOR]
+
+
+def test_an_order_check_with_a_refused_requester_is_not_verified() -> None:
+    answer = ViesAnswer(result=engine.VAT_UNAVAILABLE, detail=engine.DETAIL_INVALID_REQUESTER)
+    check = _order_check(FakeViesClient(default=answer))
+    assert check.verified is False
+    assert check.detail == engine.DETAIL_INVALID_REQUESTER
+
+
+def test_an_order_check_that_times_out_is_not_verified() -> None:
+    answer = ViesAnswer(result=engine.VAT_UNAVAILABLE, detail=engine.DETAIL_TIMEOUT)
+    check = _order_check(FakeViesClient(default=answer))
+    assert check.verified is False
+    assert check.reason == engine.VAT_REASON_TIMEOUT
+
+
+def test_an_order_check_with_the_wrong_prefix_is_not_verified_and_asks_nothing() -> None:
+    client = RequesterAwareClient()
+    vendor = VendorFactory.create(country="IT", vat_number="IT01234567897")
+    check = services.verify_vat_number_for_order(
+        "DE", "FR12345678901", vendor=vendor, client=client
+    )
+    assert check.verified is False
+    assert check.reason == engine.VAT_REASON_PREFIX_MISMATCH
     assert client.calls == []
