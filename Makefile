@@ -1,6 +1,6 @@
 # MPMV task runner. Local containers use Apple `container` (ADR-0002); no Docker, no compose.
 .DEFAULT_GOAL := help
-.PHONY: help install docs docs-check docs-open db db-stop db-reset db-shell image dev dev-down dev-reset dev-status dev-logs migrate seed run assets worker test test-unit test-security-nightly test-e2e e2e-baselines test-all check lint fmt typecheck imports theme-gates audit sbom
+.PHONY: i18n i18n-check help install docs docs-check docs-open db db-stop db-reset db-shell image dev dev-down dev-reset dev-status dev-logs migrate seed run assets worker test test-unit test-security-nightly test-e2e e2e-baselines test-all check lint fmt typecheck imports theme-gates audit sbom
 
 DB_NAME      := mpmv-db
 DB_IMAGE     := docker.io/library/postgres:17
@@ -139,6 +139,13 @@ fmt: ## Auto-fix lint issues and format
 	uv run ruff check --fix .
 	uv run ruff format .
 
+i18n: ## Re-extract and compile the interface-string catalogs (I18N.7; no GNU gettext needed)
+	uv run python tools/i18n_catalog.py extract
+	uv run python tools/i18n_catalog.py compile
+
+i18n-check: ## Catalogs are complete, translated and compiled (I18N.7)
+	uv run python tools/i18n_catalog.py check
+
 typecheck: ## Static type check with mypy
 	uv run mypy .
 
@@ -160,6 +167,6 @@ sbom: ## CycloneDX SBOM of the production Python environment (no dev group) in b
 	uv run cyclonedx-py environment --pyproject pyproject.toml --mc-type application \
 		--of JSON --output-file build/sbom/mpmv-python.cdx.json build/sbom/venv/bin/python
 
-check: lint typecheck imports theme-gates docs-check ## All static checks (no database needed)
+check: lint typecheck imports theme-gates docs-check i18n-check ## All static checks (no database needed)
 	$(MANAGE) check --settings=mpmv.settings.test
 	$(MANAGE) makemigrations --check --dry-run --settings=mpmv.settings.test

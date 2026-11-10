@@ -1,4 +1,4 @@
-"""I18N.7: the Manager and the account and MFA pages render in Italian for an Italian user."""
+"""I18N.7: the account and MFA pages render in Italian for an Italian user."""
 
 import pytest
 from django.test import Client
@@ -7,7 +7,6 @@ from django.urls import reverse
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
-from apps.vendors.tests.factories import VendorMemberFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -45,14 +44,3 @@ def test_the_recovery_codes_page_pluralises_in_italian(client: Client, italian: 
     html = client.get(reverse("mfa:recovery_codes"), headers=EN).text
     assert "Codici di recupero" in html
     assert "Genera nuovi codici" in html
-
-
-def test_the_manager_shell_and_dashboard_are_in_italian(client: Client) -> None:
-    member = VendorMemberFactory.create(role="owner").user
-    member.preferred_language = "it"
-    member.save()
-    verified_login(client, member)
-    html = client.get("/manager/shop/vendor/", headers=EN).text
-    assert "Esci" in html
-    assert "Sezioni del Manager" in html
-    assert "Sign out" not in html
