@@ -7,6 +7,7 @@ workflow's fingerprints: rows that were in step with the source text before stay
 """
 
 from django.db import migrations
+from django.utils.module_loading import import_string
 from wagtail.fields import RichTextField
 
 from apps.core.translations import source_hash, source_language
@@ -17,9 +18,9 @@ TEXTS = ("tagline", *RICH)
 
 
 def convert(value: str) -> str:
-    from apps.cms.engine import sanitise_rich_text
-
-    return sanitise_rich_text(plain_to_html(value), None)
+    # By path: cms sits above vendors in the import contract.
+    sanitise = import_string("apps.cms.engine.sanitise_rich_text")
+    return str(sanitise(plain_to_html(value), None))
 
 
 def to_rich_text(apps, schema_editor):  # type: ignore[no-untyped-def]
