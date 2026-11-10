@@ -20,6 +20,7 @@ from . import levels
 from .decorators import MFA_EXEMPT_ATTR, mfa_redirect
 from .mfa_session import is_verified
 from .services import has_second_factor, mfa_required
+from .session_language import SESSION_LANGUAGE_KEY
 
 # Signing out is always possible: the staff admin's and the editors' (Wagtail, CMS.1).
 EXEMPT_VIEW_NAMES = frozenset({"admin:logout", "wagtailadmin_logout"})
@@ -74,25 +75,32 @@ class PreferredLanguageMiddleware:
     The language switcher sets no cookie (the URL prefix decides), so the Manager, the account
     area and the admins, which have no prefix, would stay in the primary language. Runs right after
     `AuthenticationMiddleware`. Public pages (routes in `i18n_patterns`) keep their prefix as the
-    only source; anonymous users, an unknown or no longer configured language change nothing.
+    only source. An anonymous visitor's session choice (`mpmv_language`, I18N.11, no cookie) is read
+    after the stored preference; an unknown or no longer configured language changes nothing.
     """
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponseBase]) -> None:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponseBase:
-        user = getattr(request, "user", None)
-        language = getattr(user, "preferred_language", "") if user is not None else ""
+        language = self._language(request)
         if (
-            user is not None
-            and user.is_authenticated
-            and language in configured_languages()
+            language in configured_languages()
             and language != translation.get_language()
             and not self._is_public_page(request.path_info, language)
         ):
             translation.activate(language)
             request.LANGUAGE_CODE = language
         return self.get_response(request)
+
+    @staticmethod
+    def _language(request: HttpRequest) -> str:
+        """A signed-in user's stored preference, else the session's choice (I18N.11), else ''."""
+        user = getattr(request, "user", None)
+        if user is not None and user.is_authenticated:
+            return str(getattr(user, "preferred_language", ""))
+        session = getattr(request, "session", None)
+        return str(session.get(SESSION_LANGUAGE_KEY, "")) if session is not None else ""
 
     @staticmethod
     def _is_public_page(path: str, language: str) -> bool:

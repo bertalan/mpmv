@@ -47,11 +47,11 @@ urlpatterns = [
     path("account/", include("apps.manager.account_urls")),  # Manager sign-in (CORE.17)
     path("manager/", include("apps.manager.urls")),  # the Manager's two spaces (CORE.17)
     path("vendor/claim/", include("apps.vendors.urls")),  # claim an imported vendor (VEN.24)
-    path("vendor/apply/", include("apps.vendors.application_urls")),  # "Sell with us" (VEN.22)
     path("geocoding/", include("apps.core.geocoding.urls")),  # "Find coordinates" (EVT.12)
     # Staff-only styleguide of the active theme (THM.4); a string, as no app imports themes.
     path("_styleguide/", include("apps.themes.urls")),
     *i18n_patterns(
+        path("vendor/apply/", include("apps.vendors.application_urls")),  # "Sell with us" (VEN.22)
         path("", include("apps.catalog.urls")),  # listings (CAT.8): before the CMS catch-all
         path("", include("apps.compliance.urls")),  # DSA contact points (CMP.5)
         path("", include("apps.cms.urls")),
