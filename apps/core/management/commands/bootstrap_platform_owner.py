@@ -39,3 +39,10 @@ class Command(BaseCommand):
         verb = "Would grant" if dry_run else "Granted"
         for change in changes.changes:
             self.stdout.write(f"{verb} platform owner to {change.key} ({change.op}).")
+            if change.op == "create" and not dry_run:
+                self.stdout.write(
+                    "The account has no usable password and the command prints none. Set one "
+                    "through the password-set link (CORE.19) or, until it exists, as a superuser "
+                    "in the staff admin. At the first sign-in the Manager gate forces the "
+                    "enrolment of a second factor (CORE.4) before any page opens."
+                )

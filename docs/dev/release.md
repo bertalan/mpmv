@@ -91,11 +91,15 @@ manage.py bootstrap_platform_owner owner@example.org             # grants it, au
 manage.py bootstrap_platform_owner owner@example.org --create    # also creates the account
 ```
 
-The command is idempotent (a second run says "already a platform owner" and changes nothing) and
-refuses an unknown or inactive user without `--create`. A created account has no usable password:
-the person sets one with the password reset and enrols a second factor at the first sign-in
-(CORE.4). Check the AuditLog entry `core.platform_owner.grant`. A platform owner cannot also be a
-vendor member (spec 02 Roles).
+The command is idempotent (a second run says "already a platform owner" and changes nothing).
+It refuses an unknown user without `--create`, an inactive user (also with `--create`: it never
+reactivates an account) and a vendor member (platform roles and vendor membership never mix, so
+the user would be locked out of both spaces). It does not refuse when another owner already
+exists: several platform owners are allowed. A created account has no usable password and the
+command never prints one. Until the CORE.19 password-set link exists, a superuser sets the
+password in the staff admin (user page, "set password"); the owner then signs in and the Manager
+gate forces the enrolment of a second factor (CORE.4) before any page opens. Check
+the AuditLog entry `core.platform_owner.grant`; its target is the lower-cased email.
 
 ### Editor roles migration (CORE.8)
 

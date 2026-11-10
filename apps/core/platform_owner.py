@@ -7,6 +7,7 @@ first person after a deploy. Idempotent, and audited like every sensitive mutati
 
 from typing import Any
 
+from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
@@ -34,7 +35,7 @@ def grant_platform_owner(
     one through the password reset). An unknown or inactive user is refused (`ValidationError`).
     """
     user_model = get_user_model()
-    email = email.strip()
+    email = email.strip().lower()  # the accounts app stores emails trimmed and lower-cased
     validate_email(email)
     user = user_model.objects.filter(email__iexact=email).first()
     changes = ChangeSet()
@@ -47,6 +48,11 @@ def grant_platform_owner(
             raise ValidationError("That user is inactive.")
         if is_platform_owner(user):
             return changes
+        if apps.get_model("vendors", "VendorMember").objects.filter(user=user).exists():
+            raise ValidationError(
+                "That user is a vendor member. Platform roles and vendor membership never mix "
+                "(spec 02 Roles): the user would be refused by both Manager spaces."
+            )
         changes.update(
             USER_MODEL,
             user.get_username(),

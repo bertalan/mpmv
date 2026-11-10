@@ -1,6 +1,7 @@
 """CORE.17 fixes: CSRF on every Manager form, the Manager root, the explanatory 403."""
 
 import re
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from django.test import Client
@@ -149,3 +150,24 @@ def test_a_path_outside_both_spaces_is_still_404_for_a_signed_in_user(
 def test_an_editor_with_only_the_staff_flag_gets_the_403(client: Client) -> None:
     verified_login(client, UserFactory.create(staff=True))
     assert client.get(PLATFORM).status_code == 403
+
+
+@pytest.mark.parametrize("path", ["/manager", "//manager/", "/MANAGER/", "/manager//platform/"])
+def test_odd_spellings_of_the_root_never_reach_a_space(
+    client: Client, platform_staff: User, path: str
+) -> None:
+    verified_login(client, platform_staff)
+    response = client.get(path)
+    assert response.status_code in (200, 301, 302, 404)
+    if response.status_code == 200:  # the CMS catch-all, never a Manager page
+        assert "manager-header" not in response.text
+    elif response.status_code != 404:
+        assert response["Location"] != PLATFORM
+
+
+def test_the_anonymous_root_redirect_carries_its_own_path_as_next(client: Client) -> None:
+    response = client.get("/manager/?next=https://evil.example/&x=1")
+    assert response.status_code == 302
+    location = urlsplit(response["Location"])
+    assert location.path == LOGIN
+    assert parse_qs(location.query)["next"] == ["/manager/?next=https://evil.example/&x=1"]
