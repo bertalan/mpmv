@@ -1,0 +1,5 @@
+{% load i18n %}{% blocktranslate %}These published products lack mandatory GPSR data. Complete their data or unpublish them in the staff admin.{% endblocktranslate %}
+{% for item in products %}
+- {{ item.sku }} ({{ item.vendor_name }}): {{ item.missing }}{% endfor %}
+{% if more %}
+{% blocktranslate %}And {{ more }} more.{% endblocktranslate %}{% endif %}

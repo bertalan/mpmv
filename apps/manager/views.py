@@ -17,6 +17,7 @@ from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 
 from apps.accounts.decorators import mfa_exempt
+from apps.accounts.forms import ManagerLoginForm
 from apps.vendors.scoping import Source, VendorScopedQuerySet
 
 from .access import ManagerContext, may_enter
@@ -117,6 +118,7 @@ class LoginView(auth_views.LoginView):
     """
 
     template_name = "manager/login.html"
+    authentication_form = ManagerLoginForm
 
     def get_default_redirect_url(self) -> str:
         return home_url(self.request.user)

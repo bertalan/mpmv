@@ -52,6 +52,13 @@ from apps.catalog.tests.factories import (
 )
 from apps.cms.models import VendorLandingPage
 from apps.cms.tests.factories import VendorLandingPageFactory
+from apps.compliance.models import GpsrInfo, GpsrSafetyText, SafetyCase, VendorGpsrDefaults
+from apps.compliance.tests.factories import (
+    GpsrInfoFactory,
+    GpsrSafetyTextFactory,
+    SafetyCaseFactory,
+    VendorGpsrDefaultsFactory,
+)
 from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage, VendorEventPolicy
@@ -155,6 +162,14 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         variant=VariantFactory.create(
             product=ProductFactory.create(vendor=vendor, kind=Product.Kind.VARIABLE)
         )
+    ),
+    GpsrInfo: lambda vendor: GpsrInfoFactory.create(product=ProductFactory.create(vendor=vendor)),
+    VendorGpsrDefaults: lambda vendor: VendorGpsrDefaultsFactory.create(vendor=vendor),
+    GpsrSafetyText: lambda vendor: GpsrSafetyTextFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
+    SafetyCase: lambda vendor: SafetyCaseFactory.create(
+        product=ProductFactory.create(vendor=vendor)
     ),
     ShippingZone: lambda vendor: ShippingZoneFactory.create(vendor=vendor),  # a vendor zone
     ShippingMethod: lambda vendor: ShippingMethodFactory.create(vendor=vendor),

@@ -33,6 +33,23 @@ def test_the_login_page_renders_with_the_theme(client: Client) -> None:
     assert 'class="site-main"' in response.text
 
 
+def test_the_login_page_meets_the_accessible_authentication_rules(client: Client) -> None:
+    """CMP.9 (WCAG 2.2 SC 3.3.8): autocomplete tokens, the show-password module, no paste block."""
+    html = client.get(LOGIN).text
+    assert 'autocomplete="current-password"' in html
+    assert "data-password-toggle=" in html
+    assert "accounts/password-toggle.js" in html
+    assert "onpaste" not in html
+
+
+def test_a_failed_login_ties_the_error_to_both_fields(client: Client) -> None:
+    html = client.post(
+        LOGIN, {"username": "nobody@example.test", "password": secrets.token_urlsafe(12)}
+    ).text
+    assert 'id="login-error"' in html
+    assert html.count('aria-describedby="login-error"') == 2
+
+
 def test_a_member_logs_in_and_is_asked_for_the_second_factor(
     client: Client, vendor: Vendor, password: str
 ) -> None:
