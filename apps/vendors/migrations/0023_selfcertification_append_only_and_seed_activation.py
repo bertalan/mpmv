@@ -72,7 +72,7 @@ def unseed(apps: Any, schema_editor: Any) -> None:
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("vendors", "0021_platform_duties_activation"),
+        ("vendors", "0022_platform_duties_activation"),
     ]
 
     operations = [

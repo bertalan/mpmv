@@ -38,6 +38,6 @@ def seed_legal_requirements() -> None:
         "0005_seed_legal_requirements",
         "0007_seed_dac7_requirements",
         "0018_seed_dac7_seller_dataset",
-        "0022_selfcertification_append_only_and_seed_activation",
+        "0023_selfcertification_append_only_and_seed_activation",
     ):
         importlib.import_module(f"apps.vendors.migrations.{name}").seed(apps, None)

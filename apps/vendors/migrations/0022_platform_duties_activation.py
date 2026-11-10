@@ -12,7 +12,7 @@ import apps.core.i18n
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("vendors", "0020_vendor_claim"),
+        ("vendors", "0021_platform_staff_permission"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
