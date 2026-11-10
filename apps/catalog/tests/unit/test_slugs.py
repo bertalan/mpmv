@@ -1,8 +1,8 @@
-"""CAT.5: SKU-free product slugs and product paths (spec 03 §3.2, owner decisions Q-30, Q-33).
+"""CAT.5: product slugs and product paths (spec 03 §3.2, owner decisions Q-30, Q-33, D-25).
 
 The cases are the legacy permalink rules (transliteration, 80-character limit with a truncated
-title, `-2` on collisions) without the SKU part: a slug is `{title}-{lang}` and never carries
-the SKU.
+title, `-2` on collisions) without the SKU and without the language: a slug is the
+transliterated `{title}` (the language is in the URL prefix).
 """
 
 import inspect
@@ -20,71 +20,70 @@ LANGUAGES = ("en", "it", "de", "fr", "es")
 
 
 @pytest.mark.parametrize(
-    ("title", "lang", "expected"),
+    ("title", "expected"),
     [
-        ("Leather Bag", "en", "leather-bag-en"),
-        ("Borsa in pelle è più bella", "it", "borsa-in-pelle-e-piu-bella-it"),
-        ("Große Tasche", "de", "grosse-tasche-de"),
-        ("Smørrebrød Æble Œuvre", "fr", "smorrebrod-aeble-oeuvre-fr"),
-        ("Łódź bag", "en", "lodz-bag-en"),
-        ("Bag 100% cotton & leather!", "en", "bag-100-cotton-leather-en"),
-        ("Women's  bag -- large", "en", "womens-bag-large-en"),
-        ("  Trimmed title  ", "es", "trimmed-title-es"),
-        ("Bag", "EN", "bag-en"),
+        ("Leather Bag", "leather-bag"),
+        ("Borsa in pelle è più bella", "borsa-in-pelle-e-piu-bella"),
+        ("Große Tasche", "grosse-tasche"),
+        ("Smørrebrød Æble Œuvre", "smorrebrod-aeble-oeuvre"),
+        ("Łódź bag", "lodz-bag"),
+        ("Bag 100% cotton & leather!", "bag-100-cotton-leather"),
+        ("Women's  bag -- large", "womens-bag-large"),
+        ("  Trimmed title  ", "trimmed-title"),
     ],
 )
-def test_slug_is_the_transliterated_title_and_the_language(
-    title: str, lang: str, expected: str
-) -> None:
-    assert build_product_slug(title, lang) == expected
+def test_slug_is_the_transliterated_title_only(title: str, expected: str) -> None:
+    assert build_product_slug(title) == expected
 
 
-def test_the_slug_function_takes_no_sku() -> None:
-    assert "sku" not in inspect.signature(build_product_slug).parameters
+def test_the_slug_function_takes_no_sku_and_no_language_parameters() -> None:
+    parameters = inspect.signature(build_product_slug).parameters
+    assert "sku" not in parameters
+    assert "lang" not in parameters
 
 
 @pytest.mark.parametrize("title", ["", "   ", "!!! ???", "★☆"])
 def test_a_title_without_letters_or_digits_gets_a_fallback(title: str) -> None:
-    assert build_product_slug(title, "it") == "product-it"
+    assert build_product_slug(title) == "product"
 
 
-def test_a_long_title_is_truncated_to_80_characters_keeping_the_language() -> None:
-    slug = build_product_slug("a" * 100, "en")
-    assert slug == "a" * 77 + "-en"
-    assert len(slug) == 80
+def test_a_long_title_is_truncated_to_80_characters() -> None:
+    slug = build_product_slug("a" * 100)
+    assert slug == "a" * 80
 
 
-def test_truncation_never_leaves_a_dash_before_the_language() -> None:
-    title = "x" * 76 + " tail of the title"
-    slug = build_product_slug(title, "en")
-    assert slug == "x" * 76 + "-en"
-    assert "--" not in slug
+def test_truncation_never_leaves_a_trailing_dash() -> None:
+    slug = build_product_slug("x" * 79 + " tail of the title")
+    assert slug == "x" * 79
+    slug = build_product_slug("word " * 30)
+    assert len(slug) <= 80
+    assert not slug.endswith("-")
 
 
 def test_max_len_is_configurable() -> None:
-    assert build_product_slug("Leather travel bag", "en", max_len=12) == "leather-t-en"
+    assert build_product_slug("Leather travel bag", max_len=9) == "leather-t"
 
 
 def test_max_len_must_leave_room_for_the_title() -> None:
     with pytest.raises(ValueError, match="max_len"):
-        build_product_slug("Bag", "en", max_len=3)
+        build_product_slug("Bag", max_len=0)
 
 
 def test_unique_slug_without_collision_is_the_plain_slug() -> None:
-    assert unique_product_slug("Leather Bag", "en", taken=set()) == "leather-bag-en"
+    assert unique_product_slug("Leather Bag", taken=set()) == "leather-bag"
 
 
 def test_a_collision_gets_a_numeric_suffix() -> None:
-    taken = {"leather-bag-en"}
-    assert unique_product_slug("Leather Bag", "en", taken=taken) == "leather-bag-en-2"
-    taken.add("leather-bag-en-2")
-    assert unique_product_slug("Leather Bag", "en", taken=taken) == "leather-bag-en-3"
+    taken = {"leather-bag"}
+    assert unique_product_slug("Leather Bag", taken=taken) == "leather-bag-2"
+    taken.add("leather-bag-2")
+    assert unique_product_slug("Leather Bag", taken=taken) == "leather-bag-3"
 
 
 def test_the_suffix_keeps_the_slug_within_max_len() -> None:
-    plain = build_product_slug("b" * 100, "en")
-    slug = unique_product_slug("b" * 100, "en", taken={plain})
-    assert slug == "b" * 75 + "-en-2"
+    plain = build_product_slug("b" * 100)
+    slug = unique_product_slug("b" * 100, taken={plain})
+    assert slug == "b" * 78 + "-2"
     assert len(slug) == 80
 
 
