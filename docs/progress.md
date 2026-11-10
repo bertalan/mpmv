@@ -103,7 +103,7 @@ part of the done-when still open) · `not started`.
 | SEC.2 | done | #164 | Secure uploads (spec 12 task row; not the "Tenant isolation" requirement of the same ID): content-checked, re-encoded uploads with app-made names on every upload path (`apps/core/uploads.py`); caps on bytes, pixels, side and animation frames; originals over 40 megapixels downscaled; bounded decode memory and one decode per process; MPO and ICC handled; malicious-upload corpus. The final caps are in code only, not yet in spec 12. Security code, needs human review |
 | CMS.9 | done | #129 | Launch countdown block: pure `countdown_state`, server-rendered absolute date and expired state, page cache capped at the target, CSP-safe ES module with visitor time zone, minute updates, pause button, single polite announcement |
 | CMP.9 | done | #177 | WCAG 2.2 SC 3.3.8 on the authentication templates: paste allowed, `autocomplete` tokens, passkeys offered, Turnstile without a puzzle |
-| CORE.17 | done | #170 | Manager shell (`apps/manager/`): two gated spaces by URL prefix, deny-by-default gate with 404s, navigation registry, vendor picker and switcher, base list view with bulk actions (dry-run preview), closed vendors refused in the shop space, sign-in page meeting CMP.9, URL sweep test. Staff access to the shop space through impersonation is CORE.10 |
+| CORE.17 | done | #170, #212 | Manager shell (`apps/manager/`): two gated spaces by URL prefix, deny-by-default gate with 404s, navigation registry, vendor picker and switcher, base list view with bulk actions (dry-run preview), closed vendors refused in the shop space, sign-in page meeting CMP.9, URL sweep test. Staff access to the shop space through impersonation is CORE.10. #212 fixes: the language switcher posts through a real CSRF check, `/manager/` redirects to the user's home, a signed-in user without the space's right gets an explanatory 403 page (anonymous still goes to the login), `bootstrap_platform_owner` (CORE.23). Access code, needs human review |
 | CORE.8 | done | #185, #188, #189, #209 | 1/3 platform staff is the model permission `vendors.view_all_vendors`, not `is_staff` (migration vendors 0021, no data grant; release note in release.md). 2/3 account unlock service with audit (`accounts.user.unlocked`, `accounts.user.unlocked_by_reset`) and a completed password reset clears the lockout. 3/3 own editor roles per page-tree part replace Wagtail's default Editors and Moderators groups (migration cms 0013, edit-only editor roles, empty publisher roles, nobody approves their own submission), Wagtail admin menu limited to CMS entries (`docs/dev/editor-roles.md`). #209 makes the seeding safe during partial migrations (main was red). Permissions code, needs human review |
 | SEC.12 | done | #199 | Reverse proxy header ownership: Caddy drops `Server`, media carry the transport and framing headers, CORP on the HTTPS 301; the three strict xfails are plain tests; documented in security-headers.md |
 | OPS.9 | partial: triage decided and rules file merged, no STAGE scan run on the new main yet | #197 | STAGE scan triage (SEC.5): no wildcard CORS, CORP header, ZAP rules file with documented accepts |
@@ -111,6 +111,12 @@ part of the done-when still open) · `not started`.
 | CMP.25 | done | #181 | Activation gate for platform duties: `activation` purpose in `LegalFieldRequirement` seeded with the DSA article 30 trader data, append-only `SelfCertification` (version, language, text hash, no IP), checked by the VEN.5 activation next to CMP.13; DAC7 data still blocks payouts only (migrations vendors 0022, 0023). Compliance code, needs human review |
 | VEN.10 | done | #182 | Public vendor storefront per language: bio, policies, products and store categories, category sidebar correct in IT |
 | THM.6 | done | #184 | First vertical theme `ride`: operator palette tokens (light and dark), type scale and shapes, self-hosted Barlow and Barlow Condensed (OFL 1.1), Lucide icon subset (ISC), header, hero and home blocks, placeholder art, `LICENSES.toml` complete |
+| VEN.22 | done | #202 | Public "Sell with us" application at `/vendor/apply/`: account and applicant vendor in one form with no password (the person who opens the emailed link chooses it), Turnstile through the CORE.5 verifier, confirmation mail plus one reminder at 48 h each with a cancel link, GET never changes state and a second POST is idempotent, unconfirmed applications deleted after 3 days (D-24, hourly jobs), MFA at first login (CORE.4); migration vendors 0024. Account and compliance code, needs human review |
+| CMS.12 | done | #201 | Server-side rich-text sanitiser: `engine.sanitise_rich_text` on the editor's own allow-list, applied by a `pre_save` receiver to every rich-text field and StreamField block, so any write path is covered; the editor opens stored HTML it would not write; the F1 and F2 strict xfails are plain tests. Security code, needs human review |
+| ARC.17 | done | #198 | `PlatformOperator.einvoice_channel` and its choices removed (migration core 0018, admin, seed, factory, spec 01); a guard test; no comment says the platform writes FatturaPA XML |
+| CORE.9 | partial: 2 of 3 (dashboard and owner-only profile); staff revert from the platform space open | #200, #204 | 1/3 shop dashboard with product KPIs on a queryset scoped by `for_actor` and the selected vendor. 2/3 `save_storefront_profile`: owners only, plain text with length caps, rate limit, post-moderation email to the operator support address, `vendor.profile_changed` audit with before and after, form at `/manager/shop/profile/` that vendor staff cannot reach |
+| CORE.23 | done | #212 | `manage.py bootstrap_platform_owner EMAIL [--create] [--dry-run]`: idempotent, ChangeSet, audit `core.platform_owner.grant`, step in release.md |
+| OPS.10 | partial: the workflow has not run yet (manual run after merge) | #213 | Nightly line-only coverage workflow (`coverage-nightly.yml`), report only, `coverage-report` artifact and job summary table |
 
 ## Owner decisions 2026-11-07
 
@@ -747,6 +753,14 @@ Compliance, security and content:
 | #181 | CMP.25 | Activation gate for platform duties, self-certification |
 | #182 | VEN.10 | Public vendor storefront |
 | #184 | THM.6 | `ride` theme |
+| #210 | none | Coherence check 11 (release candidate v0.1.3) |
+| #202 | VEN.22 | Public "Sell with us" application |
+| #201 | CMS.12 | Server-side rich-text sanitiser |
+| #198 | ARC.17 | Remove the e-invoicing leftovers |
+| #200 | CORE.9 | Shop dashboard with product KPIs (1 of 3) |
+| #212 | CORE.17, CORE.23 | Manager fixes: CSRF, root redirect, explanatory 403, platform owner bootstrap |
+| #213 | OPS.10 | Nightly line-only coverage workflow |
+| #204 | CORE.9 | Owner-only storefront profile editing (2 of 3) |
 
 ## Coherence checks
 
@@ -1370,3 +1384,25 @@ Findings and actions:
 
 Release candidate verdict: GO for v0.1.3 from bd01f8e. No blocker or major finding in the code, gates are green, and the STAGE effects are in release.md. Conditions: no other merge between this PR and the tag; apply the release notes on STAGE (grant `vendors.view_all_vendors` to existing staff, assign publisher roles after the migrate).
 Open from check 10: item 1 closed; item 2 (Manager developer docs) still a proposed row; item 3 (OPS.9) open.
+
+### Check 12 (2026-11-10, main at 734b4cc)
+
+Scope: main at 734b4cc, seven merges since check 11 (#202, #201, #198, #200, #212, #213, #204; 95 files, about 4.9k lines, counted from 5522579). #221 (CAT.5, D-25) had not merged when the check ran. Review by lane-b in four passes.
+
+| Area | Result |
+|---|---|
+| Code vs spec | VEN.22: form without password (`apps/vendors/application_views.py:81`), confirm and cancel act only on POST (`:113`, `:142`), reminder at 48 h and purge after 3 days as jobs (`apps/vendors/tasks.py:30`, `:49`, `services.py:2454`, `:2501`), MFA at first login left to CORE.4. CMS.12: sanitiser in `apps/cms/engine.py` and `apps/cms/services.py:961-1022`, `pre_save` receiver `apps/cms/signals.py:40`, connected at `apps/cms/apps.py:92`; F1 and F2 are plain tests (`tests/integration/test_hostile_input_outputs.py:183`, `:197`), only the F3 xfail (I18N.10) remains. ARC.17: no `einvoice_channel` field in models, admin, factory or seed; the only mentions are the guard test, migrations 0003 and 0018 and spec text. CORE.9 1/3 and 2/3: `ShopDashboardView` uses `self.scoped(Product)` (`apps/manager/views.py:93`), the profile service refuses non-owners (`apps/vendors/services.py:1866`) and suspended or closed vendors (`:1882`), audit `vendor.profile_changed` and the moderator email (`:1938-1940`); the staff revert (3/3) is not built. CORE.17 fixes: CSRF token passed to the language switcher (`apps/manager/templates/manager/layout.html:36`), `/manager/` redirect and 403 in `apps/manager/middleware.py:81-83`; CORE.23 command with tests. OPS.10: the workflow has cron and `workflow_dispatch`, writes the job summary (`.github/workflows/coverage-nightly.yml:82`) and uploads `coverage-report` (`:87`), no fail-under. 364 targeted tests green locally (application, manager fixes, shop profile, rich-text paths, hostile inputs) |
+| Spec and docs | `make docs` leaves no diff. D-24 is recorded in 92-open-decisions; D-25 (#221), D-26 and D-28 (#218), D-27 (#222) and D-29 (#226) are still only in open PRs; D-30 to D-32 are in no open PR. audit-trail.md, background-jobs.md, rich-text.md and release.md were updated by the merges; the spec 01, 02, 04 and 12 tables match the code. No vendor names, hostnames or credentials in the diff (only `example.*` domains and `owner@example.org` in release.md). progress.md lacked these tasks and PRs (added here) |
+| Hygiene | `makemigrations --check` clean. One leaf per app: accounts 0005, api 0007, cart 0001, catalog 0009, cms 0013, compliance 0002, core 0018, events 0003, shipping 0010, tax 0006, themes 0001, vendors 0024 (ingest, ledger, mcp, orders, payments, seo have no migrations). No new TODO, FIXME, print, breakpoint or sleep in non-test code. Test password literal `Attacker-chosen-1!` at `apps/vendors/tests/integration/test_application.py:167-169`. Still the `RemovedInWagtail90Warning` at `apps/cms/admin_views.py:30` (OPS.7) |
+| Gates | `make check` pass (ruff, mypy strict over 920 files, 8 contracts kept and 0 broken, backlog freshness, Django checks, theme gates for base and ride). Main CI: success on e81a205, e4bd252, 167604f, 5610c6e and 068fd90 (e501e06 cancelled by the next merge); the run on the head 734b4cc was still in progress when the check ran. Full suite not run locally (CI is the gate). The coverage nightly has not run yet |
+
+Findings and actions:
+
+1. Minor. progress.md missed these merges. Action: this update.
+2. Minor. The test password literal in the application tests is credential-like; ADR-0006 says to use `secrets.token_urlsafe()`. Action: lane-b replaces it in the next vendors PR.
+3. Minor. CORE.9 3/3 (staff revert from the platform space) is open; the moderator notice goes to the operator support address until CORE.18. Action: none, tracked in the row.
+4. Minor. D-25 to D-29 are decided but only in open PRs (#221, #218, #222, #226); D-30 to D-32 are in no open PR. Action: for lane-a, merge them or confirm the register.
+5. Minor, ops. OPS.10: run `gh workflow run coverage-nightly.yml` once to close the done-when. OPS.9: a Security STAGE scan on 5522579 succeeded, so lane-a can close it.
+Open from check 11: item 3 (OPS.9) can close on lane-a's word; the others are closed or accepted.
+
+Verdict: GO with follow-ups. No blocker or major finding; the follow-ups are minor and none blocks a tag. Condition: CI on 734b4cc green.

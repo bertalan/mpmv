@@ -1,7 +1,9 @@
 {% extends "manager/layout.html" %}
 {% load i18n %}
 {% comment %}
-Shop space dashboard (CORE.17): the selected vendor and the member's role. CORE.9 adds the KPIs.
+Shop space dashboard (CORE.17, CORE.9): the selected vendor, the member's role and the essential
+KPIs. Every number comes from the vendor-scoped services; orders and balance join the block
+with ORD.6 and VEN.9. No inline script or style (strict CSP).
 {% endcomment %}
 {% block manager_content %}
   <h1>{% translate "Dashboard" %}</h1>
@@ -10,4 +12,13 @@ Shop space dashboard (CORE.17): the selected vendor and the member's role. CORE.
     <dt>{% translate "Vendor" %}</dt><dd>{{ manager.vendor.display_name }}</dd>
     <dt>{% translate "Your role" %}</dt><dd>{% if manager.role == "owner" %}{% translate "Owner" %}{% else %}{% translate "Staff" %}{% endif %}</dd>
   </dl>
+  <section aria-labelledby="kpi-heading">
+    <h2 id="kpi-heading">{% translate "Products" %}</h2>
+    <dl class="manager-kpis">
+      <div class="manager-kpi"><dt>{% translate "Published" %}</dt><dd data-kpi="products-published">{{ products.published }}</dd></div>
+      <div class="manager-kpi"><dt>{% translate "Drafts" %}</dt><dd data-kpi="products-draft">{{ products.draft }}</dd></div>
+      <div class="manager-kpi"><dt>{% translate "Retired" %}</dt><dd data-kpi="products-retired">{{ products.retired }}</dd></div>
+      <div class="manager-kpi"><dt>{% translate "Out of stock" %}</dt><dd data-kpi="products-out-of-stock">{{ products.out_of_stock }}</dd></div>
+    </dl>
+  </section>
 {% endblock %}

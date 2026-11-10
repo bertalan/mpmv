@@ -21,13 +21,12 @@ pytestmark = pytest.mark.django_db
 CTX = AuditContext(actor_id=1, actor_label="staff:ops", source="admin", ip="127.0.0.1")
 
 
-def test_operator_holds_country_vat_regime_einvoice_channel_and_dac7_authority() -> None:
+def test_operator_holds_country_vat_regime_and_dac7_authority() -> None:
     op = PlatformOperatorFactory.build(
         country="it",
         vat_number="IT00000000000",
         tax_regime=PlatformOperator.TaxRegime.SMALL_BUSINESS,
         commission_vat_mode=PlatformOperator.CommissionVatMode.NONE,
-        einvoice_channel=PlatformOperator.EInvoiceChannel.SDI,
         dac7_authority_country="it",
     )
     op.full_clean()
@@ -36,7 +35,6 @@ def test_operator_holds_country_vat_regime_einvoice_channel_and_dac7_authority()
     assert stored.country == "IT"
     assert stored.dac7_authority_country == "IT"
     assert stored.commission_vat_mode == "none"
-    assert stored.einvoice_channel == "sdi"
     assert stored.public_id is not None
 
 
@@ -46,7 +44,6 @@ def test_operator_holds_country_vat_regime_einvoice_channel_and_dac7_authority()
         ("country", "XX"),
         ("dac7_authority_country", "ZZ"),
         ("commission_vat_mode", "sometimes"),
-        ("einvoice_channel", "fax"),
         ("tax_regime", "unknown"),
     ],
 )
@@ -191,3 +188,10 @@ def test_new_configuration_is_validated_before_writing() -> None:
     with pytest.raises(ValidationError):
         configure_platform_operator(PlatformOperatorFactory.build(country="XX"), ctx=CTX)
     assert PlatformOperator.objects.count() == 0
+
+
+def test_operator_has_no_einvoice_channel_field() -> None:
+    """ARC.17: the platform issues no invoices, so no e-invoice channel is configured."""
+    names = {f.name for f in PlatformOperator._meta.get_fields()}
+    assert "einvoice_channel" not in names
+    assert not hasattr(PlatformOperator, "EInvoiceChannel")

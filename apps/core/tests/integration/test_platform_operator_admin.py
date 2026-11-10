@@ -29,7 +29,6 @@ def _form(**overrides: str) -> dict[str, str]:
         "vat_number": "ATU00000000",
         "tax_regime": "small_business",
         "commission_vat_mode": "none",
-        "einvoice_channel": "none",
         "dac7_authority_country": "AT",
         "valid_from_0": "2027-01-01",
         "valid_from_1": "00:00:00",
