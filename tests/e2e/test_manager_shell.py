@@ -174,3 +174,27 @@ def test_vendor_staff_have_no_storefront_profile(page: Page, live_server: LiveSe
     response = page.goto(f"{live_server.url}/manager/shop/profile/")
     assert response is not None
     assert response.status == 404
+
+
+def test_the_manager_language_switcher_changes_the_language(
+    page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+) -> None:
+    """I18N.12: the switch stays on the unprefixed Manager page, now in the chosen language."""
+    password = secrets.token_urlsafe(16)  # generated: no credential literals in git
+    user = UserFactory.create(email="switcher@example.com", password=password)
+    device = TOTPDeviceFactory.create(user=user)
+    VendorMemberFactory.create(vendor=VendorFactory.create(display_name="Shop One"), user=user)
+    _login(page, live_server.url, "switcher@example.com", password)
+    verify_with_totp(page, totp_token(device))
+    expect(page).to_have_url(re.compile(r"/manager/shop/"))
+    expect(page.locator("html")).to_have_attribute("lang", "en")
+    shot("manager-en")
+
+    page.locator('button[value="it"]').click()
+    expect(page).to_have_url(re.compile(r"/manager/shop/"))
+    expect(page.locator("html")).to_have_attribute("lang", "it")
+    expect(page.locator('button[value="it"]')).to_have_attribute("aria-current", "true")
+    shot("manager-it")
+
+    page.locator('button[value="en"]').click()
+    expect(page.locator("html")).to_have_attribute("lang", "en")

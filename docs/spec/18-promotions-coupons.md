@@ -33,10 +33,12 @@ would not build.
 2. **Co-funding of one coupon** by vendor and platform. One coupon, one funder. Shared funding
    stays where it already exists (bundles, CAT.16).
 3. **Platform money behind a vendor's coupon**, or a vendor's money behind a platform coupon.
-4. **A coupon that appears for any returning visitor** (exit-intent pop-up, cookie-based "welcome back"
-   for guests): it teaches people to abandon, needs cookies or profiling, and is trivially farmed.
-   The incentive reaches only the signed-in customer through the recovery email (§18.7).
-5. **SMS, push, WhatsApp** (owner: not now), and **recovery for guests by default** (§18.6).
+4. **A coupon that appears for any returning visitor** (exit-intent pop-up, profiling-based "welcome
+   back"): it teaches people to abandon, needs profiling, and is trivially farmed. The incentive reaches
+   the person who left a cart (a signed-in customer or an opted-in guest) through the recovery email
+   and, decided by the owner (Q-P7), through a non-modal box on the site for a signed-in visitor
+   (§18.7); never a pop-up to anyone else.
+5. **SMS, push, WhatsApp** (owner: not now).
 6. **Open-tracking pixels**, countdown timers, "only 2 left" unless true, rising-value coupon ladders,
    machine-learned discount sizing, price personalisation of the list price.
 7. **Giving vendors customer lists**: a vendor sets the rules and the budget and sees aggregate
@@ -114,20 +116,26 @@ normalised email (case folded, plus-tags removed) and is best effort; personal c
 
 ### The rule, stated once
 
-The promotion's issuer is its funder and the only payer. The customer-visible price reduction is
-identical in both cases. What changes is who is debited for it. **The vendor's commission does not
-depend on any coupon.**
+**Decided (owner, 2026-11-10, Q-P2):** the vendor pays from its own credit and the coupon applies to
+the total; the platform likewise, from the platform's credit. The promotion's issuer is its funder and
+the only payer. The customer-visible price reduction is identical in both cases. What changes is whose
+credit balance is debited for it: **a funding debit on the issuer's ledger balance, with one ledger kind
+per funder** (`coupon_vendor_funded`, `coupon_platform_funded`), never a hidden line discount.
+**The commission is computed on the pre-coupon total and does not depend on any coupon.**
 
 | | Vendor promotion | Platform promotion |
 |---|---|---|
 | Customer pays | list price − discount | list price − discount |
-| Vendor's supply price (and VAT base) | list price − discount | see §18.4 (⚖️ T-1) |
-| Vendor receives | list − discount − commission | list − commission (full price) |
-| Platform bears | nothing | the discount, as a marketing cost |
+| Vendor's VAT base | open, for the tax advisor (⚖️ T-1): list or list − discount | open (⚖️ T-1) |
+| Vendor receives | list − commission − discount (debited from its credit) | list − commission (full price) |
+| Platform bears | nothing | the discount, debited from the platform's credit (marketing cost) |
 
-### Commission base: recommendation
+### Commission base (decided)
 
-**Recommended: commission is computed on the list price (before any coupon), for both funders.**
+**Decided (Q-P2): commission is computed on the pre-coupon total (the list price), for both funders.**
+Worked example (owner): item 100, vendor coupon 20, commission 10%: the customer pays 80, the 20 is debited
+from the vendor's credit, commission is 10 on the pre-coupon total, the vendor nets 100 − 10 − 20 = 70. With
+a platform coupon of 20 the 20 comes from the platform's credit and the vendor nets 90.
 
 Example: line 100, commission 15%, coupon 10. Vendor coupon: customer pays 90, commission 15, vendor
 nets 75, so the vendor paid exactly 10 more than without the coupon. If commission were computed on the
@@ -142,8 +150,8 @@ vendor net = list − normal commission − own share, [03](03-catalog.md)). Cos
 commission on money its customer did not pay (a 50% coupon on a 15% rule is an effective 30% on the
 price paid), the contract and the statement must say so (VEN.30), and VEN.3's current wording
 ("taxable amount of the vendor's goods") changes. The fallback is a versioned
-`CommissionRule.coupon_base` = `list` (default) or `paid`; the rule snapshot on the order records which one
-applied, so the owner can flip the policy for new orders without touching old ones (Q-P2).
+`CommissionRule.coupon_base` = `list` (the decided default) or `paid`; the rule snapshot on the order
+records which one applied, so a later policy change never touches old orders.
 
 **Guard rails.** A vendor-funded discount on a line may not exceed that line's list price minus its
 commission and its share of the payment fee, so the vendor's net per line never goes negative:
@@ -195,15 +203,16 @@ constraint for single-use codes under `select_for_update`), **redeemed** in `on_
 
 ### Ledger
 
-`LedgerEntry.kind` gains `coupon_discount` and `coupon_platform_funded` (P2, next to the bundle
-kinds). `sale` is the list goods amount in both cases:
+`LedgerEntry.kind` gains `coupon_vendor_funded` (a debit of the vendor's balance) and
+`coupon_platform_funded` (a debit of the platform's balance), P2, next to the bundle kinds. `sale` is the
+list goods amount in both cases:
 
 | Case (line 100, rule 15%, coupon 10) | Rows for the vendor | Vendor net | Platform |
 |---|---|---|---|
-| Vendor-funded | `sale` +100, `coupon_discount` −10, `commission` −15 | 75 | +15 |
-| Platform-funded | `sale` +100, `coupon_discount` −10, `coupon_platform_funded` +10, `commission` −15 | 85 | +15 − 10 = +5 |
+| Vendor-funded | `sale` +100, `commission` −15, `coupon_vendor_funded` −10 | 75 | +15 |
+| Platform-funded | `sale` +100, `commission` −15; platform balance: `coupon_platform_funded` −10 | 85 | +15 − 10 = +5 |
 
-The sum of `sale` and `coupon_discount` always equals what the customer paid for goods, which is what the
+The sum of `sale` and the funding debit always equals what the customer paid for goods, which is what the
 nightly Stripe reconciliation checks. The platform's marketing cost is the sum of `coupon_platform_funded`
 rows, reported to staff (Finance and payments role) per promotion and budget. The transfer to the vendor is
 for the full `vendor_net`, so with a platform coupon the platform balance pays the 10 (⚖️ D-08: the
@@ -215,9 +224,10 @@ to the vendor: customer-paid plus platform-funded amounts, so list minus vendor-
 
 - **A refund returns what the customer paid for the line**: list − allocated discount, VAT from the
   snapshot (`tax_base_net`), proportional for a partial quantity. The refund row is that amount.
-- Vendor-funded, line above refunded in full: `refund` −90, `commission_reversal` +15, `coupon_discount`
-  stays: 100 − 10 − 15 − 90 + 15 = 0. Platform-funded: `refund` −90, `commission_reversal` +15, and
-  `coupon_platform_funded` −10 (the platform takes its 10 back): 100 − 10 + 10 − 15 − 90 + 15 − 10 = 0.
+- Vendor-funded, line above refunded in full: `refund` −90, `commission_reversal` +15, `coupon_vendor_funded`
+  stays: 100 − 15 − 10 − 90 + 15 = 0. Platform-funded: `refund` −90, `commission_reversal` +15, and
+  the platform's `coupon_platform_funded` is reversed in the platform's own balance (it was never the vendor's
+  money): the vendor side is 100 − 15 − 90 + 15 − 10 = 0 with the platform covering its 10 as before.
   D-05 applies unchanged (full: commission and fee returned; partial: proportional).
 - **No clawback.** Returning part of an order never removes a discount on the lines kept: a minimum
   order or the loss of a gift trigger is checked at order time only. Reason: a penalty for using the
@@ -235,10 +245,12 @@ to the vendor: customer-paid plus platform-funded amounts, so list minus vendor-
   instruments that only entitle to a price reduction; articles 30a to 30b (single-purpose and
   multi-purpose vouchers) apply to instruments redeemable for goods or services, which is why the design
   issues no stored value (§18.1).
-- **Vendor-funded: certain.** The vendor reduces its own price at the time of supply, so the taxable
-  amount of the supply is the price actually charged (article 73), per line, `ROUND_HALF_UP`. Shipping
-  discounts reduce the shipping base the same way. Nothing for the advisor except confirming the
-  per-line rounding rule and the 0.50 floor.
+- **Vendor-funded: open (owner, 2026-11-10).** Because the funding is a debit on the vendor's credit, a
+  vendor-funded coupon is economically a price reduction, but the vendor's VAT base is 80 or 100 in the
+  owner's example, and the advisor must say which (article 73, T-1 now covers both funders). Until then
+  the order stores both figures (`tax_base_net` and the list net) and a `PlatformOperator` setting selects
+  the mode. Shipping discounts follow the same answer. The per-line rounding rule and the 0.50 floor are
+  also confirmed.
 - **Platform-funded: open.** Customer pays 90, vendor receives 100 (90 from the customer, 10 from the
   platform). Two readings, both stored so that policy can change without a data migration:
   - **T1, third-party consideration (article 73):** the platform's 10 is paid for the vendor's supply by
@@ -261,7 +273,7 @@ to the vendor: customer-paid plus platform-funded amounts, so list minus vendor-
 ### When a cart is abandoned
 
 A cart is **abandoned** when all of these hold: it has at least one line; its owner is a signed-in
-customer (a `user` on the cart, never a guest session, §18.6); it has had no activity (`updated_at`) for
+customer or a guest who ticked the checkbox (§18.6); it has had no activity (`updated_at`) for
 `CART_IDLE_MINUTES` (default 120, range 60 to 4320); the cart total is at least `RECOVERY_MIN_CART_NET`
 (default 15.00); no order was placed since the last activity; and at least one line is still
 purchasable (`sales_mode=buy`, vendor active, stock available). A price change since `added_price_net`
@@ -333,19 +345,22 @@ retention jobs).
 
 ## 18.6 Guests
 
-**No recovery for guests by default.** A guest's email, typed at checkout, exists to deliver the order
-and is not a basis for marketing. The design does not recognise anonymous returning visitors with cookies
-(ePrivacy article 5(3), CMP consent). If the owner wants guest recovery (Q-P6), the only accepted route is
-an unticked checkbox at the email step ("Email me about this cart"), stored as `MarketingConsent`
-with double opt-in (the first message asks for confirmation and carries nothing else), the same caps,
-and the same retention. The soft opt-in does not apply to a person who never bought.
+**Decided (owner, 2026-11-10, Q-P6): guests are included.** A first-party cookie recognises a returning
+guest's own cart on the site (a functional cookie: it is the cart they built, no profiling). E-mail
+reminders go to a guest **only with the unticked checkbox** at the email step ("Email me about this cart"),
+never to an address typed and not submitted: a guest's email exists to deliver the order and is not a basis
+for marketing. The checkbox is stored as `MarketingConsent` with double opt-in (the first message asks for
+confirmation and carries nothing else), the same caps, and the same retention. The soft opt-in does not
+apply to a person who never bought.
 
 ## 18.7 Return incentive
 
 The owner's idea: when the customer comes back, an incentive and a coupon appear. This design gives
-the incentive **only through the recovery email** and applies it when the customer opens the restored
-cart, so the coupon "appears" in the cart as a visible discount line; it is not shown to anyone who simply
-visits.
+the incentive **through the recovery email and on the site** (decided, Q-P7), details configurable per
+campaign. By email it is applied when the customer opens the restored cart, so the coupon "appears" in the
+cart as a visible discount line. On the site, a signed-in visitor with a qualifying abandoned cart sees a
+non-modal box with the cart and the coupon, under the same cooldown, minimum, validity, holdout and the
+"created automatically from your cart" notice; it is not shown to anyone who simply visits.
 
 ### Campaign model
 
@@ -472,8 +487,8 @@ Names are stable test names. Amounts are line net before VAT, rule 15%.
 
 | Case | Setup | Expected |
 |---|---|---|
-| CPN-VENDOR | Vendor coupon 10% on line 100 | Customer 90, VAT base 90, commission 15, vendor net 75, platform +15, rows `sale` 100, `coupon_discount` −10, `commission` −15 |
-| CPN-PLATFORM | Platform coupon 10 on line 100 | Customer 90, vendor net 85, platform +15 − 10, rows include `coupon_platform_funded` +10; VAT base per `platform_funded_coupon_vat_mode`; feature off until T-1 is answered |
+| CPN-VENDOR | Vendor coupon 10% on line 100 | Customer 90, commission 15 on the pre-coupon 100, vendor net 75, platform +15, rows `sale` 100, `commission` −15, `coupon_vendor_funded` −10; VAT base 90 or 100 per the T-1 mode |
+| CPN-PLATFORM | Platform coupon 10 on line 100 | Customer 90, vendor net 85, platform +15 − 10, the 10 is a `coupon_platform_funded` debit on the platform's balance, not the vendor's; VAT base per `platform_funded_coupon_vat_mode`; feature off until T-1 is answered |
 | CPN-FIXED-SPLIT | Fixed 10 on lines 60 and 30 and 10 | Shares 6, 3, 1 (HALF_UP, remainder to largest), sum 10 |
 | CPN-MULTI | Platform fixed 20 across vendors A (100) and B (50) | Shares 13.33 and 6.67, each vendor still receives full price, platform cost 20 |
 | CPN-MINPAY | Coupon makes total 0.10 | Promotion not applied, customer told, no zero-total order |
@@ -483,7 +498,7 @@ Names are stable test names. Amounts are line net before VAT, rule 15%.
 | CPN-RACE | Two checkouts, single-use code | One wins, one gets the uniform refusal |
 | CPN-BRUTE | 6 wrong codes in a minute | Captcha then lockout, uniform message, no enumeration |
 | CPN-GAMING | Vendor raises price 10 days ago, platform coupon | Line excluded from platform coupon |
-| RCV-GUEST | Cart without user | Never in the cohort without a guest consent record |
+| RCV-GUEST | Guest cart | Never in the cohort without a ticked guest checkbox and a confirmed double opt-in; a typed but unsubmitted address is never used; the on-site cookie only restores the guest's own cart |
 | RCV-CONSENT | Consent withdrawn after queueing | Not sent; suppression holds |
 | RCV-QUIET | Due 23:30 business time | Sent 09:00 next day |
 | RCV-CAP | Second abandonment 5 days after a sequence | No second sequence within 14 days |
@@ -502,10 +517,10 @@ decides. Open owner questions are in §18.12, tax advisor (T-) and counsel (L-) 
 | PRM.1 | New app `promotions`: `Promotion` (versioned, issuer is funder with a check constraint, no separate funder field), `Coupon`, `Redemption`, scope, limits, activation modes, audited services with `dry_run`; no order or tax import | P2 | 10 | CAT.1, VEN.2, ORD.2 | A promotion with redemptions cannot be edited in place; a vendor promotion cannot scope another vendor's product; a platform promotion needs a budget cap; migrations and import contract green |
 | PRM.2 | Pure `apply_promotions` engine: types percent, fixed, free shipping, gift; one discount per line; fixed-amount sharing with remainder to the largest line; caps and vendor-net clamp; minimum payable total; stacking rules; per-line `ROUND_HALF_UP` | P2 | 12 | PRM.1, TAX.4 | CPN-VENDOR, CPN-FIXED-SPLIT, CPN-MULTI, CPN-MINPAY, CPN-STACK green; a random-cart property test never exceeds the eligible total or makes a negative vendor net |
 | PRM.3 | Cart and checkout integration: apply a code (HTMX, one code slot per funder context), automatic promotions, redemption reserve at `place_order`, confirm in `on_payment_succeeded`, release on cancel and expiry, coupon line in cart and confirmation | P2 | 12 | PRM.2, ORD.4 | CPN-RACE green on PostgreSQL; a cancelled order frees a single-use code; duplicate payment event redeems once |
-| PRM.4 | Order snapshots: `OrderLineDiscount`, `shipping_discount_net`, `tax_base_net`, `list_unit_price_net`; non-fiscal confirmation and CMP.23 export fields; VAT on the discounted base | P2 | 8 | PRM.3, CMP.23 | A coupon order's confirmation and export show list, vendor-funded and platform-funded discount and VAT base per line; a deleted promotion leaves the snapshot intact |
-| PRM.5 | Commission and ledger: `compute_commission` on the list base, `CommissionRule.coupon_base` (`list` default, `paid`), ledger kinds `coupon_discount` and `coupon_platform_funded`, statement lines, refund and partial refund rows, DAC7 aggregate adjustment, nightly reconciliation | P2 | 12 | PRM.4, VEN.3, PAY.4, CMP.1 | CPN-VENDOR, CPN-PLATFORM, CPN-REFUND-VENDOR and CPN-REFUND-PARTIAL green; statement shows both rows; reconciliation passes; ledger needs human review |
+| PRM.4 | Order snapshots: `OrderLineDiscount`, `shipping_discount_net`, `tax_base_net`, `list_unit_price_net`; non-fiscal confirmation and CMP.23 export fields; VAT base per the T-1 mode (both figures stored) | P2 | 8 | PRM.3, CMP.23 | A coupon order's confirmation and export show list, vendor-funded and platform-funded discount and VAT base per line; a deleted promotion leaves the snapshot intact |
+| PRM.5 | Commission and ledger: `compute_commission` on the list base, `CommissionRule.coupon_base` (`list` default, `paid`), ledger kinds `coupon_vendor_funded` and `coupon_platform_funded` (a funding debit on the issuer's balance), statement lines, refund and partial refund rows, DAC7 aggregate adjustment, nightly reconciliation | P2 | 12 | PRM.4, VEN.3, PAY.4, CMP.1 | CPN-VENDOR, CPN-PLATFORM, CPN-REFUND-VENDOR and CPN-REFUND-PARTIAL green; statement shows both rows; reconciliation passes; ledger needs human review |
 | PRM.6 | Vendor promotions in the Manager shop space: create, pause, end, net-effect preview ("you pay X per use"), usage report; creation validation against commission and fee; activation behind the D-32 level and an audit entry | P2 | 10 | PRM.3, CORE.18 | A vendor creates and ends a coupon; the preview matches the ledger; a percent above 100 − commission − fee is refused |
-| PRM.7 | Platform promotions in the platform space: budget caps and alerts, vendor opt-in setting (`CrossVendorConsent.in_platform_coupons`, no row = opted out), 30-day price-history gate, self-dealing exclusion, `platform_funded_coupon_vat_mode`; **blocked until the tax advisor answers T-1 and the owner answers Q-P3 and Q-P4** | P2 | 12 | PRM.5, PRM.6 | CPN-GAMING green; a vendor that did not opt in is untouched; the feature flag is off by default; the VAT mode setting changes only new orders |
+| PRM.7 | Platform promotions in the platform space: budget caps and alerts, vendor opt-in setting (`CrossVendorConsent.in_platform_coupons`, no row = opted out), 30-day price-history gate, self-dealing exclusion, `platform_funded_coupon_vat_mode`; **blocked until the tax advisor answers T-1** | P2 | 12 | PRM.5, PRM.6 | CPN-GAMING green; a vendor that did not opt in is untouched; the feature flag is off by default; the VAT mode setting changes only new orders |
 | PRM.8 | Abuse and security of the apply endpoint: rate limits per account, IP and session, Turnstile after 5 failures, lockout, uniform answer, constant-time compare, no codes in logs, registration in the SEC.13 register when merged | P2 | 8 | PRM.3 | CPN-BRUTE green; an endpoint sweep finds the form protected; logs contain no code |
 | PRM.9 | Marketing consent and suppression: `MarketingConsent` (purpose, text version, method, timestamp, append-only), checkboxes at signup and checkout, preference toggle (ORD.11), suppression list with salted hashes, one-click unsubscribe (RFC 8058) through CORE.15 links, evidence retention; legal texts through CMP.24 | P2 | 10 | CORE.15, ARC.16, ORD.11, CMP.24 | Consent and withdrawal are recorded; unsubscribe by POST works from the header and the footer; a withdrawn purpose is never sent; texts carry counsel approval |
 | PRM.10 | Abandoned-cart detection and reminder (step 1): 15-minute job, eligibility, quiet hours in the business time zone, caps, `RecoveryDispatch`, CORE.15 `cart_restore` link, marketing email class in five languages with no pixel, consent re-check at send, personalised-offer notice | P2 | 12 | PRM.9, ORD.1, ORD.9 | RCV-GUEST, RCV-CONSENT, RCV-QUIET, RCV-CAP, RCV-PIXEL green; snapshot tests of the email in EN, IT, DE, FR and ES; needs human review |
@@ -518,27 +533,27 @@ decides. Open owner questions are in §18.12, tax advisor (T-) and counsel (L-) 
 | VEN.30 | Vendor terms and checklist for promotions: contract clause on funding, commission on the list price, platform promotions and campaign selection, price-honesty duty (no raising a price to fund a discount), 30 days' notice for changes (P2B), CMP.10 checklist row | P2 | 4 | VEN.14, CMP.24 | New contract version carries the clause as a specific-approval item; checklist row visible; wording approved |
 | CMP.32 | Counsel review of the cart-reminder legal basis (L-1 to L-9) and the Omnibus and personalised-price wording; outcome recorded as ADR | P2 | 4 | CMP.24 | Written answers to L-1 to L-9 in an ADR; any change of wording goes through CMP.24 |
 
-## 18.12 Open owner questions
+## 18.12 Owner questions: decisions and what is left
 
-- **Q-P1.** One funder per coupon, no co-funding in v1. Is a "platform matches the vendor" mode ever wanted (it is a
-  later row, not a change of the rule)?
-- **Q-P2.** Commission on the list price (recommended, §18.3) or on the price paid? List means a vendor pays commission
-  on money the customer did not pay; paid means the platform quietly co-funds every vendor coupon.
-- **Q-P3.** Platform promotions: do vendors opt in by default (recommended: no, `CrossVendorConsent` style, and the vendor terms
-  ask once) or opt out? Do you want vendors able to exclude single products?
-- **Q-P4.** Who may create platform coupons and with what ceiling? Proposal: Finance and payments role, monthly
-  ceiling set by the platform owner, second approver above a threshold, every one audited.
-- **Q-P5.** Recovery ladder: plain reminder first and incentive 24 hours later (recommended), or the incentive in
-  the first message? Holdout of 10% (carts that receive nothing) accepted?
-- **Q-P6.** Guests: no recovery at launch (recommended), or the unticked "email me about this cart" route (§18.6)?
-- **Q-P7.** The incentive reaches only the emailed customer and appears in the restored cart (recommended). Do you also want a
-  "welcome back" coupon for signed-in visitors on the site? It is discoverable and farmable, so it is not proposed.
-- **Q-P8.** Default values: idle 2 hours, minimum cart 15, cooldown 60 days, lifetime cap 3, validity 5 days, caps on
-  vendor percent coupons, quiet hours 09:00 to 20:00. Confirm or change.
-- **Q-P9.** Any vendor on any plan can run coupons and campaigns, or only some plans (`VendorPlan.features`)?
-- **Q-P10.** Operator-owned shop (VEN.26): same rules, with its coupons funded by the operator as vendor?
-- **Q-P11.** After a withdrawal the coupon is not given back and no discount is clawed back (§18.3). Agree?
-- **Q-P12.** Vendors choose their own public codes. Reserved words and a platform-wide unique namespace acceptable?
+Decided 2026-11-10 (owner for Q-P2, Q-P6, Q-P7, Q-P9; lane-a technical defaults for the rest):
+
+- **Q-P1.** Decided: no co-funding in v1; a "platform matches the vendor" mode is a later row.
+- **Q-P2.** Decided (owner): funding is a debit on the issuer's credit balance, with a ledger kind per
+  funder; commission on the pre-coupon total (§18.3). The VAT base stays open for the tax advisor (T-1).
+- **Q-P3.** Decided: platform promotions are opt-in by the vendor, default off; a vendor can exclude single products.
+- **Q-P4.** Decided as proposed: Finance and payments role, monthly ceiling set by the owner, second approver
+  above a threshold, every one audited.
+- **Q-P5.** Decided: plain reminder first, incentive 24 hours later, holdout 10%.
+- **Q-P6.** Decided (owner): guests included, cookie for the on-site cart, e-mail only with the unticked checkbox (§18.6).
+- **Q-P7.** Decided (owner): e-mail and on site, details configurable per campaign (§18.7).
+- **Q-P8.** Decided: the proposed defaults, all operator settings.
+- **Q-P9.** Decided (owner): only some plans (`VendorPlan.features`); the operator sets the plan matrix.
+- **Q-P10.** Decided: yes, the operator-owned shop follows the same rules.
+- **Q-P11.** Decided: agreed (no clawback, no coupon restored after dispatch).
+- **Q-P12.** Decided: yes, reserved words and a platform-wide unique namespace.
+
+Still open: the VAT base of a vendor-funded and of a platform-funded coupon (tax advisor T-1 to T-7), and
+counsel L-1 to L-9. Neither blocks the spec PR; platform-funded coupons stay disabled until T-1 is answered.
 
 ## 18.13 Open questions for the tax advisor and counsel
 
