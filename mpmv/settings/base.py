@@ -566,4 +566,4 @@ ORDER_NUMBER_PREFIX = ""
 
 # Months after an order during which its non-fiscal data is kept; then `minimise_order` may
 # drop it (D-29). The fiscal snapshot is kept 10 years from the end of the order's year.
-ORDER_ACTIVE_PHASE_MONTHS = 24
+ORDER_ACTIVE_PHASE_MONTHS = 24  # can only lengthen the 24-month floor enforced in the database

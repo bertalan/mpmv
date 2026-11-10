@@ -258,6 +258,7 @@ def create_order(
     vat_validation: dict[str, Any] | None = None,
     state: str = "checkout",
     legacy_wp_order_id: int | None = None,
+    placed_at: dt.datetime | None = None,
     dry_run: bool = False,
     now: dt.datetime | None = None,
 ) -> tuple[Order | None, ChangeSet]:
@@ -278,6 +279,8 @@ def create_order(
     if state not in engine.ORDER_STATES:
         raise ValueError(f"{state!r} is not an order state")
     legacy = legacy_wp_order_id is not None
+    if placed_at is not None and not legacy:
+        raise ValueError("only a legacy order may choose its date (placed_at)")
     if state not in engine.ORDER_INITIAL_STATES and not legacy:
         raise ValueError(f"{state!r} is not an initial state of an order")
     for item in vendor_orders:
@@ -303,6 +306,8 @@ def create_order(
         state=state,
         legacy_wp_order_id=legacy_wp_order_id,
     )
+    if placed_at is not None:
+        order.created_at = placed_at  # MIG.4: the original date starts the retention clock
     built = [_build_vendor_order(order, item) for item in vendor_orders]
     grand = engine.add_totals(totals for _, _, totals in built)
     order.goods_net, order.shipping_net = grand.goods_net, grand.shipping_net
@@ -480,7 +485,11 @@ def _scrub(
         with transaction.atomic():
             locked = Order.objects.select_for_update().get(pk=order.pk)
             if mode == "minimise":
-                months = int(getattr(settings, "ORDER_ACTIVE_PHASE_MONTHS", 24))
+                # The database trigger enforces 24 months as a floor; the setting only lengthens.
+                months = max(
+                    int(getattr(settings, "ORDER_ACTIVE_PHASE_MONTHS", 24)),
+                    engine.MIN_ACTIVE_PHASE_MONTHS,
+                )
                 if not engine.minimisation_due(locked.created_at, stamp, months, _business_zone()):
                     raise ScrubNotDue(f"the active phase of {months} months has not ended")
             elif not engine.anonymisation_due(locked.created_at, stamp, _business_zone()):
@@ -519,7 +528,9 @@ def minimise_order(
     order: Order, *, ctx: AuditContext, dry_run: bool = False, now: dt.datetime | None = None
 ) -> ChangeSet:
     """Drop the non-fiscal fields (carrier contact phone, support notes of the sub-orders) once
-    `ORDER_ACTIVE_PHASE_MONTHS` (default 24) have passed since the order. Fiscal data stays.
+    `ORDER_ACTIVE_PHASE_MONTHS` (default 24, never shorter: the database enforces 24) have
+    passed since the order. The database checks its own clock; `now` serves dry runs. Fiscal
+    data stays.
     Raises `ScrubNotDue` before that. Idempotent."""
     return _scrub(order, "minimise", ctx=ctx, dry_run=dry_run, now=now)
 

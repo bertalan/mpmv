@@ -373,10 +373,10 @@ def test_raw_minimise_on_a_young_order_fails_and_on_an_old_one_works() -> None:
 
 
 def test_a_legacy_order_keeps_its_original_created_at() -> None:
-    original = dt.datetime(2019, 5, 6, 9, 0, tzinfo=dt.UTC)
+    original = dt.datetime(2014, 5, 6, 9, 0, tzinfo=dt.UTC)
     order = place(state="closed", legacy_wp_order_id=777, placed_at=original)
     assert Order.objects.get(pk=order.pk).created_at == original
-    # and its retention clock runs from it: year 10 ended on 31 Dec 2029
+    # and its retention clock runs from it: year 10 ended on 31 Dec 2024
     services.anonymise_order(order, ctx=CTX)
 
 

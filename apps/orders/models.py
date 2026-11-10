@@ -19,6 +19,7 @@ from typing import Any, ClassVar
 from django.conf import settings
 from django.db import models
 from django.db.models.functions import Round
+from django.utils import timezone
 
 from apps.catalog.models import Product
 from apps.core.fields import CountryField, LanguageField, MoneyField
@@ -114,6 +115,11 @@ class Order(_StateGuarded):
     _machine = staticmethod(engine.check_order_transition)
     _initial_states = engine.ORDER_INITIAL_STATES
 
+    # The retention clock (D-29) and the numbering year count from this date. It is the time of
+    # insert, except for a legacy order (MIG.4), which keeps its original date; the database
+    # trigger enforces the same rule.
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+
     number = models.CharField(
         max_length=32, unique=True, editable=False, help_text="Order reference, not an invoice."
     )
@@ -191,6 +197,14 @@ class Order(_StateGuarded):
                 condition=models.Q(grand_total__gte=0), name="orders_order_grand_total_not_negative"
             ),
         ]
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        fresh = self._state.adding and self.legacy_wp_order_id is None
+        if fresh:
+            self.created_at = timezone.now()
+        super().save(*args, **kwargs)
+        if fresh:  # the trigger stamped the database's own insert time: read it back
+            self.created_at = Order.objects.values_list("created_at", flat=True).get(pk=self.pk)
 
     def __str__(self) -> str:
         return f"Order {self.number}"

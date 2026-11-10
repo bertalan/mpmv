@@ -179,6 +179,9 @@ def derive_order_state(current: str, vendor_states: Iterable[str]) -> str:
 ANONYMISED = "ANONYMISED"
 ANONYMISED_EMAIL = "anonymised@example.invalid"
 FISCAL_RETENTION_YEARS = 10
+# Frozen into the database trigger (migration 0006): the setting ORDER_ACTIVE_PHASE_MONTHS can
+# only make the active phase longer than this.
+MIN_ACTIVE_PHASE_MONTHS = 24
 ANONYMISED_ORDER_FIELDS: Mapping[str, object] = {
     "customer_name": ANONYMISED,
     "customer_vat_number": ANONYMISED,

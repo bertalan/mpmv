@@ -15,12 +15,25 @@ The state arrows are the same frozen copy as in 0003.
 """
 
 import importlib
+import re
 
 from django.db import migrations
 
 _guards = importlib.import_module("apps.orders.migrations.0003_database_guards")
 ORDER_ARROWS = _guards.ORDER_ARROWS
 VENDOR_ORDER_ARROWS = _guards.VENDOR_ORDER_ARROWS
+
+
+def _restore(sql: str) -> str:
+    """The 0003 guard functions as CREATE OR REPLACE."""
+    blocks = []
+    for name in ("orders_order_guard", "orders_vendororder_guard"):
+        match = re.search(rf"CREATE FUNCTION {name}\(\).*?\$\$ LANGUAGE plpgsql;", sql, re.S)
+        if match is None:
+            raise RuntimeError(f"{name} not found")
+        blocks.append(match.group(0).replace("CREATE FUNCTION", "CREATE OR REPLACE FUNCTION"))
+    return "\n\n".join(blocks)
+
 
 FORWARD = f"""
 CREATE OR REPLACE FUNCTION orders_order_guard() RETURNS trigger AS $$
@@ -128,13 +141,13 @@ CREATE TRIGGER orders_vendororder_no_delete
     FOR EACH ROW EXECUTE FUNCTION orders_forbid_delete();
 """  # noqa: S608 - only constants of this file are interpolated
 
-# Reversing drops the delete guards only; the replaced guard functions stay (they are stricter
-# than 0003's and work on the same columns).
+# Reversing drops the delete guards and puts the 0003 guard functions back (they do not know the
+# columns that 0004's reverse removes, so `migrate orders 0003` leaves working triggers).
 REVERSE = """
 DROP TRIGGER orders_vendororder_no_delete ON orders_vendororder;
 DROP TRIGGER orders_order_no_delete ON orders_order;
 DROP FUNCTION orders_forbid_delete();
-"""
+""" + _restore(_guards.FORWARD)
 
 
 class Migration(migrations.Migration):
