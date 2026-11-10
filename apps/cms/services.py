@@ -28,6 +28,7 @@ from django.http import HttpRequest
 from django.template.loader import render_to_string
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
+from django.utils.html import strip_tags
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from wagtail import blocks
@@ -45,10 +46,9 @@ from wagtail_localize.operations import TranslationCreator
 from apps.catalog import listings, slugs
 from apps.catalog import services as catalog
 from apps.catalog.models import Category, Term
-from apps.core import translations
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
-from apps.core.i18n import configured_languages
+from apps.core.i18n import configured_languages, hreflang_alternates
 from apps.core.image_licences import Credit
 from apps.core.money import CURRENCY
 from apps.core.services import run_mutation
@@ -558,13 +558,38 @@ def set_legal_effective_date(
     return run_mutation(changeset, apply, ctx=ctx, action=LEGAL_DATE_SET, dry_run=dry_run)
 
 
-def legal_readiness(languages: Sequence[str] | None = None) -> list[engine.ReadinessProblem]:
+GoliveCheck = Callable[[Sequence[str] | None], list[str]]
+# Checks other apps add to `golive_readiness` (one go-live gate): each takes the languages (None
+# for all) and returns problem messages. `apps.compliance` registers the DSA and P2B check
+# (CMP.5, D-27); cms cannot import it.
+GOLIVE_CHECKS: list[GoliveCheck] = []
+
+
+def register_golive_check(check: GoliveCheck) -> None:
+    if check not in GOLIVE_CHECKS:
+        GOLIVE_CHECKS.append(check)
+
+
+def golive_problems(languages: Sequence[str] | None = None) -> list[str]:
+    """Every go-live problem: the legal pages of all kinds with their reviews (I18N.9, D-27),
+    then the registered checks."""
+    kinds = (*engine.GO_LIVE_LEGAL_KINDS, *engine.DSA_LEGAL_KINDS)
+    messages = [p.message for p in legal_readiness(languages, kinds=kinds)]
+    for check in GOLIVE_CHECKS:
+        messages.extend(check(languages))
+    return messages
+
+
+def legal_readiness(
+    languages: Sequence[str] | None = None, kinds: Sequence[str] | None = None
+) -> list[engine.ReadinessProblem]:
     """What stops go-live on the customer legal and checkout pages, in every go-live language
     (all of settings.LANGUAGES unless `languages` is given): a page without a published
     translation in a language, or a language's published text without its reviews."""
+    kinds = kinds or engine.GO_LIVE_LEGAL_KINDS
     pages = (
         LegalPage.objects.live()
-        .filter(kind__in=engine.GO_LIVE_LEGAL_KINDS, alias_of__isnull=True)
+        .filter(kind__in=kinds, alias_of__isnull=True)
         .select_related("locale")
     )
     texts = []
@@ -579,9 +604,30 @@ def legal_readiness(languages: Sequence[str] | None = None) -> list[engine.Readi
                 reviews=frozenset(stages),
             )
         )
-    return engine.legal_readiness_problems(
-        texts, engine.GO_LIVE_LEGAL_KINDS, languages or configured_languages()
+    return engine.legal_readiness_problems(texts, kinds, languages or configured_languages())
+
+
+def legal_section_tags(kinds: Iterable[str]) -> dict[tuple[str, str], set[str]]:
+    """The required-section tags carried by the live legal pages of `kinds`, per (kind, language).
+
+    A section counts when its text has content: markup alone (`<p></p>`) is empty. A page
+    without any section still has its key, so callers tell "no page" from "no section".
+    Read by `apps.compliance` (CMP.5), which owns the rules about which tags are required.
+    """
+    pages = (
+        LegalPage.objects.live()
+        .filter(kind__in=list(kinds), alias_of__isnull=True)
+        .select_related("locale")
     )
+    found: dict[tuple[str, str], set[str]] = {}
+    for page in pages:
+        tags = found.setdefault((page.kind, page.locale.language_code), set())
+        tags.update(
+            block.value["section"]
+            for block in page.body
+            if block.block_type == "legal_section" and strip_tags(str(block.value["text"])).strip()
+        )
+    return found
 
 
 def _seed_legal_placeholders(home: HomePage, report: SeedReport) -> None:
@@ -925,6 +971,22 @@ def listing_editorial(
     return None
 
 
+def page_language_urls(page: Page | None, request: HttpRequest | None) -> dict[str, str]:
+    """{language code: URL} of the live translations of `page` (itself included): the one
+    source of the page's `hreflang` links and of its language switcher (`apps.core.i18n`)."""
+    if page is None:
+        return {}
+    urls: dict[str, str] = {}
+    for translated in page.get_translations(inclusive=True).live().select_related("locale"):
+        # A page that is live but not shown to visitors (a hidden event) is not offered.
+        if not getattr(translated.specific, "is_publicly_visible", lambda: True)():
+            continue
+        url = translated.get_url(request)
+        if url is not None:
+            urls[translated.locale.language_code] = url
+    return urls
+
+
 def vendor_landing_context(page: Any, request: HttpRequest | None) -> dict[str, Any]:
     """The vendor's featured products (its storefront listing's newest) and the page's own
     canonical and `hreflang` links: its live translations of a public vendor."""
@@ -943,13 +1005,11 @@ def vendor_landing_context(page: Any, request: HttpRequest | None) -> dict[str, 
         return request.build_absolute_uri(url) if request is not None else url
 
     found: dict[str, str] = {}
-    for translation in page.get_translations(inclusive=True).live().specific():
-        url = absolute(translation.get_url(request))
-        if url is not None:
-            found[translation.locale.language_code] = url
-    alternates = [(code, found[code]) for code in configured_languages() if code in found]
-    source = translations.source_language()
-    alternates.extend(("x-default", url) for code, url in list(alternates) if code == source)
+    for code, url in page_language_urls(page, request).items():
+        absolute_url = absolute(url)
+        if absolute_url is not None:
+            found[code] = absolute_url
+    alternates = hreflang_alternates(found)
     return {
         "featured": grid,
         "currency": CURRENCY,

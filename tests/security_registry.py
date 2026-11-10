@@ -43,6 +43,7 @@ PASSWORD_RESET = "Password reset flow of the editors' admin: answers before sign
 # Endpoints an anonymous visitor may reach (a 2xx, or a redirect that is not to a sign-in page).
 PUBLIC: dict[str, str] = {
     "healthz": "Liveness probe with a constant answer.",
+    "robots_txt": "robots.txt (SEO.8): constant text for crawlers, no vendor data.",
     "email_webhook": "Email provider feedback: refused unless the payload is signed (ARC.16).",
     "home": "Public home page.",
     "media": MEDIA,
@@ -53,6 +54,10 @@ PUBLIC: dict[str, str] = {
     "switch_language": "Stores the visitor's language choice in a cookie.",
     "action_link:open": "Secure action link (CORE.15): the signed token is the credential.",
     "action_link:continue": "Secure action link (CORE.15): the signed token is the credential.",
+    "dsa_contact_points": (
+        "DSA points of contact (CMP.5): the operator's own contact data, read-only, public by law "
+        "(DSA art. 11 and 12)."
+    ),
     "vendors:apply": (
         "Public 'Sell with us' application form (VEN.22): the page is public by design; the POST "
         "is CSRF-checked, rate limited per IP and behind Turnstile, and it creates an inactive "

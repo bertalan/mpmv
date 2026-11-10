@@ -137,6 +137,8 @@ def translation_date_problem(
 
 GO_LIVE_LEGAL_KINDS: tuple[str, ...] = ("terms", "privacy", "withdrawal", "shipping", "returns")
 REQUIRED_LEGAL_REVIEWS: tuple[str, ...] = ("native_review", "counsel_check")
+# D-27: the platform terms and the ranking page (CMP.5) are go-live pages in every language too.
+DSA_LEGAL_KINDS: tuple[str, ...] = ("platform_terms", "ranking")
 MISSING_TRANSLATION = "translation"
 
 
@@ -453,6 +455,14 @@ _ID_EMBEDTYPES = frozenset({"image"})
 _NUMERIC_ID_RE = re.compile(r"[0-9]+")
 
 
+def image_format_names() -> frozenset[str]:
+    """The names of Wagtail's registered image formats: an image embed outside them makes
+    `expand_db_html` raise at render."""
+    from wagtail.images.formats import get_image_formats
+
+    return frozenset(fmt.name for fmt in get_image_formats())
+
+
 def _has_valid_id(kind: str, value: Any, id_kinds: frozenset[str]) -> bool:
     """False for a `kind` that needs a numeric id and has none; True for any other kind."""
     return kind not in id_kinds or (
@@ -512,8 +522,10 @@ def _whitelister(features: tuple[str, ...]) -> Any:
                     tag.unwrap()
                 return
             if tag.name == "embed" and "data-embedtype" not in tag.attrs:
-                if tag.get("embedtype") in self.embed_handlers and _has_valid_id(
-                    tag["embedtype"], tag.get("id"), _ID_EMBEDTYPES
+                if (
+                    tag.get("embedtype") in self.embed_handlers
+                    and _has_valid_id(tag["embedtype"], tag.get("id"), _ID_EMBEDTYPES)
+                    and (tag["embedtype"] != "image" or tag.get("format") in image_format_names())
                 ):
                     tag.attrs = {k: v for k, v in tag.attrs.items() if k in _DB_EMBED_ATTRS}
                 else:
