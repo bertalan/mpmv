@@ -28,6 +28,7 @@ from apps.catalog.services import product_kpis
 from apps.core.audit import audit_context
 from apps.core.models import AuditLog
 from apps.core.public_forms import Protection, pre_mfa_step, public_form
+from apps.vendors.engine import RICH_TEXT_FIELDS, plain_to_html
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.scoping import Source, VendorScopedQuerySet
 from apps.vendors.services import (
@@ -128,9 +129,13 @@ class StorefrontProfileView(ManagerView):
 
     def stored_values(self, language: str) -> dict[str, str]:
         row = self.stored_row(language)
-        return (
-            {} if row is None else {n: getattr(row, n) for n in StorefrontProfileForm.base_fields}
-        )
+        if row is None:
+            return {}
+        # A legacy plain text is shown to the editor as the paragraphs it will be stored as.
+        return {
+            n: plain_to_html(getattr(row, n)) if n in RICH_TEXT_FIELDS else getattr(row, n)
+            for n in StorefrontProfileForm.base_fields
+        }
 
     def locked(self) -> bool:
         vendor = self.manager.vendor
