@@ -13,7 +13,7 @@ from django.utils import translation
 from django.utils.safestring import SafeString, mark_safe
 from wagtail.models import Locale, Page
 
-from apps.core.i18n import configured_languages
+from apps.core.i18n import LanguageLink, switcher_links
 from apps.core.image_licences import Credit
 
 from .. import services
@@ -27,14 +27,6 @@ register = template.Library()
 class MenuLink:
     label: str
     url: str
-
-
-@dataclass(frozen=True)
-class LanguageLink:
-    code: str
-    name: str  # in its own language ("Italiano")
-    url: str  # the current page in that language, query string kept
-    current: bool
 
 
 def _menu(location: str) -> NavigationMenu | None:
@@ -72,42 +64,30 @@ def navigation_links(context: dict[str, Any], location: str) -> list[MenuLink]:
     return links
 
 
-def _translations(page: Page | None, request: HttpRequest | None) -> dict[str, str]:
-    """{language code: URL} of the live translations of `page` (itself included)."""
-    if page is None:
-        return {}
-    return {
-        translated.locale.language_code: translated.get_url(request)
-        for translated in page.get_translations(inclusive=True).live().select_related("locale")
-    }
-
-
 @register.simple_tag(takes_context=True)
 def language_links(context: dict[str, Any]) -> list[LanguageLink]:
     """One entry per configured language: where the switcher takes the visitor.
 
-    On a CMS page, the target is that page's translation (slugs differ between languages);
-    without one, the language's home. Elsewhere, the language's home.
+    The target is the same object in that language: the translations a view puts in the context
+    as `language_urls` (listings and storefronts, the set of their `hreflang` links), else the
+    CMS page's live translations (slugs differ between languages). Without a translation, the
+    language's home, flagged so the switch shows a notice.
     """
     request: HttpRequest | None = context.get("request")
-    page: Page | None = context.get("page")
     query = request.META.get("QUERY_STRING", "") if request is not None else ""
     suffix = f"?{query}" if query else ""
-    current = translation.get_language()
-    infos = {code: translation.get_language_info(code) for code in configured_languages()}
-    translated = _translations(page, request)
-    links: list[LanguageLink] = []
-    for code, info in infos.items():
-        url = translated.get(code)
-        if url is None:
-            with translation.override(code):
-                url = reverse("home")
-        links.append(
-            LanguageLink(
-                code=code, name=str(info["name_local"]), url=url + suffix, current=code == current
-            )
-        )
-    return links
+    urls: Mapping[str, str] | None = context.get("language_urls")
+    if urls is None:
+        urls = {
+            code: url + suffix
+            for code, url in services.page_language_urls(context.get("page"), request).items()
+        }
+
+    def home(code: str) -> str:
+        with translation.override(code):
+            return reverse("home") + suffix
+
+    return switcher_links(urls, translation.get_language(), home)
 
 
 @register.simple_tag

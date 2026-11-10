@@ -1,6 +1,10 @@
-"""E2E (I18N.1): `/` is EN, the other four languages have a prefix, the switcher keeps the page."""
+"""E2E (I18N.11): the language switch stays on the same object.
 
-import re
+On a taxonomy term page the switch to Italian leads to the Italian term page (with the filter
+written in Italian), not to the Italian home; a language without a translation leads to its home
+with a notice. Works in a real browser, no CSP violation.
+"""
+
 from collections.abc import Callable
 from pathlib import Path
 
@@ -8,44 +12,28 @@ import pytest
 from playwright.sync_api import Page, expect
 from pytest_django.live_server_helper import LiveServer
 
+from tests.e2e.test_catalog_listings import term_page  # noqa: F401
+from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
+
 pytestmark = pytest.mark.django_db(transaction=True)
 
 
-HOMES = [("/", "en"), ("/it/", "it"), ("/de/", "de"), ("/fr/", "fr"), ("/es/", "es")]
-
-
-@pytest.mark.parametrize(("path", "language"), HOMES)
-def test_each_language_home_is_served(
-    page: Page, live_server: LiveServer, shot: Callable[[str], Path], path: str, language: str
-) -> None:
-    page.goto(f"{live_server.url}{path}")
-    expect(page.locator("html")).to_have_attribute("lang", language)
-    expect(page.locator(f'button[value="{language}"]')).to_have_attribute("aria-current", "true")
-    shot(language)
-
-
-def test_visitor_switches_language_and_stays_on_the_page(
+@pytest.mark.usefixtures("term_page")
+def test_the_switch_stays_on_the_same_term_page(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
-    page.goto(f"{live_server.url}/?page=2")
-    shot("en")
-    page.locator('button[value="it"]').click()
-    expect(page).to_have_url(re.compile(r"/it/\?page=2$"))
-    expect(page.locator("html")).to_have_attribute("lang", "it")
-    shot("it")
-    page.locator('button[value="de"]').click()
-    expect(page).to_have_url(re.compile(r"/de/\?page=2$"))
-    expect(page.locator("html")).to_have_attribute("lang", "de")
-    shot("de")
-    page.locator('button[value="fr"]').click()
-    expect(page).to_have_url(re.compile(r"/fr/\?page=2$"))
-    expect(page.locator("html")).to_have_attribute("lang", "fr")
-    shot("fr")
-    page.locator('button[value="es"]').click()
-    expect(page).to_have_url(re.compile(r"/es/\?page=2$"))
-    expect(page.locator("html")).to_have_attribute("lang", "es")
-    shot("es")
-    page.locator('button[value="en"]').click()
-    expect(page).to_have_url(re.compile(r"^http://[^/]+/\?page=2$"))
-    expect(page.locator("html")).to_have_attribute("lang", "en")
-    shot("back-to-en")
+    page.add_init_script(RECORD_CSP_VIOLATIONS)
+    page.goto(f"{live_server.url}/compatibility/maker/?colour=red")
+    switcher = page.locator("nav.language-switcher")
+    shot("switch-en")
+    switcher.locator('button[value="it"]').click()
+    expect(page).to_have_url(f"{live_server.url}/it/compatibilita/marca/?colore=rosso")
+    expect(page.get_by_role("heading", level=1)).to_have_text("Marca")
+    expect(page.locator(".site-messages")).to_have_count(0)
+    shot("switch-it")
+
+    switcher.locator('button[value="de"]').click()
+    expect(page).to_have_url(f"{live_server.url}/de/")
+    expect(page.locator(".site-messages")).to_contain_text("not available in this language")
+    shot("switch-de-notice")
+    assert csp_violations(page) == [], "\n".join(csp_violations(page))

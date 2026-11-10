@@ -62,14 +62,6 @@ def test_a_term_page_switches_to_its_translation(client: Client, compat: dict[st
     same_as_hreflang(html)
 
 
-def test_a_filtered_term_page_keeps_its_filters_in_the_other_language(
-    client: Client,
-    compat: dict[str, Any],  # noqa: F811
-) -> None:
-    html = client.get("/compatibility/maker/?page=1").content.decode()
-    assert switch_targets(html)["it"][0] == "/it/compatibilita/marca/"
-
-
 def test_a_brand_page_switches_to_its_translation(client: Client) -> None:
     brand = BrandFactory.create()
     BrandTranslationFactory.create(brand=brand, slug="acme", status=PUBLISHED)

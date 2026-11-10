@@ -3,11 +3,16 @@
 @layer layout {
   .site-header__inner,
   .site-main,
+  .site-messages,
   .site-footer__inner {
     inline-size: 100%;
     max-inline-size: var(--measure-page);
     margin-inline: auto;
     padding-inline: var(--space-m);
+  }
+
+  .site-messages {
+    padding-block-start: var(--space-m);
   }
 
   .site-main {
