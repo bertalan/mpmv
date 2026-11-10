@@ -187,16 +187,16 @@ def test_add_months_clamps_the_day() -> None:
     assert engine.add_months(dt.date(2027, 3, 15), 24) == dt.date(2029, 3, 15)
 
 
-def test_minimisation_is_due_after_the_active_phase() -> None:
+def test_restriction_is_due_after_the_active_phase() -> None:
     import datetime as dt
     import zoneinfo
 
     rome = zoneinfo.ZoneInfo("Europe/Rome")
     created = dt.datetime(2027, 3, 15, 10, 0, tzinfo=dt.UTC)
-    assert not engine.minimisation_due(
+    assert not engine.restriction_due(
         created, dt.datetime(2029, 3, 14, 12, tzinfo=dt.UTC), 24, rome
     )
-    assert engine.minimisation_due(created, dt.datetime(2029, 3, 15, 12, tzinfo=dt.UTC), 24, rome)
+    assert engine.restriction_due(created, dt.datetime(2029, 3, 15, 12, tzinfo=dt.UTC), 24, rome)
 
 
 def test_anonymisation_is_due_after_31_december_of_year_ten() -> None:
@@ -214,3 +214,42 @@ def test_anonymisation_is_due_after_31_december_of_year_ten() -> None:
     late = dt.datetime(2027, 12, 31, 23, 30, tzinfo=dt.UTC)
     assert not engine.anonymisation_due(late, dt.datetime(2038, 6, 1, tzinfo=dt.UTC), rome)
     assert engine.anonymisation_due(late, dt.datetime(2039, 1, 1, tzinfo=dt.UTC), rome)
+
+
+def test_tax_retention_until_is_the_end_of_year_ten_in_the_given_zone() -> None:
+    import datetime as dt
+    import zoneinfo
+
+    rome = zoneinfo.ZoneInfo("Europe/Rome")
+    assert engine.tax_retention_until(dt.datetime(2027, 3, 15, tzinfo=dt.UTC), rome) == dt.date(
+        2037, 12, 31
+    )
+    assert engine.tax_retention_until(
+        dt.datetime(2027, 12, 31, 23, 30, tzinfo=dt.UTC), rome
+    ) == dt.date(2038, 12, 31)
+
+
+def test_anonymisation_starts_the_day_after_the_retention_date() -> None:
+    import datetime as dt
+
+    until = dt.date(2037, 12, 31)
+    assert not engine.retention_over(until, dt.date(2037, 12, 31))
+    assert engine.retention_over(until, dt.date(2038, 1, 1))
+
+
+def test_privacy_transitions_go_forward_only() -> None:
+    engine.check_privacy_transition("active", "restricted_tax_only")
+    engine.check_privacy_transition("restricted_tax_only", "anonymized")
+    engine.check_privacy_transition("active", "anonymized")
+    for source, target in [
+        ("restricted_tax_only", "active"),
+        ("anonymized", "active"),
+        ("anonymized", "restricted_tax_only"),
+        ("active", "active"),
+    ]:
+        with pytest.raises(IllegalTransition):
+            engine.check_privacy_transition(source, target)
+
+
+def test_unpaid_states_are_the_ones_that_never_reached_paid() -> None:
+    assert {"checkout", "quote_flow", "awaiting_payment", "cancelled"} == engine.UNPAID_STATES

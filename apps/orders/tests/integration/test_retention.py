@@ -1,7 +1,8 @@
 """ORD.2, owner decision D-29: fiscal snapshot fields are immutable; only the audited scrub
-service (minimise after the active phase, anonymise after year 10) may change them."""
+service (restrict after the active phase, anonymise after year 10) may change them."""
 
 import datetime as dt
+import zoneinfo
 from decimal import Decimal
 from typing import Any
 
@@ -9,6 +10,7 @@ import pytest
 from django.db import IntegrityError, connection, transaction
 from django.utils import timezone
 
+from apps.accounts.tests.factories import UserFactory
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 from apps.orders import engine, services
@@ -45,8 +47,9 @@ def ago(**delta: int) -> dt.datetime:
 def backdate(order: Order, created: dt.datetime) -> None:
     """Set created_at without the triggers (test set-up): the retention dates count from it,
     and the database checks them against its own clock."""
+    until = engine.tax_retention_until(created, zoneinfo.ZoneInfo("Europe/Rome"))
     with unchecked():
-        Order.objects.filter(pk=order.pk).update(created_at=created)
+        Order.objects.filter(pk=order.pk).update(created_at=created, tax_retention_until=until)
     order.refresh_from_db()
 
 
@@ -76,7 +79,11 @@ def place(created: dt.datetime | None = None, **overrides: object) -> Order:
         "customer_name": "Mario Rossi",
         "customer_vat_number": "IT12345678901",
         "customer_tax_id": "RSSMRA80A01H501U",
-        "vat_validation": {"consultation": "WAPIAAAA", "at": "2027-03-15T10:00:00Z"},
+        "vat_validation": {
+            "consultation": "WAPIAAAA",
+            "at": "2027-03-15T10:00:00Z",
+            "name": "ROSSI SRL",
+        },
         "vendor_orders": [sub],
         "ctx": CTX,
         "now": PLACED,
@@ -188,7 +195,7 @@ def test_raw_sql_cannot_change_an_address_either() -> None:
 @pytest.mark.parametrize(
     ("mode", "assignment"),
     [
-        ("minimise", "email = 'x@example.com'"),
+        ("restrict", "email = 'x@example.com'"),
         ("anonymise", "grand_total = 1"),
         ("anonymise", "shipping_country = 'DE'"),
     ],
@@ -226,26 +233,26 @@ def with_phone(order: Order) -> VendorOrder:
     return VendorOrder.objects.get(pk=sub.pk)
 
 
-def test_minimise_before_the_active_phase_is_refused() -> None:
+def test_restrict_before_the_active_phase_is_refused() -> None:
     order = place(created=ago(days=700))
     with pytest.raises(ScrubNotDue):
-        services.minimise_order(order, ctx=CTX)
+        services.restrict_order(order, ctx=CTX)
     with pytest.raises(ScrubNotDue):
-        services.minimise_order(order, ctx=CTX, dry_run=True)
+        services.restrict_order(order, ctx=CTX, dry_run=True)
 
 
-def test_minimise_drops_only_the_non_fiscal_fields_and_audits() -> None:
+def test_restrict_drops_only_the_non_fiscal_fields_and_audits() -> None:
     order = place(created=MID)
     with_phone(order)
-    changeset = services.minimise_order(order, ctx=CTX)
+    changeset = services.restrict_order(order, ctx=CTX)
     assert not changeset.is_empty
     sub = order.vendor_orders.get()
     assert (sub.carrier_contact_phone, sub.support_notes) == ("", "")
     order.refresh_from_db()
-    assert order.minimised_at is not None
+    assert order.restricted_at is not None
     assert order.email == "buyer@example.com"  # fiscal data stays
     assert order.billing_address["city"] == "Roma"
-    entries = AuditLog.objects.filter(action="orders.minimise")
+    entries = AuditLog.objects.filter(action="orders.restrict")
     assert entries.count() == 2  # the sub-order and the order
     assert all("+39" not in str(e.before) + str(e.after) for e in entries)
 
@@ -254,24 +261,24 @@ def test_the_active_phase_setting_can_only_lengthen_it(settings: object) -> None
     order = place(created=ago(days=30 * 30))  # about 30 months
     settings.ORDER_ACTIVE_PHASE_MONTHS = 36  # type: ignore[attr-defined]
     with pytest.raises(ScrubNotDue):
-        services.minimise_order(order, ctx=CTX)
+        services.restrict_order(order, ctx=CTX)
     settings.ORDER_ACTIVE_PHASE_MONTHS = 6  # type: ignore[attr-defined]  # shorter: ignored
     young = place(created=ago(days=200))
     with pytest.raises(ScrubNotDue):
-        services.minimise_order(young, ctx=CTX)
+        services.restrict_order(young, ctx=CTX)
     settings.ORDER_ACTIVE_PHASE_MONTHS = 24  # type: ignore[attr-defined]
-    services.minimise_order(order, ctx=CTX)
+    services.restrict_order(order, ctx=CTX)
 
 
 def test_a_dry_run_scrub_writes_nothing() -> None:
     order = place(created=OLD)
     with_phone(order)
     audited = AuditLog.objects.count()
-    changeset = services.minimise_order(order, ctx=CTX, dry_run=True)
+    changeset = services.restrict_order(order, ctx=CTX, dry_run=True)
     assert not changeset.is_empty
     assert order.vendor_orders.get().carrier_contact_phone == "+39 0000 000"
     order.refresh_from_db()
-    assert order.minimised_at is None
+    assert order.restricted_at is None
     assert AuditLog.objects.count() == audited
 
     changeset = services.anonymise_order(order, ctx=CTX, dry_run=True)
@@ -350,7 +357,8 @@ def test_raw_anonymise_with_the_right_placeholders_works_on_an_old_order() -> No
     scrub_sql(
         order,
         "anonymise",
-        "email = %s, customer_name = %s, billing_address = %s::jsonb, anonymised_at = now()",
+        "email = %s, customer_name = %s, billing_address = %s::jsonb,"
+        " privacy_status = 'anonymized', anonymised_at = now()",
         engine.ANONYMISED_EMAIL,
         engine.ANONYMISED,
         '{"anonymised": true}',
@@ -359,14 +367,16 @@ def test_raw_anonymise_with_the_right_placeholders_works_on_an_old_order() -> No
     assert order.email == engine.ANONYMISED_EMAIL
 
 
-def test_raw_minimise_on_a_young_order_fails_and_on_an_old_one_works() -> None:
+def test_raw_restrict_on_a_young_order_fails_and_on_an_old_one_works() -> None:
     young = place()
     with pytest.raises(IntegrityError):
-        scrub_sql(young, "minimise", "minimised_at = now()")
+        scrub_sql(
+            young, "restrict", "privacy_status = 'restricted_tax_only', restricted_at = now()"
+        )
     old = place(created=MID)
-    scrub_sql(old, "minimise", "minimised_at = now()")
+    scrub_sql(old, "restrict", "privacy_status = 'restricted_tax_only', restricted_at = now()")
     old.refresh_from_db()
-    assert old.minimised_at is not None
+    assert old.restricted_at is not None
 
 
 # --- MIG.4: a legacy order keeps its original date ----------------------------------------------
@@ -408,3 +418,120 @@ def test_the_legacy_id_cannot_be_set_or_changed_after_insert() -> None:
     legacy = place(state="closed", legacy_wp_order_id=778)
     with pytest.raises(IntegrityError):
         run_sql(("UPDATE orders_order SET legacy_wp_order_id = NULL WHERE id = %s", [legacy.pk]))
+
+
+# --- D-30: tax_retention_until, privacy_status, unpaid orders, VIES name -----------------------
+
+
+def test_tax_retention_until_is_31_december_of_year_ten_in_rome_and_immutable() -> None:
+    order = place()
+    year = timezone.now().astimezone(zoneinfo.ZoneInfo("Europe/Rome")).year
+    assert order.tax_retention_until == dt.date(year + 10, 12, 31)
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Order.objects.filter(pk=order.pk).update(tax_retention_until=dt.date(2030, 1, 1))
+
+
+def test_a_legacy_order_counts_the_retention_from_its_original_date() -> None:
+    order = place(
+        state="closed", legacy_wp_order_id=900, placed_at=dt.datetime(2014, 5, 6, tzinfo=dt.UTC)
+    )
+    assert order.tax_retention_until == dt.date(2024, 12, 31)
+    # a new year in Rome: 23:30 UTC on 31 Dec belongs to the next year
+    late = place(
+        state="closed",
+        legacy_wp_order_id=901,
+        placed_at=dt.datetime(2014, 12, 31, 23, 30, tzinfo=dt.UTC),
+    )
+    assert late.tax_retention_until == dt.date(2025, 12, 31)
+
+
+def test_a_new_order_starts_active() -> None:
+    assert place().privacy_status == "active"
+
+
+def test_privacy_status_moves_forward_only() -> None:
+    order = place(created=OLD)
+    services.restrict_order(order, ctx=CTX)
+    order.refresh_from_db()
+    assert order.privacy_status == "restricted_tax_only"
+    for back in ("active",):
+        with pytest.raises(IntegrityError), transaction.atomic():
+            Order.objects.filter(pk=order.pk).update(privacy_status=back)
+    services.anonymise_order(order, ctx=CTX)
+    order.refresh_from_db()
+    assert order.privacy_status == "anonymized"
+    for back in ("active", "restricted_tax_only"):
+        with pytest.raises(IntegrityError), transaction.atomic():
+            Order.objects.filter(pk=order.pk).update(privacy_status=back)
+
+
+def test_privacy_status_cannot_change_without_the_scrub_service() -> None:
+    order = place(created=OLD)
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Order.objects.filter(pk=order.pk).update(privacy_status="restricted_tax_only")
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Order.objects.filter(pk=order.pk).update(privacy_status="anonymized")
+
+
+def test_restricting_for_an_account_erasure_needs_no_waiting() -> None:
+    order = place()
+    with_phone(order)
+    with pytest.raises(ScrubNotDue):
+        services.restrict_order(order, ctx=CTX)
+    services.restrict_order(order, ctx=CTX, reason="account_erasure")
+    order.refresh_from_db()
+    assert order.privacy_status == "restricted_tax_only"
+    assert order.vendor_orders.get().carrier_contact_phone == ""
+    assert order.email == "buyer@example.com"  # still in the snapshot, masked by the UI later
+
+
+def test_an_order_never_paid_is_anonymised_at_once() -> None:
+    order = place()  # checkout: nothing was ever paid
+    services.anonymise_order(order, ctx=CTX)
+    order.refresh_from_db()
+    assert (order.privacy_status, order.email) == ("anonymized", engine.ANONYMISED_EMAIL)
+    assert order.grand_total == Decimal("12.20")
+
+
+def test_a_paid_order_is_not_anonymised_early() -> None:
+    order = place()
+    for state in ("awaiting_payment", "paid"):
+        services.transition_order(order, state, ctx=CTX)
+    with pytest.raises(ScrubNotDue):
+        services.anonymise_order(order, ctx=CTX)
+    with pytest.raises(IntegrityError):
+        scrub_sql(
+            order,
+            "anonymise",
+            "email = %s, privacy_status = 'anonymized', anonymised_at = now()",
+            engine.ANONYMISED_EMAIL,
+        )
+
+
+def test_raw_sql_anonymises_an_unpaid_order_but_only_to_placeholders() -> None:
+    order = place()
+    with pytest.raises(IntegrityError):
+        scrub_sql(order, "anonymise", "email = %s, privacy_status = 'anonymized'", "x@example.com")
+    scrub_sql(
+        order,
+        "anonymise",
+        "email = %s, privacy_status = 'anonymized', anonymised_at = now()",
+        engine.ANONYMISED_EMAIL,
+    )
+
+
+def test_the_vies_log_keeps_the_name_returned_by_vies() -> None:
+    order = place()
+    assert order.vat_validation["name"] == "ROSSI SRL"
+    with pytest.raises(ValueError, match="vat_validation"):
+        place(vat_validation={"consultation": "X", "at": "2027-03-15T10:00:00Z"})
+    place(vat_validation={})  # no VAT number checked
+
+
+def test_deleting_the_user_keeps_the_order_snapshot() -> None:
+    user = UserFactory.create()
+    order = place(customer=user)
+    user.delete()
+    order.refresh_from_db()
+    assert order.customer is None
+    assert order.email == "buyer@example.com"
