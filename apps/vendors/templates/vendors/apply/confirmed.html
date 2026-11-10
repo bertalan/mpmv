@@ -1,0 +1,11 @@
+{% extends "layouts/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Email confirmed" %} · {{ site_name }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block content %}
+<article class="apply">
+  <h1>{% translate "Your email is confirmed" %}</h1>
+  <p>{% translate "Your application is with our team for review. Sign in with the password you chose: you will be asked to set up an authenticator app the first time." %}</p>
+  {% include "components/button.html" with label=_("Sign in") url=sign_in_url only %}
+</article>
+{% endblock %}
