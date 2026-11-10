@@ -210,6 +210,15 @@ class ElevationGrant(BaseModel):
 
     class Meta:
         indexes = [models.Index(fields=["session_hash", "action", "digest"])]
+        constraints = [
+            # At most one unspent grant per session, user, action and parameters: parallel
+            # requests replaying one assertion cannot mint two grants.
+            models.UniqueConstraint(
+                fields=["session_hash", "user", "action", "digest"],
+                condition=models.Q(used_at__isnull=True),
+                name="accounts_one_open_grant",
+            )
+        ]
 
     def __str__(self) -> str:
         return f"{self.action} for {self.user_id} until {self.expires_at:%H:%M:%S}"

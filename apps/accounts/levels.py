@@ -21,6 +21,7 @@ from typing import Any, Final
 from django.conf import settings
 from django.contrib.auth import user_logged_in, user_logged_out
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
+from django.db import IntegrityError, transaction
 from django.dispatch import receiver
 from django.http import HttpRequest
 from django.utils import timezone
@@ -296,15 +297,30 @@ def _session_hash(session_key: str) -> str:
 
 
 def create_grant(session_key: str, user: Any, action: str, digest: str, *, ttl: int) -> None:
+    """Mint a grant; at most one unspent grant exists per session, user, action and parameters
+    (a unique constraint), so a parallel replay of one assertion mints no second one."""
     now = timezone.now()
+    session_hash = _session_hash(session_key)
     ElevationGrant.objects.filter(expires_at__lt=now - dt.timedelta(days=1)).delete()
-    ElevationGrant.objects.create(
-        session_hash=_session_hash(session_key),
+    ElevationGrant.objects.filter(
+        session_hash=session_hash,
         user=user,
         action=action,
         digest=digest,
-        expires_at=now + dt.timedelta(seconds=ttl),
-    )
+        used_at__isnull=True,
+        expires_at__lte=now,
+    ).delete()  # an expired unspent grant must not block a new one
+    try:
+        with transaction.atomic():
+            ElevationGrant.objects.create(
+                session_hash=session_hash,
+                user=user,
+                action=action,
+                digest=digest,
+                expires_at=now + dt.timedelta(seconds=ttl),
+            )
+    except IntegrityError:
+        pass  # a live grant for exactly this already exists
 
 
 def spend_grant(session_key: str, user: Any, action: str, digest: str) -> bool:

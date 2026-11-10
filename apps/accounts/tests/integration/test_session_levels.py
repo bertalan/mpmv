@@ -926,3 +926,43 @@ def test_changing_the_password_ends_operational_mode(client: Client) -> None:
     assert response.status_code == 302
     assert client.session.get(levels.STARTED_KEY) is None
     assert _after(_actions(levels.SESSION_ENDED)[-1])["reason"] == "password"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_minting_the_same_grant_in_parallel_leaves_one_usable_grant() -> None:
+    import threading
+
+    from django.db import connection
+
+    from apps.accounts.models import ElevationGrant
+
+    user = UserFactory.create(staff=True)
+    barrier = threading.Barrier(8)
+    errors: list[BaseException] = []
+
+    def mint() -> None:
+        try:
+            barrier.wait()
+            levels.create_grant("session-key", user, "export", "digest-1", ttl=120)
+        except BaseException as exc:  # the test reports it
+            errors.append(exc)
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=mint) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+    assert not any(thread.is_alive() for thread in threads)
+    assert not errors
+    assert ElevationGrant.objects.filter(used_at__isnull=True).count() == 1
+    assert levels.spend_grant("session-key", user, "export", "digest-1")
+    assert not levels.spend_grant("session-key", user, "export", "digest-1")
+
+
+def test_an_expired_unspent_grant_does_not_block_a_new_one() -> None:
+    user = UserFactory.create(staff=True)
+    levels.create_grant("s", user, "export", "d", ttl=-5)
+    levels.create_grant("s", user, "export", "d", ttl=120)
+    assert levels.spend_grant("s", user, "export", "d")
