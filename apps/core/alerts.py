@@ -10,7 +10,9 @@ The host calls `manage.py check_ops` (cron or a systemd timer). Thresholds are s
 """
 
 import datetime as dt
+import hashlib
 import logging
+import re
 import shutil
 from pathlib import Path
 
@@ -39,7 +41,11 @@ def alert_address() -> str:
 
 
 def raise_alert(
-    alert: Alert, *, now: dt.datetime | None = None, exc: BaseException | None = None
+    alert: Alert,
+    *,
+    now: dt.datetime | None = None,
+    exc: BaseException | None = None,
+    dedup: str = "",
 ) -> None:
     """Log, track (as `exc` when given) and (once per repeat window) e-mail `alert`."""
     moment = now or timezone.now()
@@ -63,14 +69,25 @@ def raise_alert(
         template_key=EMAIL_TEMPLATE,
         language=settings.LANGUAGE_CODE,
         context={"key": alert.key, "summary": alert.summary, "details": details},
-        idempotency_key=f"ops:alert:{alert.key}:{bucket}",
+        idempotency_key=f"ops:alert:{alert.key}{dedup}:{bucket}",
     )
+
+
+def message_fingerprint(exc: BaseException) -> str:
+    """`:` plus a short stable hash of the message with digit runs ignored: a different failure
+    of one class is mailed separately, an id in the text does not defeat de-duplication."""
+    stable = re.sub(r"\d+", "#", str(exc))
+    return ":" + hashlib.sha256(stable.encode()).hexdigest()[:8]
 
 
 def report_checkout_error(exc: BaseException, *, context: dict[str, str] | None = None) -> None:
     """Call from the checkout's error path: track the exception and alert staff.
 
-    Only the exception type is reported; its message may hold customer data.
+    Only the exception type is reported; its message may hold customer data. Call it after the
+    checkout's transaction has rolled back (from the `except` clause, outside `atomic`): the
+    e-mail goes through the outbox in the caller's transaction, so inside a block that rolls
+    back it would be lost. The log line and the tracker event are not affected. (`on_commit`
+    would not help: its callbacks are discarded on a rollback too.)
     """
     safe = redact_mapping(context or {})
     raise_alert(
@@ -80,6 +97,7 @@ def report_checkout_error(exc: BaseException, *, context: dict[str, str] | None 
             {"area": "checkout", "exception": type(exc).__name__, **safe},
         ),
         exc=exc,
+        dedup=message_fingerprint(exc),
     )
 
 

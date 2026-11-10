@@ -9,10 +9,15 @@
   `X-Request-ID` of 8 to 64 letters, digits or dashes, else makes one, and answers it in
   `X-Request-ID`. The id is in a context variable, so every record of the request carries it.
 - **Redaction** (`apps/core/observability.py`): `RedactSensitiveData` runs on the handler before any
-  output. It removes e-mail addresses, bearer tokens, values after `password`/`token`/`secret`/
-  `api_key`/`cookie`/`session`/`iban`/card-like keys, card-like numbers and action link tokens
-  (CORE.15), in the message, the traceback and extra fields. Do not log personal data on purpose;
-  the filter is a safety net.
+  output, on the message, traceback, `stack_info` and extra fields. It removes e-mail addresses
+  (also percent-encoded), IBANs of any country, EU VAT numbers, card-like numbers, the
+  `Authorization` header of any scheme, URL credentials, provider key shapes (`sk_live_`,
+  `whsec_` and so on), long tokens after `=`, and the value of any key containing `secret`,
+  `passwd`/`password`, `pwd`, `token`, `api_key`, `private_key`, `session`, `cookie`, `csrf`,
+  `signature` (also `pw`, `pin` as whole keys), quoted or not, in text and in dict reprs. Extra
+  field values are redacted recursively (dicts, lists, tuples, objects through their text) on a copy,
+  with depth and size limits. It prefers over-redaction: an order number of 13 or more digits looks
+  like a card number. Do not log personal data on purpose; the filter is a safety net.
 
 ## Error tracking
 `apps/core/errortracking.py`: an `ErrorTracker` protocol, adapters `none` (default, no-op) and
@@ -34,7 +39,10 @@ e-mail (template `core.ops_alert`) through the outbox, once per alert key and
 address.
 
 - `report_checkout_error(exc, context=...)`: for the checkout's error path (no checkout code
-  exists yet; the CHK tasks call it). Reports the exception type only.
+  exists yet; the CHK tasks call it). Reports the exception type only. Call it after the
+  transaction rolled back (in the `except` clause, outside `atomic`), or the outbox e-mail rolls
+  back with it. The e-mail repeats per exception class and message (digits ignored).
+- `/readyz` logs a failure at most once per dependency per minute.
 - `uv run python manage.py check_ops`: for the host's timer. Exit 1 when an alert is raised.
 
 | Check | Settings (env `MPMV_` + name) | Alert keys |
