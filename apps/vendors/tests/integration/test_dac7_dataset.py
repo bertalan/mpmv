@@ -68,7 +68,7 @@ def raw_column(vendor: Vendor, column: str) -> str:
 @pytest.mark.parametrize("trait", TRAITS)
 def test_complete_traits_have_the_dac7_dataset(seeded: None, trait: str) -> None:
     vendor = VendorFactory.create(**{trait: True})
-    assert engine.dac7_missing(vendor.legal_identity()) == ()
+    assert engine.dac7_missing(vendor.legal_identity(), engine.SEEDED_NO_TIN_COUNTRIES) == ()
     assert_payout_allowed(vendor)  # does not raise
 
 

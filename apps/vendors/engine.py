@@ -364,7 +364,7 @@ _ANY_TIN = re.compile(r"[A-Z0-9][A-Z0-9./-]{0,29}", re.ASCII)
 _TIN_SEPARATORS = re.compile(r"[./-]")
 # Jurisdictions that issue no TIN (in their absence DAC7 asks an individual's place of birth).
 # The live list is staff-editable data (`NoTinCountry`, VEN.27) that the service passes in; this
-# is only the list migration 0026 seeds it with, and the default of the pure unit-test calls.
+# is only the list migration 0026 seeds it with (and what the pure unit tests pass in).
 SEEDED_NO_TIN_COUNTRIES: Final = frozenset({"AE", "BM", "BS", "KY", "MC", "VG"})
 # Member States where an entity's VAT number, without its prefix, is also its TIN: only there is
 # "same as the VAT number" offered. Elsewhere the two differ (AT "U" + 8 digits, DE, FR, NL, SE
@@ -1067,9 +1067,7 @@ def _vat_number_as_tin(identity: LegalIdentity) -> tuple[str, str] | None:
     return (country, number) if is_valid_tin(number, country) else None
 
 
-def dac7_check(
-    identity: LegalIdentity, no_tin_countries: Collection[str] = SEEDED_NO_TIN_COUNTRIES
-) -> Completeness:
+def dac7_check(identity: LegalIdentity, no_tin_countries: Collection[str]) -> Completeness:
     """The DAC7 dataset of `identity`: fields that are missing, and present ones that are
     invalid (a TIN malformed for its country, a VAT number VIES found invalid, ...).
 
@@ -1115,9 +1113,7 @@ def dac7_check(
     return Completeness(missing=_in_field_order(missing), invalid=_in_field_order(invalid))
 
 
-def dac7_missing(
-    identity: LegalIdentity, no_tin_countries: Collection[str] = SEEDED_NO_TIN_COUNTRIES
-) -> tuple[str, ...]:
+def dac7_missing(identity: LegalIdentity, no_tin_countries: Collection[str]) -> tuple[str, ...]:
     """The DAC7 fields still missing or invalid, in field order (see `dac7_check`)."""
     result = dac7_check(identity, no_tin_countries)
     return _in_field_order((*result.missing, *result.invalid))
@@ -1126,7 +1122,7 @@ def dac7_missing(
 def payout_completeness(
     identity: LegalIdentity,
     rules: Iterable[Requirement],
-    no_tin_countries: Collection[str] = SEEDED_NO_TIN_COUNTRIES,
+    no_tin_countries: Collection[str],
 ) -> Completeness:
     """What a payout still needs: the staff-editable rules plus the DAC7 dataset.
 

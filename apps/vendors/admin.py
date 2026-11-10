@@ -790,8 +790,10 @@ class LegalFieldRequirementAdmin(admin.ModelAdmin[LegalFieldRequirement]):
 @admin.register(NoTinCountry)
 class NoTinCountryAdmin(admin.ModelAdmin[NoTinCountry]):
     """Jurisdictions that issue no TIN (VEN.27). Staff add a country with a reason; both adding
-    and removing go through the audited services. A removal asks for no typed reason here, so
-    the admin records that it was done from the admin; use the service for a specific reason."""
+    and removing go through the audited services. The delete page asks for the removal reason
+    and refuses an empty one. No bulk delete: it has no place to ask for a reason."""
+
+    delete_confirmation_template = "admin/vendors/notincountry/delete_confirmation.html"
 
     list_display = ("country", "reason", "updated_at")
     search_fields = ("country", "reason")
@@ -809,13 +811,21 @@ class NoTinCountryAdmin(admin.ModelAdmin[NoTinCountry]):
     def save_model(self, request: HttpRequest, obj: NoTinCountry, form: Any, change: bool) -> None:
         add_no_tin_country(obj.country, reason=obj.reason, ctx=audit_context(request))
 
+    def delete_view(
+        self, request: HttpRequest, object_id: str, extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        if request.method == "POST" and not request.POST.get("reason", "").strip():
+            messages.error(request, "A reason is required to remove a country.")
+            return redirect(request.get_full_path())
+        return super().delete_view(request, object_id, extra_context)
+
     def delete_model(self, request: HttpRequest, obj: NoTinCountry) -> None:
         remove_no_tin_country(
-            obj.country, reason="Removed in the admin.", ctx=audit_context(request)
+            obj.country, reason=request.POST.get("reason", ""), ctx=audit_context(request)
         )
 
     def delete_queryset(self, request: HttpRequest, queryset: QuerySet[NoTinCountry]) -> None:
-        for row in queryset:
+        for row in queryset:  # unreachable (no bulk actions); kept on the audited path
             self.delete_model(request, row)
 
 

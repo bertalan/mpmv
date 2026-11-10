@@ -767,7 +767,14 @@ def add_no_tin_country(
     row.full_clean(exclude=["public_id"])
     changes = ChangeSet()
     changes.create(NO_TIN_MODEL, row.country, no_tin_snapshot(row))
-    return run_mutation(changes, row.save, ctx=ctx, action=NO_TIN_ADDED, dry_run=dry_run)
+
+    def apply() -> None:
+        try:
+            row.save()
+        except IntegrityError:  # a concurrent add of the same country won the race
+            raise ValidationError({"country": f"{row.country} is already on the list."}) from None
+
+    return run_mutation(changes, apply, ctx=ctx, action=NO_TIN_ADDED, dry_run=dry_run)
 
 
 def remove_no_tin_country(
@@ -784,7 +791,13 @@ def remove_no_tin_country(
         if row is None:
             raise ValidationError({"country": f"{code} is not on the no-TIN list."})
         changes = ChangeSet()
-        changes.delete(NO_TIN_MODEL, row.country, {**no_tin_snapshot(row), "removal_reason": why})
+        # Impact preview: vendors of this TIN country with no TIN now fail the payout check.
+        blocked = Vendor.objects.filter(tin_country=row.country, tax_code="").count()
+        changes.delete(
+            NO_TIN_MODEL,
+            row.country,
+            {**no_tin_snapshot(row), "removal_reason": why, "vendors_without_tin": blocked},
+        )
         return run_mutation(changes, row.delete, ctx=ctx, action=NO_TIN_REMOVED, dry_run=dry_run)
 
 

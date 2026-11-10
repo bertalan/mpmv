@@ -7,11 +7,15 @@ its reason, and a dry run changes nothing; vendor members cannot edit the list; 
 no ORM import.
 """
 
+import ast
 import datetime as dt
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
+from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
 from django.test import Client
 from django.urls import reverse
@@ -98,6 +102,11 @@ def test_adding_a_country_makes_an_individual_with_a_place_of_birth_complete() -
     add_no_tin_country("NZ", reason=REASON, ctx=CTX)
     assert "tax_code" not in missing(vendor)
     assert "NZ" in no_tin_countries()
+    # Only the TIN is relaxed: the other payout requirements still apply.
+    Vendor.objects.filter(pk=vendor.pk).update(iban="", registered_street="")
+    vendor.refresh_from_db()
+    assert {"iban", "registered_street"} <= set(missing(vendor))
+    assert "tax_code" not in missing(vendor)
 
 
 def test_removing_a_country_makes_the_vendor_incomplete_again() -> None:
@@ -157,23 +166,76 @@ def test_removing_an_unlisted_country_is_refused() -> None:
         remove_no_tin_country("NZ", reason=REASON, ctx=CTX)
 
 
-def test_vendor_members_cannot_edit_the_list(client: Client) -> None:
-    member = VendorMemberFactory.create().user
-    client.force_login(member)
-    for name in ("admin:vendors_notincountry_changelist", "admin:vendors_notincountry_add"):
-        response = client.get(reverse(name))
-        assert response.status_code in (302, 403)
+URLS = {
+    "changelist": lambda row: reverse("admin:vendors_notincountry_changelist"),
+    "add": lambda row: reverse("admin:vendors_notincountry_add"),
+    "delete": lambda row: reverse("admin:vendors_notincountry_delete", args=[row.pk]),
+}
 
 
-def test_staff_without_the_permission_cannot_edit_the_list(client: Client) -> None:
+@pytest.mark.parametrize("url", URLS)
+def test_anonymous_users_are_sent_to_the_login(client: Client, url: str) -> None:
+    row = NoTinCountry.objects.get(country="BS")
+    response = client.get(URLS[url](row))
+    assert response.status_code == 302
+    assert "login" in response["Location"]
+
+
+@pytest.mark.parametrize("url", URLS)
+def test_vendor_members_cannot_edit_the_list(client: Client, url: str) -> None:
+    client.force_login(VendorMemberFactory.create().user)
+    row = NoTinCountry.objects.get(country="BS")
+    assert client.get(URLS[url](row)).status_code in (302, 403)
+    assert client.post(URLS[url](row), {"post": "yes", "reason": REASON}).status_code in (302, 403)
+    assert NoTinCountry.objects.filter(country="BS").exists()
+
+
+@pytest.mark.parametrize("url", URLS)
+def test_staff_without_the_permission_get_403(client: Client, url: str, mfa_login: Any) -> None:
+    client = mfa_login(client, UserFactory.create(staff=True))
+    row = NoTinCountry.objects.get(country="BS")
+    assert client.get(URLS[url](row)).status_code == 403
+    assert client.post(URLS[url](row), {"post": "yes", "reason": REASON}).status_code == 403
+    assert NoTinCountry.objects.filter(country="BS").exists()
+
+
+def test_staff_with_only_the_add_permission_cannot_delete(client: Client, mfa_login: Any) -> None:
     staff = UserFactory.create(staff=True)
-    client.force_login(staff)
-    assert client.get(reverse("admin:vendors_notincountry_add")).status_code in (302, 403)
+    staff.user_permissions.add(Permission.objects.get(codename="add_notincountry"))
+    client = mfa_login(client, staff)
+    row = NoTinCountry.objects.get(country="BS")
+    assert (
+        client.get(reverse("admin:vendors_notincountry_delete", args=[row.pk])).status_code == 403
+    )
+    assert client.get(reverse("admin:vendors_notincountry_changelist")).status_code == 403
 
 
-def test_the_engine_has_no_orm_import() -> None:
-    source = (Path(engine.__file__)).read_text()
-    assert "django" not in source
+def test_the_engine_does_not_import_django_or_apps() -> None:
+    tree = ast.parse(Path(engine.__file__).read_text())
+    imported: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported += [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            imported.append(node.module or "")
+    pure = {"apps.core.countries", "apps.core.text"}  # no ORM: plain helpers
+    orm_django = ("django.db", "django.apps", "django.conf", "django.contrib")
+    assert not [m for m in imported if m.startswith(orm_django)]
+    assert not [m for m in imported if m.startswith("apps") and m not in pure]
+
+
+def test_the_engine_imports_with_django_unconfigured() -> None:
+    code = (
+        "import sys; import apps.vendors.engine; "
+        "assert not {'django.db', 'django.conf'} & set(sys.modules)"
+    )
+    result = subprocess.run(  # noqa: S603 - fixed argv, no user input
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        cwd=Path(engine.__file__).parents[2],
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_staff_add_and_remove_a_country_in_the_admin_and_it_is_audited(
@@ -188,7 +250,10 @@ def test_staff_add_and_remove_a_country_in_the_admin_and_it_is_audited(
     assert AuditLog.objects.filter(action=NO_TIN_ADDED, target_key="NZ").exists()
 
     row = NoTinCountry.objects.get(country="NZ")
-    staff.post(reverse("admin:vendors_notincountry_delete", args=[row.pk]), {"post": "yes"})
+    staff.post(
+        reverse("admin:vendors_notincountry_delete", args=[row.pk]),
+        {"post": "yes", "reason": "Added by mistake."},
+    )
     assert "NZ" not in no_tin_countries()
     assert AuditLog.objects.filter(action=NO_TIN_REMOVED, target_key="NZ").exists()
 
@@ -196,3 +261,41 @@ def test_staff_add_and_remove_a_country_in_the_admin_and_it_is_audited(
 def test_a_listed_country_in_the_factory_row_counts_like_any_other() -> None:
     row = NoTinCountryFactory.create(country="NZ")
     assert row.country in no_tin_countries()
+
+
+def test_a_removal_in_the_admin_needs_a_reason_and_records_it(
+    client: Client, superuser: User, mfa_login: Any
+) -> None:
+    staff: Client = mfa_login(client, superuser)
+    url = reverse(
+        "admin:vendors_notincountry_delete", args=[NoTinCountry.objects.get(country="BS").pk]
+    )
+    assert b'name="reason"' in staff.get(url).content
+    for reason in ("", "   "):
+        assert staff.post(url, {"post": "yes", "reason": reason}).status_code == 302
+        assert "BS" in no_tin_countries()
+        assert not AuditLog.objects.filter(action=NO_TIN_REMOVED).exists()
+    staff.post(url, {"post": "yes", "reason": "Accountant says it issues TINs."})
+    assert "BS" not in no_tin_countries()
+    removed = AuditLog.objects.get(action=NO_TIN_REMOVED, target_key="BS")
+    assert (removed.before or {})["removal_reason"] == "Accountant says it issues TINs."
+
+
+def test_the_admin_has_no_bulk_delete(client: Client, superuser: User, mfa_login: Any) -> None:
+    staff: Client = mfa_login(client, superuser)
+    response = staff.get(reverse("admin:vendors_notincountry_changelist"))
+    assert b"delete_selected" not in response.content
+
+
+def test_a_removal_counts_the_vendors_it_blocks() -> None:
+    no_tin_vendor("BS")
+    changes = remove_no_tin_country("BS", reason=REASON, ctx=CTX, dry_run=True)
+    assert changes.changes[0].before["vendors_without_tin"] == 1  # type: ignore[index]
+
+
+def test_a_lost_add_race_is_a_validation_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    real_clean = NoTinCountry.full_clean
+    monkeypatch.setattr(NoTinCountry, "full_clean", lambda self, **kw: None)
+    with pytest.raises(ValidationError):
+        add_no_tin_country("BS", reason=REASON, ctx=CTX)  # unique violation at save
+    monkeypatch.setattr(NoTinCountry, "full_clean", real_clean)

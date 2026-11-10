@@ -1,0 +1,17 @@
+{% extends "admin/delete_confirmation.html" %}
+{% load i18n %}
+{% block delete_confirm %}
+  <p>Remove {{ escaped_object }} from the no-TIN list? Individuals from this country will need a
+  TIN again, and vendors that relied on the list will fail the payout check.</p>
+  <form method="post">{% csrf_token %}
+  <div>
+  <input type="hidden" name="post" value="yes">
+  <p>
+    <label for="id_reason">Reason (kept in the audit log)</label><br>
+    <textarea name="reason" id="id_reason" rows="3" cols="60" required></textarea>
+  </p>
+  <input type="submit" value="{% translate 'Yes, I’m sure' %}">
+  <a role="button" href="#" class="button cancel-link">{% translate "No, take me back" %}</a>
+  </div>
+  </form>
+{% endblock %}
