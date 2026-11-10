@@ -25,6 +25,7 @@ from apps.vendors.models import (
     ContractAcceptance,
     CrossVendorConsent,
     LegalFieldRequirement,
+    NoTinCountry,
     SelfCertification,
     Vendor,
     VendorApplication,
@@ -414,3 +415,13 @@ class VendorApplicationFactory(DjangoModelFactory[VendorApplication]):
         if create and extracted is not False:
             vendor = VendorFactory.create(contact_email=self.user.email)
             VendorMember.objects.create(vendor=vendor, user=self.user, role=engine.OWNER)
+
+
+class NoTinCountryFactory(DjangoModelFactory[NoTinCountry]):
+    """A jurisdiction that issues no TIN; the data migration already seeds the six default ones."""
+
+    class Meta:
+        model = NoTinCountry
+
+    country = factory.Iterator(["NZ", "JP", "CH", "SG", "AU"])
+    reason = "Issues no TIN to individuals."

@@ -16,6 +16,7 @@ from django.core.exceptions import ValidationError
 from django.test import Client
 from django.urls import reverse
 
+from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
@@ -114,9 +115,9 @@ def test_each_change_is_in_the_audit_log_with_its_reason() -> None:
     remove_no_tin_country("NZ", reason="Added by mistake.", ctx=CTX)
     added = AuditLog.objects.get(action=NO_TIN_ADDED, target_key="NZ")
     removed = AuditLog.objects.get(action=NO_TIN_REMOVED, target_key="NZ")
-    assert added.after["reason"] == REASON
+    assert (added.after or {})["reason"] == REASON
     assert added.actor_label == "staff:reviewer"
-    assert removed.before["removal_reason"] == "Added by mistake."
+    assert (removed.before or {})["removal_reason"] == "Added by mistake."
 
 
 def test_a_dry_run_returns_the_change_and_changes_nothing() -> None:
@@ -168,3 +169,20 @@ def test_staff_without_the_permission_cannot_edit_the_list(client: Client) -> No
 def test_the_engine_has_no_orm_import() -> None:
     source = (Path(engine.__file__)).read_text()
     assert "django" not in source
+
+
+def test_staff_add_and_remove_a_country_in_the_admin_and_it_is_audited(
+    client: Client, superuser: User, mfa_login: Any
+) -> None:
+    staff: Client = mfa_login(client, superuser)
+    response = staff.post(
+        reverse("admin:vendors_notincountry_add"), {"country": "NZ", "reason": REASON}
+    )
+    assert response.status_code == 302
+    assert "NZ" in no_tin_countries()
+    assert AuditLog.objects.filter(action=NO_TIN_ADDED, target_key="NZ").exists()
+
+    row = NoTinCountry.objects.get(country="NZ")
+    staff.post(reverse("admin:vendors_notincountry_delete", args=[row.pk]), {"post": "yes"})
+    assert "NZ" not in no_tin_countries()
+    assert AuditLog.objects.filter(action=NO_TIN_REMOVED, target_key="NZ").exists()

@@ -60,6 +60,7 @@ from .models import (
     ContractAcceptance,
     CrossVendorConsent,
     LegalFieldRequirement,
+    NoTinCountry,
     SelfCertification,
     Vendor,
     VendorApplication,
@@ -636,6 +637,11 @@ def requirement_rules(purpose: str = engine.PAYOUT) -> list[engine.Requirement]:
     return [row.as_rule() for row in rows]
 
 
+def no_tin_countries() -> frozenset[str]:
+    """The jurisdictions that issue no TIN (VEN.27), read from the table for the pure engine."""
+    return frozenset(NoTinCountry.objects.values_list("country", flat=True))
+
+
 def legal_profile_completeness(vendor: Vendor, purpose: str = engine.PAYOUT) -> engine.Completeness:
     """Which fields required for `purpose` the vendor is missing, or holds invalid values for.
 
@@ -644,7 +650,7 @@ def legal_profile_completeness(vendor: Vendor, purpose: str = engine.PAYOUT) -> 
     """
     identity = vendor.legal_identity()
     if purpose == engine.PAYOUT:
-        return engine.payout_completeness(identity, requirement_rules(purpose))
+        return engine.payout_completeness(identity, requirement_rules(purpose), no_tin_countries())
     return engine.completeness(identity, requirement_rules(purpose), purpose=purpose)
 
 
@@ -739,6 +745,47 @@ def delete_requirement(
         requirement.delete()
 
     return run_mutation(changes, apply, ctx=ctx, action=REQUIREMENT_DELETED, dry_run=dry_run)
+
+
+# --- No-TIN jurisdictions (VEN.27, owner decision MQ-16): a staff-edited, audited list.
+
+NO_TIN_MODEL = "vendors.notincountry"
+NO_TIN_ADDED = "vendor.no_tin_country_added"
+NO_TIN_REMOVED = "vendor.no_tin_country_removed"
+
+
+def no_tin_snapshot(row: NoTinCountry) -> dict[str, Any]:
+    return {"country": row.country, "reason": row.reason}
+
+
+def add_no_tin_country(
+    country: str, *, reason: str, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """List `country` as issuing no TIN, with the reason (audited). Raises `ValidationError`
+    for an unknown or already listed country and for an empty reason."""
+    row = NoTinCountry(country=country, reason=reason.strip())
+    row.full_clean(exclude=["public_id"])
+    changes = ChangeSet()
+    changes.create(NO_TIN_MODEL, row.country, no_tin_snapshot(row))
+    return run_mutation(changes, row.save, ctx=ctx, action=NO_TIN_ADDED, dry_run=dry_run)
+
+
+def remove_no_tin_country(
+    country: str, *, reason: str, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Remove `country` from the list, with the reason (audited): its individuals need a TIN
+    again. Raises `ValidationError` for an unlisted country and for an empty reason."""
+    why = reason.strip()
+    if not why:
+        raise ValidationError({"reason": "A reason is required."})
+    code = NoTinCountry._meta.get_field("country").to_python(country)
+    with transaction.atomic():
+        row = NoTinCountry.objects.select_for_update().filter(country=code).first()
+        if row is None:
+            raise ValidationError({"country": f"{code} is not on the no-TIN list."})
+        changes = ChangeSet()
+        changes.delete(NO_TIN_MODEL, row.country, {**no_tin_snapshot(row), "removal_reason": why})
+        return run_mutation(changes, row.delete, ctx=ctx, action=NO_TIN_REMOVED, dry_run=dry_run)
 
 
 # --- Onboarding (VEN.5): application, versioned contract, acceptance, checklist
@@ -1089,7 +1136,7 @@ def onboarding_checklist(vendor: Vendor) -> engine.OnboardingChecklist:
     return engine.onboarding_checklist(
         contract_version=contract.version if contract is not None and accepted else None,
         current_contract_version=contract.version if contract is not None else None,
-        dac7_missing=engine.dac7_missing(stored.legal_identity()),
+        dac7_missing=engine.dac7_missing(stored.legal_identity(), no_tin_countries()),
         payout=legal_profile_completeness(stored),
         platform_duties_missing=platform_duties_missing(stored),
     )

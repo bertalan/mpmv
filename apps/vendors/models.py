@@ -978,3 +978,24 @@ class VendorApplication(BaseModel):
 
     def __str__(self) -> str:
         return f"application of {self.user_id} (link v{self.version})"
+
+
+class NoTinCountry(BaseModel):
+    """A jurisdiction that issues no TIN (VEN.27, owner decision MQ-16).
+
+    For an individual whose TIN country is listed, the DAC7 check accepts the place of birth
+    instead of a TIN (`engine.dac7_check`). Staff-editable data: changes go through
+    `services.add_no_tin_country` and `remove_no_tin_country`, which audit them with a reason.
+    Migration 0026 seeds the six countries that were a code constant.
+    """
+
+    country = CountryField(unique=True)
+    reason = models.CharField(max_length=300, help_text="Why this country issues no TIN.")
+
+    class Meta:
+        ordering = ["country"]
+        verbose_name = "no-TIN country"
+        verbose_name_plural = "no-TIN countries"
+
+    def __str__(self) -> str:
+        return str(self.country)

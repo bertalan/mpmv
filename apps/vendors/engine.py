@@ -363,8 +363,9 @@ TIN_FORMATS: Final[Mapping[str, re.Pattern[str]]] = {
 _ANY_TIN = re.compile(r"[A-Z0-9][A-Z0-9./-]{0,29}", re.ASCII)
 _TIN_SEPARATORS = re.compile(r"[./-]")
 # Jurisdictions that issue no TIN (in their absence DAC7 asks an individual's place of birth).
-# A reviewable list, kept short on purpose: staff can still record a TIN when there is one.
-NO_TIN_COUNTRIES: Final = frozenset({"AE", "BM", "BS", "KY", "MC", "VG"})
+# The live list is staff-editable data (`NoTinCountry`, VEN.27) that the service passes in; this
+# is only the list migration 0026 seeds it with, and the default of the pure unit-test calls.
+SEEDED_NO_TIN_COUNTRIES: Final = frozenset({"AE", "BM", "BS", "KY", "MC", "VG"})
 # Member States where an entity's VAT number, without its prefix, is also its TIN: only there is
 # "same as the VAT number" offered. Elsewhere the two differ (AT "U" + 8 digits, DE, FR, NL, SE
 # "01" suffix, EE, HU, LT, LU, MT): the vendor enters the TIN. A test derives a valid TIN for
@@ -1066,7 +1067,9 @@ def _vat_number_as_tin(identity: LegalIdentity) -> tuple[str, str] | None:
     return (country, number) if is_valid_tin(number, country) else None
 
 
-def dac7_check(identity: LegalIdentity) -> Completeness:
+def dac7_check(
+    identity: LegalIdentity, no_tin_countries: Collection[str] = SEEDED_NO_TIN_COUNTRIES
+) -> Completeness:
     """The DAC7 dataset of `identity`: fields that are missing, and present ones that are
     invalid (a TIN malformed for its country, a VAT number VIES found invalid, ...).
 
@@ -1077,6 +1080,8 @@ def dac7_check(identity: LegalIdentity) -> Completeness:
     that passes has a tax identifier for FatturaPA.
     The VAT number, the account holder's name and a permanent establishment are reported only
     when there is one, so they are never missing.
+
+    `no_tin_countries` is the staff-editable list of jurisdictions that issue no TIN (VEN.27).
     """
     ident = normalized(identity)
     missing: list[str] = []
@@ -1096,7 +1101,7 @@ def dac7_check(identity: LegalIdentity) -> Completeness:
     if ident.registered_country == ITALY:
         need("registered_province")
     need("tin_country")
-    if ident.tin_country in NO_TIN_COUNTRIES and is_individual(ident):
+    if ident.tin_country in no_tin_countries and is_individual(ident):
         if not ident.tax_code:
             need("place_of_birth")
     else:
@@ -1110,20 +1115,26 @@ def dac7_check(identity: LegalIdentity) -> Completeness:
     return Completeness(missing=_in_field_order(missing), invalid=_in_field_order(invalid))
 
 
-def dac7_missing(identity: LegalIdentity) -> tuple[str, ...]:
+def dac7_missing(
+    identity: LegalIdentity, no_tin_countries: Collection[str] = SEEDED_NO_TIN_COUNTRIES
+) -> tuple[str, ...]:
     """The DAC7 fields still missing or invalid, in field order (see `dac7_check`)."""
-    result = dac7_check(identity)
+    result = dac7_check(identity, no_tin_countries)
     return _in_field_order((*result.missing, *result.invalid))
 
 
-def payout_completeness(identity: LegalIdentity, rules: Iterable[Requirement]) -> Completeness:
+def payout_completeness(
+    identity: LegalIdentity,
+    rules: Iterable[Requirement],
+    no_tin_countries: Collection[str] = SEEDED_NO_TIN_COUNTRIES,
+) -> Completeness:
     """What a payout still needs: the staff-editable rules plus the DAC7 dataset.
 
     The DAC7 check is not a rule: deactivating requirement rows relaxes only what the rows add,
     never the dataset the platform must report.
     """
     by_rules = completeness(identity, rules, purpose=PAYOUT)
-    dac7 = dac7_check(identity)
+    dac7 = dac7_check(identity, no_tin_countries)
     missing = _in_field_order((*by_rules.missing, *dac7.missing))
     invalid = _in_field_order(
         name for name in (*by_rules.invalid, *dac7.invalid) if name not in missing

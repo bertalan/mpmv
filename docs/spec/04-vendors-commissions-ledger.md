@@ -317,7 +317,7 @@ incomplete DAC7 dataset through. The rows mirror the dataset for staff.
 
 **DAC7 follow-up (owner decision MQ-16, 2026-11-09).** The list of jurisdictions that issue no
 TIN becomes data that staff edit, each change through an audited service with dry-run and an
-AuditLog entry, instead of the `engine.NO_TIN_COUNTRIES` code constant (VEN.27). For an Italian
+AuditLog entry, instead of a code constant (VEN.27: table `NoTinCountry`, seeded by migration 0026 with the six countries; the service passes the list to `engine.dac7_check`). For an Italian
 company the REA number is accepted as the business registration number (Annex V, section
 III.B), as migration 0019 already derives it. Still open, not decided: the accountant confirms
 the initial no-TIN list and the TIN formats per issuing country; until then the shipped list and

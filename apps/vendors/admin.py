@@ -35,6 +35,7 @@ from .models import (
     ContractAcceptance,
     CrossVendorConsent,
     LegalFieldRequirement,
+    NoTinCountry,
     Vendor,
     VendorClaim,
     VendorContract,
@@ -45,6 +46,7 @@ from .models import (
     legal_field_label,
 )
 from .services import (
+    add_no_tin_country,
     approve_claim,
     can_reopen,
     change_status,
@@ -58,6 +60,7 @@ from .services import (
     legal_profile_completeness,
     onboarding_checklist,
     reject_claim,
+    remove_no_tin_country,
     reopen_vendor,
     save_contract,
     save_requirement,
@@ -782,6 +785,38 @@ class LegalFieldRequirementAdmin(admin.ModelAdmin[LegalFieldRequirement]):
         ctx = audit_context(request)
         for requirement in queryset:
             delete_requirement(requirement, ctx=ctx)
+
+
+@admin.register(NoTinCountry)
+class NoTinCountryAdmin(admin.ModelAdmin[NoTinCountry]):
+    """Jurisdictions that issue no TIN (VEN.27). Staff add a country with a reason; both adding
+    and removing go through the audited services. A removal asks for no typed reason here, so
+    the admin records that it was done from the admin; use the service for a specific reason."""
+
+    list_display = ("country", "reason", "updated_at")
+    search_fields = ("country", "reason")
+    fields = ("country", "reason")
+    actions = None
+
+    def get_readonly_fields(
+        self, request: HttpRequest, obj: NoTinCountry | None = None
+    ) -> tuple[str, ...]:
+        return ("country", "reason") if obj is not None else ()
+
+    def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False  # to change a reason, remove the country and add it again
+
+    def save_model(self, request: HttpRequest, obj: NoTinCountry, form: Any, change: bool) -> None:
+        add_no_tin_country(obj.country, reason=obj.reason, ctx=audit_context(request))
+
+    def delete_model(self, request: HttpRequest, obj: NoTinCountry) -> None:
+        remove_no_tin_country(
+            obj.country, reason="Removed in the admin.", ctx=audit_context(request)
+        )
+
+    def delete_queryset(self, request: HttpRequest, queryset: QuerySet[NoTinCountry]) -> None:
+        for row in queryset:
+            self.delete_model(request, row)
 
 
 def _overrides_kill_switch(override: VendorFeatureFlag | None) -> bool:
