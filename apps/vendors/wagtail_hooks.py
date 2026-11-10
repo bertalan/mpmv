@@ -31,7 +31,7 @@ def _own_collections(user: Any) -> QuerySet[Collection] | None:
 
 
 def _scoped(items: QuerySet[Any], request: Any) -> QuerySet[Any]:
-    allowed = _own_collections(request.user)
+    allowed = _own_collections(getattr(request, "user", None))
     return items if allowed is None else items.filter(collection__in=allowed)
 
 

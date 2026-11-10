@@ -1,4 +1,4 @@
-{% load wagtailadmin_tags %}{% comment %}
+{% load static wagtailadmin_tags %}{% comment %}
 The scripts and icon sprite Wagtail's Draftail editor needs outside the Wagtail admin (D-34).
 No inline script: the editor starts from `data-controller` attributes.
 {% endcomment %}{% wagtail_config as config %}{{ config|json_script:"wagtail-config" }}
@@ -8,3 +8,4 @@ No inline script: the editor starts from `data-controller` attributes.
 <script src="{% versioned_static 'wagtailadmin/js/vendor.js' %}"></script>
 <script src="{% versioned_static 'wagtailadmin/js/wagtailadmin.js' %}"></script>
 <link rel="stylesheet" href="{% versioned_static 'wagtailadmin/css/core.css' %}">
+<script src="{% static 'manager/editor-labels.js' %}"></script>
