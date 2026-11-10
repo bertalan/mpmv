@@ -742,3 +742,11 @@ def test_removing_a_factor_needs_operational_mode_and_a_fresh_passkey(client: Cl
     verified_login(client, user)  # operational, but only a TOTP confirmation
     assert client.post(url).status_code == 302
     assert PasskeyDevice.objects.filter(pk=device.pk).exists()
+
+
+def test_a_factory_grant_is_live_and_unspent() -> None:
+    from apps.accounts.tests.factories import ElevationGrantFactory
+
+    grant = ElevationGrantFactory.create()
+    assert grant.used_at is None
+    assert grant.expires_at > timezone.now()

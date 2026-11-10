@@ -41,3 +41,28 @@ def make_operational(page: Page) -> None:
     store = SessionStore(session_key=cookies[settings.SESSION_COOKIE_NAME])
     store[levels.STARTED_KEY] = store[levels.ACTIVITY_KEY] = time.time()
     store.save()
+
+
+def fresh_passkey(page: Page) -> None:
+    """Record a fresh passkey with user verification in the browser's session (D-32 group 3).
+
+    Like `make_operational`, it writes the server-side session state because the e2e suite has
+    no authenticator; the ceremony itself is tested in the integration suite.
+    """
+    import time
+
+    from django.conf import settings
+    from django.contrib.sessions.backends.db import SessionStore
+
+    from apps.accounts.mfa_session import (
+        VERIFIED_AT_SESSION_KEY,
+        VERIFIED_KIND_SESSION_KEY,
+        VERIFIED_UV_SESSION_KEY,
+    )
+
+    cookies = {cookie["name"]: cookie["value"] for cookie in page.context.cookies()}
+    store = SessionStore(session_key=cookies[settings.SESSION_COOKIE_NAME])
+    store[VERIFIED_AT_SESSION_KEY] = time.time()
+    store[VERIFIED_KIND_SESSION_KEY] = "passkey"
+    store[VERIFIED_UV_SESSION_KEY] = True
+    store.save()
