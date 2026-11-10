@@ -290,6 +290,8 @@ def test_a_dry_run_scrub_writes_nothing() -> None:
 
 def test_anonymise_before_year_ten_is_refused() -> None:
     order = place(created=MID)
+    for state in ("awaiting_payment", "paid"):
+        services.transition_order(order, state, ctx=CTX)
     with pytest.raises(ScrubNotDue):
         services.anonymise_order(order, ctx=CTX)
     order.refresh_from_db()

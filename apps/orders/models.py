@@ -28,6 +28,7 @@ from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager
 
 from . import engine
+from .tz import business_tz
 
 
 class OrderState(models.TextChoices):
@@ -51,6 +52,12 @@ class VendorOrderState(models.TextChoices):
     COMPLETED = "completed"
     CANCELLED = "cancelled"
     REFUNDED = "refunded"
+
+
+class PrivacyStatus(models.TextChoices):
+    ACTIVE = "active"
+    RESTRICTED_TAX_ONLY = "restricted_tax_only"
+    ANONYMIZED = "anonymized"
 
 
 class CustomerTaxStatus(models.TextChoices):
@@ -158,8 +165,20 @@ class Order(_StateGuarded):
     shipping_net = MoneyField()
     tax_total = MoneyField()
     grand_total = MoneyField()
-    minimised_at = models.DateTimeField(
-        null=True, blank=True, editable=False, help_text="When the non-fiscal fields were dropped."
+    privacy_status = models.CharField(
+        max_length=24,
+        choices=PrivacyStatus.choices,
+        default=PrivacyStatus.ACTIVE,
+        editable=False,
+        db_index=True,
+        help_text="Forward only (D-30): changed by the scrub services, enforced by a trigger.",
+    )
+    tax_retention_until = models.DateField(
+        editable=False,
+        help_text="31 December of the order year + 10, in the business time zone; immutable.",
+    )
+    restricted_at = models.DateTimeField(
+        null=True, blank=True, editable=False, help_text="When it became restricted_tax_only."
     )
     anonymised_at = models.DateTimeField(
         null=True, blank=True, editable=False, help_text="When the personal fields were replaced."
@@ -174,6 +193,10 @@ class Order(_StateGuarded):
             models.CheckConstraint(
                 condition=models.Q(state__in=OrderState.values),
                 name="orders_order_state_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(privacy_status__in=PrivacyStatus.values),
+                name="orders_order_privacy_status_valid",
             ),
             models.CheckConstraint(
                 condition=models.Q(
@@ -199,12 +222,17 @@ class Order(_StateGuarded):
         ]
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        fresh = self._state.adding and self.legacy_wp_order_id is None
+        adding = self._state.adding
+        fresh = adding and self.legacy_wp_order_id is None
         if fresh:
             self.created_at = timezone.now()
+        if adding:
+            self.tax_retention_until = engine.tax_retention_until(self.created_at, business_tz())
         super().save(*args, **kwargs)
-        if fresh:  # the trigger stamped the database's own insert time: read it back
-            self.created_at = Order.objects.values_list("created_at", flat=True).get(pk=self.pk)
+        if fresh:  # the trigger stamped the database's own times: read them back
+            self.created_at, self.tax_retention_until = Order.objects.values_list(
+                "created_at", "tax_retention_until"
+            ).get(pk=self.pk)
 
     def __str__(self) -> str:
         return f"Order {self.number}"
@@ -255,7 +283,7 @@ class VendorOrder(_StateGuarded):
         default=dict, blank=True, help_text="Snapshot of compute_commission: rule, percentage, fee."
     )
     tax_profile_snapshot = models.JSONField(default=dict, blank=True)
-    # Non-fiscal: dropped by `minimise_order` after the active phase (D-29).
+    # Non-fiscal: dropped by `restrict_order` when the order becomes restricted_tax_only (D-30).
     carrier_contact_phone = models.CharField(max_length=32, blank=True)
     support_notes = models.TextField(blank=True)
     tracking_number = models.CharField(max_length=100, blank=True)

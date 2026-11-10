@@ -200,13 +200,34 @@ def add_months(day: dt.date, months: int) -> dt.date:
     return dt.date(year, month, min(day.day, calendar.monthrange(year, month)[1]))
 
 
-def minimisation_due(created: dt.datetime, now: dt.datetime, months: int, tz: dt.tzinfo) -> bool:
+def restriction_due(created: dt.datetime, now: dt.datetime, months: int, tz: dt.tzinfo) -> bool:
     """True once the active phase (`months` after the order was placed) is over."""
     due = add_months(created.astimezone(tz).date(), months)
     return now.astimezone(tz).date() >= due
 
 
+def tax_retention_until(created: dt.datetime, tz: dt.tzinfo) -> dt.date:
+    """31 December of (the order's calendar year in `tz` + 10): the fiscal retention date."""
+    return dt.date(created.astimezone(tz).year + FISCAL_RETENTION_YEARS, 12, 31)
+
+
+def retention_over(until: dt.date, today: dt.date) -> bool:
+    """Anonymisation of a paid order runs from the DAY AFTER the retention date (D-31)."""
+    return today > until
+
+
 def anonymisation_due(created: dt.datetime, now: dt.datetime, tz: dt.tzinfo) -> bool:
-    """True after 31 December of year 10 counted from the order's calendar year."""
-    last_day = dt.date(created.astimezone(tz).year + FISCAL_RETENTION_YEARS, 12, 31)
-    return now.astimezone(tz).date() > last_day
+    return retention_over(tax_retention_until(created, tz), now.astimezone(tz).date())
+
+
+# Privacy lifecycle (D-30): forward only. An order never paid may go straight to anonymized.
+PRIVACY_TRANSITIONS: Mapping[str, frozenset[str]] = {
+    "active": frozenset({"restricted_tax_only", "anonymized"}),
+    "restricted_tax_only": frozenset({"anonymized"}),
+    "anonymized": frozenset(),
+}
+UNPAID_STATES = frozenset({"checkout", "quote_flow", "awaiting_payment", "cancelled"})
+
+
+def check_privacy_transition(source: str, target: str) -> None:
+    _check(PRIVACY_TRANSITIONS, "an order's privacy status", source, target)

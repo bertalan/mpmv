@@ -7,7 +7,6 @@ per changed object (SEC.4). `tax` and `shipping` are never imported here.
 """
 
 import datetime as dt
-import zoneinfo
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -28,6 +27,7 @@ from apps.vendors.models import Vendor
 
 from . import engine
 from .models import Order, OrderLine, OrderNumberSequence, VendorOrder
+from .tz import business_tz
 
 DRY_RUN_NUMBER = "(assigned when placed)"
 
@@ -67,6 +67,8 @@ class VendorOrderInput:
 PAID_OR_LATER = frozenset(engine.ORDER_STATES) - engine.ORDER_INITIAL_STATES - {"cancelled"}
 # The shape of `CommissionRule.snapshot()` (VEN.2). Required keys; `promo_label` and `valid_from`
 # are allowed too. A constant copy: orders does not import vendors for this.
+# The VIES log kept in the snapshot (D-30): time, consultation number and the name VIES returned.
+VIES_KEYS = ("at", "consultation", "name")
 COMMISSION_KEYS = ("rule_id", "version", "percent", "base", "fee_percent", "fee_fixed", "fee_base")
 COMMISSION_OPTIONAL_KEYS = ("promo_label", "valid_from")
 MAX_PREFIX_LENGTH = 14  # number = prefix + "YYYY-" + 6+ digits must fit in 32 characters
@@ -77,13 +79,12 @@ MAX_PREFIX_LENGTH = 14  # number = prefix + "YYYY-" + 6+ digits must fit in 32 c
 def _year_and_prefix(now: dt.datetime | None) -> tuple[int, str]:
     """The numbering year is the business year (settings.BUSINESS_TIME_ZONE, Europe/Rome), so an
     order placed at 00:30 on 1 January in Rome starts the new year even when UTC says 31 Dec."""
-    zone = zoneinfo.ZoneInfo(settings.BUSINESS_TIME_ZONE)
     prefix = str(getattr(settings, "ORDER_NUMBER_PREFIX", ""))
     if len(prefix) > MAX_PREFIX_LENGTH:
         raise ImproperlyConfigured(
             f"ORDER_NUMBER_PREFIX is longer than {MAX_PREFIX_LENGTH} characters"
         )
-    return (now or timezone.now()).astimezone(zone).year, prefix
+    return (now or timezone.now()).astimezone(business_tz()).year, prefix
 
 
 def peek_order_number(*, now: dt.datetime | None = None) -> str:
@@ -272,6 +273,8 @@ def create_order(
     which equals it) must be sent to the payment provider only AFTER the transaction commits
     (`transaction.on_commit`), never from inside it (ORD.4).
     """
+    if vat_validation and not set(VIES_KEYS) <= set(vat_validation):
+        raise ValueError(f"vat_validation needs {', '.join(VIES_KEYS)}")
     if not vendor_orders:
         raise ValueError("an order needs at least one vendor order")
     if len({item.vendor.pk for item in vendor_orders}) != len(vendor_orders):
@@ -430,17 +433,14 @@ def transition_vendor_order(
 # The fiscal snapshot of an order is kept, unchanged, for 10 years from the end of its calendar
 # year (GDPR art. 6(1)(c) and 17(3)(b); VAT Directive art. 242a). The database refuses any
 # rewrite of it. These two services are the only path, and each runs only after its date:
-# `minimise_order` drops the non-fiscal fields after the active phase, `anonymise_order` replaces
-# the personal fields after 31 December of year 10. The retention jobs that call them and the
-# archive masking are separate tasks.
+# `restrict_order` (D-30: active -> restricted_tax_only) drops the non-fiscal fields;
+# `anonymise_order` replaces the personal fields from the day after `tax_retention_until`, or at
+# once for an order never paid. The retention jobs that call them, the masking, the accounting
+# role and the erasure flow are separate tasks.
 
 
 class ScrubNotDue(ValueError):
     """The retention period of this scrub has not ended."""
-
-
-def _business_zone() -> zoneinfo.ZoneInfo:
-    return zoneinfo.ZoneInfo(settings.BUSINESS_TIME_ZONE)
 
 
 def _set_scrub_mode(mode: str) -> None:
@@ -452,8 +452,8 @@ def _set_scrub_mode(mode: str) -> None:
 def _scrub_snapshot(order: Order) -> dict[str, Any]:
     return {
         "number": order.number,
-        "minimised": order.minimised_at is not None,
-        "anonymised": order.anonymised_at is not None,
+        "privacy_status": order.privacy_status,
+        "tax_retention_until": order.tax_retention_until,
     }
 
 
@@ -473,73 +473,98 @@ def _clear_non_fiscal(order: Order, changeset: ChangeSet) -> None:
 
 def _scrub(
     order: Order,
-    mode: str,
+    target: str,
     *,
+    reason: str,
     ctx: AuditContext,
     dry_run: bool,
     now: dt.datetime | None,
 ) -> ChangeSet:
+    """Move an order forward in its privacy lifecycle (D-30), after its date. The database
+    trigger checks the same gates against its own clock."""
     stamp = now or timezone.now()
     changeset = ChangeSet()
     try:
         with transaction.atomic():
             locked = Order.objects.select_for_update().get(pk=order.pk)
-            if mode == "minimise":
+            if locked.privacy_status == target or (
+                target == "restricted_tax_only" and locked.privacy_status == "anonymized"
+            ):
+                return changeset  # idempotent: already there (or further)
+            today = stamp.astimezone(business_tz()).date()
+            if target == "restricted_tax_only":
+                mode = "restrict_erasure" if reason == "account_erasure" else "restrict"
                 # The database trigger enforces 24 months as a floor; the setting only lengthens.
                 months = max(
                     int(getattr(settings, "ORDER_ACTIVE_PHASE_MONTHS", 24)),
                     engine.MIN_ACTIVE_PHASE_MONTHS,
                 )
-                if not engine.minimisation_due(locked.created_at, stamp, months, _business_zone()):
+                if mode == "restrict" and not engine.restriction_due(
+                    locked.created_at, stamp, months, business_tz()
+                ):
                     raise ScrubNotDue(f"the active phase of {months} months has not ended")
-            elif not engine.anonymisation_due(locked.created_at, stamp, _business_zone()):
-                raise ScrubNotDue("anonymisation is due after 31 December of year 10")
-            done = locked.anonymised_at if mode == "anonymise" else locked.minimised_at
-            before = _scrub_snapshot(locked)
-            if done is None:
-                _set_scrub_mode(mode)
-                _clear_non_fiscal(locked, changeset)
-                values: dict[str, Any] = {"updated_at": stamp}
-                if mode == "anonymise":
-                    values.update(
-                        engine.ANONYMISED_ORDER_FIELDS,
-                        email=engine.ANONYMISED_EMAIL,
-                        customer=None,
-                        anonymised_at=stamp,
+            else:
+                mode = "anonymise"
+                never_paid = locked.state in engine.UNPAID_STATES
+                if not never_paid and not engine.retention_over(locked.tax_retention_until, today):
+                    raise ScrubNotDue(
+                        f"anonymisation is due after {locked.tax_retention_until} "
+                        "(or at once for an order never paid)"
                     )
-                else:
-                    values["minimised_at"] = stamp
-                Order.objects.filter(pk=locked.pk).update(**values)
-                _set_scrub_mode("")
-                locked.refresh_from_db()
-                changeset.update(
-                    "orders.order", str(locked.public_id), before, _scrub_snapshot(locked)
+            engine.check_privacy_transition(locked.privacy_status, target)
+            before = _scrub_snapshot(locked)
+            _set_scrub_mode(mode)
+            _clear_non_fiscal(locked, changeset)
+            values: dict[str, Any] = {"updated_at": stamp, "privacy_status": target}
+            if target == "anonymized":
+                values.update(
+                    engine.ANONYMISED_ORDER_FIELDS,
+                    email=engine.ANONYMISED_EMAIL,
+                    customer=None,
+                    anonymised_at=stamp,
                 )
+            else:
+                values["restricted_at"] = stamp
+            Order.objects.filter(pk=locked.pk).update(**values)
+            _set_scrub_mode("")
+            locked.refresh_from_db()
+            changeset.update("orders.order", str(locked.public_id), before, _scrub_snapshot(locked))
             if dry_run:
                 raise _DryRunRollback
-            audit_changes(changeset, ctx=ctx, action=f"orders.{mode}")
+            audit_changes(
+                changeset,
+                ctx=ctx,
+                action="orders.restrict" if target == "restricted_tax_only" else "orders.anonymise",
+            )
     except _DryRunRollback:
         pass
     order.refresh_from_db()
     return changeset
 
 
-def minimise_order(
-    order: Order, *, ctx: AuditContext, dry_run: bool = False, now: dt.datetime | None = None
+def restrict_order(
+    order: Order,
+    *,
+    ctx: AuditContext,
+    reason: str = "active_phase_over",
+    dry_run: bool = False,
+    now: dt.datetime | None = None,
 ) -> ChangeSet:
-    """Drop the non-fiscal fields (carrier contact phone, support notes of the sub-orders) once
-    `ORDER_ACTIVE_PHASE_MONTHS` (default 24, never shorter: the database enforces 24) have
-    passed since the order. The database checks its own clock; `now` serves dry runs. Fiscal
-    data stays.
-    Raises `ScrubNotDue` before that. Idempotent."""
-    return _scrub(order, "minimise", ctx=ctx, dry_run=dry_run, now=now)
+    """active -> restricted_tax_only: drop the non-fiscal fields (carrier contact phone, support
+    notes) on entry; the fiscal snapshot stays, masked by the UI later (D-30).
+
+    Allowed once `ORDER_ACTIVE_PHASE_MONTHS` (default 24, never shorter: the database enforces
+    24) have passed, or at once with `reason="account_erasure"`. Raises `ScrubNotDue` otherwise.
+    The database checks its own clock; `now` serves dry runs. Idempotent."""
+    return _scrub(order, "restricted_tax_only", reason=reason, ctx=ctx, dry_run=dry_run, now=now)
 
 
 def anonymise_order(
     order: Order, *, ctx: AuditContext, dry_run: bool = False, now: dt.datetime | None = None
 ) -> ChangeSet:
-    """Replace the personal fields (name, VAT and tax ids, e-mail, addresses, VAT validation
-    log, buyer link) with fixed placeholders after 31 December of year 10 from the order year
-    (business time zone), keeping amounts, countries and tax rates. Also drops the non-fiscal
-    fields. Raises `ScrubNotDue` before that. Idempotent."""
-    return _scrub(order, "anonymise", ctx=ctx, dry_run=dry_run, now=now)
+    """-> anonymized: replace the personal fields (name, VAT and tax ids, e-mail, addresses, VAT
+    validation log, buyer link) with fixed placeholders, keeping amounts, countries, dates and
+    tax rates. Allowed from the day after `tax_retention_until` (31 December of year 10, business
+    time zone), or at once for an order that never reached `paid`. Raises `ScrubNotDue` before
+    that. Idempotent."""
+    return _scrub(order, "anonymized", reason="", ctx=ctx, dry_run=dry_run, now=now)

@@ -4,7 +4,7 @@ import pytest
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 
-LATEST = "0006_created_at_and_scrub_gates"
+LATEST = "0008_privacy_guards"
 
 
 def migrate(target: str) -> None:
