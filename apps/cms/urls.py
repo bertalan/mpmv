@@ -13,7 +13,7 @@ from . import views
 
 # Wagtail's page view restriction forms (a page shared with a password) are public POSTs that no
 # code of ours protects yet: the sweep found them (SEC.13). Declared as known gaps so the register
-# and `manage.py check` (core.W701) keep saying so until a rate limit exists or the feature stays
+# and `manage.py check` (core.I701) keep saying so until a rate limit exists or the feature stays
 # unused; see the SEC.13 pull request.
 _RESTRICTION_GAP = "page view restrictions are not rate limited or captcha protected (SEC.13)"
 for _name, _purpose in (

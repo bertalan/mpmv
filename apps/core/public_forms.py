@@ -34,8 +34,9 @@ Three kinds of declaration:
 - `pre_mfa_step`: a signed-in user who has not yet verified a second factor (the MFA pages).
 - `not_anonymous`: a POST that answers an anonymous request with a refusal, and why.
 
-`known_gap` marks a form that is reachable and not protected yet. It is a warning (core.W701),
-listed in the register, and names the task that closes it.
+`known_gap` marks a form that is reachable and not protected yet. It is a message at INFO level
+(core.I701: the deploy gate fails on warnings), listed in the register, and names the task that
+closes it.
 """
 
 import enum
@@ -254,7 +255,7 @@ def _spec_problems(leaf: Leaf, spec: FormSpec) -> list[str]:
             return ["it is mfa_exempt, so it is reachable before the second factor"]
         return [] if spec.reason or spec.kind is Kind.PRE_MFA else ["it needs a written reason"]
     if spec.known_gap:
-        return []  # reported as a warning, and listed in the register
+        return []  # reported as INFO (core.I701), and listed in the register
     problems = []
     if spec.protection is Protection.CAPTCHA:
         if not spec.templates:
@@ -292,7 +293,7 @@ def public_form_report(urlconf: UrlConf = None) -> Report:
         for problem in _spec_problems(leaf, spec):
             errors.append(("core.E702", f"{leaf.path} ({leaf.name or 'unnamed'}): {problem}"))
         if spec.known_gap:
-            warnings.append(("core.W701", f"{leaf.path}: unprotected for now, {spec.known_gap}"))
+            warnings.append(("core.I701", f"{leaf.path}: unprotected for now, {spec.known_gap}"))
         rows[spec.kind].append(Row(leaf, spec))
     for url_name in sorted(set(_declared) - leaf_names):
         if urlconf is None:  # a declaration for a route that does not exist is a typo

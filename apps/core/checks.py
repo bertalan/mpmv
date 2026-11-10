@@ -611,5 +611,5 @@ def check_public_forms(app_configs: Any = None, **kwargs: Any) -> list[checks.Ch
         checks.Error(message, hint="See docs/dev/public-forms.md.", id=check_id)
         for check_id, message in report.errors
     ]
-    messages += [checks.Warning(message, id=check_id) for check_id, message in report.warnings]
+    messages += [checks.Info(message, id=check_id) for check_id, message in report.warnings]
     return messages
