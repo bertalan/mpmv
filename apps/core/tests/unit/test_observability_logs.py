@@ -3,6 +3,7 @@
 import json
 import logging
 import re
+import secrets
 
 import pytest
 from django.http import HttpRequest, HttpResponse
@@ -50,13 +51,16 @@ def test_an_exception_is_logged_as_type_and_redacted_traceback() -> None:
     assert "Traceback" in str(out["exc_text"])
 
 
+_API_KEY = secrets.token_hex(8)  # random per run; the parametrize id is fixed
+
+
 @pytest.mark.parametrize(
     "text",
     [
         "contact ada@example.org now",
         "Authorization: Bearer abc.def-123_xyz",
         "password=hunter2hunter2",
-        "api_key: 0123456789abcdef",
+        pytest.param(f"api_key: {_API_KEY}", id="api-key"),
         'token="sekret-value"',
         "card 4111 1111 1111 1111 declined",
         "csrftoken=abcdef; sessionid=ffee00",
@@ -68,7 +72,7 @@ def test_personal_data_and_secrets_never_reach_the_output(text: str) -> None:
         "ada@example.org",
         "abc.def-123_xyz",
         "hunter2hunter2",
-        "0123456789abcdef",
+        _API_KEY,
         "sekret-value",
         "4111 1111",
         "abcdef;",

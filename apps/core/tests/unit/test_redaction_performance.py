@@ -105,7 +105,7 @@ def test_a_secret_beyond_the_cut_is_not_logged() -> None:
         "otp=123456",
         "key=abcdefgh",
         "bearer: abcdefgh1234",
-        "jwt " + _random_jwt(),
+        pytest.param("jwt " + _random_jwt(), id="jwt"),
         _fullwidth("IT60X0542811101000000123456"),
         _fullwidth("password=hunter2zz"),
         "card " + _fullwidth("4111 1111 1111 1111"),
