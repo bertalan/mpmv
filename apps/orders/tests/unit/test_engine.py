@@ -178,3 +178,39 @@ def test_shipping_tax_is_rounded_half_up() -> None:
     assert engine.shipping_tax(Decimal("0.25"), Decimal("22")) == Decimal("0.06")  # 0.055
     with pytest.raises(ValueError, match="shipping"):
         engine.shipping_tax(Decimal("-1"), Decimal("22"))
+
+
+def test_add_months_clamps_the_day() -> None:
+    import datetime as dt
+
+    assert engine.add_months(dt.date(2027, 1, 31), 1) == dt.date(2027, 2, 28)
+    assert engine.add_months(dt.date(2027, 3, 15), 24) == dt.date(2029, 3, 15)
+
+
+def test_minimisation_is_due_after_the_active_phase() -> None:
+    import datetime as dt
+    import zoneinfo
+
+    rome = zoneinfo.ZoneInfo("Europe/Rome")
+    created = dt.datetime(2027, 3, 15, 10, 0, tzinfo=dt.UTC)
+    assert not engine.minimisation_due(
+        created, dt.datetime(2029, 3, 14, 12, tzinfo=dt.UTC), 24, rome
+    )
+    assert engine.minimisation_due(created, dt.datetime(2029, 3, 15, 12, tzinfo=dt.UTC), 24, rome)
+
+
+def test_anonymisation_is_due_after_31_december_of_year_ten() -> None:
+    import datetime as dt
+    import zoneinfo
+
+    rome = zoneinfo.ZoneInfo("Europe/Rome")
+    created = dt.datetime(2027, 3, 15, tzinfo=dt.UTC)
+    # 2037-12-31 22:30 UTC is still 31 Dec in Rome; 23:30 UTC is 00:30 on 1 Jan 2038.
+    assert not engine.anonymisation_due(
+        created, dt.datetime(2037, 12, 31, 22, 30, tzinfo=dt.UTC), rome
+    )
+    assert engine.anonymisation_due(created, dt.datetime(2037, 12, 31, 23, 30, tzinfo=dt.UTC), rome)
+    # An order placed at 23:30 UTC on 31 Dec 2027 belongs to 2028 in Rome.
+    late = dt.datetime(2027, 12, 31, 23, 30, tzinfo=dt.UTC)
+    assert not engine.anonymisation_due(late, dt.datetime(2038, 6, 1, tzinfo=dt.UTC), rome)
+    assert engine.anonymisation_due(late, dt.datetime(2039, 1, 1, tzinfo=dt.UTC), rome)
