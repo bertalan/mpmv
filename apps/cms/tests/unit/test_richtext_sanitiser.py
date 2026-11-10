@@ -152,3 +152,37 @@ def test_a_deeply_nested_text_never_raises_and_stays_inert() -> None:
 
 def test_no_features_given_means_the_default_features() -> None:
     assert "<b>b</b>" in sanitise_rich_text("<p>a <b>b</b></p>", None)
+
+
+@pytest.mark.parametrize("linktype", ["page", "document"])
+@pytest.mark.parametrize("attrs", ['id="abc"', 'id=""', 'id="1 2"', 'id="-3"', 'id="3x"', ""])
+def test_a_stored_link_without_a_numeric_id_is_unwrapped(linktype: str, attrs: str) -> None:
+    clean = sanitise_rich_text(f'<p><a linktype="{linktype}" {attrs}>text</a></p>', ["link"])
+
+    assert clean == "<p>text</p>"
+    assert sanitise_rich_text(clean, ["link"]) == clean
+
+
+@pytest.mark.parametrize("linktype", ["page", "document"])
+def test_a_stored_link_with_a_numeric_id_is_kept(linktype: str) -> None:
+    html = f'<p><a id="42" linktype="{linktype}">text</a></p>'
+
+    clean = sanitise_rich_text(html, ["link", "document-link"])
+
+    assert clean == html
+    assert sanitise_rich_text(clean, ["link", "document-link"]) == clean
+
+
+def test_a_page_link_with_an_href_but_no_id_is_unwrapped() -> None:
+    clean = sanitise_rich_text('<p><a href="/x" linktype="page">text</a></p>', ["link"])
+
+    assert clean == "<p>text</p>"
+    assert sanitise_rich_text(clean, ["link"]) == clean
+
+
+def test_an_image_embed_without_a_numeric_id_is_dropped() -> None:
+    clean = sanitise_rich_text(
+        '<embed embedtype="image" id="abc" alt="a" format="left"/>', ["image"]
+    )
+
+    assert "embed" not in clean
