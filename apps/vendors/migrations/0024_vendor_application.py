@@ -9,7 +9,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("vendors", "0021_platform_staff_permission"),
+        ("vendors", "0023_selfcertification_append_only_and_seed_activation"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
