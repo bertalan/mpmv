@@ -62,8 +62,9 @@ BEGIN
        OR NEW.shipping_net IS DISTINCT FROM OLD.shipping_net
        OR NEW.tax_total IS DISTINCT FROM OLD.tax_total
        OR NEW.grand_total IS DISTINCT FROM OLD.grand_total
+       OR NEW.legacy_wp_order_id IS DISTINCT FROM OLD.legacy_wp_order_id
        OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
-        RAISE EXCEPTION 'orders_order: number, countries, totals and tax status are immutable'
+        RAISE EXCEPTION 'orders_order: number, countries, totals, legacy id are immutable'
             USING ERRCODE = 'check_violation';
     END IF;
 
@@ -81,19 +82,20 @@ BEGIN
             RAISE EXCEPTION 'orders_order: anonymisation is due after 31 December of year 10'
                 USING ERRCODE = 'check_violation';
         END IF;
-        IF (NEW.email IS DISTINCT FROM OLD.email AND NEW.email <> 'anonymised@example.invalid')
+        IF (NEW.email IS DISTINCT FROM OLD.email
+               AND NEW.email IS DISTINCT FROM 'anonymised@example.invalid')
            OR (NEW.customer_name IS DISTINCT FROM OLD.customer_name
-               AND NEW.customer_name <> 'ANONYMISED')
+               AND NEW.customer_name IS DISTINCT FROM 'ANONYMISED')
            OR (NEW.customer_vat_number IS DISTINCT FROM OLD.customer_vat_number
-               AND NEW.customer_vat_number <> 'ANONYMISED')
+               AND NEW.customer_vat_number IS DISTINCT FROM 'ANONYMISED')
            OR (NEW.customer_tax_id IS DISTINCT FROM OLD.customer_tax_id
-               AND NEW.customer_tax_id <> 'ANONYMISED')
+               AND NEW.customer_tax_id IS DISTINCT FROM 'ANONYMISED')
            OR (NEW.billing_address IS DISTINCT FROM OLD.billing_address
-               AND NEW.billing_address <> placeholder)
+               AND NEW.billing_address IS DISTINCT FROM placeholder)
            OR (NEW.shipping_address IS DISTINCT FROM OLD.shipping_address
-               AND NEW.shipping_address <> placeholder)
+               AND NEW.shipping_address IS DISTINCT FROM placeholder)
            OR (NEW.vat_validation IS DISTINCT FROM OLD.vat_validation
-               AND NEW.vat_validation <> placeholder) THEN
+               AND NEW.vat_validation IS DISTINCT FROM placeholder) THEN
             RAISE EXCEPTION 'orders_order: personal fields may only take their fixed placeholders'
                 USING ERRCODE = 'check_violation';
         END IF;

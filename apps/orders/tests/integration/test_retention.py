@@ -399,3 +399,12 @@ def test_the_save_guard_and_the_trigger_ignore_a_chosen_date_for_a_new_order() -
         [Order(**{**kwargs, "number": "2998-000202"}, legacy_wp_order_id=8, created_at=old)]
     )
     assert Order.objects.get(number="2998-000202").created_at == old
+
+
+def test_the_legacy_id_cannot_be_set_or_changed_after_insert() -> None:
+    order = OrderFactory.create()
+    with pytest.raises(IntegrityError):
+        run_sql(("UPDATE orders_order SET legacy_wp_order_id = 777 WHERE id = %s", [order.pk]))
+    legacy = place(state="closed", legacy_wp_order_id=778)
+    with pytest.raises(IntegrityError):
+        run_sql(("UPDATE orders_order SET legacy_wp_order_id = NULL WHERE id = %s", [legacy.pk]))
