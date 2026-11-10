@@ -9,6 +9,7 @@ confirmed second factor is sent to enrolment before any Manager page.
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from django.contrib.auth.models import Group, Permission
 from django.test import Client
 from django.urls import reverse
 
@@ -117,7 +118,7 @@ def test_the_staff_flag_plus_the_permission_opens_the_platform_space(client: Cli
 
 
 def test_the_platform_owner_permission_alone_is_not_platform_staff(client: Client) -> None:
-    """The gate is `vendors.is_platform_staff()`: only `vendors.view_all_vendors` counts."""
+    """The gate is `vendors.scoping.is_platform_staff()`: only `vendors.view_all_vendors` counts."""
     verified_login(client, UserFactory.create(permissions=["core.platform_owner"]))
     assert client.get(PLATFORM).status_code == 404
 
@@ -127,13 +128,27 @@ def test_an_inactive_user_with_the_permission_is_refused(client: Client) -> None
     verified_login(client, user)
     user.is_active = False
     user.save(update_fields=["is_active"])
-    assert client.get(PLATFORM).status_code != 200
+    response = client.get(PLATFORM)
+    # Django signs an inactive user out, so the visitor lands on the login, never on the page.
+    assert response.status_code == 302
+    assert _location(response)[0] == LOGIN
 
 
 def test_a_superuser_holding_the_permission_explicitly_opens_the_platform_space(
     client: Client,
 ) -> None:
     user = UserFactory.create(superuser=True, permissions=["vendors.view_all_vendors"])
+    verified_login(client, user)
+    assert client.get(PLATFORM).status_code == 200
+
+
+def test_a_superuser_granted_the_permission_through_a_group_opens_the_platform_space(
+    client: Client,
+) -> None:
+    group = Group.objects.create(name="platform-staff-test")
+    group.permissions.add(Permission.objects.get(codename="view_all_vendors"))
+    user = UserFactory.create(superuser=True)
+    user.groups.add(group)
     verified_login(client, user)
     assert client.get(PLATFORM).status_code == 200
 

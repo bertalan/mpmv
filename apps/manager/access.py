@@ -29,7 +29,7 @@ from .spaces import Space
 type AnyUser = AbstractBaseUser | AnonymousUser
 
 
-def is_platform_staff(user: AnyUser) -> bool:
+def may_enter_platform_space(user: AnyUser) -> bool:
     """`vendors.scoping.is_platform_staff()`, minus the implicit superuser pass.
 
     `is_staff` does not count. A superuser needs the permission granted to them or to one of
@@ -55,7 +55,7 @@ def may_enter(space: Space, user: AnyUser) -> bool:
     """Whether `user` may enter `space` at all; the sections check the rest."""
     if not (user.is_authenticated and user.is_active):
         return False
-    staff, member = is_platform_staff(user), is_vendor_member(user)
+    staff, member = may_enter_platform_space(user), is_vendor_member(user)
     if space is Space.SHOP:
         return member and not staff and not _has_admin_access(user)
     return staff and not member

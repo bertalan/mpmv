@@ -75,7 +75,11 @@ ssh <stage> '~/.local/bin/mpmv-deploy deploy 0.2.0'
 Platform staff is the model permission `vendors.view_all_vendors`, not `is_staff`. No data
 migration grants it: on every environment, existing staff accounts must get it explicitly (admin
 user page, or the CORE.18 role groups once they exist), otherwise they lose the all-vendor view
-after the deploy (fail closed). Superusers keep it. STAGE has only seed users: the next seed run
+after the deploy (fail closed). Superusers keep the all-vendor view in the code that uses
+`apps.vendors.scoping.is_platform_staff()` (`for_actor`, events), because Django's `has_perm`
+grants every permission to a superuser. The Manager platform space (CORE.17) does not honour
+that shortcut: a superuser, like a `core.platform_owner` holder, gets 404 there unless
+`vendors.view_all_vendors` is granted to them or to one of their groups. STAGE has only seed users: the next seed run
 grants the permission to the seed operator.
 
 ## Promoting to LIVE
