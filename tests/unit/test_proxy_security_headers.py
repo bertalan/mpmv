@@ -155,3 +155,19 @@ def test_request_bodies_are_capped_just_above_the_upload_cap() -> None:
     assert found, "the site block must cap request bodies"
     cap = caddy_bytes(found.group(1))
     assert IMAGE_UPLOAD_CAP < cap <= IMAGE_UPLOAD_CAP + FORM_OVERHEAD_LIMIT
+
+
+def test_the_header_ownership_doc_names_every_header_of_the_snippet() -> None:
+    """SEC.12: `docs/dev/security-headers.md` says which layer owns each header."""
+    doc = (CADDYFILE.parents[2] / "docs" / "dev" / "security-headers.md").read_text()
+    for field in snippet_headers():
+        assert f"`{field.lstrip('?-')}`" in doc, field
+    for exception in ("301", "421"):
+        assert exception in doc
+
+
+def test_the_plain_http_redirect_is_the_proxys_own_with_the_full_set() -> None:
+    """In LIVE plain HTTP is redirected by Caddy, never by the app's 301 (documented exception)."""
+    block = top_level_block("http://{$MPMV_SITE_ADDRESS}")
+    assert "import security_headers" in block
+    assert "308" in block

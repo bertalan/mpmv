@@ -184,19 +184,19 @@ def test_https_redirect_301_carries_the_transport_headers(anon: Client) -> None:
     assert_no_leak_headers(response)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Finding: SecurityMiddleware's HTTP-to-HTTPS 301 is returned before the CSP, "
-        "Permissions-Policy and X-Frame-Options middleware run. Empty body, and in LIVE the "
-        "reverse proxy redirects plain HTTP first, so the app never sends it there. "
-        "Owned by SEC.12."
-    ),
-)
-def test_https_redirect_301_full_header_set(anon: Client) -> None:
+def test_https_redirect_301_is_the_documented_exception(anon: Client) -> None:
+    """SEC.12: the app's own 301 never carries CSP, Permissions-Policy or X-Frame-Options.
+
+    SecurityMiddleware returns it before the other header middleware run, with an empty body.
+    It is not a gap in LIVE: Caddy redirects plain HTTP first, with the full set from its
+    `security_headers` snippet (tests/unit/test_proxy_security_headers.py), so the app never
+    sends this response there. `docs/dev/security-headers.md` records the decision.
+    """
     response = anon.get("/django-admin/login/")
     assert response.status_code == 301
-    assert_security_headers(response)
+    assert response.content == b""
+    for header in ("Content-Security-Policy", "Permissions-Policy", "X-Frame-Options"):
+        assert header not in response.headers, header
 
 
 # --- Media (Django's view, used without Caddy) -------------------------------------------------
