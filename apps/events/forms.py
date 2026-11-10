@@ -32,6 +32,7 @@ from wagtail.admin.forms import WagtailAdminPageForm
 
 from apps.catalog.models import Product, ProductStatus
 from apps.core.geocoding import AddressQuery, GeocodeResult, engine
+from apps.vendors.scoping import is_platform_staff
 
 ADDRESS_QUERY_FIELDS = ("country", "postcode", "city", "street")
 
@@ -54,7 +55,7 @@ class EventPageForm(WagtailAdminPageForm):  # type: ignore[misc]  # Wagtail is u
         if instance.original_locale_id is None and instance.locale_id is not None:
             instance.original_locale_id = instance.locale_id
         if "vendor" in self.fields:
-            if user is None or not getattr(user, "is_staff", False):
+            if user is None or not is_platform_staff(user):
                 del self.fields["vendor"]
             elif instance.pk is not None:
                 self.fields["vendor"].disabled = True
