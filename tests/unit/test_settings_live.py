@@ -17,11 +17,11 @@ def live_settings() -> dict[str, Any]:
 # The middleware that only add security headers (SEC.1). WhiteNoise answers static files itself,
 # so it runs inside all of them and static responses carry the headers too (SEC.5).
 HEADER_MIDDLEWARE = [
+    "apps.core.middleware.CrossOriginResourcePolicyMiddleware",  # outermost: wraps the 301 (SEC.12)
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "apps.cms.middleware.WagtailAdminPickerNonceMiddleware",
     "apps.core.middleware.PermissionsPolicyMiddleware",
-    "apps.core.middleware.CrossOriginResourcePolicyMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
