@@ -44,6 +44,7 @@ PASSWORD_RESET = "Password reset flow of the editors' admin: answers before sign
 PUBLIC: dict[str, str] = {
     "healthz": "Liveness probe with a constant answer.",
     "readyz": "Readiness probe: a status only, no data.",
+    "robots_txt": "robots.txt (SEO.8): constant text for crawlers, no vendor data.",
     "email_webhook": "Email provider feedback: refused unless the payload is signed (ARC.16).",
     "home": "Public home page.",
     "media": MEDIA,

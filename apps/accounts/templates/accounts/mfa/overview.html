@@ -1,4 +1,6 @@
 {% extends "layouts/account.html" %}
+{# This page shows its messages in place; the base layout must not repeat them. #}
+{% block messages %}{% endblock %}
 {% block title %}Two-factor settings · MPMV{% endblock %}
 {% block account_content %}
 <h1>Two-factor authentication</h1>

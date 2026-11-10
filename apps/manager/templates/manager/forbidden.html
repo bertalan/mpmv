@@ -1,0 +1,19 @@
+{% extends "layouts/account.html" %}
+{% load i18n %}
+{% comment %}
+No access to this Manager space (CORE.17, owner decision 2026-11-10): a signed-in user without the
+space's right gets this page with status 403 instead of a bare 404. It says who is signed in and
+why the page is closed; anonymous visitors still go to the login. No section or data is listed.
+{% endcomment %}
+{% block title %}{% translate "No access" %} · {{ site_name }}{% endblock %}
+{% block description %}{% robots_meta "noindex" %}{% endblock %}
+{% block account_content %}
+  <h1>{% translate "No access" %}</h1>
+  <p>{% blocktranslate with user=request.user.get_username %}You are signed in as {{ user }}, and you do not have access to this part of the site.{% endblocktranslate %}</p>
+  <p>{% translate "The Manager is for platform staff and for vendor members. If you need access, ask the platform staff, or sign in with another account." %}</p>
+  <p><a href="/">{% translate "Back to the site" %}</a></p>
+  <form action="{% url 'logout' %}" method="post">
+    {% csrf_token %}
+    {% include "components/button.html" with label=_("Sign out") type="submit" variant="secondary" only %}
+  </form>
+{% endblock %}

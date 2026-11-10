@@ -1,7 +1,7 @@
 {% extends "layouts/base.html" %}
 {% load i18n %}
 {% block title %}{% translate "Cancel the application" %} · {{ site_name }}{% endblock %}
-{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block head %}{% robots_meta "noindex, nofollow" %}{% endblock %}
 {% block content %}
 <article class="apply">
   <h1>{% translate "Cancel this application" %}</h1>

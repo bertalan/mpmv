@@ -1,11 +1,25 @@
 """The redaction regexes run in the request thread: linear time, bounded input (OPS.2 re-check)."""
 
+import base64
+import json
+import secrets
 import time
 from collections.abc import Callable
 
 import pytest
 
 from apps.core.observability import MAX_TEXT, redact_text, redact_unbounded
+
+
+def _random_jwt() -> str:
+    """A well-formed JWT shape built at run time (no literal token in the source)."""
+
+    def part(data: dict[str, str]) -> str:
+        return base64.urlsafe_b64encode(json.dumps(data).encode()).rstrip(b"=").decode()
+
+    return ".".join(
+        [part({"alg": "HS256"}), part({"sub": secrets.token_hex(4)}), secrets.token_urlsafe(32)]
+    )
 
 
 def _fullwidth(text: str) -> str:
@@ -91,7 +105,7 @@ def test_a_secret_beyond_the_cut_is_not_logged() -> None:
         "otp=123456",
         "key=abcdefgh",
         "bearer: abcdefgh1234",
-        "jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV",
+        "jwt " + _random_jwt(),
         _fullwidth("IT60X0542811101000000123456"),
         _fullwidth("password=hunter2zz"),
         "card " + _fullwidth("4111 1111 1111 1111"),

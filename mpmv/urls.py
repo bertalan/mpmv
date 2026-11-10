@@ -17,7 +17,7 @@ from wagtail.admin import urls as wagtailadmin_urls
 
 from apps.accounts.views import switch_language
 from apps.core.media import serve_media
-from apps.core.views import email_webhook
+from apps.core.views import email_webhook, robots_view
 
 # Error pages with the `base` layouts (THM.3); 400 and 500 render without the database.
 handler400 = "apps.themes.views.bad_request"
@@ -42,6 +42,7 @@ def readyz(request: HttpRequest) -> JsonResponse:
 urlpatterns = [
     path("healthz", healthz, name="healthz"),
     path("readyz", readyz, name="readyz"),
+    path("robots.txt", robots_view, name="robots_txt"),  # SEO.8
     path("webhooks/email/", email_webhook, name="email_webhook"),
     # Uploaded images and renditions, as images only (THM.12, apps.core.media).
     path("media/<path:path>", serve_media, name="media"),
