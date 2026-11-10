@@ -321,6 +321,31 @@
     font-weight: 700;
   }
 
+  .manager-languages ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-s);
+    padding: 0;
+    list-style: none;
+  }
+
+  .manager-languages a {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+  }
+
+  .manager-languages a[aria-current="page"] {
+    font-weight: 700;
+  }
+
+  .manager-form {
+    display: grid;
+    gap: var(--space-m);
+    max-inline-size: var(--measure-text);
+  }
+
   .manager-choices,
   .manager-changes {
     display: grid;
