@@ -317,6 +317,7 @@ ENDPOINTS: dict[str, Access] = {
     "login": NoVendorData("Manager sign-in page."),
     "logout": NoVendorData("Sign-out of the Manager."),
     "manager:shop:dashboard": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    "manager:shop:profile": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
@@ -331,6 +332,10 @@ ENDPOINTS: dict[str, Access] = {
         "Unknown API paths: a 404 problem document.", path="/api/v1/no-such-operation"
     ),
     # CMS (CMS.1): public pages and the editors' sign-in. The rest of /admin/ is CMS_ADMIN.
+    "dsa_contact_points": NoVendorData(
+        "DSA points of contact (CMP.5): the platform operator's own contact data, the same for "
+        "every visitor; no vendor data."
+    ),
     "wagtail_serve": NoVendorData(
         "Public CMS pages (home, static pages); no vendor data until the CMS.4 landing pages.",
         path="/no-such-page/",

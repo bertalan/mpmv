@@ -1,0 +1,1 @@
+{% load i18n %}{% blocktranslate %}{{ vendor_name }} changed its storefront profile ({{ language }}): {{ fields }}. The change is already live. Review it in the audit log; staff can revert it.{% endblocktranslate %}

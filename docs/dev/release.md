@@ -78,6 +78,29 @@ user page, or the CORE.18 role groups once they exist), otherwise they lose the 
 after the deploy (fail closed). Superusers keep it. STAGE has only seed users: the next seed run
 grants the permission to the seed operator.
 
+### First platform owner (CORE.23)
+
+The platform owner is the `core.platform_owner` permission; nobody holds it after the first
+deploy, so nobody can open `/manager/platform/`. Until the ARC.25 first-start wizard exists, give
+it to the first person with the management command, once per environment, inside the app
+container:
+
+```sh
+manage.py bootstrap_platform_owner owner@example.org --dry-run   # shows what would change
+manage.py bootstrap_platform_owner owner@example.org             # grants it, audited
+manage.py bootstrap_platform_owner owner@example.org --create    # also creates the account
+```
+
+The command is idempotent (a second run says "already a platform owner" and changes nothing).
+It refuses an unknown user without `--create`, an inactive user (also with `--create`: it never
+reactivates an account) and a vendor member (platform roles and vendor membership never mix, so
+the user would be locked out of both spaces). It does not refuse when another owner already
+exists: several platform owners are allowed. A created account has no usable password and the
+command never prints one. Until the CORE.19 password-set link exists, a superuser sets the
+password in the staff admin (user page, "set password"); the owner then signs in and the Manager
+gate forces the enrolment of a second factor (CORE.4) before any page opens. Check
+the AuditLog entry `core.platform_owner.grant`; its target is the lower-cased email.
+
 ### Editor roles migration (CORE.8)
 
 Migration `cms/0013_editor_roles` removes Wagtail's default "Editors" and "Moderators" groups
@@ -94,6 +117,19 @@ editors). Effects on STAGE and later environments:
   Manager.
 
 Details: [editor-roles.md](editor-roles.md).
+
+### Product slugs without the language suffix (CAT.5, D-25)
+
+Migration `catalog/0010_d25_product_slugs` reslugs every product translation to `{title}` and keeps
+the old `{title}-{lang}` and `{title}-{lang}-{sku}` slugs in SlugHistory (one 301 each). Before
+deploying a release that contains it:
+
+1. Run `manage.py rebuild_product_slugs --dry-run` on the target environment and check the count
+   and the listed renames. The dry run checks each translation against the stored slugs only, so two
+   translations of the same run that would need a `-2` are not seen: its count may differ from the
+   migration's, which reslugs one translation after the other.
+2. Deploy; `migrate` applies the same reslug and writes the audit entries.
+3. Rerunning changes nothing. Reverse is a no-op: the old slugs stay in SlugHistory.
 
 ### Activation gate and tax territories (CMP.25, TAX.7)
 

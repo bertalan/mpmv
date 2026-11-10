@@ -33,7 +33,7 @@ script or style.
           {% csrf_token %}
           {% include "components/button.html" with label=_("Sign out") type="submit" variant="ghost" size="small" only %}
         </form>
-        {% include "components/language_switcher.html" with languages=languages current_language=current_language next_url=request.get_full_path only %}
+        {% include "components/language_switcher.html" with languages=languages current_language=current_language next_url=request.get_full_path csrf_token=csrf_token only %}
       </div>
     </div>
     {% if manager_menu %}
