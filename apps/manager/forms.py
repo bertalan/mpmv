@@ -1,5 +1,7 @@
 """Manager forms (CORE.9): thin wrappers that validate input; the services own the rules."""
 
+from typing import Any
+
 from django import forms
 from django.utils.translation import gettext_lazy as _
 from wagtail.admin.rich_text import DraftailRichTextArea
@@ -17,8 +19,20 @@ MANAGER_RICH_TEXT_FEATURES = [
 ]
 
 
+class _Editor(DraftailRichTextArea):  # type: ignore[misc]  # Wagtail is untyped
+    """Draftail posts its content state as JSON. A post that is not (a script, a hostile
+    client) must not be a server error: it is taken as the HTML text it is, and cleaned like any
+    other value by the service."""
+
+    def value_from_datadict(self, data: Any, files: Any, name: str) -> Any:
+        try:
+            return super().value_from_datadict(data, files, name)
+        except (ValueError, TypeError, KeyError, AttributeError):
+            return data.get(name)
+
+
 def _editor() -> DraftailRichTextArea:
-    return DraftailRichTextArea(features=MANAGER_RICH_TEXT_FEATURES)
+    return _Editor(features=MANAGER_RICH_TEXT_FEATURES)
 
 
 class StorefrontProfileForm(forms.Form):

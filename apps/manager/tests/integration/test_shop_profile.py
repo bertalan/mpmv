@@ -4,6 +4,8 @@ Staff get 404 (and no menu entry), the form is accessible (CMP.9: labels, error 
 the fields), and every change goes through the audited service.
 """
 
+import re
+
 import pytest
 from django.test import Client
 
@@ -101,7 +103,9 @@ def test_the_page_has_no_inline_script_or_style(client: Client, owner: User) -> 
     verified_login(client, owner)
     _, _, content = client.get(PROFILE).text.partition('class="manager-page"')
     assert content
-    assert "<script" not in content
+    # External scripts (Wagtail's editor, same origin) and a JSON data block are fine: no code
+    # inline, so the strict CSP holds.
+    assert not re.search(r"<script(?![^>]*(?:\bsrc=|type=\"application/json\"))", content)
     assert 'style="' not in content
 
 
@@ -129,10 +133,19 @@ def test_a_machine_draft_is_marked_on_the_form(client: Client, owner: User, vend
 
 def test_html_in_a_field_shows_an_error_and_is_not_stored(client: Client, owner: User) -> None:
     verified_login(client, owner)
-    response = client.post(PROFILE, {"language": "en", "description": "<script>x</script>"})
+    response = client.post(PROFILE, {"language": "en", "tagline": "<script>x</script>"})
     assert response.status_code == 200
-    assert 'href="#id_description"' in response.text
+    assert 'href="#id_tagline"' in response.text
     assert not VendorTranslation.objects.exists()
+
+
+def test_html_in_a_rich_text_field_is_cleaned_and_stored(client: Client, owner: User) -> None:
+    verified_login(client, owner)
+    html = "<p>ok <b>bold</b></p><script>x()</script>"
+    response = client.post(PROFILE, {"language": "en", "description": html})
+    assert response.status_code == 302
+    stored = VendorTranslation.objects.get().description
+    assert stored == "<p>ok <b>bold</b></p>"
 
 
 def test_stored_text_is_escaped_on_output(client: Client, owner: User, vendor: Vendor) -> None:

@@ -2,7 +2,7 @@
 The scripts and icon sprite Wagtail's Draftail editor needs outside the Wagtail admin (D-34).
 No inline script: the editor starts from `data-controller` attributes.
 {% endcomment %}{% wagtail_config as config %}{{ config|json_script:"wagtail-config" }}
-{% icons %}
+{% include "wagtailadmin/shared/icons.html" %}
 <script src="{% versioned_static 'wagtailadmin/js/vendor/jquery-3.6.0.min.js' %}"></script>
 <script src="{% versioned_static 'wagtailadmin/js/core.js' %}"></script>
 <script src="{% versioned_static 'wagtailadmin/js/vendor.js' %}"></script>
