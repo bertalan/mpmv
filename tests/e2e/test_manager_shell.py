@@ -14,10 +14,12 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Page, expect
 from pytest_django.live_server_helper import LiveServer
+from wagtail.models import Collection
 
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from apps.catalog.tests.factories import ProductFactory
+from apps.core.tests.factories import ImageLicenceFactory
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
@@ -131,6 +133,11 @@ def test_the_owner_edits_the_storefront_profile_and_staff_cannot(
     device = TOTPDeviceFactory.create(user=owner)
     shop = VendorFactory.create(display_name="Shop West")
     VendorMemberFactory.create(vendor=shop, user=owner, role="owner")
+    # Transactional tests flush the seeded allow list and the root collection: put back what the
+    # logo upload uses.
+    ImageLicenceFactory.create(code="own-work", name="Own work", source_required=False)
+    if Collection.get_first_root_node() is None:
+        Collection.add_root(name="Root")
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
     _login(page, live_server.url, "owner@example.com", password)
