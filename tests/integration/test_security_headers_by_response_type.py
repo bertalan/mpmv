@@ -185,7 +185,7 @@ def test_https_redirect_301_carries_the_transport_headers(anon: Client) -> None:
 
 
 def test_https_redirect_301_is_the_documented_exception(anon: Client) -> None:
-    """SEC.12: the app's own 301 never carries CSP, Permissions-Policy or X-Frame-Options.
+    """SEC.12: the app's own 301 carries CORP, but no CSP, Permissions-Policy or X-Frame-Options.
 
     SecurityMiddleware returns it before the other header middleware run, with an empty body.
     It is not a gap in LIVE: Caddy redirects plain HTTP first, with the full set from its
@@ -195,6 +195,7 @@ def test_https_redirect_301_is_the_documented_exception(anon: Client) -> None:
     response = anon.get("/django-admin/login/")
     assert response.status_code == 301
     assert response.content == b""
+    assert response.headers["Cross-Origin-Resource-Policy"] == "same-origin"
     for header in ("Content-Security-Policy", "Permissions-Policy", "X-Frame-Options"):
         assert header not in response.headers, header
 
@@ -226,6 +227,32 @@ def test_static_file(anon: Client) -> None:
     response = anon.get("/static/admin/css/base.css", secure=True)
     assert response.status_code == 200
     assert_security_headers(response)
+
+
+def test_static_file_has_no_cross_origin_read_header(anon: Client) -> None:
+    """WhiteNoise sends `Access-Control-Allow-Origin: *` unless told not to (ZAP 10098)."""
+    for headers in ({}, {"Origin": "https://other.example"}):
+        response = anon.get("/static/admin/css/base.css", secure=True, headers=headers)
+        assert response.status_code == 200
+        assert "Access-Control-Allow-Origin" not in response.headers
+
+
+def test_media_file_has_no_cross_origin_read_header(anon: Client, tmp_path: Path) -> None:
+    (tmp_path / "images").mkdir()
+    (tmp_path / "images" / "pic.png").write_bytes(b"not decoded by the view")
+    with override_settings(MEDIA_ROOT=str(tmp_path)):
+        response = anon.get(
+            "/media/images/pic.png", secure=True, headers={"Origin": "https://other.example"}
+        )
+    assert response.status_code == 200
+    assert "Access-Control-Allow-Origin" not in response.headers
+
+
+def test_corp_is_same_origin_on_every_kind_of_response(anon: Client) -> None:
+    for url in ("/healthz", "/static/admin/css/base.css", "/django-admin/", "/nope/"):
+        response = anon.get(url, secure=True)
+        assert response.headers["Cross-Origin-Resource-Policy"] == "same-origin", url
+        assert "Cross-Origin-Embedder-Policy" not in response.headers, path
 
 
 # --- API (JSON and RFC 9457 problems) -----------------------------------------------------------

@@ -25,19 +25,20 @@ redirect.
 | `X-Content-Type-Options` | sets | default; media sets `nosniff` itself |
 | `Referrer-Policy` | sets | default |
 | `Cross-Origin-Opener-Policy` | sets | default |
+| `Cross-Origin-Resource-Policy` | sets `same-origin` on every response, the 301 included (outermost middleware) | default |
 | `X-Frame-Options` | sets | default |
 | `Content-Security-Policy` | sets (per page) | default `default-src 'none'; frame-ancestors 'none'`; media uses its sandbox CSP |
 | `Permissions-Policy` | sets | default, same value as `build_permissions_policy` |
 | `Server` | not removable | deleted (`-Server`): Caddy's own and gunicorn's |
 | `Via` | none | deleted (`-Via`): `reverse_proxy` adds `Via: 1.0 Caddy` |
 
-`Cross-Origin-Resource-Policy: same-origin` follows the same rule once added (SEC.5 STAGE triage,
-PR #197): app middleware plus the same `?` line in the snippet.
+ZAP findings and their accepted exceptions are in `docs/dev/security-scans.md`.
 
 ## Documented exceptions
 
 - The app's own HTTP-to-HTTPS 301 (`SecurityMiddleware`) is returned before the CSP,
-  Permissions-Policy and X-Frame-Options middleware run, with an empty body. In LIVE and STAGE
+  Permissions-Policy and X-Frame-Options middleware run, with an empty body. Only CORP reaches it,
+  because its middleware is the outermost one. In LIVE and STAGE
   Caddy redirects plain HTTP first (308, full set), so the app never sends it.
   `test_https_redirect_301_is_the_documented_exception` records the behaviour.
 - The 421 for a Host header that differs from the TLS server name comes from `strict_sni_host`

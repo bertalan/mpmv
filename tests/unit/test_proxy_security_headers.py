@@ -171,3 +171,18 @@ def test_the_plain_http_redirect_is_the_proxys_own_with_the_full_set() -> None:
     block = top_level_block("http://{$MPMV_SITE_ADDRESS}")
     assert "import security_headers" in block
     assert "308" in block
+
+
+def test_caddy_never_opens_resources_to_other_origins() -> None:
+    """ZAP 10098: no `Access-Control-Allow-Origin` anywhere; everything is same-origin."""
+    text = CADDYFILE.read_text()
+    code = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
+    assert "access-control" not in code.lower()
+
+
+def test_caddy_snippet_sets_corp_same_origin_and_no_coep() -> None:
+    fields = snippet_headers()
+    assert fields["?Cross-Origin-Resource-Policy"] == "same-origin"
+    assert not [field for field in fields if "Embedder" in field], "COEP is a documented accept"
+    # The media handler relies on the site block's snippet: it must not delete or replace it.
+    assert "Cross-Origin" not in public_media_block()
