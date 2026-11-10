@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **274** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **2225 h** (P1 1780 h · P2 413 h · P3 32 h)
+- Micro-tasks: **275** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **2226 h** (P1 1781 h · P2 413 h · P3 32 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -23,7 +23,7 @@
 | ORD | Cart, orders, returns | 12 | 102 | 14 | 0 | 116 |
 | PAY | Payments (Stripe Connect) | 4 | 40 | 0 | 0 | 40 |
 | ING | Supplier import and pipelines | 13 | 92 | 26 | 0 | 118 |
-| I18N | Multilingual | 11 | 53 | 9 | 0 | 62 |
+| I18N | Multilingual | 12 | 54 | 9 | 0 | 63 |
 | CMS | Wagtail content | 11 | 62 | 10 | 0 | 72 |
 | EVT | Events, feeds and maps | 17 | 111 | 12 | 0 | 123 |
 | THM | Frontend themes | 12 | 76 | 12 | 0 | 88 |
@@ -33,7 +33,7 @@
 | SEC | Security | 9 | 59 | 0 | 0 | 59 |
 | OPS | Operations | 10 | 19 | 30 | 8 | 57 |
 | MIG | Migration and cutover | 15 | 121 | 23 | 0 | 144 |
-| **Total** | | **274** | **1780** | **413** | **32** | **2225** |
+| **Total** | | **275** | **1781** | **413** | **32** | **2226** |
 
 ## By phase
 
@@ -95,7 +95,7 @@
 | OPS.2 | Observability: JSON logs, error tracking, healthchecks, alerts (including database disk space, WAL archiving and backup age) | P1 | 8 | ARC.5 | Alert on a simulated checkout error |
 | OPS.5 | Technical Django admin reachable only from a restricted network (owner decision Q-18): allow-list at the reverse proxy plus an app-level check on the Django admin path (defence in depth), the allowed networks as environment configuration, staff operations moved to the Manager platform space (CORE.17) and editors to the Wagtail admin (CORE.8) | P1 | 3 | ARC.13, CORE.8 | On STAGE the Django admin answers 404 from outside the allowed networks and works from inside; a test covers the app-level check |
 
-### F1 — Catalog, import, base frontend (41 tasks, 359 h)
+### F1 — Catalog, import, base frontend (42 tasks, 360 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -132,6 +132,7 @@
 | I18N.7 | Interface strings in IT, DE, FR and ES for go-live (D-18): gettext catalogs for templates, emails, notifications, error and validation messages, MFA pages and tax/legal wording keys, including the language-switch notice \"This content is not available in this language.\" (I18N.11); AI draft, human review of checkout, emails and legal/tax wording; coverage report | P1 | 10 | I18N.5 | Coverage report: 100% of interface strings translated in IT, DE, FR and ES; checkout, email and legal/tax wording reviewed by a human |
 | I18N.9 | Customer legal and checkout pages at go-live (Q-42): terms of sale, privacy, withdrawal, shipping and returns as `LegalPage` translations in EN, IT, DE, FR and ES through wagtail-localize, each language with its own version and effective date; AI draft, native-speaker review and legal counsel check recorded per language; no EN fallback for these pages | P1 | 6 | CMS.5, I18N.3 | Every one of the five pages is published in all five languages; a go-live readiness check fails when a legal or checkout page lacks a published translation in a go-live language; a translation of a legal page shows its own effective date |
 | I18N.11 | Language switch stays on the same object (owner bug, priority 1): the public switch leads to the same page, listing, storefront or event in the chosen language (a product page when it exists), from the one `{language: URL}` mapping that also builds the `hreflang` alternates (`apps.core.i18n`); a language with no translation of the object leads to that language's home and shows a notice that the content is not available in it | P1 | 3 | I18N.1, I18N.6 | A term, brand, vendor and CMS page switch to their translation (the `hreflang` set equals the switch targets without notice); an untranslated object leads to the target home with the notice once; e2e screenshot of the switch |
+| I18N.12 | The stored language applies on unprefixed areas (owner bug on STAGE v0.1.4, priority 1, follow-up of I18N.11): the language switcher sets no cookie, so a middleware right after `AuthenticationMiddleware` activates a signed-in user's `preferred_language` for requests without a language prefix (Manager, account area, MFA pages, admins) and sets `request.LANGUAGE_CODE`; prefixed public URLs keep the prefix as the only source; anonymous users, an unknown or no longer configured language change nothing | P1 | 1 | I18N.1, I18N.11 | A signed-in user who switches language in the Manager sees the Manager in that language and can switch back; a prefixed public URL ignores `preferred_language`; anonymous and unknown-language cases unchanged; e2e screenshot of the Manager switch |
 | CMS.1 | Wagtail: site, locales, base page types, per-language navigation and footer | P1 | 8 | ARC.3 | Home and static pages in every configured language |
 | THM.1 | Theme framework: `apps/themes` registry and manifest, theme-aware template loader with parent fallback and `(theme, name)` cache, `ThemeSettings` per Wagtail Site with audit, `MPMV_THEME_DEFAULT`, system checks, import-linter rule, ADR for the frontend toolchain | P1 | 8 | CMS.1 | Two sites render different themes in an integration test; a template missing in the child comes from `base`; an unknown theme fails the system check |
 | THM.2 | Design-token pipeline: `tokens.toml` resolution and inheritance, token contract with contrast pairs, `tokens.css` rendering, `python -m apps.themes.build` (`make assets`), Containerfile build step | P1 | 6 | THM.1 | Unit tests on `resolve_tokens`, `contrast_ratio` and `check_tokens` (a pair below 4.5:1 fails); the image build produces hashed `theme.css` for every theme |
