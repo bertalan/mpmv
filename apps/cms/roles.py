@@ -108,6 +108,3 @@ ADMIN_MENU_ALLOWED: frozenset[str] = frozenset(
         "images-to-classify",
     }
 )
-
-# Entries of the "Events" submenu that are not CMS work: the vendors' moderation policies.
-EVENTS_SUBMENU_HIDDEN: frozenset[str] = frozenset({"vendor-policies"})

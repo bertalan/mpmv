@@ -13,7 +13,7 @@ from django.contrib.auth.models import Group
 from django.test import Client, RequestFactory
 from django.urls import reverse
 from wagtail.admin.menu import admin_menu
-from wagtail.models import GroupPagePermission, Page
+from wagtail.models import GroupCollectionPermission, GroupPagePermission, Page
 
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
@@ -27,7 +27,6 @@ from apps.cms.tests.factories import (
     StandardPageFactory,
     editor_user,
 )
-from apps.events.tests.factories import EventPageFactory, primary_index
 
 pytestmark = pytest.mark.django_db
 
@@ -47,15 +46,7 @@ def tree() -> dict[str, Page]:
     legal = LegalPageFactory.create()
     post = BlogPostPageFactory.create()
     blog = BlogIndexPage.objects.get(pk=post.get_parent().pk)
-    event = EventPageFactory.create()
-    return {
-        "about": about,
-        "legal": legal,
-        "post": post,
-        "blog": blog,
-        "event": event,
-        "events_index": primary_index(),
-    }
+    return {"about": about, "legal": legal, "post": post, "blog": blog}
 
 
 def test_the_default_groups_are_gone_and_the_roles_exist() -> None:
@@ -70,10 +61,10 @@ def test_the_default_groups_are_gone_and_the_roles_exist() -> None:
 @pytest.mark.parametrize(
     ("role", "editable", "refused"),
     [
-        (roles.BLOG_EDITORS, ["post", "blog"], ["about", "legal", "event", "events_index"]),
-        (roles.LEGAL_EDITORS, ["legal"], ["about", "post", "blog", "event"]),
-        (roles.PAGE_EDITORS, ["about"], ["legal", "post", "blog", "event"]),
-        (roles.EVENT_MODERATORS, ["event", "events_index"], ["about", "legal", "post", "blog"]),
+        (roles.BLOG_EDITORS, ["post", "blog"], ["about", "legal"]),
+        (roles.LEGAL_EDITORS, ["legal"], ["about", "post", "blog"]),
+        (roles.PAGE_EDITORS, ["about"], ["legal", "post", "blog"]),
+        (roles.EVENT_MODERATORS, [], ["about", "legal", "post", "blog"]),
     ],
 )
 def test_each_role_edits_only_its_part_of_the_tree(
@@ -142,7 +133,12 @@ def test_the_sync_is_idempotent_and_never_removes_grants(tree: dict[str, Page]) 
 def test_roles_open_the_admin_and_the_snippets_they_need() -> None:
     blog_editor = _fresh(editor_user(roles.BLOG_EDITORS))
     assert blog_editor.has_perm("wagtailadmin.access_admin")
-    assert blog_editor.has_perm("wagtailimages.add_image")
+    granted = set(
+        GroupCollectionPermission.objects.filter(group__user=blog_editor).values_list(
+            "permission__codename", flat=True
+        )
+    )
+    assert {"add_image", "change_image", "choose_image"} <= granted
     assert blog_editor.has_perm("cms.add_blogauthor")
     legal_editor = _fresh(editor_user(roles.LEGAL_EDITORS))
     assert legal_editor.has_perm("wagtailadmin.access_admin")
@@ -168,12 +164,12 @@ def _menu(user: Any) -> list[tuple[str, str]]:
 COMMERCE = re.compile(r"vendor|product|order|rate|payout|shipping|tax|ledger", re.IGNORECASE)
 
 
-@pytest.mark.parametrize("who", ["superuser", "platform_staff", *roles.ROLE_NAMES])
+@pytest.mark.parametrize("who", ["superuser", "staff_moderator", *roles.ROLE_NAMES])
 def test_the_admin_menu_has_no_commerce_item(who: str) -> None:
     if who == "superuser":
         user = UserFactory.create(superuser=True)
-    elif who == "platform_staff":
-        user = UserFactory.create(staff=True, platform_staff=True)
+    elif who == "staff_moderator":
+        user = UserFactory.create(staff=True)
         user.groups.add(Group.objects.get(name=roles.EVENT_MODERATORS))
     else:
         user = editor_user(who)
