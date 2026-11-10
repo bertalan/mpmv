@@ -1,12 +1,11 @@
 """Who may enter which Manager space, and the per-request actor (CORE.17, spec 02 §Backoffice).
 
 - Shop space: vendor members (owner or staff, CORE.2), on one selected vendor.
-- Platform space: platform staff, meaning a user who holds a dedicated platform permission
-  (spec 02 Q-34). Wagtail or Django admin access (`is_staff`) never counts, and neither does
-  superuser status (spec 02 CORE.18: the technical superuser holds no Manager section without a
-  role). Until CORE.18 adds the staff roles, the only such permission is the platform owner's
-  (`core.platform_owner`); CORE.18 replaces `is_platform_staff` with the role membership of
-  `roles.py`.
+- Platform space: platform staff, as defined by `apps.vendors.scoping.is_platform_staff()`: an
+  active user holding `vendors.view_all_vendors` (spec 02 Q-34). Wagtail or Django admin access
+  (`is_staff`) neither grants nor is needed for it. A superuser passes only with the permission
+  granted explicitly, not through Django's superuser rule (spec 02 CORE.18: the technical
+  superuser holds no Manager section without a role). CORE.18 adds the per-section role checks.
 
 Platform roles and vendor membership never mix (spec 02 Roles): a user who is both is let into
 neither space, so a data error never opens a side door between them. A vendor member with admin
@@ -17,10 +16,12 @@ platform side.
 from dataclasses import dataclass, field
 
 from django.contrib.auth.base_user import AbstractBaseUser
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.models import AnonymousUser, Permission
+from django.db.models import Q
 
-from apps.core.services import is_platform_owner
 from apps.vendors.models import Vendor, VendorMember
+from apps.vendors.scoping import PLATFORM_STAFF_PERMISSION
+from apps.vendors.scoping import is_platform_staff as holds_staff_permission
 from apps.vendors.services import is_vendor_member
 
 from .spaces import Space
@@ -29,10 +30,21 @@ type AnyUser = AbstractBaseUser | AnonymousUser
 
 
 def is_platform_staff(user: AnyUser) -> bool:
-    """Holds a dedicated platform permission; `is_staff` and superuser status do not count."""
-    if not (user.is_authenticated and user.is_active):
+    """`vendors.scoping.is_platform_staff()`, minus the implicit superuser pass.
+
+    `is_staff` does not count. A superuser needs the permission granted to them or to one of
+    their groups: Django's `has_perm` would grant it to every superuser.
+    """
+    if not (user.is_authenticated and user.is_active and holds_staff_permission(user)):
         return False
-    return is_platform_owner(user)
+    if not getattr(user, "is_superuser", False):
+        return True
+    app_label, codename = PLATFORM_STAFF_PERMISSION.split(".")
+    return Permission.objects.filter(
+        Q(user=user) | Q(group__user=user),
+        content_type__app_label=app_label,
+        codename=codename,
+    ).exists()
 
 
 def _has_admin_access(user: AnyUser) -> bool:

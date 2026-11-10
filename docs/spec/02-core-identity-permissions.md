@@ -97,6 +97,8 @@ def get_for_actor_or_404(qs, actor, **lookup):  # 404 (not 403) to prevent enume
   writes pages and blog posts in Wagtail sees no vendor's orders, customers or bank data.
   `apps/vendors/scoping.py` (`is_platform_staff`) checks this permission, not `is_staff`
   (CORE.8, part 1); a superuser passes it through Django's own superuser rule.
+  The Manager platform space (CORE.17) uses the same check, except that a superuser needs the
+  permission granted explicitly (the technical superuser holds no Manager section without a role).
 - **Mandatory negative tests** for every endpoint: "Vendor A requests Vendor B's object → 404".
 - Vendor documents (KYC, signed contracts, commission and payout statements) can be downloaded only from views that check permissions; never
   public URLs.
