@@ -175,3 +175,29 @@ def test_the_seeded_territory_found_is_the_most_specific(
     territory = services.find_territory(country, postcode)
     assert territory is not None
     assert territory.code == code
+
+
+def test_the_madeira_azores_reverse_keeps_a_rate_staff_entered_later() -> None:
+    import datetime as dt
+    from decimal import Decimal
+    from importlib import import_module
+
+    from django.apps import apps
+
+    from apps.tax.models import TaxRate
+
+    migration = import_module("apps.tax.migrations.0008_seed_madeira_azores")
+    madeira = Territory.objects.get(code="PT-MA")
+    seeded = TaxRate.objects.get(territory=madeira, category="standard")
+    TaxRate.objects.filter(pk=seeded.pk).update(valid_to=dt.datetime(2027, 1, 1, tzinfo=dt.UTC))
+    TaxRate.objects.create(
+        country="PT",
+        territory=madeira,
+        category="standard",
+        rate=Decimal("22.00"),
+        source="manual",
+        valid_from=dt.datetime(2027, 1, 1, tzinfo=dt.UTC),
+    )
+    migration.unseed(apps, None)
+    assert TaxRate.objects.filter(territory=madeira, valid_from__year=2027).exists()
+    assert Territory.objects.filter(code="PT-MA").exists()

@@ -6,9 +6,16 @@ and requester; a cached answer is reused only when it was asked for the same req
 carries a number. Fail closed stays. VIES is reached through fakes of our `ViesClient` only.
 """
 
+import datetime as dt
+from typing import Any
+
 import pytest
+from django.contrib import admin
+from django.db import connection, transaction
+from django.db.utils import InternalError, ProgrammingError
 from django.utils import timezone
 
+from apps.core.tests.factories import PlatformOperatorFactory
 from apps.tax import engine, services
 from apps.tax.engine import ViesAnswer, ViesQuery
 from apps.tax.models import VatValidation
@@ -106,3 +113,124 @@ def test_a_recent_unavailable_answer_is_reused_so_an_outage_does_not_stall_check
     check = services.verify_vat_number("DE", "DE123456789", client=client, requester=VENDOR)
     assert check.from_cache is True
     assert check.verified is False
+
+
+def test_the_default_requester_is_the_operators_and_is_recorded_as_sent() -> None:
+    """Review 1: the row never shows an empty requester for an operator-issued number."""
+    operator = PlatformOperatorFactory.create(country="AT", vat_number="ATU12345678")
+    client = RequesterAwareClient()
+    check = services.verify_vat_number("DE", "DE123456789", client=client)
+    assert [r.full_number for r in client.requesters if r] == ["ATU12345678"]
+    row = check.validation
+    assert row is not None
+    assert (row.requester, row.requester_kind) == ("ATU12345678", "operator")
+    assert operator.vat_number == "ATU12345678"
+
+
+def test_a_vendor_requester_is_recorded_as_vendor_proof() -> None:
+    check = services.verify_vat_number(
+        "DE", "DE123456789", client=RequesterAwareClient(), requester=VENDOR
+    )
+    assert check.snapshot()["requester_kind"] == "vendor"
+
+
+def test_no_operator_and_no_vendor_records_an_anonymous_check() -> None:
+    check = services.verify_vat_number("DE", "DE123456789", client=RequesterAwareClient())
+    assert check.snapshot()["requester_kind"] == ""
+    assert check.snapshot()["requester"] == ""
+
+
+def test_a_vendor_without_a_valid_vat_number_has_no_vendor_proof() -> None:
+    """Review 2: no silent fallback; the caller sees None and the log says operator proof."""
+    assert services.vendor_requester("IT", "") is None
+    assert services.vendor_requester("IT", "not a vat number") is None
+    assert services.vendor_requester("IT", "IT01234567897") == VENDOR
+    PlatformOperatorFactory.create(country="AT", vat_number="ATU12345678")
+    check = services.verify_vat_number(
+        "DE",
+        "DE123456789",
+        client=RequesterAwareClient(),
+        requester=services.vendor_requester("IT", ""),
+    )
+    assert check.snapshot()["requester_kind"] == "operator"  # i.e. "no vendor proof"
+
+
+def test_the_vies_request_date_is_stored_next_to_the_local_time() -> None:
+    class Dated(RequesterAwareClient):
+        def check(self, query: ViesQuery, *, requester: ViesQuery | None = None) -> ViesAnswer:
+            return ViesAnswer(
+                result=engine.VAT_VALID,
+                request_id="WAPIDATE",
+                request_date="2026-11-10T12:30:45.000+01:00",
+            )
+
+    row = services.verify_vat_number(
+        "DE", "DE123456789", client=Dated(), requester=VENDOR
+    ).validation
+    assert row is not None
+    assert row.vies_request_date == dt.datetime(2026, 11, 10, 11, 30, 45, tzinfo=dt.UTC)
+
+
+def test_an_invalid_requester_has_its_own_detail_a_warning_and_a_long_negative_cache(
+    caplog: pytest.LogCaptureFixture, settings: Any
+) -> None:
+    class Rejecting(RequesterAwareClient):
+        def check(self, query: ViesQuery, *, requester: ViesQuery | None = None) -> ViesAnswer:
+            self.calls.append(query)
+            return ViesAnswer(result=engine.VAT_UNAVAILABLE, detail=engine.DETAIL_INVALID_REQUESTER)
+
+    client = Rejecting()
+    with caplog.at_level("WARNING"):
+        check = services.verify_vat_number("DE", "DE123456789", client=client, requester=VENDOR)
+    assert check.verified is False
+    assert check.detail == engine.DETAIL_INVALID_REQUESTER
+    assert "IT01234567897" in caplog.text
+    # an hour later (past the 5 minute outage cache) the same vendor is still not asked again
+    VatValidation.objects.filter().count()
+    row = check.validation
+    assert row is not None
+    assert row.detail == engine.DETAIL_INVALID_REQUESTER
+    again = services.verify_vat_number("DE", "DE123456789", client=client, requester=VENDOR)
+    assert again.from_cache is True
+    assert len(client.calls) == 1
+
+
+def test_vies_requester_error_code_is_read_as_invalid_requester() -> None:
+    answer = engine.read_vies_answer(
+        engine.vies_query("DE", "DE123456789"),
+        {"errorWrappers": [{"error": "INVALID_REQUESTER_INFO"}]},
+    )
+    assert (answer.result, answer.detail) == (
+        engine.VAT_UNAVAILABLE,
+        engine.DETAIL_INVALID_REQUESTER,
+    )
+
+
+def test_an_overlong_requester_does_not_make_the_check_raise() -> None:
+    long = ViesQuery("IT", "IT", "1" * 60)
+    check = services.verify_vat_number(
+        "DE", "DE123456789", client=RequesterAwareClient(), requester=long
+    )
+    assert check.validation is not None
+
+
+def test_the_log_is_append_only_in_the_database() -> None:
+    row = VatValidationFactory.create()
+    for sql in ("UPDATE tax_vatvalidation SET name = 'x'", "DELETE FROM tax_vatvalidation"):
+        with (
+            pytest.raises((InternalError, ProgrammingError)),
+            transaction.atomic(),
+            connection.cursor() as cursor,
+        ):
+            cursor.execute(sql)
+    assert VatValidation.objects.filter(pk=row.pk).exists()
+    with pytest.raises(PermissionError):
+        VatValidation.objects.filter(pk=row.pk).first().save()  # type: ignore[union-attr]
+    assert VatValidation.objects.filter(pk=row.pk).exists()
+
+
+def test_the_admin_shows_the_requester_read_only() -> None:
+    model_admin = admin.site._registry[VatValidation]
+    for name in ("requester", "requester_kind", "vies_request_date"):
+        assert name in model_admin.readonly_fields
+    assert "requester" in model_admin.list_display
