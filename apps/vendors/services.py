@@ -17,7 +17,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.sessions.backends.base import SessionBase
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, connection, transaction
-from django.db.models import OuterRef, QuerySet, Subquery
+from django.db.models import OuterRef, ProtectedError, QuerySet, Subquery
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.module_loading import import_string
@@ -1885,11 +1885,19 @@ def _logo_snapshot(logo: Any, alt: str) -> dict[str, Any]:
 
 def vendor_logo_collection(vendor: Vendor) -> ImageCollection:
     """The vendor's own image collection `vendor-<public id>` (created on first use, under the
-    root; no group permissions, so only the superuser sees it in the Wagtail admin). Call it
-    with the vendor row locked: two uploads at once would otherwise make two collections."""
+    root; no group permissions, so only the superuser sees it in the Wagtail admin).
+
+    Call it with the vendor row locked (the same vendor twice) and it also locks the root
+    collection row: the collections are one shared tree, so two vendors' first uploads would
+    otherwise compute the same child path. Found by name among the root's children, the oldest
+    first: staff can rename or duplicate collections in the Wagtail admin, and a duplicate never
+    changes which one an upload goes to.
+    """
     name = f"vendor-{vendor.public_id}"
-    root = ImageCollection.get_first_root_node()
-    found = root.get_children().filter(name=name).first()
+    root = ImageCollection.objects.select_for_update().get(
+        pk=ImageCollection.get_first_root_node().pk
+    )
+    found = root.get_children().filter(name=name).order_by("pk").first()
     return found if found is not None else root.add_child(name=name)
 
 
@@ -1898,11 +1906,14 @@ def _new_logo_image(
 ) -> MediaImage:
     """The unsaved image for `upload`, validated by `MediaImage.clean` (SEC.2: content checks,
     caps, safe name; the file is re-encoded when saved). Own work of the vendor."""
+    licence = ImageLicence.objects.filter(code=LOGO_LICENCE_CODE).first()
+    if licence is None:  # the seeded allow list (core migration 0013) is incomplete
+        raise ValidationError({"logo": "Logos cannot be uploaded right now: contact support."})
     image = MediaImage(
         title=f"Logo of {vendor.display_name}"[:255],
         file=upload,
         collection=collection,
-        licence=ImageLicence.objects.get(code=LOGO_LICENCE_CODE),
+        licence=licence,
         author=vendor.display_name[:200],
         uploaded_by_user=actor,
     )
@@ -1932,40 +1943,68 @@ def set_vendor_logo(
     the logo and alt text before and after. It counts against the profile save limits.
     """
     alt = alt.strip()
-    with transaction.atomic():
-        locked = _lock_profile_vendor(vendor, actor)
-        problem = engine.logo_alt_errors(alt)
-        if problem:
-            raise ValidationError({"logo_alt": problem})
-        if upload is None and locked.logo is None:
-            raise ValidationError({"logo": "Choose an image."})
-        before = _logo_snapshot(locked.logo, locked.logo_alt)
-        image = locked.logo
-        if upload is not None:
-            collection = ImageCollection.get_first_root_node() if dry_run else None
-            collection = collection or vendor_logo_collection(locked)
-            image = _new_logo_image(locked, upload, actor, collection)
-        after = _logo_snapshot(image if upload is None else _PendingImage(), alt)
-        changes = ChangeSet()
-        changes.update(MODEL_LABEL, str(vendor.public_id), before, after)
-        if dry_run or changes.is_empty:
-            return changes
+    spent = False
+    if upload is not None and not dry_run:
+        # A refused file costs decode work: count every attempt, in its own transaction so that
+        # the refusal below does not roll the count back.
+        if not has_vendor_permission(actor, vendor, "profile"):
+            raise PermissionDenied("Only the vendor owner edits the storefront profile.")
         _spend_profile_budget(actor, vendor)
-        previous = locked.logo
-        if upload is not None:
-            image.save()  # type: ignore[union-attr]
-            after = _logo_snapshot(image, alt)
+        spent = True
+    stored: tuple[Any, str] | None = None
+    try:
+        with transaction.atomic():
+            locked = _lock_profile_vendor(vendor, actor)
+            problem = engine.logo_alt_errors(alt)
+            if problem:
+                raise ValidationError({"logo_alt": problem})
+            if upload is None and locked.logo is None:
+                raise ValidationError({"logo": "Choose an image."})
+            before = _logo_snapshot(locked.logo, locked.logo_alt)
+            image = locked.logo
+            if upload is not None:
+                collection = ImageCollection.get_first_root_node() if dry_run else None
+                collection = collection or vendor_logo_collection(locked)
+                image = _new_logo_image(locked, upload, actor, collection)
+            after = _logo_snapshot(image if upload is None else _PendingImage(), alt)
             changes = ChangeSet()
             changes.update(MODEL_LABEL, str(vendor.public_id), before, after)
-        Vendor.objects.filter(pk=vendor.pk).update(
-            logo=image, logo_alt=alt, updated_at=timezone.now()
-        )
-        audit_changes(changes, ctx=ctx, action=LOGO_CHANGED)
-        if upload is not None and previous is not None:
-            previous.delete()
-        _notify_profile_changed(vendor, "all languages", ["logo"])
+            if dry_run or changes.is_empty:
+                return changes
+            if not spent:
+                _spend_profile_budget(actor, vendor)
+            previous = locked.logo
+            if upload is not None:
+                image.save()  # type: ignore[union-attr]
+                stored = (image.file.storage, image.file.name)  # type: ignore[union-attr]
+                after = _logo_snapshot(image, alt)
+                changes = ChangeSet()
+                changes.update(MODEL_LABEL, str(vendor.public_id), before, after)
+            Vendor.objects.filter(pk=vendor.pk).update(
+                logo=image, logo_alt=alt, updated_at=timezone.now()
+            )
+            audit_changes(changes, ctx=ctx, action=LOGO_CHANGED)
+            if upload is not None and previous is not None:
+                _discard_logo_image(previous, vendor)
+            _notify_profile_changed(vendor, "all languages", ["logo"])
+    except BaseException:
+        if stored is not None:  # the row rolls back; the file would stay on disk
+            stored[0].delete(stored[1])
+        raise
     vendor.logo, vendor.logo_alt = image, alt
     return changes
+
+
+def _discard_logo_image(image: MediaImage, vendor: Vendor) -> None:
+    """Delete a replaced or removed logo image, unless something else still uses it (another
+    vendor, or a protected reference): then it is only unlinked from `vendor`."""
+    if Vendor.objects.filter(logo=image).exclude(pk=vendor.pk).exists():
+        return
+    try:
+        with transaction.atomic():  # a savepoint: a protected row must not poison the caller's
+            image.delete()
+    except ProtectedError:
+        logger.info("logo image %s is still referenced: kept", image.pk)
 
 
 def remove_vendor_logo(
@@ -1991,7 +2030,7 @@ def remove_vendor_logo(
             logo=None, logo_alt="", updated_at=timezone.now()
         )
         audit_changes(changes, ctx=ctx, action=LOGO_CHANGED)
-        previous.delete()
+        _discard_logo_image(previous, vendor)
     vendor.logo, vendor.logo_alt = None, ""
     return changes
 
