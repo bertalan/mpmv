@@ -129,7 +129,7 @@ def _prompt(request: HttpRequest, action: str, group: int, digest: str) -> HttpR
             "group": group,
             "digest": digest,
             "can_elevate": can_elevate,
-            "can_do_once": can_elevate and group == session_policy.GROUP_OPERATIONAL,
+            "can_do_once": can_elevate,
             "has_passkey": levels.has_passkey(request.user),
             "replay_method": request.method,
             "replay_url": request.get_full_path(),
@@ -149,7 +149,9 @@ def requires_level[**P](action: str) -> Callable[[View[P]], View[P]]:
        (a fresh passkey authorises this action with these parameters, once, about 2 minutes) or
        "Switch to operational mode";
     3. operational mode and, per action, a passkey verification no older than
-       `MFA_STEP_UP_MAX_AGE` (a code does not count), even inside operational mode.
+       `MFA_STEP_UP_MAX_AGE` (a code does not count), even inside operational mode. In
+       restricted mode it can also be done once, each time with a fresh passkey assertion with
+       user verification made for that grant (never one from an earlier login or elevation).
 
     Stack it with `step_up_required` where the view must also confirm a recent second factor.
     """
@@ -167,9 +169,7 @@ def requires_level[**P](action: str) -> Callable[[View[P]], View[P]]:
                 return view(request, *args, **kwargs)
             digest = levels.params_digest(request)
             if levels.current_level(request) != levels.OPERATIONAL:
-                if group == session_policy.GROUP_OPERATIONAL and levels.consume_single(
-                    request, action, digest
-                ):
+                if levels.consume_single(request, action, digest):
                     return view(request, *args, **kwargs)
                 return _prompt(request, action, group, digest)
             if group == session_policy.GROUP_PASSKEY and not is_recently_passkey_verified(request):

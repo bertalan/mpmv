@@ -70,6 +70,9 @@ def _require_elevate(request: HttpRequest) -> None:
         raise PermissionDenied
 
 
+# Groups 2 and 3 may be done once; group 3 only with its own fresh passkey assertion with user
+# verification (every `_assert` requires it, bound to this action and digest, single use, 120 s).
+ONCE_GROUPS = (2, 3)
 DIGEST = re.compile(r"[0-9a-f]{64}")
 
 
@@ -119,7 +122,7 @@ def once_options(request: HttpRequest) -> JsonResponse:
         return _bad_request("an action and its parameters digest are required")
     if not DIGEST.fullmatch(digest):
         return _bad_request("the parameters digest must be 64 lowercase hex characters")
-    if levels.policy().group_of(action) != 2:
+    if levels.policy().group_of(action) not in ONCE_GROUPS:
         return _bad_request("this action cannot be done once")
     return _options(request, levels.SINGLE_CHALLENGE_KEY, {"action": action, "digest": digest})
 
@@ -137,7 +140,9 @@ def once(request: HttpRequest) -> JsonResponse:
     result = _assert(request, levels.SINGLE_CHALLENGE_KEY)
     if isinstance(result, JsonResponse):
         return result
-    if levels.policy().group_of(result["action"]) != 2:  # the policy may have changed meanwhile
+    if (
+        levels.policy().group_of(result["action"]) not in ONCE_GROUPS
+    ):  # the policy may have changed meanwhile
         return _bad_request("this action cannot be done once")
     levels.grant_single(request, result["action"], result["digest"])
     return JsonResponse({"granted": True})

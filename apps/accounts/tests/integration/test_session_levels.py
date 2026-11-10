@@ -347,12 +347,95 @@ def test_group_3_passes_after_a_fresh_passkey(client: Client) -> None:
     assert client.get(reverse("test-payout")).status_code == 200
 
 
-def test_group_3_is_refused_in_restricted_mode_with_no_do_it_once(client: Client) -> None:
+def test_group_3_is_refused_in_restricted_mode_and_offers_do_it_once(client: Client) -> None:
     user, _ = _staff_with_passkey()
     _restricted_session(client, user)
     refused = client.get(reverse("test-payout"))
     assert refused.status_code == 403
+    assert "Do it once" in refused.content.decode()
+
+
+def _group3_options(client: Client, refusal: Any) -> Any:
+    return _post(
+        client,
+        "levels:once_options",
+        {"action": refusal.context["action"], "digest": refusal.context["digest"]},
+    )
+
+
+def test_a_group_3_one_off_needs_a_fresh_user_verified_assertion(client: Client) -> None:
+    user, authenticator = _staff_with_passkey()
+    _restricted_session(client, user)
+    refused = client.get(reverse("test-payout"))
+    options = _group3_options(client, refused)
+    assert options.status_code == 200
+    credential = authenticator.get(options.json()["publicKey"])
+    assert _post(client, "levels:once", {"credential": credential}).status_code == 200
+    assert client.get(reverse("test-payout")).status_code == 200
+    assert client.get(reverse("test-payout")).status_code == 403  # single use
+    assert not _actions(levels.SESSION_STARTED)  # still restricted
+    granted = [_after(r) for r in _actions(levels.SINGLE_GRANTED)]
+    assert [(g["kind"], g["action"]) for g in granted] == [("single", "payout_details")]
+    assert [_after(r)["action"] for r in _actions(levels.SINGLE_USED)] == ["payout_details"]
+
+
+def test_a_group_3_one_off_refuses_an_assertion_without_user_verification(
+    client: Client,
+) -> None:
+    user, authenticator = _staff_with_passkey()
+    _restricted_session(client, user)
+    refused = client.get(reverse("test-payout"))
+    options = _group3_options(client, refused).json()["publicKey"]
+    credential = authenticator.get(options, user_verified=False)
+    assert _post(client, "levels:once", {"credential": credential}).status_code == 400
+    assert client.get(reverse("test-payout")).status_code == 403
+
+
+def test_an_earlier_login_or_elevation_does_not_authorise_a_group_3_one_off(
+    client: Client,
+) -> None:
+    user, authenticator = _staff_with_passkey()
+    _restricted_session(client, user)
+    assert _elevate(client, authenticator).status_code == 200  # fresh UV passkey, operational
+    assert client.post(reverse("levels:end")).status_code == 302  # back to restricted
+    assert client.get(reverse("test-payout")).status_code == 403  # nothing carried over
+
+
+def test_a_group_3_one_off_assertion_cannot_be_replayed(client: Client) -> None:
+    user, authenticator = _staff_with_passkey()
+    _restricted_session(client, user)
+    refused = client.get(reverse("test-payout"))
+    options = _group3_options(client, refused).json()["publicKey"]
+    credential = authenticator.get(options)
+    assert _post(client, "levels:once", {"credential": credential}).status_code == 200
+    assert _post(client, "levels:once", {"credential": credential}).status_code == 400
+    assert client.get(reverse("test-payout")).status_code == 200
+    assert client.get(reverse("test-payout")).status_code == 403
+
+
+def test_a_group_2_grant_does_not_open_a_group_3_action(client: Client) -> None:
+    user, authenticator = _staff_with_passkey()
+    _restricted_session(client, user)
+    _do_it_once(client, authenticator, client.get(reverse("test-export")))
+    assert client.get(reverse("test-payout")).status_code == 403
+
+
+def test_a_group_3_one_off_expires_after_about_two_minutes(client: Client) -> None:
+    from apps.accounts.models import ElevationGrant
+
+    user, authenticator = _staff_with_passkey()
+    _restricted_session(client, user)
+    _do_it_once(client, authenticator, client.get(reverse("test-payout")))
+    ElevationGrant.objects.update(expires_at=timezone.now() - dt.timedelta(seconds=1))
+    assert client.get(reverse("test-payout")).status_code == 403
+
+
+def test_a_group_3_one_off_needs_the_elevate_permission(client: Client) -> None:
+    user, _ = _staff_with_passkey(elevate=False)
+    _restricted_session(client, user)
+    refused = client.get(reverse("test-payout"))
     assert "Do it once" not in refused.content.decode()
+    assert _group3_options(client, refused).status_code == 403
 
 
 # --- Tunable without code, audit of prompts
@@ -635,12 +718,12 @@ def test_a_challenge_for_one_action_cannot_start_operational_mode(client: Client
     assert client.get(reverse("test-backup")).status_code == 403
 
 
-def test_once_is_refused_for_an_action_that_is_not_group_2(client: Client) -> None:
+def test_once_is_refused_for_a_free_action(client: Client) -> None:
+    _configure(actions={"restricted": ["export"]})
     user, _ = _staff_with_passkey()
     _restricted_session(client, user)
-    for action in ("payout_details", "catalogue_edit"):
-        response = _post(client, "levels:once_options", {"action": action, "digest": "d"})
-        assert response.status_code == 400
+    response = _post(client, "levels:once_options", {"action": "export", "digest": "d" * 64})
+    assert response.status_code == 400
 
 
 def test_re_elevating_does_not_extend_the_two_hour_cap(client: Client) -> None:

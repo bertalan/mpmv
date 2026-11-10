@@ -7,7 +7,7 @@ buttons do nothing and say so.{% endcomment %}
 <h1>This needs Operational mode</h1>
 <p>You are in Secure mode. This action ({{ action }}) is not available there.</p>
 {% if group == 3 %}
-<p>It also asks for a passkey of its own, even in Operational mode.</p>
+<p>It also asks for a passkey of its own, even in Operational mode, and again each time you do it once.</p>
 {% endif %}
 {% if can_elevate %}
   {% if can_do_once %}
