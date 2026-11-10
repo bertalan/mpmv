@@ -1,4 +1,4 @@
-# 16 — The garage: a personalised catalogue by what the customer owns
+# 17 — The garage: a personalised catalogue by what the customer owns
 
 > **Status: proposal under review (D-38).** Written by lane-b as an independent design from the
 > owner's idea (issue #86, comments of 2026-11-10) so that lane-a can compare it with its own and
@@ -7,7 +7,7 @@
 > "make", "model", "variant" and "year range". A vertical theme or the operator's configuration
 > supplies the real nouns.
 
-## 16.1 The idea and the principles
+## 17.1 The idea and the principles
 
 The owner's idea: ask the customer which item they own or prefer (the make and model of a
 vehicle, device or piece of equipment) and show only the products, articles and other content
@@ -38,15 +38,15 @@ Design principles (each one is argued in the sections that follow):
 - **Vendors own the fitment claims**, the platform checks their shape and shows them as "declared
   by the seller".
 
-Summary of what this proposal asks lane-a to decide, in one place (full list in §16.12):
+Summary of what this proposal asks lane-a to decide, in one place (full list in §17.12):
 a new app `fitment`, a new prefix `FIT`, phase P2 (after go-live) with the legacy `compatibility`
 taxonomy carried over as plain terms until then, filter over ranking, anonymous garage in one
 first-party cookie under the user-interface-customisation exemption pending counsel, no per-node
 generated pages.
 
-## 16.2 Data model
+## 17.2 Data model
 
-### 16.2.1 Where it lives
+### 17.2.1 Where it lives
 
 A new app `apps/fitment/` (taxonomy, product declarations, matching engine, garage profiles).
 Why not extend the existing configurable `Taxonomy`/`Term` of the catalog
@@ -67,9 +67,9 @@ App graph (spec 01 §1.3), no cycle: `accounts --> fitment`, `catalog --> fitmen
 `fitment --> cms`, `fitment --> events`, `fitment --> seo`, `ingest --> fitment`. The catalog does not
 import `fitment`: CAT.8 and CAT.9 expose a small **listing predicate registry** (the same pattern as
 `catalog/publishing.py` for compliance), and `fitment` registers its predicate at start-up. `tax`,
-`shipping` and `orders` never import it (an order never stores the garage, §16.4.6).
+`shipping` and `orders` never import it (an order never stores the garage, §17.4.6).
 
-### 16.2.2 The scheme: levels and nodes
+### 17.2.2 The scheme: levels and nodes
 
 ```python
 class FitmentLevel(Model):  # the operator's scheme: ordered levels, 1 to 4 node levels
@@ -91,7 +91,7 @@ class FitmentScheme(Model):  # singleton per installation
     year_enabled = BooleanField()  # whether a year or year range exists in this sector
     year_min = SmallIntegerField()
     year_max_offset = SmallIntegerField()  # e.g. 1900 and +2 years
-    contains_special_category = BooleanField(default=False)  # §16.4.5: forces session-only storage
+    contains_special_category = BooleanField(default=False)  # §17.4.5: forces session-only storage
     max_profiles = PositiveSmallIntegerField(default=10)
 
 
@@ -101,8 +101,8 @@ class FitmentNode(MP_Node):  # treebeard tree: depth = level position
     sort_key = CharField()  # natural sort ("Model 9" before "Model 10")
     status = CharField(choices=["proposed", "active", "retired"])
     source = FK(FitmentSource, null=True)
-    external_ref = CharField(null=True)  # §16.3.5
-    editorial_page = FK("wagtailcore.Page", null=True, on_delete=SET_NULL)  # hub article, §16.5.4
+    external_ref = CharField(null=True)  # §17.3.5
+    editorial_page = FK("wagtailcore.Page", null=True, on_delete=SET_NULL)  # hub article, §17.5.4
     # + FitmentNodeTranslation(language, name) only used when level.translate_names is true
 
 
@@ -124,9 +124,9 @@ class FitmentNodeAlias(
   under it is refused (the operator merges or retires nodes first).
 - Nodes are edited by the Catalog and moderation role in the Manager platform space: CRUD, merge
   (references moved in one transaction, the old node id answering as an alias for profiles), retire
-  (kept in old profiles, hidden from pickers), and the review queue of proposals (§16.3.2).
+  (kept in old profiles, hidden from pickers), and the review queue of proposals (§17.3.2).
 
-### 16.2.3 How a product declares what it fits
+### 17.2.3 How a product declares what it fits
 
 ```python
 class ProductFitmentState(Model):  # one row per product that has any declaration
@@ -173,10 +173,10 @@ Reading the rules:
   `check`, never `fits`: the garage must not claim certainty it does not have.
 - `universal` items answer `fits` for every profile, and they are **never hidden** by the filter.
 - `undeclared` items in a relevant category are hidden by an active garage, but disclosed
-  ("N more items have no fitment information", §16.5.1), so the vendor's gap is visible to the
+  ("N more items have no fitment information", §17.5.1), so the vendor's gap is visible to the
   customer and to the vendor's data-quality report, never silent.
 
-### 16.2.4 Validation rules (service level, shared by every entry path)
+### 17.2.4 Validation rules (service level, shared by every entry path)
 
 - the node exists and is `active` (a row on a `proposed` node is stored inactive until approved);
 - `year_from <= year_to`, both inside the scheme's allowed range;
@@ -188,9 +188,9 @@ Reading the rules:
 - publish gate (setting per category, default off): a `buy` product in a fitment-relevant category
   cannot be published with `mode=undeclared`.
 
-## 16.3 How vendors fill it
+## 17.3 How vendors fill it
 
-### 16.3.1 Manager shop space (CORE.9, CAT.19)
+### 17.3.1 Manager shop space (CORE.9, CAT.19)
 
 A "Fits" tab on the product form in `/manager/shop/products/`:
 
@@ -208,7 +208,7 @@ Vendors only see and edit their own products (CORE.3 tenant isolation). The serv
 `AuditLog` entry for a replace of more than one row, bumps `rows_version` and refreshes
 `always_visible`.
 
-### 16.3.2 A node the vendor cannot find
+### 17.3.2 A node the vendor cannot find
 
 Same pattern as brands (CAT.20): the vendor *proposes* a node (parent, name), it stays `proposed`
 and its rows inactive until Catalog and moderation approves, merges it into an existing node
@@ -217,7 +217,7 @@ on pending proposals per vendor (setting, default 20) applies; proposals arrivin
 are grouped into one batch per run, reviewed together, outside that limit. Vendors are never free to
 create nodes directly: a node is shared by every vendor and by the customers' profiles.
 
-### 16.3.3 Bulk CSV
+### 17.3.3 Bulk CSV
 
 Headers use the **level codes of the scheme**, so the format is the same in every sector:
 
@@ -232,13 +232,13 @@ A-200;universal;;;;;;
 - Load mode `replace` (default: the file is the full truth for the SKUs it names) or `add`.
 - Names are matched after NFC, case and punctuation normalisation against node names and aliases;
   unmatched names do not create nodes: they become review items (and, for a trusted source, a
-  batch proposal as in §16.3.2).
+  batch proposal as in §17.3.2).
 - Always a dry run first: a report of rows read, matched, unmatched, rejected (with the line and the
   reason), and the ChangeSet. Set-based upsert through a staging table, limits of 500 000 rows and
   50 MB per file, processed as a background task (ARC.9) with progress.
 - The same module exports a vendor's fitment as the same CSV (round trip test, like SHP.14).
 
-### 16.3.4 The import pipeline (ING)
+### 17.3.4 The import pipeline (ING)
 
 - `MappingTable` gets a kind `fitment`: the supplier's own make/model strings (and codes) map to
   nodes, per vendor, with aliases (ING.1).
@@ -250,7 +250,7 @@ A-200;universal;;;;;;
 - Row provenance: `source` is kept per row. A feed refresh replaces only `feed` rows. A `manual` or `csv`
   row is never overwritten by a feed (consistent with D-14's "local fields").
 
-### 16.3.5 Standard reference data (later, optional)
+### 17.3.5 Standard reference data (later, optional)
 
 `FitmentSource(code, name, licence, version)` and `FitmentNode.external_ref` let the operator load a
 reference catalogue of makes, models and generations (a standards body or a licensed data
@@ -260,9 +260,9 @@ sui generis right, Directive 96/9/EC; the licence decides what may be stored and
 interface can later supply product-to-node compatibility lists keyed by MPN. It is a P3 row (FIT.16)
 so that nothing depends on buying data; the manual and CSV paths work alone.
 
-## 16.4 The garage
+## 17.4 The garage
 
-### 16.4.1 Profiles
+### 17.4.1 Profiles
 
 ```python
 class GarageProfile(Model):
@@ -288,7 +288,7 @@ class GarageProfile(Model):
   merge; retired: the profile stays, shown with a note "this item is no longer in the catalogue",
   and matching treats it as before).
 
-### 16.4.2 The anonymous garage
+### 17.4.2 The anonymous garage
 
 Anonymous visitors can use the garage without an account. The proposal is **one first-party
 cookie, written only after an explicit user action** (pressing *Save* in the chooser), never at
@@ -327,7 +327,7 @@ without it) and `off` (anonymous garage works for the current visit only, kept i
 cookie that falls under the same exemption). Counsel confirms `exempt` before go-live (⚖️, open
 question Q-G1).
 
-### 16.4.3 Merge on login or sign-up
+### 17.4.3 Merge on login or sign-up
 
 When a visitor with an anonymous garage signs in or creates an account:
 
@@ -344,7 +344,7 @@ At sign-out the garage cookie is cleared if (and only if) it was created from th
 profile; a signed-in user's profiles live in the database, not in a cookie. The signed-in garage
 needs no cookie at all.
 
-### 16.4.4 The always-visible state
+### 17.4.4 The always-visible state
 
 On every list that the garage filters (category, taxonomy, brand, vendor storefront, search, product
 grids, blog index, event list) a region labelled "Garage" shows above the results:
@@ -361,12 +361,12 @@ grids, blog index, event list) a region labelled "Garage" shows above the result
 - The state changes only by an explicit action (a button or a form), which posts, redirects and
   announces the new state in a polite live region ("Garage reset: showing all items"). It
   never changes because of navigation, a link in an email, a shared URL or a crawler. There is **no
-  URL parameter** for any of it (§16.6).
+  URL parameter** for any of it (§17.6).
 - No pop-up on arrival. A discreet, dismissible *Add your garage* line appears on listings and
   product pages for a visitor who has none; dismissing it hides it for the session. It never covers
   content, steals focus or repeats (dark patterns, DSA article 25).
 
-### 16.4.5 GDPR
+### 17.4.5 GDPR
 
 - **Is a garage personal data?** Linked to an account, yes: it is information relating to an
   identifiable person, and it can reveal something about them (what they own and use).
@@ -381,7 +381,7 @@ grids, blog index, event list) a region labelled "Garage" shows above the result
   and manages themself; legitimate interest (6(1)(f)) is not needed. No consent is required for
   the filter itself.
 - **Purpose limitation (5(1)(b)).** The garage is used for three things only: filtering and the
-  fit check, the editorial links and the event tags (§16.5). It is **not** used for: advertising or
+  fit check, the editorial links and the event tags (§17.5). It is **not** used for: advertising or
   Merchant/Meta feeds, analytics events (the e-commerce events of SEO.5 carry no make, model or
   garage field), marketing emails, search ranking, price or shipping differences, vendor lead
   generation, or sharing with vendors. Vendors never see a customer's garage. A "new items for your
@@ -400,7 +400,7 @@ grids, blog index, event list) a region labelled "Garage" shows above the result
   deletion is one click, nothing is sent to third parties, logs and analytics do not carry it.
   A DPIA screening note is recorded (low risk, small-scale, no special category by default).
 
-### 16.4.6 Orders do not store the garage
+### 17.4.6 Orders do not store the garage
 
 A fit check is shown at the point of choosing, not written to the order. Orders keep the existing
 snapshots (price, tax, commission rule) and nothing about the garage, so the account export does not
@@ -408,9 +408,9 @@ grow and no personal "what they own" data reaches the ledger or the vendors. If 
 policy later wants the shown fit answer kept as evidence on the order line, that is a separate
 decision with its own retention rule (open question Q-G6).
 
-## 16.5 How the garage is used
+## 17.5 How the garage is used
 
-### 16.5.1 Filter, not ranking (recommendation)
+### 17.5.1 Filter, not ranking (recommendation)
 
 Two designs were compared:
 
@@ -418,7 +418,7 @@ Two designs were compared:
 |---|---|---|
 | Predictability | deterministic, the same query gives the same set | order changes opaquely per person |
 | Customer control | clear: "N items fit", *show all* one click away | hard to see or undo |
-| Legal exposure | not a recommender (§16.9), no ranking parameters to disclose for consumers | needs ranking transparency (Omnibus, P2B, DSA 27) |
+| Legal exposure | not a recommender (§17.9), no ranking parameters to disclose for consumers | needs ranking transparency (Omnibus, P2B, DSA 27) |
 | Fairness to vendors | a vendor is visible if the fitment is declared, an auditable rule | an invisible weight |
 | Cost | one indexed predicate | scoring in every listing |
 | Failure mode | an undeclared item is hidden: mitigated by the disclosure line and the vendor data-quality report | a fitting item can be buried below non-fitting ones |
@@ -433,7 +433,7 @@ What is shown under an active garage in a fitment-relevant context:
 - `no` and `unknown` items are hidden and counted: *"128 of 940 items fit. 31 more have no fitment
   information. [Show all]"*.
 
-### 16.5.2 Listings and search
+### 17.5.2 Listings and search
 
 - CAT.8 listings (category, taxonomy, brand, vendor storefront) and CMS.10 product grids accept the
   registered predicate; the active garage is read from the request context (user or cookie), never
@@ -445,7 +445,7 @@ What is shown under an active garage in a fitment-relevant context:
 - The result count and the "N of M" figures come from the same query shape (one extra count).
 - Search suggestions (autocomplete) do not use the garage in v1.
 
-### 16.5.3 Product page: "Does it fit?"
+### 17.5.3 Product page: "Does it fit?"
 
 The product page is **always reachable** whatever the garage says: a link from a search engine, an
 email or another customer must not become a 404 or a different page.
@@ -461,7 +461,7 @@ email or another customer must not become a 404 or a different page.
 - The price, stock and the buy button are never affected by the answer. Buying an item flagged
   *does not fit* is possible (the customer may know better), with one inline note and no extra step.
 
-### 16.5.4 Editorial articles linked to fitment (owner input 1)
+### 17.5.4 Editorial articles linked to fitment (owner input 1)
 
 There are **no generated make or model pages.** A node has a public page only if an editor has
 written one.
@@ -485,7 +485,7 @@ written one.
 - Migration: the existing articles per model of the legacy site are loaded as blog posts (MIG.3)
   and an editor-assisted mapping links each to a node (FIT.15), with the report of unmatched ones.
 
-### 16.5.5 Events
+### 17.5.5 Events
 
 Events (spec 15) are sparse and local. Hiding them by garage would often give an empty list, so:
 
@@ -494,7 +494,7 @@ Events (spec 15) are sparse and local. Hiding them by garage would often give an
   and a checkbox *Only events for my garage* (off by default, remembered like the garage itself);
 - an event without nodes is general. Feeds (RSS, ICS, SEO.7) ignore the garage.
 
-### 16.5.6 Empty and edge states
+### 17.5.6 Empty and edge states
 
 - **Filter returns 0:** *"No items in this category fit <profile>."* with buttons *Show all items in
   this category*, *See where items that fit are* (the other categories with a count) and *Change
@@ -506,7 +506,7 @@ Events (spec 15) are sparse and local. Hiding them by garage would often give an
 - **Language switch** keeps the garage (nodes are language-neutral) and the labels follow the language.
 - **Pagination, sorting and other filters** compose with the garage as intersections.
 
-## 16.6 SEO
+## 17.6 SEO
 
 - **What is indexed:** products, categories, terms, brand pages, vendor storefronts and the
   **editorial hub articles per make and model** (owner input 1). The fitment summary on each
@@ -518,7 +518,7 @@ Events (spec 15) are sparse and local. Hiding them by garage would often give an
   carries the garage cookie or a signed-in session; a crawler has neither, so it always receives the
   generic page. The server never varies by user agent (that would be cloaking). Every list
   keeps a self-referencing canonical to its generic URL; the personalised HTML
-  carries the same canonical and `Cache-Control: private` (§16.7). The proposal deliberately does
+  carries the same canonical and `Cache-Control: private` (§17.7). The proposal deliberately does
   **not** add `noindex` on top of the canonical: the two signals together are contradictory, the
   canonical alone already points any stray copy at the generic page.
 - **Sitemap:** hub articles appear like any blog post with their hreflang; there is no sitemap
@@ -532,7 +532,7 @@ Events (spec 15) are sparse and local. Hiding them by garage would often give an
   from the commercial pages they describe (the owner's reason for writing them).
 - **Legacy URLs** of model articles keep their redirects through CAT.6 and MIG.11.
 
-## 16.7 Performance and caching (SEO.6)
+## 17.7 Performance and caching (SEO.6)
 
 **Recommendation: personalised responses are not shared-cacheable. Everything else keeps the
 anonymous page cache.**
@@ -581,7 +581,7 @@ WHERE ps.always_visible
   purges the product page and the hub article of the affected nodes through the existing
   publish-time invalidation (SEO.6).
 
-## 16.8 Internationalisation
+## 17.8 Internationalisation
 
 - Level labels, the garage noun, notes and the interface are translatable (gettext and
   `FitmentLevelTranslation`, `FitmentNote` translations through `TranslationModel`, I18N.2). The
@@ -598,11 +598,11 @@ WHERE ps.always_visible
 - Hub articles are wagtail-localize pages; a missing translation of an article never shows a
   fallback copy as another language's article (I18N.6 rules apply).
 
-## 16.9 EU rules
+## 17.9 EU rules
 
 | Rule | Does it apply | What the design does |
 |---|---|---|
-| **GDPR** (2016/679) | the account garage is personal data | §16.4.5: basis 6(1)(b), purposes limited, minimal data, retention, export and erasure, notice, no art. 22 decision, privacy by design, special-category switch |
+| **GDPR** (2016/679) | the account garage is personal data | §17.4.5: basis 6(1)(b), purposes limited, minimal data, retention, export and erasure, notice, no art. 22 decision, privacy by design, special-category switch |
 | **ePrivacy** art. 5(3) | storage on the terminal (the anonymous cookie, also `localStorage`) | explicit user action, no identifier, UI-customisation exemption (WP29 04/2012, EDPB 2/2023), `GARAGE_ANON_STORAGE` with a consent fallback, counsel check (Q-G1) |
 | **Omnibus** (2019/2161), Consumer Rights Directive art. 6(1)(ea) | main parameters of ranking of results presented after a search | Our reading: a filter the consumer chooses and can switch off is the consumer's own criterion, not a ranking the trader determines, and the order is unchanged. Nothing in this design boosts or demotes. To be safe the banner links to a "How the garage works" page, and the existing ranking page (CMP.5) states that fitment declaration affects what an active garage shows. **Counsel confirms (⚖️, Q-G2).** If a boost is ever added, art. 6(1)(ea) applies in full |
 | **P2B** (2019/1150) art. 5 and 7 | the garage changes vendors' exposure | yes, in practice: an undeclared item is hidden under an active garage. The ranking/exposure page (CMP.5) lists "declared fitment and `universal` status" as a parameter and says how it works; no preferential treatment of the operator's own items (art. 7), tested by FIT.8 |
@@ -612,19 +612,19 @@ WHERE ps.always_visible
 | **Database right** (96/9/EC) | only for FIT.16 reference data | licence stored with the data, no copying beyond it |
 | **Accessibility** (EAA, EN 301 549, WCAG 2.2 AA, CMP.7) | the whole UI | native `<select>` and `<button>` controls, visible labels, a polite live region for the state change (4.1.3), an explicit *Apply* instead of auto-submit on change (3.2.2), no drag, targets at least 24 px (2.5.8), the banner in text with an icon (1.4.1), focus returned to the banner after a change, consistent help link (3.2.6), the chooser state remembered so it is not asked twice (3.3.7), an axe and a keyboard e2e test of the whole flow |
 
-## 16.10 Alternatives rejected
+## 17.10 Alternatives rejected
 
-- **Ranking boost** (personalised sort): see §16.5.1.
+- **Ranking boost** (personalised sort): see §17.5.1.
 - **Generated landing pages per node** (programmatic SEO): the owner asked for editorial articles;
   generated pages would also create thin duplicate content and a URL explosion.
 - **Garage in the URL** (`?fits=...`): shareable but crawlable, cache-fragmenting, and it leaks
   the person's data in logs, referrers and screenshots.
-- **Reusing `Term` trees for fitment**: no years, no exclusions, no bulk path (§16.2.1).
+- **Reusing `Term` trees for fitment**: no years, no exclusions, no bulk path (§17.2.1).
 - **One server-side session record per anonymous visitor**: stores data we do not need.
 - **Client-side filtering of a cached page**: flash of unfiltered content, breaks without
   JavaScript, cannot paginate by fit, fails accessibility expectations.
 
-## 16.11 Regression and acceptance cases
+## 17.11 Regression and acceptance cases
 
 1. A product that fits Make One Model A 2016–2021 is `fits` for 2019, `no` for 2022, `check` when
    the profile is Model A with no year, and `check` for a make-only profile.
@@ -647,9 +647,9 @@ WHERE ps.always_visible
 11. A scheme change that would orphan nodes is refused; a node merge moves rows and profiles.
 12. A vendor CSV: dry run lists unmatched names; `replace` removes only the named SKUs' rows; a
     feed refresh never overwrites `manual` rows; AI-parsed fitment lands in review, not published.
-13. The EXPLAIN budget of §16.7 on the generated dataset.
+13. The EXPLAIN budget of §17.7 on the generated dataset.
 
-## 16.12 Open owner questions
+## 17.12 Open owner questions
 
 | ID | Question | Proposal |
 |---|---|---|
@@ -658,13 +658,13 @@ WHERE ps.always_visible
 | Q-G3 | Priority and timing: P2 (after go-live), with the legacy `compatibility` terms carried as terms through cutover? Or P1, if the legacy shop's model articles and tag URLs must keep their traffic at once? | P2, FIT.15 right after go-live; MIG.11 keeps the legacy tag URLs meanwhile |
 | Q-G4 | Is the feature meaningful for the first vertical's whole range, or only some categories (`fitment_relevant` per category)? | Operator turns it on per category, default off |
 | Q-G5 | Undeclared items under an active garage: hidden and counted (proposal), or shown in a separate collapsed section? | Hidden and counted, with *Show all* |
-| Q-G6 | Should the fit answer shown at purchase be kept on the order line as dispute evidence? | No: orders never store the garage (§16.4.6) |
+| Q-G6 | Should the fit answer shown at purchase be kept on the order line as dispute evidence? | No: orders never store the garage (§17.4.6) |
 | Q-G7 | Level limits: at most 4 node levels and 3 anonymous profiles, 10 per account, 500 rows per product, 24 months inactivity: acceptable defaults? | Yes, all settings |
 | Q-G8 | Vendor liability wording for wrong fitment in the vendor contract and the return rule for "does not fit" items | Declared by the seller; the normal withdrawal right applies; a repeated wrong claim is a moderation case |
 | Q-G9 | Is a reference catalogue (licensed standard data) in scope at all, and who pays the licence? | No, FIT.16 is P3 and optional |
 | Q-G10 | A "new items for your garage" email or a personalised home block: wanted later? | Not in this proposal; each needs its own opt-in and decision |
 
-## 16.13 Tasks
+## 17.13 Tasks
 
 All rows are blocked by D-38 and start only after it is decided. IDs are checked against `main` and
 every open pull request. The proposed priority is P2 (Q-G3).
@@ -672,13 +672,13 @@ every open pull request. The proposed priority is P2 (Q-G3).
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
 | FIT.1 | Scheme and nodes (D-38): `FitmentScheme`, `FitmentLevel` (up to 4 node levels, translated labels), `FitmentNode` tree with status, aliases, optional translated names, `FitmentNote`; Manager platform pages for the scheme (Configuration and tax, step-up, dry run, no reorder or removal when nodes exist) and for nodes (Catalog and moderation: CRUD, merge with references moved, retire, proposals queue); `Category.fitment_relevant` | P2 | 16 | CAT.2, CORE.17, CORE.18, I18N.2 | A two-level and a four-level scheme are created in two sectors' vocabularies; a scheme change that would orphan nodes is refused; a node merge moves the references; a proposed node is invisible to pickers until approved |
-| FIT.2 | Product declaration (D-38): `ProductFitmentState`, `ProductFitment` with year range, exclusion, note, source, constraints, validation rules of §16.2.4, pure `fitment/engine.py` (`fits`, `check`, `no`, `unknown`), `set_product_fitment` with dry run, ChangeSet and AuditLog, `always_visible` and `rows_version` upkeep | P2 | 16 | FIT.1, CAT.14 | The regression cases 1 to 3 of §16.11 pass as unit tests with no database; an overlapping contradictory row is refused; a replace of several rows writes one AuditLog entry |
+| FIT.2 | Product declaration (D-38): `ProductFitmentState`, `ProductFitment` with year range, exclusion, note, source, constraints, validation rules of §17.2.4, pure `fitment/engine.py` (`fits`, `check`, `no`, `unknown`), `set_product_fitment` with dry run, ChangeSet and AuditLog, `always_visible` and `rows_version` upkeep | P2 | 16 | FIT.1, CAT.14 | The regression cases 1 to 3 of §17.11 pass as unit tests with no database; an overlapping contradictory row is refused; a replace of several rows writes one AuditLog entry |
 | FIT.3 | Vendor Fits tab in the shop space (D-38): mode radio, cascading node picker with search and a no-script fallback, year fields, exclusion, notes, copy from another product, bulk action with ChangeSet preview, node proposals with an anti-flooding limit, per-vendor data-quality report | P2 | 14 | FIT.2, CAT.19, CORE.9 | A vendor sets fitment on a product and on 50 products in bulk; a proposal is pending and invisible until reviewed; the 21st pending proposal is refused; a cross-tenant negative test passes |
 | FIT.4 | CSV import and export of fitment and the ING link (D-38): headers from the level codes, `replace` and `add`, dry run report, set-based upsert through staging, review items for unmatched names, `MappingTable` kind `fitment`, `StagedFitment`, provenance rules, AI-parsed fitment never auto-published | P2 | 14 | FIT.2, ING.1, ING.5 | A 100 000-row file loads in a background task with a report; round trip export equals import; a feed refresh leaves `manual` rows alone; an AI-parsed row lands in review |
 | FIT.5 | Garage profiles for accounts (D-38): `GarageProfile` (one active at most, reset keeps profiles, rename, duplicate, delete with confirmation, merged and retired node handling), limits, the "My garage" page in the customer area, 24-month inactivity cleanup with notice, CMP.4 export and erasure hooks, `contains_special_category` switch | P2 | 12 | FIT.1, CORE.1, CMP.4, ORD.11 | Regression case 7 and 10 pass; export contains the profiles and erasure removes them; with the special-category switch the account garage is unavailable |
 | FIT.6 | Anonymous garage and merge (D-38): the `mpmv_garage` cookie (explicit save, up to 3 profiles, no identifier, hostile-input validation, 180 days, *Forget my garage*), `GARAGE_ANON_STORAGE` modes `exempt`, `consent`, `off` wired to the SEO.5 consent state, merge notice at sign-in without silent merge, cookie cleared at sign-out when it came from the account | P2 | 10 | FIT.5, SEO.5, ORD.1 | Regression case 8 passes; no server write and no log of the cookie value; the three storage modes are tested; analytics tags never read the cookie |
-| FIT.7 | Garage UI (D-38): header menu, banner with *Change* and *Show all*, chooser (explicit *Apply*), "Add your garage" line, polite live announcements, focus handling, empty states of §16.5.6, no URL parameter anywhere, the translatable garage noun | P2 | 14 | FIT.5, THM.4, I18N.1 | An e2e run with screenshots covers the flow with keyboard only; zero axe violations (`wcag22aa`); reload, language switch and back button keep the state; no garage in any URL |
-| FIT.8 | Listings and search (D-38): predicate registry in CAT.8 and CAT.9, registered by `fitment`; filter semantics of §16.5.1, counts "N of M" and the unknown-count, exact SKU, GTIN or MPN always shown, CMS.10 grids, no reordering, `check` badge | P2 | 14 | FIT.2, FIT.7, CAT.8, CAT.9, CMS.10 | Regression cases 3 and 4 pass; an active garage never changes the sort order of a listing; the count equals the rows listed; the operator's own items get no preference |
+| FIT.7 | Garage UI (D-38): header menu, banner with *Change* and *Show all*, chooser (explicit *Apply*), "Add your garage" line, polite live announcements, focus handling, empty states of §17.5.6, no URL parameter anywhere, the translatable garage noun | P2 | 14 | FIT.5, THM.4, I18N.1 | An e2e run with screenshots covers the flow with keyboard only; zero axe violations (`wcag22aa`); reload, language switch and back button keep the state; no garage in any URL |
+| FIT.8 | Listings and search (D-38): predicate registry in CAT.8 and CAT.9, registered by `fitment`; filter semantics of §17.5.1, counts "N of M" and the unknown-count, exact SKU, GTIN or MPN always shown, CMS.10 grids, no reordering, `check` badge | P2 | 14 | FIT.2, FIT.7, CAT.8, CAT.9, CMS.10 | Regression cases 3 and 4 pass; an active garage never changes the sort order of a listing; the count equals the rows listed; the operator's own items get no preference |
 | FIT.9 | Product page (D-38): "Does it fit?" box in four states, summary list of fitment grouped by make and model, links to hub articles, card badges, buy flow unaffected | P2 | 8 | FIT.8, CAT.7 | Regression case 5 passes; a non-fitting item is purchasable with one inline note; the summary is identical with and without a garage |
 | FIT.10 | Editorial links (D-38): `fitment_nodes` chooser on blog posts and term landing pages, `editorial_page` hub article per node and locale, *Compatible items* block from the fitment query, *Make this my garage* form button, product-to-article links, the staff coverage report, the blog index garage banner | P2 | 12 | FIT.1, FIT.8, CMS.3, CMS.4 | An article linked to a node lists the matching items without hand-picking; a node with 50 items and no article appears in the report; a general article is always shown; a second hub article for the same node and locale is refused |
 | FIT.11 | Events (D-38): `fitment_nodes` on `EventPage` (organiser chooser), the "For <profile> owners" badge and the *Only events for my garage* checkbox (off by default), feeds ignore the garage | P2 | 6 | FIT.1, FIT.7, EVT.1 | A tagged event gets the badge; the checkbox filters; the RSS and ICS feeds are the same with and without a garage |
