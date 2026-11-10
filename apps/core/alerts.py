@@ -90,6 +90,11 @@ def report_checkout_error(exc: BaseException, *, context: dict[str, str] | None 
     would not help: its callbacks are discarded on a rollback too.)
     """
     safe = redact_mapping(context or {})
+    if connection.in_atomic_block:
+        logger.warning(
+            "report_checkout_error called inside a transaction: the alert e-mail is lost if it "
+            "rolls back; call it after the rollback, outside atomic"
+        )
     raise_alert(
         Alert(
             f"checkout:{type(exc).__name__}",

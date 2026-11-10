@@ -18,6 +18,11 @@
   field values are redacted recursively (dicts, lists, tuples, objects through their text) on a copy,
   with depth and size limits. It prefers over-redaction: an order number of 13 or more digits looks
   like a card number. Do not log personal data on purpose; the filter is a safety net.
+  It runs in the request thread, so every pattern is linear (matches start at the start of a
+  run, possessive repeats) and a message is cut to 8 KB (tracebacks to 16 KB, keeping the end)
+  before any pattern runs; `test_redaction_performance.py` guards both. Non-ASCII text is NFKC
+  normalised first, so fullwidth digits and letters are caught (the logged text is the
+  normalised form). Known gap: zero-width characters or homoglyphs inside a key name.
 
 ## Error tracking
 `apps/core/errortracking.py`: an `ErrorTracker` protocol, adapters `none` (default, no-op) and
@@ -41,7 +46,7 @@ address.
 - `report_checkout_error(exc, context=...)`: for the checkout's error path (no checkout code
   exists yet; the CHK tasks call it). Reports the exception type only. Call it after the
   transaction rolled back (in the `except` clause, outside `atomic`), or the outbox e-mail rolls
-  back with it. The e-mail repeats per exception class and message (digits ignored).
+  back with it (a warning is logged when it is called inside a transaction). The e-mail repeats per exception class and message (digits ignored).
 - `/readyz` logs a failure at most once per dependency per minute.
 - `uv run python manage.py check_ops`: for the host's timer. Exit 1 when an alert is raised.
 
