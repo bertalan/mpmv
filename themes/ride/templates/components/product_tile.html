@@ -1,0 +1,15 @@
+{% load i18n theme_tags responsive_images %}{% comment %}
+Product tile of the `ride` theme (THM.6): the context of base's components/product_tile.html. Unlike
+base, the whole tile is not one link: the product name links to the product and a small "View"
+button repeats that link for people who look for an action (its text names the product for
+screen readers). The image is decorative next to the name, so it is not a second link.
+{% endcomment %}{% with href=url|safe_href level=heading_level|heading_level:3 %}<article class="product-tile{% if 'out_of_stock' in badges %} product-tile--unavailable{% endif %}">
+  <div class="product-tile__media">{% if image %}{% responsive_image image "card" alt=image_alt %}{% elif image_url %}<img src="{{ image_url }}" alt="{{ image_alt|default:'' }}" width="{{ image_width|default:400 }}" height="{{ image_height|default:400 }}" loading="lazy">{% else %}<div class="product-tile__placeholder" aria-hidden="true"></div>{% endif %}</div>
+  <div class="product-tile__body">
+    <h{{ level }} class="product-tile__name">{% if href %}<a class="product-tile__title-link" href="{{ href }}">{{ name }}</a>{% else %}{{ name }}{% endif %}</h{{ level }}>
+    {% if vendor %}<p class="product-tile__vendor">{% blocktranslate %}Sold by {{ vendor }}{% endblocktranslate %}</p>{% endif %}
+    <p class="product-tile__price">{% if price and not 'on_request' in badges %}{% if price_before %}<del><span class="visually-hidden">{% translate "Was" %} </span>{{ price_before }}</del> {% endif %}<span class="product-tile__amount">{{ price }}</span>{% else %}{% translate "Price on request" %}{% endif %}</p>
+    {% if badges %}<ul class="product-tile__badges" aria-label="{% translate 'Status' %}">{% for kind in badges %}<li>{% include "components/badge.html" with kind=kind only %}</li>{% endfor %}</ul>{% endif %}
+    {% if href %}<a class="button button--small button--outline-accent product-tile__action" href="{{ href }}">{% translate "View" %}<span class="visually-hidden"> {{ name }}</span></a>{% endif %}
+  </div>
+</article>{% endwith %}

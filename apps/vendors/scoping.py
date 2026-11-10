@@ -22,7 +22,7 @@ client as the actor: `get_for_actor_or_404(Product, api_client_of(request), sku=
 from typing import Any, Final, Protocol, Self
 
 from django.contrib.auth.base_user import AbstractBaseUser
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.models import AnonymousUser, PermissionsMixin
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist, ValidationError
 from django.db import models
 from django.http import Http404
@@ -70,8 +70,20 @@ def scope_target(model: type[models.Model]) -> type[models.Model]:
     return current
 
 
-def _is_platform_staff(user: AnyUser) -> bool:
-    return bool(user.is_authenticated and user.is_active and getattr(user, "is_staff", False))
+PLATFORM_STAFF_PERMISSION: Final = "vendors.view_all_vendors"
+
+
+def is_platform_staff(user: AnyUser) -> bool:
+    """Platform staff (spec 02, Q-34): an active user holding `vendors.view_all_vendors`.
+
+    `is_staff` (Wagtail or Django admin login) does not count: an editor sees no vendor data.
+    The permission comes from a role group (CORE.18) or, for a superuser, from the superuser flag.
+    """
+    return bool(
+        isinstance(user, PermissionsMixin)
+        and user.is_active
+        and user.has_perm(PLATFORM_STAFF_PERMISSION)
+    )
 
 
 class VendorScopedQuerySet[M: models.Model](models.QuerySet[M]):
@@ -108,7 +120,7 @@ class VendorScopedQuerySet[M: models.Model](models.QuerySet[M]):
         if not isinstance(actor, AbstractBaseUser | AnonymousUser):
             vendor_id = actor.credential_vendor_id
             return self.all() if vendor_id is None else self.filter(**{self._lookup(): vendor_id})
-        if _is_platform_staff(actor):
+        if is_platform_staff(actor):
             return self.all()
         return self.for_member(actor)
 

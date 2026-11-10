@@ -15,7 +15,7 @@ from django.contrib.staticfiles.finders import get_finder
 from django.core.management import call_command
 from pytest_django.fixtures import Settings as SettingsWrapper
 
-from apps.themes.build import BuildError, build_themes, main, read_tokens
+from apps.themes.build import BuildError, build_themes, main, read_assets, read_tokens
 from apps.themes.contract import TOKEN_CONTRACT
 from apps.themes.engine import ContrastPair, check_tokens, resolve_tokens
 from apps.themes.finders import ThemeAssetsFinder
@@ -241,3 +241,68 @@ def test_the_image_builds_the_themes_before_collectstatic() -> None:
     build_stage = containerfile.split(" AS runtime", 1)[0]
     assert "-m apps.themes.build" in build_stage
     assert build_stage.index("-m apps.themes.build") < build_stage.index("manage.py collectstatic")
+
+
+# --- Theme assets (THM.6): fonts, icons and images are copied, nothing else
+
+ASSET_DIR = "static/themes/alt"
+
+
+def _theme_with_assets(tmp_path: Path) -> Path:
+    root = tmp_path / "themes"
+    write_theme(root, "base", tokens=shipped_tokens())
+    write_theme(root, "alt", tokens="")
+    assets = root / "alt" / ASSET_DIR
+    (assets / "fonts").mkdir(parents=True)
+    (assets / "fonts" / "face.woff2").write_bytes(b"wOF2" + bytes(8))
+    (assets / "icons").mkdir()
+    (assets / "icons" / "sprite.svg").write_text("<svg/>", encoding="utf-8")
+    (assets / "licenses").mkdir()
+    (assets / "licenses" / "OFL.txt").write_text("licence", encoding="utf-8")
+    return root
+
+
+def test_the_build_copies_allowed_assets_next_to_the_theme_css(tmp_path: Path) -> None:
+    root = _theme_with_assets(tmp_path)
+    out = tmp_path / "out"
+    build_themes(root, out)
+    built = out / "themes" / "alt"
+    assert (built / "fonts" / "face.woff2").read_bytes() == b"wOF2" + bytes(8)
+    assert (built / "icons" / "sprite.svg").read_text() == "<svg/>"
+    assert (built / "licenses" / "OFL.txt").read_text() == "licence"
+
+
+def test_the_build_ignores_files_that_are_not_assets(tmp_path: Path) -> None:
+    root = _theme_with_assets(tmp_path)
+    assets = root / "alt" / ASSET_DIR
+    for name in ("notes.py", "secret.toml", "app.js.map", ".env", "data.json", "run.sh"):
+        (assets / name).write_text("x", encoding="utf-8")
+    out = tmp_path / "out"
+    build_themes(root, out)
+    assert sorted(p.name for p in (out / "themes" / "alt").rglob("*") if p.is_file()) == [
+        "OFL.txt",
+        "face.woff2",
+        "sprite.svg",
+        "theme.css",
+        "tokens.css",
+    ]
+
+
+def test_the_build_never_copies_a_symlink_or_a_file_outside_the_theme(tmp_path: Path) -> None:
+    root = _theme_with_assets(tmp_path)
+    outside = tmp_path / "outside.svg"
+    outside.write_text("<svg>private</svg>", encoding="utf-8")
+    assets = root / "alt" / ASSET_DIR
+    (assets / "images").mkdir()
+    (assets / "images" / "link.svg").symlink_to(outside)
+    (assets / "linked-dir").symlink_to(tmp_path, target_is_directory=True)
+    out = tmp_path / "out"
+    build_themes(root, out)
+    copied = [p.name for p in (out / "themes" / "alt").rglob("*") if p.is_file()]
+    assert "link.svg" not in copied
+    assert "outside.svg" not in copied
+    assert read_assets(root / "alt", "alt").keys() == {
+        "fonts/face.woff2",
+        "icons/sprite.svg",
+        "licenses/OFL.txt",
+    }

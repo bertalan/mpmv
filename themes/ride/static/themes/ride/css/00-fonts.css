@@ -1,0 +1,36 @@
+/* Ride: self-hosted Barlow (400, 700) and Barlow Condensed (600, 700), OFL-1.1, subset to Latin
+   and Latin Extended-A (themes/ride/LICENSES.toml). Same-origin woff2 only; `swap` shows the
+   fallback text at once. The URLs are relative to theme.css. */
+@layer base {
+  @font-face {
+    font-family: 'Barlow';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url(fonts/barlow-400.woff2) format("woff2");
+  }
+
+  @font-face {
+    font-family: 'Barlow';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url(fonts/barlow-700.woff2) format("woff2");
+  }
+
+  @font-face {
+    font-family: 'Barlow Condensed';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url(fonts/barlow-condensed-600.woff2) format("woff2");
+  }
+
+  @font-face {
+    font-family: 'Barlow Condensed';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url(fonts/barlow-condensed-700.woff2) format("woff2");
+  }
+}

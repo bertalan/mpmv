@@ -34,9 +34,13 @@ status=0
 
 # ZAP baseline: passive scan after a short spider. -I: warnings alone do not fail the tool; the
 # risk counts below decide. Exit codes: 0 clean, 1 FAIL rules, 2 warnings, 3 scanner error.
+# -c: rules file with the documented accepts only (docs/dev/security-scans.md), mounted read-only.
+ZAP_RULES="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/zap-rules.tsv"
 set +e
-docker run --rm --network host -v "$OUT/zap:/zap/wrk:rw" "$ZAP_IMAGE" \
-  zap-baseline.py -t "$TARGET_URL" -J zap.json -I -m 3 > "$OUT/zap/zap.log" 2>&1
+docker run --rm --network host -v "$OUT/zap:/zap/wrk:rw" \
+  -v "$ZAP_RULES:/zap/wrk/zap-rules.tsv:ro" "$ZAP_IMAGE" \
+  zap-baseline.py -t "$TARGET_URL" -c zap-rules.tsv -J zap.json -I -m 3 \
+  > "$OUT/zap/zap.log" 2>&1
 zap_exit=$?
 set -e
 if [ "$zap_exit" -ne 0 ] && [ "$zap_exit" -ne 2 ]; then

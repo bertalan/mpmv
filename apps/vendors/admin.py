@@ -448,7 +448,8 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
 
     @admin.display(description="Onboarding checklist")
     def onboarding(self, obj: Vendor | None) -> SafeString | str:
-        """The VEN.5 checklist: only the contract blocks activation; data gaps gate payouts."""
+        """The VEN.5 checklist: the contract and the platform duties (CMP.25) block activation; DAC7
+        and payout data gaps gate payouts."""
         if obj is None or obj.pk is None:
             return "-"
         checklist = onboarding_checklist(obj)
@@ -463,7 +464,10 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
                     + ("accepted" if item.done else "not accepted")
                 )
             else:
-                name = "DAC7 data" if item.key == engine.DAC7 else "Payout data"
+                name = {
+                    engine.DAC7: "DAC7 data",
+                    engine.PLATFORM_DUTIES: "Platform duties",
+                }.get(item.key, "Payout data")
                 text = f"{name}: " + (
                     "complete" if item.done else "missing " + _field_labels(item.missing)
                 )

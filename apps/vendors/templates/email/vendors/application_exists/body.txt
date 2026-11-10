@@ -1,0 +1,3 @@
+{% load i18n %}{% translate "Someone used this email address to apply to sell with us, but it already has an account. Nothing was changed. If it was you, sign in with your existing account or reset its password instead. If it was not you, ignore this email." %}
+
+{{ sign_in_url }}

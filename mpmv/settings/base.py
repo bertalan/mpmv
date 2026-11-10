@@ -99,6 +99,8 @@ INSTALLED_APPS = [
 PROCRASTINATE_ON_APP_READY = "apps.core.tasks.on_app_ready"
 
 MIDDLEWARE = [
+    # Outermost, so it wraps SecurityMiddleware's own HTTPS 301 too (SEC.5 triage, SEC.12).
+    "apps.core.middleware.CrossOriginResourcePolicyMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "apps.cms.middleware.WagtailAdminPickerNonceMiddleware",  # Wagtail's inline pickers (CMS.1)
@@ -168,6 +170,14 @@ VENDOR_CLAIM_RATE_LIMIT = 20
 # Storefront profile saves per vendor owner per hour (CORE.9): each one emails the moderators.
 VENDOR_PROFILE_SAVE_LIMIT = 20
 VENDOR_PROFILE_VENDOR_SAVE_LIMIT = 30  # all owners of one vendor together
+# Public "Sell with us" application (VEN.22): validity of the email confirmation link, and
+# confirm-page POSTs allowed per IP every 15 minutes (the form uses the registration limit).
+VENDOR_APPLICATION_LINK_MAX_AGE = 72 * 3600  # seconds
+VENDOR_APPLICATION_RATE_LIMIT = 20
+# Unconfirmed applications (owner decision D-24, VEN.22): the account and its applicant vendor
+# are deleted this many days after the request, and one reminder goes out after this many hours.
+VENDOR_APPLICATION_RETENTION_DAYS = 3
+VENDOR_APPLICATION_REMINDER_HOURS = 48
 MFA_ISSUER = "MPMV"  # name shown in authenticator apps and passkey prompts
 OTP_TOTP_ISSUER = MFA_ISSUER
 OTP_ADMIN_HIDE_SENSITIVE_DATA = True
@@ -522,6 +532,8 @@ API_REFUSED_KEY_BLOCK_SECONDS = int(env_str("MPMV_API_REFUSED_KEY_BLOCK_SECONDS"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+# Everything is same-origin: no other site embeds our resources (apps.core.middleware).
+CROSS_ORIGIN_RESOURCE_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"

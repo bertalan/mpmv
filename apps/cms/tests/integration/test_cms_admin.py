@@ -18,6 +18,7 @@ from apps.accounts.models import User
 from apps.accounts.services import mfa_required
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
+from apps.cms import roles
 from apps.cms.models import HomePage, NavigationMenu
 from apps.cms.services import SeedReport, can_access_cms_admin
 
@@ -25,9 +26,9 @@ pytestmark = pytest.mark.django_db
 
 
 def _editor(password: str | None = None) -> User:
-    """A non-staff member of Wagtail's default "Editors" group (created by its migrations)."""
+    """A non-staff member of the "Page editors" role (CORE.8)."""
     user: User = UserFactory.create(password=password or secrets.token_urlsafe(16))
-    user.groups.add(Group.objects.get(name="Editors"))
+    user.groups.add(Group.objects.get(name=roles.PAGE_EDITORS))
     return user
 
 
