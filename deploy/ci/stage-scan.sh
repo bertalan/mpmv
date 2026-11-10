@@ -19,12 +19,16 @@ echo "::add-mask::${TARGET_URL}"
 
 ZAP_IMAGE="zaproxy/zap-stable:2.17.0"
 NUCLEI_IMAGE="projectdiscovery/nuclei:v3.11.1"
+# Pinned nuclei-templates release (tag and the commit it must resolve to). Bump monthly, in a PR.
+NUCLEI_TEMPLATES_REPO="projectdiscovery/nuclei-templates"
+NUCLEI_TEMPLATES_TAG="v10.5.1"
+NUCLEI_TEMPLATES_SHA="79fb682760ab3d5b0e22afbb44709353cbebf023"
 OUT="${RUNNER_TEMP:-/tmp}/stage-scan"
 OUTPUT_FILE="${GITHUB_OUTPUT:-/dev/null}"
 
-mkdir -p "$OUT/zap" "$OUT/nuclei" "$OUT/templates"
+mkdir -p "$OUT/zap" "$OUT/nuclei"
 # Both images run as a non-root user and write their reports into these mounts.
-chmod 0777 "$OUT/zap" "$OUT/nuclei" "$OUT/templates"
+chmod 0777 "$OUT/zap" "$OUT/nuclei"
 
 status=0
 
@@ -48,20 +52,28 @@ fi
 python3 -I "$REPORT" zap-list "$OUT/zap/zap.json"
 read -r zap_high zap_medium zap_low < <(python3 -I "$REPORT" zap-counts "$OUT/zap/zap.json")
 
-# nuclei: the image ships no templates and -disable-update-check also skips the first download,
-# so the scan would stop with "no templates" and exit 1. Download them first, into a mount.
+# nuclei templates: the image ships none, and -disable-update-check also skips the first download.
+# They are cloned at a pinned release tag and commit SHA and passed with -t, so a scan never runs
+# unreviewed templates. A tag can be moved: the SHA is checked after the clone, and a mismatch is a
+# scanner error. Bump both values monthly, in a PR (docs/dev/release.md, "Security schedule").
 set +e
-docker run --rm --network host -v "$OUT/templates:/templates:rw" "$NUCLEI_IMAGE" \
-  -update-templates -update-template-dir /templates -no-color \
-  > "$OUT/nuclei/update.log" 2>&1
-update_exit=$?
+git clone --quiet --depth 1 --branch "$NUCLEI_TEMPLATES_TAG" \
+  "https://github.com/$NUCLEI_TEMPLATES_REPO.git" "$OUT/templates" > "$OUT/nuclei/update.log" 2>&1
+clone_exit=$?
 set -e
-if [ "$update_exit" -ne 0 ]; then
-  echo "::error::nuclei scanner error: template download failed with exit code $update_exit"
+if [ "$clone_exit" -ne 0 ]; then
+  echo "::error::nuclei scanner error: template clone failed with exit code $clone_exit"
   status=3
+  rm -rf "$OUT/templates"
+  mkdir -p "$OUT/templates"
+elif [ "$(git -C "$OUT/templates" rev-parse HEAD)" != "$NUCLEI_TEMPLATES_SHA" ]; then
+  echo "::error::nuclei scanner error: templates commit does not match the pinned SHA"
+  status=3
+  rm -rf "$OUT/templates"
+  mkdir -p "$OUT/templates"
 fi
 template_count="$(find "$OUT/templates" -type f -name '*.yaml' | wc -l | tr -d ' ')"
-echo "nuclei templates downloaded: $template_count"
+echo "nuclei templates ($NUCLEI_TEMPLATES_TAG): $template_count"
 if [ "$template_count" -eq 0 ]; then
   echo "::error::nuclei scanner error: 0 templates loaded, the scan would test nothing"
   status=3

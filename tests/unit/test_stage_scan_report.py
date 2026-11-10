@@ -5,6 +5,7 @@ tests check that such fields never reach the printed output.
 """
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -121,8 +122,10 @@ def test_script_separates_scanner_errors_from_findings() -> None:
     assert "status=3" in text
     # Findings alone exit 1; a scanner error keeps its own code.
     assert 'if [ "$status" -eq 0 ]; then status=1; fi' in text
-    # Templates are downloaded explicitly, since -disable-update-check skips the first download.
-    assert "-update-templates" in text
+    # Templates come from a pinned tag and SHA, never from a floating update.
+    assert "NUCLEI_TEMPLATES_TAG" in text
+    assert "NUCLEI_TEMPLATES_SHA" in text
+    assert "-update-templates" not in text
 
 
 def test_clean_collapses_every_run_of_colons(tmp_path: Path) -> None:
@@ -173,16 +176,25 @@ case "$args" in
     MNT=/zap/wrk; dir=$(mount "$@")
     [ -n "${FAKE_ZAP_JSON:-}" ] && printf '%s' "$FAKE_ZAP_JSON" > "$dir/zap.json"
     exit "${FAKE_ZAP_EXIT:-0}";;
-  *-update-templates*)
-    MNT=/templates; dir=$(mount "$@")
-    [ "${FAKE_TEMPLATES:-1}" = 1 ] && echo "id: synthetic" > "$dir/synthetic.yaml"
-    exit "${FAKE_UPDATE_EXIT:-0}";;
   *)
     MNT=/out; dir=$(mount "$@")
     [ -n "${FAKE_NUCLEI_JSONL:-}" ] && printf '%s\\n' "$FAKE_NUCLEI_JSONL" > "$dir/nuclei.jsonl"
     exit "${FAKE_NUCLEI_EXIT:-0}";;
 esac
 """
+
+FAKE_VCS = """#!/usr/bin/env bash
+# Stands in for the version control tool: a clone makes a templates dir, rev-parse a commit id.
+if [ "$1" = clone ]; then
+  [ "${FAKE_CLONE_EXIT:-0}" = 0 ] || exit "$FAKE_CLONE_EXIT"
+  dest="${@: -1}"; mkdir -p "$dest"
+  [ "${FAKE_TEMPLATES:-1}" = 1 ] && echo "id: synthetic" > "$dest/synthetic.yaml"
+  exit 0
+fi
+echo "$FAKE_VCS_SHA"
+"""
+
+PINNED_SHA = re.search(r'NUCLEI_TEMPLATES_SHA="([0-9a-f]{40})"', SCRIPT.read_text())
 
 CLEAN_ZAP = json.dumps({"site": [{"alerts": []}]})
 MEDIUM_NUCLEI = json.dumps({"template-id": "synthetic-m", "info": {"severity": "medium"}})
@@ -194,7 +206,12 @@ def run_script(tmp_path: Path, **env: str) -> subprocess.CompletedProcess[str]:
     docker = bin_dir / "docker"
     docker.write_text(FAKE_DOCKER)
     docker.chmod(0o755)
+    vcs = bin_dir / "git"
+    vcs.write_text(FAKE_VCS)
+    vcs.chmod(0o755)
+    assert PINNED_SHA
     full_env = {
+        "FAKE_VCS_SHA": PINNED_SHA.group(1),
         "PATH": f"{bin_dir}:/usr/bin:/bin",
         "TARGET_URL": f"https://{SECRET_HOST}",
         "RUNNER_TEMP": str(tmp_path / "runner"),
@@ -230,7 +247,8 @@ def test_script_exit_1_on_findings_only(tmp_path: Path) -> None:
         ({"FAKE_ZAP_EXIT": "3"}, "ZAP scanner error"),
         ({"FAKE_ZAP_JSON": '{"site": ['}, "ZAP scanner error: report unreadable"),
         ({"FAKE_TEMPLATES": "0"}, "nuclei scanner error: 0 templates"),
-        ({"FAKE_UPDATE_EXIT": "1"}, "nuclei scanner error: template download"),
+        ({"FAKE_CLONE_EXIT": "1"}, "nuclei scanner error: template clone"),
+        ({"FAKE_VCS_SHA": "0" * 40}, "does not match the pinned SHA"),
     ],
 )
 def test_script_exit_3_on_a_scanner_error(
