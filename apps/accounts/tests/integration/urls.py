@@ -56,6 +56,16 @@ def export(request: HttpRequest) -> HttpResponse:
     return HttpResponse("export-csv")
 
 
+@requires_level("export")
+def export_json(request: HttpRequest) -> HttpResponse:
+    return HttpResponse(f"export-json {len(request.body)}")
+
+
+@requires_level("export")
+def export_upload(request: HttpRequest) -> HttpResponse:
+    return HttpResponse("export-upload")
+
+
 @requires_level("backup")
 def backup(request: HttpRequest) -> HttpResponse:
     return HttpResponse("backup")
@@ -174,6 +184,8 @@ urlpatterns = [
     path("test/very-sensitive/", very_sensitive, name="test-very-sensitive"),
     path("test/everyday/", everyday, name="test-everyday"),
     path("test/export/", export, name="test-export"),
+    path("test/export-json/", export_json, name="test-export-json"),
+    path("test/export-upload/", export_upload, name="test-export-upload"),
     path("test/backup/", backup, name="test-backup"),
     path("test/payout/", payout, name="test-payout"),
     path("test/approve/<str:key>/", approve, name="test-approve"),

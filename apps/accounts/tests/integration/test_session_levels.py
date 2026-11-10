@@ -310,6 +310,19 @@ def test_do_it_once_needs_the_elevate_permission_and_a_passkey(client: Client) -
 # --- Group 3
 
 
+def _group3_passkey(client: Client, authenticator: FakeAuthenticator, **assertion: Any) -> Any:
+    """The passkey step the group 3 redirect leads to (`factor=passkey`: UV required)."""
+    suffix = "?factor=passkey"
+    options = client.post(reverse("mfa:passkey_auth_options") + suffix)
+    assert options.status_code == 200
+    credential = authenticator.get(options.json()["publicKey"], **assertion)
+    return client.post(
+        reverse("mfa:passkey_auth") + suffix,
+        data=json.dumps({"credential": credential}),
+        content_type="application/json",
+    )
+
+
 def test_group_3_prompts_for_a_passkey_even_inside_operational_mode(client: Client) -> None:
     user, _ = _staff_with_passkey()
     verified_login(client, user, verified_at=time.time() - 3600)  # operational, old second factor
@@ -328,9 +341,7 @@ def test_group_3_does_not_accept_a_totp_confirmation(client: Client) -> None:
 def test_group_3_passes_after_a_fresh_passkey(client: Client) -> None:
     user, authenticator = _staff_with_passkey()
     verified_login(client, user, verified_at=time.time() - 3600)
-    options = _post(client, "mfa:passkey_auth_options").json()["publicKey"]
-    credential = authenticator.get(options)
-    assert _post(client, "mfa:passkey_auth", {"credential": credential}).status_code == 200
+    assert _group3_passkey(client, authenticator).status_code == 200
     assert client.get(reverse("test-payout")).status_code == 200
 
 
@@ -430,3 +441,299 @@ def test_every_group_2_and_3_action_has_a_decorator_or_is_listed_as_not_built() 
     assert {"role_grant", "vat_regime", "audit_in_clear"} <= _gated_actions()
     wired = _gated_actions() & KNOWN_UNWIRED - {"export", "payout_details", "backup"}
     assert not wired, f"remove from KNOWN_UNWIRED, now gated: {sorted(wired)}"
+
+
+# --- Security review fixes (PR 234)
+
+from django.core.files.uploadedfile import SimpleUploadedFile  # noqa: E402
+from django.test import RequestFactory  # noqa: E402
+
+
+def test_a_login_passkey_without_user_verification_does_not_satisfy_group_3(
+    client: Client,
+) -> None:
+    user, authenticator = _staff_with_passkey()
+    verified_login(client, user, verified_at=time.time() - 3600)
+    options = _post(client, "mfa:passkey_auth_options").json()["publicKey"]
+    credential = authenticator.get(options, user_verified=False)
+    assert _post(client, "mfa:passkey_auth", {"credential": credential}).status_code == 200
+    assert client.get(reverse("test-payout")).status_code == 302  # login passkey: not enough
+
+
+def test_the_group_3_passkey_step_refuses_an_assertion_without_uv(client: Client) -> None:
+    user, authenticator = _staff_with_passkey()
+    verified_login(client, user, verified_at=time.time() - 3600)
+    assert _group3_passkey(client, authenticator, user_verified=False).status_code == 400
+    assert client.get(reverse("test-payout")).status_code == 302
+
+
+def test_a_later_totp_verification_clears_the_group_3_passkey(client: Client) -> None:
+    from apps.accounts.tests.mfa import totp_token
+
+    user, authenticator = _staff_with_passkey()
+    device = verified_login(client, user, verified_at=time.time() - 3600)
+    assert _group3_passkey(client, authenticator).status_code == 200
+    assert client.get(reverse("test-payout")).status_code == 200
+    client.post(reverse("mfa:verify"), {"method": "totp", "token": totp_token(device)})
+    assert client.get(reverse("test-payout")).status_code == 302
+
+
+# Digest of what a request does
+
+
+def _digest(request: Any) -> str:
+    return levels.params_digest(request)
+
+
+def test_the_digest_covers_method_query_body_and_files() -> None:
+    rf = RequestFactory()
+    base = _digest(rf.get("/x/", {"a": "1", "b": "2"}))
+    assert base == _digest(rf.get("/x/", {"b": "2", "a": "1"}))  # canonical order
+    assert base != _digest(rf.get("/x/", {"a": "1", "b": "2", "c": "3"}))
+    assert base != _digest(rf.post("/x/", {"a": "1", "b": "2"}))  # method
+    small = _digest(rf.post("/x/", json.dumps({"rows": 10}), content_type="application/json"))
+    big = _digest(rf.post("/x/", json.dumps({"rows": 10000}), content_type="application/json"))
+    assert small != big
+    same = _digest(
+        rf.post("/x/", json.dumps({"b": 1, "a": 2}, indent=3), content_type="application/json")
+    )
+    assert same == _digest(rf.post("/x/", '{"a":2,"b":1}', content_type="application/json"))
+    one = _digest(rf.post("/x/", {"f": SimpleUploadedFile("a.csv", b"1")}))
+    other = _digest(rf.post("/x/", {"f": SimpleUploadedFile("a.csv", b"2")}))
+    renamed = _digest(rf.post("/x/", {"f": SimpleUploadedFile("b.csv", b"1")}))
+    assert len({one, other, renamed}) == 3
+
+
+def test_the_digest_encoding_is_unambiguous() -> None:
+    rf = RequestFactory()
+    assert _digest(rf.get("/x/", {"a": "b\x1fc"})) != _digest(rf.get("/x/", {"a": "b", "c": ""}))
+    assert _digest(rf.get("/x/", {"a": "1\x1e"})) != _digest(rf.get("/x/", {"a": "1"}))
+
+
+def test_a_grant_for_a_small_export_cannot_run_a_bigger_one(client: Client) -> None:
+    user, authenticator = _staff_with_passkey()
+    _restricted_session(client, user)
+    url = reverse("test-export-json")
+
+    def body(rows: int) -> dict[str, Any]:
+        return {"data": json.dumps({"rows": rows}), "content_type": "application/json"}
+
+    refused = client.post(url, **body(10))
+    assert refused.status_code == 403
+    _do_it_once(client, authenticator, refused)
+    assert client.post(url, **body(10000)).status_code == 403  # differs only in the body
+    assert client.post(url, **body(10)).status_code == 200
+
+
+def test_a_grant_survives_reordered_but_not_extra_parameters(client: Client) -> None:
+    user, authenticator = _staff_with_passkey()
+    _restricted_session(client, user)
+    refused = client.get(reverse("test-export"), {"a": "1", "b": "2"})
+    _do_it_once(client, authenticator, refused)
+    assert client.get(reverse("test-export"), {"a": "1", "b": "2", "limit": "9"}).status_code == 403
+    assert client.get(reverse("test-export"), {"b": "2", "a": "1"}).status_code == 200
+
+
+# Single use under concurrency
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_grant_is_spent_once_even_with_parallel_requests() -> None:
+    import threading
+
+    from django.db import connection
+
+    user = UserFactory.create(staff=True)
+    levels.create_grant("session-key", user, "export", "digest-1", ttl=120)
+    results: list[bool] = []
+    barrier = threading.Barrier(8)
+
+    def spend() -> None:
+        try:
+            barrier.wait()
+            results.append(levels.spend_grant("session-key", user, "export", "digest-1"))
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=spend) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert results.count(True) == 1
+    assert results.count(False) == 7
+
+
+def test_a_grant_is_bound_to_its_session_user_action_and_digest() -> None:
+    user, other = UserFactory.create(staff=True), UserFactory.create(staff=True)
+    levels.create_grant("s1", user, "export", "d", ttl=120)
+    assert not levels.spend_grant("s2", user, "export", "d")
+    assert not levels.spend_grant("s1", other, "export", "d")
+    assert not levels.spend_grant("s1", user, "backup", "d")
+    assert not levels.spend_grant("s1", user, "export", "e")
+    assert levels.spend_grant("s1", user, "export", "d")
+    assert not levels.spend_grant("s1", user, "export", "d")
+
+
+def test_the_grant_row_stores_a_hash_of_the_session_key_not_the_key(client: Client) -> None:
+    from apps.accounts.models import ElevationGrant
+
+    user, authenticator = _staff_with_passkey()
+    _restricted_session(client, user)
+    _do_it_once(client, authenticator, client.get(reverse("test-export")))
+    grant = ElevationGrant.objects.get()
+    assert client.session.session_key not in (grant.session_hash, grant.digest)
+    assert grant.used_at is None
+    client.get(reverse("test-export"))
+    grant.refresh_from_db()
+    assert grant.used_at is not None
+
+
+# Challenges, caps, re-login, polling, failing closed
+
+
+def test_a_passkey_challenge_expires(client: Client) -> None:
+    user, authenticator = _staff_with_passkey()
+    _restricted_session(client, user)
+    options = _post(client, "levels:options").json()["publicKey"]
+    credential = authenticator.get(options)
+    session = client.session
+    session[levels.CHALLENGE_KEY]["issued_at"] -= 121
+    session.save()
+    assert _post(client, "levels:operational", {"credential": credential}).status_code == 400
+
+
+def test_a_challenge_for_one_action_cannot_start_operational_mode(client: Client) -> None:
+    user, authenticator = _staff_with_passkey()
+    _restricted_session(client, user)
+    refused = client.get(reverse("test-export"))
+    options = _post(
+        client,
+        "levels:once_options",
+        {"action": "export", "digest": refused.context["digest"]},
+    ).json()["publicKey"]
+    credential = authenticator.get(options)
+    assert _post(client, "levels:operational", {"credential": credential}).status_code == 400
+    assert client.get(reverse("test-backup")).status_code == 403
+
+
+def test_once_is_refused_for_an_action_that_is_not_group_2(client: Client) -> None:
+    user, _ = _staff_with_passkey()
+    _restricted_session(client, user)
+    for action in ("payout_details", "catalogue_edit"):
+        response = _post(client, "levels:once_options", {"action": action, "digest": "d"})
+        assert response.status_code == 400
+
+
+def test_re_elevating_does_not_extend_the_two_hour_cap(client: Client) -> None:
+    user, authenticator = _staff_with_passkey()
+    _restricted_session(client, user)
+    _elevate(client, authenticator)
+    session = client.session
+    started = session[levels.STARTED_KEY] = session[levels.STARTED_KEY] - 7000
+    session.save()
+    assert _elevate(client, authenticator).status_code == 200
+    assert client.session[levels.STARTED_KEY] == started
+
+
+def test_logging_in_again_in_the_same_session_ends_operational_mode(client: Client) -> None:
+    user, authenticator = _staff_with_passkey()
+    _restricted_session(client, user)
+    _elevate(client, authenticator)
+    client.force_login(user)  # the same user signs in again: Django keeps the session data
+    assert levels.STARTED_KEY not in client.session
+    assert _after(_actions(levels.SESSION_ENDED)[-1])["reason"] == "relogin"
+
+
+def test_polling_requests_do_not_keep_operational_mode_alive(client: Client) -> None:
+    user, authenticator = _staff_with_passkey()
+    _restricted_session(client, user)
+    _elevate(client, authenticator)
+    _age(client, levels.ACTIVITY_KEY, 10 * 60)
+    before = client.session[levels.ACTIVITY_KEY]
+    client.get(reverse("test-everyday"), headers={"x-mpmv-poll": "1"})
+    assert client.session[levels.ACTIVITY_KEY] == before
+    client.get(reverse("test-everyday"), headers={"sec-purpose": "prefetch"})
+    assert client.session[levels.ACTIVITY_KEY] == before
+    client.get(reverse("test-everyday"))
+    assert client.session[levels.ACTIVITY_KEY] > before
+
+
+def test_an_invalid_stored_policy_fails_closed(client: Client, caplog: Any) -> None:
+    user, authenticator = _staff_with_passkey()
+    verified_login(client, user, verified_at=time.time() - 3600)  # operational, old passkey
+    operator = PlatformOperatorFactory.create(
+        open_ended=True, valid_from=datetime(2020, 1, 1, tzinfo=UTC)
+    )
+    type(operator).objects.filter(pk=operator.pk).update(session_policy={"idle_minutes": -3})
+    assert client.get(reverse("test-everyday")).status_code == 302  # even everyday work: group 3
+    assert "session policy" in caplog.text.lower()
+
+
+def test_the_admin_warns_about_an_invalid_stored_policy(client: Client) -> None:
+    root = UserFactory.create(superuser=True)
+    verified_login(client, root)
+    operator = PlatformOperatorFactory.create(
+        open_ended=True, valid_from=datetime(2020, 1, 1, tzinfo=UTC)
+    )
+    type(operator).objects.filter(pk=operator.pk).update(session_policy={"idle_minutes": -3})
+    response = client.get(reverse("admin:core_platformoperator_changelist"))
+    assert "session policy is invalid" in response.content.decode()
+
+
+# Real views (restricted mode refuses them)
+
+
+def _superuser_restricted(client: Client) -> User:
+    root = UserFactory.create(superuser=True)
+    verified_login(client, root, level=levels.RESTRICTED)
+    return root
+
+
+@pytest.mark.parametrize(
+    ("name", "action"),
+    [
+        ("admin:core_auditlog_changelist", "audit_in_clear"),
+        ("admin:accounts_user_add", "role_grant"),
+        ("admin:auth_group_add", "role_grant"),
+    ],
+)
+def test_real_admin_views_refuse_in_restricted_mode(client: Client, name: str, action: str) -> None:
+    _superuser_restricted(client)
+    response = client.get(reverse(name))
+    assert response.status_code == 403
+    assert response.context["action"] == action
+
+
+def test_real_group_admin_change_and_delete_refuse_in_restricted_mode(client: Client) -> None:
+    from django.contrib.auth.models import Group
+
+    _superuser_restricted(client)
+    group = Group.objects.create(name="Support")
+    assert client.get(reverse("admin:auth_group_change", args=[group.pk])).status_code == 403
+    assert client.get(reverse("admin:auth_group_delete", args=[group.pk])).status_code == 403
+
+
+def test_removing_a_factor_needs_operational_mode_and_a_fresh_passkey(client: Client) -> None:
+    from apps.accounts.models import PasskeyDevice
+
+    user, authenticator = _staff_with_passkey()
+    device = PasskeyDevice.objects.get(user=user)
+    url = reverse("mfa:remove_device", args=["passkey", str(device.public_id)])
+    verified_login(client, user, level=levels.RESTRICTED)
+    assert client.post(url).status_code == 403  # restricted
+    verified_login(client, user)  # operational, but only a TOTP confirmation
+    assert client.post(url).status_code == 302
+    assert PasskeyDevice.objects.filter(pk=device.pk).exists()
+
+
+def test_vendor_bank_details_need_a_per_action_passkey(client: Client) -> None:
+    from apps.vendors.tests.factories import VendorFactory
+
+    vendor = VendorFactory.create()
+    root = UserFactory.create(superuser=True)
+    verified_login(client, root)  # operational, TOTP only
+    url = reverse("admin:vendors_vendor_change", args=[vendor.pk])
+    response = client.post(url, {"iban": "XX00 CHANGED", "_save": "Save"})
+    assert response.status_code == 302
+    assert "factor=passkey" in response["Location"]
