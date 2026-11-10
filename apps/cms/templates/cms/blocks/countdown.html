@@ -1,0 +1,4 @@
+{% load tz %}{% comment %}
+Launch countdown block (CMS.9, spec 10 §10.2): the theme component, with the dates in the
+operator's time zone. The theme's countdown.js module rewrites them in the visitor's.
+{% endcomment %}{% timezone time_zone %}{% include "components/launch_countdown.html" with title=value.heading text=value.body target=value.target url=cta_url action=value.cta_label expired=state.expired expired_text=expired_text expired_url=expired_url only %}{% endtimezone %}

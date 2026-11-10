@@ -519,6 +519,19 @@ def is_vendor_member(user: AbstractBaseUser | AnonymousUser) -> bool:
     return VendorMember.objects.filter(user_id=user.pk).exists()
 
 
+def memberships_of(user: AbstractBaseUser | AnonymousUser) -> list[VendorMember]:
+    """The user's own memberships with their vendors, by vendor name (the Manager's vendor
+    picker, CORE.17). Inactive and anonymous users have none."""
+    if not (user.is_authenticated and user.is_active):
+        return []
+    return list(
+        VendorMember.objects.for_member(user)
+        .filter(user_id=user.pk)
+        .select_related("vendor")
+        .order_by("vendor__display_name", "vendor_id")
+    )
+
+
 # --- Legal and e-invoicing identity (VEN.12)
 
 VAT_CHECKED = "vendor.vat_checked"

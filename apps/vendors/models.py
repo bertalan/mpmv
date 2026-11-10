@@ -299,6 +299,9 @@ class Vendor(BaseModel):
 
     class Meta:
         ordering = ["display_name", "id"]
+        permissions = [
+            ("view_all_vendors", "Platform staff: can see every vendor's data (spec 02, Q-34)"),
+        ]
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(status__in=VendorStatus.values),

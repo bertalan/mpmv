@@ -4,7 +4,8 @@ Special VAT territories (Canary Islands, Livigno, Northern Ireland goods rulesâ€
 by the tax app, not by inventing country codes here.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from types import MappingProxyType
 from typing import Final
 
 ISO_3166_ALPHA2: Final = frozenset(
@@ -23,6 +24,25 @@ ISO_3166_ALPHA2: Final = frozenset(
 
 EU_MEMBER_STATES: Final = frozenset(
     "AT BE BG CY CZ DE DK EE ES FI FR GR HR HU IE IT LT LU LV MT NL PL PT RO SE SI SK".split()  # noqa: SIM905
+)
+
+#: Official national languages (ISO 639-1) of the EU and EEA states, where GPSR applies: product
+#: warnings must be in a language consumers of the destination understand (art. 19(c), CMP.3).
+#: Reference data like the tables above, not the platform's country (that is `current_operator()`).
+#: These are the defaults: the live map, which staff can extend, is
+#: `apps.compliance.services.country_warning_languages()`.
+_OFFICIAL_LANGUAGES_TABLE: Final = """
+    AT de; BE nl fr de; BG bg; CY el tr; CZ cs; DE de; DK da; EE et; ES es; FI fi sv; FR fr;
+    GR el; HR hr; HU hu; IE en ga; IT it; LT lt; LU lb fr de; LV lv; MT mt en; NL nl; PL pl;
+    PT pt; RO ro; SE sv; SI sl; SK sk; IS is; LI de; NO nb nn
+"""
+OFFICIAL_LANGUAGES: Final[Mapping[str, tuple[str, ...]]] = MappingProxyType(
+    {
+        country: tuple(languages)
+        for country, *languages in (
+            entry.split() for entry in _OFFICIAL_LANGUAGES_TABLE.split(";") if entry.strip()
+        )
+    }
 )
 
 # Non-ISO spellings that show up in VAT and postal data.

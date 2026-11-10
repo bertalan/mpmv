@@ -410,10 +410,12 @@ def test_the_multiple_upload_stores_the_re_serialised_svg(client: Client) -> Non
 
 
 def _stored_raw_svg(document: str, collection: Collection) -> MediaImage:
-    """An image whose file was written to storage before the model saw it, as Wagtail's
-    multiple upload does (`file.save(..., save=False)`), bypassing `clean()`."""
+    """An image whose file is already in storage, unsanitised, before the model saw it (a file
+    written around the field, e.g. by a migration), bypassing `clean()`. Wagtail's multiple
+    upload goes through the field's `file.save`, which sanitises it (SEC.2): see below."""
     image = MediaImage()
-    image.file.save("logo.svg", ContentFile(document.encode()), save=False)
+    storage = image.file.storage
+    image.file.name = storage.save("original_images/logo.svg", ContentFile(document.encode()))
     image._set_image_file_metadata()
     image.width = image.height = 10
     image.title = "Raw logo"
@@ -448,6 +450,19 @@ def test_saving_refuses_a_scripted_svg_already_in_storage() -> None:
 
     with pytest.raises(ValidationError):
         image.save()
+
+
+def test_storing_a_scripted_svg_through_the_field_is_refused() -> None:
+    """SEC.2: the field's `file.save`, the step every new original goes through (Wagtail's
+    multiple upload included), stores only the sanitiser's output, so a scripted SVG never
+    reaches storage."""
+    image = MediaImage()
+
+    with pytest.raises(ValidationError) as error:
+        image.file.save("logo.svg", ContentFile(SCRIPTED_SVG.encode()), save=False)
+
+    assert "script" in " ".join(error.value.message_dict["file"])
+    assert not image.file
 
 
 def _bulk_add_to_collection(client: Client, images: list[MediaImage], target: Collection) -> Any:

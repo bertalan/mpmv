@@ -21,6 +21,7 @@ from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.catalog.models import Product, ProductStatus
 from apps.catalog.tests.factories import ProductFactory
+from apps.cms import roles
 from apps.events.models import EventPage
 from apps.events.tests.factories import EventPageFactory, primary_index
 from apps.vendors.tests.factories import VendorMemberFactory
@@ -37,9 +38,9 @@ def _staff(client: Client) -> User:
 
 
 def _editor() -> User:
-    """A non-staff member of Wagtail's "Editors" group: admin access, no staff status."""
+    """A non-staff member of the "Event moderators" role: admin access, no staff status."""
     user: User = UserFactory.create(password=secrets.token_urlsafe(16))
-    user.groups.add(Group.objects.get(name="Editors"))
+    user.groups.add(Group.objects.get(name=roles.EVENT_MODERATORS))
     return user
 
 
@@ -222,7 +223,7 @@ def test_a_vendor_member_with_wagtail_access_still_cannot_open_the_admin(client:
     tenant-scoped, so a vendor member is kept out of every admin view, not only the event ones.
     """
     member = VendorMemberFactory.create()
-    member.user.groups.add(Group.objects.get(name="Editors"))
+    member.user.groups.add(Group.objects.get(name=roles.PAGE_EDITORS))
     verified_login(client, member.user)
     own = EventPageFactory.create(vendor=member.vendor)
     other = EventPageFactory.create(title="Competitor draft")
@@ -261,11 +262,11 @@ def test_a_vendor_member_with_wagtail_access_still_cannot_open_the_admin(client:
 def test_the_admin_permission_is_refused_to_vendor_members_only() -> None:
     editor = _editor()
     member = VendorMemberFactory.create()
-    member.user.groups.add(Group.objects.get(name="Editors"))
+    member.user.groups.add(Group.objects.get(name=roles.PAGE_EDITORS))
     staff_member = VendorMemberFactory.create()
     staff_member.user.is_staff = True
     staff_member.user.save(update_fields=["is_staff"])
-    staff_member.user.groups.add(Group.objects.get(name="Editors"))
+    staff_member.user.groups.add(Group.objects.get(name=roles.PAGE_EDITORS))
     assert editor.has_perm("wagtailadmin.access_admin")
     assert not User.objects.get(pk=member.user.pk).has_perm("wagtailadmin.access_admin")
     assert User.objects.get(pk=staff_member.user.pk).has_perm("wagtailadmin.access_admin")

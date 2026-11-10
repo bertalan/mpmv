@@ -34,6 +34,7 @@ from apps.catalog.listings import EDITORIAL_HOOK, ListingEditorial
 from apps.catalog.services import ListingScope
 from apps.core.services import classified
 
+from . import roles
 from .admin_views import can_classify_images, image_review
 from .choosers import (
     brand_chooser,
@@ -90,8 +91,12 @@ _withdraw("register_bulk_action", _from_wagtail_users)
 
 
 @hooks.register("construct_main_menu")  # type: ignore[untyped-decorator]
-def hide_documents_menu(request: Any, menu_items: list[Any]) -> None:
-    menu_items[:] = [item for item in menu_items if item.name != "documents"]
+def cms_only_menu(request: Any, menu_items: list[Any]) -> None:
+    """The Wagtail admin menu holds CMS entries only (CORE.8): pages, images, snippets, reports,
+    settings, help and the event review. Vendors, products, orders, rates and payouts are in the
+    Manager (CORE.17), so whatever an app or package adds that is not in the allow list is
+    dropped, and so are documents (installed for wagtail-localize only)."""
+    menu_items[:] = [item for item in menu_items if item.name in roles.ADMIN_MENU_ALLOWED]
 
 
 @hooks.register("construct_image_chooser_queryset")  # type: ignore[untyped-decorator]
@@ -133,13 +138,13 @@ def register_category_chooser() -> Any:
 
 
 @hooks.register("register_admin_viewset")  # type: ignore[untyped-decorator]
-def register_brand_chooser() -> Any:
-    return brand_chooser
+def register_product_chooser() -> Any:
+    return product_chooser
 
 
 @hooks.register("register_admin_viewset")  # type: ignore[untyped-decorator]
-def register_product_chooser() -> Any:
-    return product_chooser
+def register_brand_chooser() -> Any:
+    return brand_chooser
 
 
 @hooks.register(EDITORIAL_HOOK)  # type: ignore[untyped-decorator]

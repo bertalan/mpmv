@@ -28,6 +28,8 @@ SECURITY_SETTING_PREFIXES = (
     "CSRF_COOKIE_",
     "X_FRAME_OPTIONS",
     "PERMISSIONS_POLICY",
+    "CROSS_ORIGIN_",
+    "WHITENOISE_ALLOW_ALL_ORIGINS",
     "MIDDLEWARE",
     "TEMPLATES",
 )
@@ -39,6 +41,9 @@ EXPECTED_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Cross-Origin-Opener-Policy": "same-origin",
+    # SEC.5 triage: nothing here is meant to be embedded by another origin. COEP stays unset
+    # on purpose (docs/dev/security-scans.md).
+    "Cross-Origin-Resource-Policy": "same-origin",
     "X-Frame-Options": "DENY",
 }
 

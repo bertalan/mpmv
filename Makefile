@@ -102,8 +102,12 @@ REPORTS := build/reports
 test-unit: ## Unit suite only (no database, no container)
 	uv run pytest -m unit
 
-test: db ## Unit + integration suites
-	uv run pytest -m "unit or integration" --junitxml=$(REPORTS)/junit.xml \
+# Parallel by default (pytest-xdist, one test database per worker). Locally 2 workers, safe on a
+# low-RAM machine; raise it with MPMV_TEST_WORKERS=4 or use "auto"; 0 runs serially. CI uses auto.
+MPMV_TEST_WORKERS ?= 2
+
+test: db ## Unit + integration suites (MPMV_TEST_WORKERS xdist workers, default 2)
+	uv run pytest -n $(MPMV_TEST_WORKERS) --dist loadgroup -m "unit or integration" --junitxml=$(REPORTS)/junit.xml \
 		--cov --cov-report=term-missing:skip-covered --cov-report=html:$(REPORTS)/coverage
 
 # SEC.5: the security-nightly workflow runs this on CI against its PostgreSQL service. The slow

@@ -1,0 +1,1 @@
+{% load i18n %}{% blocktranslate %}Overdue GPSR safety case: {{ kind }} {{ reference }}{% endblocktranslate %}

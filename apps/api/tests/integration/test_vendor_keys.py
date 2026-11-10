@@ -79,7 +79,7 @@ def test_a_vendor_member_lists_only_their_vendors_keys_and_never_platform_keys()
 
     assert list(ApiClient.objects.for_member(owner_a.user)) == [key_a]
     assert list(ApiClient.objects.for_actor(key_a)) == [key_a]
-    assert ApiClient.objects.for_actor(UserFactory.create(staff=True)).count() == 3
+    assert ApiClient.objects.for_actor(UserFactory.create(platform_staff=True)).count() == 3
 
 
 def test_a_vendor_keys_actor_scope_is_its_vendor() -> None:
