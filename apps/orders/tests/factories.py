@@ -15,6 +15,7 @@ from django.db import connection
 from factory.django import DjangoModelFactory
 
 from apps.orders.models import Order, OrderLine, OrderNumberSequence, VendorOrder
+from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
 _numbers = itertools.count(1)
@@ -97,3 +98,17 @@ class OrderNumberSequenceFactory(DjangoModelFactory[OrderNumberSequence]):
 
     year = factory.Sequence(lambda n: 3000 + n)
     last_value = 0
+
+
+def paid_vendor_order(vendor: Vendor | None = None, **fields: object) -> VendorOrder:
+    """A `pending` sub-order of a paid order, ready for the vendor to fulfil (ORD.6)."""
+    from apps.core.audit import AuditContext
+    from apps.core.models import AuditLog
+    from apps.orders import services
+
+    sub = VendorOrderFactory.create(**({"vendor": vendor} if vendor else {}), **fields)
+    ctx = AuditContext(actor_label="system:factory", source=AuditLog.Source.SYSTEM)
+    services.transition_order(sub.order, "awaiting_payment", ctx=ctx)
+    services.transition_order(sub.order, "paid", ctx=ctx)
+    sub.refresh_from_db()
+    return sub
