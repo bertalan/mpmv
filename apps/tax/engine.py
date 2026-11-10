@@ -2,9 +2,9 @@
 workflow, and the rules of the VIES check (TAX.5). No ORM.
 
 This module holds the vocabulary of the tax configuration and the consistency rules of its
-rows. The tax decision itself (`resolve_goods_tax`, `resolve_shipping_tax`) is TAX.3 and TAX.4,
-and depends on open decisions D-01 (country of taxation), D-02 (Northern Ireland) and D-03
-(carrier `force_vat`): nothing here decides them.
+rows, and the goods tax decision (`resolve_goods_tax`, TAX.3, decision D-01: B2C goods are
+taxed in the delivery country). The shipping tax decision is TAX.4; D-02 (Northern Ireland) and
+D-03 (carrier `force_vat`) are open and nothing here decides them.
 """
 
 import datetime as dt
@@ -12,7 +12,7 @@ import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any, Final
+from typing import Any, Final, Literal
 
 from apps.core import postcodes
 from apps.core.countries import EU_MEMBER_STATES, InvalidCountry, normalize_country
@@ -715,3 +715,175 @@ def vat_check_message(reason: str, *, country: str) -> str:
     """A sentence for staff and customers saying why the number is, or is not, verified."""
     text = _MESSAGES.get(reason, _MESSAGES[VAT_REASON_UNAVAILABLE]).format(country=country)
     return text if reason == VAT_REASON_VALID else text + _NOT_VERIFIED
+
+
+# --- The goods tax decision (TAX.3, spec 05 §5.2)
+
+# D-01 (owner, 2026-11-10): B2C goods are taxed in the country they are delivered to (VAT
+# Directive art. 33, OSS since 2021). The billing country only validates B2B data. The decision
+# reads `TaxContext.destination_country` and nothing else for the basis; this constant names
+# the rule so a change of rule has one place to start from.
+DELIVERY: Final = "delivery"
+BILLING: Final = "billing"
+GOODS_COUNTRY_BASIS: Final = DELIVERY
+
+REASON_STANDARD_DESTINATION: Final = "standard_destination"
+REASON_DOMESTIC_VENDOR_COUNTRY: Final = "domestic_vendor_country"
+REASON_EXPORT: Final = "export"
+REASON_REVERSE_CHARGE: Final = "reverse_charge"
+REASON_ART74_PUBLISHING: Final = ART74_PUBLISHING
+REASON_FLAT_RATE_VENDOR: Final = "flat_rate_vendor"
+
+# Keys of the legal wording on the order document (the texts live in the CMS and the profile).
+NOTE_REVERSE_CHARGE: Final = "reverse_charge_art196"  # Directive 2006/112/EC art. 196
+NOTE_EXPORT: Final = "export_art146"  # Directive 2006/112/EC art. 146
+NOTE_OUTSIDE_VAT_TERRITORY: Final = OUTSIDE_VAT_TERRITORY
+NOTE_EXEMPT_PREFIX: Final = "exempt:"  # followed by the profile's exempt_reason
+
+MONEY_QUANTUM: Final = Decimal("0.01")
+
+FiscalCategory = str  # one of CATEGORIES
+
+
+class MissingTaxRate(LookupError):
+    """No rate for the country (or territory) and category: a blocking configuration error,
+    never a silent 0% (T6)."""
+
+
+@dataclass(frozen=True)
+class VendorTaxProfileSnapshot:
+    """The vendor's tax profile valid on the date of the sale."""
+
+    regime: str
+    exempt_reason: str = ""
+    exempt_country: str = ""
+
+
+@dataclass(frozen=True)
+class PlatformOperatorSnapshot:
+    """The platform operator valid on the date of the sale. The goods tree does not read it
+    (no deemed-supplier branch, D-21); it is part of the context for TAX.4 and CMP.18."""
+
+    country: str
+
+
+@dataclass(frozen=True)
+class B2BValidated:
+    """A business customer whose VAT number VIES confirmed (fail closed: anything else is a
+    consumer). `vat_country` is the country of the number, not of the delivery."""
+
+    vat_country: str
+    vat_number: str
+    checked_at: dt.datetime
+
+
+@dataclass(frozen=True)
+class RateTable:
+    """VAT percentages valid on the date of the sale, by (country or territory code, category)."""
+
+    rates: Mapping[tuple[str, str], Decimal]
+
+    def rate(self, code: str, category: str) -> Decimal:
+        try:
+            return self.rates[(code, category)]
+        except KeyError:
+            raise MissingTaxRate(f"no {category} tax rate configured for {code}") from None
+
+
+@dataclass(frozen=True)
+class TaxContext:
+    on: dt.date
+    vendor_country: str
+    vendor_profile: VendorTaxProfileSnapshot
+    platform: PlatformOperatorSnapshot
+    destination_country: str
+    destination_postcode: str | None  # for special territories
+    customer: Literal["b2c"] | B2BValidated
+    rates: RateTable
+    territories: tuple[TerritoryRule, ...] = ()
+
+
+@dataclass(frozen=True)
+class TaxDecision:
+    rate: Decimal  # effective percentage, never a "class"
+    reason: str
+    country_of_taxation: str | None
+    legal_note_key: str | None  # text on the order document
+
+
+def _zero(reason: str, note: str | None) -> TaxDecision:
+    return TaxDecision(
+        rate=Decimal(0), reason=reason, country_of_taxation=None, legal_note_key=note
+    )
+
+
+def _taxed(rate: Decimal, reason: str, country: str) -> TaxDecision:
+    return TaxDecision(
+        rate=quantize_rate(rate), reason=reason, country_of_taxation=country, legal_note_key=None
+    )
+
+
+def resolve_goods_tax(ctx: TaxContext, category: FiscalCategory) -> TaxDecision:
+    """The VAT on one line of goods: the decision tree of spec 05 §5.2.
+
+    1. an exempt vendor charges no VAT, whatever else is true (T4);
+    2. an address in a territory outside the VAT area is 0% (T15), found before the EU test
+       because Aaland, Saint-Martin and the like are written with a country code of their own;
+    3. a destination outside the EU is an export (T14);
+    4. a VIES-validated business with a VAT number from another member state than the vendor's,
+       receiving goods in a member state other than the vendor's, is reverse charge (T1);
+    5. the vendor country's rate applies at home or for a `domestic_only` vendor (T3, T7, T8);
+    6. otherwise the destination country's rate (OSS, T2, T5).
+
+    Rates come from the context's table; a missing rate raises `MissingTaxRate` (T6). A blank or
+    invalid destination country raises `InvalidCountry`: there is no default country (T18).
+    """
+    if category not in CATEGORIES:
+        raise ValueError(f"{category!r} is not a fiscal category")
+    profile = ctx.vendor_profile
+    destination = normalize_country(ctx.destination_country)
+    vendor_country = normalize_country(ctx.vendor_country)
+
+    if profile.regime == EXEMPT:
+        reason = (
+            REASON_ART74_PUBLISHING
+            if profile.exempt_reason == ART74_PUBLISHING
+            else (REASON_FLAT_RATE_VENDOR)
+        )
+        return _zero(reason, NOTE_EXEMPT_PREFIX + profile.exempt_reason)
+
+    territory = find_territory(destination, ctx.destination_postcode or "", ctx.territories)
+    if territory is not None and territory.vat_status == OUTSIDE_VAT_AREA:
+        return _zero(OUTSIDE_VAT_TERRITORY, NOTE_OUTSIDE_VAT_TERRITORY)
+    destination = territory_country(destination)
+
+    if destination not in EU_MEMBER_STATES:
+        return _zero(REASON_EXPORT, NOTE_EXPORT)
+
+    customer = ctx.customer
+    if (
+        customer != "b2c"
+        and destination != vendor_country
+        and customer.vat_country != vendor_country
+        and customer.vat_country in EU_MEMBER_STATES
+    ):
+        return _zero(REASON_REVERSE_CHARGE, NOTE_REVERSE_CHARGE)
+
+    if destination == vendor_country or profile.regime == DOMESTIC_ONLY:
+        return _taxed(
+            ctx.rates.rate(vendor_country, category), REASON_DOMESTIC_VENDOR_COUNTRY, vendor_country
+        )
+
+    code = (
+        territory.code
+        if territory is not None and territory.vat_status == OWN_RATES
+        else destination
+    )
+    return _taxed(ctx.rates.rate(code, category), REASON_STANDARD_DESTINATION, destination)
+
+
+def tax_amount(net: Decimal, rate: Decimal) -> Decimal:
+    """The VAT on a line's net amount, ROUND_HALF_UP to the cent (never floats)."""
+    if not isinstance(net, Decimal) or not isinstance(rate, Decimal):
+        raise TypeError("net and rate must be Decimal")
+    return (net * rate / 100).quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP)

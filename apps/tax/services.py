@@ -29,7 +29,7 @@ from apps.core.audit import VENDOR_FIELD, AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.countries import normalize_country
 from apps.core.models import Versioned
-from apps.core.services import run_mutation, save_audited
+from apps.core.services import current_operator, run_mutation, save_audited
 from apps.core.validity import NoValidRow, next_start_error, pick_valid
 from apps.vendors import engine as vendors_engine
 from apps.vendors.engine import VendorAction, split_vat_number
@@ -1039,3 +1039,56 @@ def recheck_vat_number(country: str, vat_number: str) -> VatCheck:
     if check.result == engine.VAT_UNAVAILABLE:
         raise ViesUnavailable(check.message)
     return check
+
+
+# --- The goods tax context (TAX.3)
+
+
+def rate_table(at: dt.datetime) -> engine.RateTable:
+    """Every rate valid at `at`, by country (or territory code) and category."""
+    rows = (
+        TaxRate.objects.filter(valid_from__lte=at)
+        .filter(Q(valid_to__isnull=True) | Q(valid_to__gt=at))
+        .select_related("territory")
+    )
+    return engine.RateTable(
+        {((r.territory.code if r.territory else r.country), r.category): r.rate for r in rows}
+    )
+
+
+def build_tax_context(
+    vendor: Vendor,
+    *,
+    destination_country: str,
+    destination_postcode: str | None = None,
+    customer_vat: VatValidation | None = None,
+    at: dt.datetime | None = None,
+) -> engine.TaxContext:
+    """The inputs of `engine.resolve_goods_tax` for a sale by `vendor` valid at `at` (default now).
+
+    Only a VIES-valid answer makes the customer a validated business: invalid, unavailable or
+    absent answers leave a consumer (T2, fail closed). The platform country is the operator's.
+    """
+    at = at or timezone.now()
+    profile = current_tax_profile(vendor, at)
+    operator = current_operator(at)
+    customer: engine.B2BValidated | None = None
+    if customer_vat is not None and customer_vat.result == engine.VAT_VALID:
+        customer = engine.B2BValidated(
+            customer_vat.country, customer_vat.vat_number, customer_vat.checked_at
+        )
+    return engine.TaxContext(
+        on=at.date(),
+        vendor_country=vendor.country,
+        vendor_profile=engine.VendorTaxProfileSnapshot(
+            regime=profile.regime,
+            exempt_reason=profile.exempt_reason,
+            exempt_country=profile.exempt_country,
+        ),
+        platform=engine.PlatformOperatorSnapshot(country=operator.country),
+        destination_country=destination_country,
+        destination_postcode=destination_postcode,
+        customer=customer or "b2c",
+        rates=rate_table(at),
+        territories=tuple(territory_rules()),
+    )

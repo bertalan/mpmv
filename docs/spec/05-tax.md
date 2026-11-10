@@ -157,9 +157,10 @@ Intended differences from today:
   - Saint-Martin: ISO `MF`; French postcode `97150`. The French part is an outermost region excluded from the VAT territory.
   - Saint-Barthélemy: ISO `BL`; French postcode `97133`. An overseas country and territory outside the EU since 2012.
   - Both resolve to 0% with reason `outside_vat_territory` (case T15).
-- Country basis: **delivery country** for B2C distance sales (EU rule on distance sales of
-  goods), with the billing country used only for B2B. Today the billing country is used: **to be confirmed with the
-  tax advisor** (D-01).
+- Country basis (D-01, decided by the owner on 2026-11-10): **delivery country** for B2C goods
+  (VAT Directive art. 33, OSS since 2021). The billing country only validates B2B data: a
+  validated business receiving goods in the vendor's country pays the vendor country's VAT. The
+  basis is the named constant `GOODS_COUNTRY_BASIS` in the tax engine.
 - The carrier `force_vat` flag goes away, unless it turns out to be needed (D-03).
 - VIES fails closed: VIES unavailable, invalid number or prefix different from the country →
   VAT applied; result saved in `VatValidation` and in the order snapshot.
