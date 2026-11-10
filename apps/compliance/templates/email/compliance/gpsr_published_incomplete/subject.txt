@@ -1,0 +1,1 @@
+{% load i18n %}{% blocktranslate count counter=count %}{{ counter }} published product fails the GPSR check{% plural %}{{ counter }} published products fail the GPSR check{% endblocktranslate %}

@@ -1,0 +1,14 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate %}A GPSR safety case is past its deadline and still open. Act on it now and record what was done in the staff admin.{% endblocktranslate %}</p>
+<ul>
+<li>{% translate "Case" %}: {{ kind }} {{ reference }} ({{ case_id }})</li>
+{% if authority %}<li>{% translate "Authority" %}: {{ authority }}</li>{% endif %}
+<li>{% translate "Vendor" %}: {{ vendor_name }}</li>
+{% if product_sku %}<li>{% translate "Product SKU" %}: {{ product_sku }}</li>{% endif %}
+<li>{% translate "Received on" %}: {{ received_on }}</li>
+<li>{% translate "Due on" %}: {{ due_on }}</li>
+</ul>
+</body>
+</html>

@@ -45,6 +45,19 @@ def test_export_prints_a_vendor_configuration_as_json_or_csv() -> None:
     assert csv_text.splitlines()[0] == ",".join(fmt.CSV_COLUMNS)
 
 
+def test_a_csv_export_the_importer_could_not_read_fails_the_command(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    vendor = VendorFactory.create()
+    document = export_config(vendor)
+    document["zones"] = [{"code": "home", "name": "x" * (fmt.MAX_CELL_CHARS + 1)}]
+    monkeypatch.setattr(
+        "apps.shipping.management.commands.shipping_config.export_config", lambda owner: document
+    )
+    with pytest.raises(CommandError, match="larger than"):
+        run("export", "--vendor", str(vendor.public_id), "--csv")
+
+
 def test_import_is_a_dry_run_unless_applied(tmp_path: Path) -> None:
     path, _ = vendor_file(tmp_path, "config.csv")
     target = VendorFactory.create()

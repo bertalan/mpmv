@@ -276,6 +276,12 @@ login for everyone. It has **two spaces**, split by URL prefix:
   vendor from the header, and the choice is checked against their memberships on every request.
   Every query goes through `VendorScopedQuerySet.for_actor` (CORE.3), so the tenant isolation
   rule stays where it is: in the services.
+  Members of a **closed** vendor are refused (lane-a decision on PR #170): every shop URL, bulk
+  actions and the vendor switch included, answers **403** with a page that says the vendor is
+  closed and how to ask for reopening (VEN.21), and shows no vendor data. A closed vendor is not
+  offered in the picker or the switcher. Platform staff keep their access through the platform
+  space and impersonation (CORE.10). Read-only downloads of a closed vendor's past documents are
+  proposed as VEN.28.
 - **Platform space** `/manager/platform/`: platform staff roles only (CORE.18). Each role sees
   only its own sections.
 

@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **263** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **2174 h** (P1 1769 h · P2 387 h · P3 18 h)
+- Micro-tasks: **265** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **2184 h** (P1 1775 h · P2 391 h · P3 18 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -17,7 +17,7 @@
 | ARC | Architecture and foundations | 25 | 160 | 14 | 0 | 174 |
 | CORE | Identity, permissions, API, backoffice | 19 | 162 | 0 | 0 | 162 |
 | CAT | Product catalog | 20 | 150 | 60 | 0 | 210 |
-| VEN | Vendors, commissions, ledger | 27 | 221 | 22 | 0 | 243 |
+| VEN | Vendors, commissions, ledger | 28 | 221 | 26 | 0 | 247 |
 | TAX | Tax engine | 13 | 53 | 28 | 0 | 81 |
 | SHP | Shipping and quotes | 14 | 96 | 28 | 0 | 124 |
 | ORD | Cart, orders, returns | 12 | 102 | 14 | 0 | 116 |
@@ -29,11 +29,11 @@
 | THM | Frontend themes | 12 | 76 | 12 | 0 | 88 |
 | SEO | SEO, feeds, analytics | 7 | 38 | 14 | 0 | 52 |
 | AI | AI channels (MCP, agents) | 4 | 0 | 22 | 18 | 40 |
-| CMP | Compliance | 25 | 157 | 69 | 0 | 226 |
+| CMP | Compliance | 26 | 163 | 69 | 0 | 232 |
 | SEC | Security | 9 | 59 | 0 | 0 | 59 |
 | OPS | Operations | 7 | 19 | 27 | 0 | 46 |
 | MIG | Migration and cutover | 14 | 121 | 20 | 0 | 141 |
-| **Total** | | **263** | **1769** | **387** | **18** | **2174** |
+| **Total** | | **265** | **1775** | **391** | **18** | **2184** |
 
 ## By phase
 
@@ -146,7 +146,7 @@
 | ARC.10 | Synthetic data seed: vendors with all regimes, EN/IT products, zones, orders | P1 | 10 | CAT.1, TAX.1, SHP.1 | Reproducible `make seed`, used by the tests |
 | TAX.1 | TaxRate, Territory, versioned VendorTaxProfile, VatValidation models | P1 | 8 | ARC.7, VEN.1 | Migrations + admin |
 | TAX.2 | Regime change workflow (vendor request → staff approval), history | P1 | 6 | TAX.1 | Parity with VTO review |
-| TAX.3 | `resolve_goods_tax` pure function + T1–T18 case table as parametrized tests | P1 | 12 | TAX.1 | 100% of cases green, 100% module coverage |
+| TAX.3 | `resolve_goods_tax` pure function + T1–T18 case table as parametrized tests | P1 | 12 | TAX.1 | 100% of cases green (T15 included: territories outside the VAT territory resolve to 0% with reason `outside_vat_territory`, using `is_outside_vat_territory` from TAX.7), 100% module coverage |
 | TAX.4 | `resolve_shipping_tax` with proportional split | P1 | 6 | TAX.3 | T8–T13 green |
 | TAX.5 | VIES client with cache, timeout, fail-closed | P1 | 6 | TAX.1 | Test with simulated VIES down |
 | TAX.7 | Special territories by postcode (initial dataset) | P1 | 4 | TAX.1, TAX.11 | T15 green |
@@ -178,7 +178,7 @@
 | PAY.3 | Transfer per vendor, reverse transfer, reconciliation with the ledger | P1 | 10 | PAY.2 | 3 vendors in one order: 3 correct transfers |
 | PAY.4 | Full/partial refunds with VAT and commissions reversed | P1 | 10 | PAY.3 | Partial refund cases green |
 
-### F3 — Vendors, ledger, compliance (41 tasks, 378 h)
+### F3 — Vendors, ledger, compliance (42 tasks, 384 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -223,6 +223,7 @@
 | CMP.15 | Swiss small-consignment counter: yearly turnover of consignments to Swiss consumers with import tax of CHF 5 or less, CHF rate as data, alerts to owner and staff at configurable levels (default 70% and 90% of CHF 100,000), levels changed through an audited service | P1 | 4 | ORD.2, ARC.9, ARC.16 | Seed orders above and below the CHF 5 import tax limit count correctly; crossing 70% and then 90% sends one alert each, once a year; the counter restarts on 1 January |
 | CMP.24 | Approval of (L) legal wording: per text and language a version hash, draft author (person or agent) and counsel approval (approver name or role, date, approved hash) for gettext keys with an `(L)` context and database texts; release check and production system check refuse unapproved texts; STAGE shows a pending marker; approvals audited | P1 | 6 | I18N.7, ARC.16, SEC.4 | Changing an approved (L) text in any language makes the release check fail until a new approval matches its hash; production refuses to start with an unapproved text; STAGE shows the marker; each approval is in the audit log |
 | CMP.25 | Activation gate for platform duties (coherence check 5): an `activation` purpose in `LegalFieldRequirement` seeded with the DSA article 30 trader data (name, address, telephone, email, trade register entry where registered), the article 30(1)(e) self-certification recorded as an append-only acceptance with text hash, both checked by the VEN.5 activation next to the CMP.13 gate; DAC7 data still blocks payouts only; CMP.11 keeps the checks, display on offers and EPR | P1 | 4 | VEN.5, VEN.12, CMP.13 | An EU vendor missing its telephone, its trade register entry (when registered) or the self-certification cannot be activated and gets the reason; a complete vendor is activated; missing DAC7 data does not block activation; the self-certification row stores version, language and hash |
+| CMP.26 | GPSR follow-ups of the owner decisions 2026-11-09 (CMP.3): the checkout refuses a line whose product `apps.catalog.selling.sale_blockers` blocks for the delivery country and shows `{% product_destination_notice %}` (ORD.3, ORD.5); the product page includes the notice for the visitor's country (CAT.7); a Manager shop space page lists the vendor's products with the country languages their warnings miss (`vendor_warnings_language_gaps`, CORE.17); an in-app notice in the Manager platform space for the Catalog and moderation role when a safety case is overdue; open points of the CMP.3 review: link the notice only to languages in which the product page is published, a composite foreign key `(product, vendor)` on `SafetyCase` as in the catalog, `no` vs `nb`/`nn` matching for Norway, and Northern Ireland (GPSR applies, ships as `GB`, not checked) | P1 | 6 | CMP.3, ORD.3, ORD.5, CAT.7, CORE.17 | A cart line with warnings only in German cannot be checked out to a French-only country and the checkout shows why, with a link to the German warnings; the same cart checks out to a German-speaking country; the vendor's Manager page lists the missing country languages; an overdue safety case shows a notice to a Catalog and moderation user and not to a Finance user |
 
 ### F4 — Content, SEO, feeds (33 tasks, 223 h)
 
@@ -280,7 +281,7 @@
 | MIG.11 | Staggered product and tag URL switch (owner decisions Q-91 and D-07): per-product and per-term `url_mode` and frozen legacy paths, traffic ranking from analytics (SEO.5) or the MIG.1 legacy access-log counts, configurable batch size and cadence, batch switch and rollback as a management command and staff action with dry-run and audit, sitemap, canonical and hreflang by mode, gate on 404 rate, Search Console impressions and clicks against baseline, and errors with configurable thresholds | P1 | 6 | MIG.6, CAT.5, CAT.8 | A batch switch gives a single 301 hop and an updated sitemap; a rollback leaves no redirect loop; a legacy-mode page is 200 with a self-canonical; a switched legacy tag URL is a single 301 to `/{taxonomy}/{term}/`; the next batch is refused when a gate metric is over threshold; the MIG.6 "no URL lost" count still holds after a switch and a rollback; products and terms created after go-live start in new mode |
 | MIG.12 | Source-connector interface (owner decision 2026-11-09, spec 13 §13.2 "Source connectors"): `ShopConnector` protocol (`capabilities`, `check`, `extract`), registry by decorator and `MPMV_IMPORT_CONNECTORS`, intermediate format `mpmv-import/1` (JSON Schema and Pydantic models, an evolution of the MIG.1 JSON) read by the MIG.3 and MIG.4 loaders only; shared HTTP client `apps/core/http.py` (HTTPS only, per-connector rate limit, timeouts, backoff honouring `Retry-After`, one log line per call without credentials, SSRF guard refusing loopback, private, link-local, CGNAT and metadata addresses and redirects to them); `ingest.services.import_from_source(..., dry_run=True) -> ChangeSet` with one AuditLog entry per run and an import-origin map on `(source, source_id)`; `fetched_at` in the run manifest; RFC 9457 errors; secrets by reference from the environment or a vault; schema validation of every record (SEC.9); read-only, dry-run by default, idempotent; the MIG.1 extractor wrapped as the `wordpress_db` connector; connectors import no app models (import-linter contract) | P1 | 9 | MIG.1 | A fake connector registered from settings appears in the registry and the loaders load its output with no change to their code; a record that fails the schema is rejected with a report and nothing of it is written; a canary secret never appears in logs, output or the database; two runs on the same source give byte-identical records (the manifest aside); a source resolving to 127.0.0.1, 10.x, 169.254.x, 100.64.x or a private IPv6 address is refused, also when reached by a redirect; a run interrupted halfway resumes without duplicates; a dry run writes nothing and returns the ChangeSet; the MIG.1 output validates against `mpmv-import/1`; a connector that sends a non-GET request fails its test |
 
-### F6 — After go-live (P2) (48 tasks, 387 h)
+### F6 — After go-live (P2) (49 tasks, 391 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -294,6 +295,7 @@
 | VEN.7 | Payouts: eligibility, block if DAC7 incomplete (`assert_payout_allowed`), history | P2 | 8 | VEN.4, PAY.3, VEN.12 | Tests on every blocking condition |
 | VEN.11 | Tax regime change request by vendor with staff review and email | P2 | 6 | TAX.2, ARC.16 | Parity with VTO 2.4 |
 | VEN.19 | Plan entitlements and plan fees: `plan_allows(vendor, feature)` service over `VendorPlan.features`, plan change with effective date and audit; monthly `plan_fee` ledger debit by a scheduled idempotent job; non-fiscal statement PDF per charge in the vendor's language (no invoice issued by the marketplace; the operator invoices outside the platform) | P2 | 8 | VEN.2, VEN.4, VEN.15, ARC.9 | A vendor whose plan lacks a feature cannot use it and keeps its data; a plan with a monthly fee gets exactly one `plan_fee` entry per period even when the job runs twice; the statement PDF states that it is not a tax invoice and matches the ledger entry; no fiscal document or e-invoice is produced |
+| VEN.28 | Read-only document access for closed vendors (proposed, lane-a decision on #170, not built): the CORE.17 shop space refuses members of a closed vendor with a 403 page; for the legal retention period they may still need to download their own past payout statements, invoices and DAC7 data. A dedicated read-only area for the closed vendor's former members, downloads only through signed URLs, no other shop page, every download in the AuditLog, access ending with the retention period | P2 | 4 | CORE.17, VEN.9, VEN.15, VEN.23 | A member of a closed vendor downloads that vendor's past payout statements, invoices and DAC7 data and opens no other shop page; another vendor's documents answer 404; after the retention period the area answers 403 with the closed-vendor page; each download writes an AuditLog entry |
 | TAX.6 | Rate import from official source + staff review + validity periods | P2 | 8 | TAX.1 | Simulated update without touching past orders |
 | TAX.8 | `distance_sales_eu` + `suggest_regime` from the ledger | P2 | 6 | VEN.4 | T16 green |
 | TAX.9 | Cart tax simulator in admin and API (`/tax/simulate`) | P2 | 6 | TAX.4, SHP.4 | Staff simulate a mixed cart |

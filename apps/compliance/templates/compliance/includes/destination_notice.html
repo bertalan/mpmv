@@ -1,0 +1,7 @@
+{% load i18n %}{# Why a product cannot be shipped to a country (CMP.3, GPSR art. 19(c)). Needs `check` and `links`. #}{% if not check.allowed %}
+<div class="notice notice-warning product-destination-notice" role="status">
+  <p>{% blocktranslate with country=check.country languages=check.country_languages|join:", " %}This product cannot be shipped to {{ country }}: its safety warnings are not yet available in a language of that country ({{ languages }}). It can still be bought for delivery to other countries.{% endblocktranslate %}</p>
+  {% if links %}<p>{% translate "Read the safety warnings in:" %}
+    {% for link in links %}<a href="{{ link.href }}" hreflang="{{ link.language }}" lang="{{ link.language }}">{{ link.name }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+</div>
+{% endif %}

@@ -126,6 +126,8 @@ OPERATOR_FIELDS = (
     "commission_vat_mode",
     "einvoice_channel",
     "dac7_authority_country",
+    "support_email",
+    "compliance_email",
     "allowed_vendor_countries",
     "valid_from",
     "valid_to",
