@@ -72,3 +72,53 @@ def test_cat13_migration_fills_match_keys_and_staff_refs_of_existing_rows() -> N
             "SELECT sku, sku_key, staff_ref FROM catalog_product WHERE id = %s", [product.pk]
         )
         assert cursor.fetchone() == ("BAG 100", "bag 100", "P-000001")
+
+
+def _d25_migration():  # type: ignore[no-untyped-def]
+    import importlib
+
+    return importlib.import_module("apps.catalog.migrations.0010_d25_product_slugs")
+
+
+@pytest.mark.django_db
+def test_d25_migration_dry_run_changes_nothing() -> None:
+    """CAT.5b: a dry run lists the reslugs and writes neither slugs, history nor audit."""
+    from django.apps import apps
+
+    from apps.catalog.models import ProductTranslation, SlugHistory
+    from apps.catalog.tests.factories import ProductTranslationFactory
+    from apps.core.models import AuditLog
+
+    translation = ProductTranslationFactory.create(
+        language="en", title="Leather Bag", slug="leather-bag-en"
+    )
+    changes = _d25_migration().reslug_products(apps, None, dry_run=True)
+    assert not changes.is_empty
+    translation.refresh_from_db()
+    assert translation.slug == "leather-bag-en"
+    assert not SlugHistory.objects.exists()
+    assert not AuditLog.objects.exists()
+    assert ProductTranslation.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_d25_migration_reslugs_existing_products_with_history_and_audit() -> None:
+    """CAT.5b: `{title}-{lang}` slugs move to history, audited; a rerun changes nothing."""
+    from django.apps import apps
+
+    from apps.catalog.models import SlugHistory
+    from apps.catalog.tests.factories import ProductTranslationFactory
+    from apps.core.models import AuditLog
+
+    translation = ProductTranslationFactory.create(
+        language="it", title="Borsa in pelle", slug="borsa-in-pelle-it"
+    )
+    migration = _d25_migration()
+    migration.reslug_products(apps, None)
+    translation.refresh_from_db()
+    assert translation.slug == "borsa-in-pelle"
+    assert list(SlugHistory.objects.values_list("slug", flat=True)) == ["borsa-in-pelle-it"]
+    entry = AuditLog.objects.get(action="catalog.product.slug_changed")
+    assert entry.source == "command"
+    assert migration.reslug_products(apps, None).is_empty
+    assert SlugHistory.objects.count() == 1
