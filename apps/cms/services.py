@@ -46,10 +46,9 @@ from wagtail_localize.operations import TranslationCreator
 from apps.catalog import listings, slugs
 from apps.catalog import services as catalog
 from apps.catalog.models import Category, Term
-from apps.core import translations
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
-from apps.core.i18n import configured_languages
+from apps.core.i18n import configured_languages, hreflang_alternates
 from apps.core.image_licences import Credit
 from apps.core.money import CURRENCY
 from apps.core.services import run_mutation
@@ -972,6 +971,22 @@ def listing_editorial(
     return None
 
 
+def page_language_urls(page: Page | None, request: HttpRequest | None) -> dict[str, str]:
+    """{language code: URL} of the live translations of `page` (itself included): the one
+    source of the page's `hreflang` links and of its language switcher (`apps.core.i18n`)."""
+    if page is None:
+        return {}
+    urls: dict[str, str] = {}
+    for translated in page.get_translations(inclusive=True).live().select_related("locale"):
+        # A page that is live but not shown to visitors (a hidden event) is not offered.
+        if not getattr(translated.specific, "is_publicly_visible", lambda: True)():
+            continue
+        url = translated.get_url(request)
+        if url is not None:
+            urls[translated.locale.language_code] = url
+    return urls
+
+
 def vendor_landing_context(page: Any, request: HttpRequest | None) -> dict[str, Any]:
     """The vendor's featured products (its storefront listing's newest) and the page's own
     canonical and `hreflang` links: its live translations of a public vendor."""
@@ -990,13 +1005,11 @@ def vendor_landing_context(page: Any, request: HttpRequest | None) -> dict[str, 
         return request.build_absolute_uri(url) if request is not None else url
 
     found: dict[str, str] = {}
-    for translation in page.get_translations(inclusive=True).live().specific():
-        url = absolute(translation.get_url(request))
-        if url is not None:
-            found[translation.locale.language_code] = url
-    alternates = [(code, found[code]) for code in configured_languages() if code in found]
-    source = translations.source_language()
-    alternates.extend(("x-default", url) for code, url in list(alternates) if code == source)
+    for code, url in page_language_urls(page, request).items():
+        absolute_url = absolute(url)
+        if absolute_url is not None:
+            found[code] = absolute_url
+    alternates = hreflang_alternates(found)
     return {
         "featured": grid,
         "currency": CURRENCY,

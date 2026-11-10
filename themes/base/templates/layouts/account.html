@@ -8,8 +8,8 @@ path instead of a translated page. Pages fill `account_content` and set `title`.
 {% block title %}{{ site_name }}{% endblock %}
 {% block header %}
   {% navigation_links "header" as header_links %}
-  {% get_current_language as current_language %}{% get_available_languages as available %}{% get_language_info_list for available as languages %}
-  {% include "components/header.html" with site_name=site_name links=header_links languages=languages current_language=current_language next_url=request.get_full_path %}
+  {% switch_next_url as next_url %}{% get_current_language as current_language %}{% get_available_languages as available %}{% get_language_info_list for available as languages %}
+  {% include "components/header.html" with site_name=site_name links=header_links languages=languages current_language=current_language next_url=next_url %}
 {% endblock %}
 {% block content %}
   <div class="account-page">
