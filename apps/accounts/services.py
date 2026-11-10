@@ -668,7 +668,7 @@ def record_password_change(user: User, *, had_usable_password: bool, ctx: AuditC
 ACCOUNT_UNLOCKED = "accounts.user.unlocked"  # by platform staff
 ACCOUNT_UNLOCKED_BY_RESET = "accounts.user.unlocked_by_reset"  # by a completed password reset
 # The platform staff permission (Q-34). The same string as `PLATFORM_STAFF_PERMISSION` in
-# `apps.vendors.scoping` (#185); accounts must not import vendors, so a guard test pins both.
+# `apps.vendors.scoping`; accounts must not import vendors, so a guard test pins both.
 UNLOCK_PERMISSION = "vendors.view_all_vendors"
 
 

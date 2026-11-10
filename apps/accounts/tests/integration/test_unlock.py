@@ -7,6 +7,7 @@ There is no "request a reset" flow in the code base yet: when one lands it must 
 """
 
 import datetime as dt
+import importlib
 import secrets
 
 import pytest
@@ -269,8 +270,7 @@ def test_a_failing_audit_rolls_the_reset_back(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_the_permission_name_matches_the_platform_staff_rule() -> None:
-    scoping = pytest.importorskip("apps.vendors.scoping")
-    constant = getattr(scoping, "PLATFORM_STAFF_PERMISSION", None)
-    if constant is None:
-        pytest.skip("#185 not merged yet")
-    assert constant == services.UNLOCK_PERMISSION
+    # Dynamic import: the layer contract forbids a static accounts -> vendors import. A hard
+    # failure (no skip) if #185's constant ever disappears.
+    scoping = importlib.import_module("apps.vendors.scoping")
+    assert scoping.PLATFORM_STAFF_PERMISSION == services.UNLOCK_PERMISSION
