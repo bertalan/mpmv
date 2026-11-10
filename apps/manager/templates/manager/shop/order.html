@@ -13,8 +13,10 @@ data are not shown. Every action is a POST with a CSRF token. No inline script o
     <dt>{% translate "Status" %}</dt><dd data-order-state>{{ sub.get_state_display }}</dd>
     <dt>{% translate "Placed" %}</dt><dd>{{ placed|date:"SHORT_DATETIME_FORMAT" }}</dd>
     <dt>{% translate "Customer" %}</dt><dd>{{ customer_name }}</dd>
-    <dt>{% translate "Ship to" %}</dt>
-    <dd>{% for line in address %}{{ line }}{% if not forloop.last %}<br>{% endif %}{% endfor %}{% if country %}<br>{{ country }}{% endif %}</dd>
+    {% if show_address %}
+      <dt>{% translate "Ship to" %}</dt>
+      <dd>{% for line in address %}{{ line }}{% if not forloop.last %}<br>{% endif %}{% endfor %}{% if country %}<br>{{ country }}{% endif %}</dd>
+    {% endif %}
     {% if sub.tracking_number %}
       <dt>{% translate "Tracking number" %}</dt><dd>{{ sub.tracking_number }}</dd>
       {% if sub.carrier %}<dt>{% translate "Carrier" %}</dt><dd>{{ sub.carrier }}</dd>{% endif %}

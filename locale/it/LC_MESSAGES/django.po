@@ -735,8 +735,8 @@ msgstr ""
 "pagina a cui porta."
 
 #: apps/manager/views.py
-msgid "This order cannot take that step now."
-msgstr "Questo ordine non può fare questo passaggio ora."
+msgid "This step is not possible in the order's current state."
+msgstr "Questo passaggio non è possibile nello stato attuale dell'ordine."
 
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid "This vendor is closed, so its shop pages are no longer available."

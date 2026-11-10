@@ -299,6 +299,10 @@ class VendorOrderDetailView(ManagerView):
             number=order.number,
             placed=order.created_at,
             customer_name=order.customer_name,
+            # Minimisation (D-30): the address is for shipping, so not after delivery nor once
+            # the order is restricted or anonymised.
+            show_address=sub.state in {"pending", "accepted", "shipped"}
+            and order.privacy_status == "active",
             address=address_lines(order.shipping_address),
             country=order.shipping_country,
             lines=[
@@ -326,6 +330,12 @@ class VendorOrderActionView(VendorOrderDetailView):
 
     http_method_names = ["post", "options"]
 
+    def refused(self, sub: VendorOrder) -> HttpResponse:
+        context = self.get_context_data(
+            action_error=_("This step is not possible in the order's current state.")
+        )
+        return self.render_to_response(context, status=409)
+
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         action = self.kwargs["action"]
         if action not in orders_engine.FULFILMENT_ACTIONS:
@@ -336,6 +346,8 @@ class VendorOrderActionView(VendorOrderDetailView):
             raise Http404("No such order.")
         tracking, carrier = "", ""
         if action == "ship":
+            if sub.state != "accepted":  # the state first: a form for it is not even shown
+                return self.refused(sub)
             form = ShipmentForm(request.POST)
             if not form.is_valid():
                 return self.render_to_response(self.get_context_data(form=form), status=400)
@@ -345,13 +357,8 @@ class VendorOrderActionView(VendorOrderDetailView):
             fulfil_vendor_order(
                 sub, action, actor=actor, ctx=ctx, tracking_number=tracking, carrier=carrier
             )
-        except PermissionDenied:
-            return self.render_to_response(self.get_context_data(), status=403)
-        except orders_engine.InvalidTracking:  # the form checked it: only a race lands here
-            raise Http404("No such order.") from None
         except (orders_engine.IllegalTransition, ValueError):
-            context = self.get_context_data(action_error=_("This order cannot take that step now."))
-            return self.render_to_response(context, status=409)
+            return self.refused(sub)
         messages.success(request, _("The order was updated."))
         return HttpResponseRedirect(reverse("manager:shop:order", args=[sub.public_id]))
 

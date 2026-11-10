@@ -4,24 +4,31 @@ List, detail, and the POSTs accept / ship / deliver. Tenant isolation (list, det
 forged ids), tracking validation, illegal transitions, audit rows, no buyer e-mail shown.
 """
 
+import datetime as dt
 import uuid
+import zoneinfo
 
 import pytest
 from django.test import Client
 
 from apps.accounts.models import User
 from apps.accounts.tests.mfa import verified_login
+from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
-from apps.orders.models import VendorOrder
-from apps.orders.tests.factories import paid_vendor_order
+from apps.manager.vendor_choice import SESSION_KEY
+from apps.orders import services
+from apps.orders.engine import tax_retention_until
+from apps.orders.models import Order, VendorOrder
+from apps.orders.tests.factories import paid_vendor_order, unchecked
 from apps.vendors.models import Vendor
-from apps.vendors.tests.factories import VendorMemberFactory
+from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 from tests.tenancy import CrossTenant
 
-from .conftest import SHOP
+from .conftest import PICKER, SHOP
 
 pytestmark = pytest.mark.django_db
 
+CTX = AuditContext(actor_label="system:test", source=AuditLog.Source.SYSTEM)
 ORDERS = f"{SHOP}orders/"
 
 
@@ -166,3 +173,104 @@ def test_the_gate_still_applies(
     client = Client()
     verified_login(client, platform_staff)
     assert client.get(ORDERS).status_code == 403
+
+
+# --- review findings (closed vendor, forged switch, error order, minimisation)
+
+
+def test_a_closed_vendor_gets_the_closed_page_on_list_detail_and_every_post(
+    client: Client, owner: User, vendor: Vendor, sub: VendorOrder
+) -> None:
+    verified_login(client, owner)
+    Vendor.objects.filter(pk=vendor.pk).update(status=Vendor.Status.CLOSED)
+    for path in (ORDERS, url(sub)):
+        assert client.get(path).status_code == 403
+    for action in ("accept", "ship", "deliver"):
+        response = client.post(url(sub, action), {"tracking_number": "TRK-12345"})
+        assert response.status_code == 403
+    assert VendorOrder.objects.get(pk=sub.pk).state == "pending"
+
+
+def test_a_forged_vendor_choice_never_reaches_another_vendors_orders(
+    client: Client, cross_tenant: CrossTenant
+) -> None:
+    theirs = paid_vendor_order(cross_tenant.b.vendor)
+    verified_login(client, cross_tenant.a.owner)
+    client.get(SHOP)
+    session = client.session
+    session[SESSION_KEY] = str(cross_tenant.b.vendor.public_id)
+    session.save()
+    for path in (ORDERS, url(theirs)):
+        assert client.get(path).status_code == 404
+    assert client.post(url(theirs, "accept")).status_code == 404
+    assert VendorOrder.objects.get(pk=theirs.pk).state == "pending"
+
+
+def test_a_member_of_two_vendors_acts_only_on_the_selected_vendors_orders(
+    client: Client, cross_tenant: CrossTenant
+) -> None:
+    user = cross_tenant.a.owner
+    other = VendorMemberFactory.create(vendor=VendorFactory.create(), user=user, role="staff")
+    mine = paid_vendor_order(cross_tenant.a.vendor)
+    elsewhere = paid_vendor_order(other.vendor)
+    verified_login(client, user)
+    client.post(PICKER, {"vendor": str(cross_tenant.a.vendor.public_id)})
+    assert client.post(url(mine, "accept")).status_code == 302
+    assert client.post(url(elsewhere, "accept")).status_code == 404
+    assert VendorOrder.objects.get(pk=elsewhere.pk).state == "pending"
+
+
+def test_an_invalid_ship_form_on_an_order_not_accepted_is_409_not_400(
+    client: Client, owner: User, sub: VendorOrder
+) -> None:
+    verified_login(client, owner)
+    response = client.post(url(sub, "ship"), {"tracking_number": ""})
+    assert response.status_code == 409
+    assert VendorOrder.objects.get(pk=sub.pk).state == "pending"
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {"tracking_number": "x" * 101},
+        {"tracking_number": "TRK-12345", "carrier": "<b>Poste</b>"},
+        {"tracking_number": "TRK-12345", "carrier": "x" * 101},
+    ],
+)
+def test_a_bad_tracking_or_carrier_is_400_and_changes_nothing(
+    client: Client, owner: User, sub: VendorOrder, data: dict[str, str]
+) -> None:
+    verified_login(client, owner)
+    client.post(url(sub, "accept"))
+    response = client.post(url(sub, "ship"), data)
+    assert response.status_code == 400
+    assert "<b>" not in response.text
+    sub.refresh_from_db()
+    assert (sub.state, sub.tracking_number) == ("accepted", "")
+
+
+def test_the_address_is_hidden_after_delivery(
+    client: Client, owner: User, sub: VendorOrder
+) -> None:
+    verified_login(client, owner)
+    assert "1 Test Street" in client.get(url(sub)).text
+    client.post(url(sub, "accept"))
+    client.post(url(sub, "ship"), {"tracking_number": "TRK-12345"})
+    assert "1 Test Street" in client.get(url(sub)).text
+    client.post(url(sub, "deliver"))
+    assert "1 Test Street" not in client.get(url(sub)).text
+
+
+def test_a_restricted_order_renders_without_the_address(
+    client: Client, owner: User, sub: VendorOrder
+) -> None:
+    created = dt.datetime.now(dt.UTC) - dt.timedelta(days=366 * 3)
+    until = tax_retention_until(created, zoneinfo.ZoneInfo("Europe/Rome"))
+    with unchecked():
+        Order.objects.filter(pk=sub.order_id).update(created_at=created, tax_retention_until=until)
+    services.restrict_order(Order.objects.get(pk=sub.order_id), ctx=CTX)
+    assert Order.objects.get(pk=sub.order_id).privacy_status == "restricted_tax_only"
+    verified_login(client, owner)
+    response = client.get(url(sub))
+    assert response.status_code == 200
+    assert "1 Test Street" not in response.text
