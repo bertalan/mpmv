@@ -157,12 +157,21 @@ def test_too_many_saves_show_a_form_error(client: Client, owner: User, settings:
 def test_saving_a_machine_draft_unchanged_says_it_is_still_a_draft(
     client: Client, owner: User, vendor: Vendor
 ) -> None:
-    VendorTranslationFactory.create(vendor=vendor, language="it", tagline="Bozza", status="machine")
+    VendorTranslationFactory.create(
+        vendor=vendor,
+        language="it",
+        tagline="Bozza",
+        description="",
+        shipping_policy="",
+        refund_policy="",
+        cancellation_policy="",
+        status="machine",
+    )
     verified_login(client, owner)
     response = client.post(PROFILE, {"language": "it", "tagline": "Bozza"}, follow=True)
     text = response.text.lower()
     assert "still a draft" in text
-    assert "nothing changed" not in text.replace("still a draft", "")
+    assert "edit it to publish it" in text
 
 
 def test_a_nul_byte_posted_to_the_page_is_a_form_error(client: Client, owner: User) -> None:

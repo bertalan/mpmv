@@ -1773,11 +1773,20 @@ def save_storefront_profile(
                 changes.update(PROFILE_LABEL, key, old, new)
         if dry_run or changes.is_empty:
             return changes
-        wait = consume_rate_limit(
-            f"vendor-profile:user:{actor.pk}",
-            limit=settings.VENDOR_PROFILE_SAVE_LIMIT,
-            window=PROFILE_RATE_WINDOW,
+        # Per owner, and per vendor so that several owners cannot multiply the moderator emails.
+        waits = (
+            consume_rate_limit(
+                f"vendor-profile:user:{actor.pk}",
+                limit=settings.VENDOR_PROFILE_SAVE_LIMIT,
+                window=PROFILE_RATE_WINDOW,
+            ),
+            consume_rate_limit(
+                f"vendor-profile:vendor:{vendor.pk}",
+                limit=settings.VENDOR_PROFILE_VENDOR_SAVE_LIMIT,
+                window=PROFILE_RATE_WINDOW,
+            ),
         )
+        wait = max(waits)
         if wait:
             raise ValidationError(
                 f"Too many changes: try again in {max(1, int(wait.total_seconds() // 60))} minutes."

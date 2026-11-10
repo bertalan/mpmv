@@ -165,12 +165,15 @@ class StorefrontProfileView(ManagerView):
             except PermissionDenied:  # suspended between the page and the save
                 return self.render_to_response(self.get_context_data(), status=403)
             else:
-                messages.success(
-                    request,
-                    _("Storefront profile saved.")
-                    if not changes.is_empty
-                    else _("Nothing changed."),
-                )
+                if not changes.is_empty:
+                    notice = _("Storefront profile saved.")
+                elif (row := self.stored_row(language)) and row.status == "machine":
+                    notice = _(
+                        "Nothing changed: this text is still a draft. Edit it to publish it."
+                    )
+                else:
+                    notice = _("Nothing changed.")
+                messages.success(request, notice)
                 return HttpResponseRedirect(
                     f"{reverse('manager:shop:profile')}?language={language}"
                 )

@@ -1710,6 +1710,9 @@ PROFILE_MAX_LENGTH: Final[dict[str, int]] = {
 }
 # An HTML tag, comment or declaration. A lone "<" in prose ("under 5 kg < 20 EUR") is fine.
 _HTML_MARKUP: Final = re.compile(r"<\s*[A-Za-z!/?]")
+# Control characters other than tab, line feed and carriage return (a NUL byte makes
+# PostgreSQL refuse the value).
+_CONTROL: Final = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
 def profile_text_errors(values: Mapping[str, str]) -> dict[str, str]:
@@ -1720,6 +1723,8 @@ def profile_text_errors(values: Mapping[str, str]) -> dict[str, str]:
         limit = PROFILE_MAX_LENGTH[name]
         if len(value) > limit:
             errors[name] = f"At most {limit} characters (now {len(value)})."
+        elif _CONTROL.search(value):
+            errors[name] = "Remove the control characters."
         elif _HTML_MARKUP.search(value):
             errors[name] = "Write plain text: HTML tags are not accepted."
     return errors
