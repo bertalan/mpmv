@@ -15,8 +15,7 @@ redirect, and asserts:
 
 Pages with no switcher on purpose (error pages, the Django admin, the editors' admin) are asserted
 to have none. Unprefixed areas (the Manager, the account and MFA pages, sign-in) cannot switch
-language yet: those cases are `xfail(strict=True)`, so the fix turns them into failures and the
-marker must then be removed.
+language for anonymous visitors: those cases are `xfail(strict=True)` until lane-a decides.
 
 Adding a language to `settings.LANGUAGES` adds a column to the sweep; adding a page class means
 adding one entry to `CASES` (the routes themselves are walked by
@@ -79,11 +78,7 @@ pytestmark = pytest.mark.django_db
 PUBLISHED = TranslationStatus.PUBLISHED
 LANGUAGES = configured_languages()
 NOTICE_MSGID = "This content is not available in this language."
-FIXED_BY = "fixed by lane-b/i18n-manager-language"
-ANONYMOUS_UNPREFIXED = (
-    "an anonymous visitor on an unprefixed page cannot switch language either: "
-    "the lane-b/i18n-manager-language middleware covers signed-in users only"
-)
+ANONYMOUS_UNPREFIXED = "anonymous language choice on unprefixed pages: decision pending (lane-a)"
 
 
 def home_of(code: str) -> str:
@@ -547,9 +542,9 @@ CASES: dict[str, tuple[Callable[[], Case], list[Any]]] = {
     "secret-action-link": (_secret(lambda k: f"/account/link/{k}/"), []),
     "unprefixed-vendor-apply-anonymous": (sell_with_us_form, [_xfail(ANONYMOUS_UNPREFIXED)]),
     "unprefixed-sign-in-anonymous": (sign_in_page, [_xfail(ANONYMOUS_UNPREFIXED)]),
-    "unprefixed-mfa-signed-in": (mfa_overview, [_xfail(FIXED_BY)]),
-    "unprefixed-manager-shop": (manager_shop, [_xfail(FIXED_BY)]),
-    "unprefixed-manager-platform": (manager_platform, [_xfail(FIXED_BY)]),
+    "unprefixed-mfa-signed-in": (mfa_overview, []),
+    "unprefixed-manager-shop": (manager_shop, []),
+    "unprefixed-manager-platform": (manager_platform, []),
     "admin-django-no-switcher": (django_admin, []),
     "admin-cms-no-switcher": (cms_admin, []),
 }

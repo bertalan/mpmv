@@ -3,7 +3,7 @@
 The integration sweep (`tests/integration/test_language_switcher_everywhere.py`) covers every
 route class by posting the form it reads from the page; this one clicks the button, so a CSP
 violation, a hidden button or a broken form is caught too. Screenshots in
-build/e2e/screenshots. The signed-in Manager case is `xfail(strict=True)` until
+build/e2e/screenshots. The signed-in Manager and account cases changed language through
 lane-b/i18n-manager-language lands: remove the marker then.
 """
 
@@ -88,7 +88,6 @@ def test_a_page_without_an_object_keeps_its_own_path(
     shot("en")
 
 
-@pytest.mark.xfail(strict=True, reason="fixed by lane-b/i18n-manager-language")
 def test_the_manager_switch_changes_the_language(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
@@ -112,7 +111,6 @@ def test_the_manager_switch_changes_the_language(
     shot("it")
 
 
-@pytest.mark.xfail(strict=True, reason="fixed by lane-b/i18n-manager-language")
 def test_the_account_switch_changes_the_language(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
