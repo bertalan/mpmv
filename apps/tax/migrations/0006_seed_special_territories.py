@@ -23,8 +23,10 @@ Northern Ireland (XI, `BT*`) is not seeded: its status is the open decision D-02
 
 Seeding is idempotent and never overwrites a row staff changed: an existing code is left alone.
 Seeded without an AuditLog entry, by design: it is initial data, not a staff change.
-A staff row under another code with overlapping patterns coexists with the seed; the first
-match by country and code wins, so staff should edit the seeded row instead.
+A staff row under another code with overlapping patterns coexists with the seed; the most
+specific matching pattern wins (exact postcode, then longer prefix; ties go to the first code),
+so staff should edit the seeded row instead. Saint-Martin 97150 and Saint-Barthelemy 97133 win
+over Guadeloupe's 971* this way.
 The reverse deletes only rows that still equal the seed (name, country, status, patterns) and
 have no tax rate.
 """

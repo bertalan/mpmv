@@ -157,13 +157,33 @@ def test_a_prefix_never_matches_a_postcode_of_the_wrong_length(country: str, pos
     assert engine.find_territory(country, postcode, RULES) is None
 
 
-@pytest.mark.parametrize("postcode", ["97150", "97133"])
-def test_saint_martin_and_saint_barthelemy_are_outside_as_france_with_their_postcode(
-    postcode: str,
-) -> None:
-    # Both also fall under the 971* prefix of Guadeloupe: whichever rule matches first, the
-    # status is the same.
-    assert engine.find_territory("FR", postcode, RULES) is not None
-    assert engine.is_outside_vat_territory("FR", postcode, RULES) is True
-    only = [r for r in RULES if r.code in {"FR-MF", "FR-BL"}]
-    assert engine.is_outside_vat_territory("FR", postcode, only) is True
+@pytest.mark.parametrize(
+    ("postcode", "code"),
+    [("97150", "FR-MF"), ("97133", "FR-BL"), ("97100", "FR-971"), ("97410", "FR-974")],
+)
+def test_the_most_specific_pattern_wins_whatever_the_order(postcode: str, code: str) -> None:
+    # Saint-Martin and Saint-Barthelemy lie inside the 971* prefix of Guadeloupe.
+    for rules in (RULES, list(reversed(RULES))):
+        rule = engine.find_territory("FR", postcode, rules)
+        assert rule is not None
+        assert rule.code == code
+
+
+def test_an_exact_postcode_beats_a_longer_prefix_which_beats_a_shorter_one() -> None:
+    rules = [
+        engine.territory_rule("ES-A", "ES", engine.OUTSIDE_VAT_AREA, ["3*"]),
+        engine.territory_rule("ES-B", "ES", engine.OUTSIDE_VAT_AREA, ["350*"]),
+        engine.territory_rule("ES-C", "ES", engine.OWN_RATES, ["35001"]),
+    ]
+    for ordered in (rules, list(reversed(rules))):
+        assert engine.find_territory("ES", "35001", ordered).code == "ES-C"  # type: ignore[union-attr]
+        assert engine.find_territory("ES", "35002", ordered).code == "ES-B"  # type: ignore[union-attr]
+        assert engine.find_territory("ES", "36000", ordered).code == "ES-A"  # type: ignore[union-attr]
+
+
+def test_equally_specific_rules_keep_the_given_order() -> None:
+    rules = [
+        engine.territory_rule("ES-X", "ES", engine.OUTSIDE_VAT_AREA, ["35*"]),
+        engine.territory_rule("ES-Y", "ES", engine.OUTSIDE_VAT_AREA, ["35*"]),
+    ]
+    assert engine.find_territory("ES", "35001", rules).code == "ES-X"  # type: ignore[union-attr]

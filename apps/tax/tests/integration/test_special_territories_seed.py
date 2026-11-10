@@ -108,3 +108,21 @@ def test_the_reverse_deletes_only_rows_still_equal_to_the_seed() -> None:
     Territory.objects.filter(code="ES-CN").update(postcode_patterns=["35001"])
     migration.unseed(apps, None)
     assert list(Territory.objects.values_list("code", flat=True)) == ["ES-CN"]
+
+
+@pytest.mark.parametrize(
+    ("country", "postcode", "code"),
+    [
+        ("FR", "97150", "FR-MF"),
+        ("FR", "97133", "FR-BL"),
+        ("FR", "97100", "FR-971"),
+        ("MF", "", "FR-MF"),
+        ("BL", "", "FR-BL"),
+    ],
+)
+def test_the_seeded_territory_found_is_the_most_specific(
+    country: str, postcode: str, code: str
+) -> None:
+    territory = services.find_territory(country, postcode)
+    assert territory is not None
+    assert territory.code == code

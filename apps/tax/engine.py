@@ -473,14 +473,27 @@ def territory_rule(
     )
 
 
+_EXACT_SPECIFICITY: Final = 1000  # above any prefix or range length
+
+
+def _specificity(pattern: PostcodePattern) -> int:
+    """How narrow a pattern is: an exact postcode beats any prefix or range, and a longer
+    prefix (or range bound) beats a shorter one."""
+    return _EXACT_SPECIFICITY if pattern.kind == "exact" else len(pattern.low)
+
+
 def find_territory(
     country: str, postcode: str, rules: Iterable[TerritoryRule]
 ) -> TerritoryRule | None:
-    """The first rule whose territory contains the address, or None (mainland, no postcode).
+    """The territory that contains the address, or None (mainland, no postcode).
 
     The country must be the territory's own: Padova (IT 35100) is not in the Canary Islands
     (ES `35*`). A country with an ISO code of its own (`AX`, `GP`...) names its territory by
     itself, whatever the postcode (`TERRITORY_BY_ALIAS_COUNTRY`).
+
+    Territories may overlap (Saint-Martin 97150 lies inside Guadeloupe's `971*`): the most
+    specific matching pattern wins, whatever the order of the rules (`_specificity`). Equally
+    specific rules keep the order given.
     """
     rules = list(rules)
     code = normalize_country(country)
@@ -488,12 +501,21 @@ def find_territory(
     if alias is not None:
         return next((rule for rule in rules if rule.code == alias), None)
     expected = POSTCODE_LENGTH.get(code)
-    if expected is not None and len(normalize_postcode(postcode)) != expected:
+    normalized = normalize_postcode(postcode)
+    if not normalized or (expected is not None and len(normalized) != expected):
         return None
+    best: TerritoryRule | None = None
+    best_score = -1
     for rule in rules:
-        if postcode_in_territory(rule.country, rule.patterns, code, postcode):
-            return rule
-    return None
+        if rule.country != code:
+            continue
+        score = max(
+            (_specificity(p) for p in rule.patterns if p.matches_normalized(normalized)),
+            default=-1,
+        )
+        if score > best_score:
+            best, best_score = rule, score
+    return best
 
 
 def is_outside_vat_territory(country: str, postcode: str, rules: Iterable[TerritoryRule]) -> bool:
