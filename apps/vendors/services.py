@@ -2042,31 +2042,105 @@ def _delete_application(application: VendorApplication) -> bool:
     return True
 
 
+APPLICATION_BATCH_SIZE = 200  # rows a job selects and processes at a time
+
+
+def _lock_pending(pk: int, *, skip_locked: bool = True) -> VendorApplication | None:
+    """Lock the marker and its account, then re-check under the locks that the application is
+    still pending. Call inside `transaction.atomic()`.
+
+    A job passes `skip_locked`: a row another transaction holds (an applicant confirming right
+    now) is left for the next run. A cancel waits for the lock instead, and then finds nothing
+    when the confirm won. Returns None when the application is gone or no longer pending: the
+    account is active, the marker was deleted, or the vendor moved past `applicant`."""
+    marker = VendorApplication.objects.select_for_update(skip_locked=skip_locked).filter(pk=pk)
+    application = marker.first()
+    if application is None:
+        return None
+    user = (
+        User.objects.select_for_update(skip_locked=skip_locked)
+        .filter(pk=application.user_id, is_active=False)
+        .first()
+    )
+    if user is None:
+        return None
+    application.user = user
+    if _pending_application(str(user.public_id)) is None:
+        return None
+    return application
+
+
 def cancel_application(
     link: ActionLinkCheck, *, ctx: AuditContext, dry_run: bool = False
 ) -> ChangeSet:
     """ "This was not me": delete the pending application at once (D-24). One-time signed link,
     no login; nothing is blocked afterwards and no address or hash is kept. Idempotent: returns
     an empty ChangeSet, changing nothing, when no application is pending (already cancelled,
-    confirmed or purged). The audit entry holds no personal data. The link is not spent:
-    deleting the application is what stops it working, and it never touches a confirmed
-    account."""
+    confirmed or purged, also when a confirm won a race with this call). The audit entry holds
+    no personal data. The link is not spent: deleting the application is what stops it working,
+    and it never touches a confirmed account."""
     claims = link.claims
     changes = ChangeSet()
     if link.refusal is not None or claims is None:
         return changes
+    pending = _pending_application(claims.object_key)
+    if pending is None:
+        return changes
+    if dry_run:
+        changes.delete(APPLICATION_MODEL, str(pending.public_id), application_snapshot(pending))
+        return changes
     with transaction.atomic():
-        application = _pending_application(claims.object_key)
-        if application is None:
+        application = _lock_pending(pending.pk, skip_locked=False)
+        if application is None:  # a confirm (or a purge) got there first
             return changes
         public_id = str(application.public_id)
         changes.delete(APPLICATION_MODEL, public_id, application_snapshot(application))
-        if dry_run:
-            return changes
-        VendorApplication.objects.select_for_update().get(pk=application.pk)
         _delete_application(application)
         record(ctx, APPLICATION_CANCELLED, APPLICATION_MODEL, public_id, None, {"deleted": 1})
     return changes
+
+
+def _due_reminder_ids(cutoff: dt.datetime, after_id: int) -> list[int]:
+    return list(
+        VendorApplication.objects.filter(
+            user__is_active=False,
+            reminder_sent_at__isnull=True,
+            created_at__lte=cutoff,
+            id__gt=after_id,
+        )
+        .order_by("id")
+        .values_list("id", flat=True)[:APPLICATION_BATCH_SIZE]
+    )
+
+
+def _remind_one(
+    pk: int, cutoff: dt.datetime, now: dt.datetime, *, ctx: AuditContext
+) -> dict[str, Any] | None:
+    """Send the reminder of one application, under its locks and after a re-check; returns the
+    marker's snapshot when a mail was queued."""
+    with transaction.atomic():
+        application = _lock_pending(pk)
+        if (
+            application is None
+            or application.reminder_sent_at is not None
+            or application.created_at > cutoff
+        ):
+            return None
+        sent = _confirmation_email(
+            application,
+            ctx=ctx,
+            key=f"vendors.application.reminder:{application.public_id}",
+            template_key=APPLICATION_REMINDER_TEMPLATE,
+        )
+        application.reminder_sent_at = now
+        application.save(update_fields=["reminder_sent_at", "updated_at"])
+        if sent.is_empty:  # a retry of a mail already queued
+            return None
+        snapshot = application_snapshot(application)
+        record(
+            ctx, APPLICATION_REMINDED, APPLICATION_MODEL, str(application.public_id), None, snapshot
+        )
+        return snapshot
 
 
 def send_application_reminders(
@@ -2075,52 +2149,57 @@ def send_application_reminders(
     """The one reminder (D-24): `VENDOR_APPLICATION_REMINDER_HOURS` hours after the request, a
     pending application gets a mail with a fresh confirmation link (same version, so the first
     link keeps working) and the cancel link. Exactly one: the marker records it, and the outbox
-    idempotency key stops a retry. Audited with the marker's public id only."""
+    idempotency key stops a retry. Audited with the marker's public id only.
+
+    Works in batches of `APPLICATION_BATCH_SIZE`; each application is locked and re-checked
+    (still inactive, marker present, still an applicant vendor) in its own transaction, so a
+    link is never mailed to an applicant who has just confirmed."""
     now = now or timezone.now()
     cutoff = now - dt.timedelta(hours=settings.VENDOR_APPLICATION_REMINDER_HOURS)
-    due = list(
-        VendorApplication.objects.select_related("user")
-        .filter(user__is_active=False, reminder_sent_at__isnull=True, created_at__lte=cutoff)
-        .order_by("id")
-    )
     changes = ChangeSet()
-    for application in due:
-        if _pending_application(str(application.user.public_id)) is None:
-            continue
-        if dry_run:
-            changes.update(
-                APPLICATION_MODEL,
-                str(application.public_id),
-                application_snapshot(application),
-                {**application_snapshot(application), "reminded": True},
-            )
-            continue
-        with transaction.atomic():
-            sent = _confirmation_email(
-                application,
-                ctx=ctx,
-                key=f"vendors.application.reminder:{application.public_id}",
-                template_key=APPLICATION_REMINDER_TEMPLATE,
-            )
-            application.reminder_sent_at = now
-            application.save(update_fields=["reminder_sent_at", "updated_at"])
-            if sent.is_empty:
-                continue  # a retry of a mail already queued
-            changes.update(
-                APPLICATION_MODEL,
-                str(application.public_id),
-                application_snapshot(application),
-                {**application_snapshot(application), "reminded": True},
-            )
-            record(
-                ctx,
-                APPLICATION_REMINDED,
-                APPLICATION_MODEL,
-                str(application.public_id),
-                None,
-                application_snapshot(application),
-            )
+    last = 0
+    while ids := _due_reminder_ids(cutoff, last):
+        last = ids[-1]
+        for pk in ids:
+            if dry_run:
+                application = VendorApplication.objects.select_related("user").filter(pk=pk).first()
+                if (
+                    application is None
+                    or _pending_application(str(application.user.public_id)) is None
+                ):
+                    continue
+                snapshot: dict[str, Any] | None = application_snapshot(application)
+            else:
+                snapshot = _remind_one(pk, cutoff, now, ctx=ctx)
+            if snapshot is not None:
+                changes.update(
+                    APPLICATION_MODEL,
+                    str(snapshot["user"]),
+                    snapshot,
+                    {**snapshot, "reminded": True},
+                )
     return changes
+
+
+def _stale_application_ids(cutoff: dt.datetime, after_id: int) -> list[int]:
+    return list(
+        VendorApplication.objects.filter(
+            user__is_active=False, created_at__lt=cutoff, id__gt=after_id
+        )
+        .order_by("id")
+        .values_list("id", flat=True)[:APPLICATION_BATCH_SIZE]
+    )
+
+
+def _purge_one(pk: int, cutoff: dt.datetime) -> dict[str, Any] | None:
+    """Delete one unconfirmed application under its locks, after re-checking that it is still
+    pending and still past the retention period; returns its snapshot when the account went."""
+    with transaction.atomic():
+        application = _lock_pending(pk)
+        if application is None or application.created_at >= cutoff:
+            return None
+        snapshot = application_snapshot(application)
+        return snapshot if _delete_application(application) else None
 
 
 def purge_unconfirmed_applications(
@@ -2128,31 +2207,40 @@ def purge_unconfirmed_applications(
 ) -> ChangeSet:
     """Delete applications nobody confirmed (D-24, GDPR): the account, its applicant vendor,
     memberships and link uses, `VENDOR_APPLICATION_RETENTION_DAYS` days (3) after the request;
-    a later link does not extend it. Audited by count only: no name or address is kept.
-    Accounts that confirmed or never applied this way are never touched.
+    a later link does not extend it. The job runs hourly, so a deletion can lag up to an hour.
+    Audited by count only (one entry per batch): no name or address is kept. Accounts that
+    confirmed or never applied this way are never touched.
+
+    Works in batches of `APPLICATION_BATCH_SIZE`. Each application is deleted in its own
+    transaction, under a lock on the marker and the account, after a re-check (still inactive,
+    marker present, still an applicant vendor, still past retention): an applicant who confirms
+    between the selection and the deletion is never deleted, and a row being confirmed right
+    now is skipped (`skip_locked`) and left for the next run.
     """
     now = now or timezone.now()
     cutoff = now - dt.timedelta(days=settings.VENDOR_APPLICATION_RETENTION_DAYS)
-    stale = list(
-        VendorApplication.objects.select_related("user")
-        .filter(user__is_active=False, created_at__lt=cutoff)
-        .order_by("id")
-    )
     changes = ChangeSet()
-    for application in stale:
-        changes.delete(
-            APPLICATION_MODEL, str(application.public_id), application_snapshot(application)
-        )
-    if dry_run or not stale:
-        return changes
-    with transaction.atomic():
-        deleted = sum(_delete_application(application) for application in stale)
-        record(
-            ctx,
-            APPLICATION_PURGED,
-            APPLICATION_MODEL,
-            "purge",
-            None,
-            {"deleted": deleted, "retention_days": settings.VENDOR_APPLICATION_RETENTION_DAYS},
-        )
+    last = 0
+    while ids := _stale_application_ids(cutoff, last):
+        last = ids[-1]
+        deleted = 0
+        for pk in ids:
+            if dry_run:
+                application = VendorApplication.objects.select_related("user").filter(pk=pk).first()
+                snapshot = application_snapshot(application) if application else None
+            else:
+                snapshot = _purge_one(pk, cutoff)
+            if snapshot is None:
+                continue
+            deleted += 1
+            changes.delete(APPLICATION_MODEL, str(snapshot["user"]), snapshot)
+        if deleted and not dry_run:
+            record(
+                ctx,
+                APPLICATION_PURGED,
+                APPLICATION_MODEL,
+                "purge",
+                None,
+                {"deleted": deleted, "retention_days": settings.VENDOR_APPLICATION_RETENTION_DAYS},
+            )
     return changes
