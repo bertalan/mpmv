@@ -13,6 +13,7 @@ a one-time signed token (CORE.15), or an allow-list entry with its reason.
 
 | URL name | Path | View | Purpose | Protection | Rate limit | Task |
 |---|---|---|---|---|---|---|
+| `dsa_notice` | `/[<lang>/]report/` | `apps.compliance.views.notice_form` | Report illegal content (DSA notice) | captcha | per IP (notice and captcha-failure budgets) | CMP.5 |
 | `action_link:continue` | `/account/link/continue/` | `apps.accounts.action_link_views.continue_link` | Continue from an emailed action link (spends the token's one sign-in use) | signed token: the one-time signed token in the POST body is checked before anything else | per IP | CORE.15 |
 | `login` | `/account/login/` | `apps.manager.views.LoginView` | Sign in to the Manager (every Manager user) | captcha | per account and IP lockout (CORE.5) | CORE.17 |
 | `wagtailadmin_login` | `/admin/login/` | `wagtail.admin.views.account.LoginView` | Sign in to the editors' admin | captcha | per account and IP lockout (CORE.5) | CMP.9 |
