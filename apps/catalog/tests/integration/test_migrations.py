@@ -159,3 +159,64 @@ def test_d25_migration_reslugs_both_legacy_shapes_on_the_historical_state(
 
     # A rerun changes nothing.
     assert _d25_migration().reslug_products(django_apps, None) == []
+
+
+@pytest.mark.parametrize(
+    "title",
+    ["Leather Bag", "Borsa in pelle è più bella", "Große Tasche", "Łódź & Æble", "★☆", "x" * 120],
+)
+def test_the_frozen_slug_copy_matches_slugs_py_today(title: str) -> None:
+    """The migration keeps a private copy of the slug rules; a change in slugs.py must be
+    decided on purpose, so the copy is pinned against it."""
+    from apps.catalog import slugs
+
+    frozen = _d25_migration()
+    assert frozen.unique_product_slug(title, taken=set()) == slugs.unique_product_slug(
+        title, taken=set()
+    )
+    taken = {slugs.build_product_slug(title)}
+    assert frozen.unique_product_slug(title, taken=taken) == slugs.unique_product_slug(
+        title, taken=taken
+    )
+
+
+@pytest.mark.django_db
+def test_d25_migration_is_a_noop_without_translations() -> None:
+    from django.apps import apps
+
+    assert _d25_migration().reslug_products(apps, None) == []
+
+
+@pytest.mark.django_db
+def test_d25_migration_first_slug_has_no_history_or_audit_and_bumps_updated_at() -> None:
+    from django.apps import apps
+
+    from apps.catalog.models import SlugHistory
+    from apps.catalog.tests.factories import ProductTranslationFactory
+    from apps.core.models import AuditLog
+
+    translation = ProductTranslationFactory.create(language="en", title="Safari", slug="")
+    before = translation.updated_at
+    _d25_migration().reslug_products(apps, None)
+    translation.refresh_from_db()
+    assert translation.slug == "safari"
+    assert translation.updated_at > before
+    assert not SlugHistory.objects.exists()
+    assert not AuditLog.objects.exists()
+
+
+@pytest.mark.django_db
+def test_d25_migration_reclaims_an_own_old_slug_without_a_loop() -> None:
+    from django.apps import apps
+
+    from apps.catalog.models import SlugHistory
+    from apps.catalog.tests.factories import ProductTranslationFactory
+
+    translation = ProductTranslationFactory.create(
+        language="en", title="Leather Bag", slug="travel-bag"
+    )
+    SlugHistory.objects.create(product=translation.product, language="en", slug="leather-bag")
+    _d25_migration().reslug_products(apps, None)
+    translation.refresh_from_db()
+    assert translation.slug == "leather-bag"
+    assert list(SlugHistory.objects.values_list("slug", flat=True)) == ["travel-bag"]

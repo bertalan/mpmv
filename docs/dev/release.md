@@ -102,7 +102,9 @@ the old `{title}-{lang}` and `{title}-{lang}-{sku}` slugs in SlugHistory (one 30
 deploying a release that contains it:
 
 1. Run `manage.py rebuild_product_slugs --dry-run` on the target environment and check the count
-   and the listed renames.
+   and the listed renames. The dry run checks each translation against the stored slugs only, so two
+   translations of the same run that would need a `-2` are not seen: its count may differ from the
+   migration's, which reslugs one translation after the other.
 2. Deploy; `migrate` applies the same reslug and writes the audit entries.
 3. Rerunning changes nothing. Reverse is a no-op: the old slugs stay in SlugHistory.
 

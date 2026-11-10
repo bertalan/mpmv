@@ -32,11 +32,11 @@ LANGUAGES = ("en", "it", "de", "fr", "es")
         ("  Trimmed title  ", "trimmed-title"),
     ],
 )
-def test_slug_is_the_transliterated_title(title: str, expected: str) -> None:
+def test_slug_is_the_transliterated_title_only(title: str, expected: str) -> None:
     assert build_product_slug(title) == expected
 
 
-def test_the_slug_function_takes_no_sku_and_no_language() -> None:
+def test_the_slug_function_takes_no_sku_and_no_language_parameters() -> None:
     parameters = inspect.signature(build_product_slug).parameters
     assert "sku" not in parameters
     assert "lang" not in parameters
