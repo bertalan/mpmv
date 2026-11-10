@@ -12,7 +12,7 @@ reports stay on the runner. This page records the alerts we fixed and the ones w
   `tests/integration/test_security_headers_by_response_type.py`,
   `tests/unit/test_proxy_security_headers.py`.
 - ZAP 90004, missing `Cross-Origin-Resource-Policy` (low): `same-origin` on every response
-  (`CrossOriginResourcePolicyMiddleware`, and the Caddy `security_headers` snippet for what Caddy
+  (`CrossOriginResourcePolicyMiddleware`, ownership in `docs/dev/security-headers.md`; and the Caddy `security_headers` snippet for what Caddy
   answers itself).
 
 ## Accepted (ignored in `deploy/ci/zap-rules.tsv`, one line per plugin id)
