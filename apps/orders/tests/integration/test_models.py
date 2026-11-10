@@ -8,7 +8,12 @@ from django.db import IntegrityError, transaction
 from apps.catalog.tests.factories import ProductFactory
 from apps.orders.engine import IllegalTransition
 from apps.orders.models import Order, OrderLine, VendorOrder
-from apps.orders.tests.factories import OrderFactory, OrderLineFactory, VendorOrderFactory
+from apps.orders.tests.factories import (
+    OrderFactory,
+    OrderLineFactory,
+    VendorOrderFactory,
+    unchecked,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -44,12 +49,13 @@ def test_the_grand_total_must_be_net_plus_shipping_plus_tax() -> None:
         VendorOrderFactory.create(
             goods_net=Decimal("10.00"), gross_total=Decimal("11.00"), tax_total=Decimal("0")
         )
-    OrderFactory.create(
-        goods_net=Decimal("10.00"),
-        shipping_net=Decimal("5.00"),
-        tax_total=Decimal("3.30"),
-        grand_total=Decimal("18.30"),
-    )
+    with unchecked():
+        OrderFactory.create(
+            goods_net=Decimal("10.00"),
+            shipping_net=Decimal("5.00"),
+            tax_total=Decimal("3.30"),
+            grand_total=Decimal("18.30"),
+        )
 
 
 def test_states_outside_the_machine_are_refused_by_the_database() -> None:
@@ -133,9 +139,10 @@ def test_line_quantity_and_discount_rules() -> None:
 
 
 def test_amounts_are_stored_with_two_places() -> None:
-    sub = VendorOrderFactory.create(
-        goods_net=Decimal("1.50"), gross_total=Decimal("1.50"), tax_total=Decimal("0")
-    )
+    with unchecked():
+        sub = VendorOrderFactory.create(
+            goods_net=Decimal("1.50"), gross_total=Decimal("1.50"), tax_total=Decimal("0")
+        )
     sub.refresh_from_db()
     assert sub.goods_net == Decimal("1.50")
     assert sub.goods_net.as_tuple().exponent == -2

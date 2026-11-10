@@ -4,6 +4,7 @@ import datetime as dt
 import threading
 import time
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
@@ -324,11 +325,13 @@ def test_shipping_needs_a_tracking_number() -> None:
 def test_vendor_order_transition_dry_run_changes_nothing() -> None:
     order = place()
     pay(order)
+    audited = AuditLog.objects.filter(action="orders.transition").count()
     sub = order.vendor_orders.get()
     changeset = services.transition_vendor_order(sub, "accepted", ctx=CTX, dry_run=True)
     assert not changeset.is_empty
     assert VendorOrder.objects.get(pk=sub.pk).state == "pending"
-    assert not AuditLog.objects.filter(action="orders.transition").exists()
+    assert Order.objects.get(pk=order.pk).state == "paid"
+    assert AuditLog.objects.filter(action="orders.transition").count() == audited
 
 
 @pytest.mark.django_db
@@ -425,14 +428,15 @@ def test_a_vendor_order_of_an_unpaid_order_cannot_move() -> None:
 @pytest.mark.django_db(transaction=True)
 def test_a_rolled_back_number_is_reused_by_the_waiting_order_through_create_order() -> None:
     vendors = [VendorFactory.create(), VendorFactory.create()]
-    a_has_number, results = threading.Event(), {}
+    a_has_number = threading.Event()
+    results: dict[str, Any] = {}
     errors: list[BaseException] = []
 
     def rolled_back() -> None:
         try:
             try:
                 with transaction.atomic():
-                    order, _ = services.create_order(**_kwargs(vendors[0]))
+                    order, _ = services.create_order(**_kwargs(vendors[0]))  # type: ignore[arg-type]
                     assert order is not None
                     results["a"] = order.number
                     a_has_number.set()
@@ -450,7 +454,7 @@ def test_a_rolled_back_number_is_reused_by_the_waiting_order_through_create_orde
         try:
             a_has_number.wait(timeout=10)
             started = time.monotonic()
-            order, _ = services.create_order(**_kwargs(vendors[1]))
+            order, _ = services.create_order(**_kwargs(vendors[1]))  # type: ignore[arg-type]
             assert order is not None
             results["b"] = order.number
             results["b_waited"] = time.monotonic() - started

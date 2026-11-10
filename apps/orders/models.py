@@ -18,6 +18,7 @@ from typing import Any, ClassVar
 
 from django.conf import settings
 from django.db import models
+from django.db.models.functions import Round
 
 from apps.catalog.models import Product
 from apps.core.fields import CountryField, LanguageField, MoneyField
@@ -71,6 +72,7 @@ class _StateGuarded(BaseModel):
     """Refuses to save a state change that the machine has no arrow for."""
 
     _machine: ClassVar[Any]  # engine.check_*_transition
+    _initial_states: ClassVar[frozenset[str]]
     _stored_state: str | None = None
 
     class Meta:
@@ -89,6 +91,8 @@ class _StateGuarded(BaseModel):
     def save(self, *args: Any, **kwargs: Any) -> None:
         update_fields = kwargs.get("update_fields")
         state: str = self.state  # type: ignore[attr-defined]
+        if self._state.adding and state not in self._initial_states:
+            raise engine.IllegalTransition(f"{state!r} is not an initial state")
         if (
             (update_fields is None or "state" in update_fields)
             and self._stored_state is not None
@@ -101,6 +105,7 @@ class _StateGuarded(BaseModel):
 
 class Order(_StateGuarded):
     _machine = staticmethod(engine.check_order_transition)
+    _initial_states = engine.ORDER_INITIAL_STATES
 
     number = models.CharField(
         max_length=32, unique=True, editable=False, help_text="Order reference, not an invoice."
@@ -151,6 +156,19 @@ class Order(_StateGuarded):
                 ),
                 name="orders_order_grand_total_adds_up",
             ),
+            models.CheckConstraint(
+                condition=models.Q(goods_net__gte=0), name="orders_order_goods_net_not_negative"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(shipping_net__gte=0),
+                name="orders_order_shipping_net_not_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(tax_total__gte=0), name="orders_order_tax_total_not_negative"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(grand_total__gte=0), name="orders_order_grand_total_not_negative"
+            ),
         ]
 
     def __str__(self) -> str:
@@ -158,9 +176,17 @@ class Order(_StateGuarded):
 
 
 class VendorOrder(_StateGuarded):
+    """One vendor's part of an order.
+
+    Privacy: `order` leads to the buyer's e-mail and addresses. Anything that shows a
+    vendor-scoped sub-order to a vendor (views, API serialisers, exports, MCP) must pick its
+    fields explicitly and never serialise `order` as a whole.
+    """
+
     vendor_scope: ClassVar[str] = "vendor"
     objects: ClassVar[VendorScopedManager["VendorOrder"]] = VendorScopedManager()
     _machine = staticmethod(engine.check_vendor_order_transition)
+    _initial_states = engine.VENDOR_ORDER_INITIAL_STATES
 
     order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name="vendor_orders")
     vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="vendor_orders")
@@ -174,6 +200,19 @@ class VendorOrder(_StateGuarded):
     shipping_net = MoneyField()
     tax_total = MoneyField()
     gross_total = MoneyField()
+    shipping_tax_rate = models.DecimalField(
+        max_digits=6, decimal_places=3, default=0, help_text="Snapshot: VAT rate on the shipping."
+    )
+    shipping_tax_amount = MoneyField(default=0, help_text="Snapshot: VAT on the shipping.")
+    shipping_tax_reason = models.CharField(max_length=64, blank=True)
+    shipping_vat_nature_code = models.CharField(
+        max_length=16, blank=True, help_text="N-code when the shipping is not taxed (TAX.3)."
+    )
+    vendor_snapshot = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="The vendor's name, VAT number and country when ordered.",
+    )
     shipping_choice = models.JSONField(
         default=dict, blank=True, help_text="Snapshot: carrier, zone, rate or quote."
     )
@@ -201,6 +240,42 @@ class VendorOrder(_StateGuarded):
                     + models.F("tax_total")
                 ),
                 name="orders_vendororder_gross_total_adds_up",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(goods_net__gte=0),
+                name="orders_vendororder_goods_net_not_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(shipping_net__gte=0),
+                name="orders_vendororder_shipping_net_not_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(tax_total__gte=0),
+                name="orders_vendororder_tax_total_not_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(gross_total__gte=0),
+                name="orders_vendororder_gross_total_not_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(shipping_tax_amount__gte=0),
+                name="orders_vendororder_shipping_tax_amount_not_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(shipping_tax_rate__gte=0),
+                name="orders_vendororder_shipping_tax_rate_not_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    shipping_tax_amount=Round(
+                        models.F("shipping_net") * models.F("shipping_tax_rate") / 100, 2
+                    )
+                ),
+                name="orders_vendororder_shipping_tax_consistent",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(tax_total__gte=models.F("shipping_tax_amount")),
+                name="orders_vendororder_tax_includes_shipping_tax",
             ),
         ]
 
@@ -230,6 +305,9 @@ class OrderLine(BaseModel):
     tax_rate = models.DecimalField(max_digits=6, decimal_places=3)
     tax_reason = models.CharField(max_length=64, blank=True)
     tax_amount = MoneyField()
+    vat_nature_code = models.CharField(
+        max_length=16, blank=True, help_text="N-code when no VAT is charged (TAX.3); else blank."
+    )
     legal_note_key = models.CharField(max_length=64, blank=True)
 
     class Meta:
@@ -237,6 +315,26 @@ class OrderLine(BaseModel):
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(quantity__gte=1), name="orders_orderline_quantity_positive"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(unit_price_net__gt=0), name="orders_orderline_price_positive"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(net_total__gte=0, tax_amount__gte=0),
+                name="orders_orderline_totals_not_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    net_total=models.F("unit_price_net") * models.F("quantity")
+                    - models.F("discount_net")
+                ),
+                name="orders_orderline_net_total_adds_up",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    tax_amount=Round(models.F("net_total") * models.F("tax_rate") / 100, 2)
+                ),
+                name="orders_orderline_tax_amount_rounded",
             ),
             models.CheckConstraint(
                 condition=models.Q(discount_net__gte=0),
@@ -254,3 +352,6 @@ class OrderLine(BaseModel):
         if not self._state.adding:
             raise PermissionError("An order line is an immutable snapshot")
         super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> Any:
+        raise PermissionError("An order line is an immutable snapshot")

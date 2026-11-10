@@ -93,6 +93,13 @@ def add_totals(parts: Iterable[Totals]) -> Totals:
     )
 
 
+def shipping_tax(shipping_net: Decimal, rate: Decimal) -> Decimal:
+    """The tax on the shipping of one vendor order, rounded half up to cents."""
+    if shipping_net < 0:
+        raise ValueError("shipping cannot be negative")
+    return round_line(shipping_net * rate / HUNDRED)
+
+
 # --- state machines --------------------------------------------------------------------------
 
 
@@ -105,7 +112,7 @@ ORDER_TRANSITIONS: Mapping[str, frozenset[str]] = {
     "quote_flow": frozenset({"awaiting_payment"}),
     "awaiting_payment": frozenset({"paid", "cancelled"}),
     "paid": frozenset({"in_fulfillment", "partially_refunded"}),
-    "in_fulfillment": frozenset({"fulfilled"}),
+    "in_fulfillment": frozenset({"fulfilled", "partially_refunded"}),
     "fulfilled": frozenset({"closed", "partially_refunded"}),
     "partially_refunded": frozenset({"refunded"}),
     "closed": frozenset(),
@@ -125,6 +132,7 @@ VENDOR_ORDER_TRANSITIONS: Mapping[str, frozenset[str]] = {
     "refunded": frozenset(),
 }
 VENDOR_ORDER_STATES: tuple[str, ...] = tuple(VENDOR_ORDER_TRANSITIONS)
+VENDOR_ORDER_INITIAL_STATES = frozenset({"pending"})
 
 
 def _check(table: Mapping[str, frozenset[str]], kind: str, source: str, target: str) -> None:
@@ -146,19 +154,19 @@ _DEAD_STATES = frozenset({"cancelled", "refunded"})
 
 
 def derive_order_state(current: str, vendor_states: Iterable[str]) -> str:
-    """The order state implied by its vendor orders (spec 07: derived from the sub-orders).
+    """The next order state implied by its vendor orders (spec 07: derived from the sub-orders).
 
-    Only the fulfilment stretch is derived: a paid order moves to `in_fulfillment` when a vendor
-    accepts, and to `fulfilled` when every vendor order that is still alive has shipped or been
-    delivered. Payment, refund and closing states are never derived.
+    One legal step at a time, so `check_order_transition(current, result)` always accepts the
+    answer (call again until it is stable): a paid order moves to `in_fulfillment` when a vendor
+    accepts; an `in_fulfillment` order moves to `fulfilled` when every vendor order that is
+    still alive has shipped or been delivered. Payment, refund and closing states are never
+    derived.
     """
-    if current not in {"paid", "in_fulfillment"}:
-        return current
     alive = [state for state in vendor_states if state not in _DEAD_STATES]
     if not alive:
         return current
-    if all(state in _FULFILLED_STATES for state in alive):
-        return "fulfilled"
-    if any(state in _STARTED_STATES for state in alive):
+    if current == "paid" and any(state in _STARTED_STATES for state in alive):
         return "in_fulfillment"
+    if current == "in_fulfillment" and all(state in _FULFILLED_STATES for state in alive):
+        return "fulfilled"
     return current

@@ -7,12 +7,14 @@ per changed object (SEC.4). `tax` and `shipping` are never imported here.
 """
 
 import datetime as dt
+import zoneinfo
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.utils import timezone
 
@@ -20,6 +22,7 @@ from apps.accounts.models import User
 from apps.catalog.models import Product
 from apps.core.audit import VENDOR_FIELD, AuditContext
 from apps.core.changeset import ChangeSet
+from apps.core.money import CENT
 from apps.core.services import audit_changes
 from apps.vendors.models import Vendor
 
@@ -42,6 +45,7 @@ class LineInput:
     tax_rate: Decimal
     tax_reason: str
     variant_label: str = ""
+    vat_nature_code: str = ""
     discount_net: Decimal = Decimal("0.00")
     legal_note_key: str = ""
 
@@ -51,20 +55,31 @@ class VendorOrderInput:
     vendor: Vendor
     lines: Sequence[LineInput]
     shipping_net: Decimal = Decimal("0.00")
-    shipping_tax: Decimal = Decimal("0.00")
+    shipping_tax_rate: Decimal = Decimal("0")
+    shipping_tax_reason: str = ""
+    shipping_vat_nature_code: str = ""
     shipping_choice: dict[str, Any] = field(default_factory=dict)
     commission_snapshot: dict[str, Any] = field(default_factory=dict)
     tax_profile_snapshot: dict[str, Any] = field(default_factory=dict)
 
 
+PAID_OR_LATER = frozenset(engine.ORDER_STATES) - engine.ORDER_INITIAL_STATES - {"cancelled"}
+COMMISSION_KEYS = ("rule_id", "rule_version", "percentage", "fee")
+MAX_PREFIX_LENGTH = 14  # number = prefix + "YYYY-" + 6+ digits must fit in 32 characters
+
 # --- numbering -------------------------------------------------------------------------------
 
 
 def _year_and_prefix(now: dt.datetime | None) -> tuple[int, str]:
-    return (
-        timezone.localtime(now or timezone.now()).year,
-        str(getattr(settings, "ORDER_NUMBER_PREFIX", "")),
-    )
+    """The numbering year is the business year (settings.BUSINESS_TIME_ZONE, Europe/Rome), so an
+    order placed at 00:30 on 1 January in Rome starts the new year even when UTC says 31 Dec."""
+    zone = zoneinfo.ZoneInfo(settings.BUSINESS_TIME_ZONE)
+    prefix = str(getattr(settings, "ORDER_NUMBER_PREFIX", ""))
+    if len(prefix) > MAX_PREFIX_LENGTH:
+        raise ImproperlyConfigured(
+            f"ORDER_NUMBER_PREFIX is longer than {MAX_PREFIX_LENGTH} characters"
+        )
+    return (now or timezone.now()).astimezone(zone).year, prefix
 
 
 def peek_order_number(*, now: dt.datetime | None = None) -> str:
@@ -119,6 +134,8 @@ def _vendor_order_snapshot(sub: VendorOrder) -> dict[str, Any]:
         "state": sub.state,
         "goods_net": sub.goods_net,
         "shipping_net": sub.shipping_net,
+        "shipping_tax_rate": sub.shipping_tax_rate,
+        "shipping_tax_amount": sub.shipping_tax_amount,
         "tax_total": sub.tax_total,
         "gross_total": sub.gross_total,
         "tracking_number": sub.tracking_number,
@@ -144,20 +161,39 @@ def _line_snapshot(line: OrderLine) -> dict[str, Any]:
 # --- creating an order -----------------------------------------------------------------------
 
 
+def _vendor_identity(vendor: Vendor) -> dict[str, Any]:
+    """Who the vendor was when the order was placed (for the confirmation, ORD.9)."""
+    return {
+        "display_name": vendor.display_name,
+        "legal_name": vendor.legal_name,
+        "vat_number": vendor.vat_number,
+        "country": vendor.country,
+    }
+
+
 def _build_vendor_order(
     order: Order, item: VendorOrderInput
 ) -> tuple[VendorOrder, list[OrderLine], engine.Totals]:
     if not item.lines:
         raise ValueError("a vendor order needs at least one line")
+    missing = [key for key in COMMISSION_KEYS if key not in item.commission_snapshot]
+    if missing:
+        raise ValueError(f"commission_snapshot needs {', '.join(missing)}")
+    if item.shipping_net < 0 or item.shipping_net != item.shipping_net.quantize(CENT):
+        raise ValueError("shipping must be a non-negative amount in cents")
+    for entry in item.lines:
+        if entry.unit_price_net <= 0:
+            raise ValueError("the unit price must be above zero")
+        if entry.unit_price_net != entry.unit_price_net.quantize(CENT):
+            raise ValueError("the unit price must be in cents")
+    shipping_tax = engine.shipping_tax(item.shipping_net, item.shipping_tax_rate)
     amounts = [
         engine.line_amounts(
             entry.unit_price_net, entry.quantity, entry.discount_net, entry.tax_rate
         )
         for entry in item.lines
     ]
-    sub_totals = engine.totals(
-        amounts, shipping_net=item.shipping_net, shipping_tax=item.shipping_tax
-    )
+    sub_totals = engine.totals(amounts, shipping_net=item.shipping_net, shipping_tax=shipping_tax)
     sub = VendorOrder(
         order=order,
         vendor=item.vendor,
@@ -165,6 +201,11 @@ def _build_vendor_order(
         shipping_net=sub_totals.shipping_net,
         tax_total=sub_totals.tax_total,
         gross_total=sub_totals.grand_total,
+        shipping_tax_rate=item.shipping_tax_rate,
+        shipping_tax_amount=shipping_tax,
+        shipping_tax_reason=item.shipping_tax_reason,
+        shipping_vat_nature_code=item.shipping_vat_nature_code,
+        vendor_snapshot=_vendor_identity(item.vendor),
         shipping_choice=item.shipping_choice,
         commission_snapshot=item.commission_snapshot,
         tax_profile_snapshot=item.tax_profile_snapshot,
@@ -176,6 +217,7 @@ def _build_vendor_order(
             sku=entry.sku,
             title=entry.title,
             variant_label=entry.variant_label,
+            vat_nature_code=entry.vat_nature_code,
             unit_price_net=entry.unit_price_net,
             quantity=entry.quantity,
             discount_net=entry.discount_net,
@@ -212,6 +254,11 @@ def create_order(
 
     The totals are computed here (rounded per line, spec 01), never taken from the caller.
     Dry run returns `(None, changeset)` and uses no number.
+
+    The number is taken inside the transaction and returned to the pool if it rolls back, so a
+    rolled-back order's number may go to another order. Therefore `number` (and `transfer_group`,
+    which equals it) must be sent to the payment provider only AFTER the transaction commits
+    (`transaction.on_commit`), never from inside it (ORD.4).
     """
     if not vendor_orders:
         raise ValueError("an order needs at least one vendor order")
@@ -311,6 +358,8 @@ def transition_vendor_order(
     try:
         with transaction.atomic():
             order = Order.objects.select_for_update().get(pk=sub.order_id)
+            if order.state not in PAID_OR_LATER:
+                raise ValueError(f"the order must be paid first (it is {order.state})")
             locked = (
                 VendorOrder.objects.select_for_update()
                 .select_related("vendor", "order")
@@ -332,15 +381,14 @@ def transition_vendor_order(
                 "orders.vendororder", str(locked.public_id), before, _vendor_order_snapshot(locked)
             )
             states = list(order.vendor_orders.values_list("state", flat=True))
-            derived = engine.derive_order_state(order.state, states)
-            if derived != order.state:
-                order_before = _order_snapshot(order)
+            order_before = _order_snapshot(order)
+            while (derived := engine.derive_order_state(order.state, states)) != order.state:
                 engine.check_order_transition(order.state, derived)
                 order.state = derived
                 order.save(update_fields=["state", "updated_at"])
-                changeset.update(
-                    "orders.order", str(order.public_id), order_before, _order_snapshot(order)
-                )
+            changeset.update(
+                "orders.order", str(order.public_id), order_before, _order_snapshot(order)
+            )
             if dry_run:
                 raise _DryRunRollback
             audit_changes(changeset, ctx=ctx, action="orders.transition")

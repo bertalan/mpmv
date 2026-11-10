@@ -4,7 +4,9 @@ Snapshots are immutable, states move only along the engine's arrows, and the tot
 whatever the client: `QuerySet.update()`, `bulk_update` and raw SQL all fail.
 """
 
+from collections.abc import Callable
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from django.db import IntegrityError, connection, transaction
@@ -12,13 +14,18 @@ from django.db import IntegrityError, connection, transaction
 from apps.catalog.tests.factories import ProductFactory
 from apps.orders import engine
 from apps.orders.models import Order, OrderLine, VendorOrder
-from apps.orders.tests.factories import OrderFactory, OrderLineFactory, VendorOrderFactory
+from apps.orders.tests.factories import (
+    OrderFactory,
+    OrderLineFactory,
+    VendorOrderFactory,
+    unchecked,
+)
 
 pytestmark = pytest.mark.django_db
 
 
-def refuses(sql: str, params: list[object] | None = None) -> None:
-    with transaction.atomic(), pytest.raises(IntegrityError), connection.cursor() as cursor:
+def refuses(sql: str, params: list[Any] | None = None) -> None:
+    with pytest.raises(IntegrityError), transaction.atomic(), connection.cursor() as cursor:
         cursor.execute(sql, params)
 
 
@@ -35,16 +42,16 @@ def force_state(table: str, pk: int, state: str) -> None:
 
 def test_a_line_cannot_be_changed_by_queryset_update() -> None:
     line = OrderLineFactory.create()
-    with transaction.atomic(), pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError), transaction.atomic():
         OrderLine.objects.filter(pk=line.pk).update(title="Other")
-    with transaction.atomic(), pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError), transaction.atomic():
         OrderLine.objects.filter(pk=line.pk).update(unit_price_net=Decimal("1.00"))
 
 
 def test_a_line_cannot_be_changed_by_bulk_update_or_raw_sql() -> None:
     line = OrderLineFactory.create()
     line.quantity = 5
-    with transaction.atomic(), pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError), transaction.atomic():
         OrderLine.objects.bulk_update([line], ["quantity"])
     refuses("UPDATE orders_orderline SET sku = 'X' WHERE id = %s", [line.pk])
 
@@ -53,7 +60,7 @@ def test_a_line_cannot_be_deleted() -> None:
     line = OrderLine.objects.get(pk=OrderLineFactory.create().pk)
     with pytest.raises(PermissionError):
         line.delete()
-    with transaction.atomic(), pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError), transaction.atomic():
         OrderLine.objects.filter(pk=line.pk).delete()
     refuses("DELETE FROM orders_orderline WHERE id = %s", [line.pk])
 
@@ -61,7 +68,7 @@ def test_a_line_cannot_be_deleted() -> None:
 def test_the_only_allowed_line_change_is_clearing_the_product() -> None:
     product = ProductFactory.create()
     line = OrderLineFactory.create(product=product)
-    with transaction.atomic(), pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError), transaction.atomic():
         OrderLine.objects.filter(pk=line.pk).update(product=ProductFactory.create())
     OrderLine.objects.filter(pk=line.pk).update(product=None)
     assert OrderLine.objects.get(pk=line.pk).product is None
@@ -73,13 +80,13 @@ def test_the_only_allowed_line_change_is_clearing_the_product() -> None:
 @pytest.mark.parametrize("column", ["goods_net", "shipping_net", "tax_total", "grand_total"])
 def test_order_money_columns_cannot_change(column: str) -> None:
     order = OrderFactory.create()
-    with transaction.atomic(), pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError), transaction.atomic():
         Order.objects.filter(pk=order.pk).update(**{column: Decimal("1.00")})
 
 
 def test_the_order_number_cannot_change_but_personal_data_can_be_scrubbed() -> None:
     order = OrderFactory.create()
-    with transaction.atomic(), pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError), transaction.atomic():
         Order.objects.filter(pk=order.pk).update(number="2999-999999")
     Order.objects.filter(pk=order.pk).update(email="", billing_address={}, shipping_address={})
     assert Order.objects.get(pk=order.pk).email == ""
@@ -90,7 +97,7 @@ def test_the_order_number_cannot_change_but_personal_data_can_be_scrubbed() -> N
 )
 def test_vendor_order_money_columns_cannot_change(column: str) -> None:
     sub = VendorOrderFactory.create()
-    with transaction.atomic(), pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError), transaction.atomic():
         VendorOrder.objects.filter(pk=sub.pk).update(**{column: Decimal("1.00")})
 
 
@@ -105,7 +112,7 @@ def test_vendor_order_snapshots_and_identity_cannot_change() -> None:
         {"order": other.order},
         {"vendor": other.vendor},
     ):
-        with transaction.atomic(), pytest.raises(IntegrityError):
+        with pytest.raises(IntegrityError), transaction.atomic():
             VendorOrder.objects.filter(pk=sub.pk).update(**change)
 
 
@@ -118,12 +125,17 @@ def test_tracking_and_dates_can_still_change() -> None:
 # --- state transitions in the database ------------------------------------------------------
 
 
-def test_an_order_cannot_be_created_in_a_non_initial_state() -> None:
-    with transaction.atomic(), pytest.raises(IntegrityError):
-        OrderFactory.create(state="paid")
-    with transaction.atomic(), pytest.raises(IntegrityError):
-        VendorOrderFactory.create(state="shipped")
-    OrderFactory.create(state="awaiting_payment")
+def test_an_order_cannot_be_inserted_in_a_non_initial_state() -> None:
+    # bulk_create skips save(), so this reaches the database trigger.
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Order.objects.bulk_create([Order(**{**_order_kwargs(), "state": "paid"})])
+    sub = VendorOrderFactory.create()
+    other = OrderFactory.create()
+    with pytest.raises(IntegrityError), transaction.atomic():
+        VendorOrder.objects.bulk_create(
+            [VendorOrder(order=other, vendor=sub.vendor, state="shipped")]
+        )
+    Order.objects.bulk_create([Order(**{**_order_kwargs(), "state": "awaiting_payment"})])
 
 
 def test_the_save_guard_also_refuses_a_non_initial_new_order() -> None:
@@ -147,10 +159,10 @@ def _order_kwargs() -> dict[str, object]:
 
 def test_queryset_update_cannot_make_an_illegal_transition() -> None:
     order = OrderFactory.create()
-    with transaction.atomic(), pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError), transaction.atomic():
         Order.objects.filter(pk=order.pk).update(state="paid")
     sub = VendorOrderFactory.create()
-    with transaction.atomic(), pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError), transaction.atomic():
         VendorOrder.objects.filter(pk=sub.pk).update(state="delivered")
     refuses("UPDATE orders_order SET state = 'closed' WHERE id = %s", [order.pk])
 
@@ -160,7 +172,7 @@ def test_save_with_update_fields_cannot_skip_the_guard_in_the_database() -> None
     Order.objects.filter(pk=order.pk).update(state="awaiting_payment")
     deferred = Order.objects.only("number").get(pk=order.pk)
     deferred.state = "closed"
-    with transaction.atomic(), pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError), transaction.atomic():
         deferred.save()
 
 
@@ -176,7 +188,7 @@ def test_the_database_allows_exactly_the_engine_order_transitions(source: str, t
         Order.objects.filter(pk=order.pk).update(state=target)
         assert Order.objects.get(pk=order.pk).state == target
     else:
-        with transaction.atomic(), pytest.raises(IntegrityError):
+        with pytest.raises(IntegrityError), transaction.atomic():
             Order.objects.filter(pk=order.pk).update(state=target)
 
 
@@ -193,7 +205,7 @@ def test_the_database_allows_exactly_the_engine_vendor_order_transitions(
         VendorOrder.objects.filter(pk=sub.pk).update(state=target)
         assert VendorOrder.objects.get(pk=sub.pk).state == target
     else:
-        with transaction.atomic(), pytest.raises(IntegrityError):
+        with pytest.raises(IntegrityError), transaction.atomic():
             VendorOrder.objects.filter(pk=sub.pk).update(state=target)
 
 
@@ -211,27 +223,28 @@ def test_the_database_allows_exactly_the_engine_vendor_order_transitions(
     ],
 )
 def test_a_line_must_do_its_own_sums(overrides: dict[str, object]) -> None:
-    with transaction.atomic(), pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError), transaction.atomic():
         OrderLineFactory.create(**overrides)
 
 
 def test_a_line_rounds_half_up() -> None:
     # 0.25 x 22% = 0.055 -> 0.06
-    OrderLineFactory.create(
-        unit_price_net=Decimal("0.25"), net_total=Decimal("0.25"), tax_amount=Decimal("0.06")
-    )
-    with transaction.atomic(), pytest.raises(IntegrityError):
+    with unchecked():
+        OrderLineFactory.create(
+            unit_price_net=Decimal("0.25"), net_total=Decimal("0.25"), tax_amount=Decimal("0.06")
+        )
+    with pytest.raises(IntegrityError), transaction.atomic():
         OrderLineFactory.create(
             unit_price_net=Decimal("0.25"), net_total=Decimal("0.25"), tax_amount=Decimal("0.05")
         )
 
 
 def test_negative_totals_are_refused() -> None:
-    with transaction.atomic(), pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError), transaction.atomic():
         OrderFactory.create(
             goods_net=Decimal("-1.00"), tax_total=Decimal("0"), grand_total=Decimal("-1.00")
         )
-    with transaction.atomic(), pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError), transaction.atomic():
         VendorOrderFactory.create(
             goods_net=Decimal("-1.00"), tax_total=Decimal("0"), gross_total=Decimal("-1.00")
         )
@@ -245,35 +258,40 @@ def check_now() -> None:
         cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
 
 
-def test_sums_must_match_at_commit() -> None:
+def fails_at_commit(build: Callable[[], None]) -> None:
+    """`build` makes rows that break a sum; the check fails and the savepoint drops them."""
+    try:
+        with transaction.atomic():
+            build()
+            check_now()
+    except IntegrityError:
+        return
+    pytest.fail("the commit-time check accepted inconsistent totals")
+
+
+def test_a_line_the_sub_order_does_not_know_fails_at_commit() -> None:
     sub = VendorOrderFactory.create()  # no lines: goods 0.00, consistent
     check_now()
-    OrderLineFactory.create(vendor_order=sub)  # a 10.00 line the sub-order does not know
-    with pytest.raises(IntegrityError):
-        check_now()
+
+    def build() -> None:
+        OrderLineFactory.create(vendor_order=sub)
+
+    fails_at_commit(build)
 
 
 def test_a_consistent_order_passes_the_commit_check() -> None:
-    order = OrderFactory.create(
-        goods_net=Decimal("10.00"), tax_total=Decimal("2.20"), grand_total=Decimal("12.20")
-    )
-    sub = VendorOrderFactory.create(
-        order=order,
-        goods_net=Decimal("10.00"),
-        tax_total=Decimal("2.20"),
-        gross_total=Decimal("12.20"),
-    )
-    OrderLineFactory.create(vendor_order=sub)
+    OrderLineFactory.create()
     check_now()
 
 
-def test_an_order_that_differs_from_its_sub_orders_fails_the_commit_check() -> None:
-    order = OrderFactory.create(
-        goods_net=Decimal("10.00"), tax_total=Decimal("0"), grand_total=Decimal("10.00")
-    )
-    VendorOrderFactory.create(order=order)  # sub-order totals are 0.00
-    with pytest.raises(IntegrityError):
-        check_now()
+def test_an_order_that_differs_from_its_sub_orders_fails_at_commit() -> None:
+    def build() -> None:
+        order = OrderFactory.create(
+            goods_net=Decimal("10.00"), tax_total=Decimal("0"), grand_total=Decimal("10.00")
+        )
+        VendorOrderFactory.create(order=order)  # sub-order totals are 0.00
+
+    fails_at_commit(build)
 
 
 def test_shipping_tax_is_part_of_the_sub_order_tax() -> None:

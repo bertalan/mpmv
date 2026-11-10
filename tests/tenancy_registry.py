@@ -203,9 +203,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     CartLine: lambda vendor: CartLineFactory.create(product=ProductFactory.create(vendor=vendor)),
     # ORD.2: a sub-order of its own order, and a line of such a sub-order.
     VendorOrder: lambda vendor: VendorOrderFactory.create(vendor=vendor),
-    OrderLine: lambda vendor: OrderLineFactory.create(
-        vendor_order=VendorOrderFactory.create(vendor=vendor)
-    ),
+    OrderLine: lambda vendor: OrderLineFactory.create(vendor_order__vendor=vendor),
     # EVT.1: a draft event page under the primary language's events index.
     EventPage: lambda vendor: EventPageFactory.create(vendor=vendor),
     VendorEventPolicy: lambda vendor: VendorEventPolicyFactory.create(vendor=vendor),

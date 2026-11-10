@@ -6,15 +6,32 @@ build real orders through `apps.orders.services.create_order`.
 """
 
 import itertools
+from collections.abc import Iterator
+from contextlib import contextmanager
 from decimal import Decimal
 
 import factory
+from django.db import connection
 from factory.django import DjangoModelFactory
 
 from apps.orders.models import Order, OrderLine, OrderNumberSequence, VendorOrder
 from apps.vendors.tests.factories import VendorFactory
 
 _numbers = itertools.count(1)
+
+
+@contextmanager
+def unchecked() -> Iterator[None]:
+    """Skip the order triggers inside the block, to build data that breaks the commit-time sums
+    on purpose. Django checks deferred constraints when a test ends, so use it for data a test
+    does not want checked at all."""
+    with connection.cursor() as cursor:
+        cursor.execute("SET LOCAL session_replication_role = replica")
+    try:
+        yield
+    finally:
+        with connection.cursor() as cursor:
+            cursor.execute("SET LOCAL session_replication_role = origin")
 
 
 class OrderFactory(DjangoModelFactory[Order]):
@@ -50,7 +67,17 @@ class OrderLineFactory(DjangoModelFactory[OrderLine]):
     class Meta:
         model = OrderLine
 
-    vendor_order = factory.SubFactory(VendorOrderFactory)
+    # The default parent already carries this line's totals (10.00 + 2.20 tax), so the
+    # commit-time sums hold; pass your own `vendor_order` to build something else.
+    vendor_order = factory.SubFactory(
+        VendorOrderFactory,
+        goods_net=Decimal("10.00"),
+        tax_total=Decimal("2.20"),
+        gross_total=Decimal("12.20"),
+        order__goods_net=Decimal("10.00"),
+        order__tax_total=Decimal("2.20"),
+        order__grand_total=Decimal("12.20"),
+    )
     product = None
     sku = factory.Sequence(lambda n: f"SKU-{n:05d}")
     title = "Test product"
