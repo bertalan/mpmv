@@ -2,7 +2,7 @@
 
 Every rich text that reaches storage goes through one sanitiser: `apps.cms.engine.sanitise_rich_text(html, features)`.
 It is the editor's own allow-list (Wagtail's `DbWhitelister` for the granted features), so only the elements and
-attributes the editor can write are stored. It also reads the stored form (`<a linktype id>`, `<embed>`), keeps plain
+attributes the editor can write are stored. It also reads the stored form (`<a linktype id>`, `<embed>`; a page or document link or an image embed needs a numeric `id`, else the link is unwrapped or the embed dropped), keeps plain
 text only (no CDATA, DOCTYPE, processing instructions or comments), adds `rel="noopener noreferrer"` to external links,
 never raises, and is idempotent. `features=None` means Wagtail's default features.
 

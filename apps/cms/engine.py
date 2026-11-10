@@ -446,6 +446,20 @@ def listing_slug_path(path: str, prefix: str) -> str | None:
 #: Attributes a stored `<a linktype=...>` and `<embed>` may keep (the database format).
 _DB_LINK_ATTRS = ("id", "linktype")
 _DB_EMBED_ATTRS = ("embedtype", "id", "alt", "format")
+#: Link and embed types whose handler looks the target up by a numeric `id`: a missing or
+#: non-numeric one makes Wagtail's `expand_db_html` raise at render, so such a link is unwrapped.
+_ID_LINKTYPES = frozenset({"page", "document"})
+_ID_EMBEDTYPES = frozenset({"image"})
+_NUMERIC_ID_RE = re.compile(r"[0-9]+")
+
+
+def _has_valid_id(kind: str, value: Any, id_kinds: frozenset[str]) -> bool:
+    """False for a `kind` that needs a numeric id and has none; True for any other kind."""
+    return kind not in id_kinds or (
+        isinstance(value, str) and _NUMERIC_ID_RE.fullmatch(value) is not None
+    )
+
+
 _TAG_RE = re.compile(r"<[^>]*>?")
 EXTERNAL_LINK_REL = "noopener noreferrer"
 _EXTERNAL_PREFIXES = ("http://", "https://", "//")
@@ -490,18 +504,30 @@ def _whitelister(features: tuple[str, ...]) -> Any:
             if tag.name == "a" and "linktype" in tag.attrs and "data-linktype" not in tag.attrs:
                 for child in list(tag.contents):
                     self.clean_node(doc, child)
-                if tag["linktype"] in self.link_handlers:
+                if tag["linktype"] in self.link_handlers and _has_valid_id(
+                    tag["linktype"], tag.get("id"), _ID_LINKTYPES
+                ):
                     tag.attrs = {k: v for k, v in tag.attrs.items() if k in _DB_LINK_ATTRS}
                 else:
                     tag.unwrap()
                 return
             if tag.name == "embed" and "data-embedtype" not in tag.attrs:
-                if tag.get("embedtype") in self.embed_handlers:
+                if tag.get("embedtype") in self.embed_handlers and _has_valid_id(
+                    tag["embedtype"], tag.get("id"), _ID_EMBEDTYPES
+                ):
                     tag.attrs = {k: v for k, v in tag.attrs.items() if k in _DB_EMBED_ATTRS}
                 else:
                     tag.decompose()
                 return
             super().clean_tag_node(doc, tag)
+            if (
+                tag.name == "a"
+                and tag.get("linktype")
+                and not _has_valid_id(tag["linktype"], tag.get("id"), _ID_LINKTYPES)
+            ):
+                # The editor's own format (`data-id`) reaches the same stored shape.
+                tag.unwrap()
+                return
             href = tag.get("href") if tag.name == "a" else None
             if href and check_url(href) and href.lstrip().lower().startswith(_EXTERNAL_PREFIXES):
                 tag["rel"] = EXTERNAL_LINK_REL
