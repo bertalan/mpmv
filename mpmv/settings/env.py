@@ -29,6 +29,28 @@ def env_bool(name: str, default: bool = False) -> bool:
     raise ImproperlyConfigured(f"{name} must be a boolean, got {raw!r}")
 
 
+def env_int(name: str, default: int) -> int:
+    """An integer; unset or empty means `default`."""
+    raw = os.environ.get(name, "")
+    if not raw.strip():
+        return default
+    try:
+        return int(raw.strip())
+    except ValueError:
+        raise ImproperlyConfigured(f"{name} must be an integer, got {raw!r}") from None
+
+
+def env_float(name: str, default: float) -> float:
+    """A number; unset or empty means `default`."""
+    raw = os.environ.get(name, "")
+    if not raw.strip():
+        return default
+    try:
+        return float(raw.strip())
+    except ValueError:
+        raise ImproperlyConfigured(f"{name} must be a number, got {raw!r}") from None
+
+
 def env_list(name: str, default: str = "") -> list[str]:
     return [item.strip() for item in os.environ.get(name, default).split(",") if item.strip()]
 

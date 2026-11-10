@@ -1,0 +1,18 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Vendor picker (CORE.17): a member of several vendors chooses the one to work on. One button per
+membership; the choice is checked against the memberships again on every request.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Choose a vendor" %}</h1>
+  <p class="manager-lead">{% translate "You are a member of several vendors. Choose the one to work on; you can switch from the header later." %}</p>
+  <form action="{% url 'manager:shop:vendor' %}" method="post">
+    {% csrf_token %}
+    <ul class="manager-choices">
+      {% for membership in manager.memberships %}
+        <li>{% include "components/button.html" with label=membership.vendor.display_name type="submit" name="vendor" value=membership.vendor.public_id variant="secondary" only %}</li>
+      {% endfor %}
+    </ul>
+  </form>
+{% endblock %}

@@ -45,6 +45,7 @@
 		?X-Content-Type-Options "nosniff"
 		?Referrer-Policy "strict-origin-when-cross-origin"
 		?Cross-Origin-Opener-Policy "same-origin"
+		?Cross-Origin-Resource-Policy "same-origin"
 		?X-Frame-Options "DENY"
 		?Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
 		?Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
@@ -67,11 +68,11 @@
 
 	# Public media: only image files in Wagtail's image folders (the THM.12 allow-list), straight
 	# from the mpmv-media volume (read-only). Everything else under /media/ is a 404, so documents
-	# and any private upload never become public by path (Wagtail documents go through their own
-	# serve view with its permission checks; private files belong in ARC.15's private storage).
+	# and any private upload never become public by path (Wagtail documents have no serve view
+	# mounted; private files belong in ARC.15's private storage).
 	# The files are inert: no listing, no MIME sniffing (the type comes from the allowed extension),
-	# a sandbox CSP if one is opened directly (SEC.4). Renditions are re-encoded by the app;
-	# originals are kept as uploaded.
+	# a sandbox CSP if one is opened directly (SEC.4). Originals and renditions are re-encoded by
+	# the app, without metadata, under names it makes (SEC.2, apps/core/uploads.py).
 	@public_media path_regexp public_media ^/media/(original_images|images)/[^/]+\.(?i:avif|webp|jpe?g|png|gif|svg)$
 	handle @public_media {
 		uri strip_prefix /media

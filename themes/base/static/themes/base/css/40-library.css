@@ -654,6 +654,14 @@
     font-weight: 600;
   }
 
+  /* CMS.9: the call to action and the pause button share a row, and wrap when narrow. */
+  .launch-countdown__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-s);
+    align-items: center;
+  }
+
   /* --- Image credit (CMS.8, core/components/image_credit.html): small text under the image. */
 
   .image-credit {

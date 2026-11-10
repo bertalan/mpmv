@@ -30,13 +30,21 @@ SUITES = ("unit", "integration", "e2e")
 # Hypothesis profiles for every `@given` test (SEC.5). `ci` is the default: a fixed example
 # sequence, no example database and no per-example deadline, because one slow example on a
 # loaded runner would otherwise fail as `Flaky`. `HYPOTHESIS_PROFILE=dev` runs more random
-# examples locally, with a deadline to spot slow code.
+# examples locally, with a deadline to spot slow code. `nightly` (security-nightly.yml) runs 1000
+# fresh random examples per test, no deadline.
 HYPOTHESIS_PROFILES = {
     "ci": settings(
         max_examples=30,
         deadline=None,
         database=None,
         derandomize=True,
+        suppress_health_check=[HealthCheck.function_scoped_fixture, HealthCheck.too_slow],
+    ),
+    "nightly": settings(
+        max_examples=1000,
+        deadline=None,
+        database=None,
+        derandomize=False,
         suppress_health_check=[HealthCheck.function_scoped_fixture, HealthCheck.too_slow],
     ),
     "dev": settings(
@@ -69,6 +77,25 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         if suite == "unit" and item.get_closest_marker("django_db") is not None:
             raise pytest.UsageError(f"{item.nodeid}: unit tests must not use the database")
         item.add_marker(getattr(pytest.mark, suite))
+        if _flushes_database(item):
+            # Under xdist (--dist loadgroup) a transactional test flushes the rows its worker's
+            # database got from data migrations. pytest-django runs those tests last; the group
+            # keeps that order: the group starts only after every other test is handed out, and
+            # a worker that ran it takes no ordinary test afterwards.
+            item.add_marker(pytest.mark.xdist_group(name=f"flush-{item.nodeid}"))
+
+
+def _flushes_database(item: pytest.Item) -> bool:
+    """True for a test that truncates the database (transaction=True, TransactionTestCase)."""
+    marker = item.get_closest_marker("django_db")
+    if marker is not None and marker.kwargs.get("transaction"):
+        return True
+    cls = getattr(item, "cls", None)
+    if cls is not None:
+        from django.test import TestCase, TransactionTestCase
+
+        return issubclass(cls, TransactionTestCase) and not issubclass(cls, TestCase)
+    return "transactional_db" in getattr(item, "fixturenames", ())
 
 
 def pytest_report_header() -> str:

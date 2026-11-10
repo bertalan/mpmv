@@ -21,6 +21,7 @@ from wagtail.models import GroupPagePermission, Site, WorkflowState
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
+from apps.cms import roles
 from apps.core.models import AuditLog
 from apps.events.models import EVENT_MODERATORS, EventPage, EventSettings, VendorEventPolicy
 from apps.events.services import hide_event, save_event_draft, submit_event
@@ -95,19 +96,20 @@ def _staff(client: Client) -> User:
 def _editor(*, publisher: bool = False) -> User:
     """A non-staff Wagtail editor; `publisher` also gives publish rights on the events index."""
     user: User = UserFactory.create(password=secrets.token_urlsafe(16))
-    user.groups.add(Group.objects.get(name="Editors"))
-    if publisher:
-        group = Group.objects.create(name=f"Event publishers {secrets.token_hex(4)}")
-        group.permissions.add(Permission.objects.get(codename="access_admin"))
-        for codename in ("change_page", "publish_page"):
-            GroupPagePermission.objects.create(
-                group=group,
-                page=primary_index(),
-                permission=Permission.objects.get(
-                    content_type__app_label="wagtailcore", codename=codename
-                ),
-            )
-        user.groups.add(group)
+    group = Group.objects.create(name=f"Event editors {secrets.token_hex(4)}")
+    group.permissions.add(
+        Permission.objects.get(codename="access_admin"),
+        Permission.objects.get(codename="submit_translation"),
+    )
+    for codename in ("change_page", "publish_page") if publisher else ("change_page",):
+        GroupPagePermission.objects.create(
+            group=group,
+            page=primary_index(),
+            permission=Permission.objects.get(
+                content_type__app_label="wagtailcore", codename=codename
+            ),
+        )
+    user.groups.add(group)
     return user
 
 
@@ -437,7 +439,7 @@ def test_a_vendor_member_with_wagtail_access_cannot_edit_or_resubmit_a_hidden_pa
     client: Client,
 ) -> None:
     owner = _owner()
-    owner.groups.add(Group.objects.get(name="Editors"))
+    owner.groups.add(Group.objects.get(name=roles.PAGE_EDITORS))
     page = _submitted(owner)
     hide_event(UserFactory.create(superuser=True), page, "Misleading offer.")
     verified_login(client, owner)
