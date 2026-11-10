@@ -2559,8 +2559,8 @@ class ProductKpis:
         return self.published + self.draft + self.retired
 
 
-def product_kpis(products: "QuerySet[Product]") -> ProductKpis:
-    """The counts for `products`, which the caller has already scoped to the vendor (CORE.3)."""
+def product_kpis(products: VendorScopedQuerySet[Product]) -> ProductKpis:
+    """The counts for `products`; the scoped type refuses an unscoped queryset (CORE.3)."""
     counts = products.aggregate(
         published=models.Count("pk", filter=Q(status=ProductStatus.PUBLISHED)),
         draft=models.Count("pk", filter=Q(status=ProductStatus.DRAFT)),

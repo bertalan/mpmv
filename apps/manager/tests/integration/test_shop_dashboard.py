@@ -4,7 +4,9 @@ staff alike, and never another vendor's numbers (CORE.3, spec 02 §2.2)."""
 import re
 
 import pytest
+from django.db import connection
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
 
 from apps.accounts.models import User
 from apps.accounts.tests.mfa import verified_login
@@ -82,5 +84,25 @@ def test_the_kpi_block_is_labelled_and_has_no_inline_script_or_style(
     page = client.get(SHOP).text
     assert 'aria-labelledby="kpi-heading"' in page
     assert 'id="kpi-heading"' in page
-    assert "<script" not in page.split("manager-page")[1]
+    _, _, content = page.partition('class="manager-page"')
+    assert content, "the page has no manager-page block"
+    assert "<script" not in content
     assert 'style="' not in page
+
+
+def _dashboard_queries(client: Client) -> int:
+    with CaptureQueriesContext(connection) as queries:
+        assert client.get(SHOP).status_code == 200
+    return len(queries)
+
+
+def test_the_dashboard_query_count_does_not_grow_with_the_products(
+    client: Client, owner: User, vendor: Vendor
+) -> None:
+    ProductFactory.create(vendor=vendor, status="published")
+    verified_login(client, owner)
+    client.get(SHOP)  # settle the session and the vendor choice
+    few = _dashboard_queries(client)
+    for _ in range(8):
+        ProductFactory.create(vendor=vendor, status="published", stock_status="out_of_stock")
+    assert _dashboard_queries(client) == few
