@@ -14,6 +14,7 @@ app_name = "manager"
 shop = (
     [
         path("", views.ShopDashboardView.as_view(), name="dashboard"),
+        path("profile/", views.StorefrontProfileView.as_view(), name="profile"),
         path("vendor/", views.VendorPickerView.as_view(), name="vendor"),
     ],
     "shop",

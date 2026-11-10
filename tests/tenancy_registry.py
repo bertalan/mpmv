@@ -116,6 +116,7 @@ from tests.tenancy import (
     VendorScoped,
     VendorScopedList,
     member_session,
+    vendor_api_key,
 )
 
 # --- Vendor-owned models: how to make one object owned by a given vendor
@@ -317,6 +318,7 @@ ENDPOINTS: dict[str, Access] = {
     "login": NoVendorData("Manager sign-in page."),
     "logout": NoVendorData("Sign-out of the Manager."),
     "manager:shop:dashboard": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    "manager:shop:profile": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
@@ -389,6 +391,14 @@ def classify(endpoint: Endpoint) -> Access | None:
 # --- API v1 operations ("METHOD /path" as in the OpenAPI description), called with Vendor A's
 # API key (CORE.13)
 
+
+def active_vendor_events_key(client: Client, tenants: CrossTenant) -> dict[str, str]:
+    """A write key is refused (403) while its vendor is not active (CORE.14): activate Vendor A."""
+    Vendor.objects.filter(pk=tenants.a.vendor.pk).update(status=Vendor.Status.ACTIVE)
+    tenants.a.vendor.refresh_from_db()
+    return vendor_api_key(["events:read", "events:write"])(client, tenants)
+
+
 API_OPERATIONS: dict[str, Access] = {
     "GET /api/v1/me": NoVendorData("The calling API client itself, with its own vendor."),
     # CAT.3
@@ -401,5 +411,28 @@ API_OPERATIONS: dict[str, Access] = {
     ),
     "GET /api/v1/catalog/products/{public_id}": VendorScoped(
         make=lambda vendor: ProductFactory.create(vendor=vendor)
+    ),
+    # EVT.5
+    "GET /api/v1/events": VendorScopedList(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor)
+    ),
+    "POST /api/v1/events": NoVendorData(
+        "Creates a draft for the caller's own vendor; a platform key is refused. Shows only the "
+        "ChangeSet of what it creates."
+    ),
+    "GET /api/v1/events/{public_id}": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor)
+    ),
+    "PATCH /api/v1/events/{public_id}": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        login=active_vendor_events_key,
+    ),
+    "POST /api/v1/events/{public_id}/submit": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        login=active_vendor_events_key,
+    ),
+    "POST /api/v1/events/{public_id}/cancel": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        login=active_vendor_events_key,
     ),
 }
