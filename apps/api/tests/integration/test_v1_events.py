@@ -9,13 +9,17 @@ from typing import Any
 
 import pytest
 from django.test import Client
-from wagtail.models import Revision
+from wagtail.models import Collection, Revision
 
 from apps.api.tests.factories import ApiClientFactory
 from apps.catalog.tests.factories import ProductFactory
 from apps.core.models import AuditLog
+from apps.core.tests.factories import MediaImageFactory
+from apps.events import engine as event_engine
+from apps.events import services
 from apps.events.models import EventPage
 from apps.events.tests.factories import EventPageFactory, primary_index
+from apps.vendors import engine as vendor_engine
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -202,3 +206,143 @@ def test_cancel_a_live_event(client: Client) -> None:
     assert response.status_code == 200
     page.refresh_from_db()
     assert page.cancelled_at is not None
+
+
+# --- Rich text, images and CTA links written through the API (EVT.5, CMS.12)
+
+
+def _stored_body(page: EventPage) -> str:
+    return str(page.get_latest_revision_as_object().body.get_prep_value())
+
+
+@pytest.mark.parametrize(
+    "hostile",
+    [
+        "<p>a</p><script>alert(1)</script>",
+        "<p><![CDATA[><img src=x onerror=alert(1)>]]></p>",
+        '<p><a href="javascript:alert(1)">x</a></p>',
+        '<p onclick="alert(1)" onmouseover="alert(2)">x</p>',
+    ],
+)
+def test_rich_text_written_through_the_api_is_stored_sanitised(
+    client: Client, hostile: str
+) -> None:
+    body = [{"type": "paragraph", "value": hostile}]
+    response = client.post(
+        EVENTS, _payload(body=body), content_type=JSON, headers=_headers(_vendor())
+    )
+    if response.status_code == 422:  # refused outright is as safe as sanitised
+        assert ["body"] in _error_fields(response)
+        return
+    assert response.status_code == 201, response.content
+    stored = _stored_body(EventPage.objects.get())
+    for marker in ("<script", "CDATA", "javascript:", "onerror", "onclick", "onmouseover"):
+        assert marker not in stored
+
+
+def test_rich_text_of_a_patch_is_sanitised_too(client: Client) -> None:
+    headers = _headers(_vendor())
+    created = client.post(EVENTS, _payload(), content_type=JSON, headers=headers)
+    assert created.status_code == 201
+    page = EventPage.objects.get()
+    patched = client.patch(
+        f"{EVENTS}/{page.public_id}",
+        {"body": [{"type": "paragraph", "value": '<p onclick="x()">hi</p><script>1</script>'}]},
+        content_type=JSON,
+        headers=headers,
+    )
+    if patched.status_code == 422:
+        return
+    assert patched.status_code == 200, patched.content
+    stored = _stored_body(EventPage.objects.get())
+    assert "onclick" not in stored
+    assert "<script" not in stored
+
+
+def _own_collection(vendor: Vendor) -> Collection:
+    root = Collection.get_first_root_node() or Collection.add_root(name="Root")
+    return root.add_child(name=event_engine.vendor_collection_name(str(vendor.public_id)))
+
+
+def _figure(image_id: Any) -> dict[str, Any]:
+    return {"type": "figure", "value": {"image": image_id, "alt_text": "A stand"}}
+
+
+def _cta(**link: Any) -> dict[str, Any]:
+    value = {"heading": "Join", "text": "", "link": {"label": "Go", **link}}
+    return {"type": "cta", "value": value}
+
+
+def test_an_own_image_is_accepted_and_a_foreign_or_missing_one_is_refused(
+    client: Client,
+) -> None:
+    vendor, other = _vendor(), _vendor()
+    own = MediaImageFactory.create(collection=_own_collection(vendor))
+    foreign = MediaImageFactory.create(collection=_own_collection(other))
+    root_image = MediaImageFactory.create()
+    headers = _headers(vendor)
+    ok = client.post(EVENTS, _payload(body=[_figure(own.pk)]), content_type=JSON, headers=headers)
+    assert ok.status_code == 201, ok.content
+    for bad in (foreign.pk, root_image.pk, 999_999, "1; DROP", True):
+        response = client.post(
+            EVENTS, _payload(body=[_figure(bad)]), content_type=JSON, headers=headers
+        )
+        assert response.status_code == 422, bad
+        assert ["body"] in _error_fields(response)
+    assert EventPage.objects.count() == 1
+
+
+def test_a_cta_accepts_https_only(client: Client) -> None:
+    headers = _headers(_vendor())
+    ok = client.post(
+        EVENTS,
+        _payload(body=[_cta(url="https://shop.example/offer")]),
+        content_type=JSON,
+        headers=headers,
+    )
+    assert ok.status_code == 201, ok.content
+    for url in (
+        "javascript:alert(1)",
+        "data:text/html,<b>x</b>",
+        "http://shop.example/",
+        "//shop.example/",
+        "https://user@shop.example/",
+        "https://shop.example/a b",
+        "vbscript:x",
+    ):
+        response = client.post(
+            EVENTS, _payload(body=[_cta(url=url)]), content_type=JSON, headers=headers
+        )
+        assert response.status_code == 422, url
+        assert ["body"] in _error_fields(response)
+    assert EventPage.objects.count() == 1
+
+
+def test_a_cta_cannot_link_another_vendors_event(client: Client) -> None:
+    foreign = EventPageFactory.create(vendor=_vendor())
+    response = client.post(
+        EVENTS,
+        _payload(body=[_cta(page=foreign.pk)]),
+        content_type=JSON,
+        headers=_headers(_vendor()),
+    )
+    assert response.status_code == 422
+    assert ["body"] in _error_fields(response)
+
+
+@pytest.mark.parametrize("status", [vendor_engine.SUSPENDED, vendor_engine.CLOSED])
+def test_a_vendor_that_stops_being_active_mid_write_gets_the_standard_refusal(
+    client: Client, monkeypatch: pytest.MonkeyPatch, status: str
+) -> None:
+    """The key authenticated while the vendor was active; the status changed before the write
+    (CORE.14). The service's `VendorCannotWrite` is the API's refusal, not a 500."""
+
+    def refuse(vendor: Vendor) -> str:
+        raise vendor_engine.VendorCannotWrite(status)
+
+    monkeypatch.setattr(services, "ensure_vendor_can_write", refuse)
+    response = client.post(EVENTS, _payload(), content_type=JSON, headers=_headers(_vendor()))
+    assert response.status_code in {401, 403}
+    assert response.headers["Content-Type"].startswith("application/problem+json")
+    assert response.json()["status"] == response.status_code
+    assert EventPage.objects.count() == 0

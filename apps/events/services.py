@@ -62,6 +62,7 @@ from wagtail_localize.models import Translation, TranslationSource
 from apps.accounts.models import User
 from apps.catalog.models import Category, Product
 from apps.cms.models import HomePage
+from apps.cms.services import sanitise_rich_text_fields
 from apps.core.audit import AuditContext, record, user_context
 from apps.core.changeset import ChangeSet, to_jsonable
 from apps.core.geocoding import AddressQuery, GeocodeResult
@@ -599,6 +600,9 @@ def _apply(page: EventPage, data: Mapping[str, Any], *, staff: bool) -> None:
             setattr(page, name, data[name])
     if "body" in data:
         _set_body(page, data["body"], staff=staff)
+        # A revision is a JSON snapshot: `save_revision` skips `pre_save`, so a draft edit would
+        # keep the raw rich text. The one sanitiser (CMS.12) runs here, for create and edit.
+        sanitise_rich_text_fields(page, only={"body"})
     _set_links(page, data)
 
 
