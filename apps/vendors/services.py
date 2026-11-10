@@ -795,24 +795,51 @@ def _rules_of_scope(rule: CommissionRule) -> "QuerySet[CommissionRule]":
     return CommissionRule.objects.filter(vendor=rule.vendor, plan=rule.plan)
 
 
+BACKDATE_TOLERANCE = dt.timedelta(minutes=1)  # a caller's "now" computed a moment earlier
+
+
 def add_commission_rule(
-    new: CommissionRule, *, ctx: AuditContext, dry_run: bool = False
+    new: CommissionRule,
+    *,
+    ctx: AuditContext,
+    dry_run: bool = False,
+    backdate: bool = False,
+    backdate_reason: str = "",
 ) -> ChangeSet:
     """Add a rule from `new.valid_from`, closing the open one of its scope; the version counts up.
 
     Existing rules are never edited: orders freeze the rule they were computed with. Raises
     `ValidationError` for invalid rates (a 0% rule needs a promo label), a start that does not
-    follow the latest rule of the scope, or a scope of both vendor and plan.
+    follow the latest rule of the scope (a closed latest rule must be followed with no gap), or a
+    scope of both vendor and plan.
+
+    A rule starting in the past is refused: closing the open rule retroactively would change
+    which rule a re-pricing or a statement finds for an old order. Only an import of historical
+    rules (MIG) passes `backdate=True` with a non-empty `backdate_reason`, which is audited.
+    The admin never offers it.
     """
     if new.pk is not None:
         raise ValueError("Pass a new, unsaved CommissionRule")
     new.promo_label = new.promo_label.strip()
     new.valid_to = None
+    reason = backdate_reason.strip()
+    if backdate and not reason:
+        raise ValidationError({"valid_from": "Backdating a rule needs a reason."})
+    if not backdate and new.valid_from < timezone.now() - BACKDATE_TOLERANCE:
+        raise ValidationError(
+            {"valid_from": "A commission rule cannot start in the past; use now or later."}
+        )
     with transaction.atomic():
         latest = _rules_of_scope(new).select_for_update().order_by("-version").first()
         new.version = 1 if latest is None else latest.version + 1
         new.full_clean(exclude=["public_id"], validate_constraints=False)  # the database decides
         error = next_start_error(new.valid_from, latest)
+        gap = (
+            latest is not None and latest.valid_to is not None and new.valid_from != latest.valid_to
+        )
+        if error is None and gap and latest is not None:
+            # A gap would silently fall back to another level's rule.
+            error = f"Must start at {latest.valid_to}, the end of the latest rule."
         if error is not None:
             raise ValidationError({"valid_from": error})
 
@@ -829,7 +856,7 @@ def add_commission_rule(
         changeset.create(
             COMMISSION_RULE_MODEL,
             str(new.public_id),
-            commission_rule_snapshot(new),
+            {**commission_rule_snapshot(new), **({"backdate_reason": reason} if backdate else {})},
             supersedes=commission_rule_snapshot(latest) if latest is not None else None,
         )
 

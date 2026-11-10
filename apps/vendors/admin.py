@@ -8,8 +8,10 @@ audit trail.
 import functools
 from collections.abc import Callable
 from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 from django import forms
+from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.admin.utils import unquote
 from django.core.exceptions import FieldDoesNotExist, PermissionDenied, ValidationError
@@ -18,6 +20,7 @@ from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import URLPattern, path, reverse
+from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.http import urlencode
 from django.utils.safestring import SafeString
@@ -876,7 +879,13 @@ class CommissionRuleAdmin(admin.ModelAdmin[CommissionRule]):
         self, request: HttpRequest, form_url: str = "", extra_context: dict[str, Any] | None = None
     ) -> HttpResponse:
         parent = super().add_view
-        return step_up(lambda req: parent(req, form_url, extra_context))(request)
+
+        def in_business_time(req: HttpRequest) -> HttpResponse:
+            # A naive "from" typed by staff is read in Rome time, not UTC.
+            with timezone.override(ZoneInfo(settings.BUSINESS_TIME_ZONE)):
+                return parent(req, form_url, extra_context)
+
+        return step_up(in_business_time)(request)
 
 
 def _overrides_kill_switch(override: VendorFeatureFlag | None) -> bool:

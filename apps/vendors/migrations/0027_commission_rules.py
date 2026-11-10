@@ -53,6 +53,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # OPS: creating btree_gist needs owner rights once (superuser, or the database owner
+        # on PostgreSQL 13+, where it is a trusted extension). tax 0001 and shipping 0001 already
+        # create it, so on a database that ran them this is a no-op.
         migrations.RunSQL(
             "CREATE EXTENSION IF NOT EXISTS btree_gist", reverse_sql=migrations.RunSQL.noop
         ),
