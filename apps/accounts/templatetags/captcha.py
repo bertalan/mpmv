@@ -36,4 +36,11 @@ def captcha_widget() -> SafeString:
     site_key = _site_key()
     if not site_key:
         return SafeString("")
-    return format_html('<div class="cf-turnstile" data-sitekey="{}"></div>', site_key)
+    # No puzzle (CMP.9, WCAG 2.2 SC 3.3.8, spec 14 §14.6): the site key is a Managed or
+    # Invisible widget, shown only when Cloudflare needs one click on its accessible checkbox,
+    # and a failed check retries by itself instead of asking the user to solve anything.
+    return format_html(
+        '<div class="cf-turnstile" data-sitekey="{}" data-appearance="interaction-only"'
+        ' data-retry="auto"></div>',
+        site_key,
+    )

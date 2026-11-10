@@ -54,6 +54,7 @@ part of the done-when still open) · `not started`.
 | CAT.14 | done | #80, #94, #116 | Catalogue integrity rules |
 | CAT.3 | done | #84, #96, #116 | Typed attributes, translated values and variant axes |
 | CAT.5 | done | #81, #116 | SKU-free product slugs, SlugHistory and 301 redirects |
+| CAT.6 | done | #174 | Redirect model, admin, `import_redirects`, resolved in the middleware |
 | THM.1 | done | #88 | Theme registry, loader and per-site theme |
 | ARC.18 | done | #106 | Engine purity contract and dry-run exception guard |
 | TAX.5 | done | #92 | VIES client with cache, timeout and fail-closed check. Tax code, flagged for careful human review |
@@ -77,6 +78,7 @@ part of the done-when still open) · `not started`.
 | EVT.1 | done | #125, #127 | Event page models, constraints, tenancy, admin panels and templates |
 | CORE.16 | done | #136 | API rate limit defaults and per-key override |
 | EVT.2 | done | #130 | Recurrence engine |
+| EVT.3 | done | #147, #149 | Event services, Event review workflow, moderation UI (hide, restore, cancel, policies) |
 | ARC.13 | partial: the done-when is proven on STAGE (lane-a) | #146, #148, #152 | Multi-arch release image, database env file and root CA mount, site-only Caddy, media volume |
 | THM.5 | done | #128 | Theme quality gates |
 | VEN.25 | partial: the EX number is not in the FatturaPA party data yet (tax advisor) | #139 | RF20 only for EU-established vendors with an EX number |
@@ -94,6 +96,7 @@ part of the done-when still open) · `not started`.
 | SEC.5 | partial: items 6, 7, 9 and 10 of the security wave open | #162, #169, #166, #171 | Security headers by response type, endpoint sweep, hostile-input corpus, rate-limit tests |
 | CAT.9 | done | #167 | Product search: full-text per language, trigram, SKU prefix |
 | CORE.20 | done | #171 | Per-IP limit on refused API keys |
+| CMS.3 | done | #156 | Blog: index and post pages, scheduling, translatable authors with author pages, ProfilePage/Person and BlogPosting JSON-LD, choosers, `import_article` |
 | CMS.4 | done | #168 | Term and vendor landing pages |
 | THM.12 | done | #151 | WebP and AVIF renditions, sanitised SVG logos |
 
@@ -622,6 +625,9 @@ Spec and process:
 | #155 | CORE.18 | Spec: Manager backoffice, staff roles, setup wizard, import connectors |
 | #157 | SEO.7, CMS.11, CAT.20 | Spec: schema.org graph, product cards, linked brands |
 | #158 | — | Coherence check 6: generic wording for the legacy system in the spec |
+| #165 | MQ-14 to MQ-17 | Spec: owner decisions 2026-11-09 |
+| #172 | — | Coherence check 7: spec rows, docs drift and hygiene fixes |
+| #173 | — | Coherence check 7 follow-up: lane-a decisions, progress log, test hygiene |
 
 Commerce (catalogue, vendors, tax, shipping):
 
@@ -640,6 +646,8 @@ Commerce (catalogue, vendors, tax, shipping):
 | #154 | CAT.19 | Vendor products in the Manager shop space |
 | #141 | VEN.24 | Claim an imported vendor |
 | #167 | CAT.9 | Product search: full-text per language, trigram, SKU prefix |
+| #176 | CAT.9 | Make the index-usage EXPLAIN test deterministic |
+| #174 | CAT.6 | Redirects |
 
 Themes, CMS, languages and events:
 
@@ -666,6 +674,10 @@ Themes, CMS, languages and events:
 | #142 | I18N.9 | Customer legal and checkout pages per language |
 | #168 | CMS.4 | Term and vendor landing pages |
 | #151 | THM.12 | WebP and AVIF renditions, sanitised SVG logos |
+| #178 | EVT.1 | Close the date pickers before Publish in the event e2e test |
+| #156 | CMS.3 | Blog with scheduling, authors and choosers |
+| #147 | EVT.3 | Event services and moderation workflow (1/2) |
+| #149 | EVT.3 | Event moderation UI (2/2) |
 
 Core, accounts, API and security:
 
@@ -679,6 +691,9 @@ Core, accounts, API and security:
 | #169 | SEC.5 | Endpoint security sweep |
 | #166 | SEC.5 | Hostile-input corpus and property-based tests |
 | #171 | SEC.5, CORE.20 | Rate-limit tests and a per-IP limit on refused API keys |
+| #160 | SEC.5 | Periodic security runs: nightly and weekly STAGE scans |
+| #177 | CMP.9 | Accessible authentication (WCAG 2.2 SC 3.3.8) |
+| #183 | SEC.5 | Refused-key log test made deterministic (flaky fragment assertion) |
 
 Infrastructure and CI:
 
@@ -691,6 +706,7 @@ Infrastructure and CI:
 | #152 | ARC.13 | Media volume for uploads, served read-only by Caddy |
 | #153 | ARC.23 | Release gate with production parity |
 | #161 | OPS.4 | Dependabot: uv image 0.10.11 to 0.13.7 |
+| #159 | THM.12, ARC.13 | Caddy SVG CSP and media allow-list parity |
 
 ## Coherence checks
 
@@ -1224,3 +1240,26 @@ question); 3.5 compromised-password check has no row; 3.6 spec 02 sketch fields;
 check on `MFA_REQUIRED_POLICIES`; 4.3 ADR-0005 citations in deploy files; 4.5 OPS.2 dependencies;
 5.5 `einvoice_channel` (ARC.17); the SEC.3 row binding (check 5 cleanup item 7, Q-93); the
 check 6 items above.
+
+### Check 8 (2026-11-10, after #156, #147, #149, #174, #183)
+
+Scope: main at a35b1ff, five merges (76 files, about 8k lines). Two read-only reviews: code vs spec,
+and spec, docs and hygiene. Fix PR: #187.
+
+| Area | Result |
+|---|---|
+| Done-when criteria | Met for CAT.6, EVT.3 and CMS.3; services/engine split, `dry_run`, AuditLog and the `"IT"` rule kept; no blocker or major finding in the code |
+| Docs drift | audit-trail.md lacked `catalog.redirect.*` and the EVT.3 actions, background-jobs.md lacked `cms.publish_scheduled` (now 7 periodic jobs). Fixed in #187, with a guard test that every audit action is listed |
+| Release gate | The owner's rule (a coherence check on the exact commit before every STAGE release) is in [release.md](dev/release.md) |
+| Hygiene | No credential-like literals or vendor names; 2 pre-existing TODOs tied to CORE.18 and CMP.4; the #183 flaky pattern swept, clean |
+| Migrations | One leaf per app, contiguous (cms 0011, catalog 0009, events 0002). #156 renumbered its blog migration twice (0010, then 0011, after #168 and #129) |
+| Gates | `make check` green, `makemigrations --check` clean, last 5 CI runs on main green; full suite not run (CI is the gate) |
+
+Findings and actions:
+
+1. Major. progress.md missed the five merges. Action: this update.
+2. Minor. Docs drift above. Action: fixed in #187.
+3. Minor. `cms.services.import_article` writes no AuditLog (Wagtail history covers it) and has no caller yet. Action: noted in audit-trail.md; the MIG owner uses it.
+4. Minor. `RemovedInWagtail90Warning` at `apps/cms/admin_views.py:30` (image permission policy). Action: proposed row (with OPS.7 deprecations).
+5. Minor. No developer pages for redirects (CAT.6) or event moderation (EVT.3). Action: proposed rows.
+6. Minor, for lane-a: check whether #129 is still open and will renumber again (cms is at 0011), and that the CAT.6 follow-ups are registered as rows or answered.
