@@ -7,7 +7,7 @@ and [CONTRIBUTING.md](../../CONTRIBUTING.md) and does not replace them.
 | Lane | Role |
 |---|---|
 | **lane-a** | Integrator. Runs the backend waves, merges every PR (its own and lane-b's), keeps `docs/progress.md` and the owner-question register, and runs the coherence checks. |
-| **lane-b** | Implementer. Takes ready tasks from its areas, opens one PR per task and marks it ready. Never merges. |
+| **lane-b** | Implementer. Takes ready tasks from its areas, opens one PR per task and marks it ready. Never merges. Runs the coherence check that precedes every release candidate ([release.md](release.md#coherence-check-before-a-release-candidate)). |
 
 ## Who owns which areas
 

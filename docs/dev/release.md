@@ -8,7 +8,20 @@ How a commit becomes a release and reaches STAGE and LIVE. The mechanics are in
 - Tag only a commit on `main` whose CI run is green, and name it by its full SHA:
   `git tag -a v0.2.0 <full SHA> -m v0.2.0 && git push origin v0.2.0`. Never tag a branch name
   or `HEAD`: by the time the tag is pushed, either may point elsewhere.
+- Tag only the merge commit of the coherence PR described in the next section.
 - Release tags are immutable. A broken release gets a new patch version, never a re-tag.
+
+## Coherence check before a release candidate
+
+Owner rule: every STAGE release is preceded by a coherence check on the exact commit being
+released.
+
+1. lane-a announces "release candidate" on the Lane board issue (#86). lane-b runs the
+   coherence check on current `main` and opens one PR (docs and tests only).
+2. lane-a merges that PR with no other merge in between, then cuts the pre-release from that
+   merge commit, named by its full SHA, after green CI.
+3. A major finding that the PR does not fix blocks the tag until lane-a decides. If anything
+   else merges after the check, the next tag needs a new check.
 
 ## What the release workflow does
 

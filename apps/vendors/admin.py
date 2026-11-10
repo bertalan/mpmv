@@ -28,6 +28,7 @@ from apps.accounts.models import User
 from apps.core.admin import step_up
 from apps.core.audit import audit_context
 from apps.core.changeset import ChangeSet
+from apps.core.text import ascii_int
 
 from . import engine
 from .models import (
@@ -223,10 +224,11 @@ def _reviewed_value(claim: VendorClaim) -> str:
 
 
 def _parse_reviewed(value: str) -> tuple[int, int] | None:
-    version, _, claimant = value.partition(":")
-    if not (version.isdigit() and claimant.isdigit()):
+    first, _, second = value.partition(":")
+    version, claimant = ascii_int(first), ascii_int(second)
+    if version is None or claimant is None:
         return None
-    return int(version), int(claimant)
+    return version, claimant
 
 
 def _review_page(
