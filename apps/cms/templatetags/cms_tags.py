@@ -83,6 +83,9 @@ def language_links(context: dict[str, Any]) -> list[LanguageLink]:
             for code, url in services.page_language_urls(context.get("page"), request).items()
         }
 
+    if "language_urls" in context:
+        suffix = ""  # a listing's filters mean nothing on a home page
+
     def home(code: str) -> str:
         with translation.override(code):
             return reverse("home") + suffix

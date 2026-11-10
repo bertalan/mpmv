@@ -129,3 +129,11 @@ def test_every_configured_language_has_a_switch_target(client: Client) -> None:
     vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
     html = client.get(f"/shop/{vendor.slug}/").content.decode()
     assert set(switch_targets(html)) == set(configured_languages())
+
+
+def test_a_listing_never_carries_its_query_to_a_home_page(
+    client: Client,
+    compat: dict[str, Any],  # noqa: F811
+) -> None:
+    targets = switch_targets(client.get("/compatibility/maker/?utm_source=x").content.decode())
+    assert targets["de"] == ("/de/", True)
