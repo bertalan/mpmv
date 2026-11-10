@@ -35,6 +35,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.core.audit import audit_context
 from apps.core.http import client_ip
+from apps.core.i18n import language_switch_home
 
 from . import services
 from .decorators import mfa_exempt
@@ -59,6 +60,7 @@ def _session_user(request: HttpRequest) -> User | None:
     return user if isinstance(user, User) and user.is_authenticated else None
 
 
+@language_switch_home
 @mfa_exempt
 @require_http_methods(["GET", "HEAD"])
 def open_link(request: HttpRequest, token: str) -> HttpResponse:
