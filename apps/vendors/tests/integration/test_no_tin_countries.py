@@ -31,7 +31,12 @@ from apps.vendors.services import (
     onboarding_checklist,
     remove_no_tin_country,
 )
-from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory, iban
+from apps.vendors.tests.factories import (
+    NoTinCountryFactory,
+    VendorFactory,
+    VendorMemberFactory,
+    iban,
+)
 from apps.vendors.tests.fakes import seed_legal_requirements
 
 pytestmark = pytest.mark.django_db
@@ -186,3 +191,8 @@ def test_staff_add_and_remove_a_country_in_the_admin_and_it_is_audited(
     staff.post(reverse("admin:vendors_notincountry_delete", args=[row.pk]), {"post": "yes"})
     assert "NZ" not in no_tin_countries()
     assert AuditLog.objects.filter(action=NO_TIN_REMOVED, target_key="NZ").exists()
+
+
+def test_a_listed_country_in_the_factory_row_counts_like_any_other() -> None:
+    row = NoTinCountryFactory.create(country="NZ")
+    assert row.country in no_tin_countries()
