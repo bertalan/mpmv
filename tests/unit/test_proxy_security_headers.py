@@ -155,3 +155,34 @@ def test_request_bodies_are_capped_just_above_the_upload_cap() -> None:
     assert found, "the site block must cap request bodies"
     cap = caddy_bytes(found.group(1))
     assert IMAGE_UPLOAD_CAP < cap <= IMAGE_UPLOAD_CAP + FORM_OVERHEAD_LIMIT
+
+
+def test_the_header_ownership_doc_names_every_header_of_the_snippet() -> None:
+    """SEC.12: `docs/dev/security-headers.md` says which layer owns each header."""
+    doc = (CADDYFILE.parents[2] / "docs" / "dev" / "security-headers.md").read_text()
+    for field in snippet_headers():
+        assert f"`{field.lstrip('?-')}`" in doc, field
+    for exception in ("301", "421"):
+        assert exception in doc
+
+
+def test_the_plain_http_redirect_is_the_proxys_own_with_the_full_set() -> None:
+    """In LIVE plain HTTP is redirected by Caddy, never by the app's 301 (documented exception)."""
+    block = top_level_block("http://{$MPMV_SITE_ADDRESS}")
+    assert "import security_headers" in block
+    assert "308" in block
+
+
+def test_caddy_never_opens_resources_to_other_origins() -> None:
+    """ZAP 10098: no `Access-Control-Allow-Origin` anywhere; everything is same-origin."""
+    text = CADDYFILE.read_text()
+    code = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
+    assert "access-control" not in code.lower()
+
+
+def test_caddy_snippet_sets_corp_same_origin_and_no_coep() -> None:
+    fields = snippet_headers()
+    assert fields["?Cross-Origin-Resource-Policy"] == "same-origin"
+    assert not [field for field in fields if "Embedder" in field], "COEP is a documented accept"
+    # The media handler relies on the site block's snippet: it must not delete or replace it.
+    assert "Cross-Origin" not in public_media_block()

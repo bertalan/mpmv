@@ -24,7 +24,9 @@
       {% if is_fallback %}<p class="listing-notice">{% translate "This page is not available in your language yet." %}</p>{% endif %}
       <p class="listing-count">{% blocktranslate count counter=window.total %}{{ counter }} product{% plural %}{{ counter }} products{% endblocktranslate %}</p>
     </header>
+    {% if vendor_profile %}{% include "catalog/includes/vendor_profile.html" %}{% endif %}
     {% if editorial.before %}{{ editorial.before }}{% endif %}
+    {% if store_categories %}{% include "catalog/includes/store_categories.html" %}{% endif %}
 
     {% include "catalog/includes/listing_filters.html" %}
 

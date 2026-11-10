@@ -7,7 +7,8 @@
   "Permissions": only platform staff create platform events).
 - The moderation UI (EVT.3 part 2/2): staff hide, restore and cancel an event from the page
   action menu and the explorer listing; the "Events" menu holds the events awaiting review,
-  the vendors' moderation policies and the events settings (`admin_views`). A non-staff user
+  the events settings (`admin_views`; the vendors' policies page has no menu item, CORE.8).
+  A non-staff user
   never edits a hidden event, nor publishes one (alone or in bulk) while its vendor needs
   review: the submission goes through "Event review". wagtail-localize's own views keep the
   same rules through `apps.events.middleware`, and `EventPage.publish` refuses a hidden page on
@@ -222,9 +223,6 @@ def events_menu() -> MenuItem:
         items=[
             _ReviewMenuItem(
                 _("Awaiting review"), reverse_lazy("events_admin:review"), icon_name="tasks"
-            ),
-            _StaffMenuItem(
-                _("Vendor policies"), reverse_lazy("events_admin:policies"), icon_name="group"
             ),
             _StaffMenuItem(_("Settings"), reverse_lazy("events_admin:settings"), icon_name="cog"),
         ]

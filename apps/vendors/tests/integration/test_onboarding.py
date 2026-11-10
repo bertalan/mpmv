@@ -31,6 +31,7 @@ from apps.vendors.models import (
 from apps.vendors.services import (
     accept_contract,
     assert_payout_allowed,
+    certify_platform_duties,
     change_status,
     contract_offer,
     current_contract,
@@ -630,7 +631,7 @@ def test_the_checklist_of_a_new_vendor_lists_what_is_missing() -> None:
     vendor = VendorFactory.create(status=Vendor.Status.ONBOARDING)
     result = onboarding_checklist(vendor)
     assert not result.ready
-    assert result.blocking_missing == (engine.CONTRACT,)
+    assert result.blocking_missing == (engine.CONTRACT, engine.PLATFORM_DUTIES)
     dac7 = {item.key: item for item in result.items}[engine.DAC7]
     assert "iban" in dac7.missing
     assert "tax_residence_country" in dac7.missing
@@ -649,9 +650,13 @@ def test_a_vendor_cannot_be_activated_before_accepting_the_contract() -> None:
 
 
 def test_incomplete_dac7_or_payout_data_does_not_block_activation() -> None:
-    member = onboarding_owner()  # a bare vendor: no IBAN, no address, no tax residence
+    # Trader data complete (CMP.25), but no IBAN and no tax residence (DAC7, payouts only).
+    member = onboarding_owner(italian_company=True, iban="", tax_residence_country="")
     VendorContractFactory.create()
     accept(member.vendor, member.user, language="en", ctx=vendor_ctx(member.user.pk))
+    certify_platform_duties(
+        member.vendor, member.user, language="en", ctx=vendor_ctx(member.user.pk)
+    )
 
     change_status(member.vendor, Vendor.Status.ACTIVE, ctx=STAFF_CTX)
 

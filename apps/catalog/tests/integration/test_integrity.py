@@ -272,7 +272,7 @@ def make_rich_product() -> Product:
 def test_staff_duplicate_a_product_to_another_vendor_as_a_draft() -> None:
     original = make_rich_product()
     target = VendorFactory.create()
-    staff = UserFactory.create(staff=True)
+    staff = UserFactory.create(platform_staff=True)
     original_vendor = original.vendor
 
     changes = duplicate_product_to_vendor(
@@ -316,7 +316,7 @@ def test_staff_duplicate_a_product_to_another_vendor_as_a_draft() -> None:
 def test_a_dry_run_duplicate_writes_nothing() -> None:
     original = make_rich_product()
     target = VendorFactory.create()
-    staff = UserFactory.create(staff=True)
+    staff = UserFactory.create(platform_staff=True)
     count = Product.objects.count()
     changes = duplicate_product_to_vendor(
         original, target, actor=staff, reason="mistake", ctx=CTX, dry_run=True
@@ -340,7 +340,7 @@ def test_only_staff_can_duplicate_a_product() -> None:
 
 def test_a_duplicate_needs_a_reason_and_another_vendor() -> None:
     original = ProductFactory.create()
-    staff = UserFactory.create(staff=True)
+    staff = UserFactory.create(platform_staff=True)
     with pytest.raises(ValidationError):
         duplicate_product_to_vendor(
             original, VendorFactory.create(), actor=staff, reason="  ", ctx=CTX
@@ -355,7 +355,7 @@ def test_a_duplicate_onto_a_taken_sku_is_refused() -> None:
     ProductFactory.create(vendor=target, sku="SKU-TAKEN")
     with pytest.raises(ValidationError):
         duplicate_product_to_vendor(
-            original, target, actor=UserFactory.create(staff=True), reason="x", ctx=CTX
+            original, target, actor=UserFactory.create(platform_staff=True), reason="x", ctx=CTX
         )
     assert Product.objects.filter(vendor=target).count() == 1
 
@@ -368,7 +368,7 @@ def test_a_duplicate_gets_its_own_staff_refs_and_match_keys() -> None:
     original_variant = original.variants.get()
     target = VendorFactory.create()
     duplicate_product_to_vendor(
-        original, target, actor=UserFactory.create(staff=True), reason="transfer", ctx=CTX
+        original, target, actor=UserFactory.create(platform_staff=True), reason="transfer", ctx=CTX
     )
     copy = Product.objects.get(vendor=target)
     copied_variant = Variant.objects.get(product=copy)
@@ -386,7 +386,7 @@ def test_a_duplicate_onto_a_variant_holding_the_product_sku_is_refused() -> None
     VariantFactory.create(product__vendor=target, sku="BAG  100")
     with pytest.raises(ValidationError, match="already has a variant with this SKU"):
         duplicate_product_to_vendor(
-            original, target, actor=UserFactory.create(staff=True), reason="x", ctx=CTX
+            original, target, actor=UserFactory.create(platform_staff=True), reason="x", ctx=CTX
         )
     assert Product.objects.filter(vendor=target).count() == 1  # the variant's product
 
@@ -405,9 +405,21 @@ def test_a_duplicate_whose_variant_sku_the_target_uses_is_refused(dry_run: bool)
         duplicate_product_to_vendor(
             original,
             target,
-            actor=UserFactory.create(staff=True),
+            actor=UserFactory.create(platform_staff=True),
             reason="x",
             ctx=CTX,
             dry_run=dry_run,
         )
     assert Product.objects.filter(vendor=target).count() == 2
+
+
+def test_an_admin_login_without_the_permission_cannot_duplicate_a_product() -> None:
+    original = ProductFactory.create()
+    target = VendorFactory.create()
+    for actor in (
+        UserFactory.create(staff=True),
+        UserFactory.create(platform_staff=True, is_active=False),
+    ):
+        with pytest.raises(PermissionDenied):
+            duplicate_product_to_vendor(original, target, actor=actor, reason="x", ctx=CTX)
+    assert not Product.objects.filter(vendor=target).exists()

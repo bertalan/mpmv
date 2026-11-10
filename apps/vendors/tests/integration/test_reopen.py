@@ -21,6 +21,7 @@ from apps.vendors import engine
 from apps.vendors.models import ContractAcceptance, Vendor, VendorMember
 from apps.vendors.services import (
     accept_contract,
+    certify_platform_duties,
     change_status,
     contract_offer,
     onboarding_checklist,
@@ -33,6 +34,7 @@ from apps.vendors.tests.factories import (
     VendorFactory,
     VendorMemberFactory,
 )
+from apps.vendors.tests.fakes import clear_activation_requirements
 
 pytestmark = pytest.mark.django_db
 
@@ -189,6 +191,7 @@ def test_a_reopen_dry_run_returns_the_change_and_applies_nothing() -> None:
 
 
 def test_a_reopened_vendor_must_accept_the_contract_in_force_again() -> None:
+    clear_activation_requirements()
     contract = VendorContractFactory.create()
     vendor = VendorFactory.create(status=Vendor.Status.ONBOARDING)
     acceptance = ContractAcceptanceFactory.create(vendor=vendor, contract=contract)
@@ -199,11 +202,18 @@ def test_a_reopened_vendor_must_accept_the_contract_in_force_again() -> None:
     reopen_vendor(vendor, actor=staff_user(), reason=REASON, ctx=STAFF_CTX)
 
     checklist = onboarding_checklist(vendor)
-    assert checklist.blocking_missing == (engine.CONTRACT,)
+    # The self-certification of the first round does not count in the new one (CMP.25).
+    assert checklist.blocking_missing == (engine.CONTRACT, engine.PLATFORM_DUTIES)
     with pytest.raises(engine.ActivationNotAllowed, match="contract"):
         change_status(vendor, Vendor.Status.ACTIVE, ctx=STAFF_CTX)
 
     accept_offer(vendor, owner)  # the same version, accepted again in the new round
+    certify_platform_duties(
+        vendor,
+        owner,
+        language="en",
+        ctx=AuditContext(actor_id=owner.pk, actor_label="user:owner", source="vendor"),
+    )
     assert ContractAcceptance.objects.filter(vendor=vendor, contract=contract).count() == 2
     assert onboarding_checklist(vendor).ready
     change_status(vendor, Vendor.Status.ACTIVE, ctx=STAFF_CTX)
@@ -222,6 +232,7 @@ def test_a_reopened_vendor_accepts_a_version_once_per_round() -> None:
 
 
 def test_a_newer_contract_version_is_the_one_a_reopened_vendor_accepts() -> None:
+    clear_activation_requirements()
     old = VendorContractFactory.create(valid_from=timezone.now() - dt.timedelta(days=60))
     acceptance = ContractAcceptanceFactory.create(
         contract=old, vendor=VendorFactory.create(status=Vendor.Status.CLOSED)
@@ -230,9 +241,15 @@ def test_a_newer_contract_version_is_the_one_a_reopened_vendor_accepts() -> None
     reopen_vendor(acceptance.vendor, actor=staff_user(), reason=REASON, ctx=STAFF_CTX)
 
     checklist = onboarding_checklist(acceptance.vendor)
-    assert checklist.blocking_missing == (engine.CONTRACT,)
+    assert checklist.blocking_missing == (engine.CONTRACT, engine.PLATFORM_DUTIES)
     assert checklist.current_contract_version == newer.version
     accept_offer(acceptance.vendor, acceptance.user)
+    certify_platform_duties(
+        acceptance.vendor,
+        acceptance.user,
+        language="en",
+        ctx=AuditContext(actor_id=acceptance.user.pk, actor_label="user:owner", source="vendor"),
+    )
     latest = ContractAcceptance.objects.filter(vendor=acceptance.vendor).first()  # newest first
     assert latest is not None
     assert (latest.contract, latest.onboarding_round) == (newer, 2)

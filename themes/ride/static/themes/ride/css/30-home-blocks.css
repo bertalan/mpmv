@@ -1,0 +1,254 @@
+/* Ride: hero and the home blocks (THM.6): CTA band, featured tiles, product grid, blog teasers,
+   logo strip. Containers query their own width, so a block works in any column. */
+@layer overrides {
+  /* --- Hero: full-width image under a navy scrim, white condensed heading. No carousel. */
+
+  .full-bleed {
+    margin-inline: calc(50% - 50vw);
+    padding-inline: calc(50vw - 50%);
+  }
+
+  .block-hero {
+    margin-block-start: calc(-1 * var(--space-l));
+  }
+
+  .hero {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    align-items: center;
+    grid-template-columns: minmax(0, 1fr);
+    min-block-size: clamp(26rem, 60vh, 40rem);
+    margin-block: 0;
+    padding-block: var(--space-section);
+    border-radius: 0;
+    background: var(--color-overlay) url(images/hero-placeholder.svg) center / cover no-repeat;
+    color: var(--color-text-inverse);
+  }
+
+  .hero--image {
+    background-image: none;
+  }
+
+  .hero__image {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    inline-size: 100%;
+    block-size: 100%;
+    border-radius: 0;
+    object-fit: cover;
+  }
+
+  .hero__scrim {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: color-mix(
+      in srgb,
+      var(--color-overlay) calc(var(--scrim-opacity) * 100%),
+      transparent
+    );
+  }
+
+  .hero__content {
+    max-inline-size: 48rem;
+  }
+
+  .hero__title {
+    margin-block: 0 var(--space-m);
+    color: var(--color-text-inverse);
+    font-size: var(--step-display);
+    font-weight: 700;
+    line-height: 0.95;
+  }
+
+  .hero__text {
+    margin-block: 0 var(--space-l);
+    font-size: var(--step-1);
+  }
+
+  .hero .button--secondary {
+    --button-bg: transparent;
+    --button-fg: var(--color-text-inverse);
+    --button-bg-hover: var(--color-surface);
+
+    border-color: var(--color-text-inverse);
+  }
+
+  .hero .button--secondary:hover {
+    color: var(--color-heading);
+  }
+
+  /* --- CTA band on the primary fill: white text (5.20:1) and an amber button. */
+
+  .block-cta {
+    padding-block: 0;
+  }
+
+  .block-cta .cta-band {
+    margin-inline: calc(50% - 50vw);
+    padding-inline: calc(50vw - 50%);
+  }
+
+  .cta-band {
+    margin-block: 0;
+    padding-block: var(--space-section-end);
+    border-radius: 0;
+  }
+
+  .cta-band--accent {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  .cta-band--accent .cta-band__title {
+    color: var(--color-on-accent);
+  }
+
+  .cta-band--accent .cta-band__title::before {
+    background: var(--color-on-accent);
+  }
+
+  /* --- Featured tiles (terms, vendors, pages): one link per card. */
+
+  .block-featured .cards,
+  .card-grid,
+  .product-grid {
+    display: grid;
+    gap: var(--space-l);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr));
+  }
+
+  .block-featured .cards > li,
+  .card-grid > li,
+  .product-grid > li {
+    container-type: inline-size;
+    display: grid;
+  }
+
+  .block-featured .card {
+    position: relative;
+    padding: var(--card-padding);
+    background: var(--color-accent-tint);
+    border: 0;
+    border-radius: var(--card-radius);
+  }
+
+  .block-featured .card a {
+    color: var(--color-heading);
+    font-family: var(--font-display);
+    font-size: var(--step-2);
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .block-featured .card a::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+
+  .block-featured .card p {
+    margin: var(--space-xs) 0 0;
+  }
+
+  /* --- Product tile: image, title, price and a small button; only the title and the button
+     link, never the whole card. */
+
+  .product-tile {
+    border-color: var(--color-border);
+    border-radius: var(--card-radius);
+  }
+
+  .product-tile__placeholder {
+    aspect-ratio: 1;
+    background: var(--color-surface-sunken);
+  }
+
+  .product-tile__body {
+    padding: var(--space-l);
+  }
+
+  .product-tile__name {
+    font-family: var(--font-display);
+    font-size: var(--step-2);
+    line-height: 1.1;
+  }
+
+  .product-tile__title-link {
+    color: var(--color-heading);
+    text-decoration: none;
+  }
+
+  .product-tile__title-link:hover {
+    text-decoration: underline;
+  }
+
+  .product-tile__amount {
+    color: var(--color-heading);
+    font-size: var(--step-1);
+    font-weight: 700;
+  }
+
+  .product-tile__action {
+    justify-self: start;
+    margin-block-start: var(--space-xs);
+  }
+
+  @container (min-width: 20rem) {
+    .product-tile__body {
+      padding: var(--space-l) var(--space-xl);
+    }
+  }
+
+  .product-tile:hover,
+  .card--linked:hover {
+    box-shadow: none;
+    border-color: var(--color-border-strong);
+  }
+
+  /* --- Blog teasers: a card each. */
+
+  .post-summary {
+    margin-block-end: var(--space-l);
+    padding: var(--card-padding);
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border);
+    border-radius: var(--card-radius);
+  }
+
+  .post-summary h2 {
+    margin-block-start: 0;
+    font-size: var(--step-2);
+  }
+
+  .post-summary > :last-child {
+    margin-block-end: 0;
+  }
+
+  /* --- Brand and vendor logos: a static grid, nothing moves. */
+
+  .logo-strip {
+    display: grid;
+    gap: var(--space-l);
+    align-items: center;
+    justify-items: center;
+    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  }
+
+  @media (width >= 64rem) {
+    .hero {
+      padding-block: calc(var(--space-section) * 1.2);
+    }
+  }
+
+  @media (width >= 80rem) {
+    .hero__content {
+      max-inline-size: 56rem;
+    }
+  }
+}

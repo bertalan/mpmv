@@ -58,6 +58,18 @@ class UserFactory(DjangoModelFactory[User]):
                 Permission.objects.get(content_type__app_label=app_label, codename=codename)
             )
 
+    @factory.post_generation
+    def platform_staff(obj: User, create: bool, extracted: bool | None, **kwargs: Any) -> None:
+        """`platform_staff=True`: admin login plus `vendors.view_all_vendors` (spec 02, Q-34).
+
+        Plain `staff=True` is Wagtail/Django admin login only and sees no vendor's data.
+        """
+        if not create or not extracted:
+            return
+        obj.is_staff = True
+        obj.save(update_fields=["is_staff"])
+        obj.user_permissions.add(Permission.objects.get(codename="view_all_vendors"))
+
 
 class TOTPDeviceFactory(DjangoModelFactory[TOTPDevice]):
     """A confirmed authenticator-app device (django-otp). The key is random, from the model."""

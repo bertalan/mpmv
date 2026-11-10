@@ -1,0 +1,35 @@
+{% load i18n theme_tags %}{% comment %}
+Site footer of the `ride` theme (THM.6, spec 14 §14.6): a dark surface with three columns: the
+site name with the help link (WCAG 3.2.6: the same place on every page), the footer menu
+(CMS.1), and the legal links (CMS.5) with the copyright line. A column's list is left out when
+it is empty, the column stays so the grid keeps its shape.
+
+Context: `site_name`, `links`, `legal_links` (label and url each), and the context of the
+help link.
+{% endcomment %}<footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__col">
+      <p class="site-footer__name">{{ site_name }}</p>
+      {% include "components/help_link.html" %}
+    </div>
+    <div class="site-footer__col">
+      {% if links %}
+        <nav aria-label="{% translate 'Footer' %}">
+          <ul>
+            {% for link in links %}<li>{% with href=link.url|safe_href %}{% if href %}<a href="{{ href }}">{{ link.label }}</a>{% else %}{{ link.label }}{% endif %}{% endwith %}</li>{% endfor %}
+          </ul>
+        </nav>
+      {% endif %}
+    </div>
+    <div class="site-footer__col">
+      {% if legal_links %}
+        <nav aria-label="{% translate 'Legal' %}">
+          <ul>
+            {% for link in legal_links %}<li>{% with href=link.url|safe_href %}{% if href %}<a href="{{ href }}">{{ link.label }}</a>{% else %}{{ link.label }}{% endif %}{% endwith %}</li>{% endfor %}
+          </ul>
+        </nav>
+      {% endif %}
+      <p>&copy; {% now "Y" %} {{ site_name }}</p>
+    </div>
+  </div>
+</footer>

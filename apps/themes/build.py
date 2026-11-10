@@ -6,6 +6,8 @@ contract, and write under the build directory (`MPMV_THEME_BUILD_DIR`, default `
     themes/<slug>/tokens.css   the resolved tokens in `@layer tokens`
     themes/<slug>/theme.css    layer order + tokens + the chain's CSS sources, minified
     themes/<slug>/js/...       the theme's ES modules (THM.3), copied as they are
+    themes/<slug>/<asset>      fonts, icons and images (THM.6), copied as they are, so a
+                               stylesheet reaches them with a relative `url()`
 
 CSS sources are `themes/<slug>/static/themes/<slug>/css/*.css`, in file-name order. Any invalid
 manifest, invalid `tokens.toml` or contract violation stops the build before anything is
@@ -102,6 +104,30 @@ def read_js_modules(theme_dir: Path, slug: str) -> dict[str, str]:
     }
 
 
+ASSET_SUFFIXES = frozenset(
+    {".woff2", ".svg", ".png", ".jpg", ".jpeg", ".webp", ".avif", ".ico", ".txt"}
+)  # fonts, icons, images and licence texts; anything else stays out of the served build
+
+
+def read_assets(theme_dir: Path, slug: str) -> dict[str, Path]:
+    """The theme's fonts, icons, images and licence texts by path relative to
+    `static/themes/<slug>/`: only files with a suffix of `ASSET_SUFFIXES`, never a symlink and
+    never a file whose real path leaves that directory. Their licences are checked by the
+    THM.5 gate."""
+    root = theme_dir / "static" / OUTPUT_PREFIX / slug
+    if not root.is_dir():
+        return {}
+    real_root = root.resolve()
+    assets: dict[str, Path] = {}
+    for path in sorted(root.rglob("*")):
+        if path.suffix.lower() not in ASSET_SUFFIXES or path.is_symlink() or not path.is_file():
+            continue
+        if not path.resolve().is_relative_to(real_root):
+            continue
+        assets[path.relative_to(root).as_posix()] = path
+    return assets
+
+
 def render_themes(themes_root: Path, contract: TokenContract = TOKEN_CONTRACT) -> dict[str, str]:
     """Every output file (relative path -> CSS) of every theme; BuildError on any problem."""
     registry = build_registry(read_manifest_sources(themes_root))
@@ -139,7 +165,7 @@ def render_themes(themes_root: Path, contract: TokenContract = TOKEN_CONTRACT) -
 def build_themes(
     themes_root: Path, out_root: Path, contract: TokenContract = TOKEN_CONTRACT
 ) -> list[str]:
-    """Write every theme's `tokens.css`, `theme.css` and JS modules; return the built slugs.
+    """Write every theme's `tokens.css`, `theme.css`, JS modules and assets; return the built slugs.
 
     Replaces `out_root/themes/` as a whole, so a removed theme leaves no stale CSS; nothing is
     written when the build fails.
@@ -152,7 +178,13 @@ def build_themes(
         path = out_root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(css, encoding="utf-8")
-    return sorted({relative.split("/")[1] for relative in outputs})
+    slugs = sorted({relative.split("/")[1] for relative in outputs})
+    for slug in slugs:
+        for relative, source in read_assets(themes_root / slug, slug).items():
+            path = target / slug / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, path)
+    return slugs
 
 
 def main(argv: Sequence[str] | None = None) -> int:

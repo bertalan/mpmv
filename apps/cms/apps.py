@@ -1,9 +1,28 @@
 from typing import Any
 
 from django.apps import AppConfig
+from django.apps import apps as django_apps
 from django.core import checks
+from django.core.exceptions import ImproperlyConfigured
 from django.db import DEFAULT_DB_ALIAS, connections
-from django.db.models.signals import post_migrate
+from django.db.models.signals import post_migrate, post_save, pre_save
+
+from . import roles
+
+
+def _sync_editor_roles(using: str = DEFAULT_DB_ALIAS, **kwargs: Any) -> None:
+    from . import editor_roles
+
+    editor_roles.sync_editor_roles(using=using)
+
+
+def _grant_new_page(
+    sender: Any, instance: Any, created: bool, raw: bool = False, **kw: Any
+) -> None:
+    if created and not raw:
+        from . import editor_roles
+
+        editor_roles.grant_for_new_page(instance, using=kw.get("using") or DEFAULT_DB_ALIAS)
 
 
 def _sync_locales(using: str = DEFAULT_DB_ALIAS, **kwargs: Any) -> None:
@@ -33,6 +52,7 @@ class CmsConfig(AppConfig):
         "blogauthor": "Wagtail snippet: a byline name, logged in Wagtail's action log",
         "termlandingpage": "Wagtail page: editor content with revisions and action log",
         "vendorlandingpage": "Wagtail page: editor content with revisions and action log",
+        "editorroleseed": "marker row that a role was seeded once; no security data of its own",
         "navigationmenu": "Wagtail snippet: menu content, logged in Wagtail's action log",
         # Installed only for wagtail-localize's editor (I18N.3); its menu is hidden.
         "wagtaildocs.document": "Wagtail document: editor upload, logged in Wagtail's action log",
@@ -46,7 +66,7 @@ class CmsConfig(AppConfig):
 
         from .checks import check_base_url
         from .models import LegalPage
-        from .signals import record_published_legal_page
+        from .signals import record_published_legal_page, sanitise_before_save
 
         checks.register(check_base_url, deploy=True)
         # After every migrate (and every test database flush): one Locale per configured
@@ -56,3 +76,54 @@ class CmsConfig(AppConfig):
         page_published.connect(
             record_published_legal_page, sender=LegalPage, dispatch_uid="cms.legal_versions"
         )
+        # Editor roles (CORE.8, Q-58): groups and page grants after every migrate, and a grant
+        # for every page created later in a part of the tree a role is bound to.
+        post_migrate.connect(_sync_editor_roles, sender=self, dispatch_uid="cms.editor_roles")
+        from . import workflow
+
+        workflow.install()  # nobody approves their own submission
+        for label in roles.ROLE_PAGE_MODELS:
+            post_save.connect(
+                _grant_new_page,
+                sender=django_apps.get_model(label),
+                dispatch_uid=f"cms.role.{label}",
+            )
+        # Rich text written outside the editor is stored with the editor's allow-list (CMS.12).
+        pre_save.connect(sanitise_before_save, dispatch_uid="cms.sanitise_rich_text")
+        _guard_editor()
+
+
+def _guard_editor() -> None:
+    """The editor opens any stored rich text (CMS.12, F2).
+
+    Wagtail's Draftail converter asserts on stored HTML it would not write (an `<img>` in a
+    field without the image feature). Text from an import or a seed can hold such an element, so
+    the converter reads the sanitised text: the editor shows what a save would store.
+
+    Written against Wagtail 8.1 (`wagtail>=8.1,<8.2`). It is verified here, at startup, so a
+    Wagtail upgrade that renames the method or changes its behaviour fails the deploy, not the
+    first editor who opens such a page.
+    """
+    from wagtail.admin.rich_text.converters.contentstate import ContentstateConverter
+    from wagtail.rich_text import features as feature_registry
+
+    from . import engine
+
+    if not hasattr(ContentstateConverter, "from_database_format"):
+        raise ImproperlyConfigured("CMS.12: ContentstateConverter.from_database_format is gone")
+    if getattr(ContentstateConverter.from_database_format, "_cms12", False):
+        return
+    original = ContentstateConverter.from_database_format
+
+    def from_database_format(self: Any, html: str) -> Any:
+        features = self.features
+        if features is None:
+            features = feature_registry.get_default_features()
+        return original(self, engine.sanitise_rich_text(html, features))
+
+    from_database_format._cms12 = True  # type: ignore[attr-defined]
+    ContentstateConverter.from_database_format = from_database_format
+    try:
+        ContentstateConverter(["bold"]).from_database_format("<p>a</p><p><img src=x></p><p>b</p>")
+    except Exception as error:
+        raise ImproperlyConfigured(f"CMS.12: the editor guard does not hold: {error!r}") from error
