@@ -166,3 +166,12 @@ def test_the_alert_mail_survives_a_rolled_back_checkout(
     except RuntimeError as exc:
         report_checkout_error(exc, context={})  # after the rollback, as the docs say
     assert OutboxEmail.objects.count() == 1
+
+
+def test_a_checkout_alert_inside_a_transaction_warns(
+    tracker: MemoryTracker, operator: None, caplog: pytest.LogCaptureFixture
+) -> None:
+    # pytest-django wraps this test in a transaction, like an `atomic` checkout block.
+    with caplog.at_level(logging.WARNING, logger="mpmv.alerts"):
+        report_checkout_error(RuntimeError("x"), context={})
+    assert any("inside a transaction" in r.getMessage() for r in caplog.records)
