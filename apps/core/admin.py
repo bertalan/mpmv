@@ -48,6 +48,8 @@ class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
             "commission_vat_mode",
             "einvoice_channel",
             "dac7_authority_country",
+            "support_email",
+            "compliance_email",
             "valid_from",
         )
 

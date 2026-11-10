@@ -12,6 +12,8 @@ from mpmv.settings.env import (
     ensure_key_file,
     env_bool,
     env_flags,
+    env_float,
+    env_int,
     env_list,
     env_secret_list,
     env_str,
@@ -171,6 +173,30 @@ def test_map_tiles_from_one_https_host_allow_that_origin_only() -> None:
 def test_a_bad_map_tile_url_is_a_configuration_error(url: str) -> None:
     with pytest.raises(ImproperlyConfigured, match="MPMV_MAP_TILE_URL"):
         map_tile_origin(url)
+
+
+def test_env_int_and_env_float_read_numbers_or_the_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("MPMV_TEST_VALUE", raising=False)
+    assert env_int("MPMV_TEST_VALUE", 7) == 7
+    assert env_float("MPMV_TEST_VALUE", 1.5) == 1.5
+    monkeypatch.setenv("MPMV_TEST_VALUE", " ")  # empty in mpmv.env: the default
+    assert env_int("MPMV_TEST_VALUE", 7) == 7
+    assert env_float("MPMV_TEST_VALUE", 1.5) == 1.5
+    monkeypatch.setenv("MPMV_TEST_VALUE", " 60_000_000 ")
+    assert env_int("MPMV_TEST_VALUE", 7) == 60_000_000
+    monkeypatch.setenv("MPMV_TEST_VALUE", "2.5")
+    assert env_float("MPMV_TEST_VALUE", 1.5) == 2.5
+
+
+@pytest.mark.parametrize("raw", ["many", "1.5e", "7 MB"])
+def test_env_int_and_env_float_refuse_what_is_not_a_number(
+    monkeypatch: pytest.MonkeyPatch, raw: str
+) -> None:
+    monkeypatch.setenv("MPMV_TEST_VALUE", raw)
+    with pytest.raises(ImproperlyConfigured, match="MPMV_TEST_VALUE"):
+        env_int("MPMV_TEST_VALUE", 7)
+    with pytest.raises(ImproperlyConfigured, match="MPMV_TEST_VALUE"):
+        env_float("MPMV_TEST_VALUE", 1.5)
 
 
 # --- The server env template lists every variable the deployed settings read ------------------
