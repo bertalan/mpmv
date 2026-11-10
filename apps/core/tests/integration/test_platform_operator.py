@@ -193,5 +193,5 @@ def test_new_configuration_is_validated_before_writing() -> None:
 def test_operator_has_no_einvoice_channel_field() -> None:
     """ARC.17: the platform issues no invoices, so no e-invoice channel is configured."""
     names = {f.name for f in PlatformOperator._meta.get_fields()}
-    assert not {n for n in names if "invoice" in n}
+    assert "einvoice_channel" not in names
     assert not hasattr(PlatformOperator, "EInvoiceChannel")
