@@ -47,7 +47,7 @@
 | ARC.4 | CI: ruff, mypy, pytest, coverage, import-linter (dependency graph), pip-audit, secret scan | P1 | 8 | ARC.3 | Pipeline green on PRs |
 | ARC.5 | Containers: OCI `Containerfile`, local stack with Apple `container` (network, volumes, app, worker, Postgres), Linux runtime for STAGE/LIVE, versioned images | P1 | 10 | ARC.3 | `make dev` with `container`; release image, Quadlet units, and deploy and rollback tooling tested locally and in CI |
 | ARC.6 | `core`: base model, `MoneyField`, Country, `ChangeSet`/dry-run, `AuditLog` | P1 | 12 | ARC.3 | Tests on rounding and audit |
-| ARC.7 | `PlatformOperator` (country, VAT number, regime, e-invoice channel, DAC7 authority) as configuration | P1 | 4 | ARC.6 | No "IT" constant in the tax code |
+| ARC.7 | `PlatformOperator` (country, VAT number, regime, DAC7 authority) as configuration | P1 | 4 | ARC.6 | No "IT" constant in the tax code |
 | ARC.9 | Task worker + cron scheduler on Postgres, with locks and retries | P1 | 8 | ARC.2 | Test job scheduled and observable |
 | ARC.11 | Test harness per ADR-0006: unit / integration / e2e suites, auto-markers, Playwright with screenshots, CI reports | P1 | 6 | ARC.3 | `make test-unit`, `make test`, `make test-e2e` green; e2e screenshots saved |
 | ARC.12 | Adopt factory_boy for test data: one DjangoModelFactory per model in `apps/<app>/tests/factories.py`, Faker with a fixed seed, synthetic data only; convert hand-written builders; document in ADR-0006 and CONTRIBUTING | P1 | 4 | ARC.6 | Every model has a factory used by the tests; no hand-written model builders left |
