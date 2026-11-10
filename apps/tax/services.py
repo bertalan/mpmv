@@ -1066,17 +1066,38 @@ def build_tax_context(
 ) -> engine.TaxContext:
     """The inputs of `engine.resolve_goods_tax` for a sale by `vendor` valid at `at` (default now).
 
-    Only a VIES-valid answer makes the customer a validated business: invalid, unavailable or
+    Only a VIES-valid answer no older than `VIES_CACHE_SECONDS` makes the customer a validated
+    business (the answer is kept in `vat_check` for the order snapshot): invalid, unavailable or
     absent answers leave a consumer (T2, fail closed). The platform country is the operator's.
     """
     at = at or timezone.now()
     profile = current_tax_profile(vendor, at)
     operator = current_operator(at)
-    customer: engine.B2BValidated | None = None
-    if customer_vat is not None and customer_vat.result == engine.VAT_VALID:
-        customer = engine.B2BValidated(
-            customer_vat.country, customer_vat.vat_number, customer_vat.checked_at
+    territories = tuple(territory_rules())
+    # A vendor established in a territory with rates of its own or outside the VAT area is not
+    # supported: the context has no vendor territory (Q3). Detectable only with a postcode.
+    if vendor.registered_postal_code and engine.find_territory(
+        vendor.country, vendor.registered_postal_code, territories
+    ):
+        raise engine.UnresolvedTerritory(
+            "a vendor established in a special territory is not supported by the tax engine"
         )
+    customer: engine.B2BValidated | None = None
+    vat_check: engine.VatCheckSnapshot | None = None
+    if customer_vat is not None:
+        stale = at - customer_vat.checked_at > dt.timedelta(seconds=settings.VIES_CACHE_SECONDS)
+        vat_check = engine.VatCheckSnapshot(
+            country=customer_vat.country,
+            vat_number=customer_vat.vat_number,
+            result=customer_vat.result,
+            request_id=customer_vat.request_id,
+            checked_at=customer_vat.checked_at,
+            stale=stale and customer_vat.result == engine.VAT_VALID,
+        )
+        if customer_vat.result == engine.VAT_VALID and not stale:
+            customer = engine.B2BValidated(
+                customer_vat.country, customer_vat.vat_number, customer_vat.checked_at
+            )
     return engine.TaxContext(
         on=at.date(),
         vendor_country=vendor.country,
@@ -1090,5 +1111,6 @@ def build_tax_context(
         destination_postcode=destination_postcode,
         customer=customer or "b2c",
         rates=rate_table(at),
-        territories=tuple(territory_rules()),
+        territories=territories,
+        vat_check=vat_check,
     )

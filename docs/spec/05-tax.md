@@ -115,7 +115,7 @@ class TaxContext:
 class TaxDecision:
     rate: Decimal                             # effective percentage, never a "class"
     reason: Literal["standard_destination", "domestic_vendor_country", "export",
-                    "reverse_charge", "art74_publishing", "flat_rate_vendor",
+                    "reverse_charge", "art74_publishing", "flat_rate_vendor", "exempt_other",
                     "outside_vat_territory"]
     country_of_taxation: str | None
     legal_note_key: str | None                # text on the order document
@@ -161,6 +161,9 @@ Intended differences from today:
   (VAT Directive art. 33, OSS since 2021). The billing country only validates B2B data: a
   validated business receiving goods in the vendor's country pays the vendor country's VAT. The
   basis is the named constant `GOODS_COUNTRY_BASIS` in the tax engine.
+- Fail closed until decided: a sale to Northern Ireland (`XI`, or GB with a `BT` postcode) or to a
+  `special` territory raises a blocking error (D-02 open), and so does a vendor established in
+  such a territory (not supported: the context has no vendor territory).
 - The carrier `force_vat` flag goes away, unless it turns out to be needed (D-03).
 - VIES fails closed: VIES unavailable, invalid number or prefix different from the country →
   VAT applied; result saved in `VatValidation` and in the order snapshot.

@@ -5,6 +5,7 @@ import datetime as dt
 from decimal import Decimal
 
 import pytest
+from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.core.tests.factories import PlatformOperatorFactory, utc
 from apps.tax import engine, services
@@ -132,3 +133,75 @@ def test_a_vendor_without_a_profile_is_an_error() -> None:
     PlatformOperatorFactory.create(open_ended=True, valid_from=utc(2026, 1, 1))
     with pytest.raises(services.NoVendorTaxProfile):
         services.build_tax_context(VendorFactory.create(), destination_country="DE", at=AT)
+
+
+# M3: the VIES evidence stays in the context
+def test_m3_no_number_leaves_no_evidence(vendor_oss: Vendor) -> None:
+    assert services.build_tax_context(vendor_oss, destination_country="DE", at=AT).vat_check is None
+
+
+@pytest.mark.parametrize("result", [engine.VAT_VALID, engine.VAT_INVALID, engine.VAT_UNAVAILABLE])
+def test_m3_the_answer_is_kept_whatever_it_was(vendor_oss: Vendor, result: str) -> None:
+    vat = VatValidationFactory.create(country="DE", result=result, checked_at=AT)
+    ctx = services.build_tax_context(vendor_oss, destination_country="DE", customer_vat=vat, at=AT)
+    assert ctx.vat_check is not None
+    assert (ctx.vat_check.result, ctx.vat_check.request_id) == (result, vat.request_id)
+    assert ctx.vat_check.stale is False
+
+
+def test_m5_a_valid_answer_older_than_the_cache_age_is_not_trusted(
+    vendor_oss: Vendor, settings: SettingsWrapper
+) -> None:
+    settings.VIES_CACHE_SECONDS = 3600
+    vat = VatValidationFactory.create(country="DE", checked_at=AT - dt.timedelta(hours=2))
+    ctx = services.build_tax_context(vendor_oss, destination_country="DE", customer_vat=vat, at=AT)
+    assert ctx.customer == "b2c"
+    assert ctx.vat_check is not None
+    assert ctx.vat_check.stale is True
+
+
+def test_m1_a_pt_vendor_delivering_to_madeira_gets_the_territory_rate() -> None:
+    PlatformOperatorFactory.create(open_ended=True, valid_from=utc(2026, 1, 1), country="IT")
+    vendor = VendorFactory.create(country="PT")
+    VendorTaxProfileFactory.create(vendor=vendor, oss=True, valid_from=utc(2027, 1, 1))
+    territory = TerritoryFactory.create(
+        code="PT-20", country="PT", vat_status=engine.OWN_RATES, postcode_patterns=["9000..9499"]
+    )
+    rate("PT", "standard", "23")
+    TaxRateFactory.create(
+        country="PT",
+        territory=territory,
+        category="standard",
+        rate=Decimal("22"),
+        valid_from=utc(2027, 1, 1),
+        valid_to=None,
+    )
+    ctx = services.build_tax_context(
+        vendor, destination_country="PT", destination_postcode="9050", at=AT
+    )
+    assert engine.resolve_goods_tax(ctx, engine.STANDARD).rate == Decimal("22")
+
+
+def test_m6_an_own_rates_territory_without_its_rate_row_blocks_the_sale(
+    vendor_oss: Vendor,
+) -> None:
+    TerritoryFactory.create(
+        code="PT-20", country="PT", vat_status=engine.OWN_RATES, postcode_patterns=["9000..9499"]
+    )
+    rate("PT", "standard", "23")  # the country has a rate, the territory has none
+    ctx = services.build_tax_context(
+        vendor_oss, destination_country="PT", destination_postcode="9050", at=AT
+    )
+    with pytest.raises(engine.MissingTaxRate):
+        engine.resolve_goods_tax(ctx, engine.STANDARD)
+
+
+def test_q3_a_vendor_established_in_an_own_rates_territory_is_not_supported() -> None:
+    PlatformOperatorFactory.create(open_ended=True, valid_from=utc(2026, 1, 1), country="IT")
+    TerritoryFactory.create(
+        code="PT-20", country="PT", vat_status=engine.OWN_RATES, postcode_patterns=["9000..9499"]
+    )
+    vendor = VendorFactory.create(country="PT", registered_postal_code="9050")
+    VendorTaxProfileFactory.create(vendor=vendor, oss=True, valid_from=utc(2027, 1, 1))
+    with pytest.raises(engine.UnresolvedTerritory):
+        services.build_tax_context(vendor, destination_country="PT", at=AT)

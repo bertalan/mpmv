@@ -3,7 +3,9 @@
 T4 and T10-T13 (shipping) wait for TAX.4; T16-T18 belong to their own rows (TAX.8, ORD, CHK).
 """
 
+import dataclasses
 import datetime as dt
+import typing
 from decimal import Decimal
 
 import pytest
@@ -268,11 +270,22 @@ def test_a_business_number_outside_the_eu_is_not_reverse_charge() -> None:
         ("0.23", "22", "0.05"),  # 0.0506
         ("1.15", "10", "0.12"),  # 0.115 -> 0.12, not banker's 0.12/0.11
         ("0.50", "25.5", "0.13"),  # 0.1275
+        ("0.25", "18", "0.05"),  # 0.045: HALF_UP gives 0.05, banker's rounding 0.04
+        ("-0.25", "18", "-0.05"),  # a refund line rounds symmetrically
+        ("-1.15", "10", "-0.12"),
         ("100.00", "0", "0.00"),
     ],
 )
 def test_tax_amount_rounds_half_up_per_line(net: str, rate: str, expected: str) -> None:
     assert engine.tax_amount(D(net), D(rate)) == D(expected)
+
+
+@pytest.mark.parametrize("bad", [D("NaN"), D("Infinity"), D("-Infinity")])
+def test_tax_amount_refuses_non_finite_values(bad: D) -> None:
+    with pytest.raises(ValueError, match="finite"):
+        engine.tax_amount(bad, D("22"))
+    with pytest.raises(ValueError, match="finite"):
+        engine.tax_amount(D("1"), bad)
 
 
 def test_tax_amount_refuses_floats() -> None:
@@ -322,3 +335,99 @@ def test_t17() -> None: ...
 
 @pytest.mark.skip(reason="checkout: T18 missing customer country blocks checkout")
 def test_t18() -> None: ...
+
+
+# M1: the own-rates territory rate applies in every branch, not only the OSS one
+@pytest.mark.parametrize("profile", [OSS, DOMESTIC])
+def test_m1_a_vendor_selling_into_its_own_countrys_own_rates_territory(
+    profile: engine.VendorTaxProfileSnapshot,
+) -> None:
+    d = engine.resolve_goods_tax(
+        ctx(vendor="PT", destination="PT", postcode="9050", profile=profile), engine.STANDARD
+    )
+    assert d.rate == D("22")
+
+
+def test_m1_a_domestic_only_vendor_selling_into_a_foreign_own_rates_territory() -> None:
+    d = engine.resolve_goods_tax(
+        ctx(vendor="IT", destination="PT", postcode="9050", profile=DOMESTIC), engine.STANDARD
+    )
+    assert d.rate == D("22")
+
+
+def test_m1_the_mainland_of_that_country_keeps_the_country_rate() -> None:
+    d = engine.resolve_goods_tax(ctx(vendor="PT", destination="PT", postcode="1000"), "standard")
+    assert d.rate == D("23")
+
+
+# M2: D-02 is open: Northern Ireland and `special` territories block the sale
+SPECIAL_RULES = (*TERRITORIES, engine.territory_rule("XI", "GB", engine.SPECIAL, ["BT*"]))
+
+
+@pytest.mark.parametrize(
+    ("country", "postcode"), [("XI", None), ("GB", "BT1 1AA"), ("gb", "bt71 4ab"), ("GB", "BT")]
+)
+def test_m2_northern_ireland_blocks_the_sale(country: str, postcode: str | None) -> None:
+    with pytest.raises(engine.UnresolvedTerritory):
+        engine.resolve_goods_tax(ctx(destination=country, postcode=postcode), engine.STANDARD)
+
+
+def test_m2_great_britain_is_still_an_export() -> None:
+    d = engine.resolve_goods_tax(ctx(destination="GB", postcode="SW1A 1AA"), engine.STANDARD)
+    assert d.reason == "export"
+
+
+def test_m2_a_special_territory_blocks_the_sale() -> None:
+    special = engine.territory_rule("ES-X", "ES", engine.SPECIAL, ["07*"])
+    c = dataclasses.replace(ctx(destination="ES", postcode="07001"), territories=(special,))
+    with pytest.raises(engine.UnresolvedTerritory):
+        engine.resolve_goods_tax(c, engine.STANDARD)
+
+
+def test_m2_the_error_is_a_blocking_tax_error() -> None:
+    assert issubclass(engine.UnresolvedTerritory, engine.BlockingTaxError)
+    assert issubclass(engine.MissingTaxRate, engine.BlockingTaxError)
+
+
+def test_m2_an_exempt_vendor_is_still_exempt_in_northern_ireland() -> None:
+    d = engine.resolve_goods_tax(
+        ctx(destination="GB", postcode="BT1 1AA", profile=ART74), "standard"
+    )
+    assert d.reason == "art74_publishing"
+
+
+# M4: `other` exemptions have a reason of their own and carry the law country
+OTHER = engine.VendorTaxProfileSnapshot(
+    regime=engine.EXEMPT, exempt_reason=engine.OTHER_EXEMPTION, exempt_country="DE"
+)
+
+
+def test_m4_an_other_exemption_is_not_labelled_flat_rate() -> None:
+    d = engine.resolve_goods_tax(ctx(profile=OTHER), engine.STANDARD)
+    assert (d.rate, d.reason, d.legal_note_key) == (D("0"), "exempt_other", "exempt:other:DE")
+
+
+@pytest.mark.parametrize("reason", ["", "made_up"])
+def test_m4_an_exempt_profile_needs_a_known_reason(reason: str) -> None:
+    profile = engine.VendorTaxProfileSnapshot(regime=engine.EXEMPT, exempt_reason=reason)
+    with pytest.raises(ValueError, match="exempt"):
+        engine.resolve_goods_tax(ctx(profile=profile), engine.STANDARD)
+
+
+def test_m4_an_other_exemption_needs_its_law_country() -> None:
+    profile = engine.VendorTaxProfileSnapshot(regime=engine.EXEMPT, exempt_reason="other")
+    with pytest.raises(ValueError, match="exempt"):
+        engine.resolve_goods_tax(ctx(profile=profile), engine.STANDARD)
+
+
+def test_m3_the_reasons_are_the_spec_literal() -> None:
+    assert set(typing.get_args(engine.TaxReason)) == {
+        "standard_destination",
+        "domestic_vendor_country",
+        "export",
+        "reverse_charge",
+        "art74_publishing",
+        "flat_rate_vendor",
+        "exempt_other",
+        "outside_vat_territory",
+    }

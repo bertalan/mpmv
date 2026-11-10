@@ -3,8 +3,9 @@ workflow, and the rules of the VIES check (TAX.5). No ORM.
 
 This module holds the vocabulary of the tax configuration and the consistency rules of its
 rows, and the goods tax decision (`resolve_goods_tax`, TAX.3, decision D-01: B2C goods are
-taxed in the delivery country). The shipping tax decision is TAX.4; D-02 (Northern Ireland) and
-D-03 (carrier `force_vat`) are open and nothing here decides them.
+taxed in the delivery country). The shipping tax decision is TAX.4. D-02 (Northern Ireland) and
+D-03 (carrier `force_vat`) are open: nothing here decides them, and a sale to Northern Ireland is
+blocked (`UnresolvedTerritory`).
 """
 
 import datetime as dt
@@ -733,6 +734,22 @@ REASON_EXPORT: Final = "export"
 REASON_REVERSE_CHARGE: Final = "reverse_charge"
 REASON_ART74_PUBLISHING: Final = ART74_PUBLISHING
 REASON_FLAT_RATE_VENDOR: Final = "flat_rate_vendor"
+REASON_EXEMPT_OTHER: Final = "exempt_other"
+
+TaxReason = Literal[
+    "standard_destination",
+    "domestic_vendor_country",
+    "export",
+    "reverse_charge",
+    "art74_publishing",
+    "flat_rate_vendor",
+    "exempt_other",
+    "outside_vat_territory",
+]
+
+# D-02 (Northern Ireland) is open: `XI`, and GB with a `BT` postcode, block the sale.
+NORTHERN_IRELAND_CODE: Final = "XI"
+NORTHERN_IRELAND_POSTCODE_PREFIX: Final = "BT"
 
 # Keys of the legal wording on the order document (the texts live in the CMS and the profile).
 NOTE_REVERSE_CHARGE: Final = "reverse_charge_art196"  # Directive 2006/112/EC art. 196
@@ -745,9 +762,19 @@ MONEY_QUANTUM: Final = Decimal("0.01")
 FiscalCategory = str  # one of CATEGORIES
 
 
-class MissingTaxRate(LookupError):
+class BlockingTaxError(Exception):
+    """The tax cannot be decided: checkout shows the message and the sale does not go on."""
+
+
+class MissingTaxRate(BlockingTaxError, LookupError):
     """No rate for the country (or territory) and category: a blocking configuration error,
     never a silent 0% (T6)."""
+
+
+class UnresolvedTerritory(BlockingTaxError):
+    """The address (or the vendor) lies in a territory whose VAT treatment is not decided or
+    not supported: Northern Ireland (D-02 open), a `special` territory, a vendor established
+    in a territory with its own rates or outside the VAT area."""
 
 
 @dataclass(frozen=True)
@@ -778,6 +805,20 @@ class B2BValidated:
 
 
 @dataclass(frozen=True)
+class VatCheckSnapshot:
+    """The VIES evidence behind the customer's treatment, for the order snapshot: tells "no
+    number" (no snapshot), "invalid", "VIES unavailable" and a valid answer too old to trust
+    (`stale`) apart."""
+
+    country: str
+    vat_number: str
+    result: str
+    request_id: str
+    checked_at: dt.datetime
+    stale: bool = False
+
+
+@dataclass(frozen=True)
 class RateTable:
     """VAT percentages valid on the date of the sale, by (country or territory code, category)."""
 
@@ -801,23 +842,24 @@ class TaxContext:
     customer: Literal["b2c"] | B2BValidated
     rates: RateTable
     territories: tuple[TerritoryRule, ...] = ()
+    vat_check: VatCheckSnapshot | None = None
 
 
 @dataclass(frozen=True)
 class TaxDecision:
     rate: Decimal  # effective percentage, never a "class"
-    reason: str
+    reason: TaxReason
     country_of_taxation: str | None
     legal_note_key: str | None  # text on the order document
 
 
-def _zero(reason: str, note: str | None) -> TaxDecision:
+def _zero(reason: TaxReason, note: str | None) -> TaxDecision:
     return TaxDecision(
         rate=Decimal(0), reason=reason, country_of_taxation=None, legal_note_key=note
     )
 
 
-def _taxed(rate: Decimal, reason: str, country: str) -> TaxDecision:
+def _taxed(rate: Decimal, reason: TaxReason, country: str) -> TaxDecision:
     return TaxDecision(
         rate=quantize_rate(rate), reason=reason, country_of_taxation=country, legal_note_key=None
     )
@@ -841,20 +883,18 @@ def resolve_goods_tax(ctx: TaxContext, category: FiscalCategory) -> TaxDecision:
     if category not in CATEGORIES:
         raise ValueError(f"{category!r} is not a fiscal category")
     profile = ctx.vendor_profile
+    if profile.regime == EXEMPT:
+        return _exempt(profile)
+
+    if _is_northern_ireland(ctx.destination_country, ctx.destination_postcode):
+        raise UnresolvedTerritory("sales to Northern Ireland are blocked until D-02 is decided")
     destination = normalize_country(ctx.destination_country)
     vendor_country = normalize_country(ctx.vendor_country)
-
-    if profile.regime == EXEMPT:
-        reason = (
-            REASON_ART74_PUBLISHING
-            if profile.exempt_reason == ART74_PUBLISHING
-            else (REASON_FLAT_RATE_VENDOR)
-        )
-        return _zero(reason, NOTE_EXEMPT_PREFIX + profile.exempt_reason)
-
     territory = find_territory(destination, ctx.destination_postcode or "", ctx.territories)
     if territory is not None and territory.vat_status == OUTSIDE_VAT_AREA:
         return _zero(OUTSIDE_VAT_TERRITORY, NOTE_OUTSIDE_VAT_TERRITORY)
+    if territory is not None and territory.vat_status == SPECIAL:
+        raise UnresolvedTerritory(f"territory {territory.code} has no tax rule yet")
     destination = territory_country(destination)
 
     if destination not in EU_MEMBER_STATES:
@@ -869,21 +909,44 @@ def resolve_goods_tax(ctx: TaxContext, category: FiscalCategory) -> TaxDecision:
     ):
         return _zero(REASON_REVERSE_CHARGE, NOTE_REVERSE_CHARGE)
 
+    # A territory with rates of its own is keyed by its code, in every branch below.
+    own_rates = territory is not None and territory.vat_status == OWN_RATES
+    rate_code = territory.code if territory is not None and own_rates else destination
     if destination == vendor_country or profile.regime == DOMESTIC_ONLY:
+        # Delivered at home, or a domestic_only vendor: the vendor country's rate; an own-rates
+        # territory inside the delivery country keeps its own rate.
+        code = rate_code if own_rates else vendor_country
         return _taxed(
-            ctx.rates.rate(vendor_country, category), REASON_DOMESTIC_VENDOR_COUNTRY, vendor_country
+            ctx.rates.rate(code, category), REASON_DOMESTIC_VENDOR_COUNTRY, vendor_country
         )
 
-    code = (
-        territory.code
-        if territory is not None and territory.vat_status == OWN_RATES
-        else destination
+    return _taxed(ctx.rates.rate(rate_code, category), REASON_STANDARD_DESTINATION, destination)
+
+
+def _is_northern_ireland(country: str, postcode: str | None) -> bool:
+    code = country.strip().upper()
+    if code == NORTHERN_IRELAND_CODE:
+        return True
+    return code in ("GB", "UK") and normalize_postcode(postcode or "").startswith(
+        NORTHERN_IRELAND_POSTCODE_PREFIX
     )
-    return _taxed(ctx.rates.rate(code, category), REASON_STANDARD_DESTINATION, destination)
+
+
+def _exempt(profile: VendorTaxProfileSnapshot) -> TaxDecision:
+    reason = profile.exempt_reason
+    if reason == ART74_PUBLISHING:
+        return _zero(REASON_ART74_PUBLISHING, NOTE_EXEMPT_PREFIX + reason)
+    if reason == FLAT_RATE_FORFETTARIO:
+        return _zero(REASON_FLAT_RATE_VENDOR, NOTE_EXEMPT_PREFIX + reason)
+    if reason == OTHER_EXEMPTION and profile.exempt_country:
+        return _zero(REASON_EXEMPT_OTHER, f"{NOTE_EXEMPT_PREFIX}{reason}:{profile.exempt_country}")
+    raise ValueError(f"an exempt vendor profile needs a known exemption reason ({reason!r})")
 
 
 def tax_amount(net: Decimal, rate: Decimal) -> Decimal:
     """The VAT on a line's net amount, ROUND_HALF_UP to the cent (never floats)."""
     if not isinstance(net, Decimal) or not isinstance(rate, Decimal):
         raise TypeError("net and rate must be Decimal")
+    if not (net.is_finite() and rate.is_finite()):
+        raise ValueError("net and rate must be finite")
     return (net * rate / 100).quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP)
