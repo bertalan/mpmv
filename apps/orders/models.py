@@ -60,7 +60,7 @@ class OrderNumberSequence(models.Model):
     """The last sequence number issued in a year. Locked while a number is taken, and the
     increment commits or rolls back with the order, so numbers have no gaps."""
 
-    year = models.PositiveSmallIntegerField(primary_key=True)
+    year = models.PositiveSmallIntegerField(unique=True)
     last_value = models.PositiveIntegerField(default=0)
 
     def __str__(self) -> str:

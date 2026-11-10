@@ -60,19 +60,29 @@ class VendorOrderInput:
 # --- numbering -------------------------------------------------------------------------------
 
 
-def next_order_number(*, now: dt.datetime | None = None, dry_run: bool = False) -> str:
-    """The next order number of the year, e.g. `2027-000123` (prefix: ORDER_NUMBER_PREFIX).
+def _year_and_prefix(now: dt.datetime | None) -> tuple[int, str]:
+    return (
+        timezone.localtime(now or timezone.now()).year,
+        str(getattr(settings, "ORDER_NUMBER_PREFIX", "")),
+    )
+
+
+def peek_order_number(*, now: dt.datetime | None = None) -> str:
+    """The number the next order would get, e.g. `2027-000123`. A preview: it takes no lock and
+    changes nothing, and the real number may differ if another order is placed first."""
+    year, prefix = _year_and_prefix(now)
+    last = OrderNumberSequence.objects.filter(year=year).values_list("last_value", flat=True)
+    return engine.format_order_number(year, (last.first() or 0) + 1, prefix=prefix)
+
+
+def _take_order_number(*, now: dt.datetime | None = None) -> str:
+    """Issue the next order number of the year (prefix: ORDER_NUMBER_PREFIX).
 
     Locks the year's counter row until the surrounding transaction ends, so concurrent orders
-    queue up and a rolled-back order gives its number back: no duplicates, no gaps. Call it
-    inside the transaction that saves the order. Dry run only previews the number: it takes
-    no lock and changes nothing (the real one may differ if another order is placed first).
+    queue up and a rolled-back order gives its number back: no duplicates, no gaps. Only
+    `create_order` calls it, inside the transaction that saves the order.
     """
-    year = timezone.localtime(now or timezone.now()).year
-    prefix = str(getattr(settings, "ORDER_NUMBER_PREFIX", ""))
-    if dry_run:
-        last = OrderNumberSequence.objects.filter(year=year).values_list("last_value", flat=True)
-        return engine.format_order_number(year, (last.first() or 0) + 1, prefix=prefix)
+    year, prefix = _year_and_prefix(now)
     with transaction.atomic():
         OrderNumberSequence.objects.bulk_create(
             [OrderNumberSequence(year=year)], ignore_conflicts=True
@@ -241,7 +251,7 @@ def create_order(
     if dry_run:
         return None, changes()
     with transaction.atomic():
-        order.number = next_order_number(now=now)
+        order.number = _take_order_number(now=now)
         order.transfer_group = order.number
         order.save()
         for sub, lines, _ in built:

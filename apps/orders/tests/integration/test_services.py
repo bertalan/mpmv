@@ -14,6 +14,7 @@ from apps.orders import services
 from apps.orders.engine import IllegalTransition
 from apps.orders.models import Order, OrderNumberSequence, VendorOrder
 from apps.orders.services import LineInput, VendorOrderInput
+from apps.orders.tests.factories import OrderNumberSequenceFactory
 from apps.vendors.tests.factories import VendorFactory
 
 CTX = AuditContext(actor_label="system:test", source=AuditLog.Source.SYSTEM)
@@ -132,7 +133,7 @@ def test_two_concurrent_transactions_get_different_numbers() -> None:
         try:
             with transaction.atomic():
                 barrier.wait(timeout=10)
-                numbers.append(services.next_order_number(now=NOW))
+                numbers.append(services._take_order_number(now=NOW))
         except BaseException as exc:
             errors.append(exc)
         finally:
@@ -322,8 +323,14 @@ def test_vendor_order_transition_dry_run_changes_nothing() -> None:
 
 @pytest.mark.django_db
 def test_a_number_preview_does_not_consume_the_number() -> None:
-    assert services.next_order_number(now=NOW, dry_run=True) == "2027-000001"
-    assert services.next_order_number(now=NOW, dry_run=True) == "2027-000001"
+    assert services.peek_order_number(now=NOW) == "2027-000001"
+    assert services.peek_order_number(now=NOW) == "2027-000001"
     assert OrderNumberSequence.objects.count() == 0
     assert place().number == "2027-000001"
-    assert services.next_order_number(now=NOW, dry_run=True) == "2027-000002"
+    assert services.peek_order_number(now=NOW) == "2027-000002"
+
+
+@pytest.mark.django_db
+def test_numbering_continues_from_the_stored_counter() -> None:
+    OrderNumberSequenceFactory.create(year=2027, last_value=41)
+    assert place().number == "2027-000042"
