@@ -7,11 +7,15 @@ never edited once written (orders snapshot it: `snapshot()` is the JSON they sto
 import datetime as dt
 import json
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, ProgrammingError, connection, transaction
+from django.test import Client
+from django.urls import reverse
 
+from apps.accounts.models import User
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 from apps.vendors import engine
@@ -288,3 +292,39 @@ def test_a_snapshot_does_not_follow_the_live_rule() -> None:
     snapshot = rule.snapshot()
     CommissionRule.objects.filter(pk=rule.pk).update(valid_to=utc(2027))
     assert rule.snapshot() == snapshot  # the closing date is no part of what an order froze
+
+
+# --- Admin
+
+
+def test_staff_add_a_rule_in_the_admin_and_cannot_edit_or_delete_one(
+    client: Client, superuser: User, mfa_login: Any
+) -> None:
+    staff: Client = mfa_login(client, superuser)
+    url = reverse("admin:vendors_commissionrule_add")
+    data = {
+        "percent": "15.00",
+        "base": "net_goods",
+        "fee_percent": "4.00",
+        "fee_fixed": "2.00",
+        "fee_base": "gross_paid",
+        "promo_label": "",
+        "valid_from_0": "2026-01-01",
+        "valid_from_1": "00:00:00",
+    }
+    assert staff.post(url, data).status_code == 302
+    rule = CommissionRule.objects.get()
+    assert (rule.version, rule.percent) == (1, Decimal("15.00"))
+    assert AuditLog.objects.filter(action=COMMISSION_RULE_ADDED).exists()
+
+    refused = staff.post(url, {**data, "percent": "0.00", "valid_from_0": "2027-01-01"})
+    assert refused.status_code == 200  # an implicit zero is a form error, not a crash
+    assert CommissionRule.objects.count() == 1
+
+    assert (
+        staff.get(reverse("admin:vendors_commissionrule_delete", args=[rule.pk])).status_code == 403
+    )
+    assert (
+        staff.post(reverse("admin:vendors_commissionrule_change", args=[rule.pk]), data).status_code
+        == 403
+    )

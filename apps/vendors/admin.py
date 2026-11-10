@@ -26,12 +26,13 @@ from apps.accounts.decorators import step_up_required
 from apps.accounts.mfa_session import is_recently_verified
 from apps.accounts.models import User
 from apps.core.admin import step_up
-from apps.core.audit import audit_context
+from apps.core.audit import AuditContext, audit_context
 from apps.core.changeset import ChangeSet
 from apps.core.text import ascii_int
 
 from . import engine
 from .models import (
+    CommissionRule,
     ContractAcceptance,
     CrossVendorConsent,
     LegalFieldRequirement,
@@ -40,11 +41,13 @@ from .models import (
     VendorContract,
     VendorContractTranslation,
     VendorFeatureFlag,
+    VendorPlan,
     VendorStatus,
     VendorTranslation,
     legal_field_label,
 )
 from .services import (
+    add_commission_rule,
     approve_claim,
     can_reopen,
     change_status,
@@ -60,6 +63,7 @@ from .services import (
     reject_claim,
     reopen_vendor,
     save_contract,
+    save_plan,
     save_requirement,
     save_vendor,
     save_vendor_flag,
@@ -782,6 +786,97 @@ class LegalFieldRequirementAdmin(admin.ModelAdmin[LegalFieldRequirement]):
         ctx = audit_context(request)
         for requirement in queryset:
             delete_requirement(requirement, ctx=ctx)
+
+
+@admin.register(VendorPlan)
+class VendorPlanAdmin(admin.ModelAdmin[VendorPlan]):
+    """Plans are data (VEN.2). Rules point at plans (PROTECT), so a plan is changed, never
+    deleted. At launch a plan only scopes a commission rule and sets limits (D-04)."""
+
+    list_display = ("code", "name", "max_products", "monthly_fee")
+    search_fields = ("code", "name")
+    fields = ("code", "name", "max_products", "features", "monthly_fee")
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+    def save_model(self, request: HttpRequest, obj: VendorPlan, form: Any, change: bool) -> None:
+        save_plan(obj, ctx=audit_context(request))
+
+
+class CommissionRuleForm(forms.ModelForm[CommissionRule]):
+    """Runs the service's rules (a dry run) so a refusal is a form error, not a crash."""
+
+    class Meta:
+        model = CommissionRule
+        fields = (
+            "vendor",
+            "plan",
+            "percent",
+            "base",
+            "fee_percent",
+            "fee_fixed",
+            "fee_base",
+            "promo_label",
+            "valid_from",
+        )
+
+    def validate_unique(self) -> None:
+        super().validate_unique()
+        if self.instance.pk is not None or self.errors:
+            return
+        try:
+            add_commission_rule(
+                self.instance,
+                ctx=AuditContext(actor_label="form", source="admin"),
+                dry_run=True,
+            )
+        except ValidationError as exc:
+            self.add_error(None, exc)
+
+
+@admin.register(CommissionRule)
+class CommissionRuleAdmin(admin.ModelAdmin[CommissionRule]):
+    """Commission rules (VEN.2): add a version, never edit or delete one (a database trigger
+    enforces it). The add page asks for a fresh second factor like any rate change."""
+
+    form = CommissionRuleForm
+    list_display = (
+        "scope",
+        "version",
+        "percent",
+        "base",
+        "fee_percent",
+        "fee_fixed",
+        "promo_label",
+        "valid_from",
+        "valid_to",
+    )
+    list_filter = ("base",)
+    list_select_related = ("vendor", "plan")
+    readonly_fields = ("version", "valid_to", "public_id", "created_at")
+    actions = None
+
+    @admin.display(description="Scope")
+    def scope(self, obj: CommissionRule) -> str:
+        return str(obj.vendor or obj.plan or "platform default")
+
+    def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+    def save_model(
+        self, request: HttpRequest, obj: CommissionRule, form: Any, change: bool
+    ) -> None:
+        add_commission_rule(obj, ctx=audit_context(request))
+
+    def add_view(
+        self, request: HttpRequest, form_url: str = "", extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        parent = super().add_view
+        return step_up(lambda req: parent(req, form_url, extra_context))(request)
 
 
 def _overrides_kill_switch(override: VendorFeatureFlag | None) -> bool:
