@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
+from django.urls import reverse
 
 from apps.core.services import is_platform_owner
 from apps.vendors.models import Vendor, VendorMember
@@ -62,3 +63,11 @@ class ManagerContext:
     vendor: Vendor | None = None
     role: str | None = None
     memberships: tuple[VendorMember, ...] = field(default=())
+
+
+def home_url(user: AnyUser) -> str:
+    """Where a user lands without `next`: their Manager space, else the site root."""
+    for space in (Space.PLATFORM, Space.SHOP):
+        if may_enter(space, user):
+            return reverse(f"manager:{space}:dashboard")
+    return "/"

@@ -10,9 +10,9 @@ import time
 from django.db import transaction
 from django.http import Http404, HttpRequest, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_safe
 
-from . import mail, services
+from . import indexing, mail, services
 from .audit import AuditContext
 from .http import client_ip
 from .models import AuditLog
@@ -40,3 +40,12 @@ def email_webhook(request: HttpRequest) -> HttpResponse:
         for event in events:
             services.record_email_feedback(event, ctx=ctx)
     return HttpResponse(status=204)
+
+
+@require_safe
+def robots_view(request: HttpRequest) -> HttpResponse:
+    """`/robots.txt` (SEO.8): public, no language prefix, no vendor data."""
+    return HttpResponse(
+        indexing.robots_txt(forced=indexing.is_noindex_forced()),
+        content_type="text/plain; charset=utf-8",
+    )

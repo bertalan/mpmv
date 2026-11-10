@@ -1,0 +1,91 @@
+# OPS.10: nightly line-only coverage of the unit + integration suites on main. Report only: the
+# job never fails the build on a coverage number. Branch tracing is off (it roughly doubles the
+# run time, which is why ci.yml runs without coverage). Run it by hand: Actions > Coverage
+# nightly > Run workflow, or `gh workflow run coverage-nightly.yml`.
+name: Coverage nightly
+
+on:
+  schedule:
+    - cron: "15 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: coverage-nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  UV_FROZEN: "1"
+  DJANGO_SETTINGS_MODULE: mpmv.settings.test
+  # Throwaway service database with trust auth: no credentials in the repository.
+  DATABASE_URL: postgres://mpmv@localhost:5432/mpmv
+
+jobs:
+  coverage:
+    name: Line coverage (unit + integration)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mpmv
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: mpmv
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mpmv -d mpmv"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+      - run: uv sync
+      - name: PostgreSQL without fsync
+        run: |
+          psql "$DATABASE_URL" -c "ALTER SYSTEM SET fsync = off" \
+            -c "ALTER SYSTEM SET synchronous_commit = off" \
+            -c "ALTER SYSTEM SET full_page_writes = off" -c "SELECT pg_reload_conf()"
+      - name: Line-only coverage configuration
+        run: |
+          mkdir -p build/reports
+          printf '[run]\nsource = apps,mpmv\nbranch = false\n' > build/reports/coveragerc
+      # Test failures do not fail this job either: the coverage report is what it is for (ci.yml
+      # is the gate). A failing run is flagged in the summary.
+      - name: Pytest with coverage
+        id: pytest
+        continue-on-error: true
+        run: >-
+          uv run pytest -n auto --dist loadgroup -m "unit or integration"
+          --cov --cov-config=build/reports/coveragerc
+          --cov-report=term --cov-report=xml:build/reports/coverage.xml
+          --cov-report=html:build/reports/coverage-html
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "## Line coverage (unit + integration)"
+            echo
+            if [ "${{ steps.pytest.outcome }}" != "success" ]; then
+              echo "Warning: the test run did not finish green; the numbers may be partial."
+              echo
+            fi
+            if [ -f build/reports/coverage.xml ]; then
+              uv run coverage report --rcfile=build/reports/coveragerc --format=markdown \
+                --skip-covered --sort=cover || true
+            else
+              echo "No coverage data was produced."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Store coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: |
+            build/reports/coverage.xml
+            build/reports/coverage-html/
+          if-no-files-found: ignore

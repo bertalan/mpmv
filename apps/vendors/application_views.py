@@ -27,6 +27,7 @@ from django.views.decorators.http import require_http_methods
 from apps.accounts.decorators import protect_registration
 from apps.core.audit import audit_context
 from apps.core.http import client_ip
+from apps.core.i18n import language_switch_home
 
 from . import services
 from .forms import MAX_BODY_BYTES, ApplicationForm, ConfirmForm
@@ -109,6 +110,7 @@ def _refused(request: HttpRequest) -> HttpResponse:
     return _page(request, "invalid", {}, status=403)
 
 
+@language_switch_home
 @require_http_methods(["GET", "HEAD", "POST"])
 def confirm(request: HttpRequest, user_key: str) -> HttpResponse:
     """Where the emailed link leads, after its Continue page opened it in this session."""
@@ -138,6 +140,7 @@ def confirm(request: HttpRequest, user_key: str) -> HttpResponse:
     return _page(request, "confirm", {"form": form})
 
 
+@language_switch_home
 @require_http_methods(["GET", "HEAD", "POST"])
 def cancel(request: HttpRequest, user_key: str) -> HttpResponse:
     """ "This was not me": the page the cancel link of every application mail leads to.
