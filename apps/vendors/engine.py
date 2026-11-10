@@ -1847,6 +1847,19 @@ def media_references(html: str) -> tuple[list[str], list[str]]:
     return images, documents
 
 
+def image_embed_formats(html: str) -> list[str]:
+    """The `format` of every image embed of a stored rich text, as written ("" when missing)."""
+    return [
+        {m[0].lower(): m[1] or m[2] or m[3] for m in _ATTR.findall(raw)}.get("format", "")
+        for tag, raw in _TAG.findall(html)
+        if tag.lower() == "embed"
+        and {m[0].lower(): m[1] or m[2] or m[3] for m in _ATTR.findall(raw)}.get(
+            "embedtype", ""
+        ).lower()
+        == "image"
+    ]
+
+
 def profile_text_errors(values: Mapping[str, str]) -> dict[str, str]:
     """What is wrong with the storefront texts: too long (stored HTML counted) or with control
     characters. The tagline is plain text: HTML there is refused, never stripped."""

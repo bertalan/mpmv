@@ -261,3 +261,30 @@ def test_the_choosers_list_only_the_members_own_collection_tree(
     assert listed(owner) == {mine.pk}
     staff = UserFactory.create(is_staff=True)
     assert {mine.pk, theirs.pk, loose.pk} <= listed(staff)
+
+
+@pytest.mark.parametrize("fmt", [' format="bogus"', ""])
+def test_a_bogus_or_missing_image_format_is_refused_on_save(
+    vendor: Vendor, owner: User, fmt: str
+) -> None:
+    image = MediaImageFactory.create(collection=_collection(vendor))
+    html = f'<p>x</p><embed embedtype="image" id="{image.pk}" alt="a"{fmt}/>'
+    with pytest.raises(ValidationError):
+        _save(vendor, owner, "description", html)
+
+
+@pytest.mark.parametrize("fmt", [' format="bogus"', ""])
+def test_the_storefront_never_fails_on_a_bogus_image_format(
+    client: Client, vendor: Vendor, fmt: str
+) -> None:
+    image = MediaImageFactory.create(collection=_collection(vendor))
+    VendorTranslationFactory.create(
+        vendor=vendor,
+        language="en",
+        status="published",
+        description=f'<p>Story</p><embed embedtype="image" id="{image.pk}" alt="a"{fmt}/>',
+    )
+    response = client.get(f"/shop/{vendor.slug}/")
+    assert response.status_code == 200
+    assert "Story" in response.content.decode()
+    assert "<embed" not in response.content.decode()

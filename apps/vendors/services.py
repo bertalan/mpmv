@@ -1953,6 +1953,17 @@ def save_storefront_profile(
     unknown = sorted(set(values) - set(PROFILE_FIELDS))
     if unknown:
         raise ValidationError(f"Not storefront profile fields: {', '.join(unknown)}.")
+    # A bogus image format would make the page fail: refused on the raw text, before the cleaning
+    # (which would drop such an embed without a word).
+    formats = import_string("apps.cms.engine.image_format_names")()
+    format_problems = {
+        name: "Choose an image format from the editor."
+        for name, value in values.items()
+        if name in engine.RICH_TEXT_FIELDS
+        and any(fmt not in formats for fmt in engine.image_embed_formats(value))
+    }
+    if format_problems:
+        raise ValidationError(format_problems)
     # Rich text is cleaned first (the CMS.12 hook would do it on `save` anyway): the caps, the
     # media rule and the before/after audit all see the text that would be stored.
     values = {
