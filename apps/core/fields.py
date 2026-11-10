@@ -1,16 +1,23 @@
 """Shared model fields."""
 
+import io
 from typing import Any
 
+from django.conf import settings
 from django.core.exceptions import FieldError, ValidationError
+from django.core.files.base import ContentFile
 from django.db import models
 from django.db.models import lookups
 from django.db.models.expressions import Col
+from wagtail.images.models import WagtailImageField, WagtailImageFieldFile
+from wagtail.utils.file import hash_filelike
 
 from .countries import InvalidCountry, normalize_country
 from .crypto import DecryptionError
 from .encryption import configured_keyring, encryption_context
 from .i18n import language_choices
+from .svg import MAX_SVG_BYTES, UnsafeSvgError, sanitise_svg
+from .uploads import ImageLimits, UploadRefused, safe_svg_name, sanitise_image, upload_kind
 
 
 class MoneyField(models.DecimalField[Any, Any]):
@@ -172,3 +179,102 @@ class EncryptedDateField(EncryptedFieldMixin, models.DateField[Any, Any]):
     def from_db_value(self, value: Any, expression: Any, connection: Any) -> Any:
         plain = super().from_db_value(value, expression, connection)
         return None if plain is None or plain == "" else self.to_python(plain)
+
+
+# --- Uploaded images (SEC.2) -----------------------------------------------------------------
+
+
+def image_limits() -> ImageLimits:
+    """The upload caps from settings (WAGTAILIMAGES_MAX_UPLOAD_SIZE and friends)."""
+    return ImageLimits(
+        max_bytes=settings.WAGTAILIMAGES_MAX_UPLOAD_SIZE,
+        max_pixels=settings.WAGTAILIMAGES_MAX_IMAGE_PIXELS,
+        max_side=settings.MPMV_MAX_IMAGE_SIDE,
+        max_frames=settings.MPMV_MAX_IMAGE_FRAMES,
+        max_stored_pixels=settings.MPMV_MAX_STORED_IMAGE_PIXELS,
+        max_animation_pixels=settings.MPMV_MAX_ANIMATION_PIXELS,
+        decode_wait=settings.MPMV_IMAGE_DECODE_WAIT_SECONDS,
+    )
+
+
+def read_upload(content: Any, limit: int) -> bytes:
+    """Up to `limit + 1` bytes of an uploaded or stored file, from its start; rewinds it after."""
+    if hasattr(content, "open") and getattr(content, "closed", False):
+        content.open("rb")
+    content.seek(0)
+    data = content.read(limit + 1)
+    content.seek(0)
+    return bytes(data)
+
+
+class SanitisedImageFieldFile(WagtailImageFieldFile):  # type: ignore[misc]  # Wagtail is untyped
+    """Stores only the re-encoded image under a safe name (`apps.core.uploads.sanitise_image`).
+
+    `FieldFile.save` is the one place every new original goes through: a model save of a new
+    upload (Wagtail's single and chooser uploads, file replacement, `services.save_image`, the
+    seed) and Wagtail's multiple upload, which saves the file itself before the image. Size and
+    hash are set from the stored bytes, so Wagtail's duplicate check compares stored files.
+    """
+
+    def get_image_dimensions(self) -> Any:
+        """None for a file Willow cannot read (it may raise anything): `clean` refuses it."""
+        try:
+            return super().get_image_dimensions()
+        except Exception:  # an XML parse error for "<?php", OSError for a truncated PNG...
+            return (None, None)
+
+    def save(self, name: str, content: Any, save: bool = True) -> None:
+        # The name was checked with the content in `MediaImage.clean`; here it may already be
+        # a storage rewrite (Wagtail's pending multiple uploads), which keeps the extension, so
+        # the content decides the branch and an SVG must still be named `.svg`.
+        limits = image_limits()
+        data = read_upload(content, max(limits.max_bytes, MAX_SVG_BYTES))
+        try:
+            if upload_kind(data, name or "") == "svg":
+                self._save_svg(name or "", data[: MAX_SVG_BYTES + 1])
+            else:
+                self._save_raster(name or "", data[: limits.max_bytes + 1], limits)
+        except UploadRefused as refusal:
+            raise ValidationError({self.field.name: refusal.message}, code=refusal.code) from None
+        if save:
+            self.instance.save()
+
+    def _save_raster(self, name: str, data: bytes, limits: ImageLimits) -> None:
+        clean = sanitise_image(data, name, limits, check_name=False)
+        self._store(clean.name, clean.data)
+        self.instance.width, self.instance.height = clean.width, clean.height
+
+    def _save_svg(self, name: str, data: bytes) -> None:
+        """THM.12: only the sanitiser's re-serialisation is stored. Which collection may hold
+        an SVG is the model's rule (`MediaImage.clean` and `save`): the collection may not be
+        set yet when Wagtail's multiple upload stores the file."""
+        try:
+            cleaned = sanitise_svg(data)
+        except UnsafeSvgError as error:
+            raise UploadRefused("svg_unsafe", f"This SVG is refused: {error}") from None
+        self._store(safe_svg_name(name), cleaned)
+        width, height = self.get_image_dimensions()
+        if not width or not height:
+            self.delete(save=False)
+            raise UploadRefused(
+                "svg_size", "This SVG has no size: give it a width and height or a viewBox."
+            )
+        self.instance.width, self.instance.height = width, height
+
+    def _store(self, name: str, data: bytes) -> None:
+        super().save(name, ContentFile(data), save=False)
+        self.instance.file_size = len(data)
+        self.instance.file_hash = hash_filelike(io.BytesIO(data))
+
+
+class SanitisedImageField(WagtailImageField):  # type: ignore[misc]  # Wagtail is untyped
+    """Wagtail's image file field whose files are re-encoded when stored (SEC.2).
+
+    Behaviour only: it deconstructs as Wagtail's field, so it needs no migration.
+    """
+
+    attr_class = SanitisedImageFieldFile
+
+    def deconstruct(self) -> Any:
+        name, _path, args, kwargs = super().deconstruct()
+        return name, "wagtail.images.models.WagtailImageField", args, kwargs
