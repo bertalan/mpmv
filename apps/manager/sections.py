@@ -7,7 +7,9 @@ whose role checks CORE.18 defines.
 
 from django.utils.translation import gettext_lazy as _
 
-from .navigation import Registry, Section, anyone, vendor_action
+from apps.vendors.services import PROFILE_REVERT_PERMISSION
+
+from .navigation import Registry, Section, anyone, platform_permission, vendor_action
 from .spaces import Space
 
 BUILT_IN = (
@@ -46,6 +48,15 @@ BUILT_IN = (
         "manager:platform:dashboard",
         order=10,
         allowed=anyone,
+    ),
+    # Staff with the revert permission (CORE.9 3/3): history of owners' profile changes, revert.
+    Section(
+        "platform.profile_changes",
+        Space.PLATFORM,
+        _("Storefront changes"),
+        "manager:platform:profile_changes",
+        order=20,
+        allowed=platform_permission(PROFILE_REVERT_PERMISSION),
     ),
 )
 

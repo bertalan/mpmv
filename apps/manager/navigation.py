@@ -57,6 +57,16 @@ def vendor_action(action: str) -> Check:
     return check
 
 
+def platform_permission(permission: str) -> Check:
+    """Platform staff holding the model permission `permission` (until CORE.18 adds roles)."""
+
+    def check(ctx: Actor) -> bool:
+        user = getattr(ctx, "user", None)
+        return bool(user is not None and user.is_active and user.has_perm(permission))
+
+    return check
+
+
 @dataclass(frozen=True)
 class Section:
     key: str

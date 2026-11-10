@@ -1986,6 +1986,138 @@ def _notify_profile_changed(vendor: Vendor, language: str, changed: list[str]) -
     )
 
 
+# --- Staff review and revert of storefront profile changes (CORE.9, owner decision Q-16)
+
+PROFILE_REVERTED = "vendor.profile_reverted"
+PROFILE_REVERT_PERMISSION = "vendors.revert_storefront_profile"
+PROFILE_REVERT_EMAIL_TEMPLATE = "vendors.profile_reverted"
+PROFILE_REASON_MAX_LENGTH = 1000
+PROFILE_HISTORY_LIMIT = 200
+
+
+def can_review_profiles(actor: User | AnonymousUser) -> bool:
+    """Active users holding the dedicated permission; `is_staff` alone never does, and a vendor
+    member as such never does. Until the CORE.18 roles exist this is the catalog and
+    moderation staff's right (spec 02, Q-16)."""
+    return bool(actor.is_active and actor.has_perm(PROFILE_REVERT_PERMISSION))
+
+
+def profile_history(actor: User | AnonymousUser, *, vendor: Vendor | None = None) -> list[AuditLog]:
+    """The owners' storefront profile changes and the staff reverts, newest first (at most
+    `PROFILE_HISTORY_LIMIT`), each with `before` and `after` of the changed fields. For staff
+    holding `PROFILE_REVERT_PERMISSION` only: a vendor never sees any history, not its own."""
+    if not can_review_profiles(actor):
+        raise PermissionDenied("Only platform staff review storefront profile changes.")
+    entries = AuditLog.objects.filter(action__in=(PROFILE_CHANGED, PROFILE_REVERTED))
+    if vendor is not None:
+        entries = entries.filter(vendor_key=str(vendor.public_id))
+    return list(entries.order_by("-created_at", "-id")[:PROFILE_HISTORY_LIMIT])
+
+
+def reverted_entry_ids(entries: Collection[AuditLog]) -> set[str]:
+    """Public ids of the changes among `entries` that a later revert has undone."""
+    return {
+        str(e.after["reverts"])
+        for e in entries
+        if e.action == PROFILE_REVERTED and isinstance(e.after, dict) and "reverts" in e.after
+    }
+
+
+def revert_profile_change(
+    entry_public_id: Any,
+    reason: str,
+    *,
+    actor: User,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Staff put back the texts an owner's `vendor.profile_changed` entry replaced (CORE.9).
+
+    Needs `PROFILE_REVERT_PERMISSION` and a `reason` (required, plain text, at most
+    `PROFILE_REASON_MAX_LENGTH` characters). Only the fields that entry changed are restored, to
+    the values in its `before` (blank for a first save), together with the row's status. Refused
+    with a `ValidationError` when the entry is unknown or already reverted, or when one of those
+    fields has changed since (revert the later change first): a revert never overwrites newer
+    text. Works on a suspended or closed vendor too, and does not lock the owner's own edits
+    (`PROFILE_LOCKED` is about the vendor's status only). Translations are not sent back to
+    review. One `vendor.profile_reverted` audit entry holds the restored fields, the reason and
+    the id of the entry it reverts; each vendor owner gets a `vendors.profile_reverted` email
+    with the reason, in the caller's transaction. A dry run returns the ChangeSet only.
+    """
+    if not can_review_profiles(actor):
+        raise PermissionDenied("Only platform staff revert storefront profile changes.")
+    reason = reason.strip()
+    if not reason:
+        raise ValidationError({"reason": "A reason is required."})
+    if len(reason) > PROFILE_REASON_MAX_LENGTH:
+        raise ValidationError({"reason": "The reason is too long."})
+    if problems := engine.profile_text_errors({"description": reason}):
+        raise ValidationError(problems)
+    with transaction.atomic():
+        entry = AuditLog.objects.filter(public_id=entry_public_id, action=PROFILE_CHANGED).first()
+        if entry is None or not isinstance(entry.after, dict):
+            raise ValidationError({"entry": "Unknown storefront profile change."})
+        entry_id = str(entry.public_id)
+        vendor = Vendor.objects.select_for_update().filter(public_id=entry.after["vendor"]).first()
+        language = entry.after["language"]
+        if vendor is None:
+            raise ValidationError({"entry": "The vendor no longer exists."})
+        if AuditLog.objects.filter(action=PROFILE_REVERTED, after__reverts=entry_id).exists():
+            raise ValidationError({"entry": "This change was already reverted."})
+        row = (
+            VendorTranslation.objects.select_for_update()
+            .filter(vendor=vendor, language=language)
+            .first()
+        )
+        fields = [n for n in PROFILE_FIELDS if n in entry.after]
+        if row is None or any(getattr(row, n) != entry.after[n] for n in fields):
+            raise ValidationError(
+                {"entry": "The text changed after this change: revert the later change first."}
+            )
+        previous: Mapping[str, Any] = entry.before or {}
+        current = _profile_texts(row)
+        restored = {n: str(previous.get(n, "")) for n in fields}
+        old_status = row.status
+        new_status = str(previous.get("status", old_status))
+        identity = _profile_identity(row, reverts=entry_id)
+        changes = ChangeSet()
+        changes.update(
+            PROFILE_LABEL,
+            f"{vendor.public_id}/{language}",
+            {**identity, "status": old_status, **{n: current[n] for n in fields}},
+            {**identity, "status": new_status, **restored, "reason": reason},
+        )
+        if dry_run:
+            return changes
+        for name, value in restored.items():
+            setattr(row, name, value)
+        row.status = new_status
+        row.full_clean()
+        row.save()
+        audit_changes(changes, ctx=ctx, action=PROFILE_REVERTED)
+        _notify_profile_reverted(vendor, language, fields, reason)
+    return changes
+
+
+def _notify_profile_reverted(vendor: Vendor, language: str, fields: list[str], reason: str) -> None:
+    """Tell each vendor owner, in their own language, through the outbox."""
+    owners = User.objects.filter(
+        vendor_memberships__vendor=vendor, vendor_memberships__role="owner"
+    ).distinct()
+    for owner in owners:
+        enqueue_email(
+            recipient=owner.email,
+            template_key=PROFILE_REVERT_EMAIL_TEMPLATE,
+            language=owner.preferred_language,
+            context={
+                "vendor_name": vendor.display_name,
+                "language": language,
+                "fields": ", ".join(fields),
+                "reason": reason,
+            },
+        )
+
+
 # --- Public "Sell with us" application (VEN.22, owner decision Q-55)
 
 APPLICATION_PURPOSE = "vendors.application"

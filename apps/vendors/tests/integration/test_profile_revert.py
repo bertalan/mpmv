@@ -10,7 +10,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
-from apps.core.audit import AuditContext
+from apps.core.audit import AuditContext, user_context
 from apps.core.models import AuditLog, OutboxEmail
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.services import (
@@ -63,7 +63,9 @@ def test_the_revert_restores_the_previous_text_and_is_audited(
 ) -> None:
     VendorTranslationFactory.create(vendor=vendor, language="en", refund_policy="Fair", tagline="T")
     entry = _change(vendor, owner, refund_policy="No refunds ever")
-    changes = revert_profile_change(entry.public_id, REASON, actor=staff, ctx=STAFF_CTX)
+    changes = revert_profile_change(
+        entry.public_id, REASON, actor=staff, ctx=user_context(staff, None)
+    )
     row = _row(vendor)
     assert (row.refund_policy, row.tagline) == ("Fair", "T")
     assert not changes.is_empty

@@ -69,8 +69,8 @@ def test_a_vendor_member_cannot_reach_the_page_or_the_revert(
     client: Client, owner: User, changed: AuditLog
 ) -> None:
     verified_login(client, owner)
-    assert client.get(PAGE).status_code == 404
-    assert client.post(revert_url(changed), {"reason": "x"}).status_code == 404
+    assert client.get(PAGE).status_code == 403
+    assert client.post(revert_url(changed), {"reason": "x"}).status_code == 403
     assert "New tagline" not in client.get(SHOP).text
     assert PAGE not in client.get(SHOP).text
 

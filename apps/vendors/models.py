@@ -301,6 +301,10 @@ class Vendor(BaseModel):
         ordering = ["display_name", "id"]
         permissions = [
             ("view_all_vendors", "Platform staff: can see every vendor's data (spec 02, Q-34)"),
+            (
+                "revert_storefront_profile",
+                "Platform staff: can revert storefront profile changes (Q-16)",
+            ),
         ]
         constraints = [
             models.CheckConstraint(

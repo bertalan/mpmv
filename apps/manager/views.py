@@ -27,9 +27,16 @@ from apps.catalog.models import Product
 from apps.catalog.services import product_kpis
 from apps.core.audit import audit_context
 from apps.core.models import AuditLog
-from apps.vendors.models import VendorTranslation
+from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.scoping import Source, VendorScopedQuerySet
-from apps.vendors.services import PROFILE_LOCKED, save_storefront_profile
+from apps.vendors.services import (
+    PROFILE_FIELDS,
+    PROFILE_LOCKED,
+    profile_history,
+    revert_profile_change,
+    reverted_entry_ids,
+    save_storefront_profile,
+)
 
 from .access import ManagerContext, home_url
 from .forms import StorefrontProfileForm
@@ -183,6 +190,86 @@ class StorefrontProfileView(ManagerView):
 class PlatformDashboardView(ManagerView):
     section = "platform.dashboard"
     template_name = "manager/platform/dashboard.html"
+
+
+class ProfileChangesView(ManagerView):
+    """Staff review the owners' storefront profile changes and see the reverts (CORE.9 3/3).
+
+    Platform space only (vendor members never get here, so a vendor sees no history), and only for
+    holders of the revert permission. Optional `?vendor=<public id>` narrows the list.
+    """
+
+    section = "platform.profile_changes"
+    template_name = "manager/platform/profile_changes.html"
+
+    def selected_vendor(self) -> Vendor | None:
+        found = self.request.GET.get("vendor", "")
+        if not found:
+            return None
+        try:
+            return Vendor.objects.filter(public_id=found).first()
+        except (ValidationError, ValueError):
+            return None
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        vendor = self.selected_vendor()
+        user = self.manager.user
+        entries = profile_history(user, vendor=vendor) if isinstance(user, User) else []
+        reverted = reverted_entry_ids(entries)
+        names = {
+            str(k): v
+            for k, v in (
+                Vendor.objects.filter(
+                    public_id__in=[e.vendor_key for e in entries if e.vendor_key]
+                ).values_list("public_id", "display_name")
+            )
+        }
+        rows = []
+        for entry in entries:
+            before, after = entry.before or {}, entry.after or {}
+            rows.append(
+                {
+                    "entry": entry,
+                    "vendor": names.get(entry.vendor_key, entry.vendor_key),
+                    "language": after.get("language", ""),
+                    "is_revert": entry.action == "vendor.profile_reverted",
+                    "reason": after.get("reason", ""),
+                    "reverted": str(entry.public_id) in reverted,
+                    "diff": [
+                        {"field": name, "before": before.get(name, ""), "after": after[name]}
+                        for name in PROFILE_FIELDS
+                        if name in after
+                    ],
+                }
+            )
+        context["rows"] = rows
+        context["filter_vendor"] = vendor
+        return context
+
+
+class ProfileRevertView(ManagerView):
+    """Revert one change, with a required reason (POST only, CSRF-protected)."""
+
+    section = "platform.profile_changes"
+    http_method_names = ["post"]
+
+    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        actor = self.manager.user
+        if not isinstance(actor, User):
+            raise Http404("No Manager page here.")
+        ctx = replace(audit_context(request), source=AuditLog.Source.ADMIN)
+        try:
+            revert_profile_change(
+                kwargs["entry"], request.POST.get("reason", ""), actor=actor, ctx=ctx
+            )
+        except ValidationError as error:
+            messages.error(request, " ".join(error.messages))
+        except PermissionDenied as error:
+            raise Http404("No Manager page here.") from error
+        else:
+            messages.success(request, _("The change was reverted and the owners were told."))
+        return HttpResponseRedirect(reverse("manager:platform:profile_changes"))
 
 
 class VendorPickerView(ManagerView):
