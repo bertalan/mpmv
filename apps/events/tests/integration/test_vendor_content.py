@@ -8,6 +8,7 @@ import pytest
 from django.core.exceptions import ValidationError
 from wagtail.models import Collection, Page
 
+from apps.accounts.tests.factories import UserFactory
 from apps.core.tests.factories import MediaImageFactory
 from apps.events import engine
 from apps.events.models import EventPage
@@ -146,6 +147,7 @@ def test_a_suspended_vendor_cannot_save_submit_or_cancel() -> None:
     owner = _owner()
     vendor = _vendor_of(owner)
     page = _create(owner)
+    submit_event(UserFactory.create(superuser=True), page)  # live, so cancel can run
     Vendor.objects.filter(pk=vendor.pk).update(status=Vendor.Status.SUSPENDED)
     # The caller still holds the stale, active object: only the re-read inside the write stops it.
     with pytest.raises(VendorCannotWrite):

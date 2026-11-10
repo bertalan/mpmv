@@ -11,6 +11,7 @@ import unicodedata
 from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
 
 # Event types (spec 15 "Page models"). There is deliberately no closure type: a vendor's
@@ -597,6 +598,91 @@ def has_unsafe_link(html: str) -> bool:
         if _link_scheme(url).startswith(_UNSAFE_SCHEMES):
             return True
     return False
+
+
+# Size limits of vendor-authored content (a stored revision is re-parsed on every read).
+MAX_BODY_BLOCKS = 50
+MAX_EXDATES = 500  # excluded occurrences or days
+MAX_LIST_ITEMS = 50  # images in a gallery, questions in an FAQ
+MAX_TEXT_LENGTH = 20_000  # characters in one text value of a block
+
+_FOREIGN_REFERENCE = re.compile(
+    r"""<embed\b|\blinktype\s*=\s*["']?(?:document|image)\b""", re.IGNORECASE
+)
+
+
+def vendor_collection_name(vendor_public_id: str) -> str:
+    """The name of a vendor's own Wagtail image collection (a child of the root collection);
+    the vendor-area upload stores there and the services accept only images from it."""
+    return f"vendor-{vendor_public_id}"
+
+
+def has_foreign_reference(html: str) -> bool:
+    """Whether vendor rich text embeds media or links a document by id: neither is a vendor
+    feature, and an id could name another tenant's file."""
+    return _FOREIGN_REFERENCE.search(html) is not None
+
+
+def image_ids(raw: Any) -> list[Any]:
+    """Every image reference of the `figure` and `gallery` blocks of a raw body (a gallery
+    item is either the plain value or Wagtail's `{"type": "item", "value": ...}` wrapper)."""
+    found: list[Any] = []
+
+    def walk(node: Any) -> None:
+        if isinstance(node, Mapping):
+            if "image" in node:
+                found.append(node["image"])
+            for child in node.values():
+                walk(child)
+        elif isinstance(node, list | tuple):
+            for child in node:
+                walk(child)
+
+    for block in raw:
+        if block.get("type") in ("figure", "gallery"):
+            walk(block.get("value"))
+    return found
+
+
+def cta_links(raw: Any) -> list[Mapping[str, Any]]:
+    """The `link` values of the `cta` blocks of a raw body."""
+    links: list[Mapping[str, Any]] = []
+    for block in raw:
+        value = block.get("value")
+        if block.get("type") == "cta" and isinstance(value, Mapping):
+            link = value.get("link")
+            if isinstance(link, Mapping):
+                links.append(link)
+    return links
+
+
+def cta_url_problem(url: str) -> str | None:
+    """Why a vendor CTA may not use `url`, or None: only `https://` addresses (spec 15)."""
+    text = url.strip()
+    if not text.lower().startswith("https://") or len(text) <= len("https://"):
+        return "A call-to-action link must start with https://."
+    if any(ch <= " " for ch in text):
+        return "A call-to-action link must not contain spaces."
+    return None
+
+
+def body_limit_problem(raw: Any) -> str | None:
+    """Why a raw body is too big, or None: blocks, list items and text length are capped."""
+    if len(raw) > MAX_BODY_BLOCKS:
+        return f"A body has at most {MAX_BODY_BLOCKS} blocks."
+
+    def too_big(node: Any) -> str | None:
+        if isinstance(node, str):
+            return "A text is too long." if len(node) > MAX_TEXT_LENGTH else None
+        if isinstance(node, Mapping):
+            return next((p for child in node.values() if (p := too_big(child))), None)
+        if isinstance(node, list | tuple):
+            if len(node) > MAX_LIST_ITEMS:
+                return f"A list has at most {MAX_LIST_ITEMS} items."
+            return next((p for child in node if (p := too_big(child))), None)
+        return None
+
+    return next((p for block in raw if (p := too_big(block.get("value")))), None)
 
 
 # --- Slugs (spec 15 "Slugs and routes") --------------------------------------------------------

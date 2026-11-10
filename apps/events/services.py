@@ -45,7 +45,9 @@ from django.http import Http404
 from django.utils import timezone
 from django.utils.translation import gettext as _
 from wagtail.actions.unpublish_page import UnpublishPageAction
+from wagtail.images import get_image_model
 from wagtail.models import (
+    Collection,
     Locale,
     Page,
     PageLogEntry,
@@ -69,7 +71,7 @@ from apps.core.models import AuditLog
 from apps.core.services import save_audited
 from apps.vendors.engine import VendorAction
 from apps.vendors.models import Vendor, VendorMember
-from apps.vendors.services import has_vendor_permission
+from apps.vendors.services import ensure_vendor_can_write, has_vendor_permission
 
 from . import engine
 from .models import (
@@ -491,6 +493,8 @@ def _set_body(page: EventPage, raw: Any, *, staff: bool) -> None:
         )
     if not staff and any(engine.has_unsafe_link(text) for text in _strings(raw)):
         raise ValidationError({"body": _("Links must not use javascript: or data: addresses.")})
+    if not staff:
+        _check_vendor_body(page, raw)
     field = EventPage._meta.get_field("body")
     unknown = sorted(set(types) - set(field.stream_block.child_blocks))
     if unknown:
@@ -500,6 +504,51 @@ def _set_body(page: EventPage, raw: Any, *, staff: bool) -> None:
         page.body = field.stream_block.clean(value)
     except ValidationError as exc:
         raise ValidationError({"body": exc.messages}) from exc
+
+
+def _vendor_images_allowed(vendor: Vendor, ids: list[Any]) -> bool:
+    """Whether every id is an image in `vendor`'s own collection (or one below it)."""
+    if not all(isinstance(pk, int) and not isinstance(pk, bool) for pk in ids):
+        return False
+    wanted = set(ids)
+    own = Collection.objects.filter(
+        depth=2, name=engine.vendor_collection_name(str(vendor.public_id))
+    ).first()
+    if own is None:
+        return not wanted
+    allowed = Collection.objects.descendant_of(own, inclusive=True)
+    found = get_image_model().objects.filter(pk__in=wanted, collection__in=allowed)
+    return bool(found.count() == len(wanted))
+
+
+def _check_vendor_body(page: EventPage, raw: list[Mapping[str, Any]]) -> None:
+    """The vendor-only body rules (spec 15 "Vendor-safe block subset"), for every entry point:
+    size limits, own images only, `https://` or own-event CTA links, no embeds by id."""
+    problem = engine.body_limit_problem(raw)
+    if problem is not None:
+        raise ValidationError({"body": problem})
+    if any(engine.has_foreign_reference(text) for text in _strings(raw)):
+        raise ValidationError({"body": _("Rich text cannot embed media or link documents.")})
+    vendor = page.vendor
+    ids = engine.image_ids(raw)
+    if ids and (vendor is None or not _vendor_images_allowed(vendor, ids)):
+        raise ValidationError({"body": _("Choose images from your own image library.")})
+    own_pages: set[int] = set()
+    for link in engine.cta_links(raw):
+        url, target = link.get("url"), link.get("page")
+        if url:
+            url_problem = engine.cta_url_problem(str(url))
+            if url_problem is not None:
+                raise ValidationError({"body": url_problem})
+        if target not in (None, ""):
+            if isinstance(target, bool) or not isinstance(target, int):
+                raise ValidationError({"body": _("Choose one of your own events.")})
+            if not own_pages and vendor is not None:
+                own_pages = set(
+                    EventPage.objects.filter(vendor=vendor).values_list("pk", flat=True)
+                )
+            if target not in own_pages:
+                raise ValidationError({"body": _("Choose one of your own events.")})
 
 
 def _set_links(page: EventPage, data: Mapping[str, Any]) -> None:
@@ -527,6 +576,11 @@ def _apply(page: EventPage, data: Mapping[str, Any], *, staff: bool) -> None:
     slug = data.get("slug")
     if slug is not None and slug in engine.RESERVED_SLUGS:
         raise ValidationError({"slug": _("This address is reserved for the events index.")})
+    for name in ("exdates", "exdate_days"):
+        if len(data.get(name) or ()) > engine.MAX_EXDATES:
+            raise ValidationError(
+                {name: _("At most %(max)d exclusions.") % {"max": engine.MAX_EXDATES}}
+            )
     for name in EDITABLE_FIELDS:
         if name in data:
             setattr(page, name, data[name])
@@ -551,9 +605,16 @@ def _record(ctx: AuditContext, action: str, page: EventPage, before: Any, after:
 
 
 @contextmanager
-def _mutation(dry_run: bool) -> Iterator[None]:
-    """One transaction per service call; a dry-run rolls it back, revisions and audit included."""
+def _mutation(dry_run: bool, *, actor: Any = None, vendor: Vendor | None = None) -> Iterator[None]:
+    """One transaction per service call; a dry-run rolls it back, revisions and audit included.
+
+    A vendor's own write (`actor` not staff, `vendor` set) first re-reads the vendor's status
+    inside the transaction (`ensure_vendor_can_write`, CORE.14, the CAT.3 pattern): a suspension
+    between authentication and the write raises `engine.VendorCannotWrite` (vendors app).
+    """
     with transaction.atomic():
+        if vendor is not None and not _is_staff(actor):
+            ensure_vendor_can_write(vendor)
         yield
         if dry_run:
             transaction.set_rollback(True)
@@ -593,7 +654,7 @@ def save_event_draft(
         # The approval publishes what the moderator reviewed: no vendor edit while it waits.
         raise ValidationError(_("The event is awaiting review and cannot be edited."))
     changes = EventChangeSet(page=stored)
-    with _mutation(dry_run):
+    with _mutation(dry_run, actor=actor, vendor=stored.vendor):
         draft: EventPage = stored.get_latest_revision_as_object()
         before = _snapshot(draft)
         _apply(draft, data, staff=staff)
@@ -621,7 +682,7 @@ def _create_event(
         raise PermissionDenied("no permission to manage this vendor's events")
     locale = locale or Locale.get_default()
     changes = EventChangeSet()
-    with _mutation(dry_run):
+    with _mutation(dry_run, actor=actor, vendor=vendor):
         index = _index_for(locale)
         page = EventPage(
             vendor=vendor, locale=locale, original_locale=locale, owner=actor, live=False
@@ -659,7 +720,7 @@ def submit_event(
     stored = _event_for(actor, page)
     _refuse_hidden(actor, stored)
     changes = EventChangeSet(page=stored)
-    with _mutation(dry_run):
+    with _mutation(dry_run, actor=actor, vendor=stored.vendor):
         before = _state(stored)
         state = stored.current_workflow_state
         if _in_review(stored):
@@ -803,7 +864,7 @@ def cancel_event(
     if stored.cancelled_at is not None:
         raise ValidationError(_("The event is already cancelled."))
     changes = EventChangeSet(page=stored)
-    with _mutation(dry_run):
+    with _mutation(dry_run, actor=actor, vendor=stored.vendor):
         before = _state(stored)
         now = timezone.now()
         pages = _translations(stored)
