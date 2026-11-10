@@ -358,6 +358,15 @@ class PlatformOperator(Versioned):
         "DAC7 reporting authority country",
         help_text="Member state whose authority receives the DAC7 report.",
     )
+    # CMP.3 (owner decision 2026-11-09): staff alerts, e.g. an overdue GPSR safety case, go to
+    # the compliance address, else to the support address.
+    support_email = models.EmailField(
+        "platform support email", blank=True, help_text="The platform's support address."
+    )
+    compliance_email = models.EmailField(
+        blank=True,
+        help_text="Where compliance alerts go. Empty: the support address.",
+    )
     # D-21, CMP.13: changed only by a platform owner through
     # `apps.core.services.set_allowed_vendor_countries`; other new versions carry it over.
     allowed_vendor_countries = ArrayField(

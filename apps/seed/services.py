@@ -56,6 +56,7 @@ from apps.catalog.taxonomy import (
 from apps.cms.models import HomePage, LegalPage, StandardPage
 from apps.cms.seed import seed_text
 from apps.cms.services import seed_site
+from apps.compliance import services as compliance_services
 from apps.core import translations
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
@@ -699,8 +700,29 @@ def _variant_sku(sku: str, options: tuple[str, ...]) -> str:
     return "-".join([sku, *(option.upper() for option in options)])
 
 
+def _gpsr_defaults(run: _Run, vendor: Vendor) -> None:
+    """The seed vendors make what they sell: their GPSR defaults name themselves (CMP.3)."""
+    street = f"{vendor.registered_street} {vendor.registered_street_number}".strip()
+    city = f"{vendor.registered_postal_code} {vendor.registered_city}".strip()
+    run.add(
+        compliance_services.set_vendor_gpsr_defaults(
+            vendor,
+            {
+                "manufacturer_name": vendor.legal_name,
+                "manufacturer_address": ", ".join(part for part in (street, city) if part)
+                or vendor.country,
+                "manufacturer_contact": vendor.contact_email,
+                "manufacturer_country": vendor.country,
+            },
+            ctx=run.ctx,
+        )
+    )
+
+
 def _products(run: _Run, vendor: Vendor, spec: data.VendorSeed, catalog: _Catalog) -> None:
     existing = set(Product.objects.filter(vendor=vendor).values_list("sku", flat=True))
+    if not existing:
+        _gpsr_defaults(run, vendor)
     for number, item in enumerate(data.PRODUCTS[spec.letter]):
         sku = f"{spec.sku_prefix}-{item.code}"
         if sku in existing:
@@ -759,7 +781,8 @@ def _products(run: _Run, vendor: Vendor, spec: data.VendorSeed, catalog: _Catalo
         product.category = catalog.categories[item.category]
         product.brand = catalog.brands[spec.brand]
         product.stock_qty = 0 if item.axes else 4 + (number * 7) % 30
-        product.status = Product.Status.PUBLISHED
+        run.add(compliance_services.set_product_gpsr(product, {"model_number": sku}, ctx=run.ctx))
+        product.status = Product.Status.PUBLISHED  # GPSR complete: the publication check passes
         run.add(catalog_services.save_product(product, ctx=run.ctx))
         before = catalog_services.relations_snapshot(product)
         product.terms.set([catalog.terms[item.term]])
