@@ -16,14 +16,16 @@ from django.http import (
     HttpResponseRedirect,
     JsonResponse,
 )
-from django.shortcuts import resolve_url
+from django.shortcuts import render, resolve_url
 from django.urls import reverse
 
+from apps.core import session_policy
 from apps.core.http import client_ip
 
+from . import levels
 from .captcha import captcha_passes
 from .http import wants_json
-from .mfa_session import is_recently_verified
+from .mfa_session import is_recently_passkey_verified, is_recently_verified
 from .services import has_second_factor, record_registration_attempt, registration_retry_after
 
 TOO_MANY_ATTEMPTS = "Too many attempts. Please try again later."
@@ -96,6 +98,85 @@ def step_up_required[**P](max_age: int | None = None) -> Callable[[View[P]], Vie
             if not is_recently_verified(request, max_age):
                 target = "mfa:verify" if has_second_factor(user) else "mfa:setup"
                 return mfa_redirect(request, target)
+            return view(request, *args, **kwargs)
+
+        return wrapped
+
+    return decorator
+
+
+def _prompt(request: HttpRequest, action: str, group: int, digest: str) -> HttpResponse:
+    """The refusal of a sensitive action in restricted mode, with the way forward (D-32)."""
+    outcome = "restricted"
+    levels.record_prompt(request, action, group, outcome)
+    can_elevate = levels.may_elevate(request.user)
+    if wants_json(request):
+        return JsonResponse(
+            {"error": "operational_mode_required", "action": action, "digest": digest}, status=403
+        )
+    replay = [
+        (key, value)
+        for key in request.POST
+        if key != "csrfmiddlewaretoken"
+        for value in request.POST.getlist(key)
+    ]
+    return render(
+        request,
+        "accounts/levels/prompt.html",
+        {
+            "action": action,
+            "group": group,
+            "digest": digest,
+            "can_elevate": can_elevate,
+            "can_do_once": can_elevate and group == session_policy.GROUP_OPERATIONAL,
+            "has_passkey": levels.has_passkey(request.user),
+            "replay_method": request.method,
+            "replay_url": request.get_full_path(),
+            "replay_fields": replay,
+        },
+        status=403,
+    )
+
+
+def requires_level[**P](action: str) -> Callable[[View[P]], View[P]]:
+    """Gate a view by the session level its `action` needs (D-32, CORE.25).
+
+    The group of `action` comes from the `PlatformOperator` configuration, per request:
+
+    1. free: runs in any session;
+    2. operational mode required: in restricted mode the user gets a prompt with "Do it once"
+       (a fresh passkey authorises this action with these parameters, once, about 2 minutes) or
+       "Switch to operational mode";
+    3. operational mode and, per action, a passkey verification no older than
+       `MFA_STEP_UP_MAX_AGE` (a code does not count), even inside operational mode.
+
+    Stack it with `step_up_required` where the view must also confirm a recent second factor.
+    """
+    levels.REGISTERED_ACTIONS.add(action)
+
+    def decorator(view: View[P]) -> View[P]:
+        @functools.wraps(view)
+        def wrapped(request: HttpRequest, /, *args: P.args, **kwargs: P.kwargs) -> HttpResponse:
+            if not request.user.is_authenticated:
+                return redirect_to_login(
+                    request.get_full_path(), resolve_url(settings.MFA_LOGIN_URL)
+                )
+            group = levels.policy().group_of(action)
+            if group == session_policy.GROUP_FREE:
+                return view(request, *args, **kwargs)
+            digest = levels.params_digest(request)
+            if levels.current_level(request) != levels.OPERATIONAL:
+                if group == session_policy.GROUP_OPERATIONAL and levels.consume_single(
+                    request, action, digest
+                ):
+                    return view(request, *args, **kwargs)
+                return _prompt(request, action, group, digest)
+            if group == session_policy.GROUP_PASSKEY and not is_recently_passkey_verified(request):
+                levels.record_prompt(request, action, group, "passkey_required")
+                if wants_json(request):
+                    return JsonResponse({"error": "passkey_required", "action": action}, status=403)
+                query = urlencode({"next": request.get_full_path(), "factor": "passkey"})
+                return HttpResponseRedirect(f"{reverse('mfa:verify')}?{query}")
             return view(request, *args, **kwargs)
 
         return wrapped

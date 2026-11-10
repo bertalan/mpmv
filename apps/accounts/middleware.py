@@ -13,12 +13,28 @@ from typing import Any
 from django.http import HttpRequest
 from django.http.response import HttpResponseBase
 
+from . import levels
 from .decorators import MFA_EXEMPT_ATTR, mfa_redirect
 from .mfa_session import is_verified
 from .services import has_second_factor, mfa_required
 
 # Signing out is always possible: the staff admin's and the editors' (Wagtail, CMS.1).
 EXEMPT_VIEW_NAMES = frozenset({"admin:logout", "wagtailadmin_logout"})
+
+
+class SessionLevelMiddleware:
+    """D-32 (CORE.25): end operational mode on idle or cap, and count the request as activity.
+
+    After `MfaRequiredMiddleware`: a request that is turned away there is not activity.
+    """
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponseBase]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
+        if request.user.is_authenticated:
+            levels.refresh(request)
+        return self.get_response(request)
 
 
 class MfaRequiredMiddleware:

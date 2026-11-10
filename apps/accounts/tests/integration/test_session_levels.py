@@ -6,6 +6,7 @@ authenticator is fake. Needs human review: security code.
 
 import json
 import time
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -73,6 +74,11 @@ def _actions(name: str) -> list[AuditLog]:
     return list(AuditLog.objects.filter(action=name).order_by("id"))
 
 
+def _after(row: AuditLog) -> dict[str, Any]:
+    assert isinstance(row.after, dict)
+    return row.after
+
+
 def _age(client: Client, key: str, seconds: float) -> None:
     session = client.session
     session[key] -= seconds
@@ -126,7 +132,7 @@ def test_a_fresh_passkey_starts_operational_mode_and_it_is_audited(client: Clien
     assert client.get(reverse("test-export")).status_code == 200  # repeated
     (started,) = _actions(levels.SESSION_STARTED)
     assert started.actor_id == user.pk
-    assert started.after["kind"] == "session"
+    assert _after(started)["kind"] == "session"
 
 
 def test_a_role_without_the_elevate_permission_cannot_elevate(client: Client) -> None:
@@ -142,7 +148,7 @@ def test_a_user_without_a_passkey_cannot_elevate(client: Client) -> None:
     user.user_permissions.add(Permission.objects.get(codename=levels.ELEVATE_CODENAME))
     _restricted_session(client, user)  # verified with TOTP only
     assert _post(client, "levels:options").status_code == 400
-    assert _post(client, "levels:operational", {"credential": {}}).status_code == 400
+    assert _post(client, "levels:operational", {"credential": {}}).status_code == 403
     assert client.get(reverse("test-export")).status_code == 403
 
 
@@ -184,7 +190,7 @@ def test_idle_for_16_minutes_ends_operational_mode(client: Client) -> None:
     _age(client, levels.ACTIVITY_KEY, 16 * 60)
     assert client.get(reverse("test-export")).status_code == 403
     (ended,) = _actions(levels.SESSION_ENDED)
-    assert ended.after["reason"] == "idle"
+    assert _after(ended)["reason"] == "idle"
 
 
 def test_activity_keeps_the_mode_alive_until_the_cap(client: Client) -> None:
@@ -195,7 +201,7 @@ def test_activity_keeps_the_mode_alive_until_the_cap(client: Client) -> None:
     assert client.get(reverse("test-export")).status_code == 200  # 10 min idle: still on
     _age(client, levels.STARTED_KEY, 2 * 3600 + 1)
     assert client.get(reverse("test-export")).status_code == 403
-    assert _actions(levels.SESSION_ENDED)[-1].after["reason"] == "cap"
+    assert _after(_actions(levels.SESSION_ENDED)[-1])["reason"] == "cap"
 
 
 def test_logout_ends_operational_mode_and_audits_it(client: Client) -> None:
@@ -204,7 +210,7 @@ def test_logout_ends_operational_mode_and_audits_it(client: Client) -> None:
     _elevate(client, authenticator)
     client.logout()
     (ended,) = _actions(levels.SESSION_ENDED)
-    assert ended.after["reason"] == "logout"
+    assert _after(ended)["reason"] == "logout"
     assert ended.actor_id == user.pk
 
 
@@ -215,7 +221,7 @@ def test_end_now_returns_to_restricted(client: Client) -> None:
     response = client.post(reverse("levels:end"))
     assert response.status_code == 302
     assert client.get(reverse("test-export")).status_code == 403
-    assert _actions(levels.SESSION_ENDED)[-1].after["reason"] == "manual"
+    assert _after(_actions(levels.SESSION_ENDED)[-1])["reason"] == "manual"
 
 
 def test_the_banner_shows_the_mode_and_an_end_now_button(client: Client) -> None:
@@ -262,8 +268,8 @@ def test_do_it_once_keeps_the_session_restricted_and_is_audited_as_single(client
     assert client.get(reverse("test-backup")).status_code == 403  # another action
     assert not _actions(levels.SESSION_STARTED)
     granted = _actions(levels.SINGLE_GRANTED)
-    assert [row.after["kind"] for row in granted] == ["single"]
-    assert granted[0].after["action"] == "export"
+    assert [_after(row)["kind"] for row in granted] == ["single"]
+    assert _after(granted[0])["action"] == "export"
 
 
 def test_a_single_authorisation_is_bound_to_the_parameters(client: Client) -> None:
@@ -337,17 +343,32 @@ def test_group_3_is_refused_in_restricted_mode_with_no_do_it_once(client: Client
 # --- Tunable without code, audit of prompts
 
 
-def test_changing_the_configuration_changes_the_behaviour(client: Client) -> None:
+def _configure(**policy: Any) -> None:
+    PlatformOperatorFactory.create(
+        open_ended=True, valid_from=datetime(2020, 1, 1, tzinfo=UTC), session_policy=policy
+    )
+
+
+def test_moving_an_action_to_the_free_list_frees_it_with_no_code_change(client: Client) -> None:
+    user, _ = _staff_with_passkey()
+    _restricted_session(client, user)
+    assert client.get(reverse("test-export")).status_code == 403
+    _configure(actions={"restricted": ["export"]})
+    assert client.get(reverse("test-export")).status_code == 200
+
+
+def test_moving_an_action_to_the_passkey_list_makes_it_group_3(client: Client) -> None:
+    user, _ = _staff_with_passkey()
+    verified_login(client, user, verified_at=time.time() - 3600)  # operational
+    assert client.get(reverse("test-export")).status_code == 200
+    _configure(actions={"passkey": ["export"]})
+    assert client.get(reverse("test-export")).status_code == 302
+
+
+def test_a_tuned_idle_timer_applies(client: Client) -> None:
     user, authenticator = _staff_with_passkey()
     _restricted_session(client, user)
-    operator = PlatformOperatorFactory.create(
-        open_ended=True,
-        session_policy={"idle_minutes": 5, "actions": {"restricted": ["export"]}},
-    )
-    assert client.get(reverse("test-export")).status_code == 200  # moved to the free group
-    operator.session_policy = {"idle_minutes": 5}
-    operator.save()
-    assert client.get(reverse("test-export")).status_code == 403
+    _configure(idle_minutes=5)
     _elevate(client, authenticator)
     _age(client, levels.ACTIVITY_KEY, 6 * 60)  # 6 min > the tuned 5 min idle
     assert client.get(reverse("test-export")).status_code == 403
@@ -359,8 +380,8 @@ def test_every_prompt_is_audited(client: Client) -> None:
     client.get(reverse("test-export"))
     client.get(reverse("test-payout"))
     prompts = _actions(levels.PROMPT)
-    assert [row.after["action"] for row in prompts] == ["export", "payout_details"]
-    assert [row.after["group"] for row in prompts] == [2, 3]
+    assert [_after(row)["action"] for row in prompts] == ["export", "payout_details"]
+    assert [_after(row)["group"] for row in prompts] == [2, 3]
     assert all(row.actor_id == user.pk for row in prompts)
 
 

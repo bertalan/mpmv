@@ -15,6 +15,7 @@ from apps.core.audit import audit_context
 from . import engine, services
 
 VERIFIED_AT_SESSION_KEY = "mfa_verified_at"
+VERIFIED_KIND_SESSION_KEY = "mfa_verified_kind"  # the factor kind of the last verification
 
 
 def complete_verification(request: HttpRequest, device: object) -> None:
@@ -26,6 +27,7 @@ def complete_verification(request: HttpRequest, device: object) -> None:
     request.session.cycle_key()
     django_otp.login(request, device)
     request.session[VERIFIED_AT_SESSION_KEY] = time.time()
+    request.session[VERIFIED_KIND_SESSION_KEY] = services.kind_of(device)
     services.record_mfa_verified(device, ctx=audit_context(request))
 
 
@@ -45,4 +47,13 @@ def is_recently_verified(request: HttpRequest, max_age: int | None = None) -> bo
         float(verified_at) if isinstance(verified_at, int | float) else None,
         now=time.time(),
         max_age=limit,
+    )
+
+
+def is_recently_passkey_verified(request: HttpRequest, max_age: int | None = None) -> bool:
+    """Like `is_recently_verified`, but the last verification must have been a passkey (D-32
+    group 3: a code or a recovery code does not count)."""
+    return (
+        is_recently_verified(request, max_age)
+        and request.session.get(VERIFIED_KIND_SESSION_KEY) == services.PASSKEY
     )

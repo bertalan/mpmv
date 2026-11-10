@@ -16,7 +16,7 @@ from django.utils import timezone
 from wagtail.images.models import AbstractImage, AbstractRendition, Image, get_upload_to
 from wagtail.models import Collection
 
-from . import flags, translations, uploads
+from . import flags, session_policy, translations, uploads
 from .countries import default_allowed_vendor_countries
 from .fields import (
     CountryField,
@@ -39,6 +39,8 @@ from .svg import LOGO_COLLECTION_NAME, MAX_SVG_BYTES, UnsafeSvgError, sanitise_s
 # admin access, superuser status included. Granted as `core.platform_owner`, directly or through a
 # group, and checked by `services.is_platform_owner`, not `has_perm` (true for any superuser).
 PLATFORM_OWNER_CODENAME = "platform_owner"
+# D-32 (CORE.25): the roles that may switch a session to operational mode ("Do it once" too).
+ELEVATE_CODENAME = "elevate"
 
 
 class BaseModel(models.Model):
@@ -361,6 +363,13 @@ class PlatformOperator(Versioned):
     )
     # D-21, CMP.13: changed only by a platform owner through
     # `apps.core.services.set_allowed_vendor_countries`; other new versions carry it over.
+    # D-32 (CORE.25): the session level timers and the three action lists, sparse over the D-32
+    # defaults (`core.session_policy`); `{}` is the defaults. Tunable without code (trial).
+    session_policy = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Session level overrides (timers, lists). Empty: the D-32 defaults.",
+    )
     allowed_vendor_countries = ArrayField(
         CountryField(),
         default=default_allowed_vendor_countries,
@@ -376,7 +385,11 @@ class PlatformOperator(Versioned):
             (
                 PLATFORM_OWNER_CODENAME,
                 "Platform owner: owner-only settings, such as the allowed vendor countries",
-            )
+            ),
+            (
+                ELEVATE_CODENAME,
+                "May switch a session to operational mode or do a sensitive action once",
+            ),
         ]
         constraints = [
             valid_period_check("core_platformoperator_valid_to_after_valid_from"),
@@ -392,6 +405,13 @@ class PlatformOperator(Versioned):
 
     def __str__(self) -> str:
         return f"{self.legal_name} ({self.country}) from {self.valid_from:%Y-%m-%d}"
+
+    def clean(self) -> None:
+        super().clean()
+        try:
+            session_policy.parse_policy(self.session_policy)
+        except ValueError as exc:
+            raise ValidationError({"session_policy": str(exc)}) from exc
 
 
 # Per-vendor overrides are vendor-owned rows (CORE.3) in apps.vendors, which core cannot import:

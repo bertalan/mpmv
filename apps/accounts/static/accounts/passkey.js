@@ -106,7 +106,42 @@
     window.location.assign(result.redirect);
   };
 
-  const ceremonies = { register, authenticate };
+  // D-32 (CORE.25): a fresh passkey for operational mode, or for one action ("Do it once").
+  const assertion = async (form, optionsBody) => {
+    const { publicKey } = await postJson(form.dataset.optionsUrl, form, optionsBody);
+    publicKey.challenge = toBytes(publicKey.challenge);
+    publicKey.allowCredentials = descriptors(publicKey.allowCredentials);
+    const credential = await navigator.credentials.get({ publicKey });
+    const response = credential.response;
+    return {
+      credential: {
+        id: credential.id,
+        rawId: toBase64url(credential.rawId),
+        type: credential.type,
+        response: {
+          clientDataJSON: toBase64url(response.clientDataJSON),
+          authenticatorData: toBase64url(response.authenticatorData),
+          signature: toBase64url(response.signature),
+          userHandle: response.userHandle ? toBase64url(response.userHandle) : null,
+        },
+        clientExtensionResults: credential.getClientExtensionResults(),
+        authenticatorAttachment: credential.authenticatorAttachment,
+      },
+    };
+  };
+
+  const elevate = async (form) => {
+    await postJson(form.dataset.finishUrl, form, await assertion(form));
+    window.location.assign(form.dataset.next || "/");
+  };
+
+  const once = async (form) => {
+    const body = await assertion(form, { action: form.dataset.action, digest: form.dataset.digest });
+    await postJson(form.dataset.finishUrl, form, body);
+    document.getElementById(form.dataset.replay).submit();
+  };
+
+  const ceremonies = { register, authenticate, elevate, once };
 
   for (const form of document.querySelectorAll("form[data-passkey]")) {
     const error = form.querySelector("[data-passkey-error]");

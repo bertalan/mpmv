@@ -140,9 +140,11 @@ def verify(request: HttpRequest) -> HttpResponse:
     if not services.has_second_factor(user):
         return mfa_redirect(request, "mfa:setup", next_url=safe_next(request))
     next_url = safe_next(request)
+    # D-32 group 3: the action asked for a passkey, so a code or recovery code is not offered.
+    passkey_only = (request.POST.get("factor") or request.GET.get("factor")) == "passkey"
     error = ""
     method: str | None = None
-    if request.method == "POST":
+    if request.method == "POST" and not passkey_only:
         method = request.POST.get("method")
         device: object | None = None
         if method == "totp":
@@ -163,9 +165,11 @@ def verify(request: HttpRequest) -> HttpResponse:
             "next": next_url,
             "error": error,
             "error_method": method if error else None,  # the field the error is tied to (CMP.9)
-            "has_totp": TOTPDevice.objects.filter(user=user, confirmed=True).exists(),
+            "passkey_only": passkey_only,
+            "has_totp": not passkey_only
+            and TOTPDevice.objects.filter(user=user, confirmed=True).exists(),
             "has_passkey": PasskeyDevice.objects.filter(user=user, confirmed=True).exists(),
-            "has_recovery": services.unused_recovery_codes(user) > 0,
+            "has_recovery": not passkey_only and services.unused_recovery_codes(user) > 0,
             "auth_options_url": reverse("mfa:passkey_auth_options"),
             "auth_url": _with_next("mfa:passkey_auth", next_url),
         },

@@ -30,7 +30,7 @@ from django_otp.plugins.otp_totp.models import TOTPDevice
 from apps.core.audit import audit_context
 
 from . import services
-from .decorators import step_up_required
+from .decorators import requires_level, step_up_required
 from .forms import StaffLoginForm
 from .mfa_session import is_recently_verified
 from .models import User
@@ -194,7 +194,7 @@ class UserAdmin(DjangoUserAdmin[User]):
         def view(req: HttpRequest) -> HttpResponse:
             return parent(req, object_id, form_url, extra_context)
 
-        return step_up_required()(view)(request)
+        return requires_level("role_grant")(step_up_required()(view))(request)
 
     def user_change_password(
         self, request: HttpRequest, id: str, form_url: str = ""
@@ -207,7 +207,7 @@ class UserAdmin(DjangoUserAdmin[User]):
                 raise PermissionDenied
             return parent(req, id, form_url)
 
-        return step_up_required()(view)(request)
+        return requires_level("role_grant")(step_up_required()(view))(request)
 
     def delete_view(
         self, request: HttpRequest, object_id: str, extra_context: dict[str, Any] | None = None
@@ -217,7 +217,7 @@ class UserAdmin(DjangoUserAdmin[User]):
         def view(req: HttpRequest) -> HttpResponse:
             return parent(req, object_id, extra_context)
 
-        return step_up_required()(view)(request)
+        return requires_level("role_grant")(step_up_required()(view))(request)
 
     # --- Audited writes (SEC.4)
 

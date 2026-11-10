@@ -483,7 +483,12 @@ def register_passkey(
 
 
 def authenticate_passkey(
-    user: User, rp: engine.RelyingParty, credential: Mapping[str, Any], *, challenge: bytes
+    user: User,
+    rp: engine.RelyingParty,
+    credential: Mapping[str, Any],
+    *,
+    challenge: bytes,
+    require_user_verification: bool = False,
 ) -> PasskeyDevice:
     """Verify an assertion from one of `user`'s passkeys and advance its counter."""
     credential_id = engine.credential_id_from(credential)
@@ -501,6 +506,7 @@ def authenticate_passkey(
             challenge=challenge,
             public_key=bytes(device.public_key),
             sign_count=device.sign_count,
+            require_user_verification=require_user_verification,
         )
         device.last_used_at = timezone.now()
         device.save(update_fields=["sign_count", "last_used_at", "updated_at"])

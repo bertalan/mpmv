@@ -49,8 +49,12 @@ class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
             "dac7_authority_country",
             "support_email",
             "compliance_email",
+            "session_policy",
             "valid_from",
         )
+
+    def clean_session_policy(self) -> Any:
+        return self.cleaned_data.get("session_policy") or {}
 
     def clean_valid_from(self) -> dt.datetime:
         valid_from: dt.datetime = self.cleaned_data["valid_from"]
@@ -186,13 +190,21 @@ class DateRangeFilter(InputFilter):
 type AdminView = Callable[[HttpRequest], HttpResponse]
 
 
-def step_up(view: AdminView) -> AdminView:
-    """Wrap `view` with the step-up decorator named in settings, if any."""
+def step_up(view: AdminView, *, level: str | None = None) -> AdminView:
+    """Wrap `view` with the step-up decorator named in settings, if any.
+
+    With `level` (a D-32 action key) the view also needs the session level that action asks for,
+    through `settings.LEVEL_DECORATOR` (CORE.25; core cannot import accounts either).
+    """
     path = getattr(settings, "STEP_UP_DECORATOR", "")
-    if not path:
-        return view
-    decorator: Callable[[], Callable[[AdminView], AdminView]] = import_string(path)
-    return decorator()(view)
+    if path:
+        decorator: Callable[[], Callable[[AdminView], AdminView]] = import_string(path)
+        view = decorator()(view)
+    level_path = getattr(settings, "LEVEL_DECORATOR", "")
+    if level and level_path:
+        gate: Callable[[str], Callable[[AdminView], AdminView]] = import_string(level_path)
+        view = gate(level)(view)
+    return view
 
 
 @admin.register(AuditLog)
@@ -250,7 +262,7 @@ class AuditLogAdmin(admin.ModelAdmin[AuditLog]):
         self, request: HttpRequest, extra_context: dict[str, Any] | None = None
     ) -> HttpResponse:
         parent = super().changelist_view
-        return step_up(lambda req: parent(req, extra_context))(request)
+        return step_up(lambda req: parent(req, extra_context), level="audit_in_clear")(request)
 
     def change_view(
         self,
@@ -268,13 +280,15 @@ class AuditLogAdmin(admin.ModelAdmin[AuditLog]):
                 req, object_id, form_url, {**(extra_context or {}), "audit_changes": changes}
             )
 
-        return step_up(view)(request)
+        return step_up(view, level="audit_in_clear")(request)
 
     def history_view(
         self, request: HttpRequest, object_id: str, extra_context: dict[str, Any] | None = None
     ) -> HttpResponse | TemplateResponse:
         parent = super().history_view
-        return step_up(lambda req: parent(req, object_id, extra_context))(request)
+        return step_up(lambda req: parent(req, object_id, extra_context), level="audit_in_clear")(
+            request
+        )
 
 
 # --- Feature flags and kill switches (ARC.8, docs/dev/feature-flags.md)

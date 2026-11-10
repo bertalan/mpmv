@@ -27,7 +27,7 @@ from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import SafeString
 
-from apps.accounts.decorators import step_up_required
+from apps.accounts.decorators import requires_level, step_up_required
 from apps.accounts.models import User
 from apps.core.admin import step_up
 from apps.core.audit import audit_context
@@ -437,12 +437,16 @@ class TaxRegimeChangeRequestAdmin(HistoryAdmin[TaxRegimeChangeRequest]):
         review = [
             path(
                 "<path:object_id>/approve/",
-                self.admin_site.admin_view(step_up_required()(self.approve_view)),
+                self.admin_site.admin_view(
+                    requires_level("vat_regime")(step_up_required()(self.approve_view))
+                ),
                 name=f"{prefix}_approve",
             ),
             path(
                 "<path:object_id>/reject/",
-                self.admin_site.admin_view(step_up_required()(self.reject_view)),
+                self.admin_site.admin_view(
+                    requires_level("vat_regime")(step_up_required()(self.reject_view))
+                ),
                 name=f"{prefix}_reject",
             ),
         ]

@@ -1,0 +1,116 @@
+"""Session level endpoints (D-32, CORE.25): elevate with a fresh passkey, "do it once", end now.
+
+Thin adapters over `levels`. The passkey ceremony is the one of the MFA pages, with user
+verification required; the challenge is kept in the session and used once. A session without the
+passkey (a stolen cookie) cannot pass it, and a code is never accepted.
+"""
+
+from django.core.exceptions import PermissionDenied
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
+from django.views.decorators.http import require_POST
+
+from apps.core.audit import audit_context
+
+from . import engine, levels, services
+from .http import relying_party, safe_next
+from .mfa_views import _bad_request, _json_body, _user, signed_in
+from .models import PasskeyDevice
+
+
+def _options(
+    request: HttpRequest, session_key: str, binding: dict[str, str] | None
+) -> JsonResponse:
+    credential_ids = list(
+        PasskeyDevice.objects.filter(user=_user(request), confirmed=True).values_list(
+            "credential_id", flat=True
+        )
+    )
+    if not credential_ids:
+        return _bad_request("no passkey registered")
+    options = engine.passkey_authentication_options(
+        relying_party(request), credential_ids=credential_ids, require_user_verification=True
+    )
+    request.session[session_key] = {
+        "challenge": engine.b64url(options.challenge),
+        **(binding or {}),
+    }
+    return JsonResponse({"publicKey": options.public_key})
+
+
+def _assert(request: HttpRequest, session_key: str) -> dict[str, str] | JsonResponse:
+    """Verify the posted assertion against the pending challenge; the pending state or an error."""
+    pending = request.session.pop(session_key, None)
+    body = _json_body(request)
+    if not isinstance(pending, dict) or not isinstance(body.get("credential"), dict):
+        return _bad_request("no pending passkey authentication")
+    try:
+        services.authenticate_passkey(
+            _user(request),
+            relying_party(request),
+            body["credential"],
+            challenge=engine.from_b64url(pending["challenge"]),
+            require_user_verification=True,
+        )
+    except engine.PasskeyError:
+        services.record_mfa_failure(_user(request), services.PASSKEY, ctx=audit_context(request))
+        return _bad_request("the passkey was not accepted")
+    return {k: v for k, v in pending.items() if k != "challenge"}
+
+
+def _require_elevate(request: HttpRequest) -> None:
+    if not levels.may_elevate(request.user):
+        raise PermissionDenied
+
+
+@signed_in
+@require_POST
+def options(request: HttpRequest) -> JsonResponse:
+    """Passkey request options for switching to operational mode. A challenge alone grants
+    nothing: `operational` checks the role and verifies the assertion."""
+    return _options(request, levels.CHALLENGE_KEY, None)
+
+
+@signed_in
+@require_POST
+def operational(request: HttpRequest) -> JsonResponse:
+    """Verify a fresh passkey assertion and start operational mode."""
+    _require_elevate(request)
+    result = _assert(request, levels.CHALLENGE_KEY)
+    if isinstance(result, JsonResponse):
+        return result
+    levels.start_operational(request)
+    return JsonResponse({"redirect": safe_next(request)})
+
+
+@signed_in
+@require_POST
+def once_options(request: HttpRequest) -> JsonResponse:
+    """Passkey request options for one action, bound to it and its parameters."""
+    _require_elevate(request)
+    body = _json_body(request)
+    action, digest = body.get("action"), body.get("digest")
+    if not isinstance(action, str) or not isinstance(digest, str) or not action or not digest:
+        return _bad_request("an action and its parameters digest are required")
+    if levels.policy().group_of(action) != 2:
+        return _bad_request("this action cannot be done once")
+    return _options(request, levels.SINGLE_CHALLENGE_KEY, {"action": action, "digest": digest})
+
+
+@signed_in
+@require_POST
+def once(request: HttpRequest) -> JsonResponse:
+    """Verify a fresh passkey assertion and authorise the bound action once."""
+    _require_elevate(request)
+    result = _assert(request, levels.SINGLE_CHALLENGE_KEY)
+    if isinstance(result, JsonResponse):
+        return result
+    levels.grant_single(request, result["action"], result["digest"])
+    return JsonResponse({"granted": True})
+
+
+@signed_in
+@require_POST
+def end(request: HttpRequest) -> HttpResponse:
+    """The banner's "end now" button."""
+    levels.end_operational(request, "manual")
+    return HttpResponseRedirect(safe_next(request))
