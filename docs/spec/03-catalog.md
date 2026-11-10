@@ -58,7 +58,8 @@ class Product(VendorScopedModel):
     google_category_id = IntegerField(null=True)
     required_companion = FK("self", null=True)  # formerly a pa_* attribute; same vendor only (Q-32)
     upsells = M2M("self")                     # cross-sell and up-sell; another vendor's product only if that vendor opted in (Q-32)
-    gpsr = OneToOne(GpsrInfo, null=True)      # see 11-compliance; blocks publishing if missing
+    # gpsr: compliance.GpsrInfo.product = OneToOne(Product, related_name="gpsr") (CMP.3, see 11-compliance);
+    #   the catalog never imports compliance, which registers its publication check in catalog/publishing.py
     stock_policy = CharField(choices=["track", "always_open", "from_source"])
     stock_qty; stock_status                   # simple products only; variable products keep stock on their variants (Q-29)
     legacy_wp_id_en / legacy_wp_id_it = IntegerField(null=True)   # Merchant g:id, redirects, audit

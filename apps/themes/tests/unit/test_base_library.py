@@ -470,6 +470,26 @@ def test_a_launch_countdown_shows_the_absolute_date_before_and_the_expired_text_
     assert "launch-countdown--expired" in expired
 
 
+def test_a_launch_countdown_is_ready_for_the_cms9_module() -> None:
+    """CMS.9: the UTC target for the module, the counter and the pause button hidden until the
+    module runs, the expired text rendered but hidden until the target."""
+    target = datetime(2026, 12, 1, 9, 0, tzinfo=UTC)
+    upcoming = render(
+        "launch_countdown",
+        title="New jacket",
+        target=target,
+        url="/p/",
+        action="See it",
+        expired_text="Now available",
+        expired_url="/p/",
+    )
+    assert 'data-target="2026-12-01T09:00:00Z"' in upcoming
+    assert re.search(r"<button[^>]*data-countdown-pause[^>]*hidden", upcoming)
+    assert re.search(r"<p[^>]*data-countdown-counter[^>]*hidden", upcoming)
+    assert re.search(r"<div[^>]*data-countdown-expired[^>]*hidden", upcoming)
+    assert "Now available" in upcoming
+
+
 # --- Every new component has its style
 
 

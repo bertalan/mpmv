@@ -237,7 +237,8 @@ def routes_to(endpoint: Endpoint, path: str) -> bool:
 
 
 def sign_in_paths() -> frozenset[str]:
-    return frozenset({reverse("admin:login"), reverse("wagtailadmin_login")})
+    """The sign-in pages: the staff admin's, the editors' admin's and the Manager's (CORE.17)."""
+    return frozenset({reverse("admin:login"), reverse("wagtailadmin_login"), reverse("login")})
 
 
 def is_refusal(response: HttpResponseBase) -> bool:
