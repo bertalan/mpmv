@@ -10,6 +10,7 @@ from django.views.decorators.http import require_POST
 from apps.core.i18n import configured_languages, translate_path
 
 from .services import set_preferred_language
+from .session_language import SESSION_LANGUAGE_KEY
 
 
 @require_POST
@@ -17,7 +18,8 @@ def switch_language(request: HttpRequest) -> HttpResponseRedirect:
     """Language switcher: redirect to the current page in the chosen language (I18N.1).
 
     The URL prefix decides the language, so no cookie is set; a signed-in user's choice is also
-    stored as `preferred_language`. Unknown languages and off-site `next` URLs are ignored.
+    stored as `preferred_language`, an anonymous visitor's in the session. Unknown languages and
+    off-site `next` URLs are ignored.
     """
     next_url = request.POST.get("next", "")
     if not url_has_allowed_host_and_scheme(
@@ -29,6 +31,8 @@ def switch_language(request: HttpRequest) -> HttpResponseRedirect:
         return HttpResponseRedirect(next_url)
     if request.user.is_authenticated:
         set_preferred_language(request.user, language)
+    else:  # an anonymous choice lives in the session (no cookie): unprefixed pages read it
+        request.session[SESSION_LANGUAGE_KEY] = language
     exact = request.POST.get("exact") == "1"
     if exact and request.POST.get("notice") == "1":
         # The object has no translation: the visitor lands on the language's home, told once.

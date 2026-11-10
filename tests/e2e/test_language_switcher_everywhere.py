@@ -124,3 +124,17 @@ def test_the_account_switch_changes_the_language(
     page.locator('nav.language-switcher button[value="de"]').click()
     _lang(page, "de")
     shot("de")
+
+
+def test_an_anonymous_visitor_switches_language_on_the_sign_in_page(
+    page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+) -> None:
+    """The choice lives in the session (no cookie) and holds on the next unprefixed page."""
+    page.goto(f"{live_server.url}/account/login/")
+    page.locator('nav.language-switcher button[value="de"]').click()
+    expect(page).to_have_url(f"{live_server.url}/account/login/")
+    _lang(page, "de")
+    shot("de")
+    assert not [c for c in page.context.cookies() if c["name"] == "django_language"]
+    page.goto(f"{live_server.url}/account/login/")
+    _lang(page, "de")

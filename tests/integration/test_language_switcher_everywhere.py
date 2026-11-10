@@ -15,7 +15,7 @@ redirect, and asserts:
 
 Pages with no switcher on purpose (error pages, the Django admin, the editors' admin) are asserted
 to have none. Unprefixed areas (the Manager, the account and MFA pages, sign-in) cannot switch
-language for anonymous visitors: those cases are `xfail(strict=True)` until lane-a decides.
+language for anonymous visitors: a visitor's choice lives in the session (I18N.11).
 
 Adding a language to `settings.LANGUAGES` adds a column to the sweep; adding a page class means
 adding one entry to `CASES` (the routes themselves are walked by
@@ -78,7 +78,6 @@ pytestmark = pytest.mark.django_db
 PUBLISHED = TranslationStatus.PUBLISHED
 LANGUAGES = configured_languages()
 NOTICE_MSGID = "This content is not available in this language."
-ANONYMOUS_UNPREFIXED = "anonymous language choice on unprefixed pages: decision pending (lane-a)"
 
 
 def home_of(code: str) -> str:
@@ -468,7 +467,8 @@ def _secret(url: Callable[[str], str], status: int = 200) -> Callable[[], Case]:
 
 def sell_with_us_form() -> Case:
     seed_site()
-    return Case.same_everywhere("/vendor/apply/")
+    paths = {code: f"{home_of(code)}vendor/apply/" for code in LANGUAGES}
+    return Case("/vendor/apply/", {code: (paths[code], False) for code in LANGUAGES})
 
 
 def sign_in_page() -> Case:
@@ -505,10 +505,6 @@ def cms_admin() -> Case:
     return Case("/admin/", user=user, mfa=True, no_switcher=True)
 
 
-def _xfail(reason: str) -> Any:
-    return pytest.mark.xfail(strict=True, reason=reason)
-
-
 # name -> (builder, marks). The names are the route classes of the report.
 CASES: dict[str, tuple[Callable[[], Case], list[Any]]] = {
     "cms-home-en": (home_en, []),
@@ -540,8 +536,8 @@ CASES: dict[str, tuple[Callable[[], Case], list[Any]]] = {
     "secret-vendor-apply-confirm": (_secret(lambda k: f"/vendor/apply/confirm/{k}/", 403), []),
     "secret-vendor-claim": (_secret(lambda k: f"/vendor/claim/{k}/", 403), []),
     "secret-action-link": (_secret(lambda k: f"/account/link/{k}/"), []),
-    "unprefixed-vendor-apply-anonymous": (sell_with_us_form, [_xfail(ANONYMOUS_UNPREFIXED)]),
-    "unprefixed-sign-in-anonymous": (sign_in_page, [_xfail(ANONYMOUS_UNPREFIXED)]),
+    "sell-with-us-form": (sell_with_us_form, []),
+    "unprefixed-sign-in-anonymous": (sign_in_page, []),
     "unprefixed-mfa-signed-in": (mfa_overview, []),
     "unprefixed-manager-shop": (manager_shop, []),
     "unprefixed-manager-platform": (manager_platform, []),

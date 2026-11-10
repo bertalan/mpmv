@@ -36,26 +36,24 @@ def test_the_pages_exist_in_every_language(client: Client, code: str) -> None:
 
 
 def test_the_english_urls_are_the_old_unprefixed_ones(client: Client) -> None:
-    assert reverse("vendors:apply") == "/vendor/apply/"
-    assert reverse("vendors:apply_sent") == "/vendor/apply/sent/"
+    with translation.override("en"):
+        assert reverse("vendors:apply") == "/vendor/apply/"
+        assert reverse("vendors:apply_sent") == "/vendor/apply/sent/"
     response = client.get("/vendor/apply/", HTTP_ACCEPT_LANGUAGE="it")
     assert response.status_code == 200  # no redirect to /it/: this is the English page
 
 
 def test_an_emailed_link_opens_the_prefixed_page_of_the_visitors_language(client: Client) -> None:
+    """The link itself (`/account/link/...`) has no prefix, so the language comes from the
+    visitor's switcher choice kept in the session; the page it leads to is in that language."""
     _, user, path = applied(client)
-    opened = Client()
-    response = open_link(opened, path)
-    assert response["Location"] == confirm_url(user)  # English visitor: the old URL
-    other = Client()
-    response = other.get(path, HTTP_ACCEPT_LANGUAGE="it")
-    response = other.post(
-        reverse("action_link:continue"),
-        {"token": path.rstrip("/").rsplit("/", 1)[1]},
-        HTTP_ACCEPT_LANGUAGE="it",
-    )
+    english = Client()
+    assert open_link(english, path)["Location"] == confirm_url(user)
+    italian = Client()
+    italian.post(reverse("switch_language"), {"language": "it", "next": "/"})
+    response = open_link(italian, path)
     assert response["Location"] == f"/it/vendor/apply/confirm/{user.public_id}/"
-    page = other.get(response["Location"])
+    page = italian.get(response["Location"])
     assert page.status_code == 200
     assert 'lang="it"' in page.content.decode()
 

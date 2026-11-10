@@ -21,7 +21,7 @@ def _switch(client: Client, language: str, nxt: str = "/account/login/") -> obje
 
 def _lang(response: object) -> str:
     html = response.content.decode()  # type: ignore[attr-defined]
-    return html.split('<html lang="', 1)[1].split('"', 1)[0]
+    return str(html.split('<html lang="', 1)[1].split('"', 1)[0])
 
 
 def test_an_anonymous_choice_is_kept_in_the_session_and_no_cookie(client: Client) -> None:
