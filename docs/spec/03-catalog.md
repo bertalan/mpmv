@@ -68,7 +68,7 @@ class Product(VendorScopedModel):
 class ProductTranslation(Model):              # one row per language, single source of truth for everything else
     product = FK(Product); language = CharField(choices=LANGUAGES)
     title; short_description; description (rich text)
-    slug = SlugField()                        # derived: {title}-{lang}, never the SKU
+    slug = SlugField()                        # derived: {title}, no language suffix, never the SKU (D-25)
     legacy_path = CharField(null=True)        # frozen legacy URL path of a migrated product (Q-91, MIG.11)
     seo_title; seo_description
     status = CharField(choices=["machine", "reviewed", "published"])  # translation workflow
@@ -106,9 +106,10 @@ class Redirect(Model):     source_path; target (path | product | term | search);
 
 ```python
 # catalog/slugs.py — pure function, replicates legacy-sku-permalink
-def build_product_slug(title: str, lang: str, max_len: int = 80) -> str:
-    """slugify(translit(title)) truncated + f"-{lang}"; guarantees max_len; never contains the SKU.
-    A collision gets a numeric suffix (-2, -3…)."""
+def build_product_slug(title: str, max_len: int = 80) -> str:
+    """slugify(translit(title)) truncated to max_len; no language suffix (the language is in the
+    URL prefix, D-25); never contains the SKU. A collision in the same language gets a numeric
+    suffix (-2, -3…)."""
 
 # catalog/engine.py: pure functions
 def sku_match_key(raw: str) -> str            # NFKC, trim, collapse inner whitespace, casefold
@@ -143,7 +144,14 @@ def images_for_language(images: list[ImageRow], lang: str) -> list[ImageRow]
 | Vendor storefront | `/shop/{vendor}/` | `/it/shop/{vendor}/` |
 
 Category URLs **stay identical** to the current ones. Product slugs no longer carry the SKU
-(owner decision on the vendor SKU, Q-30 and Q-33). The switch is staggered (owner decision Q-91,
+(owner decision on the vendor SKU, Q-30 and Q-33) **nor the language** (owner decision D-25, 2026-11-10):
+the slug is the transliterated title, at most 80 characters, unique per language (`-2`, `-3` on a
+collision), because the language is already in the URL prefix. Both the first-generation
+`{title}-{lang}` slugs and the legacy `{title}-{lang}-{sku}` slugs go to `SlugHistory` and answer a
+single 301 to the new slug (no chains). A data migration reslugs the existing products through the
+slug service (dry run and audit like every slug change). A product in `url_mode=legacy` keeps
+answering 200 on its frozen legacy path, which is stored apart from the slug history (MIG.11), so
+reslugging does not touch the staggered switch (Q-91). The switch is staggered (owner decision Q-91,
 [13](13-migration-cutover.md)): at cutover every migrated product keeps answering 200 on its
 frozen legacy URL (`url_mode=legacy`); after go-live, batches ordered by traffic move to the new
 URL (`url_mode=new`), and the legacy URL becomes a single 301 to it (CAT.5, MIG.6, MIG.11).
@@ -293,7 +301,8 @@ products can be part of another party's bundle only if that vendor opted in to b
 | CAT.2 | Taxonomies: Category (tree), configurable Taxonomy/Term, Brand, translations and SEO texts | P1 | 10 | CAT.1 | Admin CRUD with translations |
 | CAT.3 | Typed attributes and translated values; variant axes with ordering | P1 | 10 | CAT.1 | Variable size×color product created via API |
 | CAT.4 | Media: ProductImage on Wagtail Images, WebP/AVIF renditions, dedup by hash, cover lock; optional image language with the replacement rule, translatable alt text and captions (D-18) | P1 | 12 | CAT.1, ARC.15, CMS.8 | Upload → automatic renditions; a DE-dedicated image replaces the neutral gallery in DE only; alt text falls back to EN |
-| CAT.5 | `build_product_slug` without the SKU + SlugHistory + 301 redirect middleware; current `{title}-{lang}-{sku}` slugs loaded as history | P1 | 8 | CAT.1 | Test cases ported from legacy-sku-permalink without the SKU part; a current SKU slug answers 301 to the new slug |
+| CAT.5 | `build_product_slug` without the SKU and without the language suffix (D-25: `{title}`, unique per language) + SlugHistory + 301 redirect middleware; the first-generation `{title}-{lang}` and the legacy `{title}-{lang}-{sku}` slugs loaded as history | P1 | 8 | CAT.1 | Test cases ported from legacy-sku-permalink without the SKU and language parts; a current `{title}-{lang}` or SKU slug answers a single 301 to the new slug |
+| CAT.5b | Data migration reslugging existing products to the D-25 slug through the slug service (dry run, audit, history rows, no redirect chains) | P1 | 2 | CAT.5 | After the migration every old slug answers one 301 to the new slug; a rerun changes nothing |
 | CAT.6 | `Redirect` model + admin management + import of existing maps (retired SKUs, merged tags, discontinued categories) | P1 | 6 | CAT.5 | All rules from the 4 mu-plugins covered by tests |
 | CAT.7 | Product page: gallery, variants with default, companion box, related products, visible SKU, "on request" | P1 | 16 | CAT.3, CAT.4 | Visual and functional parity with LIVE |
 | CAT.8 | Listings: category, taxonomy page on `/{taxonomy}/{term}/` and `/{taxonomy}/{term}/{child}/` with translated slugs (D-07), brand, vendor storefront, filters (category, taxonomy term, price, vendor) | P1 | 14 | CAT.2 | Pagination and filters with indexable URLs; a taxonomy page answers 200 on `/{taxonomy}/{term}/` in every configured language, and its paginated and filtered URLs build on the term's current URL |

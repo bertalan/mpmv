@@ -46,7 +46,6 @@ class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
             "vat_number",
             "tax_regime",
             "commission_vat_mode",
-            "einvoice_channel",
             "dac7_authority_country",
             "support_email",
             "compliance_email",
@@ -71,7 +70,6 @@ class PlatformOperatorAdmin(admin.ModelAdmin[PlatformOperator]):
         "country",
         "vat_number",
         "commission_vat_mode",
-        "einvoice_channel",
         "valid_from",
         "valid_to",
     )
