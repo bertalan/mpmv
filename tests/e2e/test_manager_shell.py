@@ -128,7 +128,7 @@ def test_the_owner_edits_the_storefront_profile_and_staff_cannot(
     password = secrets.token_urlsafe(16)
     owner = UserFactory.create(email="owner@example.com", password=password)
     device = TOTPDeviceFactory.create(user=owner)
-    shop = VendorFactory.create(display_name="Shop West")
+    shop = VendorFactory.create(display_name="Shop West", status="active")
     VendorMemberFactory.create(vendor=shop, user=owner, role="owner")
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
@@ -152,12 +152,25 @@ def test_the_owner_edits_the_storefront_profile_and_staff_cannot(
     shot("profile-error")
 
     page.get_by_label("Tagline").fill("Hand made in the west")
-    page.get_by_label("Returns and refunds policy").fill("Send it back within 30 days.")
+    # The policies are rich text (D-34): Wagtail's Draftail editor, here with a bold word.
+    refund = page.locator(".Draftail-Editor").nth(2).locator(".public-DraftEditor-content")
+    refund.click()
+    page.keyboard.type("Send it back within ")
+    page.keyboard.press("Control+b")
+    page.keyboard.type("30 days")
+    page.keyboard.press("Control+b")
+    page.keyboard.type(".")
+    shot("profile-rich-text")
     page.get_by_role("button", name="Save").click()
     expect(page.get_by_text("Storefront profile saved.")).to_be_visible()
     expect(page.get_by_label("Tagline")).to_have_value("Hand made in the west")
     _accessible(page)
     shot("profile-saved")
+
+    page.goto(f"{live_server.url}/shop/{shop.slug}/")
+    expect(page.locator(".vendor-profile strong, .vendor-profile b").first).to_have_text("30 days")
+    page.get_by_text("Returns and refunds").click()  # open the accordion item
+    shot("vendor-page-formatted-policy")
 
 
 def test_vendor_staff_have_no_storefront_profile(page: Page, live_server: LiveServer) -> None:

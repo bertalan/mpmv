@@ -61,7 +61,8 @@ def _save(vendor: Vendor, owner: User, field: str, html: str) -> None:
 
 @pytest.mark.parametrize("field", FIELDS)
 def test_formatting_is_kept(vendor: Vendor, owner: User, field: str) -> None:
-    html = '<p><b>Bold</b> <i>it</i></p><ul><li>one</li></ul><p><a href="https://example.org/">x</a></p>'
+    link = '<a href="https://example.org/" rel="noopener noreferrer">x</a>'
+    html = f"<p><b>Bold</b> <i>it</i></p><ul><li>one</li></ul><p>{link}</p>"
     _save(vendor, owner, field, html)
     assert _stored(vendor, field) == html
 
@@ -150,7 +151,7 @@ def test_the_storefront_renders_formatting_and_strips_stored_xss(
     html = client.get(f"/shop/{vendor.slug}/").content.decode()
     assert "<b>there</b>" in html
     assert "<li>fast</li>" in html
-    assert '<a href="https://example.org/">x</a>' in html
+    assert 'href="https://example.org/"' in html
     for bad in ("<script>boom", "onclick", "<iframe", "javascript:", "&lt;p"):
         assert bad not in html
 
@@ -164,13 +165,99 @@ def test_a_legacy_plain_text_policy_renders_as_paragraphs(client: Client, vendor
         description="",
     )
     html = client.get(f"/shop/{vendor.slug}/").content.decode()
-    assert "<p>First line<br>second line</p>" in html
+    assert "<p>First line<br/>second line</p>" in html
     assert "<p>New paragraph</p>" in html
 
 
 def test_plain_to_html_is_idempotent() -> None:
     once = engine.plain_to_html("a < b & c\n\nsecond\nline")
-    assert once == "<p>a &lt; b &amp; c</p><p>second<br>line</p>"
+    assert once == "<p>a &lt; b &amp; c</p><p>second<br/>line</p>"
     assert engine.plain_to_html(once) == once
     assert engine.plain_to_html("") == ""
     assert engine.plain_to_html("  \n ") == ""
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_data_migration_converts_plain_text_and_is_idempotent() -> None:
+    from django.db import connection
+    from django.db.migrations.executor import MigrationExecutor
+
+    before = [("vendors", "0024_vendor_application")]
+    after = [("vendors", "0025_storefront_rich_text")]
+    executor = MigrationExecutor(connection)
+    executor.migrate(before)
+    old = executor.loader.project_state(before).apps
+    OldVendor = old.get_model("vendors", "Vendor")
+    OldTranslation = old.get_model("vendors", "VendorTranslation")
+    vendor = OldVendor.objects.create(
+        legal_name="Vendor A S.r.l.",
+        display_name="Vendor A",
+        slug="vendor-a",
+        country="IT",
+        contact_email="vendor-a@example.com",
+    )
+    from apps.core.translations import source_hash
+
+    texts = {
+        "tagline": "Tag",
+        "description": "One\ntwo\n\nThree",
+        "shipping_policy": "<p>Kept</p><script>x()</script>",
+        "refund_policy": "",
+        "cancellation_policy": "a < b",
+    }
+    en = OldTranslation.objects.create(vendor=vendor, language="en", status="published", **texts)
+    en.source_hash = source_hash(texts)
+    en.save()
+    it = OldTranslation.objects.create(
+        vendor=vendor, language="it", status="published", source_hash=en.source_hash
+    )
+    executor = MigrationExecutor(connection)
+    executor.migrate(after)
+    row = VendorTranslation.objects.get(pk=en.pk)
+    assert row.description == "<p>One<br/>two</p><p>Three</p>"
+    assert row.shipping_policy == "<p>Kept</p>"
+    assert row.cancellation_policy == "<p>a &lt; b</p>"
+    assert row.tagline == "Tag"
+    assert not VendorTranslation.objects.get(pk=it.pk).is_stale
+    # A second run (the data step on converted values) changes nothing.
+    import importlib
+
+    from django.apps import apps as live
+
+    module = importlib.import_module("apps.vendors.migrations.0025_storefront_rich_text")
+    module.to_rich_text(live, None)
+    again = VendorTranslation.objects.get(pk=en.pk)
+    assert (again.description, again.shipping_policy, again.cancellation_policy) == (
+        row.description,
+        row.shipping_policy,
+        row.cancellation_policy,
+    )
+    assert again.source_hash == row.source_hash
+    assert not VendorTranslation.objects.get(pk=it.pk).is_stale
+
+
+def test_the_choosers_list_only_the_members_own_collection_tree(
+    vendor: Vendor, owner: User
+) -> None:
+    from django.test import RequestFactory
+    from wagtail.images import get_image_model
+
+    from apps.accounts.tests.factories import UserFactory
+    from apps.vendors.wagtail_hooks import scope_image_chooser
+
+    mine = MediaImageFactory.create(collection=_collection(vendor).add_child(name="sub"))
+    theirs = MediaImageFactory.create(collection=_collection(VendorFactory.create()))
+    loose = MediaImageFactory.create(collection=Collection.get_first_root_node())
+
+    def listed(user: User) -> set[int]:
+        request = RequestFactory().get("/")
+        request.user = user
+        return set(
+            scope_image_chooser(get_image_model().objects.all(), request).values_list(
+                "pk", flat=True
+            )
+        )
+
+    assert listed(owner) == {mine.pk}
+    staff = UserFactory.create(is_staff=True)
+    assert {mine.pk, theirs.pk, loose.pk} <= listed(staff)

@@ -23,6 +23,9 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.module_loading import import_string
 from django.utils.translation import gettext_lazy
+from wagtail.documents import get_document_model
+from wagtail.images import get_image_model
+from wagtail.models import Collection as WagtailCollection
 
 from apps.accounts import engine as accounts_engine
 from apps.accounts.models import ActionLinkUse, User, normalize_email_address
@@ -124,6 +127,51 @@ class StorefrontProfile:
     is_fallback: bool
 
 
+def _clean_rich_text(html: str) -> str:
+    """Wagtail's default editor allow-list (CMS.12). Loaded by path: cms sits above vendors."""
+    clean: str = import_string("apps.cms.engine.sanitise_rich_text")(html, None)
+    return clean
+
+
+def media_problem(vendor: Vendor, html: str) -> str | None:
+    """Why a stored rich text may not be published for `vendor`, or None: every image it embeds
+    and every document it links must be in the vendor's own collection (depth 2, named by
+    `engine.vendor_collection_name`) or below it. A foreign, missing or non-numeric id is a
+    problem, so crafted HTML cannot reach another vendor's files (D-34)."""
+    images, documents = engine.media_references(html)
+    if not images and not documents:
+        return None
+    if not all(ref.isdecimal() for ref in (*images, *documents)):
+        return "Choose images and documents from your own library."
+    own = WagtailCollection.objects.filter(
+        depth=2, name=engine.vendor_collection_name(str(vendor.public_id))
+    ).first()
+    if own is None:
+        return "Choose images and documents from your own library."
+    allowed = WagtailCollection.objects.descendant_of(own, inclusive=True)
+    for model, refs in ((get_image_model(), images), (get_document_model(), documents)):
+        wanted = {int(ref) for ref in refs}
+        if wanted and model.objects.filter(pk__in=wanted, collection__in=allowed).count() != len(
+            wanted
+        ):
+            return "Choose images and documents from your own library."
+    return None
+
+
+def storefront_html(vendor: Vendor, stored: str) -> str:
+    """A stored storefront text ready for `|richtext` (D-34): a legacy plain text becomes
+    paragraphs, the HTML goes through the allow-list again (it was cleaned on save, but a write
+    that skipped the hook must not reach a page), and a text that embeds another vendor's image
+    or document is not shown at all."""
+    html = _clean_rich_text(engine.plain_to_html(stored))
+    if media_problem(vendor, html) is not None:
+        logger.warning(
+            "Storefront text of vendor %s hidden: media outside its collection", vendor.pk
+        )
+        return ""
+    return html
+
+
 def storefront_profile(vendor: Vendor, language: str) -> StorefrontProfile | None:
     """The published text of `vendor` in `language`, else in the source language, else None.
     Drafts and machine translations awaiting review are never public."""
@@ -132,13 +180,13 @@ def storefront_profile(vendor: Vendor, language: str) -> StorefrontProfile | Non
     if text is None or resolved.language is None:
         return None
     policies = (
-        (gettext_lazy("Shipping"), text.shipping_policy),
-        (gettext_lazy("Returns and refunds"), text.refund_policy),
-        (gettext_lazy("Cancellation"), text.cancellation_policy),
+        (gettext_lazy("Shipping"), storefront_html(vendor, text.shipping_policy)),
+        (gettext_lazy("Returns and refunds"), storefront_html(vendor, text.refund_policy)),
+        (gettext_lazy("Cancellation"), storefront_html(vendor, text.cancellation_policy)),
     )
     return StorefrontProfile(
         tagline=text.tagline,
-        description=text.description,
+        description=storefront_html(vendor, text.description),
         policies=tuple((str(title), body) for title, body in policies if body.strip()),
         language=resolved.language,
         is_fallback=resolved.is_fallback,
@@ -1850,10 +1898,11 @@ def save_storefront_profile(
 
     Only an owner of `vendor` may (`profile` in the role matrix, CORE.2); staff, members of other
     vendors and strangers get `PermissionDenied` before anything is read, and so does a suspended
-    or closed vendor. The texts are plain text with length caps (`engine.PROFILE_MAX_LENGTH`):
-    HTML is refused with a `ValidationError`, never stripped, and every consumer must escape on
-    output. The change is live at once (post-moderation): the row becomes `published` only when a
-    text really changes (saving a machine draft unchanged leaves it a draft). One
+    or closed vendor. The tagline is plain text (HTML refused); the description and policies are
+    rich text, cleaned with the CMS.12 allow-list, capped on the stored HTML
+    (`engine.PROFILE_MAX_LENGTH`), and may embed only images and documents of the vendor's own
+    collection (D-34). The change is live at once (post-moderation): the row becomes `published`
+    only when a text really changes (saving a machine draft unchanged leaves it a draft). One
     `vendor.profile_changed` audit entry holds the changed fields before and after (so staff can
     revert); when the source-language row changes, the other languages sent back to review get a
     `vendor.profile_translation_stale` entry each. The moderators are told through the email
@@ -1869,7 +1918,20 @@ def save_storefront_profile(
     unknown = sorted(set(values) - set(PROFILE_FIELDS))
     if unknown:
         raise ValidationError(f"Not storefront profile fields: {', '.join(unknown)}.")
+    # Rich text is cleaned first (the CMS.12 hook would do it on `save` anyway): the caps, the
+    # media rule and the before/after audit all see the text that would be stored.
+    values = {
+        name: _clean_rich_text(value) if name in engine.RICH_TEXT_FIELDS else value
+        for name, value in values.items()
+    }
     problems = engine.profile_text_errors(values)
+    if not problems:
+        problems = {
+            name: problem
+            for name, value in values.items()
+            if name in engine.RICH_TEXT_FIELDS
+            if (problem := media_problem(vendor, value)) is not None
+        }
     if problems:
         raise ValidationError(problems)
     with transaction.atomic():
