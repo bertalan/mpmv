@@ -27,7 +27,7 @@ from django_otp.oath import TOTP as OathTOTP
 from django_otp.plugins.otp_totp.models import TOTPDevice
 from django_otp.util import random_hex
 
-from apps.core.audit import AuditContext, record
+from apps.core.audit import AuditContext, record, user_context
 from apps.core.changeset import ChangeSet
 from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog
@@ -665,8 +665,11 @@ def record_password_change(user: User, *, had_usable_password: bool, ctx: AuditC
 # Only the account counter is cleared. The IP counter stays: it is shared by everyone behind
 # the address, and clearing it would let one unlock launder a guessing client.
 
-ACCOUNT_UNLOCKED = "accounts.user.unlocked"
-UNLOCK_PERMISSION = "vendors.view_all_vendors"  # the platform staff permission (Q-34)
+ACCOUNT_UNLOCKED = "accounts.user.unlocked"  # by platform staff
+ACCOUNT_UNLOCKED_BY_RESET = "accounts.user.unlocked_by_reset"  # by a completed password reset
+# The platform staff permission (Q-34). The same string as `PLATFORM_STAFF_PERMISSION` in
+# `apps.vendors.scoping` (#185); accounts must not import vendors, so a guard test pins both.
+UNLOCK_PERMISSION = "vendors.view_all_vendors"
 
 
 def _account_lock_changeset(user: User, now: dt.datetime) -> tuple[ChangeSet, str | None]:
@@ -680,8 +683,12 @@ def _account_lock_changeset(user: User, now: dt.datetime) -> tuple[ChangeSet, st
         changeset.update(
             THROTTLE_MODEL,
             key[:200],
-            {"failures": state.failures, "locked_until": state.locked_until},
-            {"failures": 0, "locked_until": None},
+            {
+                "user": str(user.public_id),
+                "failures": state.failures,
+                "locked_until": state.locked_until,
+            },
+            {"user": str(user.public_id), "failures": 0, "locked_until": None},
         )
     return changeset, key
 
@@ -694,26 +701,38 @@ def unlock_account(
     The actor must be active and hold `vendors.view_all_vendors` (superusers pass through
     Django's rule). The refusal is the same whatever the target's state, so it reveals nothing
     about it. A target that is not locked is a no-op without an audit entry.
+
+    The audit actor is always `actor`: `ctx` only supplies the IP and request id. Platform staff
+    may unlock customers and vendor members; only a superuser unlocks a staff or superuser
+    account, because the lockout protects privileged accounts from brute force (lane-a, #86;
+    same rule as the staff password and MFA reset). Every refusal is the same exception.
     """
+    privileged = user.is_staff or user.is_superuser
     if not (actor.is_active and actor.has_perm(UNLOCK_PERMISSION)):
         raise PermissionDenied
-    return _clear_account_lock(user, ctx=ctx, dry_run=dry_run)
+    if privileged and not actor.is_superuser:
+        raise PermissionDenied
+    audit = replace(user_context(actor, ctx.ip), request_id=ctx.request_id)
+    return _clear_account_lock(user, ctx=audit, action=ACCOUNT_UNLOCKED, dry_run=dry_run)
 
 
-def _clear_account_lock(user: User, *, ctx: AuditContext, dry_run: bool) -> ChangeSet:
+def _clear_account_lock(user: User, *, ctx: AuditContext, action: str, dry_run: bool) -> ChangeSet:
     changeset, key = _account_lock_changeset(user, timezone.now())
 
     def apply() -> None:
         if key is not None:
             clear_throttle(key)
 
-    return run_mutation(changeset, apply, ctx=ctx, action=ACCOUNT_UNLOCKED, dry_run=dry_run)
+    return run_mutation(changeset, apply, ctx=ctx, action=action, dry_run=dry_run)
 
 
 def complete_password_reset(
     user: User, new_password: str, *, ctx: AuditContext, dry_run: bool = False
 ) -> ChangeSet:
     """Set the new password of a COMPLETED reset and clear the account's lockout (Q-18).
+
+    SECURITY: this has no authorization of its own. Only the reset confirm step may call it, after
+    the link token is validated; never a request step, a form without a token or any other view.
 
     Call it only once the reset link was verified and the form submitted; a reset request
     proves nothing and must never reach this function. The password goes through the
@@ -736,7 +755,7 @@ def complete_password_reset(
         user.save(update_fields=["password", "updated_at"])
         record_password_change(user, had_usable_password=had_usable, ctx=ctx)
         if key is not None:
-            _clear_account_lock(user, ctx=ctx, dry_run=False)
+            _clear_account_lock(user, ctx=ctx, action=ACCOUNT_UNLOCKED_BY_RESET, dry_run=False)
     return changeset
 
 

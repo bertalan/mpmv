@@ -70,7 +70,7 @@ def test_the_unlock_is_audited() -> None:
     assert entry.before["failures"] > 0
     assert entry.after["failures"] == 0
     assert entry.after["locked_until"] is None
-    assert entry.actor_label == "staff:support"
+    assert entry.actor_id is not None
 
 
 def test_dry_run_changes_and_audits_nothing() -> None:
@@ -141,14 +141,18 @@ def test_a_completed_reset_clears_the_lockout_and_audits_both_changes() -> None:
     assert user.check_password(new_password)
     assert services.login_retry_after(user.email, None) == dt.timedelta(0)
     assert AuditLog.objects.filter(action=services.CREDENTIAL_CHANGED).count() == 1
-    assert AuditLog.objects.get(action=services.ACCOUNT_UNLOCKED).target_model == "core.throttle"
+    entry = AuditLog.objects.get(action=services.ACCOUNT_UNLOCKED_BY_RESET)
+    assert entry.target_model == "core.throttle"
+    assert not AuditLog.objects.filter(action=services.ACCOUNT_UNLOCKED).exists()
 
 
 def test_a_completed_reset_of_an_unlocked_account_audits_only_the_password() -> None:
     user = UserFactory.create()
     services.complete_password_reset(user, secrets.token_urlsafe(20), ctx=CTX)
     assert AuditLog.objects.filter(action=services.CREDENTIAL_CHANGED).count() == 1
-    assert not AuditLog.objects.filter(action=services.ACCOUNT_UNLOCKED).exists()
+    assert not AuditLog.objects.filter(
+        action__in=[services.ACCOUNT_UNLOCKED, services.ACCOUNT_UNLOCKED_BY_RESET]
+    ).exists()
 
 
 def test_a_refused_new_password_changes_nothing_and_keeps_the_lock() -> None:
@@ -175,3 +179,98 @@ def test_a_reset_dry_run_changes_nothing() -> None:
             action__in=[services.ACCOUNT_UNLOCKED, services.CREDENTIAL_CHANGED]
         ).exists()
     )
+
+
+def test_the_audit_actor_is_the_authorizing_actor_whatever_ctx_says() -> None:
+    user = _locked_user()
+    actor = _platform_staff()
+    forged = AuditContext(actor_label="anonymous", source=AuditLog.Source.SYSTEM, ip=IP)
+    services.unlock_account(user, actor=actor, ctx=forged)
+    entry = AuditLog.objects.get(action=services.ACCOUNT_UNLOCKED)
+    assert entry.actor_id == actor.pk
+    assert entry.actor_label == f"staff:{actor.email}"
+    assert entry.ip == IP
+
+
+def test_the_unlock_names_the_user_in_the_audit_payload() -> None:
+    user = _locked_user()
+    services.unlock_account(user, actor=_platform_staff(), ctx=CTX)
+    entry = AuditLog.objects.get(action=services.ACCOUNT_UNLOCKED)
+    assert entry.before is not None
+    assert entry.before["user"] == str(user.public_id)
+
+
+def test_unlock_clears_only_the_target_counter() -> None:
+    target, other = _locked_user(), _locked_user()
+    services.unlock_account(target, actor=_platform_staff(), ctx=CTX)
+    assert not services.login_retry_after(target.email, None)
+    assert services.login_retry_after(other.email, None)
+
+
+def test_a_completed_reset_clears_only_that_users_counter() -> None:
+    target, other = _locked_user(), _locked_user()
+    services.complete_password_reset(target, secrets.token_urlsafe(20), ctx=CTX)
+    assert not services.login_retry_after(target.email, None)
+    assert services.login_retry_after(other.email, None)
+
+
+def test_a_superuser_actor_may_unlock() -> None:
+    user = _locked_user()
+    services.unlock_account(user, actor=UserFactory.create(superuser=True), ctx=CTX)
+    assert not services.login_retry_after(user.email, None)
+
+
+def _lock_account(user: User) -> None:
+    for _ in range(services.ACCOUNT_LOCKOUT.free_attempts + 1):
+        services.record_failed_login(user.email, IP)
+    assert services.login_retry_after(user.email, None)
+
+
+@pytest.mark.parametrize("target_kind", ["staff", "superuser"])
+def test_platform_staff_cannot_unlock_a_privileged_account(target_kind: str) -> None:
+    """Only a superuser unlocks staff or superuser accounts (lane-a, #86; same rule as #111)."""
+    user = UserFactory.create(staff=target_kind == "staff", superuser=target_kind == "superuser")
+    _lock_account(user)
+    with pytest.raises(PermissionDenied) as raised:
+        services.unlock_account(user, actor=_platform_staff(), ctx=CTX)
+    assert str(raised.value) == ""
+    assert services.login_retry_after(user.email, None)
+    assert not AuditLog.objects.filter(action=services.ACCOUNT_UNLOCKED).exists()
+
+
+@pytest.mark.parametrize("target_kind", ["staff", "superuser"])
+def test_a_superuser_unlocks_a_privileged_account(target_kind: str) -> None:
+    user = UserFactory.create(staff=target_kind == "staff", superuser=target_kind == "superuser")
+    _lock_account(user)
+    services.unlock_account(user, actor=UserFactory.create(superuser=True), ctx=CTX)
+    assert not services.login_retry_after(user.email, None)
+
+
+def test_platform_staff_unlocks_a_vendor_member_account() -> None:
+    user = UserFactory.create(permissions=["vendors.change_vendor"])
+    _lock_account(user)
+    services.unlock_account(user, actor=_platform_staff(), ctx=CTX)
+    assert not services.login_retry_after(user.email, None)
+
+
+def test_a_failing_audit_rolls_the_reset_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    user = _locked_user()
+    old_hash = user.password
+
+    def boom(*args: object, **kwargs: object) -> None:
+        raise RuntimeError
+
+    monkeypatch.setattr(services, "record_password_change", boom)
+    with pytest.raises(RuntimeError):
+        services.complete_password_reset(user, secrets.token_urlsafe(20), ctx=CTX)
+    user.refresh_from_db()
+    assert user.password == old_hash
+    assert services.login_retry_after(user.email, None)
+
+
+def test_the_permission_name_matches_the_platform_staff_rule() -> None:
+    scoping = pytest.importorskip("apps.vendors.scoping")
+    constant = getattr(scoping, "PLATFORM_STAFF_PERMISSION", None)
+    if constant is None:
+        pytest.skip("#185 not merged yet")
+    assert constant == services.UNLOCK_PERMISSION
