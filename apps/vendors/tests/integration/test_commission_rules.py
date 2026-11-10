@@ -5,6 +5,7 @@ never edited once written (orders snapshot it: `snapshot()` is the JSON they sto
 """
 
 import datetime as dt
+import functools
 import json
 from decimal import Decimal
 from typing import Any
@@ -14,6 +15,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, ProgrammingError, connection, transaction
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.core.audit import AuditContext
@@ -32,6 +34,10 @@ from apps.vendors.tests.factories import CommissionRuleFactory, VendorFactory, V
 pytestmark = pytest.mark.django_db
 
 CTX = AuditContext(actor_id=1, actor_label="staff:ops", source="admin", ip="127.0.0.1")
+# Most tests are about validity periods in the past: they import historical rules explicitly.
+add_rule = functools.partial(
+    add_commission_rule, backdate=True, backdate_reason="historical import (test)"
+)
 
 
 def utc(year: int, month: int = 1) -> dt.datetime:
@@ -79,11 +85,9 @@ def test_a_plan_refuses_a_negative_fee_a_negative_limit_and_non_object_features(
 
 def test_a_zero_percent_rule_needs_an_explicit_promo_label_in_the_service() -> None:
     with pytest.raises(ValidationError) as excinfo:
-        add_commission_rule(
-            CommissionRuleFactory.build(percent=Decimal("0"), promo_label=""), ctx=CTX
-        )
+        add_rule(CommissionRuleFactory.build(percent=Decimal("0"), promo_label=""), ctx=CTX)
     assert "percent" in excinfo.value.message_dict
-    add_commission_rule(
+    add_rule(
         CommissionRuleFactory.build(percent=Decimal("0"), promo_label="operator-owned"), ctx=CTX
     )
 
@@ -139,9 +143,9 @@ def test_an_end_before_the_start_is_refused() -> None:
 
 def test_a_new_rule_closes_the_open_one_and_gets_the_next_version() -> None:
     first = CommissionRuleFactory.build(valid_from=utc(2026), percent=Decimal("20"))
-    add_commission_rule(first, ctx=CTX)
+    add_rule(first, ctx=CTX)
     second = CommissionRuleFactory.build(valid_from=utc(2027), percent=Decimal("18"))
-    changes = add_commission_rule(second, ctx=CTX)
+    changes = add_rule(second, ctx=CTX)
 
     assert changes.summary() == {"create": 1, "update": 1, "delete": 0}
     old, new = CommissionRule.objects.order_by("version")
@@ -153,20 +157,20 @@ def test_a_new_rule_closes_the_open_one_and_gets_the_next_version() -> None:
 
 def test_versions_count_per_scope() -> None:
     vendor = VendorFactory.create()
-    add_commission_rule(CommissionRuleFactory.build(valid_from=utc(2026)), ctx=CTX)
-    add_commission_rule(CommissionRuleFactory.build(valid_from=utc(2026), vendor=vendor), ctx=CTX)
+    add_rule(CommissionRuleFactory.build(valid_from=utc(2026)), ctx=CTX)
+    add_rule(CommissionRuleFactory.build(valid_from=utc(2026), vendor=vendor), ctx=CTX)
     assert set(CommissionRule.objects.values_list("version", flat=True)) == {1}
 
 
 def test_a_new_rule_must_start_after_the_latest_one() -> None:
-    add_commission_rule(CommissionRuleFactory.build(valid_from=utc(2027)), ctx=CTX)
+    add_rule(CommissionRuleFactory.build(valid_from=utc(2027)), ctx=CTX)
     with pytest.raises(ValidationError) as excinfo:
-        add_commission_rule(CommissionRuleFactory.build(valid_from=utc(2026)), ctx=CTX)
+        add_rule(CommissionRuleFactory.build(valid_from=utc(2026)), ctx=CTX)
     assert "valid_from" in excinfo.value.message_dict
 
 
 def test_a_dry_run_returns_the_change_and_writes_nothing() -> None:
-    changes = add_commission_rule(CommissionRuleFactory.build(), ctx=CTX, dry_run=True)
+    changes = add_rule(CommissionRuleFactory.build(), ctx=CTX, dry_run=True)
     assert changes.summary()["create"] == 1
     assert not CommissionRule.objects.exists()
     assert not AuditLog.objects.filter(action=COMMISSION_RULE_ADDED).exists()
@@ -174,7 +178,7 @@ def test_a_dry_run_returns_the_change_and_writes_nothing() -> None:
 
 def test_adding_a_rule_is_audited_with_its_rate() -> None:
     rule = CommissionRuleFactory.build(percent=Decimal("17.50"))
-    add_commission_rule(rule, ctx=CTX)
+    add_rule(rule, ctx=CTX)
     entry = AuditLog.objects.get(action=COMMISSION_RULE_ADDED)
     assert entry.actor_label == "staff:ops"
     assert (entry.after or {})["percent"] == "17.50"
@@ -182,7 +186,7 @@ def test_adding_a_rule_is_audited_with_its_rate() -> None:
 
 def test_a_vendor_scoped_rule_for_a_vendor_and_a_plan_together_is_refused() -> None:
     with pytest.raises(ValidationError):
-        add_commission_rule(
+        add_rule(
             CommissionRuleFactory.build(
                 vendor=VendorFactory.create(), plan=VendorPlanFactory.create()
             ),
@@ -253,8 +257,8 @@ def test_a_missing_rule_is_a_blocking_error_not_a_zero_commission() -> None:
 
 def test_the_rule_in_force_depends_on_the_date() -> None:
     vendor = VendorFactory.create()
-    add_commission_rule(CommissionRuleFactory.build(valid_from=utc(2026), percent=20), ctx=CTX)
-    add_commission_rule(CommissionRuleFactory.build(valid_from=utc(2027), percent=18), ctx=CTX)
+    add_rule(CommissionRuleFactory.build(valid_from=utc(2026), percent=20), ctx=CTX)
+    add_rule(CommissionRuleFactory.build(valid_from=utc(2027), percent=18), ctx=CTX)
     assert commission_rule_for(vendor, at=utc(2026, 6)).version == 1
     assert commission_rule_for(vendor, at=utc(2027, 6)).version == 2
 
@@ -309,7 +313,7 @@ def test_staff_add_a_rule_in_the_admin_and_cannot_edit_or_delete_one(
         "fee_fixed": "2.00",
         "fee_base": "gross_paid",
         "promo_label": "",
-        "valid_from_0": "2026-01-01",
+        "valid_from_0": "2030-01-01",
         "valid_from_1": "00:00:00",
     }
     assert staff.post(url, data).status_code == 302
@@ -317,7 +321,7 @@ def test_staff_add_a_rule_in_the_admin_and_cannot_edit_or_delete_one(
     assert (rule.version, rule.percent) == (1, Decimal("15.00"))
     assert AuditLog.objects.filter(action=COMMISSION_RULE_ADDED).exists()
 
-    refused = staff.post(url, {**data, "percent": "0.00", "valid_from_0": "2027-01-01"})
+    refused = staff.post(url, {**data, "percent": "0.00", "valid_from_0": "2031-01-01"})
     assert refused.status_code == 200  # an implicit zero is a form error, not a crash
     assert CommissionRule.objects.count() == 1
 
@@ -328,3 +332,125 @@ def test_staff_add_a_rule_in_the_admin_and_cannot_edit_or_delete_one(
         staff.post(reverse("admin:vendors_commissionrule_change", args=[rule.pk]), data).status_code
         == 403
     )
+
+
+def test_the_admin_reads_the_start_in_business_time_not_utc(
+    client: Client, superuser: User, mfa_login: Any
+) -> None:
+    staff: Client = mfa_login(client, superuser)
+    data = {
+        "percent": "15.00",
+        "base": "net_goods",
+        "fee_percent": "4.00",
+        "fee_fixed": "2.00",
+        "fee_base": "gross_paid",
+        "promo_label": "",
+        "valid_from_0": "2030-01-01",
+        "valid_from_1": "00:00:00",
+    }
+    assert staff.post(reverse("admin:vendors_commissionrule_add"), data).status_code == 302
+    # "From 1 January" typed by staff is midnight in Rome, 23:00 UTC the day before.
+    assert CommissionRule.objects.get().valid_from == dt.datetime(2029, 12, 31, 23, tzinfo=dt.UTC)
+
+
+def test_the_admin_form_never_offers_backdating(
+    client: Client, superuser: User, mfa_login: Any
+) -> None:
+    staff: Client = mfa_login(client, superuser)
+    page = staff.get(reverse("admin:vendors_commissionrule_add")).content.decode()
+    assert "backdate" not in page
+    past = {
+        "percent": "15.00",
+        "base": "net_goods",
+        "fee_percent": "4.00",
+        "fee_fixed": "2.00",
+        "fee_base": "gross_paid",
+        "promo_label": "",
+        "valid_from_0": "2020-01-01",
+        "valid_from_1": "00:00:00",
+    }
+    response = staff.post(reverse("admin:vendors_commissionrule_add"), past)
+    assert response.status_code == 200
+    assert not CommissionRule.objects.exists()
+
+
+# --- No backdating (review of #225): orders priced with a rule must keep finding it
+
+
+def future(days: int = 30) -> dt.datetime:
+    return timezone.now() + dt.timedelta(days=days)
+
+
+def test_a_rule_starting_in_the_past_is_refused_by_default() -> None:
+    with pytest.raises(ValidationError) as excinfo:
+        add_commission_rule(
+            CommissionRuleFactory.build(valid_from=timezone.now() - dt.timedelta(days=1)), ctx=CTX
+        )
+    assert "valid_from" in excinfo.value.message_dict
+    assert not CommissionRule.objects.exists()
+
+
+def test_a_rule_from_now_or_later_is_accepted() -> None:
+    add_commission_rule(CommissionRuleFactory.build(valid_from=timezone.now()), ctx=CTX)
+    add_commission_rule(CommissionRuleFactory.build(valid_from=future()), ctx=CTX)
+    assert CommissionRule.objects.count() == 2
+
+
+def test_backdating_needs_the_flag_and_a_reason_and_is_audited() -> None:
+    past = timezone.now() - dt.timedelta(days=400)
+    with pytest.raises(ValidationError):
+        add_commission_rule(CommissionRuleFactory.build(valid_from=past), ctx=CTX, backdate=True)
+    with pytest.raises(ValidationError):
+        add_commission_rule(
+            CommissionRuleFactory.build(valid_from=past),
+            ctx=CTX,
+            backdate=True,
+            backdate_reason="   ",
+        )
+    add_commission_rule(
+        CommissionRuleFactory.build(valid_from=past),
+        ctx=CTX,
+        backdate=True,
+        backdate_reason="MIG import of the 2025 rule",
+    )
+    entry = AuditLog.objects.get(action=COMMISSION_RULE_ADDED)
+    assert (entry.after or {})["backdate_reason"] == "MIG import of the 2025 rule"
+
+
+def test_a_normal_rule_has_no_backdate_reason_in_its_audit_entry() -> None:
+    add_commission_rule(CommissionRuleFactory.build(valid_from=future()), ctx=CTX)
+    assert "backdate_reason" not in (AuditLog.objects.get().after or {})
+
+
+def test_backdating_a_dry_run_still_changes_nothing() -> None:
+    changes = add_commission_rule(
+        CommissionRuleFactory.build(valid_from=utc(2020)),
+        ctx=CTX,
+        dry_run=True,
+        backdate=True,
+        backdate_reason="import",
+    )
+    assert changes.summary()["create"] == 1
+    assert not CommissionRule.objects.exists()
+
+
+# --- Boundaries and gaps
+
+
+def test_the_end_instant_is_the_next_version_and_before_the_start_is_none() -> None:
+    vendor = VendorFactory.create()
+    add_rule(CommissionRuleFactory.build(valid_from=utc(2026), percent=20), ctx=CTX)
+    add_rule(CommissionRuleFactory.build(valid_from=utc(2027), percent=18), ctx=CTX)
+    assert commission_rule_for(vendor, at=utc(2027)).version == 2  # at == valid_to of v1
+    last_of_v1 = utc(2027) - dt.timedelta(microseconds=1)
+    assert commission_rule_for(vendor, at=last_of_v1).version == 1
+    with pytest.raises(engine.NoCommissionRule):
+        commission_rule_for(vendor, at=utc(2026) - dt.timedelta(microseconds=1))
+
+
+def test_a_rule_cannot_leave_a_gap_after_a_closed_one() -> None:
+    CommissionRuleFactory.create(valid_from=utc(2026), valid_to=utc(2027), version=1)
+    with pytest.raises(ValidationError) as excinfo:
+        add_rule(CommissionRuleFactory.build(valid_from=utc(2028)), ctx=CTX)
+    assert "valid_from" in excinfo.value.message_dict
+    add_rule(CommissionRuleFactory.build(valid_from=utc(2027)), ctx=CTX)  # exactly at the end
