@@ -51,6 +51,8 @@ def test_the_owner_saves_and_the_change_is_audited(
     assert response.status_code == 302
     assert VendorTranslation.objects.get(vendor=vendor, language="en").tagline == "Fresh"
     entry = AuditLog.objects.get(action="vendor.profile_changed")
+    assert entry.before is not None
+    assert entry.after is not None
     assert (entry.before["tagline"], entry.after["tagline"]) == ("Old", "Fresh")
     assert entry.actor_id == owner.pk
 

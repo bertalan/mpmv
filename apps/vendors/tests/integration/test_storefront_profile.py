@@ -64,6 +64,8 @@ def test_the_audit_entry_has_before_and_after_and_names_the_vendor(
     VendorTranslationFactory.create(vendor=vendor, language="en", refund_policy="Old refund")
     save_storefront_profile(vendor, "en", {"refund_policy": "New refund"}, actor=owner, ctx=CTX)
     entry = AuditLog.objects.get(action=ACTION)
+    assert entry.before is not None
+    assert entry.after is not None
     assert entry.before["refund_policy"] == "Old refund"
     assert entry.after["refund_policy"] == "New refund"
     assert entry.vendor_key == str(vendor.public_id)
@@ -85,9 +87,11 @@ def test_the_owner_of_another_vendor_and_a_stranger_cannot_edit_it(vendor: Vendo
             save_storefront_profile(vendor, "en", {"tagline": "x"}, actor=actor, ctx=CTX)
 
 
-def test_a_closed_vendor_cannot_be_edited(vendor: Vendor, owner: User) -> None:
-    Vendor.objects.filter(pk=vendor.pk).update(status=Vendor.Status.CLOSED)
-    vendor.refresh_from_db()
+@pytest.mark.parametrize("status", [Vendor.Status.CLOSED, Vendor.Status.SUSPENDED])
+def test_a_closed_or_suspended_vendor_cannot_be_edited(
+    vendor: Vendor, owner: User, status: str
+) -> None:
+    Vendor.objects.filter(pk=vendor.pk).update(status=status)
     with pytest.raises(PermissionDenied):
         save_storefront_profile(vendor, "en", {"tagline": "x"}, actor=owner, ctx=CTX)
 
@@ -129,7 +133,9 @@ def test_an_unchanged_save_writes_no_audit_entry_and_sends_no_email(
     vendor: Vendor, owner: User
 ) -> None:
     _operator(support_email="help@platform.example")
-    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Same")
+    VendorTranslationFactory.create(
+        vendor=vendor, language="en", tagline="Same", status="published"
+    )
     changes = save_storefront_profile(vendor, "en", {"tagline": "Same"}, actor=owner, ctx=CTX)
     assert changes.is_empty
     assert not AuditLog.objects.filter(action=ACTION).exists()
