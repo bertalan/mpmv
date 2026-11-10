@@ -252,10 +252,10 @@ def test_an_edit_publishes_the_draft_and_notifies(vendor: Vendor, owner: User) -
 def test_a_source_language_edit_that_stales_other_languages_is_audited(
     vendor: Vendor, owner: User
 ) -> None:
+    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Hi", status="published")
     it = VendorTranslationFactory.create(
         vendor=vendor, language="it", tagline="Ciao", status="published", source_hash="old"
     )
-    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Hi", status="published")
     save_storefront_profile(vendor, "en", {"tagline": "Hello"}, actor=owner, ctx=CTX)
     it.refresh_from_db()
     assert it.status == "machine"
@@ -305,8 +305,22 @@ def test_a_concurrent_first_save_gives_a_clean_error_not_a_500(
             VendorTranslation.objects.bulk_create(
                 [VendorTranslation(vendor=self.vendor, language=self.language)]
             )
-        original(self, *args, **kwargs)  # type: ignore[arg-type]
+        original(self, *args, **kwargs)
 
     monkeypatch.setattr(VendorTranslation, "save", racing_save)
     with pytest.raises(ValidationError):
         save_storefront_profile(vendor, "it", {"tagline": "x"}, actor=owner, ctx=CTX)
+
+
+def test_the_moderator_email_renders_hostile_values_inert() -> None:
+    from apps.core import services as core_services
+
+    rendered = core_services.render_email(
+        "vendors.profile_changed",
+        "en",
+        {"vendor_name": "Evil <script>x()</script>", "language": "en", "fields": "<b>tagline</b>"},
+    )
+    assert "<script>" not in rendered.html_body
+    assert "&lt;script&gt;" in rendered.html_body
+    assert "<b>" not in rendered.html_body
+    assert "<img" not in rendered.html_body

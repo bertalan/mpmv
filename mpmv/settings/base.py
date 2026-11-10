@@ -165,6 +165,8 @@ ACTION_LINK_RATE_LIMIT = 30
 VENDOR_CLAIM_LINK_MAX_AGE = 72 * 3600  # seconds
 VENDOR_CLAIM_MAX_FAILURES = 5
 VENDOR_CLAIM_RATE_LIMIT = 20
+# Storefront profile saves per vendor owner per hour (CORE.9): each one emails the moderators.
+VENDOR_PROFILE_SAVE_LIMIT = 20
 MFA_ISSUER = "MPMV"  # name shown in authenticator apps and passkey prompts
 OTP_TOTP_ISSUER = MFA_ISSUER
 OTP_ADMIN_HIDE_SENSITIVE_DATA = True

@@ -11,7 +11,7 @@ from typing import Any, ClassVar
 from django.conf import settings
 from django.contrib import auth, messages
 from django.contrib.auth import views as auth_views
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Model
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.http.response import HttpResponseBase
@@ -29,7 +29,7 @@ from apps.core.audit import audit_context
 from apps.core.models import AuditLog
 from apps.vendors.models import VendorTranslation
 from apps.vendors.scoping import Source, VendorScopedQuerySet
-from apps.vendors.services import save_storefront_profile
+from apps.vendors.services import PROFILE_LOCKED, save_storefront_profile
 
 from .access import ManagerContext, may_enter
 from .forms import StorefrontProfileForm
@@ -117,17 +117,29 @@ class StorefrontProfileView(ManagerView):
             raise Http404("Unknown language.")
         return language
 
+    def stored_row(self, language: str) -> VendorTranslation | None:
+        return self.scoped(VendorTranslation).filter(language=language).first()
+
     def stored_values(self, language: str) -> dict[str, str]:
-        row = self.scoped(VendorTranslation).filter(language=language).first()
+        row = self.stored_row(language)
         return (
             {} if row is None else {n: getattr(row, n) for n in StorefrontProfileForm.base_fields}
         )
 
+    def locked(self) -> bool:
+        vendor = self.manager.vendor
+        return vendor is not None and vendor.status in PROFILE_LOCKED
+
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         language = self.language()
+        row = self.stored_row(language)
         context.setdefault("form", StorefrontProfileForm(initial=self.stored_values(language)))
         context["language"] = language
+        context["locked"] = self.locked()
+        context["machine_draft"] = (
+            row is not None and row.status == VendorTranslation.Status.MACHINE
+        )
         context["languages"] = [
             {"code": code, "name": name, "current": code == language}
             for code, name in settings.LANGUAGES
@@ -138,6 +150,8 @@ class StorefrontProfileView(ManagerView):
         vendor, actor = self.manager.vendor, self.manager.user
         if vendor is None or not isinstance(actor, User):
             raise Http404("No vendor selected.")
+        if self.locked():  # the reason is on the page; the service refuses it too
+            return self.render_to_response(self.get_context_data(), status=403)
         language = self.language()
         form = StorefrontProfileForm(request.POST, initial=self.stored_values(language))
         if form.is_valid():
@@ -148,6 +162,8 @@ class StorefrontProfileView(ManagerView):
                 )
             except ValidationError as error:
                 form.add_error(None, error)
+            except PermissionDenied:  # suspended between the page and the save
+                return self.render_to_response(self.get_context_data(), status=403)
             else:
                 messages.success(
                     request,
