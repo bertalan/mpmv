@@ -700,7 +700,7 @@ customers when FIT-c, FIT-d and FIT.13 are merged. FIT.15 must land before the M
 
 ### Effect on the existing P1 plan
 
-P1 goes from 1,781 h to 1,951 h (+170 h, about +10%; with the acceptance, review and coordination
+P1 goes from 1,787 h to 1,957 h (+170 h, about +10%; with the acceptance, review and coordination
 margins of [91](91-estimates.md) §91.2 the go-live total grows by about 190 h). No existing P1 row
 gets a dependency on FIT, so no existing row is blocked. The P1 critical path (the schedule lower bound
 with full parallelism) grows by **6 h, 147 to 153 h**, because the longest FIT chain (CORE.18, FIT.1,
