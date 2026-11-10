@@ -26,12 +26,46 @@ EXPECTED = {
     "DE-HELGOLAND": ("DE", ["27498"]),
     "DE-BUSINGEN": ("DE", ["78266"]),
 }
+# D-28: Madeira and the Azores are INSIDE the VAT area, with rates of their own.
+OWN_RATES_EXPECTED = {
+    "PT-MA": ("PT", ["9000..9499"]),
+    "PT-AZ": ("PT", ["9500..9999"]),
+}
 
 
 def test_the_dataset_holds_the_territories_of_the_spec_outside_the_vat_area() -> None:
-    seeded = {t.code: t for t in Territory.objects.all()}
+    seeded = {t.code: t for t in Territory.objects.filter(vat_status=engine.OUTSIDE_VAT_AREA)}
     assert {code: (t.country, t.postcode_patterns) for code, t in seeded.items()} == EXPECTED
-    assert {t.vat_status for t in seeded.values()} == {engine.OUTSIDE_VAT_AREA}
+
+
+def test_madeira_and_the_azores_are_inside_the_vat_area_with_their_own_rates() -> None:
+    seeded = {t.code: t for t in Territory.objects.filter(vat_status=engine.OWN_RATES)}
+    assert {c: (t.country, t.postcode_patterns) for c, t in seeded.items()} == OWN_RATES_EXPECTED
+    assert services.current_rate("PT", "standard", territory=seeded["PT-MA"]).rate == 22
+    assert services.current_rate("PT", "standard", territory=seeded["PT-AZ"]).rate == 16
+
+
+@pytest.mark.parametrize(
+    ("postcode", "code"),
+    [("9000-050", "PT-MA"), ("9300-001", "PT-MA"), ("9500-101", "PT-AZ"), ("9980-001", "PT-AZ")],
+)
+def test_madeira_and_azores_postcodes_are_territories_but_not_outside_the_vat_area(
+    postcode: str, code: str
+) -> None:
+    found = services.find_territory("PT", postcode)
+    assert found is not None
+    assert found.code == code
+    assert not engine.is_outside_vat_territory("PT", postcode, services.territory_rules())
+
+
+@pytest.mark.parametrize("postcode", ["1000-001", "4000-001", "8000-001"])
+def test_mainland_portugal_is_in_no_territory(postcode: str) -> None:
+    assert services.find_territory("PT", postcode) is None
+
+
+@pytest.mark.parametrize(("country", "postcode"), [("ES", "35001"), ("ES", "38001")])
+def test_the_canary_islands_stay_outside_the_vat_area(country: str, postcode: str) -> None:
+    assert engine.is_outside_vat_territory(country, postcode, services.territory_rules())
 
 
 def test_northern_ireland_is_not_seeded_while_d02_is_open() -> None:
@@ -95,7 +129,7 @@ def test_the_seed_is_idempotent_and_keeps_staff_edits() -> None:
     migration = import_module("apps.tax.migrations.0006_seed_special_territories")
     Territory.objects.filter(code="ES-CN").update(postcode_patterns=["35001"])
     migration.seed(apps, None)
-    assert Territory.objects.count() == len(EXPECTED)
+    assert Territory.objects.count() == len(EXPECTED) + len(OWN_RATES_EXPECTED)
     assert Territory.objects.get(code="ES-CN").postcode_patterns == ["35001"]
 
 
