@@ -6,7 +6,7 @@ follows on the MFA pages (CORE.4). The Turnstile widget renders only when the ca
 (CORE.5); errors stay generic, so they say nothing about which accounts exist.
 {% endcomment %}
 {% block title %}{% translate "Sign in" %} · {{ site_name }}{% endblock %}
-{% block description %}<meta name="robots" content="noindex">{% endblock %}
+{% block description %}{% robots_meta "noindex" %}{% endblock %}
 {% block head %}{% captcha_script %}
 <link rel="stylesheet" href="{% static 'accounts/password-toggle.css' %}">
 <script type="module" src="{% static 'accounts/password-toggle.js' %}"></script>{% endblock %}

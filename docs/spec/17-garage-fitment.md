@@ -69,7 +69,7 @@ App graph (spec 01 §1.3), no cycle: `accounts --> fitment`, `catalog --> fitmen
 `fitment --> cms`, `fitment --> events`, `fitment --> seo`, `ingest --> fitment`. The catalog does not
 import `fitment`: CAT.8 and CAT.9 expose a small **listing predicate registry** (the same pattern as
 `catalog/publishing.py` for compliance), and `fitment` registers its predicate at start-up. `tax`,
-`shipping` and `orders` never import it (an order never stores the garage, §17.4.6).
+`shipping` and `orders` never import it (an order line keeps only the fit answer shown at purchase, never the garage, §17.4.6).
 
 ### 17.2.2 The scheme: levels and nodes
 
@@ -403,13 +403,17 @@ grids, blog index, event list) a region labelled "Garage" shows above the result
   deletion is one click, nothing is sent to third parties, logs and analytics do not carry it.
   A DPIA screening note is recorded (low risk, small-scale, no special category by default).
 
-### 17.4.6 Orders do not store the garage
+### 17.4.6 The order keeps the fit answer, never the garage
 
-A fit check is shown at the point of choosing, not written to the order. Orders keep the existing
-snapshots (price, tax, commission rule) and nothing about the garage, so the account export does not
-grow and no personal "what they own" data reaches the ledger or the vendors. If counsel or a dispute
-policy later wants the shown fit answer kept as evidence on the order line, that is a separate
-decision with its own retention rule (open question Q-G6).
+**Decided (lane-a, 2026-11-10, Q-G6):** the fit answer shown at the moment of purchase is snapshotted on
+the order line, because it matters in returns and disputes and orders store snapshots by rule (spec 01).
+What is stored is only the answer: the tier (`fits`, `check`, `unknown`, `not_fit`), the "Compatibility
+declared by the seller" wording version and the matched profile node (id and label at that time). It is
+**not** the garage: no list of profiles, no other vehicles, no cookie. It is not personal data beyond the
+order itself, follows the order's retention (D-29, D-30, D-31) and is exported with the order.
+`orders` does not import `fitment`: the product page posts the snapshot as an opaque, validated JSON
+annotation through a small order-line annotation hook in `orders`, and an order line without one is
+normal (FIT.17). Vendors see the answer on the order line as seller-declared compatibility, nothing more.
 
 ## 17.5 How the garage is used
 
@@ -664,8 +668,8 @@ WHERE ps.always_visible
 | Q-G2 ⚖️ | Counsel: confirm that a consumer-chosen filter is not a ranking under Omnibus art. 6(1)(ea) and not a recommender under DSA art. 27 | **With counsel, not a blocker.** The "How the garage works" page and the CMP.5 ranking and terms text are updated anyway (FIT.13) |
 | Q-G3 ✅ | Priority and timing | **Decided (owner, 2026-11-10): P1, before opening, the whole garage** (not only the fit box), in the slices of §17.13 that merge one by one |
 | Q-G4 ✅ | Which categories are fitment-relevant? | **Decided (owner):** a setting the operator fills (`Category.fitment_relevant`, bulk-settable in the platform space), **seeded with none**: until the operator marks categories, the garage filters nothing |
-| Q-G5 | Undeclared items under an active garage: hidden and counted (proposal), or shown in a separate collapsed section? | Hidden and counted, with *Show all* |
-| Q-G6 | Should the fit answer shown at purchase be kept on the order line as dispute evidence? | No: orders never store the garage (§17.4.6) |
+| Q-G5 ✅ | Undeclared items under an active garage: hidden and counted (proposal), or shown in a separate collapsed section? | **Decided (lane-a, 2026-11-10):** hidden and counted, with *Show all* |
+| Q-G6 ✅ | Should the fit answer shown at purchase be kept on the order line as dispute evidence? | **Decided (lane-a, 2026-11-10): yes**, the answer (tier, declared-by-seller wording version, profile node) is snapshotted on the order line, never the garage; not personal data beyond the order itself (§17.4.6, FIT.17) |
 | Q-G7 | Level limits: at most 4 node levels and 3 anonymous profiles, 10 per account, 500 rows per product, 24 months inactivity: acceptable defaults? | Yes, all settings |
 | Q-G8 ✅ | Vendor liability wording and the return rule | **Decided (owner):** the wording is "Compatibility declared by the seller"; the platform does not guarantee it; the seller answers for its declaration; a wrong fit is a non-conformity return (§17.5.3, vendor terms through FIT.13) |
 | Q-G9 | Is a reference catalogue (licensed standard data) in scope at all, and who pays the licence? | Open. FIT.16 stays P3 and optional: the garage works without it |
@@ -686,17 +690,17 @@ garage still invisible to customers until the slice that shows it.
 | FIT-a | FIT.1, FIT.2 | 32 | scheme, nodes, product declaration, matching engine | CAT.2, CAT.14, CORE.17, CORE.18 |
 | FIT-b | FIT.3, FIT.4 | 28 | vendor entry (Fits tab, node proposals) and CSV with ING | FIT-a, CAT.19, ING.1 |
 | FIT-c | FIT.5, FIT.6, FIT.7 | 36 | garage profiles, anonymous cookie and merge, the garage UI | FIT-a, THM.4, SEO.5 |
-| FIT-d | FIT.8, FIT.9, FIT.14 | 28 | listing and search filter, product page box, performance budget | FIT-a, FIT-c, CAT.8, CAT.9, CAT.7 |
+| FIT-d | FIT.8, FIT.9, FIT.14, FIT.17 | 34 | listing and search filter, product page box, performance budget, fit answer on the order line | FIT-a, FIT-c, CAT.8, CAT.9, CAT.7, ORD.2 |
 | FIT-e | FIT.10, FIT.11, FIT.12 | 26 | editorial hubs, events, SEO and cache rules | FIT-d, CMS.3, CMS.4, EVT.1, SEO.7 |
 | FIT-f | FIT.13, FIT.15 | 14 | legal and transparency text, legacy carry-over | FIT-c (FIT.13), FIT-e and MIG.3 (FIT.15) |
 
-Total 164 h of P1. FIT-a and FIT-b can start as soon as CAT and the Manager shell exist and are the
+Total 170 h of P1. FIT-a and FIT-b can start as soon as CAT and the Manager shell exist and are the
 data the others need; FIT-c can run in parallel with FIT-b; FIT-d after both; the garage opens to
 customers when FIT-c, FIT-d and FIT.13 are merged. FIT.15 must land before the MIG.11 URL switch.
 
 ### Effect on the existing P1 plan
 
-P1 goes from 1,781 h to 1,945 h (+164 h, about +9%; with the acceptance, review and coordination
+P1 goes from 1,781 h to 1,951 h (+170 h, about +10%; with the acceptance, review and coordination
 margins of [91](91-estimates.md) §91.2 the go-live total grows by about 190 h). No existing P1 row
 gets a dependency on FIT, so no existing row is blocked. The P1 critical path (the schedule lower bound
 with full parallelism) grows by **6 h, 147 to 153 h**, because the longest FIT chain (CORE.18, FIT.1,
@@ -711,7 +715,7 @@ confirm, not a new dependency edge):
 - EVT.6, EVT.7 and EVT.10 (event public pages and JSON-LD, 17 h) are finished first, FIT.11 extends them;
 - the lane-b content rows CMS.5, CMS.11 and the open EVT rows (EVT.4, EVT.8, EVT.9, EVT.11, EVT.14,
   EVT.15, about 59 h) lose about one week of lane capacity to FIT-c to FIT-e (the lane clears about 500
-  estimated hours a week, §91.4, so 164 h is roughly a third of a week of the whole budget);
+  estimated hours a week, §91.4, so 170 h is roughly a third of a week of the whole budget);
 - ING.4 and ING.5 (import extraction and enrichment, 18 h) keep their order but FIT.4 needs ING.1 early:
   ING.1 is pulled ahead of ING.2 and ING.3 if FIT-b is to start before the adapters;
 - two rows lose a dependency they would otherwise have gained and stay where they are: SEO.6 (P2)
@@ -729,6 +733,7 @@ confirm, not a new dependency edge):
 | FIT.7 | Garage UI (D-38, slice FIT-c): header menu, banner with *Change* and *Show all*, chooser (explicit *Apply*), "Add your garage" line, polite live announcements, focus handling, empty states of §17.5.6, no URL parameter anywhere, the translatable garage noun | P1 | 14 | FIT.5, THM.4, I18N.1 | An e2e run with screenshots covers the flow with keyboard only; zero axe violations (`wcag22aa`); reload, language switch and back button keep the state; no garage in any URL |
 | FIT.8 | Listings and search (D-38, slice FIT-d): predicate registry in CAT.8 and CAT.9, registered by `fitment`; filter semantics of §17.5.1, counts "N of M" and the unknown-count, exact SKU, GTIN or MPN always shown, CMS.10 grids, no reordering, `check` badge | P1 | 14 | FIT.2, FIT.7, CAT.8, CAT.9, CMS.10 | Regression cases 3 and 4 pass; an active garage never changes the sort order of a listing; the count equals the rows listed; the operator's own items get no preference |
 | FIT.9 | Product page (D-38, slice FIT-d): "Does it fit?" box in four states, summary list of fitment grouped by make and model, links to hub articles, card badges, buy flow unaffected | P1 | 8 | FIT.8, CAT.7 | Regression case 5 passes; a non-fitting item is purchasable with one inline note; the summary is identical with and without a garage |
+| FIT.17 | Fit answer on the order line (D-38 Q-G6, slice FIT-d): an order-line annotation hook in `orders` (opaque validated JSON, no `fitment` import), the product page posts the shown answer (tier, wording version, profile node id and label), shown on the order, the confirmation and the vendor order view as seller-declared compatibility, in the order export and in the retention scrub | P1 | 6 | FIT.9, ORD.2 | A purchase with an active garage stores the answer and never the profiles; an order without a garage has no annotation; the import contract shows `orders` does not import `fitment`; a return view shows the wording the customer saw |
 | FIT.10 | Editorial links (D-38, slice FIT-e): `fitment_nodes` chooser on blog posts and term landing pages, `editorial_page` hub article per node and locale, *Compatible items* block from the fitment query, *Make this my garage* form button, product-to-article links, the staff coverage report, the blog index garage banner | P1 | 12 | FIT.1, FIT.8, CMS.3, CMS.4 | An article linked to a node lists the matching items without hand-picking; a node with 50 items and no article appears in the report; a general article is always shown; a second hub article for the same node and locale is refused |
 | FIT.11 | Events (D-38, slice FIT-e): `fitment_nodes` on `EventPage` (organiser chooser), the "For <profile> owners" badge and the *Only events for my garage* checkbox (off by default), feeds ignore the garage | P1 | 6 | FIT.1, FIT.7, EVT.1 | A tagged event gets the badge; the checkbox filters; the RSS and ICS feeds are the same with and without a garage |
 | FIT.12 | SEO and cache rules (D-38, slice FIT-e): self-canonical to the generic URL, `Cache-Control: private` and `Vary: Cookie` on personalised responses (no `noindex`, canonical only), edge bypass on the garage cookie, JSON-LD `isAccessoryOrSparePartFor` (up to 10) and BlogPosting `about`, hub articles in the sitemap, cache purge on fitment change | P1 | 8 | FIT.8, FIT.10, SEO.7 | Regression cases 6 and 9 pass (the bypass rule is also written into the SEO.6 cache contract and tested there when SEO.6 lands); the generic and personalised crawl give the same URL set; Rich Results Test has no errors; no garage in any JSON-LD |

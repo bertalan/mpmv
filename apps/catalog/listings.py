@@ -19,6 +19,8 @@ from dataclasses import dataclass, replace
 from decimal import Decimal
 from urllib.parse import parse_qs, parse_qsl, quote, urlencode
 
+from apps.core.indexing import NOINDEX, is_noindex_forced
+
 from .engine import to_price
 
 CATEGORY = "category"
@@ -250,6 +252,8 @@ def listing_robots(params: ListingParams, *, total: int, indexed_pages: int = IN
     """`noindex, follow` for a page past `indexed_pages` and for a filtered listing with no
     products (like an internal search with no results); `index, follow` otherwise. Filtered
     listings with products are indexable on their canonical URL (CAT.8)."""
+    if is_noindex_forced():
+        return NOINDEX
     if params.page > indexed_pages or (params.has_filters and total == 0):
         return ROBOTS_NOINDEX
     return ROBOTS_INDEX

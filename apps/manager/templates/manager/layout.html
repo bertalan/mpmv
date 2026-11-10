@@ -13,7 +13,7 @@ The Manager has no language prefix and no CMS page, like the account area. Stric
 script or style.
 {% endcomment %}
 {% block title %}{{ title }} · {{ site_name }}{% endblock %}
-{% block description %}<meta name="robots" content="noindex">{% endblock %}
+{% block description %}{% robots_meta "noindex" %}{% endblock %}
 {% block header %}
   {% switch_next_url as next_url %}{% get_current_language as current_language %}{% get_available_languages as available %}{% get_language_info_list for available as languages %}
   <header class="site-header manager-header">

@@ -41,7 +41,7 @@ STAGE moves to a single VPS and gains the abuse-test row ARC.21 (2026-11-08): +1
 counts the earlier totals.
 
 The garage (owner decision D-38, 2026-11-10, [17](17-garage-fitment.md)) adds FIT.1 to FIT.15 as P1 in six
-slices: +15 tasks, +164 h of P1 (FIT.16, 14 h, is P3). The P1 critical path grows from 147 to 153 h (the FIT chain becomes the longest).
+slices: +16 tasks, +170 h of P1 (FIT.16, 14 h, is P3). The P1 critical path grows from 147 to 153 h (the FIT chain becomes the longest).
 
 The public STAGE demo mode (owner decision 2026-11-08) adds the row ARC.22: +1 task, +6 h of P1.
 
