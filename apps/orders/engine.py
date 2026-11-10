@@ -226,7 +226,23 @@ PRIVACY_TRANSITIONS: Mapping[str, frozenset[str]] = {
     "restricted_tax_only": frozenset({"anonymized"}),
     "anonymized": frozenset(),
 }
-UNPAID_STATES = frozenset({"checkout", "quote_flow", "awaiting_payment", "cancelled"})
+# An order that never reached `paid` may be anonymised at once when it is `cancelled` (expired or
+# failed checkouts end there) or when a draft / awaiting-payment checkout has been abandoned for
+# this many days (frozen into the database trigger, migration 0009). A live checkout is never
+# anonymised: a payment can still arrive. `paid_at` is set by the trigger when an order first
+# becomes paid, so "never paid" does not depend on the current state.
+ABANDONED_AFTER_DAYS = 30
+_ABANDONABLE = frozenset({"checkout", "quote_flow", "awaiting_payment"})
+
+
+def anonymisable_at_once(
+    state: str, paid_at: dt.datetime | None, created: dt.datetime, now: dt.datetime
+) -> bool:
+    if paid_at is not None:
+        return False
+    if state == "cancelled":
+        return True
+    return state in _ABANDONABLE and now - created > dt.timedelta(days=ABANDONED_AFTER_DAYS)
 
 
 def check_privacy_transition(source: str, target: str) -> None:

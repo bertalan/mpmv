@@ -260,6 +260,7 @@ def create_order(
     state: str = "checkout",
     legacy_wp_order_id: int | None = None,
     placed_at: dt.datetime | None = None,
+    paid_at: dt.datetime | None = None,
     dry_run: bool = False,
     now: dt.datetime | None = None,
 ) -> tuple[Order | None, ChangeSet]:
@@ -282,8 +283,8 @@ def create_order(
     if state not in engine.ORDER_STATES:
         raise ValueError(f"{state!r} is not an order state")
     legacy = legacy_wp_order_id is not None
-    if placed_at is not None and not legacy:
-        raise ValueError("only a legacy order may choose its date (placed_at)")
+    if (placed_at is not None or paid_at is not None) and not legacy:
+        raise ValueError("only a legacy order may choose its dates (placed_at, paid_at)")
     if state not in engine.ORDER_INITIAL_STATES and not legacy:
         raise ValueError(f"{state!r} is not an initial state of an order")
     for item in vendor_orders:
@@ -309,6 +310,7 @@ def create_order(
         state=state,
         legacy_wp_order_id=legacy_wp_order_id,
     )
+    order.paid_at = paid_at if legacy else None
     if placed_at is not None:
         order.created_at = placed_at  # MIG.4: the original date starts the retention clock
     built = [_build_vendor_order(order, item) for item in vendor_orders]
@@ -331,6 +333,7 @@ def create_order(
         order.number = _take_order_number(now=now)
         order.transfer_group = order.number
         order.save()
+        order.refresh_from_db(fields=["paid_at"])  # the trigger may have set it (legacy states)
         for sub, lines, _ in built:
             sub.order = order
             sub.save()
@@ -505,11 +508,13 @@ def _scrub(
                     raise ScrubNotDue(f"the active phase of {months} months has not ended")
             else:
                 mode = "anonymise"
-                never_paid = locked.state in engine.UNPAID_STATES
-                if not never_paid and not engine.retention_over(locked.tax_retention_until, today):
+                at_once = engine.anonymisable_at_once(
+                    locked.state, locked.paid_at, locked.created_at, stamp
+                )
+                if not at_once and not engine.retention_over(locked.tax_retention_until, today):
                     raise ScrubNotDue(
                         f"anonymisation is due after {locked.tax_retention_until} "
-                        "(or at once for an order never paid)"
+                        "(or at once for a cancelled or abandoned order never paid)"
                     )
             engine.check_privacy_transition(locked.privacy_status, target)
             before = _scrub_snapshot(locked)
@@ -565,6 +570,7 @@ def anonymise_order(
     """-> anonymized: replace the personal fields (name, VAT and tax ids, e-mail, addresses, VAT
     validation log, buyer link) with fixed placeholders, keeping amounts, countries, dates and
     tax rates. Allowed from the day after `tax_retention_until` (31 December of year 10, business
-    time zone), or at once for an order that never reached `paid`. Raises `ScrubNotDue` before
+    time zone), or at once for a cancelled or abandoned order that never reached `paid`
+    (`paid_at` is empty). Raises `ScrubNotDue` before
     that. Idempotent."""
     return _scrub(order, "anonymized", reason="", ctx=ctx, dry_run=dry_run, now=now)

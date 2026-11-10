@@ -177,6 +177,13 @@ class Order(_StateGuarded):
         editable=False,
         help_text="31 December of the order year + 10, in the business time zone; immutable.",
     )
+    paid_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+        help_text="Set by the trigger when the order first becomes paid; immutable. A legacy "
+        "loader supplies it on insert. Decides whether an order was ever paid.",
+    )
     restricted_at = models.DateTimeField(
         null=True, blank=True, editable=False, help_text="When it became restricted_tax_only."
     )
