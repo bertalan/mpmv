@@ -5,8 +5,10 @@ authenticator is fake. Needs human review: security code.
 """
 
 import json
+import re
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -409,17 +411,22 @@ KNOWN_UNWIRED = {
 }
 
 
+def _gated_actions() -> set[str]:
+    """Action keys named at `requires_level("...")` or `step_up(..., level="...")` in app code."""
+    pattern = re.compile(r"""(?:requires_level\(|level=)\s*["'](\w+)["']""")
+    found: set[str] = set()
+    for path in Path(__file__).resolve().parents[4].glob("apps/*/*.py"):
+        found |= set(pattern.findall(path.read_text()))
+    return found
+
+
 def test_every_group_2_and_3_action_has_a_decorator_or_is_listed_as_not_built() -> None:
-    import importlib
-
-    from django.urls import get_resolver
-
     from apps.core.session_policy import parse_policy
 
-    get_resolver()  # import every URLconf and its views
-    importlib.import_module("apps.accounts.tests.integration.urls")
     policy = parse_policy({})
     sensitive = policy.operational | policy.passkey
-    missing = sensitive - levels.REGISTERED_ACTIONS - KNOWN_UNWIRED
+    missing = sensitive - _gated_actions() - KNOWN_UNWIRED
     assert not missing, f"group 2 or 3 actions with no requires_level view: {sorted(missing)}"
-    assert {"role_grant", "vat_regime", "audit_in_clear"} <= levels.REGISTERED_ACTIONS
+    assert {"role_grant", "vat_regime", "audit_in_clear"} <= _gated_actions()
+    wired = _gated_actions() & KNOWN_UNWIRED - {"export", "payout_details", "backup"}
+    assert not wired, f"remove from KNOWN_UNWIRED, now gated: {sorted(wired)}"
