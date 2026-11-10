@@ -152,3 +152,21 @@ def test_too_many_saves_show_a_form_error(client: Client, owner: User, settings:
     response = client.post(PROFILE, {"language": "en", "tagline": "two"})
     assert response.status_code == 200
     assert 'class="error-summary"' in response.text
+
+
+def test_saving_a_machine_draft_unchanged_says_it_is_still_a_draft(
+    client: Client, owner: User, vendor: Vendor
+) -> None:
+    VendorTranslationFactory.create(vendor=vendor, language="it", tagline="Bozza", status="machine")
+    verified_login(client, owner)
+    response = client.post(PROFILE, {"language": "it", "tagline": "Bozza"}, follow=True)
+    text = response.text.lower()
+    assert "still a draft" in text
+    assert "nothing changed" not in text.replace("still a draft", "")
+
+
+def test_a_nul_byte_posted_to_the_page_is_a_form_error(client: Client, owner: User) -> None:
+    verified_login(client, owner)
+    response = client.post(PROFILE, {"language": "en", "tagline": "a\x00b"})
+    assert response.status_code == 200
+    assert 'class="error-summary"' in response.text

@@ -324,3 +324,44 @@ def test_the_moderator_email_renders_hostile_values_inert() -> None:
     assert "&lt;script&gt;" in rendered.html_body
     assert "<b>" not in rendered.html_body
     assert "<img" not in rendered.html_body
+
+
+# --- Re-check (#204): control characters, per-vendor limit
+
+
+@pytest.mark.parametrize("char", ["\x00", "\x07", "\x1b", "\x7f"])
+@pytest.mark.parametrize("field", ["tagline", "description", "refund_policy"])
+def test_control_characters_are_refused_not_a_500(
+    vendor: Vendor, owner: User, field: str, char: str
+) -> None:
+    with pytest.raises(ValidationError):
+        save_storefront_profile(vendor, "en", {field: f"a{char}b"}, actor=owner, ctx=CTX)
+    assert not VendorTranslation.objects.filter(vendor=vendor).exists()
+
+
+def test_line_breaks_and_tabs_are_allowed_in_the_texts(vendor: Vendor, owner: User) -> None:
+    text = "Line one\r\nLine two\n\tindented"
+    save_storefront_profile(vendor, "en", {"refund_policy": text}, actor=owner, ctx=CTX)
+    assert VendorTranslation.objects.get(vendor=vendor, language="en").refund_policy == text
+
+
+def test_several_owners_share_the_vendors_limit(
+    vendor: Vendor, owner: User, settings: object
+) -> None:
+    settings.VENDOR_PROFILE_SAVE_LIMIT = 100  # type: ignore[attr-defined]
+    settings.VENDOR_PROFILE_VENDOR_SAVE_LIMIT = 2  # type: ignore[attr-defined]
+    second = VendorMemberFactory.create(vendor=vendor, role="owner").user
+    save_storefront_profile(vendor, "en", {"tagline": "a"}, actor=owner, ctx=CTX)
+    save_storefront_profile(vendor, "en", {"tagline": "b"}, actor=second, ctx=CTX)
+    with pytest.raises(ValidationError):
+        save_storefront_profile(vendor, "en", {"tagline": "c"}, actor=owner, ctx=CTX)
+    with pytest.raises(ValidationError):
+        save_storefront_profile(vendor, "en", {"tagline": "c"}, actor=second, ctx=CTX)
+
+
+def test_the_vendor_limit_is_per_vendor(owner: User, vendor: Vendor, settings: object) -> None:
+    settings.VENDOR_PROFILE_VENDOR_SAVE_LIMIT = 1  # type: ignore[attr-defined]
+    other = VendorFactory.create()
+    VendorMemberFactory.create(vendor=other, user=owner, role="owner")
+    save_storefront_profile(vendor, "en", {"tagline": "a"}, actor=owner, ctx=CTX)
+    save_storefront_profile(other, "en", {"tagline": "a"}, actor=owner, ctx=CTX)
