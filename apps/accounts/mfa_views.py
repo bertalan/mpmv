@@ -18,10 +18,12 @@ from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.http import urlencode
+from django.utils.translation import gettext
 from django.views.decorators.http import require_http_methods, require_POST
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
 from apps.core.audit import audit_context
+from apps.core.public_forms import not_anonymous, pre_mfa_step
 
 from . import engine, services
 from .decorators import mfa_exempt, mfa_redirect, step_up_required
@@ -86,6 +88,7 @@ def setup(request: HttpRequest) -> HttpResponse:
     )
 
 
+@pre_mfa_step(purpose="Enter or enrol the authenticator-app code", task="CORE.4")
 @mfa_exempt
 @signed_in
 @require_http_methods(["GET", "POST"])
@@ -106,7 +109,7 @@ def totp(request: HttpRequest) -> HttpResponse:
                 device, request.POST.get("token", "").strip(), ctx=audit_context(request)
             )
         except services.MfaError:
-            error = "Invalid code. Check the time on your device and try again."
+            error = gettext("Invalid code. Check the time on your device and try again.")
         else:
             request.session.pop(PENDING_TOTP_DEVICE, None)
             complete_verification(request, enrolment.device)
@@ -132,6 +135,7 @@ def totp(request: HttpRequest) -> HttpResponse:
 # --- Verification
 
 
+@pre_mfa_step(purpose="Enter the second-factor code to finish signing in", task="CORE.4")
 @mfa_exempt
 @signed_in
 @require_http_methods(["GET", "POST"])
@@ -155,7 +159,7 @@ def verify(request: HttpRequest) -> HttpResponse:
             complete_verification(request, device)
             return HttpResponseRedirect(next_url)
         services.record_mfa_failure(user, str(method), ctx=audit_context(request))
-        error = "Invalid code. Try again."
+        error = gettext("Invalid code. Try again.")
     return render(
         request,
         "accounts/mfa/verify.html",
@@ -175,6 +179,7 @@ def verify(request: HttpRequest) -> HttpResponse:
 # --- Passkeys (JSON endpoints used by accounts/passkey.js)
 
 
+@pre_mfa_step(purpose="Start a passkey enrolment (WebAuthn options)", task="CORE.4")
 @mfa_exempt
 @signed_in
 @require_POST
@@ -195,6 +200,7 @@ def passkey_register_options(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"publicKey": options.public_key})
 
 
+@pre_mfa_step(purpose="Finish a passkey enrolment", task="CORE.4")
 @mfa_exempt
 @signed_in
 @require_POST
@@ -204,7 +210,7 @@ def passkey_register(request: HttpRequest) -> JsonResponse:
     challenge = request.session.pop(REGISTRATION_CHALLENGE, None)
     body = _json_body(request)
     if not challenge or not isinstance(body.get("credential"), dict):
-        return _bad_request("no pending passkey registration")
+        return _bad_request(gettext("no pending passkey registration"))
     try:
         passkey = engine.verify_passkey_registration(
             relying_party(request), body["credential"], challenge=engine.from_b64url(challenge)
@@ -216,13 +222,14 @@ def passkey_register(request: HttpRequest) -> JsonResponse:
             ctx=audit_context(request),
         )
     except engine.PasskeyError:
-        return _bad_request("the passkey could not be registered")
+        return _bad_request(gettext("the passkey could not be registered"))
     complete_verification(request, enrolment.device)
     return JsonResponse(
         {"redirect": safe_next(request), "recovery_codes": enrolment.recovery_codes}
     )
 
 
+@pre_mfa_step(purpose="Start a passkey check (WebAuthn options)", task="CORE.4")
 @mfa_exempt
 @signed_in
 @require_POST
@@ -233,7 +240,7 @@ def passkey_auth_options(request: HttpRequest) -> JsonResponse:
         )
     )
     if not credential_ids:
-        return _bad_request("no passkey registered")
+        return _bad_request(gettext("no passkey registered"))
     options = engine.passkey_authentication_options(
         relying_party(request), credential_ids=credential_ids
     )
@@ -241,6 +248,7 @@ def passkey_auth_options(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"publicKey": options.public_key})
 
 
+@pre_mfa_step(purpose="Finish a passkey check as the second factor", task="CORE.4")
 @mfa_exempt
 @signed_in
 @require_POST
@@ -248,7 +256,7 @@ def passkey_auth(request: HttpRequest) -> JsonResponse:
     challenge = request.session.pop(AUTHENTICATION_CHALLENGE, None)
     body = _json_body(request)
     if not challenge or not isinstance(body.get("credential"), dict):
-        return _bad_request("no pending passkey authentication")
+        return _bad_request(gettext("no pending passkey authentication"))
     try:
         device = services.authenticate_passkey(
             _user(request),
@@ -258,7 +266,7 @@ def passkey_auth(request: HttpRequest) -> JsonResponse:
         )
     except engine.PasskeyError:
         services.record_mfa_failure(_user(request), services.PASSKEY, ctx=audit_context(request))
-        return _bad_request("the passkey was not accepted")
+        return _bad_request(gettext("the passkey was not accepted"))
     complete_verification(request, device)
     return JsonResponse({"redirect": safe_next(request)})
 
@@ -297,6 +305,11 @@ def overview(request: HttpRequest) -> HttpResponse:
     )
 
 
+@not_anonymous(
+    reason="signed in and a fresh second factor (step-up) are required before any work",
+    purpose="Regenerate recovery codes",
+    task="CORE.4",
+)
 @signed_in
 @step_up_required()
 @require_http_methods(["GET", "POST"])
@@ -327,6 +340,11 @@ def _own_device(user: User, kind: str, public_id: str) -> services.SecondFactor:
     raise Http404
 
 
+@not_anonymous(
+    reason="signed in and a fresh second factor (step-up) are required before any work",
+    purpose="Remove a second factor",
+    task="CORE.4",
+)
 @signed_in
 @step_up_required()
 @require_POST
@@ -335,7 +353,7 @@ def remove_device(request: HttpRequest, kind: str, public_id: str) -> HttpRespon
     try:
         services.remove_device(device, ctx=audit_context(request))
     except services.MfaPolicyError:
-        messages.error(request, "Add another factor before removing your last one.")
+        messages.error(request, gettext("Add another factor before removing your last one."))
     else:
-        messages.success(request, f"{device.name} removed.")
+        messages.success(request, gettext("%(name)s removed.") % {"name": device.name})
     return HttpResponseRedirect(reverse("mfa:overview"))

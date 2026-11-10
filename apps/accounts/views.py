@@ -5,6 +5,7 @@ import math
 
 from django.contrib import messages
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
+from django.http.response import HttpResponseBase
 from django.utils import translation
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext
@@ -12,32 +13,38 @@ from django.views.decorators.http import require_POST
 
 from apps.core.http import client_ip
 from apps.core.i18n import configured_languages, translate_path
+from apps.core.public_forms import Protection, public_form
 from apps.core.services import consume_rate_limit
 
 from .services import set_preferred_language
 from .session_language import SESSION_LANGUAGE_KEY
 
-SWITCH_LIMIT = 30  # per client address and minute (SEC.13): the anonymous POST writes a session
+# A visitor changes language a few times; 30 a minute per IP is generous (SEC.13).
+SWITCH_LIMIT = 30
 SWITCH_WINDOW = dt.timedelta(minutes=1)
 
 
+@public_form(
+    protection=Protection.ALLOW,
+    purpose="Language switcher (redirect to the same page in another language)",
+    task="I18N.1",
+    reason="stores nothing for an anonymous visitor and redirects only to this host",
+    rate_limit="per IP, generous",
+)
 @require_POST
-def switch_language(request: HttpRequest) -> HttpResponse:
+def switch_language(request: HttpRequest) -> HttpResponseBase:
     """Language switcher: redirect to the current page in the chosen language (I18N.1).
 
     The URL prefix decides the language, so no cookie is set; a signed-in user's choice is also
     stored as `preferred_language`, an anonymous visitor's in the session. Unknown languages and
     off-site `next` URLs are ignored.
     """
-    retry_after = consume_rate_limit(
-        f"switch_language:ip:{client_ip(request) or 'unknown'}",
-        limit=SWITCH_LIMIT,
-        window=SWITCH_WINDOW,
+    wait = consume_rate_limit(
+        f"language_switch:ip:{client_ip(request)}", limit=SWITCH_LIMIT, window=SWITCH_WINDOW
     )
-    if retry_after:
-        response = HttpResponse("Too many requests, try again shortly.", status=429)
-        response["Retry-After"] = str(max(1, math.ceil(retry_after.total_seconds())))
-        return response
+    if wait:
+        retry = str(max(1, math.ceil(wait.total_seconds())))
+        return HttpResponse("Too many requests.", status=429, headers={"Retry-After": retry})
     next_url = request.POST.get("next", "")
     if not url_has_allowed_host_and_scheme(
         next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
