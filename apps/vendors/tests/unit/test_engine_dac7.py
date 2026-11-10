@@ -189,7 +189,7 @@ def test_the_account_holder_and_the_establishment_are_never_missing() -> None:
 
 
 def test_a_vendor_whose_country_issues_no_tin_is_complete_with_a_place_of_birth() -> None:
-    assert "BS" in engine.NO_TIN_COUNTRIES
+    assert "BS" in engine.SEEDED_NO_TIN_COUNTRIES
     identity = individual(
         country="BS",
         tax_code="",
@@ -405,7 +405,7 @@ def test_vies_unavailable_does_not_keep_a_tin_that_is_not_the_vat_number() -> No
 
 
 def test_an_entity_whose_country_issues_no_tin_still_needs_a_tin() -> None:
-    assert "AE" in engine.NO_TIN_COUNTRIES
+    assert "AE" in engine.SEEDED_NO_TIN_COUNTRIES
     identity = entity(
         country="AE",
         legal_name="Acme LLC",
@@ -423,3 +423,51 @@ def test_an_entity_whose_country_issues_no_tin_still_needs_a_tin() -> None:
     with_birthplace = dataclasses.replace(identity, place_of_birth="Dubai")
     assert engine.dac7_check(with_birthplace).missing == ("tax_code",)
     assert engine.dac7_check(dataclasses.replace(identity, tax_code="TRN123456")).complete
+
+
+# --- The no-TIN list is data passed in by the service (VEN.27, owner decision MQ-16)
+
+
+def no_tin_individual(country: str = "NZ") -> LegalIdentity:
+    return individual(
+        country=country,
+        tax_code="",
+        tin_country=country,
+        tax_residence_country=country,
+        registered_province="",
+        registered_country=country,
+        registered_postal_code="6011",
+        registered_city="Wellington",
+        iban=GB_IBAN,
+    )
+
+
+def test_the_seed_is_the_six_countries_that_were_a_constant() -> None:
+    assert {"AE", "BM", "BS", "KY", "MC", "VG"} == engine.SEEDED_NO_TIN_COUNTRIES
+
+
+def test_a_country_in_the_passed_list_accepts_a_place_of_birth_instead_of_a_tin() -> None:
+    identity = dataclasses.replace(no_tin_individual(), place_of_birth="Wellington")
+    assert engine.dac7_missing(identity, no_tin_countries={"NZ"}) == ()
+
+
+def test_a_country_not_in_the_passed_list_still_needs_the_tin() -> None:
+    identity = dataclasses.replace(no_tin_individual(), place_of_birth="Wellington")
+    assert engine.dac7_missing(identity, no_tin_countries={"BS"}) == ("tax_code",)
+    assert engine.dac7_missing(identity, no_tin_countries=frozenset()) == ("tax_code",)
+
+
+def test_the_passed_list_replaces_the_seed_it_does_not_add_to_it() -> None:
+    identity = individual(country="BS", tax_code="", tin_country="BS", place_of_birth="Nassau")
+    assert "tax_code" in engine.dac7_missing(identity, no_tin_countries={"NZ"})
+
+
+def test_an_entity_needs_a_tin_even_in_a_listed_country() -> None:
+    identity = entity(country="NZ", tax_code="", tin_country="NZ")
+    assert "tax_code" in engine.dac7_missing(identity, no_tin_countries={"NZ"})
+
+
+def test_the_payout_check_uses_the_passed_list_too() -> None:
+    identity = dataclasses.replace(no_tin_individual(), place_of_birth="Wellington")
+    assert engine.payout_completeness(identity, [], no_tin_countries={"NZ"}).complete
+    assert not engine.payout_completeness(identity, [], no_tin_countries=frozenset()).complete
