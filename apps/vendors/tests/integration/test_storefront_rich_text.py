@@ -16,7 +16,7 @@ from apps.core.audit import AuditContext
 from apps.core.tests.factories import MediaImageFactory
 from apps.vendors import engine
 from apps.vendors.models import Vendor, VendorTranslation
-from apps.vendors.services import save_storefront_profile
+from apps.vendors.services import media_problem, save_storefront_profile
 from apps.vendors.tests.factories import (
     VendorFactory,
     VendorMemberFactory,
@@ -288,3 +288,16 @@ def test_the_storefront_never_fails_on_a_bogus_image_format(
     assert response.status_code == 200
     assert "Story" in response.content.decode()
     assert "<embed" not in response.content.decode()
+
+
+def test_a_page_link_is_refused_on_save(vendor: Vendor, owner: User) -> None:
+    """#238 minor: a `linktype="page"` link resolves any page id; vendors may not use it."""
+    html = '<p><a linktype="page" id="1">other page</a></p>'
+    assert media_problem(vendor, html) is not None
+
+
+def test_the_manager_editor_has_no_link_or_chooser_feature_it_cannot_serve() -> None:
+    from apps.manager.forms import MANAGER_RICH_TEXT_FEATURES
+
+    assert "link" not in MANAGER_RICH_TEXT_FEATURES
+    assert "image" in MANAGER_RICH_TEXT_FEATURES
