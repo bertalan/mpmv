@@ -29,9 +29,14 @@ def test_authority_languages_include_an_official_language_of_the_country() -> No
     assert contact_codes(country="BE", authority_languages=["nl", "en"]) == []
 
 
-def test_authority_languages_include_a_widely_understood_one() -> None:
-    assert contact_codes(authority_languages=["it"]) == ["authority_widely_understood_language"]
-    # English counts as both when it is official (Ireland).
+def test_authority_languages_include_english() -> None:
+    # D-27 (article 11(3)): an official language and English.
+    assert contact_codes(authority_languages=["it"]) == ["authority_english_language"]
+    assert contact_codes(authority_languages=["fr"]) == [
+        "authority_official_language",
+        "authority_english_language",
+    ]
+    # English is both when it is official (Ireland).
     assert contact_codes(country="IE", authority_languages=["en"]) == []
 
 
@@ -40,14 +45,21 @@ def test_recipient_contact_is_the_support_email() -> None:
 
 
 def test_required_sections_per_kind() -> None:
-    assert engine.REQUIRED_SECTIONS["platform_terms"] == ("restrictions", "moderation_policy")
+    assert engine.REQUIRED_SECTIONS["platform_terms"] == (
+        "restrictions",
+        "moderation_policy",
+        "complaint_handling",
+        "redress",
+    )
     assert engine.REQUIRED_SECTIONS["ranking"] == ("ranking_parameters",)
 
 
 def test_missing_sections_are_reported_per_page_and_language() -> None:
-    problems = engine.section_problems("platform_terms", "de", ["restrictions"])
+    problems = engine.section_problems(
+        "platform_terms", "de", ["restrictions", "moderation_policy", "redress"]
+    )
     assert [(p.code, p.subject) for p in problems] == [
-        ("section_missing", "platform_terms [de]: moderation_policy")
+        ("section_missing", "platform_terms [de]: complaint_handling")
     ]
     assert engine.section_problems("ranking", "en", ["ranking_parameters"]) == []
 

@@ -260,11 +260,12 @@ def warnings_language_gaps(
 # `LegalSectionBlock`. DSA article 14 (restrictions and moderation policy in the terms) and P2B
 # article 5 (ranking parameters). The wording is the editor's; code only checks the tags.
 REQUIRED_SECTIONS: Final[Mapping[str, tuple[str, ...]]] = {
-    "platform_terms": ("restrictions", "moderation_policy"),
+    "platform_terms": ("restrictions", "moderation_policy", "complaint_handling", "redress"),
     "ranking": ("ranking_parameters",),
 }
-# A language that counts as broadly understood in the Union for DSA article 11(2).
-WIDELY_UNDERSTOOD_LANGUAGE: Final = "en"
+# DSA article 11(3) (owner decision D-27): the authorities can write in an official language of the
+# Member State of establishment and in English.
+AUTHORITY_LANGUAGE: Final = "en"
 
 
 @dataclass(frozen=True)
@@ -287,8 +288,8 @@ def contact_problems(
     support_email: str,
 ) -> list[DsaProblem]:
     """DSA articles 11 and 12 on the operator's data: an authorities' address, the languages it
-    can be used in (an official language of the Member State of establishment, plus one broadly
-    understood in the Union, article 11(2)), and an address for recipients (article 12)."""
+    can be used in (an official language of the Member State of establishment plus English,
+    article 11(3), D-27), and an address for recipients (article 12)."""
     problems: list[DsaProblem] = []
     languages = {code.lower().split("-")[0] for code in authority_languages}
     if not authority_email:
@@ -299,8 +300,8 @@ def contact_problems(
         official = set(OFFICIAL_LANGUAGES.get(country.upper(), ()))
         if official and not official & languages:
             problems.append(DsaProblem("authority_official_language", country.upper()))
-        elif len(languages) < 2 and WIDELY_UNDERSTOOD_LANGUAGE not in languages:
-            problems.append(DsaProblem("authority_widely_understood_language"))
+        if AUTHORITY_LANGUAGE not in languages:
+            problems.append(DsaProblem("authority_english_language"))
     if not support_email:
         problems.append(DsaProblem("support_email"))
     return problems

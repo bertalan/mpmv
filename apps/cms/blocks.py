@@ -225,6 +225,8 @@ class CallToActionBlock(blocks.StructBlock):  # type: ignore[misc]
 LEGAL_SECTIONS: tuple[tuple[str, Any], ...] = (
     ("restrictions", _("Restrictions: what the platform may restrict, and why")),
     ("moderation_policy", _("Content moderation policy and procedures")),
+    ("complaint_handling", _("Internal complaint handling (DSA article 20)")),
+    ("redress", _("Out-of-court dispute settlement (DSA article 21)")),
     ("ranking_parameters", _("Ranking: main parameters and their relative importance")),
     ("differentiated_treatment", _("Differentiated treatment of vendors")),
     ("data_access", _("Access to data")),

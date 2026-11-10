@@ -559,13 +559,38 @@ def set_legal_effective_date(
     return run_mutation(changeset, apply, ctx=ctx, action=LEGAL_DATE_SET, dry_run=dry_run)
 
 
-def legal_readiness(languages: Sequence[str] | None = None) -> list[engine.ReadinessProblem]:
+GoliveCheck = Callable[[Sequence[str] | None], list[str]]
+# Checks other apps add to `golive_readiness` (one go-live gate): each takes the languages (None
+# for all) and returns problem messages. `apps.compliance` registers the DSA and P2B check
+# (CMP.5, D-27); cms cannot import it.
+GOLIVE_CHECKS: list[GoliveCheck] = []
+
+
+def register_golive_check(check: GoliveCheck) -> None:
+    if check not in GOLIVE_CHECKS:
+        GOLIVE_CHECKS.append(check)
+
+
+def golive_problems(languages: Sequence[str] | None = None) -> list[str]:
+    """Every go-live problem: the legal pages of all kinds with their reviews (I18N.9, D-27),
+    then the registered checks."""
+    kinds = (*engine.GO_LIVE_LEGAL_KINDS, *engine.DSA_LEGAL_KINDS)
+    messages = [p.message for p in legal_readiness(languages, kinds=kinds)]
+    for check in GOLIVE_CHECKS:
+        messages.extend(check(languages))
+    return messages
+
+
+def legal_readiness(
+    languages: Sequence[str] | None = None, kinds: Sequence[str] | None = None
+) -> list[engine.ReadinessProblem]:
     """What stops go-live on the customer legal and checkout pages, in every go-live language
     (all of settings.LANGUAGES unless `languages` is given): a page without a published
     translation in a language, or a language's published text without its reviews."""
+    kinds = kinds or engine.GO_LIVE_LEGAL_KINDS
     pages = (
         LegalPage.objects.live()
-        .filter(kind__in=engine.GO_LIVE_LEGAL_KINDS, alias_of__isnull=True)
+        .filter(kind__in=kinds, alias_of__isnull=True)
         .select_related("locale")
     )
     texts = []
@@ -580,9 +605,7 @@ def legal_readiness(languages: Sequence[str] | None = None) -> list[engine.Readi
                 reviews=frozenset(stages),
             )
         )
-    return engine.legal_readiness_problems(
-        texts, engine.GO_LIVE_LEGAL_KINDS, languages or configured_languages()
-    )
+    return engine.legal_readiness_problems(texts, kinds, languages or configured_languages())
 
 
 def legal_section_tags(kinds: Iterable[str]) -> dict[tuple[str, str], set[str]]:

@@ -41,6 +41,9 @@ def operator(**extra: object) -> PlatformOperator:
     return PlatformOperatorFactory.create(**values)
 
 
+TERMS_SECTIONS = ("restrictions", "moderation_policy", "complaint_handling", "redress")
+
+
 def section(name: str) -> tuple[str, dict[str, str]]:
     return ("legal_section", {"section": name, "heading": name, "text": "<p>Text.</p>"})
 
@@ -120,7 +123,7 @@ def test_contact_page_hides_an_empty_optional_url() -> None:
 
 
 def full_pages(languages: list[str] | None = None) -> None:
-    publish("platform_terms", "restrictions", "moderation_policy")
+    publish("platform_terms", *TERMS_SECTIONS)
     publish("ranking", "ranking_parameters")
 
 
@@ -144,7 +147,7 @@ def test_readiness_reports_missing_contacts() -> None:
 
 def test_readiness_reports_missing_pages_and_sections() -> None:
     operator()
-    publish("platform_terms", "restrictions")
+    publish("platform_terms", "restrictions", "moderation_policy", "complaint_handling")
     found = services.dsa_p2b_readiness(["en"])
     assert [p.code for p in found] == ["section_missing", "page_missing"]
 
@@ -155,7 +158,7 @@ def test_readiness_ignores_unpublished_pages_and_empty_sections() -> None:
         kind="ranking", title="R", slug="r", body=[section("ranking_parameters")], live=False
     )
     assert page.live is False
-    publish("platform_terms", "restrictions", "moderation_policy")
+    publish("platform_terms", *TERMS_SECTIONS)
     assert codes(services.dsa_p2b_readiness(["en"])) == ["page_missing"]
     LegalPageFactory.create(
         kind="ranking",
@@ -223,7 +226,28 @@ def test_contact_page_is_cached_for_a_short_time() -> None:
 
 
 def test_publishing_a_platform_terms_page_records_a_version_with_the_section() -> None:
-    page = publish("platform_terms", "restrictions", "moderation_policy")
+    page = publish("platform_terms", *TERMS_SECTIONS)
     version = page.versions.get()
-    assert [b.block_type for b in version.body] == ["legal_section", "legal_section"]
+    assert [b.block_type for b in version.body] == ["legal_section"] * len(TERMS_SECTIONS)
     assert version.body[0].value["section"] == "restrictions"
+
+
+def test_contact_page_is_not_found_when_no_contact_is_configured() -> None:
+    operator(authority_contact_email="", support_email="", user_contact_url="")
+    assert Client().get(reverse("dsa_contact_points")).status_code == 404
+
+
+def test_golive_readiness_includes_the_dsa_checks_and_reviews(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from apps.cms.services import golive_problems
+
+    operator(authority_contact_languages=["de"])  # no English
+    full_pages()
+    messages = golive_problems(["en"])
+    assert any("authority_english_language" in m for m in messages)
+    # The DSA pages need the native and counsel reviews like the other legal pages (D-27).
+    assert any("platform_terms [en]: no native_review" in m for m in messages)
+    assert any("ranking [en]: no counsel_check" in m for m in messages)
+    with pytest.raises(CommandError, match="authority_english_language"):
+        call_command("golive_readiness", "--language", "en")

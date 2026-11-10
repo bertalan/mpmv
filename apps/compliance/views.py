@@ -21,6 +21,8 @@ def contact_points(request: HttpRequest) -> HttpResponse:
         points = services.contact_points()
     except NoPlatformOperator as exc:
         raise Http404("No platform operator is configured") from exc
+    if not (points.authority_email or points.user_email or points.user_url):
+        raise Http404("No contact is configured")  # a half-configured site publishes nothing
     return render(
         request,
         "compliance/contact_points.html",

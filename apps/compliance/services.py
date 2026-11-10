@@ -20,7 +20,7 @@ job flags any published product that fails the check anyway
 import datetime as dt
 import logging
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
 from zoneinfo import ZoneInfo
@@ -970,6 +970,11 @@ def language_name(code: str) -> str:
         return str(get_language_info(code)["name_local"]).capitalize()
     except KeyError:
         return code
+
+
+def golive_messages(languages: Sequence[str] | None = None) -> list[str]:
+    """`dsa_p2b_readiness` as the messages `golive_readiness` lists (registered in `ready()`)."""
+    return [problem.message for problem in dsa_p2b_readiness(languages)]
 
 
 def dsa_p2b_readiness(languages: Iterable[str] | None = None) -> list[engine.DsaProblem]:
