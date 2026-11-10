@@ -82,7 +82,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             # database got from data migrations. pytest-django runs those tests last; the group
             # keeps that order: the group starts only after every other test is handed out, and
             # a worker that ran it takes no ordinary test afterwards.
-            item.add_marker(pytest.mark.xdist_group(name=f"flush-{item.path.name}"))
+            item.add_marker(pytest.mark.xdist_group(name=f"flush-{item.nodeid}"))
 
 
 def _flushes_database(item: pytest.Item) -> bool:
