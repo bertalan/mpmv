@@ -16,7 +16,7 @@ so each one is audited, and so is each review of a language's text (I18N.9).
 import datetime as dt
 import hashlib
 import json
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Collection, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -972,7 +972,7 @@ def _sanitise_block_value(block: blocks.Block, value: Any) -> Any:
     """`value` (a block's stored form) with every rich text inside cleaned."""
     if isinstance(block, blocks.RichTextBlock):
         if isinstance(value, str):
-            return engine.sanitise_rich_text(value, block.features or [])
+            return engine.sanitise_rich_text(value, block.features)
         return value
     if isinstance(block, blocks.StructBlock) and isinstance(value, dict):
         return {
@@ -993,18 +993,23 @@ def _sanitise_block_value(block: blocks.Block, value: Any) -> Any:
     return value
 
 
-def sanitise_rich_text_fields(instance: Any) -> list[str]:
+def sanitise_rich_text_fields(instance: Any, only: Collection[str] | None = None) -> list[str]:
     """Clean every rich text of a model instance in place: `RichTextField`s and the
     `RichTextBlock`s of its StreamFields (CMS.12). Returns the names of the fields changed.
 
     Called before every save, so import, seed, API and migration writes are covered; the
-    editor's own output is already clean and stays byte for byte.
+    editor's own output is already clean and stays byte for byte. `only` limits the work to
+    those field names (`save(update_fields=...)` writes just those). Writes that skip
+    `pre_save` (`bulk_create`, `bulk_update`, `QuerySet.update` of a rich-text field, `loaddata`)
+    must call this first: see docs/dev/rich-text.md.
     """
     changed: list[str] = []
     for model_field in instance._meta.get_fields():
+        if only is not None and model_field.name not in only:
+            continue
         if isinstance(model_field, RichTextField):
             current = getattr(instance, model_field.attname)
-            clean = engine.sanitise_rich_text(current, model_field.features or [])
+            clean = engine.sanitise_rich_text(current, model_field.features)
             if clean != current:
                 setattr(instance, model_field.attname, clean)
                 changed.append(model_field.name)

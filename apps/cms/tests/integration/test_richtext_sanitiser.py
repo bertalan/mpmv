@@ -61,3 +61,21 @@ def test_a_second_save_changes_nothing() -> None:
     page.save()
 
     assert BlogIndexPage.objects.get(pk=page.pk).intro == first
+
+
+def test_save_with_update_fields_cleans_the_rich_text_it_writes() -> None:
+    page = BlogIndexPageFactory.create(intro="<p>clean</p>")
+    page.intro = HOSTILE
+
+    page.save(update_fields=["intro"])
+
+    assert hi.active_markup(BlogIndexPage.objects.get(pk=page.pk).intro) == []
+
+
+def test_a_cdata_payload_in_a_stream_block_is_dropped() -> None:
+    page = StandardPageFactory.create(body=[("paragraph", hi.RICH_TEXT_SHAPES[0])])
+
+    stored = json.dumps(list(StandardPage.objects.get(pk=page.pk).body.raw_data))
+
+    assert "CDATA" not in stored
+    assert "onerror" not in stored

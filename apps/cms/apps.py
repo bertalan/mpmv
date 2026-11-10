@@ -2,6 +2,7 @@ from typing import Any
 
 from django.apps import AppConfig
 from django.core import checks
+from django.core.exceptions import ImproperlyConfigured
 from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.models.signals import post_migrate, pre_save
 
@@ -67,12 +68,18 @@ def _guard_editor() -> None:
     Wagtail's Draftail converter asserts on stored HTML it would not write (an `<img>` in a
     field without the image feature). Text from an import or a seed can hold such an element, so
     the converter reads the sanitised text: the editor shows what a save would store.
+
+    Written against Wagtail 8.1 (`wagtail>=8.1,<8.2`). It is verified here, at startup, so a
+    Wagtail upgrade that renames the method or changes its behaviour fails the deploy, not the
+    first editor who opens such a page.
     """
     from wagtail.admin.rich_text.converters.contentstate import ContentstateConverter
     from wagtail.rich_text import features as feature_registry
 
     from . import engine
 
+    if not hasattr(ContentstateConverter, "from_database_format"):
+        raise ImproperlyConfigured("CMS.12: ContentstateConverter.from_database_format is gone")
     if getattr(ContentstateConverter.from_database_format, "_cms12", False):
         return
     original = ContentstateConverter.from_database_format
@@ -85,3 +92,7 @@ def _guard_editor() -> None:
 
     from_database_format._cms12 = True  # type: ignore[attr-defined]
     ContentstateConverter.from_database_format = from_database_format
+    try:
+        ContentstateConverter(["bold"]).from_database_format("<p>a</p><p><img src=x></p><p>b</p>")
+    except Exception as error:
+        raise ImproperlyConfigured(f"CMS.12: the editor guard does not hold: {error!r}") from error

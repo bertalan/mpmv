@@ -35,9 +35,11 @@ the elements and attributes the editor can write are stored.
 import datetime as dt
 import json
 import math
+import re
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
+from html import escape, unescape
 from html.parser import HTMLParser
 from typing import Any
 
@@ -444,6 +446,7 @@ def listing_slug_path(path: str, prefix: str) -> str | None:
 #: Attributes a stored `<a linktype=...>` and `<embed>` may keep (the database format).
 _DB_LINK_ATTRS = ("id", "linktype")
 _DB_EMBED_ATTRS = ("embedtype", "id", "alt", "format")
+_TAG_RE = re.compile(r"<[^>]*>?")
 EXTERNAL_LINK_REL = "noopener noreferrer"
 _EXTERNAL_PREFIXES = ("http://", "https://", "//")
 
@@ -458,6 +461,7 @@ def _whitelister(features: tuple[str, ...]) -> Any:
     """
     # Imported here: the admin converters need the app registry, which loads after the models
     # that import this module.
+    from bs4.element import NavigableString
     from wagtail.admin.rich_text.converters.editor_html import (
         DbWhitelister,
         EditorHTMLConverter,
@@ -465,7 +469,24 @@ def _whitelister(features: tuple[str, ...]) -> Any:
     from wagtail.whitelist import check_url
 
     class StoredTextWhitelister(DbWhitelister):  # type: ignore[misc]
+        def clean_string_node(self, doc: Any, node: Any) -> None:
+            # Only plain text stays. CDATA, DOCTYPE, declarations and processing instructions
+            # are `NavigableString`s too, and a browser reads them as bogus comments that end
+            # at the first `>`: what follows is live markup.
+            if type(node) is not NavigableString:
+                node.extract()
+
         def clean_tag_node(self, doc: Any, tag: Any) -> None:
+            try:
+                self._clean_tag_node(doc, tag)
+            except (KeyError, AttributeError, TypeError, ValueError):
+                # A link or embed missing what its handler needs (`data-id`): not one of ours.
+                if tag.name == "embed" or "data-embedtype" in tag.attrs:
+                    tag.decompose()
+                elif tag.parent is not None:
+                    tag.unwrap()
+
+        def _clean_tag_node(self, doc: Any, tag: Any) -> None:
             if tag.name == "a" and "linktype" in tag.attrs and "data-linktype" not in tag.attrs:
                 for child in list(tag.contents):
                     self.clean_node(doc, child)
@@ -488,14 +509,23 @@ def _whitelister(features: tuple[str, ...]) -> Any:
     return StoredTextWhitelister(EditorHTMLConverter(list(features)).converter_rules)
 
 
-def sanitise_rich_text(html: str, features: Sequence[str]) -> str:
+def sanitise_rich_text(html: str, features: Sequence[str] | None) -> str:
     """`html` reduced to what the editor with `features` can write (CMS.12).
 
     The editor's allow-list is the one on save: elements and attributes of the granted features
     stay, anything else (script, style, iframe, event handlers, `javascript:` and `data:` links)
     goes, with the text of a dropped element kept. Stored text is not escaped twice, and the
-    result is stable: sanitising it again changes nothing.
+    result is stable: sanitising it again changes nothing. `features=None` means Wagtail's
+    default features, as for a field. The function never raises: a text nested too deeply for
+    the parser is reduced to its escaped plain text.
     """
     if not html:
         return html
-    return str(_whitelister(tuple(features)).clean(html))
+    if features is None:
+        from wagtail.rich_text import features as feature_registry
+
+        features = feature_registry.get_default_features()
+    try:
+        return str(_whitelister(tuple(features)).clean(html))
+    except RecursionError:
+        return escape(_TAG_RE.sub("", unescape(html)))

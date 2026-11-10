@@ -39,4 +39,4 @@ def _has_rich_text(model: type[models.Model]) -> bool:
 def sanitise_before_save(sender: type[models.Model], instance: models.Model, **kwargs: Any) -> None:
     """`pre_save`: rich text reaches storage only through the sanitiser (CMS.12)."""
     if not kwargs.get("raw") and _has_rich_text(sender):
-        services.sanitise_rich_text_fields(instance)
+        services.sanitise_rich_text_fields(instance, only=kwargs.get("update_fields"))
