@@ -307,7 +307,6 @@ def _platform(run: _Run) -> None:
             vat_number=f"{data.ITALY}{_italian_vat(900)}",
             tax_regime=PlatformOperator.TaxRegime.STANDARD,
             commission_vat_mode=PlatformOperator.CommissionVatMode.STANDARD,
-            einvoice_channel=PlatformOperator.EInvoiceChannel.SDI,
             dac7_authority_country=data.ITALY,
             valid_from=data.SEED_EPOCH,
         )
