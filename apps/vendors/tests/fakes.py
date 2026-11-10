@@ -20,6 +20,14 @@ class FakeVatNumberValidator:
         return self.answers.get(country_prefix + number, self.default)
 
 
+def clear_activation_requirements() -> None:
+    """Drop the `activation` requirement rows: tests of the status machine that use bare
+    vendors do not depend on whether an earlier test left the seeded rows (CMP.25)."""
+    from apps.vendors.models import LegalFieldRequirement
+
+    LegalFieldRequirement.objects.filter(purpose="activation").delete()
+
+
 def seed_legal_requirements() -> None:
     """Re-run the seeding data migrations (idempotent).
 
@@ -30,5 +38,6 @@ def seed_legal_requirements() -> None:
         "0005_seed_legal_requirements",
         "0007_seed_dac7_requirements",
         "0018_seed_dac7_seller_dataset",
+        "0023_selfcertification_append_only_and_seed_activation",
     ):
         importlib.import_module(f"apps.vendors.migrations.{name}").seed(apps, None)

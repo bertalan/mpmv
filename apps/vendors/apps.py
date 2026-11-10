@@ -13,6 +13,7 @@ class VendorsConfig(AppConfig):
         "legalfieldrequirement",
         "vendorcontract",
         "contractacceptance",
+        "selfcertification",
         "vendorfeatureflag",
         "crossvendorconsent",
     )

@@ -70,6 +70,40 @@ ssh <stage> '~/.local/bin/mpmv-deploy deploy 0.2.0'
 
 `~/.local/bin/mpmv-deploy doctor` and `~/.local/bin/mpmv-deploy check` run steps 1 and 5 on demand.
 
+### Platform staff permission (CORE.8)
+
+Platform staff is the model permission `vendors.view_all_vendors`, not `is_staff`. No data
+migration grants it: on every environment, existing staff accounts must get it explicitly (admin
+user page, or the CORE.18 role groups once they exist), otherwise they lose the all-vendor view
+after the deploy (fail closed). Superusers keep it. STAGE has only seed users: the next seed run
+grants the permission to the seed operator.
+
+### Editor roles migration (CORE.8)
+
+Migration `cms/0013_editor_roles` removes Wagtail's default "Editors" and "Moderators" groups
+and moves their members into three edit-only roles (Page editors, Blog editors, Legal page
+editors). Effects on STAGE and later environments:
+
+- Former Editors and Moderators can edit and submit their work but no longer publish or approve.
+- The three publisher roles and Event moderators are created empty. After the migrate, staff
+  assign them in the staff admin (superuser only) to whoever must publish.
+- The home page is in no role; only superusers edit it.
+- A database without the default groups (STAGE, a fresh install) gets the roles and no members.
+- Reverse restores the default groups for users who held all three editor roles only.
+- The Wagtail admin menu shows CMS entries only, superusers included. Commerce work is in the
+  Manager.
+
+Details: [editor-roles.md](editor-roles.md).
+
+### Activation gate and tax territories (CMP.25, TAX.7)
+
+- Migration `vendors/0023` seeds the `activation` requirements (DSA article 30 trader data) and
+  makes self-certifications append-only. A vendor is activated only with that data and the
+  self-certification; existing active vendors keep their status.
+- Migration `tax/0006` seeds the special territories (Livigno, Canary Islands, French overseas
+  departments and others) without overwriting rows staff changed. The postcode lists are for
+  the owner to review in the tax admin; Northern Ireland is not seeded (D-02).
+
 ## Promoting to LIVE
 
 LIVE gets only a tag that has run on STAGE without incident, and only on the owner's go. The same

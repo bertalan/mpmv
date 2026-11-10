@@ -215,6 +215,20 @@ def territory_key_errors(territory: Territory) -> dict[str, str]:
     }
 
 
+def territory_rules() -> list[engine.TerritoryRule]:
+    """Every territory as an engine rule, ordered by country and code. Raises
+    `engine.TerritoryConfigError` for a stored invalid pattern."""
+    return [
+        engine.territory_rule(t.code, t.country, t.vat_status, t.postcode_patterns)
+        for t in Territory.objects.all()
+    ]
+
+
+def find_territory(country: str, postcode: str | None) -> engine.TerritoryRule | None:
+    """The territory an address lies in, or None. A missing postcode matches nothing."""
+    return engine.find_territory(country, postcode or "", territory_rules())
+
+
 def save_territory(territory: Territory, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Create or change a territory, audited. Territories are not versioned: rates are.
 
