@@ -186,11 +186,6 @@ def test_the_owner_edits_the_storefront_profile_and_staff_cannot(
     _accessible(page, editor=True)
     shot("profile-saved")
 
-    page.goto(f"{live_server.url}/shop/{shop.slug}/")
-    expect(page.locator(".vendor-profile strong, .vendor-profile b").first).to_have_text("30 days")
-    page.get_by_text("Returns and refunds").click()  # open the accordion item
-    shot("vendor-page-formatted-policy")
-
     page.get_by_role("button", name="Save logo").click()
     expect(page.get_by_role("region", name="There is a problem")).to_be_visible()
     _accessible(page, editor=True)
@@ -205,6 +200,11 @@ def test_the_owner_edits_the_storefront_profile_and_staff_cannot(
     expect(page.get_by_role("img", name="Shop West anvil mark")).to_be_visible()
     _accessible(page, editor=True)
     shot("logo-saved")
+
+    page.goto(f"{live_server.url}/shop/{shop.slug}/")
+    expect(page.locator(".vendor-profile strong, .vendor-profile b").first).to_have_text("30 days")
+    page.get_by_text("Returns and refunds").click()  # open the accordion item
+    shot("vendor-page-formatted-policy")
 
 
 def test_vendor_staff_have_no_storefront_profile(page: Page, live_server: LiveServer) -> None:
