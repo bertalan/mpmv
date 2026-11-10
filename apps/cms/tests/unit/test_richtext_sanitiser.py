@@ -38,17 +38,31 @@ def test_sanitising_twice_changes_nothing(value: str) -> None:
 def test_the_editors_own_formatting_survives() -> None:
     html = (
         "<h2>Title</h2><h3>Sub</h3><p>Some <b>bold</b> and <i>italic</i> text "
-        '<a href="https://example.org/x?a=1&amp;b=2">a link</a></p>'
+        '<a href="https://example.org/x?a=1&amp;b=2" rel="noopener noreferrer">a link</a></p>'
         "<ul><li>one</li><li>two</li></ul><ol><li>first</li></ol>"
     )
 
     assert sanitise_rich_text(html, RICH_TEXT_FEATURES) == html
 
 
-def test_internal_links_survive() -> None:
-    html = '<p><a id="3" linktype="page">page</a></p>'
+def test_internal_links_survive_and_get_no_rel() -> None:
+    html = '<p><a id="3" linktype="page">page</a> <a href="/about/">about</a></p>'
 
     assert sanitise_rich_text(html, RICH_TEXT_FEATURES) == html
+
+
+def test_an_external_link_gets_rel_noopener_noreferrer() -> None:
+    clean = sanitise_rich_text('<p><a href="//example.org/" rel="opener">x</a></p>', ["link"])
+
+    assert clean == '<p><a href="//example.org/" rel="noopener noreferrer">x</a></p>'
+
+
+def test_a_stored_link_with_extra_attributes_is_reduced_to_the_known_ones() -> None:
+    clean = sanitise_rich_text(
+        '<p><a linktype="page" id="3" onclick="x()" href="javascript:y()">p</a></p>', ["link"]
+    )
+
+    assert clean == '<p><a id="3" linktype="page">p</a></p>'
 
 
 def test_existing_entities_are_not_escaped_twice() -> None:

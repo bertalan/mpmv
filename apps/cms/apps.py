@@ -3,7 +3,7 @@ from typing import Any
 from django.apps import AppConfig
 from django.core import checks
 from django.db import DEFAULT_DB_ALIAS, connections
-from django.db.models.signals import post_migrate
+from django.db.models.signals import post_migrate, pre_save
 
 
 def _sync_locales(using: str = DEFAULT_DB_ALIAS, **kwargs: Any) -> None:
@@ -46,7 +46,7 @@ class CmsConfig(AppConfig):
 
         from .checks import check_base_url
         from .models import LegalPage
-        from .signals import record_published_legal_page
+        from .signals import record_published_legal_page, sanitise_before_save
 
         checks.register(check_base_url, deploy=True)
         # After every migrate (and every test database flush): one Locale per configured
@@ -56,3 +56,32 @@ class CmsConfig(AppConfig):
         page_published.connect(
             record_published_legal_page, sender=LegalPage, dispatch_uid="cms.legal_versions"
         )
+        # Rich text written outside the editor is stored with the editor's allow-list (CMS.12).
+        pre_save.connect(sanitise_before_save, dispatch_uid="cms.sanitise_rich_text")
+        _guard_editor()
+
+
+def _guard_editor() -> None:
+    """The editor opens any stored rich text (CMS.12, F2).
+
+    Wagtail's Draftail converter asserts on stored HTML it would not write (an `<img>` in a
+    field without the image feature). Text from an import or a seed can hold such an element, so
+    the converter reads the sanitised text: the editor shows what a save would store.
+    """
+    from wagtail.admin.rich_text.converters.contentstate import ContentstateConverter
+    from wagtail.rich_text import features as feature_registry
+
+    from . import engine
+
+    if getattr(ContentstateConverter.from_database_format, "_cms12", False):
+        return
+    original = ContentstateConverter.from_database_format
+
+    def from_database_format(self: Any, html: str) -> Any:
+        features = self.features
+        if features is None:
+            features = feature_registry.get_default_features()
+        return original(self, engine.sanitise_rich_text(html, features))
+
+    from_database_format._cms12 = True  # type: ignore[attr-defined]
+    ContentstateConverter.from_database_format = from_database_format

@@ -26,6 +26,10 @@ Product grid (CMS.10, spec 10 §10.2): how many products a grid shows.
 
 Blog (CMS.3, spec 10 §10.2): an article's schedule, Wagtail's `go_live_at` and `expire_at`, and
 the schema.org data of articles and author pages (Person, ProfilePage, BlogPosting).
+
+Rich text (CMS.12, spec 10 §10.2): the sanitiser every rich-text write outside the editor goes
+through. It is the editor's own allow-list (`DbWhitelister` of the Wagtail features), so only
+the elements and attributes the editor can write are stored.
 """
 
 import datetime as dt
@@ -33,6 +37,7 @@ import json
 import math
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from functools import lru_cache
 from html.parser import HTMLParser
 from typing import Any
 
@@ -434,3 +439,63 @@ def listing_slug_path(path: str, prefix: str) -> str | None:
     top of the tree, after the language `prefix` and the listing segment. None without slugs."""
     _segment, _sep, slugs = path.removeprefix(prefix).strip("/").partition("/")
     return slugs or None
+
+
+#: Attributes a stored `<a linktype=...>` and `<embed>` may keep (the database format).
+_DB_LINK_ATTRS = ("id", "linktype")
+_DB_EMBED_ATTRS = ("embedtype", "id", "alt", "format")
+EXTERNAL_LINK_REL = "noopener noreferrer"
+_EXTERNAL_PREFIXES = ("http://", "https://", "//")
+
+
+@lru_cache(maxsize=32)
+def _whitelister(features: tuple[str, ...]) -> Any:
+    """The editor's allow-list for `features`, reading the database format too.
+
+    Wagtail's `DbWhitelister` turns the editor's HTML into the stored form; stored text
+    (`<a linktype="page" id="3">`, `<embed embedtype=...>`) is not editor HTML, so those two
+    shapes are kept here, reduced to their known attributes, when the feature is granted.
+    """
+    # Imported here: the admin converters need the app registry, which loads after the models
+    # that import this module.
+    from wagtail.admin.rich_text.converters.editor_html import (
+        DbWhitelister,
+        EditorHTMLConverter,
+    )
+    from wagtail.whitelist import check_url
+
+    class StoredTextWhitelister(DbWhitelister):  # type: ignore[misc]
+        def clean_tag_node(self, doc: Any, tag: Any) -> None:
+            if tag.name == "a" and "linktype" in tag.attrs and "data-linktype" not in tag.attrs:
+                for child in list(tag.contents):
+                    self.clean_node(doc, child)
+                if tag["linktype"] in self.link_handlers:
+                    tag.attrs = {k: v for k, v in tag.attrs.items() if k in _DB_LINK_ATTRS}
+                else:
+                    tag.unwrap()
+                return
+            if tag.name == "embed" and "data-embedtype" not in tag.attrs:
+                if tag.get("embedtype") in self.embed_handlers:
+                    tag.attrs = {k: v for k, v in tag.attrs.items() if k in _DB_EMBED_ATTRS}
+                else:
+                    tag.decompose()
+                return
+            super().clean_tag_node(doc, tag)
+            href = tag.get("href") if tag.name == "a" else None
+            if href and check_url(href) and href.lstrip().lower().startswith(_EXTERNAL_PREFIXES):
+                tag["rel"] = EXTERNAL_LINK_REL
+
+    return StoredTextWhitelister(EditorHTMLConverter(list(features)).converter_rules)
+
+
+def sanitise_rich_text(html: str, features: Sequence[str]) -> str:
+    """`html` reduced to what the editor with `features` can write (CMS.12).
+
+    The editor's allow-list is the one on save: elements and attributes of the granted features
+    stay, anything else (script, style, iframe, event handlers, `javascript:` and `data:` links)
+    goes, with the text of a dropped element kept. Stored text is not escaped twice, and the
+    result is stable: sanitising it again changes nothing.
+    """
+    if not html:
+        return html
+    return str(_whitelister(tuple(features)).clean(html))

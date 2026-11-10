@@ -1,7 +1,10 @@
 """Signal adapters (CMS.5): thin, the work is in `services`."""
 
+from functools import cache
 from typing import Any
 
+from django.db import models
+from wagtail.fields import RichTextField, StreamField
 from wagtail.models import Revision
 
 from apps.core.audit import AuditContext, user_context
@@ -26,3 +29,14 @@ def record_published_legal_page(
     user = getattr(revision, "user", None)
     ctx = user_context(user, ip=None) if user is not None else SYSTEM
     services.record_legal_version(instance, ctx=ctx)
+
+
+@cache
+def _has_rich_text(model: type[models.Model]) -> bool:
+    return any(isinstance(f, RichTextField | StreamField) for f in model._meta.get_fields())
+
+
+def sanitise_before_save(sender: type[models.Model], instance: models.Model, **kwargs: Any) -> None:
+    """`pre_save`: rich text reaches storage only through the sanitiser (CMS.12)."""
+    if not kwargs.get("raw") and _has_rich_text(sender):
+        services.sanitise_rich_text_fields(instance)
