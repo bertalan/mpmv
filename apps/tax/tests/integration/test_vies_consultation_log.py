@@ -145,24 +145,59 @@ def test_no_operator_and_no_vendor_records_an_anonymous_check() -> None:
     assert check.snapshot()["requester"] == ""
 
 
-def test_a_vendor_without_a_valid_vat_number_has_no_vendor_proof() -> None:
-    """Review 2: no silent fallback; the caller sees None and the log says operator proof."""
-    assert services.vendor_requester("IT", "") is None
-    assert services.vendor_requester("IT", "not a vat number") is None
-    assert services.vendor_requester("IT", "IT01234567897") == VENDOR
+def test_a_vendor_without_a_valid_vat_number_cannot_make_a_reverse_charge_check() -> None:
+    """Owner answer (#224): art. 138 needs a VAT-identified supplier. The operator's
+    consultation number is never an order's proof: no VIES call, no row, not verified."""
     PlatformOperatorFactory.create(
         country="AT",
         vat_number="ATU12345678",
         valid_from=timezone.now() - dt.timedelta(days=1),
         valid_to=None,
     )
-    check = services.verify_vat_number(
+    client = RequesterAwareClient()
+    for vendor_vat in ("", "not a vat number"):
+        check = services.verify_vat_number_for_order(
+            "DE",
+            "DE123456789",
+            vendor_country="IT",
+            vendor_vat_number=vendor_vat,
+            client=client,
+        )
+        assert check.verified is False
+        assert check.reason == engine.VAT_REASON_NO_VENDOR_VAT
+        assert check.snapshot()["request_id"] == ""
+    assert client.calls == []
+    assert VatValidation.objects.count() == 0
+
+
+def test_an_order_check_is_always_fresh_and_sent_as_the_vendor() -> None:
+    client = RequesterAwareClient()
+    first = services.verify_vat_number_for_order(
+        "DE", "DE123456789", vendor_country="IT", vendor_vat_number="IT01234567897", client=client
+    )
+    second = services.verify_vat_number_for_order(
+        "DE", "DE123456789", vendor_country="IT", vendor_vat_number="IT01234567897", client=client
+    )
+    assert first.verified
+    assert second.verified
+    assert second.from_cache is False
+    assert client.requesters == [VENDOR, VENDOR]
+    assert VatValidation.objects.count() == 2
+    assert second.snapshot()["requester_kind"] == "vendor"
+    assert second.snapshot()["request_id"] == "WAPIVENDOR0001"
+
+
+def test_an_order_check_fails_closed_when_vies_is_down_even_with_a_cached_valid_answer() -> None:
+    services.verify_vat_number("DE", "DE123456789", client=RequesterAwareClient(), requester=VENDOR)
+    check = services.verify_vat_number_for_order(
         "DE",
         "DE123456789",
-        client=RequesterAwareClient(),
-        requester=services.vendor_requester("IT", ""),
+        vendor_country="IT",
+        vendor_vat_number="IT01234567897",
+        client=DownViesClient(),
     )
-    assert check.snapshot()["requester_kind"] == "operator"  # i.e. "no vendor proof"
+    assert check.verified is False
+    assert check.from_cache is False
 
 
 def test_the_vies_request_date_is_stored_next_to_the_local_time() -> None:

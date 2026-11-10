@@ -1126,6 +1126,37 @@ def verify_vat_number(
     return _vat_check(query, row, detail=answer.detail, from_cache=False)
 
 
+def verify_vat_number_for_order(
+    country: str,
+    vat_number: str,
+    *,
+    vendor_country: str,
+    vendor_vat_number: str,
+    client: ViesClient | None = None,
+) -> VatCheck:
+    """The VIES check an order's reverse-charge decision rests on (D-28, owner answers on #224).
+
+    Always a fresh VIES call (never the 24 h cache, which is for the cart display only), sent
+    with the VENDOR's VAT number as requester so the consultation number in the snapshot is the
+    vendor's. A vendor without a VAT number VIES can use cannot make an intra-EU supply
+    (art. 138): the check is not verified with `VAT_REASON_NO_VENDOR_VAT`, VIES is not asked,
+    and the operator's number is never substituted. VIES down: fails closed like
+    `verify_vat_number`.
+    """
+    requester = vendor_requester(vendor_country, vendor_vat_number)
+    if requester is None:
+        return VatCheck(
+            country=country.strip().upper(),
+            vat_number=vat_number.strip(),
+            verified=False,
+            reason=engine.VAT_REASON_NO_VENDOR_VAT,
+            message=engine.vat_check_message(
+                engine.VAT_REASON_NO_VENDOR_VAT, country=country.strip().upper()
+            ),
+        )
+    return verify_vat_number(country, vat_number, client=client, refresh=True, requester=requester)
+
+
 def recheck_vat_number(country: str, vat_number: str) -> VatCheck:
     """Ask VIES again, skipping the cache (for the background job). Raises `ViesUnavailable`
     when VIES gives no answer, so that the job is retried with backoff."""
