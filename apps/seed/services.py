@@ -103,7 +103,11 @@ SOLE_PROPRIETOR = vendors_engine.SOLE_PROPRIETORSHIP
 # The audit context of the `demo_seed` test fixture (root conftest); the command has its own.
 TEST_CONTEXT = AuditContext(actor_label="test:demo_seed", source="system")
 OWN_WORK_LICENCE = "own-work"  # seeded by core migration 0013
-OPERATOR_PERMISSIONS = (tax_services.REVIEW_PERMISSION, vendors_services.REOPEN_PERMISSION)
+OPERATOR_PERMISSIONS = (
+    tax_services.REVIEW_PERMISSION,
+    vendors_services.REOPEN_PERMISSION,
+    "vendors.view_all_vendors",  # CORE.8: platform staff is a permission, not is_staff
+)
 
 
 @dataclasses.dataclass
@@ -303,7 +307,6 @@ def _platform(run: _Run) -> None:
             vat_number=f"{data.ITALY}{_italian_vat(900)}",
             tax_regime=PlatformOperator.TaxRegime.STANDARD,
             commission_vat_mode=PlatformOperator.CommissionVatMode.STANDARD,
-            einvoice_channel=PlatformOperator.EInvoiceChannel.SDI,
             dac7_authority_country=data.ITALY,
             valid_from=data.SEED_EPOCH,
         )
@@ -550,6 +553,7 @@ def _identity(index: int, spec: data.VendorSeed) -> dict[str, Any]:
     }
     if spec.share_capital is not None:
         values["share_capital"] = spec.share_capital
+    values["phone"] = f"+39 06 5550{index + 1:04d}"  # DSA article 30 (CMP.25), a fictional number
     # DAC7 (VEN.23): the TIN's issuing country, and a registration number or a date of birth.
     values["tin_country"] = spec.country
     if spec.legal_form == SOLE_PROPRIETOR:
@@ -646,6 +650,11 @@ def _vendor(run: _Run, index: int, spec: data.VendorSeed, contract: VendorContra
                     ctx=run.ctx,
                 )
             )
+        run.add(
+            vendors_services.certify_platform_duties(
+                vendor, owner, language=SOURCE_LANGUAGE, ctx=run.ctx
+            )
+        )
         run.add(vendors_services.change_status(vendor, vendors_engine.ACTIVE, ctx=run.ctx))
     if not tax_services.has_tax_profile(vendor):
         profile = VendorTaxProfile(

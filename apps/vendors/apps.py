@@ -10,9 +10,11 @@ class VendorsConfig(AppConfig):
         "vendor",
         "vendormember",
         "vendorclaim",
+        "vendorapplication",
         "legalfieldrequirement",
         "vendorcontract",
         "contractacceptance",
+        "selfcertification",
         "vendorfeatureflag",
         "crossvendorconsent",
     )
@@ -28,3 +30,4 @@ class VendorsConfig(AppConfig):
         from . import services
 
         services.register_claim_purpose()  # VEN.24: the email-bound claim link (CORE.15)
+        services.register_application_purpose()  # VEN.22: the application email link

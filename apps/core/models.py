@@ -339,20 +339,12 @@ class PlatformOperator(Versioned):
         NONE = "none", "No VAT on commissions and fees"
         STANDARD = "standard", "VAT on commissions and fees under the general rules"
 
-    class EInvoiceChannel(models.TextChoices):
-        NONE = "none", "No structured e-invoicing"
-        SDI = "sdi", "SDI (FatturaPA)"
-        PEPPOL = "peppol", "Peppol"
-
     legal_name = models.CharField(max_length=200)
     country = CountryField(help_text="Country of establishment (ISO 3166-1 alpha-2).")
     vat_number = models.CharField("VAT number", max_length=32, help_text="With the country prefix.")
     tax_regime = models.CharField(max_length=32, choices=TaxRegime.choices)
     commission_vat_mode = models.CharField(
         "commission VAT mode", max_length=16, choices=CommissionVatMode.choices
-    )
-    einvoice_channel = models.CharField(
-        "e-invoice channel", max_length=16, choices=EInvoiceChannel.choices
     )
     dac7_authority_country = CountryField(
         "DAC7 reporting authority country",

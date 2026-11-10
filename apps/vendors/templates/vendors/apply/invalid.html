@@ -1,0 +1,10 @@
+{% extends "layouts/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Link not valid" %} · {{ site_name }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block content %}
+<article class="apply">
+  <h1>{% translate "This link is not valid" %}</h1>
+  <p>{% translate "The link has expired, was already used, or does not belong to a pending application. Open the link from the most recent email, or apply again." %}</p>
+</article>
+{% endblock %}

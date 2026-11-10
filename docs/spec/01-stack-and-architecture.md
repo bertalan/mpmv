@@ -122,7 +122,7 @@ flowchart TD
 |---|---|
 | Money | `Decimal` with 2 decimal places in the DB (`MoneyField` = `DecimalField(12,2)`), internal calculations to 4 decimal places, `ROUND_HALF_UP` rounding **per line**; explicit EUR currency |
 | Countries | ISO 3166-1 alpha-2 (`GR`, not `EL`); EU special territories modeled (see [05](05-tax.md)) |
-| Platform operator | Country, VAT number, regime, commission VAT mode, e-invoice channel (informational only: the platform sends no e-invoices, see [00](00-vision-and-review.md); removal proposed in ARC.17) and DAC7 authority come from the versioned `PlatformOperator` (`apps.core.services.current_operator(at)`); never a literal such as `"IT"` in application code (guarded by `tests/unit/test_no_platform_country_literal.py`; tests and migrations excluded) |
+| Platform operator | Country, VAT number, regime, commission VAT mode and DAC7 authority come from the versioned `PlatformOperator` (`apps.core.services.current_operator(at)`); never a literal such as `"IT"` in application code (guarded by `tests/unit/test_no_platform_country_literal.py`; tests and migrations excluded) |
 | Identifiers | Internal `bigint` PK; UUID `public_id` for APIs and technical URLs; orders, ledger, stock, carts, feeds and URLs reference the internal identity. The vendor SKU is a label: unique per vendor on its match key, used only to match imports ([03](03-catalog.md)) |
 | History | Configuration tables with `valid_from` / `valid_to`; orders store snapshots, not live references |
 | Dry-run | Every mutating service accepts `dry_run=True` and returns a `ChangeSet` (diff), or takes its caller's `ChangeSet`; the only exceptions are listed under [Dry-run exceptions](#dry-run-exceptions) (guarded by `tests/unit/test_dry_run_guard.py`) |
@@ -165,6 +165,7 @@ when a new mutating service has neither `dry_run` nor a place in this table (ARC
 | `apps.tax.services.recheck_vat_number` | telemetry | Same lookup as `verify_vat_number`, forced past the cache by the background job |
 | `apps.vendors.services.confirm_claim_identity` | throttle counter | Counts a wrong VAT number or TIN against the claim and locks it after too many (VEN.24) |
 | `apps.vendors.services.submit_claim` | one-time code | Spends the claim link and the authenticator code that creates the account (VEN.24) |
+| `apps.vendors.services.confirm_application` | one-time code | Spends the single-use email link that activates an applicant account (VEN.22) |
 | `apps.vendors.services.submit_claim_as_account` | one-time code | Spends the claim link of an existing account that just signed in (VEN.24) |
 
 ### Marketplace configuration pages (ARC.24)
@@ -275,7 +276,7 @@ def tax_for_cart_line(line: CartLine, checkout: CheckoutData, on: date) -> TaxDe
 | ARC.4 | CI: ruff, mypy, pytest, coverage, import-linter (dependency graph), pip-audit, secret scan | P1 | 8 | ARC.3 | Pipeline green on PRs |
 | ARC.5 | Containers: OCI `Containerfile`, local stack with Apple `container` (network, volumes, app, worker, Postgres), Linux runtime for STAGE/LIVE, versioned images | P1 | 10 | ARC.3 | `make dev` with `container`; release image, Quadlet units, and deploy and rollback tooling tested locally and in CI |
 | ARC.6 | `core`: base model, `MoneyField`, Country, `ChangeSet`/dry-run, `AuditLog` | P1 | 12 | ARC.3 | Tests on rounding and audit |
-| ARC.7 | `PlatformOperator` (country, VAT number, regime, e-invoice channel, DAC7 authority) as configuration | P1 | 4 | ARC.6 | No "IT" constant in the tax code |
+| ARC.7 | `PlatformOperator` (country, VAT number, regime, DAC7 authority) as configuration | P1 | 4 | ARC.6 | No "IT" constant in the tax code |
 | ARC.8 | Feature flags per environment and per vendor + kill switch (checkout, import, payments) | P2 | 6 | ARC.6 | Flags manageable from the admin |
 | ARC.9 | Task worker + cron scheduler on Postgres, with locks and retries | P1 | 8 | ARC.2 | Test job scheduled and observable |
 | ARC.10 | Synthetic data seed: vendors with all regimes, EN/IT products, zones, orders | P1 | 10 | CAT.1, TAX.1, SHP.1 | Reproducible `make seed`, used by the tests |

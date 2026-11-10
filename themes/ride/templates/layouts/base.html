@@ -1,0 +1,6 @@
+{% extends "layouts/base.html" %}{% load static %}{% comment %}
+Page layout of the `ride` theme (THM.6): base's layout plus one font preload (Barlow 400, the
+body face; spec 14 §14.7 allows one). A page that overrides `head` without `{{ block.super }}`
+loses the preload only.
+{% endcomment %}
+{% block head %}<link rel="preload" href="{% static 'themes/ride/fonts/barlow-400.woff2' %}" as="font" type="font/woff2" crossorigin>{{ block.super }}{% endblock %}

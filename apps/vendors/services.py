@@ -6,6 +6,7 @@ gate of CMP.13); per-vendor feature flag overrides (ARC.8); claiming an imported
 
 import dataclasses
 import datetime as dt
+import hashlib
 import logging
 from collections.abc import Callable, Collection, Mapping
 from typing import Any
@@ -16,22 +17,25 @@ from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.sessions.backends.base import SessionBase
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import connection, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import OuterRef, QuerySet, Subquery
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.module_loading import import_string
+from django.utils.translation import gettext_lazy
 
 from apps.accounts import engine as accounts_engine
-from apps.accounts.models import User, normalize_email_address
+from apps.accounts.models import ActionLinkUse, User, normalize_email_address
 from apps.accounts.services import (
     ActionLinkCheck,
     ActionLinkSpent,
     ActionPurpose,
     Enrolment,
+    action_link_path,
     email_bound_link,
     enrol_totp_key,
     has_second_factor,
+    issue_action_token,
     register_action_purpose,
     send_action_link_email,
     spend_email_bound_link,
@@ -39,11 +43,12 @@ from apps.accounts.services import (
 )
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import Change, ChangeSet
-from apps.core.models import AuditLog
+from apps.core.models import AuditLog, resolve_translation
 from apps.core.services import (
     allowed_vendor_countries,
     audit_changes,
     consume_rate_limit,
+    enqueue_email,
     flags_changed,
     run_mutation,
     save_audited,
@@ -55,7 +60,9 @@ from .models import (
     ContractAcceptance,
     CrossVendorConsent,
     LegalFieldRequirement,
+    SelfCertification,
     Vendor,
+    VendorApplication,
     VendorClaim,
     VendorContract,
     VendorContractTranslation,
@@ -99,6 +106,40 @@ def storefront_vendors() -> QuerySet[Vendor]:
 def has_public_storefront(vendor: Vendor) -> bool:
     """The same rule as `storefront_vendors`, on a vendor already loaded."""
     return bool(vendor.status == Vendor.Status.ACTIVE)
+
+
+@dataclasses.dataclass(frozen=True)
+class StorefrontProfile:
+    """A vendor's public texts in one language (VEN.10): tagline, bio and the non-empty policies
+    as `(title, text)` pairs. `language` is the one actually shown, `is_fallback` is True when
+    it is the source language standing in for the requested one."""
+
+    tagline: str
+    description: str
+    policies: tuple[tuple[str, str], ...]
+    language: str
+    is_fallback: bool
+
+
+def storefront_profile(vendor: Vendor, language: str) -> StorefrontProfile | None:
+    """The published text of `vendor` in `language`, else in the source language, else None.
+    Drafts and machine translations awaiting review are never public."""
+    resolved = resolve_translation(vendor.translations.all(), language)
+    text = resolved.translation
+    if text is None or resolved.language is None:
+        return None
+    policies = (
+        (gettext_lazy("Shipping"), text.shipping_policy),
+        (gettext_lazy("Returns and refunds"), text.refund_policy),
+        (gettext_lazy("Cancellation"), text.cancellation_policy),
+    )
+    return StorefrontProfile(
+        tagline=text.tagline,
+        description=text.description,
+        policies=tuple((str(title), body) for title, body in policies if body.strip()),
+        language=resolved.language,
+        is_fallback=resolved.is_fallback,
+    )
 
 
 # Fields encrypted at rest (SEC.3) are masked in audit rows, or the log would hold them in clear.
@@ -714,7 +755,12 @@ CONTRACT_ACCEPTED = "vendor.contract_accepted"
 
 
 def submit_application(
-    vendor: Vendor, applicant: User, *, ctx: AuditContext, dry_run: bool = False
+    vendor: Vendor,
+    applicant: User,
+    *,
+    ctx: AuditContext,
+    dry_run: bool = False,
+    pending_confirmation: bool = False,
 ) -> ChangeSet:
     """Create `vendor` (new, unsaved) as an applicant with `applicant` as its owner; audited.
 
@@ -722,11 +768,12 @@ def submit_application(
     incomplete. The VIES result and the legacy user id are reset: only the VIES check and the
     legacy migration set them. Being an owner, the applicant must enrol a second factor (CORE.4).
     Raises `ValidationError`, or `ValueError` for a saved vendor or an inactive user, also on
-    dry-run.
+    dry-run. `pending_confirmation` (the public application, VEN.22) accepts the inactive account
+    of an applicant who has yet to confirm the email address.
     """
     if not vendor._state.adding:
         raise ValueError("submit_application takes a new vendor, not a saved one")
-    if not applicant.is_active:
+    if not applicant.is_active and not pending_confirmation:
         raise ValueError("only an active user can apply as a vendor")
     vendor.status = engine.APPLICANT
     # Set by the VIES check and the legacy migration, never by an applicant.
@@ -940,10 +987,97 @@ def accept_contract(
         )
 
 
+SELF_CERTIFIED = "vendor.self_certified"
+SELF_CERTIFICATION_MODEL = "vendors.selfcertification"
+
+
+def is_self_certified(vendor: Vendor) -> bool:
+    """The vendor's owner certified the current text version in the vendor's current round."""
+    return SelfCertification.objects.filter(
+        vendor=vendor,
+        version=engine.SELF_CERTIFICATION_VERSION,
+        onboarding_round=vendor.onboarding_round,
+    ).exists()
+
+
+def platform_duties_missing(vendor: Vendor) -> tuple[str, ...]:
+    """What the stored vendor still lacks for activation under CMP.25: the `activation`
+    requirement fields, then the self-certification (`engine.platform_duties_missing`).
+
+    The self-certification is asked of every vendor while the field rules are EU-only; that is
+    harmless while D-21 admits only EU vendors (follow-up: scope it to the EU if that changes)."""
+    stored = Vendor.objects.get(pk=vendor.pk)
+    return engine.platform_duties_missing(
+        stored.legal_identity().values(),
+        requirement_rules(engine.ACTIVATION),
+        certified=is_self_certified(stored),
+    )
+
+
+def certify_platform_duties(
+    vendor: Vendor,
+    user: User,
+    *,
+    language: str,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Record that `user`, an owner, certifies for `vendor` the DSA article 30(1)(e) statement
+    shown in `language` (CMP.25).
+
+    Stores the text version, the language and the hash of the text.
+    Certifying again in the same onboarding round changes nothing. Raises
+    `engine.SelfCertificationError` (vendor status, not an owner, no text in `language`), also
+    on dry-run.
+    """
+    with transaction.atomic():
+        locked = (
+            Vendor.objects.select_for_update()
+            .only("status", "public_id", "onboarding_round")
+            .get(pk=vendor.pk)
+        )
+        role = member_role(user, locked) if user.is_active else None
+        engine.check_can_certify(locked.status, role)
+        text_hash = engine.self_certification_hash(language)
+        if SelfCertification.objects.filter(
+            vendor=locked,
+            version=engine.SELF_CERTIFICATION_VERSION,
+            onboarding_round=locked.onboarding_round,
+        ).exists():
+            return ChangeSet()
+        certification = SelfCertification(
+            vendor=locked,
+            user=user,
+            version=engine.SELF_CERTIFICATION_VERSION,
+            language=language,
+            text_hash=text_hash,
+            accepted_at=timezone.now(),
+            onboarding_round=locked.onboarding_round,
+        )
+        changes = ChangeSet()
+        changes.create(
+            SELF_CERTIFICATION_MODEL,
+            str(certification.public_id),
+            {
+                "vendor": str(locked.public_id),
+                "user": str(user.public_id),
+                "version": certification.version,
+                "language": language,
+                "text_hash": text_hash,
+                "accepted_at": certification.accepted_at,
+                "onboarding_round": certification.onboarding_round,
+            },
+        )
+        return run_mutation(
+            changes, certification.save, ctx=ctx, action=SELF_CERTIFIED, dry_run=dry_run
+        )
+
+
 def onboarding_checklist(vendor: Vendor) -> engine.OnboardingChecklist:
-    """The stored vendor's onboarding checklist: contract in force accepted (blocks activation),
-    DAC7 dataset and payout data (listed only: VEN.12 gates payouts with them). Only an
-    acceptance of the vendor's current onboarding round counts (VEN.21)."""
+    """The stored vendor's onboarding checklist: contract in force accepted and the platform
+    duties (CMP.25: DSA article 30 data and self-certification) block activation; DAC7 dataset
+    and payout data are listed only (VEN.12 gates payouts with them). Only an acceptance of the
+    vendor's current onboarding round counts (VEN.21)."""
     stored = Vendor.objects.get(pk=vendor.pk)
     contract = current_contract()
     accepted = (
@@ -957,6 +1091,7 @@ def onboarding_checklist(vendor: Vendor) -> engine.OnboardingChecklist:
         current_contract_version=contract.version if contract is not None else None,
         dac7_missing=engine.dac7_missing(stored.legal_identity()),
         payout=legal_profile_completeness(stored),
+        platform_duties_missing=platform_duties_missing(stored),
     )
 
 
@@ -1677,3 +1812,559 @@ def reject_claim(
         reviewed_claimant_id=reviewed_claimant_id,
         dry_run=dry_run,
     )
+
+
+# --- Public "Sell with us" application (VEN.22, owner decision Q-55)
+
+APPLICATION_PURPOSE = "vendors.application"
+APPLICATION_CONFIRM_TEMPLATE = "vendors.application_confirm"
+APPLICATION_REMINDER_TEMPLATE = "vendors.application_reminder"
+APPLICATION_EXISTS_TEMPLATE = "vendors.application_exists"
+APPLICATION_CANCEL_PURPOSE = "vendors.application_cancel"
+APPLICATION_MODEL = "vendors.vendorapplication"
+APPLICATION_PENDING = "vendor.application_pending"
+APPLICATION_LINK_ROTATED = "vendor.application_link_rotated"
+APPLICATION_CONFIRMED = "vendor.application_confirmed"
+APPLICATION_DUPLICATE = "vendor.application_duplicate"
+APPLICATION_PURGED = "vendor.application_purged"
+APPLICATION_REMINDED = "vendor.application_reminded"
+APPLICATION_CANCELLED = "vendor.application_cancelled"
+APPLICATION_CANCEL_VERSION = "1"
+APPLICATION_RATE_WINDOW = dt.timedelta(minutes=15)
+
+
+class ApplicationLinkInvalid(ValueError):
+    """The confirmation link is spent, expired, or no longer names a pending application."""
+
+
+def _applicant_membership(user: User) -> VendorMember | None:
+    """The applicant vendor `user` owns, if any (the first one: never a `get`, so an account
+    with several memberships cannot turn a form submission into a server error)."""
+    return (
+        VendorMember.objects.select_related("vendor")
+        .filter(user=user, role=engine.OWNER, vendor__status=engine.APPLICANT)
+        .order_by("id")
+        .first()
+    )
+
+
+def _pending_application(key: str) -> VendorApplication | None:
+    """The pending application of the inactive account `key` (its public id).
+
+    Pending means: the marker written by `apply_to_sell` still exists (it is deleted on
+    confirmation and by the retention job), the account is inactive, and it owns an applicant
+    vendor. Staff-blocked, migrated and staff-created accounts have no marker, so no form
+    submission or link can reactivate them."""
+    try:
+        application = (
+            VendorApplication.objects.select_related("user").filter(user__public_id=key).first()
+        )
+    except ValidationError:  # not a UUID
+        return None
+    if application is None or application.user.is_active:
+        return None
+    return application if _applicant_membership(application.user) else None
+
+
+def _application_version(object_key: str) -> str | None:
+    """The version links are bound to: a new link (a re-application before confirming) raises
+    it, so the older link stops working. There is no password to change before activation."""
+    application = _pending_application(object_key)
+    return str(application.version) if application else None
+
+
+def _application_email_of(object_key: str) -> str | None:
+    application = _pending_application(object_key)
+    return application.user.email if application else None
+
+
+def _cancel_version(object_key: str) -> str | None:
+    """The cancel link is bound to the pending state only, not to the confirmation link's
+    version: a new confirmation link does not kill the "this was not me" link of the older
+    mail. Once the account is confirmed or deleted nothing is pending, and it stops working."""
+    return APPLICATION_CANCEL_VERSION if _pending_application(object_key) else None
+
+
+def application_path(object_key: str) -> str:
+    return reverse("vendors:apply_confirm", args=[object_key])
+
+
+def application_cancel_path(object_key: str) -> str:
+    return reverse("vendors:apply_cancel", args=[object_key])
+
+
+def register_application_purpose() -> None:
+    """Register the email-bound confirmation link with the CORE.15 action links."""
+    register_action_purpose(
+        ActionPurpose(
+            name=APPLICATION_PURPOSE,
+            version_of=_application_version,
+            url_of=application_path,
+            email_of=_application_email_of,
+            max_age=settings.VENDOR_APPLICATION_LINK_MAX_AGE,
+        )
+    )
+    register_action_purpose(
+        ActionPurpose(
+            name=APPLICATION_CANCEL_PURPOSE,
+            version_of=_cancel_version,
+            url_of=application_cancel_path,
+            email_of=_application_email_of,
+            max_age=settings.VENDOR_APPLICATION_LINK_MAX_AGE,
+        )
+    )
+
+
+def application_link(session: SessionBase, object_key: str) -> ActionLinkCheck:
+    """The confirmation link opened in this session for the account `object_key`."""
+    return email_bound_link(session, APPLICATION_PURPOSE, object_key)
+
+
+def application_cancel_link(session: SessionBase, object_key: str) -> ActionLinkCheck:
+    """The "this was not me" link opened in this session for the account `object_key`."""
+    return email_bound_link(session, APPLICATION_CANCEL_PURPOSE, object_key)
+
+
+def application_retry_after(ip: str | None) -> dt.timedelta:
+    """Count one confirm-page POST from `ip`; zero when allowed, else the wait (Retry-After)."""
+    return consume_rate_limit(
+        f"vendor-apply:ip:{ip_bucket(ip) or 'unknown'}",
+        limit=settings.VENDOR_APPLICATION_RATE_LIMIT,
+        window=APPLICATION_RATE_WINDOW,
+    )
+
+
+def _daily_key(kind: str, email: str) -> str:
+    digest = hashlib.sha256(email.lower().encode()).hexdigest()[:32]
+    return f"vendors.application.{kind}:{digest}:{timezone.now().date().isoformat()}"
+
+
+def _language_of(language: str) -> str:
+    return language if language in dict(settings.LANGUAGES) else settings.LANGUAGE_CODE
+
+
+def application_snapshot(application: VendorApplication) -> dict[str, Any]:
+    """Public ids and the link version only."""
+    return {"user": str(application.user.public_id), "version": application.version}
+
+
+def _confirmation_email(
+    application: VendorApplication,
+    *,
+    ctx: AuditContext,
+    key: str | None,
+    template_key: str = APPLICATION_CONFIRM_TEMPLATE,
+) -> ChangeSet:
+    """Queue a mail with the confirmation link and the "cancel / this was not me" link. It
+    names nothing the applicant typed: anyone can send it to any address, so it must not
+    carry their words."""
+    object_key = str(application.user.public_id)
+    cancel_token = issue_action_token(
+        purpose=APPLICATION_CANCEL_PURPOSE,
+        object_key=object_key,
+        version=APPLICATION_CANCEL_VERSION,
+        expires_in=settings.VENDOR_APPLICATION_LINK_MAX_AGE,
+    )
+    return send_action_link_email(
+        purpose=APPLICATION_PURPOSE,
+        object_key=object_key,
+        version=application.version,
+        template_key=template_key,
+        context={"cancel_url": settings.SITE_BASE_URL.rstrip("/") + action_link_path(cancel_token)},
+        language=application.user.preferred_language,
+        expires_in=settings.VENDOR_APPLICATION_LINK_MAX_AGE,
+        idempotency_key=key,
+        ctx=ctx,
+    )
+
+
+def _resend_confirmation(application: VendorApplication, *, ctx: AuditContext) -> bool:
+    """A new link for a pending application: it raises the version, so the old link dies. At
+    most one per address and day: when none is queued the version is not raised either, so the
+    link already delivered keeps working. Returns whether a link was sent."""
+    with transaction.atomic():
+        locked = (
+            VendorApplication.objects.select_related("user")
+            .select_for_update()
+            .get(pk=application.pk)
+        )
+        before = application_snapshot(locked)
+        locked.version += 1
+        locked.link_sent_at = timezone.now()
+        locked.save(update_fields=["version", "link_sent_at", "updated_at"])
+        changes = _confirmation_email(locked, ctx=ctx, key=_daily_key("resend", locked.user.email))
+        if changes.is_empty:
+            transaction.set_rollback(True)
+            return False
+        record(
+            ctx,
+            APPLICATION_LINK_ROTATED,
+            APPLICATION_MODEL,
+            str(locked.public_id),
+            before,
+            application_snapshot(locked),
+        )
+    return True
+
+
+def _answer_duplicate(user: User, *, ctx: AuditContext) -> None:
+    """Someone applied with the address of an existing account: the caller gets the same answer
+    as a new applicant. A pending applicant gets a fresh confirmation link, any other account a
+    notice with no link; at most one such email per address and day. Nothing else changes."""
+    application = _pending_application(str(user.public_id))
+    if application is not None:
+        _resend_confirmation(application, ctx=ctx)
+    else:
+        enqueue_email(
+            recipient=user.email,
+            template_key=APPLICATION_EXISTS_TEMPLATE,
+            language=user.preferred_language,
+            context={"sign_in_url": settings.SITE_BASE_URL.rstrip("/") + reverse("login")},
+            idempotency_key=_daily_key("exists", user.email),
+        )
+    record(
+        ctx,
+        APPLICATION_DUPLICATE,
+        "accounts.user",
+        str(user.public_id),
+        None,
+        {"outcome": "resent" if application is not None else "notified"},
+    )
+
+
+def apply_to_sell(
+    *,
+    full_name: str,
+    email: str,
+    business_name: str,
+    country: str,
+    language: str,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """The public "Sell with us" application: account and vendor application in one step.
+
+    A new address gets an INACTIVE account with an UNUSABLE password, an `applicant` vendor it
+    owns, a pending marker (`VendorApplication`) and a confirmation link by email through the
+    ARC.16 outbox. Nobody chooses a password here: whoever opens the link sets it on the confirm
+    page (`confirm_application`), so typing someone else's address gains nothing, not even a
+    secret to use after they click. An address that already has an account changes nothing
+    and the caller learns nothing (`_answer_duplicate`): the returned ChangeSet is empty. The
+    vendor is validated before the address is looked up, so both paths refuse the same inputs.
+
+    Raises `ValidationError` for invalid data, on dry-run too.
+    """
+    address = normalize_email_address(email)
+    user = User(
+        email=address,
+        full_name=full_name.strip(),
+        preferred_language=_language_of(language),
+        is_active=False,
+    )
+    user.set_unusable_password()
+    vendor = Vendor(
+        legal_name=business_name.strip(),
+        display_name=business_name.strip(),
+        contact_email=address,
+        country=country,
+    )
+    vendor.status = engine.APPLICANT
+    vendor.normalize()
+    vendor.full_clean()
+    if vendor.country not in allowed_vendor_countries():  # CMP.13: nobody applies in vain
+        raise ValidationError({"country": "We do not accept businesses established there."})
+    existing = User.objects.filter(email__iexact=address).order_by("id").first()
+    if existing is None:
+        if dry_run:
+            return submit_application(
+                vendor, user, ctx=ctx, dry_run=True, pending_confirmation=True
+            )
+        try:
+            with transaction.atomic():
+                user.save()
+                changes = submit_application(vendor, user, ctx=ctx, pending_confirmation=True)
+                application = VendorApplication.objects.create(
+                    user=user, link_sent_at=timezone.now()
+                )
+                record(
+                    ctx,
+                    APPLICATION_PENDING,
+                    APPLICATION_MODEL,
+                    str(application.public_id),
+                    None,
+                    application_snapshot(application),
+                )
+                _confirmation_email(application, ctx=ctx, key=None)
+        except IntegrityError:  # a concurrent request took the address first
+            existing = User.objects.filter(email__iexact=address).order_by("id").first()
+            if existing is None:
+                raise
+        else:
+            return changes
+    if not dry_run:
+        _answer_duplicate(existing, ctx=ctx)
+    return ChangeSet()
+
+
+def confirm_application(link: ActionLinkCheck, *, password: str, ctx: AuditContext) -> User:
+    """The applicant opened the emailed link and chose a password: activate the account.
+
+    One transaction: the password is validated (`ValidationError` leaves the link usable), the
+    single-use link is spent, the password is set, the account is activated and the pending
+    marker is deleted. It never signs anyone in: the applicant signs in with the password
+    just chosen and enrols a second factor (CORE.4). The vendor stays `applicant` until staff
+    review it (VEN.5). Raises `ApplicationLinkInvalid`.
+    """
+    claims = link.claims
+    if link.refusal is not None or claims is None:
+        raise ApplicationLinkInvalid(link.refusal or "link not opened")
+    with transaction.atomic():
+        application = _pending_application(claims.object_key)
+        if application is None or str(application.version) != claims.version:
+            raise ApplicationLinkInvalid("no pending application for this link")
+        user = User.objects.select_for_update().get(pk=application.user_id)
+        if user.is_active:
+            raise ApplicationLinkInvalid("already confirmed")
+        membership = _applicant_membership(user)
+        if membership is None:
+            raise ApplicationLinkInvalid("no applicant vendor")
+        validate_password(password, user)
+        try:
+            spend_email_bound_link(link, user, ctx=ctx)
+        except ActionLinkSpent as exc:
+            raise ApplicationLinkInvalid(str(exc)) from exc
+        user.set_password(password)
+        user.is_active = True
+        user.save(update_fields=["password", "is_active"])
+        snapshot = {"user": str(user.public_id), "vendor": str(membership.vendor.public_id)}
+        application.delete()
+        record(
+            ctx,
+            APPLICATION_CONFIRMED,
+            "accounts.user",
+            str(user.public_id),
+            {**snapshot, "is_active": False},
+            {**snapshot, "is_active": True},
+        )
+    return user
+
+
+def _delete_application(application: VendorApplication) -> bool:
+    """Delete an unconfirmed application: the account, its applicant vendors, their memberships
+    and link uses. An account that also belongs to a real vendor keeps it: only the stale marker
+    goes. Returns whether the account was deleted."""
+    user = application.user
+    if VendorMember.objects.filter(user=user).exclude(vendor__status=engine.APPLICANT).exists():
+        application.delete()
+        return False
+    for membership in VendorMember.objects.select_related("vendor").filter(
+        user=user, vendor__status=engine.APPLICANT
+    ):
+        membership.vendor.delete()  # its memberships go with it
+    ActionLinkUse.objects.filter(user=user).delete()
+    user.delete()  # the marker goes with the account
+    return True
+
+
+APPLICATION_BATCH_SIZE = 200  # rows a job selects and processes at a time
+
+
+def _lock_pending(pk: int, *, skip_locked: bool = True) -> VendorApplication | None:
+    """Lock the marker and its account, then re-check under the locks that the application is
+    still pending. Call inside `transaction.atomic()`.
+
+    A job passes `skip_locked`: a row another transaction holds (an applicant confirming right
+    now) is left for the next run. A cancel waits for the lock instead, and then finds nothing
+    when the confirm won. Returns None when the application is gone or no longer pending: the
+    account is active, the marker was deleted, or the vendor moved past `applicant`."""
+    marker = VendorApplication.objects.select_for_update(skip_locked=skip_locked).filter(pk=pk)
+    application = marker.first()
+    if application is None:
+        return None
+    user = (
+        User.objects.select_for_update(skip_locked=skip_locked)
+        .filter(pk=application.user_id, is_active=False)
+        .first()
+    )
+    if user is None:
+        return None
+    application.user = user
+    if _pending_application(str(user.public_id)) is None:
+        return None
+    return application
+
+
+def cancel_application(
+    link: ActionLinkCheck, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """ "This was not me": delete the pending application at once (D-24). One-time signed link,
+    no login; nothing is blocked afterwards and no address or hash is kept. Idempotent: returns
+    an empty ChangeSet, changing nothing, when no application is pending (already cancelled,
+    confirmed or purged, also when a confirm won a race with this call). The audit entry holds
+    no personal data. The link is not spent: deleting the application is what stops it working,
+    and it never touches a confirmed account."""
+    claims = link.claims
+    changes = ChangeSet()
+    if link.refusal is not None or claims is None:
+        return changes
+    pending = _pending_application(claims.object_key)
+    if pending is None:
+        return changes
+    if dry_run:
+        changes.delete(APPLICATION_MODEL, str(pending.public_id), application_snapshot(pending))
+        return changes
+    with transaction.atomic():
+        application = _lock_pending(pending.pk, skip_locked=False)
+        if application is None:  # a confirm (or a purge) got there first
+            return changes
+        public_id = str(application.public_id)
+        changes.delete(APPLICATION_MODEL, public_id, application_snapshot(application))
+        _delete_application(application)
+        record(ctx, APPLICATION_CANCELLED, APPLICATION_MODEL, public_id, None, {"deleted": 1})
+    return changes
+
+
+def _due_reminder_ids(cutoff: dt.datetime, after_id: int) -> list[int]:
+    return list(
+        VendorApplication.objects.filter(
+            user__is_active=False,
+            reminder_sent_at__isnull=True,
+            created_at__lte=cutoff,
+            id__gt=after_id,
+        )
+        .order_by("id")
+        .values_list("id", flat=True)[:APPLICATION_BATCH_SIZE]
+    )
+
+
+def _remind_one(
+    pk: int, cutoff: dt.datetime, now: dt.datetime, *, ctx: AuditContext
+) -> dict[str, Any] | None:
+    """Send the reminder of one application, under its locks and after a re-check; returns the
+    marker's snapshot when a mail was queued."""
+    with transaction.atomic():
+        application = _lock_pending(pk)
+        if (
+            application is None
+            or application.reminder_sent_at is not None
+            or application.created_at > cutoff
+        ):
+            return None
+        sent = _confirmation_email(
+            application,
+            ctx=ctx,
+            key=f"vendors.application.reminder:{application.public_id}",
+            template_key=APPLICATION_REMINDER_TEMPLATE,
+        )
+        application.reminder_sent_at = now
+        application.save(update_fields=["reminder_sent_at", "updated_at"])
+        if sent.is_empty:  # a retry of a mail already queued
+            return None
+        snapshot = application_snapshot(application)
+        record(
+            ctx, APPLICATION_REMINDED, APPLICATION_MODEL, str(application.public_id), None, snapshot
+        )
+        return snapshot
+
+
+def send_application_reminders(
+    *, ctx: AuditContext, now: dt.datetime | None = None, dry_run: bool = False
+) -> ChangeSet:
+    """The one reminder (D-24): `VENDOR_APPLICATION_REMINDER_HOURS` hours after the request, a
+    pending application gets a mail with a fresh confirmation link (same version, so the first
+    link keeps working) and the cancel link. Exactly one: the marker records it, and the outbox
+    idempotency key stops a retry. Audited with the marker's public id only.
+
+    Works in batches of `APPLICATION_BATCH_SIZE`; each application is locked and re-checked
+    (still inactive, marker present, still an applicant vendor) in its own transaction, so a
+    link is never mailed to an applicant who has just confirmed."""
+    now = now or timezone.now()
+    cutoff = now - dt.timedelta(hours=settings.VENDOR_APPLICATION_REMINDER_HOURS)
+    changes = ChangeSet()
+    last = 0
+    while ids := _due_reminder_ids(cutoff, last):
+        last = ids[-1]
+        for pk in ids:
+            if dry_run:
+                application = VendorApplication.objects.select_related("user").filter(pk=pk).first()
+                if (
+                    application is None
+                    or _pending_application(str(application.user.public_id)) is None
+                ):
+                    continue
+                snapshot: dict[str, Any] | None = application_snapshot(application)
+            else:
+                snapshot = _remind_one(pk, cutoff, now, ctx=ctx)
+            if snapshot is not None:
+                changes.update(
+                    APPLICATION_MODEL,
+                    str(snapshot["user"]),
+                    snapshot,
+                    {**snapshot, "reminded": True},
+                )
+    return changes
+
+
+def _stale_application_ids(cutoff: dt.datetime, after_id: int) -> list[int]:
+    return list(
+        VendorApplication.objects.filter(
+            user__is_active=False, created_at__lt=cutoff, id__gt=after_id
+        )
+        .order_by("id")
+        .values_list("id", flat=True)[:APPLICATION_BATCH_SIZE]
+    )
+
+
+def _purge_one(pk: int, cutoff: dt.datetime) -> dict[str, Any] | None:
+    """Delete one unconfirmed application under its locks, after re-checking that it is still
+    pending and still past the retention period; returns its snapshot when the account went."""
+    with transaction.atomic():
+        application = _lock_pending(pk)
+        if application is None or application.created_at >= cutoff:
+            return None
+        snapshot = application_snapshot(application)
+        return snapshot if _delete_application(application) else None
+
+
+def purge_unconfirmed_applications(
+    *, ctx: AuditContext, now: dt.datetime | None = None, dry_run: bool = False
+) -> ChangeSet:
+    """Delete applications nobody confirmed (D-24, GDPR): the account, its applicant vendor,
+    memberships and link uses, `VENDOR_APPLICATION_RETENTION_DAYS` days (3) after the request;
+    a later link does not extend it. The job runs hourly, so a deletion can lag up to an hour.
+    Audited by count only (one entry per batch): no name or address is kept. Accounts that
+    confirmed or never applied this way are never touched.
+
+    Works in batches of `APPLICATION_BATCH_SIZE`. Each application is deleted in its own
+    transaction, under a lock on the marker and the account, after a re-check (still inactive,
+    marker present, still an applicant vendor, still past retention): an applicant who confirms
+    between the selection and the deletion is never deleted, and a row being confirmed right
+    now is skipped (`skip_locked`) and left for the next run.
+    """
+    now = now or timezone.now()
+    cutoff = now - dt.timedelta(days=settings.VENDOR_APPLICATION_RETENTION_DAYS)
+    changes = ChangeSet()
+    last = 0
+    while ids := _stale_application_ids(cutoff, last):
+        last = ids[-1]
+        deleted = 0
+        for pk in ids:
+            if dry_run:
+                application = VendorApplication.objects.select_related("user").filter(pk=pk).first()
+                snapshot = application_snapshot(application) if application else None
+            else:
+                snapshot = _purge_one(pk, cutoff)
+            if snapshot is None:
+                continue
+            deleted += 1
+            changes.delete(APPLICATION_MODEL, str(snapshot["user"]), snapshot)
+        if deleted and not dry_run:
+            record(
+                ctx,
+                APPLICATION_PURGED,
+                APPLICATION_MODEL,
+                "purge",
+                None,
+                {"deleted": deleted, "retention_days": settings.VENDOR_APPLICATION_RETENTION_DAYS},
+            )
+    return changes

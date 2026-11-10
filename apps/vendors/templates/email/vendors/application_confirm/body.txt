@@ -1,0 +1,9 @@
+{% load i18n %}{% translate "Someone, probably you, used this email address to apply to sell with us. To go on, open this link, confirm your email address and choose a password." %}
+
+{{ action_url }}
+
+{% blocktranslate with expires=action_link_expires_at %}The link works once and expires on {{ expires }} (UTC). Our team reviews your application afterwards. If you do not confirm, the application is deleted after a few days.{% endblocktranslate %}
+
+{% translate "This was not me: open this link to cancel the application and delete the data created with it." %}
+
+{{ cancel_url }}

@@ -275,6 +275,43 @@ To add or update baselines after a reviewed, intentional change:
 
 The first baselines for `base` and `ride` are committed by THM.10.
 
+## The `ride` theme (THM.6)
+
+`themes/ride/` is the first vertical theme (`parent = "base"`). It was written clean-room from the
+public spec and a brief: no file derives from a reference template (spec 14 §14.8).
+
+- **Tokens** (`tokens.toml`): the colours are the operator palette of spec 14 §14.4 and §14.12
+  (primary `#046BD2` with white, hover `#035AB1`, tint `#EEF6FF`, secondary `#FBA926` with
+  `#1A1A1A` text, secondary text `#BE5900`); the neutrals, the dark surface `#30373F` of header
+  and footer and the navy `#051026` scrim come from the brief. The primary is never text on the
+  dark surface (white there). Extra tokens: `color.heading`, `color.border-strong`,
+  `color.overlay`, `scrim.opacity`, `step.display`, `space.section`, `radius.pill`,
+  `radius.round`, `shadow.button-hover`. Buttons: filled primary (default), amber
+  `.button--secondary`, filled dark `.button--dark`, outline dark `.button--ghost`, outline
+  primary `.button--outline-accent`. Every text pair is tested in
+  `apps/themes/tests/unit/test_ride_theme.py`. CSS uses `var(--…)` only, so a vendor or operator
+  palette overrides the defaults with custom properties.
+- **Fonts**: Barlow 400 and 700, Barlow Condensed 600 and 700, woff2 subset to Latin and Latin
+  Extended-A (the gate allows 4 files), `font-display: swap`, one preload in `layouts/base.html`.
+  Upstream commit and licence are in `LICENSES.toml`; the OFL text with the copyright notice is
+  `licenses/OFL.txt` (the gate allows only woff2 in `fonts/`). Barlow 500 is not shipped (the
+  4-file cap), so 500 renders as 400.
+- **Icons**: `components/icon.html` draws from `static/themes/ride/icons/sprite.svg`, a
+  same-origin sprite of the 13 Lucide icons the components use (ISC, with MIT for the Feather
+  icons; `licenses/LUCIDE-LICENSE.txt`).
+- **Assets in the build**: `python -m apps.themes.build` copies the files under
+  `static/themes/<slug>/` with a suffix of `build.ASSET_SUFFIXES` (woff2, svg, png, jpg, webp, avif,
+  ico, txt), never a symlink or a file outside that directory, to `build/themes/<slug>/`, so `theme.css` reaches fonts and images with
+  a relative `url()` and `{% static "themes/ride/icons/sprite.svg" %}` resolves.
+- **Templates**: `components/header.html` (dark bar, disclosure sub-menus for links with
+  `children`, search and cart icons when `search_url` and `cart_url` are given, burger below
+  64rem), `components/footer.html` (three columns), `components/hero.html` (scrim over the
+  image), `components/product_tile.html` (title link plus a small button, not one giant link),
+  `components/icon.html`, `cms/blocks/hero.html`, `cms/blocks/cta.html` and `cms/home_page.html`
+  (the first hero block carries the page's one `<h1>`).
+- **Not yet**: catalog, cart, checkout, account and content pages are THM.7 to THM.9. Pages that
+  override the `head` block without `{{ block.super }}` lose the font preload only.
+
 ## System checks
 
 | Id | Fails when |

@@ -68,7 +68,7 @@ def _start_review(page: EventPage) -> tuple[WorkflowState, User]:
     task.groups.add(Group.objects.get_or_create(name="Event moderators")[0])
     WorkflowTask.objects.create(workflow=workflow, task=task, sort_order=0)
     WorkflowPage.objects.create(workflow=workflow, page=page.get_parent())
-    author = UserFactory.create(staff=True)
+    author = UserFactory.create(platform_staff=True)
     page.save_revision(user=author)
     state = workflow.start(page, author)
     return state, author
