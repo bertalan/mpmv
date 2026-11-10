@@ -5,24 +5,34 @@ Every Manager view extends `ManagerView` and names its section; the gate
 `scoped()`: `for_actor` (CORE.3), narrowed in the shop space to the selected vendor.
 """
 
+from dataclasses import replace
 from typing import Any, ClassVar
 
-from django.contrib import auth
+from django.conf import settings
+from django.contrib import auth, messages
 from django.contrib.auth import views as auth_views
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Model
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.http.response import HttpResponseBase
 from django.urls import reverse
+from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 
 from apps.accounts.decorators import mfa_exempt
 from apps.accounts.forms import ManagerLoginForm
+from apps.accounts.models import User
 from apps.catalog.models import Product
 from apps.catalog.services import product_kpis
+from apps.core.audit import audit_context
+from apps.core.models import AuditLog
+from apps.vendors.models import VendorTranslation
 from apps.vendors.scoping import Source, VendorScopedQuerySet
+from apps.vendors.services import PROFILE_LOCKED, save_storefront_profile
 
-from .access import ManagerContext, may_enter
+from .access import ManagerContext, home_url
+from .forms import StorefrontProfileForm
 from .middleware import manager_context
 from .navigation import Section, registry
 from .spaces import Space
@@ -90,6 +100,86 @@ class ShopDashboardView(ManagerView):
         return context
 
 
+class StorefrontProfileView(ManagerView):
+    """The owner edits the storefront texts and policies, one language at a time (CORE.9).
+
+    Vendor staff never get here: the section is declared for the `profile` action, which the role
+    matrix gives to owners only. The service checks the same right again.
+    """
+
+    section = "shop.profile"
+    template_name = "manager/shop/profile.html"
+
+    def language(self) -> str:
+        found = self.request.POST.get("language") or self.request.GET.get("language")
+        language = found or settings.LANGUAGE_CODE
+        if language not in dict(settings.LANGUAGES):
+            raise Http404("Unknown language.")
+        return language
+
+    def stored_row(self, language: str) -> VendorTranslation | None:
+        return self.scoped(VendorTranslation).filter(language=language).first()
+
+    def stored_values(self, language: str) -> dict[str, str]:
+        row = self.stored_row(language)
+        return (
+            {} if row is None else {n: getattr(row, n) for n in StorefrontProfileForm.base_fields}
+        )
+
+    def locked(self) -> bool:
+        vendor = self.manager.vendor
+        return vendor is not None and vendor.status in PROFILE_LOCKED
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        language = self.language()
+        row = self.stored_row(language)
+        context.setdefault("form", StorefrontProfileForm(initial=self.stored_values(language)))
+        context["language"] = language
+        context["locked"] = self.locked()
+        context["machine_draft"] = (
+            row is not None and row.status == VendorTranslation.Status.MACHINE
+        )
+        context["languages"] = [
+            {"code": code, "name": name, "current": code == language}
+            for code, name in settings.LANGUAGES
+        ]
+        return context
+
+    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        vendor, actor = self.manager.vendor, self.manager.user
+        if vendor is None or not isinstance(actor, User):
+            raise Http404("No vendor selected.")
+        if self.locked():  # the reason is on the page; the service refuses it too
+            return self.render_to_response(self.get_context_data(), status=403)
+        language = self.language()
+        form = StorefrontProfileForm(request.POST, initial=self.stored_values(language))
+        if form.is_valid():
+            ctx = replace(audit_context(request), source=AuditLog.Source.VENDOR)
+            try:
+                changes = save_storefront_profile(
+                    vendor, language, form.cleaned_data, actor=actor, ctx=ctx
+                )
+            except ValidationError as error:
+                form.add_error(None, error)
+            except PermissionDenied:  # suspended between the page and the save
+                return self.render_to_response(self.get_context_data(), status=403)
+            else:
+                if not changes.is_empty:
+                    notice = _("Storefront profile saved.")
+                elif (row := self.stored_row(language)) and row.status == "machine":
+                    notice = _(
+                        "Nothing changed: this text is still a draft. Edit it to publish it."
+                    )
+                else:
+                    notice = _("Nothing changed.")
+                messages.success(request, notice)
+                return HttpResponseRedirect(
+                    f"{reverse('manager:shop:profile')}?language={language}"
+                )
+        return self.render_to_response(self.get_context_data(form=form))
+
+
 class PlatformDashboardView(ManagerView):
     section = "platform.dashboard"
     template_name = "manager/platform/dashboard.html"
@@ -107,14 +197,6 @@ class VendorPickerView(ManagerView):
 
 
 # --- Sign-in and sign-out: outside /manager/, so the sweep keeps every Manager URL gated
-
-
-def home_url(user: Any) -> str:
-    """Where a user lands after signing in without `next`: their Manager space, else the site."""
-    for space in (Space.PLATFORM, Space.SHOP):
-        if may_enter(space, user):
-            return reverse(f"manager:{space}:dashboard")
-    return "/"
 
 
 class LoginView(auth_views.LoginView):

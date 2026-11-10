@@ -2,7 +2,7 @@
 
 A member of two vendors signs in on the Manager login, verifies the second factor, picks a
 vendor, switches to the other one from the header; platform staff land on the platform space and
-get 404 on the shop space. Every Manager page passes axe (WCAG 2.2 AA) with no CSP violation;
+get 403 on the shop space. Every Manager page passes axe (WCAG 2.2 AA) with no CSP violation;
 screenshots are kept for review.
 """
 
@@ -83,7 +83,7 @@ def test_a_member_of_two_vendors_signs_in_and_switches_vendor(
 
     response = page.goto(f"{live_server.url}/manager/platform/")
     assert response is not None
-    assert response.status == 404
+    assert response.status == 403
 
     page.goto(f"{live_server.url}/manager/shop/")
     page.get_by_role("button", name="Sign out").click()
@@ -114,9 +114,63 @@ def test_platform_staff_land_on_the_platform_space(
 
     response = page.goto(f"{live_server.url}/manager/shop/")
     assert response is not None
-    assert response.status == 404
+    assert response.status == 403
 
 
 def test_an_anonymous_visitor_is_sent_to_the_login(page: Page, live_server: LiveServer) -> None:
     page.goto(f"{live_server.url}/manager/platform/")
     expect(page).to_have_url(re.compile(r"/account/login/\?next=/manager/platform/"))
+
+
+def test_the_owner_edits_the_storefront_profile_and_staff_cannot(
+    page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+) -> None:
+    password = secrets.token_urlsafe(16)
+    owner = UserFactory.create(email="owner@example.com", password=password)
+    device = TOTPDeviceFactory.create(user=owner)
+    shop = VendorFactory.create(display_name="Shop West")
+    VendorMemberFactory.create(vendor=shop, user=owner, role="owner")
+    page.add_init_script(RECORD_CSP_VIOLATIONS)
+
+    _login(page, live_server.url, "owner@example.com", password)
+    verify_with_totp(page, totp_token(device))
+    page.get_by_role("navigation", name="Manager sections").get_by_role(
+        "link", name="Storefront profile"
+    ).click()
+    expect(page).to_have_url(re.compile(r"/manager/shop/profile/"))
+    expect(page.get_by_role("heading", name="Storefront profile")).to_be_visible()
+    _accessible(page)
+    shot("profile-form")
+
+    # The browser stops typing at the limit; drop it to reach the server-side check.
+    page.get_by_label("Tagline").evaluate("el => el.removeAttribute('maxlength')")
+    page.get_by_label("Tagline").fill("x" * 201)
+    page.get_by_role("button", name="Save").click()
+    expect(page.get_by_role("region", name="There is a problem")).to_be_visible()
+    expect(page.get_by_label("Tagline")).to_have_attribute("aria-invalid", "true")
+    _accessible(page)
+    shot("profile-error")
+
+    page.get_by_label("Tagline").fill("Hand made in the west")
+    page.get_by_label("Returns and refunds policy").fill("Send it back within 30 days.")
+    page.get_by_role("button", name="Save").click()
+    expect(page.get_by_text("Storefront profile saved.")).to_be_visible()
+    expect(page.get_by_label("Tagline")).to_have_value("Hand made in the west")
+    _accessible(page)
+    shot("profile-saved")
+
+
+def test_vendor_staff_have_no_storefront_profile(page: Page, live_server: LiveServer) -> None:
+    password = secrets.token_urlsafe(16)
+    member = UserFactory.create(email="staff@example.com", password=password)
+    device = TOTPDeviceFactory.create(user=member)
+    VendorMemberFactory.create(
+        vendor=VendorFactory.create(display_name="Shop East"), user=member, role="staff"
+    )
+
+    _login(page, live_server.url, "staff@example.com", password)
+    verify_with_totp(page, totp_token(device))
+    expect(page.get_by_role("link", name="Storefront profile")).to_have_count(0)
+    response = page.goto(f"{live_server.url}/manager/shop/profile/")
+    assert response is not None
+    assert response.status == 404
