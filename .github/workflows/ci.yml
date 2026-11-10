@@ -109,12 +109,11 @@ jobs:
           psql "$DATABASE_URL" -c "ALTER SYSTEM SET fsync = off" \
             -c "ALTER SYSTEM SET synchronous_commit = off" \
             -c "ALTER SYSTEM SET full_page_writes = off" -c "SELECT pg_reload_conf()"
+      # No coverage here: branch tracing roughly doubles the run time. `make test` still reports it.
       - name: Pytest (unit + integration)
         run: >-
           uv run pytest -n auto --dist loadgroup --durations=40 -m "unit or integration"
           --junitxml=build/reports/junit.xml
-          --cov --cov-report=term-missing:skip-covered
-          --cov-report=html:build/reports/coverage --cov-report=xml:build/reports/coverage.xml
       - name: Store reports
         if: failure()
         uses: actions/upload-artifact@v7
