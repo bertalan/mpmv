@@ -29,5 +29,20 @@ the top with links to the fields and set `aria-invalid` on them. The language li
       {% for field in form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
       {% include "components/button.html" with label=_("Save") type="submit" only %}
     </form>
+    <section class="manager-logo-section" aria-labelledby="logo-heading">
+      <h2 id="logo-heading">{% translate "Logo" %}</h2>
+      {% if logo %}
+        <img class="manager-logo" src="{{ logo.file.url }}" alt="{{ manager.vendor.logo_alt }}" width="{{ logo.width }}" height="{{ logo.height }}">
+      {% else %}
+        <p class="manager-lead">{% translate "No logo yet." %}</p>
+      {% endif %}
+      {% include "components/error_summary.html" with form=logo_form summary_id="logo-error-summary" autofocus=True only %}
+      <form method="post" action="{% url 'manager:shop:profile' %}" enctype="multipart/form-data" class="manager-form" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="logo">
+        {% for field in logo_form.visible_fields %}{% if field.name != "remove" or logo %}{% include "components/field.html" with field=field only %}{% endif %}{% endfor %}
+        {% include "components/button.html" with label=_("Save logo") type="submit" only %}
+      </form>
+    </section>
   {% endif %}
 {% endblock %}

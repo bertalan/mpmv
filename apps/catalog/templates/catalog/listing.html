@@ -10,7 +10,7 @@
 {% block title %}{% if editorial.title %}{{ editorial.title }}{% else %}{{ name }}{% endif %}{% if window.page > 1 %} · {% blocktranslate with page=window.page %}Page {{ page }}{% endblocktranslate %}{% endif %}{% if current_site.site_name %} · {{ current_site.site_name }}{% endif %}{% endblock %}
 {% block description %}{% if editorial.description %}<meta name="description" content="{{ editorial.description }}">{% endif %}{% endblock %}
 {% block head %}
-  <meta name="robots" content="{{ robots }}">
+  {% robots_meta robots %}
   <link rel="canonical" href="{{ canonical_url }}">
   {% for lang, url in alternates %}<link rel="alternate" hreflang="{{ lang }}" href="{{ url }}">
   {% endfor %}{% if previous_url %}<link rel="prev" href="{{ previous_url }}">{% endif %}
@@ -20,6 +20,7 @@
 {% block content %}
   <div class="listing">
     <header class="listing-header">
+      {% if scope.vendor.logo %}<img class="listing-logo" src="{{ scope.vendor.logo.file.url }}" alt="{{ scope.vendor.logo_alt }}" width="{{ scope.vendor.logo.width }}" height="{{ scope.vendor.logo.height }}">{% endif %}
       <h1>{{ name }}</h1>
       {% if is_fallback %}<p class="listing-notice">{% translate "This page is not available in your language yet." %}</p>{% endif %}
       <p class="listing-count">{% blocktranslate count counter=window.total %}{{ counter }} product{% plural %}{{ counter }} products{% endblocktranslate %}</p>

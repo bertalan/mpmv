@@ -1,11 +1,12 @@
 {% extends "layouts/content.html" %}
-{% load i18n tz wagtailcore_tags %}
+{% load i18n tz wagtailcore_tags cms_tags %}
 {% comment %}
 Event page (EVT.1 part 2/2, spec 15 "Public pages"): a minimal page on the base theme layout.
 Dates are in the page's language and the event's own time zone, with machine-readable
 `<time datetime>` values; the type is text. No inline script or style (CSP, spec 14 §14.5).
 EVT.6 adds the ICS and report links, robots rules and the linked products; EVT.15 the map.
 {% endcomment %}
+{% block head %}{% page_hreflang %}{% endblock %}
 {% block page_content %}
   <article class="event">
     <header>
