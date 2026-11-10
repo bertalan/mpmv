@@ -244,3 +244,34 @@ def test_the_admin_shows_the_requester_read_only() -> None:
     for name in ("requester", "requester_kind", "vies_request_date"):
         assert name in model_admin.readonly_fields
     assert "requester" in model_admin.list_display
+
+
+def test_an_invalid_requester_row_is_not_served_to_another_requester() -> None:
+    VatValidationFactory.create(
+        country="DE",
+        vat_number="123456789",
+        result=engine.VAT_UNAVAILABLE,
+        request_id="",
+        detail=engine.DETAIL_INVALID_REQUESTER,
+        requester="FR12345678901",
+        requester_kind="vendor",
+    )
+    client = RequesterAwareClient()
+    check = services.verify_vat_number("DE", "DE123456789", client=client, requester=VENDOR)
+    assert check.from_cache is False
+    assert len(client.calls) == 1
+
+
+def test_a_service_down_row_is_still_shared_between_requesters() -> None:
+    VatValidationFactory.create(
+        country="DE",
+        vat_number="123456789",
+        result=engine.VAT_UNAVAILABLE,
+        request_id="",
+        detail="MS_UNAVAILABLE",
+        requester="FR12345678901",
+    )
+    client = RequesterAwareClient()
+    check = services.verify_vat_number("DE", "DE123456789", client=client, requester=VENDOR)
+    assert check.from_cache is True
+    assert client.calls == []

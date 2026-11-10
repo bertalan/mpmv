@@ -982,9 +982,7 @@ def _cached_vat_validation(
         return definitive
     if requester is not None:
         # VIES refused this requester: do not hammer it for every checkout.
-        refused_since = now - dt.timedelta(
-            seconds=getattr(settings, "VIES_INVALID_REQUESTER_CACHE_SECONDS", 60 * 60)
-        )
+        refused_since = now - dt.timedelta(seconds=settings.VIES_INVALID_REQUESTER_CACHE_SECONDS)
         refused = (
             rows.filter(
                 result=engine.VAT_UNAVAILABLE,
@@ -999,7 +997,9 @@ def _cached_vat_validation(
             return refused
     down_since = now - dt.timedelta(seconds=settings.VIES_UNAVAILABLE_CACHE_SECONDS)
     return (
+        # Only genuine service-down rows are shared; a refused requester is that requester's.
         rows.filter(result=engine.VAT_UNAVAILABLE, checked_at__gte=down_since)
+        .exclude(detail=engine.DETAIL_INVALID_REQUESTER)
         .order_by(*newest)
         .first()
     )
