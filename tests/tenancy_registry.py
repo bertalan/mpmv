@@ -328,7 +328,8 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "manager:platform:notice": StaffOnly(
         "One notice of illegal content (CMP.5): platform data, not vendor-owned; needs the "
-        "compliance.review_notices permission, so a vendor member gets 404."
+        "compliance.review_notices permission, so a vendor member gets 404.",
+        kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
     ),
     "dsa_notice": NoVendorData(
         "Public report form for illegal content (DSA art. 16, CMP.5): no vendor data is shown, "
