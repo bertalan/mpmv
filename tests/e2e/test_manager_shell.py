@@ -2,7 +2,7 @@
 
 A member of two vendors signs in on the Manager login, verifies the second factor, picks a
 vendor, switches to the other one from the header; platform staff land on the platform space and
-get 404 on the shop space. Every Manager page passes axe (WCAG 2.2 AA) with no CSP violation;
+get 403 on the shop space. Every Manager page passes axe (WCAG 2.2 AA) with no CSP violation;
 screenshots are kept for review.
 """
 
@@ -86,7 +86,7 @@ def test_a_member_of_two_vendors_signs_in_and_switches_vendor(
 
     response = page.goto(f"{live_server.url}/manager/platform/")
     assert response is not None
-    assert response.status == 404
+    assert response.status == 403
 
     page.goto(f"{live_server.url}/manager/shop/")
     page.get_by_role("button", name="Sign out").click()
@@ -117,7 +117,7 @@ def test_platform_staff_land_on_the_platform_space(
 
     response = page.goto(f"{live_server.url}/manager/shop/")
     assert response is not None
-    assert response.status == 404
+    assert response.status == 403
 
 
 def test_an_anonymous_visitor_is_sent_to_the_login(page: Page, live_server: LiveServer) -> None:

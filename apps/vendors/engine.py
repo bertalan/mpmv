@@ -1153,8 +1153,8 @@ class PayoutNotAllowed(ValueError):
         )
 
 
-# --- FatturaPA 1.2.x party blocks, specification `FATTURAPA_SPECIFICATION_VERSION` (data only:
-# CMP.2 writes the XML)
+# --- FatturaPA 1.2.x party blocks, specification `FATTURAPA_SPECIFICATION_VERSION` (data only: the
+# platform writes no FatturaPA XML; CMP.2 puts these data in a non-fiscal statement export)
 
 CEDENTE: Final = "CedentePrestatore"  # the vendor invoices (its customers)
 CESSIONARIO: Final = "CessionarioCommittente"  # the vendor is invoiced (platform commissions)
