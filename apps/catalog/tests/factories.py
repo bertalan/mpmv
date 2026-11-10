@@ -26,6 +26,7 @@ from apps.catalog.models import (
     Product,
     ProductAttribute,
     ProductTranslation,
+    Redirect,
     SkuAlias,
     SlugHistory,
     Taxonomy,
@@ -84,6 +85,18 @@ class SlugHistoryFactory(DjangoModelFactory[SlugHistory]):
     product = factory.SubFactory(ProductFactory)
     language = "en"
     slug = factory.Sequence(lambda n: f"old-product-{n}-en")
+
+
+class RedirectFactory(DjangoModelFactory[Redirect]):
+    """A 301 from an old path to a path on this site (CAT.6); written around the services, so
+    nothing is validated or audited."""
+
+    class Meta:
+        model = Redirect
+
+    source_path = factory.Sequence(lambda n: f"/old-page-{n}/")
+    target_kind = Redirect.Target.PATH
+    target_path = "/"
 
 
 class VariantFactory(DjangoModelFactory[Variant]):

@@ -48,6 +48,8 @@ vendor's change page links to its trail (`?vendor=<public id>`).
 | Field encryption keys (SEC.3) | `core.field_keys.rotated` (one per object, key ids only; see [field-encryption.md](field-encryption.md)) |
 | Product prices (CAT.1) | `catalog.product.price_changed`, `catalog.variant.price_changed` |
 | Products and variants (CAT.12) | `catalog.product.created`, `.updated`, `.deleted`, `.relations_changed` (categories, terms, upsells); `catalog.variant.created`, `.updated`, `.deleted`, through `catalog.services.save_product`, `delete_product`, `save_variant` and `delete_variant`. Entries show the sales mode, fiscal category, weight and dimensions (variants: weight override) with SKU and vendor; other fields are saved but not audited. Prices are refused there (price services only) and the owning vendor never changes (Q-33) |
+| Redirects (CAT.6) | `catalog.redirect.created`, `.updated`, `.deleted` (the rule's kind, source, target and expiry), through `catalog.services.save_redirect` and `delete_redirect`; `import_redirects` writes one entry per row it applies |
+| Events (EVT.3) | `events.event_created`, `.event_draft_saved`, `.event_hidden`, `.event_restored`, `.event_cancelled` (moderation and organiser actions, with the reason where staff give one), `.event_approved`, `.event_changes_requested` (the review workflow, from its signals); `events.policy_set`, `.policy_changed` (a vendor's moderation mode); `events.settings_set`, `.settings_changed` (the site's moderation threshold and retention) |
 | Product slugs (CAT.5) | `catalog.product.slug_changed`, `catalog.product.old_slug_recorded` (the old slug kept for the 301) |
 | Vendor SKUs (CAT.13) | `catalog.product.sku_renamed`, `catalog.variant.sku_renamed` (the old SKU kept as an alias), `catalog.sku_rows_updated` (stock updates by SKU) |
 | Catalogue integrity (CAT.14) | `catalog.product.duplicated_to_vendor` (a product copied to another vendor, with the reason) |
@@ -57,6 +59,10 @@ vendor's change page links to its trail (`?vendor=<public id>`).
 | Site themes (THM.1) | `themes.theme_settings.configured` (the site's hostname and theme, before and after; see [themes.md](themes.md)) |
 | Legal pages (CMS.5, I18N.9) | `cms.legal_page_version.recorded` (a published legal page version), `cms.legal_page_review.recorded` (a per-language review), `cms.legal_page.effective_date_set` |
 | Tax regime changes (TAX.2) | `tax.regime_change.requested`, `.approved`, `.rejected` (who, the requested regime, the review reason); an approval also writes `tax.vendor_tax_profile.configured` and, when it moves the declared fiscal regime, `vendor.updated` |
+
+Not audited here on purpose: blog articles created by `cms.services.import_article` (CMS.3) and
+other CMS page content. Wagtail's page history and revisions record them, like an editor's
+publish; the service is listed in `tests/unit/test_audit_coverage.py` with that reason.
 
 Deliberately not stored: password hashes (only `has_usable_password`), API key hashes, TOTP
 secrets, and the identifier typed in a failed login that matches no account (it may be a typo

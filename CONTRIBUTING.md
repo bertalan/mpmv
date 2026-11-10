@@ -50,6 +50,8 @@ synthetic only: pseudonyms like "Vendor A", `example.com` addresses, never real 
 vendors. No credential-like literals: generate passwords and keys at runtime with
 `secrets.token_urlsafe()`. Details in [ADR-0006](docs/adr/0006-testing-strategy.md).
 
+For parallel work (worktrees, agents), set `MPMV_TEST_DB_NAME=test_mpmv_<branch>` so test databases do not collide on the shared local PostgreSQL ([parallel-lanes.md](docs/dev/parallel-lanes.md)).
+
 ## Commits
 
 - Imperative mood, ≤72-character subject, task ID as a prefix: `ARC.6: add MoneyField with ROUND_HALF_UP per line`.

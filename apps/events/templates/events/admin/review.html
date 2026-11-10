@@ -1,0 +1,31 @@
+{% extends "wagtailadmin/generic/base.html" %}
+{% load i18n %}
+{% block main_content %}
+  {% if items %}
+    <table class="listing">
+      <caption class="w-sr-only">{% translate "Events awaiting review" %}</caption>
+      <thead>
+        <tr>
+          <th scope="col">{% translate "Event" %}</th>
+          <th scope="col">{% translate "Vendor" %}</th>
+          <th scope="col">{% translate "Language" %}</th>
+          <th scope="col">{% translate "Submitted" %}</th>
+          <th scope="col">{% translate "Submitted by" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event, state in items %}
+          <tr>
+            <td><a href="{% url 'wagtailadmin_pages:edit' event.pk %}">{{ event.title }}</a></td>
+            <td>{{ event.vendor|default:"-" }}</td>
+            <td>{{ event.locale.get_display_name }}</td>
+            <td><time datetime="{{ state.created_at|date:'c' }}">{{ state.created_at }}</time></td>
+            <td>{{ state.requested_by|default:"-" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>{% translate "No event is awaiting review." %}</p>
+  {% endif %}
+{% endblock %}
