@@ -20,6 +20,13 @@ member's own vendor's events for a vendor member, and nothing for anyone else. A
 `status` is denormalised for filters (vendor area, API, admin): `services.sync_event_status`
 keeps it in step with `live`, the workflow state, `cancelled_at` and `hidden_at`.
 
+Moderation (EVT.3): `EventPage.get_workflow()` returns the "Event review" workflow
+(`event_review_workflow`) while the vendor needs review (`engine.needs_review`: policy,
+threshold, approved events), and none otherwise, so Wagtail publishes at once. Every publish goes
+through `EventPage.publish`, which bumps `sequence` when the revision changes a field the ICS
+shows. The page-level state (`ROW_FIELDS`: hiding, sequence, status) lives on the page row and
+never comes back from a revision.
+
 Validation lives in `clean()` (field errors for the forms) and in check constraints (the same
 rules, for every other write path). The admin panels are in `panels` and the admin form in
 `forms` (EVT.1 part 2/2); the public templates are `events/event_index_page.html` and
@@ -33,11 +40,14 @@ from decimal import Decimal
 from typing import Any, ClassVar
 
 from django.conf import settings
+from django.contrib.auth.models import Group
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.fields import ArrayField
-from django.core.exceptions import ValidationError
-from django.db import models
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import models, transaction
 from django.db.models import F, Q
 from django.http import Http404, HttpRequest
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from modelcluster.fields import ParentalManyToManyField
 from wagtail import blocks
@@ -45,7 +55,16 @@ from wagtail.admin.panels import FieldPanel
 from wagtail.contrib.settings.models import BaseSiteSetting
 from wagtail.fields import RichTextField, StreamField
 from wagtail.images import get_image_model_string
-from wagtail.models import Page, PageManager, PageQuerySet
+from wagtail.models import (
+    GroupApprovalTask,
+    Page,
+    PageManager,
+    PageQuerySet,
+    Site,
+    Workflow,
+    WorkflowState,
+    WorkflowTask,
+)
 from wagtail_localize.fields import SynchronizedField
 
 from apps.cms.blocks import (
@@ -107,7 +126,7 @@ def event_blocks() -> list[tuple[str, blocks.Block]]:
 
     The CMS.9 launch countdown is offered (spec 10 §10.2; `EventPage` caps its cache at the
     target). The CMS.10 product grid joins when that task adds it; embeds only with the SEO.5
-    consent rules. EVT.3 restricts vendors to the vendor-safe subset.
+    consent rules. The EVT.3 services give vendors `engine.VENDOR_SAFE_BLOCKS` only.
     """
     return [
         ("paragraph", blocks.RichTextBlock(features=RICH_TEXT_FEATURES, label=_("Rich text"))),
@@ -210,6 +229,17 @@ SYNCHRONISED_FIELDS = (
     "content_changed_at",
 )
 
+# Page-level state, written by the services on the page row: a revision never carries it back.
+ROW_FIELDS = (
+    "status",
+    "sequence",
+    "content_changed_at",
+    "hidden_at",
+    "hidden_by",
+    "hidden_reason",
+    "dsa_notice_ref",
+)
+
 ADDRESS_FIELDS = ("street", "postcode", "city", "region", "country")
 LATITUDE_RANGE = (Decimal(-90), Decimal(90))
 LONGITUDE_RANGE = (Decimal(-180), Decimal(180))
@@ -309,6 +339,10 @@ def _constraints() -> list[models.BaseConstraint]:
             name="events_eventpage_geo_confidence_range",
         ),
     ]
+
+
+class HiddenEventPublishRefused(PermissionDenied):
+    """A hidden event is published again only through `restore_event` (spec 15 "Hiding")."""
 
 
 class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is untyped
@@ -448,6 +482,110 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
     class Meta:
         verbose_name = _("event")
         constraints = _constraints()
+
+    # --- Moderation (spec 15 "Moderation with Wagtail workflows", EVT.3)
+
+    def review_needed(self, *, staff: bool = False) -> bool:
+        """Whether a submission of this event goes through "Event review" (`engine.needs_review`).
+
+        `staff`: the submitter is platform staff. A platform event (no vendor) is never
+        reviewed. The threshold is the page's site's `EventSettings` (the default site's when the
+        page is outside every site), and the count is the vendor's approved events.
+        """
+        if staff or self.vendor_id is None:
+            return False
+        mode = (
+            VendorEventPolicy.objects.filter(vendor_id=self.vendor_id)
+            .values_list("mode", flat=True)
+            .first()
+        ) or PolicyMode.DEFAULT
+        threshold = EventSettings.current(self._settings_site()).moderation_threshold
+        approved = approved_event_count(self.vendor_id) if mode == PolicyMode.DEFAULT else 0
+        return engine.needs_review(approved, threshold, mode, is_staff=False)
+
+    def _settings_site(self) -> Site:
+        site: Site | None = self.get_site() if self.pk else None
+        return site or Site.objects.get(is_default_site=True)
+
+    def get_workflow(self) -> Workflow | None:
+        """Wagtail hook: "Event review" while the vendor needs review, else none (publish at once).
+
+        Replaces Wagtail's tree-based lookup, so a workflow assigned to an ancestor page never
+        applies to events.
+        """
+        if not getattr(settings, "WAGTAIL_WORKFLOW_ENABLED", True) or not self.review_needed():
+            return None
+        workflow = event_review_workflow()
+        return workflow if workflow.active else None
+
+    @property
+    def has_workflow(self) -> bool:
+        return self.get_workflow() is not None
+
+    # --- Publishing: the ICS SEQUENCE rule (spec 15 "Services")
+
+    def with_content_json(self, content: dict[str, Any]) -> "EventPage":
+        """A revision applied over this page, keeping the page-level state (`ROW_FIELDS`).
+
+        Hiding, the sequence and the denormalised status belong to the page, not to a revision:
+        an old revision never clears a hiding or rolls the sequence back. A cancellation sticks
+        once published.
+        """
+        page: EventPage = super().with_content_json(content)
+        for name in ROW_FIELDS:
+            attname = self._meta.get_field(name).attname
+            setattr(page, attname, getattr(self, attname))
+        if self.cancelled_at is not None:
+            page.cancelled_at = self.cancelled_at
+        return page
+
+    def publish(
+        self,
+        revision: Any,
+        user: Any = None,
+        changed: bool = True,
+        log_action: bool = True,
+        previous_revision: Any = None,
+        skip_permission_checks: bool = False,
+    ) -> Any:
+        """Publish `revision`, bumping `sequence` first when it changes a field the ICS shows.
+
+        Every publish goes through here: the services, Wagtail's admin, the workflow approval,
+        scheduled publishing and wagtail-localize. A hidden page is published again only by
+        `restore_event` (spec 15 "Hiding"), whatever path the publish takes: the stored row
+        decides, and only `restore_event` clears `hidden_at` before it republishes.
+        """
+        if EventPage.objects.filter(pk=self.pk, hidden_at__isnull=False).exists():
+            raise HiddenEventPublishRefused("a hidden event is restored by platform staff only")
+        self._bump_sequence(revision)
+        return super().publish(
+            revision,
+            user=user,
+            changed=changed,
+            log_action=log_action,
+            previous_revision=previous_revision,
+            skip_permission_checks=skip_permission_checks,
+        )
+
+    def _bump_sequence(self, revision: Any) -> None:
+        stored: EventPage | None = EventPage.objects.filter(pk=self.pk).first()
+        if stored is None:
+            return
+        published = stored.with_content_json(revision.content)
+        sequence = engine.next_sequence(
+            stored.sequence,
+            ics_snapshot(stored),
+            ics_snapshot(published),
+            was_published=stored.first_published_at is not None,
+        )
+        if sequence == stored.sequence:
+            return
+        now = timezone.now()
+        EventPage.objects.filter(pk=self.pk).update(sequence=sequence, content_changed_at=now)
+        # The publish action builds the published page from the revision's own object.
+        for target in (self, revision.content_object):
+            target.sequence = sequence
+            target.content_changed_at = now
 
     # --- Public routing (spec 15 §Status)
 
@@ -649,3 +787,72 @@ class EventSettings(BaseSiteSetting):  # type: ignore[misc]  # Wagtail is untype
     class Meta:
         verbose_name = _("events settings")
         verbose_name_plural = _("events settings")
+
+    @classmethod
+    def current(cls, site: Site) -> "EventSettings":
+        """The settings of `site`, or unsaved defaults: a read never creates the row.
+
+        Wagtail's `for_site` creates it, which would make a GET (an admin page, the workflow
+        lookup) write. Only `set_event_settings` saves it.
+        """
+        found: EventSettings | None = cls.objects.filter(site=site).first()
+        return found if found is not None else cls(site=site)
+
+
+# --- The "Event review" workflow (spec 15 "Moderation with Wagtail workflows")
+
+EVENT_REVIEW = "Event review"
+EVENT_MODERATORS = "Event moderators"
+
+
+def event_review_workflow() -> Workflow:
+    """The "Event review" workflow: one `GroupApprovalTask` for the "Event moderators" group.
+
+    Created after every `migrate` and on first use when missing; never changed once it exists,
+    so staff may edit its task and groups in the admin. The CORE.8 editor roles take over the
+    group.
+    """
+    workflow: Workflow | None = Workflow.objects.filter(name=EVENT_REVIEW).order_by("pk").first()
+    if workflow is not None:
+        return workflow
+    with transaction.atomic():
+        group, _ = Group.objects.get_or_create(name=EVENT_MODERATORS)
+        task = GroupApprovalTask.objects.create(name=EVENT_REVIEW)
+        task.groups.add(group)
+        workflow = Workflow.objects.create(name=EVENT_REVIEW)
+        WorkflowTask.objects.create(workflow=workflow, task=task, sort_order=0)
+    return workflow
+
+
+def approved_event_count(vendor_id: int) -> int:
+    """The vendor's events with at least one approved workflow state (spec 15 "Threshold").
+
+    Events, not translations: the pages of one event share a `translation_key`. Rejected and
+    withdrawn submissions do not count.
+    """
+    keys = {
+        str(pk): key
+        for pk, key in EventPage.objects.filter(vendor_id=vendor_id).values_list(
+            "pk", "translation_key"
+        )
+    }
+    approved = WorkflowState.objects.filter(
+        base_content_type=ContentType.objects.get_for_model(Page),
+        object_id__in=list(keys),
+        status=WorkflowState.STATUS_APPROVED,
+    ).values_list("object_id", flat=True)
+    return len({keys[object_id] for object_id in approved})
+
+
+def _comparable(page: EventPage, name: str) -> Any:
+    field = page._meta.get_field(name)
+    value = getattr(page, field.attname)
+    if isinstance(field, ArrayField):
+        return [field.base_field.to_python(item) for item in value or []]
+    return field.to_python(value)
+
+
+def ics_snapshot(page: EventPage) -> dict[str, Any]:
+    """The values of the fields the ICS shows (`engine.ICS_FIELDS`), comparable across a
+    stored page and a page restored from a revision."""
+    return {name: _comparable(page, name) for name in engine.ICS_FIELDS}

@@ -165,6 +165,27 @@ def test_a_decision_without_the_reviewed_claim_is_refused(
     assert not VendorMember.objects.filter(vendor=vendor).exists()
 
 
+@pytest.mark.parametrize("value", ["\u00b2:1", "1:\u2460", "1" * 5000 + ":1", "9" * 30 + ":1"])
+def test_a_hostile_reviewed_claim_value_is_refused_without_an_error(
+    staff_client: Client, value: str
+) -> None:
+    vendor = VendorFactory.create(italian_company=True)
+    claim = submitted_claim(vendor)
+    response = staff_client.post(
+        reverse(CHANGELIST),
+        {
+            "action": "approve_claim",
+            "_selected_action": [vendor.pk],
+            "post": "yes",
+            f"reviewed-{vendor.pk}": value,
+        },
+        follow=True,
+    )
+    assert response.status_code == 200
+    claim.refresh_from_db()
+    assert claim.status == VendorClaim.Status.SUBMITTED
+
+
 def test_staff_a_cannot_approve_a_claimant_they_never_saw(staff_client: Client) -> None:
     """Staff A opens the review; meanwhile staff B rejects, resends the link to the PEC and
     the PEC holder submits. A's confirmation must not approve the new claimant."""

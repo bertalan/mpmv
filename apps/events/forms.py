@@ -61,7 +61,8 @@ class EventPageForm(WagtailAdminPageForm):  # type: ignore[misc]  # Wagtail is u
         if "products" in self.fields:
             offered = ~Q(status=ProductStatus.RETIRED)
             if instance.pk is not None:
-                # A draft revision holds its links in memory (modelcluster): no `values()` there.
+                # A page built from a revision holds its links in memory (modelcluster): read
+                # them as objects, not with `values()`, which such a queryset cannot run.
                 offered |= Q(pk__in=[product.pk for product in instance.products.all()])
             products = Product.objects.filter(offered)
             if instance.pk is not None and instance.vendor_id is not None:

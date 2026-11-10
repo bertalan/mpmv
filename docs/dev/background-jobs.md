@@ -82,6 +82,7 @@ Jobs on `main` today (cron in Europe/Rome; a new job adds its row here):
 | `core.purge_geocode_cache` | `27 4 * * *` | none | Deletes geocoding cache entries past their 180 days (EVT.12) |
 | `tax.check_profile_consistency` | `41 5 * * *` | none | Logs current tax profiles that disagree with the vendor's fiscal regime (TAX.2) |
 | `vendors.check_establishments` | `47 5 * * *` | none | Logs active vendors established outside the allowed vendor countries (CMP.13); suspends nobody |
+| `cms.publish_scheduled` | `*/5 * * * *` | none | Publishes pages whose go-live has come and unpublishes expired ones (Wagtail's `publish_scheduled`), so scheduled blog articles appear on time (CMS.3) |
 | `core.send_email` | on demand | 5 retries, 1 min doubling to 1 h | Sends one outbox email ([transactional-email.md](transactional-email.md), ARC.16) |
 | `tax.recheck_vat_number` | on demand | 8 retries, 1 min doubling to 1 h | Asks VIES again about a VAT number while VIES is down (TAX.5) |
 

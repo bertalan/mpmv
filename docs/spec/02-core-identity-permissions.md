@@ -28,7 +28,7 @@ class VendorMember(Model):  # vendors — user ↔ vendor membership
     vendor = FK(Vendor)
     user = FK(User)
     role = CharField(choices=["owner", "staff"])
-    # owner: payouts, IBAN, VAT regime, users, storefront profile; staff: orders, quotes, products
+    # owner: payouts, IBAN, VAT regime, users, storefront profile; staff: orders, quotes, products, events
 
 
 class ApiClient(Model):  # api — machine credential (pipelines, MCP, integrations)
@@ -50,7 +50,7 @@ class ApiClient(Model):  # api — machine credential (pipelines, MCP, integrati
 | Anonymous | Site | Browse, cart, guest checkout, quote request |
 | Customer | Customer area | Orders, quotes, returns/withdrawal, personal data, GDPR export |
 | Vendor owner | Manager, shop space (`/manager/shop/`) | Everything concerning **their own** vendor, including financial settings |
-| Vendor staff | Manager, shop space (`/manager/shop/`) | Orders, quotes, products; no payouts, IBAN or tax regime |
+| Vendor staff | Manager, shop space (`/manager/shop/`) | Orders, quotes, products, events ([15](15-events.md)); no payouts, IBAN or tax regime |
 | Editor | Wagtail admin | Pages, blog, SEO copy, translations, each editor role limited to its part of the page tree (Q-58) |
 | Configuration and tax | Manager, platform space (`/manager/platform/`) | Operator data, countries, languages, currency, VAT rates, regimes, commissions, shipping rules (owner decision 2026-11-09) |
 | Catalog and moderation | Manager, platform space | All vendors' products, categories, attributes, taxonomies, imports; approval of vendor events and content (with the Wagtail "Event review" role); approval and suspension of vendors (owner decision 2026-11-09) |
