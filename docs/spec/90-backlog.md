@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **272** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **2220 h** (P1 1777 h · P2 413 h · P3 30 h)
+- Micro-tasks: **273** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **2222 h** (P1 1777 h · P2 413 h · P3 32 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -31,9 +31,9 @@
 | AI | AI channels (MCP, agents) | 4 | 0 | 22 | 18 | 40 |
 | CMP | Compliance | 27 | 163 | 81 | 0 | 244 |
 | SEC | Security | 9 | 59 | 0 | 0 | 59 |
-| OPS | Operations | 9 | 19 | 30 | 6 | 55 |
+| OPS | Operations | 10 | 19 | 30 | 8 | 57 |
 | MIG | Migration and cutover | 15 | 121 | 23 | 0 | 144 |
-| **Total** | | **272** | **1777** | **413** | **30** | **2220** |
+| **Total** | | **273** | **1777** | **413** | **32** | **2222** |
 
 ## By phase
 
@@ -340,7 +340,7 @@
 | MIG.14 | WCFM Marketplace connector `wcfm_rest` (owner decision 2026-11-09): discovers the `wcfmmp/v1` namespace from the `/wp-json` index; store vendors (profile, address, policies, logo), product to vendor link, vendor orders with the commission split; without the add-on, a run report of the gaps and a CSV map of product id to vendor as fallback; never bank, KYC or payout data; imported vendor members created without a usable password, activated through CORE.19 and enrolling MFA at first login (CORE.4) | P2 | 8 | MIG.13, CORE.19 | A recorded fixture with the add-on gives vendors and product attribution; a fixture without it completes with the gap report and attributes products from the CSV map; the schema has no bank, KYC or payout field, so no such data can be written; an imported vendor member sets a password and enrols MFA before any Manager page |
 | MIG.15 | Audit of the migration article import (accepted by lane-a 2026-11-10): cms `import_article` writes no `AuditLog` today and relies on Wagtail page history; decide whether the migration import needs its own audit trail, and if so implement it (one entry per imported article with the source id and the run id; owner: MIG lane) | P2 | 3 | MIG.2, SEC.4 | The decision is recorded in this spec; if audited, a migration import run writes one `AuditLog` entry per imported article and a re-run writes none for unchanged articles |
 
-### F7 — Later evolution (P3) (4 tasks, 30 h)
+### F7 — Later evolution (P3) (5 tasks, 32 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -348,3 +348,4 @@
 | AI.3 | Read-only public catalog API for agents | P3 | 6 | CAT.9 | Search by taxonomy term via API |
 | AI.4 | Evaluation of agentic commerce protocols (ACP, WebMCP) and prototype | P3 | 12 | PAY.1, AI.3 | ADR with recommendation |
 | OPS.8 | Developer docs pages for features that have none (accepted by lane-a 2026-11-10): redirects (CAT.6), event moderation (EVT.3), uploads and their caps (SEC.2), GPSR data and its publication block (CMP.3), launch countdown block (CMS.9), each under `docs/dev/` with how it works, settings and the tests that guard it | P3 | 6 | CAT.6, EVT.3, SEC.2, CMP.3, CMS.9 | Five pages in `docs/dev/` linked from the docs index; `make docs` and `make check` pass |
+| OPS.10 | Nightly line-only coverage (owner-approved 2026-11-10): a scheduled GitHub Actions workflow (`coverage-nightly.yml`, cron plus manual run) runs the unit and integration suites against the CI PostgreSQL service with line coverage only, uploads the XML and HTML report as an artifact and writes the table to the job summary; report only, it never fails the build on a coverage number | P3 | 2 | ARC.4 | A manual run of the workflow produces the `coverage-report` artifact and a coverage table in the job summary |
