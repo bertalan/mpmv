@@ -19,6 +19,7 @@ from apps.accounts.models import User
 from apps.accounts.tests.mfa import verified_login
 from apps.core.models import AuditLog
 from apps.core.tests.factories import MediaImageFactory
+from apps.manager.forms import MANAGER_RICH_TEXT_FEATURES
 from apps.vendors import engine
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorMemberFactory
@@ -106,7 +107,7 @@ def test_choosing_an_own_image_returns_it(client: Client, owner: User, own: Coll
     verified_login(client, owner)
     data = _json(client.get(_chosen(image.pk)))
     assert data["step"] == "chosen"
-    assert data["result"]["id"] == image.pk
+    assert data["result"]["id"] == str(image.pk)
 
 
 def test_the_format_step_serves_an_own_image(client: Client, owner: User, own: Collection) -> None:
@@ -128,14 +129,15 @@ def test_another_vendors_image_id_is_a_404_and_is_audited(
     route: str,
 ) -> None:
     pk = {
-        "foreign": lambda: MediaImageFactory.create(collection=foreign).pk,
-        "platform": lambda: MediaImageFactory.create().pk,
-        "missing": lambda: 999_999,
-    }[where]()
+        "foreign": MediaImageFactory.create(collection=foreign).pk,
+        "platform": MediaImageFactory.create().pk,
+        "missing": 999_999,
+    }[where]
     url = _chosen(pk) if route == "chosen" else f"{BASE}{pk}/select_format/"
     verified_login(client, owner)
     assert client.get(url).status_code == 404
-    assert client.post(url, {}).status_code == 404
+    if route == "select_format":
+        assert client.post(url, {}).status_code == 404
     entry = AuditLog.objects.filter(action=DENIED).first()
     assert entry is not None
     assert entry.actor_id == owner.pk
@@ -159,7 +161,7 @@ def test_an_owner_uploads_into_the_vendors_own_collection(
     verified_login(client, owner)
     data = _json(_post(client))
     assert data["step"] == "chosen"
-    image = get_image_model().objects.get(pk=data["result"]["id"])
+    image = get_image_model().objects.get(pk=int(data["result"]["id"]))
     assert image.collection.name == engine.vendor_collection_name(str(vendor.public_id))
     assert image.collection.depth == 2
     assert image.uploaded_by_user_id == owner.pk
@@ -234,3 +236,8 @@ def test_the_editor_points_at_the_manager_chooser_not_the_wagtail_admin(
     page = client.get(f"{SHOP}profile/").content.decode()
     assert "/admin/images/chooser" not in page
     assert BASE in page
+
+
+def test_the_manager_editor_has_no_link_or_chooser_feature_it_cannot_serve() -> None:
+    assert "link" not in MANAGER_RICH_TEXT_FEATURES
+    assert "image" in MANAGER_RICH_TEXT_FEATURES

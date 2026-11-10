@@ -138,6 +138,8 @@ def media_problem(vendor: Vendor, html: str) -> str | None:
     and every document it links must be in the vendor's own collection (depth 2, named by
     `engine.vendor_collection_name`) or below it. A foreign, missing or non-numeric id is a
     problem, so crafted HTML cannot reach another vendor's files (D-34)."""
+    if engine.has_page_link(html):
+        return "Links to other pages of the site are not allowed here."
     images, documents = engine.media_references(html)
     if not images and not documents:
         return None
@@ -2239,6 +2241,102 @@ def remove_vendor_logo(
         _discard_logo_image(previous, vendor)
     vendor.logo, vendor.logo_alt = None, ""
     return changes
+
+
+# --- Storefront media chooser (VEN.31, D-34)
+
+MEDIA_UPLOADED = "vendor.media_uploaded"
+MEDIA_DENIED = "vendor.media_denied"
+MEDIA_UPLOAD_LIMIT = 30  # uploads per owner and hour: every attempt costs image decode work
+
+
+def vendor_media_collection(vendor: Vendor) -> ImageCollection | None:
+    """The vendor's own collection `vendor-<public id>` (depth 2), or None before the first
+    upload. Read only: the chooser creates nothing."""
+    return ImageCollection.objects.filter(
+        depth=2, name=engine.vendor_collection_name(str(vendor.public_id))
+    ).first()
+
+
+def vendor_media_images(vendor: Vendor) -> QuerySet[Any]:
+    """The images the vendor may list and choose: its collection and the ones below it."""
+    own = vendor_media_collection(vendor)
+    images: QuerySet[Any] = get_image_model().objects.all()
+    if own is None:
+        return images.none()
+    allowed = ImageCollection.objects.descendant_of(own, inclusive=True)
+    found: QuerySet[Any] = images.filter(collection__in=allowed)
+    return found
+
+
+def audit_media_denied(vendor: Vendor, *, ctx: AuditContext, what: str, target: str = "") -> None:
+    """A chooser or upload request named something outside the vendor's own collection."""
+    record(
+        ctx,
+        MEDIA_DENIED,
+        MODEL_LABEL,
+        str(vendor.public_id),
+        None,
+        {"request": what, "target": target[:100], "vendor": str(vendor.public_id)},
+    )
+
+
+def upload_storefront_image(
+    vendor: Vendor, *, upload: Any, title: str, actor: User, ctx: AuditContext
+) -> MediaImage:
+    """The vendor owner uploads an image from the storefront editor, into the vendor's own
+    collection only (the caller cannot name another). The SEC.2 checks of `MediaImage` apply
+    (content type, caps, re-encoding without metadata, no SVG); the image is the vendor's own
+    work (CMS.8). Owner only, and not for a suspended or closed vendor (`PermissionDenied`).
+    Counted against an hourly limit per owner; one `vendor.media_uploaded` audit entry.
+    Raises `ValidationError({"file": [...]})` for a refused file."""
+    if not has_vendor_permission(actor, vendor, "profile"):
+        raise PermissionDenied("Only the vendor owner uploads storefront images.")
+    wait = consume_rate_limit(
+        f"vendor-media:user:{actor.pk}", limit=MEDIA_UPLOAD_LIMIT, window=PROFILE_RATE_WINDOW
+    )
+    if wait:
+        minutes = max(1, int(wait.total_seconds() // 60))
+        raise ValidationError({"file": f"Too many uploads: try again in {minutes} minutes."})
+    stored: tuple[Any, str] | None = None
+    try:
+        with transaction.atomic():
+            locked = _lock_profile_vendor(vendor, actor)
+            licence = ImageLicence.objects.filter(code=LOGO_LICENCE_CODE).first()
+            if licence is None:  # the seeded allow list (core migration 0013) is incomplete
+                raise ValidationError({"file": "Uploads are not available: contact support."})
+            image = MediaImage(
+                title=(title.strip() or "Image")[:255],
+                file=upload,
+                collection=vendor_logo_collection(locked),
+                licence=licence,
+                author=vendor.display_name[:200],
+                uploaded_by_user=actor,
+            )
+            try:
+                image.full_clean()
+            except ValidationError as error:
+                messages = [m for items in error.message_dict.values() for m in items]
+                raise ValidationError({"file": messages}) from error
+            image.save()
+            stored = (image.file.storage, image.file.name)
+            record(
+                ctx,
+                MEDIA_UPLOADED,
+                MODEL_LABEL,
+                str(vendor.public_id),
+                None,
+                {
+                    "image": f"image:{image.pk}",
+                    "title": image.title,
+                    "vendor": str(vendor.public_id),
+                },
+            )
+    except BaseException:
+        if stored is not None:  # the row rolls back; the file would stay on disk
+            stored[0].delete(stored[1])
+        raise
+    return image
 
 
 class _PendingImage:

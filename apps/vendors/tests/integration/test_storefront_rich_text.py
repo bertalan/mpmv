@@ -294,10 +294,3 @@ def test_a_page_link_is_refused_on_save(vendor: Vendor, owner: User) -> None:
     """#238 minor: a `linktype="page"` link resolves any page id; vendors may not use it."""
     html = '<p><a linktype="page" id="1">other page</a></p>'
     assert media_problem(vendor, html) is not None
-
-
-def test_the_manager_editor_has_no_link_or_chooser_feature_it_cannot_serve() -> None:
-    from apps.manager.forms import MANAGER_RICH_TEXT_FEATURES
-
-    assert "link" not in MANAGER_RICH_TEXT_FEATURES
-    assert "image" in MANAGER_RICH_TEXT_FEATURES
