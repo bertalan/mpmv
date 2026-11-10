@@ -736,8 +736,8 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
         if self.online_url:
             if self.attendance not in (Attendance.ONLINE, Attendance.MIXED):
                 add("online_url", _("Only online and mixed events have a link."))
-            elif not self.online_url.startswith("https://"):
-                add("online_url", _("The link must start with https://."))
+            elif (problem := engine.https_url_problem(self.online_url, "The link")) is not None:
+                add("online_url", problem)
 
 
 # --- Moderation policy and settings

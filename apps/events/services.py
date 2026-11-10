@@ -602,7 +602,7 @@ def _apply(page: EventPage, data: Mapping[str, Any], *, staff: bool) -> None:
         _set_body(page, data["body"], staff=staff)
         # A revision is a JSON snapshot: `save_revision` skips `pre_save`, so a draft edit would
         # keep the raw rich text. The one sanitiser (CMS.12) runs here, for create and edit.
-        sanitise_rich_text_fields(page, only={"body"})
+        sanitise_rich_text_fields(page)
     _set_links(page, data)
 
 

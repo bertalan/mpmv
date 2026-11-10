@@ -13,6 +13,7 @@ from wagtail.models import Collection, Revision
 
 from apps.api.tests.factories import ApiClientFactory
 from apps.catalog.tests.factories import ProductFactory
+from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 from apps.core.tests.factories import MediaImageFactory
 from apps.events import engine as event_engine
@@ -330,19 +331,100 @@ def test_a_cta_cannot_link_another_vendors_event(client: Client) -> None:
     assert ["body"] in _error_fields(response)
 
 
+def _suspend(vendor: Vendor, status: str) -> None:
+    Vendor.objects.filter(pk=vendor.pk).update(status=status)
+
+
 @pytest.mark.parametrize("status", [vendor_engine.SUSPENDED, vendor_engine.CLOSED])
-def test_a_vendor_that_stops_being_active_mid_write_gets_the_standard_refusal(
-    client: Client, monkeypatch: pytest.MonkeyPatch, status: str
+def test_a_vendor_stopped_after_authentication_cannot_write_through_the_services(
+    status: str,
 ) -> None:
-    """The key authenticated while the vendor was active; the status changed before the write
-    (CORE.14). The service's `VendorCannotWrite` is the API's refusal, not a 500."""
+    """The status changed in the database after the key was authenticated (CORE.14): each
+    service re-reads it inside its transaction with the real `FOR SHARE` check."""
+    vendor = _vendor()
+    client_obj, _ = ApiClientFactory.create_with_key(vendor=vendor, scopes=READ_WRITE)
+    page = EventPageFactory.create(vendor=vendor)
+    page.save_revision().publish()
+    revisions = Revision.objects.count()
+    audits = AuditLog.objects.count()
+    pages = EventPage.objects.count()
+    ctx = AuditContext(actor_label="api:test", source=AuditLog.Source.API)
+    _suspend(vendor, status)  # `vendor` and `client_obj.vendor` are now stale instances
+    with pytest.raises(vendor_engine.VendorCannotWrite):
+        services.save_event_draft(client_obj, _payload(), vendor=vendor, ctx=ctx)
+    with pytest.raises(vendor_engine.VendorCannotWrite):
+        services.save_event_draft(client_obj, {"title": "New"}, page, ctx=ctx)
+    with pytest.raises(vendor_engine.VendorCannotWrite):
+        services.submit_event(client_obj, page, ctx=ctx)
+    with pytest.raises(vendor_engine.VendorCannotWrite):
+        services.cancel_event(client_obj, page, ctx=ctx)
+    assert EventPage.objects.count() == pages
+    assert Revision.objects.count() == revisions
+    assert AuditLog.objects.count() == audits
 
-    def refuse(vendor: Vendor) -> str:
-        raise vendor_engine.VendorCannotWrite(status)
 
-    monkeypatch.setattr(services, "ensure_vendor_can_write", refuse)
-    response = client.post(EVENTS, _payload(), content_type=JSON, headers=_headers(_vendor()))
-    assert response.status_code in {401, 403}
-    assert response.headers["Content-Type"].startswith("application/problem+json")
-    assert response.json()["status"] == response.status_code
-    assert EventPage.objects.count() == 0
+@pytest.mark.parametrize(
+    ("status", "http_status"), [(vendor_engine.SUSPENDED, 403), (vendor_engine.CLOSED, 401)]
+)
+def test_a_stopped_vendor_gets_the_standard_refusal_on_every_write(
+    client: Client, status: str, http_status: int
+) -> None:
+    """The same code as every other vendor API: 403 for a suspended vendor, 401 for a closed one
+    (its keys no longer authenticate)."""
+    vendor = _vendor()
+    headers = _headers(vendor)
+    page = EventPageFactory.create(vendor=vendor)
+    page.save_revision().publish()
+    revisions = Revision.objects.count()
+    audits = AuditLog.objects.count()
+    _suspend(vendor, status)
+    url = f"{EVENTS}/{page.public_id}"
+    responses = [
+        client.post(EVENTS, _payload(), content_type=JSON, headers=headers),
+        client.patch(url, {"title": "New"}, content_type=JSON, headers=headers),
+        client.post(f"{url}/submit", headers=headers),
+        client.post(f"{url}/cancel", headers=headers),
+    ]
+    for response in responses:
+        assert response.status_code == http_status
+        assert response.headers["Content-Type"].startswith("application/problem+json")
+        assert response.json()["status"] == http_status
+    assert EventPage.objects.count() == 1
+    assert Revision.objects.count() == revisions
+    assert AuditLog.objects.count() == audits
+
+
+def test_faq_answer_rich_text_is_stored_sanitised(client: Client) -> None:
+    hostile = '<p onclick="x()">a</p><script>alert(1)</script><img src=x onerror=alert(1)>'
+    faq = {
+        "type": "faq",
+        "value": {"heading": "Q", "items": [{"question": "Why?", "answer": hostile}]},
+    }
+    response = client.post(
+        EVENTS, _payload(body=[faq]), content_type=JSON, headers=_headers(_vendor())
+    )
+    if response.status_code == 422:
+        return
+    assert response.status_code == 201, response.content
+    stored = _stored_body(EventPage.objects.get())
+    for marker in ("<script", "onclick", "onerror"):
+        assert marker not in stored
+
+
+def test_an_online_url_with_a_user_name_is_refused(client: Client) -> None:
+    headers = _headers(_vendor())
+    base = _payload(attendance="online", venue_name="", city="", country="")
+    base.pop("street", None)
+    ok = client.post(
+        EVENTS,
+        base | {"online_url": "https://meet.example/room"},
+        content_type=JSON,
+        headers=headers,
+    )
+    assert ok.status_code == 201, ok.content
+    for url in ("https://trusted.example@evil.example/", "https://u:p@evil.example/"):
+        response = client.post(
+            EVENTS, base | {"online_url": url}, content_type=JSON, headers=headers
+        )
+        assert response.status_code == 422, url
+        assert ["online_url"] in _error_fields(response)
