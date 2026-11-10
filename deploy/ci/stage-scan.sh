@@ -41,6 +41,10 @@ if [ "$zap_exit" -ne 0 ] && [ "$zap_exit" -ne 2 ]; then
 fi
 
 REPORT="$(dirname "${BASH_SOURCE[0]}")/../../tools/stage_scan_report.py"
+if ! zap_problem="$(python3 -I "$REPORT" zap-check "$OUT/zap/zap.json")"; then
+  echo "::error::ZAP scanner error: $zap_problem"
+  status=3
+fi
 python3 -I "$REPORT" zap-list "$OUT/zap/zap.json"
 read -r zap_high zap_medium zap_low < <(python3 -I "$REPORT" zap-counts "$OUT/zap/zap.json")
 
@@ -54,6 +58,12 @@ update_exit=$?
 set -e
 if [ "$update_exit" -ne 0 ]; then
   echo "::error::nuclei scanner error: template download failed with exit code $update_exit"
+  status=3
+fi
+template_count="$(find "$OUT/templates" -type f -name '*.yaml' | wc -l | tr -d ' ')"
+echo "nuclei templates downloaded: $template_count"
+if [ "$template_count" -eq 0 ]; then
+  echo "::error::nuclei scanner error: 0 templates loaded, the scan would test nothing"
   status=3
 fi
 

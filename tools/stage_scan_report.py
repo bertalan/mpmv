@@ -5,6 +5,7 @@ only what is safe in a public log: ZAP plugin id, risk and alert name; nuclei te
 severity; counts; and, for a failed nuclei run, a coarse error class taken from its log. URLs,
 evidence, parameters and raw scanner output are never printed.
 
+    python3 -I tools/stage_scan_report.py zap-check REPORT     exit 3 when missing or malformed
     python3 -I tools/stage_scan_report.py zap-list REPORT      alert lines
     python3 -I tools/stage_scan_report.py zap-counts REPORT    "high medium low"
     python3 -I tools/stage_scan_report.py nuclei-list REPORT   finding lines
@@ -41,10 +42,23 @@ NUCLEI_ERROR_CLASSES = (
 )
 
 
-def _clean(text: object) -> str:
-    """One printable line with no workflow-command prefix."""
-    line = re.sub(r"[^\x20-\x7e]", "?", str(text)).replace("::", ":")
-    return line.strip()[:120]
+URL_LIKE = re.compile(
+    r"[A-Za-z][A-Za-z0-9+.-]*://\S*|www\.\S+|(?:[\w-]+\.)+[A-Za-z]{2,}(?::\d+)?(?:/\S*)?|"
+    r"\S*:\d{2,5}\b"
+)
+
+
+def _clean(text: object, *, mask_hosts: bool = False) -> str:
+    """One printable line with no workflow-command prefix.
+
+    With mask_hosts, URL-like and host-like tokens are replaced: a few ZAP plugins put request
+    text (a path, a header value) into the alert name.
+    """
+    line = str(text)
+    if mask_hosts:
+        line = URL_LIKE.sub("<masked>", line)
+    line = re.sub(r"[^\x20-\x7e]", "?", line)
+    return re.sub(r":{2,}", ":", line).strip()[:120]
 
 
 def zap_alerts(path: Path) -> list[tuple[str, str, str]]:
@@ -57,7 +71,7 @@ def zap_alerts(path: Path) -> list[tuple[str, str, str]]:
             risk = ZAP_RISKS.get(str(alert.get("riskcode", "")))
             if risk:
                 plugin = _clean(alert.get("pluginid", "?"))
-                alerts.append((plugin, risk, _clean(alert.get("name", "?"))))
+                alerts.append((plugin, risk, _clean(alert.get("name", "?"), mask_hosts=True)))
     return alerts
 
 
@@ -87,13 +101,31 @@ def nuclei_error_class(path: Path) -> str:
     return "unknown"
 
 
+def zap_alerts_or_none(path: Path) -> list[tuple[str, str, str]]:
+    """zap_alerts, but a malformed report gives no alerts; zap-check reports the error."""
+    try:
+        return zap_alerts(path)
+    except (ValueError, AttributeError):
+        return []
+
+
 def main(argv: list[str]) -> int:
     command, path = argv[1], Path(argv[2])
-    if command == "zap-list":
-        for plugin, risk, name in zap_alerts(path):
+    if command == "zap-check":
+        # A missing or malformed report is a scanner error. Nothing of the file is printed.
+        if not path.is_file():
+            print("report missing")
+            return 3
+        try:
+            zap_alerts(path)
+        except (ValueError, AttributeError):
+            print("report unreadable")
+            return 3
+    elif command == "zap-list":
+        for plugin, risk, name in zap_alerts_or_none(path):
             print(f"ZAP alert: plugin {plugin}, risk {risk}, {name}")
     elif command == "zap-counts":
-        risks = [risk for _, risk, _ in zap_alerts(path)]
+        risks = [risk for _, risk, _ in zap_alerts_or_none(path)]
         print(*(risks.count(r) for r in ("high", "medium", "low")))
     elif command == "nuclei-list":
         for template, severity in nuclei_findings(path):
