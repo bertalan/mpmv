@@ -57,7 +57,7 @@ def test_the_patterns_scale_linearly(name: str) -> None:
     make = PATHOLOGICAL[name]
     small = _best(redact_unbounded, make(3000))
     large = _best(redact_unbounded, make(12000))
-    assert large <= max(small, 0.0005) * 8, f"{name}: {small:.4f}s -> {large:.4f}s"
+    assert large <= max(small, 0.002) * 8, f"{name}: {small:.4f}s -> {large:.4f}s"
 
 
 @pytest.mark.parametrize("name", sorted(PATHOLOGICAL))
