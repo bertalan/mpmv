@@ -88,7 +88,7 @@ def test_platform_staff_land_on_the_platform_space(
 ) -> None:
     password = secrets.token_urlsafe(16)
     user = UserFactory.create(
-        email="ops@example.com", password=password, permissions=["core.platform_owner"]
+        email="ops@example.com", password=password, permissions=["vendors.view_all_vendors"]
     )
     device = TOTPDeviceFactory.create(user=user)
     page.add_init_script(RECORD_CSP_VIOLATIONS)

@@ -71,7 +71,7 @@ def test_without_next_the_login_leads_to_the_actor_space(
     client: Client, vendor: Vendor, password: str, role: str, home: str
 ) -> None:
     """An `is_staff` user without a platform role is not platform staff (spec 02 Q-34)."""
-    permissions = ["core.platform_owner"] if role == "platform_owner" else []
+    permissions = ["vendors.view_all_vendors"] if role == "platform_owner" else []
     user = UserFactory.create(
         password=password, staff=role == "admin_only", permissions=permissions
     )

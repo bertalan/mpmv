@@ -84,8 +84,8 @@ def test_a_superuser_without_a_platform_role_gets_404_on_both_spaces(client: Cli
     assert client.get(SHOP).status_code == 404
 
 
-def test_a_platform_owner_without_the_staff_flag_opens_the_platform_space(client: Client) -> None:
-    owner = UserFactory.create(permissions=["core.platform_owner"])
+def test_platform_staff_without_the_staff_flag_opens_the_platform_space(client: Client) -> None:
+    owner = UserFactory.create(permissions=["vendors.view_all_vendors"])
     verified_login(client, owner)
     assert client.get(PLATFORM).status_code == 200
 
@@ -111,11 +111,38 @@ def test_an_anonymous_visitor_is_sent_to_the_login(client: Client, method: str, 
         assert _location(response) == (LOGIN, path)
 
 
+def test_the_staff_flag_plus_the_permission_opens_the_platform_space(client: Client) -> None:
+    verified_login(client, UserFactory.create(platform_staff=True))
+    assert client.get(PLATFORM).status_code == 200
+
+
+def test_the_platform_owner_permission_alone_is_not_platform_staff(client: Client) -> None:
+    """The gate is `vendors.is_platform_staff()`: only `vendors.view_all_vendors` counts."""
+    verified_login(client, UserFactory.create(permissions=["core.platform_owner"]))
+    assert client.get(PLATFORM).status_code == 404
+
+
+def test_an_inactive_user_with_the_permission_is_refused(client: Client) -> None:
+    user = UserFactory.create(permissions=["vendors.view_all_vendors"])
+    verified_login(client, user)
+    user.is_active = False
+    user.save(update_fields=["is_active"])
+    assert client.get(PLATFORM).status_code != 200
+
+
+def test_a_superuser_holding_the_permission_explicitly_opens_the_platform_space(
+    client: Client,
+) -> None:
+    user = UserFactory.create(superuser=True, permissions=["vendors.view_all_vendors"])
+    verified_login(client, user)
+    assert client.get(PLATFORM).status_code == 200
+
+
 def test_platform_staff_who_are_also_vendor_members_get_neither_space(
     client: Client, vendor: Vendor
 ) -> None:
     """Platform roles and vendor membership never mix (spec 02 Roles): such a user is refused."""
-    user = UserFactory.create(permissions=["core.platform_owner"])
+    user = UserFactory.create(permissions=["vendors.view_all_vendors"])
     VendorMemberFactory.create(vendor=vendor, user=user)
     verified_login(client, user)
     assert client.get(SHOP).status_code == 404
@@ -174,7 +201,7 @@ def test_a_platform_owner_outside_the_mfa_policies_is_still_sent_to_enrolment(
     client: Client,
 ) -> None:
     """The gate asks for MFA itself: a Manager user not covered by `MFA_REQUIRED_POLICIES`."""
-    owner = UserFactory.create(permissions=["core.platform_owner"])
+    owner = UserFactory.create(permissions=["vendors.view_all_vendors"])
     password_login(client, owner)
     response = client.get(PLATFORM)
     assert response.status_code == 302

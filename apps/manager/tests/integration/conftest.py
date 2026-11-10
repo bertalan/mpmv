@@ -41,11 +41,11 @@ def owner(vendor: Vendor) -> User:
 
 @pytest.fixture
 def platform_staff(db: None) -> User:
-    """Platform staff until CORE.18 adds the roles: the platform owner permission (spec 02 Q-34).
+    """Platform staff until CORE.18 adds the roles: `vendors.view_all_vendors` (spec 02 Q-34).
 
     Never the `is_staff` flag: Wagtail or Django admin access does not make platform staff.
     """
-    return UserFactory.create(permissions=["core.platform_owner"])
+    return UserFactory.create(permissions=["vendors.view_all_vendors"])
 
 
 @pytest.fixture
