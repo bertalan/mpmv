@@ -102,6 +102,13 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync
+      # Throwaway service database: durability is worthless here, and the migration and flush
+      # tests write a lot. All three settings reload without a restart.
+      - name: PostgreSQL without fsync
+        run: |
+          psql "$DATABASE_URL" -c "ALTER SYSTEM SET fsync = off" \
+            -c "ALTER SYSTEM SET synchronous_commit = off" \
+            -c "ALTER SYSTEM SET full_page_writes = off" -c "SELECT pg_reload_conf()"
       - name: Pytest (unit + integration)
         run: >-
           uv run pytest -n auto --dist loadgroup --durations=40 -m "unit or integration"
