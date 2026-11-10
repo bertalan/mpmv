@@ -1,25 +1,32 @@
 {% extends "admin/login.html" %}
-{% load i18n captcha %}
+{% load i18n static captcha %}
 {% comment %}
 Django admin login with the Turnstile widget (CORE.5). The content block repeats Django's own
-admin/login.html, adding only {% captcha_widget %} inside the form; keep it in sync on upgrades.
+admin/login.html, adding only {% captcha_widget %} inside the form and the id of the error that
+the fields point to (CMP.9, `accounts.forms.LOGIN_ERROR_ID`); keep it in sync on upgrades. The
+show-password toggle is a static module (no inline code under the strict CSP).
 {% endcomment %}
 
-{% block extrahead %}{{ block.super }}{% captcha_script %}{% endblock %}
+{% block extrahead %}{{ block.super }}{% captcha_script %}
+<link rel="stylesheet" href="{% static 'accounts/password-toggle.css' %}">
+<script type="module" src="{% static 'accounts/password-toggle.js' %}" nonce="{{ csp_nonce }}"></script>
+{% endblock %}
 
 {% block content %}
 {% if form.errors and not form.non_field_errors %}
-<p class="errornote">
+<p class="errornote" id="login-error" role="alert">
 {% blocktranslate count counter=form.errors.items|length %}Please correct the error below.{% plural %}Please correct the errors below.{% endblocktranslate %}
 </p>
 {% endif %}
 
 {% if form.non_field_errors %}
+<div id="login-error" role="alert">
 {% for error in form.non_field_errors %}
 <p class="errornote">
     {{ error }}
 </p>
 {% endfor %}
+</div>
 {% endif %}
 
 <div id="content-main">

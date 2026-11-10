@@ -141,6 +141,7 @@ def verify(request: HttpRequest) -> HttpResponse:
         return mfa_redirect(request, "mfa:setup", next_url=safe_next(request))
     next_url = safe_next(request)
     error = ""
+    method: str | None = None
     if request.method == "POST":
         method = request.POST.get("method")
         device: object | None = None
@@ -161,6 +162,7 @@ def verify(request: HttpRequest) -> HttpResponse:
         {
             "next": next_url,
             "error": error,
+            "error_method": method if error else None,  # the field the error is tied to (CMP.9)
             "has_totp": TOTPDevice.objects.filter(user=user, confirmed=True).exists(),
             "has_passkey": PasskeyDevice.objects.filter(user=user, confirmed=True).exists(),
             "has_recovery": services.unused_recovery_codes(user) > 0,
