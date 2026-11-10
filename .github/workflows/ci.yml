@@ -240,7 +240,7 @@ jobs:
           path: build/e2e/screenshots/
           if-no-files-found: ignore
       # CMP.7: the axe audit of the key public pages (tests/e2e/test_axe_audit.py): a JSON file per
-      # page and a summary table. Serious or critical findings fail the e2e step above.
+      # page and a summary table. Any finding fails the e2e step above.
       - name: Accessibility audit summary
         if: always()
         run: |

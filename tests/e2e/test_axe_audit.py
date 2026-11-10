@@ -13,12 +13,17 @@ import json
 import re
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
 
 import pytest
 from playwright.sync_api import Page
 from pytest_django.live_server_helper import LiveServer
 
+from apps.catalog.models import Product
+from apps.catalog.tests.factories import (
+    CategoryFactory,
+    CategoryTranslationFactory,
+    ProductFactory,
+)
 from apps.cms.tests.factories import (
     BlogIndexPageFactory,
     LegalPageFactory,
@@ -32,9 +37,9 @@ from tests.e2e.axe import format_violations, run_axe
 pytestmark = pytest.mark.django_db(transaction=True)
 
 REPORT_DIR = Path(__file__).resolve().parents[2] / "build" / "e2e" / "axe"
-BLOCKING = frozenset({"serious", "critical"})
 # The key public pages: the seeded site (home, About, blog), the recruitment funnel, the legal
-# pages, the Manager sign-in and a vendor storefront, in the primary and a second language.
+# pages, the Manager sign-in, a vendor storefront and a public catalogue listing, in the primary
+# and a second language. Cart, checkout and the product page do not exist yet (see Follow-ups).
 KEY_PAGES = (
     "/",
     "/it/",
@@ -45,6 +50,8 @@ KEY_PAGES = (
     "/account/login/",
     "/shop/acme/",
     "/it/shop/acme/",
+    "/product-category/vases/",
+    "/it/categoria-prodotto/vasi/",
 )
 
 
@@ -61,14 +68,24 @@ def storefront() -> Vendor:
         VendorTranslationFactory.create(
             vendor=vendor, language=language, status=TranslationStatus.PUBLISHED
         )
+    category = CategoryFactory.create()
+    for language, name, slug in (("en", "Vases", "vases"), ("it", "Vasi", "vasi")):
+        CategoryTranslationFactory.create(
+            category=category,
+            language=language,
+            name=name,
+            slug=slug,
+            status=TranslationStatus.PUBLISHED,
+        )
+    ProductFactory.create(vendor=vendor, category=category, status=Product.Status.PUBLISHED)
     return vendor
 
 
 @pytest.fixture(scope="module", autouse=True)
 def _fresh_report_dir() -> Iterator[None]:
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    for old in REPORT_DIR.glob("*"):
-        old.unlink()
+    for old in [*REPORT_DIR.glob("*.json"), REPORT_DIR / "summary.md"]:
+        old.unlink(missing_ok=True)
     yield
     write_summary()
 
@@ -94,12 +111,8 @@ def write_summary() -> None:
         )
 
 
-def blocking(violations: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [v for v in violations if v.get("impact") in BLOCKING]
-
-
 @pytest.mark.parametrize("path", KEY_PAGES)
-def test_key_page_has_no_serious_or_critical_axe_violation(
+def test_key_page_has_no_axe_violation(
     path: str, page: Page, live_server: LiveServer, storefront: Vendor
 ) -> None:
     response = page.goto(f"{live_server.url}{path}")
@@ -113,11 +126,4 @@ def test_key_page_has_no_serious_or_critical_axe_violation(
     (REPORT_DIR / f"{slug_of(path)}.json").write_text(
         json.dumps({"path": path, "violations": violations}, indent=2), encoding="utf-8"
     )
-    failing = blocking(violations)
-    assert failing == [], format_violations(failing)
-
-
-def test_the_gate_counts_only_serious_and_critical_findings() -> None:
-    found = [{"id": "a", "impact": "minor"}, {"id": "b", "impact": "serious"},
-             {"id": "c", "impact": "moderate"}, {"id": "d", "impact": "critical"}]  # fmt: skip
-    assert [v["id"] for v in blocking(found)] == ["b", "d"]
+    assert violations == [], format_violations(violations)
