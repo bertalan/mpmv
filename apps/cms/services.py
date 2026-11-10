@@ -16,7 +16,7 @@ so each one is audited, and so is each review of a language's text (I18N.9).
 import datetime as dt
 import hashlib
 import json
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Collection, Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -31,7 +31,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from wagtail import blocks
-from wagtail.fields import StreamField
+from wagtail.fields import RichTextField, StreamField
 from wagtail.images.blocks import ImageChooserBlock
 from wagtail.models import Locale, Page, Site
 from wagtail_localize.models import (
@@ -956,3 +956,71 @@ def vendor_landing_context(page: Any, request: HttpRequest | None) -> dict[str, 
         "canonical_url": absolute(page.get_url(request)),
         "alternates": alternates,
     }
+
+
+# --- Rich-text sanitiser (CMS.12)
+
+
+def _sanitise_stream_child(block: blocks.StreamBlock, child: Any) -> Any:
+    if isinstance(child, dict) and child.get("type") in block.child_blocks:
+        inner = _sanitise_block_value(block.child_blocks[child["type"]], child.get("value"))
+        return {**child, "value": inner}
+    return child
+
+
+def _sanitise_block_value(block: blocks.Block, value: Any) -> Any:
+    """`value` (a block's stored form) with every rich text inside cleaned."""
+    if isinstance(block, blocks.RichTextBlock):
+        if isinstance(value, str):
+            return engine.sanitise_rich_text(value, block.features)
+        return value
+    if isinstance(block, blocks.StructBlock) and isinstance(value, dict):
+        return {
+            name: _sanitise_block_value(block.child_blocks[name], item)
+            if name in block.child_blocks
+            else item
+            for name, item in value.items()
+        }
+    if isinstance(block, blocks.StreamBlock) and isinstance(value, list):
+        return [_sanitise_stream_child(block, child) for child in value]
+    if isinstance(block, blocks.ListBlock) and isinstance(value, list):
+        return [
+            {**item, "value": _sanitise_block_value(block.child_block, item["value"])}
+            if isinstance(item, dict) and item.get("type") == "item" and "value" in item
+            else _sanitise_block_value(block.child_block, item)
+            for item in value
+        ]
+    return value
+
+
+def sanitise_rich_text_fields(instance: Any, only: Collection[str] | None = None) -> list[str]:
+    """Clean every rich text of a model instance in place: `RichTextField`s and the
+    `RichTextBlock`s of its StreamFields (CMS.12). Returns the names of the fields changed.
+
+    Called before every save, so import, seed, API and migration writes are covered; the
+    editor's own output is already clean and stays byte for byte. `only` limits the work to
+    those field names (`save(update_fields=...)` writes just those). Writes that skip
+    `pre_save` (`bulk_create`, `bulk_update`, `QuerySet.update` of a rich-text field, `loaddata`)
+    must call this first: see docs/dev/rich-text.md.
+    """
+    changed: list[str] = []
+    for model_field in instance._meta.get_fields():
+        if only is not None and model_field.name not in only:
+            continue
+        if isinstance(model_field, RichTextField):
+            current = getattr(instance, model_field.attname)
+            clean = engine.sanitise_rich_text(current, model_field.features)
+            if clean != current:
+                setattr(instance, model_field.attname, clean)
+                changed.append(model_field.name)
+        elif isinstance(model_field, StreamField):
+            value = getattr(instance, model_field.attname)
+            if value is None:
+                continue
+            stream_block = model_field.stream_block
+            stored = stream_block.get_prep_value(value)
+            clean_stored = _sanitise_block_value(stream_block, stored)
+            if clean_stored != stored:
+                setattr(instance, model_field.attname, stream_block.to_python(clean_stored))
+                changed.append(model_field.name)
+    return changed

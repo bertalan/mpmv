@@ -2,7 +2,7 @@
 
 A member of two vendors signs in on the Manager login, verifies the second factor, picks a
 vendor, switches to the other one from the header; platform staff land on the platform space and
-get 404 on the shop space. Every Manager page passes axe (WCAG 2.2 AA) with no CSP violation;
+get 403 on the shop space. Every Manager page passes axe (WCAG 2.2 AA) with no CSP violation;
 screenshots are kept for review.
 """
 
@@ -17,6 +17,7 @@ from pytest_django.live_server_helper import LiveServer
 
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
+from apps.catalog.tests.factories import ProductFactory
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
@@ -44,7 +45,10 @@ def test_a_member_of_two_vendors_signs_in_and_switches_vendor(
     password = secrets.token_urlsafe(16)  # generated: no credential literals in git
     user = UserFactory.create(email="member@example.com", password=password)
     device = TOTPDeviceFactory.create(user=user)
-    VendorMemberFactory.create(vendor=VendorFactory.create(display_name="Shop North"), user=user)
+    north = VendorFactory.create(display_name="Shop North")
+    VendorMemberFactory.create(vendor=north, user=user)
+    ProductFactory.create(vendor=north, status="published")
+    ProductFactory.create(vendor=north, status="draft")
     VendorMemberFactory.create(
         vendor=VendorFactory.create(display_name="Shop South"), user=user, role="staff"
     )
@@ -63,6 +67,8 @@ def test_a_member_of_two_vendors_signs_in_and_switches_vendor(
     expect(page).to_have_url(re.compile(r"/manager/shop/$"))
     expect(page.get_by_role("heading", name="Dashboard")).to_be_visible()
     expect(page.locator("main")).to_contain_text("Shop North")
+    expect(page.locator('[data-kpi="products-published"]')).to_have_text("1")
+    expect(page.locator('[data-kpi="products-draft"]')).to_have_text("1")
     _accessible(page)
     shot("shop-dashboard")
 
@@ -71,12 +77,13 @@ def test_a_member_of_two_vendors_signs_in_and_switches_vendor(
     expect(page).to_have_url(re.compile(r"/manager/shop/$"))
     expect(page.locator("main")).to_contain_text("Shop South")
     expect(page.locator("main")).not_to_contain_text("Shop North")
+    expect(page.locator('[data-kpi="products-published"]')).to_have_text("0")
     _accessible(page)
     shot("shop-dashboard-switched")
 
     response = page.goto(f"{live_server.url}/manager/platform/")
     assert response is not None
-    assert response.status == 404
+    assert response.status == 403
 
     page.goto(f"{live_server.url}/manager/shop/")
     page.get_by_role("button", name="Sign out").click()
@@ -107,7 +114,7 @@ def test_platform_staff_land_on_the_platform_space(
 
     response = page.goto(f"{live_server.url}/manager/shop/")
     assert response is not None
-    assert response.status == 404
+    assert response.status == 403
 
 
 def test_an_anonymous_visitor_is_sent_to_the_login(page: Page, live_server: LiveServer) -> None:
