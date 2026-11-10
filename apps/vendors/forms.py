@@ -19,7 +19,8 @@ from apps.core.services import allowed_vendor_countries
 COUNTRY_NAMES = {
     "AT": "Austria", "BE": "Belgium", "BG": "Bulgaria", "HR": "Croatia", "CY": "Cyprus",
     "CZ": "Czechia", "DK": "Denmark", "EE": "Estonia", "FI": "Finland", "FR": "France",
-    "DE": "Germany", "GR": "Greece", "HU": "Hungary", "IE": "Ireland", "IT": "Italy",
+    "DE": "Germany", "GR": "Greece", "HU": "Hungary", "IE": "Ireland",
+    "IT": "Italy",  # country-literal: display name in a table of EU names
     "LV": "Latvia", "LT": "Lithuania", "LU": "Luxembourg", "MT": "Malta", "NL": "Netherlands",
     "PL": "Poland", "PT": "Portugal", "RO": "Romania", "SK": "Slovakia", "SI": "Slovenia",
     "ES": "Spain", "SE": "Sweden",
