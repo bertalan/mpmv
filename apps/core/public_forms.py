@@ -42,7 +42,7 @@ closes it.
 import enum
 import inspect
 import re
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -56,7 +56,10 @@ SPEC_ATTR = "public_form_spec"
 MFA_EXEMPT_ATTR = "mfa_exempt"  # set by apps.accounts.decorators.mfa_exempt
 CAPTCHA_TAG = "captcha_widget"
 _HTTP_METHODS = frozenset({"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE"})
-_POST_WORD = re.compile(r"\bPOST\b")
+_POST_WORD = re.compile(
+    r"\b(POST|PUT|PATCH|DELETE)\b|request\.(body|data)\b|\.method\s*(!=|not in|in\b)"
+)
+_TASK_ID = re.compile(r"[A-Z]{2,5}\.\d+")
 
 type UrlConf = str | Sequence[URLPattern | URLResolver] | None
 
@@ -130,12 +133,18 @@ def _marker[T](spec: FormSpec) -> Callable[[T], T]:
     return mark
 
 
-_declared: dict[str, FormSpec] = {}
+_declared: dict[str, tuple[str, FormSpec]] = {}
 
 
-def declare_public_form(url_name: str, spec: FormSpec) -> None:
-    """Declare a view we do not own (a Wagtail or Django view), by its URL name (with namespace)."""
-    _declared[url_name] = spec
+def declare_public_form(url_name: str, spec: FormSpec, *, view: str) -> None:
+    """Declare a view we do not own (a Wagtail or Django view): its URL name (with namespace) and
+    the dotted path of the view, so a reused name does not inherit the declaration."""
+    _declared[url_name] = (view, spec)
+
+
+def declared_spec(leaf: "Leaf") -> FormSpec | None:
+    found = _declared.get(leaf.name)
+    return found[1] if found and found[0] == _view_name(leaf.callback) else None
 
 
 @dataclass(frozen=True)
@@ -209,13 +218,40 @@ def spec_of(view: Callable[..., Any]) -> FormSpec | None:
     return None
 
 
+WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+
+def _chain(view: Callable[..., Any]) -> list[Callable[..., Any]]:
+    """The view, what it wraps (`__wrapped__`) and the functions in its closures, so a decorator
+    written without `functools.wraps` does not hide the view it calls."""
+    found: list[Callable[..., Any]] = []
+    todo: list[Any] = [view]
+    while todo and len(found) < 20:
+        current = todo.pop(0)
+        if current is None or any(current is seen for seen in found):
+            continue
+        found.append(current)
+        todo.append(getattr(current, "__wrapped__", None))
+        for cell in getattr(current, "__closure__", None) or ():
+            try:
+                value = cell.cell_contents
+            except ValueError:
+                continue
+            if inspect.isfunction(value):
+                todo.append(value)
+    return found
+
+
 def accepts_post(view: Callable[..., Any]) -> bool:
-    """Whether the view takes a POST (see the module docstring); unreadable counts as yes."""
+    """Whether the view takes a write (POST, PUT, PATCH, DELETE; see the module docstring);
+    unreadable counts as yes."""
     view_class = getattr(view, "view_class", None)
     if view_class is not None:
         allowed = {m.upper() for m in getattr(view_class, "http_method_names", ())}
-        return "POST" in allowed and hasattr(view_class, "post")
-    chain = list(_unwrap(view))
+        return any(
+            method in allowed and hasattr(view_class, method.lower()) for method in WRITE_METHODS
+        )
+    chain = _chain(view)
     for fn in chain:  # require_POST / require_http_methods keep their list in a closure
         for cell in getattr(fn, "__closure__", None) or ():
             try:
@@ -225,7 +261,7 @@ def accepts_post(view: Callable[..., Any]) -> bool:
             if isinstance(value, list | tuple | set | frozenset) and value:
                 methods = {str(m).upper() for m in value}
                 if methods <= _HTTP_METHODS:
-                    return "POST" in methods
+                    return bool(methods & WRITE_METHODS)
     try:
         return any(_POST_WORD.search(inspect.getsource(fn)) for fn in chain)
     except (OSError, TypeError):
@@ -234,7 +270,7 @@ def accepts_post(view: Callable[..., Any]) -> bool:
 
 def _gate_for(path: str) -> str | None:
     for prefix in settings.PUBLIC_FORM_GATED_PREFIXES:
-        if path.removeprefix("/").startswith(prefix):
+        if path.removeprefix("/").removeprefix("[<lang>/]").startswith(prefix):
             return str(prefix)
     return None
 
@@ -254,8 +290,8 @@ def _spec_problems(leaf: Leaf, spec: FormSpec) -> list[str]:
         if spec.kind is Kind.NOT_ANONYMOUS and getattr(leaf.callback, MFA_EXEMPT_ATTR, False):
             return ["it is mfa_exempt, so it is reachable before the second factor"]
         return [] if spec.reason or spec.kind is Kind.PRE_MFA else ["it needs a written reason"]
-    if spec.known_gap:
-        return []  # reported as INFO (core.I701), and listed in the register
+    if spec.known_gap:  # reported as INFO (core.I701) and listed in the register
+        return [] if _TASK_ID.fullmatch(spec.task) else ["a known gap needs a backlog task ID"]
     problems = []
     if spec.protection is Protection.CAPTCHA:
         if not spec.templates:
@@ -271,6 +307,89 @@ def _spec_problems(leaf: Leaf, spec: FormSpec) -> list[str]:
     return problems
 
 
+def settings_problems() -> list[str]:
+    """Wagtail features that add an anonymous form stay off unless the form is declared."""
+    problems = []
+    if settings.WAGTAIL_PASSWORD_RESET_ENABLED and "wagtailadmin_password_reset" not in _declared:
+        problems.append(
+            "WAGTAIL_PASSWORD_RESET_ENABLED adds an anonymous POST form: declare "
+            "wagtailadmin_password_reset with declare_public_form"
+        )
+    options = getattr(settings, "WAGTAIL_PRIVATE_PAGE_OPTIONS", {})
+    if (
+        options.get("SHARED_PASSWORD", True)
+        and not settings.BLOCK_PAGE_RESTRICTION_ROUTES
+        and "wagtailcore_authenticate_with_password" not in _declared
+    ):
+        problems.append(
+            "page privacy by shared password adds an anonymous POST form: declare "
+            "wagtailcore_authenticate_with_password, or keep BLOCK_PAGE_RESTRICTION_ROUTES on"
+        )
+    if (
+        "_util/" in settings.PUBLIC_FORM_GATED_PREFIXES
+        and not settings.BLOCK_PAGE_RESTRICTION_ROUTES
+    ):
+        problems.append("the _util/ gated prefix needs BLOCK_PAGE_RESTRICTION_ROUTES (SEC.14)")
+    return problems
+
+
+def _page_classes() -> Iterator[type]:
+    from wagtail.models import Page
+
+    todo = list(Page.__subclasses__())
+    seen: set[type] = set()
+    while todo:
+        cls = todo.pop()
+        if cls not in seen:
+            seen.add(cls)
+            todo.extend(cls.__subclasses__())
+            yield cls
+
+
+def _reads_a_write(function: Any) -> bool:
+    try:
+        return bool(_POST_WORD.search(inspect.getsource(inspect.unwrap(function))))
+    except (OSError, TypeError):
+        return True
+
+
+def page_problems(classes: Iterable[type] | None = None) -> list[str]:
+    """Pages are served through one catch-all route, so the leaf walk cannot see their forms.
+    A page type that overrides `serve` (or `serve_preview`), has a routable method, or is a
+    Wagtail form page, and whose code reads a POST, must carry a `public_form` declaration."""
+    from django.apps import apps
+
+    form_page: type | None = None
+    if apps.is_installed("wagtail.contrib.forms"):  # importing it otherwise adds a model
+        from wagtail.contrib.forms.models import AbstractForm
+
+        form_page = AbstractForm
+    problems = []
+    for cls in sorted(
+        classes if classes is not None else _page_classes(),
+        key=lambda c: f"{c.__module__}.{c.__qualname__}",
+    ):
+        declared = any(isinstance(getattr(base, SPEC_ATTR, None), FormSpec) for base in cls.__mro__)
+        if declared or not cls.__module__.startswith("apps."):
+            continue
+        if form_page is not None and issubclass(cls, form_page):
+            problems.append(
+                f"{cls.__qualname__} is a Wagtail form page: declare it with public_form"
+            )
+            continue
+        for base in cls.__mro__:
+            if base.__module__.startswith("wagtail."):
+                continue
+            for name, attr in vars(base).items():
+                routable = hasattr(attr, "_routablepage_routes")
+                if (name in ("serve", "serve_preview") or routable) and _reads_a_write(attr):
+                    problems.append(
+                        f"{cls.__qualname__}.{name} reads a POST: declare the page type with "
+                        "public_form"
+                    )
+    return problems
+
+
 def public_form_report(urlconf: UrlConf = None) -> Report:
     rows: dict[Kind, list[Row]] = {kind: [] for kind in Kind}
     errors: list[tuple[str, str]] = []
@@ -278,7 +397,7 @@ def public_form_report(urlconf: UrlConf = None) -> Report:
     leaf_names = set()
     for leaf in leaves(urlconf):
         leaf_names.add(leaf.name)
-        spec = spec_of(leaf.callback) or _declared.get(leaf.name)
+        spec = spec_of(leaf.callback) or declared_spec(leaf)
         if spec is None:
             if _gate_for(leaf.path) is None and accepts_post(leaf.callback):
                 errors.append(
@@ -298,6 +417,9 @@ def public_form_report(urlconf: UrlConf = None) -> Report:
     for url_name in sorted(set(_declared) - leaf_names):
         if urlconf is None:  # a declaration for a route that does not exist is a typo
             errors.append(("core.E703", f"declared public form {url_name!r} matches no URL name"))
+    if urlconf is None:
+        errors += [("core.E705", message) for message in settings_problems()]
+        errors += [("core.E704", message) for message in page_problems()]
     for kind_rows in rows.values():
         kind_rows.sort(key=lambda row: row.leaf.path)
     return Report(rows[Kind.PUBLIC], rows[Kind.PRE_MFA], rows[Kind.NOT_ANONYMOUS], errors, warnings)
@@ -347,7 +469,7 @@ def render_register(report: Report) -> str:
         spec = row.spec
         rate = spec.rate_limit or (f"none: {spec.no_rate_limit}" if spec.no_rate_limit else "")
         if spec.known_gap:
-            rate = f"NOT PROTECTED YET: {spec.known_gap}"
+            rate = f"NOT PROTECTED ({spec.task}): {spec.known_gap}"
         lines.append(
             "| "
             + " | ".join(

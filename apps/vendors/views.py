@@ -185,11 +185,12 @@ def _sign_in(request: HttpRequest, vendor: Vendor, link: ActionLinkCheck) -> Htt
 
 
 @public_form(
-    protection=Protection.CAPTCHA,
-    purpose="Claim an imported vendor: sign in or create the account (opened action link)",
+    protection=Protection.SIGNED_TOKEN,
+    purpose="Claim an imported vendor: identity, then sign in or create the account",
     task="VEN.24",
-    rate_limit="per IP (CORE.15) and account lockout (CORE.5)",
-    templates=("vendors/claim/sign_in.html",),
+    reason="the signed claim link must have been opened in this session first, then the claim "
+    "lock; only the sign-in step also runs the captcha (through authenticate())",
+    rate_limit="per IP (claim throttle) and the claim lock",
 )
 @language_switch_home
 @mfa_exempt

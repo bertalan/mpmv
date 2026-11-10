@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **274** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **2225 h** (P1 1780 h · P2 413 h · P3 32 h)
+- Micro-tasks: **275** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **2228 h** (P1 1783 h · P2 413 h · P3 32 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -30,14 +30,14 @@
 | SEO | SEO, feeds, analytics | 7 | 38 | 14 | 0 | 52 |
 | AI | AI channels (MCP, agents) | 4 | 0 | 22 | 18 | 40 |
 | CMP | Compliance | 27 | 163 | 81 | 0 | 244 |
-| SEC | Security | 9 | 59 | 0 | 0 | 59 |
+| SEC | Security | 10 | 62 | 0 | 0 | 62 |
 | OPS | Operations | 10 | 19 | 30 | 8 | 57 |
 | MIG | Migration and cutover | 15 | 121 | 23 | 0 | 144 |
-| **Total** | | **274** | **1780** | **413** | **32** | **2225** |
+| **Total** | | **275** | **1783** | **413** | **32** | **2228** |
 
 ## By phase
 
-### F0 — Foundations (53 tasks, 376 h)
+### F0 — Foundations (54 tasks, 379 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -91,6 +91,7 @@
 | SEC.5 | Security tests in CI, run on every PR (the security wave planned by lane-a on the Lane board, items 1 to 10): (1-3) an endpoint sweep over every URL pattern and API v1 operation against a declared matrix (`tests/security_registry.py`): anonymous access, CSRF on state-changing views, GET without side effects, staff-only routes refused to a customer, tenant confinement, API key scopes, IDOR review of every route carrying an identifier (#169); (4) rate limits of login, action links and API keys, including the per-IP limit on refused keys of CORE.20 (#171); (5) the security header set on every response type: pages, 403, 404, 500, redirects, static files, API JSON and problem+json, both admins, the health check, plus the Caddy media block (#162); (6) supply chain: pip-audit, ruff `S` rules and the secret scan in CI; (7) no settings module falls back to a hard-coded secret on STAGE or LIVE; (8) a hostile-input corpus with Hypothesis property tests over every admin and page form, the API v1 schemas, the shipping importers and the email, JSON-LD and CSV outputs (#166); (9) nightly and weekly scheduled security runs that report failures as an issue (#160); (10) an attack-scenario suite in `tests/security/`. Findings that need other work are strict xfails owned by SEC.11, SEC.12, CMS.12 and I18N.10 | P1 | 8 | CORE.3 | An undeclared public, CSRF-exempt, GET-writing or untested-identifier endpoint turns CI red (`tests/integration/test_endpoint_security.py`, with a meta-test that proves the sweep catches an unprotected view); every response type carries the LIVE header set and no `Server` or `X-Powered-By` (`tests/integration/test_security_headers_by_response_type.py`); each rate limit triggers and resets (`tests/integration/test_rate_limits.py`); the hostile-input corpus never gives a 500, active markup or a formula cell, with the derandomized Hypothesis `ci` profile (`tests/unit/test_hostile_input.py`, `tests/integration/test_hostile_input_*.py`); a known-vulnerable dependency, a bandit finding or a committed secret fails CI; a settings module with a hard-coded secret fallback fails a test; a failing scheduled run opens or updates one `security` issue |
 | SEC.11 | Admin routes per vendor member role and CSRF tightening (proposed as SEC.5b on PR #169, registered by coherence check 7; needed before vendor members get `wagtailadmin.access_admin`): the staff-only refusal check of the SEC.5 sweep runs for every `VendorMember.Role`, not only as a customer; hook-registered `csrf_exempt` admin views are no longer accepted wholesale but declared one by one with their reason; the vendor-role confinement test stops skipping silently | P1 | 6 | SEC.5, CORE.3 | Each vendor member role is refused on every staff-only admin route; an undeclared `csrf_exempt` admin view turns CI red; `test_every_vendor_role_is_confined_to_its_vendor` fails when a `VendorScoped` web endpoint exists and its parameter set is still empty |
 | SEC.12 | Reverse proxy security headers (SEC.5 header findings, recorded as strict xfails on PR #162, registered by coherence check 7): Caddy drops the `Server` header (its own and the app server's) on every response; public media served by Caddy carry HSTS, Referrer-Policy and `frame-ancestors 'none'`; the app's own HTTP-to-HTTPS 301 either carries the full header set or is tested as the documented exception (in LIVE the proxy redirects plain HTTP first). Open PR #159 covers the Caddy part; lane-a may fold this row into ARC.13 | P1 | 2 | ARC.13, SEC.5 | The strict xfails `test_proxy_drops_the_server_header` and `test_media_carries_the_transport_and_framing_headers` (`tests/unit/test_proxy_security_headers.py`) pass with their marks removed; `test_https_redirect_301_full_header_set` (`tests/integration/test_security_headers_by_response_type.py`) passes or is replaced by a plain test of the documented behaviour |
+| SEC.14 | Protect Wagtail's page view restriction forms (`/_util/authenticate_with_password/...` and `/_util/login/`, found by the SEC.13 sweep): a rate limit (`consume_rate_limit`, per IP and restriction) plus the captcha widget and server-side verify, through our own middleware or view wrappers; then lift `BLOCK_PAGE_RESTRICTION_ROUTES`, which answers 404 to both routes (every method) and makes `manage.py check` fail (cms.E002) while any password or login page restriction exists, and remove the `_util/` gated prefix; the routes are declared in the register of public forms | P1 | 3 | CORE.5, CORE.15 | With the block lifted, a POST to each route over the limit answers 429 with `Retry-After`, a failed captcha is refused, and a correct password still opens the page; both routes are declared in `docs/dev/public-forms.md`; cms.E002 is gone |
 | OPS.1 | Self-managed PITR with pgBackRest (continuous WAL archiving + base backups) to Hetzner Object Storage, encrypted, with retention + restore test; least-privilege DB roles (app role without DDL or TRUNCATE, so the audit log stays append-only) | P1 | 8 | ARC.13 | Documented point-in-time restore on an empty database VPS; app role cannot TRUNCATE `core_auditlog` |
 | OPS.2 | Observability: JSON logs, error tracking, healthchecks, alerts (including database disk space, WAL archiving and backup age) | P1 | 8 | ARC.5 | Alert on a simulated checkout error |
 | OPS.5 | Technical Django admin reachable only from a restricted network (owner decision Q-18): allow-list at the reverse proxy plus an app-level check on the Django admin path (defence in depth), the allowed networks as environment configuration, staff operations moved to the Manager platform space (CORE.17) and editors to the Wagtail admin (CORE.8) | P1 | 3 | ARC.13, CORE.8 | On STAGE the Django admin answers 404 from outside the allowed networks and works from inside; a test covers the app-level check |

@@ -108,6 +108,8 @@ MIDDLEWARE = [
     # With the other header middleware, so responses returned early by an inner middleware
     # (CommonMiddleware's APPEND_SLASH redirect, LIVE's static files) carry it too (SEC.5).
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # SEC.13/SEC.14: Wagtail's page view restriction forms answer 404 until they are protected.
+    "apps.cms.middleware.PageRestrictionBlockMiddleware",
     "apps.themes.middleware.ThemeMiddleware",  # the site's theme for the template loader (THM.1)
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
@@ -573,4 +575,11 @@ PUBLIC_FORM_GATED_PREFIXES = {
     "django-admin/": "the staff admin requires a signed-in staff user; its sign-in is declared",
     "api/": "API v1 authenticates every operation (API key or session)",
     "_styleguide/": "staff only (THM.4)",
+    "_util/": "Wagtail page view restriction forms answer 404 while BLOCK_PAGE_RESTRICTION_ROUTES "
+    "is on and no restriction exists (cms.E002); SEC.14 protects them",
 }
+
+# SEC.13/SEC.14: Wagtail's page view restriction forms (`/_util/...`) have no rate limit or captcha
+# yet, so apps.cms.middleware.PageRestrictionBlockMiddleware answers 404 to them and `check` fails
+# (cms.E002) while any password or login restriction exists. SEC.14 lifts the block.
+BLOCK_PAGE_RESTRICTION_ROUTES = True

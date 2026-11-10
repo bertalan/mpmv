@@ -13,17 +13,15 @@ a one-time signed token (CORE.15), or an allow-list entry with its reason.
 
 | URL name | Path | View | Purpose | Protection | Rate limit | Task |
 |---|---|---|---|---|---|---|
-| `wagtailcore_authenticate_with_password` | `/[<lang>/]_util/authenticate_with_password/<int:page_view_restriction_id>/<int:page_id>/` | `wagtail.views.authenticate_with_password` | Enter the password of a restricted page | allow-list: Wagtail's own view, unchanged | NOT PROTECTED YET: page view restrictions are not rate limited or captcha protected (SEC.13) | SEC.13 |
-| `wagtailcore_login` | `/[<lang>/]_util/login/` | `django.contrib.auth.views.LoginView` | Sign in to see a login-restricted page | allow-list: Wagtail's own view, unchanged | NOT PROTECTED YET: page view restrictions are not rate limited or captcha protected (SEC.13) | SEC.13 |
 | `action_link:continue` | `/account/link/continue/` | `apps.accounts.action_link_views.continue_link` | Continue from an emailed action link (spends the token's one sign-in use) | signed token: the one-time signed token in the POST body is checked before anything else | per IP | CORE.15 |
 | `login` | `/account/login/` | `apps.manager.views.LoginView` | Sign in to the Manager (every Manager user) | captcha | per account and IP lockout (CORE.5) | CORE.17 |
 | `wagtailadmin_login` | `/admin/login/` | `wagtail.admin.views.account.LoginView` | Sign in to the editors' admin | captcha | per account and IP lockout (CORE.5) | CMP.9 |
 | `admin:login` | `/django-admin/login/` | `apps.accounts.admin_site.AuditedAdminSite.login` | Sign in to the staff admin | captcha | per account and IP lockout (CORE.5) | CORE.5 |
-| `switch_language` | `/i18n/switch/` | `apps.accounts.views.switch_language` | Language switcher (redirect to the same page in another language) | allow-list: stores nothing for an anonymous visitor and redirects only to this host | none: a redirect that does no work for a stranger | I18N.1 |
+| `switch_language` | `/i18n/switch/` | `apps.accounts.views.switch_language` | Language switcher (redirect to the same page in another language) | allow-list: stores nothing for an anonymous visitor and redirects only to this host | per IP, generous | I18N.1 |
 | `vendors:apply` | `/vendor/apply/` | `apps.vendors.application_views.apply` | Sell with us: a vendor application | captcha | per IP (registration throttle) | VEN.22 |
 | `vendors:apply_cancel` | `/vendor/apply/cancel/<str:user_key>/` | `apps.vendors.application_views.cancel` | Cancel a vendor application ("this was not me") | signed token: the link must have been opened in this session from its one-time signed token | per IP (application throttle) | VEN.22 |
 | `vendors:apply_confirm` | `/vendor/apply/confirm/<str:user_key>/` | `apps.vendors.application_views.confirm` | Confirm a vendor application and choose a password | signed token: the link must have been opened in this session from its one-time signed token | per IP (application throttle) | VEN.22 |
-| `vendor_claim:claim` | `/vendor/claim/<str:vendor_key>/` | `apps.vendors.views.claim` | Claim an imported vendor: sign in or create the account (opened action link) | captcha | per IP (CORE.15) and account lockout (CORE.5) | VEN.24 |
+| `vendor_claim:claim` | `/vendor/claim/<str:vendor_key>/` | `apps.vendors.views.claim` | Claim an imported vendor: identity, then sign in or create the account | signed token: the signed claim link must have been opened in this session first, then the claim lock; only the sign-in step also runs the captcha (through authenticate()) | per IP (claim throttle) and the claim lock | VEN.24 |
 | `email_webhook` | `/webhooks/email/` | `apps.core.views.email_webhook` | Email provider delivery feedback (bounces, complaints) | allow-list: machine to machine: the provider's signature and a replay window are checked first | none: an unsigned request is refused before any work; off (404) with no secret | ARC.16 |
 
 ## Signed in, second factor not verified yet
@@ -49,6 +47,7 @@ an anonymous request. An anonymous exception under one (a login form) is declare
 | Prefix | Why it is gated |
 |---|---|
 | `/_styleguide/` | staff only (THM.4) |
+| `/_util/` | Wagtail page view restriction forms answer 404 while BLOCK_PAGE_RESTRICTION_ROUTES is on and no restriction exists (cms.E002); SEC.14 protects them |
 | `/admin/` | the editors' admin requires a signed-in editor; its sign-in form is declared |
 | `/api/` | API v1 authenticates every operation (API key or session) |
 | `/django-admin/` | the staff admin requires a signed-in staff user; its sign-in is declared |
