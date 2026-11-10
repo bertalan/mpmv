@@ -1,0 +1,55 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Base list of the Manager (CORE.17, apps/manager/lists.py): filters (GET), the rows in the theme's
+responsive table with one checkbox each, the bulk actions the actor may run, and pagination that
+keeps the filters. A bulk action POSTs the selection and first shows its dry-run preview.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  {% if filters %}
+    <form method="get" class="manager-filters" role="search" aria-label="{% translate 'Filters' %}">
+      {% for filter in filters %}
+        <div class="field">
+          <label for="filter-{{ filter.name }}">{{ filter.label }}</label>
+          <select id="filter-{{ filter.name }}" name="{{ filter.name }}">
+            <option value="">{% translate "All" %}</option>
+            {% for value, label in filter.choices %}<option value="{{ value }}"{% if value == filter.value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+      {% endfor %}
+      {% include "components/button.html" with label=_("Filter") type="submit" variant="secondary" only %}
+    </form>
+  {% endif %}
+
+  <form method="post" class="manager-bulk">
+    {% csrf_token %}
+    {% if selection_error %}{% include "components/alert.html" with level="danger" message=selection_error live="assertive" only %}{% endif %}
+    {% if bulk_actions and rows %}
+      <div class="manager-bulk__actions">
+        <label for="bulk-action">{% translate "Action on the selected rows" %}</label>
+        <select id="bulk-action" name="action">
+          {% for action in bulk_actions %}<option value="{{ action.name }}">{{ action.label }}</option>{% endfor %}
+        </select>
+        {% include "components/button.html" with label=_("Preview") type="submit" variant="secondary" only %}
+      </div>
+    {% endif %}
+    <div class="table-scroll" role="region" aria-labelledby="manager-list-caption" tabindex="0">
+      <table class="table">
+        <caption id="manager-list-caption">{{ title }}</caption>
+        <thead><tr>
+          {% if bulk_actions %}<th scope="col"><span class="visually-hidden">{% translate "Select" %}</span></th>{% endif %}
+          {% for column in columns %}<th scope="col"{% if column.numeric %} class="numeric"{% endif %}>{{ column.label }}</th>{% endfor %}
+        </tr></thead>
+        <tbody>
+          {% for row in rows %}<tr>
+            {% if bulk_actions %}<td><input type="checkbox" name="selected" value="{{ row.id }}" id="select-{{ row.id }}" aria-labelledby="row-{{ row.id }}"></td>{% endif %}
+            {% for cell in row.cells %}{% with column=columns|slice:forloop.counter|last %}{% if forloop.first %}<th scope="row" id="row-{{ row.id }}">{{ cell }}</th>{% else %}<td{% if column.numeric %} class="numeric"{% endif %}>{{ cell }}</td>{% endif %}{% endwith %}{% endfor %}
+          </tr>
+          {% empty %}<tr><td colspan="{{ columns|length|add:1 }}">{% translate "Nothing to show." %}</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
+  {% include "components/pagination.html" with page=page_obj.number page_count=page_obj.paginator.num_pages previous_url=previous_url next_url=next_url only %}
+{% endblock %}

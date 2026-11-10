@@ -1,0 +1,29 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Dry-run preview of a bulk action (CORE.17, apps/manager/lists.py): the ChangeSet the service
+returned with `dry_run=True`, nothing written yet. Confirming POSTs the same selection with
+`confirm`; a sensitive action then asks for an MFA step-up first.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% blocktranslate with action=action.label %}Preview: {{ action }}{% endblocktranslate %}</h1>
+  <p class="manager-lead">{% translate "Nothing has changed yet. Check the changes below, then confirm." %}</p>
+  {% if changes %}
+    <ul class="manager-changes">
+      {% for change in changes %}
+        <li><strong>{{ change.op }}</strong> {{ change.model }} <code>{{ change.key }}</code>
+          {% if change.fields %}<ul>{% for name, values in change.fields.items %}<li>{{ name }}: {{ values.0|default_if_none:"—" }} → {{ values.1|default_if_none:"—" }}</li>{% endfor %}</ul>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    {% include "components/alert.html" with level="info" message=_("This action changes nothing.") only %}
+  {% endif %}
+  <form method="post" class="manager-confirm">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="{{ action.name }}">
+    {% for id in selected %}<input type="hidden" name="selected" value="{{ id }}">{% endfor %}
+    {% include "components/button.html" with label=_("Confirm") type="submit" name="confirm" value="1" only %}
+    {% include "components/button.html" with label=_("Cancel") url=list_url variant="ghost" only %}
+  </form>
+{% endblock %}
