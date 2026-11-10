@@ -64,6 +64,8 @@ class NoticeDetailView(ManagerView):
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         notice = self.notice(kwargs["public_id"])
+        if self.request.method == "GET":
+            services.record_notice_view(notice.public_id, ctx=audit_context(self.request))
         context.setdefault("decision_form", DecisionForm())
         context.update(notice=notice, title=_("Notice"))
         return context

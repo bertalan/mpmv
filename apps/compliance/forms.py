@@ -4,6 +4,8 @@ around the form comes from the CMS legal pages. The rules are in `engine.notice_
 from typing import Any
 
 from django import forms
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.utils.translation import gettext_lazy as _
 
 from . import engine
@@ -73,6 +75,12 @@ class NoticeForm(forms.Form):
             notifier_email=data.get("notifier_email", ""),
             good_faith=bool(data.get("good_faith")),
         )
+        email = data.get("notifier_email", "").strip()
+        if email and "notifier_email" not in self.errors:
+            try:
+                validate_email(email)
+            except ValidationError:
+                self.add_error("notifier_email", _FIELD_ERRORS["notifier_email"])
         for problem in problems:
             if problem.code not in self.errors:
                 self.add_error(problem.code, _FIELD_ERRORS[problem.code])

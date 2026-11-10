@@ -18,16 +18,19 @@ job flags any published product that fails the check anyway
 """
 
 import datetime as dt
+import hashlib
 import logging
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
+from urllib.parse import urlsplit, urlunsplit
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -36,7 +39,7 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.catalog.models import Product, ProductStatus
 from apps.cms.services import legal_section_tags
-from apps.core.audit import AuditContext
+from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.countries import OFFICIAL_LANGUAGES, InvalidCountry, normalize_country
 from apps.core.flags import TtlCache
@@ -1020,6 +1023,9 @@ NOTICE_DECISION_TEMPLATE: Final = "compliance.notice_decision"
 #: Anonymous submissions per client address in each window (the SEC.13 rule: captcha + limit).
 NOTICE_RATE_LIMIT: Final = 5
 NOTICE_RATE_WINDOW: Final = dt.timedelta(hours=1)
+NOTICE_VIEWED: Final = "compliance.notice.viewed"
+#: Receipt emails per address per day: the form must not work as a mail relay.
+NOTICE_RECEIPTS_PER_ADDRESS: Final = 3
 NOTICE_PERMISSION: Final = "review_notices"
 
 
@@ -1042,12 +1048,27 @@ def anonymous_context(ip: str | None) -> AuditContext:
     return AuditContext(actor_label="anonymous", source=AuditLog.Source.SYSTEM, ip=ip)
 
 
+def public_notice_context(ip: str | None, category: str) -> AuditContext:
+    """No address is kept for the anonymous category (art. 16(2)(c)); only a hashed counter."""
+    return anonymous_context(None if anonymous_category(category) else ip)
+
+
+def _location(url: str) -> str:
+    """Scheme, host and path only: a query or fragment may carry personal data."""
+    parts = urlsplit(url)
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
+
+
+def _hash(value: str) -> str:
+    return hashlib.sha256(value.strip().lower().encode()).hexdigest()[:32]
+
+
 def notice_snapshot(notice: Notice) -> dict[str, Any]:
     """What the audit log shows of a notice: ids, the target and the status, never the
     notifier's name, email or words (personal data stays in the encrypted columns)."""
     return {
         "target_kind": notice.target_kind,
-        "url": notice.url,
+        "url": _location(notice.url),
         "category": notice.category,
         "status": notice.status,
         "has_notifier": bool(notice.notifier_email),
@@ -1055,10 +1076,35 @@ def notice_snapshot(notice: Notice) -> dict[str, Any]:
     }
 
 
+def anonymous_category(category: str) -> bool:
+    return category == engine.NOTICE_ANONYMOUS_CATEGORY
+
+
 def notice_retry_after(ip: str | None) -> dt.timedelta:
     """Count one public submission from `ip`; zero when allowed, else the time to wait."""
     return consume_rate_limit(
-        f"notice:ip:{ip or 'unknown'}", limit=NOTICE_RATE_LIMIT, window=NOTICE_RATE_WINDOW
+        f"notice:ip:{_hash(ip or 'unknown')}", limit=NOTICE_RATE_LIMIT, window=NOTICE_RATE_WINDOW
+    )
+
+
+def captcha_retry_after(ip: str | None) -> dt.timedelta:
+    """Count one refused captcha from `ip` (a larger, separate budget than the reports)."""
+    return consume_rate_limit(
+        f"notice:captcha:{_hash(ip or 'unknown')}",
+        limit=NOTICE_RATE_LIMIT * 4,
+        window=NOTICE_RATE_WINDOW,
+    )
+
+
+def record_notice_view(public_id: Any, *, ctx: AuditContext) -> None:
+    """Audit that staff opened a notice, which shows the notifier's name and email."""
+    record(
+        ctx,
+        NOTICE_VIEWED,
+        NOTICE_MODEL,
+        str(public_id),
+        None,
+        {"reason": "notice review shows the notifier's details"},
     )
 
 
@@ -1119,6 +1165,11 @@ def submit_notice(
             good_faith=good_faith,
         )
     ]
+    if notifier_email.strip() and not anonymous_category(category):
+        try:
+            validate_email(notifier_email.strip())
+        except ValidationError:
+            problems.append("notifier_email")
     if target_kind not in Notice.TargetKind.values:
         problems.append("target_kind")
     if category not in Notice.Category.values:
@@ -1144,7 +1195,12 @@ def submit_notice(
     with transaction.atomic():
         notice.save()
         audit_changes(changes, ctx=ctx, action=NOTICE_RECEIVED)
-        _notice_email(notice, NOTICE_RECEIPT_TEMPLATE, "received")
+        if notice.notifier_email and not consume_rate_limit(
+            f"notice:email:{_hash(notice.notifier_email)}",
+            limit=NOTICE_RECEIPTS_PER_ADDRESS,
+            window=dt.timedelta(days=1),
+        ):
+            _notice_email(notice, NOTICE_RECEIPT_TEMPLATE, "received")
     return changes
 
 

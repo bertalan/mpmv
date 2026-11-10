@@ -14,11 +14,11 @@ from apps.accounts.captcha import TOKEN_FIELD
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.fakes import FakeCaptchaVerifier
 from apps.accounts.tests.mfa import verified_login
-from apps.compliance import services
+from apps.compliance import engine, services
 from apps.compliance.models import Notice
 from apps.compliance.tests.factories import NoticeFactory
 from apps.core.audit import AuditContext
-from apps.core.models import AuditLog, OutboxEmail
+from apps.core.models import AuditLog, OutboxEmail, Throttle
 from apps.core.tests.factories import PlatformOperatorFactory
 
 pytestmark = pytest.mark.django_db
@@ -277,3 +277,73 @@ def test_visitors_are_sent_to_sign_in(client: Client) -> None:
 def test_an_unknown_notice_is_404(client: Client, reviewer: object) -> None:
     login(client, reviewer)
     assert client.get(f"/manager/platform/notices/{uuid.uuid4()}/").status_code == 404
+
+
+# --- Security review fixes
+
+
+def test_a_child_abuse_report_stores_no_ip_in_the_audit_log(client: Client) -> None:
+    data = form_data(category="child_abuse", notifier_name="", notifier_email="")
+    client.post(url(), data, REMOTE_ADDR=IP)
+    assert AuditLog.objects.get(action="compliance.notice.received").ip is None
+    assert not Throttle.objects.filter(key__contains=IP).exists()  # hashed in the counter
+
+
+def test_other_reports_keep_the_ip_in_the_audit_log(client: Client) -> None:
+    client.post(url(), form_data(), REMOTE_ADDR=IP)
+    assert AuditLog.objects.get(action="compliance.notice.received").ip == IP
+
+
+@pytest.mark.parametrize(
+    "bad", ["https://x.example/a b", "https://x.example/a\nBcc: x", "https://"]
+)
+def test_the_location_has_no_whitespace_or_control_characters(bad: str) -> None:
+    assert "url" in [
+        p.code
+        for p in engine.notice_problems(
+            explanation="x",
+            url=bad,
+            category="general",
+            notifier_name="n",
+            notifier_email="a@example.org",
+            good_faith=True,
+        )
+    ]
+
+
+def test_receipts_to_one_address_are_limited_per_day(client: Client) -> None:
+    for n in range(services.NOTICE_RECEIPTS_PER_ADDRESS + 2):
+        client.post(url(), form_data(), REMOTE_ADDR=f"198.51.100.{n + 10}")
+    assert Notice.objects.count() == services.NOTICE_RECEIPTS_PER_ADDRESS + 2
+    assert OutboxEmail.objects.count() == services.NOTICE_RECEIPTS_PER_ADDRESS
+    assert not Throttle.objects.filter(key__contains="ada@example.org").exists()
+
+
+def test_an_address_django_rejects_gives_a_form_error_not_a_500(client: Client) -> None:
+    response = client.post(url(), form_data(notifier_email="a@-x.com"), REMOTE_ADDR=IP)
+    assert response.status_code == 200
+    assert not Notice.objects.exists()
+
+
+def test_a_wrong_captcha_does_not_use_up_the_report_limit(client: Client, settings: object) -> None:
+    settings.CAPTCHA_ENABLED = True  # type: ignore[attr-defined]
+    settings.CAPTCHA_VERIFIER = "apps.accounts.tests.fakes.FakeCaptchaVerifier"  # type: ignore[attr-defined]
+    for _ in range(services.NOTICE_RATE_LIMIT):
+        client.post(url(), form_data(), REMOTE_ADDR=IP)
+    token = {TOKEN_FIELD: FakeCaptchaVerifier.VALID_TOKEN}
+    assert client.post(url(), form_data(**token), REMOTE_ADDR=IP).status_code == 302
+
+
+def test_the_audit_snapshot_keeps_only_scheme_host_and_path() -> None:
+    notice = NoticeFactory.build(url="https://shop.example.com/p/x/?email=a@b.c#frag")
+    assert services.notice_snapshot(notice)["url"] == "https://shop.example.com/p/x/"
+
+
+def test_staff_viewing_the_notifier_details_is_audited(client: Client, reviewer: object) -> None:
+    notice = NoticeFactory.create()
+    login(client, reviewer)
+    client.get(f"/manager/platform/notices/{notice.public_id}/")
+    entry = AuditLog.objects.get(action="compliance.notice.viewed")
+    assert entry.target_key == str(notice.public_id)
+    assert entry.after["reason"]
+    assert notice.notifier_email not in str(entry.after)

@@ -1,5 +1,6 @@
 """Public compliance pages (CMP.5): the DSA points of contact (articles 11 and 12)."""
 
+import datetime as dt
 import math
 
 from django.http import Http404, HttpRequest, HttpResponse
@@ -47,6 +48,20 @@ def contact_points(request: HttpRequest) -> HttpResponse:
 NOTICE_SESSION_KEY = "compliance.notice_reference"
 
 
+def _too_many(wait: dt.timedelta) -> HttpResponse:
+    return HttpResponse(
+        _("Too many reports from this address. Try again later."),
+        status=429,
+        headers={"Retry-After": str(math.ceil(wait.total_seconds()))},
+    )
+
+
+def _render_form(request: HttpRequest, form: NoticeForm) -> HttpResponse:
+    response = render(request, "compliance/notice_form.html", {"form": form})
+    response["Cache-Control"] = "no-store"
+    return response
+
+
 def notice_form(request: HttpRequest) -> HttpResponse:
     """The public report form: no account needed, captcha and a per-address rate limit on POST.
 
@@ -55,20 +70,19 @@ def notice_form(request: HttpRequest) -> HttpResponse:
     """
     if request.method == "POST":
         ip = client_ip(request)
-        wait = services.notice_retry_after(ip)
-        if wait:
-            return HttpResponse(
-                _("Too many reports from this address. Try again later."),
-                status=429,
-                headers={"Retry-After": str(math.ceil(wait.total_seconds()))},
-            )
         form = NoticeForm(request.POST)
-        captcha_ok = captcha_passes(request)
-        if not captcha_ok:
+        if not captcha_passes(request):
+            wait = services.captcha_retry_after(ip)
+            if wait:
+                return _too_many(wait)
             form.add_error(
                 None, _("The verification failed. Please reload the page and try again.")
             )
-        if form.is_valid() and captcha_ok:
+            return _render_form(request, form)
+        wait = services.notice_retry_after(ip)  # counted once the captcha passed
+        if wait:
+            return _too_many(wait)
+        if form.is_valid():
             data = form.cleaned_data
             changes = services.submit_notice(
                 target_kind=data["target_kind"],
@@ -79,7 +93,7 @@ def notice_form(request: HttpRequest) -> HttpResponse:
                 notifier_email=data["notifier_email"],
                 good_faith=data["good_faith"],
                 language=get_language() or "",
-                ctx=services.anonymous_context(ip),
+                ctx=services.public_notice_context(ip, data["category"]),
             )
             request.session[NOTICE_SESSION_KEY] = changes.changes[0].key  # the public id
             return redirect("dsa_notice_received")
@@ -88,9 +102,7 @@ def notice_form(request: HttpRequest) -> HttpResponse:
         if request.GET.get("kind") in Notice.TargetKind.values:
             initial["target_kind"] = request.GET["kind"]
         form = NoticeForm(initial=initial)
-    response = render(request, "compliance/notice_form.html", {"form": form})
-    response["Cache-Control"] = "no-store"
-    return response
+    return _render_form(request, form)
 
 
 @require_GET

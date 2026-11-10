@@ -48,6 +48,7 @@ CONTACT_FIELDS: Final = ("manufacturer_contact", "eu_responsible_contact")
 # Missing-data codes, in the order they are reported.
 PRODUCT_IDENTIFIER: Final = "product_identifier"
 
+_URL = re.compile(r"https?://[^\s\x00-\x1f\x7f/]+[^\s\x00-\x1f\x7f]*", re.IGNORECASE)
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _WEB = re.compile(r"^https?://[^\s/]+\.[^\s/]+\S*$", re.IGNORECASE)
 
@@ -364,7 +365,7 @@ def notice_problems(
     problems: list[NoticeProblem] = []
     if not explanation.strip():
         problems.append(NoticeProblem("explanation"))
-    if not re.match(r"https?://[^\s/]+", url.strip(), re.IGNORECASE):
+    if not _URL.fullmatch(url.strip()):
         problems.append(NoticeProblem("url"))
     if category != NOTICE_ANONYMOUS_CATEGORY:
         if not notifier_name.strip():
