@@ -3,7 +3,7 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
-from apps.vendors.engine import PROFILE_MAX_LENGTH
+from apps.vendors.engine import LOGO_ALT_MAX_LENGTH, PROFILE_MAX_LENGTH
 
 
 class StorefrontProfileForm(forms.Form):
@@ -46,3 +46,21 @@ class StorefrontProfileForm(forms.Form):
         max_length=PROFILE_MAX_LENGTH["cancellation_policy"],
         widget=forms.Textarea(attrs={"rows": 5}),
     )
+
+
+class VendorLogoForm(forms.Form):
+    """The logo: a new image (checked by content in the service), its description, or removal."""
+
+    logo = forms.FileField(
+        label=_("Logo image"),
+        required=False,
+        widget=forms.ClearableFileInput(attrs={"accept": "image/png,image/jpeg,image/webp"}),
+        help_text=_("PNG, JPEG or WebP. Leave empty to keep the current image."),
+    )
+    logo_alt = forms.CharField(
+        label=_("Description of the logo"),
+        required=False,
+        max_length=LOGO_ALT_MAX_LENGTH,
+        help_text=_("Plain text for people who cannot see the image, for example the shop name."),
+    )
+    remove = forms.BooleanField(label=_("Remove the logo"), required=False)

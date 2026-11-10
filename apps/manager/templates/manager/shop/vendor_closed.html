@@ -6,7 +6,7 @@ status 403, on every shop page. It names no vendor and shows none of its data; i
 for reopening (VEN.21: staff reopen a closed vendor, which then goes through onboarding again).
 {% endcomment %}
 {% block title %}{% translate "Vendor closed" %} · {{ site_name }}{% endblock %}
-{% block description %}<meta name="robots" content="noindex">{% endblock %}
+{% block description %}{% robots_meta "noindex" %}{% endblock %}
 {% block account_content %}
   <h1>{% translate "Vendor closed" %}</h1>
   <p>{% translate "This vendor is closed, so its shop pages are no longer available." %}</p>

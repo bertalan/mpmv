@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **275** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **2226 h** (P1 1781 h · P2 413 h · P3 32 h)
+- Micro-tasks: **276** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **2232 h** (P1 1787 h · P2 413 h · P3 32 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -27,13 +27,13 @@
 | CMS | Wagtail content | 11 | 62 | 10 | 0 | 72 |
 | EVT | Events, feeds and maps | 17 | 111 | 12 | 0 | 123 |
 | THM | Frontend themes | 12 | 76 | 12 | 0 | 88 |
-| SEO | SEO, feeds, analytics | 7 | 38 | 14 | 0 | 52 |
+| SEO | SEO, feeds, analytics | 8 | 44 | 14 | 0 | 58 |
 | AI | AI channels (MCP, agents) | 4 | 0 | 22 | 18 | 40 |
 | CMP | Compliance | 27 | 163 | 81 | 0 | 244 |
 | SEC | Security | 9 | 59 | 0 | 0 | 59 |
 | OPS | Operations | 10 | 19 | 30 | 8 | 57 |
 | MIG | Migration and cutover | 15 | 121 | 23 | 0 | 144 |
-| **Total** | | **275** | **1781** | **413** | **32** | **2226** |
+| **Total** | | **276** | **1787** | **413** | **32** | **2232** |
 
 ## By phase
 
@@ -228,7 +228,7 @@
 | CMP.25 | Activation gate for platform duties (coherence check 5): an `activation` purpose in `LegalFieldRequirement` seeded with the DSA article 30 trader data (name, address, telephone, email, trade register entry where registered), the article 30(1)(e) self-certification recorded as an append-only acceptance with text hash, both checked by the VEN.5 activation next to the CMP.13 gate; DAC7 data still blocks payouts only; CMP.11 keeps the checks, display on offers and EPR | P1 | 4 | VEN.5, VEN.12, CMP.13 | An EU vendor missing its telephone, its trade register entry (when registered) or the self-certification cannot be activated and gets the reason; a complete vendor is activated; missing DAC7 data does not block activation; the self-certification row stores version, language and hash |
 | CMP.26 | GPSR follow-ups of the owner decisions 2026-11-09 (CMP.3): the checkout refuses a line whose product `apps.catalog.selling.sale_blockers` blocks for the delivery country and shows `{% product_destination_notice %}` (ORD.3, ORD.5); the product page includes the notice for the visitor's country (CAT.7); a Manager shop space page lists the vendor's products with the country languages their warnings miss (`vendor_warnings_language_gaps`, CORE.17); an in-app notice in the Manager platform space for the Catalog and moderation role when a safety case is overdue; open points of the CMP.3 review: link the notice only to languages in which the product page is published, a composite foreign key `(product, vendor)` on `SafetyCase` as in the catalog, `no` vs `nb`/`nn` matching for Norway, and Northern Ireland (GPSR applies, ships as `GB`, not checked) | P1 | 6 | CMP.3, ORD.3, ORD.5, CAT.7, CORE.17 | A cart line with warnings only in German cannot be checked out to a French-only country and the checkout shows why, with a link to the German warnings; the same cart checks out to a German-speaking country; the vendor's Manager page lists the missing country languages; an overdue safety case shows a notice to a Catalog and moderation user and not to a Finance user |
 
-### F4 — Content, SEO, feeds (33 tasks, 223 h)
+### F4 — Content, SEO, feeds (34 tasks, 229 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -265,6 +265,7 @@
 | SEO.3 | Google feed (EN for every product, IT for products with a published IT translation, D-18) with legacy IDs, prices from the tax engine, shipping from tables; GTIN, brand and MPN from the product fields; on-request and catalogue-only products left out (Q-31, Q-33) | P1 | 8 | TAX.3, SHP.11 | Feed validated in STAGE Merchant Center; no item carries the vendor SKU as MPN; no on-request product is in the feed |
 | SEO.5 | Cookie consent + Consent Mode v2 + e-commerce events | P1 | 8 | ORD.5 | No tags fire before consent |
 | SEO.7 | Site-wide schema.org `@graph` (owner question 2026-11-09): one JSON-LD block per page from `seo.page_graph`, stable `@id` nodes for the operator `Organization`, `WebSite` + `SearchAction`, `WebPage` subtypes, `BreadcrumbList`, vendor `Organization` as `seller`, shared return and shipping nodes, `Product`/`Offer`/`AggregateOffer`, `CollectionPage` + `ItemList`, `BlogPosting` + `Person`/`ProfilePage`, `Event`; `inLanguage` and no cross-language fallback; SEO.1 and EVT.10 return nodes into it | P1 | 8 | SEO.1, CMS.3, CMS.10, CMS.11 | Each page type in the SEO.7 coverage table has a snapshot test of its graph, and a sweep over the registered page types fails on a public page without one; the search results page is a `SearchResultsPage` with an `ItemList` of mixed result types and `noindex, follow`; every `@id` reference resolves to a node in the same graph or a canonical URL; a schema check (types, required and recommended properties of the Google rich results for Product, Breadcrumb, Article, Event, ProfilePage) runs in CI; a page has exactly one JSON-LD script; a product name containing `</script><img src=x onerror=alert(1)>` is inert inside the JSON-LD and adds no element to the page; a page with a product grid and a product cards block has two named `ItemList`s whose items reference product `@id`s without repeating offers, and a retired product disappears from both; the product node checklist of §"Structured data graph" is covered (vendor as seller, gtin/mpn/productID, variants as ProductGroup, compact shipping, licence fields on images) and a product page's JSON-LD stays under 30 KB |
+| SEO.8 | Search engine visibility (owner decision D-35), in two parts. 1/2, the environment floor: the server setting `MPMV_FORCE_NOINDEX` (default false; true in the STAGE settings and whenever `MPMV_DEMO_MODE` is on) makes every page's robots meta `noindex, nofollow` (the listings return it from `listing_robots`; the base layout prints it where a page prints none, never two per page), makes Django add `X-Robots-Tag: noindex, nofollow` to every response (the proxy's header stays as defence in depth) and makes `/robots.txt` serve `Disallow: /`; not forced, `/robots.txt` exists and allows crawling with the private areas disallowed (Manager, account and MFA pages, staff admin, editors' admin, language switcher, API); it has no language prefix and is public. 2/2, the SEO settings panel (Wagtail Settings, per site, built on `wagtail-seo` if it fits our Wagtail, CSP and import contracts; one JSON-LD Organization fed from `current_operator()`) with the indexing toggle (default off on a new site, read-only under the floor), the sitemap in `robots.txt`, per-page SEO fields, an AuditLog entry on change and a platform-opening checklist reminder | P1 | 6 | SEO.7 | 1/2: forced, the meta, the header and `/robots.txt` are noindex on a listing, a CMS page, a 404 and a signed-in Manager page, and demo mode implies it; not forced, a listing keeps its index and noindex rules, no `X-Robots-Tag` is sent and `/robots.txt` allows with the private disallows. 2/2: toggle off gives header, meta and robots.txt noindex, on gives an allowing robots.txt with the sitemap; the toggle cannot be turned on under the floor (form, admin and service); a change is audited; e2e screenshot of the panel on STAGE showing the forced state |
 
 ### F5 — Migration, acceptance testing, go-live (13 tasks, 137 h)
 
