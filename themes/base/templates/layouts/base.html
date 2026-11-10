@@ -29,6 +29,7 @@ without a countdown.
   <script src="{% static 'vendor/alpine-csp.min.js' %}" defer></script>
   {% if page %}{% faq_jsonld page %}{% endif %}
   {% block head %}{% endblock %}
+  {% default_robots_meta %}
 </head>
 <body>
   {% include "components/skip_link.html" only %}

@@ -12,6 +12,9 @@ from typing import Any
 
 from django.http import HttpRequest
 from django.http.response import HttpResponseBase
+from django.utils import translation
+
+from apps.core.i18n import configured_languages, translate_path
 
 from .decorators import MFA_EXEMPT_ATTR, mfa_redirect
 from .mfa_session import is_verified
@@ -47,3 +50,37 @@ class MfaRequiredMiddleware:
         if not (enrolled or mfa_required(user)):
             return None
         return mfa_redirect(request, "mfa:verify" if enrolled else "mfa:setup")
+
+
+class PreferredLanguageMiddleware:
+    """I18N.12: a signed-in user's `preferred_language` decides the language of unprefixed areas.
+
+    The language switcher sets no cookie (the URL prefix decides), so the Manager, the account
+    area and the admins, which have no prefix, would stay in the primary language. Runs right after
+    `AuthenticationMiddleware`. Public pages (routes in `i18n_patterns`) keep their prefix as the
+    only source; anonymous users, an unknown or no longer configured language change nothing.
+    """
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponseBase]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
+        user = getattr(request, "user", None)
+        language = getattr(user, "preferred_language", "") if user is not None else ""
+        if (
+            user is not None
+            and user.is_authenticated
+            and language in configured_languages()
+            and language != translation.get_language()
+            and not self._is_public_page(request.path_info, language)
+        ):
+            translation.activate(language)
+            request.LANGUAGE_CODE = language
+        return self.get_response(request)
+
+    @staticmethod
+    def _is_public_page(path: str, language: str) -> bool:
+        """True for a route of `i18n_patterns`, which exists in every language."""
+        return translate_path(path, language) != path or (
+            translation.get_language_from_path(path) is not None
+        )
