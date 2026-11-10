@@ -345,5 +345,5 @@ def test_staff_viewing_the_notifier_details_is_audited(client: Client, reviewer:
     client.get(f"/manager/platform/notices/{notice.public_id}/")
     entry = AuditLog.objects.get(action="compliance.notice.viewed")
     assert entry.target_key == str(notice.public_id)
-    assert entry.after["reason"]
+    assert (entry.after or {})["reason"]
     assert notice.notifier_email not in str(entry.after)
