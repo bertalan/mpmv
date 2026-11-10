@@ -26,6 +26,7 @@ from apps.cms.models import (
     BlogAuthor,
     BlogIndexPage,
     BlogPostPage,
+    EditorRoleSeed,
     HomePage,
     LegalPage,
     LegalPageReview,
@@ -296,6 +297,16 @@ class VendorRecruitmentPageFactory(_InTree, DjangoModelFactory[VendorRecruitment
     @classmethod
     def _default_parent(cls) -> Page:
         return _primary_home()
+
+
+class EditorRoleSeedFactory(DjangoModelFactory[EditorRoleSeed]):
+    """A role marked as seeded (`apps.cms.roles` names): the marker only, no group or grants."""
+
+    class Meta:
+        model = EditorRoleSeed
+        django_get_or_create = ("role",)
+
+    role = factory.Sequence(lambda n: f"Test role {n}")
 
 
 class BlogAuthorFactory(DjangoModelFactory[BlogAuthor]):

@@ -7,9 +7,15 @@ page types whose nodes it may change: the blog index (and with it every post), e
 page, the event indexes (and with them every event), and the standalone content pages. The
 home page is deliberately in no role: a grant on it would reach the whole tree.
 
-`apps.cms.editor_roles` turns this data into groups and grants. It adds what is missing and
-never removes: the platform owner narrows a role later in the staff admin (CORE.18 adds the
-drift check for the platform roles).
+Editing and publishing are separate roles (lane-a decision on CORE.8): the editor roles can add,
+change and lock but never publish, so their work goes through moderation; the publisher roles
+hold `publish_page` (and approval of the default workflow task) on the same nodes. Only staff
+assign a publisher role: the migration puts nobody in it. Wagtail has no separate unpublish
+permission, so a publisher can also take down pages of its part.
+
+`apps.cms.editor_roles` turns this data into groups and grants once per role (an
+`EditorRoleSeed` marker): the platform owner narrows a role later in the staff admin and a
+deploy never reverts it (CORE.18 adds the drift check for the platform roles).
 
 The Wagtail admin menu is limited to CMS entries: `ADMIN_MENU_ALLOWED` lists the top-level
 items that may appear, whoever the user is. Commerce lives in the Manager (CORE.17).
@@ -27,11 +33,22 @@ UNLOCK = "unlock_page"
 PAGE_EDITORS = "Page editors"
 BLOG_EDITORS = "Blog editors"
 LEGAL_EDITORS = "Legal page editors"
+PAGE_PUBLISHERS = "Page publishers"
+BLOG_PUBLISHERS = "Blog publishers"
+LEGAL_PUBLISHERS = "Legal page publishers"
 EVENT_MODERATORS = "Event moderators"  # also the group of the "Event review" workflow (EVT.3)
 
 # Wagtail's default groups, removed by the data migration.
 DEFAULT_EDITORS = "Editors"
 DEFAULT_MODERATORS = "Moderators"
+
+
+PAGE_EDITOR_MODELS = (
+    "cms.StandardPage",
+    "cms.TermLandingPage",
+    "cms.VendorLandingPage",
+    "cms.VendorRecruitmentPage",
+)
 
 
 @dataclass(frozen=True)
@@ -46,18 +63,13 @@ class EditorRole:
 ROLES: tuple[EditorRole, ...] = (
     EditorRole(
         name=PAGE_EDITORS,
-        page_models=(
-            "cms.StandardPage",
-            "cms.TermLandingPage",
-            "cms.VendorLandingPage",
-            "cms.VendorRecruitmentPage",
-        ),
-        page_permissions=(CHANGE, PUBLISH, LOCK, UNLOCK),
+        page_models=PAGE_EDITOR_MODELS,
+        page_permissions=(CHANGE, LOCK, UNLOCK),
     ),
     EditorRole(
         name=BLOG_EDITORS,
         page_models=("cms.BlogIndexPage",),
-        page_permissions=(ADD, CHANGE, PUBLISH, LOCK, UNLOCK),
+        page_permissions=(ADD, CHANGE, LOCK, UNLOCK),
         model_permissions=(
             "cms.add_blogauthor",
             "cms.change_blogauthor",
@@ -68,7 +80,25 @@ ROLES: tuple[EditorRole, ...] = (
     EditorRole(
         name=LEGAL_EDITORS,
         page_models=("cms.LegalPage",),
+        page_permissions=(CHANGE, LOCK, UNLOCK),
+    ),
+    EditorRole(
+        name=PAGE_PUBLISHERS,
+        page_models=PAGE_EDITOR_MODELS,
         page_permissions=(CHANGE, PUBLISH, LOCK, UNLOCK),
+        images=False,
+    ),
+    EditorRole(
+        name=BLOG_PUBLISHERS,
+        page_models=("cms.BlogIndexPage",),
+        page_permissions=(CHANGE, PUBLISH, LOCK, UNLOCK),
+        images=False,
+    ),
+    EditorRole(
+        name=LEGAL_PUBLISHERS,
+        page_models=("cms.LegalPage",),
+        page_permissions=(CHANGE, PUBLISH, LOCK, UNLOCK),
+        images=False,
     ),
     EditorRole(
         name=EVENT_MODERATORS,
@@ -81,11 +111,13 @@ ROLES: tuple[EditorRole, ...] = (
 ROLE_NAMES: tuple[str, ...] = tuple(role.name for role in ROLES)
 
 # What a member of Wagtail's default group becomes (the migration moves the users): the three
-# content roles for both, plus the event moderators for the default "Moderators".
+# edit-only content roles for both. Nobody is moved to a publisher role or to the event
+# moderators: those are explicit grants by staff.
+PUBLISHER_ROLES: tuple[str, ...] = (PAGE_PUBLISHERS, BLOG_PUBLISHERS, LEGAL_PUBLISHERS)
 CONTENT_ROLES: tuple[str, ...] = (PAGE_EDITORS, BLOG_EDITORS, LEGAL_EDITORS)
 DEFAULT_GROUP_SUCCESSORS: dict[str, tuple[str, ...]] = {
     DEFAULT_EDITORS: CONTENT_ROLES,
-    DEFAULT_MODERATORS: (*CONTENT_ROLES, EVENT_MODERATORS),
+    DEFAULT_MODERATORS: CONTENT_ROLES,
 }
 
 # Page models whose nodes a role is bound to, for the creation signal.

@@ -20,9 +20,10 @@ from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.cms import roles
 from apps.cms.editor_roles import grant_role_on_page, sync_editor_roles
-from apps.cms.models import BlogIndexPage
+from apps.cms.models import BlogIndexPage, EditorRoleSeed, HomePage
 from apps.cms.tests.factories import (
     BlogPostPageFactory,
+    EditorRoleSeedFactory,
     LegalPageFactory,
     StandardPageFactory,
     editor_user,
@@ -120,7 +121,7 @@ def test_a_page_created_later_is_covered_by_its_role(tree: dict[str, Page]) -> N
     assert _can_edit(user, tree["legal"])
 
 
-def test_the_sync_is_idempotent_and_never_removes_grants(tree: dict[str, Page]) -> None:
+def test_the_sync_is_idempotent(tree: dict[str, Page]) -> None:
     group = Group.objects.get(name=roles.LEGAL_EDITORS)
     before = GroupPagePermission.objects.filter(group=group).count()
     assert before > 0
@@ -128,6 +129,78 @@ def test_the_sync_is_idempotent_and_never_removes_grants(tree: dict[str, Page]) 
     sync_editor_roles()
     grant_role_on_page(roles.LEGAL_EDITORS, tree["legal"])
     assert GroupPagePermission.objects.filter(group=group).count() == before
+
+
+def test_an_owner_narrowing_a_role_survives_the_next_sync(tree: dict[str, Page]) -> None:
+    """A deploy (post_migrate) must not give back a permission the owner removed."""
+    group = Group.objects.get(name=roles.LEGAL_PUBLISHERS)
+    GroupPagePermission.objects.filter(group=group, permission__codename="publish_page").delete()
+    group.permissions.remove(*group.permissions.filter(codename="submit_translation"))
+    user = editor_user(roles.LEGAL_PUBLISHERS)
+    sync_editor_roles()
+    assert not GroupPagePermission.objects.filter(
+        group=group, permission__codename="publish_page"
+    ).exists()
+    assert not group.permissions.filter(codename="submit_translation").exists()
+    assert not tree["legal"].permissions_for_user(_fresh(user)).can_publish()
+    later = LegalPageFactory.create()  # a new page still gets the role's remaining grants
+    assert _can_edit(user, later)
+
+
+def test_deleting_the_seed_marker_seeds_the_role_again(tree: dict[str, Page]) -> None:
+    group = Group.objects.get(name=roles.LEGAL_PUBLISHERS)
+    GroupPagePermission.objects.filter(group=group, permission__codename="publish_page").delete()
+    EditorRoleSeed.objects.filter(role=roles.LEGAL_PUBLISHERS).delete()
+    sync_editor_roles()
+    assert GroupPagePermission.objects.filter(
+        group=group, permission__codename="publish_page"
+    ).exists()
+
+
+def test_a_marked_role_is_not_seeded_again(tree: dict[str, Page]) -> None:
+    group = Group.objects.get(name=roles.LEGAL_PUBLISHERS)
+    GroupPagePermission.objects.filter(group=group).delete()
+    EditorRoleSeed.objects.filter(role=roles.LEGAL_PUBLISHERS).delete()
+    EditorRoleSeedFactory.create(role=roles.LEGAL_PUBLISHERS)
+    sync_editor_roles()
+    assert not GroupPagePermission.objects.filter(group=group).exists()
+
+
+@pytest.mark.parametrize("role", roles.ROLE_NAMES)
+def test_no_role_reaches_the_home_page_or_the_root(role: str, tree: dict[str, Page]) -> None:
+    user = _fresh(editor_user(role))
+    home = HomePage.objects.first()
+    assert home is not None
+    for page in (home, Page.get_first_root_node()):
+        perms = page.permissions_for_user(user)
+        assert not perms.can_edit(), page
+        assert not perms.can_publish(), page
+        assert not perms.can_delete(), page
+        assert not perms.can_move(), page
+        assert not perms.can_add_subpage(), page
+
+
+@pytest.mark.parametrize(
+    ("role", "refused"),
+    [
+        (roles.BLOG_EDITORS, ["about", "legal"]),
+        (roles.LEGAL_EDITORS, ["about", "post", "blog"]),
+        (roles.PAGE_EDITORS, ["legal", "post", "blog"]),
+        (roles.EVENT_MODERATORS, ["about", "legal", "post", "blog"]),
+    ],
+)
+def test_a_role_has_no_publish_delete_move_unpublish_or_lock_on_other_parts(
+    tree: dict[str, Page], role: str, refused: list[str]
+) -> None:
+    user = _fresh(editor_user(role))
+    for key in refused:
+        perms = tree[key].permissions_for_user(user)
+        assert not perms.can_publish(), key
+        assert not perms.can_unpublish(), key
+        assert not perms.can_delete(), key
+        assert not perms.can_move(), key
+        assert not perms.can_lock(), key
+        assert not perms.can_add_subpage(), key
 
 
 def test_roles_open_the_admin_and_the_snippets_they_need() -> None:
@@ -176,6 +249,12 @@ def test_the_admin_menu_has_no_commerce_item(who: str) -> None:
     entries = _menu(user)
     assert entries
     top = {name for name, _ in entries if "/" not in name}
+    # A renamed or mistyped allow-list entry would hide these.
+    assert {"help", "reports"} <= top
+    if who == "superuser":
+        assert {"explorer", "images", "navigation", "blog-authors"} <= top
+    if who in (roles.BLOG_EDITORS,):
+        assert {"images", "blog-authors"} <= top
     assert top <= roles.ADMIN_MENU_ALLOWED, top - roles.ADMIN_MENU_ALLOWED
     for name, label in entries:
         assert not COMMERCE.search(name), name

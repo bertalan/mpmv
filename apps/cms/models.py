@@ -197,6 +197,18 @@ class ExternalLinkBlock(blocks.StructBlock):  # type: ignore[misc]
         label = _("External link")
 
 
+class EditorRoleSeed(models.Model):
+    """Marks an editor role (`apps.cms.roles`) as seeded (CORE.8): its permissions and page
+    grants are written once, so a platform owner's later narrowing is never reverted by a
+    deploy. Deleting the row (and nothing else) makes the next migrate seed the role again."""
+
+    role = models.CharField(max_length=100, unique=True)
+    seeded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return str(self.role)
+
+
 class NavigationMenu(TranslatableMixin, models.Model):  # type: ignore[misc]
     """The header or footer links of one language (a snippet editors manage per locale)."""
 

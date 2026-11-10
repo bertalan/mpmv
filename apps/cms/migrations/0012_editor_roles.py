@@ -4,32 +4,36 @@ Our own editor roles replace them (`apps.cms.roles`). Their permissions and page
 after the migrate by `apps.cms.editor_roles.sync_editor_roles`; this step only moves people, so
 nobody loses Wagtail access silently:
 
-- members of "Editors" join the three content roles (Page editors, Blog editors, Legal page
-  editors); members of "Moderators" join those and the Event moderators. The roles are narrower
-  than the defaults, which could edit the whole tree (events included for Editors): a platform
-  owner who wants a user back on a part of the tree adds the right role in the staff admin.
-- the default "Moderators approval" workflow task keeps working: the content roles are added to
-  its groups before the group goes.
+- members of "Editors" and of "Moderators" join the three content roles (Page editors, Blog
+  editors, Legal page editors). Nobody is added to Event moderators: that is an explicit
+  assignment in the staff admin (no implicit grants, lane-a decision on CORE.8). The roles are
+  narrower than the defaults, which could edit the whole tree: a platform owner who wants a
+  user back on a part of the tree adds the right role in the staff admin.
+- the default "Moderators approval" workflow task keeps working: the publisher roles (empty:
+  staff assign them) are added to its groups before the group goes. Editors never approve.
 - a database without the default groups (STAGE, a fresh install after a flush) is untouched,
   and running the step twice changes nothing.
 
 Reverse: the default groups come back with Wagtail's initial permissions (admin access, image
 choose/add/change, page add/change/lock/unlock on the tree root, and publish for Moderators)
-and the members of the three content roles return to "Editors". Moderators members are not
-restored: the groups cannot tell them apart. Names are written out here on purpose: a migration
+and only users who are in all three content roles (what this step produced for the default
+groups) return to "Editors"; someone who holds just one content role keeps no wider access.
+Moderators members are not restored: the groups cannot tell them apart. Names are written out
+here on purpose: a migration
 does not follow later edits of `roles.py`.
 """
 
 from typing import Any
 
-from django.db import migrations
+from django.db import migrations, models
 
 EDITORS = "Editors"
 MODERATORS = "Moderators"
 CONTENT_ROLES = ("Page editors", "Blog editors", "Legal page editors")
+PUBLISHER_ROLES = ("Page publishers", "Blog publishers", "Legal page publishers")
 EVENT_MODERATORS = "Event moderators"
-ROLES = (*CONTENT_ROLES, EVENT_MODERATORS)
-SUCCESSORS = {EDITORS: CONTENT_ROLES, MODERATORS: (*CONTENT_ROLES, EVENT_MODERATORS)}
+ROLES = (*CONTENT_ROLES, *PUBLISHER_ROLES, EVENT_MODERATORS)
+SUCCESSORS = {EDITORS: CONTENT_ROLES, MODERATORS: CONTENT_ROLES}
 
 PAGE_PERMISSIONS = {
     EDITORS: ("add_page", "change_page", "bulk_delete_page", "lock_page", "unlock_page"),
@@ -57,9 +61,9 @@ def remove_default_groups(apps: Any, schema_editor: Any) -> None:
             role.user_set.add(*users)
         if default == MODERATORS:
             GroupApprovalTask = apps.get_model("wagtailcore", "GroupApprovalTask")
-            content = [role for role in roles if role.name in CONTENT_ROLES]
+            publishers = [Group.objects.get_or_create(name=name)[0] for name in PUBLISHER_ROLES]
             for task in GroupApprovalTask.objects.filter(groups=group):
-                task.groups.add(*content)
+                task.groups.add(*publishers)
         group.delete()
     for name in ROLES:
         Group.objects.get_or_create(name=name)
@@ -101,8 +105,12 @@ def restore_default_groups(apps: Any, schema_editor: Any) -> None:
                         group=group, collection=collection, permission=permission
                     )
     editors = Group.objects.get(name=EDITORS)
-    for role in Group.objects.filter(name__in=CONTENT_ROLES):
-        editors.user_set.add(*role.user_set.all())
+    roles = list(Group.objects.filter(name__in=CONTENT_ROLES))
+    if len(roles) == len(CONTENT_ROLES):
+        in_all = set.intersection(
+            *(set(role.user_set.values_list("pk", flat=True)) for role in roles)
+        )
+        editors.user_set.add(*in_all)
 
 
 class Migration(migrations.Migration):
@@ -113,4 +121,19 @@ class Migration(migrations.Migration):
         ("accounts", "0005_action_link_issue"),
     ]
 
-    operations = [migrations.RunPython(remove_default_groups, restore_default_groups)]
+    operations = [
+        migrations.CreateModel(
+            name="EditorRoleSeed",
+            fields=[
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("role", models.CharField(max_length=100, unique=True)),
+                ("seeded_at", models.DateTimeField(auto_now_add=True)),
+            ],
+        ),
+        migrations.RunPython(remove_default_groups, restore_default_groups),
+    ]
