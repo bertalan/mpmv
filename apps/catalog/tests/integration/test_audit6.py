@@ -133,10 +133,10 @@ def test_create_product_gives_every_translation_its_slug(
     changes = create_product(VendorFactory.create(), tee(), ctx=CTX, dry_run=dry_run)
     entries = [c for c in changes.changes if c.model == "catalog.producttranslation"]
     shown = sorted(str(c.after["slug"]) for c in entries if c.after)
-    assert shown == ["maglia-semplice-it", "plain-tee-en"]
+    assert shown == ["maglia-semplice", "plain-tee"]
     if not dry_run:
         product = Product.objects.get(sku="TEE-1")
-        assert slugs_of(product) == {"en": "plain-tee-en", "it": "maglia-semplice-it"}
+        assert slugs_of(product) == {"en": "plain-tee", "it": "maglia-semplice"}
         created = AuditLog.objects.filter(action="catalog.product.created")
         assert created.filter(target_key=str(product.public_id)).exists()
 
@@ -145,9 +145,9 @@ def test_create_product_suffixes_a_slug_taken_by_another_product(
     attributes: dict[str, Attribute],
 ) -> None:
     other = ProductFactory.create(languages=["en"])
-    other.translations.update(title="Plain tee", slug="plain-tee-en")
+    other.translations.update(title="Plain tee", slug="plain-tee")
     create_product(VendorFactory.create(), tee(), ctx=CTX)
-    assert slugs_of(Product.objects.get(sku="TEE-1"))["en"] == "plain-tee-en-2"
+    assert slugs_of(Product.objects.get(sku="TEE-1"))["en"] == "plain-tee-2"
 
 
 def test_a_duplicate_regenerates_unique_slugs(attributes: dict[str, Attribute]) -> None:
@@ -161,11 +161,11 @@ def test_a_duplicate_regenerates_unique_slugs(attributes: dict[str, Attribute]) 
         ctx=CTX,
     )
     copy = Product.objects.exclude(pk=original.pk).get()
-    assert slugs_of(copy) == {"en": "plain-tee-en-2", "it": "maglia-semplice-it-2"}
+    assert slugs_of(copy) == {"en": "plain-tee-2", "it": "maglia-semplice-2"}
     entries = [c for c in changes.changes if c.model == "catalog.producttranslation"]
     assert sorted(str(c.after["slug"]) for c in entries if c.after) == [
-        "maglia-semplice-it-2",
-        "plain-tee-en-2",
+        "maglia-semplice-2",
+        "plain-tee-2",
     ]
 
 

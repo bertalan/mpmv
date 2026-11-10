@@ -47,6 +47,14 @@ HTML: Final = (
     '<base href="https://example.invalid/">',
 )
 
+#: Shapes that only a sanitiser that reads the HTML tree meets (CMS.12).
+RICH_TEXT_SHAPES: Final = (
+    "<p><![CDATA[><img src=x onerror=alert(1)>]]></p>",
+    "<p>a<!DOCTYPE x><?php x ?></p>",
+    '<a linktype="page" id="1" data-linktype="page">x</a>',
+    '<a data-linktype="document">x</a><embed data-embedtype="media" src=x>',
+)
+
 TEMPLATE_SYNTAX: Final = (
     "{{ settings.SECRET_KEY }}",
     "{{ request.user.email }}",
@@ -285,6 +293,7 @@ FILENAMES: Final = (
 
 CORPUS: Final[dict[str, tuple[str, ...]]] = {
     "html": HTML,
+    "rich_text": RICH_TEXT_SHAPES,
     "template": TEMPLATE_SYNTAX,
     "sql": SQL,
     "shell": SHELL,
