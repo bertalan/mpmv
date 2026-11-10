@@ -94,6 +94,10 @@ PHASE_BY_PREFIX = {
     "MIG": "F5",
 }
 PHASE_OVERRIDE = {
+    "FIT.1": "F1",
+    "FIT.2": "F1",
+    "FIT.3": "F1",
+    "FIT.4": "F1",
     "ARC.10": "F2",
     "SEC.6": "F5",
     "CMS.1": "F1",
