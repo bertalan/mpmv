@@ -15,7 +15,9 @@ from typing import Any
 from django.db import migrations
 
 OWN_RATES = "own_rates"
-VALID_FROM = dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
+# The seed marker: no staff rate starts at this exact instant, and the reverse deletes only an
+# open-ended rate that still starts here (never a rate a staff member entered later).
+VALID_FROM = dt.datetime(2026, 1, 1, 0, 0, 0, 1, tzinfo=dt.UTC)
 
 # (code, name, postcode patterns, standard rate)
 SEED = [
@@ -51,9 +53,12 @@ def seed(apps: Any, schema_editor: Any) -> None:
 def unseed(apps: Any, schema_editor: Any) -> None:
     Territory = apps.get_model("tax", "Territory")
     TaxRate = apps.get_model("tax", "TaxRate")
-    for code, name, patterns, standard in SEED:
+    for code, name, patterns, _standard in SEED:
         TaxRate.objects.filter(
-            territory__code=code, category="standard", rate=standard, source="manual"
+            territory__code=code,
+            category="standard",
+            valid_from=VALID_FROM,
+            valid_to__isnull=True,
         ).delete()
         Territory.objects.filter(
             code=code,

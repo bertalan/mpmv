@@ -117,7 +117,12 @@ def test_a_recent_unavailable_answer_is_reused_so_an_outage_does_not_stall_check
 
 def test_the_default_requester_is_the_operators_and_is_recorded_as_sent() -> None:
     """Review 1: the row never shows an empty requester for an operator-issued number."""
-    operator = PlatformOperatorFactory.create(country="AT", vat_number="ATU12345678")
+    operator = PlatformOperatorFactory.create(
+        country="AT",
+        vat_number="ATU12345678",
+        valid_from=timezone.now() - dt.timedelta(days=1),
+        valid_to=None,
+    )
     client = RequesterAwareClient()
     check = services.verify_vat_number("DE", "DE123456789", client=client)
     assert [r.full_number for r in client.requesters if r] == ["ATU12345678"]
@@ -145,7 +150,12 @@ def test_a_vendor_without_a_valid_vat_number_has_no_vendor_proof() -> None:
     assert services.vendor_requester("IT", "") is None
     assert services.vendor_requester("IT", "not a vat number") is None
     assert services.vendor_requester("IT", "IT01234567897") == VENDOR
-    PlatformOperatorFactory.create(country="AT", vat_number="ATU12345678")
+    PlatformOperatorFactory.create(
+        country="AT",
+        vat_number="ATU12345678",
+        valid_from=timezone.now() - dt.timedelta(days=1),
+        valid_to=None,
+    )
     check = services.verify_vat_number(
         "DE",
         "DE123456789",
