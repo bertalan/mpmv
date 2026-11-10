@@ -84,12 +84,12 @@ def test_order_money_columns_cannot_change(column: str) -> None:
         Order.objects.filter(pk=order.pk).update(**{column: Decimal("1.00")})
 
 
-def test_the_order_number_cannot_change_but_personal_data_can_be_scrubbed() -> None:
+def test_the_order_number_cannot_change_and_personal_data_is_fiscal_data() -> None:
     order = OrderFactory.create()
     with pytest.raises(IntegrityError), transaction.atomic():
         Order.objects.filter(pk=order.pk).update(number="2999-999999")
-    Order.objects.filter(pk=order.pk).update(email="", billing_address={}, shipping_address={})
-    assert Order.objects.get(pk=order.pk).email == ""
+    with pytest.raises(IntegrityError), transaction.atomic():
+        Order.objects.filter(pk=order.pk).update(email="")  # D-29: only the scrub service
 
 
 @pytest.mark.parametrize(

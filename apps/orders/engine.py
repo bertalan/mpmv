@@ -3,6 +3,8 @@
 Amounts are `Decimal`, rounded half up per line before they are added up (spec 01 money rules).
 """
 
+import calendar
+import datetime as dt
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
@@ -170,3 +172,38 @@ def derive_order_state(current: str, vendor_states: Iterable[str]) -> str:
     if current == "in_fulfillment" and all(state in _FULFILLED_STATES for state in alive):
         return "fulfilled"
     return current
+
+
+# --- retention (owner decision D-29) -----------------------------------------------------------
+
+ANONYMISED = "ANONYMISED"
+ANONYMISED_EMAIL = "anonymised@example.invalid"
+FISCAL_RETENTION_YEARS = 10
+ANONYMISED_ORDER_FIELDS: Mapping[str, object] = {
+    "customer_name": ANONYMISED,
+    "customer_vat_number": ANONYMISED,
+    "customer_tax_id": ANONYMISED,
+    "billing_address": {"anonymised": True},
+    "shipping_address": {"anonymised": True},
+    "vat_validation": {"anonymised": True},
+}
+
+
+def add_months(day: dt.date, months: int) -> dt.date:
+    """`day` plus whole months; the day is clamped to the end of a shorter month."""
+    index = day.year * 12 + day.month - 1 + months
+    year, month = divmod(index, 12)
+    month += 1
+    return dt.date(year, month, min(day.day, calendar.monthrange(year, month)[1]))
+
+
+def minimisation_due(created: dt.datetime, now: dt.datetime, months: int, tz: dt.tzinfo) -> bool:
+    """True once the active phase (`months` after the order was placed) is over."""
+    due = add_months(created.astimezone(tz).date(), months)
+    return now.astimezone(tz).date() >= due
+
+
+def anonymisation_due(created: dt.datetime, now: dt.datetime, tz: dt.tzinfo) -> bool:
+    """True after 31 December of year 10 counted from the order's calendar year."""
+    last_day = dt.date(created.astimezone(tz).year + FISCAL_RETENTION_YEARS, 12, 31)
+    return now.astimezone(tz).date() > last_day

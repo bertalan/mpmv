@@ -84,6 +84,9 @@ class _StateGuarded(BaseModel):
         instance._stored_state = instance.__dict__.get("state")  # None if deferred
         return instance
 
+    def _is_legacy(self) -> bool:
+        return getattr(self, "legacy_wp_order_id", None) is not None
+
     def refresh_from_db(self, *args: Any, **kwargs: Any) -> None:
         super().refresh_from_db(*args, **kwargs)
         self._stored_state = self.__dict__.get("state")
@@ -91,7 +94,11 @@ class _StateGuarded(BaseModel):
     def save(self, *args: Any, **kwargs: Any) -> None:
         update_fields = kwargs.get("update_fields")
         state: str = self.state  # type: ignore[attr-defined]
-        if self._state.adding and state not in self._initial_states:
+        if (
+            self._state.adding
+            and state not in self._initial_states
+            and not self._is_legacy()  # MIG.4: a historical order keeps its final state
+        ):
             raise engine.IllegalTransition(f"{state!r} is not an initial state")
         if (
             (update_fields is None or "state" in update_fields)
@@ -118,6 +125,14 @@ class Order(_StateGuarded):
         related_name="orders",
         help_text="Empty for a guest order.",
     )
+    # D-29: the fiscal snapshot. These columns (with the addresses, countries and
+    # `vat_validation`) are immutable in the database; only the audited scrub services in
+    # `apps.orders.services` may rewrite them, after the legal retention periods.
+    customer_name = models.CharField(
+        max_length=200, blank=True, help_text="Name or company, as on the order."
+    )
+    customer_vat_number = models.CharField(max_length=32, blank=True)
+    customer_tax_id = models.CharField(max_length=32, blank=True)
     email = models.EmailField()
     language = LanguageField(default=settings.LANGUAGE_CODE)
     billing_address = models.JSONField(default=dict)
@@ -137,6 +152,12 @@ class Order(_StateGuarded):
     shipping_net = MoneyField()
     tax_total = MoneyField()
     grand_total = MoneyField()
+    minimised_at = models.DateTimeField(
+        null=True, blank=True, editable=False, help_text="When the non-fiscal fields were dropped."
+    )
+    anonymised_at = models.DateTimeField(
+        null=True, blank=True, editable=False, help_text="When the personal fields were replaced."
+    )
     payment_intent_ref = models.CharField(max_length=255, blank=True)
     transfer_group = models.CharField(max_length=64, blank=True)
     legacy_wp_order_id = models.PositiveBigIntegerField(null=True, blank=True, unique=True)
@@ -220,6 +241,9 @@ class VendorOrder(_StateGuarded):
         default=dict, blank=True, help_text="Snapshot of compute_commission: rule, percentage, fee."
     )
     tax_profile_snapshot = models.JSONField(default=dict, blank=True)
+    # Non-fiscal: dropped by `minimise_order` after the active phase (D-29).
+    carrier_contact_phone = models.CharField(max_length=32, blank=True)
+    support_notes = models.TextField(blank=True)
     tracking_number = models.CharField(max_length=100, blank=True)
     carrier = models.CharField(max_length=100, blank=True)
     shipped_at = models.DateTimeField(null=True, blank=True)
@@ -278,6 +302,9 @@ class VendorOrder(_StateGuarded):
                 name="orders_vendororder_tax_includes_shipping_tax",
             ),
         ]
+
+    def _is_legacy(self) -> bool:
+        return self.order.legacy_wp_order_id is not None
 
     def __str__(self) -> str:
         return f"{self.order.number} / vendor {self.vendor_id}"

@@ -24,7 +24,8 @@ _numbers = itertools.count(1)
 def unchecked() -> Iterator[None]:
     """Skip the order triggers inside the block, to build data that breaks the commit-time sums
     on purpose. Django checks deferred constraints when a test ends, so use it for data a test
-    does not want checked at all."""
+    does not want checked at all. It also turns off foreign-key checks (they are triggers too),
+    so only build rows whose references exist."""
     with connection.cursor() as cursor:
         cursor.execute("SET LOCAL session_replication_role = replica")
     try:

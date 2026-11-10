@@ -20,7 +20,17 @@ from apps.orders.services import LineInput, VendorOrderInput
 from apps.orders.tests.factories import OrderNumberSequenceFactory
 from apps.vendors.tests.factories import VendorFactory
 
-COMMISSION = {"rule_id": "default", "rule_version": 3, "percentage": "10", "fee": "2.00"}
+COMMISSION = {
+    "rule_id": "default",
+    "version": 3,
+    "percent": "10.00",
+    "base": "goods",
+    "fee_percent": "1.40",
+    "fee_fixed": "0.25",
+    "fee_base": "gross",
+    "promo_label": "",
+    "valid_from": "2027-01-01T00:00:00+00:00",
+}
 CTX = AuditContext(actor_label="system:test", source=AuditLog.Source.SYSTEM)
 NOW = dt.datetime(2027, 3, 1, 10, 0, tzinfo=dt.UTC)
 
@@ -397,7 +407,9 @@ def test_the_vendor_identity_is_snapshotted() -> None:
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("missing", ["rule_id", "rule_version", "percentage", "fee"])
+@pytest.mark.parametrize(
+    "missing", ["rule_id", "version", "percent", "base", "fee_percent", "fee_fixed", "fee_base"]
+)
 def test_the_commission_snapshot_needs_its_keys(missing: str) -> None:
     snapshot = {k: v for k, v in COMMISSION.items() if k != missing}
     with pytest.raises(ValueError, match="commission_snapshot"):
@@ -485,3 +497,11 @@ def _kwargs(vendor: object) -> dict[str, object]:
         "ctx": CTX,
         "now": NOW,
     }
+
+
+@pytest.mark.django_db
+def test_the_commission_snapshot_refuses_unknown_keys_and_allows_the_optional_ones() -> None:
+    with pytest.raises(ValueError, match="unknown keys"):
+        place(vendor_orders=[vendor_input(commission_snapshot={**COMMISSION, "fee": "2.00"})])
+    minimal = {k: v for k, v in COMMISSION.items() if k not in ("promo_label", "valid_from")}
+    place(vendor_orders=[vendor_input(commission_snapshot=minimal)])

@@ -3,6 +3,7 @@ service (minimise after the active phase, anonymise after year 10) may change th
 
 import datetime as dt
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from django.db import IntegrityError, connection, transaction
@@ -12,17 +13,25 @@ from apps.core.models import AuditLog
 from apps.orders import engine, services
 from apps.orders.models import Order, VendorOrder
 from apps.orders.services import LineInput, ScrubNotDue, VendorOrderInput
-from apps.orders.tests.factories import OrderFactory, VendorOrderFactory
+from apps.orders.tests.factories import OrderFactory, VendorOrderFactory, unchecked
 from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
 
 CTX = AuditContext(actor_label="system:test", source=AuditLog.Source.SYSTEM)
 PLACED = dt.datetime(2027, 3, 15, 10, 0, tzinfo=dt.UTC)
-COMMISSION = {"rule_id": "default", "rule_version": 1, "percentage": "10", "fee": "1.00"}
+COMMISSION = {
+    "rule_id": "default",
+    "version": 1,
+    "percent": "10.00",
+    "base": "goods",
+    "fee_percent": "1.40",
+    "fee_fixed": "0.25",
+    "fee_base": "gross",
+}
 
 
-def run_sql(*statements: tuple[str, list[object]]) -> None:
+def run_sql(*statements: tuple[str, list[Any]]) -> None:
     with transaction.atomic(), connection.cursor() as cursor:
         for sql, params in statements:
             cursor.execute(sql, params)
@@ -62,6 +71,10 @@ def place(**overrides: object) -> Order:
     values.update(overrides)
     order, _ = services.create_order(**values)  # type: ignore[arg-type]
     assert order is not None
+    # created_at is set by the database layer at insert; the retention dates count from it.
+    with unchecked():
+        Order.objects.filter(pk=order.pk).update(created_at=values["now"])
+    order.refresh_from_db()
     return order
 
 
@@ -219,8 +232,9 @@ def test_minimise_drops_only_the_non_fiscal_fields_and_audits() -> None:
     assert order.minimised_at == later
     assert order.email == "buyer@example.com"  # fiscal data stays
     assert order.billing_address["city"] == "Roma"
-    entry = AuditLog.objects.get(action="orders.minimise")
-    assert "+39" not in str(entry.before) + str(entry.after)
+    entries = AuditLog.objects.filter(action="orders.minimise")
+    assert entries.count() == 2  # the sub-order and the order
+    assert all("+39" not in str(e.before) + str(e.after) for e in entries)
 
 
 def test_the_active_phase_is_configurable(settings: object) -> None:
@@ -278,8 +292,9 @@ def test_anonymise_replaces_personal_fields_and_keeps_money_country_and_rate() -
     sub = order.vendor_orders.get()
     assert sub.carrier_contact_phone == ""
     assert sub.lines.get().tax_rate == Decimal("22.000")
-    entry = AuditLog.objects.get(action="orders.anonymise")
-    assert "Rossi" not in str(entry.before) + str(entry.after)
+    entries = AuditLog.objects.filter(action="orders.anonymise")
+    assert entries.exists()
+    assert all("Rossi" not in str(e.before) + str(e.after) for e in entries)
     # idempotent
     assert services.anonymise_order(order, ctx=CTX, now=now).is_empty
 

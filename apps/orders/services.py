@@ -15,7 +15,7 @@ from typing import Any
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils import timezone
 
 from apps.accounts.models import User
@@ -58,13 +58,17 @@ class VendorOrderInput:
     shipping_tax_rate: Decimal = Decimal("0")
     shipping_tax_reason: str = ""
     shipping_vat_nature_code: str = ""
+    state: str = "pending"  # anything else only for a legacy order (MIG.4)
     shipping_choice: dict[str, Any] = field(default_factory=dict)
     commission_snapshot: dict[str, Any] = field(default_factory=dict)
     tax_profile_snapshot: dict[str, Any] = field(default_factory=dict)
 
 
 PAID_OR_LATER = frozenset(engine.ORDER_STATES) - engine.ORDER_INITIAL_STATES - {"cancelled"}
-COMMISSION_KEYS = ("rule_id", "rule_version", "percentage", "fee")
+# The shape of `CommissionRule.snapshot()` (VEN.2). Required keys; `promo_label` and `valid_from`
+# are allowed too. A constant copy: orders does not import vendors for this.
+COMMISSION_KEYS = ("rule_id", "version", "percent", "base", "fee_percent", "fee_fixed", "fee_base")
+COMMISSION_OPTIONAL_KEYS = ("promo_label", "valid_from")
 MAX_PREFIX_LENGTH = 14  # number = prefix + "YYYY-" + 6+ digits must fit in 32 characters
 
 # --- numbering -------------------------------------------------------------------------------
@@ -179,6 +183,9 @@ def _build_vendor_order(
     missing = [key for key in COMMISSION_KEYS if key not in item.commission_snapshot]
     if missing:
         raise ValueError(f"commission_snapshot needs {', '.join(missing)}")
+    unknown = set(item.commission_snapshot) - set(COMMISSION_KEYS) - set(COMMISSION_OPTIONAL_KEYS)
+    if unknown:
+        raise ValueError(f"commission_snapshot has unknown keys: {', '.join(sorted(unknown))}")
     if item.shipping_net < 0 or item.shipping_net != item.shipping_net.quantize(CENT):
         raise ValueError("shipping must be a non-negative amount in cents")
     for entry in item.lines:
@@ -205,6 +212,7 @@ def _build_vendor_order(
         shipping_tax_amount=shipping_tax,
         shipping_tax_reason=item.shipping_tax_reason,
         shipping_vat_nature_code=item.shipping_vat_nature_code,
+        state=item.state,
         vendor_snapshot=_vendor_identity(item.vendor),
         shipping_choice=item.shipping_choice,
         commission_snapshot=item.commission_snapshot,
@@ -243,6 +251,9 @@ def create_order(
     vendor_orders: Sequence[VendorOrderInput],
     ctx: AuditContext,
     customer: User | None = None,
+    customer_name: str = "",
+    customer_vat_number: str = "",
+    customer_tax_id: str = "",
     customer_tax_status: str = "b2c",
     vat_validation: dict[str, Any] | None = None,
     state: str = "checkout",
@@ -264,12 +275,23 @@ def create_order(
         raise ValueError("an order needs at least one vendor order")
     if len({item.vendor.pk for item in vendor_orders}) != len(vendor_orders):
         raise ValueError("an order has one sub-order per vendor: the same vendor appears twice")
-    if state not in engine.ORDER_INITIAL_STATES:
+    if state not in engine.ORDER_STATES:
+        raise ValueError(f"{state!r} is not an order state")
+    legacy = legacy_wp_order_id is not None
+    if state not in engine.ORDER_INITIAL_STATES and not legacy:
         raise ValueError(f"{state!r} is not an initial state of an order")
+    for item in vendor_orders:
+        if item.state != "pending" and not legacy:
+            raise ValueError("a vendor order starts pending unless the order is a legacy one")
+        if item.state not in engine.VENDOR_ORDER_STATES:
+            raise ValueError(f"{item.state!r} is not a vendor order state")
 
     order = Order(
         number=DRY_RUN_NUMBER,
         customer=customer,
+        customer_name=customer_name,
+        customer_vat_number=customer_vat_number,
+        customer_tax_id=customer_tax_id,
         email=email,
         language=language,
         billing_address=billing_address,
@@ -396,3 +418,117 @@ def transition_vendor_order(
         pass
     sub.refresh_from_db()
     return changeset
+
+
+# --- retention: the scrub services (owner decision D-29) ---------------------------------------
+#
+# The fiscal snapshot of an order is kept, unchanged, for 10 years from the end of its calendar
+# year (GDPR art. 6(1)(c) and 17(3)(b); VAT Directive art. 242a). The database refuses any
+# rewrite of it. These two services are the only path, and each runs only after its date:
+# `minimise_order` drops the non-fiscal fields after the active phase, `anonymise_order` replaces
+# the personal fields after 31 December of year 10. The retention jobs that call them and the
+# archive masking are separate tasks.
+
+
+class ScrubNotDue(ValueError):
+    """The retention period of this scrub has not ended."""
+
+
+def _business_zone() -> zoneinfo.ZoneInfo:
+    return zoneinfo.ZoneInfo(settings.BUSINESS_TIME_ZONE)
+
+
+def _set_scrub_mode(mode: str) -> None:
+    """Transaction-local: the trigger lets the matching scrub write the protected columns."""
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT set_config('mpmv.order_scrub', %s, true)", [mode])
+
+
+def _scrub_snapshot(order: Order) -> dict[str, Any]:
+    return {
+        "number": order.number,
+        "minimised": order.minimised_at is not None,
+        "anonymised": order.anonymised_at is not None,
+    }
+
+
+def _clear_non_fiscal(order: Order, changeset: ChangeSet) -> None:
+    for sub in order.vendor_orders.select_for_update().select_related("vendor"):
+        if not (sub.carrier_contact_phone or sub.support_notes):
+            continue
+        before = {
+            VENDOR_FIELD: str(sub.vendor.public_id),
+            "has_contact_phone": bool(sub.carrier_contact_phone),
+            "has_support_notes": bool(sub.support_notes),
+        }
+        VendorOrder.objects.filter(pk=sub.pk).update(carrier_contact_phone="", support_notes="")
+        after = {**before, "has_contact_phone": False, "has_support_notes": False}
+        changeset.update("orders.vendororder", str(sub.public_id), before, after)
+
+
+def _scrub(
+    order: Order,
+    mode: str,
+    *,
+    ctx: AuditContext,
+    dry_run: bool,
+    now: dt.datetime | None,
+) -> ChangeSet:
+    stamp = now or timezone.now()
+    changeset = ChangeSet()
+    try:
+        with transaction.atomic():
+            locked = Order.objects.select_for_update().get(pk=order.pk)
+            if mode == "minimise":
+                months = int(getattr(settings, "ORDER_ACTIVE_PHASE_MONTHS", 24))
+                if not engine.minimisation_due(locked.created_at, stamp, months, _business_zone()):
+                    raise ScrubNotDue(f"the active phase of {months} months has not ended")
+            elif not engine.anonymisation_due(locked.created_at, stamp, _business_zone()):
+                raise ScrubNotDue("anonymisation is due after 31 December of year 10")
+            done = locked.anonymised_at if mode == "anonymise" else locked.minimised_at
+            before = _scrub_snapshot(locked)
+            if done is None:
+                _set_scrub_mode(mode)
+                _clear_non_fiscal(locked, changeset)
+                values: dict[str, Any] = {"updated_at": stamp}
+                if mode == "anonymise":
+                    values.update(
+                        engine.ANONYMISED_ORDER_FIELDS,
+                        email=engine.ANONYMISED_EMAIL,
+                        customer=None,
+                        anonymised_at=stamp,
+                    )
+                else:
+                    values["minimised_at"] = stamp
+                Order.objects.filter(pk=locked.pk).update(**values)
+                _set_scrub_mode("")
+                locked.refresh_from_db()
+                changeset.update(
+                    "orders.order", str(locked.public_id), before, _scrub_snapshot(locked)
+                )
+            if dry_run:
+                raise _DryRunRollback
+            audit_changes(changeset, ctx=ctx, action=f"orders.{mode}")
+    except _DryRunRollback:
+        pass
+    order.refresh_from_db()
+    return changeset
+
+
+def minimise_order(
+    order: Order, *, ctx: AuditContext, dry_run: bool = False, now: dt.datetime | None = None
+) -> ChangeSet:
+    """Drop the non-fiscal fields (carrier contact phone, support notes of the sub-orders) once
+    `ORDER_ACTIVE_PHASE_MONTHS` (default 24) have passed since the order. Fiscal data stays.
+    Raises `ScrubNotDue` before that. Idempotent."""
+    return _scrub(order, "minimise", ctx=ctx, dry_run=dry_run, now=now)
+
+
+def anonymise_order(
+    order: Order, *, ctx: AuditContext, dry_run: bool = False, now: dt.datetime | None = None
+) -> ChangeSet:
+    """Replace the personal fields (name, VAT and tax ids, e-mail, addresses, VAT validation
+    log, buyer link) with fixed placeholders after 31 December of year 10 from the order year
+    (business time zone), keeping amounts, countries and tax rates. Also drops the non-fiscal
+    fields. Raises `ScrubNotDue` before that. Idempotent."""
+    return _scrub(order, "anonymise", ctx=ctx, dry_run=dry_run, now=now)
