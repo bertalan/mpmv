@@ -104,7 +104,7 @@ jobs:
       - run: uv sync
       - name: Pytest (unit + integration)
         run: >-
-          uv run pytest -m "unit or integration"
+          uv run pytest -n auto --dist loadgroup -m "unit or integration"
           --junitxml=build/reports/junit.xml
           --cov --cov-report=term-missing:skip-covered
           --cov-report=html:build/reports/coverage --cov-report=xml:build/reports/coverage.xml

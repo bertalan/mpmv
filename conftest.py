@@ -77,6 +77,25 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         if suite == "unit" and item.get_closest_marker("django_db") is not None:
             raise pytest.UsageError(f"{item.nodeid}: unit tests must not use the database")
         item.add_marker(getattr(pytest.mark, suite))
+        if _flushes_database(item):
+            # Under xdist (--dist loadgroup) a transactional test flushes the rows its worker's
+            # database got from data migrations. pytest-django runs those tests last; the group
+            # keeps that order: the group starts only after every other test is handed out, and
+            # a worker that ran it takes no ordinary test afterwards.
+            item.add_marker(pytest.mark.xdist_group(name=f"flush-{item.path.name}"))
+
+
+def _flushes_database(item: pytest.Item) -> bool:
+    """True for a test that truncates the database (transaction=True, TransactionTestCase)."""
+    marker = item.get_closest_marker("django_db")
+    if marker is not None and marker.kwargs.get("transaction"):
+        return True
+    cls = getattr(item, "cls", None)
+    if cls is not None:
+        from django.test import TestCase, TransactionTestCase
+
+        return issubclass(cls, TransactionTestCase) and not issubclass(cls, TestCase)
+    return "transactional_db" in getattr(item, "fixturenames", ())
 
 
 def pytest_report_header() -> str:
