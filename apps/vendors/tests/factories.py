@@ -431,8 +431,9 @@ class VendorPlanFactory(DjangoModelFactory[VendorPlan]):
 class CommissionRuleFactory(DjangoModelFactory[CommissionRule]):
     """The platform default rule (20% on net goods, 4% + 2.00 payment fee on the gross paid).
 
-    `build()` leaves `version` empty for `add_commission_rule`; `create()` needs it explicit
-    when a scope gets a second row.
+    Consecutive rows are closed one-year periods, adjacent and never overlapping, with counting
+    versions. Pass `valid_to=None` for the open-ended current row, and explicit dates when a
+    test is about validity. For `add_commission_rule`, use `.build()`: the service saves.
     """
 
     class Meta:
@@ -443,5 +444,6 @@ class CommissionRuleFactory(DjangoModelFactory[CommissionRule]):
     fee_percent = Decimal("4.00")
     fee_fixed = Decimal("2.00")
     fee_base = engine.GROSS_PAID
-    valid_from = factory.LazyFunction(lambda: dt.datetime(2026, 1, 1, tzinfo=dt.UTC))
-    version = 1
+    version = factory.Sequence(lambda n: n + 1)
+    valid_from = factory.Sequence(lambda n: dt.datetime(2026 + n, 1, 1, tzinfo=dt.UTC))
+    valid_to = factory.LazyAttribute(lambda o: o.valid_from.replace(year=o.valid_from.year + 1))

@@ -1119,6 +1119,9 @@ class CommissionRule(Versioned):
         return f"{who} v{self.version}: {self.percent}% from {self.valid_from:%Y-%m-%d}"
 
     def clean(self) -> None:
+        # A field that failed its own validation is None here: its error is already reported.
+        if None in (self.percent, self.fee_percent, self.fee_fixed):
+            return
         errors = engine.commission_rule_errors(
             percent=self.percent,
             base=self.base,

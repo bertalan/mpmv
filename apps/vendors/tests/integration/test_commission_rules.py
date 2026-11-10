@@ -216,7 +216,7 @@ def test_the_rates_of_a_rule_cannot_be_updated_even_with_a_queryset_update() -> 
 
 
 def test_closing_is_the_only_update_and_only_once() -> None:
-    rule = CommissionRuleFactory.create(valid_from=utc(2026))
+    rule = CommissionRuleFactory.create(valid_from=utc(2026), valid_to=None)
     CommissionRule.objects.filter(pk=rule.pk).update(valid_to=utc(2027))
     for end in (utc(2028), None):
         with pytest.raises(ProgrammingError), transaction.atomic():
@@ -288,7 +288,7 @@ def test_the_snapshot_carries_the_rule_id_the_version_and_every_rate_as_json() -
 
 
 def test_a_snapshot_does_not_follow_the_live_rule() -> None:
-    rule = CommissionRuleFactory.create(valid_from=utc(2026))
+    rule = CommissionRuleFactory.create(valid_from=utc(2026), valid_to=None)
     snapshot = rule.snapshot()
     CommissionRule.objects.filter(pk=rule.pk).update(valid_to=utc(2027))
     assert rule.snapshot() == snapshot  # the closing date is no part of what an order froze

@@ -5,7 +5,6 @@ import uuid
 import django.contrib.postgres.constraints
 import django.db.models.deletion
 import django.db.models.functions.comparison
-from django.contrib.postgres.operations import BtreeGistExtension
 from django.db import migrations, models
 
 import apps.core.fields
@@ -54,7 +53,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        BtreeGistExtension(),
+        migrations.RunSQL(
+            "CREATE EXTENSION IF NOT EXISTS btree_gist", reverse_sql=migrations.RunSQL.noop
+        ),
         migrations.CreateModel(
             name="VendorPlan",
             fields=[
