@@ -21,6 +21,7 @@ from django.db.models import OuterRef, QuerySet, Subquery
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.module_loading import import_string
+from django.utils.translation import gettext_lazy
 
 from apps.accounts import engine as accounts_engine
 from apps.accounts.models import User, normalize_email_address
@@ -39,7 +40,7 @@ from apps.accounts.services import (
 )
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import Change, ChangeSet
-from apps.core.models import AuditLog
+from apps.core.models import AuditLog, resolve_translation
 from apps.core.services import (
     allowed_vendor_countries,
     audit_changes,
@@ -100,6 +101,40 @@ def storefront_vendors() -> QuerySet[Vendor]:
 def has_public_storefront(vendor: Vendor) -> bool:
     """The same rule as `storefront_vendors`, on a vendor already loaded."""
     return bool(vendor.status == Vendor.Status.ACTIVE)
+
+
+@dataclasses.dataclass(frozen=True)
+class StorefrontProfile:
+    """A vendor's public texts in one language (VEN.10): tagline, bio and the non-empty policies
+    as `(title, text)` pairs. `language` is the one actually shown, `is_fallback` is True when
+    it is the source language standing in for the requested one."""
+
+    tagline: str
+    description: str
+    policies: tuple[tuple[str, str], ...]
+    language: str
+    is_fallback: bool
+
+
+def storefront_profile(vendor: Vendor, language: str) -> StorefrontProfile | None:
+    """The published text of `vendor` in `language`, else in the source language, else None.
+    Drafts and machine translations awaiting review are never public."""
+    resolved = resolve_translation(vendor.translations.all(), language)
+    text = resolved.translation
+    if text is None or resolved.language is None:
+        return None
+    policies = (
+        (gettext_lazy("Shipping"), text.shipping_policy),
+        (gettext_lazy("Returns and refunds"), text.refund_policy),
+        (gettext_lazy("Cancellation"), text.cancellation_policy),
+    )
+    return StorefrontProfile(
+        tagline=text.tagline,
+        description=text.description,
+        policies=tuple((str(title), body) for title, body in policies if body.strip()),
+        language=resolved.language,
+        is_fallback=resolved.is_fallback,
+    )
 
 
 # Fields encrypted at rest (SEC.3) are masked in audit rows, or the log would hold them in clear.
