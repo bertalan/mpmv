@@ -18,8 +18,17 @@ class ComplianceConfig(AppConfig):
     def ready(self) -> None:
         from apps.catalog.publishing import register_publication_check
         from apps.catalog.selling import register_sale_check
+        from apps.cms.services import register_golive_check
 
-        from .services import SALE_CHECK_NAME, gpsr_blocking_messages, warnings_sale_messages
+        from .services import (
+            SALE_CHECK_NAME,
+            golive_messages,
+            gpsr_blocking_messages,
+            warnings_sale_messages,
+        )
+
+        # CMP.5 (D-27): the DSA and P2B checks join the one go-live gate.
+        register_golive_check(golive_messages)
 
         # CMP.3: a product without complete GPSR data cannot be published (CAT.10 asks).
         register_publication_check("gpsr", gpsr_blocking_messages)
