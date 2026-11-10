@@ -60,14 +60,19 @@ class VendorOrderInput:
 # --- numbering -------------------------------------------------------------------------------
 
 
-def next_order_number(*, now: dt.datetime | None = None) -> str:
+def next_order_number(*, now: dt.datetime | None = None, dry_run: bool = False) -> str:
     """The next order number of the year, e.g. `2027-000123` (prefix: ORDER_NUMBER_PREFIX).
 
     Locks the year's counter row until the surrounding transaction ends, so concurrent orders
     queue up and a rolled-back order gives its number back: no duplicates, no gaps. Call it
-    inside the transaction that saves the order.
+    inside the transaction that saves the order. Dry run only previews the number: it takes
+    no lock and changes nothing (the real one may differ if another order is placed first).
     """
     year = timezone.localtime(now or timezone.now()).year
+    prefix = str(getattr(settings, "ORDER_NUMBER_PREFIX", ""))
+    if dry_run:
+        last = OrderNumberSequence.objects.filter(year=year).values_list("last_value", flat=True)
+        return engine.format_order_number(year, (last.first() or 0) + 1, prefix=prefix)
     with transaction.atomic():
         OrderNumberSequence.objects.bulk_create(
             [OrderNumberSequence(year=year)], ignore_conflicts=True
@@ -75,7 +80,6 @@ def next_order_number(*, now: dt.datetime | None = None) -> str:
         counter = OrderNumberSequence.objects.select_for_update().get(year=year)
         counter.last_value += 1
         counter.save(update_fields=["last_value"])
-    prefix = str(getattr(settings, "ORDER_NUMBER_PREFIX", ""))
     return engine.format_order_number(year, counter.last_value, prefix=prefix)
 
 

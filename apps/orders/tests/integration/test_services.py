@@ -318,3 +318,12 @@ def test_vendor_order_transition_dry_run_changes_nothing() -> None:
     assert not changeset.is_empty
     assert VendorOrder.objects.get(pk=sub.pk).state == "pending"
     assert not AuditLog.objects.filter(action="orders.transition").exists()
+
+
+@pytest.mark.django_db
+def test_a_number_preview_does_not_consume_the_number() -> None:
+    assert services.next_order_number(now=NOW, dry_run=True) == "2027-000001"
+    assert services.next_order_number(now=NOW, dry_run=True) == "2027-000001"
+    assert OrderNumberSequence.objects.count() == 0
+    assert place().number == "2027-000001"
+    assert services.next_order_number(now=NOW, dry_run=True) == "2027-000002"

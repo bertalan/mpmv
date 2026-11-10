@@ -11,7 +11,7 @@ from decimal import Decimal
 import factory
 from factory.django import DjangoModelFactory
 
-from apps.orders.models import Order, OrderLine, VendorOrder
+from apps.orders.models import Order, OrderLine, OrderNumberSequence, VendorOrder
 from apps.vendors.tests.factories import VendorFactory
 
 _numbers = itertools.count(1)
@@ -61,3 +61,11 @@ class OrderLineFactory(DjangoModelFactory[OrderLine]):
     tax_rate = Decimal("22.000")
     tax_reason = "domestic"
     tax_amount = Decimal("2.20")
+
+
+class OrderNumberSequenceFactory(DjangoModelFactory[OrderNumberSequence]):
+    class Meta:
+        model = OrderNumberSequence
+
+    year = factory.Sequence(lambda n: 3000 + n)
+    last_value = 0
