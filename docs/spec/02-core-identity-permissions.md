@@ -542,6 +542,8 @@ moderators (post-moderation). Every change writes an `AuditLog` entry with befor
 staff (catalog and moderation role) can revert a change to an earlier version from the
 platform space. This is part of CORE.9.
 
+**Vendor uploads.** The shop space stores every image a vendor uploads (logo, events, products) in the vendor's own Wagtail collection, `vendor-<vendor public id>` at the root and below (spec [15](15-events.md), SEC.2 in spec [12](12-security-infra-operations.md)); the services refuse images from any other collection.
+
 ## 2.3 Tasks
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |

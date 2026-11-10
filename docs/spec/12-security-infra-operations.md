@@ -39,6 +39,8 @@ because the task SEC.2 (uploads) used the same ID.
 | SEC.9 | Untrusted input | Feeds, scraping, AI output and webhooks validated against a schema before reaching the DB; product texts never interpreted as instructions by agents; outbound fetches of staff- or vendor-entered URLs (connectors, feeds) only through the shared client that refuses loopback, private, link-local, CGNAT and metadata addresses and redirects to them (MIG.12) |
 | SEC.10 | Continuous verification | Security tests in CI, mandatory manual review on payments, tax and permissions, external penetration test before go-live |
 
+**Vendor upload location (SEC.2).** Uploads made on behalf of a vendor (images in storefront profiles, events and products) are stored in that vendor's own Wagtail collection, the root-level collection `vendor-<vendor public id>` and the collections below it (`apps.events.engine.vendor_collection_name`; rule and use in spec [15](15-events.md)). Services that accept an image reference from a vendor refuse any image outside it.
+
 ## 12.4 Infrastructure
 
 ```mermaid
