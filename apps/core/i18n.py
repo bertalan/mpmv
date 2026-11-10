@@ -98,6 +98,7 @@ def language_switch_home[V: Callable[..., Any]](view: V) -> V:
         request.language_switch_home = True  # type: ignore[attr-defined]
         return view(request, *args, **kwargs)
 
+    wrapper.language_switch_home = True  # type: ignore[attr-defined]  # marker for the URL guard
     return cast(V, wrapper)
 
 
