@@ -12,6 +12,7 @@ from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonRes
 from django.views.decorators.http import require_POST
 
 from apps.core.audit import audit_context
+from apps.core.public_forms import not_anonymous
 
 from . import engine, levels, services
 from .http import relying_party, safe_next
@@ -68,6 +69,11 @@ def _require_elevate(request: HttpRequest) -> None:
         raise PermissionDenied
 
 
+@not_anonymous(
+    reason="signed in, a verified second factor and the elevate permission are required",
+    purpose="Passkey options to start operational mode",
+    task="CORE.25",
+)
 @signed_in
 @require_POST
 def options(request: HttpRequest) -> JsonResponse:
@@ -76,6 +82,11 @@ def options(request: HttpRequest) -> JsonResponse:
     return _options(request, levels.CHALLENGE_KEY, None)
 
 
+@not_anonymous(
+    reason="signed in, a verified second factor and the elevate permission are required",
+    purpose="Start operational mode with a passkey",
+    task="CORE.25",
+)
 @signed_in
 @require_POST
 def operational(request: HttpRequest) -> JsonResponse:
@@ -88,6 +99,11 @@ def operational(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"redirect": safe_next(request)})
 
 
+@not_anonymous(
+    reason="signed in, a verified second factor and the elevate permission are required",
+    purpose="Passkey options for a single authorisation",
+    task="CORE.25",
+)
 @signed_in
 @require_POST
 def once_options(request: HttpRequest) -> JsonResponse:
@@ -102,6 +118,11 @@ def once_options(request: HttpRequest) -> JsonResponse:
     return _options(request, levels.SINGLE_CHALLENGE_KEY, {"action": action, "digest": digest})
 
 
+@not_anonymous(
+    reason="signed in, a verified second factor and the elevate permission are required",
+    purpose="Authorise one action once with a passkey",
+    task="CORE.25",
+)
 @signed_in
 @require_POST
 def once(request: HttpRequest) -> JsonResponse:
@@ -116,6 +137,11 @@ def once(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"granted": True})
 
 
+@not_anonymous(
+    reason="signed in, a verified second factor and the elevate permission are required",
+    purpose="End operational mode",
+    task="CORE.25",
+)
 @signed_in
 @require_POST
 def end(request: HttpRequest) -> HttpResponse:

@@ -344,6 +344,10 @@ ENDPOINTS: dict[str, Access] = {
         "Unknown API paths: a 404 problem document.", path="/api/v1/no-such-operation"
     ),
     # CMS (CMS.1): public pages and the editors' sign-in. The rest of /admin/ is CMS_ADMIN.
+    "dsa_contact_points": NoVendorData(
+        "DSA points of contact (CMP.5): the platform operator's own contact data, the same for "
+        "every visitor; no vendor data."
+    ),
     "wagtail_serve": NoVendorData(
         "Public CMS pages (home, static pages); no vendor data until the CMS.4 landing pages.",
         path="/no-such-page/",

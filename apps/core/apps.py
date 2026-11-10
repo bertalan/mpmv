@@ -38,12 +38,14 @@ class CoreConfig(AppConfig):
             check_feature_flag_settings,
             check_field_encryption_keys,
             check_image_upload_limits,
+            check_public_forms,
             check_trusted_proxy_for_deploy,
             translation_models,
         )
 
         checks.register(translation_models)
         checks.register(check_audit_policy, checks.Tags.security)
+        checks.register(check_public_forms, checks.Tags.security, checks.Tags.urls)
         checks.register(check_client_ip_settings, checks.Tags.security)
         checks.register(check_trusted_proxy_for_deploy, checks.Tags.security, deploy=True)
         checks.register(check_field_encryption_keys, checks.Tags.security)

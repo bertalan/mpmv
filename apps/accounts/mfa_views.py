@@ -22,6 +22,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
 from apps.core.audit import audit_context
+from apps.core.public_forms import not_anonymous, pre_mfa_step
 
 from . import engine, services
 from .decorators import mfa_exempt, mfa_redirect, requires_level, step_up_required
@@ -92,6 +93,7 @@ def setup(request: HttpRequest) -> HttpResponse:
     )
 
 
+@pre_mfa_step(purpose="Enter or enrol the authenticator-app code", task="CORE.4")
 @mfa_exempt
 @signed_in
 @require_http_methods(["GET", "POST"])
@@ -138,6 +140,7 @@ def totp(request: HttpRequest) -> HttpResponse:
 # --- Verification
 
 
+@pre_mfa_step(purpose="Enter the second-factor code to finish signing in", task="CORE.4")
 @mfa_exempt
 @signed_in
 @require_http_methods(["GET", "POST"])
@@ -187,6 +190,7 @@ def verify(request: HttpRequest) -> HttpResponse:
 # --- Passkeys (JSON endpoints used by accounts/passkey.js)
 
 
+@pre_mfa_step(purpose="Start a passkey enrolment (WebAuthn options)", task="CORE.4")
 @mfa_exempt
 @signed_in
 @require_POST
@@ -207,6 +211,7 @@ def passkey_register_options(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"publicKey": options.public_key})
 
 
+@pre_mfa_step(purpose="Finish a passkey enrolment", task="CORE.4")
 @mfa_exempt
 @signed_in
 @require_POST
@@ -235,6 +240,7 @@ def passkey_register(request: HttpRequest) -> JsonResponse:
     )
 
 
+@pre_mfa_step(purpose="Start a passkey check (WebAuthn options)", task="CORE.4")
 @mfa_exempt
 @signed_in
 @require_POST
@@ -254,6 +260,7 @@ def passkey_auth_options(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"publicKey": options.public_key})
 
 
+@pre_mfa_step(purpose="Finish a passkey check as the second factor", task="CORE.4")
 @mfa_exempt
 @signed_in
 @require_POST
@@ -312,6 +319,11 @@ def overview(request: HttpRequest) -> HttpResponse:
     )
 
 
+@not_anonymous(
+    reason="signed in and a fresh second factor (step-up) are required before any work",
+    purpose="Regenerate recovery codes",
+    task="CORE.4",
+)
 @signed_in
 @step_up_required()
 @require_http_methods(["GET", "POST"])
@@ -342,6 +354,11 @@ def _own_device(user: User, kind: str, public_id: str) -> services.SecondFactor:
     raise Http404
 
 
+@not_anonymous(
+    reason="signed in and a fresh second factor (step-up) are required before any work",
+    purpose="Remove a second factor",
+    task="CORE.4",
+)
 @signed_in
 @step_up_required()
 @require_POST

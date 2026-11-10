@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0018_drop_operator_einvoice_channel"),
+        ("core", "0019_cmp5_contacts"),
     ]
 
     operations = [

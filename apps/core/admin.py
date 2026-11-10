@@ -53,6 +53,10 @@ class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
             "support_email",
             "compliance_email",
             "session_policy",
+            "authority_contact_email",
+            "authority_contact_languages",
+            "user_contact_url",
+            "user_contact_languages",
             "valid_from",
         )
 
