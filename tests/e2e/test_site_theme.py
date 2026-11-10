@@ -48,7 +48,7 @@ def test_staff_switch_the_site_theme_and_visitors_see_it(
     user = UserFactory.create(email="staff@example.com", password=password, superuser=True)
     device = TOTPDeviceFactory.create(user=user)
     admin_login(page, live_server.url, "staff@example.com", password)
-    verify_with_totp(page, totp_token(device))
+    verify_with_totp(page, totp_token(device), operational=True)
 
     page.goto(f"{live_server.url}/django-admin/themes/themesettings/add/")
     page.get_by_label("Site").select_option(index=1)

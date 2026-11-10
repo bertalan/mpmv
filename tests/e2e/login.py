@@ -11,7 +11,33 @@ def admin_login(page: Page, base_url: str, email: str, password: str) -> None:
     page.get_by_role("button", name="Log in").click()
 
 
-def verify_with_totp(page: Page, token: str) -> None:
-    """Answer the MFA verification page with an authenticator-app code."""
+def verify_with_totp(page: Page, token: str, *, operational: bool = False) -> None:
+    """Answer the MFA verification page with an authenticator-app code.
+
+    `operational=True` then puts the session in operational mode (see `make_operational`).
+    """
     page.get_by_label("Authentication code").fill(token)
     page.get_by_role("button", name="Verify", exact=True).click()
+    if operational:
+        page.wait_for_url(lambda url: "/account/mfa/verify" not in url)
+        make_operational(page)
+
+
+def make_operational(page: Page) -> None:
+    """Put the browser's session in operational mode (D-32, CORE.25).
+
+    The real switch needs a passkey; the e2e suite has no authenticator, so the test writes the
+    session state (server side, in the shared test database) the way `levels.start_operational`
+    does. Tests of the switch itself live in the integration suite.
+    """
+    import time
+
+    from django.conf import settings
+    from django.contrib.sessions.backends.db import SessionStore
+
+    from apps.accounts import levels
+
+    cookies = {cookie["name"]: cookie["value"] for cookie in page.context.cookies()}
+    store = SessionStore(session_key=cookies[settings.SESSION_COOKIE_NAME])
+    store[levels.STARTED_KEY] = store[levels.ACTIVITY_KEY] = time.time()
+    store.save()
