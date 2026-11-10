@@ -133,13 +133,13 @@ def register_category_chooser() -> Any:
 
 
 @hooks.register("register_admin_viewset")  # type: ignore[untyped-decorator]
-def register_brand_chooser() -> Any:
-    return brand_chooser
+def register_product_chooser() -> Any:
+    return product_chooser
 
 
 @hooks.register("register_admin_viewset")  # type: ignore[untyped-decorator]
-def register_product_chooser() -> Any:
-    return product_chooser
+def register_brand_chooser() -> Any:
+    return brand_chooser
 
 
 @hooks.register(EDITORIAL_HOOK)  # type: ignore[untyped-decorator]
