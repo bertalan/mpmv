@@ -31,18 +31,20 @@ from django.contrib.auth.views import redirect_to_login
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import render, resolve_url
 from django.utils.cache import add_never_cache_headers
+from django.utils.translation import gettext, gettext_noop
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.core.audit import audit_context
 from apps.core.http import client_ip
 from apps.core.i18n import language_switch_home
+from apps.core.public_forms import Protection, public_form
 
 from . import services
 from .decorators import mfa_exempt
 from .models import User
 
 MAGIC_SIGN_IN_BACKEND = "django.contrib.auth.backends.ModelBackend"
-TOO_MANY_ATTEMPTS = "Too many attempts. Please try again later."
+TOO_MANY_ATTEMPTS = gettext_noop("Too many attempts. Please try again later.")
 # Never a path in the Referer (the token is in the link's path), but still a real `Origin` on
 # the Continue POST: with `no-referrer` browsers send `Origin: null` and the CSRF check fails.
 REFERRER_POLICY = "strict-origin"
@@ -72,13 +74,22 @@ def open_link(request: HttpRequest, token: str) -> HttpResponse:
     return _private(render(request, "accounts/action_link/continue.html", context))
 
 
+@public_form(
+    protection=Protection.SIGNED_TOKEN,
+    purpose="Continue from an emailed action link (spends the token's one sign-in use)",
+    task="CORE.15",
+    reason="the one-time signed token in the POST body is checked before anything else",
+    rate_limit="per IP",
+)
 @mfa_exempt
 @require_POST
 def continue_link(request: HttpRequest) -> HttpResponse:
     wait = services.action_link_retry_after(client_ip(request))
     if wait:
         retry = str(max(1, math.ceil(wait.total_seconds())))
-        return _private(HttpResponse(TOO_MANY_ATTEMPTS, status=429, headers={"Retry-After": retry}))
+        return _private(
+            HttpResponse(gettext(TOO_MANY_ATTEMPTS), status=429, headers={"Retry-After": retry})
+        )
     session_user = _session_user(request)
     ctx = audit_context(request)
     check = services.redeem_action_token(

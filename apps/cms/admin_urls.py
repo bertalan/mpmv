@@ -8,6 +8,8 @@ from django.views.decorators.cache import never_cache
 from wagtail.admin.auth import require_admin_access
 from wagtail.admin.views.account import LoginView
 
+from apps.core.public_forms import Protection, public_form
+
 from .admin_views import EditorAccountView, localize_image_info
 
 # Same decorators as Wagtail's own admin URLs: admin permission check and no caching.
@@ -16,7 +18,15 @@ urlpatterns: list[URLPattern] = [
     # The editors' login with the captcha and no autocomplete="off" (CMP.9, CORE.5); its form is
     # WAGTAILADMIN_USER_LOGIN_FORM. Wagtail routes its own view here without decorators.
     path(
-        "login/", LoginView.as_view(template_name="cms/admin/login.html"), name="wagtailadmin_login"
+        "login/",
+        public_form(
+            protection=Protection.CAPTCHA,
+            purpose="Sign in to the editors' admin",
+            task="CMP.9",
+            rate_limit="per account and IP lockout (CORE.5)",
+            templates=("cms/admin/login.html",),
+        )(LoginView.as_view(template_name="cms/admin/login.html")),
+        name="wagtailadmin_login",
     ),
     path(
         "account/",

@@ -7,17 +7,19 @@ import posixpath
 import uuid
 from typing import Any, ClassVar, Self
 
+from django.conf import settings
 from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import ArrayField, DateTimeRangeField, RangeOperators
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
+from django.core.validators import URLValidator
 from django.db import models, transaction
 from django.utils import timezone
 from wagtail.images.models import AbstractImage, AbstractRendition, Image, get_upload_to
 from wagtail.models import Collection
 
 from . import flags, translations, uploads
-from .countries import default_allowed_vendor_countries
+from .countries import OFFICIAL_LANGUAGES, default_allowed_vendor_countries
 from .fields import (
     CountryField,
     EncryptedTextField,
@@ -320,6 +322,25 @@ def valid_period_check(name: str) -> models.CheckConstraint:
     )
 
 
+def known_language_bases() -> frozenset[str]:
+    """Base subtags a contact language may use: the site's languages and the official
+    languages of the countries in `OFFICIAL_LANGUAGES`."""
+    bases = {code.split("-")[0].lower() for code, _name in settings.LANGUAGES}
+    for languages in OFFICIAL_LANGUAGES.values():
+        bases.update(languages)
+    return frozenset(bases)
+
+
+def validate_language_code(value: str) -> None:
+    """A known language, case-insensitive, optionally with a region (`de`, `NL`, `pt-br`)."""
+    base = value.lower().split("-")[0]
+    if base not in known_language_bases():
+        raise ValidationError(f"{value!r} is not a known language code.")
+
+
+validate_https_url = URLValidator(schemes=["https"], message="Enter an https:// address.")
+
+
 class PlatformOperator(Versioned):
     """The legal entity running the marketplace, as versioned configuration (ARC.7).
 
@@ -359,6 +380,34 @@ class PlatformOperator(Versioned):
         blank=True,
         help_text="Where compliance alerts go. Empty: the support address.",
     )
+    # CMP.5 (DSA articles 11 and 12): the single point of contact for authorities and the means
+    # for recipients of the service, published on the public contact page. Recipients reach the
+    # platform at `support_email` and, optionally, at a contact form (`user_contact_url`).
+    authority_contact_email = models.EmailField(
+        "authorities' contact email",
+        blank=True,
+        help_text="DSA article 11: single point of contact for authorities.",
+    )
+    authority_contact_languages = ArrayField(
+        models.CharField(max_length=8, validators=[validate_language_code]),
+        default=list,
+        blank=True,
+        verbose_name="authorities' contact languages",
+        help_text="Language codes: an official language, and one widely understood.",
+    )
+    user_contact_url = models.URLField(
+        "users' contact form URL",
+        validators=[validate_https_url],
+        blank=True,
+        help_text="DSA article 12: optional electronic form next to the support email.",
+    )
+    user_contact_languages = ArrayField(
+        models.CharField(max_length=8, validators=[validate_language_code]),
+        default=list,
+        blank=True,
+        verbose_name="users' contact languages",
+        help_text="Language codes the support team answers in.",
+    )
     # D-21, CMP.13: changed only by a platform owner through
     # `apps.core.services.set_allowed_vendor_countries`; other new versions carry it over.
     allowed_vendor_countries = ArrayField(
@@ -392,6 +441,13 @@ class PlatformOperator(Versioned):
 
     def __str__(self) -> str:
         return f"{self.legal_name} ({self.country}) from {self.valid_from:%Y-%m-%d}"
+
+    def clean(self) -> None:
+        super().clean()
+        # Codes are stored lower-case (`PT-BR` -> `pt-br`), without duplicates.
+        for name in ("authority_contact_languages", "user_contact_languages"):
+            codes = [code.strip().lower() for code in getattr(self, name) or []]
+            setattr(self, name, list(dict.fromkeys(codes)))
 
 
 # Per-vendor overrides are vendor-owned rows (CORE.3) in apps.vendors, which core cannot import:
