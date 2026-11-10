@@ -108,8 +108,8 @@ interpretation), **MISSING** (a mandatory obligation the spec did not cover).
 - VEN.5 activation (PR #37) does not collect the DSA article 30(1)(e) self-certification. It is
   needed before a vendor sells (formally from DSA Section 4 once the platform is no longer small,
   and required now by GPSR article 22(10) for vendors of consumer products): CMP.10 and CMP.11.
-- `apps/core/models.py` `PlatformOperator.einvoice_channel` (ARC.7) is now **superfluous** under
-  the no-invoicing decision. It is harmless and kept as information (spec 01).
+- `apps/core/models.py` `PlatformOperator.einvoice_channel` (ARC.7) was **superfluous** under
+  the no-invoicing decision. Removed by ARC.17 (migration `core/0018`).
 
 ## Sources
 
