@@ -38,7 +38,11 @@ def seed_language_on_login(
 ) -> None:
     """The language an anonymous visitor chose before signing in becomes the user's preference,
     but only when the user never chose one: a preference still equal to the default is taken as
-    unset (the field always holds a value). A stored choice is never overwritten."""
+    unset (the field always holds a value). A stored choice is never overwritten.
+
+    Known limit: a user who deliberately chose the default language (English) is not told apart
+    from one who never chose, so the session choice made just before this login (an explicit,
+    recent act) can replace it. A `language_chosen` flag would need a migration; not worth it."""
     session = getattr(request, "session", None)
     chosen = session.get(SESSION_LANGUAGE_KEY) if session is not None else None
     if (

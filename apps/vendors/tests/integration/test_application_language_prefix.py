@@ -43,9 +43,11 @@ def test_the_english_urls_are_the_old_unprefixed_ones(client: Client) -> None:
     assert response.status_code == 200  # no redirect to /it/: this is the English page
 
 
-def test_an_emailed_link_opens_the_prefixed_page_of_the_visitors_language(client: Client) -> None:
+def test_an_emailed_link_opens_the_page_in_the_language_chosen_in_the_session(
+    client: Client,
+) -> None:
     """The link itself (`/account/link/...`) has no prefix, so the language comes from the
-    visitor's switcher choice kept in the session; the page it leads to is in that language."""
+    language chosen in the session (else English); the page it leads to is in that language."""
     _, user, path = applied(client)
     english = Client()
     assert open_link(english, path)["Location"] == confirm_url(user)

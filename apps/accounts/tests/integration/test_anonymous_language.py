@@ -75,3 +75,23 @@ def test_a_switch_by_a_signed_in_user_stores_the_preference_not_the_session(clie
     user.refresh_from_db()
     assert user.preferred_language == "es"
     assert KEY not in client.session
+
+
+def test_the_switcher_is_rate_limited_per_address(client: Client) -> None:
+    from apps.accounts.views import SWITCH_LIMIT
+
+    for _ in range(SWITCH_LIMIT):
+        assert _switch(client, "it").status_code == 302  # type: ignore[attr-defined]
+    blocked = _switch(client, "en")
+    assert blocked.status_code == 429  # type: ignore[attr-defined]
+    assert int(blocked["Retry-After"]) >= 1  # type: ignore[index]
+    assert client.session[KEY] == "it"  # the refused request changed nothing
+    assert _switch(Client(REMOTE_ADDR="203.0.113.9"), "it").status_code == 302  # type: ignore[attr-defined]
+
+
+def test_a_repeated_choice_does_not_rewrite_the_session(client: Client) -> None:
+    _switch(client, "it")
+    session = client.session
+    session.modified = False
+    _switch(client, "it")
+    assert client.session[KEY] == "it"
