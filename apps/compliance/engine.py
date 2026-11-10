@@ -385,3 +385,79 @@ def decision_problems(outcome: str, reason: str) -> list[str]:
     if not reason.strip():
         problems.append("reason")
     return problems
+
+
+# --- Statement of reasons (DSA art. 17, CMP.5 part 3) and the transparency database (art. 24(5))
+
+RESTRICTION_REMOVE: Final = "remove"
+RESTRICTION_SUSPEND: Final = "suspend_account"
+RESTRICTIONS: Final = (RESTRICTION_REMOVE, RESTRICTION_SUSPEND)
+#: What the restriction is based on: a law (illegal content) or the platform terms.
+GROUND_ILLEGAL: Final = "illegal_content"
+GROUND_TERMS: Final = "terms"
+GROUND_KINDS: Final = (GROUND_ILLEGAL, GROUND_TERMS)
+
+
+def statement_problems(
+    *, restriction: str, scope: str, facts: str, ground_kind: str, ground: str
+) -> list[str]:
+    """Article 17(3) needs the restriction and its scope, the facts relied on and the legal or
+    contractual ground. The notice basis, automation and redress are filled in by the service."""
+    problems: list[str] = []
+    if restriction not in RESTRICTIONS:
+        problems.append("restriction")
+    if not scope.strip():
+        problems.append("scope")
+    if not facts.strip():
+        problems.append("facts")
+    if ground_kind not in GROUND_KINDS:
+        problems.append("ground_kind")
+    if not ground.strip():
+        problems.append("ground")
+    return problems
+
+
+def transparency_payload(
+    *,
+    restriction: str,
+    scope: str,
+    facts: str,
+    ground_kind: str,
+    ground: str,
+    target_kind: str,
+    based_on_notice: bool,
+    automated_detection: bool,
+    automated_decision: bool,
+    applied_on: dt.date,
+    reference: str,
+) -> dict[str, str]:
+    """The article 24(5) record for the EU transparency database: no vendor identity, no URL and
+    no email (the database must not hold personal data). Field names follow the database's
+    statement-of-reasons schema; the exact schema is verified when the submitter is built."""
+    payload: dict[str, str] = {
+        "puid": reference,
+        "application_date": applied_on.isoformat(),
+        "content_type": f"CONTENT_TYPE_{target_kind.upper()}",
+        "territorial_scope": scope.strip(),
+        "decision_ground": (
+            "DECISION_GROUND_ILLEGAL_CONTENT"
+            if ground_kind == GROUND_ILLEGAL
+            else "DECISION_GROUND_INCOMPATIBLE_CONTENT"
+        ),
+        "source_type": "SOURCE_ARTICLE_16" if based_on_notice else "SOURCE_VOLUNTARY",
+        "automated_detection": "Yes" if automated_detection else "No",
+        "automated_decision": (
+            "AUTOMATED_DECISION_FULLY" if automated_decision else "AUTOMATED_DECISION_NOT_AUTOMATED"
+        ),
+    }
+    if restriction == RESTRICTION_SUSPEND:
+        payload["decision_account"] = "DECISION_ACCOUNT_SUSPENDED"
+    else:
+        payload["decision_visibility"] = "DECISION_VISIBILITY_CONTENT_REMOVED"
+    if ground_kind == GROUND_ILLEGAL:
+        payload["illegal_content_legal_ground"] = ground.strip()
+        payload["illegal_content_explanation"] = facts.strip()
+    else:
+        payload["incompatible_content_ground"] = ground.strip()
+        payload["incompatible_content_explanation"] = facts.strip()
+    return payload

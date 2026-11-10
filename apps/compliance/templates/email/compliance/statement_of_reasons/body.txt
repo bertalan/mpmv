@@ -1,0 +1,18 @@
+{% load i18n %}{% translate "We restricted your content or account. This is the statement of reasons." %}
+
+{% translate "Reference" %}: {{ reference }}
+{% translate "Restriction" %}: {% if restriction == "suspend_account" %}{% translate "Your storefront is suspended" %}{% else %}{% translate "The content is removed or disabled" %}{% endif %}
+{% translate "Scope" %}: {{ scope }}
+{% translate "Facts and circumstances relied on" %}: {{ facts }}
+{% translate "Ground" %}: {% if ground_kind == "illegal_content" %}{% translate "The content is illegal" %}{% else %}{% translate "The content is incompatible with the platform terms" %}{% endif %}: {{ ground }}
+{% translate "Based on a notice" %}: {% if based_on_notice %}{% translate "Yes" %}{% else %}{% translate "No, our own initiative" %}{% endif %}
+{% translate "Automated means used to detect the content" %}: {% if automated_detection %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}
+{% translate "Automated means used to decide" %}: {% if automated_decision %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}
+
+{% translate "How to challenge this decision" %}:
+- {% translate "Internal complaint (DSA article 20)" %}
+- {% translate "Out-of-court dispute settlement (DSA article 21)" %}
+- {% translate "A court" %}
+{% if redress_text %}
+{{ redress_text }}
+{% endif %}

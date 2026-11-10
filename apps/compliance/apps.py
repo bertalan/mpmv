@@ -14,6 +14,8 @@ class ComplianceConfig(AppConfig):
         "safetycase",
         "countrywarninglanguages",
         "notice",
+        "statementofreasons",
+        "transparencysubmission",
     )
 
     def ready(self) -> None:

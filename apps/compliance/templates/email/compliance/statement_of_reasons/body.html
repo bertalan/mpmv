@@ -1,0 +1,23 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% translate "We restricted your content or account. This is the statement of reasons." %}</p>
+<ul>
+<li>{% translate "Reference" %}: {{ reference }}</li>
+<li>{% translate "Restriction" %}: {% if restriction == "suspend_account" %}{% translate "Your storefront is suspended" %}{% else %}{% translate "The content is removed or disabled" %}{% endif %}</li>
+<li>{% translate "Scope" %}: {{ scope }}</li>
+<li>{% translate "Facts and circumstances relied on" %}: {{ facts }}</li>
+<li>{% translate "Ground" %}: {% if ground_kind == "illegal_content" %}{% translate "The content is illegal" %}{% else %}{% translate "The content is incompatible with the platform terms" %}{% endif %}: {{ ground }}</li>
+<li>{% translate "Based on a notice" %}: {% if based_on_notice %}{% translate "Yes" %}{% else %}{% translate "No, our own initiative" %}{% endif %}</li>
+<li>{% translate "Automated means used to detect the content" %}: {% if automated_detection %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</li>
+<li>{% translate "Automated means used to decide" %}: {% if automated_decision %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}</li>
+</ul>
+<p>{% translate "How to challenge this decision" %}:</p>
+<ul>
+<li>{% translate "Internal complaint (DSA article 20)" %}</li>
+<li>{% translate "Out-of-court dispute settlement (DSA article 21)" %}</li>
+<li>{% translate "A court" %}</li>
+</ul>
+{% if redress_text %}<p>{{ redress_text|linebreaksbr }}</p>{% endif %}
+</body>
+</html>

@@ -102,3 +102,53 @@ class DecisionForm(forms.Form):
         widget=forms.Textarea(attrs={"rows": 4}),
         help_text=_("Sent to the notifier with the decision."),
     )
+
+
+class RestrictionForm(forms.Form):
+    """A reviewer's action on content, with the statement of reasons (DSA art. 17)."""
+
+    target_kind = forms.ChoiceField(
+        label=_("What is restricted"),
+        choices=[
+            ("product", _("Product (unpublish)")),
+            ("event", _("Event (hide)")),
+            ("vendor", _("Vendor storefront (suspend)")),
+        ],
+    )
+    target_ref = forms.UUIDField(
+        label=_("Reference of the content"), help_text=_("The public id shown in the Manager.")
+    )
+    scope = forms.CharField(
+        label=_("Scope"), help_text=_("What is restricted, where and for how long.")
+    )
+    facts = forms.CharField(
+        label=_("Facts and circumstances relied on"), widget=forms.Textarea(attrs={"rows": 4})
+    )
+    ground_kind = forms.ChoiceField(
+        label=_("Ground"),
+        choices=[
+            (engine.GROUND_ILLEGAL, _("The content is illegal")),
+            (engine.GROUND_TERMS, _("The content is incompatible with the platform terms")),
+        ],
+    )
+    ground = forms.CharField(
+        label=_("Legal provision or term relied on"), widget=forms.Textarea(attrs={"rows": 2})
+    )
+    automated_detection = forms.BooleanField(
+        label=_("Automated means were used to detect the content"), required=False
+    )
+    automated_decision = forms.BooleanField(
+        label=_("Automated means were used to decide"), required=False
+    )
+
+
+class AuthoritiesForm(forms.Form):
+    """Article 18: staff told the authorities of a suspected threat to life or safety."""
+
+    authority = forms.CharField(label=_("Authority told"), max_length=255)
+    note = forms.CharField(
+        label=_("Note"),
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 3}),
+        help_text=_("Kept with the notice, not in the audit log."),
+    )

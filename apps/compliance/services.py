@@ -20,6 +20,7 @@ job flags any published product that fails the check anyway
 import datetime as dt
 import logging
 import re
+import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
@@ -28,7 +29,7 @@ from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.contrib.auth.models import Permission
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.validators import validate_email
 from django.db import transaction
 from django.db.models import Q
@@ -37,7 +38,8 @@ from django.utils.translation import get_language_info
 from django.utils.translation import gettext_lazy as _
 
 from apps.catalog.models import Product, ProductStatus
-from apps.cms.services import legal_section_tags
+from apps.catalog.services import save_product
+from apps.cms.services import legal_section_tags, legal_section_texts
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.countries import OFFICIAL_LANGUAGES, InvalidCountry, normalize_country
@@ -53,7 +55,13 @@ from apps.core.services import (
     enqueue_email,
     save_audited,
 )
+from apps.events.models import EventPage
+from apps.events.services import hide_event
+from apps.vendors.engine import SUSPENDED as _SUSPENDED
+from apps.vendors.engine import InvalidTransition
 from apps.vendors.models import Vendor
+from apps.vendors.scoping import is_platform_staff
+from apps.vendors.services import change_status as change_vendor_status
 
 from . import engine
 from .models import (
@@ -62,6 +70,8 @@ from .models import (
     GpsrSafetyText,
     Notice,
     SafetyCase,
+    StatementOfReasons,
+    TransparencySubmission,
     VendorGpsrDefaults,
 )
 
@@ -1268,3 +1278,259 @@ def decide_notice(
     return _transition(
         public_id, outcome, action=NOTICE_DECIDED, ctx=ctx, dry_run=dry_run, reason=reason
     )
+
+
+# --- Statement of reasons (DSA art. 17), acting on content, art. 18 (CMP.5 part 3)
+
+STATEMENT_MODEL: Final = "compliance.statementofreasons"
+STATEMENT_ISSUED: Final = "compliance.statement.issued"
+STATEMENT_TEMPLATE: Final = "compliance.statement_of_reasons"
+NOTICE_AUTHORITIES_NOTIFIED: Final = "compliance.notice.authorities_notified"
+#: The tagged sections of the platform terms that give the redress wording (DSA art. 20, 21).
+REDRESS_SECTIONS: Final = ("complaint_handling", "redress")
+
+
+class StatementChangeSet(ChangeSet):
+    """The change report of an action on content, with the statement it produces."""
+
+    statement: StatementOfReasons | None = None
+
+
+def statement_snapshot(statement: StatementOfReasons) -> dict[str, Any]:
+    """Ids and kinds only: the facts and the redress text are the vendor's record, not the log's."""
+    return {
+        "vendor": str(statement.vendor.public_id),
+        "notice": str(statement.notice.public_id) if statement.notice else None,
+        "target_kind": statement.target_kind,
+        "target_ref": str(statement.target_ref),
+        "restriction": statement.restriction,
+        "ground_kind": statement.ground_kind,
+        "automated_detection": statement.automated_detection,
+        "automated_decision": statement.automated_decision,
+    }
+
+
+def redress_text(language: str) -> str:
+    """The editor's wording on complaints and out-of-court redress, from the live terms page in
+    `language` (English when that language has none). Empty when the page has no such text."""
+    for code in dict.fromkeys((language, "en")):
+        texts = legal_section_texts("platform_terms", code, REDRESS_SECTIONS)
+        if texts:
+            return "\n\n".join(texts[tag] for tag in REDRESS_SECTIONS if tag in texts)
+    return ""
+
+
+def _target(staff: Any, target_kind: str, target_ref: str) -> tuple[Any, Vendor]:
+    """The product, event or vendor to restrict and the vendor that owns it."""
+    try:
+        ref = uuid.UUID(str(target_ref))
+    except ValueError:
+        raise NoticeError("target") from None
+    found: Any = None
+    if target_kind == "product":
+        found = Product.objects.for_actor(staff).select_related("vendor").filter(public_id=ref)
+    elif target_kind == "event":
+        found = EventPage.objects.for_actor(staff).select_related("vendor").filter(public_id=ref)
+    elif target_kind == "vendor":
+        found = Vendor.objects.filter(public_id=ref)
+    else:
+        raise NoticeError("target_kind")
+    target = found.first()
+    if target is None:
+        raise NoticeError("target")
+    vendor = target if target_kind == "vendor" else target.vendor
+    if vendor is None:  # a platform event has no vendor to tell
+        raise NoticeError("target")
+    return target, vendor
+
+
+def _apply_restriction(
+    staff: Any,
+    target_kind: str,
+    target: Any,
+    facts: str,
+    notice: Notice | None,
+    *,
+    ctx: AuditContext,
+    dry_run: bool,
+) -> list[Any]:
+    """Act through the owning app's service: hide the event (EVT.11), unpublish the product
+    (back to draft), suspend the vendor. Returns the changes those services report."""
+    try:
+        if target_kind == "event":
+            ref = str(notice.public_id) if notice else ""
+            return list(
+                hide_event(
+                    staff, target, facts, dsa_notice_ref=ref, ctx=ctx, dry_run=dry_run
+                ).changes
+            )
+        if target_kind == "product":
+            if target.status == ProductStatus.DRAFT:
+                raise NoticeError("target")
+            target.status = ProductStatus.DRAFT
+            return list(save_product(target, ctx=ctx, dry_run=dry_run).changes)
+        return list(change_vendor_status(target, _SUSPENDED, ctx=ctx, dry_run=dry_run).changes)
+    except (InvalidTransition, ValidationError):
+        raise NoticeError("target") from None
+
+
+def issue_statement(
+    staff: Any,
+    *,
+    target_kind: str,
+    target_ref: str,
+    scope: str,
+    facts: str,
+    ground_kind: str,
+    ground: str,
+    automated_detection: bool = False,
+    automated_decision: bool = False,
+    notice_id: Any = None,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> StatementChangeSet:
+    """Restrict a product, event or storefront and send the vendor its statement of reasons.
+
+    `notice_id` links a notice decided as `action_taken`; without it the restriction is on
+    platform staff's own initiative. The content is acted on through the owning app's service,
+    the statement is stored (immutable from then on) with a snapshot of the CMS redress wording,
+    queued by email to the vendor, and a pending transparency-database record is built (nothing
+    is sent). All in one transaction. Raises `PermissionDenied` for a non-staff actor and
+    `NoticeError` for a missing part, an unknown target or a notice not decided as action taken,
+    also on dry-run.
+    """
+    if not is_platform_staff(staff):
+        raise PermissionDenied("only platform staff restrict content")
+    restriction = (
+        engine.RESTRICTION_SUSPEND if target_kind == "vendor" else engine.RESTRICTION_REMOVE
+    )
+    problems = engine.statement_problems(
+        restriction=restriction, scope=scope, facts=facts, ground_kind=ground_kind, ground=ground
+    )
+    if problems:
+        raise NoticeError(*problems)
+    changes = StatementChangeSet()
+    with transaction.atomic():
+        notice: Notice | None = None
+        if notice_id is not None:
+            try:
+                notice = Notice.objects.select_for_update().get(public_id=notice_id)
+            except Notice.DoesNotExist:
+                raise NoticeError("notice") from None
+            if notice.status != Notice.Status.ACTION_TAKEN:
+                raise NoticeError("notice")
+        target, vendor = _target(staff, target_kind, target_ref)
+        changes.changes.extend(
+            _apply_restriction(
+                staff, target_kind, target, facts.strip(), notice, ctx=ctx, dry_run=dry_run
+            )
+        )
+        language = settings.LANGUAGE_CODE
+        now = timezone.now()
+        statement = StatementOfReasons(
+            vendor=vendor,
+            notice=notice,
+            target_kind=target_kind,
+            target_ref=target.public_id,
+            restriction=restriction,
+            scope=scope.strip(),
+            facts=facts.strip(),
+            ground_kind=ground_kind,
+            ground=ground.strip(),
+            automated_detection=automated_detection,
+            automated_decision=automated_decision,
+            redress_text=redress_text(language),
+            language=language,
+            sent_at=now,
+        )
+        changes.statement = statement
+        changes.create(STATEMENT_MODEL, str(statement.public_id), statement_snapshot(statement))
+        if dry_run:
+            return changes
+        statement.save()
+        TransparencySubmission.objects.create(
+            statement=statement,
+            payload=engine.transparency_payload(
+                restriction=restriction,
+                scope=statement.scope,
+                facts=statement.facts,
+                ground_kind=ground_kind,
+                ground=statement.ground,
+                target_kind=target_kind,
+                based_on_notice=notice is not None,
+                automated_detection=automated_detection,
+                automated_decision=automated_decision,
+                applied_on=timezone.localdate(now),
+                reference=str(statement.public_id),
+            ),
+        )
+        record(
+            ctx,
+            STATEMENT_ISSUED,
+            STATEMENT_MODEL,
+            str(statement.public_id),
+            None,
+            statement_snapshot(statement),
+        )
+        enqueue_email(
+            recipient=vendor.contact_email,
+            template_key=STATEMENT_TEMPLATE,
+            language=language,
+            context={
+                "reference": str(statement.public_id),
+                "restriction": restriction,
+                "scope": statement.scope,
+                "facts": statement.facts,
+                "ground_kind": ground_kind,
+                "ground": statement.ground,
+                "based_on_notice": notice is not None,
+                "automated_detection": automated_detection,
+                "automated_decision": automated_decision,
+                "redress_text": statement.redress_text,
+            },
+            idempotency_key=f"compliance:statement:{statement.public_id}",
+        )
+    return changes
+
+
+def notify_authorities(
+    public_id: Any, *, authority: str, note: str, ctx: AuditContext, dry_run: bool = False
+) -> NoticeChangeSet:
+    """Article 18: record that staff told `authority` of a suspected threat to life or safety.
+
+    Staff make the report themselves; nothing is sent from here. The time is now, once per
+    notice. The audit entry keeps the authority and the time, never the note. Raises
+    `NoticeError` for an unknown notice, a missing authority or a second notification.
+    """
+    if not authority.strip():
+        raise NoticeError("authority")
+    changes = NoticeChangeSet()
+    with transaction.atomic():
+        try:
+            notice = Notice.objects.select_for_update().get(public_id=public_id)
+        except Notice.DoesNotExist:
+            raise NoticeError("notice") from None
+        if notice.authorities_notified_at is not None:
+            raise NoticeError("authorities_notified")
+        before = notice_snapshot(notice)
+        notice.authorities_notified_at = timezone.now()
+        notice.authorities_notified_to = authority.strip()
+        notice.authorities_note = note.strip()
+        changes.notice = notice
+        after = notice_snapshot(notice) | {
+            "authorities_notified_to": notice.authorities_notified_to,
+            "authorities_notified_at": notice.authorities_notified_at.isoformat(),
+        }
+        changes.update(NOTICE_MODEL, str(notice.public_id), before, after)
+        if dry_run:
+            return changes
+        notice.save(
+            update_fields=[
+                "authorities_notified_at",
+                "authorities_notified_to",
+                "authorities_note",
+                "updated_at",
+            ]
+        )
+        audit_changes(changes, ctx=ctx, action=NOTICE_AUTHORITIES_NOTIFIED)
+    return changes
