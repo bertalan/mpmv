@@ -206,8 +206,13 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
 }
 
 # Models with a ForeignKey chain to Vendor that are deliberately not vendor-scoped, by label,
-# with the reason. Empty: every vendor-owned model is scoped.
-NOT_VENDOR_OWNED: dict[str, str] = {}
+# with the reason.
+NOT_VENDOR_OWNED: dict[str, str] = {
+    "catalog.Redirect": (
+        "Platform SEO rule managed by staff only (CAT.6): its optional target product is where a "
+        "legacy URL lands, not an owner; no vendor endpoint lists or edits redirects."
+    ),
+}
 
 
 # --- Web endpoints (URL name, or route when unnamed)

@@ -148,6 +148,16 @@ def test_signed_feedback_refuses_another_secret_a_changed_body_or_an_old_timesta
     assert not parser.verify({}, body, now=1_800_000_000)
 
 
+@pytest.mark.parametrize("stamp", ["\u00b2", "\u2460", "\u0661\u0662", "1" * 5000, " 1", "-1", ""])
+def test_signed_feedback_refuses_a_timestamp_that_is_not_plain_ascii_digits(stamp: str) -> None:
+    """Superscript and circled digits pass `str.isdigit` but `int()` refuses them, and a very
+    long number exceeds `int()`'s digit limit: both are a refusal, never an exception."""
+    parser = mail.SignedJsonFeedback(secrets.token_urlsafe(32))
+    body = _payload({"type": "complaint", "recipient": "a@example.com", "message_id": "m1"})
+    headers = {**parser.sign(body, timestamp=1_800_000_000), mail.TIMESTAMP_HEADER: stamp}
+    assert not parser.verify(headers, body, now=1_800_000_000)
+
+
 def test_signed_feedback_parses_provider_neutral_events() -> None:
     parser = mail.SignedJsonFeedback(secrets.token_urlsafe(32))
     events = parser.parse(

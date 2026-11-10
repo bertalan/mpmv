@@ -21,7 +21,7 @@ from django.utils import timezone
 from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.api import tasks as api_tasks
-from apps.api.engine import generate_key, parse_rate
+from apps.api.engine import KEY_NAMESPACE, generate_key, parse_rate
 from apps.api.models import ApiClient, ApiRefusedKey
 from apps.api.services import (
     purge_expired_refused_keys,
@@ -279,12 +279,18 @@ def test_a_request_without_an_ip_is_not_counted(settings: SettingsWrapper) -> No
 def test_the_block_is_logged_without_key_material(
     client: Client, caplog: pytest.LogCaptureFixture
 ) -> None:
-    keys = [generate_key().key for _ in range(3)]
+    generated = [generate_key() for _ in range(3)]
     with caplog.at_level(logging.WARNING, logger="apps.api.services"):
-        for key in keys:
+        for key in (g.key for g in generated):
             client.get(ME, headers=_bearer(key), REMOTE_ADDR=IP)
     events = [r for r in caplog.records if "refused-key limit" in r.getMessage()]
     assert len(events) == 1
     assert IP in events[0].getMessage()
-    for key in keys:
-        assert key.split("_")[-1] not in caplog.text
+    # The secret part of a urlsafe key can itself contain "_", so split it off by position,
+    # never by separator: a one-character fragment would match any log line.
+    for g in generated:
+        secret = g.key.removeprefix(f"{KEY_NAMESPACE}_{g.prefix}_")
+        assert len(secret) >= 32
+        assert len(g.prefix) >= 8
+        for material in (g.key, secret, g.prefix):
+            assert material not in caplog.text
