@@ -1,10 +1,10 @@
 """CORE.9 part 2b: the logo form on the storefront profile page (owner only)."""
 
 import re
+from typing import Any
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.http import HttpResponse
 from django.test import Client
 
 from apps.accounts.models import User
@@ -21,7 +21,7 @@ pytestmark = pytest.mark.django_db
 PROFILE = f"{SHOP}profile/"
 
 
-def _post_logo(client: Client, **fields: object) -> HttpResponse:
+def _post_logo(client: Client, **fields: object) -> Any:
     data = {"action": "logo", "language": "en", **fields}
     return client.post(PROFILE, data)
 

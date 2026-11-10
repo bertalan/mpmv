@@ -21,6 +21,7 @@ from django.db.models import OuterRef, QuerySet, Subquery
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.module_loading import import_string
+from wagtail.models import Collection as ImageCollection
 
 from apps.accounts import engine as accounts_engine
 from apps.accounts.models import User, normalize_email_address
@@ -39,7 +40,7 @@ from apps.accounts.services import (
 )
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import Change, ChangeSet
-from apps.core.models import AuditLog
+from apps.core.models import AuditLog, ImageLicence, MediaImage
 from apps.core.services import (
     NoPlatformOperator,
     allowed_vendor_countries,
@@ -1703,6 +1704,41 @@ def _profile_identity(row: VendorTranslation, **extra: Any) -> dict[str, Any]:
     return {"vendor": str(row.vendor.public_id), "language": row.language, **extra}
 
 
+def _spend_profile_budget(actor: User, vendor: Vendor) -> None:
+    """Count one real change to the storefront profile (texts or logo) against the owner's and
+    the vendor's hourly limits, so that neither one owner nor several can flood the moderators.
+    Raises `ValidationError` when a limit is reached (the caller's transaction rolls back)."""
+    # Per owner, and per vendor so that several owners cannot multiply the moderator emails.
+    waits = (
+        consume_rate_limit(
+            f"vendor-profile:user:{actor.pk}",
+            limit=settings.VENDOR_PROFILE_SAVE_LIMIT,
+            window=PROFILE_RATE_WINDOW,
+        ),
+        consume_rate_limit(
+            f"vendor-profile:vendor:{vendor.pk}",
+            limit=settings.VENDOR_PROFILE_VENDOR_SAVE_LIMIT,
+            window=PROFILE_RATE_WINDOW,
+        ),
+    )
+    wait = max(waits)
+    if wait:
+        raise ValidationError(
+            f"Too many changes: try again in {max(1, int(wait.total_seconds() // 60))} minutes."
+        )
+
+
+def _lock_profile_vendor(vendor: Vendor, actor: User) -> Vendor:
+    """The owner check, then the vendor row under lock: a suspension or closure that commits
+    first is seen. Applicants and vendors in onboarding may set up their shop page."""
+    if not has_vendor_permission(actor, vendor, "profile"):
+        raise PermissionDenied("Only the vendor owner edits the storefront profile.")
+    locked = Vendor.objects.select_for_update(of=("self",)).select_related("logo").get(pk=vendor.pk)
+    if locked.status in PROFILE_LOCKED:
+        raise PermissionDenied("A suspended or closed vendor cannot change its profile.")
+    return locked
+
+
 def save_storefront_profile(
     vendor: Vendor,
     language: str,
@@ -1773,24 +1809,7 @@ def save_storefront_profile(
                 changes.update(PROFILE_LABEL, key, old, new)
         if dry_run or changes.is_empty:
             return changes
-        # Per owner, and per vendor so that several owners cannot multiply the moderator emails.
-        waits = (
-            consume_rate_limit(
-                f"vendor-profile:user:{actor.pk}",
-                limit=settings.VENDOR_PROFILE_SAVE_LIMIT,
-                window=PROFILE_RATE_WINDOW,
-            ),
-            consume_rate_limit(
-                f"vendor-profile:vendor:{vendor.pk}",
-                limit=settings.VENDOR_PROFILE_VENDOR_SAVE_LIMIT,
-                window=PROFILE_RATE_WINDOW,
-            ),
-        )
-        wait = max(waits)
-        if wait:
-            raise ValidationError(
-                f"Too many changes: try again in {max(1, int(wait.total_seconds() // 60))} minutes."
-            )
+        _spend_profile_budget(actor, vendor)
         siblings = dict(
             VendorTranslation.objects.filter(vendor=vendor)
             .exclude(language=language)
@@ -1850,3 +1869,134 @@ def _notify_profile_changed(vendor: Vendor, language: str, changed: list[str]) -
             "fields": ", ".join(changed),
         },
     )
+
+
+# --- Vendor logo (CORE.9 part 2b)
+
+LOGO_CHANGED = "vendor.logo_changed"
+LOGO_LICENCE_CODE = "own-work"
+
+
+def _logo_snapshot(logo: Any, alt: str) -> dict[str, Any]:
+    """The audited state: the image as `image:<id>` (its file is deleted when replaced, so the
+    id only says that it was a different image) and the alt text."""
+    return {"logo": None if logo is None else f"image:{logo.pk}", "logo_alt": alt}
+
+
+def vendor_logo_collection(vendor: Vendor) -> ImageCollection:
+    """The vendor's own image collection `vendor-<public id>` (created on first use, under the
+    root; no group permissions, so only the superuser sees it in the Wagtail admin). Call it
+    with the vendor row locked: two uploads at once would otherwise make two collections."""
+    name = f"vendor-{vendor.public_id}"
+    root = ImageCollection.get_first_root_node()
+    found = root.get_children().filter(name=name).first()
+    return found if found is not None else root.add_child(name=name)
+
+
+def _new_logo_image(
+    vendor: Vendor, upload: Any, actor: User, collection: ImageCollection
+) -> MediaImage:
+    """The unsaved image for `upload`, validated by `MediaImage.clean` (SEC.2: content checks,
+    caps, safe name; the file is re-encoded when saved). Own work of the vendor."""
+    image = MediaImage(
+        title=f"Logo of {vendor.display_name}"[:255],
+        file=upload,
+        collection=collection,
+        licence=ImageLicence.objects.get(code=LOGO_LICENCE_CODE),
+        author=vendor.display_name[:200],
+        uploaded_by_user=actor,
+    )
+    try:
+        image.full_clean()
+    except ValidationError as error:
+        messages = [m for items in error.message_dict.values() for m in items]
+        raise ValidationError({"logo": messages}) from error
+    return image
+
+
+def set_vendor_logo(
+    vendor: Vendor,
+    *,
+    upload: Any,
+    alt: str,
+    actor: User,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """The vendor owner sets or replaces the logo, or only its alt text (`upload=None`).
+
+    Owner only, and not for a suspended or closed vendor (`PermissionDenied`, before any file is
+    read). The alt text is required, short plain text. A new file goes through the SEC.2 checks
+    of `MediaImage` into the vendor's own collection; the previous image is deleted, and a
+    refused file leaves the current logo as it is. One `vendor.logo_changed` audit entry holds
+    the logo and alt text before and after. It counts against the profile save limits.
+    """
+    alt = alt.strip()
+    with transaction.atomic():
+        locked = _lock_profile_vendor(vendor, actor)
+        problem = engine.logo_alt_errors(alt)
+        if problem:
+            raise ValidationError({"logo_alt": problem})
+        if upload is None and locked.logo is None:
+            raise ValidationError({"logo": "Choose an image."})
+        before = _logo_snapshot(locked.logo, locked.logo_alt)
+        image = locked.logo
+        if upload is not None:
+            collection = ImageCollection.get_first_root_node() if dry_run else None
+            collection = collection or vendor_logo_collection(locked)
+            image = _new_logo_image(locked, upload, actor, collection)
+        after = _logo_snapshot(image if upload is None else _PendingImage(), alt)
+        changes = ChangeSet()
+        changes.update(MODEL_LABEL, str(vendor.public_id), before, after)
+        if dry_run or changes.is_empty:
+            return changes
+        _spend_profile_budget(actor, vendor)
+        previous = locked.logo
+        if upload is not None:
+            image.save()  # type: ignore[union-attr]
+            after = _logo_snapshot(image, alt)
+            changes = ChangeSet()
+            changes.update(MODEL_LABEL, str(vendor.public_id), before, after)
+        Vendor.objects.filter(pk=vendor.pk).update(
+            logo=image, logo_alt=alt, updated_at=timezone.now()
+        )
+        audit_changes(changes, ctx=ctx, action=LOGO_CHANGED)
+        if upload is not None and previous is not None:
+            previous.delete()
+        _notify_profile_changed(vendor, "all languages", ["logo"])
+    vendor.logo, vendor.logo_alt = image, alt
+    return changes
+
+
+def remove_vendor_logo(
+    vendor: Vendor, *, actor: User, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """The vendor owner removes the logo: the image is deleted, `vendor.logo_changed` audited."""
+    with transaction.atomic():
+        locked = _lock_profile_vendor(vendor, actor)
+        changes = ChangeSet()
+        if locked.logo is None:
+            return changes
+        changes.update(
+            MODEL_LABEL,
+            str(vendor.public_id),
+            _logo_snapshot(locked.logo, locked.logo_alt),
+            _logo_snapshot(None, ""),
+        )
+        if dry_run:
+            return changes
+        _spend_profile_budget(actor, vendor)
+        previous = locked.logo
+        Vendor.objects.filter(pk=vendor.pk).update(
+            logo=None, logo_alt="", updated_at=timezone.now()
+        )
+        audit_changes(changes, ctx=ctx, action=LOGO_CHANGED)
+        previous.delete()
+    vendor.logo, vendor.logo_alt = None, ""
+    return changes
+
+
+class _PendingImage:
+    """Stands for the image of a dry run, which is never saved."""
+
+    pk = "new"

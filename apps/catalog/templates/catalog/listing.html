@@ -20,6 +20,7 @@
 {% block content %}
   <div class="listing">
     <header class="listing-header">
+      {% if scope.vendor.logo %}<img class="listing-logo" src="{{ scope.vendor.logo.file.url }}" alt="{{ scope.vendor.logo_alt }}" width="{{ scope.vendor.logo.width }}" height="{{ scope.vendor.logo.height }}">{% endif %}
       <h1>{{ name }}</h1>
       {% if is_fallback %}<p class="listing-notice">{% translate "This page is not available in your language yet." %}</p>{% endif %}
       <p class="listing-count">{% blocktranslate count counter=window.total %}{{ counter }} product{% plural %}{{ counter }} products{% endblocktranslate %}</p>

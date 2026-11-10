@@ -57,3 +57,8 @@
 .pagination a[aria-current="page"] {
   font-weight: bold;
 }
+
+.listing-logo {
+  max-width: 12rem;
+  height: auto;
+}

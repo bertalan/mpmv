@@ -346,6 +346,11 @@
     max-inline-size: var(--measure-text);
   }
 
+  .manager-logo {
+    max-inline-size: 12rem;
+    block-size: auto;
+  }
+
   .manager-choices,
   .manager-changes {
     display: grid;

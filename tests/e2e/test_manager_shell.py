@@ -22,6 +22,7 @@ from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import verify_with_totp
+from tests.upload_corpus import png
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -145,7 +146,7 @@ def test_the_owner_edits_the_storefront_profile_and_staff_cannot(
     # The browser stops typing at the limit; drop it to reach the server-side check.
     page.get_by_label("Tagline").evaluate("el => el.removeAttribute('maxlength')")
     page.get_by_label("Tagline").fill("x" * 201)
-    page.get_by_role("button", name="Save").click()
+    page.get_by_role("button", name="Save", exact=True).click()
     expect(page.get_by_role("region", name="There is a problem")).to_be_visible()
     expect(page.get_by_label("Tagline")).to_have_attribute("aria-invalid", "true")
     _accessible(page)
@@ -153,11 +154,26 @@ def test_the_owner_edits_the_storefront_profile_and_staff_cannot(
 
     page.get_by_label("Tagline").fill("Hand made in the west")
     page.get_by_label("Returns and refunds policy").fill("Send it back within 30 days.")
-    page.get_by_role("button", name="Save").click()
+    page.get_by_role("button", name="Save", exact=True).click()
     expect(page.get_by_text("Storefront profile saved.")).to_be_visible()
     expect(page.get_by_label("Tagline")).to_have_value("Hand made in the west")
     _accessible(page)
     shot("profile-saved")
+
+    page.get_by_role("button", name="Save logo").click()
+    expect(page.get_by_role("region", name="There is a problem")).to_be_visible()
+    _accessible(page)
+    shot("logo-error")
+
+    page.get_by_label("Logo image").set_input_files(
+        {"name": "logo.png", "mimeType": "image/png", "buffer": png((64, 48))}
+    )
+    page.get_by_label("Description of the logo").fill("Shop West anvil mark")
+    page.get_by_role("button", name="Save logo").click()
+    expect(page.get_by_text("Logo saved.")).to_be_visible()
+    expect(page.get_by_role("img", name="Shop West anvil mark")).to_be_visible()
+    _accessible(page)
+    shot("logo-saved")
 
 
 def test_vendor_staff_have_no_storefront_profile(page: Page, live_server: LiveServer) -> None:
