@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **272** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **2220 h** (P1 1777 h · P2 413 h · P3 30 h)
+- Micro-tasks: **276** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **2244 h** (P1 1801 h · P2 413 h · P3 30 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -20,7 +20,7 @@
 | VEN | Vendors, commissions, ledger | 28 | 221 | 26 | 0 | 247 |
 | TAX | Tax engine | 13 | 53 | 28 | 0 | 81 |
 | SHP | Shipping and quotes | 14 | 96 | 28 | 0 | 124 |
-| ORD | Cart, orders, returns | 12 | 102 | 14 | 0 | 116 |
+| ORD | Cart, orders, returns | 13 | 110 | 14 | 0 | 124 |
 | PAY | Payments (Stripe Connect) | 4 | 40 | 0 | 0 | 40 |
 | ING | Supplier import and pipelines | 13 | 92 | 26 | 0 | 118 |
 | I18N | Multilingual | 10 | 50 | 9 | 0 | 59 |
@@ -29,11 +29,11 @@
 | THM | Frontend themes | 12 | 76 | 12 | 0 | 88 |
 | SEO | SEO, feeds, analytics | 7 | 38 | 14 | 0 | 52 |
 | AI | AI channels (MCP, agents) | 4 | 0 | 22 | 18 | 40 |
-| CMP | Compliance | 27 | 163 | 81 | 0 | 244 |
+| CMP | Compliance | 30 | 179 | 81 | 0 | 260 |
 | SEC | Security | 9 | 59 | 0 | 0 | 59 |
 | OPS | Operations | 9 | 19 | 30 | 6 | 55 |
 | MIG | Migration and cutover | 15 | 121 | 23 | 0 | 144 |
-| **Total** | | **272** | **1777** | **413** | **30** | **2220** |
+| **Total** | | **276** | **1801** | **413** | **30** | **2244** |
 
 ## By phase
 
@@ -140,7 +140,7 @@
 | THM.6 | First vertical theme `ride`: colour tokens from the operator palette (§14.4, §14.12), type scale, spacing and shapes from the reference template's visual language, self-hosted Barlow and Barlow Condensed (OFL 1.1, from upstream), SVG icon subset, header, hero and home block overrides, placeholder imagery, `LICENSES.toml` | P1 | 8 | THM.4, CMS.2 | Home page renders with `ride` and passes the THM.5 gates; no file derived from the reference template (PR checklist) |
 | THM.12 | Modern image formats: `WAGTAILIMAGES_FORMAT_CONVERSIONS` sends raster renditions to WebP (animated GIFs keep their format), `<picture>` renditions in AVIF, WebP and JPEG with `srcset`, `sizes`, width and height in CMS, catalog and theme templates, `fetchpriority="high"` on the LCP hero, AVIF dropped with a warning when the image library cannot encode it; uploads open to JPEG, PNG, WebP, AVIF and GIF, originals re-encoded without metadata (SEC.2); SVG only for logos and icons, checked at upload against an allow-list with a safe parser (no scripts, event handlers, `foreignObject`, external references, `url()` in styles, DTD or entities) and served same-origin as `image/svg+xml` with a restrictive CSP | P1 | 6 | THM.4, CMS.8 | Pages serve AVIF and WebP with a JPEG fallback and correct `srcset` and `sizes`; a PNG upload renders as WebP; a scripted SVG is refused; unit tests run the sanitiser on a corpus of malicious SVGs, integration tests cover the renditions, and an e2e test finds AVIF and WebP sources in a page's `<picture>` with no CSP violation |
 
-### F2 — Checkout: tax, shipping, orders, payments (34 tasks, 301 h)
+### F2 — Checkout: tax, shipping, orders, payments (35 tasks, 309 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -174,12 +174,13 @@
 | ORD.8 | Online withdrawal and returns flow | P1 | 12 | PAY.4, CMP.6, ARC.16 | Withdrawal button "withdraw from contract here" (IT "recedere dal contratto qui") visible for the whole withdrawal period, confirmation "confirm withdrawal" (IT "conferma recesso"), acknowledgement email with content, date and time |
 | ORD.9 | Transactional emails per language (customer, vendor, staff); per-vendor order confirmation as a non-fiscal document | P1 | 10 | ORD.2, ARC.16 | All emails in EN, IT, DE, FR and ES with snapshot tests; the order confirmation (email and PDF) is per vendor, labelled "Documento non fiscale / Non-fiscal document" in all five languages, carries the order reference and never an invoice number, and no email or document calls itself an invoice or receipt |
 | ORD.10 | Checkout and payments kill-switch, alert on payment without transfer | P1 | 4 | ARC.8, PAY.3 | Kill-switch verified on STAGE |
+| ORD.14 | Archive masking and the Tax/Audit permission (D-29): orders past the active phase (default 24 months) show masked personal fields (name, addresses, email, phone, tax ids) in the ordinary vendor and support UI and in exports; a dedicated Tax/Audit permission, in a platform variant (platform space) and a vendor variant (own orders only), reveals them; every reveal is in the `AuditLog` with actor, order and reason; Support impersonation never reveals them | P1 | 8 | ORD.2, CORE.18, CORE.17, ARC.9 | A seed order of 25 months is masked for a vendor member and a Support user and readable for a vendor Tax/Audit holder (own order only) and a platform Tax/Audit holder; a vendor variant cannot read another vendor's order; each reveal writes an `AuditLog` entry; an order of 3 months is shown normally; masking also applies to the API and CSV export |
 | PAY.1 | `PaymentGateway` + Stripe implementation (PaymentIntent, transfer_group) | P1 | 12 | ORD.4 | End-to-end test payment |
 | PAY.2 | Signed, idempotent webhooks, `on_payment_succeeded` | P1 | 8 | PAY.1, VEN.4 | Duplicate event has no effect |
 | PAY.3 | Transfer per vendor, reverse transfer, reconciliation with the ledger | P1 | 10 | PAY.2 | 3 vendors in one order: 3 correct transfers |
 | PAY.4 | Full/partial refunds with VAT and commissions reversed | P1 | 10 | PAY.3 | Partial refund cases green |
 
-### F3 — Vendors, ledger, compliance (42 tasks, 384 h)
+### F3 — Vendors, ledger, compliance (45 tasks, 400 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -210,7 +211,7 @@
 | CMP.1 | DAC7 quarterly aggregates + annual export, reading the dataset and completeness from VEN.12; a confirmed operator-owned vendor's sales follow D-22 (not reported, VEN.26) | P1 | 12 | VEN.5, VEN.4, VEN.12 | Test export validates against the Agenzia delle Entrate DPI XML schema and is checked by the advisor; excluded sellers (under 30 sales and €2,000 or less) are left out; each reported vendor gets its data |
 | CMP.2 | Non-fiscal commission statement (pro-forma) per vendor and period from the ledger, with VEN.12 party data, as PDF per language and CSV/JSON export mappable to FatturaPA fields; no invoice issuing, no e-invoicing channel | P1 | 8 | VEN.4, VEN.12 | A seed vendor's statement and export are labelled "Documento non fiscale / Non-fiscal document, not an invoice" in all five languages, carry a stable reference ID and no invoice number sequence, and their totals match the ledger |
 | CMP.3 | `GpsrInfo` with per-vendor defaults, publication block, product page with picture, recall procedure; GPSR article 22 marketplace duties: points of contact, authority orders within 2 working days, safety notices within 3 working days, Safety Gate checks, repeat-offender suspension | P1 | 12 | CAT.1 | Product without GPSR cannot be published; a safety notice and an authority order show their working-day deadline and an overdue one alerts staff |
-| CMP.4 | GDPR: customer export and anonymization, sub-processor register, retention job; erasure for a closed vendor's owner as restriction plus deletion of the data not under a retention duty (Q-16) | P1 | 12 | ORD.2 | Erasure request on a seed order; an erasure request from a closed vendor's owner keeps the membership, contract evidence, DAC7, ledger and order records, deletes the rest, and the retention job anonymises the kept data once the period ends (test with a frozen clock) |
+| CMP.4 | GDPR: customer export and erasure that anonymises the profile and non-fiscal data and never touches concluded orders (D-29), sub-processor register, retention job; erasure for a closed vendor's owner as restriction plus deletion of the data not under a retention duty (Q-16) | P1 | 12 | ORD.2 | Erasure request on a seed order; an erasure request from a closed vendor's owner keeps the membership, contract evidence, DAC7, ledger and order records, deletes the rest, and the retention job anonymises the kept data once the period ends (test with a frozen clock) |
 | CMP.5 | DSA duties of every platform (points of contact, terms, notice and action, statement of reasons, criminal offence notification) and P2B (reasons for restrictions, 30 days' notice of termination, ranking page, differentiated treatment and data access in the terms); vendor terms acceptance is VEN.5, VEN.13 to VEN.16 | P1 | 10 | VEN.5 | A notice gets a tracked outcome and the vendor a statement of reasons; a termination cannot take effect before 30 days from its notice |
 | CMP.6 | Online withdrawal, 30-day price history (Omnibus), pre-contractual information, marketplace information (art. 49-bis Codice del Consumo), harmonised legal guarantee notice | P1 | 10 | ORD.2, CAT.1 | Correct strikethrough price in tests; every offer shows the vendor's trader status and the split of obligations; checkout shows the harmonised legal guarantee notice |
 | CMP.7 | Automated accessibility audit in CI (axe, WCAG 2.2 AA tags) + manual review + statement | P1 | 8 | THM.5 | Zero axe violations with the `wcag22aa` tag on key pages; manual review recorded; statement published |
@@ -225,6 +226,9 @@
 | CMP.24 | Approval of (L) legal wording: per text and language a version hash, draft author (person or agent) and counsel approval (approver name or role, date, approved hash) for gettext keys with an `(L)` context and database texts; release check and production system check refuse unapproved texts; STAGE shows a pending marker; approvals audited | P1 | 6 | I18N.7, ARC.16, SEC.4 | Changing an approved (L) text in any language makes the release check fail until a new approval matches its hash; production refuses to start with an unapproved text; STAGE shows the marker; each approval is in the audit log |
 | CMP.25 | Activation gate for platform duties (coherence check 5): an `activation` purpose in `LegalFieldRequirement` seeded with the DSA article 30 trader data (name, address, telephone, email, trade register entry where registered), the article 30(1)(e) self-certification recorded as an append-only acceptance with text hash, both checked by the VEN.5 activation next to the CMP.13 gate; DAC7 data still blocks payouts only; CMP.11 keeps the checks, display on offers and EPR | P1 | 4 | VEN.5, VEN.12, CMP.13 | An EU vendor missing its telephone, its trade register entry (when registered) or the self-certification cannot be activated and gets the reason; a complete vendor is activated; missing DAC7 data does not block activation; the self-certification row stores version, language and hash |
 | CMP.26 | GPSR follow-ups of the owner decisions 2026-11-09 (CMP.3): the checkout refuses a line whose product `apps.catalog.selling.sale_blockers` blocks for the delivery country and shows `{% product_destination_notice %}` (ORD.3, ORD.5); the product page includes the notice for the visitor's country (CAT.7); a Manager shop space page lists the vendor's products with the country languages their warnings miss (`vendor_warnings_language_gaps`, CORE.17); an in-app notice in the Manager platform space for the Catalog and moderation role when a safety case is overdue; open points of the CMP.3 review: link the notice only to languages in which the product page is published, a composite foreign key `(product, vendor)` on `SafetyCase` as in the catalog, `no` vs `nb`/`nn` matching for Norway, and Northern Ireland (GPSR applies, ships as `GB`, not checked) | P1 | 6 | CMP.3, ORD.3, ORD.5, CAT.7, CORE.17 | A cart line with warnings only in German cannot be checked out to a French-only country and the checkout shows why, with a link to the German warnings; the same cart checks out to a German-speaking country; the vendor's Manager page lists the missing country languages; an overdue safety case shows a notice to a Catalog and moderation user and not to a Finance user |
+| CMP.29 | Order retention jobs (D-29) on the ORD.2 scrub service, scheduled with dry-run reports and an `AuditLog` entry per run: early minimisation drops the non-fiscal fields (carrier contact phone, support notes) of orders older than the active phase (setting, default 24 months); final anonymisation on 31 Dec of year 10 replaces the personal fields with fixed placeholders or hashes and keeps amount, country and rate; both skip orders inside their period and never touch the fiscal fields before it | P1 | 8 | ORD.2, CMP.4, ARC.9 | With a frozen clock a seed order keeps every field at 23 months, loses the carrier phone and support notes at 25 months (24-month default, setting changed in the test), keeps the fiscal fields until 31 Dec of year 10 and is anonymised after it with amount, country and rate intact; `dry_run` changes nothing and lists the orders; each run is in the `AuditLog`; the immutability trigger still refuses a direct update |
+| CMP.30 | Customer account-deletion flow (D-29; spec 02 covers only the vendor-owner flow of Q-16, so CORE has no task for it): anonymise the login profile, unsubscribe the user, delete carts, preferences and logs, leave every concluded order untouched, show and email the notice that the order data is kept for the legal period; an open order blocks the request until concluded; audited | P1 | 6 | CMP.4, ORD.2, ORD.11 | Erasing a seed customer with two concluded orders anonymises the profile, removes the cart and preferences and unsubscribes the email; the order rows are byte-identical afterwards; the confirmation page and email state the retention period; a customer with an open order is refused with the reason; the audit entry holds no personal data |
+| CMP.31 | Privacy-policy retention line (D-29) as a CMS-managed legal text requirement: the `LegalPage` privacy policy must contain "order, billing, shipping and VAT-validation data are kept 10 years from the close of the fiscal year…" with the legal basis, in all five languages; the period shown comes from the same setting as the CMP.29 jobs; wording approved through CMP.24 (L) | P1 | 2 | CMS.5, I18N.9, CMP.24, CMP.4 | The privacy page of a seed site renders the retention line in each language with the configured years; publishing the privacy page without the line is refused by the release check; the line text is an (L) text needing CMP.24 approval |
 
 ### F4 — Content, SEO, feeds (33 tasks, 223 h)
 
