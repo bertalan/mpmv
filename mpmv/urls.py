@@ -29,8 +29,19 @@ def healthz(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"status": "ok"})
 
 
+def readyz(request: HttpRequest) -> JsonResponse:
+    """Readiness probe (OPS.2): database, cache and storage answer. Status only, no detail."""
+    from apps.core.health import readiness_failures
+
+    ok = not readiness_failures()
+    response = JsonResponse({"status": "ok" if ok else "unavailable"}, status=200 if ok else 503)
+    response["Cache-Control"] = "no-store"
+    return response
+
+
 urlpatterns = [
     path("healthz", healthz, name="healthz"),
+    path("readyz", readyz, name="readyz"),
     path("robots.txt", robots_view, name="robots_txt"),  # SEO.8
     path("webhooks/email/", email_webhook, name="email_webhook"),
     # Uploaded images and renditions, as images only (THM.12, apps.core.media).

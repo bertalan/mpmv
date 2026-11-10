@@ -105,6 +105,7 @@ PROCRASTINATE_ON_APP_READY = "apps.core.tasks.on_app_ready"
 MIDDLEWARE = [
     # Outermost, so it wraps SecurityMiddleware's own HTTPS 301 too (SEC.5 triage, SEC.12).
     "apps.core.middleware.CrossOriginResourcePolicyMiddleware",
+    "apps.core.middleware.RequestIdMiddleware",  # OPS.2: id for the logs, X-Request-ID
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "apps.cms.middleware.WagtailAdminPickerNonceMiddleware",  # Wagtail's inline pickers (CMS.1)
@@ -563,15 +564,33 @@ PERMISSIONS_POLICY: dict[str, list[str]] = {
 
 # A secure action link holds its token in the URL path (CORE.15): request logs redact it. The
 # filter on `django.request` runs before propagation, so Django's own handlers get it too.
+# OPS.2: one JSON line per record with the request id; personal data and secrets are redacted
+# before any handler sees the record. `MPMV_LOG_FORMAT=plain` for a human reading a terminal.
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "filters": {"redact_secret_paths": {"()": "mpmv.log_redaction.RedactSecretPaths"}},
+    "filters": {
+        "redact_secret_paths": {"()": "mpmv.log_redaction.RedactSecretPaths"},
+        "request_id": {"()": "apps.core.observability.RequestIdFilter"},
+        "redact_sensitive": {"()": "apps.core.observability.RedactSensitiveData"},
+    },
+    "formatters": {
+        "json": {"()": "apps.core.observability.JsonFormatter"},
+        "plain": {"format": "%(asctime)s %(levelname)s [%(request_id)s] %(name)s: %(message)s"},
+    },
     "handlers": {
-        "console": {"class": "logging.StreamHandler", "filters": ["redact_secret_paths"]},
+        "console": {
+            "class": "logging.StreamHandler",
+            "filters": ["request_id", "redact_secret_paths", "redact_sensitive"],
+            "formatter": "plain" if env_str("MPMV_LOG_FORMAT", "json") == "plain" else "json",
+        },
+        "error_tracker": {
+            "class": "apps.core.errortracking.ErrorTrackingHandler",
+            "level": "ERROR",
+        },
     },
     "loggers": {"django.request": {"filters": ["redact_secret_paths"]}},
-    "root": {"handlers": ["console"], "level": "INFO"},
+    "root": {"handlers": ["console", "error_tracker"], "level": "INFO"},
 }
 
 # SEC.13 (apps/core/public_forms.py): URL prefixes the anonymous-POST sweep does not walk, each
@@ -592,6 +611,19 @@ PUBLIC_FORM_GATED_PREFIXES = {
 # (cms.E002) while any password or login restriction exists. SEC.14 lifts the block.
 BLOCK_PAGE_RESTRICTION_ROUTES = True
 
+
+# OPS.2: error tracker adapter (`none` or `log`; no external provider chosen yet) and the
+# thresholds of `manage.py check_ops`, which the host runs on a timer. An empty list or file
+# setting, or a False flag, skips that check.
+ERROR_TRACKER = env_str("MPMV_ERROR_TRACKER", "")
+OPS_ALERT_EMAIL = env_str("MPMV_OPS_ALERT_EMAIL", "")  # empty: the operator's support address
+OPS_ALERT_REPEAT_HOURS = env_int("MPMV_OPS_ALERT_REPEAT_HOURS", 6)
+OPS_DISK_PATHS = env_list("MPMV_OPS_DISK_PATHS")
+OPS_DISK_MIN_FREE_PERCENT = env_int("MPMV_OPS_DISK_MIN_FREE_PERCENT", 15)
+OPS_WAL_ARCHIVE_CHECK = env_bool("MPMV_OPS_WAL_ARCHIVE_CHECK", default=False)
+OPS_WAL_MAX_LAG_SECONDS = env_int("MPMV_OPS_WAL_MAX_LAG_SECONDS", 900)  # RPO 15 min
+OPS_BACKUP_STATUS_FILE = env_str("MPMV_OPS_BACKUP_STATUS_FILE", "")
+OPS_BACKUP_MAX_AGE_HOURS = env_int("MPMV_OPS_BACKUP_MAX_AGE_HOURS", 26)
 # Optional prefix of order numbers, e.g. "MP-" gives "MP-2027-000123" (ORD.2). Empty by default.
 ORDER_NUMBER_PREFIX = ""
 
