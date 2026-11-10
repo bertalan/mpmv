@@ -338,6 +338,8 @@ class GroupAdmin(DjangoGroupAdmin):
         form_url: str = "",
         extra_context: dict[str, Any] | None = None,
     ) -> HttpResponse:
+        if not _is_superuser(request):
+            raise PermissionDenied  # before any prompt: staff get a 403, not a step-up
         parent = super().changeform_view
 
         def view(req: HttpRequest) -> HttpResponse:
@@ -351,6 +353,8 @@ class GroupAdmin(DjangoGroupAdmin):
     def delete_view(
         self, request: HttpRequest, object_id: str, extra_context: dict[str, Any] | None = None
     ) -> HttpResponse:
+        if not _is_superuser(request):
+            raise PermissionDenied
         parent = super().delete_view
 
         def view(req: HttpRequest) -> HttpResponse:
