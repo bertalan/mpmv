@@ -1,0 +1,135 @@
+/* Ride: type, buttons, section rhythm (THM.6). All rules sit in `overrides`, above the base
+   layers. Colours only through tokens; operator palette values override the tokens. */
+@layer overrides {
+  body {
+    overflow-x: clip;
+    line-height: 1.5;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    color: var(--color-heading);
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  h3,
+  h4 {
+    font-weight: 600;
+  }
+
+  h1,
+  .hero__title {
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+  }
+
+  /* Section title: a short accent bar above a large condensed heading. */
+  .block > h2::before,
+  .cta-band__title::before {
+    content: "";
+    display: block;
+    inline-size: 3rem;
+    block-size: 0.25rem;
+    margin-block-end: var(--space-s);
+    background: var(--color-accent);
+  }
+
+  /* --- Buttons: filled accent (default), filled dark, outline dark, outline accent. */
+
+  button,
+  .button {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    border-width: 2px;
+  }
+
+  /* Secondary role of the operator palette: the amber fill with dark text. */
+  .button--secondary {
+    --button-bg: var(--color-secondary);
+    --button-fg: var(--color-on-secondary);
+    --button-bg-hover: var(--color-secondary-hover);
+  }
+
+  /* Filled dark, and outline dark (ghost). */
+  .button--dark {
+    --button-bg: var(--color-surface-inverse);
+    --button-fg: var(--color-text-inverse);
+    --button-bg-hover: var(--color-heading);
+  }
+
+  .button--ghost {
+    --button-bg: transparent;
+    --button-fg: var(--color-surface-inverse);
+    --button-bg-hover: var(--color-surface-inverse);
+
+    border-color: var(--color-surface-inverse);
+  }
+
+  .button--ghost:hover {
+    color: var(--color-text-inverse);
+  }
+
+  .button--outline-accent {
+    --button-bg: transparent;
+    --button-fg: var(--color-link);
+    --button-bg-hover: var(--color-accent);
+
+    border-color: var(--color-accent);
+  }
+
+  .button--outline-accent:hover {
+    color: var(--color-on-accent);
+  }
+
+  .button:not(.button--secondary, .button--dark, .button--ghost, .button--outline-accent):hover {
+    box-shadow: var(--shadow-button-hover);
+  }
+
+  .pill,
+  .badge {
+    border-radius: var(--radius-pill);
+  }
+
+  .avatar,
+  .button--icon {
+    border-radius: var(--radius-round);
+  }
+
+  /* --- Section rhythm. Blocks of the home page breathe: more room above than below. */
+
+  .block {
+    padding-block: var(--space-section) var(--space-section-end);
+  }
+
+  .block > h2 {
+    margin-block-start: 0;
+  }
+
+  .block-hero {
+    padding-block: 0;
+  }
+
+  .block-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-s) var(--space-m);
+  }
+
+  /* --- Motion: only when the visitor has not asked for less of it. */
+
+  @media (prefers-reduced-motion: no-preference) {
+    button,
+    .button,
+    .site-nav a,
+    .card,
+    .product-tile {
+      transition:
+        background-color var(--duration-fast),
+        box-shadow var(--duration-fast),
+        color var(--duration-fast);
+    }
+  }
+}

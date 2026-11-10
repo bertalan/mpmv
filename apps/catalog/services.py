@@ -2101,6 +2101,45 @@ def listing_vendor_options(
     ]
 
 
+def store_categories(
+    scope: ListingScope, params: listings.ListingParams, language: str
+) -> list[FilterOption]:
+    """The categories of a vendor storefront's sidebar (VEN.10): those of the vendor's own listed
+    products (main or secondary, with their upper levels), named and written as slug paths in
+    `language`, else in the source language, so the sidebar reads the same in every language.
+    Empty on any other page. A category with no published name in either language is left out."""
+    vendor = scope.vendor
+    if vendor is None:
+        return []
+    in_scope = listing_products(scope).order_by().values("pk")
+    used = Category.objects.filter(Q(products__in=in_scope) | Q(secondary_products__in=in_scope))
+    paths = set(used.values_list("path", flat=True).distinct())
+    paths |= {up for path in paths for up in engine.ancestor_paths(path, Category.steplen)}
+    rows = CategoryTranslation.objects.filter(status=translations.PUBLISHED)
+    values = _filter_slug_paths(rows, "category", paths, Category.steplen, language)
+    source = translations.source_language()
+    named = rows.filter(category__path__in=paths, language__in={language, source}).select_related(
+        "category"
+    )
+    options: list[tuple[str, FilterOption]] = []
+    for text in _shown_text(named, "category", language).values():
+        value = values.get(text.category.path)
+        if value is None:
+            continue
+        options.append(
+            (
+                text.category.path,
+                FilterOption(
+                    value=value,
+                    label=str(text.name),
+                    selected=value == params.category,
+                    depth=len(text.category.path) // Category.steplen,
+                ),
+            )
+        )
+    return [option for _, option in sorted(options, key=lambda pair: pair[0])]
+
+
 # --- Redirects (CAT.6, spec 03 §3.1-3.2): the legacy rules of the presentation mu-plugins.
 # Retired SKUs go to the replacement product or to a tag, merged tags to the surviving tag,
 # discontinued categories to a search, `/author/*` home (a prefix rule); a GET `?add-to-cart=`

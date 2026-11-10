@@ -1,0 +1,10 @@
+{% extends "layouts/base.html" %}
+{% load wagtailcore_tags %}
+{% comment %}
+Home page of the `ride` theme (THM.6): when the first block is a hero it carries the page's one
+`<h1>` (the page title stays in `<title>`); otherwise the page title is the `<h1>` as in base.
+{% endcomment %}
+{% block content %}
+  {% with first=page.body.0 %}{% if first.block_type != "hero" %}<h1>{{ page.title }}</h1>{% endif %}{% endwith %}
+  {% for block in page.body %}{% if forloop.first and block.block_type == "hero" %}{% include_block block with heading_level=1 %}{% else %}{% include_block block %}{% endif %}{% endfor %}
+{% endblock %}

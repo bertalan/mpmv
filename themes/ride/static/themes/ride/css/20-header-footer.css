@@ -1,0 +1,221 @@
+/* Ride: header (dark bar, logo left, nav with disclosure sub-menus, burger below 64rem) and
+   footer (dark, three columns). No hover-only menus: a sub-menu opens with its button. */
+@layer overrides {
+  .site-header {
+    background: var(--color-surface-inverse);
+    color: var(--color-text-inverse);
+    border-block-end: 0;
+  }
+
+  .site-header a,
+  .site-header .nav-toggle,
+  .site-header .subnav__toggle {
+    color: var(--color-text-inverse);
+  }
+
+  .site-header__inner {
+    min-block-size: var(--header-height);
+    gap: var(--space-xs) var(--space-l);
+  }
+
+  .site-name {
+    color: var(--color-text-inverse);
+    font-size: var(--step-2);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .site-nav > nav > ul,
+  .site-nav .subnav__list {
+    gap: var(--space-xs) var(--space-l);
+  }
+
+  .site-nav a {
+    min-block-size: var(--target-primary);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .site-nav a:hover {
+    text-decoration: underline;
+    text-decoration-thickness: 0.14em;
+  }
+
+  .site-header .help-link,
+  .site-header__tools a {
+    min-block-size: var(--target-primary);
+    min-inline-size: var(--target-primary);
+    justify-content: center;
+  }
+
+  .site-header__tools {
+    gap: var(--space-xs) var(--space-s);
+  }
+
+  /* --- Sub-menus: a button next to the link. Without JavaScript the list is simply shown. */
+
+  .subnav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    position: relative;
+  }
+
+  .subnav__toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    border-color: transparent;
+    border-radius: var(--radius-round);
+  }
+
+  .subnav__toggle:hover {
+    background: var(--color-heading);
+  }
+
+  .subnav__toggle[aria-expanded="true"] .icon {
+    transform: rotate(180deg);
+  }
+
+  .subnav__list {
+    flex-basis: 100%;
+    flex-direction: column;
+    padding-inline-start: var(--space-m);
+  }
+
+  .subnav.is-enhanced:not(.is-open) .subnav__list {
+    display: none;
+  }
+
+  .nav-toggle {
+    display: inline-flex;
+    gap: var(--space-xs);
+    background: transparent;
+    color: var(--color-text-inverse);
+    border-color: var(--color-text-inverse);
+  }
+
+  .nav-toggle:hover,
+  .nav-toggle[aria-expanded="true"] {
+    background: var(--color-heading);
+  }
+
+  /* Below 64rem the header wraps and the sticky bar would hide focused content (WCAG 2.4.11):
+     it scrolls away, and the nav sits in a full-width panel behind the burger. */
+  @media (width < 64rem) {
+    html {
+      scroll-padding-top: 0;
+    }
+
+    .site-header {
+      position: static;
+    }
+
+    /* The wrapper steps aside so the burger sits beside the logo, the tools form a row of
+       their own and the menu panel spans the width. */
+    .site-nav {
+      display: contents;
+    }
+
+    .site-nav .nav-toggle {
+      order: 1;
+      margin-inline-start: auto;
+    }
+
+    .site-nav nav {
+      order: 3;
+      flex-basis: 100%;
+    }
+
+    .site-header__tools {
+      order: 2;
+      flex-basis: 100%;
+    }
+
+    .site-nav.is-enhanced:not(.is-open) nav {
+      display: none;
+    }
+
+    .site-nav.is-enhanced ul {
+      flex-direction: column;
+      padding-block-start: var(--space-s);
+    }
+  }
+
+  @media (width >= 64rem) {
+    .site-header {
+      position: sticky;
+    }
+
+    html {
+      scroll-padding-top: var(--header-offset, var(--header-height));
+    }
+
+    .nav-toggle {
+      display: none;
+    }
+
+    .subnav__list {
+      flex-basis: auto;
+      padding-inline-start: 0;
+    }
+
+    .subnav.is-enhanced .subnav__list {
+      position: absolute;
+      inset-block-start: 100%;
+      inset-inline-start: 0;
+      z-index: 20;
+      min-inline-size: 14rem;
+      padding: var(--space-s) var(--space-m);
+      background: var(--color-surface-inverse);
+      border-radius: 0 0 var(--radius-card) var(--radius-card);
+    }
+  }
+
+  /* --- Footer: dark surface, three columns from 40rem. */
+
+  .site-footer {
+    background: var(--color-surface-inverse);
+    color: var(--color-text-inverse);
+    border-block-start: 0;
+  }
+
+  .site-footer a,
+  .site-footer p {
+    color: var(--color-text-inverse);
+  }
+
+  .site-footer__inner {
+    display: grid;
+    gap: var(--space-l) var(--space-xl);
+    align-items: start;
+    padding-block: var(--space-section-end);
+  }
+
+  .site-footer__col {
+    display: grid;
+    gap: var(--space-s);
+    align-content: start;
+  }
+
+  .site-footer__name {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--step-2);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .site-footer ul {
+    flex-direction: column;
+  }
+
+  @media (width >= 40rem) {
+    .site-footer__inner {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+}
