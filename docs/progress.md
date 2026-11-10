@@ -53,7 +53,7 @@ part of the done-when still open) · `not started`.
 | CAT.12 | done | #76 | Audited product and variant edit and delete services (fiscal category, sales mode, weight, dimensions), vendor and price rules enforced in the service, admin routed through them |
 | CAT.14 | done | #80, #94, #116 | Catalogue integrity rules |
 | CAT.3 | done | #84, #96, #116 | Typed attributes, translated values and variant axes |
-| CAT.5 | done | #81, #116 | SKU-free product slugs, SlugHistory and 301 redirects |
+| CAT.5 | done | #81, #116, #221 | SKU-free product slugs, SlugHistory and 301 redirects. #221 (D-25): the slug is the title without the `-{lang}` suffix, `catalog/0010` reslugs existing products on the historical models with audit, old slugs answer one 301 |
 | CAT.6 | done | #174 | Redirect model, admin, `import_redirects`, resolved in the middleware |
 | THM.1 | done | #88 | Theme registry, loader and per-site theme |
 | ARC.18 | done | #106 | Engine purity contract and dry-run exception guard |
@@ -91,6 +91,8 @@ part of the done-when still open) · `not started`.
 | ARC.23 | done | #153 | Release gate with production parity |
 | EVT.13 | done | #144 | Map picker for event locations |
 | I18N.9 | done | #142 | Customer legal and checkout pages per language |
+| I18N.11 | done | #220 | Language switch stays on the same object, from the one `{language: URL}` mapping shared with hreflang (`apps/core/i18n.py`); untranslated object goes to the target home with a notice once; pages with secret-bearing URLs opt out |
+| EVT.5 | done | #180 | Vendor events API `/api/v1/events` (list, get, create, update, submit, cancel), scopes `events:read` and `events:write`, vendor-scoped keys, dry run, RFC 9457 errors. Event code, needs human review |
 | CAT.19 | done | #154 | Vendor products in the Manager shop space |
 | VEN.24 | done | #141 | Claim an imported vendor (legal email or registered PEC) |
 | SEC.5 | partial: items 6, 7, 9 and 10 of the security wave open | #162, #169, #166, #171 | Security headers by response type, endpoint sweep, hostile-input corpus, rate-limit tests |
@@ -761,6 +763,10 @@ Compliance, security and content:
 | #212 | CORE.17, CORE.23 | Manager fixes: CSRF, root redirect, explanatory 403, platform owner bootstrap |
 | #213 | OPS.10 | Nightly line-only coverage workflow |
 | #204 | CORE.9 | Owner-only storefront profile editing (2 of 3) |
+| #221 | CAT.5 | D-25: product slugs without the language suffix, reslug migration `catalog/0010` |
+| #228 | none | Coherence check 12 |
+| #220 | I18N.11 | Language switch stays on the same object |
+| #180 | EVT.5 | Vendor events API |
 
 ## Coherence checks
 
@@ -1406,3 +1412,23 @@ Findings and actions:
 Open from check 11: item 3 (OPS.9) can close on lane-a's word; the others are closed or accepted.
 
 Verdict: GO with follow-ups. No blocker or major finding; the follow-ups are minor and none blocks a tag. Condition: CI on 734b4cc green.
+
+### Coherence check 13 (release gate v0.1.4, main at 81a2f11)
+
+Scope: main at 81a2f11, the merges since check 12's code base (734b4cc): #221 (CAT.5, D-25; merged before #228 but after check 12 ran, so not reviewed there), #220 (I18N.11) and #180 (EVT.5); #228 is docs. 32 files and about 1.5k lines from a8bf1a1 (check 12 merge), plus the #221 delta (15 files). Short release-gate check, delta only.
+
+| Area | Result |
+|---|---|
+| Code vs spec | CAT.5 D-25: `build_product_slug` has no language or SKU (`apps/catalog/slugs.py:66`), migration `catalog/0010_d25_product_slugs.py` runs on historical models with a frozen slug copy pinned by a test (`tests/integration/test_migrations.py:168`), writes the audit entry, rerun is a no-op, reverse is `noop` (`:157`); old `{title}-{lang}` and `{title}-{lang}-{sku}` slugs answer a 301 through `OldProductSlugRedirectMiddleware` (`apps/catalog/middleware.py:3`); `rebuild_product_slugs --dry-run` exists (`management/commands/rebuild_product_slugs.py:23`). I18N.11: one mapping `{language: URL}` in `apps/core/i18n.py` (`hreflang_alternates:57`, `switcher_links:70`), used by catalog, CMS and event pages; secret-bearing URLs opt out with `@language_switch_home` (`apps/core/i18n.py:91`; `apps/accounts/action_link_views.py`, `apps/vendors/views.py:186`, `apps/vendors/application_views.py:113`, `:143`) and a guard test checks every such URL pattern (`apps/core/tests/integration/test_language_switch_secrets.py`); e2e `tests/e2e/test_language_switch_object.py`. EVT.5: six routes with `events:read` and `events:write` (`apps/api/v1/events.py:36-37`, `:211-303`), router mounted at `apps/api/v1/api.py:66`, vendor scoping through `get_for_actor_or_404` (`:28`), `dry_run` returns the changeset with 200 and writes nothing (`:239-251`), StreamField limited to vendor-safe blocks and sanitised drafts, no userinfo in `online_url` (`apps/events/engine.py:530`, `services.py:310`); 430 lines of API tests in `apps/api/tests/integration/test_v1_events.py`; `tests/tenancy_registry.py` extended |
+| Spec and docs | Backlog and spec 09 and 03 updated by the PRs; D-25 recorded in 92-open-decisions. progress.md lacked I18N.11, EVT.5 and the #221 and #228 rows (added here). release.md already has the CAT.5 note; EVT.5 and I18N.11 effects added here |
+| Hygiene | `makemigrations --check` clean; the only migration in the delta is `catalog/0010`. One leaf per app: accounts 0005, api 0007, cart 0001, catalog 0010, cms 0013, compliance 0002, core 0018, events 0003, shipping 0010, tax 0006, themes 0001, vendors 0024 (ingest, ledger, mcp, orders, payments, seo have none). No print, breakpoint, TODO, FIXME or sleep and no credential-like literal added in the delta. No new env variable or setting. The `RemovedInWagtail90Warning` at `apps/cms/admin_views.py:30` is still open (OPS.7) |
+| Gates | `make check` pass (ruff, mypy strict over 928 files, 8 contracts kept and 0 broken, backlog freshness, Django checks, theme gates for base and ride). Main CI on 81a2f11: success (run 42876101506); the run on #220's merge also succeeded. Full suite not run locally (CI is the gate) |
+
+Findings and actions:
+
+1. Minor. progress.md lacked I18N.11, EVT.5 and four PR rows. Action: this update.
+2. Minor. Check 12 did not cover #221 (it merged after the check ran). Reviewed here; no finding.
+3. Minor, ops. `catalog/0010` changes every product URL: run `rebuild_product_slugs --dry-run` on STAGE before the deploy and check the count (release.md).
+4. Minor. Carried over from check 12: the credential-like test password in the application tests (item 2 there) and CORE.9 3/3 are still open; none touches this delta.
+
+Verdict: GO for v0.1.4 from 81a2f11. No blocker or major finding. Conditions: no other merge between this PR and the tag, run the slug dry run on STAGE before deploying, and have the owner run the STAGE checks listed in release.md ("v0.1.4 on STAGE"). EVT.5 is event code and needs human review.
