@@ -18,6 +18,7 @@ from django.http import (
 )
 from django.shortcuts import render, resolve_url
 from django.urls import reverse
+from django.utils.translation import gettext, gettext_noop
 
 from apps.core import session_policy
 from apps.core.http import client_ip
@@ -28,8 +29,8 @@ from .http import wants_json
 from .mfa_session import is_recently_passkey_verified, is_recently_verified
 from .services import has_second_factor, record_registration_attempt, registration_retry_after
 
-TOO_MANY_ATTEMPTS = "Too many attempts. Please try again later."
-VERIFICATION_FAILED = "The verification failed. Please reload the page and try again."
+TOO_MANY_ATTEMPTS = gettext_noop("Too many attempts. Please try again later.")
+VERIFICATION_FAILED = gettext_noop("The verification failed. Please reload the page and try again.")
 
 
 def protect_registration[**P](
@@ -49,13 +50,13 @@ def protect_registration[**P](
         wait = registration_retry_after(ip)
         if wait:
             return HttpResponse(
-                TOO_MANY_ATTEMPTS,
+                gettext(TOO_MANY_ATTEMPTS),
                 status=429,
                 headers={"Retry-After": str(math.ceil(wait.total_seconds()))},
             )
         record_registration_attempt(ip)
         if not captcha_passes(request):
-            return HttpResponseBadRequest(VERIFICATION_FAILED)
+            return HttpResponseBadRequest(gettext(VERIFICATION_FAILED))
         return view(request, *args, **kwargs)
 
     return wrapped
