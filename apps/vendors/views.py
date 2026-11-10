@@ -45,6 +45,7 @@ from apps.accounts.services import (
 )
 from apps.core.audit import audit_context
 from apps.core.http import client_ip
+from apps.core.i18n import language_switch_home
 
 from . import engine, services
 from .models import Vendor
@@ -182,6 +183,7 @@ def _sign_in(request: HttpRequest, vendor: Vendor, link: ActionLinkCheck) -> Htt
     return _page(request, "submitted", {"vendor": vendor, "codes": []})
 
 
+@language_switch_home
 @mfa_exempt
 @require_http_methods(["GET", "POST"])
 def claim(request: HttpRequest, vendor_key: str) -> HttpResponse:

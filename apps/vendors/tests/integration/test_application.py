@@ -164,9 +164,10 @@ def test_an_application_creates_an_inactive_account_with_no_usable_password(
 
 def test_an_application_never_signs_anyone_in_or_grants_access(client: Client) -> None:
     data = form()
-    apply(client, {**data, "password": "Attacker-chosen-1!"})  # an extra field is ignored
+    chosen = secrets.token_urlsafe(18)
+    apply(client, {**data, "password": chosen})  # an extra field is ignored
     assert "_auth_user_id" not in client.session
-    assert client.login(username=data["email"], password="Attacker-chosen-1!") is False
+    assert client.login(username=data["email"], password=chosen) is False
     assert client.get("/manager/").status_code in (302, 403, 404)
 
 

@@ -5,7 +5,7 @@ The editor's preview of a term landing page (CMS.4). Visitors never see this pag
 page lives on its term's listing page (`/{taxonomy}/{term}/`, D-07), which shows the same parts
 around the listing. The preview shows them with the term's newest products.
 {% endcomment %}
-{% block head %}<meta name="robots" content="noindex">{% endblock %}
+{% block head %}{% robots_meta "noindex" %}{% endblock %}
 {% block content %}
   <div class="listing">
     <header class="listing-header"><h1>{{ name }}</h1></header>

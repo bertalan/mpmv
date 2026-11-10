@@ -7,7 +7,7 @@ whose role checks CORE.18 defines.
 
 from django.utils.translation import gettext_lazy as _
 
-from .navigation import Registry, Section, anyone
+from .navigation import Registry, Section, anyone, vendor_action
 from .spaces import Space
 
 BUILT_IN = (
@@ -18,6 +18,15 @@ BUILT_IN = (
         "manager:shop:dashboard",
         order=10,
         allowed=anyone,
+    ),
+    # Owner only: the role matrix gives `profile` to owners, so staff get no menu entry and a 404.
+    Section(
+        "shop.profile",
+        Space.SHOP,
+        _("Storefront profile"),
+        "manager:shop:profile",
+        order=20,
+        allowed=vendor_action("profile"),
     ),
     # The vendor picker: reached from the header, so not in the menu, and before any choice.
     Section(
