@@ -1,10 +1,12 @@
 """Product slugs and the paths of catalog pages (spec 03 §3.2, CAT.5, CAT.8). Pure functions,
 no ORM.
 
-A product slug is the transliterated title plus the language, `{title}-{lang}`, at most 80
-characters. It replicates the legacy permalink rules without the SKU part (owner decisions Q-30,
-Q-33): the vendor SKU never appears in a URL. The legacy `{title}-{lang}-{sku}` slugs live on as
-`SlugHistory` and answer a single 301 to the current slug.
+A product slug is the transliterated title, at most 80 characters, with no language suffix: the
+language is in the URL prefix (owner decision D-25). It replicates the legacy permalink rules
+without the SKU part (owner decisions Q-30, Q-33): the vendor SKU never appears in a URL. The
+`{title}-{lang}` slugs of the first generation and the legacy `{title}-{lang}-{sku}` slugs live on
+as `SlugHistory` and answer a single 301 to the current slug. Uniqueness is per language; a
+collision appends `-2`, `-3`…
 """
 
 import re
@@ -61,21 +63,20 @@ def _compose(title_part: str, tail: str, max_len: int) -> str:
     return f"{title_part[:room].rstrip('-') or FALLBACK_TITLE[:room]}{tail}"
 
 
-def build_product_slug(title: str, lang: str, max_len: int = SLUG_MAX_LENGTH) -> str:
-    """slugify(translit(title)) truncated + f"-{lang}"; at most `max_len`; never the SKU."""
-    return _compose(_slugify(title) or FALLBACK_TITLE, f"-{lang.lower()}", max_len)
+def build_product_slug(title: str, max_len: int = SLUG_MAX_LENGTH) -> str:
+    """slugify(translit(title)) truncated; at most `max_len`; no language, never the SKU."""
+    return _compose(_slugify(title) or FALLBACK_TITLE, "", max_len)
 
 
-def unique_product_slug(
-    title: str, lang: str, taken: Container[str], max_len: int = SLUG_MAX_LENGTH
-) -> str:
-    """`build_product_slug`, with -2, -3… appended while the slug is in `taken`."""
+def unique_product_slug(title: str, taken: Container[str], max_len: int = SLUG_MAX_LENGTH) -> str:
+    """`build_product_slug`, with -2, -3… appended while the slug is in `taken` (the slugs of
+    the other products in the same language)."""
     title_part = _slugify(title) or FALLBACK_TITLE
-    slug = _compose(title_part, f"-{lang.lower()}", max_len)
+    slug = _compose(title_part, "", max_len)
     number = 1
     while slug in taken:
         number += 1
-        slug = _compose(title_part, f"-{lang.lower()}-{number}", max_len)
+        slug = _compose(title_part, f"-{number}", max_len)
     return slug
 
 
