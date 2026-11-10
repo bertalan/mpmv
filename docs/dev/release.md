@@ -95,6 +95,17 @@ editors). Effects on STAGE and later environments:
 
 Details: [editor-roles.md](editor-roles.md).
 
+### Product slugs without the language suffix (CAT.5, D-25)
+
+Migration `catalog/0010_d25_product_slugs` reslugs every product translation to `{title}` and keeps
+the old `{title}-{lang}` and `{title}-{lang}-{sku}` slugs in SlugHistory (one 301 each). Before
+deploying a release that contains it:
+
+1. Run `manage.py rebuild_product_slugs --dry-run` on the target environment and check the count
+   and the listed renames.
+2. Deploy; `migrate` applies the same reslug and writes the audit entries.
+3. Rerunning changes nothing. Reverse is a no-op: the old slugs stay in SlugHistory.
+
 ### Activation gate and tax territories (CMP.25, TAX.7)
 
 - Migration `vendors/0023` seeds the `activation` requirements (DSA article 30 trader data) and
