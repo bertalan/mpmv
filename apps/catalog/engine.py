@@ -582,7 +582,11 @@ def prefix_source_error(path: str, *, languages: Iterable[str]) -> str | None:
         return 'A prefix ends with "/", e.g. /author/.'
     if path == "/" or path.strip("/") in set(languages):
         return "A prefix cannot cover the whole site or a whole language."
-    reserved = next((root for root in RESERVED_PREFIXES if path.startswith(root)), None)
+    # The public pages exist in every language: `/it/vendor/apply/` is as reserved as
+    # `/vendor/apply/`, so a configured language prefix is stripped before matching.
+    first, _, rest = path.lstrip("/").partition("/")
+    unprefixed = f"/{rest}" if first in set(languages) and rest else path
+    reserved = next((root for root in RESERVED_PREFIXES if unprefixed.startswith(root)), None)
     if reserved is not None:
         return f"A prefix cannot cover {reserved}: it is reserved (admin, API, files, sign-in)."
     return None

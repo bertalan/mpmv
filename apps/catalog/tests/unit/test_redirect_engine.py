@@ -247,3 +247,25 @@ def test_gone_rules_and_independent_rules_are_fine() -> None:
 def test_a_target_that_is_a_gone_rule_is_a_chain() -> None:
     rules = [rule("/a/", "/gone/"), rule("/gone/", None)]
     assert "/gone/" in redirect_problems(rules, checked={"/a/"})["/a/"]
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/it/vendor/apply/",
+        "/de/vendor/apply/confirm/x/",
+        "/it/vendor/apply/sent/",
+        "/de/vendor/claim/",
+        "/it/admin/",
+    ],
+)
+def test_a_reserved_path_stays_reserved_under_a_language_prefix(path: str) -> None:
+    """The "Sell with us" pages exist in every language (I18N.11): `/it/vendor/apply/` is as
+    reserved as `/vendor/apply/`."""
+    assert prefix_source_error(path, languages=LANGUAGES) is not None
+
+
+@pytest.mark.parametrize("path", ["/it/vendor/", "/it/vendors-old/", "/fr/vendor/apply/"])
+def test_a_language_prefix_does_not_reserve_more_than_the_path_below_it(path: str) -> None:
+    """`/fr/` is not a configured language here, so it is an ordinary first segment."""
+    assert prefix_source_error(path, languages=LANGUAGES) is None
