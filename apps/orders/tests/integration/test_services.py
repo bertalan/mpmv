@@ -2,9 +2,11 @@
 
 import datetime as dt
 import threading
+import time
 from decimal import Decimal
 
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 from django.db import connection, transaction
 
 from apps.catalog.tests.factories import ProductFactory
@@ -17,6 +19,7 @@ from apps.orders.services import LineInput, VendorOrderInput
 from apps.orders.tests.factories import OrderNumberSequenceFactory
 from apps.vendors.tests.factories import VendorFactory
 
+COMMISSION = {"rule_id": "default", "rule_version": 3, "percentage": "10", "fee": "2.00"}
 CTX = AuditContext(actor_label="system:test", source=AuditLog.Source.SYSTEM)
 NOW = dt.datetime(2027, 3, 1, 10, 0, tzinfo=dt.UTC)
 
@@ -43,9 +46,10 @@ def vendor_input(vendor: object = None, **overrides: object) -> VendorOrderInput
         "vendor": vendor or VendorFactory.create(),
         "lines": [line_input()],
         "shipping_net": Decimal("5.00"),
-        "shipping_tax": Decimal("1.10"),
+        "shipping_tax_rate": Decimal("22"),
+        "shipping_tax_reason": "domestic",
         "shipping_choice": {"carrier": "A", "zone": "IT", "rate": "5.00"},
-        "commission_snapshot": {"rule": "default", "percentage": "10", "fee": "2.00"},
+        "commission_snapshot": COMMISSION,
         "tax_profile_snapshot": {"regime": "standard"},
     }
     values.update(overrides)
@@ -68,6 +72,11 @@ def place(**overrides: object) -> Order:
     order, _ = services.create_order(**values)  # type: ignore[arg-type]
     assert order is not None
     return order
+
+
+def pay(order: Order) -> None:
+    services.transition_order(order, "awaiting_payment", ctx=CTX)
+    services.transition_order(order, "paid", ctx=CTX)
 
 
 @pytest.mark.django_db
@@ -154,9 +163,9 @@ def test_totals_are_computed_and_stored_per_vendor_and_overall() -> None:
         vendor_orders=[
             vendor_input(),  # goods 20.00, line tax 4.40, shipping 5.00 + 1.10
             vendor_input(
-                lines=[line_input(unit_price_net=Decimal("0.335"), quantity=3)],
+                lines=[line_input(unit_price_net=Decimal("0.33"), quantity=3)],
                 shipping_net=Decimal("0.00"),
-                shipping_tax=Decimal("0.00"),
+                shipping_tax_rate=Decimal("0"),
             ),
         ]
     )
@@ -168,14 +177,14 @@ def test_totals_are_computed_and_stored_per_vendor_and_overall() -> None:
         Decimal("30.50"),
     )
     assert (second.goods_net, second.tax_total, second.gross_total) == (
-        Decimal("1.01"),
+        Decimal("0.99"),
         Decimal("0.22"),
-        Decimal("1.23"),
+        Decimal("1.21"),
     )
-    assert order.goods_net == Decimal("21.01")
+    assert order.goods_net == Decimal("20.99")
     assert order.shipping_net == Decimal("5.00")
     assert order.tax_total == Decimal("5.72")
-    assert order.grand_total == Decimal("31.73")
+    assert order.grand_total == Decimal("31.71")
     assert order.state == "checkout"
 
 
@@ -204,7 +213,7 @@ def test_lines_and_sub_orders_are_snapshots() -> None:
         Decimal("4.40"),
     )
     assert line.legal_note_key == "reverse_charge"
-    assert sub.commission_snapshot == {"rule": "default", "percentage": "10", "fee": "2.00"}
+    assert sub.commission_snapshot == COMMISSION
     assert sub.shipping_choice["carrier"] == "A"
     assert sub.tax_profile_snapshot == {"regime": "standard"}
     # later catalogue edits never reach the order
@@ -274,8 +283,7 @@ def test_transition_order_refuses_illegal_moves_and_changes_nothing() -> None:
 @pytest.mark.django_db
 def test_vendor_order_shipping_and_delivery_stamp_dates_and_roll_up_the_order() -> None:
     order = place(vendor_orders=[vendor_input(), vendor_input()])
-    services.transition_order(order, "awaiting_payment", ctx=CTX)
-    services.transition_order(order, "paid", ctx=CTX)
+    pay(order)
     first, second = order.vendor_orders.order_by("id")
 
     services.transition_vendor_order(first, "accepted", ctx=CTX)
@@ -304,6 +312,7 @@ def test_vendor_order_shipping_and_delivery_stamp_dates_and_roll_up_the_order() 
 @pytest.mark.django_db
 def test_shipping_needs_a_tracking_number() -> None:
     order = place()
+    pay(order)
     sub = order.vendor_orders.get()
     services.transition_vendor_order(sub, "accepted", ctx=CTX)
     with pytest.raises(ValueError, match="tracking number"):
@@ -314,6 +323,7 @@ def test_shipping_needs_a_tracking_number() -> None:
 @pytest.mark.django_db
 def test_vendor_order_transition_dry_run_changes_nothing() -> None:
     order = place()
+    pay(order)
     sub = order.vendor_orders.get()
     changeset = services.transition_vendor_order(sub, "accepted", ctx=CTX, dry_run=True)
     assert not changeset.is_empty
@@ -334,3 +344,140 @@ def test_a_number_preview_does_not_consume_the_number() -> None:
 def test_numbering_continues_from_the_stored_counter() -> None:
     OrderNumberSequenceFactory.create(year=2027, last_value=41)
     assert place().number == "2027-000042"
+
+
+@pytest.mark.django_db
+def test_the_numbering_year_is_the_business_year_in_rome() -> None:
+    # 23:30 UTC on 31 December is 00:30 on 1 January in Rome.
+    assert place(now=dt.datetime(2027, 12, 31, 23, 30, tzinfo=dt.UTC)).number == "2028-000001"
+    assert place(now=dt.datetime(2027, 12, 31, 22, 30, tzinfo=dt.UTC)).number == "2027-000001"
+    # 22:30 UTC on 30 June is 00:30 on 1 July in Rome: same year, no rollover.
+    assert place(now=dt.datetime(2027, 6, 30, 22, 30, tzinfo=dt.UTC)).number == "2027-000002"
+
+
+@pytest.mark.django_db
+def test_an_overlong_prefix_is_refused(settings: object) -> None:
+    settings.ORDER_NUMBER_PREFIX = "X" * 15  # type: ignore[attr-defined]
+    with pytest.raises(ImproperlyConfigured, match="ORDER_NUMBER_PREFIX"):
+        place()
+
+
+@pytest.mark.django_db
+def test_shipping_tax_is_snapshotted_on_the_sub_order() -> None:
+    order = place(
+        vendor_orders=[
+            vendor_input(
+                shipping_tax_reason="domestic",
+                shipping_vat_nature_code="N2.2",
+                lines=[line_input(vat_nature_code="N3.5")],
+            )
+        ]
+    )
+    sub = order.vendor_orders.get()
+    assert (sub.shipping_tax_rate, sub.shipping_tax_amount) == (Decimal("22"), Decimal("1.10"))
+    assert (sub.shipping_tax_reason, sub.shipping_vat_nature_code) == ("domestic", "N2.2")
+    assert sub.lines.get().vat_nature_code == "N3.5"
+    assert sub.tax_total == Decimal("4.40") + Decimal("1.10")
+
+
+@pytest.mark.django_db
+def test_the_vendor_identity_is_snapshotted() -> None:
+    vendor = VendorFactory.create(display_name="Cups Ltd", legal_name="Cups S.r.l.")
+    sub = place(vendor_orders=[vendor_input(vendor)]).vendor_orders.get()
+    assert sub.vendor_snapshot["display_name"] == "Cups Ltd"
+    assert sub.vendor_snapshot["legal_name"] == "Cups S.r.l."
+    assert set(sub.vendor_snapshot) >= {"vat_number", "country"}
+    vendor.display_name = "Renamed"
+    vendor.save()
+    sub.refresh_from_db()
+    assert sub.vendor_snapshot["display_name"] == "Cups Ltd"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("missing", ["rule_id", "rule_version", "percentage", "fee"])
+def test_the_commission_snapshot_needs_its_keys(missing: str) -> None:
+    snapshot = {k: v for k, v in COMMISSION.items() if k != missing}
+    with pytest.raises(ValueError, match="commission_snapshot"):
+        place(vendor_orders=[vendor_input(commission_snapshot=snapshot)])
+
+
+@pytest.mark.django_db
+def test_negative_shipping_and_zero_prices_are_refused() -> None:
+    with pytest.raises(ValueError, match="shipping"):
+        place(vendor_orders=[vendor_input(shipping_net=Decimal("-1.00"))])
+    with pytest.raises(ValueError, match="price"):
+        place(vendor_orders=[vendor_input(lines=[line_input(unit_price_net=Decimal("0.00"))])])
+    with pytest.raises(ValueError, match="cents"):
+        place(vendor_orders=[vendor_input(lines=[line_input(unit_price_net=Decimal("0.335"))])])
+
+
+@pytest.mark.django_db
+def test_a_vendor_order_of_an_unpaid_order_cannot_move() -> None:
+    order = place()
+    sub = order.vendor_orders.get()
+    with pytest.raises(ValueError, match="paid"):
+        services.transition_vendor_order(sub, "accepted", ctx=CTX)
+    services.transition_order(order, "awaiting_payment", ctx=CTX)
+    with pytest.raises(ValueError, match="paid"):
+        services.transition_vendor_order(sub, "accepted", ctx=CTX, dry_run=True)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_rolled_back_number_is_reused_by_the_waiting_order_through_create_order() -> None:
+    vendors = [VendorFactory.create(), VendorFactory.create()]
+    a_has_number, results = threading.Event(), {}
+    errors: list[BaseException] = []
+
+    def rolled_back() -> None:
+        try:
+            try:
+                with transaction.atomic():
+                    order, _ = services.create_order(**_kwargs(vendors[0]))
+                    assert order is not None
+                    results["a"] = order.number
+                    a_has_number.set()
+                    time.sleep(1.0)  # B is now blocked on the counter row
+                    raise RuntimeError("payment setup failed")
+            except RuntimeError:
+                pass
+        except BaseException as exc:
+            errors.append(exc)
+        finally:
+            a_has_number.set()
+            connection.close()
+
+    def waiting() -> None:
+        try:
+            a_has_number.wait(timeout=10)
+            started = time.monotonic()
+            order, _ = services.create_order(**_kwargs(vendors[1]))
+            assert order is not None
+            results["b"] = order.number
+            results["b_waited"] = time.monotonic() - started
+        except BaseException as exc:
+            errors.append(exc)
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=rolled_back), threading.Thread(target=waiting)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+    assert not errors
+    assert results["a"] == results["b"] == "2027-000001"
+    assert results["b_waited"] > 0.3  # it queued behind A's lock
+
+
+def _kwargs(vendor: object) -> dict[str, object]:
+    return {
+        "email": "buyer@example.com",
+        "language": "en",
+        "billing_address": {},
+        "billing_country": "IT",
+        "shipping_address": {},
+        "shipping_country": "IT",
+        "vendor_orders": [vendor_input(vendor)],
+        "ctx": CTX,
+        "now": NOW,
+    }

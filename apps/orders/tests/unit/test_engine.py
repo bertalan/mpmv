@@ -74,6 +74,7 @@ ORDER_FLOW = [
     ("in_fulfillment", "fulfilled"),
     ("fulfilled", "closed"),
     ("paid", "partially_refunded"),
+    ("in_fulfillment", "partially_refunded"),
     ("fulfilled", "partially_refunded"),
     ("partially_refunded", "refunded"),
 ]
@@ -91,6 +92,14 @@ def test_every_other_order_transition_is_illegal() -> None:
             if (source, target) not in allowed:
                 with pytest.raises(IllegalTransition):
                     engine.check_order_transition(source, target)
+
+
+def test_a_refunded_vendor_order_does_not_fulfil_or_block_the_others() -> None:
+    # One vendor refunded while another is still being fulfilled: no derived change.
+    assert engine.derive_order_state("partially_refunded", ["refunded", "accepted"]) == (
+        "partially_refunded"
+    )
+    assert engine.derive_order_state("in_fulfillment", ["refunded", "shipped"]) == "fulfilled"
 
 
 def test_terminal_order_states_have_no_exit() -> None:
@@ -146,3 +155,26 @@ def test_the_order_state_is_derived_from_its_vendor_orders(
     current: str, vendor_states: list[str], expected: str
 ) -> None:
     assert engine.derive_order_state(current, vendor_states) == expected
+
+
+def test_a_derived_state_is_always_reachable_in_one_legal_step() -> None:
+    import itertools
+
+    for current in engine.ORDER_STATES:
+        for combo in itertools.chain.from_iterable(
+            itertools.product(engine.VENDOR_ORDER_STATES, repeat=n) for n in (1, 2)
+        ):
+            derived = engine.derive_order_state(current, combo)
+            if derived != current:
+                engine.check_order_transition(current, derived)
+
+
+def test_a_paid_order_steps_through_in_fulfillment() -> None:
+    assert engine.derive_order_state("paid", ["shipped"]) == "in_fulfillment"
+
+
+def test_shipping_tax_is_rounded_half_up() -> None:
+    assert engine.shipping_tax(Decimal("5.00"), Decimal("22")) == Decimal("1.10")
+    assert engine.shipping_tax(Decimal("0.25"), Decimal("22")) == Decimal("0.06")  # 0.055
+    with pytest.raises(ValueError, match="shipping"):
+        engine.shipping_tax(Decimal("-1"), Decimal("22"))

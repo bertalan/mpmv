@@ -80,7 +80,10 @@ def test_a_legal_order_transition_can_be_saved_and_saving_again_is_fine() -> Non
 
 
 def test_a_terminal_order_cannot_leave_its_state() -> None:
-    order = OrderFactory.create(state="cancelled")
+    order = OrderFactory.create()
+    for state in ("awaiting_payment", "cancelled"):
+        order.state = state
+        order.save()
     order.state = "paid"
     with pytest.raises(IllegalTransition):
         order.save()
