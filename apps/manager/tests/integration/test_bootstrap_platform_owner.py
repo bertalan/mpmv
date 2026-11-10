@@ -1,4 +1,7 @@
-"""CORE.23: `manage.py bootstrap_platform_owner`, the first platform owner after a deploy."""
+"""CORE.23: `manage.py bootstrap_platform_owner`, the first platform owner after a deploy.
+
+Lives with the Manager tests because the user model is in accounts, which core tests may not import.
+"""
 
 from io import StringIO
 

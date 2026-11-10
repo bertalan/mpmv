@@ -183,6 +183,6 @@ def test_a_platform_owner_outside_the_mfa_policies_is_still_sent_to_enrolment(
 
 
 def test_a_customer_is_not_told_about_enrolment(client: Client, customer: User) -> None:
-    """The space check comes first: a customer gets 404, never an MFA redirect."""
+    """The space check comes first: a customer gets 403, never an MFA redirect."""
     password_login(client, customer)
-    assert client.get(SHOP).status_code == 404
+    assert client.get(SHOP).status_code == 403
