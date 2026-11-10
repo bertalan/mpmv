@@ -1,0 +1,8 @@
+{% load i18n %}{% blocktranslate %}A GPSR safety case is past its deadline and still open. Act on it now and record what was done in the staff admin.{% endblocktranslate %}
+
+{% translate "Case" %}: {{ kind }} {{ reference }} ({{ case_id }})
+{% if authority %}{% translate "Authority" %}: {{ authority }}
+{% endif %}{% translate "Vendor" %}: {{ vendor_name }}
+{% if product_sku %}{% translate "Product SKU" %}: {{ product_sku }}
+{% endif %}{% translate "Received on" %}: {{ received_on }}
+{% translate "Due on" %}: {{ due_on }}
