@@ -93,7 +93,7 @@ def restore_default_groups(apps: Any, schema_editor: Any) -> None:
                 ).first()
                 if permission is not None:
                     GroupPagePermission.objects.get_or_create(
-                        group=group, page=root, permission=permission
+                        group_id=group.pk, page_id=root.pk, permission_id=permission.pk
                     )
         if collection is not None:
             for codename in IMAGE_PERMISSIONS:
@@ -102,7 +102,9 @@ def restore_default_groups(apps: Any, schema_editor: Any) -> None:
                 ).first()
                 if permission is not None:
                     GroupCollectionPermission.objects.get_or_create(
-                        group=group, collection=collection, permission=permission
+                        group_id=group.pk,
+                        collection_id=collection.pk,
+                        permission_id=permission.pk,
                     )
     editors = Group.objects.get(name=EDITORS)
     roles = list(Group.objects.filter(name__in=CONTENT_ROLES))
