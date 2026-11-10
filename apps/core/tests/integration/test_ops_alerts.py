@@ -2,6 +2,7 @@
 
 import datetime as dt
 import logging
+from collections.abc import Iterator
 from io import StringIO
 from pathlib import Path
 
@@ -20,16 +21,20 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def tracker() -> MemoryTracker:
+def tracker() -> Iterator[MemoryTracker]:
     memory = MemoryTracker()
     errortracking.set_tracker(memory)
-    yield memory  # type: ignore[misc]
+    yield memory
     errortracking.reset_tracker()
 
 
 @pytest.fixture
 def operator() -> None:
-    PlatformOperatorFactory(support_email="help@platform.example")
+    PlatformOperatorFactory.create(
+        open_ended=True,
+        valid_from=dt.datetime(2020, 1, 1, tzinfo=dt.UTC),
+        support_email="help@platform.example",
+    )
 
 
 def test_a_simulated_checkout_error_raises_an_alert(

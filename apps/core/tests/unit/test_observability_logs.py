@@ -6,6 +6,7 @@ import re
 
 import pytest
 from django.http import HttpRequest, HttpResponse
+from django.http.response import HttpResponseBase
 from django.test import RequestFactory
 
 from apps.core.middleware import RequestIdMiddleware
@@ -97,15 +98,15 @@ def test_the_action_link_path_stays_redacted_in_the_json_message() -> None:
     assert "s3cr3t-token" not in json.dumps(out)
 
 
-def _run(request: HttpRequest) -> tuple[HttpResponse, str | None]:
+def _run(request: HttpRequest) -> tuple[HttpResponseBase, str | None]:
     seen: list[str | None] = []
 
     def view(_: HttpRequest) -> HttpResponse:
         seen.append(current_request_id())
         return HttpResponse("ok")
 
-    response = RequestIdMiddleware(view)(request)  # type: ignore[arg-type]
-    return response, seen[0]  # type: ignore[return-value]
+    response = RequestIdMiddleware(view)(request)
+    return response, seen[0]
 
 
 def test_every_response_carries_a_request_id_that_the_logs_see() -> None:
@@ -132,4 +133,4 @@ def test_a_hostile_inbound_request_id_is_replaced(bad: str) -> None:
 def test_the_filter_stamps_the_request_id_on_records() -> None:
     record = _record("hi")
     RequestIdFilter().filter(record)
-    assert record.request_id == "-"
+    assert record.__dict__["request_id"] == "-"

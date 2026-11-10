@@ -1,0 +1,10 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate %}An operations alert was raised on the platform.{% endblocktranslate %}</p>
+<p>{% translate "Alert" %}: {{ key }}<br>{{ summary }}</p>
+<ul>
+{% for name, value in details.items %}<li>{{ name }}: {{ value }}</li>
+{% endfor %}</ul>
+</body>
+</html>

@@ -10,6 +10,7 @@ from apps.core import errortracking
 from apps.core.errortracking import (
     ErrorTracker,
     ErrorTrackingHandler,
+    LogTracker,
     MemoryTracker,
     NoOpTracker,
     get_tracker,
@@ -25,15 +26,21 @@ def test_the_default_tracker_is_a_no_op_that_satisfies_the_protocol() -> None:
     tracker.capture_message("m", level="error", context={})
 
 
-def test_the_provider_comes_from_a_dotted_path_setting() -> None:
-    with override_settings(ERROR_TRACKER="apps.core.errortracking.MemoryTracker"):
+def test_the_log_adapter_is_chosen_by_name_and_writes_one_error_line(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with override_settings(ERROR_TRACKER="log"):
         errortracking.reset_tracker()
-        assert isinstance(get_tracker(), MemoryTracker)
+        assert isinstance(get_tracker(), LogTracker)
+        with caplog.at_level(logging.ERROR, logger="mpmv.errors"):
+            errortracking.capture_exception(ValueError("x"), context={"a": "b"})
     errortracking.reset_tracker()
+    assert [r.levelno for r in caplog.records] == [logging.ERROR]
+    assert "ValueError" in caplog.records[0].getMessage()
 
 
 def test_a_bad_provider_path_is_a_configuration_error() -> None:
-    with override_settings(ERROR_TRACKER="no.such.Tracker"):
+    with override_settings(ERROR_TRACKER="sentry"):
         errortracking.reset_tracker()
         with pytest.raises(ImproperlyConfigured):
             get_tracker()
@@ -72,6 +79,7 @@ def test_the_log_handler_forwards_errors_with_a_traceback() -> None:
     log = logging.getLogger("mpmv.test.tracker")
     handler = ErrorTrackingHandler(level=logging.ERROR)
     log.addHandler(handler)
+    log.propagate = False  # the root logger has the same handler in the settings
     try:
         log.warning("ignored")
         try:
