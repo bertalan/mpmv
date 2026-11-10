@@ -283,6 +283,7 @@ def empty_document() -> dict[str, Any]:
 
 
 MAX_FILE_BYTES: Final = 1024 * 1024  # an upload adapter (SHP.6) reuses this cap
+MAX_CELL_CHARS: Final = 131_072  # the csv module's default field size limit
 
 
 def _too_big() -> str:
@@ -595,7 +596,17 @@ def dump_csv(document: Mapping[str, Any]) -> str:
 
 def _csv_line(record: str, values: Mapping[str, Any]) -> list[str]:
     cells = (_csv_cell(values.get(name)) for name in CSV_COLUMNS[1:])
-    return [record, *map(_escape_formula, cells)]
+    return [record, *map(_escape_formula, map(_within_cell_cap, cells))]
+
+
+def _within_cell_cap(cell: str) -> str:
+    """Refuse a cell `csv.reader` cannot read back: it raises `csv.Error` past its field size
+    limit, which `parse_csv` reports as an unreadable file (stored values are far shorter)."""
+    if len(cell) > MAX_CELL_CHARS:
+        raise ValueError(
+            f"A cell is larger than {MAX_CELL_CHARS} characters: the CSV import cannot read it."
+        )
+    return cell
 
 
 # A cell a spreadsheet evaluates: a formula sign first, after any apostrophes we added. Tab and

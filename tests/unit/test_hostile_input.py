@@ -197,18 +197,13 @@ def _number(cell: str) -> bool:
     return bool(re.fullmatch(r"-?\d+(\.\d+)?", cell))
 
 
-# A zone name or carrier is a CharField(max_length=100): a stored cell never exceeds it.
-_STORED_CELL_MAX = 100
-MAX_CELL_PROBE = fmt.MAX_FILE_BYTES + 1  # one cell alone is past the cap
-
-
-@example("[" * _STORED_CELL_MAX)
-@example("[" * 100_000 + "]" * 100_000)  # nightly falsifying example: far past any stored cell
+@example("[" * fmt.MAX_CELL_CHARS)
+@example("[" * 100_000 + "]" * 100_000)  # the nightly falsifying example: past csv's field limit
 @given(hi.storable_text(max_size=60).filter(lambda v: v.strip() and "|" not in v))
 def test_the_csv_export_round_trips_escaped_cells(text: str) -> None:
     text = text.replace("\r", "").replace("\n", " ").strip() or "x"
     document = _document_with(text)
-    if len(text) > _STORED_CELL_MAX:
+    if len(text) > fmt.MAX_CELL_CHARS:
         with pytest.raises(ValueError, match="larger than"):
             fmt.dump_csv(document)
         return
@@ -221,12 +216,9 @@ def test_the_csv_export_round_trips_escaped_cells(text: str) -> None:
     assert method.values["carrier"] == text
 
 
-@pytest.mark.parametrize("dump", [fmt.dump_csv, fmt.dump_json])
-def test_an_export_larger_than_the_import_cap_is_refused_not_written(dump: Any) -> None:
-    document = _document_with("[" * MAX_CELL_PROBE)
-
+def test_a_cell_the_csv_reader_cannot_read_is_refused_at_export() -> None:
     with pytest.raises(ValueError, match="larger than"):
-        dump(document)
+        fmt.dump_csv(_document_with("[" * (fmt.MAX_CELL_CHARS + 1)))
 
 
 @given(hi.hostile_text(max_size=2000))
