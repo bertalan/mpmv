@@ -167,6 +167,9 @@ ACTION_LINK_RATE_LIMIT = 30
 VENDOR_CLAIM_LINK_MAX_AGE = 72 * 3600  # seconds
 VENDOR_CLAIM_MAX_FAILURES = 5
 VENDOR_CLAIM_RATE_LIMIT = 20
+# Storefront profile saves per vendor owner per hour (CORE.9): each one emails the moderators.
+VENDOR_PROFILE_SAVE_LIMIT = 20
+VENDOR_PROFILE_VENDOR_SAVE_LIMIT = 30  # all owners of one vendor together
 # Public "Sell with us" application (VEN.22): validity of the email confirmation link, and
 # confirm-page POSTs allowed per IP every 15 minutes (the form uses the registration limit).
 VENDOR_APPLICATION_LINK_MAX_AGE = 72 * 3600  # seconds

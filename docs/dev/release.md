@@ -78,6 +78,29 @@ user page, or the CORE.18 role groups once they exist), otherwise they lose the 
 after the deploy (fail closed). Superusers keep it. STAGE has only seed users: the next seed run
 grants the permission to the seed operator.
 
+### First platform owner (CORE.23)
+
+The platform owner is the `core.platform_owner` permission; nobody holds it after the first
+deploy, so nobody can open `/manager/platform/`. Until the ARC.25 first-start wizard exists, give
+it to the first person with the management command, once per environment, inside the app
+container:
+
+```sh
+manage.py bootstrap_platform_owner owner@example.org --dry-run   # shows what would change
+manage.py bootstrap_platform_owner owner@example.org             # grants it, audited
+manage.py bootstrap_platform_owner owner@example.org --create    # also creates the account
+```
+
+The command is idempotent (a second run says "already a platform owner" and changes nothing).
+It refuses an unknown user without `--create`, an inactive user (also with `--create`: it never
+reactivates an account) and a vendor member (platform roles and vendor membership never mix, so
+the user would be locked out of both spaces). It does not refuse when another owner already
+exists: several platform owners are allowed. A created account has no usable password and the
+command never prints one. Until the CORE.19 password-set link exists, a superuser sets the
+password in the staff admin (user page, "set password"); the owner then signs in and the Manager
+gate forces the enrolment of a second factor (CORE.4) before any page opens. Check
+the AuditLog entry `core.platform_owner.grant`; its target is the lower-cased email.
+
 ### Editor roles migration (CORE.8)
 
 Migration `cms/0013_editor_roles` removes Wagtail's default "Editors" and "Moderators" groups
