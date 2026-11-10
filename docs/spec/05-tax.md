@@ -117,6 +117,7 @@ class TaxDecision:
     reason: Literal["standard_destination", "domestic_vendor_country", "export",
                     "reverse_charge", "art74_publishing", "flat_rate_vendor", "exempt_other",
                     "outside_vat_territory"]
+    nature_code: str | None                   # N1-N7 e-invoice nature, None when VAT is charged
     country_of_taxation: str | None
     legal_note_key: str | None                # text on the order document
 
@@ -171,9 +172,13 @@ Intended differences from today:
 - D-26 (owner, 2026-11-10): a business with a valid number of the **vendor's own country**
   receiving goods in another member state is charged vendor-country VAT (departure is the place of
   supply, art. 32; no intra-community exemption without a number of another member state, art. 138;
-  advisor to confirm). A foreign EU number with delivery in the vendor's country is a domestic sale
+  confirmed by the advisor, D-28). A foreign EU number with delivery in the vendor's country is a domestic sale
   (vendor-country VAT, no reverse charge). The wording of an `other` exemption is the profile's
   translated `legal_note`, which must not be empty.
+- D-28 (owner, 2026-11-10): the decision carries an exemption-nature code (Italian e-invoice
+  `Natura`): `N3.2` for intra-EU B2B supplies (art. 138, IT art. 41 D.L. 331/93), and the other zero
+  reasons map as in [tax-nature-codes](../dev/tax-nature-codes.md). `exempt_other` takes a
+  structured nature (N1 to N7) plus the legal note; Italian vendors need both.
 - Rates are updated from an official source (the Commission's TEDB) with staff review and validity
   periods; past orders keep the rates in their snapshot.
 

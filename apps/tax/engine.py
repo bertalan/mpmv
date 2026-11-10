@@ -736,6 +736,24 @@ REASON_ART74_PUBLISHING: Final = ART74_PUBLISHING
 REASON_FLAT_RATE_VENDOR: Final = "flat_rate_vendor"
 REASON_EXEMPT_OTHER: Final = "exempt_other"
 
+# Italian e-invoice exemption natures (FatturaPA `Natura`), D-28. The platform issues no invoices
+# (spec 00): the code is carried on the decision and the order snapshot so the vendor's own
+# invoice and the OSS and intra-community reports can use it.
+NATURE_CODES: Final = (
+    "N1", "N2.1", "N2.2", "N3.1", "N3.2", "N3.3", "N3.4", "N3.5", "N3.6", "N4", "N5",
+    "N6.1", "N6.2", "N6.3", "N6.4", "N6.5", "N6.6", "N6.7", "N6.8", "N6.9", "N7",
+)  # fmt: skip
+# Reason -> nature, for the reasons that map to one nature whatever the vendor. `exempt_other`
+# takes the nature the vendor's profile declares; taxed reasons have none. Reviewed by the tax
+# advisor before production (docs/dev/tax-nature-codes.md).
+NATURE_BY_REASON: Final[Mapping[str, str]] = {
+    "reverse_charge": "N3.2",  # intra-EU supply, art. 138 (IT art. 41 D.L. 331/93)
+    "export": "N3.1",  # art. 146 (IT art. 8 DPR 633/72)
+    "outside_vat_territory": "N2.1",  # outside the VAT area, art. 6 (IT arts. 7 to 7-septies)
+    "art74_publishing": "N2.2",
+    "flat_rate_vendor": "N2.2",
+}
+
 TaxReason = Literal[
     "standard_destination",
     "domestic_vendor_country",
@@ -773,8 +791,8 @@ class MissingTaxRate(BlockingTaxError, LookupError):
 
 class IncompleteTaxProfile(BlockingTaxError, ValueError):
     """The vendor's exempt profile lacks what the decision needs (an unknown reason, or `other`
-    without its law country or its legal note, which exists after migration, MQ-15): checkout
-    shows a message."""
+    without its law country, its legal note or (Italy) its nature code; such profiles exist after
+    migration, MQ-15): checkout shows a message."""
 
 
 class UnresolvedTerritory(BlockingTaxError):
@@ -793,6 +811,8 @@ class VendorTaxProfileSnapshot:
     # The profile's translated legal notes as (language, text) pairs (D-26): the wording of an
     # `other` exemption, which must not be empty.
     legal_notes: tuple[tuple[str, str], ...] = ()
+    # An `other` exemption's structured reason, one of NATURE_CODES (D-28); Italian vendors need it.
+    exemption_nature: str = ""
 
 
 @dataclass(frozen=True)
@@ -860,11 +880,16 @@ class TaxDecision:
     reason: TaxReason
     country_of_taxation: str | None
     legal_note_key: str | None  # text on the order document
+    nature_code: str | None = None  # Italian e-invoice nature (N1-N7), None when taxed
 
 
-def _zero(reason: TaxReason, note: str | None) -> TaxDecision:
+def _zero(reason: TaxReason, note: str | None, nature: str | None = None) -> TaxDecision:
     return TaxDecision(
-        rate=Decimal(0), reason=reason, country_of_taxation=None, legal_note_key=note
+        rate=Decimal(0),
+        reason=reason,
+        country_of_taxation=None,
+        legal_note_key=note,
+        nature_code=NATURE_BY_REASON.get(reason, nature),
     )
 
 
@@ -882,9 +907,13 @@ def resolve_goods_tax(ctx: TaxContext, category: FiscalCategory) -> TaxDecision:
        because Aaland, Saint-Martin and the like are written with a country code of their own;
     3. a destination outside the EU is an export (T14);
     4. a VIES-validated business with a VAT number from another member state than the vendor's,
-       receiving goods in a member state other than the vendor's, is reverse charge (T1);
-    5. the vendor country's rate applies at home or for a `domestic_only` vendor (T3, T7, T8);
-    6. otherwise the destination country's rate (OSS, T2, T5).
+       receiving goods in a member state other than the vendor's, is reverse charge (T1, N3.2);
+    5. a validated business with a number of the vendor's own country, receiving goods in
+       another member state, pays vendor-country VAT (D-26.1: place of supply is departure,
+       art. 32; art. 138 needs a number of another member state);
+    6. the vendor country's rate applies at home or for a `domestic_only` vendor (T3, T7, T8,
+       D-26.2: a foreign number delivered in the vendor's country is a domestic sale);
+    7. otherwise the destination country's rate (OSS, T2, T5).
 
     Rates come from the context's table; a missing rate raises `MissingTaxRate` (T6). A blank or
     invalid destination country raises `InvalidCountry`: there is no default country (T18).
@@ -893,7 +922,7 @@ def resolve_goods_tax(ctx: TaxContext, category: FiscalCategory) -> TaxDecision:
         raise ValueError(f"{category!r} is not a fiscal category")
     profile = ctx.vendor_profile
     if profile.regime == EXEMPT:
-        return _exempt(profile)
+        return _exempt(profile, vendor_country=ctx.vendor_country)
 
     if _is_northern_ireland(ctx.destination_country, ctx.destination_postcode):
         raise UnresolvedTerritory("sales to Northern Ireland are blocked until D-02 is decided")
@@ -927,7 +956,7 @@ def resolve_goods_tax(ctx: TaxContext, category: FiscalCategory) -> TaxDecision:
         and customer.vat_country == vendor_country
     ):
         # D-26: place of supply is departure (art. 32) and the intra-community exemption needs a
-        # number of another member state (art. 138): vendor-country VAT, advisor to confirm.
+        # number of another member state (art. 138): vendor-country VAT (confirmed, D-28).
         return _taxed(
             ctx.rates.rate(vendor_country, category),
             REASON_DOMESTIC_VENDOR_COUNTRY,
@@ -953,7 +982,7 @@ def _is_northern_ireland(country: str, postcode: str | None) -> bool:
     )
 
 
-def _exempt(profile: VendorTaxProfileSnapshot) -> TaxDecision:
+def _exempt(profile: VendorTaxProfileSnapshot, *, vendor_country: str) -> TaxDecision:
     reason = profile.exempt_reason
     if reason == ART74_PUBLISHING:
         return _zero(REASON_ART74_PUBLISHING, NOTE_EXEMPT_PREFIX + reason)
@@ -964,7 +993,16 @@ def _exempt(profile: VendorTaxProfileSnapshot) -> TaxDecision:
         and profile.exempt_country
         and any(text.strip() for _, text in profile.legal_notes)
     ):
-        return _zero(REASON_EXEMPT_OTHER, f"{NOTE_EXEMPT_PREFIX}{reason}:{profile.exempt_country}")
+        nature = profile.exemption_nature
+        if nature and nature not in NATURE_CODES:
+            raise IncompleteTaxProfile(f"{nature!r} is not an exemption nature code")
+        if not nature and normalize_country(vendor_country) == vendors.ITALY:
+            raise IncompleteTaxProfile("an Italian vendor's `other` exemption needs a nature code")
+        return _zero(
+            REASON_EXEMPT_OTHER,
+            f"{NOTE_EXEMPT_PREFIX}{reason}:{profile.exempt_country}",
+            nature or None,
+        )
     raise IncompleteTaxProfile(
         f"an exempt vendor profile needs a known exemption reason ({reason!r})"
     )

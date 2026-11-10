@@ -252,7 +252,8 @@ def test_d01_a_business_delivered_in_the_vendor_country_pays_vendor_country_vat(
 
 
 def test_d26_a_vendor_country_number_delivered_abroad_pays_vendor_country_vat() -> None:
-    """D-26 (advisor to confirm): departure is the place of supply (art. 32) and art. 138 needs a
+    """D-26 (confirmed by the advisor, D-28): departure is the place of supply (art. 32) and
+    art. 138 needs a
     number of another member state."""
     d = engine.resolve_goods_tax(ctx(destination="DE", customer=b2b("IT")), engine.STANDARD)
     assert (d.rate, d.reason, d.country_of_taxation) == (D("22"), "domestic_vendor_country", "IT")
@@ -415,6 +416,7 @@ OTHER = engine.VendorTaxProfileSnapshot(
     regime=engine.EXEMPT,
     exempt_reason=engine.OTHER_EXEMPTION,
     exempt_country="DE",
+    exemption_nature="N4",
     legal_notes=(("en", "VAT exempt under the law cited."),),
 )
 
@@ -422,6 +424,7 @@ OTHER = engine.VendorTaxProfileSnapshot(
 def test_m4_an_other_exemption_is_not_labelled_flat_rate() -> None:
     d = engine.resolve_goods_tax(ctx(profile=OTHER), engine.STANDARD)
     assert (d.rate, d.reason, d.legal_note_key) == (D("0"), "exempt_other", "exempt:other:DE")
+    assert d.nature_code == "N4"
 
 
 @pytest.mark.parametrize("reason", ["", "made_up"])
@@ -452,3 +455,60 @@ def test_m3_the_reasons_are_the_spec_literal() -> None:
         "exempt_other",
         "outside_vat_territory",
     }
+
+
+# D-28: exemption-nature codes (Italian e-invoice natures) on the decision
+def nature(c: engine.TaxContext, category: str = engine.STANDARD) -> str | None:
+    return engine.resolve_goods_tax(c, category).nature_code
+
+
+def test_d28_intra_eu_b2b_supply_is_n3_2() -> None:
+    assert nature(ctx(destination="DE", customer=b2b("DE"))) == "N3.2"
+
+
+def test_d28_export_and_outside_territory_have_their_nature() -> None:
+    assert nature(ctx(destination="US")) == engine.NATURE_BY_REASON["export"] == "N3.1"
+    assert nature(ctx(destination="ES", postcode="35001")) == "N2.1"
+
+
+def test_d28_taxed_sales_have_no_nature_code() -> None:
+    assert nature(ctx(destination="DE")) is None
+    assert nature(ctx(destination="IT")) is None
+
+
+def test_d28_the_mapping_covers_every_zero_reason() -> None:
+    zero = set(typing.get_args(engine.TaxReason)) - {
+        "standard_destination",
+        "domestic_vendor_country",
+        "exempt_other",  # the nature comes from the vendor's profile
+    }
+    assert zero == set(engine.NATURE_BY_REASON)
+    assert set(engine.NATURE_BY_REASON.values()) <= set(engine.NATURE_CODES)
+
+
+@pytest.mark.parametrize("profile", [ART74, FLAT])
+def test_d28_exempt_vendors_carry_their_nature(profile: engine.VendorTaxProfileSnapshot) -> None:
+    assert nature(ctx(profile=profile)) == "N2.2"
+
+
+@pytest.mark.parametrize("bad", ["", "N9", "n4"])
+def test_d28_an_italian_other_exemption_needs_a_valid_nature(bad: str) -> None:
+    profile = dataclasses.replace(OTHER, exempt_country="IT", exemption_nature=bad)
+    with pytest.raises(engine.IncompleteTaxProfile):
+        engine.resolve_goods_tax(ctx(vendor="IT", profile=profile), engine.STANDARD)
+
+
+def test_d28_an_italian_other_exemption_with_nature_and_note_resolves() -> None:
+    profile = dataclasses.replace(OTHER, exempt_country="IT", exemption_nature="N6.3")
+    d = engine.resolve_goods_tax(ctx(vendor="IT", profile=profile), engine.STANDARD)
+    assert (d.reason, d.nature_code) == ("exempt_other", "N6.3")
+
+
+def test_d28_a_foreign_other_exemption_needs_no_nature() -> None:
+    profile = dataclasses.replace(OTHER, exemption_nature="")
+    d = engine.resolve_goods_tax(ctx(vendor="DE", profile=profile), engine.STANDARD)
+    assert (d.reason, d.nature_code) == ("exempt_other", None)
+
+
+def test_d28_every_nature_code_is_an_einvoice_n_code() -> None:
+    assert {c.split(".")[0] for c in engine.NATURE_CODES} == {f"N{i}" for i in range(1, 8)}

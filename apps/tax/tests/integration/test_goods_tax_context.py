@@ -213,8 +213,9 @@ def test_d26_the_legal_note_of_an_other_exemption_comes_from_the_profile() -> No
     profile = VendorTaxProfileFactory.create(
         regime=engine.EXEMPT,
         exempt_reason=engine.OTHER_EXEMPTION,
-        exempt_country="DE",
-        vendor=VendorFactory.create(country="DE"),
+        exempt_country="IT",
+        exemption_nature="N4",
+        vendor=VendorFactory.create(country="IT"),
         valid_from=utc(2027, 1, 1),
     )
     ctx = services.build_tax_context(profile.vendor, destination_country="FR", at=AT)
@@ -222,4 +223,6 @@ def test_d26_the_legal_note_of_an_other_exemption_comes_from_the_profile() -> No
         engine.resolve_goods_tax(ctx, engine.STANDARD)
     VendorTaxProfileTranslationFactory.create(profile=profile, language="en")
     ctx = services.build_tax_context(profile.vendor, destination_country="FR", at=AT)
-    assert engine.resolve_goods_tax(ctx, engine.STANDARD).reason == "exempt_other"
+    d = engine.resolve_goods_tax(ctx, engine.STANDARD)
+    assert (d.reason, d.nature_code) == ("exempt_other", "N4")
+    assert ctx.vendor_profile.exemption_nature == "N4"

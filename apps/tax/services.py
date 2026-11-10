@@ -58,6 +58,7 @@ PROFILE_FIELDS = (
     "regime",
     "exempt_reason",
     "exempt_country",
+    "exemption_nature",
     "oss_registered_since",
     "valid_from",
     "valid_to",
@@ -1105,6 +1106,7 @@ def build_tax_context(
             regime=profile.regime,
             exempt_reason=profile.exempt_reason,
             exempt_country=profile.exempt_country,
+            exemption_nature=profile.exemption_nature,
             legal_notes=tuple(
                 (n.language, n.legal_note) for n in profile.translations.all() if n.legal_note
             ),
