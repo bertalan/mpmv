@@ -18,7 +18,7 @@ from typing import Annotated, Any
 
 from django.core.exceptions import ValidationError
 from django.http import HttpRequest
-from ninja import Query, Router, Schema, Status
+from ninja import Body, Query, Router, Schema, Status
 from pydantic import ConfigDict, Field
 
 from apps.api.auth import api_client_of
@@ -190,9 +190,9 @@ def _event(request: HttpRequest, public_id: uuid.UUID) -> EventPage:
     )
 
 
-def _input(request: HttpRequest, payload: EventIn) -> dict[str, Any]:
+def _input(request: HttpRequest, payload: EventIn | None) -> dict[str, Any]:
     """The service input: the fields the client sent, products by primary key."""
-    data = payload.model_dump(exclude_unset=True)
+    data = {} if payload is None else payload.model_dump(exclude_unset=True)
     if "products" in data:
         ids: list[uuid.UUID] = data["products"]
         # Scoped to the key's vendor: another vendor's product is "not found", like a missing one.
@@ -208,7 +208,7 @@ def _input(request: HttpRequest, payload: EventIn) -> dict[str, Any]:
     return data
 
 
-@router.get("", response=EventList, auth=ApiKey(READ), summary="List events")
+@router.get("", response=EventList, auth=ApiKey(READ), summary="List events", url_name="events")
 def list_events(request: HttpRequest, query: Annotated[ListQuery, Query()]) -> dict[str, Any]:
     """The key's events, newest first (all languages). Items show the published page; `GET` one
     event for its latest draft."""
@@ -221,7 +221,9 @@ def list_events(request: HttpRequest, query: Annotated[ListQuery, Query()]) -> d
     return {"count": pages.count(), "items": [_item(page) for page in window]}
 
 
-@router.get("/{public_id}", response=EventOut, auth=ApiKey(READ), summary="An event")
+@router.get(
+    "/{public_id}", response=EventOut, auth=ApiKey(READ), summary="An event", url_name="event"
+)
 def get_event(request: HttpRequest, public_id: uuid.UUID) -> dict[str, Any]:
     return _detail(_event(request, public_id))
 
@@ -231,6 +233,7 @@ def get_event(request: HttpRequest, public_id: uuid.UUID) -> dict[str, Any]:
     response={200: ChangeSetOut, 201: ChangeSetOut},
     auth=ApiKey(WRITE),
     summary="Create an event draft",
+    url_name="events",
 )
 def create_event(
     request: HttpRequest, payload: EventIn, dry_run: DryRun = False
@@ -253,16 +256,22 @@ def create_event(
     response=ChangeSetOut,
     auth=ApiKey(WRITE),
     summary="Update an event draft",
+    url_name="event",
 )
 def update_event(
-    request: HttpRequest, public_id: uuid.UUID, payload: EventIn, dry_run: DryRun = False
+    request: HttpRequest,
+    public_id: uuid.UUID,
+    payload: Annotated[EventIn | None, Body()] = None,
+    dry_run: DryRun = False,
 ) -> dict[str, Any]:
     """Save a new draft revision from the fields sent; a live page stays as published until the
     revision is submitted."""
+    # The event is looked up first, so another vendor's event is a 404 whatever the body.
+    page = _event(request, public_id)
     changes = services.save_event_draft(
         api_client_of(request),
         _input(request, payload),
-        _event(request, public_id),
+        page,
         ctx=audit_context(request),
         dry_run=dry_run,
     )
