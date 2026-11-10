@@ -1,7 +1,10 @@
 """Account views: thin adapters over `services`."""
 
+from django.contrib import messages
 from django.http import HttpRequest, HttpResponseRedirect
+from django.utils import translation
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.translation import gettext
 from django.views.decorators.http import require_POST
 
 from apps.core.i18n import configured_languages, translate_path
@@ -26,4 +29,11 @@ def switch_language(request: HttpRequest) -> HttpResponseRedirect:
         return HttpResponseRedirect(next_url)
     if request.user.is_authenticated:
         set_preferred_language(request.user, language)
+    exact = request.POST.get("exact") == "1"
+    if exact and request.POST.get("notice") == "1":
+        # The object has no translation: the visitor lands on the language's home, told once.
+        with translation.override(language):
+            messages.info(request, gettext("This content is not available in this language."))
+    if exact:
+        return HttpResponseRedirect(next_url)  # already the target in `language`
     return HttpResponseRedirect(translate_path(next_url, language))
