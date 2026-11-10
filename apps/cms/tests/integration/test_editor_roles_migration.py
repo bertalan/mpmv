@@ -128,3 +128,14 @@ def test_the_reverse_does_not_widen_a_single_role_member_to_editors() -> None:
     )
     executor.loader.build_graph()
     executor.migrate(executor.loader.graph.leaf_nodes())
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_reverse_and_forward_run_with_the_editor_role_hooks_active() -> None:
+    """Main-red regression: a partial migrate back past cms 0013 and forward again (as the
+    catalog migration tests do) must not fail on historical-model queries."""
+    executor = MigrationExecutor(connection)
+    executor.migrate([("cms", "0012_launch_countdown")])
+    executor.loader.build_graph()
+    executor.migrate(executor.loader.graph.leaf_nodes())
+    assert "cms_editorroleseed" in connection.introspection.table_names()
