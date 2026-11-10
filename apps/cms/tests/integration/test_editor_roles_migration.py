@@ -14,8 +14,8 @@ from django.db.migrations.executor import MigrationExecutor
 
 from apps.cms import roles
 
-BEFORE = [("cms", "0011_blog")]
-CODE = "0012_editor_roles"
+BEFORE = [("cms", "0012_launch_countdown")]
+CODE = "0013_editor_roles"
 
 
 def _names(model: type, **filters: object) -> set[str]:

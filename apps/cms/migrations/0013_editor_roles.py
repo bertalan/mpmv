@@ -115,7 +115,7 @@ def restore_default_groups(apps: Any, schema_editor: Any) -> None:
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("cms", "0011_blog"),
+        ("cms", "0012_launch_countdown"),
         ("auth", "0012_alter_user_first_name_max_length"),
         ("wagtailcore", "0098_apitoken"),
         ("accounts", "0005_action_link_issue"),

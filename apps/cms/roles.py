@@ -1,7 +1,7 @@
 """Editor roles of the Wagtail admin (CORE.8, owner decision Q-58): pure data, no ORM.
 
 Each role is a group limited to its part of the page tree. They replace Wagtail's default
-"Editors" and "Moderators" groups, which migration `cms/0012_editor_roles` removes. Wagtail
+"Editors" and "Moderators" groups, which migration `cms/0013_editor_roles` removes. Wagtail
 page permissions are granted on a tree node and inherit downwards, so a role is bound to the
 page types whose nodes it may change: the blog index (and with it every post), each legal
 page, the event indexes (and with them every event), and the standalone content pages. The

@@ -1,7 +1,7 @@
 # Editor roles (CORE.8, owner decision Q-58)
 
 Wagtail's default "Editors" and "Moderators" groups are removed by migration
-`apps/cms/migrations/0012_editor_roles.py`. Our own roles replace them. The data is
+`apps/cms/migrations/0013_editor_roles.py`. Our own roles replace them. The data is
 `apps/cms/roles.py`; `apps/cms/editor_roles.py` turns it into groups and grants.
 
 | Role | Works on | Page permissions |
