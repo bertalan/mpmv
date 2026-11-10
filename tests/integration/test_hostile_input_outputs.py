@@ -180,25 +180,21 @@ def test_the_editor_keeps_only_the_allowed_rich_text_features(value: str) -> Non
 # --- Findings (xfail strict: fixed later, the test then turns red as a reminder) -----------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="F1: rich text written outside the editor (import, seed, MIG.7) is rendered as "
-    "stored: no server-side sanitiser yet (owner: 'the same sanitiser as MIG.7'); proposed "
-    "backlog row CMS.12 in PR #166 Follow-ups",
-)
 def test_stored_rich_text_is_sanitised_on_output() -> None:
+    """F1 (CMS.12): rich text written outside the editor is stored with the allowed features."""
     from wagtail.rich_text import expand_db_html
 
-    assert hi.active_markup(expand_db_html(hi.HTML[1] + hi.HTML[6])) == []
+    from apps.cms.models import BlogIndexPage
+    from apps.cms.tests.factories import BlogIndexPageFactory
+
+    page = BlogIndexPageFactory.create(intro=hi.HTML[1] + hi.HTML[6])
+
+    stored = BlogIndexPage.objects.get(pk=page.pk).intro
+    assert hi.active_markup(expand_db_html(stored)) == []
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="F2: the Draftail converter raises on stored HTML it did not write (an <img>), so "
-    "the editor of such a page fails; reachable only through non-editor writes; proposed "
-    "backlog row CMS.12 in PR #166 Follow-ups",
-)
 def test_the_editor_opens_rich_text_it_did_not_write() -> None:
+    """F2 (CMS.12): the editor opens stored HTML it would not write (an <img>)."""
     contentstate = ContentstateConverter(RICH_TEXT_FEATURES).from_database_format(
         "<p>before</p><p><img src=x></p><p>after</p>"
     )
