@@ -248,3 +248,112 @@ def test_a_stored_logo_is_a_real_reencoded_image(vendor: Vendor, owner: User) ->
     assert vendor.logo is not None
     with vendor.logo.file.open("rb") as handle, Image.open(io.BytesIO(handle.read())) as image:
         assert image.size == (vendor.logo.width, vendor.logo.height)
+
+
+# --- Review fixes (#208)
+
+
+def test_the_first_logo_locks_the_root_collection_before_adding_the_child(
+    vendor: Vendor, owner: User
+) -> None:
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    with CaptureQueriesContext(connection) as queries:
+        set_vendor_logo(vendor, upload=_file(), alt="Mark", actor=owner, ctx=CTX)
+    sql = [q["sql"] for q in queries.captured_queries]
+    lock = next(i for i, s in enumerate(sql) if "FOR UPDATE" in s and "wagtailcore_collection" in s)
+    insert = next(
+        i for i, s in enumerate(sql) if s.startswith("INSERT") and "wagtailcore_collection" in s
+    )
+    assert lock < insert, "two vendors' first uploads could pick the same tree path"
+
+
+def test_a_duplicate_collection_name_is_resolved_to_the_oldest(vendor: Vendor, owner: User) -> None:
+    root = Collection.get_first_root_node()
+    oldest = root.add_child(name=f"vendor-{vendor.public_id}")
+    root.add_child(name=f"vendor-{vendor.public_id}")
+    set_vendor_logo(vendor, upload=_file(), alt="Mark", actor=owner, ctx=CTX)
+    vendor.refresh_from_db()
+    assert vendor.logo is not None
+    assert vendor.logo.collection_id == oldest.pk
+
+
+def _share_logo(vendor: Vendor, owner: User) -> Vendor:
+    """Another vendor whose logo row is the same image as `vendor`'s."""
+    set_vendor_logo(vendor, upload=_file(), alt="Shared", actor=owner, ctx=CTX)
+    vendor.refresh_from_db()
+    other = VendorFactory.create()
+    Vendor.objects.filter(pk=other.pk).update(logo=vendor.logo, logo_alt="Shared")
+    return other
+
+
+def test_replacing_a_logo_another_vendor_still_uses_only_unlinks_it(
+    vendor: Vendor, owner: User
+) -> None:
+    other = _share_logo(vendor, owner)
+    shared_pk = other.__class__.objects.get(pk=other.pk).logo_id
+    set_vendor_logo(vendor, upload=_file(), alt="Own now", actor=owner, ctx=CTX)
+    assert MediaImage.objects.filter(pk=shared_pk).exists()
+    other.refresh_from_db()
+    assert other.logo_id == shared_pk
+
+
+def test_removing_a_logo_another_vendor_still_uses_only_unlinks_it(
+    vendor: Vendor, owner: User
+) -> None:
+    other = _share_logo(vendor, owner)
+    shared_pk = Vendor.objects.get(pk=other.pk).logo_id
+    remove_vendor_logo(vendor, actor=owner, ctx=CTX)
+    vendor.refresh_from_db()
+    assert vendor.logo is None
+    assert MediaImage.objects.filter(pk=shared_pk).exists()
+
+
+def test_a_missing_own_work_licence_is_a_clear_error_not_a_500(vendor: Vendor, owner: User) -> None:
+    from apps.core.models import ImageLicence
+
+    ImageLicence.objects.filter(code="own-work").delete()
+    with pytest.raises(ValidationError) as caught:
+        set_vendor_logo(vendor, upload=_file(), alt="Mark", actor=owner, ctx=CTX)
+    assert "logo" in caught.value.message_dict
+
+
+def test_refused_uploads_count_against_the_rate_limit(
+    vendor: Vendor, owner: User, settings: object
+) -> None:
+    settings.VENDOR_PROFILE_SAVE_LIMIT = 2  # type: ignore[attr-defined]
+    bad = _file("logo.png", b"<?php echo 1; ?>")
+    for _ in range(2):
+        with pytest.raises(ValidationError) as caught:
+            set_vendor_logo(vendor, upload=bad, alt="Evil", actor=owner, ctx=CTX)
+        assert "Too many" not in str(caught.value)
+    with pytest.raises(ValidationError) as caught:
+        set_vendor_logo(vendor, upload=_file(), alt="Good", actor=owner, ctx=CTX)
+    assert "Too many" in str(caught.value)
+    assert not MediaImage.objects.exists()
+
+
+def test_a_stored_file_is_removed_when_a_later_step_fails(
+    vendor: Vendor, owner: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from apps.vendors import services
+
+    stored: list[tuple[object, str]] = []
+    original = MediaImage.save
+
+    def spying_save(self: MediaImage, *args: object, **kwargs: object) -> None:
+        original(self, *args, **kwargs)  # type: ignore[arg-type]
+        stored.append((self.file.storage, self.file.name))
+
+    def failing_notice(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("outbox down")
+
+    monkeypatch.setattr(MediaImage, "save", spying_save)
+    monkeypatch.setattr(services, "_notify_profile_changed", failing_notice)
+    with pytest.raises(RuntimeError):
+        set_vendor_logo(vendor, upload=_file(), alt="Mark", actor=owner, ctx=CTX)
+    assert stored
+    storage, name = stored[0]
+    assert not storage.exists(name)  # type: ignore[attr-defined]
+    assert not MediaImage.objects.exists()
