@@ -3,9 +3,10 @@
 {% translate "Reference" %}: {{ reference }}
 {% translate "Restriction" %}: {% if restriction == "suspend_account" %}{% translate "Your storefront is suspended" %}{% else %}{% translate "The content is removed or disabled" %}{% endif %}
 {% translate "Scope" %}: {{ scope }}
-{% translate "Facts and circumstances relied on" %}: {{ facts }}
+{% if valid_until %}{% translate "Until" %}: {{ valid_until }}
+{% endif %}{% translate "Facts and circumstances relied on" %}: {{ facts }}
 {% translate "Ground" %}: {% if ground_kind == "illegal_content" %}{% translate "The content is illegal" %}{% else %}{% translate "The content is incompatible with the platform terms" %}{% endif %}: {{ ground }}
-{% translate "Based on a notice" %}: {% if based_on_notice %}{% translate "Yes" %}{% else %}{% translate "No, our own initiative" %}{% endif %}
+{% translate "Based on a notice" %}: {% if based_on_notice %}{% translate "Yes" %}, {% translate "notice" %} {{ notice_reference }}{% else %}{% translate "No, our own initiative" %}{% endif %}
 {% translate "Automated means used to detect the content" %}: {% if automated_detection %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}
 {% translate "Automated means used to decide" %}: {% if automated_decision %}{% translate "Yes" %}{% else %}{% translate "No" %}{% endif %}
 

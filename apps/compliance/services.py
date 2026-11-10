@@ -69,6 +69,7 @@ from .models import (
     GpsrInfo,
     GpsrSafetyText,
     Notice,
+    ProductRestriction,
     SafetyCase,
     StatementOfReasons,
     TransparencySubmission,
@@ -1037,6 +1038,7 @@ NOTICE_VIEWED: Final = "compliance.notice.viewed"
 #: Receipt emails per address per day: the form must not work as a mail relay.
 NOTICE_RECEIPTS_PER_ADDRESS: Final = 3
 NOTICE_PERMISSION: Final = "review_notices"
+AUTHORITIES_PERMISSION: Final = "notify_authorities"
 
 
 class NoticeError(ValueError):
@@ -1114,6 +1116,21 @@ def record_notice_view(public_id: Any, *, ctx: AuditContext) -> None:
         None,
         {"reason": "notice review shows the notifier's details"},
     )
+
+
+def _has_permission(user: Any, codename: str) -> bool:
+    if not (getattr(user, "is_active", False) and getattr(user, "pk", None) is not None):
+        return False
+    return Permission.objects.filter(
+        Q(user=user) | Q(group__user=user),
+        content_type__app_label=Notice._meta.app_label,
+        codename=codename,
+    ).exists()
+
+
+def can_notify_authorities(user: Any) -> bool:
+    """An active user granted `compliance.notify_authorities` (the art. 18 record)."""
+    return _has_permission(user, AUTHORITIES_PERMISSION)
 
 
 def can_review_notices(user: Any) -> bool:
@@ -1383,6 +1400,8 @@ def issue_statement(
     facts: str,
     ground_kind: str,
     ground: str,
+    transparency_explanation: str,
+    valid_until: dt.date | None = None,
     automated_detection: bool = False,
     automated_decision: bool = False,
     notice_id: Any = None,
@@ -1399,13 +1418,18 @@ def issue_statement(
     `NoticeError` for a missing part, an unknown target or a notice not decided as action taken,
     also on dry-run.
     """
-    if not is_platform_staff(staff):
-        raise PermissionDenied("only platform staff restrict content")
+    if not (is_platform_staff(staff) and can_review_notices(staff)):
+        raise PermissionDenied("restricting content needs platform staff with review_notices")
     restriction = (
         engine.RESTRICTION_SUSPEND if target_kind == "vendor" else engine.RESTRICTION_REMOVE
     )
     problems = engine.statement_problems(
-        restriction=restriction, scope=scope, facts=facts, ground_kind=ground_kind, ground=ground
+        restriction=restriction,
+        scope=scope,
+        facts=facts,
+        ground_kind=ground_kind,
+        ground=ground,
+        transparency_explanation=transparency_explanation,
     )
     if problems:
         raise NoticeError(*problems)
@@ -1417,7 +1441,7 @@ def issue_statement(
                 notice = Notice.objects.select_for_update().get(public_id=notice_id)
             except Notice.DoesNotExist:
                 raise NoticeError("notice") from None
-            if notice.status != Notice.Status.ACTION_TAKEN:
+            if notice.status != Notice.Status.ACTION_TAKEN or notice.target_kind != target_kind:
                 raise NoticeError("notice")
         target, vendor = _target(staff, target_kind, target_ref)
         changes.changes.extend(
@@ -1426,6 +1450,9 @@ def issue_statement(
             )
         )
         language = settings.LANGUAGE_CODE
+        redress = redress_text(language)
+        if not redress:  # art. 17(3)(f): no statement without the redress information
+            raise NoticeError("redress_text")
         now = timezone.now()
         statement = StatementOfReasons(
             vendor=vendor,
@@ -1434,12 +1461,14 @@ def issue_statement(
             target_ref=target.public_id,
             restriction=restriction,
             scope=scope.strip(),
+            valid_until=valid_until,
             facts=facts.strip(),
             ground_kind=ground_kind,
             ground=ground.strip(),
+            transparency_explanation=engine.scrub_public_text(transparency_explanation),
             automated_detection=automated_detection,
             automated_decision=automated_decision,
-            redress_text=redress_text(language),
+            redress_text=redress,
             language=language,
             sent_at=now,
         )
@@ -1452,18 +1481,19 @@ def issue_statement(
             statement=statement,
             payload=engine.transparency_payload(
                 restriction=restriction,
-                scope=statement.scope,
-                facts=statement.facts,
                 ground_kind=ground_kind,
-                ground=statement.ground,
                 target_kind=target_kind,
+                explanation=statement.transparency_explanation,
                 based_on_notice=notice is not None,
                 automated_detection=automated_detection,
                 automated_decision=automated_decision,
                 applied_on=timezone.localdate(now),
+                valid_until=valid_until,
                 reference=str(statement.public_id),
             ),
         )
+        if target_kind == "product":
+            ProductRestriction.objects.create(product=target, statement=statement)
         record(
             ctx,
             STATEMENT_ISSUED,
@@ -1479,7 +1509,9 @@ def issue_statement(
             context={
                 "reference": str(statement.public_id),
                 "restriction": restriction,
+                "notice_reference": str(notice.public_id) if notice else "",
                 "scope": statement.scope,
+                "valid_until": statement.valid_until.isoformat() if statement.valid_until else "",
                 "facts": statement.facts,
                 "ground_kind": ground_kind,
                 "ground": statement.ground,
@@ -1494,14 +1526,23 @@ def issue_statement(
 
 
 def notify_authorities(
-    public_id: Any, *, authority: str, note: str, ctx: AuditContext, dry_run: bool = False
+    actor: Any,
+    public_id: Any,
+    *,
+    authority: str,
+    note: str,
+    ctx: AuditContext,
+    dry_run: bool = False,
 ) -> NoticeChangeSet:
     """Article 18: record that staff told `authority` of a suspected threat to life or safety.
 
     Staff make the report themselves; nothing is sent from here. The time is now, once per
     notice. The audit entry keeps the authority and the time, never the note. Raises
-    `NoticeError` for an unknown notice, a missing authority or a second notification.
+    `NoticeError` for an unknown notice, a missing authority or a second notification, and
+    `PermissionDenied` unless `actor` holds `compliance.notify_authorities`.
     """
+    if not can_notify_authorities(actor):
+        raise PermissionDenied("the art. 18 record needs compliance.notify_authorities")
     if not authority.strip():
         raise NoticeError("authority")
     changes = NoticeChangeSet()
@@ -1533,4 +1574,61 @@ def notify_authorities(
             ]
         )
         audit_changes(changes, ctx=ctx, action=NOTICE_AUTHORITIES_NOTIFIED)
+    return changes
+
+
+RESTRICTION_LIFTED: Final = "compliance.restriction.lifted"
+RESTRICTION_MODEL: Final = "compliance.productrestriction"
+
+
+def restriction_blocking_messages(product: Product) -> tuple[str, ...]:
+    """The publication check (CAT.10 hook): an active statement-of-reasons hold blocks it."""
+    if (
+        product.pk is not None
+        and ProductRestriction.objects.filter(
+            product_id=product.pk, lifted_at__isnull=True
+        ).exists()
+    ):
+        return (
+            str(
+                _(
+                    "This product is restricted by a statement of reasons; "
+                    "only platform staff can lift the restriction."
+                )
+            ),
+        )
+    return ()
+
+
+def lift_restriction(
+    staff: Any, product_ref: Any, *, reason: str, ctx: AuditContext, dry_run: bool = False
+) -> StatementChangeSet:
+    """Lift the hold on a product (an appeal under art. 20 succeeded). The vendor can then
+    publish it again through the normal checks. Needs `review_notices`; a reason is required.
+    Raises `NoticeError` when the product has no active restriction."""
+    if not (is_platform_staff(staff) and can_review_notices(staff)):
+        raise PermissionDenied("lifting a restriction needs platform staff with review_notices")
+    if not str(reason).strip():
+        raise NoticeError("reason")
+    changes = StatementChangeSet()
+    with transaction.atomic():
+        row = (
+            ProductRestriction.objects.select_for_update(of=("self",))
+            .filter(product__public_id=product_ref, lifted_at__isnull=True)
+            .first()
+        )
+        if row is None:
+            raise NoticeError("restriction")
+        changes.update(
+            RESTRICTION_MODEL,
+            str(row.public_id),
+            {"product": str(product_ref), "active": True},
+            {"product": str(product_ref), "active": False},
+        )
+        if dry_run:
+            return changes
+        row.lifted_at = timezone.now()
+        row.lift_reason = str(reason).strip()
+        row.save(update_fields=["lifted_at", "lift_reason", "updated_at"])
+        audit_changes(changes, ctx=ctx, action=RESTRICTION_LIFTED)
     return changes

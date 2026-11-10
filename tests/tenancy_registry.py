@@ -55,6 +55,7 @@ from apps.cms.tests.factories import VendorLandingPageFactory
 from apps.compliance.models import (
     GpsrInfo,
     GpsrSafetyText,
+    ProductRestriction,
     SafetyCase,
     StatementOfReasons,
     TransparencySubmission,
@@ -63,6 +64,7 @@ from apps.compliance.models import (
 from apps.compliance.tests.factories import (
     GpsrInfoFactory,
     GpsrSafetyTextFactory,
+    ProductRestrictionFactory,
     SafetyCaseFactory,
     StatementOfReasonsFactory,
     TransparencySubmissionFactory,
@@ -186,6 +188,10 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         product=ProductFactory.create(vendor=vendor)
     ),
     StatementOfReasons: lambda vendor: StatementOfReasonsFactory.create(vendor=vendor),
+    ProductRestriction: lambda vendor: ProductRestrictionFactory.create(
+        product=ProductFactory.create(vendor=vendor),
+        statement=StatementOfReasonsFactory.create(vendor=vendor),
+    ),
     TransparencySubmission: lambda vendor: TransparencySubmissionFactory.create(
         statement=StatementOfReasonsFactory.create(vendor=vendor)
     ),

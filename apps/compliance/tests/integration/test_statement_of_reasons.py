@@ -17,7 +17,11 @@ from apps.catalog.tests.factories import ProductFactory
 from apps.cms.tests.factories import LegalPageFactory
 from apps.compliance import engine, services
 from apps.compliance.models import Notice, StatementOfReasons, TransparencySubmission
-from apps.compliance.tests.factories import NoticeFactory
+from apps.compliance.tests.factories import (
+    GpsrInfoFactory,
+    NoticeFactory,
+    VendorGpsrDefaultsFactory,
+)
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog, OutboxEmail
 from apps.core.tests.factories import PlatformOperatorFactory
@@ -40,7 +44,27 @@ def _operator() -> None:
 
 @pytest.fixture
 def staff() -> Any:
-    return UserFactory.create(platform_staff=True)
+    return UserFactory.create(
+        platform_staff=True,
+        permissions=["compliance.review_notices", "compliance.notify_authorities"],
+    )
+
+
+def terms_page() -> None:
+    sections = [
+        ("complaint_handling", "<p>Write to the complaints desk within six months.</p>"),
+        ("redress", "<p>Pick a body.</p>"),
+    ]
+    page = LegalPageFactory.create(
+        kind="platform_terms",
+        body=[("legal_section", {"section": t, "heading": t, "text": x}) for t, x in sections],
+    )
+    page.save_revision().publish()
+
+
+@pytest.fixture(autouse=True)
+def _terms() -> None:
+    terms_page()
 
 
 def published_product() -> Product:
@@ -55,6 +79,8 @@ def issue(staff: Any, **override: Any) -> services.StatementChangeSet:
         "target_ref": str(product.public_id),
         "scope": "The product is no longer shown or sold",
         "facts": "The listing offers a counterfeit item.",
+        "transparency_explanation": "Counterfeit item offered.",
+        "valid_until": None,
         "ground_kind": engine.GROUND_ILLEGAL,
         "ground": "Trade mark infringement",
         "automated_detection": False,
@@ -86,7 +112,9 @@ def test_an_action_notice_unpublishes_a_product_and_tells_the_vendor(staff: Any)
 
 
 def test_a_hide_of_an_event_carries_the_notice_reference(staff: Any) -> None:
-    notice = NoticeFactory.create(status=Notice.Status.ACTION_TAKEN)
+    notice = NoticeFactory.create(
+        status=Notice.Status.ACTION_TAKEN, target_kind=Notice.TargetKind.EVENT
+    )
     event = EventPageFactory.create(live=True)
     changes = issue(
         staff, target_kind="event", target_ref=str(event.public_id), notice_id=notice.public_id
@@ -170,24 +198,6 @@ def test_the_statement_records_article_17_3_and_is_immutable(staff: Any) -> None
 
 
 def test_the_redress_wording_comes_from_the_cms_terms_page(staff: Any) -> None:
-    page = LegalPageFactory.create(
-        kind="platform_terms",
-        body=[
-            (
-                "legal_section",
-                {
-                    "section": "complaint_handling",
-                    "heading": "Complaints",
-                    "text": "<p>Write to the complaints desk within six months.</p>",
-                },
-            ),
-            (
-                "legal_section",
-                {"section": "redress", "heading": "Redress", "text": "<p>Pick a body.</p>"},
-            ),
-        ],
-    )
-    page.save_revision().publish()
     statement = issue(staff).statement
     assert statement is not None
     assert "complaints desk within six months" in statement.redress_text
@@ -196,10 +206,26 @@ def test_the_redress_wording_comes_from_the_cms_terms_page(staff: Any) -> None:
     assert "complaints desk within six months" in mail.context
 
 
+def test_without_redress_wording_nothing_is_sent(staff: Any) -> None:
+    from apps.cms.models import LegalPage
+
+    for page in LegalPage.objects.all():
+        page.unpublish()
+    product = published_product()
+    with pytest.raises(services.NoticeError) as excinfo:
+        issue(staff, product=product)
+    assert "redress_text" in excinfo.value.codes
+    product.refresh_from_db()
+    assert product.status == ProductStatus.PUBLISHED
+    assert not StatementOfReasons.objects.exists()
+
+
 def test_the_email_gives_the_facts_and_the_notice_basis(staff: Any) -> None:
-    issue(staff, notice_id=NoticeFactory.create(status=Notice.Status.ACTION_TAKEN).public_id)
+    notice = NoticeFactory.create(status=Notice.Status.ACTION_TAKEN)
+    issue(staff, notice_id=notice.public_id)
     mail = OutboxEmail.objects.get(template_key="compliance.statement_of_reasons")
     assert "counterfeit" in mail.context
+    assert str(notice.public_id) in mail.context
     assert "Trade mark infringement" in mail.context
 
 
@@ -231,7 +257,11 @@ def test_a_pending_export_is_built_without_an_external_call(staff: Any) -> None:
 def test_staff_record_a_notification_to_the_authorities(staff: Any) -> None:
     notice = NoticeFactory.create(status=Notice.Status.UNDER_REVIEW)
     services.notify_authorities(
-        notice.public_id, authority="Public prosecutor, district X", note="Threat to life", ctx=CTX
+        staff,
+        notice.public_id,
+        authority="Public prosecutor, district X",
+        note="Threat to life",
+        ctx=CTX,
     )
     notice.refresh_from_db()
     assert notice.authorities_notified_at is not None
@@ -240,20 +270,20 @@ def test_staff_record_a_notification_to_the_authorities(staff: Any) -> None:
     assert "Threat to life" not in str(entry.after)
 
 
-def test_the_notification_needs_an_authority_and_happens_once() -> None:
+def test_the_notification_needs_an_authority_and_happens_once(staff: Any) -> None:
     notice = NoticeFactory.create()
     with pytest.raises(services.NoticeError) as excinfo:
-        services.notify_authorities(notice.public_id, authority=" ", note="x", ctx=CTX)
+        services.notify_authorities(staff, notice.public_id, authority=" ", note="x", ctx=CTX)
     assert "authority" in excinfo.value.codes
-    services.notify_authorities(notice.public_id, authority="Police", note="x", ctx=CTX)
+    services.notify_authorities(staff, notice.public_id, authority="Police", note="x", ctx=CTX)
     with pytest.raises(services.NoticeError):
-        services.notify_authorities(notice.public_id, authority="Police", note="x", ctx=CTX)
+        services.notify_authorities(staff, notice.public_id, authority="Police", note="x", ctx=CTX)
 
 
-def test_a_notification_dry_run_changes_nothing() -> None:
+def test_a_notification_dry_run_changes_nothing(staff: Any) -> None:
     notice = NoticeFactory.create()
     changes = services.notify_authorities(
-        notice.public_id, authority="Police", note="x", ctx=CTX, dry_run=True
+        staff, notice.public_id, authority="Police", note="x", ctx=CTX, dry_run=True
     )
     assert changes.changes
     notice.refresh_from_db()
@@ -270,7 +300,12 @@ def login(client: Client, user: object) -> None:
 @pytest.fixture
 def reviewer() -> object:
     return UserFactory.create(
-        permissions=["core.platform_owner", "compliance.review_notices"], platform_staff=True
+        permissions=[
+            "core.platform_owner",
+            "compliance.review_notices",
+            "compliance.notify_authorities",
+        ],
+        platform_staff=True,
     )
 
 
@@ -288,6 +323,7 @@ def test_a_reviewer_acts_on_the_content_from_the_notice(client: Client, reviewer
             "target_ref": str(product.public_id),
             "scope": "Not shown or sold",
             "facts": "Counterfeit item",
+            "transparency_explanation": "Counterfeit item offered.",
             "ground_kind": "illegal_content",
             "ground": "Trade mark infringement",
         },
@@ -322,3 +358,109 @@ def test_the_restriction_form_needs_the_review_permission(client: Client) -> Non
     )
     notice.refresh_from_db()
     assert notice.authorities_notified_at is None
+
+
+# --- Review fixes: public text, DB immutability, restriction hold, permissions, cross-checks
+
+
+def test_personal_data_never_reaches_the_public_payload(staff: Any) -> None:
+    leak = "Ada ada@example.org https://shop.example.com/p/1"
+    statement = issue(
+        staff, facts=leak, ground=leak, scope=leak, transparency_explanation=leak
+    ).statement
+    assert statement is not None
+    text = str(TransparencySubmission.objects.get(statement=statement).payload)
+    assert "ada@example.org" not in text
+    assert "shop.example.com" not in text
+    assert "Ada" in statement.facts  # the vendor still gets the full facts
+
+
+def test_the_public_explanation_is_required(staff: Any) -> None:
+    with pytest.raises(services.NoticeError) as excinfo:
+        issue(staff, transparency_explanation=" ")
+    assert "transparency_explanation" in excinfo.value.codes
+
+
+def test_the_duration_is_its_own_field(staff: Any) -> None:
+    until = dt.date.today() + dt.timedelta(days=30)
+    statement = issue(staff, valid_until=until).statement
+    assert statement is not None
+    assert statement.valid_until == until
+
+
+def test_the_database_refuses_updates_and_deletes_of_a_statement(staff: Any) -> None:
+    from django.db import DatabaseError, connection, transaction
+
+    statement = issue(staff).statement
+    assert statement is not None
+    with pytest.raises(DatabaseError), transaction.atomic():
+        StatementOfReasons.objects.filter(pk=statement.pk).update(facts="changed")
+    with pytest.raises(DatabaseError), transaction.atomic():
+        StatementOfReasons.objects.filter(pk=statement.pk).delete()
+    with pytest.raises(DatabaseError), transaction.atomic(), connection.cursor() as cursor:
+        cursor.execute("UPDATE compliance_statementofreasons SET scope = 'x'")
+    assert StatementOfReasons.objects.get().facts != "changed"
+
+
+def test_a_restricted_product_cannot_be_republished_until_staff_lift_it(staff: Any) -> None:
+    from django.core.exceptions import ValidationError
+
+    from apps.catalog.services import save_product
+
+    product = published_product()
+    VendorGpsrDefaultsFactory.create(vendor=product.vendor)
+    GpsrInfoFactory.create(product=product)
+    issue(staff, product=product)
+    product.refresh_from_db()
+    product.status = ProductStatus.PUBLISHED
+    with pytest.raises(ValidationError) as excinfo:
+        save_product(product, ctx=CTX)
+    assert "restriction" in excinfo.value.message_dict
+    services.lift_restriction(staff, product.public_id, reason="Appeal upheld", ctx=CTX)
+    assert AuditLog.objects.filter(action="compliance.restriction.lifted").exists()
+    product.refresh_from_db()
+    product.status = ProductStatus.PUBLISHED
+    save_product(product, ctx=CTX)
+    with pytest.raises(services.NoticeError):
+        services.lift_restriction(staff, product.public_id, reason="again", ctx=CTX)
+
+
+def test_lifting_needs_a_reason_and_the_permission(staff: Any) -> None:
+    product = published_product()
+    issue(staff, product=product)
+    with pytest.raises(services.NoticeError):
+        services.lift_restriction(staff, product.public_id, reason=" ", ctx=CTX)
+    plain = UserFactory.create(platform_staff=True)
+    with pytest.raises(PermissionDenied):
+        services.lift_restriction(plain, product.public_id, reason="x", ctx=CTX)
+
+
+def test_staff_without_the_review_permission_cannot_restrict() -> None:
+    plain = UserFactory.create(platform_staff=True)
+    with pytest.raises(PermissionDenied):
+        issue(plain)
+
+
+def test_the_art_18_record_needs_its_own_permission() -> None:
+    reviewer_only = UserFactory.create(
+        platform_staff=True, permissions=["compliance.review_notices"]
+    )
+    notice = NoticeFactory.create()
+    with pytest.raises(PermissionDenied):
+        services.notify_authorities(
+            reviewer_only, notice.public_id, authority="Police", note="x", ctx=CTX
+        )
+    notice.refresh_from_db()
+    assert notice.authorities_notified_at is None
+
+
+def test_the_notice_kind_must_match_the_target(staff: Any) -> None:
+    notice = NoticeFactory.create(
+        status=Notice.Status.ACTION_TAKEN, target_kind=Notice.TargetKind.EVENT
+    )
+    product = published_product()
+    with pytest.raises(services.NoticeError) as excinfo:
+        issue(staff, product=product, notice_id=notice.public_id)
+    assert "notice" in excinfo.value.codes
+    product.refresh_from_db()
+    assert product.status == ProductStatus.PUBLISHED

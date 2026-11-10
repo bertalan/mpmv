@@ -261,7 +261,10 @@ class Notice(BaseModel):
 
     class Meta:
         ordering = ("-created_at", "-id")
-        permissions = [("review_notices", "Review notices of illegal content (DSA art. 16)")]
+        permissions = [
+            ("review_notices", "Review notices of illegal content (DSA art. 16)"),
+            ("notify_authorities", "Record a report to the authorities (DSA art. 18)"),
+        ]
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(good_faith=True), name="compliance_notice_good_faith"
@@ -308,10 +311,16 @@ class StatementOfReasons(BaseModel):
     target_kind = models.CharField(max_length=10, choices=TargetKind.choices)
     target_ref = models.UUIDField()
     restriction = models.CharField(max_length=16, choices=[(r, r) for r in engine.RESTRICTIONS])
-    scope = models.TextField(help_text="What is restricted, where and for how long.")
+    scope = models.TextField(help_text="What is restricted and where.")
+    valid_until = models.DateField(
+        null=True, blank=True, help_text="When the restriction ends; empty means no end date."
+    )
     facts = models.TextField(help_text="The facts and circumstances relied on.")
     ground_kind = models.CharField(max_length=16, choices=[(g, g) for g in engine.GROUND_KINDS])
     ground = models.TextField(help_text="The legal ground or the term of the platform terms.")
+    transparency_explanation = models.TextField(
+        help_text="Written for the public transparency database (art. 24(5)): no personal data."
+    )
     automated_detection = models.BooleanField(default=False)
     automated_decision = models.BooleanField(default=False)
     redress_text = models.TextField(blank=True)
@@ -373,3 +382,27 @@ class TransparencySubmission(BaseModel):
 
     def __str__(self) -> str:
         return f"Transparency record of {self.statement_id} ({self.status})"
+
+
+class ProductRestriction(BaseModel):
+    """The hold a statement of reasons puts on a product: while `lifted_at` is empty the product
+    cannot be published again (the CMP.5 publication check). Staff lift it, audited, when an
+    appeal (art. 20) succeeds. Written only through `services.issue_statement` and
+    `services.lift_restriction`."""
+
+    vendor_scope: ClassVar[str] = "product__vendor"
+
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="restrictions")
+    statement = models.OneToOneField(
+        StatementOfReasons, on_delete=models.PROTECT, related_name="product_restriction"
+    )
+    lifted_at = models.DateTimeField(null=True, blank=True, editable=False)
+    lift_reason = models.TextField(blank=True, editable=False)
+
+    objects = VendorScopedManager()
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+
+    def __str__(self) -> str:
+        return f"Restriction of {self.product_id} ({'lifted' if self.lifted_at else 'active'})"

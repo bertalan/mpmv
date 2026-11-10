@@ -16,6 +16,7 @@ from apps.compliance.models import (
     GpsrInfo,
     GpsrSafetyText,
     Notice,
+    ProductRestriction,
     SafetyCase,
     StatementOfReasons,
     TransparencySubmission,
@@ -117,6 +118,7 @@ class StatementOfReasonsFactory(DjangoModelFactory[StatementOfReasons]):
     facts = "The listing offers a counterfeit item."
     ground_kind = "illegal_content"
     ground = "Trade mark infringement"
+    transparency_explanation = "Counterfeit item offered."
     language = "en"
     sent_at = factory.LazyFunction(timezone.now)
 
@@ -129,3 +131,13 @@ class TransparencySubmissionFactory(DjangoModelFactory[TransparencySubmission]):
 
     statement = factory.SubFactory(StatementOfReasonsFactory)
     payload = factory.LazyFunction(lambda: {"puid": "x"})
+
+
+class ProductRestrictionFactory(DjangoModelFactory[ProductRestriction]):
+    """An active hold on a product."""
+
+    class Meta:
+        model = ProductRestriction
+
+    product = factory.SubFactory(ProductFactory)
+    statement = factory.SubFactory(StatementOfReasonsFactory)

@@ -10,6 +10,7 @@ import uuid
 from typing import Any
 
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.http import Http404, HttpRequest, HttpResponseRedirect
 from django.http.response import HttpResponseBase
@@ -119,10 +120,14 @@ class NoticeDetailView(ManagerView):
                     return self.render_to_response(
                         self.get_context_data(authorities_form=authorities_form, **kwargs)
                     )
-                services.notify_authorities(public_id, ctx=ctx, **authorities_form.cleaned_data)
+                services.notify_authorities(
+                    request.user, public_id, ctx=ctx, **authorities_form.cleaned_data
+                )
                 messages.success(request, _("The notification to the authorities is recorded."))
             else:
                 raise Http404("No such action.")
+        except PermissionDenied:
+            raise Http404("No such action.") from None
         except services.NoticeError:
             if action == "restrict":
                 messages.error(

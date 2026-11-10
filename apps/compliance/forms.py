@@ -121,8 +121,23 @@ class RestrictionForm(forms.Form):
     scope = forms.CharField(
         label=_("Scope"), help_text=_("What is restricted, where and for how long.")
     )
+    valid_until = forms.DateField(
+        label=_("Restriction ends on"),
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}),
+        help_text=_("Leave empty when the restriction has no end date."),
+    )
     facts = forms.CharField(
         label=_("Facts and circumstances relied on"), widget=forms.Textarea(attrs={"rows": 4})
+    )
+    transparency_explanation = forms.CharField(
+        label=_("Explanation for the public database"),
+        max_length=engine.PUBLIC_TEXT_LIMIT,
+        widget=forms.Textarea(attrs={"rows": 3}),
+        help_text=_(
+            "Warning: this text is published in the EU transparency database. Write no personal "
+            "data, no names, no email addresses or web addresses."
+        ),
     )
     ground_kind = forms.ChoiceField(
         label=_("Ground"),
