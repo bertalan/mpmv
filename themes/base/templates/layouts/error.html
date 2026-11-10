@@ -11,7 +11,7 @@ and footer then leave out the CMS menus and the language switcher, so nothing he
 database, the session or a CSRF token. The same minimal header serves a 404 raised under a
 URLconf without the public routes (test URLconfs), where the switcher could not be reversed.
 {% endcomment %}
-{% block description %}<meta name="robots" content="noindex">{% endblock %}
+{% block description %}{% robots_meta "noindex" %}{% endblock %}
 {% block header %}
   {% url 'switch_language' as switch_url %}
   {% if minimal_chrome or not switch_url %}

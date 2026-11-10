@@ -22,6 +22,7 @@ HEADER_MIDDLEWARE = [
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "apps.cms.middleware.WagtailAdminPickerNonceMiddleware",
     "apps.core.middleware.PermissionsPolicyMiddleware",
+    "apps.seo.middleware.ForceNoindexMiddleware",  # SEO.8
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
