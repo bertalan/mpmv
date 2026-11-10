@@ -5,6 +5,7 @@ Every Manager view extends `ManagerView` and names its section; the gate
 `scoped()`: `for_actor` (CORE.3), narrowed in the shop space to the selected vendor.
 """
 
+import uuid
 from dataclasses import replace
 from typing import Any, ClassVar
 
@@ -20,9 +21,11 @@ from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 
-from apps.accounts.decorators import mfa_exempt
+from apps.accounts.decorators import mfa_exempt, mfa_redirect
 from apps.accounts.forms import ManagerLoginForm
+from apps.accounts.mfa_session import is_recently_verified
 from apps.accounts.models import User
+from apps.accounts.services import has_second_factor
 from apps.catalog.models import Product
 from apps.catalog.services import product_kpis
 from apps.core.audit import audit_context
@@ -192,6 +195,14 @@ class PlatformDashboardView(ManagerView):
     template_name = "manager/platform/dashboard.html"
 
 
+def _is_uuid(value: str) -> bool:
+    try:
+        uuid.UUID(value)
+    except (ValueError, AttributeError):
+        return False
+    return True
+
+
 class ProfileChangesView(ManagerView):
     """Staff review the owners' storefront profile changes and see the reverts (CORE.9 3/3).
 
@@ -217,17 +228,17 @@ class ProfileChangesView(ManagerView):
         user = self.manager.user
         entries = profile_history(user, vendor=vendor) if isinstance(user, User) else []
         reverted = reverted_entry_ids(entries)
+        keys = {e.vendor_key for e in entries if _is_uuid(e.vendor_key)}
         names = {
             str(k): v
             for k, v in (
-                Vendor.objects.filter(
-                    public_id__in=[e.vendor_key for e in entries if e.vendor_key]
-                ).values_list("public_id", "display_name")
+                Vendor.objects.filter(public_id__in=keys).values_list("public_id", "display_name")
             )
         }
         rows = []
         for entry in entries:
-            before, after = entry.before or {}, entry.after or {}
+            before = entry.before if isinstance(entry.before, dict) else {}
+            after = entry.after if isinstance(entry.after, dict) else {}
             rows.append(
                 {
                     "entry": entry,
@@ -258,6 +269,11 @@ class ProfileRevertView(ManagerView):
         actor = self.manager.user
         if not isinstance(actor, User):
             raise Http404("No Manager page here.")
+        if not is_recently_verified(request):  # step-up, as the other sensitive staff actions
+            target = "mfa:verify" if has_second_factor(actor) else "mfa:setup"
+            return mfa_redirect(
+                request, target, next_url=reverse("manager:platform:profile_changes")
+            )
         ctx = replace(audit_context(request), source=AuditLog.Source.ADMIN)
         try:
             revert_profile_change(

@@ -201,3 +201,100 @@ def test_history_needs_the_permission_and_filters_by_vendor(
         profile_history(owner)
     with pytest.raises(PermissionDenied):
         profile_history(other_owner, vendor=other)
+
+
+# --- D-33 and the security review of #231
+
+
+def test_a_revert_of_the_source_text_sends_translations_back_to_review(
+    vendor: Vendor, owner: User, staff: User
+) -> None:
+    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Hi", status="published")
+    it = VendorTranslationFactory.create(
+        vendor=vendor, language="it", tagline="Ciao", status="published", source_hash="old"
+    )
+    entry = _change(vendor, owner, tagline="Hello")
+    VendorTranslation.objects.filter(pk=it.pk).update(status="published")  # back to published
+    before_count = AuditLog.objects.filter(action="vendor.profile_translation_stale").count()
+    revert_profile_change(entry.public_id, REASON, actor=staff, ctx=STAFF_CTX)
+    it.refresh_from_db()
+    assert it.status == "machine"
+    stale = AuditLog.objects.filter(action="vendor.profile_translation_stale").latest("id")
+    assert AuditLog.objects.filter(action="vendor.profile_translation_stale").count() > before_count
+    assert stale.target_key == f"{vendor.public_id}/it"
+
+
+def test_crafted_before_values_with_markup_are_refused(
+    vendor: Vendor, owner: User, staff: User
+) -> None:
+    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Old")
+    entry = _change(vendor, owner, tagline="New")
+    assert entry.before is not None
+    crafted = AuditLog.objects.create(
+        actor_label="x",
+        source="vendor",
+        action=CHANGED,
+        target_model=entry.target_model,
+        target_key=entry.target_key,
+        before={**entry.before, "tagline": "<script>x()</script>"},
+        after=entry.after,
+        vendor_key=entry.vendor_key,
+    )
+    with pytest.raises(ValidationError):
+        revert_profile_change(crafted.public_id, REASON, actor=staff, ctx=STAFF_CTX)
+    assert _row(vendor).tagline == "New"
+
+
+@pytest.mark.parametrize(
+    "after",
+    [
+        {},
+        {"language": "en", "tagline": "x"},
+        {"vendor": "not-a-uuid", "language": "en", "tagline": "x"},
+        {"vendor": "00000000-0000-0000-0000-000000000000", "language": "en", "tagline": "x"},
+        ["not", "a", "dict"],
+    ],
+)
+def test_a_malformed_entry_is_refused_cleanly(staff: User, after: object) -> None:
+    entry = AuditLog.objects.create(
+        actor_label="x",
+        source="vendor",
+        action=CHANGED,
+        target_model="vendors.vendortranslation",
+        target_key="k",
+        before=None,
+        after=after,
+    )
+    with pytest.raises(ValidationError):
+        revert_profile_change(entry.public_id, REASON, actor=staff, ctx=STAFF_CTX)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_two_simultaneous_reverts_apply_once() -> None:
+    import threading
+
+    from django.db import connection
+
+    vendor = VendorFactory.create()
+    owner = VendorMemberFactory.create(vendor=vendor, role="owner").user
+    staff = UserFactory.create(permissions=[PROFILE_REVERT_PERMISSION])
+    VendorTranslationFactory.create(vendor=vendor, language="en", tagline="Old")
+    entry = _change(vendor, owner, tagline="New")
+    results: list[str] = []
+
+    def run() -> None:
+        try:
+            revert_profile_change(entry.public_id, REASON, actor=staff, ctx=STAFF_CTX)
+            results.append("ok")
+        except ValidationError:
+            results.append("refused")
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=run) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert sorted(results) == ["ok", "refused"]
+    assert AuditLog.objects.filter(action=REVERTED).count() == 1

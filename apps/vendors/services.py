@@ -2015,12 +2015,11 @@ def profile_history(actor: User | AnonymousUser, *, vendor: Vendor | None = None
 
 
 def reverted_entry_ids(entries: Collection[AuditLog]) -> set[str]:
-    """Public ids of the changes among `entries` that a later revert has undone."""
-    return {
-        str(e.after["reverts"])
-        for e in entries
-        if e.action == PROFILE_REVERTED and isinstance(e.after, dict) and "reverts" in e.after
-    }
+    """Public ids of the changes among `entries` that a revert has undone (one query, not
+    limited to the entries shown)."""
+    ids = [str(e.public_id) for e in entries if e.action == PROFILE_CHANGED]
+    found = AuditLog.objects.filter(action=PROFILE_REVERTED, after__reverts__in=ids)
+    return {str(after["reverts"]) for after in found.values_list("after", flat=True) if after}
 
 
 def revert_profile_change(
@@ -2055,11 +2054,21 @@ def revert_profile_change(
         raise ValidationError(problems)
     with transaction.atomic():
         entry = AuditLog.objects.filter(public_id=entry_public_id, action=PROFILE_CHANGED).first()
-        if entry is None or not isinstance(entry.after, dict):
+        after = entry.after if entry is not None else None
+        if entry is None or not isinstance(after, dict):
             raise ValidationError({"entry": "Unknown storefront profile change."})
         entry_id = str(entry.public_id)
-        vendor = Vendor.objects.select_for_update().filter(public_id=entry.after["vendor"]).first()
-        language = entry.after["language"]
+        language = after.get("language")
+        try:
+            vendor = (
+                Vendor.objects.select_for_update()
+                .filter(public_id=str(after.get("vendor")))
+                .first()
+            )
+        except (ValueError, ValidationError, TypeError):  # not a UUID: a crafted or legacy entry
+            vendor = None
+        if vendor is None or not isinstance(language, str):
+            raise ValidationError({"entry": "Unknown storefront profile change."})
         if vendor is None:
             raise ValidationError({"entry": "The vendor no longer exists."})
         if AuditLog.objects.filter(action=PROFILE_REVERTED, after__reverts=entry_id).exists():
@@ -2069,14 +2078,16 @@ def revert_profile_change(
             .filter(vendor=vendor, language=language)
             .first()
         )
-        fields = [n for n in PROFILE_FIELDS if n in entry.after]
-        if row is None or any(getattr(row, n) != entry.after[n] for n in fields):
+        fields = [n for n in PROFILE_FIELDS if isinstance(after.get(n), str)]
+        if row is None or not fields or any(getattr(row, n) != after[n] for n in fields):
             raise ValidationError(
                 {"entry": "The text changed after this change: revert the later change first."}
             )
-        previous: Mapping[str, Any] = entry.before or {}
+        previous: Mapping[str, Any] = entry.before if isinstance(entry.before, dict) else {}
         current = _profile_texts(row)
         restored = {n: str(previous.get(n, "")) for n in fields}
+        if problems := engine.profile_text_errors(restored):  # a crafted or pre-validation `before`
+            raise ValidationError(problems)
         old_status = row.status
         new_status = str(previous.get("status", old_status))
         identity = _profile_identity(row, reverts=entry_id)
@@ -2089,12 +2100,19 @@ def revert_profile_change(
         )
         if dry_run:
             return changes
+        siblings = dict(
+            VendorTranslation.objects.filter(vendor=vendor)
+            .exclude(language=language)
+            .values_list("language", "status")
+        )
         for name, value in restored.items():
             setattr(row, name, value)
         row.status = new_status
         row.full_clean()
         row.save()
         audit_changes(changes, ctx=ctx, action=PROFILE_REVERTED)
+        # As an edit of the source text: reviewed and published translations go back to review.
+        _audit_stale_translations(vendor, language, siblings, ctx=ctx)
         _notify_profile_reverted(vendor, language, fields, reason)
     return changes
 

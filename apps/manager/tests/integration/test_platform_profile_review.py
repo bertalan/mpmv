@@ -101,3 +101,39 @@ def test_the_reviewer_reverts_with_a_reason(
 def test_the_revert_is_post_only(client: Client, reviewer: User, changed: AuditLog) -> None:
     verified_login(client, reviewer)
     assert client.get(revert_url(changed)).status_code == 405
+
+
+def test_the_revert_asks_for_a_recent_second_factor(
+    client: Client, reviewer: User, changed: AuditLog, vendor: Vendor
+) -> None:
+    verified_login(client, reviewer, verified_at=1.0)  # verified, but long ago
+    response = client.post(revert_url(changed), {"reason": "Misleading policy"})
+    assert response.status_code == 302
+    assert "/mfa/" in response["Location"]
+    assert VendorTranslation.objects.get(vendor=vendor, language="en").tagline == "New tagline"
+    assert not AuditLog.objects.filter(action="vendor.profile_reverted").exists()
+
+
+def test_a_malformed_entry_does_not_break_the_page(client: Client, reviewer: User) -> None:
+    AuditLog.objects.create(
+        actor_label="x",
+        source="vendor",
+        action="vendor.profile_changed",
+        target_model="vendors.vendortranslation",
+        target_key="k",
+        before=None,
+        after={"tagline": "x"},
+        vendor_key="not-a-uuid",
+    )
+    verified_login(client, reviewer)
+    assert client.get(PAGE).status_code == 200
+
+
+def test_a_revert_marks_the_change_reverted_without_a_limit_on_the_list(
+    client: Client, reviewer: User, changed: AuditLog
+) -> None:
+    verified_login(client, reviewer)
+    client.post(revert_url(changed), {"reason": "Misleading policy"})
+    page = client.get(PAGE).text
+    assert "Reverted" in page
+    assert f'action="{revert_url(changed)}"' not in page
