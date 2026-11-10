@@ -57,3 +57,8 @@ def test_page_problem_message_names_kind_and_language() -> None:
     assert problem.code == "page_missing"
     assert "ranking" in problem.message
     assert "fr" in problem.message
+
+
+def test_regional_and_upper_case_codes_match_the_base_language() -> None:
+    assert contact_codes(authority_languages=["de-AT", "EN"], country="AT") == []
+    assert contact_codes(country="PT", authority_languages=["PT-BR", "en"]) == []

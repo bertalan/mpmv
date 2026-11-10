@@ -290,7 +290,7 @@ def contact_problems(
     can be used in (an official language of the Member State of establishment, plus one broadly
     understood in the Union, article 11(2)), and an address for recipients (article 12)."""
     problems: list[DsaProblem] = []
-    languages = {code.lower() for code in authority_languages}
+    languages = {code.lower().split("-")[0] for code in authority_languages}
     if not authority_email:
         problems.append(DsaProblem("authority_email"))
     if not languages:

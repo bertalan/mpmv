@@ -161,7 +161,12 @@ def test_readiness_ignores_unpublished_pages_and_empty_sections() -> None:
         kind="ranking",
         title="R2",
         slug="r2",
-        body=[("legal_section", {"section": "ranking_parameters", "heading": "h", "text": ""})],
+        body=[
+            (
+                "legal_section",
+                {"section": "ranking_parameters", "heading": "h", "text": "<p></p>"},
+            )
+        ],
     ).save_revision().publish()
     assert codes(services.dsa_p2b_readiness(["en"])) == ["section_missing"]
 
@@ -177,3 +182,48 @@ def test_readiness_command_passes_when_ready(capsys: pytest.CaptureFixture[str])
     full_pages()
     call_command("dsa_p2b_readiness", "--language", "en")
     assert "ready" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "url", ["http://example.com/contact", "ftp://example.com/x", "mailto:a@b.c"]
+)
+def test_contact_form_url_must_be_https(url: str) -> None:
+    new = PlatformOperatorFactory.build(valid_from=timezone.now(), user_contact_url=url)
+    with pytest.raises(ValidationError):
+        configure_platform_operator(new, ctx=CTX)
+
+
+@pytest.mark.parametrize("code", ["xx", "zzz", "de_AT", "english"])
+def test_unknown_language_codes_are_refused(code: str) -> None:
+    new = PlatformOperatorFactory.build(
+        valid_from=timezone.now(), authority_contact_languages=[code]
+    )
+    with pytest.raises(ValidationError):
+        configure_platform_operator(new, ctx=CTX)
+
+
+def test_language_codes_are_stored_lower_case_without_duplicates() -> None:
+    new = PlatformOperatorFactory.build(
+        valid_from=timezone.now(),
+        authority_contact_languages=["DE-AT", "de-at", "En", "nl"],
+    )
+    configure_platform_operator(new, ctx=CTX)
+    assert PlatformOperator.objects.get(pk=new.pk).authority_contact_languages == [
+        "de-at",
+        "en",
+        "nl",
+    ]
+
+
+def test_contact_page_is_cached_for_a_short_time() -> None:
+    operator()
+    header = Client().get(reverse("dsa_contact_points"))["Cache-Control"]
+    assert "public" in header
+    assert "max-age=300" in header
+
+
+def test_publishing_a_platform_terms_page_records_a_version_with_the_section() -> None:
+    page = publish("platform_terms", "restrictions", "moderation_policy")
+    version = page.versions.get()
+    assert [b.block_type for b in version.body] == ["legal_section", "legal_section"]
+    assert version.body[0].value["section"] == "restrictions"

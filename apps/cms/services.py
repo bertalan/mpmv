@@ -28,6 +28,7 @@ from django.http import HttpRequest
 from django.template.loader import render_to_string
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
+from django.utils.html import strip_tags
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from wagtail import blocks
@@ -582,6 +583,29 @@ def legal_readiness(languages: Sequence[str] | None = None) -> list[engine.Readi
     return engine.legal_readiness_problems(
         texts, engine.GO_LIVE_LEGAL_KINDS, languages or configured_languages()
     )
+
+
+def legal_section_tags(kinds: Iterable[str]) -> dict[tuple[str, str], set[str]]:
+    """The required-section tags carried by the live legal pages of `kinds`, per (kind, language).
+
+    A section counts when its text has content: markup alone (`<p></p>`) is empty. A page
+    without any section still has its key, so callers tell "no page" from "no section".
+    Read by `apps.compliance` (CMP.5), which owns the rules about which tags are required.
+    """
+    pages = (
+        LegalPage.objects.live()
+        .filter(kind__in=list(kinds), alias_of__isnull=True)
+        .select_related("locale")
+    )
+    found: dict[tuple[str, str], set[str]] = {}
+    for page in pages:
+        tags = found.setdefault((page.kind, page.locale.language_code), set())
+        tags.update(
+            block.value["section"]
+            for block in page.body
+            if block.block_type == "legal_section" and strip_tags(str(block.value["text"])).strip()
+        )
+    return found
 
 
 def _seed_legal_placeholders(home: HomePage, report: SeedReport) -> None:

@@ -2,6 +2,7 @@
 
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import render
+from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_GET
 
 from apps.core.services import NoPlatformOperator
@@ -10,8 +11,12 @@ from . import services
 
 
 @require_GET
+@cache_control(public=True, max_age=300)
 def contact_points(request: HttpRequest) -> HttpResponse:
-    """Who authorities and users contact, and in which languages, from the current operator."""
+    """Who authorities and users contact, and in which languages, from the current operator.
+
+    Public and cached for five minutes: the data is staff configuration that rarely changes.
+    """
     try:
         points = services.contact_points()
     except NoPlatformOperator as exc:

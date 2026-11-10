@@ -4,21 +4,22 @@ licence allow list, the transactional email outbox."""
 
 import json
 import posixpath
-import re
 import uuid
 from typing import Any, ClassVar, Self
 
+from django.conf import settings
 from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import ArrayField, DateTimeRangeField, RangeOperators
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
+from django.core.validators import URLValidator
 from django.db import models, transaction
 from django.utils import timezone
 from wagtail.images.models import AbstractImage, AbstractRendition, Image, get_upload_to
 from wagtail.models import Collection
 
 from . import flags, translations, uploads
-from .countries import default_allowed_vendor_countries
+from .countries import OFFICIAL_LANGUAGES, default_allowed_vendor_countries
 from .fields import (
     CountryField,
     EncryptedTextField,
@@ -321,10 +322,23 @@ def valid_period_check(name: str) -> models.CheckConstraint:
     )
 
 
+def known_language_bases() -> frozenset[str]:
+    """Base subtags a contact language may use: the site's languages and the official
+    languages of the countries in `OFFICIAL_LANGUAGES`."""
+    bases = {code.split("-")[0].lower() for code, _name in settings.LANGUAGES}
+    for languages in OFFICIAL_LANGUAGES.values():
+        bases.update(languages)
+    return frozenset(bases)
+
+
 def validate_language_code(value: str) -> None:
-    """A lowercase ISO 639 code, optionally with a region (`de`, `nl`, `pt-br`)."""
-    if not re.fullmatch(r"[a-z]{2,3}(-[a-z]{2,4})?", value):
-        raise ValidationError(f"{value!r} is not a language code.")
+    """A known language, case-insensitive, optionally with a region (`de`, `NL`, `pt-br`)."""
+    base = value.lower().split("-")[0]
+    if base not in known_language_bases():
+        raise ValidationError(f"{value!r} is not a known language code.")
+
+
+validate_https_url = URLValidator(schemes=["https"], message="Enter an https:// address.")
 
 
 class PlatformOperator(Versioned):
@@ -383,6 +397,7 @@ class PlatformOperator(Versioned):
     )
     user_contact_url = models.URLField(
         "users' contact form URL",
+        validators=[validate_https_url],
         blank=True,
         help_text="DSA article 12: optional electronic form next to the support email.",
     )
@@ -426,6 +441,13 @@ class PlatformOperator(Versioned):
 
     def __str__(self) -> str:
         return f"{self.legal_name} ({self.country}) from {self.valid_from:%Y-%m-%d}"
+
+    def clean(self) -> None:
+        super().clean()
+        # Codes are stored lower-case (`PT-BR` -> `pt-br`), without duplicates.
+        for name in ("authority_contact_languages", "user_contact_languages"):
+            codes = [code.strip().lower() for code in getattr(self, name) or []]
+            setattr(self, name, list(dict.fromkeys(codes)))
 
 
 # Per-vendor overrides are vendor-owned rows (CORE.3) in apps.vendors, which core cannot import:

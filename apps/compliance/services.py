@@ -33,7 +33,7 @@ from django.utils.translation import get_language_info
 from django.utils.translation import gettext_lazy as _
 
 from apps.catalog.models import Product, ProductStatus
-from apps.cms.models import LegalPage
+from apps.cms.services import legal_section_tags
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.countries import OFFICIAL_LANGUAGES, InvalidCountry, normalize_country
@@ -976,7 +976,10 @@ def dsa_p2b_readiness(languages: Iterable[str] | None = None) -> list[engine.Dsa
     """What stops go-live on the DSA and P2B duties of part 1: the operator's contact data,
     and per language one published platform terms page and one ranking page, each carrying its
     required sections (a section tag with a heading and a text). No EN fallback: each language
-    stands on its own, like the customer legal pages (Q-42)."""
+    stands on its own, like the customer legal pages (Q-42). Part 1 does not check the users'
+    contact languages or a section's heading. The page data comes from `apps.cms.services`:
+    `compliance` sits above `cms` in spec 01 §1.3 (cms --> events --> compliance), so this
+    dependency follows the graph."""
     try:
         operator = current_operator()
     except NoPlatformOperator:
@@ -987,19 +990,7 @@ def dsa_p2b_readiness(languages: Iterable[str] | None = None) -> list[engine.Dsa
         authority_languages=operator.authority_contact_languages,
         support_email=operator.support_email,
     )
-    pages = (
-        LegalPage.objects.live()
-        .filter(kind__in=engine.REQUIRED_SECTIONS, alias_of__isnull=True)
-        .select_related("locale")
-    )
-    sections: dict[tuple[str, str], set[str]] = {}
-    for page in pages:
-        found = sections.setdefault((page.kind, page.locale.language_code), set())
-        found.update(
-            block.value["section"]
-            for block in page.body
-            if block.block_type == "legal_section" and str(block.value["text"]).strip()
-        )
+    sections = legal_section_tags(engine.REQUIRED_SECTIONS)
     for language in languages or configured_languages():
         for kind in engine.REQUIRED_SECTIONS:
             if (kind, language) not in sections:
