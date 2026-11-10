@@ -397,6 +397,7 @@ def test_enrolling_a_passkey_needs_a_fresh_second_factor(client: Client) -> None
 KNOWN_UNWIRED = {
     # Group 2 and 3 actions whose view does not exist yet (follow-ups in the PR).
     "bulk_edit",
+    "tax_in_clear",
     "impersonation",
     "api_key",
     "mfa_disable",
