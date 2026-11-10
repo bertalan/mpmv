@@ -347,3 +347,18 @@ def test_staff_viewing_the_notifier_details_is_audited(client: Client, reviewer:
     assert entry.target_key == str(notice.public_id)
     assert (entry.after or {})["reason"]
     assert notice.notifier_email not in str(entry.after)
+
+
+def test_plus_tags_and_case_do_not_get_around_the_receipt_limit(client: Client) -> None:
+    for n in range(services.NOTICE_RECEIPTS_PER_ADDRESS + 2):
+        email = f"Ada+{n}@Example.org"
+        client.post(url(), form_data(notifier_email=email), REMOTE_ADDR=f"198.51.100.{n + 40}")
+    assert OutboxEmail.objects.count() == services.NOTICE_RECEIPTS_PER_ADDRESS
+    assert OutboxEmail.objects.first().recipient.startswith("Ada+")  # type: ignore[union-attr]
+
+
+def test_counter_keys_hold_no_address_or_ip_in_the_clear(client: Client) -> None:
+    client.post(url(), form_data(), REMOTE_ADDR=IP)
+    keys = " ".join(Throttle.objects.values_list("key", flat=True))
+    assert IP not in keys
+    assert "ada" not in keys

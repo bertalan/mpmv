@@ -18,7 +18,6 @@ job flags any published product that fails the check anyway
 """
 
 import datetime as dt
-import hashlib
 import logging
 import re
 from collections.abc import Iterable, Mapping, Sequence
@@ -45,6 +44,7 @@ from apps.core.countries import OFFICIAL_LANGUAGES, InvalidCountry, normalize_co
 from apps.core.flags import TtlCache
 from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog
+from apps.core.privacy import keyed_hash, normalise_email
 from apps.core.services import (
     NoPlatformOperator,
     audit_changes,
@@ -1059,10 +1059,6 @@ def _location(url: str) -> str:
     return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
 
 
-def _hash(value: str) -> str:
-    return hashlib.sha256(value.strip().lower().encode()).hexdigest()[:32]
-
-
 def notice_snapshot(notice: Notice) -> dict[str, Any]:
     """What the audit log shows of a notice: ids, the target and the status, never the
     notifier's name, email or words (personal data stays in the encrypted columns)."""
@@ -1083,14 +1079,16 @@ def anonymous_category(category: str) -> bool:
 def notice_retry_after(ip: str | None) -> dt.timedelta:
     """Count one public submission from `ip`; zero when allowed, else the time to wait."""
     return consume_rate_limit(
-        f"notice:ip:{_hash(ip or 'unknown')}", limit=NOTICE_RATE_LIMIT, window=NOTICE_RATE_WINDOW
+        f"notice:ip:{keyed_hash(ip or 'unknown', purpose='notice-ip')}",
+        limit=NOTICE_RATE_LIMIT,
+        window=NOTICE_RATE_WINDOW,
     )
 
 
 def captcha_retry_after(ip: str | None) -> dt.timedelta:
     """Count one refused captcha from `ip` (a larger, separate budget than the reports)."""
     return consume_rate_limit(
-        f"notice:captcha:{_hash(ip or 'unknown')}",
+        f"notice:captcha:{keyed_hash(ip or 'unknown', purpose='notice-ip')}",
         limit=NOTICE_RATE_LIMIT * 4,
         window=NOTICE_RATE_WINDOW,
     )
@@ -1195,8 +1193,9 @@ def submit_notice(
     with transaction.atomic():
         notice.save()
         audit_changes(changes, ctx=ctx, action=NOTICE_RECEIVED)
+        mailbox = keyed_hash(normalise_email(notice.notifier_email), purpose="notice-email")
         if notice.notifier_email and not consume_rate_limit(
-            f"notice:email:{_hash(notice.notifier_email)}",
+            f"notice:email:{mailbox}",
             limit=NOTICE_RECEIPTS_PER_ADDRESS,
             window=dt.timedelta(days=1),
         ):
