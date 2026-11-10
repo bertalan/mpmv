@@ -359,3 +359,17 @@ class BlogPostPageFactory(_InTree, DjangoModelFactory[BlogPostPage]):
     def _default_parent(cls) -> Page:
         blog: BlogIndexPage | None = BlogIndexPage.objects.child_of(_primary_home()).first()
         return blog if blog is not None else BlogIndexPageFactory.create()
+
+
+def editor_user(*roles: str) -> Any:
+    """A non-staff user in the given editor roles (`apps.cms.roles` names), who can sign in to
+    the Wagtail admin. The role groups exist after every `migrate`."""
+    import secrets
+
+    from django.contrib.auth.models import Group
+
+    from apps.accounts.tests.factories import UserFactory
+
+    user = UserFactory.create(password=secrets.token_urlsafe(16))
+    user.groups.add(*Group.objects.filter(name__in=roles))
+    return user
