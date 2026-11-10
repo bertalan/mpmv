@@ -874,6 +874,116 @@ def test_cancel_posts_are_rate_limited_per_ip(
     assert response.status_code == 429
 
 
+# --- Races and batches (re-check N1, N2, N3)
+
+
+def confirm_behind_the_jobs_back(monkeypatch: pytest.MonkeyPatch, name: str, user: User) -> None:
+    """After the job has selected its rows, the applicant confirms: the account is active and
+    the marker is gone (what `confirm_application` does in its own transaction)."""
+    original = getattr(services, name)
+
+    def selecting(*args: Any, **kwargs: Any) -> Any:
+        rows = original(*args, **kwargs)
+        User.objects.filter(pk=user.pk).update(is_active=True)
+        VendorApplication.objects.filter(user=user).delete()
+        return rows
+
+    monkeypatch.setattr(services, name, selecting)
+
+
+def test_an_applicant_who_confirms_after_the_selection_is_not_purged(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data, user, _ = applied(client)
+    age(user, hours=80)
+    confirm_behind_the_jobs_back(monkeypatch, "_stale_application_ids", user)
+
+    services.purge_unconfirmed_applications(ctx=SYSTEM)
+
+    assert User.objects.filter(pk=user.pk, is_active=True).exists()
+    assert Vendor.objects.filter(contact_email=data["email"]).exists()
+    assert VendorMember.objects.filter(user=user).exists()
+    assert not AuditLog.objects.filter(action=services.APPLICATION_PURGED).exists()
+
+
+def test_an_applicant_whose_vendor_moved_on_after_the_selection_is_not_purged(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data, user, _ = applied(client)
+    age(user, hours=80)
+    original = services._stale_application_ids
+
+    def selecting(*args: Any, **kwargs: Any) -> Any:
+        rows = original(*args, **kwargs)
+        Vendor.objects.filter(contact_email=data["email"]).update(status=engine.ONBOARDING)
+        return rows
+
+    monkeypatch.setattr(services, "_stale_application_ids", selecting)
+    services.purge_unconfirmed_applications(ctx=SYSTEM)
+    assert User.objects.filter(pk=user.pk).exists()
+    assert Vendor.objects.filter(contact_email=data["email"]).exists()
+
+
+def test_a_marker_renewed_after_the_selection_is_not_purged(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, user, _ = applied(client)
+    age(user, hours=80)
+    original = services._stale_application_ids
+
+    def selecting(*args: Any, **kwargs: Any) -> Any:
+        rows = original(*args, **kwargs)
+        VendorApplication.objects.filter(user=user).update(created_at=timezone.now())
+        return rows
+
+    monkeypatch.setattr(services, "_stale_application_ids", selecting)
+    services.purge_unconfirmed_applications(ctx=SYSTEM)
+    assert User.objects.filter(pk=user.pk).exists()
+
+
+def test_a_reminder_is_not_sent_to_an_applicant_who_confirmed_after_the_selection(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, user, _ = applied(client)
+    age(user, hours=49)
+    confirm_behind_the_jobs_back(monkeypatch, "_due_reminder_ids", user)
+    services.send_application_reminders(ctx=SYSTEM)
+    assert not emails("vendors.application_reminder")
+
+
+def test_the_purge_and_the_reminders_work_through_batches(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(services, "APPLICATION_BATCH_SIZE", 2)
+    applications = [VendorApplicationFactory.create() for _ in range(5)]
+    VendorApplication.objects.update(created_at=timezone.now() - dt.timedelta(hours=49))
+    services.send_application_reminders(ctx=SYSTEM)
+    assert len(emails("vendors.application_reminder")) == 5
+    VendorApplication.objects.update(created_at=timezone.now() - dt.timedelta(hours=80))
+
+    services.purge_unconfirmed_applications(ctx=SYSTEM)
+
+    assert not User.objects.filter(pk__in=[a.user_id for a in applications]).exists()
+    entries = AuditLog.objects.filter(action=services.APPLICATION_PURGED)
+    assert sum(entry.after["deleted"] for entry in entries) == 5  # type: ignore[index]
+    assert entries.count() == 3
+
+
+def test_cancel_after_a_concurrent_confirm_shows_the_neutral_page(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, user, _ = applied(client)
+    open_link(client, cancel_path(emails()[0]))
+    stale = services._pending_application(str(user.public_id))
+    VendorApplication.objects.filter(user=user).delete()  # the confirm won the race
+    User.objects.filter(pk=user.pk).update(is_active=True)
+    monkeypatch.setattr(services, "_pending_application", lambda key: stale)
+    response = client.post(cancel_url(user), REMOTE_ADDR=IP)
+    assert response.status_code == 200
+    assert User.objects.filter(pk=user.pk, is_active=True).exists()
+    assert not AuditLog.objects.filter(action=services.APPLICATION_CANCELLED).exists()
+
+
 def test_a_marker_without_a_vendor_is_not_pending() -> None:
     orphan = VendorApplicationFactory.create(owns_applicant_vendor=False)
     pending = VendorApplicationFactory.create()
