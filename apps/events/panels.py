@@ -25,6 +25,8 @@ from wagtail.admin.panels import (
     TitleFieldPanel,
 )
 
+from apps.vendors.scoping import is_platform_staff
+
 # The inputs of the event form the picker reads and writes (`data-<name>-input` on the picker).
 PICKER_INPUTS = ("latitude", "longitude", "street", "postcode", "city", "country")
 # The hidden inputs that keep the chosen "Find coordinates" candidate's point when the marker is
@@ -88,12 +90,12 @@ class MapPickerPanel(Panel):  # type: ignore[misc]  # Wagtail is untyped
 
 
 class StaffOnlyPanel(MultiFieldPanel):  # type: ignore[misc]  # Wagtail is untyped
-    """A group shown to platform staff only (`is_staff`), not to other Wagtail editors."""
+    """A group shown to platform staff only (`view_all_vendors`), not to other Wagtail editors."""
 
     class BoundPanel(MultiFieldPanel.BoundPanel):  # type: ignore[misc]
         def is_shown(self) -> bool:
             user = getattr(self.request, "user", None)
-            return bool(getattr(user, "is_staff", False)) and bool(super().is_shown())
+            return user is not None and is_platform_staff(user) and bool(super().is_shown())
 
 
 def _read_only(*names: str) -> list[FieldPanel]:

@@ -170,10 +170,11 @@ def test_zap_check_flags_a_missing_or_malformed_report(tmp_path: Path, zap_repor
 FAKE_DOCKER = """#!/usr/bin/env bash
 # Stands in for docker: writes the reports the scanners would write, from FAKE_* variables.
 args="$*"
-mount() { for a in "$@"; do case "$a" in *":$MNT"*) echo "${a%%:*}";; esac; done; }
+mount() { for a in "$@"; do case "$a" in *":$MNT:"*) echo "${a%%:*}";; esac; done; }
 case "$args" in
   *zap-baseline.py*)
     MNT=/zap/wrk; dir=$(mount "$@")
+    [ -n "${FAKE_ARGS_LOG:-}" ] && printf '%s\\n' "$args" > "$FAKE_ARGS_LOG"
     [ -n "${FAKE_ZAP_JSON:-}" ] && printf '%s' "$FAKE_ZAP_JSON" > "$dir/zap.json"
     exit "${FAKE_ZAP_EXIT:-0}";;
   *)
@@ -266,3 +267,39 @@ def test_script_exit_3_on_a_scanner_error(
 def test_a_scanner_error_wins_over_findings(tmp_path: Path) -> None:
     result = run_script(tmp_path, FAKE_NUCLEI_JSONL=MEDIUM_NUCLEI, FAKE_NUCLEI_EXIT="1")
     assert result.returncode == 3
+
+
+RULES = SCRIPT.parent / "zap-rules.tsv"
+ACCEPTED_IDS = {"90004", "10110"}
+
+
+def rule_lines() -> list[list[str]]:
+    lines = [ln for ln in RULES.read_text().splitlines() if ln.strip() and ln[0] != "#"]
+    return [ln.split("\t") for ln in lines]
+
+
+def test_rules_file_ignores_only_the_documented_accepts() -> None:
+    rules = rule_lines()
+    assert rules
+    assert all(len(rule) >= 2 and rule[1] == "IGNORE" for rule in rules)
+    assert {rule[0] for rule in rules} == ACCEPTED_IDS
+    assert len({rule[0] for rule in rules}) == len(rules), "one line per plugin id"
+    doc = (SCRIPT.parents[2] / "docs" / "dev" / "security-scans.md").read_text()
+    for plugin_id in ACCEPTED_IDS:
+        assert plugin_id in doc
+
+
+def test_script_passes_the_read_only_rules_file_to_zap(tmp_path: Path) -> None:
+    log = tmp_path / "args.log"
+    result = run_script(tmp_path, FAKE_ARGS_LOG=str(log))
+    assert result.returncode == 0, result.stdout + result.stderr
+    args = log.read_text()
+    assert f"{RULES}:/zap/wrk/zap-rules.tsv:ro" in args
+    assert "-c zap-rules.tsv" in args
+    assert "-J zap.json" in args
+
+
+def test_script_still_fails_on_a_medium_alert_with_the_rules_wired(tmp_path: Path) -> None:
+    alert = {"pluginid": "10098", "riskcode": "2", "name": "X"}
+    result = run_script(tmp_path, FAKE_ZAP_JSON=json.dumps({"site": [{"alerts": [alert]}]}))
+    assert result.returncode == 1, result.stdout

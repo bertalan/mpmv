@@ -34,6 +34,9 @@ MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware",
     *_BASE_MIDDLEWARE[_HEADERS_END:],
 ]
+# WhiteNoise adds `Access-Control-Allow-Origin: *` to every static file by default. Nothing here
+# is read cross-origin, so it stays off (ZAP 10098, docs/dev/security-scans.md).
+WHITENOISE_ALLOW_ALL_ORIGINS = False
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "apps.cms.staticfiles.StaticFilesStorage"},

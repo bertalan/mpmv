@@ -103,6 +103,7 @@ MIDDLEWARE = [
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "apps.cms.middleware.WagtailAdminPickerNonceMiddleware",  # Wagtail's inline pickers (CMS.1)
     "apps.core.middleware.PermissionsPolicyMiddleware",
+    "apps.core.middleware.CrossOriginResourcePolicyMiddleware",  # SEC.5 triage
     # With the other header middleware, so responses returned early by an inner middleware
     # (CommonMiddleware's APPEND_SLASH redirect, LIVE's static files) carry it too (SEC.5).
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -523,6 +524,8 @@ API_REFUSED_KEY_BLOCK_SECONDS = int(env_str("MPMV_API_REFUSED_KEY_BLOCK_SECONDS"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+# Everything is same-origin: no other site embeds our resources (apps.core.middleware).
+CROSS_ORIGIN_RESOURCE_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
