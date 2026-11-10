@@ -88,7 +88,6 @@ class PlatformOperatorFactory(DjangoModelFactory[PlatformOperator]):
     vat_number = factory.Sequence(lambda n: f"ATU{n:08d}")
     tax_regime = PlatformOperator.TaxRegime.SMALL_BUSINESS
     commission_vat_mode = PlatformOperator.CommissionVatMode.NONE
-    einvoice_channel = PlatformOperator.EInvoiceChannel.NONE
     dac7_authority_country = "AT"
     valid_from = factory.Sequence(lambda n: utc(2027 + n))
     valid_to = factory.LazyAttribute(lambda o: _one_year_later(o.valid_from))
