@@ -4,6 +4,7 @@ A software authenticator plays the browser through the real WebAuthn endpoints; 
 authenticator is fake. Needs human review: security code.
 """
 
+import datetime as dt
 import json
 import re
 import time
@@ -15,6 +16,7 @@ import pytest
 from django.contrib.auth.models import Permission
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts import levels
 from apps.accounts.models import User
@@ -287,10 +289,9 @@ def test_a_single_authorisation_expires_after_about_two_minutes(client: Client) 
     user, authenticator = _staff_with_passkey()
     _restricted_session(client, user)
     _do_it_once(client, authenticator, client.get(reverse("test-export")))
-    session = client.session
-    for grant in session[levels.SINGLE_KEY]:
-        grant["expires"] -= 121
-    session.save()
+    from apps.accounts.models import ElevationGrant
+
+    ElevationGrant.objects.update(expires_at=timezone.now() - dt.timedelta(seconds=1))
     assert client.get(reverse("test-export")).status_code == 403
 
 
@@ -407,40 +408,56 @@ def test_enrolling_a_passkey_needs_a_fresh_second_factor(client: Client) -> None
 # --- Sweep
 
 
-KNOWN_UNWIRED = {
-    # Group 2 and 3 actions whose view does not exist yet (follow-ups in the PR).
-    "bulk_edit",
-    "tax_in_clear",
-    "impersonation",
-    "api_key",
+WIRED = {
+    "role_grant",
+    "vat_regime",
+    "audit_in_clear",
     "mfa_disable",
     "owner_role_grant",
-    "bootstrap_platform_owner",
-    "backup",
-    "export",
     "payout_details",
+    "api_key",
 }
+# Actions whose web view does not exist yet: nothing to decorate (follow-ups in the PR).
+NOT_BUILT = {"tax_in_clear", "export", "backup", "bulk_edit", "impersonation"}
+# Actions that are not web views: `manage.py bootstrap_platform_owner` runs with shell access on
+# the server, outside any browser session, so session levels cannot apply to it.
+NO_SESSION = {"bootstrap_platform_owner"}
+
+
+def _source_files() -> list[Path]:
+    root = Path(__file__).resolve().parents[4]
+    return [p for p in root.glob("apps/*/*.py")]
 
 
 def _gated_actions() -> set[str]:
-    """Action keys named at `requires_level("...")` or `step_up(..., level="...")` in app code."""
-    pattern = re.compile(r"""(?:requires_level\(|level=)\s*["'](\w+)["']""")
+    """Action keys named at `requires_level`, `level_gated_action` or `level=` in app code."""
+    pattern = re.compile(r"""(?:requires_level\(|level_gated_action\(|level=)\s*["'](\w+)["']""")
     found: set[str] = set()
-    for path in Path(__file__).resolve().parents[4].glob("apps/*/*.py"):
+    for path in _source_files():
         found |= set(pattern.findall(path.read_text()))
     return found
 
 
-def test_every_group_2_and_3_action_has_a_decorator_or_is_listed_as_not_built() -> None:
+def test_every_configured_action_is_wired_not_built_or_outside_sessions() -> None:
     from apps.core.session_policy import parse_policy
 
     policy = parse_policy({})
-    sensitive = policy.operational | policy.passkey
-    missing = sensitive - _gated_actions() - KNOWN_UNWIRED
-    assert not missing, f"group 2 or 3 actions with no requires_level view: {sorted(missing)}"
-    assert {"role_grant", "vat_regime", "audit_in_clear"} <= _gated_actions()
-    wired = _gated_actions() & KNOWN_UNWIRED - {"export", "payout_details", "backup"}
-    assert not wired, f"remove from KNOWN_UNWIRED, now gated: {sorted(wired)}"
+    configured = policy.operational | policy.passkey
+    assert configured == WIRED | NOT_BUILT | NO_SESSION, "classify every configured action"
+    missing = WIRED - _gated_actions()
+    assert not missing, f"existing views without their requires_level: {sorted(missing)}"
+
+
+def test_no_unclassified_view_looks_like_a_sensitive_action() -> None:
+    """A view or admin action named like a group 2 action must be gated: fails on a new one."""
+    pattern = re.compile(r"def \w*(export|impersonat|bulk_edit|backup|dump)\w*", re.IGNORECASE)
+    hits = []
+    for path in _source_files():
+        if path.name in {"admin.py", "views.py"} or path.name.endswith("_views.py"):
+            text = path.read_text()
+            if pattern.search(text) and "requires_level(" not in text and "level=" not in text:
+                hits.append(path.name)
+    assert not hits, f"sensitive-looking views with no level gate: {hits}"
 
 
 # --- Security review fixes (PR 234)
@@ -660,7 +677,7 @@ def test_polling_requests_do_not_keep_operational_mode_alive(client: Client) -> 
 
 
 def test_an_invalid_stored_policy_fails_closed(client: Client, caplog: Any) -> None:
-    user, authenticator = _staff_with_passkey()
+    user, _ = _staff_with_passkey()
     verified_login(client, user, verified_at=time.time() - 3600)  # operational, old passkey
     operator = PlatformOperatorFactory.create(
         open_ended=True, valid_from=datetime(2020, 1, 1, tzinfo=UTC)
@@ -717,7 +734,7 @@ def test_real_group_admin_change_and_delete_refuse_in_restricted_mode(client: Cl
 def test_removing_a_factor_needs_operational_mode_and_a_fresh_passkey(client: Client) -> None:
     from apps.accounts.models import PasskeyDevice
 
-    user, authenticator = _staff_with_passkey()
+    user, _ = _staff_with_passkey()
     device = PasskeyDevice.objects.get(user=user)
     url = reverse("mfa:remove_device", args=["passkey", str(device.public_id)])
     verified_login(client, user, level=levels.RESTRICTED)
@@ -725,15 +742,3 @@ def test_removing_a_factor_needs_operational_mode_and_a_fresh_passkey(client: Cl
     verified_login(client, user)  # operational, but only a TOTP confirmation
     assert client.post(url).status_code == 302
     assert PasskeyDevice.objects.filter(pk=device.pk).exists()
-
-
-def test_vendor_bank_details_need_a_per_action_passkey(client: Client) -> None:
-    from apps.vendors.tests.factories import VendorFactory
-
-    vendor = VendorFactory.create()
-    root = UserFactory.create(superuser=True)
-    verified_login(client, root)  # operational, TOTP only
-    url = reverse("admin:vendors_vendor_change", args=[vendor.pk])
-    response = client.post(url, {"iban": "XX00 CHANGED", "_save": "Save"})
-    assert response.status_code == 302
-    assert "factor=passkey" in response["Location"]

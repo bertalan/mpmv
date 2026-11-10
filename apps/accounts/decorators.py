@@ -4,7 +4,7 @@ step-up (CORE.4)."""
 import functools
 import math
 from collections.abc import Callable
-from typing import Concatenate
+from typing import Any, Concatenate
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -180,5 +180,33 @@ def requires_level[**P](action: str) -> Callable[[View[P]], View[P]]:
             return view(request, *args, **kwargs)
 
         return wrapped
+
+    return decorator
+
+
+_ACTION_PASSED = HttpResponse()
+
+
+def _action_passed(request: HttpRequest) -> HttpResponse:
+    return _ACTION_PASSED
+
+
+def level_gated_action[**A](action: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """Gate a Django admin action (`modeladmin, request, queryset`) by `requires_level(action)`.
+
+    The check runs on the request when the action runs, whatever `action` values the POST
+    carries; when the level is not met the action's response (the prompt or the redirect) is
+    returned and nothing changes.
+    """
+
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        @functools.wraps(func)
+        def guarded(modeladmin: Any, request: HttpRequest, queryset: Any) -> Any:
+            refused = requires_level(action)(_action_passed)(request)
+            if refused is not _ACTION_PASSED:
+                return refused
+            return func(modeladmin, request, queryset)
+
+        return guarded
 
     return decorator

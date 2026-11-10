@@ -15,7 +15,7 @@ from typing import Any
 
 from django import forms
 from django.conf import settings
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.admin.options import IncorrectLookupParameters
 from django.contrib.admin.views.main import ChangeList
 from django.db.models import Model, Q, QuerySet
@@ -28,13 +28,16 @@ from .audit import audit_context
 from .changeset import diff
 from .models import AuditLog, FeatureFlag, ImageLicence, PlatformOperator
 from .services import (
+    NoPlatformOperator,
     check_operator_start,
     configure_platform_operator,
+    current_operator,
     environment_default,
     latest_operator,
     save_flag,
     save_image_licence,
 )
+from .session_policy import parse_policy
 
 
 class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
@@ -90,6 +93,22 @@ class PlatformOperatorAdmin(admin.ModelAdmin[PlatformOperator]):
 
     def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         return False
+
+    def changelist_view(
+        self, request: HttpRequest, extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        """Warn when the stored session policy cannot be read (CORE.25: sessions fail closed)."""
+        try:
+            parse_policy(current_operator().session_policy)
+        except NoPlatformOperator:
+            pass
+        except ValueError as exc:
+            messages.warning(
+                request,
+                f"The session policy is invalid ({exc}): every sensitive action asks for a "
+                "passkey until a new configuration row fixes it.",
+            )
+        return super().changelist_view(request, extra_context)
 
     def save_model(
         self, request: HttpRequest, obj: PlatformOperator, form: Any, change: bool

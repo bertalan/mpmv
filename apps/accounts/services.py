@@ -542,6 +542,19 @@ def remove_device(device: AnyDevice, *, ctx: AuditContext, dry_run: bool = False
     return changeset
 
 
+def removal_weakens_mfa(device: AnyDevice) -> bool:
+    """Removing `device` would disable MFA or remove the user's last passkey (D-32 group 3)."""
+    kind = kind_of(device)
+    if kind == RECOVERY_CODES:
+        return False
+    others = [
+        d for d in second_factors(device.user) if (type(d), d.pk) != (type(device), device.pk)
+    ]
+    if not any(kind_of(d) != RECOVERY_CODES for d in others):
+        return True
+    return kind == PASSKEY and not any(kind_of(d) == PASSKEY for d in others)
+
+
 def reset_mfa(user: User, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Delete every factor and recovery code of `user` (lost device, offboarding).
 

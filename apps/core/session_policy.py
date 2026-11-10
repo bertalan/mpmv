@@ -9,8 +9,8 @@ after STAGE). Shape of the mapping (every key optional)::
 
 Groups: 1 free in restricted mode, 2 operational mode required, 3 a per-action fresh passkey.
 An action named in no list fails closed to group 2. The floor actions (payout and bank details,
-the owner-role grant, MFA disable) are group 3 whatever the lists say (CORE.26 reuses this floor
-for the vendor layer).
+the owner-role grant, MFA disable, `bootstrap_platform_owner`) are group 3 whatever the lists
+say (CORE.26 reuses this floor for the vendor layer).
 """
 
 from collections.abc import Mapping
@@ -48,7 +48,9 @@ DEFAULT_OPERATIONAL_ACTIONS: Final = frozenset(
 DEFAULT_PASSKEY_ACTIONS: Final = frozenset(
     {"payout_details", "owner_role_grant", "mfa_disable", "bootstrap_platform_owner"}
 )
-FLOOR_PASSKEY_ACTIONS: Final = frozenset({"payout_details", "owner_role_grant", "mfa_disable"})
+FLOOR_PASSKEY_ACTIONS: Final = frozenset(
+    {"payout_details", "owner_role_grant", "mfa_disable", "bootstrap_platform_owner"}
+)
 
 _LISTS = ("restricted", "operational", "passkey")
 _KEYS = frozenset({"idle_minutes", "cap_minutes", "single_seconds", "actions"})
@@ -62,9 +64,11 @@ class SessionPolicy:
     restricted: frozenset[str]
     operational: frozenset[str]
     passkey: frozenset[str]
+    # An unreadable stored policy fails closed: every action is group 3 until it is fixed.
+    fail_closed: bool = False
 
     def group_of(self, action: str) -> int:
-        if action in FLOOR_PASSKEY_ACTIONS or action in self.passkey:
+        if self.fail_closed or action in FLOOR_PASSKEY_ACTIONS or action in self.passkey:
             return GROUP_PASSKEY
         if action in self.restricted:
             return GROUP_FREE
@@ -132,6 +136,15 @@ def parse_policy(raw: object) -> SessionPolicy:
 
 
 DEFAULT_POLICY: Final = parse_policy({})
+FAIL_CLOSED_POLICY: Final = SessionPolicy(
+    idle_minutes=DEFAULT_IDLE_MINUTES,
+    cap_minutes=DEFAULT_CAP_MINUTES,
+    single_seconds=DEFAULT_SINGLE_SECONDS,
+    restricted=frozenset(),
+    operational=frozenset(),
+    passkey=frozenset(),
+    fail_closed=True,
+)
 
 
 def expiry(

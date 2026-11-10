@@ -5,6 +5,8 @@ verification required; the challenge is kept in the session and used once. A ses
 passkey (a stolen cookie) cannot pass it, and a code is never accepted.
 """
 
+import time
+
 from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.views.decorators.http import require_POST
@@ -32,6 +34,7 @@ def _options(
     )
     request.session[session_key] = {
         "challenge": engine.b64url(options.challenge),
+        "issued_at": time.time(),
         **(binding or {}),
     }
     return JsonResponse({"publicKey": options.public_key})
@@ -43,6 +46,9 @@ def _assert(request: HttpRequest, session_key: str) -> dict[str, str] | JsonResp
     body = _json_body(request)
     if not isinstance(pending, dict) or not isinstance(body.get("credential"), dict):
         return _bad_request("no pending passkey authentication")
+    issued_at = pending.get("issued_at")
+    if not isinstance(issued_at, int | float) or time.time() - issued_at > levels.CHALLENGE_TTL:
+        return _bad_request("the passkey request expired")
     try:
         services.authenticate_passkey(
             _user(request),
@@ -54,7 +60,7 @@ def _assert(request: HttpRequest, session_key: str) -> dict[str, str] | JsonResp
     except engine.PasskeyError:
         services.record_mfa_failure(_user(request), services.PASSKEY, ctx=audit_context(request))
         return _bad_request("the passkey was not accepted")
-    return {k: v for k, v in pending.items() if k != "challenge"}
+    return {k: v for k, v in pending.items() if k not in {"challenge", "issued_at"}}
 
 
 def _require_elevate(request: HttpRequest) -> None:
@@ -104,6 +110,8 @@ def once(request: HttpRequest) -> JsonResponse:
     result = _assert(request, levels.SINGLE_CHALLENGE_KEY)
     if isinstance(result, JsonResponse):
         return result
+    if levels.policy().group_of(result["action"]) != 2:  # the policy may have changed meanwhile
+        return _bad_request("this action cannot be done once")
     levels.grant_single(request, result["action"], result["digest"])
     return JsonResponse({"granted": True})
 

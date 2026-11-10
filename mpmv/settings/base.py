@@ -156,6 +156,8 @@ MFA_REQUIRED_POLICIES: list[str] = [
 MFA_STEP_UP_MAX_AGE = 300  # seconds a verification counts as fresh for sensitive actions
 # Step-up for sensitive views of apps that cannot import accounts (the core audit log view, SEC.4).
 STEP_UP_DECORATOR = "apps.accounts.decorators.step_up_required"
+# Path prefixes whose requests (polling) do not count as activity for operational mode (CORE.25).
+SESSION_LEVEL_POLL_PATHS: tuple[str, ...] = ()
 LEVEL_DECORATOR = "apps.accounts.decorators.requires_level"  # CORE.25 (D-32)
 # The Manager login (CORE.17): where the Manager gate sends anonymous visitors.
 LOGIN_URL = "login"
