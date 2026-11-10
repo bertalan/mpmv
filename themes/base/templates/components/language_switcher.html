@@ -12,7 +12,9 @@ Django's language info dicts (`code`, `name_local`) together with `current_langu
       <li>
         <form action="{% url 'switch_language' %}" method="post">
           {% csrf_token %}
-          <input type="hidden" name="next" value="{% firstof language.url next_url %}">
+          {% if language.url %}<input type="hidden" name="exact" value="1">
+          <input type="hidden" name="notice" value="{% if language.available %}0{% else %}1{% endif %}">
+          {% endif %}<input type="hidden" name="next" value="{% firstof language.url next_url %}">
           {% firstof language.name_local language.name as label %}<button type="submit" name="language" value="{{ language.code }}" lang="{{ language.code }}"{% if language.current or language.code == current_language %} aria-current="true" disabled{% endif %}>{{ label|capfirst }}</button>
         </form>
       </li>

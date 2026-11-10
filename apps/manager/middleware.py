@@ -3,9 +3,11 @@
 Spec 02 §Backoffice. Runs after the authentication and MFA middlewares, on every view under
 `/manager/`, in this order:
 
-1. a path outside both space prefixes (the Manager root included) answers 404;
+1. a path outside both space prefixes answers 404, except the Manager root, which sends a signed-in
+   user to their own space (or the 403 of step 3 when they have none);
 2. an anonymous visitor goes to the login, with `next`;
-3. a signed-in user without the space's right gets 404 (never 403: nothing to enumerate);
+3. a signed-in user without the space's right gets the explanatory 403 page (owner decision
+   2026-11-10; the sections below it keep answering 404);
 4. a session without a verified second factor goes to enrolment or verification (CORE.4), for
    every Manager user, also one that no `MFA_REQUIRED_POLICIES` entry covers;
 5. the view must name a registered section of its space, else 404 (deny by default);
@@ -35,7 +37,7 @@ from apps.accounts.mfa_session import is_verified
 from apps.accounts.services import has_second_factor
 from apps.vendors.services import memberships_of
 
-from .access import ManagerContext, may_enter
+from .access import ManagerContext, home_url, may_enter
 from .navigation import registry, section_key
 from .spaces import MANAGER_PREFIX, Space, space_of
 from .vendor_choice import open_memberships, refused_closed, selected_membership
@@ -44,11 +46,17 @@ CONTEXT_ATTR = "manager"
 PICKER_URL_NAME = "manager:shop:vendor"
 PICKER_SECTION = "shop.vendor"
 CLOSED_TEMPLATE = "manager/shop/vendor_closed.html"
+FORBIDDEN_TEMPLATE = "manager/forbidden.html"
 
 
 def vendor_closed(request: HttpRequest) -> HttpResponse:
     """403: the vendor is closed. Says how to ask for reopening (VEN.21), shows no vendor data."""
     return render(request, CLOSED_TEMPLATE, status=403)
+
+
+def forbidden(request: HttpRequest) -> HttpResponse:
+    """403: signed in, but without the right to this space. Explains it, lists nothing."""
+    return render(request, FORBIDDEN_TEMPLATE, status=403)
 
 
 def manager_context(request: HttpRequest) -> ManagerContext | None:
@@ -62,7 +70,17 @@ class ManagerGateMiddleware:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponseBase:
+        if request.path_info == MANAGER_PREFIX:  # no route of its own: answered before routing
+            return self.root(request)
         return self.get_response(request)
+
+    def root(self, request: HttpRequest) -> HttpResponseBase:
+        """The Manager root: anonymous to the login, others to their own space or the 403."""
+        user = request.user
+        if not user.is_authenticated:
+            return redirect_to_login(request.get_full_path(), resolve_url(settings.LOGIN_URL))
+        target = home_url(user)
+        return forbidden(request) if target == "/" else HttpResponseRedirect(target)
 
     def process_view(
         self,
@@ -75,13 +93,13 @@ class ManagerGateMiddleware:
         if not path.startswith(MANAGER_PREFIX):
             return None
         space = space_of(path)
+        user = request.user
         if space is None:
             raise Http404("No Manager page here.")
-        user = request.user
         if not user.is_authenticated:
             return redirect_to_login(request.get_full_path(), resolve_url(settings.LOGIN_URL))
         if not may_enter(space, user):
-            raise Http404("No Manager page here.")
+            return forbidden(request)
         if not is_verified(request):
             return mfa_redirect(request, "mfa:verify" if has_second_factor(user) else "mfa:setup")
 

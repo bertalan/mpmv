@@ -1768,3 +1768,34 @@ def check_establishment(establishment: Establishment, allowed: Collection[str]) 
     error = establishment_error(establishment, allowed)
     if error is not None:
         raise EstablishmentNotAllowed(establishment, error)
+
+
+# --- Storefront profile (CORE.9): plain text only, with length caps (change the numbers here)
+
+PROFILE_MAX_LENGTH: Final[dict[str, int]] = {
+    "tagline": 200,
+    "description": 10_000,
+    "shipping_policy": 5_000,
+    "refund_policy": 5_000,
+    "cancellation_policy": 5_000,
+}
+# An HTML tag, comment or declaration. A lone "<" in prose ("under 5 kg < 20 EUR") is fine.
+_HTML_MARKUP: Final = re.compile(r"<\s*[A-Za-z!/?]")
+# Control characters other than tab, line feed and carriage return (a NUL byte makes
+# PostgreSQL refuse the value).
+_CONTROL: Final = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def profile_text_errors(values: Mapping[str, str]) -> dict[str, str]:
+    """What is wrong with the storefront texts: too long, or HTML (they are plain text,
+    escaped on output and never rendered as markup)."""
+    errors: dict[str, str] = {}
+    for name, value in values.items():
+        limit = PROFILE_MAX_LENGTH[name]
+        if len(value) > limit:
+            errors[name] = f"At most {limit} characters (now {len(value)})."
+        elif _CONTROL.search(value):
+            errors[name] = "Remove the control characters."
+        elif _HTML_MARKUP.search(value):
+            errors[name] = "Write plain text: HTML tags are not accepted."
+    return errors

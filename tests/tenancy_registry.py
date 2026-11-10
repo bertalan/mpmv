@@ -318,6 +318,7 @@ ENDPOINTS: dict[str, Access] = {
     "login": NoVendorData("Manager sign-in page."),
     "logout": NoVendorData("Sign-out of the Manager."),
     "manager:shop:dashboard": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    "manager:shop:profile": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
