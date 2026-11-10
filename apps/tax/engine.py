@@ -771,6 +771,11 @@ class MissingTaxRate(BlockingTaxError, LookupError):
     never a silent 0% (T6)."""
 
 
+class IncompleteTaxProfile(BlockingTaxError, ValueError):
+    """The vendor's exempt profile lacks what the decision needs (an unknown reason, or `other`
+    without its law country, which exists after migration, MQ-15): checkout shows a message."""
+
+
 class UnresolvedTerritory(BlockingTaxError):
     """The address (or the vendor) lies in a territory whose VAT treatment is not decided or
     not supported: Northern Ireland (D-02 open), a `special` territory, a vendor established
@@ -940,7 +945,9 @@ def _exempt(profile: VendorTaxProfileSnapshot) -> TaxDecision:
         return _zero(REASON_FLAT_RATE_VENDOR, NOTE_EXEMPT_PREFIX + reason)
     if reason == OTHER_EXEMPTION and profile.exempt_country:
         return _zero(REASON_EXEMPT_OTHER, f"{NOTE_EXEMPT_PREFIX}{reason}:{profile.exempt_country}")
-    raise ValueError(f"an exempt vendor profile needs a known exemption reason ({reason!r})")
+    raise IncompleteTaxProfile(
+        f"an exempt vendor profile needs a known exemption reason ({reason!r})"
+    )
 
 
 def tax_amount(net: Decimal, rate: Decimal) -> Decimal:

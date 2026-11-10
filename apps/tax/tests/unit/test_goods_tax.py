@@ -410,14 +410,18 @@ def test_m4_an_other_exemption_is_not_labelled_flat_rate() -> None:
 @pytest.mark.parametrize("reason", ["", "made_up"])
 def test_m4_an_exempt_profile_needs_a_known_reason(reason: str) -> None:
     profile = engine.VendorTaxProfileSnapshot(regime=engine.EXEMPT, exempt_reason=reason)
-    with pytest.raises(ValueError, match="exempt"):
+    with pytest.raises(engine.IncompleteTaxProfile, match="exempt"):
         engine.resolve_goods_tax(ctx(profile=profile), engine.STANDARD)
 
 
 def test_m4_an_other_exemption_needs_its_law_country() -> None:
     profile = engine.VendorTaxProfileSnapshot(regime=engine.EXEMPT, exempt_reason="other")
-    with pytest.raises(ValueError, match="exempt"):
+    with pytest.raises(engine.IncompleteTaxProfile, match="exempt"):
         engine.resolve_goods_tax(ctx(profile=profile), engine.STANDARD)
+
+
+def test_n1_an_incomplete_profile_is_a_blocking_error_not_a_crash() -> None:
+    assert issubclass(engine.IncompleteTaxProfile, engine.BlockingTaxError)
 
 
 def test_m3_the_reasons_are_the_spec_literal() -> None:
