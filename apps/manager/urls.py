@@ -15,6 +15,13 @@ shop = (
     [
         path("", views.ShopDashboardView.as_view(), name="dashboard"),
         path("profile/", views.StorefrontProfileView.as_view(), name="profile"),
+        path("orders/", views.VendorOrderListView.as_view(), name="orders"),
+        path("orders/<uuid:public_id>/", views.VendorOrderDetailView.as_view(), name="order"),
+        path(
+            "orders/<uuid:public_id>/<slug:action>/",
+            views.VendorOrderActionView.as_view(),
+            name="order_action",
+        ),
         path("vendor/", views.VendorPickerView.as_view(), name="vendor"),
     ],
     "shop",

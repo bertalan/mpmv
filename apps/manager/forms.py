@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from wagtail.admin.rich_text import DraftailRichTextArea
 from wagtail.rich_text import features as feature_registry
 
+from apps.orders import engine as orders_engine
 from apps.vendors.engine import LOGO_ALT_MAX_LENGTH, PROFILE_MAX_LENGTH
 
 # Wagtail's default editor features (D-34), minus the three that open Wagtail's admin choosers.
@@ -93,3 +94,31 @@ class VendorLogoForm(forms.Form):
         help_text=_("Plain text for people who cannot see the image, for example the shop name."),
     )
     remove = forms.BooleanField(label=_("Remove the logo"), required=False)
+
+
+class ShipmentForm(forms.Form):
+    """The tracking number (and carrier) to ship with (ORD.6); the service checks them again."""
+
+    tracking_number = forms.CharField(
+        label=_("Tracking number"),
+        max_length=orders_engine.TRACKING_MAX,
+        help_text=_("Letters, digits, spaces and . / _ - only."),
+    )
+    carrier = forms.CharField(
+        label=_("Carrier"), required=False, max_length=orders_engine.CARRIER_MAX
+    )
+
+    def clean_tracking_number(self) -> str:
+        try:
+            return orders_engine.normalise_tracking(self.cleaned_data["tracking_number"])
+        except orders_engine.InvalidTracking:
+            raise forms.ValidationError(
+                _("Enter the tracking number: letters, digits, spaces and . / _ - only."),
+                code="invalid",
+            ) from None
+
+    def clean_carrier(self) -> str:
+        try:
+            return orders_engine.normalise_carrier(self.cleaned_data["carrier"])
+        except orders_engine.InvalidTracking:
+            raise forms.ValidationError(_("Enter a valid carrier name."), code="invalid") from None

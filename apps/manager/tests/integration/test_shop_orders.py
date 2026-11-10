@@ -34,7 +34,9 @@ def sub(vendor: Vendor) -> VendorOrder:
     return paid_vendor_order(vendor, order__customer_name="Mario Rossi")
 
 
-def test_the_list_shows_own_orders_and_a_menu_entry(client: Client, owner: User, sub) -> None:  # type: ignore[no-untyped-def]
+def test_the_list_shows_own_orders_and_a_menu_entry(
+    client: Client, owner: User, sub: VendorOrder
+) -> None:
     verified_login(client, owner)
     response = client.get(ORDERS)
     assert response.status_code == 200
@@ -42,7 +44,7 @@ def test_the_list_shows_own_orders_and_a_menu_entry(client: Client, owner: User,
     assert f'href="{ORDERS}"' in client.get(SHOP).text
 
 
-def test_staff_may_fulfil_too(client: Client, vendor: Vendor, sub) -> None:  # type: ignore[no-untyped-def]
+def test_staff_may_fulfil_too(client: Client, vendor: Vendor, sub: VendorOrder) -> None:
     staff = VendorMemberFactory.create(vendor=vendor, role="staff").user
     verified_login(client, staff)
     assert client.get(ORDERS).status_code == 200
@@ -53,7 +55,7 @@ def test_staff_may_fulfil_too(client: Client, vendor: Vendor, sub) -> None:  # t
 def test_the_detail_shows_what_shipping_needs_but_not_the_buyer_email(
     client: Client,
     owner: User,
-    sub,  # type: ignore[no-untyped-def]
+    sub: VendorOrder,
 ) -> None:
     verified_login(client, owner)
     response = client.get(url(sub))
@@ -66,7 +68,7 @@ def test_the_detail_shows_what_shipping_needs_but_not_the_buyer_email(
 def test_accept_ship_deliver_through_the_page_with_audit_rows(
     client: Client,
     owner: User,
-    sub,  # type: ignore[no-untyped-def]
+    sub: VendorOrder,
 ) -> None:
     verified_login(client, owner)
     assert client.post(url(sub, "accept")).status_code == 302
@@ -75,7 +77,7 @@ def test_accept_ship_deliver_through_the_page_with_audit_rows(
     assert client.post(url(sub, "deliver")).status_code == 302
     sub.refresh_from_db()
     assert (sub.state, sub.tracking_number, sub.carrier) == ("delivered", "TRK-12345", "Poste")
-    rows = AuditLog.objects.filter(action="orders.transition", object_type="orders.vendororder")
+    rows = AuditLog.objects.filter(action="orders.transition", target_model="orders.vendororder")
     assert rows.count() == 3
     assert {r.actor_id for r in rows} == {owner.pk}
     assert {r.source for r in rows} == {AuditLog.Source.VENDOR}
@@ -84,7 +86,7 @@ def test_accept_ship_deliver_through_the_page_with_audit_rows(
 def test_a_bad_tracking_number_redisplays_the_form_and_changes_nothing(
     client: Client,
     owner: User,
-    sub,  # type: ignore[no-untyped-def]
+    sub: VendorOrder,
 ) -> None:
     verified_login(client, owner)
     client.post(url(sub, "accept"))
@@ -98,28 +100,28 @@ def test_a_bad_tracking_number_redisplays_the_form_and_changes_nothing(
 def test_an_illegal_step_is_refused_with_a_message_and_no_change(
     client: Client,
     owner: User,
-    sub,  # type: ignore[no-untyped-def]
+    sub: VendorOrder,
 ) -> None:
     verified_login(client, owner)
     response = client.post(url(sub, "deliver"))
     assert response.status_code == 409
     assert VendorOrder.objects.get(pk=sub.pk).state == "pending"
-    assert not AuditLog.objects.filter(action="orders.transition").exists()
+    assert not AuditLog.objects.filter(target_model="orders.vendororder").exists()
 
 
-def test_actions_are_post_only(client: Client, owner: User, sub) -> None:  # type: ignore[no-untyped-def]
+def test_actions_are_post_only(client: Client, owner: User, sub: VendorOrder) -> None:
     verified_login(client, owner)
     for action in ("accept", "ship", "deliver"):
         assert client.get(url(sub, action)).status_code == 405
     assert VendorOrder.objects.get(pk=sub.pk).state == "pending"
 
 
-def test_an_unknown_action_url_is_404(client: Client, owner: User, sub) -> None:  # type: ignore[no-untyped-def]
+def test_an_unknown_action_url_is_404(client: Client, owner: User, sub: VendorOrder) -> None:
     verified_login(client, owner)
     assert client.post(url(sub, "refund")).status_code == 404
 
 
-def test_posts_need_a_real_csrf_token(owner: User, sub) -> None:  # type: ignore[no-untyped-def]
+def test_posts_need_a_real_csrf_token(owner: User, sub: VendorOrder) -> None:
     client = Client(enforce_csrf_checks=True)
     verified_login(client, owner)
     assert client.post(url(sub, "accept")).status_code == 403
@@ -145,7 +147,7 @@ def test_vendor_a_never_sees_or_touches_vendor_b_orders(
         data = {"tracking_number": "TRK-12345"}
         assert client.post(url(theirs, action), data).status_code == 404
     assert VendorOrder.objects.get(pk=theirs.pk).state == "pending"
-    assert not AuditLog.objects.filter(action="orders.transition").exists()
+    assert not AuditLog.objects.filter(target_model="orders.vendororder").exists()
 
 
 def test_a_forged_or_malformed_id_is_404(client: Client, owner: User) -> None:
@@ -155,7 +157,9 @@ def test_a_forged_or_malformed_id_is_404(client: Client, owner: User) -> None:
     assert client.get(f"{ORDERS}not-a-uuid/").status_code == 404
 
 
-def test_the_gate_still_applies(client: Client, customer: User, platform_staff: User, sub) -> None:  # type: ignore[no-untyped-def]
+def test_the_gate_still_applies(
+    client: Client, customer: User, platform_staff: User, sub: VendorOrder
+) -> None:
     verified_login(client, customer)
     assert client.get(ORDERS).status_code == 403
     assert client.post(url(sub, "accept")).status_code == 403

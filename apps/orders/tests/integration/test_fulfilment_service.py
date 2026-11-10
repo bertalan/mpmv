@@ -44,7 +44,7 @@ def test_accept_ship_deliver_walks_the_machine_and_rolls_up_the_order() -> None:
 def test_every_step_writes_an_audit_row() -> None:
     sub = paid_vendor_order()
     services.fulfil_vendor_order(sub, "accept", actor=member(sub), ctx=CTX)
-    entry = AuditLog.objects.filter(action="orders.transition", object_type="orders.vendororder")
+    entry = AuditLog.objects.filter(action="orders.transition", target_model="orders.vendororder")
     assert entry.count() == 1
     row = entry.get()
     assert row.before is not None
@@ -59,7 +59,7 @@ def test_a_non_member_and_another_vendors_member_are_refused() -> None:
         with pytest.raises(PermissionDenied):
             services.fulfil_vendor_order(sub, "accept", actor=actor, ctx=CTX)
     assert VendorOrder.objects.get(pk=sub.pk).state == "pending"
-    assert not AuditLog.objects.filter(action="orders.transition").exists()
+    assert not AuditLog.objects.filter(target_model="orders.vendororder").exists()
 
 
 def test_an_inactive_member_is_refused() -> None:
@@ -119,4 +119,4 @@ def test_dry_run_returns_the_changes_and_writes_nothing() -> None:
     changes = services.fulfil_vendor_order(sub, "accept", actor=member(sub), ctx=CTX, dry_run=True)
     assert not changes.is_empty
     assert VendorOrder.objects.get(pk=sub.pk).state == "pending"
-    assert not AuditLog.objects.filter(action="orders.transition").exists()
+    assert not AuditLog.objects.filter(target_model="orders.vendororder").exists()

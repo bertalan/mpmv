@@ -12,9 +12,11 @@ from django.conf import settings
 from django.contrib import auth, messages
 from django.contrib.auth import views as auth_views
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.paginator import Paginator
 from django.db.models import Model
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.http.response import HttpResponseBase
+from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
@@ -28,6 +30,9 @@ from apps.catalog.services import product_kpis
 from apps.core.audit import audit_context
 from apps.core.models import AuditLog
 from apps.core.public_forms import Protection, pre_mfa_step, public_form
+from apps.orders import engine as orders_engine
+from apps.orders.models import VendorOrder, VendorOrderState
+from apps.orders.services import fulfil_vendor_order
 from apps.vendors.engine import RICH_TEXT_FIELDS, plain_to_html
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.scoping import Source, VendorScopedQuerySet
@@ -39,7 +44,7 @@ from apps.vendors.services import (
 )
 
 from .access import ManagerContext, home_url
-from .forms import StorefrontProfileForm, VendorLogoForm
+from .forms import ShipmentForm, StorefrontProfileForm, VendorLogoForm
 from .middleware import manager_context
 from .navigation import Section, registry
 from .spaces import Space
@@ -220,6 +225,135 @@ class StorefrontProfileView(ManagerView):
                     f"{reverse('manager:shop:profile')}?language={language}"
                 )
         return self.render_to_response(self.get_context_data(form=form))
+
+
+class VendorOrderListView(ManagerView):
+    """The selected vendor's sub-orders, newest first, filtered by state (ORD.6)."""
+
+    section = "shop.orders"
+    template_name = "manager/shop/orders.html"
+    paginate_by = 25
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        rows = (
+            self.scoped(VendorOrder).select_related("order").order_by("-order__created_at", "-id")
+        )
+        state = self.request.GET.get("state", "")
+        if state in VendorOrderState.values:
+            rows = rows.filter(state=state)
+        else:
+            state = ""
+        page = Paginator(rows, self.paginate_by).get_page(self.request.GET.get("page"))
+        query = f"state={state}&" if state else ""
+        context.update(
+            page_obj=page,
+            orders=[
+                {
+                    "number": sub.order.number,
+                    "placed": sub.order.created_at,
+                    "state": sub.get_state_display(),
+                    "total": sub.gross_total,
+                    "url": reverse("manager:shop:order", args=[sub.public_id]),
+                }
+                for sub in page.object_list
+            ],
+            states=VendorOrderState.choices,
+            state=state,
+            previous_url=f"?{query}page={page.previous_page_number()}"
+            if page.has_previous()
+            else "",
+            next_url=f"?{query}page={page.next_page_number()}" if page.has_next() else "",
+        )
+        return context
+
+
+def address_lines(address: Any) -> list[str]:
+    """The text values of a stored address, in stored order (an anonymised one has none)."""
+    if not isinstance(address, dict):
+        return []
+    return [str(v) for v in address.values() if isinstance(v, str) and v]
+
+
+class VendorOrderDetailView(ManagerView):
+    """One sub-order with what the vendor needs to ship it, and the actions it may take now.
+
+    Privacy: fields are picked one by one; the buyer's e-mail and billing data never reach the
+    template (VendorOrder docstring).
+    """
+
+    section = "shop.orders"
+    template_name = "manager/shop/order.html"
+
+    def sub_order(self) -> VendorOrder:
+        return get_object_or_404(
+            self.scoped(VendorOrder).select_related("order"), public_id=self.kwargs["public_id"]
+        )
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        sub = self.sub_order()
+        order = sub.order
+        context.update(
+            sub=sub,
+            number=order.number,
+            placed=order.created_at,
+            customer_name=order.customer_name,
+            address=address_lines(order.shipping_address),
+            country=order.shipping_country,
+            lines=[
+                {
+                    "title": line.title,
+                    "variant": line.variant_label,
+                    "sku": line.sku,
+                    "quantity": line.quantity,
+                }
+                for line in sub.lines.all()
+            ],
+            can_accept=sub.state == "pending",
+            can_ship=sub.state == "accepted",
+            can_deliver=sub.state == "shipped",
+            accept_url=reverse("manager:shop:order_action", args=[sub.public_id, "accept"]),
+            ship_url=reverse("manager:shop:order_action", args=[sub.public_id, "ship"]),
+            deliver_url=reverse("manager:shop:order_action", args=[sub.public_id, "deliver"]),
+        )
+        context.setdefault("form", ShipmentForm(initial={"carrier": sub.carrier}))
+        return context
+
+
+class VendorOrderActionView(VendorOrderDetailView):
+    """POST accept / ship / deliver on one of the vendor's own sub-orders (ORD.6)."""
+
+    http_method_names = ["post", "options"]
+
+    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        action = self.kwargs["action"]
+        if action not in orders_engine.FULFILMENT_ACTIONS:
+            raise Http404("No such action.")
+        sub = self.sub_order()  # another vendor's id is 404 here, before anything runs
+        actor = self.manager.user
+        if not isinstance(actor, User):
+            raise Http404("No such order.")
+        tracking, carrier = "", ""
+        if action == "ship":
+            form = ShipmentForm(request.POST)
+            if not form.is_valid():
+                return self.render_to_response(self.get_context_data(form=form), status=400)
+            tracking, carrier = form.cleaned_data["tracking_number"], form.cleaned_data["carrier"]
+        ctx = replace(audit_context(request), source=AuditLog.Source.VENDOR)
+        try:
+            fulfil_vendor_order(
+                sub, action, actor=actor, ctx=ctx, tracking_number=tracking, carrier=carrier
+            )
+        except PermissionDenied:
+            return self.render_to_response(self.get_context_data(), status=403)
+        except orders_engine.InvalidTracking:  # the form checked it: only a race lands here
+            raise Http404("No such order.") from None
+        except (orders_engine.IllegalTransition, ValueError):
+            context = self.get_context_data(action_error=_("This order cannot take that step now."))
+            return self.render_to_response(context, status=409)
+        messages.success(request, _("The order was updated."))
+        return HttpResponseRedirect(reverse("manager:shop:order", args=[sub.public_id]))
 
 
 class PlatformDashboardView(ManagerView):
