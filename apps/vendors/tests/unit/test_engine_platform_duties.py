@@ -87,3 +87,9 @@ def test_self_certification_text_has_a_stable_hash_per_language() -> None:
     assert engine.SELF_CERTIFICATION_VERSION >= 1
     with pytest.raises(engine.SelfCertificationError):
         engine.self_certification_text("xx")
+
+
+def test_the_hash_covers_the_language_code(monkeypatch: pytest.MonkeyPatch) -> None:
+    same = {"en": "Same text.", "it": "Same text."}
+    monkeypatch.setattr(engine, "SELF_CERTIFICATION_TEXTS", same)
+    assert engine.self_certification_hash("en") != engine.self_certification_hash("it")

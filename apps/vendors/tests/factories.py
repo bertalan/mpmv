@@ -354,7 +354,6 @@ class SelfCertificationFactory(DjangoModelFactory[SelfCertification]):
     language = "en"
     text_hash = factory.LazyAttribute(lambda o: engine.self_certification_hash(o.language))
     accepted_at = factory.LazyFunction(timezone.now)
-    ip = "198.51.100.1"
     onboarding_round = factory.SelfAttribute("vendor.onboarding_round")
 
 

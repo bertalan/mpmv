@@ -2,51 +2,28 @@
 
 UPDATE and DELETE raise, whatever the client, like vendors_contractacceptance (migration 0010).
 The seed is the DSA article 30 trader data of every EU vendor (telephone and address; name and
-email are always present) and the trade register entry of the legal forms that are registered
-(not sole proprietors). Staff edit the rows afterwards; rules are additive.
+email are always present) and, for the companies that must register in Italy, Germany, France
+and Spain, the trade register entry. Sole proprietors and the legal form `other` are exempt
+(decision on PR 181): staff add per-country rows. Rules are additive.
 """
 
 from typing import Any
 
 from django.db import migrations
 
-# Frozen copy of the member states at the time of this migration.
-EU_MEMBER_STATES = [
-    "AT",
-    "BE",
-    "BG",
-    "CY",
-    "CZ",
-    "DE",
-    "DK",
-    "EE",
-    "ES",
-    "FI",
-    "FR",
-    "GR",
-    "HR",
-    "HU",
-    "IE",
-    "IT",
-    "LT",
-    "LU",
-    "LV",
-    "MT",
-    "NL",
-    "PL",
-    "PT",
-    "RO",
-    "SE",
-    "SI",
-    "SK",
-]
-REGISTERED_FORMS = ("partnership", "srl", "spa", "cooperative", "other")
+REGISTERED_COUNTRIES = ("IT", "DE", "FR", "ES")
+COMPANY_FORMS = ("partnership", "srl", "spa", "cooperative")
 NOTE = "DSA article 30: trader data held before the vendor sells."
 
+# (country, region, legal form, field); an empty country or form matches every one.
 SEED = [
-    ("", field)
+    ("", "eu", "", field)
     for field in ("phone", "registered_street", "registered_postal_code", "registered_city")
-] + [(form, "business_registration_number") for form in REGISTERED_FORMS]
+] + [
+    (country, "", form, "business_registration_number")
+    for country in REGISTERED_COUNTRIES
+    for form in COMPANY_FORMS
+]
 
 FORBID = """
 CREATE OR REPLACE FUNCTION vendors_selfcertification_append_only() RETURNS trigger AS $$
@@ -67,17 +44,12 @@ DROP FUNCTION IF EXISTS vendors_selfcertification_append_only();
 """
 
 
-def _rows() -> list[tuple[str, str]]:
-    """(legal form, field) pairs; the empty form matches every legal form."""
-    return SEED
-
-
 def seed(apps: Any, schema_editor: Any) -> None:
     LegalFieldRequirement = apps.get_model("vendors", "LegalFieldRequirement")
-    for legal_form, field_name in _rows():
+    for country, region, legal_form, field_name in SEED:
         LegalFieldRequirement.objects.get_or_create(
-            country="",
-            region="eu",
+            country=country,
+            region=region,
             legal_form=legal_form,
             field_name=field_name,
             purpose="activation",
@@ -87,13 +59,14 @@ def seed(apps: Any, schema_editor: Any) -> None:
 
 def unseed(apps: Any, schema_editor: Any) -> None:
     LegalFieldRequirement = apps.get_model("vendors", "LegalFieldRequirement")
-    for legal_form, field_name in _rows():
+    for country, region, legal_form, field_name in SEED:
         LegalFieldRequirement.objects.filter(
-            country="",
-            region="eu",
+            country=country,
+            region=region,
             legal_form=legal_form,
             field_name=field_name,
             purpose="activation",
+            note=NOTE,  # rows staff re-created with another note stay
         ).delete()
 
 

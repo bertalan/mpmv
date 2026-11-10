@@ -41,10 +41,6 @@ class Migration(migrations.Migration):
                     models.CharField(help_text="SHA-256 of the certified text.", max_length=64),
                 ),
                 ("accepted_at", models.DateTimeField()),
-                (
-                    "ip",
-                    models.GenericIPAddressField(blank=True, null=True, verbose_name="IP address"),
-                ),
                 ("onboarding_round", models.PositiveIntegerField(default=1, editable=False)),
             ],
             options={

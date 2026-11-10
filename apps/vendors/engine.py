@@ -1561,9 +1561,9 @@ def self_certification_text(language: str) -> str:
 
 
 def self_certification_hash(language: str) -> str:
-    """SHA-256 of the text in `language` and its version, as stored with the acceptance."""
+    """SHA-256 of the version, the language code and the text, as stored with the acceptance."""
     text = self_certification_text(language)
-    return hashlib.sha256(f"{SELF_CERTIFICATION_VERSION}\n{text}".encode()).hexdigest()
+    return hashlib.sha256(f"{SELF_CERTIFICATION_VERSION}\n{language}\n{text}".encode()).hexdigest()
 
 
 def check_can_certify(status: str, role: str | None) -> None:

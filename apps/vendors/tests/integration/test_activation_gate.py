@@ -15,6 +15,7 @@ from apps.vendors.services import (
     change_status,
     is_self_certified,
     onboarding_checklist,
+    platform_duties_missing,
 )
 from apps.vendors.tests.factories import (
     ContractAcceptanceFactory,
@@ -53,13 +54,17 @@ def certify(vendor: Vendor, *, language: str = "en", dry_run: bool = False) -> C
 
 def test_the_seed_requires_telephone_address_and_trade_register_entry_for_eu_vendors() -> None:
     seed_legal_requirements()
-    rules = LegalFieldRequirement.objects.filter(purpose="activation", region="eu")
-    fields = set(rules.values_list("field_name", flat=True))
-    assert {"phone", "registered_street", "registered_postal_code", "registered_city"} <= fields
+    rules = LegalFieldRequirement.objects.filter(purpose="activation")
+    eu = set(rules.filter(region="eu").values_list("field_name", flat=True))
+    assert {"phone", "registered_street", "registered_postal_code", "registered_city"} <= eu
     register = rules.filter(field_name="business_registration_number")
-    assert register.exists()
-    assert not register.filter(legal_form="").exists()
-    assert not register.filter(legal_form="sole_proprietorship").exists()
+    assert set(register.values_list("country", flat=True)) == {"IT", "DE", "FR", "ES"}
+    assert set(register.values_list("legal_form", flat=True)) == {
+        "partnership",
+        "srl",
+        "spa",
+        "cooperative",
+    }
 
 
 def test_an_eu_vendor_without_telephone_cannot_be_activated_and_gets_the_reason() -> None:
@@ -133,6 +138,7 @@ def test_the_self_certification_row_stores_version_language_and_hash() -> None:
     assert row.version == engine.SELF_CERTIFICATION_VERSION
     assert row.language == "it"
     assert row.text_hash == engine.self_certification_hash("it")
+    assert not hasattr(row, "ip")  # data minimisation: the IP is not stored (decision on PR 181)
     assert row.vendor == vendor
     assert row.onboarding_round == vendor.onboarding_round
 
@@ -147,6 +153,7 @@ def test_certifying_is_audited_dry_run_writes_nothing_and_repeating_changes_noth
     certify(vendor)
     entry = AuditLog.objects.get(action="vendor.self_certified")
     assert entry.vendor_key == str(vendor.public_id)
+    assert "ip" not in (entry.after or {})
     assert certify(vendor).summary() == {"create": 0, "update": 0, "delete": 0}
     assert SelfCertification.objects.count() == 1
 
@@ -191,3 +198,68 @@ def test_the_self_certification_table_is_append_only() -> None:
         SelfCertification.objects.filter(pk=row.pk).update(language="en")
     with pytest.raises(DatabaseError), transaction.atomic():
         SelfCertification.objects.filter(pk=row.pk).delete()
+
+
+def test_an_inactive_owner_cannot_certify() -> None:
+    vendor = onboarding(eu_company=True)
+    owner = vendor.members.get().user
+    owner.is_active = False
+    owner.save(update_fields=["is_active"])
+    with pytest.raises(engine.SelfCertificationError):
+        certify_platform_duties(vendor, owner, language="en", ctx=owner_ctx(owner.pk))
+    assert not SelfCertification.objects.exists()
+
+
+@pytest.mark.parametrize("status", [Vendor.Status.APPLICANT, Vendor.Status.CLOSED])
+def test_a_vendor_outside_the_accepting_statuses_cannot_certify(status: str) -> None:
+    vendor = onboarding(eu_company=True)
+    Vendor.objects.filter(pk=vendor.pk).update(status=status)
+    with pytest.raises(engine.SelfCertificationError, match="cannot certify"):
+        certify(vendor)
+    assert not SelfCertification.objects.exists()
+
+
+def test_a_language_without_a_text_is_refused_by_the_service() -> None:
+    vendor = onboarding(eu_company=True)
+    with pytest.raises(engine.SelfCertificationError):
+        certify(vendor, language="xx")
+    assert not SelfCertification.objects.exists()
+
+
+def test_a_non_eu_vendor_is_not_asked_for_trader_fields_but_still_for_the_certification() -> None:
+    vendor = onboarding(non_eu_company=True, phone="")
+    assert onboarding_checklist(vendor).blocking_missing == (engine.PLATFORM_DUTIES,)
+    assert platform_duties_missing(vendor) == (engine.SELF_CERTIFICATION,)
+    certify(vendor)
+    assert platform_duties_missing(vendor) == ()
+
+
+def test_the_legal_form_other_is_not_asked_for_a_trade_register_entry() -> None:
+    # Decision on PR 181: staff add per-country rows for it.
+    vendor = onboarding(
+        eu_company=True,
+        legal_form=Vendor.LegalForm.OTHER,
+        phone=PHONE,
+        business_registration_number="",
+    )
+    assert "business_registration_number" not in platform_duties_missing(vendor)
+
+
+def test_a_german_company_form_needs_the_register_entry_but_a_french_sole_proprietor_does_not() -> (
+    None
+):
+    german = onboarding(
+        eu_company=True,
+        legal_form=Vendor.LegalForm.SRL,
+        phone=PHONE,
+        business_registration_number="",
+    )
+    assert "business_registration_number" in platform_duties_missing(german)
+    french = onboarding(
+        eu_company=True,
+        country="FR",
+        legal_form=Vendor.LegalForm.SOLE_PROPRIETORSHIP,
+        phone=PHONE,
+        business_registration_number="",
+    )
+    assert "business_registration_number" not in platform_duties_missing(french)

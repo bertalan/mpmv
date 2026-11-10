@@ -818,7 +818,7 @@ class SelfCertification(BaseModel):
     """An owner certified, for a vendor, the DSA article 30(1)(e) statement (CMP.25).
 
     The vendor offers only products and services that comply with Union law. Append-only (DB
-    trigger, migration 0021), like `ContractAcceptance`: stores the text version, the language
+    trigger, migration 0022), like `ContractAcceptance`: stores the text version, the language
     shown and the hash of that text (`engine.self_certification_hash`), and the onboarding round
     of the vendor (VEN.21). Written by `services.certify_platform_duties`.
     """
@@ -834,7 +834,6 @@ class SelfCertification(BaseModel):
     language = LanguageField()
     text_hash = models.CharField(max_length=64, help_text="SHA-256 of the certified text.")
     accepted_at = models.DateTimeField()
-    ip = models.GenericIPAddressField("IP address", null=True, blank=True)
     onboarding_round = models.PositiveIntegerField(default=1, editable=False)
 
     class Meta:

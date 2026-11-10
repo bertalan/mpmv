@@ -943,7 +943,10 @@ def is_self_certified(vendor: Vendor) -> bool:
 
 def platform_duties_missing(vendor: Vendor) -> tuple[str, ...]:
     """What the stored vendor still lacks for activation under CMP.25: the `activation`
-    requirement fields, then the self-certification (`engine.platform_duties_missing`)."""
+    requirement fields, then the self-certification (`engine.platform_duties_missing`).
+
+    The self-certification is asked of every vendor while the field rules are EU-only; that is
+    harmless while D-21 admits only EU vendors (follow-up: scope it to the EU if that changes)."""
     stored = Vendor.objects.get(pk=vendor.pk)
     return engine.platform_duties_missing(
         stored.legal_identity().values(),
@@ -963,7 +966,7 @@ def certify_platform_duties(
     """Record that `user`, an owner, certifies for `vendor` the DSA article 30(1)(e) statement
     shown in `language` (CMP.25).
 
-    Stores the text version, the language and the hash of the text, and the IP of `ctx`.
+    Stores the text version, the language and the hash of the text.
     Certifying again in the same onboarding round changes nothing. Raises
     `engine.SelfCertificationError` (vendor status, not an owner, no text in `language`), also
     on dry-run.
@@ -990,7 +993,6 @@ def certify_platform_duties(
             language=language,
             text_hash=text_hash,
             accepted_at=timezone.now(),
-            ip=ctx.ip,
             onboarding_round=locked.onboarding_round,
         )
         changes = ChangeSet()
@@ -1004,7 +1006,6 @@ def certify_platform_duties(
                 "language": language,
                 "text_hash": text_hash,
                 "accepted_at": certification.accepted_at,
-                "ip": ctx.ip,
                 "onboarding_round": certification.onboarding_round,
             },
         )
