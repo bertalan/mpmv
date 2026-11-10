@@ -596,12 +596,13 @@ def dump_csv(document: Mapping[str, Any]) -> str:
 
 def _csv_line(record: str, values: Mapping[str, Any]) -> list[str]:
     cells = (_csv_cell(values.get(name)) for name in CSV_COLUMNS[1:])
-    return [record, *map(_escape_formula, map(_within_cell_cap, cells))]
+    return [record, *map(_within_cell_cap, map(_escape_formula, cells))]
 
 
 def _within_cell_cap(cell: str) -> str:
-    """Refuse a cell `csv.reader` cannot read back: it raises `csv.Error` past its field size
-    limit, which `parse_csv` reports as an unreadable file (stored values are far shorter)."""
+    """Refuse a cell, as written (after escaping), that `csv.reader` cannot read back: it raises
+    `csv.Error` past its field size limit, which `parse_csv` reports as an unreadable file
+    (stored values are far shorter)."""
     if len(cell) > MAX_CELL_CHARS:
         raise ValueError(
             f"A cell is larger than {MAX_CELL_CHARS} characters: the CSV import cannot read it."

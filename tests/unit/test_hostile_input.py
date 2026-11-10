@@ -216,6 +216,17 @@ def test_the_csv_export_round_trips_escaped_cells(text: str) -> None:
     assert method.values["carrier"] == text
 
 
+@pytest.mark.parametrize("sign", ["=", "+", "-", "@"])
+def test_the_cell_cap_counts_the_apostrophe_the_escape_adds(sign: str) -> None:
+    at_limit = sign + "x" * (fmt.MAX_CELL_CHARS - 2)  # escaped: exactly the limit
+    parsed = fmt.parse_csv(fmt.dump_csv(_document_with(at_limit)))
+    zone = next(row for row in parsed.rows if row.record == fmt.ZONE)
+    assert zone.values["name"] == at_limit
+
+    with pytest.raises(ValueError, match="larger than"):
+        fmt.dump_csv(_document_with(at_limit + "x"))
+
+
 def test_a_cell_the_csv_reader_cannot_read_is_refused_at_export() -> None:
     with pytest.raises(ValueError, match="larger than"):
         fmt.dump_csv(_document_with("[" * (fmt.MAX_CELL_CHARS + 1)))
