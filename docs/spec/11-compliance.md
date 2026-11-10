@@ -66,21 +66,55 @@ own responsibility (CMP.10).
 
 ### CMP.3 — GPSR `[P1]`
 ```python
-class GpsrInfo(Model):
+class GpsrInfo(Model):                 # apps.compliance; product.gpsr (one-to-one)
     manufacturer_name
     manufacturer_address
-    manufacturer_contact
+    manufacturer_contact                # email or http(s) web address
+    manufacturer_country                # outside the EU: EU responsible person mandatory
     eu_responsible_name
     eu_responsible_address
     eu_responsible_contact  # mandatory if the manufacturer is outside the EU
-    product_identifiers(batch, model, GTIN)
-    warnings(translated)
-    safety_documents(file)
+    product_identifiers(batch, model)   # plus Product.gtin and Product.mpn
+    safety_documents(file)              # follow-up (private document storage, ARC.15)
+
+class VendorGpsrDefaults(Model):        # same manufacturer and EU person blocks, per vendor
+class GpsrSafetyText(Model):            # warnings and safety information, one row per language
+class SafetyCase(Model):                # article 22: authority order or safety notice,
+    kind; vendor; product; received_at; due_on; status; resolution; overdue_alerted_at
+class CountryWarningLanguages(Model):   # platform data: country -> accepted warnings languages
 ```
+- Vendor defaults fill a block (manufacturer, EU responsible person) the product leaves empty,
+  one whole block at a time, never field by field. The catalog never imports compliance:
+  compliance registers its check in `apps.catalog.publishing`, which the publishing services
+  run before a product becomes published. A published product never silently loses its data: a
+  product edit, a product GPSR write or a vendor defaults write that would remove mandatory data
+  from a published product is refused (unpublish first), and a nightly job lists every published
+  product that fails the check anyway (log error and one email a day to the staff alert
+  address). Imports (MIG, CAT.10 pipelines) publish only through the catalog services, so the
+  same checks apply.
+- Working days are Monday to Friday; the day of receipt is day 0 and counts in business time
+  (`BUSINESS_TIME_ZONE`). A receipt time in the future is refused. Public holidays are not skipped, which gives the earliest deadline (owner
+  decision 2026-11-09); the engine keeps a holiday set, empty unless the
+  `COMPLIANCE_PUBLIC_HOLIDAYS` setting lists dates.
 - Visible on the product page with at least one product picture (article 19); **publication
   blocked** if mandatory fields are missing; the import contract requires them. Per-vendor defaults
   (the manufacturer often is the vendor). Warnings and safety information in the language of the
-  destination country.
+  destination country (owner decision 2026-11-09): when a product has warnings, sale into an EU or
+  EEA country is blocked until the warnings exist in at least one of that country's accepted
+  languages, so one German text unblocks DE, AT and LU at once. The country -> accepted languages
+  map is platform data (`CountryWarningLanguages`), seeded from the official languages of the EU
+  and EEA states and edited by staff through an audited service and the admin; the engine
+  receives it as input and the services cache it per process (dropped on edit). The product stays
+  published and on sale for the other countries. The check is registered in
+  `apps.catalog.selling`, which the checkout calls per line; the product page and the checkout
+  show a notice for a blocked country with links to the warnings in the languages that exist, and
+  the vendor sees the countries the product is not sold into, with the languages that would
+  unblock each. Whenever warnings exist the product page shows them: in the page language, else
+  a language the destination accepts, else the primary language, else any, with a label saying
+  which language it is.
+- An overdue authority order or safety notice alerts staff once: an error in the log, an audit
+  entry, an email to the operator's compliance address (else its support address) through the
+  transactional outbox, and an in-app notice for the Catalog and moderation role (CMP.26).
 - Online marketplace duties of GPSR article 22, which apply whatever the platform's size: register
   on the Safety Gate portal with a single point of contact for authorities, and give consumers a
   single point of contact; act on an authority order without undue delay and within **2 working
@@ -534,3 +568,4 @@ regulatory check and when the platform grows.
 | CMP.23 | Non-fiscal order-data export per `VendorOrder` mapped to EN 16931 business terms, as CSV, JSON and optional UBL-like XML with its own document type, labelled not an invoice | P2 | 8 | ORD.2, VEN.12 | A seed order's export maps parties, lines, VAT category, rate and totals to the listed BT codes; every format carries the non-fiscal label and no invoice number; the XML is not accepted as an invoice by an EN 16931 validator |
 | CMP.24 | Approval of (L) legal wording: per text and language a version hash, draft author (person or agent) and counsel approval (approver name or role, date, approved hash) for gettext keys with an `(L)` context and database texts; release check and production system check refuse unapproved texts; STAGE shows a pending marker; approvals audited | P1 | 6 | I18N.7, ARC.16, SEC.4 | Changing an approved (L) text in any language makes the release check fail until a new approval matches its hash; production refuses to start with an unapproved text; STAGE shows the marker; each approval is in the audit log |
 | CMP.25 | Activation gate for platform duties (coherence check 5): an `activation` purpose in `LegalFieldRequirement` seeded with the DSA article 30 trader data (name, address, telephone, email, trade register entry where registered), the article 30(1)(e) self-certification recorded as an append-only acceptance with text hash, both checked by the VEN.5 activation next to the CMP.13 gate; DAC7 data still blocks payouts only; CMP.11 keeps the checks, display on offers and EPR | P1 | 4 | VEN.5, VEN.12, CMP.13 | An EU vendor missing its telephone, its trade register entry (when registered) or the self-certification cannot be activated and gets the reason; a complete vendor is activated; missing DAC7 data does not block activation; the self-certification row stores version, language and hash |
+| CMP.26 | GPSR follow-ups of the owner decisions 2026-11-09 (CMP.3): the checkout refuses a line whose product `apps.catalog.selling.sale_blockers` blocks for the delivery country and shows `{% product_destination_notice %}` (ORD.3, ORD.5); the product page includes the notice for the visitor's country (CAT.7); a Manager shop space page lists the vendor's products with the country languages their warnings miss (`vendor_warnings_language_gaps`, CORE.17); an in-app notice in the Manager platform space for the Catalog and moderation role when a safety case is overdue; open points of the CMP.3 review: link the notice only to languages in which the product page is published, a composite foreign key `(product, vendor)` on `SafetyCase` as in the catalog, `no` vs `nb`/`nn` matching for Norway, and Northern Ireland (GPSR applies, ships as `GB`, not checked) | P1 | 6 | CMP.3, ORD.3, ORD.5, CAT.7, CORE.17 | A cart line with warnings only in German cannot be checked out to a French-only country and the checkout shows why, with a link to the German warnings; the same cart checks out to a German-speaking country; the vendor's Manager page lists the missing country languages; an overdue safety case shows a notice to a Catalog and moderation user and not to a Finance user |

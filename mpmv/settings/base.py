@@ -312,6 +312,12 @@ WAGTAIL_ENABLE_UPDATE_CHECK = False
 USE_TZ = True
 TIME_ZONE = "UTC"
 BUSINESS_TIME_ZONE = "Europe/Rome"
+# Public holidays (ISO dates) the GPSR article 22 deadlines skip (CMP.3). Empty: working days are
+# Monday to Friday, the earliest deadline (owner decision 2026-11-09).
+COMPLIANCE_PUBLIC_HOLIDAYS: list[str] = []
+# The country -> accepted warnings languages map (CMP.3) is cached per process this long; a staff
+# edit drops this process's copy at once, other processes reload within this time.
+COMPLIANCE_COUNTRY_LANGUAGES_CACHE_SECONDS = 300
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
