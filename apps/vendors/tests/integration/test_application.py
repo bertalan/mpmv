@@ -2,20 +2,24 @@
 
 Done when: a visitor applies from the public page, confirms the email, enrols MFA at first login
 and appears as an applicant in the admin; a bot submission without a valid Turnstile token is
-refused; the form passes the CMP.9 checks. Security: an application never grants access by
-itself (the account stays inactive until the emailed link is used), answers never tell whether
-an email address already has an account, and every step is rate limited and audited.
+refused; the form passes the CMP.9 checks. Security (review of PR #202): the form takes no
+password, so nobody can pre-set the secret of an address they do not own; the person who opens
+the emailed link chooses it on the confirm page. An application never grants access by itself,
+answers never tell whether an address already has an account, a pending marker (not the user's
+state) decides what a link may activate, and every step is rate limited and audited.
 """
 
+import datetime as dt
 import json
 import secrets
 from collections.abc import Iterator
 from html.parser import HTMLParser
 
 import pytest
-from django.contrib.auth.hashers import check_password
+from django.core.exceptions import ValidationError
 from django.test import Client, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts.models import ActionLinkUse, User
 from apps.accounts.services import REGISTRATION_LIMIT, mfa_required
@@ -23,8 +27,10 @@ from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.fakes import FakeCaptchaVerifier
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog, OutboxEmail
+from apps.core.services import render_email
 from apps.vendors import engine, services
-from apps.vendors.models import Vendor, VendorMember
+from apps.vendors.models import Vendor, VendorApplication, VendorMember
+from apps.vendors.tests.factories import VendorFactory
 from apps.vendors.tests.integration.test_claim import open_link
 
 pytestmark = pytest.mark.django_db
@@ -37,6 +43,7 @@ CAPTCHA = {
     "CAPTCHA_VERIFIER": "apps.accounts.tests.fakes.FakeCaptchaVerifier",
     "TURNSTILE_SITE_KEY": "site-key-for-tests",
 }
+CONFIRM_TEMPLATE = "vendors.application_confirm"
 
 
 @pytest.fixture(autouse=True)
@@ -52,22 +59,20 @@ def form(**overrides: str) -> dict[str, str]:
         "email": f"applicant-{secrets.token_hex(4)}@example.com",
         "business_name": "Ada Workshop",
         "country": "IT",
-        "password": secrets.token_urlsafe(18),
     }
     return {**data, **overrides}
+
+
+def new_password() -> str:
+    return secrets.token_urlsafe(18)
 
 
 def apply(client: Client, data: dict[str, str] | None = None, ip: str = IP) -> object:
     return client.post(URL, data if data is not None else form(), REMOTE_ADDR=ip)
 
 
-def last_email(template_key: str | None = None) -> OutboxEmail:
-    emails = OutboxEmail.objects.order_by("-id")
-    if template_key:
-        emails = emails.filter(template_key=template_key)
-    email = emails.first()
-    assert email is not None
-    return email
+def emails(template_key: str = CONFIRM_TEMPLATE) -> list[OutboxEmail]:
+    return list(OutboxEmail.objects.filter(template_key=template_key).order_by("id"))
 
 
 def link_path(email: OutboxEmail) -> str:
@@ -102,23 +107,18 @@ def test_the_form_asks_only_for_what_the_application_needs(client: Client) -> No
         "email",
         "business_name",
         "country",
-        "password",
-    }
+    }  # no password: the person who opens the emailed link chooses it
 
 
 def test_the_form_is_accessible_without_a_puzzle(client: Client) -> None:
     html = client.get(URL).content.decode()
     fields = inputs_of(html)
-    assert fields["password"]["type"] == "password"
-    assert fields["password"]["autocomplete"] == "new-password"
-    assert fields["password"].get("data-password-toggle")
     assert fields["email"]["autocomplete"] == "email"
-    assert fields["country"]["autocomplete"] == "country"
     assert fields["full_name"]["autocomplete"] == "name"
+    assert fields["country"]["autocomplete"] == "country"
     assert all("onpaste" not in attrs for attrs in fields.values())
-    for name in ("full_name", "email", "business_name", "country", "password"):
+    for name in ("full_name", "email", "business_name", "country"):
         assert f'for="id_{name}"' in html  # a visible label for every field
-    assert "accounts/password-toggle.js" in html
 
 
 @override_settings(**CAPTCHA)
@@ -137,7 +137,7 @@ def test_the_form_and_the_answers_are_not_cached_or_indexed(client: Client) -> N
 # --- Applying
 
 
-def test_an_application_creates_an_inactive_account_and_an_applicant_vendor(
+def test_an_application_creates_an_inactive_account_with_no_usable_password(
     client: Client,
 ) -> None:
     data = form()
@@ -147,21 +147,21 @@ def test_an_application_creates_an_inactive_account_and_an_applicant_vendor(
     assert response["Location"] == reverse("vendors:apply_sent")  # type: ignore[index]
     user = User.objects.get(email=data["email"])
     assert user.is_active is False
+    assert user.has_usable_password() is False  # B1: nobody chose a secret yet
     assert user.full_name == "Ada Example"
-    assert check_password(data["password"], user.password)
-    assert user.password != data["password"]
     vendor = Vendor.objects.get(contact_email=data["email"])
     assert vendor.status == engine.APPLICANT
     assert vendor.legal_name == vendor.display_name == "Ada Workshop"
     member = VendorMember.objects.get(vendor=vendor)
     assert (member.user, member.role) == (user, engine.OWNER)
+    assert VendorApplication.objects.get(user=user).version == 1
 
 
 def test_an_application_never_signs_anyone_in_or_grants_access(client: Client) -> None:
     data = form()
-    apply(client, data)
+    apply(client, {**data, "password": "Attacker-chosen-1!"})  # an extra field is ignored
     assert "_auth_user_id" not in client.session
-    assert client.login(username=data["email"], password=data["password"]) is False
+    assert client.login(username=data["email"], password="Attacker-chosen-1!") is False
     assert client.get("/manager/").status_code in (302, 403, 404)
 
 
@@ -173,42 +173,39 @@ def test_an_application_collects_nothing_beyond_the_form(client: Client) -> None
     assert vendor.registered_street == ""
 
 
-def test_the_confirmation_email_goes_through_the_outbox_without_tracking(
+def test_the_confirmation_email_goes_through_the_outbox_without_tracking_or_user_text(
     client: Client,
 ) -> None:
-    data = form()
+    data = form(business_name="Phishing Workshop https://evil.example/login")
     apply(client, data)
-    email = last_email("vendors.application_confirm")
+    [email] = emails()
     assert email.recipient == data["email"]
     assert email.status == OutboxEmail.Status.QUEUED
     assert "/account/link/" in json.loads(email.context)["action_url"]
-    from apps.core.services import render_email
-
     rendered = render_email(email.template_key, email.language, email.context_data)
     assert "<img" not in rendered.html_body.lower()
-    assert data["password"] not in rendered.text_body
-    assert data["password"] not in email.context
+    for text in (rendered.html_body, rendered.text_body, rendered.subject, email.context):
+        assert "Phishing" not in text  # m3: nothing the applicant typed reaches the mail
+        assert "evil.example" not in text
 
 
-def test_the_application_is_audited_without_the_password(client: Client) -> None:
+def test_the_application_is_audited_without_secrets(client: Client) -> None:
     data = form()
     apply(client, data, ip=IP)
     entries = AuditLog.objects.filter(action=services.APPLICATION_SUBMITTED)
     assert entries.count() == 2  # the vendor and its owner membership
     for entry in entries:
         assert entry.ip == IP
-        assert data["password"] not in json.dumps([entry.before, entry.after])
-    assert not AuditLog.objects.filter(after__icontains=data["password"]).exists()
+        assert "password" not in json.dumps([entry.before, entry.after]).lower()
 
 
-def test_the_service_supports_dry_run(client: Client) -> None:
+def test_the_service_supports_dry_run() -> None:
     data = form()
     changes = services.apply_to_sell(
         full_name=data["full_name"],
         email=data["email"],
         business_name=data["business_name"],
         country=data["country"],
-        password=data["password"],
         language="en",
         ctx=SYSTEM,
         dry_run=True,
@@ -216,6 +213,22 @@ def test_the_service_supports_dry_run(client: Client) -> None:
     assert not changes.is_empty
     assert not User.objects.filter(email=data["email"]).exists()
     assert not Vendor.objects.filter(contact_email=data["email"]).exists()
+    assert not VendorApplication.objects.exists()
+    assert not OutboxEmail.objects.exists()
+
+
+def test_vendor_validation_fails_the_same_way_for_new_and_existing_addresses() -> None:
+    existing = UserFactory.create()
+    for address in (existing.email, "brand-new@example.com"):
+        with pytest.raises(ValidationError):
+            services.apply_to_sell(
+                full_name="Ada",
+                email=address,
+                business_name="Ada Workshop",
+                country="US",  # outside the allowed countries
+                language="en",
+                ctx=SYSTEM,
+            )
     assert not OutboxEmail.objects.exists()
 
 
@@ -225,8 +238,7 @@ def test_the_service_supports_dry_run(client: Client) -> None:
 def test_an_existing_account_gets_the_same_answer_and_is_left_untouched(
     client: Client,
 ) -> None:
-    password = secrets.token_urlsafe(18)
-    existing = UserFactory.create(password=password)
+    existing = UserFactory.create(password=new_password())
     before = (existing.password, existing.is_active, existing.full_name)
 
     response = apply(client, form(email=existing.email))
@@ -240,16 +252,17 @@ def test_an_existing_account_gets_the_same_answer_and_is_left_untouched(
     assert (existing.password, existing.is_active, existing.full_name) == before
     assert not Vendor.objects.filter(contact_email=existing.email).exists()
     assert not VendorMember.objects.filter(user=existing).exists()
+    assert not VendorApplication.objects.filter(user=existing).exists()
     assert User.objects.filter(email=existing.email).count() == 1
 
 
 def test_an_existing_account_is_told_by_email_with_no_link(client: Client) -> None:
     existing = UserFactory.create()
     apply(client, form(email=existing.email))
-    email = last_email("vendors.application_exists")
+    [email] = emails("vendors.application_exists")
     assert email.recipient == existing.email
     assert "action_url" not in json.loads(email.context)
-    assert not OutboxEmail.objects.filter(template_key="vendors.application_confirm").exists()
+    assert not emails()
 
 
 def test_the_email_case_does_not_reveal_an_account(client: Client) -> None:
@@ -259,55 +272,95 @@ def test_the_email_case_does_not_reveal_an_account(client: Client) -> None:
     assert not Vendor.objects.exists()
 
 
-def test_a_weak_password_is_refused_the_same_way_for_any_email(client: Client) -> None:
-    existing = UserFactory.create()
-    weak = {"password": "12345678"}
-    known = client.post(URL, form(email=existing.email, **weak), REMOTE_ADDR=IP)
-    unknown = client.post(URL, form(**weak), REMOTE_ADDR="198.51.100.7")
-    assert known.status_code == unknown.status_code == 200
-    assert not Vendor.objects.exists()
-    assert not OutboxEmail.objects.exists()
-    assert b"error-summary" in known.content
-    assert b"error-summary" in unknown.content
-
-
-def test_an_inactive_account_without_an_application_is_never_reactivated(
+def test_an_inactive_account_without_a_pending_marker_is_never_reactivated(
     client: Client,
 ) -> None:
+    """M1: a staff-blocked or migrated applicant owner looks like a pending one, but only the
+    marker written by the public application makes an account eligible for a link."""
     blocked = UserFactory.create(is_active=False)
+    vendor = VendorFactory.create(contact_email=blocked.email)
+    VendorMember.objects.create(vendor=vendor, user=blocked, role=engine.OWNER)
     apply(client, form(email=blocked.email))
     blocked.refresh_from_db()
     assert blocked.is_active is False
-    assert not OutboxEmail.objects.filter(template_key="vendors.application_confirm").exists()
+    assert not emails()
+    assert [e.template_key for e in OutboxEmail.objects.all()] == ["vendors.application_exists"]
 
 
-def test_applying_again_before_confirming_resends_the_link_and_changes_nothing(
+def test_a_closed_application_is_not_pending_any_more(client: Client) -> None:
+    data = form()
+    apply(client, data)
+    user = User.objects.get(email=data["email"])
+    vendor = VendorMember.objects.get(user=user).vendor
+    services.change_status(vendor, engine.CLOSED, ctx=SYSTEM)
+    apply(Client(), data, ip="198.51.100.9")
+    assert len(emails()) == 1  # no new link for a rejected application
+    user.refresh_from_db()
+    assert user.is_active is False
+
+
+def test_applying_again_before_confirming_rotates_the_link_and_changes_nothing_else(
     client: Client,
 ) -> None:
     data = form()
     apply(client, data)
     user = User.objects.get(email=data["email"])
-    stored_hash = user.password
+    first_link = link_path(emails()[0])
 
-    attacker = form(email=data["email"], business_name="Other Shop")
-    response = apply(Client(), attacker, ip="198.51.100.9")
+    response = apply(
+        Client(), form(email=data["email"], business_name="Other Shop"), ip="198.51.100.9"
+    )
 
     assert response.status_code == 302  # type: ignore[attr-defined]
-    user.refresh_from_db()
-    assert user.password == stored_hash  # the second password is never stored
+    user_again = User.objects.get(email=data["email"])
+    assert user_again.pk == user.pk
+    assert user_again.full_name == "Ada Example"
     assert Vendor.objects.filter(contact_email=data["email"]).count() == 1
-    assert OutboxEmail.objects.filter(template_key="vendors.application_confirm").count() == 2
+    assert Vendor.objects.get(contact_email=data["email"]).display_name == "Ada Workshop"
+    assert len(emails()) == 2
+    assert VendorApplication.objects.get(user=user).version == 2
+    old = Client()
+    open_link(old, first_link)
+    assert old.post(confirm_url(user), REMOTE_ADDR=IP).status_code == 403  # the old link is dead
+    fresh = Client()
+    open_link(fresh, link_path(emails()[1]))
+    assert fresh.get(confirm_url(user)).status_code == 200
 
 
-def test_resends_to_one_address_are_limited_per_day(client: Client) -> None:
+def test_resends_to_one_address_are_limited_per_day_and_keep_the_delivered_link(
+    client: Client,
+) -> None:
     data = form()
     for index in range(4):
         apply(Client(), data, ip=f"198.51.100.{10 + index}")
-    sent = OutboxEmail.objects.filter(recipient=data["email"]).count()
-    assert sent == 2  # the first email and one resend per address and day
+    sent = emails()
+    assert len(sent) == 2  # the first email and one resend per address and day
+    user = User.objects.get(email=data["email"])
+    assert VendorApplication.objects.get(user=user).version == 2
+    delivered = Client()
+    open_link(delivered, link_path(sent[1]))  # a suppressed resend must not kill this link
+    assert delivered.get(confirm_url(user)).status_code == 200
 
 
-# --- Confirming the email
+def test_a_pending_user_with_two_memberships_does_not_cause_a_server_error(
+    client: Client,
+) -> None:
+    data = form()
+    apply(client, data)
+    user = User.objects.get(email=data["email"])
+    VendorMember.objects.create(
+        vendor=VendorFactory.create(contact_email="other@example.com"),
+        user=user,
+        role=engine.OWNER,
+    )
+    assert apply(Client(), data, ip="198.51.100.9").status_code == 302  # type: ignore[attr-defined]
+    opened = Client()
+    open_link(opened, link_path(emails()[-1]))
+    response = opened.post(confirm_url(user), {"password": new_password()}, REMOTE_ADDR=IP)
+    assert response.status_code == 200
+
+
+# --- Confirming the email and choosing the password
 
 
 def confirm_url(user: User) -> str:
@@ -318,10 +371,10 @@ def applied(client: Client) -> tuple[dict[str, str], User, str]:
     data = form()
     apply(client, data)
     user = User.objects.get(email=data["email"])
-    return data, user, link_path(last_email("vendors.application_confirm"))
+    return data, user, link_path(emails()[-1])
 
 
-def test_opening_the_link_changes_nothing_until_the_confirm_button(client: Client) -> None:
+def test_opening_the_link_changes_nothing_until_the_password_is_set(client: Client) -> None:
     _, user, path = applied(client)
     response = open_link(client, path)
     assert response["Location"] == confirm_url(user)
@@ -332,53 +385,86 @@ def test_opening_the_link_changes_nothing_until_the_confirm_button(client: Clien
     assert not ActionLinkUse.objects.exists()
 
 
-def test_confirming_activates_the_account_which_must_then_enrol_mfa(client: Client) -> None:
+def test_the_confirm_page_offers_one_accessible_password_field(client: Client) -> None:
+    _, user, path = applied(client)
+    open_link(client, path)
+    html = client.get(confirm_url(user)).content.decode()
+    fields = inputs_of(html)
+    assert set(fields) - {"csrfmiddlewaretoken"} == {"password"}
+    assert fields["password"]["type"] == "password"
+    assert fields["password"]["autocomplete"] == "new-password"
+    assert fields["password"].get("data-password-toggle")
+    assert 'for="id_password"' in html
+    assert "accounts/password-toggle.js" in html
+
+
+def test_confirming_sets_the_chosen_password_and_activates_the_account(client: Client) -> None:
     data, user, path = applied(client)
     open_link(client, path)
-    response = client.post(confirm_url(user), REMOTE_ADDR=IP)
+    password = new_password()
+    response = client.post(confirm_url(user), {"password": password}, REMOTE_ADDR=IP)
 
     assert response.status_code == 200
     user.refresh_from_db()
     assert user.is_active is True
+    assert user.has_usable_password()
     assert "_auth_user_id" not in client.session  # confirming never signs in
-    assert client.login(username=data["email"], password=data["password"]) is True
+    assert Client().login(username=data["email"], password=new_password()) is False
+    assert client.login(username=data["email"], password=password) is True
     user.refresh_from_db()
     assert mfa_required(user)  # CORE.4: an owner enrols a second factor at first login
     vendor = Vendor.objects.get(contact_email=data["email"])
     assert vendor.status == engine.APPLICANT  # staff review comes next (VEN.5)
+    assert not VendorApplication.objects.filter(user=user).exists()  # no longer pending
     assert ActionLinkUse.objects.filter(user=user).count() == 1
     [entry] = AuditLog.objects.filter(action=services.APPLICATION_CONFIRMED)
     assert entry.before is not None
     assert entry.before["is_active"] is False
     assert entry.after is not None
     assert entry.after["is_active"] is True
+    assert password not in json.dumps([entry.before, entry.after])
+
+
+@pytest.mark.parametrize("weak", ["12345678", "short", "p" * 129, ""])
+def test_a_refused_password_keeps_the_account_inactive_and_the_link_usable(
+    client: Client, weak: str
+) -> None:
+    _, user, path = applied(client)
+    open_link(client, path)
+    response = client.post(confirm_url(user), {"password": weak}, REMOTE_ADDR=IP)
+    assert response.status_code == 200
+    assert b"error-summary" in response.content
+    user.refresh_from_db()
+    assert user.is_active is False
+    assert not ActionLinkUse.objects.exists()
+    good = client.post(confirm_url(user), {"password": new_password()}, REMOTE_ADDR=IP)
+    assert good.status_code == 200
+    user.refresh_from_db()
+    assert user.is_active is True
 
 
 def test_the_link_works_once(client: Client) -> None:
     _, user, path = applied(client)
     open_link(client, path)
-    client.post(confirm_url(user), REMOTE_ADDR=IP)
+    client.post(confirm_url(user), {"password": new_password()}, REMOTE_ADDR=IP)
     other = Client()
     open_link(other, path)
-    assert other.post(confirm_url(user), REMOTE_ADDR=IP).status_code == 403
+    assert other.post(confirm_url(user), {"password": new_password()}).status_code == 403
 
 
 def test_the_confirm_page_refuses_without_an_opened_link(client: Client) -> None:
     _, user, _ = applied(client)
     assert client.get(confirm_url(user)).status_code == 403
-    assert client.post(confirm_url(user), REMOTE_ADDR=IP).status_code == 403
+    assert client.post(confirm_url(user), {"password": new_password()}).status_code == 403
     user.refresh_from_db()
     assert user.is_active is False
 
 
-def test_a_link_never_activates_an_account_that_has_signed_in_or_is_not_pending(
-    client: Client,
-) -> None:
+def test_a_link_never_activates_an_account_without_the_pending_marker(client: Client) -> None:
     _, user, path = applied(client)
-    user.last_login = user.date_joined  # staff blocked it after use: not a pending application
-    user.save(update_fields=["last_login"])
+    VendorApplication.objects.filter(user=user).delete()  # staff cleared it
     open_link(client, path)
-    assert client.post(confirm_url(user), REMOTE_ADDR=IP).status_code == 403
+    assert client.post(confirm_url(user), {"password": new_password()}).status_code == 403
     user.refresh_from_db()
     assert user.is_active is False
 
@@ -388,7 +474,7 @@ def test_a_rejected_applicant_cannot_confirm(client: Client) -> None:
     vendor = VendorMember.objects.get(user=user).vendor
     services.change_status(vendor, engine.CLOSED, ctx=SYSTEM)
     open_link(client, path)
-    assert client.post(confirm_url(user), REMOTE_ADDR=IP).status_code == 403
+    assert client.post(confirm_url(user), {"password": new_password()}).status_code == 403
 
 
 def test_the_confirm_page_gives_nothing_away_for_a_random_key(client: Client) -> None:
@@ -407,8 +493,10 @@ def test_confirm_posts_are_rate_limited_per_ip(
     _, user, path = applied(client)
     open_link(client, path)
     for _ in range(20):
-        client.post(confirm_url(user), REMOTE_ADDR="198.51.100.77")
-    response = client.post(confirm_url(user), REMOTE_ADDR="198.51.100.77")
+        client.post(confirm_url(user), {"password": new_password()}, REMOTE_ADDR="198.51.100.77")
+    response = client.post(
+        confirm_url(user), {"password": new_password()}, REMOTE_ADDR="198.51.100.77"
+    )
     assert response.status_code == 429
     assert int(response["Retry-After"]) > 0
 
@@ -458,7 +546,6 @@ def test_an_oversized_body_is_refused_before_it_is_parsed(client: Client) -> Non
         ("business_name", "b" * 151),
         ("email", "not-an-email"),
         ("email", "a" * 250 + "@example.com"),
-        ("password", "p" * 129),
         ("country", "US"),  # outside the allowed countries (CMP.13)
         ("country", "ZZ"),
         ("country", ""),
@@ -485,3 +572,82 @@ def test_the_rate_limit_is_audited(client: Client) -> None:
     for _ in range(REGISTRATION_LIMIT.free_attempts + 1):
         apply(client)
     assert AuditLog.objects.filter(action="accounts.registration.rate_limited").exists()
+
+
+# --- Retention of unconfirmed applications (M2; the period awaits the owner's decision)
+
+
+def age(user: User, *, days: float) -> None:
+    """Make the application's link `days` days older than the moment it was sent."""
+    when = timezone.now() - dt.timedelta(days=days)
+    VendorApplication.objects.filter(user=user).update(created_at=when, link_sent_at=when)
+
+
+def test_the_retention_defaults_to_seven_days_after_the_link_expires(settings) -> None:  # type: ignore[no-untyped-def]
+    assert settings.VENDOR_APPLICATION_RETENTION_DAYS == 7
+
+
+def test_the_purge_deletes_unconfirmed_applications_past_link_expiry_plus_retention(
+    client: Client, settings
+) -> None:  # type: ignore[no-untyped-def]
+    old_data, old_user, _ = applied(client)
+    fresh_data, fresh_user, _ = applied(Client())
+    grace_data, grace_user, _ = applied(Client())
+    link_days = settings.VENDOR_APPLICATION_LINK_MAX_AGE / 86400
+    age(old_user, days=link_days + 7 + 0.1)
+    age(grace_user, days=link_days + 6)  # expired, still inside the retention period
+    confirmed = UserFactory.create()  # an ordinary account is never touched
+
+    changes = services.purge_unconfirmed_applications(ctx=SYSTEM)
+
+    assert not changes.is_empty
+    assert not User.objects.filter(pk=old_user.pk).exists()
+    assert not Vendor.objects.filter(contact_email=old_data["email"]).exists()
+    assert not VendorMember.objects.filter(user_id=old_user.pk).exists()
+    assert not VendorApplication.objects.filter(user_id=old_user.pk).exists()
+    assert User.objects.filter(pk=fresh_user.pk).exists()
+    assert User.objects.filter(pk=grace_user.pk).exists()
+    assert User.objects.filter(pk=confirmed.pk).exists()
+    assert Vendor.objects.filter(contact_email=grace_data["email"]).exists()
+    assert Vendor.objects.filter(contact_email=fresh_data["email"]).exists()
+
+
+def test_the_purge_never_touches_a_confirmed_applicant(client: Client, settings) -> None:  # type: ignore[no-untyped-def]
+    _, user, path = applied(client)
+    open_link(client, path)
+    client.post(confirm_url(user), {"password": new_password()}, REMOTE_ADDR=IP)
+    VendorApplication.objects.filter(user=user).delete()
+    services.purge_unconfirmed_applications(ctx=SYSTEM)
+    assert User.objects.filter(pk=user.pk, is_active=True).exists()
+
+
+def test_the_purge_is_audited_by_count_only(client: Client, settings) -> None:  # type: ignore[no-untyped-def]
+    data, user, _ = applied(client)
+    age(user, days=settings.VENDOR_APPLICATION_LINK_MAX_AGE / 86400 + 8)
+    services.purge_unconfirmed_applications(ctx=SYSTEM)
+    [entry] = AuditLog.objects.filter(action=services.APPLICATION_PURGED)
+    assert entry.after == {"deleted": 1, "retention_days": 7}
+    assert data["email"] not in json.dumps([entry.before, entry.after, entry.target_key])
+
+
+def test_the_purge_supports_dry_run(client: Client, settings) -> None:  # type: ignore[no-untyped-def]
+    _, user, _ = applied(client)
+    age(user, days=settings.VENDOR_APPLICATION_LINK_MAX_AGE / 86400 + 8)
+    changes = services.purge_unconfirmed_applications(ctx=SYSTEM, dry_run=True)
+    assert not changes.is_empty
+    assert User.objects.filter(pk=user.pk).exists()
+    assert not AuditLog.objects.filter(action=services.APPLICATION_PURGED).exists()
+
+
+@override_settings(VENDOR_APPLICATION_RETENTION_DAYS=1)
+def test_the_retention_period_is_a_setting(client: Client, settings) -> None:  # type: ignore[no-untyped-def]
+    _, user, _ = applied(client)
+    age(user, days=settings.VENDOR_APPLICATION_LINK_MAX_AGE / 86400 + 1.5)
+    services.purge_unconfirmed_applications(ctx=SYSTEM)
+    assert not User.objects.filter(pk=user.pk).exists()
+
+
+def test_the_purge_runs_as_a_nightly_job() -> None:
+    from apps.vendors import tasks
+
+    assert tasks.purge_unconfirmed_applications is not None
