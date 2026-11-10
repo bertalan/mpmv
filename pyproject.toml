@@ -50,6 +50,7 @@ dev = [
   "hypothesis==6.170.10",
   # tools/build_docs.py renders the HTML spec; tests/unit/test_build_docs_eof.py checks it.
   "markdown>=3.5",
+  "pytest-xdist>=3.6",
 ]
 
 [tool.uv]
