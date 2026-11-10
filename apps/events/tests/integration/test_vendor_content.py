@@ -98,12 +98,35 @@ def test_a_vendor_rich_text_cannot_embed_an_image_or_link_a_document() -> None:
     _refused(owner, [{"type": "paragraph", "value": '<a linktype="document" id="1">x</a>'}])
 
 
-def test_staff_may_use_any_image() -> None:
-    staff = _owner()
-    staff.is_staff = True
-    staff.save()
+def test_platform_staff_may_use_any_image() -> None:
+    staff = UserFactory.create(platform_staff=True)
     image = MediaImageFactory.create()
     save_event_draft(staff, _data(body=[_figure(image.pk)]), vendor=None)
+
+
+def test_plain_is_staff_is_not_exempt() -> None:
+    owner = _owner()
+    owner.is_staff = True
+    owner.save()
+    _refused(owner, [_figure(MediaImageFactory.create().pk)])
+
+
+def test_submit_rechecks_the_images_of_the_stored_revision() -> None:
+    owner = _owner()
+    image = MediaImageFactory.create(collection=_vendor_collection(_vendor_of(owner)))
+    page = _create(owner, body=[_figure(image.pk)])
+    # The image leaves the vendor's collection after the draft was saved.
+    root = Collection.get_first_root_node()
+    type(image).objects.filter(pk=image.pk).update(collection=root)
+    with pytest.raises(ValidationError):
+        submit_event(owner, page)
+
+
+def test_a_deeply_nested_body_is_refused_not_recursed() -> None:
+    value: Any = "x"
+    for _ in range(200):
+        value = {"k": value}
+    _refused(_owner(), [{"type": "paragraph", "value": value}])
 
 
 # --- M4: CTA links
@@ -122,7 +145,13 @@ def test_a_vendor_cta_may_use_an_https_url() -> None:
 
 def test_a_vendor_cta_refuses_http_and_script_urls() -> None:
     owner = _owner()
-    for url in ("http://shop.example", "javascript:alert(1)", "data:text/html,x"):
+    for url in (
+        "http://shop.example",
+        "javascript:alert(1)",
+        "data:text/html,x",
+        "https://shop.example@evil.example/",
+        "https://user:pw@evil.example/",
+    ):
         _refused(owner, [_cta(url=url)])
 
 
@@ -147,7 +176,7 @@ def test_a_suspended_vendor_cannot_save_submit_or_cancel() -> None:
     owner = _owner()
     vendor = _vendor_of(owner)
     page = _create(owner)
-    submit_event(UserFactory.create(superuser=True), page)  # live, so cancel can run
+    submit_event(UserFactory.create(platform_staff=True), page)  # live, so cancel can run
     Vendor.objects.filter(pk=vendor.pk).update(status=Vendor.Status.SUSPENDED)
     # The caller still holds the stale, active object: only the re-read inside the write stops it.
     with pytest.raises(VendorCannotWrite):

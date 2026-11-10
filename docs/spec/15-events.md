@@ -171,10 +171,12 @@ other vendors' data and bypass the CORE.3 `VendorScopedQuerySet` rule and its ne
     vendor-area upload must store there. `figure` and `gallery` accept only images of it; any other
     id (another vendor's, the root collection, a missing one) is a field error on `body`.
     Rich text cannot embed media or link a document by id.
-  - **CTA links**: `https://` only (no `http:`, `javascript:` or `data:`); a page chooser accepts
+  - **CTA links**: `https://` only (no `http:`, `javascript:`, `data:` or user name in the address); a page chooser accepts
     only the vendor's own events (the storefront joins with VEN.10).
   - **Limits**: 50 blocks per body, 50 items per gallery or FAQ, 20,000 characters per text, 500
-    `exdates` and 500 `exdate_days`.
+    `exdates` and 500 `exdate_days`, and a nesting depth of 8. The limits run before any other body check.
+    Submitting a vendor event checks the stored revision again, so a change of collection after the
+    draft was saved is caught.
   - **Vendor status**: every vendor write re-reads the vendor's status inside the transaction
     (`ensure_vendor_can_write`, CORE.14); a suspended vendor gets `VendorCannotWrite`.
 - Staff edit any event in the Wagtail admin with the full block library.

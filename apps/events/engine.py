@@ -605,6 +605,7 @@ MAX_BODY_BLOCKS = 50
 MAX_EXDATES = 500  # excluded occurrences or days
 MAX_LIST_ITEMS = 50  # images in a gallery, questions in an FAQ
 MAX_TEXT_LENGTH = 20_000  # characters in one text value of a block
+MAX_DEPTH = 8  # nesting of one block value (a gallery item is 4 deep)
 
 _FOREIGN_REFERENCE = re.compile(
     r"""<embed\b|\blinktype\s*=\s*["']?(?:document|image)\b""", re.IGNORECASE
@@ -663,6 +664,9 @@ def cta_url_problem(url: str) -> str | None:
         return "A call-to-action link must start with https://."
     if any(ch <= " " for ch in text):
         return "A call-to-action link must not contain spaces."
+    authority = text[len("https://") :].split("/", 1)[0].split("?", 1)[0].split("#", 1)[0]
+    if "@" in authority or "\\" in text:
+        return "A call-to-action link must not contain a user name."
     return None
 
 
@@ -671,18 +675,20 @@ def body_limit_problem(raw: Any) -> str | None:
     if len(raw) > MAX_BODY_BLOCKS:
         return f"A body has at most {MAX_BODY_BLOCKS} blocks."
 
-    def too_big(node: Any) -> str | None:
+    def too_big(node: Any, depth: int) -> str | None:
+        if depth > MAX_DEPTH:
+            return "A block is nested too deeply."
         if isinstance(node, str):
             return "A text is too long." if len(node) > MAX_TEXT_LENGTH else None
         if isinstance(node, Mapping):
-            return next((p for child in node.values() if (p := too_big(child))), None)
+            return next((p for child in node.values() if (p := too_big(child, depth + 1))), None)
         if isinstance(node, list | tuple):
             if len(node) > MAX_LIST_ITEMS:
                 return f"A list has at most {MAX_LIST_ITEMS} items."
-            return next((p for child in node if (p := too_big(child))), None)
+            return next((p for child in node if (p := too_big(child, depth + 1))), None)
         return None
 
-    return next((p for block in raw if (p := too_big(block.get("value")))), None)
+    return next((p for block in raw if (p := too_big(block.get("value"), 1))), None)
 
 
 # --- Slugs (spec 15 "Slugs and routes") --------------------------------------------------------

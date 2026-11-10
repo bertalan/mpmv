@@ -71,6 +71,7 @@ from apps.core.models import AuditLog
 from apps.core.services import save_audited
 from apps.vendors.engine import VendorAction
 from apps.vendors.models import Vendor, VendorMember
+from apps.vendors.scoping import is_platform_staff
 from apps.vendors.services import ensure_vendor_can_write, has_vendor_permission
 
 from . import engine
@@ -177,7 +178,7 @@ def may_edit_events_in_admin(user: AbstractBaseUser | AnonymousUser) -> bool:
     """
     if not user.is_authenticated:
         return False
-    if getattr(user, "is_staff", False):
+    if is_platform_staff(user):
         return True
     return not VendorMember.objects.filter(user_id=user.pk).exists()
 
@@ -190,7 +191,7 @@ def may_create_events_in_admin(user: AbstractBaseUser | AnonymousUser) -> bool:
     only platform staff create platform events (spec 15 "Permissions"). Other Wagtail editors
     keep editing existing events under Wagtail's own page permissions.
     """
-    return bool(user.is_authenticated and user.is_active and getattr(user, "is_staff", False))
+    return bool(is_platform_staff(user))
 
 
 # --- The Wagtail admin's moderation UI (EVT.3 part 2/2, spec 15 "Staff admin")
@@ -390,7 +391,7 @@ class EventRefused(PermissionDenied):
 
 
 def _is_staff(user: AbstractBaseUser | AnonymousUser) -> bool:
-    return bool(user.is_authenticated and user.is_active and getattr(user, "is_staff", False))
+    return bool(is_platform_staff(user))
 
 
 def _require_staff(user: AbstractBaseUser | AnonymousUser) -> None:
@@ -491,8 +492,6 @@ def _set_body(page: EventPage, raw: Any, *, staff: bool) -> None:
         raise ValidationError(
             {"body": _("These blocks are not available: %s.") % ", ".join(sorted(set(refused)))}
         )
-    if not staff and any(engine.has_unsafe_link(text) for text in _strings(raw)):
-        raise ValidationError({"body": _("Links must not use javascript: or data: addresses.")})
     if not staff:
         _check_vendor_body(page, raw)
     field = EventPage._meta.get_field("body")
@@ -523,10 +522,13 @@ def _vendor_images_allowed(vendor: Vendor, ids: list[Any]) -> bool:
 
 def _check_vendor_body(page: EventPage, raw: list[Mapping[str, Any]]) -> None:
     """The vendor-only body rules (spec 15 "Vendor-safe block subset"), for every entry point:
-    size limits, own images only, `https://` or own-event CTA links, no embeds by id."""
+    size limits first (they bound every later walk), unsafe links, no embeds by id, own images
+    only, `https://` or own-event CTA links."""
     problem = engine.body_limit_problem(raw)
     if problem is not None:
         raise ValidationError({"body": problem})
+    if any(engine.has_unsafe_link(text) for text in _strings(raw)):
+        raise ValidationError({"body": _("Links must not use javascript: or data: addresses.")})
     if any(engine.has_foreign_reference(text) for text in _strings(raw)):
         raise ValidationError({"body": _("Rich text cannot embed media or link documents.")})
     vendor = page.vendor
@@ -725,6 +727,10 @@ def submit_event(
         state = stored.current_workflow_state
         if _in_review(stored):
             raise ValidationError(_("The event is already awaiting review."))
+        if not staff:
+            # The collection rule can change after a draft was saved: check what is published.
+            latest: EventPage = stored.get_latest_revision_as_object()
+            _check_vendor_body(latest, latest.body.get_prep_value())
         revision = stored.get_latest_revision() or stored.save_revision(user=actor)
         workflow = None if staff else stored.get_workflow()
         if workflow is not None and state is not None:

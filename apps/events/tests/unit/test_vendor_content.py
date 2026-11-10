@@ -53,3 +53,15 @@ def test_body_limits() -> None:
     assert engine.body_limit_problem(long_text) is not None
     many = [{"type": "gallery", "value": {"images": [{"image": 1}] * (engine.MAX_LIST_ITEMS + 1)}}]
     assert engine.body_limit_problem(many) is not None
+
+
+def test_a_cta_url_refuses_userinfo() -> None:
+    assert engine.cta_url_problem("https://shop.example@evil.example/") is not None
+    assert engine.cta_url_problem("https://user:pw@evil.example/") is not None
+
+
+def test_body_depth_is_capped() -> None:
+    value: object = "x"
+    for _ in range(engine.MAX_DEPTH + 2):
+        value = {"k": value}
+    assert engine.body_limit_problem([{"type": "paragraph", "value": value}]) is not None
