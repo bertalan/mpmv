@@ -18,6 +18,7 @@ from apps.core.i18n import (
     LanguageLink,
     configured_languages,
     hreflang_alternates,
+    switch_goes_home,
     switcher_links,
     translate_path,
 )
@@ -101,7 +102,7 @@ def language_links(context: dict[str, Any]) -> list[LanguageLink]:
             current,
             lambda code: _home(code, suffix),
         )
-    if request is None:
+    if request is None or switch_goes_home(request):
         return switcher_links(
             {code: _home(code) for code in configured_languages()}, current, _home
         )
@@ -110,6 +111,16 @@ def language_links(context: dict[str, Any]) -> list[LanguageLink]:
         current,
         _home,
     )
+
+
+@register.simple_tag(takes_context=True)
+def switch_next_url(context: dict[str, Any]) -> str:
+    """The `next` of the account and Manager switchers: the page's own path, except for a
+    secret-bearing URL (`language_switch_home`), which must not reach the HTML."""
+    request: HttpRequest | None = context.get("request")
+    if request is None or switch_goes_home(request):
+        return "/"
+    return request.get_full_path()
 
 
 @register.simple_tag(takes_context=True)

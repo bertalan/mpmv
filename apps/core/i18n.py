@@ -6,8 +6,11 @@ settings.LANGUAGES gets `/<code>/`. Nothing here lists languages: adding one is 
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from functools import wraps
+from typing import Any, cast
 
 from django.conf import settings
+from django.http import HttpRequest
 from django.urls import translate_url
 from django.utils import translation
 
@@ -83,3 +86,20 @@ def switcher_links(
             )
         )
     return links
+
+
+def language_switch_home[V: Callable[..., Any]](view: V) -> V:
+    """Mark a view whose URL carries a secret (action link, application key, claim key): its
+    language switcher leads to the other language's home and never writes the URL, with its
+    token, into the page (crawlers, Referer). No notice: there is no object to translate."""
+
+    @wraps(view)
+    def wrapper(request: HttpRequest, *args: Any, **kwargs: Any) -> Any:
+        request.language_switch_home = True  # type: ignore[attr-defined]
+        return view(request, *args, **kwargs)
+
+    return cast(V, wrapper)
+
+
+def switch_goes_home(request: HttpRequest | None) -> bool:
+    return bool(getattr(request, "language_switch_home", False))
