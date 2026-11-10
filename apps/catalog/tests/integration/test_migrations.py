@@ -1,5 +1,7 @@
 """CAT.1 and CAT.13: the catalog migrations apply and reverse cleanly, raw SQL included."""
 
+from typing import Any
+
 import pytest
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
@@ -74,7 +76,7 @@ def test_cat13_migration_fills_match_keys_and_staff_refs_of_existing_rows() -> N
         assert cursor.fetchone() == ("BAG 100", "bag 100", "P-000001")
 
 
-def _d25_migration():  # type: ignore[no-untyped-def]
+def _d25_migration() -> Any:
     import importlib
 
     return importlib.import_module("apps.catalog.migrations.0010_d25_product_slugs")

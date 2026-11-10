@@ -1,7 +1,7 @@
 """Derive every product slug from its title, without the SKU (CAT.5, spec 03 §3.2).
 
-The replaced slugs, such as the current `{title}-{lang}-{sku}` ones, become SlugHistory and
-answer a 301 to the new slug.
+The replaced slugs, such as the `{title}-{lang}` and `{title}-{lang}-{sku}` ones, become
+SlugHistory and answer a 301 to the new slug.
 """
 
 from typing import Any

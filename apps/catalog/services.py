@@ -728,7 +728,6 @@ def duplicate_product_to_vendor(
         for new_text in copied_texts:  # new slugs, unique against every other product's (CAT.5)
             new_text.slug = slugs.unique_product_slug(
                 new_text.title,
-                new_text.language,
                 taken=_SlugsOfOtherProducts(new_text.language, None),
             )
             changes.create(
@@ -1006,7 +1005,7 @@ def create_product(
     ]
     for text in texts:  # the slug is derived now, so the ChangeSet and the row agree (CAT.5)
         text.slug = slugs.unique_product_slug(
-            text.title, text.language, taken=_SlugsOfOtherProducts(text.language, None)
+            text.title, taken=_SlugsOfOtherProducts(text.language, None)
         )
     for text in texts:
         changes.create(
@@ -1177,7 +1176,8 @@ def variant_label(variant: Variant, language: str) -> str:
     return engine.variant_label(labels)
 
 
-# --- Product slugs (CAT.5, spec 03 §3.2): `{title}-{lang}`, never the SKU; old slugs answer 301.
+# --- Product slugs (CAT.5, spec 03 §3.2): `{title}`, no language suffix, never the SKU (D-25);
+# old slugs answer a 301.
 
 TRANSLATION_MODEL = "catalog.producttranslation"
 SLUG_HISTORY_MODEL = "catalog.slughistory"
@@ -1227,7 +1227,7 @@ def sync_product_slug(
         )
         product, language, old_slug = current.product, current.language, current.slug
         new_slug = slugs.unique_product_slug(
-            current.title, language, taken=_SlugsOfOtherProducts(language, product.pk)
+            current.title, taken=_SlugsOfOtherProducts(language, product.pk)
         )
         changes = ChangeSet()
         if new_slug == old_slug:
@@ -1282,9 +1282,9 @@ def rebuild_product_slugs(
 ) -> ChangeSet:
     """`sync_product_slug` for every translation (or the given ones), in id order.
 
-    This loads the current `{title}-{lang}-{sku}` slugs as history. A dry run checks each
-    translation against the stored slugs only, so it can miss a `-2` that two translations of
-    the same run would need.
+    This loads the `{title}-{lang}` and the legacy `{title}-{lang}-{sku}` slugs as history. A dry
+    run checks each translation against the stored slugs only, so it can miss a `-2` that two
+    translations of the same run would need.
     """
     queryset = ProductTranslation.objects.all() if translations is None else translations
     changes = ChangeSet()
