@@ -30,13 +30,13 @@ def install() -> None:
     moderatable = GroupApprovalTask.get_task_states_user_can_moderate
 
     def guarded_on_action(
-        self: Any, task_state: Any, user: Any, action_name: str, **kw: Any
+        self: Any, task_state: Any, user: Any, action_name: str, **kwargs: Any
     ) -> Any:
         if action_name == "approve" and _requested_by(
             user, task_state.workflow_state.requested_by_id
         ):
             raise PermissionDenied("Nobody approves their own submission.")
-        return on_action(self, task_state, user, action_name, **kw)
+        return on_action(self, task_state, user, action_name, **kwargs)
 
     def guarded_get_actions(self: Any, obj: Any, user: Any) -> Any:
         actions = get_actions(self, obj, user)
@@ -45,8 +45,8 @@ def install() -> None:
             return [action for action in actions if action[0] != "approve"]
         return actions
 
-    def guarded_moderatable(self: Any, user: Any, **kw: Any) -> Any:
-        states = moderatable(self, user, **kw)
+    def guarded_moderatable(self: Any, user: Any, **kwargs: Any) -> Any:
+        states = moderatable(self, user, **kwargs)
         return states.exclude(workflow_state__requested_by=user) if user.pk else states.none()
 
     GroupApprovalTask.on_action = guarded_on_action

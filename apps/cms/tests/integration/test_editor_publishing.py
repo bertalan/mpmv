@@ -10,9 +10,12 @@ from typing import Any
 import pytest
 from django.contrib.auth.models import Group
 from django.core.exceptions import PermissionDenied
+from django.test import Client
+from django.urls import reverse
 from wagtail.models import GroupApprovalTask, Page, Workflow, WorkflowPage, WorkflowTask
 
 from apps.accounts.models import User
+from apps.accounts.tests.mfa import verified_login
 from apps.cms import roles
 from apps.cms.models import BlogIndexPage
 from apps.cms.tests.factories import (
@@ -154,3 +157,24 @@ def test_an_editor_is_not_an_approver_of_the_default_task(tree: dict[str, Page])
     assert not task.get_actions(tree["legal"], _fresh(author))
     assert not _approve_offered(task, tree["legal"], editor_user(roles.BLOG_EDITORS))
     assert state.task.specific.groups.filter(name__in=roles.CONTENT_ROLES).count() == 0
+
+
+def test_a_forged_approve_post_through_the_workflow_view_is_refused(
+    client: Client, tree: dict[str, Page]
+) -> None:
+    workflow, _task = _workflow(roles.LEGAL_PUBLISHERS)
+    author = editor_user(roles.LEGAL_PUBLISHERS)
+    colleague = editor_user(roles.LEGAL_PUBLISHERS)
+    state = _submit(tree["legal"], workflow, author)
+    url = reverse(
+        "wagtailadmin_pages:workflow_action", args=(tree["legal"].pk, "approve", state.pk)
+    )
+    verified_login(client, author)
+    client.post(url, {"action": "approve"})
+    state.refresh_from_db()
+    assert state.status == state.STATUS_IN_PROGRESS
+    client.logout()
+    verified_login(client, colleague)
+    client.post(url, {"action": "approve"})
+    state.refresh_from_db()
+    assert state.status == state.STATUS_APPROVED

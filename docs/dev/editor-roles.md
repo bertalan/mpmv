@@ -35,6 +35,11 @@ downwards and would reach the whole tree. Whoever must edit it is a superuser fo
 - Nobody approves their own submission: `apps/cms/workflow.py` withdraws the approve action
   (and refuses a forged one) for the person who requested the workflow, superusers included.
   Requesting changes stays allowed.
+- A publisher can publish their own edits directly, bypassing the workflow: `publish_page` is
+  enough, no second person is needed (lane-a decision). The control is that publisher roles are
+  assigned by staff only, never by the migration, and that every publish is recorded in
+  Wagtail's page history and action log (Reports, Site history). An optional four-eyes rule
+  for publishing is a CORE.18 follow-up.
 - Image permissions are on the root collection, as in Wagtail's defaults, so they reach every
   collection. Scoping them is a Manager follow-up (CORE.17).
 
