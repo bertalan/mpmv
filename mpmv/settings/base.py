@@ -54,6 +54,10 @@ LOCAL_APPS = [
 # STAGE opts in with MPMV_ALLOW_SEED=1. LIVE_DATA marks an environment holding real data
 # (live.py): the seed never runs there, and the `seed.E001` check fails if it is allowed.
 ALLOW_SEED = env_bool("MPMV_ALLOW_SEED", default=False)
+# Public STAGE demo (ARC.22) and the search engine floor (SEO.8, D-35): either one makes every
+# response noindex (meta, X-Robots-Tag and robots.txt). STAGE sets FORCE_NOINDEX itself.
+DEMO_MODE = env_bool("MPMV_DEMO_MODE", default=False)
+FORCE_NOINDEX = env_bool("MPMV_FORCE_NOINDEX", default=False)
 LIVE_DATA = False
 
 INSTALLED_APPS = [
@@ -105,6 +109,7 @@ MIDDLEWARE = [
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "apps.cms.middleware.WagtailAdminPickerNonceMiddleware",  # Wagtail's inline pickers (CMS.1)
     "apps.core.middleware.PermissionsPolicyMiddleware",
+    "apps.seo.middleware.ForceNoindexMiddleware",  # X-Robots-Tag when forced (SEO.8)
     # With the other header middleware, so responses returned early by an inner middleware
     # (CommonMiddleware's APPEND_SLASH redirect, LIVE's static files) carry it too (SEC.5).
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -221,6 +226,7 @@ TEMPLATES = [
                 "django.template.context_processors.csp",
                 "apps.themes.context_processors.theme",
             ],
+            "builtins": ["apps.seo.templatetags.seo_robots"],
             "loaders": [
                 "apps.themes.loaders.ThemeLoader",
                 (
