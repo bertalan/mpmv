@@ -560,3 +560,6 @@ LOGGING = {
     "loggers": {"django.request": {"filters": ["redact_secret_paths"]}},
     "root": {"handlers": ["console"], "level": "INFO"},
 }
+
+# Optional prefix of order numbers, e.g. "MP-" gives "MP-2027-000123" (ORD.2). Empty by default.
+ORDER_NUMBER_PREFIX = ""

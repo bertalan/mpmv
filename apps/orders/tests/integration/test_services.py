@@ -218,6 +218,7 @@ def test_creating_an_order_is_audited_without_credentials_of_the_buyer() -> None
     order = place()
     entry = AuditLog.objects.get(action="orders.create", target_model="orders.order")
     assert entry.target_key == str(order.public_id)
+    assert entry.after is not None
     assert entry.after["number"] == order.number
     assert AuditLog.objects.filter(target_model="orders.vendororder").count() == 1
     vendor_entry = AuditLog.objects.get(target_model="orders.vendororder")
@@ -252,6 +253,8 @@ def test_transition_order_is_audited_and_dry_run_able() -> None:
     order.refresh_from_db()
     assert order.state == "awaiting_payment"
     entry = AuditLog.objects.get(action="orders.transition", target_model="orders.order")
+    assert entry.before is not None
+    assert entry.after is not None
     assert (entry.before["state"], entry.after["state"]) == ("checkout", "awaiting_payment")
 
 
