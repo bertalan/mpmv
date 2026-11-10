@@ -157,7 +157,7 @@ commission are computed per line as for any other line. Who funds the discount (
 marketplace or both) follows the bundle funding rules ([03](03-catalog.md), CAT.16 to CAT.18).
 The promotion tracks the gift's stock and a per-customer limit. The VAT treatment of gifts (free
 transfers of goods) is confirmed by the operator's accountant before the row is built (⚖️).
-Proposal D-39 ([17](17-promotions-coupons.md)) would build the gift as the `gift` kind of a general
+Proposal D-39 ([18](18-promotions-coupons.md)) would build the gift as the `gift` kind of a general
 coupon engine (PRM.1 to PRM.5), funded by whoever sets the promotion up (decided).
 
 ### Transactional emails (in the recipient's language)

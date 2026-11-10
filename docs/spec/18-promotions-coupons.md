@@ -1,13 +1,13 @@
-# 17 — Coupons, abandoned-cart recovery and return incentive
+# 18 — Coupons, abandoned-cart recovery and return incentive
 
 Proposal for decision D-39 (owner ideas of 2026-11-10): a coupon engine, a reminder for abandoned
 carts, and an incentive that appears when the customer comes back. Status: **proposal, under
 review**. One rule is **decided**: **whoever sets up a coupon pays for it** (the vendor, and in
-some cases the platform). Everything else is a proposal; the rows in §17.11 are P2 and P3 and none
-blocks go-live. The design was written independently of any other notes, so §17.1 also says what it
+some cases the platform). Everything else is a proposal; the rows in §18.11 are P2 and P3 and none
+blocks go-live. The design was written independently of any other notes, so §18.1 also says what it
 would not build.
 
-## 17.1 What exists today and what this design would not build
+## 18.1 What exists today and what this design would not build
 
 - The spec has **no coupon engine**. The only related text is ORD.12 (free gift, owner decision
   MQ-9, [07](07-cart-orders-payments.md)): a promotion "triggered by a coupon code or a cart
@@ -29,22 +29,22 @@ would not build.
 
 1. **Stored value**: gift cards, credit notes as balance, wallet credit. They are vouchers under
    VAT directive articles 30a to 30b and may be e-money; a coupon code that only gives a discount is
-   not (§17.4). Nothing here issues a balance.
+   not (§18.4). Nothing here issues a balance.
 2. **Co-funding of one coupon** by vendor and platform. One coupon, one funder. Shared funding
    stays where it already exists (bundles, CAT.16).
 3. **Platform money behind a vendor's coupon**, or a vendor's money behind a platform coupon.
 4. **A coupon that appears for any returning visitor** (exit-intent pop-up, cookie-based "welcome back"
    for guests): it teaches people to abandon, needs cookies or profiling, and is trivially farmed.
-   The incentive reaches only the signed-in customer through the recovery email (§17.7).
-5. **SMS, push, WhatsApp** (owner: not now), and **recovery for guests by default** (§17.6).
+   The incentive reaches only the signed-in customer through the recovery email (§18.7).
+5. **SMS, push, WhatsApp** (owner: not now), and **recovery for guests by default** (§18.6).
 6. **Open-tracking pixels**, countdown timers, "only 2 left" unless true, rising-value coupon ladders,
    machine-learned discount sizing, price personalisation of the list price.
 7. **Giving vendors customer lists**: a vendor sets the rules and the budget and sees aggregate
    results; it never gets recipients' addresses.
-8. **Clawing back a discount** when a customer withdraws from part of an order (§17.5).
-9. **A zero-total order path**: a coupon cannot take the payable total below the minimum charge (§17.3).
+8. **Clawing back a discount** when a customer withdraws from part of an order (§18.5).
+9. **A zero-total order path**: a coupon cannot take the payable total below the minimum charge (§18.3).
 
-## 17.2 Coupon model
+## 18.2 Coupon model
 
 A new app `promotions` (prefix PRM). It depends on `catalog` and `vendors`. `orders` calls
 `promotions.engine` with a cart snapshot and never the reverse; `tax` and `shipping` never import
@@ -82,12 +82,12 @@ class Redemption(Model):                         # one row per use; the unit of 
 ```
 
 **Types.** `percent` (of the eligible line price, optional `max_discount`), `fixed` (an amount off
-the eligible lines, shared as in §17.3), `free_shipping` (zeroes the shipping of the vendor or vendors
+the eligible lines, shared as in §18.3), `free_shipping` (zeroes the shipping of the vendor or vendors
 in scope), `gift` (adds a line at full price plus a 100% discount line, ORD.12).
 
 **Scope.** A vendor promotion covers that vendor's catalogue only: the whole vendor, a product set or a
 category set. A platform promotion may span vendors, narrowed by categories. A platform promotion
-reaches a vendor only if that vendor opted in (§17.4). No country scope by default: limiting a promotion
+reaches a vendor only if that vendor opted in (§18.4). No country scope by default: limiting a promotion
 by the customer's country can fall under the geo-blocking rules (⚖️ L-8).
 
 **Activation.** `code` (public code typed by the customer), `automatic` (applies when the conditions
@@ -110,7 +110,7 @@ normalised email (case folded, plus-tags removed) and is best effort; personal c
    sets `exclude_discounted = false` (vendor choice, shown in the preview).
 5. A promotion with `combinable = false` is never combined with another price discount on the same line.
 
-## 17.3 Funding and recording
+## 18.3 Funding and recording
 
 ### The rule, stated once
 
@@ -121,7 +121,7 @@ depend on any coupon.**
 | | Vendor promotion | Platform promotion |
 |---|---|---|
 | Customer pays | list price − discount | list price − discount |
-| Vendor's supply price (and VAT base) | list price − discount | see §17.4 (⚖️ T-1) |
+| Vendor's supply price (and VAT base) | list price − discount | see §18.4 (⚖️ T-1) |
 | Vendor receives | list − discount − commission | list − commission (full price) |
 | Platform bears | nothing | the discount, as a marketing cost |
 
@@ -181,7 +181,7 @@ reduction the customer sees). New immutable rows:
 class OrderLineDiscount(Model):      # append-only; one row per promotion per line
     order_line; promotion_id (SET_NULL) + promotion_version + code snapshot + label snapshot
     kind; funder ("vendor" | "platform"); funder_vendor (null for platform)
-    amount_net; vat_effect ("reduces_base" | "third_party_consideration")   # §17.4
+    amount_net; vat_effect ("reduces_base" | "third_party_consideration")   # §18.4
     rule_snapshot (JSON: percent or fixed value, cap, scope, commission_base mode)
 # VendorOrder: shipping_discount_net, shipping_discount_funder
 # OrderLine: list_unit_price_net (the existing unit_price_net), tax_base_net (what VAT was computed on)
@@ -229,12 +229,12 @@ to the vendor: customer-paid plus platform-funded amounts, so list minus vendor-
 - A gift line (ORD.12) is not recalled when the triggering item is returned; the vendor may add the
   gift to a return request as a normal line.
 
-## 17.4 VAT treatment (⚖️ tax advisor)
+## 18.4 VAT treatment (⚖️ tax advisor)
 
 - **A code that only gives a discount is not a voucher.** VAT directive article 30a(1) excludes
   instruments that only entitle to a price reduction; articles 30a to 30b (single-purpose and
   multi-purpose vouchers) apply to instruments redeemable for goods or services, which is why the design
-  issues no stored value (§17.1).
+  issues no stored value (§18.1).
 - **Vendor-funded: certain.** The vendor reduces its own price at the time of supply, so the taxable
   amount of the supply is the price actually charged (article 73), per line, `ROUND_HALF_UP`. Shipping
   discounts reduce the shipping base the same way. Nothing for the advisor except confirming the
@@ -256,12 +256,12 @@ to the vendor: customer-paid plus platform-funded amounts, so list minus vendor-
   the operator's accountant decides how the platform records and recovers VAT on its own
   marketing cost (T-3).
 
-## 17.5 Abandoned-cart detection and recovery
+## 18.5 Abandoned-cart detection and recovery
 
 ### When a cart is abandoned
 
 A cart is **abandoned** when all of these hold: it has at least one line; its owner is a signed-in
-customer (a `user` on the cart, never a guest session, §17.6); it has had no activity (`updated_at`) for
+customer (a `user` on the cart, never a guest session, §18.6); it has had no activity (`updated_at`) for
 `CART_IDLE_MINUTES` (default 120, range 60 to 4320); the cart total is at least `RECOVERY_MIN_CART_NET`
 (default 15.00); no order was placed since the last activity; and at least one line is still
 purchasable (`sales_mode=buy`, vendor active, stock available). A price change since `added_price_net`
@@ -287,7 +287,7 @@ skipped with a reason, holdout).
   cart_reminders`, separate from any future newsletter), unticked checkbox at account creation, in
   checkout and in the account preferences (ORD.11), with a versioned text, timestamp and method;
   append-only; withdrawal is as easy as the grant. Double opt-in is not required by law but is
-  recommended for guests (§17.6).
+  recommended for guests (§18.6).
 - **Soft opt-in** (article 13(2) ePrivacy; Italy: article 130(4) Codice della privacy) lets a seller email
   its own customers about its own similar products when it got the address in a sale. **Not used at
   launch.** The platform is not the seller (vendors sell in their own name), the platform's role in the
@@ -299,15 +299,15 @@ skipped with a reason, holdout).
   addresses are kept as a salted hash on the suppression list only, to honour the refusal (legitimate
   interest, minimal data).
 - **Controller roles.** The platform sends the reminder and is its controller. A vendor that funds a
-  campaign (§17.7) never receives the address or any individual's identity; it gets aggregates.
+  campaign (§18.7) never receives the address or any individual's identity; it gets aggregates.
 
 ### Channels, frequency, timing
 
 - **Email only**, through the ARC.16 outbox (idempotent per `(cart, step)`), in the recipient's
   language, as a `marketing` template class: no tracking pixel at all, CSP-safe HTML plus text,
   sender identity and postal address in the footer, no urgency timers, no scarcity claims that are
-  not true, no price shown as reduced unless §17.9 allows it. No SMS, no push, no WhatsApp.
-- **Caps (settings, defaults):** at most **2 messages per cart** (§17.7 ladder); at most **one cart
+  not true, no price shown as reduced unless §18.9 allows it. No SMS, no push, no WhatsApp.
+- **Caps (settings, defaults):** at most **2 messages per cart** (§18.7 ladder); at most **one cart
   sequence per customer per 14 days**; at most 4 marketing emails per customer per 30 days across all
   marketing purposes, newsletters included when they exist.
 - **Quiet hours:** messages are sent between 09:00 and 20:00 in the business time zone (D-31,
@@ -331,7 +331,7 @@ order's discount snapshot is part of the order and follows its retention. Jobs r
 time zone with a dry-run report and an `AuditLog` entry per run (the same pattern as the order
 retention jobs).
 
-## 17.6 Guests
+## 18.6 Guests
 
 **No recovery for guests by default.** A guest's email, typed at checkout, exists to deliver the order
 and is not a basis for marketing. The design does not recognise anonymous returning visitors with cookies
@@ -340,7 +340,7 @@ an unticked checkbox at the email step ("Email me about this cart"), stored as `
 with double opt-in (the first message asks for confirmation and carries nothing else), the same caps,
 and the same retention. The soft opt-in does not apply to a person who never bought.
 
-## 17.7 Return incentive
+## 18.7 Return incentive
 
 The owner's idea: when the customer comes back, an incentive and a coupon appear. This design gives
 the incentive **only through the recovery email** and applies it when the customer opens the restored
@@ -356,7 +356,7 @@ class RecoveryCampaign(Model):
     step1_delay_minutes (reminder, default 120); step2_delay_hours (incentive, default 24, null = no incentive)
     incentive = {kind: percent | fixed | free_shipping; value; max_discount; validity_days (default 5)}
     min_cart_net; cooldown_days (default 60); lifetime_cap_per_customer (default 3)
-    budget_cap (mandatory, the owner of the campaign pays: §17.3); holdout_percent (default 10)
+    budget_cap (mandatory, the owner of the campaign pays: §18.3); holdout_percent (default 10)
 ```
 
 The funder of the incentive is the campaign's owner, so it is a `personal` promotion issued by the owner
@@ -415,7 +415,7 @@ logged. Window: 7 days from the send (or from the would-have-been send time).
 - Reporting: the vendor sees its own campaign in aggregate and nothing below 10 users per cell; the platform
   sees all of it. Holdout without sending is not marketing and needs no consent.
 
-## 17.8 Security and abuse
+## 18.8 Security and abuse
 
 - **Code guessing.** Public codes are guessable by nature (a vendor picks `SUMMER10`), so the defence is
   throttling: apply attempts per account (10 per hour), per IP (30 per hour) and per session, the Turnstile
@@ -434,14 +434,14 @@ logged. Window: 7 days from the send (or from the would-have-been send time).
   alert staff when one vendor takes an unusual share of a budget.
 - **Self-dealing.** Orders by accounts linked to the vendor (member accounts, same shipping address or tax
   id, operator-owned shop VEN.26) cannot redeem platform coupons on that vendor's products.
-- **Refund abuse.** See §17.3: refunds return what was paid; the no-clawback rule is bounded by the limits
+- **Refund abuse.** See §18.3: refunds return what was paid; the no-clawback rule is bounded by the limits
   and the review queue. A coupon is not restored after dispatch.
 - **Audit.** Every promotion and campaign change is an `AuditLog` entry with before and after, and a
   vendor's promotions never show another vendor's data (tenant isolation in the services, CORE.3).
   Platform promotions need the Finance and payments role (budget) with Configuration and tax for the VAT
   mode, step-up on activation, and a second approver above a budget threshold (Q-P4).
 
-## 17.9 Omnibus and price display
+## 18.9 Omnibus and price display
 
 - **A coupon is not a reduction of the displayed price.** Listings, product pages and search show the
   vendor's price. A coupon price is never shown as a "now" price next to a struck-through "was" price, and
@@ -466,7 +466,7 @@ logged. Window: 7 days from the send (or from the would-have-been send time).
 - **Vendor duty.** A vendor must not raise a price to fund a discount: added to the CMP.10 vendor
   checklist and the vendor terms (VEN.30).
 
-## 17.10 Mandatory regression cases
+## 18.10 Mandatory regression cases
 
 Names are stable test names. Amounts are line net before VAT, rule 15%.
 
@@ -492,10 +492,10 @@ Names are stable test names. Amounts are line net before VAT, rule 15%.
 | RCV-HOLDOUT | 1000 consented carts, holdout 10% | About 100 held out, stable assignment, report shows incremental and cannibalised |
 | RCV-PIXEL | Any recovery email | No image tracker, link only |
 
-## 17.11 Tasks
+## 18.11 Tasks
 
 All rows are P2 or P3 (phase F6). Estimates are first guesses, to be re-estimated when the owner
-decides. Open owner questions are in §17.12, tax advisor (T-) and counsel (L-) questions in §17.13.
+decides. Open owner questions are in §18.12, tax advisor (T-) and counsel (L-) questions in §18.13.
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
@@ -518,11 +518,11 @@ decides. Open owner questions are in §17.12, tax advisor (T-) and counsel (L-) 
 | VEN.30 | Vendor terms and checklist for promotions: contract clause on funding, commission on the list price, platform promotions and campaign selection, price-honesty duty (no raising a price to fund a discount), 30 days' notice for changes (P2B), CMP.10 checklist row | P2 | 4 | VEN.14, CMP.24 | New contract version carries the clause as a specific-approval item; checklist row visible; wording approved |
 | CMP.32 | Counsel review of the cart-reminder legal basis (L-1 to L-9) and the Omnibus and personalised-price wording; outcome recorded as ADR | P2 | 4 | CMP.24 | Written answers to L-1 to L-9 in an ADR; any change of wording goes through CMP.24 |
 
-## 17.12 Open owner questions
+## 18.12 Open owner questions
 
 - **Q-P1.** One funder per coupon, no co-funding in v1. Is a "platform matches the vendor" mode ever wanted (it is a
   later row, not a change of the rule)?
-- **Q-P2.** Commission on the list price (recommended, §17.3) or on the price paid? List means a vendor pays commission
+- **Q-P2.** Commission on the list price (recommended, §18.3) or on the price paid? List means a vendor pays commission
   on money the customer did not pay; paid means the platform quietly co-funds every vendor coupon.
 - **Q-P3.** Platform promotions: do vendors opt in by default (recommended: no, `CrossVendorConsent` style, and the vendor terms
   ask once) or opt out? Do you want vendors able to exclude single products?
@@ -530,17 +530,17 @@ decides. Open owner questions are in §17.12, tax advisor (T-) and counsel (L-) 
   ceiling set by the platform owner, second approver above a threshold, every one audited.
 - **Q-P5.** Recovery ladder: plain reminder first and incentive 24 hours later (recommended), or the incentive in
   the first message? Holdout of 10% (carts that receive nothing) accepted?
-- **Q-P6.** Guests: no recovery at launch (recommended), or the unticked "email me about this cart" route (§17.6)?
+- **Q-P6.** Guests: no recovery at launch (recommended), or the unticked "email me about this cart" route (§18.6)?
 - **Q-P7.** The incentive reaches only the emailed customer and appears in the restored cart (recommended). Do you also want a
   "welcome back" coupon for signed-in visitors on the site? It is discoverable and farmable, so it is not proposed.
 - **Q-P8.** Default values: idle 2 hours, minimum cart 15, cooldown 60 days, lifetime cap 3, validity 5 days, caps on
   vendor percent coupons, quiet hours 09:00 to 20:00. Confirm or change.
 - **Q-P9.** Any vendor on any plan can run coupons and campaigns, or only some plans (`VendorPlan.features`)?
 - **Q-P10.** Operator-owned shop (VEN.26): same rules, with its coupons funded by the operator as vendor?
-- **Q-P11.** After a withdrawal the coupon is not given back and no discount is clawed back (§17.3). Agree?
+- **Q-P11.** After a withdrawal the coupon is not given back and no discount is clawed back (§18.3). Agree?
 - **Q-P12.** Vendors choose their own public codes. Reserved words and a platform-wide unique namespace acceptable?
 
-## 17.13 Open questions for the tax advisor and counsel
+## 18.13 Open questions for the tax advisor and counsel
 
 Tax advisor (⚖️):
 
