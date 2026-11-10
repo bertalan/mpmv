@@ -54,6 +54,10 @@ LOCAL_APPS = [
 # STAGE opts in with MPMV_ALLOW_SEED=1. LIVE_DATA marks an environment holding real data
 # (live.py): the seed never runs there, and the `seed.E001` check fails if it is allowed.
 ALLOW_SEED = env_bool("MPMV_ALLOW_SEED", default=False)
+# Public STAGE demo (ARC.22) and the search engine floor (SEO.8, D-35): either one makes every
+# response noindex (meta, X-Robots-Tag and robots.txt). STAGE sets FORCE_NOINDEX itself.
+DEMO_MODE = env_bool("MPMV_DEMO_MODE", default=False)
+FORCE_NOINDEX = env_bool("MPMV_FORCE_NOINDEX", default=False)
 LIVE_DATA = False
 
 INSTALLED_APPS = [
@@ -105,6 +109,7 @@ MIDDLEWARE = [
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "apps.cms.middleware.WagtailAdminPickerNonceMiddleware",  # Wagtail's inline pickers (CMS.1)
     "apps.core.middleware.PermissionsPolicyMiddleware",
+    "apps.seo.middleware.ForceNoindexMiddleware",  # X-Robots-Tag when forced (SEO.8)
     # With the other header middleware, so responses returned early by an inner middleware
     # (CommonMiddleware's APPEND_SLASH redirect, LIVE's static files) carry it too (SEC.5).
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -118,6 +123,8 @@ MIDDLEWARE = [
     "apps.catalog.middleware.OldProductSlugRedirectMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # I18N.12: the stored language of a signed-in user on unprefixed areas (Manager, account).
+    "apps.accounts.middleware.PreferredLanguageMiddleware",
     # SEC.5: pages for a signed-in user are never stored by a shared cache.
     "apps.core.middleware.PrivateCacheForSignedInUsersMiddleware",
     # CORE.4: which device verified the session, then confine required roles to the MFA pages.
@@ -223,6 +230,7 @@ TEMPLATES = [
                 "django.template.context_processors.csp",
                 "apps.themes.context_processors.theme",
             ],
+            "builtins": ["apps.seo.templatetags.seo_robots"],
             "loaders": [
                 "apps.themes.loaders.ThemeLoader",
                 (
@@ -567,3 +575,10 @@ LOGGING = {
     "loggers": {"django.request": {"filters": ["redact_secret_paths"]}},
     "root": {"handlers": ["console"], "level": "INFO"},
 }
+
+# Optional prefix of order numbers, e.g. "MP-" gives "MP-2027-000123" (ORD.2). Empty by default.
+ORDER_NUMBER_PREFIX = ""
+
+# Months after an order during which its non-fiscal data is kept; then `minimise_order` may
+# drop it (D-29). The fiscal snapshot is kept 10 years from the end of the order's year.
+ORDER_ACTIVE_PHASE_MONTHS = 24  # can only lengthen the 24-month floor enforced in the database
