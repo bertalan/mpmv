@@ -58,12 +58,16 @@ def test_existing_translations_are_kept_published_and_not_stale() -> None:
     }
     assert set(rows) == {("vendor-a", "en"), ("vendor-a", "it"), ("vendor-b", "de")}
     en = rows["vendor-a", "en"]
-    assert {name: getattr(en, name) for name in TEXTS} == en_texts
+    # The storefront texts became rich text later (0025): plain text is now paragraphs.
+    expected = {
+        name: value if name == "tagline" else f"<p>{value}</p>" for name, value in en_texts.items()
+    }
+    assert {name: getattr(en, name) for name in TEXTS} == expected
     assert rows["vendor-a", "it"].tagline == "Attrezzatura"
     assert rows["vendor-b", "de"].tagline == "Ausrüstung"
 
     assert {row.status for row in rows.values()} == {PUBLISHED}
-    assert en.source_hash == source_hash(en_texts)
+    assert en.source_hash == source_hash(expected)
     assert rows["vendor-a", "it"].source_hash == en.source_hash
     assert rows["vendor-b", "de"].source_hash == ""  # no EN source to compare with
     assert not any(row.is_stale for row in rows.values())
