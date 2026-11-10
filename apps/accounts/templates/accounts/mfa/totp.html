@@ -8,9 +8,9 @@
 <form method="post">
   {% csrf_token %}
   <input type="hidden" name="next" value="{{ next }}">
-  {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+  {% if error %}<p id="mfa-error" role="alert">{{ error }}</p>{% endif %}
   <p><label for="id_token">Authentication code</label>
-    <input id="id_token" name="token" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="8" required autofocus></p>
+    <input id="id_token" name="token" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="8" required autofocus{% if error %} aria-invalid="true" aria-describedby="mfa-error"{% endif %}></p>
   <button type="submit">Confirm</button>
 </form>
 {% endblock %}
