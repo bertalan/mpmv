@@ -10,10 +10,17 @@ from django.conf import settings
 from django.http import HttpRequest
 from django.urls import reverse
 from django.utils import translation
+from django.utils.html import format_html_join
 from django.utils.safestring import SafeString, mark_safe
 from wagtail.models import Locale, Page
 
-from apps.core.i18n import LanguageLink, switcher_links
+from apps.core.i18n import (
+    LanguageLink,
+    configured_languages,
+    hreflang_alternates,
+    switcher_links,
+    translate_path,
+)
 from apps.core.image_licences import Credit
 
 from .. import services
@@ -64,33 +71,62 @@ def navigation_links(context: dict[str, Any], location: str) -> list[MenuLink]:
     return links
 
 
+def _home(code: str, suffix: str = "") -> str:
+    with translation.override(code):
+        return reverse("home") + suffix
+
+
 @register.simple_tag(takes_context=True)
 def language_links(context: dict[str, Any]) -> list[LanguageLink]:
     """One entry per configured language: where the switcher takes the visitor.
 
     The target is the same object in that language: the translations a view puts in the context
     as `language_urls` (listings and storefronts, the set of their `hreflang` links), else the
-    CMS page's live translations (slugs differ between languages). Without a translation, the
-    language's home, flagged so the switch shows a notice.
+    CMS page's live translations (slugs differ between languages). An object without a
+    translation leads to the language's home, flagged so the switch shows a notice. A view with
+    no object (search, cart, account, 404) keeps its own path in the other language, no notice.
     """
     request: HttpRequest | None = context.get("request")
+    current = translation.get_language()
     query = request.META.get("QUERY_STRING", "") if request is not None else ""
     suffix = f"?{query}" if query else ""
     urls: Mapping[str, str] | None = context.get("language_urls")
-    if urls is None:
-        urls = {
-            code: url + suffix
-            for code, url in services.page_language_urls(context.get("page"), request).items()
-        }
+    if urls is not None:  # a listing's filters mean nothing on a home page
+        return switcher_links(urls, current, _home)
+    page: Page | None = context.get("page")
+    if page is not None:
+        found = services.page_language_urls(page, request)
+        return switcher_links(
+            {code: url + suffix for code, url in found.items()},
+            current,
+            lambda code: _home(code, suffix),
+        )
+    if request is None:
+        return switcher_links(
+            {code: _home(code) for code in configured_languages()}, current, _home
+        )
+    return switcher_links(
+        {code: translate_path(request.path_info, code) + suffix for code in configured_languages()},
+        current,
+        _home,
+    )
 
-    if "language_urls" in context:
-        suffix = ""  # a listing's filters mean nothing on a home page
 
-    def home(code: str) -> str:
-        with translation.override(code):
-            return reverse("home") + suffix
-
-    return switcher_links(urls, translation.get_language(), home)
+@register.simple_tag(takes_context=True)
+def page_hreflang(context: dict[str, Any]) -> SafeString:
+    """The `<link rel="alternate" hreflang>` set of the page in the context, from the same
+    translations map as its language switcher (`services.page_language_urls`)."""
+    request: HttpRequest | None = context.get("request")
+    page: Page | None = context.get("page")
+    if request is None or page is None:
+        return mark_safe("")
+    urls = {
+        code: request.build_absolute_uri(url)
+        for code, url in services.page_language_urls(page, request).items()
+    }
+    return format_html_join(
+        "\n  ", '<link rel="alternate" hreflang="{}" href="{}">', hreflang_alternates(urls)
+    )
 
 
 @register.simple_tag

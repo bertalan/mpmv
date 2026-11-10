@@ -52,3 +52,30 @@ def test_the_notice_is_shown_after_switching_to_a_missing_translation(
         follow=True,
     )
     assert "not available in this language" in response.content.decode()
+
+
+def test_a_page_without_an_object_stays_on_its_path_with_no_notice(
+    client: Client, seeded: Any
+) -> None:
+    """A 404 (like search, cart or account pages) has no translations: each language keeps the
+    path, the query string, and shows no notice."""
+    response = client.get("/it/nothing-here/?q=bag")
+    assert response.status_code == 404
+    found = switch_targets(response.content.decode())
+    assert found["de"] == ("/de/nothing-here/?q=bag", False)
+    assert found["en"] == ("/nothing-here/?q=bag", False)
+
+
+def test_switch_ignores_the_notice_flag_without_exact(client: Client, seeded: Any) -> None:
+    response = client.post(
+        reverse("switch_language"), {"language": "it", "next": "/", "notice": "1"}, follow=True
+    )
+    assert "not available in this language" not in response.content.decode()
+
+
+def test_an_off_site_next_is_refused_even_with_exact(client: Client) -> None:
+    response = client.post(
+        reverse("switch_language"),
+        {"language": "it", "next": "https://evil.example/", "exact": "1", "notice": "1"},
+    )
+    assert response["Location"] == "/"

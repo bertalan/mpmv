@@ -931,6 +931,9 @@ def page_language_urls(page: Page | None, request: HttpRequest | None) -> dict[s
         return {}
     urls: dict[str, str] = {}
     for translated in page.get_translations(inclusive=True).live().select_related("locale"):
+        # A page that is live but not shown to visitors (a hidden event) is not offered.
+        if not getattr(translated.specific, "is_publicly_visible", lambda: True)():
+            continue
         url = translated.get_url(request)
         if url is not None:
             urls[translated.locale.language_code] = url

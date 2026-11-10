@@ -36,7 +36,7 @@ without a countdown.
     {% navigation_links "header" as header_links %}{% language_links as languages %}
     {% include "components/header.html" with site_name=site_name links=header_links languages=languages %}
   {% endblock %}
-  {% if messages %}<div class="site-messages">{% for message in messages %}{% include "components/alert.html" with level=message.level_tag message=message live="polite" only %}{% endfor %}</div>{% endif %}
+  {% block messages %}{% if messages %}<div class="site-messages">{% for message in messages %}{% include "components/alert.html" with level=message.level_tag message=message live="polite" only %}{% endfor %}</div>{% endif %}{% endblock %}
   <main id="main" class="site-main" tabindex="-1">
     {% block content %}{% endblock %}
     {% block image_credits %}{% if page %}{% page_image_credits page as image_credits %}{% image_credits_disclosure image_credits %}{% endif %}{% endblock %}
