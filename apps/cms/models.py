@@ -9,7 +9,10 @@ its admin editor needs no inline script, so it works under the strict CSP (SEC.1
 
 Bodies are StreamFields with rich-text paragraphs, images and galleries (I18N.3), heroes, calls to
 action, FAQs and "featured links" cards to pages, catalog terms and vendors (CMS.2); home and
-standard pages also take the product grid (CMS.10).
+standard pages also take launch countdowns (CMS.9) and the product grid (CMS.10). A page with a
+running countdown caps the Cache-Control `max-age` and `s-maxage` set upstream at the target
+(`CountdownCacheMixin`), so no cache serves the countdown after the launch; it never adds a
+lifetime.
 
 Translation (I18N.3, spec 09 §9.2): wagtail-localize copies a page into another locale and keeps
 it in sync with its source. Texts, alt texts and captions are translated; images are synchronised
@@ -47,6 +50,7 @@ from django.http import Http404, HttpRequest, HttpResponse, HttpResponsePermanen
 from django.http.response import HttpResponseBase
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.cache import get_max_age, patch_cache_control
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from wagtail import blocks
@@ -71,14 +75,21 @@ from .blocks import (
     FigureBlock,
     GalleryBlock,
     HeroBlock,
+    LaunchCountdownBlock,
     PageCardBlock,
     ProductGridBlock,
+    countdown_targets,
 )
 from .choosers import term_chooser, vendor_chooser
 
 
-def body_field(verbose_name: Any = None, *, products: bool = False) -> StreamField:
-    """A page body; `products` adds the product grid (CMS.10) for the home and standard pages."""
+def body_field(
+    verbose_name: Any = None, *, countdown: bool = False, products: bool = False
+) -> StreamField:
+    """A page body. `countdown`: also offer the launch countdown (CMS.9: home and standard
+    pages; the page class then needs `CountdownCacheMixin`). `products`: also offer the product
+    grid (CMS.10: home and standard pages)."""
+    extra = [("countdown", LaunchCountdownBlock())] if countdown else []
     grid = [("product_grid", ProductGridBlock())] if products else []
     return StreamField(
         [
@@ -90,20 +101,61 @@ def body_field(verbose_name: Any = None, *, products: bool = False) -> StreamFie
             ("faq", FaqBlock()),
             ("featured", FeaturedLinksBlock()),
             *grid,
+            *extra,
         ],
         blank=True,
         verbose_name=verbose_name or _("body"),
     )
 
 
-class HomePage(Page):  # type: ignore[misc]  # Wagtail is untyped
+class CountdownCacheMixin:
+    """Caps the response's `max-age` and `s-maxage` at the nearest running countdown target
+    of the page's body (CMS.9, spec 10 §10.2): a cache, the SEO.6 page cache included, never
+    serves an active countdown after its launch. The cap only shortens a lifetime already set
+    upstream: a response without `max-age` (or `s-maxage`) gets none, so a page that was not
+    cacheable never becomes so. When it caps, a signed-in visitor's page is marked `private` too.
+    A response that must not be stored (`no-store`) is left alone."""
+
+    body: Any
+
+    def serve(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
+        response: HttpResponseBase = super().serve(request, *args, **kwargs)  # type: ignore[misc]
+        if "no-store" in response.get("Cache-Control", ""):
+            return response
+        current = {"max_age": get_max_age(response), "s_maxage": _directive(response, "s-maxage")}
+        if all(value is None for value in current.values()):
+            return response
+        targets = countdown_targets(self.body)
+        if not targets:
+            return response
+        now = timezone.now()
+        directives: dict[str, Any] = {
+            name: engine.capped_max_age(targets, now, value)
+            for name, value in current.items()
+            if value is not None
+        }
+        if request.user.is_authenticated:
+            directives["private"] = True
+        patch_cache_control(response, **directives)
+        return response
+
+
+def _directive(response: HttpResponseBase, name: str) -> int | None:
+    for part in response.get("Cache-Control", "").split(","):
+        key, _sep, value = part.strip().partition("=")
+        if key.lower() == name and value.isdigit():
+            return int(value)
+    return None
+
+
+class HomePage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is untyped
     """The root page of one language: `/` for EN, `/<code>/` for the others.
 
     One per locale: a second one would never be served. Checked in `clean()`, which Wagtail runs
     on every save (the page table holds the locale, so no database constraint can).
     """
 
-    body = body_field(products=True)
+    body = body_field(countdown=True, products=True)
 
     content_panels: ClassVar[list[Any]] = [*Page.content_panels, FieldPanel("body")]
     parent_page_types: ClassVar[list[str]] = ["wagtailcore.Page"]
@@ -129,7 +181,7 @@ class HomePage(Page):  # type: ignore[misc]  # Wagtail is untyped
             raise ValidationError(_("This language already has a home page."))
 
 
-class StandardPage(Page):  # type: ignore[misc]
+class StandardPage(CountdownCacheMixin, Page):  # type: ignore[misc]
     """A static page: about us, contact, FAQ (spec 10 §10.2), with an optional main image."""
 
     image = models.ForeignKey(
@@ -147,7 +199,7 @@ class StandardPage(Page):  # type: ignore[misc]
         help_text=_("Describes the main image for people who cannot see it."),
     )
     image_caption = models.CharField(_("caption"), max_length=250, blank=True)
-    body = body_field(products=True)
+    body = body_field(countdown=True, products=True)
 
     content_panels: ClassVar[list[Any]] = [
         *Page.content_panels,

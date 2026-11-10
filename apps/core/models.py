@@ -13,12 +13,19 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import models, transaction
 from django.utils import timezone
-from wagtail.images.models import AbstractImage, AbstractRendition, Image
+from wagtail.images.models import AbstractImage, AbstractRendition, Image, get_upload_to
 from wagtail.models import Collection
 
-from . import flags, translations
+from . import flags, translations, uploads
 from .countries import default_allowed_vendor_countries
-from .fields import CountryField, EncryptedTextField, LanguageField
+from .fields import (
+    CountryField,
+    EncryptedTextField,
+    LanguageField,
+    SanitisedImageField,
+    image_limits,
+    read_upload,
+)
 from .image_licences import (
     Credit,
     LicenceTerms,
@@ -580,30 +587,27 @@ def read_svg(file: Any) -> bytes | None:
     """The bytes of an image file if it is an SVG (up to one byte over `MAX_SVG_BYTES`, which
     the sanitiser refuses), None if it is not or is missing from storage.
 
-    A stored file is an SVG if its name ends in `.svg`: Wagtail's upload form checks that the
-    extension matches the content. A new upload is also sniffed, so that an SVG named `.png`
-    is checked before the format check can be relied on.
+    An SVG is markup named `.svg` (`apps.core.uploads.upload_kind`, SEC.2): the content decides,
+    so a raster image named `.svg` goes to the raster checks (which refuse its name), and markup
+    under another name is refused by them too, never stored. "Named `.svg`" is
+    `uploads.is_svg_name`, the same test as the field's, so `logo.svg.` or a `.svg` followed by
+    an invisible character cannot be stored as an SVG while skipping the collection rule.
     """
-    if not file:
+    if not file or not uploads.is_svg_name(file.name or ""):
         return None
-    named_svg = posixpath.splitext(file.name or "")[1].lower() == ".svg"
+    data: bytes
     if file._committed:
-        if not named_svg:
-            return None
         try:
             with file.storage.open(file.name, "rb") as stored:
-                data: bytes = stored.read(MAX_SVG_BYTES + 1)
+                data = stored.read(MAX_SVG_BYTES + 1)
         except OSError:
             return None  # missing from storage: nothing that could be served
-        return data
-    file.open("rb")
-    head: bytes = file.read(256)
-    if not named_svg and not head.lstrip(b"\xef\xbb\xbf \t\r\n").startswith(b"<"):
+    else:
+        file.open("rb")
         file.seek(0)
-        return None
-    data = head + file.read(MAX_SVG_BYTES + 1 - len(head))
-    file.seek(0)
-    return data
+        data = file.read(MAX_SVG_BYTES + 1)
+        file.seek(0)
+    return data if uploads.is_markup(data) else None
 
 
 class SvgCollection(BaseModel):
@@ -638,8 +642,14 @@ class MediaImage(AbstractImage):  # type: ignore[misc]  # Wagtail is untyped
     without them, in the Wagtail admin and in `services.save_image`. The columns accept empty
     values so that images migrated without known metadata can exist: they are listed for
     review and cannot be chosen for new content until classified.
+
+    SEC.2: a new file is checked by its content (`apps.core.uploads`) in `clean`, and the file
+    field stores only its re-encoding, without metadata, under a name the app makes.
     """
 
+    file = SanitisedImageField(
+        verbose_name="file", upload_to=get_upload_to, width_field="width", height_field="height"
+    )
     licence = models.ForeignKey(
         ImageLicence,
         on_delete=models.PROTECT,
@@ -686,9 +696,9 @@ class MediaImage(AbstractImage):  # type: ignore[misc]  # Wagtail is untyped
             source_url=self.source_url,
             permission_ref=self.permission_ref,
         )
-        svg_error = self._clean_svg()
-        if svg_error:
-            errors["file"] = svg_error
+        file_error = self._new_file_error() or self._clean_svg()
+        if file_error:
+            errors["file"] = file_error
         if errors:
             raise ValidationError(errors)
 
@@ -696,7 +706,27 @@ class MediaImage(AbstractImage):  # type: ignore[misc]  # Wagtail is untyped
         update_fields = kwargs.get("update_fields")
         if update_fields is None or {"file", "collection"} & set(update_fields):
             self._enforce_svg_policy()
+        # Store a new upload (re-encoded or re-serialised, `SanitisedImageFieldFile.save`) after
+        # the SVG policy (so a refused SVG never reaches storage) and before Django collects the
+        # column values, so that size, hash and dimensions are those of the stored file.
+        if self.file and not getattr(self.file, "_committed", True):
+            self.file.save(self.file.name, self.file.file, save=False)
         super().save(*args, **kwargs)
+
+    def _new_file_error(self) -> str | None:
+        """Why a newly uploaded file is refused by its content (SEC.2); None when it is fine,
+        not new, or an SVG named `.svg` (checked by `_clean_svg`, THM.12)."""
+        if not self.file or getattr(self.file, "_committed", True):
+            return None
+        limits = image_limits()
+        data = read_upload(self.file.file, max(limits.max_bytes, MAX_SVG_BYTES))
+        try:
+            if uploads.upload_kind(data, self.file.name) == "svg":
+                return None
+            uploads.check_image(data[: limits.max_bytes + 1], self.file.name, limits)
+        except uploads.UploadRefused as refusal:
+            return refusal.message
+        return None
 
     def _svg_check(self) -> tuple[bytes, bytes | None, str | None] | None:
         """None if the file is not an SVG; else (its bytes, the bytes to store, the reason it is
