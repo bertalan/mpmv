@@ -43,7 +43,8 @@ def _headers(vendor: Vendor | None, scopes: list[str] = READ_WRITE) -> dict[str,
 def _payload(**changes: Any) -> dict[str, Any]:
     data: dict[str, Any] = {
         "title": "Spring fair",
-        "event_type": "trade_fair",
+        "event_type": "fair",
+        "summary": "Our stand at the spring fair.",
         "starts_at": "2027-03-10T08:00:00Z",
         "ends_at": "2027-03-10T16:00:00Z",
         "timezone": "Europe/Rome",

@@ -685,6 +685,12 @@ class EventPage(Page):  # type: ignore[misc]  # Wagtail is untyped
             zoneinfo.ZoneInfo(self.timezone)
         except (zoneinfo.ZoneInfoNotFoundError, ValueError):
             add("timezone", _("Choose a time zone such as Europe/Rome."))
+        if self.rrule:
+            try:
+                engine.validate_rrule(self.rrule, self.all_day)
+            except engine.RecurrenceError as exc:
+                add("rrule", str(exc))
+                return
         if engine.has_count_and_until(self.rrule):
             add("rrule", _("A recurrence ends after a number of times or on a date, not both."))
 

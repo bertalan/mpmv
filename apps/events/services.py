@@ -387,8 +387,13 @@ class EventRefused(PermissionDenied):
     """The event's state refuses the action to this actor: a hidden page for its vendor."""
 
 
-def _is_staff(user: AbstractBaseUser | AnonymousUser) -> bool:
-    return bool(user.is_authenticated and user.is_active and getattr(user, "is_staff", False))
+def _is_staff(user: Any) -> bool:
+    """Platform staff; an API key (no `is_authenticated`) never is."""
+    return bool(
+        getattr(user, "is_authenticated", False)
+        and user.is_active
+        and getattr(user, "is_staff", False)
+    )
 
 
 def _require_staff(user: AbstractBaseUser | AnonymousUser) -> None:
@@ -400,11 +405,22 @@ def _context(actor: AbstractBaseUser | AnonymousUser, ctx: AuditContext | None) 
     return ctx if ctx is not None else user_context(actor, ip=None)
 
 
+def _user(actor: Any) -> User | None:
+    """The Django user behind `actor`: none for an API key (a credential, CORE.13), whose
+    revisions and workflow steps carry no user; the audit entry names the key."""
+    return actor if isinstance(actor, User) else None
+
+
 def _may_author(actor: Any, vendor: Vendor | None) -> bool:
     if _is_staff(actor):
         return True
-    if vendor is None or not isinstance(actor, User):
+    if vendor is None:
         return False
+    if not isinstance(actor, User):
+        # A vendor-bound API key acts for its whole vendor (CORE.13); its scope, checked by the
+        # API, replaces the member permission. A platform key never authors.
+        credential_vendor = getattr(actor, "credential_vendor_id", None)
+        return credential_vendor is not None and credential_vendor == vendor.pk
     return has_vendor_permission(actor, vendor, VendorAction.EVENTS)
 
 
@@ -598,7 +614,7 @@ def save_event_draft(
         before = _snapshot(draft)
         _apply(draft, data, staff=staff)
         draft.full_clean()
-        draft.save_revision(user=actor, log_action=True)
+        draft.save_revision(user=_user(actor), log_action=True)
         after = _snapshot(draft)
         changes.update(EVENT, _key(stored), before, after)
         _record(ctx, "events.event_draft_saved", stored, before, after)
@@ -624,7 +640,7 @@ def _create_event(
     with _mutation(dry_run):
         index = _index_for(locale)
         page = EventPage(
-            vendor=vendor, locale=locale, original_locale=locale, owner=actor, live=False
+            vendor=vendor, locale=locale, original_locale=locale, owner=_user(actor), live=False
         )
         _apply(page, data, staff=staff)
         if not data.get("slug"):
@@ -633,7 +649,7 @@ def _create_event(
         # Field errors before the insert; the tree fields come from `add_child`.
         page.full_clean(exclude=TREE_FIELDS)
         index.add_child(instance=page)
-        page.save_revision(user=actor, log_action=True)
+        page.save_revision(user=_user(actor), log_action=True)
         after = _snapshot(page)
         changes.create(EVENT, _key(page), after)
         _record(ctx, "events.event_created", page, None, after)
@@ -664,18 +680,18 @@ def submit_event(
         state = stored.current_workflow_state
         if _in_review(stored):
             raise ValidationError(_("The event is already awaiting review."))
-        revision = stored.get_latest_revision() or stored.save_revision(user=actor)
+        revision = stored.get_latest_revision() or stored.save_revision(user=_user(actor))
         workflow = None if staff else stored.get_workflow()
         if workflow is not None and state is not None:
-            state.resume(user=actor)
+            state.resume(user=_user(actor))
             outcome = "resubmitted"
         elif workflow is not None:
-            workflow.start(stored, actor)
+            workflow.start(stored, _user(actor))
             outcome = "submitted"
         else:
             if state is not None:
-                state.cancel(user=actor)
-            revision.publish(user=actor, skip_permission_checks=True)
+                state.cancel(user=_user(actor))
+            revision.publish(user=_user(actor), skip_permission_checks=True)
             outcome = "published"
         sync_event_status(stored)
         after = _state(_fresh(stored)) | {"submission": outcome}
@@ -811,13 +827,13 @@ def cancel_event(
             current = _fresh(translation)
             state = current.current_workflow_state
             if state is not None:
-                state.cancel(user=actor)
+                state.cancel(user=_user(actor))
             if not current.live or current.live_revision is None:
                 continue
             cancelled: EventPage = current.live_revision.as_object()
             cancelled.cancelled_at = now
-            cancelled.save_revision(user=actor, log_action=True).publish(
-                user=actor, skip_permission_checks=True
+            cancelled.save_revision(user=_user(actor), log_action=True).publish(
+                user=_user(actor), skip_permission_checks=True
             )
         after = _state(_fresh(stored)) | {"languages": len(pages)}
         changes.update(EVENT, _key(stored), before, after)
