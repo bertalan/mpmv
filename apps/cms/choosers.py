@@ -1,5 +1,5 @@
 """Admin choosers for catalog terms, categories, brands, products and vendors (CMS.2 part 2/2,
-CMS.10, CMS.3, spec 10 §10.2).
+CMS.10, CMS.3, CMS.9, spec 10 §10.2).
 
 Wagtail's `ChooserViewSet` gives each model a chooser modal under `/admin/` and a StreamField
 block (`apps.cms.blocks.TermChooserBlock`, `VendorChooserBlock` and so on). Editors never type a
@@ -8,9 +8,9 @@ URL.
 - Terms are platform data with no vendor scope: every term is offered, labelled
   "taxonomy code: name" like the staff admin. Categories and brands (the product grid, CMS.10)
   are platform data too: all of them are offered, labelled as in the staff admin.
-- Products (the blog's product cards, CMS.3): only listed products, published and of an active
-  vendor (`apps.catalog.services.listed_products`), in the list and in the "chosen" step alike,
-  labelled by SKU.
+- Products (the blog's product cards, CMS.3, and the launch countdown, CMS.9): only listed
+  products, published and of an active vendor (`apps.catalog.services.listed_products`), in the
+  list and in the "chosen" step alike, labelled by SKU.
 - Vendors: only those with a public storefront (`apps.vendors.services.storefront_vendors`), in
   the list and in the "chosen" step alike, so a crafted request cannot pick another vendor.
 

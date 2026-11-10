@@ -19,6 +19,7 @@ from .base import *  # noqa: F403
 ALLOW_SEED = True  # the `demo_seed` fixture (ARC.10)
 FEATURE_FLAGS = {}
 FEATURE_FLAGS_CACHE_SECONDS = 0
+COMPLIANCE_COUNTRY_LANGUAGES_CACHE_SECONDS = 0  # the same reason: tests roll back
 # VIES (TAX.5): the suite never leaves the machine. A check without a fake fails the test, and the
 # URL is the local discard port in case a test builds the real HTTP client from these settings.
 VIES_CLIENT = "apps.tax.tests.fakes.RefusingViesClient"

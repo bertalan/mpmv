@@ -144,7 +144,8 @@ def test_scanner_images_are_pinned_to_a_version() -> None:
 
 def test_no_hard_coded_urls_or_hosts() -> None:
     for path in (NIGHTLY, STAGE, SCAN_SCRIPT):
-        text = path.read_text()
+        # The one public URL: the pinned nuclei-templates repository, built from a variable.
+        text = path.read_text().replace("https://github.com/$NUCLEI_TEMPLATES_REPO.git", "")
         assert not re.search(r"https?://", text), path.name
         for host in re.findall(r"://(?:[^@/\s]*@)?([^/:\s\"']+)", text):
             assert host == "localhost", f"{path.name}: {host}"

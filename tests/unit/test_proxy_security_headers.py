@@ -155,3 +155,18 @@ def test_request_bodies_are_capped_just_above_the_upload_cap() -> None:
     assert found, "the site block must cap request bodies"
     cap = caddy_bytes(found.group(1))
     assert IMAGE_UPLOAD_CAP < cap <= IMAGE_UPLOAD_CAP + FORM_OVERHEAD_LIMIT
+
+
+def test_caddy_never_opens_resources_to_other_origins() -> None:
+    """ZAP 10098: no `Access-Control-Allow-Origin` anywhere; everything is same-origin."""
+    text = CADDYFILE.read_text()
+    code = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
+    assert "access-control" not in code.lower()
+
+
+def test_caddy_snippet_sets_corp_same_origin_and_no_coep() -> None:
+    fields = snippet_headers()
+    assert fields["?Cross-Origin-Resource-Policy"] == "same-origin"
+    assert not [field for field in fields if "Embedder" in field], "COEP is a documented accept"
+    # The media handler relies on the site block's snippet: it must not delete or replace it.
+    assert "Cross-Origin" not in public_media_block()

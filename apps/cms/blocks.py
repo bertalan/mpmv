@@ -15,6 +15,11 @@ admin (`choosers`), never typed. A card whose target is not public is left out: 
 not live, a term (or its taxonomy or parent terms) without published texts, a vendor that is not
 active. Term and storefront URLs follow spec 03 (`engine.term_path`, `engine.storefront_path`).
 
+The launch countdown (CMS.9) announces a launch: the target is entered in the operator's time
+zone and stored in UTC, `engine.countdown_state` decides between the countdown and the expired
+state, and its links default to the chosen product or category. The theme component renders
+it; the theme's `countdown.js` module adds the live counter.
+
 The blog's "featured links" (CMS.3, `ArticleLinksBlock`) also take product cards: a published
 product of an active vendor, linked to its page in the reader's language (or in the language of
 the text it shows). Other bodies keep the page, term and vendor cards.
@@ -26,13 +31,18 @@ screen readers. An empty heading falls back to the listing's name, so the sectio
 one. Only published products of active vendors show; a grid with none is left out.
 """
 
+import datetime as dt
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Any, ClassVar
+from zoneinfo import ZoneInfo
 
+from django import forms
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 from django.utils.translation import get_language
 from django.utils.translation import gettext_lazy as _
 from wagtail import blocks
@@ -40,8 +50,14 @@ from wagtail.blocks import StructBlockValidationError
 from wagtail.images.blocks import ImageChooserBlock
 from wagtail.models import Page
 
-from apps.catalog.models import TaxonomyTranslation, Term, TermTranslation
-from apps.catalog.services import ListingScope, listed_products, product_cards, product_grid
+from apps.catalog.models import Category, Product, TaxonomyTranslation, Term, TermTranslation
+from apps.catalog.services import (
+    ListingScope,
+    category_url,
+    listed_products,
+    product_cards,
+    product_grid,
+)
 from apps.core import translations
 from apps.core.money import CURRENCY
 from apps.vendors.models import Vendor, VendorTranslation
@@ -58,6 +74,7 @@ from .engine import (
     NEUTRAL,
     PRODUCT_GRID_DEFAULT,
     PRODUCT_GRID_MAX,
+    countdown_state,
     gallery_for_language,
     grid_limit,
     link_language,
@@ -592,3 +609,119 @@ class ProductGridBlock(blocks.StructBlock):  # type: ignore[misc]
         context["see_all_url"] = grid.see_all_url if see_all else None
         context["currency"] = CURRENCY
         return context
+
+
+# --- Launch countdown (CMS.9)
+
+
+def operator_time_zone() -> ZoneInfo:
+    """The platform operator's time zone: editors enter launch times in it."""
+    return ZoneInfo(settings.BUSINESS_TIME_ZONE)
+
+
+class OperatorDateTimeField(forms.DateTimeField):
+    """A date and time typed in the operator's time zone, cleaned to UTC, and shown in that
+    zone again when the editor reopens the page (the admin itself runs in UTC)."""
+
+    def prepare_value(self, value: Any) -> Any:
+        if isinstance(value, dt.datetime) and timezone.is_aware(value):
+            return timezone.localtime(value, operator_time_zone()).replace(tzinfo=None)
+        return value
+
+    def to_python(self, value: Any) -> dt.datetime | None:
+        with timezone.override(operator_time_zone()):
+            parsed: dt.datetime | None = super().to_python(value)
+        return parsed.astimezone(dt.UTC) if parsed is not None else None
+
+
+class OperatorDateTimeBlock(blocks.DateTimeBlock):  # type: ignore[misc]
+    @cached_property
+    def field(self) -> forms.DateTimeField:
+        from wagtail.admin.widgets import AdminDateTimeInput
+
+        return OperatorDateTimeField(
+            widget=AdminDateTimeInput(format=self.format), **self.field_options
+        )
+
+
+def _default_link(value: blocks.StructValue, language: str) -> str:
+    """The public URL of the chosen product or category in `language`; "" when there is none
+    or it is not public."""
+    product: Product | None = value.get("product")
+    category: Category | None = value.get("category")
+    if product is not None:
+        shown = listed_products().filter(pk=product.pk).first()
+        url = product_cards([shown], language)[0].url if shown is not None else None
+        return url or ""
+    if category is not None:
+        return category_url(category, language) or ""
+    return ""
+
+
+class LaunchCountdownBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A launch: the date, the time left and a CTA before it, a text and a link from it on."""
+
+    target = OperatorDateTimeBlock(
+        label=_("Launch date and time"),
+        help_text=_("In the operator's time zone."),
+    )
+    heading = blocks.CharBlock(max_length=120)
+    body = blocks.TextBlock(required=False, max_length=400)
+    product = ProductChooserBlock(required=False)
+    category = CategoryChooserBlock(required=False)
+    cta_label = blocks.CharBlock(required=False, max_length=60, label=_("Button text"))
+    cta_link = blocks.URLBlock(
+        required=False,
+        label=_("Button link"),
+        help_text=_("Leave empty to link the chosen product or category."),
+    )
+    expired_text = blocks.CharBlock(
+        required=False,
+        max_length=120,
+        label=_("Text after the launch"),
+        help_text=_('Leave empty for "Available now".'),
+    )
+    expired_link = blocks.URLBlock(
+        required=False,
+        label=_("Link after the launch"),
+        help_text=_("Leave empty to link the chosen product or category."),
+    )
+
+    class Meta:
+        icon = "time"
+        label = _("Launch countdown")
+        template = "cms/blocks/countdown.html"
+
+    def clean(self, value: blocks.StructValue) -> blocks.StructValue:
+        value = super().clean(value)
+        chosen = value.get("product") is not None or value.get("category") is not None
+        if value.get("product") is not None and value.get("category") is not None:
+            raise StructBlockValidationError(
+                non_block_errors=[ValidationError(_("Choose a product or a category, not both."))]
+            )
+        if value.get("cta_label") and not value.get("cta_link") and not chosen:
+            raise StructBlockValidationError(
+                block_errors={
+                    "cta_link": ValidationError(_("Add a link, or choose a product or a category."))
+                }
+            )
+        return value
+
+    def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
+        context = super().get_context(value, parent_context=parent_context)
+        state = countdown_state(value["target"], timezone.now())
+        missing = not value.get("cta_link") or not value.get("expired_link")
+        default = _default_link(value, _page_language(parent_context)) if missing else ""
+        context.update(
+            state=state,
+            cta_url=value.get("cta_link") or default,
+            expired_url=value.get("expired_link") or default,
+            expired_text=value.get("expired_text") or _("Available now"),
+            time_zone=operator_time_zone(),
+        )
+        return context
+
+
+def countdown_targets(body: Iterable[Any]) -> list[dt.datetime]:
+    """The targets of the launch countdowns of a StreamField value."""
+    return [child.value["target"] for child in body if child.block_type == "countdown"]

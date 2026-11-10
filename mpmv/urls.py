@@ -1,7 +1,7 @@
 """Root URLconf.
 
 Operational routes (health check, email provider webhook, image files, staff admin, editors'
-admin, language switcher, API v1, MFA pages) have no language prefix.
+admin, language switcher, API v1, MFA pages, the Manager and its sign-in) have no language prefix.
 Public pages live in `i18n_patterns`: `/` is the primary language (EN), every other language in
 settings.LANGUAGES gets `/<code>/` (spec 09 §9.2, I18N.1). The catalog listings come first
 (CAT.8: category, `/{taxonomy}/{term}/`, brand and vendor storefront pages); Wagtail serves the
@@ -42,6 +42,8 @@ urlpatterns = [
     path("api/v1/", include("apps.api.urls")),
     path("account/mfa/", include("apps.accounts.urls")),
     path("account/link/", include("apps.accounts.action_link_urls")),  # CORE.15
+    path("account/", include("apps.manager.account_urls")),  # Manager sign-in (CORE.17)
+    path("manager/", include("apps.manager.urls")),  # the Manager's two spaces (CORE.17)
     path("vendor/claim/", include("apps.vendors.urls")),  # claim an imported vendor (VEN.24)
     path("geocoding/", include("apps.core.geocoding.urls")),  # "Find coordinates" (EVT.12)
     # Staff-only styleguide of the active theme (THM.4); a string, as no app imports themes.
