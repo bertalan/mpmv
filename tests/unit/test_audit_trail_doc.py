@@ -15,10 +15,13 @@ from typing import TypeGuard
 ROOT = Path(__file__).resolve().parents[2]
 DOC = (ROOT / "docs/dev/audit-trail.md").read_text().replace("`", "")
 ACTION = re.compile(r"^[a-z_]+(\.[a-z_]+)+$")
-PREFIXES = {
-    "accounts", "api", "auth", "catalog", "cms", "core", "events", "shipping",
-    "tax", "themes", "vendor", "vendors",
-}  # fmt: skip
+# Every app under apps/ is scanned, so a new app cannot be skipped. `vendor` (the singular used by
+# the vendors app's audit actions) and `auth` (Django groups) are the two prefixes that are not
+# apps.
+PREFIXES = {p.name for p in (ROOT / "apps").iterdir() if (p / "__init__.py").exists()} | {
+    "vendor",
+    "auth",
+}
 KEYWORDS = {"action", "created", "updated", "deleted"}
 
 
@@ -27,8 +30,10 @@ def _is_action(value: object) -> TypeGuard[str]:
 
 
 def _is_action_name(name: str) -> bool:
-    # Skips model labels (`..._MODEL`, `PAGE`) and permission codenames (`..._PERMISSION`).
-    return name.isupper() and "_" in name and not name.endswith(("MODEL", "PERMISSION"))
+    # Skips model labels (`..._MODEL`, `PAGE`), permission codenames (`..._PERMISSION`),
+    # session keys and email template names.
+    skipped = ("MODEL", "PERMISSION", "SESSION_KEY", "TEMPLATE")
+    return name.isupper() and "_" in name and not name.endswith(skipped)
 
 
 def _actions() -> set[str]:
@@ -37,8 +42,12 @@ def _actions() -> set[str]:
         if "tests" in path.parts or "migrations" in path.parts:
             continue
         for node in ast.walk(ast.parse(path.read_text())):
-            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant):
-                names = [t.id for t in node.targets if isinstance(t, ast.Name)]
+            if isinstance(node, ast.Assign | ast.AnnAssign) and isinstance(
+                node.value, ast.Constant
+            ):
+                # `X = "..."` and `X: Final = "..."` (the compliance app annotates its constants).
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                names = [t.id for t in targets if isinstance(t, ast.Name)]
                 if any(_is_action_name(n) for n in names) and _is_action(node.value.value):
                     found.add(node.value.value)
             elif isinstance(node, ast.Call) and getattr(node.func, "id", "") == "_record":
@@ -70,3 +79,7 @@ def test_every_audit_action_is_in_the_audit_trail_page() -> None:
 
 def test_the_scan_finds_actions() -> None:
     assert len(_actions()) > 40
+
+
+def test_every_app_is_scanned() -> None:
+    assert {"compliance", "ledger", "orders", "payments", "seo"} <= PREFIXES
