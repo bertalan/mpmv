@@ -616,12 +616,14 @@ class PlaceVendor:
     vendor: Vendor
     lines: Sequence[PlaceLine]
     shipping_net: Decimal = Decimal("0.00")
-    shipping_tax_rate: Decimal = Decimal("0")
-    shipping_tax_reason: str = ""
-    shipping_vat_nature_code: str = ""
+    shipping_tax: TaxOutcome | None = None  # from resolve_shipping_tax; required with shipping
     shipping_choice: dict[str, Any] = field(default_factory=dict)
     commission_snapshot: dict[str, Any] = field(default_factory=dict)
     tax_profile_snapshot: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.shipping_net > 0 and self.shipping_tax is None:
+            raise ValueError("shipping needs a tax decision (shipping_tax)")
 
 
 @dataclass(frozen=True)
@@ -657,6 +659,17 @@ class OrderRefused(Exception):
     def __init__(self, reasons: Sequence[Refusal]) -> None:
         self.reasons = list(reasons)
         super().__init__("; ".join(f"{r.code}: {r.detail}" for r in self.reasons))
+
+
+@dataclass(frozen=True)
+class _NoTax:
+    rate: Decimal = Decimal("0")
+    reason: str = ""
+    legal_note_key: str | None = None
+    nature_code: str | None = None
+
+
+_NO_TAX = _NoTax()
 
 
 def _stock_key(product: Product, variant: Variant | None) -> tuple[int, int | None]:
@@ -785,9 +798,11 @@ def place_order(
                     _line_input(entry, products[entry.product.pk], variants) for entry in item.lines
                 ],
                 shipping_net=item.shipping_net,
-                shipping_tax_rate=item.shipping_tax_rate,
-                shipping_tax_reason=item.shipping_tax_reason,
-                shipping_vat_nature_code=item.shipping_vat_nature_code,
+                shipping_tax_rate=item.shipping_tax.rate if item.shipping_tax else Decimal("0"),
+                shipping_tax_reason=_reason(item.shipping_tax),
+                shipping_vat_nature_code=(item.shipping_tax.nature_code or "")
+                if item.shipping_tax
+                else "",
                 shipping_choice=item.shipping_choice,
                 commission_snapshot=item.commission_snapshot,
                 tax_profile_snapshot=item.tax_profile_snapshot,
@@ -840,7 +855,6 @@ def _line_input(entry: PlaceLine, product: Product, variants: dict[int, Variant]
     )
     if unit_price is None:  # _verify refused anything not for sale
         raise OrderRefused([Refusal("unavailable", product.pk, "This item is not for sale.")])
-    reason = entry.tax.reason
     return LineInput(
         product=product,
         sku=variant.sku if variant is not None else product.sku,
@@ -849,8 +863,58 @@ def _line_input(entry: PlaceLine, product: Product, variants: dict[int, Variant]
         unit_price_net=unit_price,  # the live price, equal to the one the customer saw
         quantity=entry.quantity,
         tax_rate=entry.tax.rate,
-        tax_reason=str(getattr(reason, "value", reason)),
+        tax_reason=_reason(entry.tax),
         vat_nature_code=entry.tax.nature_code or "",  # from the decision, never from a caller
         discount_net=entry.discount_net,
         legal_note_key=entry.tax.legal_note_key or "",
     )
+
+
+def _reason(tax: TaxOutcome | None) -> str:
+    if tax is None:
+        return ""
+    return str(getattr(tax.reason, "value", tax.reason))
+
+
+def hold_stock(
+    cart: Cart,
+    product: Product,
+    variant: Variant | None,
+    quantity: int,
+    *,
+    now: dt.datetime | None = None,
+) -> StockReservation | None:
+    """Hold `quantity` units for a cart for ORDER_HOLD_MINUTES, replacing the cart's previous
+    hold on the same item. Takes the same row locks as `place_order`, so a hold and an order for
+    the last unit cannot both succeed. Raises `OrderRefused` (`out_of_stock`) when too few units
+    are free; returns None when the item has no stock limit."""
+    now = now or timezone.now()
+    with transaction.atomic():
+        products, variants = _lock_live_rows(
+            [PlaceLine(product, variant, quantity, "", Decimal("0"), _NO_TAX)]
+        )
+        live = products.get(product.pk)
+        live_variant = variants.get(variant.pk) if variant is not None else None
+        if live is None or (variant is not None and live_variant is None):
+            raise OrderRefused([Refusal("unavailable", product.pk, "This item no longer exists.")])
+        stock = live_variant if live_variant is not None else live
+        limit = cart_engine.available_quantity(
+            live.stock_policy, stock.stock_qty, stock.stock_status
+        )
+        if limit is None:
+            return None
+        key = _stock_key(live, live_variant)
+        free = max(0, limit - _held(key[0], key[1], now=now, cart=cart))
+        if quantity > free:
+            raise OrderRefused([Refusal("out_of_stock", live.pk, f"Only {free} available.")])
+        own = StockReservation.objects.filter(cart=cart, product_id=key[0])
+        (
+            own.filter(variant__isnull=True) if key[1] is None else own.filter(variant_id=key[1])
+        ).delete()
+        return StockReservation.objects.create(
+            product_id=key[0],
+            variant_id=key[1],
+            cart=cart,
+            quantity=quantity,
+            expires_at=now + dt.timedelta(minutes=int(getattr(settings, "ORDER_HOLD_MINUTES", 60))),
+        )

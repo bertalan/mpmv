@@ -27,6 +27,7 @@ from apps.orders.services import (
     OrderRefused,
     PlaceLine,
     PlaceVendor,
+    hold_stock,
     place_order,
 )
 from apps.vendors.models import Vendor
@@ -98,8 +99,7 @@ def vendor_of(product: Product, *lines: PlaceLine, **overrides: Any) -> PlaceVen
         "vendor": product.vendor,
         "lines": list(lines),
         "shipping_net": Decimal("5.00"),
-        "shipping_tax_rate": Decimal("22"),
-        "shipping_tax_reason": "domestic",
+        "shipping_tax": FakeTax(),
         "commission_snapshot": COMMISSION,
     }
     values.update(overrides)
@@ -369,8 +369,77 @@ def test_two_concurrent_orders_for_the_last_unit_one_wins() -> None:
         thread.start()
     for thread in threads:
         thread.join(timeout=60)
+    assert not any(thread.is_alive() for thread in threads)
     assert not errors
     assert sorted(outcomes) == ["out_of_stock", "placed"]
     assert Order.objects.count() == 1
     assert StockReservation.objects.filter(product=product).count() == 1
     assert services.peek_order_number()  # the loser's number went back to the pool
+
+
+@pytest.mark.django_db
+def test_a_cart_hold_counts_against_other_carts_and_replaces_its_own() -> None:
+    product = sellable(stock_qty=2)
+    mine, other = CartFactory.create(), CartFactory.create()
+    hold_stock(mine, product, None, 2, now=NOW)
+    hold_stock(mine, product, None, 1, now=NOW)  # replaces, not adds
+    assert StockReservation.objects.get(cart=mine).quantity == 1
+    with pytest.raises(OrderRefused) as refused:
+        hold_stock(other, product, None, 2, now=NOW)
+    assert refused.value.reasons[0].code == "out_of_stock"
+    hold_stock(other, product, None, 1, now=NOW)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_cart_hold_and_an_order_race_for_the_last_unit_one_wins() -> None:
+    product = sellable(stock_qty=1)
+    cart = CartFactory.create()
+    barrier = threading.Barrier(2)
+    outcomes: list[str] = []
+    errors: list[BaseException] = []
+
+    def attempt(action: Any) -> None:
+        try:
+            barrier.wait(timeout=10)
+            try:
+                action()
+                outcomes.append("ok")
+            except OrderRefused as refused:
+                outcomes.append(refused.reasons[0].code)
+        except BaseException as exc:
+            errors.append(exc)
+        finally:
+            connection.close()
+
+    wanted = preview(vendor_of(product, line(product)))
+    threads = [
+        threading.Thread(target=attempt, args=(lambda: hold_stock(cart, product, None, 1),)),
+        threading.Thread(target=attempt, args=(lambda: place_order(wanted, ctx=CTX),)),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=60)
+    assert not any(thread.is_alive() for thread in threads)
+    assert not errors
+    assert sorted(outcomes) == ["ok", "out_of_stock"]
+    assert StockReservation.objects.filter(product=product).count() == 1
+
+
+@pytest.mark.django_db
+def test_the_shipping_tax_comes_from_a_tax_outcome_not_typed_fields() -> None:
+    assert not {"shipping_tax_rate", "shipping_tax_reason", "shipping_vat_nature_code"} & {
+        f.name for f in dataclasses.fields(PlaceVendor)
+    }
+    product = sellable()
+    exempt = FakeTax(rate=Decimal("0"), reason="export", nature_code="N3.2")
+    order, _ = place_order(
+        preview(vendor_of(product, line(product), shipping_tax=exempt)), ctx=CTX, now=NOW
+    )
+    assert order is not None
+    sub = order.vendor_orders.get()
+    assert (sub.shipping_tax_rate, sub.shipping_tax_reason, sub.shipping_vat_nature_code) == (
+        Decimal("0"),
+        "export",
+        "N3.2",
+    )
