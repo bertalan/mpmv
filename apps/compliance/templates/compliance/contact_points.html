@@ -1,0 +1,31 @@
+{% extends "layouts/content.html" %}
+{% load i18n %}
+{% block page_content %}
+  <article class="legal-page contact-points">
+    <h1>{% translate "Points of contact" %}</h1>
+    <p>{% blocktranslate trimmed with name=points.legal_name %}Operated by {{ name }}.{% endblocktranslate %}</p>
+
+    <section aria-labelledby="contact-authorities">
+      <h2 id="contact-authorities">{% translate "For authorities" %}</h2>
+      {% if points.authority_email %}
+        <p><a href="mailto:{{ points.authority_email }}">{{ points.authority_email }}</a></p>
+      {% endif %}
+      {% if authority_languages %}
+        <p>{% translate "Languages:" %} {{ authority_languages|join:", " }}</p>
+      {% endif %}
+    </section>
+
+    <section aria-labelledby="contact-users">
+      <h2 id="contact-users">{% translate "For users of the service" %}</h2>
+      {% if points.user_email %}
+        <p><a href="mailto:{{ points.user_email }}">{{ points.user_email }}</a></p>
+      {% endif %}
+      {% if points.user_url %}
+        <p><a class="contact-form" href="{{ points.user_url }}" rel="noopener">{% translate "Contact form" %}</a></p>
+      {% endif %}
+      {% if user_languages %}
+        <p>{% translate "Languages:" %} {{ user_languages|join:", " }}</p>
+      {% endif %}
+    </section>
+  </article>
+{% endblock %}

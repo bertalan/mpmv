@@ -4,6 +4,7 @@ licence allow list, the transactional email outbox."""
 
 import json
 import posixpath
+import re
 import uuid
 from typing import Any, ClassVar, Self
 
@@ -320,6 +321,12 @@ def valid_period_check(name: str) -> models.CheckConstraint:
     )
 
 
+def validate_language_code(value: str) -> None:
+    """A lowercase ISO 639 code, optionally with a region (`de`, `nl`, `pt-br`)."""
+    if not re.fullmatch(r"[a-z]{2,3}(-[a-z]{2,4})?", value):
+        raise ValidationError(f"{value!r} is not a language code.")
+
+
 class PlatformOperator(Versioned):
     """The legal entity running the marketplace, as versioned configuration (ARC.7).
 
@@ -358,6 +365,33 @@ class PlatformOperator(Versioned):
     compliance_email = models.EmailField(
         blank=True,
         help_text="Where compliance alerts go. Empty: the support address.",
+    )
+    # CMP.5 (DSA articles 11 and 12): the single point of contact for authorities and the means
+    # for recipients of the service, published on the public contact page. Recipients reach the
+    # platform at `support_email` and, optionally, at a contact form (`user_contact_url`).
+    authority_contact_email = models.EmailField(
+        "authorities' contact email",
+        blank=True,
+        help_text="DSA article 11: single point of contact for authorities.",
+    )
+    authority_contact_languages = ArrayField(
+        models.CharField(max_length=8, validators=[validate_language_code]),
+        default=list,
+        blank=True,
+        verbose_name="authorities' contact languages",
+        help_text="Language codes: an official language, and one widely understood.",
+    )
+    user_contact_url = models.URLField(
+        "users' contact form URL",
+        blank=True,
+        help_text="DSA article 12: optional electronic form next to the support email.",
+    )
+    user_contact_languages = ArrayField(
+        models.CharField(max_length=8, validators=[validate_language_code]),
+        default=list,
+        blank=True,
+        verbose_name="users' contact languages",
+        help_text="Language codes the support team answers in.",
     )
     # D-21, CMP.13: changed only by a platform owner through
     # `apps.core.services.set_allowed_vendor_countries`; other new versions carry it over.

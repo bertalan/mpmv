@@ -33,6 +33,7 @@ from django.utils.translation import get_language_info
 from django.utils.translation import gettext_lazy as _
 
 from apps.catalog.models import Product, ProductStatus
+from apps.cms.models import LegalPage
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.countries import OFFICIAL_LANGUAGES, InvalidCountry, normalize_country
@@ -932,3 +933,77 @@ def flag_published_products_failing_gpsr(
         idempotency_key=f"compliance:gpsr_published_incomplete:{_business_date(moment).isoformat()}",
     )
     return rows
+
+
+# --- DSA points of contact, platform terms and ranking page (CMP.5 part 1)
+
+
+@dataclass(frozen=True)
+class ContactPoints:
+    """What the public contact page shows (DSA articles 11 and 12), from the platform operator."""
+
+    legal_name: str
+    authority_email: str
+    authority_languages: tuple[str, ...]
+    user_email: str
+    user_url: str
+    user_languages: tuple[str, ...]
+
+
+def contact_points(at: dt.datetime | None = None) -> ContactPoints:
+    """The operator's points of contact valid at `at` (default now); `NoPlatformOperator` when
+    there is none. The data is staff configuration (`configure_platform_operator`), audited."""
+    operator = current_operator(at)
+    return ContactPoints(
+        legal_name=operator.legal_name,
+        authority_email=operator.authority_contact_email,
+        authority_languages=tuple(operator.authority_contact_languages),
+        user_email=operator.support_email,
+        user_url=operator.user_contact_url,
+        user_languages=tuple(operator.user_contact_languages),
+    )
+
+
+def language_name(code: str) -> str:
+    """A language's name in its own language; the code itself for one Django does not know."""
+    try:
+        return str(get_language_info(code)["name_local"]).capitalize()
+    except KeyError:
+        return code
+
+
+def dsa_p2b_readiness(languages: Iterable[str] | None = None) -> list[engine.DsaProblem]:
+    """What stops go-live on the DSA and P2B duties of part 1: the operator's contact data,
+    and per language one published platform terms page and one ranking page, each carrying its
+    required sections (a section tag with a heading and a text). No EN fallback: each language
+    stands on its own, like the customer legal pages (Q-42)."""
+    try:
+        operator = current_operator()
+    except NoPlatformOperator:
+        return [engine.DsaProblem("operator_missing")]
+    problems = engine.contact_problems(
+        country=str(operator.country),
+        authority_email=operator.authority_contact_email,
+        authority_languages=operator.authority_contact_languages,
+        support_email=operator.support_email,
+    )
+    pages = (
+        LegalPage.objects.live()
+        .filter(kind__in=engine.REQUIRED_SECTIONS, alias_of__isnull=True)
+        .select_related("locale")
+    )
+    sections: dict[tuple[str, str], set[str]] = {}
+    for page in pages:
+        found = sections.setdefault((page.kind, page.locale.language_code), set())
+        found.update(
+            block.value["section"]
+            for block in page.body
+            if block.block_type == "legal_section" and str(block.value["text"]).strip()
+        )
+    for language in languages or configured_languages():
+        for kind in engine.REQUIRED_SECTIONS:
+            if (kind, language) not in sections:
+                problems.append(engine.page_problem(kind, language))
+            else:
+                problems.extend(engine.section_problems(kind, language, sections[kind, language]))
+    return problems

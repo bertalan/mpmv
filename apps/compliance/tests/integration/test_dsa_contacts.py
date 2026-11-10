@@ -3,6 +3,7 @@ contact page, the platform terms and ranking pages (DSA art. 14, P2B art. 5) and
 report."""
 
 import datetime as dt
+from collections.abc import Sequence
 
 import pytest
 from django.core.exceptions import ValidationError
@@ -14,9 +15,9 @@ from django.utils import timezone
 
 from apps.cms.models import LegalPage
 from apps.cms.tests.factories import LegalPageFactory
-from apps.compliance import services
+from apps.compliance import engine, services
 from apps.core.audit import AuditContext
-from apps.core.models import AuditLog
+from apps.core.models import AuditLog, PlatformOperator
 from apps.core.services import configure_platform_operator
 from apps.core.tests.factories import PlatformOperatorFactory
 
@@ -25,7 +26,7 @@ pytestmark = pytest.mark.django_db
 CTX = AuditContext(actor_id=1, actor_label="staff:ops", source="admin", ip="127.0.0.1")
 
 
-def operator(**extra: object) -> object:
+def operator(**extra: object) -> PlatformOperator:
     values: dict[str, object] = {
         "open_ended": True,
         "valid_from": timezone.now() - dt.timedelta(days=1),
@@ -72,6 +73,7 @@ def test_contact_data_changes_through_an_audited_new_version() -> None:
     )
     configure_platform_operator(new, ctx=CTX)
     entry = AuditLog.objects.filter(target_key=str(new.public_id)).get()
+    assert entry.after is not None
     assert entry.after["authority_contact_email"] == "new-authority@example.com"
     assert entry.after["authority_contact_languages"] == ["de", "en"]
     assert old.pk != new.pk
@@ -122,8 +124,8 @@ def full_pages(languages: list[str] | None = None) -> None:
     publish("ranking", "ranking_parameters")
 
 
-def codes(problems: list[object]) -> list[str]:
-    return [p.code for p in problems]  # type: ignore[attr-defined]
+def codes(problems: Sequence[engine.DsaProblem]) -> list[str]:
+    return [p.code for p in problems]
 
 
 def test_readiness_is_clean_with_contacts_and_both_pages() -> None:

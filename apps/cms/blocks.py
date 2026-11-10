@@ -219,6 +219,34 @@ class CallToActionBlock(blocks.StructBlock):  # type: ignore[misc]
         template = "cms/blocks/cta.html"
 
 
+# The required sections of the legal texts that DSA and P2B prescribe (CMP.5): an editor tags a
+# section so that the compliance readiness check finds it, whatever the heading says or the
+# language. The wording is the editor's; code never writes legal text.
+LEGAL_SECTIONS: tuple[tuple[str, Any], ...] = (
+    ("restrictions", _("Restrictions: what the platform may restrict, and why")),
+    ("moderation_policy", _("Content moderation policy and procedures")),
+    ("ranking_parameters", _("Ranking: main parameters and their relative importance")),
+    ("differentiated_treatment", _("Differentiated treatment of vendors")),
+    ("data_access", _("Access to data")),
+    ("termination", _("Suspension and termination")),
+)
+
+
+class LegalSectionBlock(blocks.StructBlock):  # type: ignore[misc]
+    """A section of a legal text that a regulation requires (DSA article 14, P2B articles 5, 7
+    and 9). The `section` tag is what `apps.compliance` checks for; the heading and the text are
+    written (and translated) by the editor."""
+
+    section = blocks.ChoiceBlock(choices=list(LEGAL_SECTIONS), label=_("Required section"))
+    heading = blocks.CharBlock(max_length=160)
+    text = blocks.RichTextBlock(features=RICH_TEXT_FEATURES)
+
+    class Meta:
+        icon = "doc-full"
+        label = _("Required section")
+        template = "cms/blocks/legal_section.html"
+
+
 class FaqItemBlock(blocks.StructBlock):  # type: ignore[misc]
     question = blocks.CharBlock(max_length=250)
     answer = blocks.RichTextBlock(features=RICH_TEXT_FEATURES)

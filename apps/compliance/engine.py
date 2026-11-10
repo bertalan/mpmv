@@ -24,7 +24,12 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Final
 
-from apps.core.countries import EU_MEMBER_STATES, InvalidCountry, normalize_country
+from apps.core.countries import (
+    EU_MEMBER_STATES,
+    OFFICIAL_LANGUAGES,
+    InvalidCountry,
+    normalize_country,
+)
 
 MANUFACTURER_FIELDS: Final = (
     "manufacturer_name",
@@ -247,3 +252,69 @@ def warnings_language_gaps(
         if not check.allowed:
             gaps[country] = check.country_languages
     return gaps
+
+
+# --- DSA points of contact and required legal sections (CMP.5, spec 11)
+
+# What each regulation-driven legal page must contain: the `section` tags of the CMS
+# `LegalSectionBlock`. DSA article 14 (restrictions and moderation policy in the terms) and P2B
+# article 5 (ranking parameters). The wording is the editor's; code only checks the tags.
+REQUIRED_SECTIONS: Final[Mapping[str, tuple[str, ...]]] = {
+    "platform_terms": ("restrictions", "moderation_policy"),
+    "ranking": ("ranking_parameters",),
+}
+# A language that counts as broadly understood in the Union for DSA article 11(2).
+WIDELY_UNDERSTOOD_LANGUAGE: Final = "en"
+
+
+@dataclass(frozen=True)
+class DsaProblem:
+    """One thing that stops the DSA and P2B duties of part 1 from being met."""
+
+    code: str
+    subject: str = ""
+
+    @property
+    def message(self) -> str:
+        return f"{self.code}: {self.subject}" if self.subject else self.code
+
+
+def contact_problems(
+    *,
+    country: str,
+    authority_email: str,
+    authority_languages: Iterable[str],
+    support_email: str,
+) -> list[DsaProblem]:
+    """DSA articles 11 and 12 on the operator's data: an authorities' address, the languages it
+    can be used in (an official language of the Member State of establishment, plus one broadly
+    understood in the Union, article 11(2)), and an address for recipients (article 12)."""
+    problems: list[DsaProblem] = []
+    languages = {code.lower() for code in authority_languages}
+    if not authority_email:
+        problems.append(DsaProblem("authority_email"))
+    if not languages:
+        problems.append(DsaProblem("authority_languages"))
+    else:
+        official = set(OFFICIAL_LANGUAGES.get(country.upper(), ()))
+        if official and not official & languages:
+            problems.append(DsaProblem("authority_official_language", country.upper()))
+        elif len(languages) < 2 and WIDELY_UNDERSTOOD_LANGUAGE not in languages:
+            problems.append(DsaProblem("authority_widely_understood_language"))
+    if not support_email:
+        problems.append(DsaProblem("support_email"))
+    return problems
+
+
+def page_problem(kind: str, language: str) -> DsaProblem:
+    return DsaProblem("page_missing", f"{kind} [{language}]: no published page")
+
+
+def section_problems(kind: str, language: str, sections: Iterable[str]) -> list[DsaProblem]:
+    """The required sections of `kind` that a published page in `language` does not carry."""
+    present = set(sections)
+    return [
+        DsaProblem("section_missing", f"{kind} [{language}]: {section}")
+        for section in REQUIRED_SECTIONS.get(kind, ())
+        if section not in present
+    ]
