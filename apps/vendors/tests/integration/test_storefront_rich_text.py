@@ -182,8 +182,8 @@ def test_the_data_migration_converts_plain_text_and_is_idempotent() -> None:
     from django.db import connection
     from django.db.migrations.executor import MigrationExecutor
 
-    before = [("vendors", "0024_vendor_application")]
-    after = [("vendors", "0025_storefront_rich_text")]
+    before = [("vendors", "0025_vendor_logo")]
+    after = [("vendors", "0026_storefront_rich_text")]
     executor = MigrationExecutor(connection)
     executor.migrate(before)
     old = executor.loader.project_state(before).apps
@@ -224,7 +224,7 @@ def test_the_data_migration_converts_plain_text_and_is_idempotent() -> None:
 
     from django.apps import apps as live
 
-    module = importlib.import_module("apps.vendors.migrations.0025_storefront_rich_text")
+    module = importlib.import_module("apps.vendors.migrations.0026_storefront_rich_text")
     module.to_rich_text(live, None)
     again = VendorTranslation.objects.get(pk=en.pk)
     assert (again.description, again.shipping_policy, again.cancellation_policy) == (

@@ -156,6 +156,24 @@ class Vendor(BaseModel):
     legacy_wp_user_id = models.PositiveBigIntegerField(
         null=True, blank=True, unique=True, help_text="Vendor user id in the legacy system."
     )
+    # The storefront logo (CORE.9 part 2b). Written only by `services.set_vendor_logo` and
+    # `remove_vendor_logo` (owner, audited), which store the image in the vendor's own Wagtail
+    # collection `vendor-<public id>` through the SEC.2 upload checks.
+    logo = models.ForeignKey(
+        "core.MediaImage",
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="The vendor's logo; set by the owner in the Manager.",
+    )
+    logo_alt = models.CharField(
+        max_length=125,
+        blank=True,
+        editable=False,
+        help_text="Plain-text description of the logo for screen readers.",
+    )
 
     # --- Legal and e-invoicing identity (VEN.12). Every field is optional while the profile is
     # edited; `LegalFieldRequirement` says which ones a payout needs. Values that are present

@@ -47,7 +47,7 @@ def to_rich_text(apps, schema_editor):  # type: ignore[no-untyped-def]
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("vendors", "0024_vendor_application"),
+        ("vendors", "0025_vendor_logo"),
     ]
 
     operations = [

@@ -14,14 +14,17 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Page, expect
 from pytest_django.live_server_helper import LiveServer
+from wagtail.models import Collection
 
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import totp_token
 from apps.catalog.tests.factories import ProductFactory
+from apps.core.tests.factories import ImageLicenceFactory
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 from tests.e2e.axe import format_violations, run_axe
 from tests.e2e.csp import RECORD_CSP_VIOLATIONS, csp_violations
 from tests.e2e.login import verify_with_totp
+from tests.upload_corpus import png
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -139,6 +142,11 @@ def test_the_owner_edits_the_storefront_profile_and_staff_cannot(
     device = TOTPDeviceFactory.create(user=owner)
     shop = VendorFactory.create(display_name="Shop West", status="active")
     VendorMemberFactory.create(vendor=shop, user=owner, role="owner")
+    # Transactional tests flush the seeded allow list and the root collection: put back what the
+    # logo upload uses.
+    ImageLicenceFactory.create(code="own-work", name="Own work", source_required=False)
+    if Collection.get_first_root_node() is None:
+        Collection.add_root(name="Root")
     page.add_init_script(RECORD_CSP_VIOLATIONS)
 
     _login(page, live_server.url, "owner@example.com", password)
@@ -154,7 +162,7 @@ def test_the_owner_edits_the_storefront_profile_and_staff_cannot(
     # The browser stops typing at the limit; drop it to reach the server-side check.
     page.get_by_label("Tagline").evaluate("el => el.removeAttribute('maxlength')")
     page.get_by_label("Tagline").fill("x" * 201)
-    page.get_by_role("button", name="Save").click()
+    page.get_by_role("button", name="Save", exact=True).click()
     expect(page.get_by_role("region", name="There is a problem")).to_be_visible()
     expect(page.get_by_label("Tagline")).to_have_attribute("aria-invalid", "true")
     _accessible(page, editor=True)
@@ -172,7 +180,7 @@ def test_the_owner_edits_the_storefront_profile_and_staff_cannot(
     shot("profile-rich-text")
     # Draftail copies its content into the hidden input a moment after the last key.
     expect(page.locator("#id_refund_policy")).to_have_value(re.compile("30 days"))
-    page.get_by_role("button", name="Save").click()
+    page.get_by_role("button", name="Save", exact=True).click()
     expect(page.get_by_text("Storefront profile saved.")).to_be_visible()
     expect(page.get_by_label("Tagline")).to_have_value("Hand made in the west")
     _accessible(page, editor=True)
@@ -182,6 +190,21 @@ def test_the_owner_edits_the_storefront_profile_and_staff_cannot(
     expect(page.locator(".vendor-profile strong, .vendor-profile b").first).to_have_text("30 days")
     page.get_by_text("Returns and refunds").click()  # open the accordion item
     shot("vendor-page-formatted-policy")
+
+    page.get_by_role("button", name="Save logo").click()
+    expect(page.get_by_role("region", name="There is a problem")).to_be_visible()
+    _accessible(page, editor=True)
+    shot("logo-error")
+
+    page.get_by_label("Logo image").set_input_files(
+        {"name": "logo.png", "mimeType": "image/png", "buffer": png((64, 48))}
+    )
+    page.get_by_label("Description of the logo").fill("Shop West anvil mark")
+    page.get_by_role("button", name="Save logo").click()
+    expect(page.get_by_text("Logo saved.")).to_be_visible()
+    expect(page.get_by_role("img", name="Shop West anvil mark")).to_be_visible()
+    _accessible(page, editor=True)
+    shot("logo-saved")
 
 
 def test_vendor_staff_have_no_storefront_profile(page: Page, live_server: LiveServer) -> None:

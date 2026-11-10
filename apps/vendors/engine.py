@@ -1860,3 +1860,19 @@ def profile_text_errors(values: Mapping[str, str]) -> dict[str, str]:
         elif name not in RICH_TEXT_FIELDS and _HTML_MARKUP.search(value):
             errors[name] = "Write plain text: HTML tags are not accepted."
     return errors
+
+
+LOGO_ALT_MAX_LENGTH: Final = 125
+
+
+def logo_alt_errors(alt: str) -> str | None:
+    """Why this logo description is refused, or None: required, short, plain text."""
+    if not alt.strip():
+        return "Describe the logo for people who cannot see it."
+    if len(alt) > LOGO_ALT_MAX_LENGTH:
+        return f"At most {LOGO_ALT_MAX_LENGTH} characters (now {len(alt)})."
+    if _CONTROL.search(alt):
+        return "Remove the control characters."
+    if _HTML_MARKUP.search(alt):
+        return "Write plain text: HTML tags are not accepted."
+    return None
