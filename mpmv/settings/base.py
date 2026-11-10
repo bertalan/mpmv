@@ -165,6 +165,10 @@ ACTION_LINK_RATE_LIMIT = 30
 VENDOR_CLAIM_LINK_MAX_AGE = 72 * 3600  # seconds
 VENDOR_CLAIM_MAX_FAILURES = 5
 VENDOR_CLAIM_RATE_LIMIT = 20
+# Public "Sell with us" application (VEN.22): validity of the email confirmation link, and
+# confirm-page POSTs allowed per IP every 15 minutes (the form uses the registration limit).
+VENDOR_APPLICATION_LINK_MAX_AGE = 72 * 3600  # seconds
+VENDOR_APPLICATION_RATE_LIMIT = 20
 MFA_ISSUER = "MPMV"  # name shown in authenticator apps and passkey prompts
 OTP_TOTP_ISSUER = MFA_ISSUER
 OTP_ADMIN_HIDE_SENSITIVE_DATA = True

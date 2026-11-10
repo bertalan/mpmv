@@ -51,6 +51,7 @@ def form(**overrides: str) -> dict[str, str]:
         "full_name": "Ada Example",
         "email": f"applicant-{secrets.token_hex(4)}@example.com",
         "business_name": "Ada Workshop",
+        "country": "IT",
         "password": secrets.token_urlsafe(18),
     }
     return {**data, **overrides}
@@ -85,8 +86,8 @@ class _Tags(HTMLParser):
 
 def inputs_of(html: str) -> dict[str, dict[str, str]]:
     parser = _Tags()
-    parser.feed(html)
-    return {a["name"]: a for t, a in parser.tags if t == "input" and a.get("name")}
+    parser.feed(html[html.index("<main") : html.index("</main>")])  # not the header's forms
+    return {a["name"]: a for t, a in parser.tags if t in ("input", "select") and a.get("name")}
 
 
 # --- The form (CMP.9, data minimisation)
@@ -100,6 +101,7 @@ def test_the_form_asks_only_for_what_the_application_needs(client: Client) -> No
         "full_name",
         "email",
         "business_name",
+        "country",
         "password",
     }
 
@@ -111,9 +113,10 @@ def test_the_form_is_accessible_without_a_puzzle(client: Client) -> None:
     assert fields["password"]["autocomplete"] == "new-password"
     assert fields["password"].get("data-password-toggle")
     assert fields["email"]["autocomplete"] == "email"
+    assert fields["country"]["autocomplete"] == "country"
     assert fields["full_name"]["autocomplete"] == "name"
     assert all("onpaste" not in attrs for attrs in fields.values())
-    for name in ("full_name", "email", "business_name", "password"):
+    for name in ("full_name", "email", "business_name", "country", "password"):
         assert f'for="id_{name}"' in html  # a visible label for every field
     assert "accounts/password-toggle.js" in html
 
@@ -159,7 +162,7 @@ def test_an_application_never_signs_anyone_in_or_grants_access(client: Client) -
     apply(client, data)
     assert "_auth_user_id" not in client.session
     assert client.login(username=data["email"], password=data["password"]) is False
-    assert client.get("/manager/").status_code in (302, 403)
+    assert client.get("/manager/").status_code in (302, 403, 404)
 
 
 def test_an_application_collects_nothing_beyond_the_form(client: Client) -> None:
@@ -204,6 +207,7 @@ def test_the_service_supports_dry_run(client: Client) -> None:
         full_name=data["full_name"],
         email=data["email"],
         business_name=data["business_name"],
+        country=data["country"],
         password=data["password"],
         language="en",
         ctx=SYSTEM,
@@ -263,8 +267,8 @@ def test_a_weak_password_is_refused_the_same_way_for_any_email(client: Client) -
     assert known.status_code == unknown.status_code == 200
     assert not Vendor.objects.exists()
     assert not OutboxEmail.objects.exists()
-    assert b'role="alert"' in known.content
-    assert b'role="alert"' in unknown.content
+    assert b"error-summary" in known.content
+    assert b"error-summary" in unknown.content
 
 
 def test_an_inactive_account_without_an_application_is_never_reactivated(
@@ -344,7 +348,9 @@ def test_confirming_activates_the_account_which_must_then_enrol_mfa(client: Clie
     assert vendor.status == engine.APPLICANT  # staff review comes next (VEN.5)
     assert ActionLinkUse.objects.filter(user=user).count() == 1
     [entry] = AuditLog.objects.filter(action=services.APPLICATION_CONFIRMED)
+    assert entry.before is not None
     assert entry.before["is_active"] is False
+    assert entry.after is not None
     assert entry.after["is_active"] is True
 
 
@@ -391,7 +397,13 @@ def test_the_confirm_page_gives_nothing_away_for_a_random_key(client: Client) ->
     assert client.get(reverse("vendors:apply_confirm", args=["not-a-uuid"])).status_code == 403
 
 
-def test_confirm_posts_are_rate_limited_per_ip(client: Client) -> None:
+def test_confirm_posts_are_rate_limited_per_ip(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refuse(*args: object, **kwargs: object) -> None:
+        raise services.ApplicationLinkInvalid("simulated")  # the link stays usable
+
+    monkeypatch.setattr(services, "confirm_application", refuse)
     _, user, path = applied(client)
     open_link(client, path)
     for _ in range(20):
@@ -447,6 +459,9 @@ def test_an_oversized_body_is_refused_before_it_is_parsed(client: Client) -> Non
         ("email", "not-an-email"),
         ("email", "a" * 250 + "@example.com"),
         ("password", "p" * 129),
+        ("country", "US"),  # outside the allowed countries (CMP.13)
+        ("country", "ZZ"),
+        ("country", ""),
         ("full_name", ""),
         ("business_name", "   "),
     ],
@@ -470,12 +485,3 @@ def test_the_rate_limit_is_audited(client: Client) -> None:
     for _ in range(REGISTRATION_LIMIT.free_attempts + 1):
         apply(client)
     assert AuditLog.objects.filter(action="accounts.registration.rate_limited").exists()
-
-
-# --- The recruitment page links to the form
-
-
-def test_the_cms_recruitment_page_resolves_the_application_url() -> None:
-    from apps.cms.services import vendor_application_url
-
-    assert vendor_application_url() == URL

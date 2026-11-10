@@ -1,0 +1,14 @@
+{% extends "layouts/base.html" %}
+{% load i18n %}
+{% block title %}{% translate "Confirm your email" %} · {{ site_name }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block content %}
+<article class="apply">
+  <h1>{% translate "Confirm your email address" %}</h1>
+  <p>{% translate "Confirm to activate your account. You then sign in with the password you chose and set up an authenticator app. Our team reviews your application afterwards." %}</p>
+  <form method="post">
+    {% csrf_token %}
+    {% include "components/button.html" with label=_("Confirm my email") type="submit" only %}
+  </form>
+</article>
+{% endblock %}

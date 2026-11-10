@@ -135,6 +135,13 @@ def payout_eligibility(vendor) -> Eligibility               # DAC7 complete, acc
    registered office nor a permanent establishment is in the allowed countries of the
    `PlatformOperator`, the EU-27 at go-live (CMP.13, D-21). Every step is recorded in `AuditLog`.
    The public "Sell with us" page creates the applicant's account and the application (VEN.22).
+   Implementation (VEN.22): `/vendor/apply/` asks for the name, email, business name, country of
+   establishment (among the allowed countries) and a password, behind the per-IP registration
+   limit, Turnstile and a body-size cap. The account is created inactive with an `applicant`
+   vendor it owns; only the emailed single-use link (CORE.15, email-bound) activates it, and it
+   never signs anyone in. An address that already has an account gets the same answer and a
+   notice by email with no link, so the form never reveals accounts and an application never
+   changes one. MFA is enrolled at first login (CORE.4, vendor members).
    Missing DAC7 or payout data never block activation: they block payouts only (owner decision
    Q-56, confirming the current `onboarding_checklist` in `apps/vendors/engine.py` and
    `assert_payout_allowed`, VEN.12).

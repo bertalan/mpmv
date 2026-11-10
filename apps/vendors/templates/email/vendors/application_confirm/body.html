@@ -1,0 +1,8 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate %}Thank you for applying to sell with us with {{ business_name }}. To activate your account, open this link and confirm your email address.{% endblocktranslate %}</p>
+<p><a href="{{ action_url }}">{% translate "Confirm my email address" %}</a></p>
+<p>{% blocktranslate with expires=action_link_expires_at %}The link works once and expires on {{ expires }} (UTC). Our team reviews your application afterwards. If you did not apply, ignore this email: nothing happens without the link.{% endblocktranslate %}</p>
+</body>
+</html>

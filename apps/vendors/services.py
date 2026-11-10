@@ -6,6 +6,7 @@ gate of CMP.13); per-vendor feature flag overrides (ARC.8); claiming an imported
 
 import dataclasses
 import datetime as dt
+import hashlib
 import logging
 from collections.abc import Callable, Collection, Mapping
 from typing import Any
@@ -16,7 +17,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.sessions.backends.base import SessionBase
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import connection, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import OuterRef, QuerySet, Subquery
 from django.urls import reverse
 from django.utils import timezone
@@ -44,6 +45,7 @@ from apps.core.services import (
     allowed_vendor_countries,
     audit_changes,
     consume_rate_limit,
+    enqueue_email,
     flags_changed,
     run_mutation,
     save_audited,
@@ -714,7 +716,12 @@ CONTRACT_ACCEPTED = "vendor.contract_accepted"
 
 
 def submit_application(
-    vendor: Vendor, applicant: User, *, ctx: AuditContext, dry_run: bool = False
+    vendor: Vendor,
+    applicant: User,
+    *,
+    ctx: AuditContext,
+    dry_run: bool = False,
+    pending_confirmation: bool = False,
 ) -> ChangeSet:
     """Create `vendor` (new, unsaved) as an applicant with `applicant` as its owner; audited.
 
@@ -722,11 +729,12 @@ def submit_application(
     incomplete. The VIES result and the legacy user id are reset: only the VIES check and the
     legacy migration set them. Being an owner, the applicant must enrol a second factor (CORE.4).
     Raises `ValidationError`, or `ValueError` for a saved vendor or an inactive user, also on
-    dry-run.
+    dry-run. `pending_confirmation` (the public application, VEN.22) accepts the inactive account
+    of an applicant who has yet to confirm the email address.
     """
     if not vendor._state.adding:
         raise ValueError("submit_application takes a new vendor, not a saved one")
-    if not applicant.is_active:
+    if not applicant.is_active and not pending_confirmation:
         raise ValueError("only an active user can apply as a vendor")
     vendor.status = engine.APPLICANT
     # Set by the VIES check and the legacy migration, never by an applicant.
@@ -1677,3 +1685,224 @@ def reject_claim(
         reviewed_claimant_id=reviewed_claimant_id,
         dry_run=dry_run,
     )
+
+
+# --- Public "Sell with us" application (VEN.22, owner decision Q-55)
+
+APPLICATION_PURPOSE = "vendors.application"
+APPLICATION_CONFIRM_TEMPLATE = "vendors.application_confirm"
+APPLICATION_EXISTS_TEMPLATE = "vendors.application_exists"
+APPLICATION_CONFIRMED = "vendor.application_confirmed"
+APPLICATION_DUPLICATE = "vendor.application_duplicate"
+APPLICATION_LINK_VERSION = "1"
+APPLICATION_RATE_WINDOW = dt.timedelta(minutes=15)
+
+
+class ApplicationLinkInvalid(ValueError):
+    """The confirmation link is spent, expired, or no longer names a pending application."""
+
+
+def _pending_applicant(key: str) -> User | None:
+    """The inactive account of an application waiting for its email confirmation, by public id.
+
+    Pending means: inactive, never signed in, and the owner of an applicant vendor. Anything
+    else (an account staff blocked, a rejected application) is never reactivated by a link."""
+    try:
+        user = User.objects.filter(public_id=key).first()
+    except ValidationError:  # not a UUID
+        return None
+    if user is None or user.is_active or user.last_login is not None:
+        return None
+    owns_applicant = VendorMember.objects.filter(
+        user=user, role=engine.OWNER, vendor__status=engine.APPLICANT
+    ).exists()
+    return user if owns_applicant else None
+
+
+def _application_version(object_key: str) -> str | None:
+    return APPLICATION_LINK_VERSION if _pending_applicant(object_key) else None
+
+
+def _application_email_of(object_key: str) -> str | None:
+    user = _pending_applicant(object_key)
+    return user.email if user else None
+
+
+def application_path(object_key: str) -> str:
+    return reverse("vendors:apply_confirm", args=[object_key])
+
+
+def register_application_purpose() -> None:
+    """Register the email-bound confirmation link with the CORE.15 action links."""
+    register_action_purpose(
+        ActionPurpose(
+            name=APPLICATION_PURPOSE,
+            version_of=_application_version,
+            url_of=application_path,
+            email_of=_application_email_of,
+            max_age=settings.VENDOR_APPLICATION_LINK_MAX_AGE,
+        )
+    )
+
+
+def application_link(session: SessionBase, object_key: str) -> ActionLinkCheck:
+    """The confirmation link opened in this session for the account `object_key`."""
+    return email_bound_link(session, APPLICATION_PURPOSE, object_key)
+
+
+def application_retry_after(ip: str | None) -> dt.timedelta:
+    """Count one confirm-page POST from `ip`; zero when allowed, else the wait (Retry-After)."""
+    return consume_rate_limit(
+        f"vendor-apply:ip:{ip_bucket(ip) or 'unknown'}",
+        limit=settings.VENDOR_APPLICATION_RATE_LIMIT,
+        window=APPLICATION_RATE_WINDOW,
+    )
+
+
+def _daily_key(kind: str, email: str) -> str:
+    digest = hashlib.sha256(email.lower().encode()).hexdigest()[:32]
+    return f"vendors.application.{kind}:{digest}:{timezone.now().date().isoformat()}"
+
+
+def _language_of(language: str) -> str:
+    return language if language in dict(settings.LANGUAGES) else settings.LANGUAGE_CODE
+
+
+def _confirmation_email(
+    user: User, business_name: str, *, ctx: AuditContext, key: str | None
+) -> ChangeSet:
+    return send_action_link_email(
+        purpose=APPLICATION_PURPOSE,
+        object_key=str(user.public_id),
+        version=APPLICATION_LINK_VERSION,
+        template_key=APPLICATION_CONFIRM_TEMPLATE,
+        context={"business_name": business_name},
+        language=user.preferred_language,
+        expires_in=settings.VENDOR_APPLICATION_LINK_MAX_AGE,
+        idempotency_key=key,
+        ctx=ctx,
+    )
+
+
+def _answer_duplicate(user: User, *, ctx: AuditContext) -> None:
+    """Someone applied with the address of an existing account: the caller gets the same answer
+    as a new applicant. A pending applicant gets its confirmation link again, any other account
+    a notice with no link; at most one such email per address and day. Nothing is changed."""
+    pending = _pending_applicant(str(user.public_id)) is not None
+    if pending:
+        member = VendorMember.objects.select_related("vendor").get(user=user)
+        _confirmation_email(
+            user, member.vendor.display_name, ctx=ctx, key=_daily_key("resend", user.email)
+        )
+    else:
+        enqueue_email(
+            recipient=user.email,
+            template_key=APPLICATION_EXISTS_TEMPLATE,
+            language=user.preferred_language,
+            context={"sign_in_url": settings.SITE_BASE_URL.rstrip("/") + reverse("login")},
+            idempotency_key=_daily_key("exists", user.email),
+        )
+    record(
+        ctx,
+        APPLICATION_DUPLICATE,
+        "accounts.user",
+        str(user.public_id),
+        None,
+        {"outcome": "resent" if pending else "notified"},
+    )
+
+
+def apply_to_sell(
+    *,
+    full_name: str,
+    email: str,
+    business_name: str,
+    country: str,
+    password: str,
+    language: str,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """The public "Sell with us" application: account and vendor application in one step.
+
+    A new address gets an INACTIVE account (the password is hashed now, but nothing can sign in
+    with it), an `applicant` vendor it owns, and a confirmation link by email through the ARC.16
+    outbox. The account is activated only by that link (`confirm_application`), so typing
+    someone else's address gains nothing. An address that already has an account changes
+    nothing and the caller learns nothing (`_answer_duplicate`): the returned ChangeSet is
+    empty. The password is validated and hashed before looking the address up, so the answer
+    and its timing do not depend on it.
+
+    Raises `ValidationError` for a weak password or invalid data, on dry-run too.
+    """
+    address = normalize_email_address(email)
+    user = User(
+        email=address,
+        full_name=full_name.strip(),
+        preferred_language=_language_of(language),
+        is_active=False,
+    )
+    validate_password(password, user)
+    user.set_password(password)
+    vendor = Vendor(
+        legal_name=business_name.strip(),
+        display_name=business_name.strip(),
+        contact_email=address,
+        country=country,
+    )
+    existing = User.objects.filter(email__iexact=address).first()
+    if existing is None:
+        if dry_run:
+            return submit_application(
+                vendor, user, ctx=ctx, dry_run=True, pending_confirmation=True
+            )
+        try:
+            with transaction.atomic():
+                user.save()
+                changes = submit_application(vendor, user, ctx=ctx, pending_confirmation=True)
+                _confirmation_email(user, vendor.display_name, ctx=ctx, key=None)
+        except IntegrityError:  # a concurrent request took the address first
+            existing = User.objects.filter(email__iexact=address).first()
+            if existing is None:
+                raise
+        else:
+            return changes
+    if not dry_run:
+        _answer_duplicate(existing, ctx=ctx)
+    return ChangeSet()
+
+
+def confirm_application(link: ActionLinkCheck, *, ctx: AuditContext) -> User:
+    """Activate the account of a pending application after its email link was used.
+
+    Spends the single-use link and activates the account; it never signs anyone in: the
+    applicant signs in with the password chosen on the form and enrols a second factor (CORE.4).
+    The vendor stays `applicant` until staff review it (VEN.5). Raises `ApplicationLinkInvalid`.
+    """
+    claims = link.claims
+    if link.refusal is not None or claims is None:
+        raise ApplicationLinkInvalid(link.refusal or "link not opened")
+    with transaction.atomic():
+        pending = _pending_applicant(claims.object_key)
+        if pending is None:
+            raise ApplicationLinkInvalid("no pending application")
+        user = User.objects.select_for_update().get(pk=pending.pk)
+        if user.is_active:
+            raise ApplicationLinkInvalid("already confirmed")
+        try:
+            spend_email_bound_link(link, user, ctx=ctx)
+        except ActionLinkSpent as exc:
+            raise ApplicationLinkInvalid(str(exc)) from exc
+        vendor = VendorMember.objects.select_related("vendor").get(user=user).vendor
+        user.is_active = True
+        user.save(update_fields=["is_active"])
+        snapshot = {"user": str(user.public_id), "vendor": str(vendor.public_id)}
+        record(
+            ctx,
+            APPLICATION_CONFIRMED,
+            "accounts.user",
+            str(user.public_id),
+            {**snapshot, "is_active": False},
+            {**snapshot, "is_active": True},
+        )
+    return user
