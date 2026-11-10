@@ -49,8 +49,13 @@ msgid "Add another factor before removing your last one."
 msgstr "Aggiungi un altro fattore prima di rimuovere l’ultimo."
 
 #: apps/manager/templates/manager/list.html
+#: apps/manager/templates/manager/platform/notices.html
 msgid "All"
 msgstr "Tutti"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Anonymous"
+msgstr "Anonimo"
 
 #: apps/accounts/templates/accounts/mfa/totp.html
 #: apps/accounts/templates/accounts/mfa/verify.html
@@ -65,6 +70,10 @@ msgstr "app di autenticazione"
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Authenticator app"
 msgstr "App di autenticazione"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Back to the notices"
+msgstr "Torna alle segnalazioni"
 
 #: apps/manager/templates/manager/forbidden.html
 msgid "Back to the site"
@@ -136,6 +145,10 @@ msgstr ""
 msgid "Dashboard"
 msgstr "Dashboard"
 
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Decided"
+msgstr "Deciso"
+
 #: apps/accounts/admin.py
 msgid "Delete selected %(verbose_name_plural)s"
 msgstr "Elimina %(verbose_name_plural)s selezionati"
@@ -169,11 +182,21 @@ msgstr "Email"
 msgid "Error"
 msgstr "Errore"
 
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Exact location"
+msgstr "Posizione esatta"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Explanation"
+msgstr "Spiegazione"
+
 #: apps/manager/templates/manager/list.html
+#: apps/manager/templates/manager/platform/notices.html
 msgid "Filter"
 msgstr "Filtra"
 
 #: apps/manager/templates/manager/list.html
+#: apps/manager/templates/manager/platform/notices.html
 msgid "Filters"
 msgstr "Filtri"
 
@@ -332,8 +355,22 @@ msgstr ""
 "conferma."
 
 #: apps/manager/templates/manager/list.html
+#: apps/manager/templates/manager/platform/notices.html
 msgid "Nothing to show."
 msgstr "Niente da mostrare."
+
+#: apps/manager/notice_views.py
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Notice"
+msgstr "Segnalazione"
+
+#: apps/manager/sections.py
+msgid "Notices"
+msgstr "Segnalazioni"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Notifier"
+msgstr "Segnalante"
 
 #: apps/manager/forms.py
 msgid "One line under the shop name. Plain text."
@@ -429,6 +466,19 @@ msgstr "Prodotti"
 msgid "Published"
 msgstr "Pubblicati"
 
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Reason"
+msgstr "Motivazione"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+#: apps/manager/templates/manager/platform/notices.html
+msgid "Received"
+msgstr "Ricevuta"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Record the decision"
+msgstr "Registra la decisione"
+
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Recovery code"
 msgstr "Codice di recupero"
@@ -438,6 +488,10 @@ msgstr "Codice di recupero"
 #: apps/accounts/templates/accounts/mfa/recovery_codes_new.html
 msgid "Recovery codes"
 msgstr "Codici di recupero"
+
+#: apps/manager/templates/manager/platform/notices.html
+msgid "Reference"
+msgstr "Riferimento"
 
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 msgid "Register a passkey"
@@ -450,6 +504,11 @@ msgstr "Rimuovi"
 #: apps/manager/forms.py
 msgid "Remove the logo"
 msgstr "Rimuovi il logo"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+#: apps/manager/templates/manager/platform/notices.html
+msgid "Reported"
+msgstr "Segnalato"
 
 #: themes/base/templates/components/field.html
 msgid "required"
@@ -529,6 +588,15 @@ msgstr "Qualcosa è andato storto"
 msgid "Staff"
 msgstr "Staff"
 
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Start review"
+msgstr "Avvia la revisione"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+#: apps/manager/templates/manager/platform/notices.html
+msgid "Status"
+msgstr "Stato"
+
 #: apps/manager/sections.py apps/manager/templates/manager/shop/profile.html
 msgid "Storefront profile"
 msgstr "Profilo del negozio"
@@ -548,6 +616,10 @@ msgstr "Cambia"
 #: apps/manager/forms.py
 msgid "Tagline"
 msgstr "Slogan"
+
+#: apps/manager/notice_views.py
+msgid "The decision is recorded and the notifier is told."
+msgstr "La decisione è registrata e il segnalante ne viene informato."
 
 #: apps/manager/templates/manager/login.html
 msgid ""
@@ -573,6 +645,10 @@ msgstr ""
 "Il Manager è riservato allo staff della piattaforma e ai membri dei "
 "venditori. Se ti serve l’accesso, chiedilo allo staff della piattaforma "
 "oppure accedi con un altro account."
+
+#: apps/manager/notice_views.py
+msgid "The notice is under review."
+msgstr "La segnalazione è in revisione."
 
 #: themes/base/templates/404.html
 msgid "The page you asked for does not exist or has moved."
@@ -646,6 +722,11 @@ msgid ""
 msgstr ""
 "Questo link ti è stato inviato per email. Premi Continua per aprire la "
 "pagina a cui porta."
+
+#: apps/manager/notice_views.py
+msgid "This step is not possible for the notice in its status."
+msgstr ""
+"Questo passaggio non è possibile per la segnalazione nel suo stato attuale."
 
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid "This vendor is closed, so its shop pages are no longer available."
