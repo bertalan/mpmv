@@ -27,6 +27,7 @@ from apps.catalog.models import Product
 from apps.catalog.services import product_kpis
 from apps.core.audit import audit_context
 from apps.core.models import AuditLog
+from apps.core.public_forms import Protection, pre_mfa_step, public_form
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.scoping import Source, VendorScopedQuerySet
 from apps.vendors.services import (
@@ -235,6 +236,13 @@ class VendorPickerView(ManagerView):
 # --- Sign-in and sign-out: outside /manager/, so the sweep keeps every Manager URL gated
 
 
+@public_form(
+    protection=Protection.CAPTCHA,
+    purpose="Sign in to the Manager (every Manager user)",
+    task="CORE.17",
+    rate_limit="per account and IP lockout (CORE.5)",
+    templates=("manager/login.html",),
+)
 class LoginView(auth_views.LoginView):
     """One login for every Manager user (spec 02 §Backoffice).
 
@@ -249,6 +257,7 @@ class LoginView(auth_views.LoginView):
         return home_url(self.request.user)
 
 
+@pre_mfa_step(purpose="Sign out, also before the second factor is verified", task="CORE.17")
 @mfa_exempt
 @require_POST
 def logout(request: HttpRequest) -> HttpResponse:
