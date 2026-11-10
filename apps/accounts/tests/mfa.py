@@ -11,6 +11,7 @@ from django_otp import DEVICE_ID_SESSION_KEY
 from django_otp.oath import TOTP
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
+from apps.accounts import levels
 from apps.accounts.mfa_session import VERIFIED_AT_SESSION_KEY
 from apps.accounts.models import User
 from apps.accounts.tests.factories import TOTPDeviceFactory
@@ -29,13 +30,20 @@ def verified_login(
     device: TOTPDevice | None = None,
     *,
     verified_at: float | None = None,
+    level: str = levels.OPERATIONAL,
 ) -> TOTPDevice:
-    """Log `user` in with a second factor already verified (a confirmed TOTP device)."""
+    """Log `user` in with a second factor already verified (a confirmed TOTP device).
+
+    The session is in operational mode by default, so tests of other features reach sensitive
+    views; pass `level=levels.RESTRICTED` for what a real login gives (CORE.25).
+    """
     device = device or TOTPDeviceFactory.create(user=user)
     client.force_login(user)
     session = client.session
     session[DEVICE_ID_SESSION_KEY] = device.persistent_id
     session[VERIFIED_AT_SESSION_KEY] = time.time() if verified_at is None else verified_at
+    if level == levels.OPERATIONAL:
+        session[levels.STARTED_KEY] = session[levels.ACTIVITY_KEY] = time.time()
     session.save()
     return device
 
