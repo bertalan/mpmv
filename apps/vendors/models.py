@@ -299,6 +299,9 @@ class Vendor(BaseModel):
 
     class Meta:
         ordering = ["display_name", "id"]
+        permissions = [
+            ("view_all_vendors", "Platform staff: can see every vendor's data (spec 02, Q-34)"),
+        ]
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(status__in=VendorStatus.values),
@@ -568,6 +571,7 @@ class VendorClaim(BaseModel):
 
 class RequirementPurpose(models.TextChoices):
     PAYOUT = engine.PAYOUT, "Payout request"
+    ACTIVATION = engine.ACTIVATION, "Vendor activation"
 
 
 class RequirementRegion(models.TextChoices):
@@ -582,7 +586,7 @@ def legal_field_label(name: str) -> str:
 
 LEGAL_FIELD_CHOICES = [
     (name, legal_field_label(name)[:1].upper() + legal_field_label(name)[1:])
-    for name in engine.LEGAL_FIELDS
+    for name in engine.REQUIREMENT_FIELDS
 ]
 
 
@@ -620,7 +624,7 @@ class LegalFieldRequirement(BaseModel):
                 name="vendors_requirement_unique",
             ),
             models.CheckConstraint(
-                condition=models.Q(field_name__in=engine.LEGAL_FIELDS),
+                condition=models.Q(field_name__in=engine.REQUIREMENT_FIELDS),
                 name="vendors_requirement_field_valid",
             ),
             models.CheckConstraint(
@@ -810,6 +814,46 @@ class ContractAcceptance(BaseModel):
     def save(self, *args: Any, **kwargs: Any) -> None:
         if not self._state.adding:
             raise PermissionError("ContractAcceptance is append-only")
+        super().save(*args, **kwargs)
+
+
+class SelfCertification(BaseModel):
+    """An owner certified, for a vendor, the DSA article 30(1)(e) statement (CMP.25).
+
+    The vendor offers only products and services that comply with Union law. Append-only (DB
+    trigger, migration 0022), like `ContractAcceptance`: stores the text version, the language
+    shown and the hash of that text (`engine.self_certification_hash`), and the onboarding round
+    of the vendor (VEN.21). Written by `services.certify_platform_duties`.
+    """
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
+
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="self_certifications")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="self_certifications"
+    )
+    version = models.PositiveIntegerField()
+    language = LanguageField()
+    text_hash = models.CharField(max_length=64, help_text="SHA-256 of the certified text.")
+    accepted_at = models.DateTimeField()
+    onboarding_round = models.PositiveIntegerField(default=1, editable=False)
+
+    class Meta:
+        ordering = ["-accepted_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["vendor", "version", "onboarding_round"],
+                name="vendors_selfcertification_vendor_version_round_unique",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.vendor} self-certified (v{self.version})"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self._state.adding:
+            raise PermissionError("SelfCertification is append-only")
         super().save(*args, **kwargs)
 
 

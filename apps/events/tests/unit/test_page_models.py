@@ -8,7 +8,8 @@ name are translatable.
 from django.db import models
 from wagtail_localize.fields import SynchronizedField, TranslatableField, get_translatable_fields
 
-from apps.cms.models import HomePage
+from apps.cms.blocks import LaunchCountdownBlock
+from apps.cms.models import CountdownCacheMixin, HomePage
 from apps.events.models import EventIndexPage, EventPage, EventSettings, VendorEventPolicy
 from apps.events.tests.factories import EventPageFactory
 from apps.vendors.models import Vendor
@@ -127,3 +128,11 @@ def test_a_new_event_page_is_a_draft_in_the_platform_zone() -> None:
     assert page.status == EventPage.Status.DRAFT
     assert page.sequence == 0
     assert EventPage._meta.get_field("timezone").get_default() == "Europe/Rome"
+
+
+def test_an_event_body_offers_the_launch_countdown_and_caps_its_cache() -> None:
+    """CMS.9 (spec 10 §10.2): the countdown block is offered in EventPage bodies, and the page
+    caps its Cache-Control lifetime at the countdown target like the CMS pages do."""
+    countdown = EventPage.body.field.stream_block.child_blocks["countdown"]
+    assert isinstance(countdown, LaunchCountdownBlock)
+    assert issubclass(EventPage, CountdownCacheMixin)

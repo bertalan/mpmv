@@ -20,7 +20,12 @@ from apps.accounts.tests.mfa import password_login, verified_login
 from apps.core.audit import user_context
 from apps.core.models import AuditLog
 from apps.vendors.models import ContractAcceptance, Vendor
-from apps.vendors.services import accept_contract, contract_offer, submit_application
+from apps.vendors.services import (
+    accept_contract,
+    certify_platform_duties,
+    contract_offer,
+    submit_application,
+)
 from apps.vendors.tests.factories import VendorContractFactory
 
 pytestmark = pytest.mark.django_db
@@ -94,6 +99,19 @@ def test_a_test_vendor_is_activated_end_to_end(
     assert acceptance.contract == contract
     assert (acceptance.language, acceptance.ip) == ("it", APPLICANT_IP)
 
+    # 5b. The owner certifies the article 30(1)(e) statement and the trader data is complete
+    # (CMP.25); activation needs both next to the contract.
+    certify_platform_duties(
+        vendor, applicant, language="it", ctx=user_context(applicant, APPLICANT_IP)
+    )
+    Vendor.objects.filter(pk=vendor.pk).update(
+        legal_form=Vendor.LegalForm.SOLE_PROPRIETORSHIP,
+        phone="+39 06 55501234",
+        registered_street="Via Example",
+        registered_postal_code="00100",
+        registered_city="Rome",
+    )
+
     # 6. Staff activate the vendor.
     run_action(staff, "move_to_active", vendor)
     vendor.refresh_from_db()
@@ -105,6 +123,7 @@ def test_a_test_vendor_is_activated_end_to_end(
         ("vendor.application_submitted", "vendors.vendormember"),
         ("vendor.status_changed", "vendors.vendor"),
         ("vendor.contract_accepted", "vendors.contractacceptance"),
+        ("vendor.self_certified", "vendors.selfcertification"),
         ("vendor.status_changed", "vendors.vendor"),
     ]
     moves = trail.filter(action="vendor.status_changed")

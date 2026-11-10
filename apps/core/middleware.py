@@ -28,6 +28,26 @@ class PermissionsPolicyMiddleware:
         return response
 
 
+class CrossOriginResourcePolicyMiddleware:
+    """Add `Cross-Origin-Resource-Policy` from ``settings.CROSS_ORIGIN_RESOURCE_POLICY``.
+
+    Django has no setting for it. ``same-origin`` keeps other sites from embedding our pages,
+    scripts and images. COEP (`require-corp`) is not set on purpose: it would block the payment
+    provider's embedded element and consent-gated embeds (docs/dev/security-scans.md).
+    A header already set by a view is left untouched.
+    """
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponseBase]) -> None:
+        self.get_response = get_response
+        self.header = getattr(settings, "CROSS_ORIGIN_RESOURCE_POLICY", "")
+
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
+        response = self.get_response(request)
+        if self.header:
+            response.headers.setdefault("Cross-Origin-Resource-Policy", self.header)
+        return response
+
+
 class PrivateCacheForSignedInUsersMiddleware:
     """Mark responses for a signed-in user as private and uncacheable (SEC.5).
 

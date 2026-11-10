@@ -18,7 +18,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from hypothesis import given
+from hypothesis import example, given
 from hypothesis import strategies as st
 
 from apps.cms.engine import faq_page_jsonld, jsonld_text
@@ -197,10 +197,16 @@ def _number(cell: str) -> bool:
     return bool(re.fullmatch(r"-?\d+(\.\d+)?", cell))
 
 
+@example("[" * fmt.MAX_CELL_CHARS)
+@example("[" * 100_000 + "]" * 100_000)  # the nightly falsifying example: past csv's field limit
 @given(hi.storable_text(max_size=60).filter(lambda v: v.strip() and "|" not in v))
 def test_the_csv_export_round_trips_escaped_cells(text: str) -> None:
     text = text.replace("\r", "").replace("\n", " ").strip() or "x"
     document = _document_with(text)
+    if len(text) > fmt.MAX_CELL_CHARS:
+        with pytest.raises(ValueError, match="larger than"):
+            fmt.dump_csv(document)
+        return
 
     parsed = fmt.parse_csv(fmt.dump_csv(document))
 
@@ -208,6 +214,22 @@ def test_the_csv_export_round_trips_escaped_cells(text: str) -> None:
     method = next(row for row in parsed.rows if row.record == fmt.METHOD)
     assert zone.values["name"] == text
     assert method.values["carrier"] == text
+
+
+@pytest.mark.parametrize("sign", ["=", "+", "-", "@"])
+def test_the_cell_cap_counts_the_apostrophe_the_escape_adds(sign: str) -> None:
+    at_limit = sign + "x" * (fmt.MAX_CELL_CHARS - 2)  # escaped: exactly the limit
+    parsed = fmt.parse_csv(fmt.dump_csv(_document_with(at_limit)))
+    zone = next(row for row in parsed.rows if row.record == fmt.ZONE)
+    assert zone.values["name"] == at_limit
+
+    with pytest.raises(ValueError, match="larger than"):
+        fmt.dump_csv(_document_with(at_limit + "x"))
+
+
+def test_a_cell_the_csv_reader_cannot_read_is_refused_at_export() -> None:
+    with pytest.raises(ValueError, match="larger than"):
+        fmt.dump_csv(_document_with("[" * (fmt.MAX_CELL_CHARS + 1)))
 
 
 @given(hi.hostile_text(max_size=2000))

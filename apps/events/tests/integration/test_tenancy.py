@@ -46,7 +46,7 @@ def test_scoping_keeps_the_page_queryset(cross_tenant: CrossTenant) -> None:
 
 def test_platform_events_are_for_staff_only(cross_tenant: CrossTenant) -> None:
     platform = EventPageFactory.create(platform=True)
-    staff = UserFactory.create(staff=True)
+    staff = UserFactory.create(platform_staff=True)
     assert platform in EventPage.objects.for_actor(staff)
     assert platform not in EventPage.objects.for_member(cross_tenant.a.owner)
     assert not EventPage.objects.for_actor(AnonymousUser()).exists()

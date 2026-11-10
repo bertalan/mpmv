@@ -56,6 +56,7 @@ from apps.catalog.taxonomy import (
 from apps.cms.models import HomePage, LegalPage, StandardPage
 from apps.cms.seed import seed_text
 from apps.cms.services import seed_site
+from apps.compliance import services as compliance_services
 from apps.core import translations
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
@@ -102,7 +103,11 @@ SOLE_PROPRIETOR = vendors_engine.SOLE_PROPRIETORSHIP
 # The audit context of the `demo_seed` test fixture (root conftest); the command has its own.
 TEST_CONTEXT = AuditContext(actor_label="test:demo_seed", source="system")
 OWN_WORK_LICENCE = "own-work"  # seeded by core migration 0013
-OPERATOR_PERMISSIONS = (tax_services.REVIEW_PERMISSION, vendors_services.REOPEN_PERMISSION)
+OPERATOR_PERMISSIONS = (
+    tax_services.REVIEW_PERMISSION,
+    vendors_services.REOPEN_PERMISSION,
+    "vendors.view_all_vendors",  # CORE.8: platform staff is a permission, not is_staff
+)
 
 
 @dataclasses.dataclass
@@ -549,6 +554,7 @@ def _identity(index: int, spec: data.VendorSeed) -> dict[str, Any]:
     }
     if spec.share_capital is not None:
         values["share_capital"] = spec.share_capital
+    values["phone"] = f"+39 06 5550{index + 1:04d}"  # DSA article 30 (CMP.25), a fictional number
     # DAC7 (VEN.23): the TIN's issuing country, and a registration number or a date of birth.
     values["tin_country"] = spec.country
     if spec.legal_form == SOLE_PROPRIETOR:
@@ -645,6 +651,11 @@ def _vendor(run: _Run, index: int, spec: data.VendorSeed, contract: VendorContra
                     ctx=run.ctx,
                 )
             )
+        run.add(
+            vendors_services.certify_platform_duties(
+                vendor, owner, language=SOURCE_LANGUAGE, ctx=run.ctx
+            )
+        )
         run.add(vendors_services.change_status(vendor, vendors_engine.ACTIVE, ctx=run.ctx))
     if not tax_services.has_tax_profile(vendor):
         profile = VendorTaxProfile(
@@ -699,8 +710,29 @@ def _variant_sku(sku: str, options: tuple[str, ...]) -> str:
     return "-".join([sku, *(option.upper() for option in options)])
 
 
+def _gpsr_defaults(run: _Run, vendor: Vendor) -> None:
+    """The seed vendors make what they sell: their GPSR defaults name themselves (CMP.3)."""
+    street = f"{vendor.registered_street} {vendor.registered_street_number}".strip()
+    city = f"{vendor.registered_postal_code} {vendor.registered_city}".strip()
+    run.add(
+        compliance_services.set_vendor_gpsr_defaults(
+            vendor,
+            {
+                "manufacturer_name": vendor.legal_name,
+                "manufacturer_address": ", ".join(part for part in (street, city) if part)
+                or vendor.country,
+                "manufacturer_contact": vendor.contact_email,
+                "manufacturer_country": vendor.country,
+            },
+            ctx=run.ctx,
+        )
+    )
+
+
 def _products(run: _Run, vendor: Vendor, spec: data.VendorSeed, catalog: _Catalog) -> None:
     existing = set(Product.objects.filter(vendor=vendor).values_list("sku", flat=True))
+    if not existing:
+        _gpsr_defaults(run, vendor)
     for number, item in enumerate(data.PRODUCTS[spec.letter]):
         sku = f"{spec.sku_prefix}-{item.code}"
         if sku in existing:
@@ -759,7 +791,8 @@ def _products(run: _Run, vendor: Vendor, spec: data.VendorSeed, catalog: _Catalo
         product.category = catalog.categories[item.category]
         product.brand = catalog.brands[spec.brand]
         product.stock_qty = 0 if item.axes else 4 + (number * 7) % 30
-        product.status = Product.Status.PUBLISHED
+        run.add(compliance_services.set_product_gpsr(product, {"model_number": sku}, ctx=run.ctx))
+        product.status = Product.Status.PUBLISHED  # GPSR complete: the publication check passes
         run.add(catalog_services.save_product(product, ctx=run.ctx))
         before = catalog_services.relations_snapshot(product)
         product.terms.set([catalog.terms[item.term]])

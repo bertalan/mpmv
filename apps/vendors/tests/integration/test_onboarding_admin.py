@@ -8,7 +8,7 @@ from django.urls import reverse
 
 from apps.accounts.models import User
 from apps.core.models import AuditLog
-from apps.vendors.models import VendorContract
+from apps.vendors.models import Vendor, VendorContract
 from apps.vendors.tests.factories import (
     ContractAcceptanceFactory,
     VendorContractFactory,
@@ -109,4 +109,16 @@ def test_the_vendor_page_shows_the_onboarding_checklist(staff_client: Client) ->
     ContractAcceptanceFactory.create(vendor=vendor, contract=contract)
     checklist = staff_client.get(url).content.decode()
     assert f"Contract version {contract.version}: accepted" in checklist
+    assert "Platform duties: missing" in checklist  # CMP.25: the trader data is not there yet
+    assert "Not ready to activate" in checklist
+
+    Vendor.objects.filter(pk=vendor.pk).update(
+        legal_form="sole_proprietorship",
+        phone="+39 06 55501234",
+        registered_street="Via Example",
+        registered_postal_code="00100",
+        registered_city="Rome",
+    )
+    checklist = staff_client.get(url).content.decode()
+    assert "Platform duties: complete" in checklist
     assert "Ready to activate" in checklist

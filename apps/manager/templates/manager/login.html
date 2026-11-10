@@ -1,0 +1,33 @@
+{% extends "layouts/account.html" %}
+{% load i18n static captcha %}
+{% comment %}
+The Manager login (CORE.17): one sign-in for vendor members and platform staff. The second factor
+follows on the MFA pages (CORE.4). The Turnstile widget renders only when the captcha is enabled
+(CORE.5); errors stay generic, so they say nothing about which accounts exist.
+{% endcomment %}
+{% block title %}{% translate "Sign in" %} · {{ site_name }}{% endblock %}
+{% block description %}<meta name="robots" content="noindex">{% endblock %}
+{% block head %}{% captcha_script %}
+<link rel="stylesheet" href="{% static 'accounts/password-toggle.css' %}">
+<script type="module" src="{% static 'accounts/password-toggle.js' %}"></script>{% endblock %}
+{% block account_content %}
+  <h1>{% translate "Sign in" %}</h1>
+  {% if form.errors %}
+    {% translate "The email or the password is not correct, or the account is locked for a while. Please try again." as login_error %}
+    {% include "components/alert.html" with level="danger" message=login_error live="assertive" id="login-error" only %}
+  {% endif %}
+  <form method="post" action="{{ request.get_full_path }}" class="manager-login">
+    {% csrf_token %}
+    <div class="field">
+      <label for="id_username">{% translate "Email" %}</label>
+      <input type="email" name="username" id="id_username" autocomplete="username" required value="{{ form.username.value|default:'' }}" autofocus{% if form.errors %} aria-invalid="true" aria-describedby="login-error"{% endif %}>
+    </div>
+    <div class="field">
+      <label for="id_password">{% translate "Password" %}</label>
+      <input type="password" name="password" id="id_password" autocomplete="current-password" data-password-toggle="{% translate 'Show password' %}" required{% if form.errors %} aria-invalid="true" aria-describedby="login-error"{% endif %}>
+    </div>
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    {% captcha_widget %}
+    {% include "components/button.html" with label=_("Sign in") type="submit" only %}
+  </form>
+{% endblock %}

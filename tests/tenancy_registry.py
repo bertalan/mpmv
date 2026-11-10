@@ -52,6 +52,13 @@ from apps.catalog.tests.factories import (
 )
 from apps.cms.models import VendorLandingPage
 from apps.cms.tests.factories import VendorLandingPageFactory
+from apps.compliance.models import GpsrInfo, GpsrSafetyText, SafetyCase, VendorGpsrDefaults
+from apps.compliance.tests.factories import (
+    GpsrInfoFactory,
+    GpsrSafetyTextFactory,
+    SafetyCaseFactory,
+    VendorGpsrDefaultsFactory,
+)
 from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage, VendorEventPolicy
@@ -83,6 +90,7 @@ from apps.tax.tests.factories import (
 from apps.vendors.models import (
     ContractAcceptance,
     CrossVendorConsent,
+    SelfCertification,
     Vendor,
     VendorClaim,
     VendorFeatureFlag,
@@ -92,6 +100,7 @@ from apps.vendors.models import (
 from apps.vendors.tests.factories import (
     ContractAcceptanceFactory,
     CrossVendorConsentFactory,
+    SelfCertificationFactory,
     VendorClaimFactory,
     VendorFeatureFlagFactory,
     VendorMemberFactory,
@@ -105,6 +114,7 @@ from tests.tenancy import (
     ObjectMaker,
     StaffOnly,
     VendorScoped,
+    VendorScopedList,
     member_session,
 )
 
@@ -127,7 +137,10 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         vendor=vendor, role=VendorMember.Role.STAFF
     ),
     VendorTranslation: lambda vendor: VendorTranslationFactory.create(vendor=vendor, language="it"),
-    ContractAcceptance: lambda vendor: ContractAcceptanceFactory.create(vendor=vendor),
+    ContractAcceptance: lambda vendor: ContractAcceptanceFactory.create(
+        vendor=vendor, certified=False
+    ),
+    SelfCertification: lambda vendor: SelfCertificationFactory.create(vendor=vendor),
     VendorFeatureFlag: lambda vendor: VendorFeatureFlagFactory.create(vendor=vendor),
     CrossVendorConsent: lambda vendor: CrossVendorConsentFactory.create(vendor=vendor),
     VendorClaim: lambda vendor: VendorClaimFactory.create(vendor=vendor),
@@ -154,6 +167,14 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         variant=VariantFactory.create(
             product=ProductFactory.create(vendor=vendor, kind=Product.Kind.VARIABLE)
         )
+    ),
+    GpsrInfo: lambda vendor: GpsrInfoFactory.create(product=ProductFactory.create(vendor=vendor)),
+    VendorGpsrDefaults: lambda vendor: VendorGpsrDefaultsFactory.create(vendor=vendor),
+    GpsrSafetyText: lambda vendor: GpsrSafetyTextFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
+    SafetyCase: lambda vendor: SafetyCaseFactory.create(
+        product=ProductFactory.create(vendor=vendor)
     ),
     ShippingZone: lambda vendor: ShippingZoneFactory.create(vendor=vendor),  # a vendor zone
     ShippingMethod: lambda vendor: ShippingMethodFactory.create(vendor=vendor),
@@ -220,6 +241,15 @@ def member_with_landing_taxonomy(client: Client, tenants: CrossTenant) -> dict[s
     return member_session(client, tenants)
 
 
+def manager_vendor(vendor: Vendor) -> Vendor:
+    """The Manager's shop pages show the selected vendor itself (CORE.17)."""
+    return vendor
+
+
+def vendor_display_name(vendor: models.Model) -> str:
+    return str(vendor.display_name)  # type: ignore[attr-defined]
+
+
 ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
     "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
@@ -266,6 +296,15 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "geocoding_find": NoVendorData(
         "Find coordinates (EVT.12): geocodes the typed address; reads no vendor data."
+    ),
+    # The Manager (CORE.17): one login, a shop space for vendor members (the selected vendor
+    # only, chosen among the member's own vendors) and a platform space for platform staff.
+    "login": NoVendorData("Manager sign-in page."),
+    "logout": NoVendorData("Sign-out of the Manager."),
+    "manager:shop:dashboard": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    "manager:platform:dashboard": StaffOnly(
+        "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
     ),
     "admin:login": NoVendorData("Staff sign-in page."),
     "admin:logout": NoVendorData("Staff sign-out."),

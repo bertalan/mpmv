@@ -21,6 +21,7 @@ from django.db.models import OuterRef, QuerySet, Subquery
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.module_loading import import_string
+from django.utils.translation import gettext_lazy
 
 from apps.accounts import engine as accounts_engine
 from apps.accounts.models import User, normalize_email_address
@@ -39,7 +40,7 @@ from apps.accounts.services import (
 )
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import Change, ChangeSet
-from apps.core.models import AuditLog
+from apps.core.models import AuditLog, resolve_translation
 from apps.core.services import (
     allowed_vendor_countries,
     audit_changes,
@@ -55,6 +56,7 @@ from .models import (
     ContractAcceptance,
     CrossVendorConsent,
     LegalFieldRequirement,
+    SelfCertification,
     Vendor,
     VendorClaim,
     VendorContract,
@@ -99,6 +101,40 @@ def storefront_vendors() -> QuerySet[Vendor]:
 def has_public_storefront(vendor: Vendor) -> bool:
     """The same rule as `storefront_vendors`, on a vendor already loaded."""
     return bool(vendor.status == Vendor.Status.ACTIVE)
+
+
+@dataclasses.dataclass(frozen=True)
+class StorefrontProfile:
+    """A vendor's public texts in one language (VEN.10): tagline, bio and the non-empty policies
+    as `(title, text)` pairs. `language` is the one actually shown, `is_fallback` is True when
+    it is the source language standing in for the requested one."""
+
+    tagline: str
+    description: str
+    policies: tuple[tuple[str, str], ...]
+    language: str
+    is_fallback: bool
+
+
+def storefront_profile(vendor: Vendor, language: str) -> StorefrontProfile | None:
+    """The published text of `vendor` in `language`, else in the source language, else None.
+    Drafts and machine translations awaiting review are never public."""
+    resolved = resolve_translation(vendor.translations.all(), language)
+    text = resolved.translation
+    if text is None or resolved.language is None:
+        return None
+    policies = (
+        (gettext_lazy("Shipping"), text.shipping_policy),
+        (gettext_lazy("Returns and refunds"), text.refund_policy),
+        (gettext_lazy("Cancellation"), text.cancellation_policy),
+    )
+    return StorefrontProfile(
+        tagline=text.tagline,
+        description=text.description,
+        policies=tuple((str(title), body) for title, body in policies if body.strip()),
+        language=resolved.language,
+        is_fallback=resolved.is_fallback,
+    )
 
 
 # Fields encrypted at rest (SEC.3) are masked in audit rows, or the log would hold them in clear.
@@ -519,6 +555,19 @@ def is_vendor_member(user: AbstractBaseUser | AnonymousUser) -> bool:
     return VendorMember.objects.filter(user_id=user.pk).exists()
 
 
+def memberships_of(user: AbstractBaseUser | AnonymousUser) -> list[VendorMember]:
+    """The user's own memberships with their vendors, by vendor name (the Manager's vendor
+    picker, CORE.17). Inactive and anonymous users have none."""
+    if not (user.is_authenticated and user.is_active):
+        return []
+    return list(
+        VendorMember.objects.for_member(user)
+        .filter(user_id=user.pk)
+        .select_related("vendor")
+        .order_by("vendor__display_name", "vendor_id")
+    )
+
+
 # --- Legal and e-invoicing identity (VEN.12)
 
 VAT_CHECKED = "vendor.vat_checked"
@@ -927,10 +976,97 @@ def accept_contract(
         )
 
 
+SELF_CERTIFIED = "vendor.self_certified"
+SELF_CERTIFICATION_MODEL = "vendors.selfcertification"
+
+
+def is_self_certified(vendor: Vendor) -> bool:
+    """The vendor's owner certified the current text version in the vendor's current round."""
+    return SelfCertification.objects.filter(
+        vendor=vendor,
+        version=engine.SELF_CERTIFICATION_VERSION,
+        onboarding_round=vendor.onboarding_round,
+    ).exists()
+
+
+def platform_duties_missing(vendor: Vendor) -> tuple[str, ...]:
+    """What the stored vendor still lacks for activation under CMP.25: the `activation`
+    requirement fields, then the self-certification (`engine.platform_duties_missing`).
+
+    The self-certification is asked of every vendor while the field rules are EU-only; that is
+    harmless while D-21 admits only EU vendors (follow-up: scope it to the EU if that changes)."""
+    stored = Vendor.objects.get(pk=vendor.pk)
+    return engine.platform_duties_missing(
+        stored.legal_identity().values(),
+        requirement_rules(engine.ACTIVATION),
+        certified=is_self_certified(stored),
+    )
+
+
+def certify_platform_duties(
+    vendor: Vendor,
+    user: User,
+    *,
+    language: str,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Record that `user`, an owner, certifies for `vendor` the DSA article 30(1)(e) statement
+    shown in `language` (CMP.25).
+
+    Stores the text version, the language and the hash of the text.
+    Certifying again in the same onboarding round changes nothing. Raises
+    `engine.SelfCertificationError` (vendor status, not an owner, no text in `language`), also
+    on dry-run.
+    """
+    with transaction.atomic():
+        locked = (
+            Vendor.objects.select_for_update()
+            .only("status", "public_id", "onboarding_round")
+            .get(pk=vendor.pk)
+        )
+        role = member_role(user, locked) if user.is_active else None
+        engine.check_can_certify(locked.status, role)
+        text_hash = engine.self_certification_hash(language)
+        if SelfCertification.objects.filter(
+            vendor=locked,
+            version=engine.SELF_CERTIFICATION_VERSION,
+            onboarding_round=locked.onboarding_round,
+        ).exists():
+            return ChangeSet()
+        certification = SelfCertification(
+            vendor=locked,
+            user=user,
+            version=engine.SELF_CERTIFICATION_VERSION,
+            language=language,
+            text_hash=text_hash,
+            accepted_at=timezone.now(),
+            onboarding_round=locked.onboarding_round,
+        )
+        changes = ChangeSet()
+        changes.create(
+            SELF_CERTIFICATION_MODEL,
+            str(certification.public_id),
+            {
+                "vendor": str(locked.public_id),
+                "user": str(user.public_id),
+                "version": certification.version,
+                "language": language,
+                "text_hash": text_hash,
+                "accepted_at": certification.accepted_at,
+                "onboarding_round": certification.onboarding_round,
+            },
+        )
+        return run_mutation(
+            changes, certification.save, ctx=ctx, action=SELF_CERTIFIED, dry_run=dry_run
+        )
+
+
 def onboarding_checklist(vendor: Vendor) -> engine.OnboardingChecklist:
-    """The stored vendor's onboarding checklist: contract in force accepted (blocks activation),
-    DAC7 dataset and payout data (listed only: VEN.12 gates payouts with them). Only an
-    acceptance of the vendor's current onboarding round counts (VEN.21)."""
+    """The stored vendor's onboarding checklist: contract in force accepted and the platform
+    duties (CMP.25: DSA article 30 data and self-certification) block activation; DAC7 dataset
+    and payout data are listed only (VEN.12 gates payouts with them). Only an acceptance of the
+    vendor's current onboarding round counts (VEN.21)."""
     stored = Vendor.objects.get(pk=vendor.pk)
     contract = current_contract()
     accepted = (
@@ -944,6 +1080,7 @@ def onboarding_checklist(vendor: Vendor) -> engine.OnboardingChecklist:
         current_contract_version=contract.version if contract is not None else None,
         dac7_missing=engine.dac7_missing(stored.legal_identity()),
         payout=legal_profile_completeness(stored),
+        platform_duties_missing=platform_duties_missing(stored),
     )
 
 

@@ -99,6 +99,14 @@ part of the done-when still open) · `not started`.
 | CMS.3 | done | #156 | Blog: index and post pages, scheduling, translatable authors with author pages, ProfilePage/Person and BlogPosting JSON-LD, choosers, `import_article` |
 | CMS.4 | done | #168 | Term and vendor landing pages |
 | THM.12 | done | #151 | WebP and AVIF renditions, sanitised SVG logos |
+| CMP.3 | partial: Safety Gate checks, repeat-offender suspension and recall procedure not built | #175 | Done-when met (spec 11, row CMP.3): GPSR data (`GpsrInfo`, vendor defaults, per-language safety texts), publication gate in `apps.catalog.publishing`, write guards on published products, nightly check, `SafetyCase` with working-day deadlines and overdue staff alert, per-country warnings languages (owner decisions 2026-11-09). Not built, though the spec row names them: recall procedure, Safety Gate checks, repeat-offender suspension (CMP.26 covers only checkout and sale blockers). Compliance code, needs human review |
+| SEC.2 | done | #164 | Secure uploads (spec 12 task row; not the "Tenant isolation" requirement of the same ID): content-checked, re-encoded uploads with app-made names on every upload path (`apps/core/uploads.py`); caps on bytes, pixels, side and animation frames; originals over 40 megapixels downscaled; bounded decode memory and one decode per process; MPO and ICC handled; malicious-upload corpus. The final caps are in code only, not yet in spec 12. Security code, needs human review |
+| CMS.9 | done | #129 | Launch countdown block: pure `countdown_state`, server-rendered absolute date and expired state, page cache capped at the target, CSP-safe ES module with visitor time zone, minute updates, pause button, single polite announcement |
+| CMP.9 | done | #177 | WCAG 2.2 SC 3.3.8 on the authentication templates: paste allowed, `autocomplete` tokens, passkeys offered, Turnstile without a puzzle |
+| CORE.17 | done | #170 | Manager shell (`apps/manager/`): two gated spaces by URL prefix, deny-by-default gate with 404s, navigation registry, vendor picker and switcher, base list view with bulk actions (dry-run preview), closed vendors refused in the shop space, sign-in page meeting CMP.9, URL sweep test. Staff access to the shop space through impersonation is CORE.10 |
+| CORE.8 | partial: 1 of 3 (platform staff permission); Wagtail admin trimming, editor roles and unlock service open | #185 | Platform staff is the model permission `vendors.view_all_vendors`, not `is_staff` (migration vendors 0021, no data grant; release note in release.md). Cross-vendor grants in catalog and events use `is_platform_staff` |
+| SEC.12 | done | #199 | Reverse proxy header ownership: Caddy drops `Server`, media carry the transport and framing headers, CORP on the HTTPS 301; the three strict xfails are plain tests; documented in security-headers.md |
+| OPS.9 | partial: triage decided and rules file merged, no STAGE scan run on the new main yet | #197 | STAGE scan triage (SEC.5): no wildcard CORS, CORP header, ZAP rules file with documented accepts |
 
 ## Owner decisions 2026-11-07
 
@@ -608,7 +616,7 @@ Follow-ups:
 
 Audit chunk 4 (#98): 0 blocker, 0 major, 5 minor (the five rows marked above).
 
-## Merges after wave 8 (2026-11-08 and 2026-11-09)
+## Merges after wave 8 (2026-11-08 to 2026-11-10)
 
 One line per merged PR, in merge order within each group. #91, #93, #101 and #107, listed above as
 not merged, merged on 2026-11-08 after their fixes. Task status is in the [Tasks](#tasks) table.
@@ -707,6 +715,25 @@ Infrastructure and CI:
 | #153 | ARC.23 | Release gate with production parity |
 | #161 | OPS.4 | Dependabot: uv image 0.10.11 to 0.13.7 |
 | #159 | THM.12, ARC.13 | Caddy SVG CSP and media allow-list parity |
+
+Compliance, security and content:
+
+| PR | Task | What |
+|---|---|---|
+| #187 | none | Coherence check 8: release gate, audit and jobs docs, audit-action guard test |
+| #175 | CMP.3 | GPSR data, publication gate, safety cases, warnings languages |
+| #164 | SEC.2 | Content-checked, re-encoded uploads with caps and a malicious-file corpus |
+| #191 | SEC.5 | Register the Hypothesis ci, dev and nightly profiles |
+| #129 | CMS.9 | Launch countdown block |
+| #192 | SHP.13 | CSV export refuses or caps a cell the importer cannot read (round trip) |
+| #170 | CORE.17 | Manager shell, two gated spaces, closed vendors refused |
+| #197 | SEC.5, OPS.9 | STAGE scan triage: no wildcard CORS, CORP header, ZAP rules file |
+| #186 | TAX.3 | Spec: T15 (Saint-Martin and Saint-Barthelemy outside the VAT territory) in the Done-when |
+| #185 | CORE.8 | Platform staff is the `vendors.view_all_vendors` permission, not `is_staff` (1 of 3) |
+| #195 | none | Coherence check 9: audit-trail rows, guard test over every app |
+| #196 | none | Spec: rows accepted by lane-a (CORE.21, CORE.22, CMP.27, MIG.15, OPS.8, OPS.9, SEC-R2 rename) |
+| #203 | ARC | Unit and integration tests in parallel with pytest-xdist (CI and `make test`) |
+| #199 | SEC.12 | Proxy header ownership between Caddy and the app |
 
 ## Coherence checks
 
@@ -1263,3 +1290,46 @@ Findings and actions:
 4. Minor. `RemovedInWagtail90Warning` at `apps/cms/admin_views.py:30` (image permission policy). Action: proposed row (with OPS.7 deprecations).
 5. Minor. No developer pages for redirects (CAT.6) or event moderation (EVT.3). Action: proposed rows.
 6. Minor, for lane-a: check whether #129 is still open and will renumber again (cms is at 0011), and that the CAT.6 follow-ups are registered as rows or answered.
+
+### Check 9 (2026-11-10, after #175, #164, #191, #129, #192)
+
+Scope: main at a99d71e, five merges (90 files, about 8.9k lines). Two read-only reviews: code vs spec
+and gates, and docs, hygiene and migrations. Fix PR: the one that carries this entry.
+
+| Area | Result |
+|---|---|
+| Done-when criteria | Met for SEC.2 and CMS.9. CMP.3 meets its Done-when but is `partial`: recall procedure, Safety Gate checks and repeat-offender suspension are not built. Services/engine split, `dry_run`, AuditLog and the `"IT"` rule kept; no blocker in the code |
+| Docs drift | audit-trail.md had no `compliance.*` rows. The check 8 guard did not see them: its prefix list skipped `compliance`, and it ignored annotated constants (`X: Final = "..."`), which the compliance app uses. It also missed `shipping.shippingtemplate.*`. Fixed here: the guard now scans every app under `apps/` and annotated constants. No developer pages for uploads, GPSR or the countdown block |
+| Hygiene | No credential-like literals, vendor names, new TODOs or sleeps; 2 pre-existing TODOs tied to CORE.18 and CMP.4 |
+| Migrations | One leaf per app, contiguous (cms 0012, events 0003, compliance 0002); #129 settled |
+| Gates | `make check` green, `makemigrations --check` clean; main CI green, but the Security STAGE scan failed once (ZAP medium 1, low 3) and its rerun on a99d71e passed; full suite not run (CI is the gate) |
+
+Findings and actions:
+
+1. Major. progress.md lacked CMP.3, SEC.2, CMS.9, CMP.9 and six PR rows. Action: this update.
+2. Major. CMP.3 status honesty (see above). Action: marked `partial`; proposed rows below.
+3. Minor. audit-trail.md drift and the blind guard. Action: fixed here.
+4. Minor. `RemovedInWagtail90Warning` at `apps/cms/admin_views.py:30` still open. Action: row proposed in check 8.
+5. Minor. No dev docs for uploads (SEC.2), GPSR (CMP.3), countdown (CMS.9); final SEC.2 caps not in spec 12; the SEC.2 ID collision with the spec 12 requirement row. Action: proposed rows.
+6. Minor, ops. STAGE scan medium alert not triaged (the report stays on the runner). Action: for lane-a after #194.
+Open from check 8: item 6 answered (#129 merged, cms settled at 0012).
+
+### Check 10 (2026-11-10, after #170, #197, #186, #185, #196, #203, #199)
+
+Scope: main at 2a3b8b3, seven merges since check 9 (91 files, about 3.5k lines). Review by lane-b in four
+dimensions. Fix PR: the one that carries this entry.
+
+| Area | Result |
+|---|---|
+| Code vs spec | CORE.17 and SEC.12 meet their Done-when (xfails removed, 404 gate, sweep test, closed vendors). CORE.8 is 1 of 3, marked `partial`. Impersonation (CORE.10) is not built, so platform staff always get 404 in the shop space (stated in #170). Manager code has no `"IT"` literal; views, lists and actions are thin adapters; bulk actions run with `dry_run` and an audit context. No new audit action strings, so audit-trail.md needs no rows (guard test green) |
+| Gates | `make check` pass, `makemigrations --check` clean, 39 targeted tests (audit guard, manager unit) pass. One leaf per app (vendors 0021). Main CI: 15908d2 green, 2a3b8b3 running when checked; cancelled runs are superseded pushes. Security nightly: failure on 29bed6d, green rerun on a99d71e. Security STAGE scan: last two runs failed (2c09781, d46ce88), both before #197 merged; no run since, so OPS.9 stays open |
+| Docs | progress.md lacked CORE.17, CORE.8, SEC.12 and #170, #197, #186, #185, #195, #196, #203, #199 (added here). release.md carries the platform-staff note; CONTRIBUTING has the parallel-tests section. No developer page for the Manager shell |
+| Hygiene | No credential-like literals (test passwords come from `secrets.token_urlsafe`), vendor names, hostnames, new TODOs, prints or sleeps in the diff. Still the `RemovedInWagtail90Warning` (OPS.7) |
+
+Findings and actions:
+
+1. Major. progress.md missed seven merges and four tasks. Action: this update.
+2. Minor. No developer docs for the Manager shell (navigation registry, gate, list views, vendor switcher). Action: proposed row.
+3. Minor. OPS.9 needs a STAGE scan run on main after #197 to close. Action: for lane-a (run the workflow).
+4. Minor. The progress.md PR tables skip about 25 older PRs (mostly spec and docs, numbers under 100). Action: none, they are listed by task where it matters.
+Open from check 9: items 1 to 3 closed; dev docs, SEC.2 caps and the ID collision became OPS.8, spec 12 and SEC-R2 (#196); CMP.3 remainder is CMP.27.

@@ -64,7 +64,10 @@ class Command(BaseCommand):
         action = options["action"]
         if action == "export":
             document = export_config(_owner(options["vendor"]))
-            text = fmt.dump_csv(document) if options["csv"] else fmt.dump_json(document)
+            try:
+                text = fmt.dump_csv(document) if options["csv"] else fmt.dump_json(document)
+            except ValueError as exc:
+                raise CommandError(f"The configuration cannot be exported: {exc}") from exc
             self.stdout.write(text, ending="")
         elif action == "import":
             result = import_config(
