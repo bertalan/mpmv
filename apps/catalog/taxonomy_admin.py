@@ -29,7 +29,9 @@ from django.utils.translation import gettext_lazy as _
 from treebeard.forms import MoveNodeForm
 
 from apps.core.audit import audit_context
+from apps.core.models import ImageLicence
 from apps.core.text import ascii_int
+from apps.vendors import engine as vendors_engine
 
 from . import brands
 from .models import Product
@@ -318,12 +320,100 @@ class BrandForm(forms.ModelForm[Brand]):
             "manufacturer",
         )
 
+    # A new logo file, with the licence fields of CMS.8 (the SEC.2 checks run in `clean`).
+    logo_file = forms.FileField(
+        required=False,
+        label=_("New logo file"),
+        help_text=_(
+            "Upload a logo to replace the current one: PNG, JPEG, WebP or SVG, checked and "
+            "re-encoded without metadata. It is shown on the brand page and in its structured "
+            "data. Example: the brand's official logo."
+        ),
+    )
+    logo_licence = forms.ModelChoiceField(
+        queryset=ImageLicence.objects.all(),
+        required=False,
+        label=_("Logo licence"),
+        help_text=_(
+            "The licence the logo is used under; only licences that allow commercial use are "
+            "listed. Needed with a new file. Example: 'Own work' for a logo the brand gave us."
+        ),
+    )
+    logo_author = forms.CharField(
+        required=False,
+        max_length=200,
+        label=_("Logo author or rights holder"),
+        help_text=_(
+            "Who to credit for the logo. Needed with a new file. Example: the brand's name."
+        ),
+    )
+    logo_source_url = forms.URLField(
+        required=False,
+        max_length=500,
+        label=_("Logo source URL"),
+        help_text=_(
+            "Where the logo comes from; some licences require it. Example: the brand's press page."
+        ),
+    )
+    logo_credit_text = forms.CharField(
+        required=False,
+        max_length=250,
+        label=_("Logo credit line"),
+        help_text=_(
+            "Optional text that replaces the generated credit line. Example: 'Logo: Acme Ltd'."
+        ),
+    )
+    logo_permission_ref = forms.CharField(
+        required=False,
+        max_length=200,
+        label=_("Logo permission reference"),
+        help_text=_(
+            "Reference of the stored written permission, when the licence needs one. "
+            "Example: 'permission-2026-11-acme.pdf'."
+        ),
+    )
+
+    # Which field of the form shows each error of `MediaImage.full_clean`.
+    LOGO_ERROR_FIELDS = {
+        "licence": "logo_licence",
+        "author": "logo_author",
+        "source_url": "logo_source_url",
+        "credit_text": "logo_credit_text",
+        "permission_ref": "logo_permission_ref",
+    }
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.fields["status"].required = False
 
     def clean_status(self) -> str:
         return str(self.cleaned_data.get("status") or Brand.Status.APPROVED)
+
+    def clean(self) -> dict[str, Any]:
+        data = super().clean() or {}
+        upload = data.get("logo_file")
+        if upload is None:
+            return data
+        problem = vendors_engine.logo_alt_errors(str(data.get("logo_alt") or ""))
+        if problem:
+            self.add_error("logo_alt", problem)
+        try:
+            brands.build_logo_image(
+                str(data.get("name") or "Brand"),
+                upload,
+                licence=data.get("logo_licence"),
+                author=str(data.get("logo_author") or ""),
+                source_url=str(data.get("logo_source_url") or ""),
+                credit_text=str(data.get("logo_credit_text") or ""),
+                permission_ref=str(data.get("logo_permission_ref") or ""),
+            )
+        except ValidationError as error:
+            for name, messages_ in error.message_dict.items():
+                for message in messages_:
+                    self.add_error(self.LOGO_ERROR_FIELDS.get(name, "logo_file"), message)
+        finally:
+            upload.seek(0)  # the service reads the file again
+        return data
 
 
 class BrandMergeForm(forms.Form):
@@ -361,6 +451,12 @@ class BrandAdmin(admin.ModelAdmin[Brand]):
         "same_as",
         "logo",
         "logo_alt",
+        "logo_file",
+        "logo_licence",
+        "logo_author",
+        "logo_source_url",
+        "logo_credit_text",
+        "logo_permission_ref",
         "manufacturer",
         "proposed_by",
         "batch",
@@ -378,7 +474,21 @@ class BrandAdmin(admin.ModelAdmin[Brand]):
     def save_model(
         self, request: HttpRequest, obj: Brand, form: forms.ModelForm[Brand], change: bool
     ) -> None:
-        brands.save_brand(obj, ctx=audit_context(request))
+        ctx = audit_context(request)
+        brands.save_brand(obj, ctx=ctx)
+        data = form.cleaned_data
+        if data.get("logo_file") is not None:
+            brands.set_brand_logo(
+                obj,
+                upload=data["logo_file"],
+                alt=str(obj.logo_alt),
+                licence=data.get("logo_licence"),
+                author=str(data.get("logo_author") or ""),
+                source_url=str(data.get("logo_source_url") or ""),
+                credit_text=str(data.get("logo_credit_text") or ""),
+                permission_ref=str(data.get("logo_permission_ref") or ""),
+                ctx=ctx,
+            )
 
     def delete_model(self, request: HttpRequest, obj: Brand) -> None:
         brands.delete_brand(obj, ctx=audit_context(request))

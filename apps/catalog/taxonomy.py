@@ -352,15 +352,41 @@ class Manufacturer(BaseModel):
     """The company behind one or more brands (CAT.20): legal name, official URL, `sameAs` links
     and country. Shared by all vendors; edited by Catalog staff only."""
 
-    legal_name = models.CharField(max_length=255)
-    url = models.URLField(blank=True, max_length=500, help_text="Official site, https only.")
+    legal_name = models.CharField(
+        _("legal name"),
+        max_length=255,
+        help_text=_(
+            "The registered name of the company that makes the products. It is shown on the "
+            "brand page and in its structured data. Example: 'Acme Holdings Ltd'."
+        ),
+    )
+    url = models.URLField(
+        _("official URL"),
+        blank=True,
+        max_length=500,
+        help_text=_(
+            "The company's own website, an https address. It tells search engines which "
+            "company this is. Example: https://holdings.example/."
+        ),
+    )
     same_as = models.JSONField(
-        "sameAs links",
+        _("sameAs links"),
         default=list,
         blank=True,
-        help_text="Absolute https links: Wikidata, Wikipedia, official profiles.",
+        help_text=_(
+            "A list of https links to the same company elsewhere: Wikidata, Wikipedia, "
+            "official profiles. Search engines use them to recognise the company. "
+            'Example: ["https://www.wikidata.org/wiki/Q7"].'
+        ),
     )
-    country = CountryField(blank=True, help_text="Country of the registered office.")
+    country = CountryField(
+        _("country"),
+        blank=True,
+        help_text=_(
+            "The country of the registered office. It is part of the structured data. "
+            "Example: Italy."
+        ),
+    )
 
     class Meta:
         ordering = ["legal_name"]
@@ -439,31 +465,91 @@ class Brand(BaseModel):
         PENDING = "pending", "Pending review"
         REJECTED = "rejected", "Rejected"
 
-    name = models.CharField(max_length=200)
+    name = models.CharField(
+        _("name"),
+        max_length=200,
+        help_text=_(
+            "The brand as customers know it; it is the same in every language. Names that "
+            "differ only in case, accents or punctuation count as duplicates. Example: 'Acme'."
+        ),
+    )
     # What duplicate detection compares: `engine.brand_name_key(name)`, set by `save()`.
     name_key = models.CharField(max_length=200, blank=True, editable=False, db_index=True)
     status = models.CharField(
-        max_length=16, choices=Status.choices, default=Status.APPROVED, db_index=True
+        _("status"),
+        max_length=16,
+        choices=Status.choices,
+        default=Status.APPROVED,
+        db_index=True,
+        help_text=_(
+            "Only approved brands have a public page and can be picked by every vendor. "
+            "Use the approve, reject and merge actions to review a proposal. "
+            "Example: Approved."
+        ),
     )
     wikidata_id = models.CharField(
-        "Wikidata item ID",
+        _("Wikidata item ID"),
         max_length=12,
         blank=True,
-        help_text="E.g. Q42; the format is checked, nothing is fetched.",
+        help_text=_(
+            "The brand's item on Wikidata. It links the brand to one world-wide identity and "
+            "is how duplicates are found. Only the format is checked, nothing is fetched. "
+            "Example: Q42."
+        ),
     )
-    url = models.URLField("official URL", blank=True, max_length=500, help_text="https only.")
+    url = models.URLField(
+        _("official URL"),
+        blank=True,
+        max_length=500,
+        help_text=_(
+            "The brand's own website, an https address. It is linked from the brand page and "
+            "given to search engines. Example: https://acme.example/."
+        ),
+    )
     same_as = models.JSONField(
-        "sameAs links",
+        _("sameAs links"),
         default=list,
         blank=True,
-        help_text="Absolute https links: Wikipedia per language, official profiles.",
+        help_text=_(
+            "A list of https links to the same brand elsewhere: Wikipedia in each language, "
+            "official profiles. The Wikidata link is added from the ID above. "
+            'Example: ["https://en.wikipedia.org/wiki/Acme"].'
+        ),
     )
     logo = models.ForeignKey(
-        "core.MediaImage", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        "core.MediaImage",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        verbose_name=_("logo"),
+        help_text=_(
+            "The brand logo shown on its page. Upload a new one with the file fields below, "
+            "or pick an image from the library that already has its licence and author. "
+            "Example: the official logo as PNG or SVG."
+        ),
     )
-    logo_alt = models.CharField(max_length=125, blank=True)
+    logo_alt = models.CharField(
+        _("logo description"),
+        max_length=125,
+        blank=True,
+        help_text=_(
+            "Plain text describing the logo for people who cannot see it. Required with a "
+            "logo. Example: 'Acme, an anvil in a red circle'."
+        ),
+    )
     manufacturer = models.ForeignKey(
-        Manufacturer, null=True, blank=True, on_delete=models.SET_NULL, related_name="brands"
+        Manufacturer,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="brands",
+        verbose_name=_("manufacturer"),
+        help_text=_(
+            "The company that makes the brand's products, when it is not the brand itself. "
+            "It is shown on the brand page and in the structured data. "
+            "Example: 'Acme Holdings Ltd'."
+        ),
     )
     proposed_by = models.ForeignKey(
         "vendors.Vendor",
@@ -544,6 +630,12 @@ class Brand(BaseModel):
         )
         if key and renamed and others.filter(name_key=key).exists():
             errors.setdefault("name", []).append("A brand with a very similar name exists.")
+        logo = self.logo if self.logo_id else None
+        if logo is not None and (logo.licence_id is None or not logo.author.strip()):
+            # CMS.8: an image migrated without its licence or author is not chosen for new content.
+            errors.setdefault("logo", []).append(
+                "This image has no licence or author yet: classify it in the image library first."
+            )
         if self.logo_id and not self.logo_alt.strip():
             errors.setdefault("logo_alt", []).append("Describe the logo for screen readers.")
         if self.wikidata_id and others.filter(wikidata_id=self.wikidata_id).exists():
@@ -564,9 +656,32 @@ class BrandTranslation(TranslationModel):
 
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name="translations")
     slug = _slug_field()
-    description = models.TextField(blank=True, help_text="HTML, shown on the brand page.")
-    seo_title = models.CharField("SEO title", max_length=255, blank=True)
-    seo_description = models.TextField("SEO description", blank=True)
+    description = models.TextField(
+        _("description"),
+        blank=True,
+        help_text=_(
+            "The text on the brand page, in this language only: a language without one shows "
+            "no description, never another language's. Basic formatting is kept. "
+            "Example: 'Anvils and forging tools made in Bergamo since 1949.'"
+        ),
+    )
+    seo_title = models.CharField(
+        _("SEO title"),
+        max_length=255,
+        blank=True,
+        help_text=_(
+            "The title search engines show for the brand page. Optional. "
+            "Example: 'Acme anvils and forging tools'."
+        ),
+    )
+    seo_description = models.TextField(
+        _("SEO description"),
+        blank=True,
+        help_text=_(
+            "The short text search engines show under the title. Example: 'Buy Acme anvils "
+            "from independent shops.'"
+        ),
+    )
 
     class Meta(TranslationModel.Meta):
         ordering = ["brand", "language"]

@@ -20,11 +20,15 @@ from django.conf import settings
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 from django.db import IntegrityError, connection, transaction
 from django.db.models import Q, QuerySet
+from django.utils import timezone
+from wagtail.models import Collection
 
 from apps.core import translations
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
+from apps.core.models import ImageLicence, MediaImage
 from apps.core.services import audit_changes, enqueue_email, run_mutation, save_audited
+from apps.vendors import engine as vendors_engine
 from apps.vendors.models import Vendor, VendorMember
 
 from . import engine, services
@@ -102,6 +106,7 @@ def brand_snapshot(brand: Brand) -> dict[str, Any]:
         "wikidata_id": brand.wikidata_id,
         "url": brand.url,
         "same_as": list(brand.same_as),
+        "logo": None if brand.logo_id is None else f"image:{brand.logo_id}",
         "logo_alt": brand.logo_alt,
         "manufacturer": brand.manufacturer_id,
         # Named `vendor` so the entry shows in the proposing vendor's audit trail.
@@ -633,6 +638,127 @@ def save_brand(brand: Brand, *, ctx: AuditContext, dry_run: bool = False) -> Cha
                 updated=BRAND_UPDATED,
                 dry_run=dry_run,
             )
+
+
+# --- Brand logo (CAT.20 3/3)
+
+BRAND_LOGO_CHANGED = "catalog.brand.logo_changed"
+
+
+def logo_collection() -> Collection:
+    """The Wagtail collection brand logos go to: the one that accepts SVG (THM.12, `SvgCollection`
+    rows), the oldest if staff made several."""
+    found = Collection.objects.filter(svg_policy__isnull=False).order_by("path").first()
+    if found is None:
+        raise ValidationError({"logo": "Logos cannot be uploaded right now: contact support."})
+    return found
+
+
+def build_logo_image(
+    brand_name: str,
+    upload: Any,
+    *,
+    licence: ImageLicence | None,
+    author: str,
+    source_url: str = "",
+    credit_text: str = "",
+    permission_ref: str = "",
+) -> MediaImage:
+    """The unsaved image for `upload`, validated: the SEC.2 content checks, caps and re-encoding
+    of `MediaImage.clean`, and the CMS.8 licence fields. Raises `ValidationError` keyed by field
+    (`file`, `licence`, `author`, `source_url`, ...)."""
+    image = MediaImage(
+        title=f"Logo of {brand_name}"[:255],
+        file=upload,
+        collection=logo_collection(),
+        licence=licence,
+        author=author.strip()[:200],
+        source_url=source_url.strip(),
+        credit_text=credit_text.strip(),
+        permission_ref=permission_ref.strip(),
+    )
+    image.full_clean()
+    return image
+
+
+def _logo_snapshot(image: MediaImage | None, alt: str) -> dict[str, Any]:
+    """The audited state: the image as `image:<id>` with its licence code and author."""
+    licence = None if image is None or image.licence is None else image.licence.code
+    return {
+        "logo": None if image is None else f"image:{image.pk}",
+        "logo_alt": alt,
+        "licence": licence,
+        "author": None if image is None else image.author,
+    }
+
+
+def set_brand_logo(
+    brand: Brand,
+    *,
+    upload: Any,
+    alt: str,
+    licence: ImageLicence | None,
+    author: str,
+    source_url: str = "",
+    credit_text: str = "",
+    permission_ref: str = "",
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Staff set or replace the logo of a saved brand, or only its alt text (`upload=None`).
+
+    The file goes through the SEC.2 checks of `MediaImage` (type by content, size and pixel caps,
+    re-encoding without EXIF or other metadata, safe name) into the logos collection, with the
+    CMS.8 licence, author and, where the licence asks, source URL. The alt text is required plain
+    text. One `catalog.brand.logo_changed` audit entry holds the logo and alt before and after.
+    A refused file leaves the current logo as it is. The replaced image stays in the image
+    library (staff delete it there) so earlier credits remain traceable.
+    """
+    alt = alt.strip()
+    problem = vendors_engine.logo_alt_errors(alt)
+    if problem:
+        raise ValidationError({"logo_alt": problem})
+    stored: tuple[Any, str] | None = None
+    try:
+        with transaction.atomic():
+            locked = Brand.objects.select_for_update().get(pk=brand.pk)
+            if upload is None and locked.logo is None:
+                raise ValidationError({"logo": "Choose an image."})
+            image: MediaImage | None = locked.logo
+            before = _logo_snapshot(image, str(locked.logo_alt))
+            if upload is not None:
+                image = build_logo_image(
+                    str(locked.name),
+                    upload,
+                    licence=licence,
+                    author=author,
+                    source_url=source_url,
+                    credit_text=credit_text,
+                    permission_ref=permission_ref,
+                )
+            after = _logo_snapshot(image, alt)
+            if upload is not None:
+                after["logo"] = "image:new"  # no id before the save
+            changes = ChangeSet()
+            changes.update(BRAND_MODEL, str(locked.public_id), before, after)
+            if dry_run or changes.is_empty:
+                return changes
+            if upload is not None and image is not None:
+                image.save()
+                stored = (image.file.storage, image.file.name)
+                after = _logo_snapshot(image, alt)
+                changes = ChangeSet()
+                changes.update(BRAND_MODEL, str(locked.public_id), before, after)
+            Brand.objects.filter(pk=locked.pk).update(
+                logo=image, logo_alt=alt, updated_at=timezone.now()
+            )
+            audit_changes(changes, ctx=ctx, action=BRAND_LOGO_CHANGED)
+    except BaseException:
+        if stored is not None:  # the row rolls back; the file would stay on disk
+            stored[0].delete(stored[1])
+        raise
+    brand.logo, brand.logo_alt = image, alt
+    return changes
 
 
 def delete_brand(brand: Brand, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:

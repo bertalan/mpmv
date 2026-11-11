@@ -2,7 +2,8 @@
 
 Type, size and pixel caps and the re-encoding without metadata are `MediaImage.clean` and its
 field (SEC.2, THM.12); the CMS.8 licence fields are required; the logo goes to the "Logos and
-icons" collection (the one that accepts SVG, sanitised); the change is audited. Staff only: a
+icons" collection (the one that accepts SVG, refused when it holds a script); the change is
+audited. Staff only: a
 vendor has no way to edit an approved brand.
 """
 
@@ -30,7 +31,11 @@ pytestmark = pytest.mark.django_db
 
 CTX = AuditContext(actor_id=1, actor_label="staff:catalog", source="admin", ip="127.0.0.1")
 MfaLogin = Callable[[Client, User], Client]
-SVG = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><script>alert(1)</script><rect width="10" height="10"/></svg>'  # noqa: E501
+SVG = (
+    b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">'
+    b'<rect width="10" height="10"/></svg>'
+)
+SVG_WITH_SCRIPT = SVG.replace(b"<rect", b"<script>alert(1)</script><rect")
 
 
 def _file(name: str = "logo.png", data: bytes | None = None) -> SimpleUploadedFile:
@@ -78,14 +83,19 @@ def test_the_stored_file_is_reencoded_without_metadata(brand: Brand) -> None:
         assert image.size == (brand.logo.width, brand.logo.height)
 
 
-def test_an_svg_logo_is_accepted_and_sanitised(brand: Brand) -> None:
+def test_a_plain_svg_logo_is_accepted(brand: Brand) -> None:
     _set(brand, upload=_file("logo.svg", SVG))
     brand.refresh_from_db()
     assert brand.logo is not None
+    assert brand.logo.collection.name == "Logos and icons"
     with brand.logo.file.open("rb") as handle:
-        stored = handle.read()
-    assert b"<script" not in stored
-    assert b"<rect" in stored
+        assert b"<rect" in handle.read()
+
+
+def test_an_svg_logo_with_a_script_is_refused(brand: Brand) -> None:
+    with pytest.raises(ValidationError):
+        _set(brand, upload=_file("logo.svg", SVG_WITH_SCRIPT))
+    assert not MediaImage.objects.exists()
 
 
 def test_a_licence_that_needs_a_source_needs_the_source_url(brand: Brand) -> None:

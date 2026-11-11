@@ -31,7 +31,7 @@ from apps.core.i18n import hreflang_alternates
 from apps.core.money import CURRENCY
 from apps.vendors import services as vendors_services
 
-from . import listings, services, slugs
+from . import engine, listings, services, slugs
 
 TEMPLATE = "catalog/listing.html"
 
@@ -175,6 +175,8 @@ def _listing(
         (group.key, option.value): option.label for group in groups for option in group.options
     }
     labels.update({(listings.VENDOR, option.value): option.label for option in vendors})
+    brand = anchor.scope.brand
+    site = request.build_absolute_uri("/").rstrip("/")
 
     context: dict[str, Any] = {
         "editorial": (
@@ -193,6 +195,11 @@ def _listing(
         "vendor_options": vendors,
         "store_categories": store_categories,
         "vendor_profile": vendor_profile,
+        "brand_profile": services.brand_profile(brand, language) if brand else None,
+        # One JSON-LD block per page (SEO.7): the brand page's graph until `seo.page_graph`.
+        "jsonld": (
+            engine.jsonld_text(services.brand_graph(brand, language, site=site)) if brand else ""
+        ),
         "policy_items": [
             {"title": title, "content": RichText(text)}
             for title, text in (vendor_profile.policies if vendor_profile else ())

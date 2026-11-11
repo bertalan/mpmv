@@ -28,6 +28,7 @@ from django.db.models import Case, Prefetch, Q, QuerySet, Value, When
 from django.db.models.functions import Length
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from django.utils.module_loading import import_string
 
 from apps.core import translations
 from apps.core.audit import AuditContext, record
@@ -48,6 +49,7 @@ from .models import (
     Category,
     CategoryTranslation,
     FiscalCategory,
+    Manufacturer,
     Product,
     ProductAttribute,
     ProductKind,
@@ -1816,6 +1818,97 @@ def brand_anchor(slug: str, language: str) -> ListingAnchor | None:
 def brand_page_paths(brand: Brand) -> dict[str, str]:
     """The public page paths of `brand` by language (empty while no text is published)."""
     return _brand_anchor(brand).paths
+
+
+def brand_node_id(brand: Brand, *, site: str) -> str:
+    """The schema.org `@id` of `brand` (its page URL in the source language plus `#brand`): the
+    one id every vendor's product and the brand page use (CAT.20, SEO.7). `site` is the origin,
+    like `https://shop.example`. Empty when the brand has no public page."""
+    return engine.brand_node_id(
+        brand_page_paths(brand), source=translations.source_language(), site=site
+    )
+
+
+@dataclass(frozen=True)
+class BrandProfile:
+    """What the brand page shows above its products (CAT.20 3/3). Links are validated https."""
+
+    logo: MediaImage | None
+    logo_alt: str
+    website: str
+    wikidata_url: str
+    manufacturer: Manufacturer | None
+    description: str  # sanitised HTML in the page language, empty when not translated
+
+    @property
+    def is_empty(self) -> bool:
+        return not (
+            self.logo or self.website or self.wikidata_url or self.manufacturer or self.description
+        )
+
+
+def brand_profile(brand: Brand, language: str) -> BrandProfile:
+    """The brand page content for `language`. The description is the published text of that
+    language only: a missing translation gives none, never the source language's text."""
+    text = brand.translation(language)
+    description = ""
+    if text.translation is not None and not text.is_fallback:
+        description = _clean_rich_text(str(text.translation.description)).strip()
+    logo = brand.logo if brand.logo_id else None
+    return BrandProfile(
+        logo=logo,
+        logo_alt=str(brand.logo_alt) if logo else "",
+        website=str(brand.url) if engine.https_url_error(brand.url) is None else "",
+        wikidata_url=engine.wikidata_url(brand.wikidata_id),
+        manufacturer=brand.manufacturer,
+        description=description,
+    )
+
+
+def _clean_rich_text(html: str) -> str:
+    """`html` through the CMS rich-text sanitiser (CMS.12), found by name: catalog sits below
+    the CMS in the app graph."""
+    clean: str = import_string("apps.cms.engine.sanitise_rich_text")(html, None)
+    return clean
+
+
+def brand_graph(brand: Brand, language: str, *, site: str) -> dict[str, Any]:
+    """The JSON-LD `@graph` of a brand page: the `Brand` node and, when there is one, its
+    manufacturer `Organization` (spec 10, SEO.7 conventions: stable `@id`s, https links only, a
+    description only in the page language). `site` is the origin, without a trailing slash."""
+    node_id = brand_node_id(brand, site=site)
+    profile = brand_profile(brand, language)
+    maker = profile.manufacturer
+    maker_id = f"{site}/#manufacturer-{maker.public_id}" if maker is not None else ""
+    logo_url = ""
+    if profile.logo is not None:
+        logo_url = profile.logo.file.url
+        if logo_url.startswith("/"):
+            logo_url = f"{site}{logo_url}"
+    nodes = [
+        engine.brand_node(
+            node_id=node_id,
+            name=str(brand.name),
+            website=profile.website,
+            logo_url=logo_url,
+            description=engine.plain_description(profile.description),
+            wikidata_id=str(brand.wikidata_id),
+            same_as=brand.same_as if isinstance(brand.same_as, list) else (),
+            manufacturer_id=maker_id,
+        )
+    ]
+    if maker is not None:
+        nodes.append(
+            engine.manufacturer_node(
+                node_id=maker_id,
+                legal_name=str(maker.legal_name),
+                url=str(maker.url),
+                same_as=maker.same_as if isinstance(maker.same_as, list) else (),
+                country=str(maker.country),
+                brand_ids=[node_id],
+            )
+        )
+    return engine.brand_graph(nodes)
 
 
 def _brand_anchor(brand: Brand) -> ListingAnchor:

@@ -53,7 +53,7 @@ def _page(client: Client, path: str) -> BeautifulSoup:
 def _graph(page: BeautifulSoup) -> list[dict[str, Any]]:
     scripts = page.find_all("script", attrs={"type": "application/ld+json"})
     assert len(scripts) == 1  # SEO.7: exactly one JSON-LD block per page
-    data = json.loads(scripts[0].string)
+    data = json.loads(scripts[0].get_text())
     assert data["@context"] == "https://schema.org"
     graph: list[dict[str, Any]] = data["@graph"]
     return graph
@@ -85,7 +85,7 @@ def test_a_missing_translation_gives_no_description_never_a_fallback(client: Cli
 def test_an_unpublished_translation_is_not_shown(client: Client) -> None:
     brand = _brand()
     brand.translations.filter(language="it").update(status="reviewed")
-    page = _page(client, "/it/marchio/acme-it/")  # fallback page: the source-language text
+    page = _page(client, "/it/marchio/acme/")  # the fallback page uses the source slug
     assert "Incudini dal 1949." not in page.get_text()
 
 
@@ -184,9 +184,12 @@ def test_two_vendors_selling_the_brand_share_one_node(client: Client) -> None:
     ProductFactory.create(brand=brand, vendor=VendorFactory.create())
     page_id = _node(_graph(_page(client, "/brand/acme/")), "Brand")["@id"]
     # What the product pages (SEO.1) reference: one id per brand, whoever sells the product.
+    products = Product.objects.filter(brand=brand).select_related("brand")
+    assert products.count() == 2
     ids = {
         services.brand_node_id(product.brand, site="http://testserver")
-        for product in Product.objects.filter(brand=brand).select_related("brand")
+        for product in products
+        if product.brand is not None
     }
     assert ids == {page_id}
 

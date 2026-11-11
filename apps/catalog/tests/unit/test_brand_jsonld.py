@@ -42,7 +42,6 @@ def test_the_brand_node_carries_name_url_logo_description_and_same_as() -> None:
         description="Anvils since 1949.",
         wikidata_id="Q42",
         same_as=["https://en.wikipedia.org/wiki/Acme"],
-        manufacturer_id=f"{SITE}/#manufacturer-1",
     )
     assert node == {
         "@type": "Brand",
@@ -71,7 +70,7 @@ def test_only_https_links_reach_the_same_as_list_and_each_once() -> None:
             "https://ok.example/a",
             "https://user:secret@bad.example/",  # credentials: refused
             "https://has space.example/",
-            42,  # type: ignore[list-item]
+            42,
         ],
     )
     assert node["sameAs"] == ["https://ok.example/a"]
