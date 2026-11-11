@@ -61,7 +61,7 @@ def test_the_caddyfile_hands_the_admin_path_outside_the_networks_to_the_app_404(
     handler = re.search(r"handle @admin_denied \{(.*?)\n\t\}", text, re.S)
     assert handler
     # the app answers its own 404 for an unknown address: same body and headers as any other
-    assert "rewrite * /__not-found__" in handler.group(1)
+    assert "rewrite * /__not-found__/\n" in handler.group(1) + "\n", "with the slash: no 301"
     assert "reverse_proxy mpmv-app:8000" in handler.group(1)
     assert "respond" not in handler.group(1)
     assert text.index("handle @admin_denied") < text.rindex("reverse_proxy mpmv-app:8000")

@@ -22,6 +22,8 @@ class CatalogConfig(AppConfig):
         "manufacturer",
     )
     unaudited_models = {
+        "pricehistory": "append-only record of price settings; every one is written by the audited "
+        "price services (set_product_price, set_variant_price) in the same transaction",
         "producttranslation": "storefront texts under the translation workflow",
         "varianttranslation": "storefront texts under the translation workflow",
         # CAT.13: written only by a database trigger on SKU renames, which services audit.

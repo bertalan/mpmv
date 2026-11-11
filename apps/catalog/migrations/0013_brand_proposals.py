@@ -9,7 +9,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("catalog", "0011_brand_entities"),
+        ("catalog", "0012_price_history"),
         ("vendors", "0026_storefront_rich_text"),
     ]
 

@@ -161,7 +161,8 @@ other vendors' data and bypass the CORE.3 `VendorScopedQuerySet` rule and its ne
   StreamField JSON is the same as if it came from the admin.
 - **Vendor-safe block subset**: rich text (headings, emphasis, lists, links), image and gallery
   (uploads stored in the vendor's own Wagtail image collection, licence fields required), CTA (internal path or `https://` URL),
-  product grid (own products only), FAQ, launch countdown. Not allowed for vendors: embeds, raw
+  product cards (the vendor's own products only) and product grid (sourced from the vendor
+  itself, never from a category, term or brand), FAQ, launch countdown. Not allowed for vendors: embeds, raw
   HTML, page choosers outside the vendor's own events and storefront. The service refuses any
   other block type, also through the API.
 - Links in vendor rich text get `rel="nofollow ugc"`; `javascript:` and `data:` URLs are refused.
@@ -171,6 +172,10 @@ other vendors' data and bypass the CORE.3 `VendorScopedQuerySet` rule and its ne
     vendor-area upload must store there. `figure` and `gallery` accept only images of it; any other
     id (another vendor's, the root collection, a missing one) is a field error on `body`.
     Rich text cannot embed media or link a document by id.
+  - **Own products only.** Every product of a `product_cards` block must be one of the vendor's
+    own; a `product_grid` must be sourced from the vendor itself. Anything else (another
+    vendor's product, a category, term or brand source, an unreadable value) is a field error on
+    `body`.
   - **CTA links**: `https://` only (no `http:`, `javascript:`, `data:` or user name in the address); a page chooser accepts
     only the vendor's own events (the storefront joins with VEN.10).
   - **Limits**: 50 blocks per body, 50 items per gallery or FAQ, 20,000 characters per text, 500

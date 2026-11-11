@@ -48,7 +48,18 @@ separate row from the base block library (CMS.2), which does not wait for the ca
 The editor picks one category, term, brand or vendor in a chooser and a limit from 1 to 24 (one
 listing page); the grid shows the newest products as the listing's product cards and, unless the
 editor turns it off, a "See all" link to the canonical listing page in the page's language. It is
-offered in `HomePage` and `StandardPage` bodies; a grid with no public product is left out.
+offered in `HomePage`, `StandardPage`, `TermLandingPage`, `VendorLandingPage`, `BlogPostPage` and
+`EventPage` bodies (owner request 2026-11-11: the same elements in every interface that has a
+body); a grid with no public product is left out. The product cards block (CMS.11) is offered in
+the same bodies. Both are placed from the product chooser, which searches by name (any language),
+SKU, brand and vendor and filters by vendor, brand and category; it lists listed products only,
+and a vendor member who reaches it sees only their own vendor's products.
+
+**Help on every field.** Every panel, snippet field and StreamField block field an editor fills in
+has a plain-language help text (what to enter, why it matters, an example or limit; what happens if
+a required field is empty), translated into Italian. The rule is the "Field help" convention in
+[01](01-stack-and-architecture.md#cross-cutting-conventions), enforced by ARC.30; events and CMS are
+the first part of the ARC.31 backfill.
 
 ### Launch countdown block (CMS.9)
 
