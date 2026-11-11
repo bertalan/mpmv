@@ -883,11 +883,13 @@ def hold_stock(
     quantity: int,
     *,
     now: dt.datetime | None = None,
-) -> StockReservation | None:
+    dry_run: bool = False,
+) -> ChangeSet:
     """Hold `quantity` units for a cart for ORDER_HOLD_MINUTES, replacing the cart's previous
     hold on the same item. Takes the same row locks as `place_order`, so a hold and an order for
     the last unit cannot both succeed. Raises `OrderRefused` (`out_of_stock`) when too few units
-    are free; returns None when the item has no stock limit."""
+    are free. Returns the change set (empty when the item has no stock limit); a dry run
+    verifies the stock and writes nothing."""
     now = now or timezone.now()
     with transaction.atomic():
         products, variants = _lock_live_rows(
@@ -901,20 +903,32 @@ def hold_stock(
         limit = cart_engine.available_quantity(
             live.stock_policy, stock.stock_qty, stock.stock_status
         )
+        changeset = ChangeSet()
         if limit is None:
-            return None
+            return changeset
         key = _stock_key(live, live_variant)
         free = max(0, limit - _held(key[0], key[1], now=now, cart=cart))
         if quantity > free:
             raise OrderRefused([Refusal("out_of_stock", live.pk, f"Only {free} available.")])
+        expires = now + dt.timedelta(minutes=int(getattr(settings, "ORDER_HOLD_MINUTES", 60)))
+        snapshot = {
+            "cart": cart.pk,
+            "product": key[0],
+            "variant": key[1],
+            "quantity": quantity,
+            "expires_at": expires,
+        }
+        if dry_run:
+            changeset.create(
+                "orders.stockreservation", f"cart{cart.pk}:{key[0]}:{key[1]}", snapshot
+            )
+            return changeset
         own = StockReservation.objects.filter(cart=cart, product_id=key[0])
         (
             own.filter(variant__isnull=True) if key[1] is None else own.filter(variant_id=key[1])
         ).delete()
-        return StockReservation.objects.create(
-            product_id=key[0],
-            variant_id=key[1],
-            cart=cart,
-            quantity=quantity,
-            expires_at=now + dt.timedelta(minutes=int(getattr(settings, "ORDER_HOLD_MINUTES", 60))),
+        hold = StockReservation.objects.create(
+            product_id=key[0], variant_id=key[1], cart=cart, quantity=quantity, expires_at=expires
         )
+        changeset.create("orders.stockreservation", str(hold.public_id), snapshot)
+        return changeset

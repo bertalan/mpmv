@@ -30,6 +30,7 @@ from apps.orders.services import (
     hold_stock,
     place_order,
 )
+from apps.orders.tests.factories import StockReservationFactory
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -243,11 +244,8 @@ def test_another_carts_active_hold_reduces_what_can_be_ordered() -> None:
 @pytest.mark.django_db
 def test_an_expired_hold_is_ignored() -> None:
     product = sellable(stock_qty=1)
-    StockReservation.objects.create(
-        product=product,
-        cart=CartFactory.create(),
-        quantity=1,
-        expires_at=NOW - dt.timedelta(seconds=1),
+    StockReservationFactory.create(
+        product=product, cart=CartFactory.create(), expires_at=NOW - dt.timedelta(seconds=1)
     )
     assert place(product, 1).state == "awaiting_payment"
 
@@ -443,3 +441,14 @@ def test_the_shipping_tax_comes_from_a_tax_outcome_not_typed_fields() -> None:
         "export",
         "N3.2",
     )
+
+
+@pytest.mark.django_db
+def test_a_cart_hold_dry_run_checks_the_stock_and_writes_nothing() -> None:
+    product = sellable(stock_qty=1)
+    cart = CartFactory.create()
+    changeset = hold_stock(cart, product, None, 1, now=NOW, dry_run=True)
+    assert changeset
+    assert StockReservation.objects.count() == 0
+    with pytest.raises(OrderRefused):
+        hold_stock(cart, product, None, 2, now=NOW, dry_run=True)
