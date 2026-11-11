@@ -914,10 +914,18 @@ def add_commission_rule(
         )
 
         def apply() -> None:
-            if closing is not None:
-                closing.valid_to = new.valid_from
-                closing.save(update_fields=["valid_to", "updated_at"])
-            new.save()
+            try:
+                with transaction.atomic():
+                    if closing is not None:
+                        closing.valid_to = new.valid_from
+                        closing.save(update_fields=["valid_to", "updated_at"])
+                    new.save()
+            except IntegrityError:
+                # Two first rules of an empty scope have no row to lock: the constraint (unique
+                # version, no overlap) refuses the loser, who gets a form error, not a 500.
+                raise ValidationError(
+                    {"valid_from": "Another rule was added for this scope at the same time."}
+                ) from None
 
         return run_mutation(
             changeset, apply, ctx=ctx, action=COMMISSION_RULE_ADDED, dry_run=dry_run

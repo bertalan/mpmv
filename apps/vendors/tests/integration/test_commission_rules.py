@@ -9,18 +9,23 @@ import functools
 import json
 from decimal import Decimal
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pytest
+from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, ProgrammingError, connection, transaction
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.accounts import levels
 from apps.accounts.models import User
+from apps.accounts.tests.factories import UserFactory
+from apps.accounts.tests.mfa import verified_login
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
-from apps.vendors import engine
+from apps.vendors import engine, services
 from apps.vendors.models import CommissionRule, VendorPlan
 from apps.vendors.services import (
     COMMISSION_RULE_ADDED,
@@ -454,3 +459,122 @@ def test_a_rule_cannot_leave_a_gap_after_a_closed_one() -> None:
         add_rule(CommissionRuleFactory.build(valid_from=utc(2028)), ctx=CTX)
     assert "valid_from" in excinfo.value.message_dict
     add_rule(CommissionRuleFactory.build(valid_from=utc(2027)), ctx=CTX)  # exactly at the end
+
+
+# --- CORE.25 session level and the Configuration and tax role (D-32 group 2, `commission_change`)
+
+RULE_FORM = {
+    "percent": "15.00",
+    "base": "net_goods",
+    "fee_percent": "4.00",
+    "fee_fixed": "2.00",
+    "fee_base": "gross_paid",
+    "promo_label": "",
+    "valid_from_0": "2030-01-01",
+    "valid_from_1": "00:00:00",
+}
+PLAN_FORM = {"code": "gold", "name": "Gold", "max_products": "10", "features": "{}"}
+
+
+def config_staff(*, role: bool = True) -> User:
+    """A staff user with the model permissions, with or without the Configuration role."""
+    staff = UserFactory.create(staff=True)
+    codenames = ["add_commissionrule", "view_commissionrule", "add_vendorplan", "change_vendorplan"]
+    if role:
+        codenames.append("platform_config")
+    staff.user_permissions.add(*Permission.objects.filter(codename__in=codenames))
+    return staff
+
+
+def test_a_restricted_session_is_refused_on_a_rule_and_a_plan_change(client: Client) -> None:
+    verified_login(client, config_staff(), passkey=True, level=levels.RESTRICTED)
+    rule_url = reverse("admin:vendors_commissionrule_add")
+    plan_url = reverse("admin:vendors_vendorplan_add")
+    assert client.get(rule_url).status_code == 403
+    assert client.post(rule_url, RULE_FORM).status_code == 403
+    assert client.post(plan_url, PLAN_FORM).status_code == 403
+    assert not CommissionRule.objects.exists()
+    assert not VendorPlan.objects.filter(code="gold").exists()
+
+
+def test_an_operational_session_may_add_a_rule_and_a_plan(client: Client) -> None:
+    verified_login(client, config_staff(), passkey=True)  # operational by default
+    assert client.post(reverse("admin:vendors_commissionrule_add"), RULE_FORM).status_code == 302
+    assert client.post(reverse("admin:vendors_vendorplan_add"), PLAN_FORM).status_code == 302
+    assert CommissionRule.objects.count() == 1
+    assert VendorPlan.objects.filter(code="gold").exists()
+
+
+def test_a_plan_change_needs_the_operational_session_too(client: Client) -> None:
+    plan = VendorPlanFactory.create(code="silver")
+    url = reverse("admin:vendors_vendorplan_change", args=[plan.pk])
+    verified_login(client, config_staff(), passkey=True, level=levels.RESTRICTED)
+    assert client.post(url, {**PLAN_FORM, "code": "silver", "name": "Changed"}).status_code == 403
+    plan.refresh_from_db()
+    assert plan.name != "Changed"
+
+
+def test_a_user_without_the_configuration_role_is_refused(client: Client) -> None:
+    verified_login(client, config_staff(role=False), passkey=True)
+    assert client.get(reverse("admin:vendors_commissionrule_add")).status_code == 403
+    assert client.post(reverse("admin:vendors_vendorplan_add"), PLAN_FORM).status_code == 403
+    assert not CommissionRule.objects.exists()
+    assert not VendorPlan.objects.filter(code="gold").exists()
+
+
+# --- Edge cases of rounding, boundaries and races
+
+ROME = ZoneInfo("Europe/Rome")
+
+
+def test_the_snapshot_rounds_half_up_not_half_even() -> None:
+    rule = CommissionRuleFactory.build(
+        percent=Decimal("20.005"), fee_percent=Decimal("2.675"), fee_fixed=Decimal("0.005")
+    )
+    snapshot = rule.snapshot()
+    assert (snapshot["percent"], snapshot["fee_percent"], snapshot["fee_fixed"]) == (
+        "20.01",
+        "2.68",
+        "0.01",
+    )
+
+
+def test_a_rate_with_a_third_decimal_is_refused_not_rounded_by_the_database() -> None:
+    for field in ("percent", "fee_percent", "fee_fixed"):
+        rule = CommissionRuleFactory.build(valid_from=utc(2026), **{field: Decimal("1.005")})
+        with pytest.raises(ValidationError):
+            add_rule(rule, ctx=CTX)
+    assert not CommissionRule.objects.exists()
+
+
+@pytest.mark.parametrize(
+    ("day", "hours_in_day"),
+    [(dt.date(2027, 3, 28), 23), (dt.date(2026, 10, 25), 25), (dt.date(2026, 7, 1), 24)],
+)
+def test_a_rule_switches_exactly_at_business_midnight_also_on_a_dst_change_day(
+    day: dt.date, hours_in_day: int
+) -> None:
+    midnight = dt.datetime.combine(day, dt.time(), tzinfo=ROME)
+    next_midnight = dt.datetime.combine(day + dt.timedelta(days=1), dt.time(), tzinfo=ROME)
+    assert (next_midnight.astimezone(dt.UTC) - midnight.astimezone(dt.UTC)).total_seconds() == (
+        hours_in_day * 3600
+    )
+    vendor = VendorFactory.create()
+    add_rule(CommissionRuleFactory.build(valid_from=utc(2026), percent=20), ctx=CTX)
+    add_rule(CommissionRuleFactory.build(valid_from=next_midnight, percent=18), ctx=CTX)
+    just_before = next_midnight - dt.timedelta(microseconds=1)
+    assert commission_rule_for(vendor, at=midnight).version == 1
+    assert commission_rule_for(vendor, at=just_before).version == 1
+    assert commission_rule_for(vendor, at=next_midnight).version == 2
+
+
+def test_two_first_rules_of_a_scope_at_once_give_a_form_error_not_a_500(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    add_rule(CommissionRuleFactory.build(valid_from=utc(2026)), ctx=CTX)
+    # The loser read the scope as empty (no row to lock) and so picks version 1 again.
+    monkeypatch.setattr(services, "_rules_of_scope", lambda new: CommissionRule.objects.none())
+    with pytest.raises(ValidationError) as excinfo:
+        add_rule(CommissionRuleFactory.build(valid_from=utc(2026)), ctx=CTX)
+    assert "valid_from" in excinfo.value.message_dict
+    assert CommissionRule.objects.count() == 1

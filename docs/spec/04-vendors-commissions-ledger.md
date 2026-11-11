@@ -741,7 +741,7 @@ and closure schedule (VEN.20).
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
 | VEN.1 | Vendor models, translations and policies, statuses, slug | P1 | 8 | ARC.6 | Admin CRUD + status tests |
-| VEN.2 | VendorPlan and versioned CommissionRule with constraints (no implicit zero rule) | P1 | 6 | VEN.1 | Tests on overlapping validity periods |
+| VEN.2 | VendorPlan and versioned CommissionRule with constraints (no implicit zero rule); the per-vendor plan assignment with its history is not part of it (VEN.19 owns it): until then callers of `commission_rule_for` pass the plan in force at order time; rule and plan changes need an operational session (CORE.25 action `commission_change`, group 2) and the Configuration and tax role | P1 | 6 | VEN.1 | Tests on overlapping validity periods; a restricted session is refused on a rule or plan change and an operational one is allowed; a user without the Configuration and tax role is refused |
 | VEN.3 | `compute_commission` pure function + real-case suite (REGOLA-ZERO, PERC-CONGELATA, FEE-NETTO) | P1 | 8 | VEN.2 | All 4.4 cases green |
 | VEN.4 | Append-only LedgerEntry (DB constraint/trigger), balance, per-vendor report | P1 | 10 | VEN.3 | UPDATE/DELETE impossible; balance = sum |
 | VEN.5 | Application → onboarding → active flow, with versioned contract and DAC7 checklist | P1 | 12 | VEN.1 | Test vendor activated end-to-end |

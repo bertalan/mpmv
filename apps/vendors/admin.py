@@ -8,10 +8,8 @@ audit trail.
 import functools
 from collections.abc import Callable
 from typing import Any, cast
-from zoneinfo import ZoneInfo
 
 from django import forms
-from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.admin.utils import unquote
 from django.core.exceptions import FieldDoesNotExist, PermissionDenied, ValidationError
@@ -31,6 +29,7 @@ from apps.accounts.models import User
 from apps.core.admin import step_up
 from apps.core.audit import AuditContext, audit_context
 from apps.core.changeset import ChangeSet
+from apps.core.tasks import business_tz
 from apps.core.text import ascii_int
 
 from . import engine
@@ -828,6 +827,12 @@ class LegalFieldRequirementAdmin(admin.ModelAdmin[LegalFieldRequirement]):
             delete_requirement(requirement, ctx=ctx)
 
 
+def _may_configure_commissions(request: HttpRequest) -> bool:
+    """Commissions and plans are configuration (spec 02, CORE.18): the Configuration and tax role
+    edits them; Finance and the platform owner only read. A superuser passes `has_perm`."""
+    return bool(request.user.has_perm("manager.platform_config"))
+
+
 @admin.register(VendorPlan)
 class VendorPlanAdmin(admin.ModelAdmin[VendorPlan]):
     """Plans are data (VEN.2). Rules point at plans (PROTECT), so a plan is changed, never
@@ -840,8 +845,27 @@ class VendorPlanAdmin(admin.ModelAdmin[VendorPlan]):
     def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         return False
 
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return _may_configure_commissions(request) and super().has_add_permission(request)
+
+    def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return _may_configure_commissions(request) and super().has_change_permission(request, obj)
+
     def save_model(self, request: HttpRequest, obj: VendorPlan, form: Any, change: bool) -> None:
         save_plan(obj, ctx=audit_context(request))
+
+    def changeform_view(
+        self,
+        request: HttpRequest,
+        object_id: str | None = None,
+        form_url: str = "",
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        """A plan sets limits and scopes commission rules: an operational session (CORE.25)."""
+        parent = super().changeform_view
+        return requires_level("commission_change")(
+            lambda req: parent(req, object_id, form_url, extra_context)
+        )(request)
 
 
 class CommissionRuleForm(forms.ModelForm[CommissionRule]):
@@ -907,6 +931,9 @@ class CommissionRuleAdmin(admin.ModelAdmin[CommissionRule]):
     def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         return False
 
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return _may_configure_commissions(request) and super().has_add_permission(request)
+
     def save_model(
         self, request: HttpRequest, obj: CommissionRule, form: Any, change: bool
     ) -> None:
@@ -919,10 +946,10 @@ class CommissionRuleAdmin(admin.ModelAdmin[CommissionRule]):
 
         def in_business_time(req: HttpRequest) -> HttpResponse:
             # A naive "from" typed by staff is read in Rome time, not UTC.
-            with timezone.override(ZoneInfo(settings.BUSINESS_TIME_ZONE)):
+            with timezone.override(business_tz()):
                 return parent(req, form_url, extra_context)
 
-        return step_up(in_business_time)(request)
+        return requires_level("commission_change")(step_up(in_business_time))(request)
 
 
 def _overrides_kill_switch(override: VendorFeatureFlag | None) -> bool:

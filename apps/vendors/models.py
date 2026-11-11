@@ -1,7 +1,9 @@
 """Vendors, their legal identity and their per-language storefront texts and policies (spec 04
 §4.2, VEN.1, VEN.12).
 
-Fields owned by later tasks are added there: `plan` (VEN.2), `payout_account` (VEN.6),
+Fields owned by later tasks are added there: `plan` (VEN.19: the per-vendor plan assignment with
+its effective-dated history; VEN.2 only defines `VendorPlan` and the rules),
+`payout_account` (VEN.6),
 `dac7_complete` (CMP.1), `logo` (media/images). Storefront texts follow the shared translation
 workflow (`apps.core.models.TranslationModel`, I18N.2). Which legal fields are required, and for
 what, is data: `LegalFieldRequirement` (VEN.12). The versioned vendor contract and its
@@ -1015,6 +1017,11 @@ class VendorPlan(BaseModel):
     At launch a plan is only a commission scope (`CommissionRule.plan`) and limits (D-04: no
     paid-plan fee is charged before VEN.19). `features` is a JSON object of flags such as
     `featured` or `api_sync`. Changes go through `services.save_plan` (audited).
+
+    Which plan a vendor is on is not stored here: the assignment, with effective dates, belongs
+    to VEN.19. Until then `services.commission_rule_for` takes the plan as an argument, and the
+    caller must pass the plan in force at the time of the order (never today's plan for an old
+    order).
     """
 
     code = models.SlugField(max_length=32, unique=True)
