@@ -38,6 +38,21 @@ seeds, fetches `/healthz`, the home page, a category page and a seeded `/media/`
 Caddy, checks the containers' read-only root, capabilities and media volume, then deploys a
 deliberately bad release and requires the rollback, units included, in under 60 s.
 
+Upgrade path (OPS.11): when the repository has an earlier release tag (read from the remote by
+[deploy/ci/previous-release.sh](../../deploy/ci/previous-release.sh); on a tag build, the tag
+before it), the smoke first pulls that release's published image from `ghcr.io`, deploys it with
+its own `mpmv-deploy`, migrations and seed, and then deploys the candidate over the same database,
+started by the previous release's script. This catches what only appears when a release migrates
+over existing data, or when an older deploy script installs a newer one (a drift check, a data
+migration, a role sync, the Caddy socket switch). The job log names both versions. With no
+previous tag, or when its image cannot be pulled, the smoke prints a `::notice::` or `::warning::`
+and runs the candidate on an empty database as before (on main and on release tags those two cases
+fail the job instead). A previous script from before the hand-over (release 0.1.7 and older, found
+by [deploy/ci/hands-over.sh](../../deploy/ci/hands-over.sh): its hand-over message is missing)
+would install the candidate's units its own old way, so the smoke applies the one-time script
+refresh described under the Caddy socket switch below, exactly as an operator does, and logs a
+notice.
+
 The smoke rewrites the runner's MPMV configuration and leaves it, its containers and its sysctl
 changes behind, so it runs only on GitHub-hosted (ephemeral) runners: it refuses to start
 elsewhere unless `MPMV_PARITY_THROWAWAY_HOST=1` declares the host disposable. Never point it at a
@@ -58,11 +73,13 @@ ssh <stage> '~/.local/bin/mpmv-deploy deploy 0.2.0'
    files hold every variable name of the release's examples (names only, values are never
    printed), the database root CA is readable, the media volume belongs to the image user, the
    disk has room, the units convert (`quadlet -dryrun`). A failure here changes nothing.
-2. **units of the tag**: the units, Caddyfile and `mpmv-deploy` baked into the image under
-   `/app/deploy` replace the installed ones; the previous set is kept for rollback.
+2. **units of the tag**: the units, the proxy's socket unit, Caddyfile and `mpmv-deploy` baked
+   into the image under `/app/deploy` replace the installed ones; the previous set is kept for
+   rollback.
 3. **migrate**: the one-shot `mpmv-migrate` unit. If it fails, the previous units and image tag
    come back and nothing restarts.
-4. **restart** app and worker (Caddy too when its Caddyfile or unit changed).
+4. **restart** app and worker (Caddy too when its Caddyfile, unit or socket unit changed: stop
+   Caddy, restart `mpmv-caddy.socket`, start Caddy).
 5. **check**: `/healthz`, the home page and one `/media/` file through Caddy on the host, by the
    site name in `caddy.env`, within 40 s; a container that restarts on its own fails at once.
 6. **automatic rollback** if the check fails: the previous image and its units, restarted and
@@ -162,8 +179,35 @@ the vendor events API and the Manager fixes of #212 (which came after the v0.1.3
 ### Django admin network allow-list (OPS.5, MQ-24)
 
 On STAGE and LIVE set `MPMV_ADMIN_ALLOWED_NETWORKS` to loopback only in both `mpmv.env` and
-`caddy.env`, restart the app, reload Caddy, then verify the SSH tunnel and the direct 404 as
+`caddy.env`, restart the app and Caddy, then verify the SSH tunnel and the direct 404 as
 described in [admin access](admin-access.md).
+
+### Caddy behind socket activation (OPS.5 follow-up)
+
+From this release on, Caddy publishes no port: the systemd user unit `mpmv-caddy.socket`
+(`deploy/systemd/`) listens on 80 and 443 and hands the sockets to Caddy, so the proxy and the app
+see each client's real address and the SSH tunnel reaches the Django admin. The switch on a host
+is a normal deploy; nothing is copied by hand.
+
+1. Before the deploy, as the deploy user: `cat /proc/sys/net/ipv4/ip_unprivileged_port_start`
+   prints 80 or lower (the doctor checks it too), and the host has IPv6 enabled (the unit also
+   listens on `[::]`). Refresh the installed deploy script from the release image first (the usual
+   `podman run --rm --network none --entrypoint cat <image>:<version> /app/deploy/server/mpmv-deploy`
+   into `~/.local/bin/mpmv-deploy`): scripts older than this release do not know the socket unit and
+   would install a Caddy unit without it. From this release on, `deploy` hands itself over to the
+   release's own script, so this step is only needed once.
+2. `ssh <host> '~/.local/bin/mpmv-deploy deploy <version>'`. The deploy installs the socket unit in
+   `~/.config/systemd/user/`, enables it, stops the old Caddy (which held 80 and 443 itself),
+   starts the socket unit, then Caddy. Expect a few seconds without the proxy.
+3. Verify on the host: `systemctl --user is-active mpmv-caddy.socket mpmv-caddy.service` prints
+   `active` twice; `systemctl --user is-enabled mpmv-caddy.socket` prints `enabled`;
+   `podman inspect --format '{{json .HostConfig.PortBindings}}' mpmv-caddy` shows no binding.
+4. Verify the client address from your computer: the SSH tunnel shows the admin sign-in page,
+   and the public address answers 404 on `/django-admin/` ([admin access](admin-access.md)).
+5. If the post-deploy check fails (for example the socket cannot bind), the deploy rolls back by
+   itself: the socket unit is stopped, disabled and removed, and the previous Caddy publishes its
+   ports again. `~/.local/bin/mpmv-deploy rollback` to a release from before this change does the
+   same.
 
 ## Promoting to LIVE
 
