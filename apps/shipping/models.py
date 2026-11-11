@@ -485,9 +485,9 @@ class ShippingMethod(BaseModel):
         choices=ShippingTaxTreatment.choices,
         default=engine.DEFAULT_TAX_TREATMENT,
         help_text=_(
-            "Not used yet: saved for a future feature. Which VAT treatment the shipping price "
-            "should get: like the goods, the standard rate, or exempt. Ask your accountant if "
-            "you are not sure."
+            "How VAT is applied to the shipping price. Today only the choice that follows the "
+            "goods works; the other choices are saved but block the shipping quote. Ask your "
+            "accountant if you are not sure."
         ),
     )
     # Hook for D-06 (open): empty means "no policy of its own"; SHP.3 then applies the platform
@@ -501,7 +501,7 @@ class ShippingMethod(BaseModel):
         help_text=_(
             "What the rate calculation should do for a parcel heavier than the last weight band: "
             "charge the last band, ask for a quote or block the checkout. Leave it empty to "
-            "follow the platform default, which is still to be decided."
+            "follow the platform default, which is to ask for a quote."
         ),
     )
 

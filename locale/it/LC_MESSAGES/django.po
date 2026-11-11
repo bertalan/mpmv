@@ -581,6 +581,16 @@ msgstr ""
 "Come usare, montare, mantenere e smaltire il prodotto in sicurezza, in "
 "questa lingua."
 
+#: apps/shipping/models.py
+msgid ""
+"How VAT is applied to the shipping price. Today only the choice that follows"
+" the goods works; the other choices are saved but block the shipping quote. "
+"Ask your accountant if you are not sure."
+msgstr ""
+"Come si applica l'IVA al prezzo della spedizione. Oggi funziona solo la "
+"scelta che segue la merce; le altre vengono salvate ma bloccano il "
+"preventivo di spedizione. Se non sei sicuro, chiedi al tuo commercialista."
+
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid ""
 "If you are not signed in, Continue signs you in once with this link; you "
@@ -813,16 +823,6 @@ msgstr ""
 "Non ancora usato: viene salvato per una funzione futura. Quando leggere il "
 "flusso, come espressione cron, per esempio '0 3 * * *' (ogni giorno alle "
 "3:00). Lascia vuoto se non serve."
-
-#: apps/shipping/models.py
-msgid ""
-"Not used yet: saved for a future feature. Which VAT treatment the shipping "
-"price should get: like the goods, the standard rate, or exempt. Ask your "
-"accountant if you are not sure."
-msgstr ""
-"Non ancora usato: viene salvato per una funzione futura. Quale trattamento "
-"IVA dovrebbe avere il prezzo della spedizione: come la merce, l'aliquota "
-"ordinaria, oppure esente. Se non sei sicuro, chiedi al tuo commercialista."
 
 #: apps/manager/views.py
 msgid "Nothing changed."
@@ -2275,12 +2275,12 @@ msgstr ""
 msgid ""
 "What the rate calculation should do for a parcel heavier than the last "
 "weight band: charge the last band, ask for a quote or block the checkout. "
-"Leave it empty to follow the platform default, which is still to be decided."
+"Leave it empty to follow the platform default, which is to ask for a quote."
 msgstr ""
 "Che cosa dovrebbe fare il calcolo delle tariffe per un pacco più pesante "
 "dell'ultima fascia di peso: addebitare l'ultima fascia, chiedere un "
 "preventivo oppure bloccare la cassa. Lascialo vuoto per seguire il valore "
-"predefinito della piattaforma, che deve ancora essere deciso."
+"predefinito della piattaforma, che è chiedere un preventivo."
 
 #: apps/ingest/models.py
 msgid "What the run does: scrape, stock, price, images or publish."
