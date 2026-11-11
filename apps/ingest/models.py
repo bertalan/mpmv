@@ -17,6 +17,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 from apps.catalog.models import Product
 from apps.core.models import BaseModel
@@ -93,14 +94,44 @@ class SupplierSource(BaseModel):
 
     vendor_scope: ClassVar[str] = "vendor"
 
-    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="supplier_sources")
-    code = models.SlugField(max_length=60, help_text="Short name, unique for the vendor.")
-    adapter_code = models.CharField(max_length=40)
-    config = models.JSONField(default=dict, blank=True)
-    schedule = models.CharField(max_length=100, blank=True, help_text="Cron expression.")
-    is_active = models.BooleanField(default=True)
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.CASCADE,
+        related_name="supplier_sources",
+        help_text=_("The vendor whose supplier feed this is."),
+    )
+    code = models.SlugField(
+        max_length=60,
+        help_text=_(
+            "A short name without spaces for this feed. Two feeds of the same vendor cannot"
+            " share it."
+        ),
+    )
+    adapter_code = models.CharField(
+        max_length=40, help_text=_("The code of the reader that understands this supplier's feed.")
+    )
+    config = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=_("Settings of the reader, as a JSON object. Leave '{}' if it needs none."),
+    )
+    schedule = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text=_(
+            "When the feed should be read, as a cron expression such as '0 3 * * *' (every "
+            "day at 3:00). It is saved with the source. Leave it empty for none."
+        ),
+    )
+    is_active = models.BooleanField(
+        default=True, help_text=_("Untick it to retire the source. Sources are never deleted.")
+    )
     write_enabled = models.BooleanField(
-        default=False, help_text="Without this flag every run of the source is a dry run."
+        default=False,
+        help_text=_(
+            "Tick it to allow runs that write. Without it, every run of this source is a "
+            "dry run that changes nothing."
+        ),
     )
 
     objects = VendorScopedManager()
@@ -120,17 +151,56 @@ class SourceItem(BaseModel):
 
     vendor_scope: ClassVar[str] = "vendor"
 
-    source = models.ForeignKey(SupplierSource, on_delete=models.CASCADE, related_name="items")
-    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="source_items")
-    source_url = models.CharField(max_length=500)
-    aliases = models.JSONField(default=list, blank=True, help_text="Other URLs of the item.")
-    sku = models.CharField(max_length=100, blank=True)
+    source = models.ForeignKey(
+        SupplierSource,
+        on_delete=models.CASCADE,
+        related_name="items",
+        help_text=_("The supplier feed this item comes from."),
+    )
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.CASCADE,
+        related_name="source_items",
+        help_text=_("The vendor that owns the item."),
+    )
+    source_url = models.CharField(
+        max_length=500,
+        help_text=_(
+            "The address of the item in the supplier's feed. It identifies the item in that feed."
+        ),
+    )
+    aliases = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=_("Other addresses the same item had in the feed, as a JSON list."),
+    )
+    sku = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text=_(
+            "The supplier's code for the item. It is used to match the item to a product of"
+            " the vendor."
+        ),
+    )
     sku_key = models.CharField(max_length=64, blank=True, editable=False)
     product = models.ForeignKey(
-        Product, on_delete=models.SET_NULL, null=True, blank=True, related_name="source_items"
+        Product,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="source_items",
+        help_text=_(
+            "The product of the catalogue this item is matched to. Empty while it is not matched."
+        ),
     )
-    last_seen_at = models.DateTimeField(null=True, blank=True)
-    missing_since = models.DateTimeField(null=True, blank=True)
+    last_seen_at = models.DateTimeField(
+        null=True, blank=True, help_text=_("When a run last found the item in the feed.")
+    )
+    missing_since = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_("Since when the item is no longer in the feed. Empty while it is there."),
+    )
 
     objects = VendorScopedManager()
 
@@ -160,10 +230,20 @@ class SourceObservation(BaseModel):
 
     vendor_scope: ClassVar[str] = "item__vendor"
 
-    item = models.ForeignKey(SourceItem, on_delete=models.CASCADE, related_name="observations")
-    observed_at = models.DateTimeField()
-    payload = models.JSONField()
-    payload_hash = models.CharField(max_length=64)
+    item = models.ForeignKey(
+        SourceItem,
+        on_delete=models.CASCADE,
+        related_name="observations",
+        help_text=_("The item this record is about."),
+    )
+    observed_at = models.DateTimeField(help_text=_("When the supplier's data was read."))
+    payload = models.JSONField(
+        help_text=_("What the supplier published for the item, as it was read.")
+    )
+    payload_hash = models.CharField(
+        max_length=64,
+        help_text=_("A fingerprint of the data. The same data is stored once per item."),
+    )
 
     objects = VendorScopedManager()
 
@@ -186,10 +266,28 @@ class ProductDraft(BaseModel):
 
     vendor_scope: ClassVar[str] = "item__vendor"
 
-    item = models.OneToOneField(SourceItem, on_delete=models.CASCADE, related_name="draft")
-    extracted = models.JSONField(default=dict, blank=True)
-    enriched = models.JSONField(default=dict, blank=True, help_text="Texts per language.")
-    status = models.CharField(max_length=20, choices=Status, default=Status.NEW)
+    item = models.OneToOneField(
+        SourceItem,
+        on_delete=models.CASCADE,
+        related_name="draft",
+        help_text=_("The supplier item this draft was made from. An item has one draft."),
+    )
+    extracted = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=_("The product data the import pulled out of the supplier's data, as JSON."),
+    )
+    enriched = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=_("The texts written for the product, one set per language, as JSON."),
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status,
+        default=Status.NEW,
+        help_text=_("Where the draft stands: new, ready, needs review, published or rejected."),
+    )
 
     objects = VendorScopedManager()
 
@@ -209,19 +307,47 @@ class ImportRun(BaseModel):
 
     vendor_scope: ClassVar[str] = "source__vendor"
 
-    source = models.ForeignKey(SupplierSource, on_delete=models.CASCADE, related_name="runs")
-    kind = models.CharField(max_length=20, choices=Kind)
-    status = models.CharField(max_length=20, choices=Status, default=Status.QUEUED)
-    dry_run = models.BooleanField(default=True)
-    started_at = models.DateTimeField(null=True, blank=True)
-    finished_at = models.DateTimeField(null=True, blank=True)
-    seen = models.PositiveIntegerField(default=0)
-    created = models.PositiveIntegerField(default=0)
-    updated = models.PositiveIntegerField(default=0)
-    unchanged = models.PositiveIntegerField(default=0)
-    skipped = models.PositiveIntegerField(default=0)
-    errors = models.PositiveIntegerField(default=0)
-    log = models.TextField(blank=True)
+    source = models.ForeignKey(
+        SupplierSource,
+        on_delete=models.CASCADE,
+        related_name="runs",
+        help_text=_("The supplier feed this run read."),
+    )
+    kind = models.CharField(
+        max_length=20,
+        choices=Kind,
+        help_text=_("What the run does: scrape, stock, price, images or publish."),
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status,
+        default=Status.QUEUED,
+        help_text=_("Where the run stands: queued, running, succeeded, failed or cancelled."),
+    )
+    dry_run = models.BooleanField(
+        default=True,
+        help_text=_(
+            "A dry run only shows what would change. A run that writes is possible only if "
+            "the source allows it."
+        ),
+    )
+    started_at = models.DateTimeField(null=True, blank=True, help_text=_("When the run started."))
+    finished_at = models.DateTimeField(
+        null=True, blank=True, help_text=_("When the run ended, whatever the result.")
+    )
+    seen = models.PositiveIntegerField(
+        default=0, help_text=_("How many items the run found in the feed.")
+    )
+    created = models.PositiveIntegerField(default=0, help_text=_("How many items were new."))
+    updated = models.PositiveIntegerField(default=0, help_text=_("How many items had changed."))
+    unchanged = models.PositiveIntegerField(
+        default=0, help_text=_("How many items had not changed.")
+    )
+    skipped = models.PositiveIntegerField(
+        default=0, help_text=_("How many items the run left out.")
+    )
+    errors = models.PositiveIntegerField(default=0, help_text=_("How many items failed."))
+    log = models.TextField(blank=True, help_text=_("The run's report, in plain text."))
 
     objects = VendorScopedManager()
 
@@ -246,22 +372,61 @@ class ReviewItem(BaseModel):
 
     vendor_scope: ClassVar[str] = "run__source__vendor"
 
-    run = models.ForeignKey(ImportRun, on_delete=models.CASCADE, related_name="review_items")
+    run = models.ForeignKey(
+        ImportRun,
+        on_delete=models.CASCADE,
+        related_name="review_items",
+        help_text=_("The run that opened this case."),
+    )
     item = models.ForeignKey(
-        SourceItem, on_delete=models.SET_NULL, null=True, blank=True, related_name="review_items"
+        SourceItem,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="review_items",
+        help_text=_("The supplier item the case is about, if it is about one."),
     )
     product = models.ForeignKey(
-        Product, on_delete=models.SET_NULL, null=True, blank=True, related_name="review_items"
+        Product,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="review_items",
+        help_text=_("The catalogue product the case is about, if it is about one."),
     )
-    kind = models.CharField(max_length=20, choices=Kind)
-    blocking = models.BooleanField(default=False)
-    payload = models.JSONField(default=dict, blank=True)
-    decision = models.CharField(max_length=10, choices=Decision, default=Decision.PENDING)
-    note = models.TextField(blank=True)
+    kind = models.CharField(
+        max_length=20,
+        choices=Kind,
+        help_text=_(
+            "Why a person must look: price jump, sale, identity change, stale item or "
+            "ambiguous SKU match."
+        ),
+    )
+    blocking = models.BooleanField(
+        default=False,
+        help_text=_("A blocking case stops its run from ending as succeeded until it is decided."),
+    )
+    payload = models.JSONField(
+        default=dict, blank=True, help_text=_("The facts of the case, as JSON.")
+    )
+    decision = models.CharField(
+        max_length=10,
+        choices=Decision,
+        default=Decision.PENDING,
+        help_text=_("The decision: pending, accepted, rejected or deferred."),
+    )
+    note = models.TextField(blank=True, help_text=_("A note on the decision."))
     resolved_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text=_("The person who decided the case."),
     )
-    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_at = models.DateTimeField(
+        null=True, blank=True, help_text=_("When the case was decided.")
+    )
 
     objects = VendorScopedManager()
 
@@ -302,17 +467,59 @@ class MappingTable(BaseModel):
     vendor_scope: ClassVar[str] = "vendor"
 
     vendor = models.ForeignKey(
-        Vendor, on_delete=models.CASCADE, null=True, blank=True, related_name="mappings"
+        Vendor,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="mappings",
+        help_text=_(
+            "Leave it empty for an entry that holds for every vendor. A vendor's own entry "
+            "wins over an entry for every vendor."
+        ),
     )
-    kind = models.CharField(max_length=20, choices=Kind)
-    key = models.CharField(max_length=200)
+    kind = models.CharField(
+        max_length=20,
+        choices=Kind,
+        help_text=_(
+            "What kind of term this is: category, taxonomy term, colour, material, brand or other."
+        ),
+    )
+    key = models.CharField(
+        max_length=200,
+        help_text=_(
+            "The supplier's term, as the supplier writes it. Upper and lower case do not matter."
+        ),
+    )
     key_norm = models.CharField(max_length=200, editable=False)
-    aliases = models.JSONField(default=list, blank=True)
-    target_type = models.ForeignKey(
-        ContentType, on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    aliases = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=_("Other ways the supplier writes the same term, as a JSON list."),
     )
-    target_id = models.PositiveBigIntegerField(null=True, blank=True)
-    target_value = models.CharField(max_length=200, blank=True)
+    target_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text=_(
+            "The kind of catalogue object this term stands for. Leave it empty when the "
+            "term stands for a plain value."
+        ),
+    )
+    target_id = models.PositiveBigIntegerField(
+        null=True,
+        blank=True,
+        help_text=_("The number of the catalogue object this term stands for."),
+    )
+    target_value = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text=_(
+            "The plain value this term stands for, for example a colour name. Use it when "
+            "there is no catalogue object."
+        ),
+    )
     target = GenericForeignKey("target_type", "target_id")
 
     objects = VendorScopedManager()
