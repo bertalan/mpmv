@@ -275,6 +275,11 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "switch_language": NoVendorData("Stores the visitor's language choice."),
     "themes:styleguide": StaffOnly("Component samples of the active theme (THM.4), staff only."),
+    "levels:options": NoVendorData(OWN_ACCOUNT),
+    "levels:operational": NoVendorData(OWN_ACCOUNT),
+    "levels:once_options": NoVendorData(OWN_ACCOUNT),
+    "levels:once": NoVendorData(OWN_ACCOUNT),
+    "levels:end": NoVendorData(OWN_ACCOUNT),
     "mfa:overview": NoVendorData(OWN_ACCOUNT),
     "mfa:setup": NoVendorData(OWN_ACCOUNT),
     "mfa:totp": NoVendorData(OWN_ACCOUNT),
@@ -329,6 +334,22 @@ ENDPOINTS: dict[str, Access] = {
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
     ),
+    "manager:platform:notices": StaffOnly(
+        "Notices of illegal content (CMP.5): platform data, not vendor-owned; needs the "
+        "compliance.review_notices permission, so a vendor member gets 404."
+    ),
+    "manager:platform:notice": StaffOnly(
+        "One notice of illegal content (CMP.5): platform data, not vendor-owned; needs the "
+        "compliance.review_notices permission, so a vendor member gets 404.",
+        kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
+    "dsa_notice": NoVendorData(
+        "Public report form for illegal content (DSA art. 16, CMP.5): no vendor data is shown, "
+        "the form only stores a notice; captcha and a rate limit guard the POST."
+    ),
+    "dsa_notice_received": NoVendorData(
+        "Thanks page after a report (CMP.5): shows only the reference kept in the session."
+    ),
     "admin:login": NoVendorData("Staff sign-in page."),
     "admin:logout": NoVendorData("Staff sign-out."),
     "admin:jsi18n": NoVendorData("Admin JavaScript translation catalog."),
@@ -339,6 +360,10 @@ ENDPOINTS: dict[str, Access] = {
         "Unknown API paths: a 404 problem document.", path="/api/v1/no-such-operation"
     ),
     # CMS (CMS.1): public pages and the editors' sign-in. The rest of /admin/ is CMS_ADMIN.
+    "dsa_contact_points": NoVendorData(
+        "DSA points of contact (CMP.5): the platform operator's own contact data, the same for "
+        "every visitor; no vendor data."
+    ),
     "wagtail_serve": NoVendorData(
         "Public CMS pages (home, static pages); no vendor data until the CMS.4 landing pages.",
         path="/no-such-page/",

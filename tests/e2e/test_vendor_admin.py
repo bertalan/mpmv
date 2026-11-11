@@ -20,7 +20,7 @@ from apps.vendors.tests.factories import (
     VendorFactory,
 )
 from apps.vendors.tests.fakes import seed_legal_requirements
-from tests.e2e.login import verify_with_totp
+from tests.e2e.login import fresh_passkey, make_operational, verify_with_totp
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -86,6 +86,8 @@ def test_staff_complete_an_incomplete_legal_profile(
     expect(page.locator(".messagelist")).to_contain_text("was changed successfully")
     expect(readiness).to_contain_text("Missing: PEC address, IBAN.")
 
+    make_operational(page)  # the IBAN is bank data: D-32 group 3 `payout_details`:
+    fresh_passkey(page)  # operational mode plus a fresh passkey
     page.locator("#id_pec").fill("vendor-a@pec.example.com")
     page.locator("#id_iban").fill("IT60 X054 2811 1010 0000 0123 456")
     page.get_by_role("button", name="Save and continue editing").click()

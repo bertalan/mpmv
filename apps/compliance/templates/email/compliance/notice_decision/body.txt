@@ -1,0 +1,6 @@
+{% load i18n %}{% translate "We reviewed your report and reached a decision." %}
+
+{% translate "Reference" %}: {{ reference }}
+{% translate "Reported location" %}: {{ url }}
+{% translate "Decision" %}: {% if outcome == "action_taken" %}{% translate "Action taken" %}{% else %}{% translate "No action" %}{% endif %}
+{% translate "Reason" %}: {{ reason }}

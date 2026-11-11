@@ -99,11 +99,12 @@ class FakeAuthenticator:
         *,
         origin: str | None = None,
         signing_key: ec.EllipticCurvePrivateKey | None = None,
+        user_verified: bool = True,
     ) -> dict[str, Any]:
         """Authentication credential JSON for `PublicKeyCredentialRequestOptions` JSON."""
         self.sign_count += 1
         rp_id_hash = hashlib.sha256(options["rpId"].encode()).digest()
-        flags = USER_PRESENT | USER_VERIFIED
+        flags = USER_PRESENT | (USER_VERIFIED if user_verified else 0)
         auth_data = rp_id_hash + bytes([flags]) + self.sign_count.to_bytes(4, "big")
         client_data = self._client_data("webauthn.get", options["challenge"], origin)
         key = signing_key or self.private_key
