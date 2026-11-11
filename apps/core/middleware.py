@@ -78,28 +78,28 @@ class PrivateCacheForSignedInUsersMiddleware:
 class AdminNetworkAllowlistMiddleware:
     """Answer 404 on the Django admin path to a client outside `ADMIN_ALLOWED_NETWORKS` (OPS.5).
 
-    Defence in depth behind the reverse proxy's allow-list. The client address is `client_ip()`,
-    so a forwarded header counts only from a trusted proxy. The refusal is the 404 page of any
-    unknown address: nothing says an admin lives there. With no network configured the app does
-    not restrict (the deploy check core.W002 warns).
+    Defence in depth behind the reverse proxy's allow-list, and fail closed: an empty list denies
+    everybody (development and tests list loopback explicitly). The client address is
+    `client_ip()`, so a forwarded header counts only from a trusted proxy. Listed after
+    LocaleMiddleware and before CommonMiddleware: the refusal is the 404 page of any unknown
+    address, in the negotiated language and theme, with the same headers, and `/django-admin`
+    without the slash gets no APPEND_SLASH redirect that would give the route away.
     """
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponseBase]) -> None:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponseBase:
-        networks = settings.ADMIN_ALLOWED_NETWORKS
-        if (
-            networks
-            and request.path.startswith(self._prefix())
-            and not ip_in_networks(client_ip(request), networks)
+        if self._is_admin_path(request.path) and not ip_in_networks(
+            client_ip(request), settings.ADMIN_ALLOWED_NETWORKS
         ):
             return page_not_found(request, Http404())
         return self.get_response(request)
 
     @staticmethod
-    def _prefix() -> str:
+    def _is_admin_path(path: str) -> bool:
         try:
-            return reverse("admin:index")
+            bare = reverse("admin:index").rstrip("/")
         except NoReverseMatch:  # a URLconf without the Django admin (some tests)
-            return "/\0"
+            return False
+        return path == bare or path.startswith(bare + "/")

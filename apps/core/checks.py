@@ -197,13 +197,13 @@ def check_admin_network_settings(
 def check_admin_network_for_deploy(
     app_configs: Iterable[AppConfig] | None, **kwargs: Any
 ) -> list[checks.CheckMessage]:
-    """OPS.5: with no allowed network the Django admin answers everybody (only Caddy limits it)."""
+    """OPS.5: with no allowed network the Django admin answers 404 to everybody (fail closed)."""
     if settings.ADMIN_ALLOWED_NETWORKS:
         return []
     return [
         checks.Warning(
-            "ADMIN_ALLOWED_NETWORKS is empty: the app does not restrict the Django admin.",
-            hint="Set MPMV_ADMIN_ALLOWED_NETWORKS as in deploy/server/mpmv.env.example.",
+            "ADMIN_ALLOWED_NETWORKS is empty: the Django admin is unreachable (404 for everybody).",
+            hint="Set MPMV_ADMIN_ALLOWED_NETWORKS (deploy/server/mpmv.env.example) to reach it.",
             id="core.W002",
         )
     ]

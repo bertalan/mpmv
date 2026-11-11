@@ -38,17 +38,18 @@ def test_from_outside_every_admin_path_answers_404(client: Client, path: str) ->
 @pytest.mark.parametrize("path", [ADMIN, ADMIN.rstrip("/"), ADMIN + "login/"])
 def test_the_refusal_is_the_normal_404(client: Client, path: str, language: str) -> None:
     """Same status, body (language and theme), header names and values as an unknown URL."""
-    extra = {"headers": {"Accept-Language": language}} if language else {}
+    headers = {"Accept-Language": language} if language else {}
     with override_settings(FORCE_NOINDEX=True):
-        refused = client.get(path, REMOTE_ADDR="203.0.113.9", **extra)
-        unknown = client.get("/no-such-page-here/", REMOTE_ADDR="203.0.113.9", **extra)
+        refused = client.get(path, headers=headers, REMOTE_ADDR="203.0.113.9")
+        unknown = client.get("/no-such-page-here/", headers=headers, REMOTE_ADDR="203.0.113.9")
     assert refused.status_code == unknown.status_code == 404
     assert "Location" not in refused
     token = re.compile(rb'(nonce|value)="[^"]*"')  # a new CSP nonce and CSRF token every time
     assert token.sub(b"", refused.content) == token.sub(b"", unknown.content)
     for name in ("X-Robots-Tag", "Permissions-Policy", "X-Frame-Options", "Content-Language"):
         assert refused.get(name) == unknown.get(name)
-    ignore = {"Content-Security-Policy"}  # carries a per-response nonce
+    # a per-response nonce; CommonMiddleware adds the length (the server does for the refusal)
+    ignore = {"Content-Security-Policy", "Content-Length"}
     assert {k for k in refused.headers if k not in ignore} == {
         k for k in unknown.headers if k not in ignore
     }
