@@ -136,7 +136,8 @@ def test_add_zone_normalizes_countries_and_is_audited(staff_client: Client) -> N
     assert zone.vendor is None
     entry = AuditLog.objects.get(action="shipping.shippingzone.created")
     assert entry.source == "admin"
-    assert entry.actor_label == "staff:staff@example.com"
+    assert entry.actor_label.startswith("staff:")
+    assert "@" not in entry.actor_label  # pseudonymous: the public id, never the address
     assert entry.target_key == str(zone.public_id)
     assert entry.after is not None
     assert entry.after["countries"] == ["GR"]

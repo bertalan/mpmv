@@ -7,7 +7,7 @@ Test data comes from factory_boy factories, reseeded before every test (ARC.12).
 import os
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import factory.random
 import pytest
@@ -21,6 +21,14 @@ if TYPE_CHECKING:
     from apps.accounts.models import User
     from apps.core.changeset import ChangeSet
     from tests.tenancy import CrossTenant
+
+
+@pytest.fixture
+def admin_open(settings: Any) -> None:
+    """OPS.5: the technical admin answers every address, for tests of the sign-in protections
+    that connect from several client addresses (the test settings allow loopback only)."""
+    settings.ADMIN_ALLOWED_NETWORKS = ["0.0.0.0/0", "::/0"]
+
 
 # Fixed seed for Faker and factory_boy, so a failure replays with the same data.
 FACTORY_SEED = int(os.environ.get("MPMV_TEST_SEED", "20271"))

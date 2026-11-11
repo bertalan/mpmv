@@ -162,6 +162,7 @@ when a new mutating service has neither `dry_run` nor a place in this table (ARC
 | `apps.core.services.consume_rate_limit` | throttle counter | Counts one request against a fixed-window rate limit |
 | `apps.tax.services.record_vat_validation` | telemetry | Append-only record of a VIES answer |
 | `apps.tax.services.verify_vat_number` | telemetry | Asking VIES stores its answer in the append-only validation log; a check is a lookup |
+| `apps.tax.services.verify_vat_number_for_order` | telemetry | Same lookup as `verify_vat_number`, always fresh and keyed to the vendor, for an order |
 | `apps.tax.services.recheck_vat_number` | telemetry | Same lookup as `verify_vat_number`, forced past the cache by the background job |
 | `apps.vendors.services.confirm_claim_identity` | throttle counter | Counts a wrong VAT number or TIN against the claim and locks it after too many (VEN.24) |
 | `apps.vendors.services.submit_claim` | one-time code | Spends the claim link and the authenticator code that creates the account (VEN.24) |

@@ -57,7 +57,7 @@ part of the done-when still open) · `not started`.
 | CAT.6 | done | #174 | Redirect model, admin, `import_redirects`, resolved in the middleware |
 | THM.1 | done | #88 | Theme registry, loader and per-site theme |
 | ARC.18 | done | #106 | Engine purity contract and dry-run exception guard |
-| TAX.5 | done | #92 | VIES client with cache, timeout and fail-closed check. Tax code, flagged for careful human review |
+| TAX.5 | done | #92, #224 | VIES client with cache, timeout and fail-closed check. Tax code, flagged for careful human review. #224 (D-28): VIES consultation log with the vendor as requester, append-only (migration `tax/0008`), Madeira and Azores territories seeded (`tax/0009`). Tax code, needs human review |
 | CAT.13 | done | #83 | Internal product identity; the vendor SKU is a label |
 | CORE.12 | done | #102 | Per-API-key rate limit with a shared PostgreSQL counter |
 | ORD.1 | done | #100 | Cart, guest and user carts, merge on sign-in |
@@ -99,8 +99,16 @@ part of the done-when still open) · `not started`.
 | CMP.7 | partial: automated audit in CI; manual review and statement open | #217 | axe (wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa) on the key public pages in the e2e suite (`tests/e2e/test_axe_audit.py`), any violation fails, report uploaded as the `e2e-axe` artifact. Cart, checkout and product detail are not yet in `KEY_PAGES` |
 | VEN.29 | done | #238 | Storefront description and the three policies are Wagtail rich text (D-34): sanitised on save and on render, embeds of another vendor's media refused and hidden, legacy plain text rendered as paragraphs, idempotent data migration (`vendors/0026`), editors scoped to the Manager form, e2e screenshot. Security (rich text), needs human review |
 | TAX.3 | done | #218 | `resolve_goods_tax` pure function in `apps/tax/engine.py` with the T1 to T15 goods case table (`apps/tax/tests/unit/test_goods_tax.py`; T4 and T10 to T13 wait for TAX.4, T16 to T18 belong to their own rows), exemption-nature codes (D-26, D-28), T15 through `is_outside_vat_territory`; migration `tax/0007`. Tax code, needs human review |
-| CMP.5 | partial: 2 of 4 (contacts, terms and ranking pages; notice and action); statement of reasons and 30-day termination notice open | #222, #230 | 1/4 DSA points of contact, platform terms and ranking pages (migration `core/0019`). 2/4 notice and action (art. 16): `Notice` with a tracked outcome and a reviewer workflow, good-faith statement, captcha, declared in the public forms register (migration `compliance/0003`). Compliance code, needs human review |
+| CMP.5 | partial: 3 of 4 (contacts, terms and ranking pages; notice and action; statement of reasons); 30-day termination notice open | #222, #230, #233 | 1/4 DSA points of contact, platform terms and ranking pages (migration `core/0019`). 2/4 notice and action (art. 16): `Notice` with a tracked outcome and a reviewer workflow, good-faith statement, captcha, declared in the public forms register (migration `compliance/0003`). Compliance code, needs human review. 3/4 DSA art. 17 statement of reasons (`StatementOfReasons`, acting on content through the owning app services), art. 18 notification, art. 24(5) transparency submission stored pending (migration `compliance/0004`). Compliance code, needs human review |
 | CORE.25 | done | #234 | Two session levels (D-32): `restricted` default, operational mode from a fresh passkey, per-action "do it once" grants stored in the database and spent once (`accounts/0006`, `0007`), group 3 actions need their own fresh user-verified passkey, timers and action lists in `SessionPolicy` (`core/0020`), start, end and prompts audited, per-user per-day report. Security code, needs human review |
+| SEC.14 | done | #251 | Rate limit (per IP and per restriction) and captcha on Wagtail page view restriction forms; the interim block is lifted. Declared in the public forms register. Security code, needs human review |
+| OPS.2 | done | #250 | JSON logs, error tracker interface (`MPMV_ERROR_TRACKER`: none or log), `/healthz` and `/readyz`, alert hooks (disk space, WAL archiving, backup age). New `MPMV_OPS_*` variables in the server env example |
+| ORD.4 | done | #247 | Transactional `place_order` with `StockReservation` (migration `orders/0011`) and price verification, concurrency test on stock 1. Order code, needs human review |
+| VEN.31 | partial: 1 of 2 (images); documents open | #248 | Manager image chooser and upload into the vendor's own collection `vendor-<id>` (`apps/manager/media.py`, section `shop.media`, owner only): crafted collection or foreign image id answers 404 and is audited (`vendor.media_denied`), `upload_storefront_image` with SEC.2 checks, own-work licence, hourly limit, `vendor.media_uploaded` audit; `link` feature dropped from the editor and `linktype="page"` refused on save. The spec row is in the open PR #244. Security code (media, tenancy), needs human review |
+| CORE.18 | partial: 1 of 2 (roles and matrix); staff UI and assignment open | #253 | `apps/manager/roles.py` (five roles, incompatible pairs, 17-section matrix, role membership never `has_perm`), unmanaged `PlatformAccess` permissions (`manager/0001`), idempotent `sync_role_groups` data migration (`manager/0002`), system checks `manager.E003` (static) and `manager.E004` (group drift), generated `docs/dev/platform-roles.md`. Part 2: Staff and roles UI, assignment service, step-up, audit, one-person team. Permissions code, needs human review |
+| ORD.6 | done | #249 | Vendor fulfilment from the Manager shop space: orders list and detail, accept, ship with tracking, delivered (`fulfil_vendor_order`, engine rules, tracking validation, audit row per step), tenant isolation tests, e2e screenshots. No model change. Customer notification on shipped is not in the row. Order code, needs human review |
+| SHP.3 | done | #254 | `quote_shipping` pure engine and service with Rates, IndicativeRates, NeedsQuote and Blocked outcomes, over-band policy, pickup, free-shipping threshold per method, special areas; cases 8 to 13, 15, 16, 19. No migration. `WeightBand.surcharge_net` is not yet defined in the spec |
+| TAX.4 | done | #255 | `resolve_shipping_tax` with proportional split by goods net (ROUND_HALF_UP, remainder on the largest share), `TaxPortion`, fail-closed `UnsupportedShippingTreatment` for non-default treatments; T8 to T13 plus T1, T7, T14. D-03 stays open for the advisor (default: shipping follows the goods). Tax code, needs human review |
 | SEC.13 | done | #236 | Anonymous POST form sweep: a system check fails for an undeclared anonymous POST endpoint, `@public_form(...)` declarations and the generated public forms register (`tools/build_public_forms.py`). Security code, needs human review |
 | I18N.7 | partial: 1 of n (Manager and account strings in Italian) | #245 | Italian catalog for the Manager and account strings through `tools/i18n_catalog.py` (extract, compile, check; `make check` runs the check) |
 | CAT.19 | done | #154 | Vendor products in the Manager shop space |
@@ -795,6 +803,18 @@ Compliance, security and content:
 | #230 | CMP.5 | DSA notice and action (2 of 4) |
 | #227 | none | Spec: D-32 session levels, anonymous-form sweep, session hardening rows |
 | #234 | CORE.25 | Two session levels, restricted and operational (D-32) |
+| #247 | ORD.4 | Transactional place_order with StockReservation and price verification |
+| #260 | none | Coherence check 15 |
+| #226 | none | Spec: D-29 order data retention |
+| #251 | SEC.14 | Protect the page view restriction forms; lift the interim block |
+| #224 | TAX.5 | VIES consultation log with the vendor as requester; Madeira and Azores (D-28) |
+| #233 | CMP.5 | Statement of reasons, acting on content, art. 18 notification (3 of 4) |
+| #250 | OPS.2 | Observability: JSON logs, error tracker, readiness, alert hooks |
+| #248 | VEN.31 | Manager image chooser and upload into the vendor's own collection (1/2) |
+| #253 | CORE.18 | Platform staff roles and the role-permission matrix (1/2) |
+| #249 | ORD.6 | Vendor fulfilment: accept, ship with tracking, delivered |
+| #254 | SHP.3 | quote_shipping with Rates, IndicativeRates, NeedsQuote, Blocked |
+| #255 | TAX.4 | resolve_shipping_tax, shipping follows the goods |
 
 ## Coherence checks
 
@@ -1505,3 +1525,42 @@ Findings and actions:
 5. Info. CORE.25 is a trial (D-32 review after STAGE): the owner reviews the friction report once STAGE runs it. TAX.14 (vendor territory in `TaxContext`, D-26) is a P2 follow-up, not in this delta.
 
 Verdict: GO with follow-ups. No blocker. VEN.29 (rich text), TAX.3 (tax), CMP.5 2/4 (compliance) and CORE.25 (sessions, passkeys) are security, tax or compliance code and need human review.
+
+### Coherence check 16 (release gate v0.1.5, main at dc668e15364bc347d850766cb8d0ff815e027705)
+
+Scope: main at dc668e1 (merge of #250), the merges since check 15 (907fedd): #226 (spec D-29), #251 (SEC.14), #224 (TAX.5, D-28), #233 (CMP.5 3/4), #250 (OPS.2); #247 (ORD.4) also lacked rows.
+
+| Area | Result |
+|---|---|
+| Code vs spec | SEC.14: `apps/cms/middleware.py` (per-IP and per-restriction rate limit, then captcha) with `apps/cms/tests/integration/test_page_restriction_protection.py`. TAX.5 / D-28: VIES consultation log with requester, tests in `test_vies_consultation_log.py`, Madeira and Azores seed (`tax/0009`). CMP.5 3/4: `StatementOfReasons`, art. 18 notification, tests in `test_statement_of_reasons.py`. OPS.2: `apps/core/errortracking.py`, JSON logs, readiness and alerts, tests `test_errortracking.py`, `test_observability_logs.py`. ORD.4: `test_place_order.py`. |
+| Spec and docs | D-29, D-30, D-31, D-32, D-34, D-35 are all in 92-open-decisions now (carried-over major finding from checks 14 and 15 is closed by #226). D-33 appears in no spec or code file, only in earlier progress notes: no action. Task rows and PR rows for the six merges added here. |
+| Hygiene | `makemigrations --check` clean. Chains linear: core ..0020, accounts ..0007, tax ..0009, vendors ..0026, compliance ..0004, orders 0001..0011. No credential-like literal, no private name in versioned files; `python tools/i18n_catalog.py check` clean. |
+| Gates | `make check` pass on dc668e1. Main CI on dc668e1: see the PR. Full suite not run locally. |
+
+Findings and actions:
+
+1. Info. The v0.1.5 STAGE notes (user-visible changes, migrations, new environment variables, data migrations, deploy steps) are in the PR body.
+2. Minor, carried over: CMP.5 stays partial (3 of 4, 30-day termination notice open), `time.sleep(1.0)` in the orders concurrency test, CMP.7 `KEY_PAGES` lacks cart, checkout and product detail, SEO.8 2/2 and CORE.9 3/3 open, OPS.7 Wagtail deprecation warning.
+3. Info. CORE.25 is a trial (D-32): the owner reviews the friction report after STAGE.
+
+Verdict: GO. No blocker. SEC.14, TAX.5, CMP.5 3/4, ORD.4 and OPS.2 are security, tax, compliance or order code and need human review.
+
+### Coherence check 17 (main at 1e6dab6b37dc62467dfcc45898fc8cc45133fac1)
+
+Scope: main at 1e6dab6 (merge of #255), the merges since check 16 (9d50a3a): #248 (VEN.31 1/2), #253 (CORE.18 1/2), #249 (ORD.6), #254 (SHP.3), #255 (TAX.4).
+
+| Area | Result |
+|---|---|
+| Code vs spec | ORD.6: engine, service and Manager pages with unit, integration and e2e tests, tenant isolation and audit covered. SHP.3: cases 8 to 13 in `test_quote_shipping.py` (unit and integration). TAX.4: T8 to T13 in `test_shipping_tax.py` (27 tests, written first). CORE.18 1/2: roles, matrix, seeding and drift check with tests; the 200/404 per page cell check waits for the platform sections (part 2). VEN.31 1/2: images with 404 and audit tests, but the spec row is not on main (see finding 1). |
+| Spec and docs | D-03 (TAX.4) and D-06 (SHP.3) exist in 92-open-decisions and are still open: TAX.4 is on the D-03 default and fails closed on other treatments; SHP.3 reads the over-band policy from the method. D-34 is decided. `WeightBand.surcharge_net` is used by SHP.3 but not defined in spec 06. |
+| Hygiene | `makemigrations --check` clean. Chains linear: manager 0001..0002 (new app), orders 0001..0011, shipping 0001..0010, tax 0001..0009, vendors ..0026, core ..0020, accounts ..0007, compliance ..0004, cms ..0014. No credential-like literal, no private name found in the five diffs. |
+| Gates | `make check` pass on 1e6dab6. Main CI on 1e6dab6: success. Full suite not run locally. |
+
+Findings and actions:
+
+1. Major. VEN.31 code is on main but its spec row is only in the open PR #244, so the task has no row in `docs/spec` or the backlog (spec first rule). Merge #244 soon; the VEN.31 row here points to it.
+2. Minor. SHP.3 needs `WeightBand.surcharge_net` defined in spec 06 (next spec PR). ORD.6 lacks a customer notification on shipped: propose a follow-up task. VEN.31 follow-ups: page-scoped CSP hash for Draftail styles (lane-a), documents chooser (2/2), a link dialog for external links.
+3. Minor, carried over: CMP.5 3 of 4, `time.sleep(1.0)` in the orders concurrency test, CMP.7 `KEY_PAGES` lacks cart, checkout and product detail, SEO.8 2/2 and CORE.9 3/3 open, OPS.7 Wagtail deprecation warning.
+4. Info. TAX.4 and SHP.3 are not wired to checkout yet: ORD.3 and SHP.4 pass the shipping rate and goods decisions. D-03 and D-06 stay open for the advisor and the owner.
+
+Verdict: GO with follow-ups. One major spec-gap finding (VEN.31 row in #244), no blocker. VEN.31 (media, tenancy), CORE.18 (permissions), ORD.6 (orders) and TAX.4 (tax) need human review.

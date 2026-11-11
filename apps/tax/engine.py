@@ -13,7 +13,7 @@ import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any, Final, Literal
+from typing import Any, Final, Literal, Protocol
 
 from apps.core import postcodes
 from apps.core.countries import EU_MEMBER_STATES, InvalidCountry, normalize_country
@@ -558,15 +558,22 @@ VAT_REASON_TIMEOUT: Final = "vies_timeout"
 VAT_REASON_MALFORMED: Final = "malformed_vat_number"
 VAT_REASON_PREFIX_MISMATCH: Final = "prefix_mismatch"
 VAT_REASON_NOT_IN_VIES: Final = "country_not_in_vies"
+#: The vendor has no VAT number VIES can use as requester: no reverse-charge supply (art. 138).
+VAT_REASON_NO_VENDOR_VAT: Final = "no_vendor_vat_number"
+#: VIES said valid but gave no consultation number: no usable proof for an order.
+VAT_REASON_NO_CONSULTATION_NUMBER: Final = "no_consultation_number"
 
 # Why VIES gave no answer, when it is not one of VIES's own error codes (MS_UNAVAILABLE…).
 DETAIL_TIMEOUT: Final = "timeout"
 DETAIL_CONNECTION: Final = "connection_failed"
 DETAIL_BAD_RESPONSE: Final = "bad_response"
 DETAIL_CLIENT_ERROR: Final = "client_error"
+#: VIES refused the requester (the vendor's or the operator's VAT number) of the consultation.
+DETAIL_INVALID_REQUESTER: Final = "invalid_requester"
 
 _TIMEOUT_DETAILS: Final = frozenset({DETAIL_TIMEOUT, "TIMEOUT"})
 _INVALID_INPUT = "INVALID_INPUT"
+_INVALID_REQUESTER_INFO = "INVALID_REQUESTER_INFO"
 _VIES_UNDISCLOSED = "---"  # a name or address the member state does not disclose
 
 _MESSAGES: Final = {
@@ -577,6 +584,8 @@ _MESSAGES: Final = {
     VAT_REASON_MALFORMED: "This is not a well-formed VAT number",
     VAT_REASON_PREFIX_MISMATCH: "The VAT number's prefix is not the one of {country}",
     VAT_REASON_NOT_IN_VIES: "VIES does not cover {country}",
+    VAT_REASON_NO_VENDOR_VAT: "The seller has no VAT number for an intra-EU supply",
+    VAT_REASON_NO_CONSULTATION_NUMBER: "VIES gave no consultation number for this check",
 }
 _NOT_VERIFIED = ": the VAT number is not verified and VAT is charged."
 
@@ -605,6 +614,7 @@ class ViesAnswer:
     name: str = ""
     address: str = ""
     request_id: str = ""
+    request_date: str = ""  # VIES `requestDate`, as sent
 
 
 class NotCheckable(ValueError):
@@ -669,11 +679,15 @@ def read_vies_answer(query: ViesQuery, payload: Mapping[str, Any]) -> ViesAnswer
         if not isinstance(wrappers, list) or not wrappers or not isinstance(wrappers[0], dict):
             return bad
         code = str(wrappers[0].get("error") or DETAIL_BAD_RESPONSE)
+        if code == _INVALID_REQUESTER_INFO:
+            return ViesAnswer(result=VAT_UNAVAILABLE, detail=DETAIL_INVALID_REQUESTER)
         return ViesAnswer(
             result=VAT_INVALID if code == _INVALID_INPUT else VAT_UNAVAILABLE, detail=code
         )
 
     error = _text(payload, "userError")
+    if error == _INVALID_REQUESTER_INFO:
+        return ViesAnswer(result=VAT_UNAVAILABLE, detail=DETAIL_INVALID_REQUESTER)
     if error not in ("", "VALID", "INVALID", _INVALID_INPUT):
         return ViesAnswer(result=VAT_UNAVAILABLE, detail=error)
     valid = payload.get("valid")
@@ -693,6 +707,7 @@ def read_vies_answer(query: ViesQuery, payload: Mapping[str, Any]) -> ViesAnswer
         name=_text(payload, "name"),
         address=_text(payload, "address"),
         request_id=_text(payload, "requestIdentifier"),
+        request_date=_text(payload, "requestDate"),
     )
 
 
@@ -1015,3 +1030,137 @@ def tax_amount(net: Decimal, rate: Decimal) -> Decimal:
     if not (net.is_finite() and rate.is_finite()):
         raise ValueError("net and rate must be finite")
     return (net * rate / 100).quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP)
+
+
+# --- TAX.4: VAT on shipping (D-03) -----------------------------------------------------------
+
+TREATMENT_FOLLOWS_GOODS: Final = "follows_goods"
+
+
+class UnsupportedShippingTreatment(BlockingTaxError):
+    """A shipping method stores a VAT treatment other than `follows_goods` (`standard_rate`,
+    `exempt`, the old carrier `force_vat`). D-03 is not decided for them: the quote is blocked
+    instead of guessing a VAT."""
+
+
+class ShippingChargeLike(Protocol):
+    """What the tax engine reads from a shipping quote: the net price and the stored treatment.
+    SHP.3's `ShippingRate` satisfies it; tax never imports shipping."""
+
+    @property
+    def net(self) -> Decimal: ...
+
+    @property
+    def tax_treatment(self) -> str: ...
+
+
+@dataclass(frozen=True)
+class ShippingCharge:
+    net: Decimal
+    tax_treatment: str = TREATMENT_FOLLOWS_GOODS
+
+
+@dataclass(frozen=True)
+class TaxPortion:
+    """The part of a vendor's shipping that falls under one goods decision.
+
+    Exposes the `TaxDecision` fields, so anything that accepts a decision (ORD.4's tax outcome)
+    accepts a portion."""
+
+    net: Decimal
+    tax: Decimal
+    decision: TaxDecision
+
+    @property
+    def rate(self) -> Decimal:
+        return self.decision.rate
+
+    @property
+    def reason(self) -> TaxReason:
+        return self.decision.reason
+
+    @property
+    def country_of_taxation(self) -> str | None:
+        return self.decision.country_of_taxation
+
+    @property
+    def legal_note_key(self) -> str | None:
+        return self.decision.legal_note_key
+
+    @property
+    def nature_code(self) -> str | None:
+        return self.decision.nature_code
+
+
+def _decision_key(d: TaxDecision) -> tuple[Decimal, str, str, str, str]:
+    return (
+        -d.rate,
+        d.reason,
+        d.country_of_taxation or "",
+        d.legal_note_key or "",
+        d.nature_code or "",
+    )
+
+
+def resolve_shipping_tax(
+    ctx: TaxContext,
+    goods: Iterable[tuple[Decimal, TaxDecision]],
+    shipping: ShippingChargeLike,
+) -> list[TaxPortion]:
+    """Split a vendor package's shipping over the goods' tax decisions (spec 05 §5.1, D-03).
+
+    Shipping follows the goods: it is divided in proportion to the net goods amount under each
+    distinct decision (rate and reason), so a 22% / 10% package has two portions, an exempt,
+    reverse-charge, export or outside-territory package has one zero portion with the goods'
+    legal note and nature code. Each portion's net is rounded ROUND_HALF_UP; the largest share
+    absorbs the rounding difference so the portions add up to the shipping net, and the VAT of
+    each is `tax_amount`. Portions come in decision order (highest rate first), zero-net ones
+    are dropped (at least one always remains). Callers pass the post-discount goods net; a
+    negative line raises. A package of zero-value goods uses the first decision. Free shipping
+    gives no portions. `ctx` is kept for the signature of spec 05 (the decisions already carry
+    the context's outcome).
+    """
+    net, treatment = shipping.net, shipping.tax_treatment
+    if not isinstance(net, Decimal):
+        raise TypeError("shipping net must be Decimal")
+    if not net.is_finite() or net < 0:
+        raise ValueError("shipping net must be a finite amount, zero or more")
+    lines = list(goods)
+    if not lines:
+        raise ValueError("shipping VAT needs the package's goods: no goods given")
+    if treatment != TREATMENT_FOLLOWS_GOODS:
+        raise UnsupportedShippingTreatment(
+            f"shipping VAT treatment {treatment!r} is not supported (D-03): "
+            "shipping follows the goods"
+        )
+    if ctx.vendor_profile.regime == EXEMPT:
+        # Re-checked so a vendor profile that became incomplete blocks here too (never a silent 0%).
+        _exempt(ctx.vendor_profile, vendor_country=ctx.vendor_country)
+    if net == 0:
+        return []
+
+    totals: dict[TaxDecision, Decimal] = {}
+    for amount, decision in lines:
+        if not isinstance(amount, Decimal) or not amount.is_finite() or amount < 0:
+            raise ValueError("goods net must be a finite Decimal, zero or more")
+        totals[decision] = totals.get(decision, Decimal(0)) + amount
+    goods_total = sum(totals.values(), Decimal(0))
+    if goods_total == 0:
+        first = next(iter(totals))
+        return [TaxPortion(net=net, tax=tax_amount(net, first.rate), decision=first)]
+
+    # Deterministic order, whatever the input order: highest rate first, then the other fields.
+    ordered = sorted(totals, key=_decision_key)
+    shares = {
+        decision: (net * totals[decision] / goods_total).quantize(
+            MONEY_QUANTUM, rounding=ROUND_HALF_UP
+        )
+        for decision in ordered
+    }
+    largest = max(ordered, key=lambda d: totals[d])  # ties: first in decision order
+    shares[largest] += net - sum(shares.values(), Decimal(0))
+    return [
+        TaxPortion(net=share, tax=tax_amount(share, decision.rate), decision=decision)
+        for decision, share in shares.items()
+        if share != 0
+    ]
