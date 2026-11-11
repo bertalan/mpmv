@@ -22,7 +22,7 @@ from django.db.models import QuerySet
 from django.utils import timezone
 from django_otp import devices_for_user
 
-from apps.accounts.models import User
+from apps.accounts.models import ElevationGrant, User
 from apps.cart.models import Cart
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import Change, ChangeSet
@@ -313,6 +313,7 @@ def anonymise_customer(
                         ).changes
                     )
             Cart.objects.filter(user=locked).delete()
+            ElevationGrant.objects.filter(user=locked).delete()
             for device in list(devices_for_user(locked, confirmed=None)):
                 device.delete()
             complete = open_orders == 0

@@ -75,7 +75,7 @@ def pseudonymise(apps, schema_editor) -> None:  # type: ignore[no-untyped-def]
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("core", "0019_cmp5_contacts"),
+        ("core", "0020_session_policy_elevate"),
         ("accounts", "0001_initial"),
     ]
 
