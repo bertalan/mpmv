@@ -79,7 +79,7 @@ class BrandChooserViewSet(ChooserViewSet):  # type: ignore[misc]
     per_page = 50
 
     def get_object_list(self) -> QuerySet[Brand]:
-        return Brand.objects.order_by("name")
+        return Brand.objects.filter(status=Brand.Status.APPROVED).order_by("name")
 
 
 SEARCH_WORDS_MAX = 8  # a longer query is cut: each word adds a pass over four columns
