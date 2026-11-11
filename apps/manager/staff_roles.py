@@ -24,6 +24,7 @@ from typing import Any
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.db.models import Q
 
 from apps.core.audit import AuditContext, user_context
@@ -151,41 +152,65 @@ def revoke_role(
     reason: str = "",
     dry_run: bool = False,
 ) -> ChangeSet:
-    """Take the platform role `role_key` from `target`; a role not held is a no-op."""
+    """Take the platform role `role_key` from `target`; a role not held is a no-op.
+
+    Revoking the owner role removes the owner permission however it was granted (group, or
+    directly as the bootstrap does), so the audit `after` is what the account really holds. The
+    last-owner check and the change run in one transaction with the owner rows locked, so two
+    owners revoking each other at once leave one. Revoking the last role clears `is_staff`,
+    including for a former legacy staff account (never a superuser, and never an account that
+    still has other groups or permissions).
+    """
     _authorise(actor)
     _check_role(role_key)
     group = Group.objects.get(name=roles.role(role_key).group)
-    if not target.groups.filter(pk=group.pk).exists():
-        return ChangeSet()
-    before = user_roles(target) | (
-        frozenset({roles.OWNER}) if _holds_owner_directly(target) else frozenset()
-    )
-    if (
-        role_key == roles.OWNER
-        and not _holds_owner_directly(target)
-        and not platform_owners().exclude(pk=target.pk).exists()
-    ):
-        raise RoleAssignmentError("The last platform owner cannot be removed or demoted.")
-    remaining = before - {role_key}
-    others = target.groups.exclude(pk=group.pk).exists() or target.user_permissions.exists()
-    clears_staff = not remaining and not others and not target.is_superuser and target.is_staff
-    changes = ChangeSet()
-    changes.update(
-        USER_MODEL,
-        str(target.public_id),
-        _snapshot(target, before, target.is_staff),
-        _snapshot(target, remaining, target.is_staff and not clears_staff, reason.strip() or None),
-    )
+    with transaction.atomic():
+        if role_key == roles.OWNER:
+            # Lock every owner row (in pk order) before reading who is left.
+            list(
+                get_user_model()
+                .objects.select_for_update()
+                .filter(pk__in=platform_owners().values("pk"))
+                .order_by("pk")
+            )
+        direct = _holds_owner_directly(target) if role_key == roles.OWNER else False
+        in_group = target.groups.filter(pk=group.pk).exists()
+        if not (in_group or direct):
+            return ChangeSet()
+        before = user_roles(target) | (
+            frozenset({roles.OWNER}) if _holds_owner_directly(target) else frozenset()
+        )
+        if role_key == roles.OWNER and not platform_owners().exclude(pk=target.pk).exists():
+            raise RoleAssignmentError("The last platform owner cannot be removed or demoted.")
+        remaining = before - {role_key}
+        other_permissions = target.user_permissions.exclude(
+            codename=PLATFORM_OWNER_CODENAME if role_key == roles.OWNER else ""
+        ).exists()
+        others = target.groups.exclude(pk=group.pk).exists() or other_permissions
+        clears_staff = not remaining and not others and not target.is_superuser and target.is_staff
+        changes = ChangeSet()
+        changes.update(
+            USER_MODEL,
+            str(target.public_id),
+            _snapshot(target, before, target.is_staff),
+            _snapshot(
+                target, remaining, target.is_staff and not clears_staff, reason.strip() or None
+            ),
+        )
 
-    def apply() -> None:
-        target.groups.remove(group)
-        if clears_staff:
-            target.is_staff = False
-            target.save(update_fields=["is_staff"])
+        def apply() -> None:
+            target.groups.remove(group)
+            if role_key == roles.OWNER:
+                target.user_permissions.remove(
+                    *target.user_permissions.filter(codename=PLATFORM_OWNER_CODENAME)
+                )
+            if clears_staff:
+                target.is_staff = False
+                target.save(update_fields=["is_staff"])
 
-    return run_mutation(
-        changes, apply, ctx=_audit_context(actor, ctx), action=REVOKE_ACTION, dry_run=dry_run
-    )
+        return run_mutation(
+            changes, apply, ctx=_audit_context(actor, ctx), action=REVOKE_ACTION, dry_run=dry_run
+        )
 
 
 def _notify_self_assignment(actor: Any, role_key: str, reason: str) -> None:
