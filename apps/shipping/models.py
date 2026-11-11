@@ -76,16 +76,16 @@ class Carrier(BaseModel):
         max_length=500,
         blank=True,
         help_text=_(
-            "The carrier's tracking link, with {tracking_number} where the parcel number "
-            "goes. Leave it empty if the carrier has none."
+            "Not used yet: saved for a future feature. The carrier's tracking link, with "
+            "{tracking_number} where the parcel number goes. Leave it empty if there is none."
         ),
     )
     supports_api = models.BooleanField(
         "supports API",
         default=False,
         help_text=_(
-            "Tick it if the carrier offers labels and tracking through an API. It is a note"
-            " about the carrier."
+            "Not used yet: saved for a future feature. Tick it if the carrier offers labels and "
+            "tracking through an API."
         ),
     )
 

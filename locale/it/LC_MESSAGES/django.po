@@ -743,6 +743,58 @@ msgstr "nessuna registrazione di passkey in corso"
 msgid "No second factor yet."
 msgstr "Nessun secondo fattore per ora."
 
+#: apps/ingest/models.py
+msgid ""
+"Not used yet: saved for a future feature. Settings of the reader, as a JSON "
+"object. Leave '{}' if it needs none."
+msgstr ""
+"Non ancora usato: viene salvato per una funzione futura. Impostazioni del "
+"lettore, come oggetto JSON. Lascia '{}' se non ne servono."
+
+#: apps/shipping/models.py
+msgid ""
+"Not used yet: saved for a future feature. The carrier's tracking link, with "
+"{tracking_number} where the parcel number goes. Leave it empty if there is "
+"none."
+msgstr ""
+"Non ancora usato: viene salvato per una funzione futura. Il link di "
+"tracciamento del corriere, con {tracking_number} al posto del numero del "
+"pacco. Lascialo vuoto se non c'è."
+
+#: apps/ingest/models.py
+msgid ""
+"Not used yet: saved for a future feature. The code of the reader that "
+"understands this supplier's feed."
+msgstr ""
+"Non ancora usato: viene salvato per una funzione futura. Il codice del "
+"lettore che capisce il flusso di questo fornitore."
+
+#: apps/shipping/models.py
+msgid ""
+"Not used yet: saved for a future feature. Tick it if the carrier offers "
+"labels and tracking through an API."
+msgstr ""
+"Non ancora usato: viene salvato per una funzione futura. Spunta se il "
+"corriere offre etichette e tracciamento tramite API."
+
+#: apps/ingest/models.py
+msgid ""
+"Not used yet: saved for a future feature. Untick it to retire the source. "
+"Sources are never deleted."
+msgstr ""
+"Non ancora usato: viene salvato per una funzione futura. Togli la spunta per"
+" mettere a riposo la fonte. Le fonti non si cancellano mai."
+
+#: apps/ingest/models.py
+msgid ""
+"Not used yet: saved for a future feature. When the feed should be read, as a"
+" cron expression such as '0 3 * * *' (every day at 3:00). Leave it empty for"
+" none."
+msgstr ""
+"Non ancora usato: viene salvato per una funzione futura. Quando leggere il "
+"flusso, come espressione cron, per esempio '0 3 * * *' (ogni giorno alle "
+"3:00). Lascia vuoto se non serve."
+
 #: apps/manager/views.py
 msgid "Nothing changed."
 msgstr "Nessuna modifica."
@@ -1079,11 +1131,6 @@ msgstr "Configura un’app di autenticazione"
 msgid "Set up two-factor authentication"
 msgstr "Configura la verifica in due passaggi"
 
-#: apps/ingest/models.py
-msgid "Settings of the reader, as a JSON object. Leave '{}' if it needs none."
-msgstr ""
-"Impostazioni del lettore, come oggetto JSON. Lascia '{}' se non ne servono."
-
 #: apps/manager/templates/manager/shop/order.html
 msgid "Ship the order"
 msgstr "Spedisci l'ordine"
@@ -1271,23 +1318,11 @@ msgstr ""
 "Il nome del corriere come lo leggono i clienti in questa lingua, per esempio"
 " 'Corriere standard'."
 
-#: apps/shipping/models.py
-msgid ""
-"The carrier's tracking link, with {tracking_number} where the parcel number "
-"goes. Leave it empty if the carrier has none."
-msgstr ""
-"Il link di tracciamento del corriere, con {tracking_number} al posto del "
-"numero del pacco. Lascialo vuoto se il corriere non ce l'ha."
-
 #: apps/ingest/models.py
 msgid "The catalogue product the case is about, if it is about one."
 msgstr ""
 "Il prodotto del catalogo a cui si riferisce il caso, se riguarda un "
 "prodotto."
-
-#: apps/ingest/models.py
-msgid "The code of the reader that understands this supplier's feed."
-msgstr "Il codice del lettore che capisce il flusso di questo fornitore."
 
 #: apps/core/models.py
 msgid ""
@@ -1980,14 +2015,6 @@ msgstr "Spunta se un software ha aiutato a trovare il contenuto."
 msgid "Tick it if software took the decision."
 msgstr "Spunta se la decisione è stata presa da un software."
 
-#: apps/shipping/models.py
-msgid ""
-"Tick it if the carrier offers labels and tracking through an API. It is a "
-"note about the carrier."
-msgstr ""
-"Spunta se il corriere offre etichette e tracciamento tramite API. È una nota"
-" sul corriere."
-
 #: apps/ingest/models.py
 msgid ""
 "Tick it to allow runs that write. Without it, every run of this source is a "
@@ -2090,12 +2117,6 @@ msgstr "La verifica in due passaggi è attiva"
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Two-factor settings"
 msgstr "Impostazioni della verifica in due passaggi"
-
-#: apps/ingest/models.py
-msgid "Untick it to retire the source. Sources are never deleted."
-msgstr ""
-"Togli la spunta per mettere a riposo la fonte. Le fonti non si cancellano "
-"mai."
 
 #: apps/shipping/models.py
 msgid ""
@@ -2277,15 +2298,6 @@ msgstr "Quando un'esecuzione ha trovato l'articolo nel flusso l'ultima volta."
 #: apps/ingest/models.py
 msgid "When the case was decided."
 msgstr "Quando il caso è stato deciso."
-
-#: apps/ingest/models.py
-msgid ""
-"When the feed should be read, as a cron expression such as '0 3 * * *' "
-"(every day at 3:00). It is saved with the source. Leave it empty for none."
-msgstr ""
-"Quando leggere il flusso, come espressione cron, per esempio '0 3 * * *' "
-"(ogni giorno alle 3:00). Viene salvata con la fonte. Lascia vuoto se non "
-"serve."
 
 #: apps/compliance/models.py
 msgid ""

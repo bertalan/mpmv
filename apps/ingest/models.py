@@ -108,23 +108,34 @@ class SupplierSource(BaseModel):
         ),
     )
     adapter_code = models.CharField(
-        max_length=40, help_text=_("The code of the reader that understands this supplier's feed.")
+        max_length=40,
+        help_text=_(
+            "Not used yet: saved for a future feature. "
+            "The code of the reader that understands this supplier's feed."
+        ),
     )
     config = models.JSONField(
         default=dict,
         blank=True,
-        help_text=_("Settings of the reader, as a JSON object. Leave '{}' if it needs none."),
+        help_text=_(
+            "Not used yet: saved for a future feature. "
+            "Settings of the reader, as a JSON object. Leave '{}' if it needs none."
+        ),
     )
     schedule = models.CharField(
         max_length=100,
         blank=True,
         help_text=_(
-            "When the feed should be read, as a cron expression such as '0 3 * * *' (every "
-            "day at 3:00). It is saved with the source. Leave it empty for none."
+            "Not used yet: saved for a future feature. When the feed should be read, as a cron "
+            "expression such as '0 3 * * *' (every day at 3:00). Leave it empty for none."
         ),
     )
     is_active = models.BooleanField(
-        default=True, help_text=_("Untick it to retire the source. Sources are never deleted.")
+        default=True,
+        help_text=_(
+            "Not used yet: saved for a future feature. "
+            "Untick it to retire the source. Sources are never deleted."
+        ),
     )
     write_enabled = models.BooleanField(
         default=False,
