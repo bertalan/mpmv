@@ -248,16 +248,13 @@ def test_wagtail_password_reset_and_page_passwords_must_be_declared(settings: An
     )
     assert not any("password_reset" in p for p in public_forms.settings_problems())
     settings.WAGTAIL_PRIVATE_PAGE_OPTIONS = {"SHARED_PASSWORD": True}
-    settings.BLOCK_PAGE_RESTRICTION_ROUTES = False
-    assert any("shared password" in p for p in public_forms.settings_problems())
-    assert any("_util/" in p for p in public_forms.settings_problems())  # the gate needs the block
-    settings.BLOCK_PAGE_RESTRICTION_ROUTES = True  # blocked: the form is unreachable
+    # SEC.14: apps.cms declares the form when it starts, so the shared password may stay on
     assert not any("shared password" in p for p in public_forms.settings_problems())
 
 
-def test_the_wagtail_restriction_routes_are_gated_not_declared() -> None:
+def test_the_wagtail_restriction_routes_are_declared_not_gated() -> None:
     report = public_form_report()
-    assert not [r for r in report.public if "_util" in r.leaf.path]
+    assert len([r for r in report.public if "_util" in r.leaf.path]) == 2
     assert report.warnings == []  # no known gap is left
     assert report.errors == []
 

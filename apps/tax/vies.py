@@ -33,7 +33,7 @@ Transport = Callable[[str, Mapping[str, Any], float], Mapping[str, Any]]
 
 @runtime_checkable
 class ViesClient(Protocol):
-    def check(self, query: ViesQuery) -> ViesAnswer:
+    def check(self, query: ViesQuery, *, requester: ViesQuery | None = None) -> ViesAnswer:
         """VIES's answer about `query`. An unreachable or slow VIES is an `unavailable`
         answer, never an exception."""
         ...
@@ -124,11 +124,13 @@ class HttpViesClient:
             requester=requester,
         )
 
-    def check(self, query: ViesQuery) -> ViesAnswer:
+    def check(self, query: ViesQuery, *, requester: ViesQuery | None = None) -> ViesAnswer:
+        """`requester` (the vendor, for an order: D-28) replaces the client's own requester."""
         body = {"countryCode": query.prefix, "vatNumber": query.number}
-        if self.requester is not None:
-            body["requesterMemberStateCode"] = self.requester.prefix
-            body["requesterNumber"] = self.requester.number
+        asking = requester if requester is not None else self.requester
+        if asking is not None:
+            body["requesterMemberStateCode"] = asking.prefix
+            body["requesterNumber"] = asking.number
         try:
             payload = self._transport(self.url, body, self.timeout)
         except (OSError, ValueError, http.client.HTTPException) as exc:

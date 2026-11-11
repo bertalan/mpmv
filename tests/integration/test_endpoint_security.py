@@ -41,7 +41,6 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import pytest
-from django.conf import settings
 from django.db import connection, models
 from django.http.response import HttpResponseBase
 from django.test import Client
@@ -271,9 +270,6 @@ def written_tables() -> Iterator[set[str]]:
             tables.add(match.group(1))
 
 
-BLOCKED_WHILE_RESTRICTIONS_ARE_OFF = {"wagtailcore_login", "wagtailcore_authenticate_with_password"}
-
-
 def is_editors_admin(endpoint: Endpoint) -> bool:
     """Served under the Wagtail admin (`/admin/`), whose API views are CSRF-exempt."""
     return endpoint.route.startswith(CMS_ADMIN_ROUTE)
@@ -381,13 +377,6 @@ def test_post_without_csrf_token_is_refused(endpoint: Endpoint) -> None:
             f"{endpoint.key} is CSRF-exempt ({CSRF_EXEMPT[endpoint.key]}), but an unsigned POST "
             f"got {describe(response)}"
         )
-    elif (
-        endpoint.key in BLOCKED_WHILE_RESTRICTIONS_ARE_OFF
-        and settings.BLOCK_PAGE_RESTRICTION_ROUTES
-    ):
-        # SEC.13/SEC.14: the middleware answers 404 before CSRF; the CSRF refusal (403) applies
-        # again once SEC.14 lifts the block, and then this branch is not taken.
-        assert response.status_code == 404, f"{endpoint.key}: got {describe(response)}"
     elif is_editors_admin(endpoint) and getattr(endpoint.callback, "csrf_exempt", False):
         # Wagtail's admin API and wagtail-localize: DRF checks the token itself (403); a view
         # without a POST handler answers 405 and changes nothing.

@@ -52,11 +52,22 @@ from apps.catalog.tests.factories import (
 )
 from apps.cms.models import VendorLandingPage
 from apps.cms.tests.factories import VendorLandingPageFactory
-from apps.compliance.models import GpsrInfo, GpsrSafetyText, SafetyCase, VendorGpsrDefaults
+from apps.compliance.models import (
+    GpsrInfo,
+    GpsrSafetyText,
+    ProductRestriction,
+    SafetyCase,
+    StatementOfReasons,
+    TransparencySubmission,
+    VendorGpsrDefaults,
+)
 from apps.compliance.tests.factories import (
     GpsrInfoFactory,
     GpsrSafetyTextFactory,
+    ProductRestrictionFactory,
     SafetyCaseFactory,
+    StatementOfReasonsFactory,
+    TransparencySubmissionFactory,
     VendorGpsrDefaultsFactory,
 )
 from apps.core.models import TranslationStatus
@@ -184,6 +195,14 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     ),
     SafetyCase: lambda vendor: SafetyCaseFactory.create(
         product=ProductFactory.create(vendor=vendor)
+    ),
+    StatementOfReasons: lambda vendor: StatementOfReasonsFactory.create(vendor=vendor),
+    ProductRestriction: lambda vendor: ProductRestrictionFactory.create(
+        product=ProductFactory.create(vendor=vendor),
+        statement=StatementOfReasonsFactory.create(vendor=vendor),
+    ),
+    TransparencySubmission: lambda vendor: TransparencySubmissionFactory.create(
+        statement=StatementOfReasonsFactory.create(vendor=vendor)
     ),
     ShippingZone: lambda vendor: ShippingZoneFactory.create(vendor=vendor),  # a vendor zone
     ShippingMethod: lambda vendor: ShippingMethodFactory.create(vendor=vendor),
