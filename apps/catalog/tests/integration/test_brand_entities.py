@@ -148,3 +148,32 @@ def test_the_migration_keeps_every_brand_public_and_fills_keys_idempotently() ->
     assert {b.status for b in brands} == {"approved"}
     assert brands.get(name="Café & Co").name_key == "cafe and co"
     assert brands.filter(translations__slug="kept").exists()
+
+
+def test_a_logo_needs_an_alt_text() -> None:
+    from apps.core.tests.factories import MediaImageFactory
+
+    brand = BrandFactory.build(logo=MediaImageFactory.create(), logo_alt="")
+    with pytest.raises(ValidationError) as caught:
+        brand.full_clean()
+    assert "logo_alt" in caught.value.message_dict
+
+
+def test_a_legacy_near_duplicate_stays_editable_but_a_rename_into_one_is_refused() -> None:
+    first = BrandFactory.create(name="Acme & Sons")
+    legacy = BrandFactory.create(name="ACME and sons")  # saved without full_clean
+    legacy.url = "https://acme.example/"
+    legacy.full_clean()  # not renamed: allowed
+    other = BrandFactory.create(name="Other")
+    other.name = first.name.upper() + "!"
+    with pytest.raises(ValidationError) as caught:
+        other.full_clean()
+    assert "name" in caught.value.message_dict
+
+
+def test_only_approved_brands_are_offered_to_product_forms(staff_client: Client) -> None:
+    approved = BrandFactory.create(name="Visible")
+    pending = BrandFactory.create(name="Hidden", status=Brand.Status.PENDING)
+    page = staff_client.get(reverse("admin:catalog_product_add")).content.decode()
+    assert approved.name in page
+    assert pending.name not in page

@@ -65,7 +65,7 @@ class BrandChooserViewSet(ChooserViewSet):  # type: ignore[misc]
     per_page = 50
 
     def get_object_list(self) -> QuerySet[Brand]:
-        return Brand.objects.order_by("name")
+        return Brand.objects.filter(status=Brand.Status.APPROVED).order_by("name")
 
 
 class ProductChosenView(ChosenView):  # type: ignore[misc]

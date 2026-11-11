@@ -295,8 +295,33 @@ class BrandTranslationInline(admin.StackedInline[BrandTranslation, Brand]):
     fields = ("language", "status", "slug", *SEO_TEXTS)
 
 
+class BrandForm(forms.ModelForm[Brand]):
+    """A brand staff create is approved unless they say otherwise."""
+
+    class Meta:
+        model = Brand
+        fields = (
+            "name",
+            "status",
+            "wikidata_id",
+            "url",
+            "same_as",
+            "logo",
+            "logo_alt",
+            "manufacturer",
+        )
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["status"].required = False
+
+    def clean_status(self) -> str:
+        return str(self.cleaned_data.get("status") or Brand.Status.APPROVED)
+
+
 @admin.register(Brand)
 class BrandAdmin(admin.ModelAdmin[Brand]):
+    form = BrandForm
     list_display = ("name", "status", "manufacturer", "wikidata_id")
     list_filter = ("status",)
     search_fields = ("name", "wikidata_id")

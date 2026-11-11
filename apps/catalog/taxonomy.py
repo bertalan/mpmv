@@ -445,8 +445,16 @@ class Brand(BaseModel):
             errors.setdefault("wikidata_id", []).append(problem)
         others = Brand.objects.exclude(pk=self.pk)
         key = engine.brand_name_key(self.name)
-        if key and others.filter(name_key=key).exists():
+        # Only a new brand or a rename is checked: a legacy brand whose near-duplicate already
+        # exists stays editable. No unique constraint on `name_key`, so existing data migrates;
+        # imports and proposals (CAT.20 2/3) must call `full_clean()`.
+        renamed = (
+            self._state.adding or not Brand.objects.filter(pk=self.pk, name=self.name).exists()
+        )
+        if key and renamed and others.filter(name_key=key).exists():
             errors.setdefault("name", []).append("A brand with a very similar name exists.")
+        if self.logo_id and not self.logo_alt.strip():
+            errors.setdefault("logo_alt", []).append("Describe the logo for screen readers.")
         if self.wikidata_id and others.filter(wikidata_id=self.wikidata_id).exists():
             errors.setdefault("wikidata_id", []).append("Another brand has this Wikidata ID.")
         if errors:
