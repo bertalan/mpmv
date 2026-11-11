@@ -19,6 +19,7 @@
   let dialog = null;
   let body = null;
   let opener = null;
+  let controller = null;
 
   function squash(text) {
     return text.replace(/\s+/g, " ").trim();
@@ -103,18 +104,29 @@
     body.className = "admin-help__body dialog__body";
     element.append(header, body);
     element.addEventListener("close", () => {
-      const back = opener && opener.isConnected ? opener : document.querySelector("[data-admin-help-open]");
-      if (back) {
-        back.focus();
+      if (controller) {
+        controller.abort();
       }
+      // Wagtail redraws its sidebar, so the opener may be gone: the Help item that is there now,
+      // else the page itself.
+      const back =
+        opener && opener.isConnected ? opener : document.querySelector("[data-admin-help-open]");
+      (back || document.body).focus();
     });
     document.body.append(element);
     return element;
   }
 
   async function load(data) {
-    body.setAttribute("aria-busy", "true");
-    body.textContent = data.helpLoading;
+    // A newer load cancels the one before it, so a slow stale answer never replaces a fresh one.
+    if (controller) {
+      controller.abort();
+    }
+    const mine = new AbortController();
+    controller = mine;
+    const target = body;
+    target.setAttribute("aria-busy", "true");
+    target.textContent = data.helpLoading;
     const query = new URLSearchParams({
       route: data.helpRoute || "",
       page_type: data.helpPageType || "",
@@ -125,30 +137,33 @@
         credentials: "same-origin",
         cache: "no-store",
         headers: { Accept: "text/html" },
+        signal: mine.signal,
       });
       if (!response.ok) {
         throw new Error(String(response.status));
       }
-      const parsed = new DOMParser().parseFromString(await response.text(), "text/html");
-      body.replaceChildren(...parsed.body.childNodes);
+      const text = await response.text();
+      if (mine.signal.aborted) {
+        return;
+      }
+      const parsed = new DOMParser().parseFromString(text, "text/html");
+      target.replaceChildren(...parsed.body.childNodes);
       const fields = pageFields();
       if (fields.length > 0) {
-        body.append(fieldsSection(fields, data.helpFieldsTitle));
+        target.append(fieldsSection(fields, data.helpFieldsTitle));
       }
     } catch {
-      body.textContent = data.helpError;
+      if (!mine.signal.aborted) {
+        target.textContent = data.helpError;
+      }
     } finally {
-      body.removeAttribute("aria-busy");
+      if (controller === mine) {
+        target.removeAttribute("aria-busy");
+      }
     }
   }
 
-  document.addEventListener("click", (event) => {
-    const target = event.target instanceof Element ? event.target.closest("[data-admin-help-open]") : null;
-    if (!target) {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
+  function open(target) {
     const data = target.dataset;
     opener = target;
     dialog = document.getElementById(DIALOG_ID) || build(data);
@@ -157,5 +172,29 @@
       dialog.showModal();
     }
     load(data);
+  }
+
+  function opening(event) {
+    return event.target instanceof Element ? event.target.closest("[data-admin-help-open]") : null;
+  }
+
+  document.addEventListener("click", (event) => {
+    const target = opening(event);
+    if (!target) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    open(target);
+  });
+
+  // Wagtail's item is a link with role="button": a button answers Space as well as Enter.
+  document.addEventListener("keydown", (event) => {
+    const target = opening(event);
+    if (target && target.tagName === "A" && event.key === " ") {
+      event.preventDefault();
+      event.stopPropagation();
+      open(target);
+    }
   });
 })();

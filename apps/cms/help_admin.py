@@ -9,6 +9,8 @@ A screen is keyed by its URL name. While a page is edited or added, the page typ
 (`app_label.ModelName`) keys it too, so one entry can help with every page of a type.
 """
 
+import re
+
 from django.apps import apps
 from django.conf import settings
 from django.http import HttpRequest
@@ -40,15 +42,33 @@ def page_type_label(match: ResolverMatch | None) -> str:
     return ""
 
 
+def endpoint_url() -> str:
+    """The help endpoint's address, "" in a URLconf without it (a test harness)."""
+    try:
+        return reverse("help_entry")
+    except NoReverseMatch:
+        return ""
+
+
+# The two tags the global hooks write (cms.wagtail_hooks); a visitor's pages drop them. The
+# pattern allows a hashed file name (a manifest storage).
+_ASSET_TAG = re.compile(r"<(?:script|link)[^>]*cms/(?:js|css)/admin-help[^>]*>(?:</script>)?\s*")
+
+
+def strip_assets(html: str) -> str:
+    """`html` without the help script and style tags (Wagtail's login page, for a visitor)."""
+    return _ASSET_TAG.sub("", html)
+
+
 def menu_attrs(request: HttpRequest) -> dict[str, str]:
     """The data attributes of the opener for this request; empty without the help endpoint."""
-    try:
-        url = reverse("help_entry")
-    except NoReverseMatch:  # a URLconf without the endpoint (a test harness)
+    url = endpoint_url()
+    if not url:
         return {}
     match = request.resolver_match
     return {
-        "role": "button",  # announced as a button, not a link
+        # A link that acts as a button: Enter follows the click, the script adds Space.
+        "role": "button",
         "data-admin-help-open": "",
         "data-help-url": url,
         "data-help-route": engine.help_route_name(getattr(match, "view_name", "")),

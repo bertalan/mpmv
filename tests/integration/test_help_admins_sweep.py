@@ -209,7 +209,32 @@ def test_a_page_editor_without_staff_status_has_the_help_item() -> None:
 
 def test_the_wagtail_login_page_has_no_help() -> None:
     html = Client().get("/admin/login/").content.decode()
-    assert "data-admin-help-open" not in html  # Wagtail's global script is inert without an opener
+    assert "data-admin-help-open" not in html
+    assert SCRIPT not in html  # the global hooks' tags are dropped for a visitor
+    assert STYLE not in html
+    assert "core.css" in html  # only ours: Wagtail's own assets stay
+
+
+def test_a_signed_in_wagtail_page_still_loads_the_help_assets() -> None:
+    html = _superuser_client().get("/admin/").content.decode()
+    assert SCRIPT in html
+    assert STYLE in html
+
+
+def test_without_the_help_endpoint_the_wagtail_help_item_is_hidden(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from django.urls import NoReverseMatch
+
+    def missing(*args: Any, **kwargs: Any) -> str:
+        raise NoReverseMatch("help_entry")
+
+    client = _superuser_client()
+    monkeypatch.setattr("apps.cms.help_admin.reverse", missing)
+    response = client.get("/admin/")
+    assert response.status_code == 200
+    assert "data-admin-help-open" not in response.content.decode()
+    assert '"help-for-this-page"' not in response.content.decode()
 
 
 def test_the_help_dialog_endpoint_answers_a_verified_staff_member_for_admin_routes() -> None:
@@ -250,3 +275,5 @@ def test_the_help_script_is_served_as_a_static_file_with_no_inline_code() -> Non
     text = Path(script).read_text(encoding="utf-8")
     assert not re.search(r"\.(inner|outer)HTML\s*=|insertAdjacentHTML", text)  # parsed nodes only
     assert "eval(" not in text
+    assert "AbortController" in text  # a stale answer never replaces a newer one
+    assert 'event.key === " "' in text  # a role=button link answers Space as well as Enter

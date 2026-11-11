@@ -110,6 +110,10 @@ class HelpForThisPageMenuItem(MenuItem):  # type: ignore[misc]  # Wagtail is unt
     """ "Help for this page" in the sidebar's Help menu (ARC.32). Menu items are built once, so the
     screen's route name, page type and language are put on a component made for each request."""
 
+    def is_shown(self, request: HttpRequest) -> bool:
+        """Without the help endpoint there is nothing to open: no dead `#` link."""
+        return bool(help_admin.endpoint_url())
+
     def render_component(self, request: HttpRequest) -> Any:
         return LinkMenuItemComponent(
             self.name,

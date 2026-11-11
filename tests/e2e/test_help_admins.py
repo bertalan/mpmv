@@ -83,6 +83,27 @@ def test_the_wagtail_help_item_opens_the_page_help(
     assert csp_violations(page) == []
 
 
+def test_the_wagtail_help_item_answers_space_and_a_stale_answer_is_dropped(
+    page: Page, live_server: LiveServer
+) -> None:
+    HelpEntryFactory.create(kind="general", key="", title="Fresh", body="<p>New.</p>")
+    sign_in(page, live_server)
+    page.goto(f"{live_server.url}/admin/")
+    page.get_by_role("button", name=re.compile(r"^Help\d*")).click()
+    page.get_by_role("button", name="Help for this page").focus()
+    page.keyboard.press("Space")
+    expect(page.locator(DIALOG)).to_be_visible()
+    page.keyboard.press("Escape")
+    expect(page.locator(DIALOG)).not_to_be_visible()
+    # Two clicks in a row (the second while the first load runs): one entry, never two.
+    page.evaluate(
+        "for (let i = 0; i < 2; i++) document.querySelector('[data-admin-help-open]').click()"
+    )
+    expect(page.locator(DIALOG)).to_contain_text("Fresh")
+    page.wait_for_timeout(500)
+    assert page.locator(f"{DIALOG} .help-entry").count() == 1
+
+
 def test_the_staff_admin_button_opens_the_screen_help(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
