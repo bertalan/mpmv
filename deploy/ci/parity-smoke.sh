@@ -8,6 +8,15 @@
 #
 #   deploy/ci/parity-smoke.sh <docker image>      e.g. mpmv-app:ci
 #
+# Upgrade path (OPS.11): when the repository has an earlier release tag, its published image is
+# deployed first, with its own mpmv-deploy, migrations and seed; then the candidate goes over the
+# same database, started by the previous release's script (which hands over to the candidate's).
+# MPMV_PARITY_PREVIOUS_IMAGE overrides the registry repository the previous image is pulled from
+# (default ghcr.io/<owner>/mpmv-app, anonymous pull). Without a previous tag, or when its image
+# cannot be pulled, a pull request runs the candidate on an empty database and logs a warning; on
+# main and on release tags (upgrade-policy.sh) those two cases fail the job. The very first
+# release, with no earlier tag at all, runs on an empty database everywhere.
+#
 # Every secret is generated here, for this run only. The script changes the runner (sysctl,
 # lingering, apt packages) and OVERWRITES the runner user's ~/.config/mpmv env files, CA, units
 # and ~/.local/bin/mpmv-deploy. It leaves all of that behind, so it refuses to run anywhere but a
@@ -39,6 +48,7 @@ bad=parity-bad
 deployer="$HOME/.local/bin/mpmv-deploy"
 config="$HOME/.config/mpmv"
 units="$HOME/.config/containers/systemd"
+user_units="$HOME/.config/systemd/user"
 started=$SECONDS
 # Pinned by digest, like third-party code in the release job (multi-arch index of postgres:17).
 postgres_image=docker.io/library/postgres:17@sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f
@@ -48,6 +58,7 @@ endgroup() { echo "::endgroup::"; }
 dump() {
   echo "::group::diagnostics"
   podman ps -a || true
+  systemctl --user --no-pager status mpmv-caddy.socket mpmv-caddy.service || true
   journalctl --user --no-pager -n 200 -u 'mpmv-*' || true
   for c in mpmv-app mpmv-worker mpmv-caddy mpmv-migrate; do podman logs --tail 50 "$c" 2>&1 || true; done
   echo "::endgroup::"
@@ -171,17 +182,93 @@ expect_status() { # expect_status <path> <code>
   echo "GET $1 -> $got"
 }
 
-group "Install mpmv-deploy from the image, then deploy it (doctor, units, migrate, restart, check)"
-mkdir -p "$(dirname "$deployer")"
-podman run --rm --network none --entrypoint cat "$registry:$good" /app/deploy/server/mpmv-deploy >"$deployer"
-chmod 755 "$deployer"
+install_deployer() { # install_deployer <image tag>: the deploy script that image carries
+  mkdir -p "$(dirname "$deployer")"
+  podman run --rm --network none --entrypoint cat "$registry:$1" /app/deploy/server/mpmv-deploy >"$deployer"
+  chmod 755 "$deployer"
+}
+
+# OPS.11: a release that migrates over the previous release's data, started by the previous
+# release's own deploy script, is what a server does. Deploy the previous tag first (its published
+# image, its script, its migrations and seed), then the candidate over the same database. The
+# previous tag comes from the repository's tags; the build's own tag is left out. Without one, or
+# when its image cannot be pulled, the smoke deploys the candidate on an empty database and says so.
+# On main and on release tags the upgrade run is required (deploy/ci/upgrade-policy.sh): an
+# unreadable tag list or an unpullable previous image fails the job there. Pull requests warn.
+skip_upgrade() {
+  if [ "$("$repo/deploy/ci/upgrade-policy.sh")" = required ]; then
+    echo "::error::parity smoke: $1, and the upgrade path is required on main and release tags"
+    exit 1
+  fi
+  echo "::warning::parity smoke: $1; deploying the candidate on an empty database"
+}
+previous=""
+building=""
+if [ "${GITHUB_REF_TYPE:-}" = tag ]; then building="${GITHUB_REF_NAME:-}"; fi
+if previous="$("$repo/deploy/ci/previous-release.sh" "$repo" "$building")"; then
+  if [ -z "$previous" ]; then
+    echo "::notice::parity smoke: no previous release tag; deploying the candidate on an empty database"
+  fi
+else
+  skip_upgrade "the repository's tags could not be read"
+  previous=""
+fi
+if [ -n "$previous" ]; then
+  previous_image="${MPMV_PARITY_PREVIOUS_IMAGE:-ghcr.io/${GITHUB_REPOSITORY_OWNER:-bertalan}/mpmv-app}"
+  previous_image="${previous_image,,}"
+  group "Previous release $previous from $previous_image: published image, its own script, migrations and seed"
+  if podman pull -q "$previous_image:$previous" >/dev/null; then
+    podman tag "$previous_image:$previous" "$registry:$previous"
+    install_deployer "$previous"
+    t0=$SECONDS
+    "$deployer" deploy "$previous" || fail "the previous release $previous did not deploy on an empty database"
+    echo "previous release $previous deployed in $((SECONDS - t0)) s"
+    podman exec -e MPMV_ALLOW_SEED=1 mpmv-app python manage.py seed | tail -n 1
+    "$deployer" check || fail "the previous release $previous does not pass its own check"
+  else
+    skip_upgrade "cannot pull $previous_image:$previous"
+    previous=""
+  fi
+  endgroup
+fi
+
+if [ -n "$previous" ]; then
+  group "Upgrade: previous release $previous, candidate $good, same database (doctor, units, migrate, restart, check)"
+  # The previous release's script runs first; it hands over to the candidate's when they differ.
+  # A script from before the hand-over would install the candidate's units its own old way: the
+  # documented one-time refresh (docs/dev/release.md) installs the candidate's script first.
+  if ! "$repo/deploy/ci/hands-over.sh" "$deployer"; then
+    echo "::notice::previous release predates the re-exec; applying the one-time script refresh (release.md)"
+    install_deployer "$good"
+  fi
+else
+  group "Install mpmv-deploy from the image, then deploy it (doctor, units, migrate, restart, check)"
+  install_deployer "$good"
+fi
 t0=$SECONDS
-"$deployer" deploy "$good" || fail "deploy of the release failed"
+"$deployer" deploy "$good" || fail "deploy of the candidate failed${previous:+ over the data of release $previous}"
 echo "deploy took $((SECONDS - t0)) s"
+cmp -s "$repo/deploy/server/mpmv-deploy" "$deployer" || fail "the installed mpmv-deploy is not the candidate's"
+if [ -n "$previous" ]; then
+  release_status="$("$deployer" status)"
+  grep -qx "previous: $previous" <<<"$release_status" || fail "the history does not show $previous before $good"
+  echo "upgraded $previous -> $good"
+  if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+    echo "Parity smoke ($(uname -m)): upgrade path $previous -> candidate" >>"$GITHUB_STEP_SUMMARY"
+  fi
+fi
 cmp -s "$repo/deploy/caddy/Caddyfile" "$config/Caddyfile" || fail "the installed Caddyfile is not the release's"
 for unit in "$repo"/deploy/quadlet/*; do
   cmp -s "$unit" "$units/${unit##*/}" || fail "installed ${unit##*/} differs from the release"
 done
+for unit in "$repo"/deploy/systemd/*; do
+  cmp -s "$unit" "$user_units/${unit##*/}" || fail "installed ${unit##*/} differs from the release"
+done
+# Caddy holds no port of its own: systemd listens and hands the sockets over (OPS.5 follow-up).
+systemctl --user is-active --quiet mpmv-caddy.socket || fail "mpmv-caddy.socket is not listening"
+systemctl --user is-enabled --quiet mpmv-caddy.socket || fail "mpmv-caddy.socket is not enabled for boot"
+bindings="$(podman inspect --format '{{json .HostConfig.PortBindings}}' mpmv-caddy)"
+case "$bindings" in "" | "{}" | null) ;; *) fail "mpmv-caddy publishes ports: $bindings" ;; esac
 endgroup
 
 group "The containers run as the units say"
@@ -285,6 +372,27 @@ grep -qix 'cache-control: no-store' <<<"$headers" || fail "the 413 is cacheable"
 ! grep -qiE '^(server|via):' <<<"$headers" || fail "the 413 names the server software"
 "$deployer" check || fail "mpmv-deploy check failed on a good release"
 "$deployer" doctor || fail "mpmv-deploy doctor failed on a good release"
+endgroup
+
+group "Client address through the proxy: the Django admin allow-list (OPS.5)"
+# The env examples allow loopback only. Caddy gets its sockets from systemd, so it sees the real
+# client: from 127.0.0.1 and ::1 (an SSH tunnel on a server) the admin answers its sign-in page,
+# from the runner's own non-loopback address it answers 404. Behind a port forwarder that hides
+# the client, both would get the same answer.
+admin_status() { # admin_status <address as curl --resolve takes it>
+  curl -sS --max-time 10 --resolve "$site:443:$1" --cacert "$MPMV_CHECK_CACERT" \
+    -o /dev/null -w '%{http_code}' "https://$site/django-admin/login/"
+}
+for address in 127.0.0.1 '[::1]'; do
+  got="$(admin_status "$address")"
+  [ "$got" = 200 ] || fail "the admin sign-in from $address answered $got, expected 200"
+  echo "GET /django-admin/login/ from $address -> $got"
+done
+outside="$(ip -4 route get 192.0.2.1 | sed -n 's/.* src \([0-9.]*\).*/\1/p')"
+[ -n "$outside" ] || fail "no non-loopback IPv4 address on the runner"
+got="$(admin_status "$outside")"
+[ "$got" = 404 ] || fail "the admin from a non-loopback address answered $got, expected 404"
+echo "GET /django-admin/login/ from a non-loopback address -> $got"
 endgroup
 
 group "A bad release rolls back, image and units, in under 60 s"

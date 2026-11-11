@@ -1,0 +1,12 @@
+{% load i18n %}{% comment %}
+The product cards (CMS.11): the hand-picked products as base theme product tiles (THM.4), in a
+grid or one scrolling row (a class, no inline style); left out when no product is public. The
+heading is the section's; the tiles' names sit one level below it.
+TODO(TAX.12): interim net price "excl. VAT", like the product grid; TAX.12 replaces it with the
+gross amount for B2C buyers. This net display must not reach LIVE.
+{% endcomment %}{% if cards %}
+<section class="block block-product-cards{% if row %} block-product-cards--row{% endif %}">
+  {% if heading %}<h2>{{ heading }}</h2>{% endif %}
+  {% include "cms/includes/product_tiles.html" with cards=cards currency=currency heading_level=3 only %}
+</section>
+{% endif %}
