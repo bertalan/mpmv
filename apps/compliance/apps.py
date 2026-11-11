@@ -13,6 +13,7 @@ class ComplianceConfig(AppConfig):
         "gpsrsafetytext",
         "safetycase",
         "countrywarninglanguages",
+        "notice",
     )
 
     def ready(self) -> None:
