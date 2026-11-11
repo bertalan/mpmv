@@ -34,13 +34,24 @@ def test_from_outside_every_admin_path_answers_404(client: Client, path: str) ->
 
 
 @override_settings(ADMIN_ALLOWED_NETWORKS=ALLOWED)
-def test_the_refusal_looks_like_any_unknown_page(client: Client) -> None:
-    refused = client.get(ADMIN, REMOTE_ADDR="203.0.113.9")
-    unknown = client.get("/no-such-page-here/", REMOTE_ADDR="203.0.113.9")
+@pytest.mark.parametrize("language", ["", "it", "en"])
+@pytest.mark.parametrize("path", [ADMIN, ADMIN.rstrip("/"), ADMIN + "login/"])
+def test_the_refusal_is_the_normal_404(client: Client, path: str, language: str) -> None:
+    """Same status, body (language and theme), header names and values as an unknown URL."""
+    extra = {"headers": {"Accept-Language": language}} if language else {}
+    with override_settings(FORCE_NOINDEX=True):
+        refused = client.get(path, REMOTE_ADDR="203.0.113.9", **extra)
+        unknown = client.get("/no-such-page-here/", REMOTE_ADDR="203.0.113.9", **extra)
     assert refused.status_code == unknown.status_code == 404
     assert "Location" not in refused
     token = re.compile(rb'(nonce|value)="[^"]*"')  # a new CSP nonce and CSRF token every time
     assert token.sub(b"", refused.content) == token.sub(b"", unknown.content)
+    for name in ("X-Robots-Tag", "Permissions-Policy", "X-Frame-Options", "Content-Language"):
+        assert refused.get(name) == unknown.get(name)
+    ignore = {"Content-Security-Policy"}  # carries a per-response nonce
+    assert {k for k in refused.headers if k not in ignore} == {
+        k for k in unknown.headers if k not in ignore
+    }
 
 
 @override_settings(ADMIN_ALLOWED_NETWORKS=ALLOWED)
@@ -66,5 +77,16 @@ def test_a_header_from_an_untrusted_peer_is_ignored(client: Client) -> None:
 
 
 @override_settings(ADMIN_ALLOWED_NETWORKS=[])
-def test_without_networks_the_admin_is_not_restricted_here(client: Client) -> None:
-    assert _get(client, "203.0.113.9") == 302
+@pytest.mark.parametrize("ip", ["127.0.0.1", "203.0.113.9"])
+def test_without_networks_nobody_gets_in(client: Client, ip: str) -> None:
+    """Fail closed: an empty list (the variable was missed) denies everybody."""
+    assert _get(client, ip) == 404
+    assert _get(client, ip, ADMIN + "login/") == 404
+
+
+def test_the_test_settings_allow_loopback_only(client: Client) -> None:
+    from django.conf import settings
+
+    assert settings.ADMIN_ALLOWED_NETWORKS == ["127.0.0.1/32", "::1/128"]
+    assert _get(client, "127.0.0.1") == 302
+    assert _get(client, "203.0.113.9") == 404
