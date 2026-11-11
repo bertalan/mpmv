@@ -14,6 +14,7 @@ class ComplianceConfig(AppConfig):
         "safetycase",
         "countrywarninglanguages",
         "notice",
+        "erasurerequest",
     )
 
     def ready(self) -> None:

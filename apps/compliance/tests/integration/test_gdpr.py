@@ -24,7 +24,15 @@ pytestmark = pytest.mark.django_db
 
 CTX = AuditContext(actor_label="system:test", source=AuditLog.Source.SYSTEM)
 PLACED = dt.datetime(2027, 3, 15, 10, 0, tzinfo=dt.UTC)
-COMMISSION = {"rule_id": "default", "version": 1, "percent": "10.00", "base": "goods"}
+COMMISSION = {
+    "rule_id": "default",
+    "version": 1,
+    "percent": "10.00",
+    "base": "goods",
+    "fee_percent": "1.40",
+    "fee_fixed": "0.25",
+    "fee_base": "gross",
+}
 
 
 def place(user: User | None, *, state: str = "closed", email: str = "") -> Order:
@@ -57,7 +65,7 @@ def place(user: User | None, *, state: str = "closed", email: str = "") -> Order
         vendor_orders=[sub],
         ctx=CTX,
         state=state,
-        legacy_wp_order_id=None if state == "checkout" else 9000 + Order.objects.count(),
+        legacy_wp_order_id=None if state == "awaiting_payment" else 9000 + Order.objects.count(),
         now=PLACED,
     )
     assert order is not None
@@ -131,7 +139,7 @@ def test_an_export_is_audited_without_personal_data() -> None:
     blob = json.dumps([entry.before, entry.after])
     assert "audited@example.com" not in blob
     assert "Ada Lovelace" not in blob
-    assert entry.after["orders"] == 1
+    assert (entry.after or {})["orders"] == 1
 
 
 def test_the_export_of_an_anonymised_account_shows_the_placeholders() -> None:
@@ -221,7 +229,7 @@ def test_erasure_is_idempotent_and_irreversible() -> None:
 def test_erasure_with_an_open_order_is_accepted_and_completes_when_it_closes() -> None:
     user = UserFactory.create(email="mario@example.com")
     closed = place(user)
-    open_order = place(user, state="checkout")
+    open_order = place(user, state="awaiting_payment")
 
     gdpr.anonymise_customer(user, ctx=CTX)
 
@@ -236,7 +244,7 @@ def test_erasure_with_an_open_order_is_accepted_and_completes_when_it_closes() -
     # still open: a rerun changes nothing
     assert gdpr.anonymise_customer(user, ctx=CTX).is_empty
 
-    Order.objects.filter(pk=open_order.pk).update(state="cancelled")
+    order_services.transition_order(open_order, "cancelled", ctx=CTX)
     gdpr.anonymise_customer(user, ctx=CTX)
     user.refresh_from_db()
     assert user.email.endswith("@anonymised.invalid")
