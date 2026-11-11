@@ -25,6 +25,7 @@ from django_stubs_ext import StrOrPromise
 
 from apps.vendors import engine as vendors_engine
 
+from . import roles
 from .spaces import Space
 
 
@@ -35,6 +36,8 @@ class Actor(Protocol):
     def space(self) -> Space: ...
     @property
     def role(self) -> str | None: ...
+    @property
+    def user(self) -> Any: ...
     @property
     def vendor(self) -> Any: ...
 
@@ -53,6 +56,20 @@ def vendor_action(action: str) -> Check:
 
     def check(ctx: Actor) -> bool:
         return ctx.role is not None and vendors_engine.is_allowed(ctx.role, checked)
+
+    return check
+
+
+def platform_role(section: str, *, write: bool = False) -> Check:
+    """Platform staff whose roles the matrix of `roles.py` lets into `section` (CORE.18).
+
+    Role membership, never `has_perm`; the owner who holds the permission directly counts.
+    """
+
+    def check(ctx: Actor) -> bool:
+        from .role_groups import effective_roles
+
+        return roles.allows(section, effective_roles(ctx.user), write=write)
 
     return check
 

@@ -14,6 +14,15 @@ msgid_plural "%(action)s: %(count)d rows done."
 msgstr[0] "%(action)s: %(count)d riga completata."
 msgstr[1] "%(action)s: %(count)d righe completate."
 
+#: apps/manager/templates/email/manager/role_self_assigned/body.html
+#: apps/manager/templates/email/manager/role_self_assigned/body.txt
+msgid ""
+"%(actor_name)s gave themselves a platform role. The change is in the audit "
+"log."
+msgstr ""
+"%(actor_name)s si è assegnato un ruolo di piattaforma. La modifica è nel "
+"registro di audit."
+
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "%(counter)s unused."
 msgid_plural "%(counter)s unused."
@@ -23,6 +32,10 @@ msgstr[1] "%(counter)s non usati."
 #: apps/accounts/mfa_views.py
 msgid "%(name)s removed."
 msgstr "%(name)s rimosso."
+
+#: apps/manager/templates/email/manager/role_self_assigned/subject.txt
+msgid "A platform owner gave themselves a role"
+msgstr "Un proprietario della piattaforma si è assegnato un ruolo"
 
 #: apps/manager/forms.py
 msgid "About the shop"
@@ -35,6 +48,10 @@ msgstr "Accetta l'ordine"
 #: themes/base/templates/403.html
 msgid "Access denied"
 msgstr "Accesso negato"
+
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Account"
+msgstr "Account"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Act on the content"
@@ -204,6 +221,10 @@ msgid "Email"
 msgstr "Email"
 
 #: apps/manager/forms.py
+msgid "Email of the account"
+msgstr "Email dell'account"
+
+#: apps/manager/forms.py
 msgid "Enter a valid carrier name."
 msgstr "Inserisci un nome di corriere valido."
 
@@ -260,6 +281,14 @@ msgstr "Genera nuovi codici"
 msgid "Generating new codes makes every previous code stop working."
 msgstr ""
 "Generando nuovi codici, tutti i codici precedenti smettono di funzionare."
+
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Give a role"
+msgstr "Assegna un ruolo"
+
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Give the role"
+msgstr "Assegna il ruolo"
 
 #: themes/base/templates/layouts/error.html
 msgid "Go to the home page"
@@ -398,6 +427,10 @@ msgstr "nessuna registrazione di passkey in corso"
 msgid "No second factor yet."
 msgstr "Nessun secondo fattore per ora."
 
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Nobody holds a platform role yet."
+msgstr "Nessuno ha ancora un ruolo di piattaforma."
+
 #: apps/manager/views.py
 msgid "Nothing changed."
 msgstr "Nessuna modifica."
@@ -510,6 +543,19 @@ msgstr ""
 msgid "Platform"
 msgstr "Piattaforma"
 
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Platform staff"
+msgstr "Staff della piattaforma"
+
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid ""
+"Platform staff hold one or more roles. Vendor members cannot hold a platform"
+" role. Changes need operational mode and are recorded in the audit log."
+msgstr ""
+"Lo staff della piattaforma ha uno o più ruoli. I membri dei venditori non "
+"possono avere un ruolo di piattaforma. Le modifiche richiedono la modalità "
+"operativa e sono registrate nel registro di audit."
+
 #: apps/accounts/templates/accounts/admin/login.html
 msgid "Please correct the error below."
 msgid_plural "Please correct the errors below."
@@ -548,6 +594,9 @@ msgstr "Pubblicati"
 msgid "Quantity"
 msgstr "Quantità"
 
+#: apps/manager/forms.py
+#: apps/manager/templates/email/manager/role_self_assigned/body.html
+#: apps/manager/templates/email/manager/role_self_assigned/body.txt
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Reason"
 msgstr "Motivazione"
@@ -600,6 +649,12 @@ msgstr "Segnalato"
 msgid "required"
 msgstr "obbligatorio"
 
+#: apps/manager/forms.py
+msgid "Required when you give a role to yourself; kept in the audit log."
+msgstr ""
+"Obbligatorio quando assegni un ruolo a te stesso; resta nel registro di "
+"audit."
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Restrict and send the statement of reasons"
 msgstr "Limita e invia la motivazione"
@@ -611,6 +666,20 @@ msgstr "Ritirati"
 #: apps/manager/forms.py
 msgid "Returns and refunds policy"
 msgstr "Condizioni di reso e rimborso"
+
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Revoke %(role)s"
+msgstr "Revoca %(role)s"
+
+#: apps/manager/forms.py
+#: apps/manager/templates/email/manager/role_self_assigned/body.html
+#: apps/manager/templates/email/manager/role_self_assigned/body.txt
+msgid "Role"
+msgstr "Ruolo"
+
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Roles"
+msgstr "Ruoli"
 
 #: apps/manager/templates/manager/shop/profile.html
 msgid "Save"
@@ -689,6 +758,11 @@ msgstr "Qualcosa è andato storto"
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Staff"
 msgstr "Staff"
+
+#: apps/manager/sections.py
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Staff and roles"
+msgstr "Staff e ruoli"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Start review"
@@ -777,6 +851,16 @@ msgstr "La segnalazione è in revisione."
 msgid "The notification to the authorities is recorded."
 msgstr "La comunicazione alle autorità è registrata."
 
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid ""
+"The one-person-team setting is on: one person may hold incompatible roles, "
+"such as Finance and payments with Configuration and tax. Every such grant is"
+" audited."
+msgstr ""
+"L'impostazione «team di una persona» è attiva: una persona può avere ruoli "
+"incompatibili, come Finanza e pagamenti con Configurazione e tasse. Ogni "
+"assegnazione di questo tipo è registrata."
+
 #: apps/manager/views.py
 msgid "The order was updated."
 msgstr "L'ordine è stato aggiornato."
@@ -809,6 +893,10 @@ msgstr ""
 msgid "The request failed."
 msgstr "La richiesta non è riuscita."
 
+#: apps/manager/views.py
+msgid "The role change is recorded."
+msgstr "La modifica del ruolo è registrata."
+
 #: apps/manager/templates/manager/shop/profile.html
 msgid ""
 "The text in this language is a machine draft and is not public yet. Edit and"
@@ -832,6 +920,10 @@ msgstr "La verifica non è riuscita. Ricarica la pagina e riprova."
 #: themes/base/templates/components/error_summary.html
 msgid "There is a problem"
 msgstr "Si è verificato un problema"
+
+#: apps/manager/views.py
+msgid "There is no account with that email."
+msgstr "Non c'è nessun account con questa email."
 
 #: apps/manager/templates/manager/bulk_preview.html
 msgid "This action changes nothing."

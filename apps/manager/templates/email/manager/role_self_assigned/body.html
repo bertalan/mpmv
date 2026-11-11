@@ -1,0 +1,10 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate %}{{ actor_name }} gave themselves a platform role. The change is in the audit log.{% endblocktranslate %}</p>
+<ul>
+<li>{% translate "Role" %}: {{ role }}</li>
+<li>{% translate "Reason" %}: {{ reason }}</li>
+</ul>
+</body>
+</html>

@@ -124,3 +124,20 @@ def in_role_group(user: Any) -> bool:
     if not (getattr(user, "is_authenticated", False) and user.is_active):
         return False
     return bool(user.groups.filter(name__in=roles.group_names()).exists())
+
+
+def effective_roles(user: Any) -> frozenset[str]:
+    """`user_roles` plus the owner role of an owner who holds the permission directly.
+
+    The first platform owner is created with the permission itself (ARC.25, the bootstrap
+    command), not with the group; both are the owner role in the matrix. A vendor member holds
+    none (`core.services.holds_permission`).
+    """
+    from apps.core.services import holds_permission
+
+    from .roles import OWNER, PLATFORM_OWNER_PERMISSION
+
+    held = user_roles(user)
+    if OWNER not in held and holds_permission(user, PLATFORM_OWNER_PERMISSION):
+        return held | {OWNER}
+    return held

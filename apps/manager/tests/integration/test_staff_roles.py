@@ -44,6 +44,8 @@ def test_a_grant_adds_the_group_sets_is_staff_and_is_audited_with_before_and_aft
     assert target.is_staff
     assert not changes.is_empty
     entry = AuditLog.objects.get(action=staff_roles.GRANT_ACTION)
+    assert entry.before is not None
+    assert entry.after is not None
     assert entry.before["roles"] == []
     assert entry.after["roles"] == ["support"]
 
@@ -118,6 +120,8 @@ def test_self_assignment_needs_a_reason_and_emails_the_other_owners_and_superuse
     staff_roles.grant_role(owner, "support", actor=owner, ctx=CTX, reason="cover leave")
     assert held(owner) == {"owner", "support"}
     entry = AuditLog.objects.get(action=staff_roles.GRANT_ACTION)
+    assert entry.before is not None
+    assert entry.after is not None
     assert entry.after["reason"] == "cover leave"
     recipients = set(OutboxEmail.objects.values_list("recipient", flat=True))
     assert recipients == {other_owner.email, superuser.email}
@@ -130,6 +134,8 @@ def test_a_revocation_is_audited_and_clears_is_staff_with_the_last_role() -> Non
     assert held(target) == frozenset()
     assert not target.is_staff
     entry = AuditLog.objects.get(action=staff_roles.REVOKE_ACTION)
+    assert entry.before is not None
+    assert entry.after is not None
     assert entry.before["roles"] == ["support"]
     assert entry.after["roles"] == []
 
@@ -186,16 +192,17 @@ def test_everyone_but_the_owner_gets_404_on_get_and_post_and_nothing_changes(
 ) -> None:
     actor, target = staff(key), UserFactory.create()
     login(client, actor)
-    assert client.get(URL).status_code == 404
-    assert client.post(URL, grant_post(target.email, "support")).status_code == 404
+    refused = (403, 404)  # 403: the gate's explanatory page for a user with no platform role
+    assert client.get(URL).status_code in refused
+    assert client.post(URL, grant_post(target.email, "support")).status_code in refused
     assert held(target) == frozenset()
 
 
 def test_a_vendor_member_and_a_superuser_without_a_role_get_404(client: Client) -> None:
     for user in (VendorMemberFactory.create().user, UserFactory.create(superuser=True)):
         login(client, user)
-        assert client.get(URL).status_code == 404
-        assert client.post(URL, grant_post("x@example.com", "support")).status_code == 404
+        assert client.get(URL).status_code in (403, 404)
+        assert client.post(URL, grant_post("x@example.com", "support")).status_code in (403, 404)
 
 
 def test_a_grant_through_the_page(client: Client) -> None:
@@ -277,5 +284,7 @@ def test_the_audit_entry_of_a_grant_carries_no_email_address(client: Client) -> 
     login(client, owner)
     client.post(URL, grant_post(target.email, "support"))
     entry = AuditLog.objects.get(action=staff_roles.GRANT_ACTION)
+    assert entry.before is not None
+    assert entry.after is not None
     assert target.email not in json.dumps([entry.before, entry.after, entry.actor_label])
     assert Group.objects.get(name=roles.role("support").group).user_set.filter(pk=target.pk)

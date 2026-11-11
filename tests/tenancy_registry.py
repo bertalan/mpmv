@@ -414,6 +414,11 @@ ENDPOINTS: dict[str, Access] = {
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
     ),
+    "manager:platform:staff_roles": StaffOnly(
+        "Staff and roles (CORE.18): platform owner only; lists the platform staff and grants or "
+        "revokes roles through the audited service. Every other role, a vendor member and a "
+        "superuser without a role get 404 or the gate's 403 (test_staff_roles)."
+    ),
     "manager:platform:notices": StaffOnly(
         "Notices of illegal content (CMP.5): platform data, not vendor-owned; needs the "
         "compliance.review_notices permission, so a vendor member gets 404."
