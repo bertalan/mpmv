@@ -8,8 +8,10 @@ else the account home. GET keeps the current request path.
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from django.http.response import HttpResponseBase
 from django.test import Client
 from django.urls import reverse
+from django_otp.plugins.otp_totp.models import TOTPDevice
 
 from apps.accounts.models import User
 from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
@@ -21,23 +23,23 @@ POST_ONLY = "/django-admin/accounts/user/add/"
 HOME = "/"
 
 
-def _enrolled_staff(client: Client) -> tuple[User, object]:
+def _enrolled_staff(client: Client) -> tuple[User, TOTPDevice]:
     user = UserFactory.create(superuser=True)
     device = TOTPDeviceFactory.create(user=user)
     password_login(client, user)
     return user, device
 
 
-def _next_of(response: object) -> str:
-    assert response.status_code == 302  # type: ignore[attr-defined]
-    parts = urlsplit(response["Location"])  # type: ignore[index]
+def _next_of(response: HttpResponseBase) -> str:
+    assert response.status_code == 302
+    parts = urlsplit(response["Location"])
     assert parts.path == reverse("mfa:verify")
     return parse_qs(parts.query).get("next", [""])[0]
 
 
-def _post(client: Client, referer: str | None, **extra: str) -> object:
+def _post(client: Client, referer: str | None) -> HttpResponseBase:
     headers = {"Referer": referer} if referer is not None else {}
-    return client.post(POST_ONLY, {}, headers=headers, **extra)
+    return client.post(POST_ONLY, {}, headers=headers)
 
 
 def test_post_uses_a_same_origin_referer_as_next(client: Client) -> None:
@@ -109,10 +111,10 @@ def test_json_post_still_answers_403(client: Client) -> None:
 def test_after_verifying_the_user_lands_on_a_page_that_answers_200(client: Client) -> None:
     _, device = _enrolled_staff(client)
     response = _post(client, "http://testserver/django-admin/")
-    verify_url = response["Location"]  # type: ignore[index]
+    verify_url = response["Location"]
     verified = client.post(
         verify_url,
-        {"method": "totp", "token": totp_token(device)},  # type: ignore[arg-type]
+        {"method": "totp", "token": totp_token(device)},
     )
     assert verified.status_code == 302
     assert verified["Location"] == "/django-admin/"
@@ -121,8 +123,8 @@ def test_after_verifying_the_user_lands_on_a_page_that_answers_200(client: Clien
 
 def test_after_verifying_without_a_referer_the_user_lands_on_home(client: Client) -> None:
     _, device = _enrolled_staff(client)
-    verify_url = _post(client, None)["Location"]  # type: ignore[index]
-    verified = client.post(verify_url, {"method": "totp", "token": totp_token(device)})  # type: ignore[arg-type]
+    verify_url = _post(client, None)["Location"]
+    verified = client.post(verify_url, {"method": "totp", "token": totp_token(device)})
     assert verified["Location"] == HOME
     assert client.get(HOME).status_code == 200
 
