@@ -133,6 +133,7 @@ MIDDLEWARE = [
     # CORE.4: which device verified the session, then confine required roles to the MFA pages.
     "django_otp.middleware.OTPMiddleware",
     "apps.accounts.middleware.MfaRequiredMiddleware",
+    "apps.accounts.middleware.SessionLevelMiddleware",  # CORE.25 (D-32): operational mode timers
     # CORE.17: one gate per Manager space (404, login or MFA) for every URL under /manager/.
     "apps.manager.middleware.ManagerGateMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -165,6 +166,9 @@ MFA_REQUIRED_POLICIES: list[str] = [
 MFA_STEP_UP_MAX_AGE = 300  # seconds a verification counts as fresh for sensitive actions
 # Step-up for sensitive views of apps that cannot import accounts (the core audit log view, SEC.4).
 STEP_UP_DECORATOR = "apps.accounts.decorators.step_up_required"
+# Path prefixes whose requests (polling) do not count as activity for operational mode (CORE.25).
+SESSION_LEVEL_POLL_PATHS: tuple[str, ...] = ()
+LEVEL_DECORATOR = "apps.accounts.decorators.requires_level"  # CORE.25 (D-32)
 # The Manager login (CORE.17): where the Manager gate sends anonymous visitors.
 LOGIN_URL = "login"
 MFA_LOGIN_URL = "admin:login"  # until the site and vendor login pages exist
@@ -453,6 +457,8 @@ VIES_API_URL = (
     or "https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-number"
 )
 VIES_TIMEOUT_SECONDS = 8  # per socket operation (connect, each read), not for the whole check
+# Used twice: the lookup cache TTL of VIES answers, and the conservative maximum age of a valid
+# answer the goods tax engine trusts (`build_tax_context`): an older one is treated as B2C.
 VIES_CACHE_SECONDS = 24 * 60 * 60
 VIES_UNAVAILABLE_CACHE_SECONDS = 5 * 60
 
@@ -626,6 +632,8 @@ OPS_BACKUP_STATUS_FILE = env_str("MPMV_OPS_BACKUP_STATUS_FILE", "")
 OPS_BACKUP_MAX_AGE_HOURS = env_int("MPMV_OPS_BACKUP_MAX_AGE_HOURS", 26)
 # Optional prefix of order numbers, e.g. "MP-" gives "MP-2027-000123" (ORD.2). Empty by default.
 ORDER_NUMBER_PREFIX = ""
+# How long `place_order` holds the stock of an order awaiting payment (ORD.4); paying releases it.
+ORDER_HOLD_MINUTES = 60
 
 # Months after an order during which its non-fiscal data is kept; then `minimise_order` may
 # drop it (D-29). The fiscal snapshot is kept 10 years from the end of the order's year.

@@ -23,26 +23,32 @@ import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
+from urllib.parse import urlsplit, urlunsplit
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
+from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import get_language_info
 from django.utils.translation import gettext_lazy as _
 
 from apps.catalog.models import Product, ProductStatus
 from apps.cms.services import legal_section_tags
-from apps.core.audit import AuditContext
+from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.countries import OFFICIAL_LANGUAGES, InvalidCountry, normalize_country
 from apps.core.flags import TtlCache
 from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog
+from apps.core.privacy import keyed_hash, normalise_email
 from apps.core.services import (
     NoPlatformOperator,
     audit_changes,
+    consume_rate_limit,
     current_operator,
     enqueue_email,
     save_audited,
@@ -54,6 +60,7 @@ from .models import (
     CountryWarningLanguages,
     GpsrInfo,
     GpsrSafetyText,
+    Notice,
     SafetyCase,
     VendorGpsrDefaults,
 )
@@ -1003,3 +1010,261 @@ def dsa_p2b_readiness(languages: Iterable[str] | None = None) -> list[engine.Dsa
             else:
                 problems.extend(engine.section_problems(kind, language, sections[kind, language]))
     return problems
+
+
+# --- Notice and action (DSA art. 16, CMP.5 part 2)
+
+NOTICE_MODEL: Final = "compliance.notice"
+NOTICE_RECEIVED: Final = "compliance.notice.received"
+NOTICE_REVIEW_STARTED: Final = "compliance.notice.review_started"
+NOTICE_DECIDED: Final = "compliance.notice.decided"
+NOTICE_RECEIPT_TEMPLATE: Final = "compliance.notice_received"
+NOTICE_DECISION_TEMPLATE: Final = "compliance.notice_decision"
+#: Anonymous submissions per client address in each window (the SEC.13 rule: captcha + limit).
+NOTICE_RATE_LIMIT: Final = 5
+NOTICE_RATE_WINDOW: Final = dt.timedelta(hours=1)
+NOTICE_VIEWED: Final = "compliance.notice.viewed"
+#: Receipt emails per address per day: the form must not work as a mail relay.
+NOTICE_RECEIPTS_PER_ADDRESS: Final = 3
+NOTICE_PERMISSION: Final = "review_notices"
+
+
+class NoticeError(ValueError):
+    """A notice or a decision that breaks the rules; `codes` names the fields at fault."""
+
+    def __init__(self, *codes: str) -> None:
+        super().__init__(", ".join(codes))
+        self.codes = codes
+
+
+class NoticeChangeSet(ChangeSet):
+    """The change report of a notice mutation, with the notice it concerns."""
+
+    notice: Notice | None = None
+
+
+def anonymous_context(ip: str | None) -> AuditContext:
+    """The actor of a public notice: nobody signed in, only the client address."""
+    return AuditContext(actor_label="anonymous", source=AuditLog.Source.SYSTEM, ip=ip)
+
+
+def public_notice_context(ip: str | None, category: str) -> AuditContext:
+    """No address is kept for the anonymous category (art. 16(2)(c)); only a hashed counter."""
+    return anonymous_context(None if anonymous_category(category) else ip)
+
+
+def _location(url: str) -> str:
+    """Scheme, host and path only: a query or fragment may carry personal data."""
+    parts = urlsplit(url)
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
+
+
+def notice_snapshot(notice: Notice) -> dict[str, Any]:
+    """What the audit log shows of a notice: ids, the target and the status, never the
+    notifier's name, email or words (personal data stays in the encrypted columns)."""
+    return {
+        "target_kind": notice.target_kind,
+        "url": _location(notice.url),
+        "category": notice.category,
+        "status": notice.status,
+        "has_notifier": bool(notice.notifier_email),
+        "decided": notice.decided_at is not None,
+    }
+
+
+def anonymous_category(category: str) -> bool:
+    return category == engine.NOTICE_ANONYMOUS_CATEGORY
+
+
+def notice_retry_after(ip: str | None) -> dt.timedelta:
+    """Count one public submission from `ip`; zero when allowed, else the time to wait."""
+    return consume_rate_limit(
+        f"notice:ip:{keyed_hash(ip or 'unknown', purpose='notice-ip')}",
+        limit=NOTICE_RATE_LIMIT,
+        window=NOTICE_RATE_WINDOW,
+    )
+
+
+def captcha_retry_after(ip: str | None) -> dt.timedelta:
+    """Count one refused captcha from `ip` (a larger, separate budget than the reports)."""
+    return consume_rate_limit(
+        f"notice:captcha:{keyed_hash(ip or 'unknown', purpose='notice-ip')}",
+        limit=NOTICE_RATE_LIMIT * 4,
+        window=NOTICE_RATE_WINDOW,
+    )
+
+
+def record_notice_view(public_id: Any, *, ctx: AuditContext) -> None:
+    """Audit that staff opened a notice, which shows the notifier's name and email."""
+    record(
+        ctx,
+        NOTICE_VIEWED,
+        NOTICE_MODEL,
+        str(public_id),
+        None,
+        {"reason": "notice review shows the notifier's details"},
+    )
+
+
+def can_review_notices(user: Any) -> bool:
+    """An active user granted `compliance.review_notices`, directly or through a group.
+
+    Read from the permission tables, not `has_perm`: a superuser holds no platform role by
+    being a superuser (spec 02 CORE.18), as with `core.services.is_platform_owner`.
+    """
+    if not (getattr(user, "is_active", False) and getattr(user, "pk", None) is not None):
+        return False
+    return Permission.objects.filter(
+        Q(user=user) | Q(group__user=user),
+        content_type__app_label=Notice._meta.app_label,
+        codename=NOTICE_PERMISSION,
+    ).exists()
+
+
+def _notice_email(notice: Notice, template_key: str, key: str, **extra: Any) -> None:
+    """Queue an email to the notifier, in their language; none for an anonymous report."""
+    if not notice.notifier_email:
+        return
+    enqueue_email(
+        recipient=notice.notifier_email,
+        template_key=template_key,
+        language=notice.notifier_language or settings.LANGUAGE_CODE,
+        context={"reference": str(notice.public_id), "url": notice.url, **extra},
+        idempotency_key=f"compliance:notice:{notice.public_id}:{key}",
+    )
+
+
+def submit_notice(
+    *,
+    target_kind: str,
+    url: str,
+    category: str,
+    explanation: str,
+    notifier_name: str,
+    notifier_email: str,
+    good_faith: bool,
+    language: str,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> NoticeChangeSet:
+    """Record a notice and confirm its receipt to the notifier (art. 16(4)).
+
+    Raises `NoticeError` when article 16(2) is not met, also on dry-run. The audit entry and the
+    receipt email are written in one transaction with the notice.
+    """
+    problems = [
+        p.code
+        for p in engine.notice_problems(
+            explanation=explanation,
+            url=url,
+            category=category,
+            notifier_name=notifier_name,
+            notifier_email=notifier_email,
+            good_faith=good_faith,
+        )
+    ]
+    if notifier_email.strip() and not anonymous_category(category):
+        try:
+            validate_email(notifier_email.strip())
+        except ValidationError:
+            problems.append("notifier_email")
+    if target_kind not in Notice.TargetKind.values:
+        problems.append("target_kind")
+    if category not in Notice.Category.values:
+        problems.append("category")
+    if problems:
+        raise NoticeError(*problems)
+    anonymous = category == engine.NOTICE_ANONYMOUS_CATEGORY
+    notice = Notice(
+        target_kind=target_kind,
+        url=url.strip(),
+        category=category,
+        explanation=explanation.strip(),
+        notifier_name="" if anonymous else notifier_name.strip(),
+        notifier_email="" if anonymous else notifier_email.strip(),
+        notifier_language=language if language in configured_languages() else "",
+        good_faith=good_faith,
+    )
+    changes = NoticeChangeSet()
+    changes.notice = notice
+    changes.create(NOTICE_MODEL, str(notice.public_id), notice_snapshot(notice))
+    if dry_run:
+        return changes
+    with transaction.atomic():
+        notice.save()
+        audit_changes(changes, ctx=ctx, action=NOTICE_RECEIVED)
+        mailbox = keyed_hash(normalise_email(notice.notifier_email), purpose="notice-email")
+        if notice.notifier_email and not consume_rate_limit(
+            f"notice:email:{mailbox}",
+            limit=NOTICE_RECEIPTS_PER_ADDRESS,
+            window=dt.timedelta(days=1),
+        ):
+            _notice_email(notice, NOTICE_RECEIPT_TEMPLATE, "received")
+    return changes
+
+
+def _transition(
+    public_id: Any,
+    new_status: str,
+    *,
+    action: str,
+    ctx: AuditContext,
+    dry_run: bool,
+    reason: str = "",
+) -> NoticeChangeSet:
+    changes = NoticeChangeSet()
+    with transaction.atomic():
+        try:
+            notice = Notice.objects.select_for_update().get(public_id=public_id)
+        except Notice.DoesNotExist:
+            raise NoticeError("notice") from None
+        if not engine.notice_transition_allowed(notice.status, new_status):
+            raise NoticeError("status")
+        before = notice_snapshot(notice)
+        notice.status = new_status
+        if new_status in engine.NOTICE_OUTCOMES:
+            notice.decision_reason = reason.strip()
+            notice.decided_at = timezone.now()
+        changes.notice = notice
+        changes.update(NOTICE_MODEL, str(notice.public_id), before, notice_snapshot(notice))
+        if dry_run:
+            return changes
+        notice.save()
+        audit_changes(changes, ctx=ctx, action=action)
+        if new_status in engine.NOTICE_OUTCOMES:  # art. 16(5): tell the notifier the decision
+            _notice_email(
+                notice,
+                NOTICE_DECISION_TEMPLATE,
+                "decision",
+                outcome=new_status,
+                reason=notice.decision_reason,
+            )
+    return changes
+
+
+def start_review(public_id: Any, *, ctx: AuditContext, dry_run: bool = False) -> NoticeChangeSet:
+    """received -> under_review. Raises `NoticeError` for an unknown notice or a wrong status."""
+    return _transition(
+        public_id,
+        Notice.Status.UNDER_REVIEW,
+        action=NOTICE_REVIEW_STARTED,
+        ctx=ctx,
+        dry_run=dry_run,
+    )
+
+
+def decide_notice(
+    public_id: Any, *, outcome: str, reason: str, ctx: AuditContext, dry_run: bool = False
+) -> NoticeChangeSet:
+    """under_review -> action_taken or no_action, with the reason, and tell the notifier.
+
+    Raises `NoticeError` for a missing reason or unknown outcome, an unknown notice or a wrong
+    status, also on dry-run. Acting on the content itself (hiding an event, unpublishing a
+    product) is a separate step through that app's service (EVT.11, part 3).
+    """
+    problems = engine.decision_problems(outcome, reason)
+    if problems:
+        raise NoticeError(*problems)
+    return _transition(
+        public_id, outcome, action=NOTICE_DECIDED, ctx=ctx, dry_run=dry_run, reason=reason
+    )

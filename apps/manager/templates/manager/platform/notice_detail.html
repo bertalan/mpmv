@@ -1,0 +1,32 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}One notice: what was reported, who by (staff only), and the next workflow step.{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Notice" %} {{ notice.public_id|slice:":8" }}</h1>
+  <dl class="manager-details">
+    <dt>{% translate "Status" %}</dt><dd>{{ notice.get_status_display }}</dd>
+    <dt>{% translate "Received" %}</dt><dd>{{ notice.created_at|date:"SHORT_DATETIME_FORMAT" }}</dd>
+    <dt>{% translate "Reported" %}</dt><dd>{{ notice.get_target_kind_display }} ({{ notice.get_category_display }})</dd>
+    <dt>{% translate "Exact location" %}</dt><dd>{{ notice.url }}</dd>
+    <dt>{% translate "Explanation" %}</dt><dd>{{ notice.explanation|linebreaksbr }}</dd>
+    <dt>{% translate "Notifier" %}</dt><dd>{% if notice.notifier_email %}{{ notice.notifier_name }} &lt;{{ notice.notifier_email }}&gt;{% else %}{% translate "Anonymous" %}{% endif %}</dd>
+    {% if notice.decided_at %}
+      <dt>{% translate "Decided" %}</dt><dd>{{ notice.decided_at|date:"SHORT_DATETIME_FORMAT" }}</dd>
+      <dt>{% translate "Reason" %}</dt><dd>{{ notice.decision_reason|linebreaksbr }}</dd>
+    {% endif %}
+  </dl>
+  {% if notice.status == "received" %}
+    <form method="post">
+      {% csrf_token %}<input type="hidden" name="action" value="review">
+      {% include "components/button.html" with label=_("Start review") type="submit" only %}
+    </form>
+  {% elif notice.status == "under_review" %}
+    <form method="post" novalidate>
+      {% csrf_token %}<input type="hidden" name="action" value="decide">
+      {% include "components/error_summary.html" with form=decision_form only %}
+      {% for field in decision_form %}{% include "components/field.html" with field=field only %}{% endfor %}
+      {% include "components/button.html" with label=_("Record the decision") type="submit" only %}
+    </form>
+  {% endif %}
+  <p><a href="{% url 'manager:platform:notices' %}">{% translate "Back to the notices" %}</a></p>
+{% endblock %}
