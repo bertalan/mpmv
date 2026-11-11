@@ -1,0 +1,7 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% if customer_name %}{% blocktranslate %}Hello {{ customer_name }},{% endblocktranslate %}{% else %}{% translate "Hello," %}{% endif %}</p>
+<p>{% blocktranslate %}We received your payment of {{ total }} EUR for order {{ order_number }}. Each seller will prepare its part and you will get a message when it ships.{% endblocktranslate %}</p>
+</body>
+</html>

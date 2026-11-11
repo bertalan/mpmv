@@ -14,6 +14,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, cast
 
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser, Permission, PermissionsMixin
@@ -127,6 +128,11 @@ OPERATOR_FIELDS = (
     "dac7_authority_country",
     "support_email",
     "compliance_email",
+    "session_policy",
+    "authority_contact_email",
+    "authority_contact_languages",
+    "user_contact_url",
+    "user_contact_languages",
     "allowed_vendor_countries",
     "valid_from",
     "valid_to",
@@ -271,6 +277,27 @@ def is_platform_owner(user: AbstractBaseUser | AnonymousUser) -> bool:
         content_type__app_label=PlatformOperator._meta.app_label,
         codename=PLATFORM_OWNER_CODENAME,
     ).exists()
+
+
+def holds_permission(user: AbstractBaseUser | AnonymousUser, *labels: str) -> bool:
+    """An active user granted at least one of the `app_label.codename` permissions, directly or
+    through a group (admin accounts only). Read from the permission tables, never `has_perm`:
+    it is true for every
+    active superuser (CORE.18, role checks)."""
+    if not (user.is_active and isinstance(user, PermissionsMixin) and user.pk is not None):
+        return False
+    wanted = Q()
+    for label in labels:
+        app_label, codename = label.split(".")
+        wanted |= Q(content_type__app_label=app_label, codename=codename)
+    # Platform roles and vendor membership never mix: a member holds no platform permission. A
+    # role (group) also needs admin access; a customer put in a role group by mistake holds none.
+    if apps.get_model("vendors", "VendorMember").objects.filter(user_id=user.pk).exists():
+        return False
+    granted = Q(user=user)
+    if getattr(user, "is_staff", False) or user.is_superuser:
+        granted |= Q(group__user=user)
+    return Permission.objects.filter(granted).filter(wanted).exists()
 
 
 def allowed_vendor_countries(at: dt.datetime | None = None) -> frozenset[str]:
@@ -597,6 +624,13 @@ def consume_rate_limit(
         row.failures += 1
         row.save(update_fields=["failures", "expires_at", "updated_at"])
     return dt.timedelta(0)
+
+
+def rate_limit_wait(key: str, *, limit: int, now: dt.datetime | None = None) -> dt.timedelta:
+    """The time until the window of `key` ends when it is full, else zero. Counts nothing."""
+    now = now or timezone.now()
+    row = Throttle.objects.filter(key=key, expires_at__gt=now, failures__gte=limit).first()
+    return row.expires_at - now if row else dt.timedelta(0)
 
 
 def purge_expired_throttles(*, now: dt.datetime | None = None) -> int:

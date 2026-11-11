@@ -76,6 +76,7 @@ from .blocks import (
     GalleryBlock,
     HeroBlock,
     LaunchCountdownBlock,
+    LegalSectionBlock,
     PageCardBlock,
     ProductGridBlock,
     countdown_targets,
@@ -84,13 +85,18 @@ from .choosers import term_chooser, vendor_chooser
 
 
 def body_field(
-    verbose_name: Any = None, *, countdown: bool = False, products: bool = False
+    verbose_name: Any = None,
+    *,
+    countdown: bool = False,
+    products: bool = False,
+    legal_sections: bool = False,
 ) -> StreamField:
     """A page body. `countdown`: also offer the launch countdown (CMS.9: home and standard
     pages; the page class then needs `CountdownCacheMixin`). `products`: also offer the product
     grid (CMS.10: home and standard pages)."""
     extra = [("countdown", LaunchCountdownBlock())] if countdown else []
     grid = [("product_grid", ProductGridBlock())] if products else []
+    sections = [("legal_section", LegalSectionBlock())] if legal_sections else []
     return StreamField(
         [
             ("hero", HeroBlock()),
@@ -102,6 +108,7 @@ def body_field(
             ("featured", FeaturedLinksBlock()),
             *grid,
             *extra,
+            *sections,
         ],
         blank=True,
         verbose_name=verbose_name or _("body"),
@@ -330,6 +337,10 @@ class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
         WITHDRAWAL = "withdrawal", _("Right of withdrawal")
         SHIPPING = "shipping", _("Shipping")
         RETURNS = "returns", _("Returns")
+        # CMP.5 (DSA article 14, P2B article 5): the platform's own terms of use, with the
+        # restrictions and the moderation policy, and the ranking parameters page.
+        PLATFORM_TERMS = "platform_terms", _("Platform terms of use")
+        RANKING = "ranking", _("Ranking parameters")
 
     # Read by the visitor-content fallback (spec 09 §9.2) when it comes: legal pages opt out.
     language_fallback: ClassVar[bool] = False
@@ -339,7 +350,7 @@ class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
         _("effective date"),
         help_text=_("Applies from this date; not before the last version's."),
     )
-    body = body_field()
+    body = body_field(legal_sections=True)
 
     content_panels: ClassVar[list[Any]] = [
         *Page.content_panels,
@@ -447,7 +458,7 @@ class LegalPageVersion(models.Model):
     language_code = models.CharField(_("language"), max_length=16)
     title = models.CharField(_("title"), max_length=255)
     effective_date = models.DateField(_("effective date"))
-    body = body_field()
+    body = body_field(legal_sections=True)
     published_at = models.DateTimeField(_("published at"))
     published_by = models.CharField(_("published by"), max_length=150)
 

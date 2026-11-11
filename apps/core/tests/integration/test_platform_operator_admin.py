@@ -53,7 +53,8 @@ def test_adding_through_the_admin_goes_through_the_audited_service(
     assert stored.country == "AT"
     entry = AuditLog.objects.get(action="core.platform_operator.configured")
     assert entry.source == "admin"
-    assert entry.actor_label == "staff:staff@example.com"
+    assert entry.actor_label.startswith("staff:")
+    assert "@" not in entry.actor_label  # pseudonymous: the public id, never the address
 
 
 def test_adding_a_new_row_closes_the_current_one(staff_client: Client) -> None:

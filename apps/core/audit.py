@@ -35,11 +35,14 @@ class AuditContext:
 
 
 def user_context(user: AbstractBaseUser | AnonymousUser, ip: str | None) -> AuditContext:
-    """`user` acting on their own account, or staff acting from the admin."""
+    """`user` acting on their own account, or staff acting from the admin.
+
+    The label carries the user's public id, never the email: the audit table is append-only, so
+    an address written here could not be erased with the account (CMP.4)."""
     staff = bool(getattr(user, "is_staff", False))
     return AuditContext(
         actor_id=user.pk,
-        actor_label=f"{'staff' if staff else 'user'}:{user.get_username()}",
+        actor_label=f"{'staff' if staff else 'user'}:{getattr(user, 'public_id', user.pk)}",
         source=AuditLog.Source.ADMIN if staff else AuditLog.Source.SYSTEM,
         ip=ip,
     )

@@ -10,10 +10,18 @@ from django.conf import settings
 from django.http import HttpRequest
 from django.urls import reverse
 from django.utils import translation
+from django.utils.html import format_html_join
 from django.utils.safestring import SafeString, mark_safe
 from wagtail.models import Locale, Page
 
-from apps.core.i18n import configured_languages
+from apps.core.i18n import (
+    LanguageLink,
+    configured_languages,
+    hreflang_alternates,
+    switch_goes_home,
+    switcher_links,
+    translate_path,
+)
 from apps.core.image_licences import Credit
 
 from .. import services
@@ -27,14 +35,6 @@ register = template.Library()
 class MenuLink:
     label: str
     url: str
-
-
-@dataclass(frozen=True)
-class LanguageLink:
-    code: str
-    name: str  # in its own language ("Italiano")
-    url: str  # the current page in that language, query string kept
-    current: bool
 
 
 def _menu(location: str) -> NavigationMenu | None:
@@ -72,42 +72,72 @@ def navigation_links(context: dict[str, Any], location: str) -> list[MenuLink]:
     return links
 
 
-def _translations(page: Page | None, request: HttpRequest | None) -> dict[str, str]:
-    """{language code: URL} of the live translations of `page` (itself included)."""
-    if page is None:
-        return {}
-    return {
-        translated.locale.language_code: translated.get_url(request)
-        for translated in page.get_translations(inclusive=True).live().select_related("locale")
-    }
+def _home(code: str, suffix: str = "") -> str:
+    with translation.override(code):
+        return reverse("home") + suffix
 
 
 @register.simple_tag(takes_context=True)
 def language_links(context: dict[str, Any]) -> list[LanguageLink]:
     """One entry per configured language: where the switcher takes the visitor.
 
-    On a CMS page, the target is that page's translation (slugs differ between languages);
-    without one, the language's home. Elsewhere, the language's home.
+    The target is the same object in that language: the translations a view puts in the context
+    as `language_urls` (listings and storefronts, the set of their `hreflang` links), else the
+    CMS page's live translations (slugs differ between languages). An object without a
+    translation leads to the language's home, flagged so the switch shows a notice. A view with
+    no object (search, cart, account, 404) keeps its own path in the other language, no notice.
     """
     request: HttpRequest | None = context.get("request")
-    page: Page | None = context.get("page")
+    current = translation.get_language()
     query = request.META.get("QUERY_STRING", "") if request is not None else ""
     suffix = f"?{query}" if query else ""
-    current = translation.get_language()
-    infos = {code: translation.get_language_info(code) for code in configured_languages()}
-    translated = _translations(page, request)
-    links: list[LanguageLink] = []
-    for code, info in infos.items():
-        url = translated.get(code)
-        if url is None:
-            with translation.override(code):
-                url = reverse("home")
-        links.append(
-            LanguageLink(
-                code=code, name=str(info["name_local"]), url=url + suffix, current=code == current
-            )
+    urls: Mapping[str, str] | None = context.get("language_urls")
+    if urls is not None:  # a listing's filters mean nothing on a home page
+        return switcher_links(urls, current, _home)
+    page: Page | None = context.get("page")
+    if page is not None:
+        found = services.page_language_urls(page, request)
+        return switcher_links(
+            {code: url + suffix for code, url in found.items()},
+            current,
+            lambda code: _home(code, suffix),
         )
-    return links
+    if request is None or switch_goes_home(request):
+        return switcher_links(
+            {code: _home(code) for code in configured_languages()}, current, _home
+        )
+    return switcher_links(
+        {code: translate_path(request.path_info, code) + suffix for code in configured_languages()},
+        current,
+        _home,
+    )
+
+
+@register.simple_tag(takes_context=True)
+def switch_next_url(context: dict[str, Any]) -> str:
+    """The `next` of the account and Manager switchers: the page's own path, except for a
+    secret-bearing URL (`language_switch_home`), which must not reach the HTML."""
+    request: HttpRequest | None = context.get("request")
+    if request is None or switch_goes_home(request):
+        return "/"
+    return request.get_full_path()
+
+
+@register.simple_tag(takes_context=True)
+def page_hreflang(context: dict[str, Any]) -> SafeString:
+    """The `<link rel="alternate" hreflang>` set of the page in the context, from the same
+    translations map as its language switcher (`services.page_language_urls`)."""
+    request: HttpRequest | None = context.get("request")
+    page: Page | None = context.get("page")
+    if request is None or page is None:
+        return mark_safe("")
+    urls = {
+        code: request.build_absolute_uri(url)
+        for code, url in services.page_language_urls(page, request).items()
+    }
+    return format_html_join(
+        "\n  ", '<link rel="alternate" hreflang="{}" href="{}">', hreflang_alternates(urls)
+    )
 
 
 @register.simple_tag

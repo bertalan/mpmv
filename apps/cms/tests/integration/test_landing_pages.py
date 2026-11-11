@@ -392,6 +392,26 @@ def test_the_vendor_page_has_its_own_canonical_and_hreflang(seeded: SeedReport) 
     }
 
 
+def test_the_vendor_page_switch_targets_equal_its_hreflang_set(seeded: SeedReport) -> None:
+    acme = VendorFactory.create(status=Vendor.Status.ACTIVE, slug="acme")
+    page = vendor_landing(acme)
+    _translate(page, "it", slug="il-laboratorio")
+    html = _html(page.url)
+    alternates = {
+        link["hreflang"]: link["href"]
+        for link in html.find_all("link", rel="alternate")
+        if link["hreflang"] != "x-default"
+    }
+    forms = {
+        form.find("button")["value"]: (form.find("input", attrs={"name": "next"})["value"],
+                                       form.find("input", attrs={"name": "notice"})["value"])
+        for form in html.select("nav.language-switcher form")
+    }  # fmt: skip
+    assert {code for code, (_url, notice) in forms.items() if notice == "0"} == set(alternates)
+    for code, url in alternates.items():
+        assert url.endswith(forms[code][0])
+
+
 def test_the_page_of_a_vendor_no_longer_active_is_gone(seeded: SeedReport) -> None:
     acme = VendorFactory.create(status=Vendor.Status.ACTIVE, slug="acme")
     page = vendor_landing(acme)

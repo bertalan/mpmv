@@ -4,9 +4,8 @@
 - Platform space: platform staff, meaning a user who holds a dedicated platform permission
   (spec 02 Q-34). Wagtail or Django admin access (`is_staff`) never counts, and neither does
   superuser status (spec 02 CORE.18: the technical superuser holds no Manager section without a
-  role). Until CORE.18 adds the staff roles, the only such permission is the platform owner's
-  (`core.platform_owner`); CORE.18 replaces `is_platform_staff` with the role membership of
-  `roles.py`.
+  role). Such a user is the platform owner (`core.platform_owner`) or a member of a platform role
+  group of `roles.py` (CORE.18).
 
 Platform roles and vendor membership never mix (spec 02 Roles): a user who is both is let into
 neither space, so a data error never opens a side door between them. A vendor member with admin
@@ -18,11 +17,13 @@ from dataclasses import dataclass, field
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
+from django.urls import reverse
 
 from apps.core.services import is_platform_owner
 from apps.vendors.models import Vendor, VendorMember
 from apps.vendors.services import is_vendor_member
 
+from .role_groups import in_role_group, user_roles
 from .spaces import Space
 
 type AnyUser = AbstractBaseUser | AnonymousUser
@@ -32,7 +33,9 @@ def is_platform_staff(user: AnyUser) -> bool:
     """Holds a dedicated platform permission; `is_staff` and superuser status do not count."""
     if not (user.is_authenticated and user.is_active):
         return False
-    return is_platform_owner(user)
+    if is_vendor_member(user):  # platform roles and vendor membership never mix
+        return False
+    return is_platform_owner(user) or bool(user_roles(user))
 
 
 def _has_admin_access(user: AnyUser) -> bool:
@@ -43,10 +46,12 @@ def may_enter(space: Space, user: AnyUser) -> bool:
     """Whether `user` may enter `space` at all; the sections check the rest."""
     if not (user.is_authenticated and user.is_active):
         return False
-    staff, member = is_platform_staff(user), is_vendor_member(user)
+    member = is_vendor_member(user)
+    # Raw: a member who also holds a platform role is let into neither space.
+    holds_role = is_platform_owner(user) or in_role_group(user)
     if space is Space.SHOP:
-        return member and not staff and not _has_admin_access(user)
-    return staff and not member
+        return member and not holds_role and not _has_admin_access(user)
+    return is_platform_staff(user)
 
 
 @dataclass(frozen=True)
@@ -62,3 +67,11 @@ class ManagerContext:
     vendor: Vendor | None = None
     role: str | None = None
     memberships: tuple[VendorMember, ...] = field(default=())
+
+
+def home_url(user: AnyUser) -> str:
+    """Where a user lands without `next`: their Manager space, else the site root."""
+    for space in (Space.PLATFORM, Space.SHOP):
+        if may_enter(space, user):
+            return reverse(f"manager:{space}:dashboard")
+    return "/"

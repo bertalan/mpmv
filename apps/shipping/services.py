@@ -16,16 +16,25 @@ from django.db.models import ProtectedError, Q
 
 from apps.core.audit import VENDOR_FIELD, AuditContext
 from apps.core.changeset import ChangeSet
+from apps.core.models import TranslationStatus
 from apps.core.services import run_mutation, save_audited
+from apps.core.translations import source_language
 from apps.vendors.models import Vendor
 
 from .engine import (
     AreaTreatment,
+    BandSnap,
     Destination,
+    MethodSnap,
+    PickupSnap,
+    ShippingConfigSnap,
+    ShippingOutcome,
     SpecialAreaDecision,
     SpecialAreaSnap,
+    VendorPackage,
     ZoneSnap,
 )
+from .engine import quote_shipping as engine_quote_shipping
 from .engine import special_area_treatment as resolve_area_treatment
 from .models import (
     Carrier,
@@ -245,3 +254,96 @@ def special_area_decision(method: ShippingMethod, dest: Destination) -> SpecialA
     its normal rate unless it sets a treatment of its own (`engine.zone_within_area`)."""
     (zone,) = _snapshots([method.zone])
     return resolve_area_treatment(special_area_snaps(), area_treatments(method), dest, zone)
+
+
+# --- The quote of a vendor's package (SHP.3)
+
+
+def _translated(rows: Iterable[Any], language: str, fallback: str) -> str:
+    """The published name or label of prefetched translation `rows` in `language`, else in the
+    source language, else `fallback`. Same rule as `resolve_translation`, without a query per
+    row."""
+    published = [row for row in rows if row.status == TranslationStatus.PUBLISHED]
+    for wanted in (language, source_language()):
+        for row in published:
+            if row.language == wanted:
+                return str(getattr(row, "name", None) or getattr(row, "label", fallback))
+    return fallback
+
+
+def shipping_config_snap(
+    vendor: Vendor, *, quotes_enabled: bool = True, language: str = "en"
+) -> ShippingConfigSnap:
+    """The configuration `engine.quote_shipping` reads for `vendor`: its methods in the zones it
+    can use (platform zones and its own), bands, special-area treatments, pickups and the special
+    areas. A fixed number of queries, whatever the number of methods."""
+    methods = list(
+        ShippingMethod.objects.filter(vendor=vendor)
+        .select_related("zone", "carrier")
+        .prefetch_related("bands", "translations")
+    )
+    zone_by_id = {
+        zone.pk: snap
+        for zone, snap in zip(
+            (m.zone for m in methods), _snapshots([m.zone for m in methods]), strict=True
+        )
+    }
+    treatments: dict[int, dict[str, AreaTreatment]] = {}
+    rows = SpecialAreaTreatment.objects.filter(method__in=methods).select_related("area")
+    for row in rows:
+        treatments.setdefault(row.method_id, {})[row.area.code] = row.snap()
+    pickups = PickupOption.objects.filter(vendor=vendor).prefetch_related("translations")
+    return ShippingConfigSnap(
+        methods=tuple(
+            MethodSnap(
+                key=m.key,
+                name=_translated(m.translations.all(), language, m.key),
+                vendor_id=vendor.pk,
+                zone=zone_by_id[m.zone_id],
+                carrier_code=m.carrier.code,
+                carrier_active=m.carrier.is_active,
+                service_level=m.service_level,
+                min_delivery_days=m.min_delivery_days,
+                max_delivery_days=m.max_delivery_days,
+                is_default=m.is_default,
+                free_shipping_threshold=m.free_shipping_threshold,
+                tax_treatment=m.tax_treatment,
+                over_max_weight=m.over_max_weight,
+                bands=tuple(
+                    BandSnap(b.from_kg, b.to_kg, b.cost_net, b.surcharge_net)
+                    for b in sorted(m.bands.all(), key=lambda b: b.from_kg)
+                ),
+                treatments=treatments.get(m.pk, {}),
+            )
+            for m in methods
+        ),
+        pickups=tuple(
+            PickupSnap(
+                vendor_id=vendor.pk,
+                key=p.key,
+                label=_translated(p.translations.all(), language, p.key),
+                cost_net=p.cost_net,
+                address=p.address,
+            )
+            for p in pickups
+        ),
+        areas=tuple(special_area_snaps()),
+        quotes_enabled=quotes_enabled,
+    )
+
+
+def quote_shipping(
+    vendor: Vendor,
+    package: VendorPackage,
+    dest: Destination,
+    *,
+    quotes_enabled: bool = True,
+    language: str = "en",
+) -> ShippingOutcome:
+    """The shipping of `vendor`'s package to `dest`: Rates, IndicativeRates, NeedsQuote or
+    Blocked, net of VAT (spec 06 §6.2). Reads only; the amounts are not stored here, the order
+    keeps its own snapshot. `quotes_enabled` is the platform switch of the quote flow (SHP.9)."""
+    if package.vendor_id != vendor.pk:
+        raise ValueError("The package belongs to another vendor.")
+    cfg = shipping_config_snap(vendor, quotes_enabled=quotes_enabled, language=language)
+    return engine_quote_shipping(package, dest, cfg)

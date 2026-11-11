@@ -1,0 +1,64 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+One vendor order (ORD.6): what the vendor needs to ship (name, shipping address, lines), the
+tracking data once shipped, and the one action that is legal now. The buyer's e-mail and billing
+data are not shown. Every action is a POST with a CSRF token. No inline script or style.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% blocktranslate %}Order {{ number }}{% endblocktranslate %}</h1>
+  <p><a href="{% url 'manager:shop:orders' %}">{% translate "Back to the orders" %}</a></p>
+  {% if action_error %}{% include "components/alert.html" with level="danger" message=action_error live="assertive" only %}{% endif %}
+  <dl class="manager-facts">
+    <dt>{% translate "Status" %}</dt><dd data-order-state>{{ sub.get_state_display }}</dd>
+    <dt>{% translate "Placed" %}</dt><dd>{{ placed|date:"SHORT_DATETIME_FORMAT" }}</dd>
+    <dt>{% translate "Customer" %}</dt><dd>{{ customer_name }}</dd>
+    {% if show_address %}
+      <dt>{% translate "Ship to" %}</dt>
+      <dd>{% for line in address %}{{ line }}{% if not forloop.last %}<br>{% endif %}{% endfor %}{% if country %}<br>{{ country }}{% endif %}</dd>
+    {% endif %}
+    {% if sub.tracking_number %}
+      <dt>{% translate "Tracking number" %}</dt><dd>{{ sub.tracking_number }}</dd>
+      {% if sub.carrier %}<dt>{% translate "Carrier" %}</dt><dd>{{ sub.carrier }}</dd>{% endif %}
+    {% endif %}
+  </dl>
+  <h2>{% translate "Items" %}</h2>
+  <div class="table-scroll" role="region" aria-labelledby="order-items-caption" tabindex="0">
+    <table class="table">
+      <caption id="order-items-caption">{% translate "Items" %}</caption>
+      <thead><tr>
+        <th scope="col">{% translate "Product" %}</th>
+        <th scope="col">{% translate "SKU" %}</th>
+        <th scope="col" class="numeric">{% translate "Quantity" %}</th>
+      </tr></thead>
+      <tbody>
+        {% for line in lines %}<tr>
+          <th scope="row">{{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %}</th>
+          <td>{{ line.sku }}</td>
+          <td class="numeric">{{ line.quantity }}</td>
+        </tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if can_accept %}
+    <form method="post" action="{{ accept_url }}" class="manager-form">
+      {% csrf_token %}
+      {% include "components/button.html" with label=_("Accept the order") type="submit" only %}
+    </form>
+  {% endif %}
+  {% if can_ship %}
+    <h2>{% translate "Ship the order" %}</h2>
+    {% include "components/error_summary.html" with form=form autofocus=True only %}
+    <form method="post" action="{{ ship_url }}" class="manager-form" novalidate>
+      {% csrf_token %}
+      {% for field in form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+      {% include "components/button.html" with label=_("Mark as shipped") type="submit" only %}
+    </form>
+  {% endif %}
+  {% if can_deliver %}
+    <form method="post" action="{{ deliver_url }}" class="manager-form">
+      {% csrf_token %}
+      {% include "components/button.html" with label=_("Mark as delivered") type="submit" only %}
+    </form>
+  {% endif %}
+{% endblock %}

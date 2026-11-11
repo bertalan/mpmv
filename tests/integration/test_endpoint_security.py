@@ -93,6 +93,7 @@ from tests.tenancy import (
     check_endpoint,
     echoed_in_path,
     endpoints,
+    member_session,
 )
 from tests.tenancy_registry import (
     API_OPERATIONS,
@@ -132,6 +133,8 @@ def sample_path(endpoint: Endpoint, access: object = None) -> str:
     if isinstance(access, NoVendorData) and access.path:
         return access.path
     kwargs = access.kwargs if isinstance(access, NoVendorData | StaffOnly) else {}
+    if isinstance(access, VendorScoped):
+        kwargs = access.sample
     return endpoint.path(**{name: kwargs.get(name, "0") for name in endpoint.params})
 
 
@@ -443,10 +446,22 @@ def test_a_customer_cannot_open_vendor_b_objects(
 
 
 NON_OWNER_ROLES = [role for role in VendorMember.Role if role != VendorMember.Role.OWNER]
+# Pages the role matrix gives to owners only: other roles get 404 instead of their own data.
+OWNER_ONLY_WEB = frozenset(
+    {
+        "manager:shop:profile",  # CORE.9
+        "manager:shop:image_choose",  # VEN.31
+        "manager:shop:image_results",
+        "manager:shop:image_chosen",
+        "manager:shop:image_select_format",
+    }
+)
 
 
 @pytest.mark.parametrize("role", NON_OWNER_ROLES, ids=str)
-@pytest.mark.parametrize("endpoint", VENDOR_SCOPED_WEB, ids=lambda e: e.key)
+@pytest.mark.parametrize(
+    "endpoint", [e for e in VENDOR_SCOPED_WEB if e.key not in OWNER_ONLY_WEB], ids=lambda e: e.key
+)
 def test_every_vendor_role_is_confined_to_its_vendor(
     endpoint: Endpoint, role: VendorMemberRole, client: Client, cross_tenant: CrossTenant
 ) -> None:
@@ -457,6 +472,25 @@ def test_every_vendor_role_is_confined_to_its_vendor(
     access = classify(endpoint)
     assert access is not None
     check_endpoint(client, endpoint, access, tenants)
+
+
+@pytest.mark.parametrize("role", NON_OWNER_ROLES, ids=str)
+@pytest.mark.parametrize(
+    "endpoint", [e for e in VENDOR_SCOPED_WEB if e.key in OWNER_ONLY_WEB], ids=lambda e: e.key
+)
+def test_an_owner_only_page_answers_404_to_the_other_roles(
+    endpoint: Endpoint, role: VendorMemberRole, client: Client, cross_tenant: CrossTenant
+) -> None:
+    member = UserFactory.create(email=f"{role}-a@example.com")
+    VendorMemberFactory.create(vendor=cross_tenant.a.vendor, user=member, role=role)
+    tenants = replace(cross_tenant, a=replace(cross_tenant.a, owner=member))
+    access = classify(endpoint)
+    assert access is not None
+    assert isinstance(access, VendorScoped | VendorScopedList)
+    member_session(client, tenants)
+    for method in access.methods:
+        response = client.generic(method, sample_path(endpoint))
+        assert response.status_code == 404, f"{endpoint.key}: {role} got {response.status_code}"
 
 
 @pytest.mark.parametrize(

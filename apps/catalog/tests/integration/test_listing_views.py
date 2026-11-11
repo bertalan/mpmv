@@ -375,6 +375,31 @@ def test_vendor_storefronts_per_language(client: Client) -> None:
     assert client.get(f"/shop/{closed.slug}/").status_code == 404
 
 
+def test_the_vendor_storefront_shows_the_logo_with_its_alt_text(client: Client) -> None:
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.core.audit import AuditContext
+    from apps.vendors.services import set_vendor_logo
+    from apps.vendors.tests.factories import VendorMemberFactory
+    from tests.upload_corpus import png
+
+    vendor = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    VendorTranslationFactory.create(vendor=vendor, status=PUBLISHED)
+    listed(vendor=vendor)
+    assert b"listing-logo" not in client.get(f"/shop/{vendor.slug}/").content
+    owner = VendorMemberFactory.create(vendor=vendor, role="owner").user
+    set_vendor_logo(
+        vendor,
+        upload=SimpleUploadedFile("logo.png", png()),
+        alt="Acme anvil mark",
+        actor=owner,
+        ctx=AuditContext(actor_label="user:owner", source="vendor"),
+    )
+    page = client.get(f"/shop/{vendor.slug}/").text
+    assert 'class="listing-logo"' in page
+    assert 'alt="Acme anvil mark"' in page
+
+
 # --- Route conflicts
 
 

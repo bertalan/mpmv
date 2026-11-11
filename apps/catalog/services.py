@@ -33,7 +33,7 @@ from apps.core import translations
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.models import MediaImage
-from apps.core.services import audit_changes, run_mutation, save_audited
+from apps.core.services import audit_changes, holds_permission, run_mutation, save_audited
 from apps.core.text import ascii_int
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedQuerySet, is_platform_staff
@@ -636,6 +636,9 @@ def _copy[M: models.Model](instance: M, **overrides: Any) -> M:
     return model(**values)
 
 
+DUPLICATE_ROLE_PERMISSIONS = ("manager.platform_catalog", "core.platform_owner")
+
+
 def duplicate_product_to_vendor(
     product: Product,
     vendor: Vendor,
@@ -654,7 +657,15 @@ def duplicate_product_to_vendor(
     Raises PermissionDenied for non-staff and ValidationError for an empty reason, the same
     vendor or a SKU the target vendor already uses.
     """
-    if not is_platform_staff(actor):
+    # The Catalog and moderation role or the platform owner (spec 02 CORE.18 matrix); another
+    # role's platform-wide vendor read is not enough.
+    if not (
+        is_platform_staff(actor)
+        and (
+            getattr(actor, "is_superuser", False)
+            or holds_permission(actor, *DUPLICATE_ROLE_PERMISSIONS)
+        )
+    ):
         raise PermissionDenied("Only staff can duplicate a product to another vendor.")
     reason = reason.strip()
     if not reason:
@@ -728,7 +739,6 @@ def duplicate_product_to_vendor(
         for new_text in copied_texts:  # new slugs, unique against every other product's (CAT.5)
             new_text.slug = slugs.unique_product_slug(
                 new_text.title,
-                new_text.language,
                 taken=_SlugsOfOtherProducts(new_text.language, None),
             )
             changes.create(
@@ -1006,7 +1016,7 @@ def create_product(
     ]
     for text in texts:  # the slug is derived now, so the ChangeSet and the row agree (CAT.5)
         text.slug = slugs.unique_product_slug(
-            text.title, text.language, taken=_SlugsOfOtherProducts(text.language, None)
+            text.title, taken=_SlugsOfOtherProducts(text.language, None)
         )
     for text in texts:
         changes.create(
@@ -1177,7 +1187,8 @@ def variant_label(variant: Variant, language: str) -> str:
     return engine.variant_label(labels)
 
 
-# --- Product slugs (CAT.5, spec 03 §3.2): `{title}-{lang}`, never the SKU; old slugs answer 301.
+# --- Product slugs (CAT.5, spec 03 §3.2): `{title}`, no language suffix, never the SKU (D-25);
+# old slugs answer a 301.
 
 TRANSLATION_MODEL = "catalog.producttranslation"
 SLUG_HISTORY_MODEL = "catalog.slughistory"
@@ -1227,7 +1238,7 @@ def sync_product_slug(
         )
         product, language, old_slug = current.product, current.language, current.slug
         new_slug = slugs.unique_product_slug(
-            current.title, language, taken=_SlugsOfOtherProducts(language, product.pk)
+            current.title, taken=_SlugsOfOtherProducts(language, product.pk)
         )
         changes = ChangeSet()
         if new_slug == old_slug:
@@ -1282,9 +1293,9 @@ def rebuild_product_slugs(
 ) -> ChangeSet:
     """`sync_product_slug` for every translation (or the given ones), in id order.
 
-    This loads the current `{title}-{lang}-{sku}` slugs as history. A dry run checks each
-    translation against the stored slugs only, so it can miss a `-2` that two translations of
-    the same run would need.
+    This loads the `{title}-{lang}` and the legacy `{title}-{lang}-{sku}` slugs as history. A dry
+    run checks each translation against the stored slugs only, so it can miss a `-2` that two
+    translations of the same run would need.
     """
     queryset = ProductTranslation.objects.all() if translations is None else translations
     changes = ChangeSet()
@@ -1794,7 +1805,9 @@ def _term_anchor(term: Term, language: str) -> ListingAnchor:
 
 def brand_anchor(slug: str, language: str) -> ListingAnchor | None:
     """The brand page at `/brand/{slug}/`; None when there is none."""
-    found = _by_slug(BrandTranslation.objects.select_related("brand"), slug, language)
+    # A pending or rejected brand (CAT.20) has no public page.
+    approved = BrandTranslation.objects.filter(brand__status=Brand.Status.APPROVED)
+    found = _by_slug(approved.select_related("brand"), slug, language)
     if found is None:
         return None
     return _brand_anchor(found.brand)

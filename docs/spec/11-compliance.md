@@ -126,8 +126,15 @@ class CountryWarningLanguages(Model):   # platform data: country -> accepted war
   working-day deadlines tracked per notice.
 
 ### CMP.4 — Operational GDPR `[P1]`
-- Customer data export (JSON/PDF) and erasure as **anonymization** (orders are kept
-  for accounting obligations).
+- Customer data export (JSON/PDF) and erasure (owner decision D-29, see "Retention per data
+  type" below). A customer erasure anonymises the login profile and the non-fiscal data (carts,
+  preferences, logs) and unsubscribes the user. It never touches concluded orders: the order
+  snapshots stay unchanged until their retention period ends (GDPR article 17(3)(b)), the same
+  restriction model as Q-16 for vendor owners. The user is told, at the request and in the
+  confirmation, that the order data is kept for the legal period. The flow is CMP.30: a web
+  flow in the customer area (not the vendor API) with a POST confirm and re-authentication;
+  guests use a verified-email request. A request with open orders is accepted at once and
+  completes when the last one closes (owner decision D-30, below).
 - Vendor owners (owner decision Q-16, [02](02-core-identity-permissions.md)): an owner is a
   contractual party, so the owner membership is kept and the last owner is never removed. An
   erasure request from a closed vendor's owner restricts processing (GDPR article 18); data that
@@ -143,6 +150,69 @@ class CountryWarningLanguages(Model):   # platform data: country -> accepted war
 - Non-production environments only with synthetic or anonymized data (today LIVE is cloned to STAGE).
 - Cookie consent with Consent Mode (see [10](10-content-seo-ai.md)).
 
+### Order data retention and archive (owner decision D-29)
+- Legal basis: GDPR article 6(1)(c) and 17(3)(b); VAT directive 2006/112/EC article 242a;
+  regulation (EU) 282/2011 article 54c; Italian civil code article 2220; DPR 633/72 article 39.
+- **Every order record is kept 10 years from the end of the calendar year of the order**, B2C and
+  B2B alike. The fiscal snapshot fields (name or company, VAT and tax ids, billing and shipping
+  addresses, email, goods description, VIES log with time and consultation number, proof of
+  dispatch) are immutable for that period: the ORD.2 trigger allows no rewrite.
+- The only way to change a retained order is the ORD.2 scrub service (`AuditLog`, `dry_run`):
+  (a) early minimisation after the active phase (default 24 months, configurable) drops the
+  non-fiscal fields, such as the carrier contact phone and support notes; (b) final
+  anonymisation on 31 December of year 10 replaces the personal fields with fixed placeholders
+  or hashes and keeps amount, country and rate. Both run as scheduled jobs (CMP.29).
+- Archive phase (the `restricted_tax_only` state, from the end of the active phase to year 10):
+  masked in the ordinary vendor and support UI; the personal fields are visible only to the
+  vendor owner, the vendor "accounting" role and the platform Tax/Audit permission, and every
+  access is audited (ORD.14).
+- **Order privacy lifecycle (owner decision D-30)**, driven by `Order.privacy_status` and
+  `Order.tax_retention_until` ([07](07-cart-orders-payments.md)):
+  - `active`: from order build until 24 months (configurable) or an account erasure, whichever
+    comes first.
+  - `restricted_tax_only`: personal fields are masked (for example `j***@example.com`) in every
+    ordinary UI and API. In clear only for the vendor owner, a vendor role "accounting"
+    (assigned by the owner) and the platform Tax/Audit permission (a CORE.18 role). Every
+    in-clear view writes an `AuditLog` entry with actor, order, time and reason. Non-fiscal
+    fields (carrier phone, delivery notes) are dropped on entry.
+  - `anonymized`: from the day after `tax_retention_until` in the business time zone (D-31),
+    or at once for orders never paid (draft, payment failed). Personal fields get fixed
+    placeholders; transport-proof files that hold names or signatures are deleted from the
+    private bucket; amounts, countries, dates, rates and nature codes stay, so the ledger,
+    payouts and the CMP.12 records stay consistent. The run is audited.
+  - The vendor's fiscal evidence package (order snapshot, VIES log, transport proofs) is
+    downloadable while the order is `active` or `restricted_tax_only` (ORD.15). The platform
+    issues no invoices, so there are none in it.
+  - Account erasure with open orders (in shipment, return or withdrawal window, open
+    dispute): the request is accepted at once, never refused with an error (GDPR answers are due
+    within a month). Login is blocked, marketing removed, saved carts, addresses and payment
+    methods deleted; the rest completes automatically when the last open order closes and the
+    user is told so. Concluded orders go to `restricted_tax_only` at once. The confirmation
+    email is sent before the address is removed, with the article 17(3)(b) wording as a
+    translatable template. Third parties (email provider, any CRM or analytics added later) are
+    revoked.
+  - Legacy orders (MIG.4): older than 10 years are imported already `anonymized`, between 2 and
+    10 years `restricted_tax_only`, under 2 years `active`; the dates come from the original
+    order date.
+- Payment data: never a full card number (Stripe holds it); the issuer country or IP country is
+  kept only as location evidence (article 24b of regulation (EU) 282/2011).
+- The privacy policy states the period (CMP.31).
+
+#### Retention per data type
+
+| Data | Legal basis | Period | End action |
+|---|---|---|---|
+| Order snapshot (`Order`, `VendorOrder`, `OrderLine`: amounts, country, rate, nature code, commission rule) | GDPR 6(1)(c), 17(3)(b); c.c. art. 2220 | 10 years from the end of the calendar year of the order (`tax_retention_until`); `active`, then `restricted_tax_only`, then `anonymized` | Personal fields anonymised from the day after `tax_retention_until`, at once for never-paid orders; amounts, countries, dates, rates and nature codes kept |
+| Invoice and fiscal fields (name or company, VAT and tax ids, billing and shipping addresses, email, goods description) | VAT directive art. 242a; DPR 633/72 art. 39; c.c. art. 2220 | 10 years from the end of the calendar year; immutable | Final anonymisation (placeholders or hashes) |
+| VIES log (consultation time, number and the name VIES returned) | Reg. 282/2011 art. 54c; DPR 633/72 art. 39 | 10 years from the end of the calendar year of the order | Final anonymisation |
+| Proof of dispatch (place of dispatch and arrival, carrier reference; transport-proof files in the private bucket) | Reg. 282/2011 art. 54c; VAT directive art. 242a | 10 years from the end of the calendar year of the order | Fields anonymised; files with names or signatures deleted |
+| Non-fiscal order fields (carrier contact phone, support notes) | Contract performance, then none | Active phase, 24 months after the order (configurable) or until an account erasure | Dropped on entry to `restricted_tax_only` |
+| Account profile (login, name, phone, language, MFA) | GDPR 6(1)(b) | While the account exists | Anonymised on erasure (at once, or when the last open order closes); the order snapshots are untouched except for the move to `restricted_tax_only` |
+| Carts, preferences, logs | GDPR 6(1)(b) and (f) | While the account exists; logs per the operations retention setting | Deleted on erasure, together with saved addresses and payment methods |
+| Contract evidence (vendor contracts, signatures, timestamp tokens) | GDPR 17(3)(e); limitation period | Whole relationship plus 10 years (proposed default) | Files deleted by the retention job |
+| CMP.12 records (art. 242a facilitated supplies) | VAT directive art. 242a; Reg. 282/2011 art. 54c | 10 years from the end of the year of the transaction | Deleted or anonymised by the retention job; outside erasure |
+| Payment data | GDPR 6(1)(b) and (c) | Stripe holds the card; we keep the payment reference per the order snapshot, and the issuer or IP country only as location evidence for the order period | Anonymised or deleted with the order |
+
 ### CMP.5 — DSA and P2B `[P1]`
 - DSA (regulation (EU) 2022/2065) duties of every hosting service and online platform, whatever
   its size, so P1 for go-live: points of contact for authorities and for users (articles 11, 12),
@@ -151,6 +221,11 @@ class CountryWarningLanguages(Model):   # platform data: country -> accepted war
   vendor for every restriction (article 17), and notification of suspected criminal offences
   (article 18). Notices can target products, vendor storefronts and event pages; hiding an event
   after a notice unpublishes it through the events service ([15](15-events.md), EVT.11).
+  Part 1 (D-27): the authority contact languages are an official language of the operator's
+  country plus English (article 11(3)); the platform terms and the ranking page exist in every
+  configured language, and the terms carry tagged sections for restrictions, moderation policy,
+  internal complaint handling (article 20) and out-of-court redress (article 21); `golive_readiness`
+  checks them with the native and counsel reviews.
 - Micro and small platforms are exempt from DSA articles 19–32 (articles 19 and 29) and from the
   transparency report (article 15(2)), until 12 months after they stop being small. The marketplace
   duties of articles 30–32 are still built at go-live (CMP.11), because GPSR article 22 and the
@@ -546,7 +621,7 @@ regulatory check and when the platform grows.
 | CMP.1 | DAC7 quarterly aggregates + annual export, reading the dataset and completeness from VEN.12; a confirmed operator-owned vendor's sales follow D-22 (not reported, VEN.26) | P1 | 12 | VEN.5, VEN.4, VEN.12 | Test export validates against the Agenzia delle Entrate DPI XML schema and is checked by the advisor; excluded sellers (under 30 sales and €2,000 or less) are left out; each reported vendor gets its data |
 | CMP.2 | Non-fiscal commission statement (pro-forma) per vendor and period from the ledger, with VEN.12 party data, as PDF per language and CSV/JSON export mappable to FatturaPA fields; no invoice issuing, no e-invoicing channel | P1 | 8 | VEN.4, VEN.12 | A seed vendor's statement and export are labelled "Documento non fiscale / Non-fiscal document, not an invoice" in all five languages, carry a stable reference ID and no invoice number sequence, and their totals match the ledger |
 | CMP.3 | `GpsrInfo` with per-vendor defaults, publication block, product page with picture, recall procedure; GPSR article 22 marketplace duties: points of contact, authority orders within 2 working days, safety notices within 3 working days, Safety Gate checks, repeat-offender suspension | P1 | 12 | CAT.1 | Product without GPSR cannot be published; a safety notice and an authority order show their working-day deadline and an overdue one alerts staff |
-| CMP.4 | GDPR: customer export and anonymization, sub-processor register, retention job; erasure for a closed vendor's owner as restriction plus deletion of the data not under a retention duty (Q-16) | P1 | 12 | ORD.2 | Erasure request on a seed order; an erasure request from a closed vendor's owner keeps the membership, contract evidence, DAC7, ledger and order records, deletes the rest, and the retention job anonymises the kept data once the period ends (test with a frozen clock) |
+| CMP.4 | GDPR: customer export and erasure that anonymises the profile and non-fiscal data and never touches concluded orders (D-29), sub-processor register, retention job; erasure for a closed vendor's owner as restriction plus deletion of the data not under a retention duty (Q-16) | P1 | 12 | ORD.2 | Erasure request on a seed order; an erasure request from a closed vendor's owner keeps the membership, contract evidence, DAC7, ledger and order records, deletes the rest, and the retention job anonymises the kept data once the period ends (test with a frozen clock) |
 | CMP.5 | DSA duties of every platform (points of contact, terms, notice and action, statement of reasons, criminal offence notification) and P2B (reasons for restrictions, 30 days' notice of termination, ranking page, differentiated treatment and data access in the terms); vendor terms acceptance is VEN.5, VEN.13 to VEN.16 | P1 | 10 | VEN.5 | A notice gets a tracked outcome and the vendor a statement of reasons; a termination cannot take effect before 30 days from its notice |
 | CMP.6 | Online withdrawal, 30-day price history (Omnibus), pre-contractual information, marketplace information (art. 49-bis Codice del Consumo), harmonised legal guarantee notice | P1 | 10 | ORD.2, CAT.1 | Correct strikethrough price in tests; every offer shows the vendor's trader status and the split of obligations; checkout shows the harmonised legal guarantee notice |
 | CMP.7 | Automated accessibility audit in CI (axe, WCAG 2.2 AA tags) + manual review + statement | P1 | 8 | THM.5 | Zero axe violations with the `wcag22aa` tag on key pages; manual review recorded; statement published |
@@ -570,3 +645,6 @@ regulatory check and when the platform grows.
 | CMP.25 | Activation gate for platform duties (coherence check 5): an `activation` purpose in `LegalFieldRequirement` seeded with the DSA article 30 trader data (name, address, telephone, email, trade register entry where registered), the article 30(1)(e) self-certification recorded as an append-only acceptance with text hash, both checked by the VEN.5 activation next to the CMP.13 gate; DAC7 data still blocks payouts only; CMP.11 keeps the checks, display on offers and EPR | P1 | 4 | VEN.5, VEN.12, CMP.13 | An EU vendor missing its telephone, its trade register entry (when registered) or the self-certification cannot be activated and gets the reason; a complete vendor is activated; missing DAC7 data does not block activation; the self-certification row stores version, language and hash |
 | CMP.26 | GPSR follow-ups of the owner decisions 2026-11-09 (CMP.3): the checkout refuses a line whose product `apps.catalog.selling.sale_blockers` blocks for the delivery country and shows `{% product_destination_notice %}` (ORD.3, ORD.5); the product page includes the notice for the visitor's country (CAT.7); a Manager shop space page lists the vendor's products with the country languages their warnings miss (`vendor_warnings_language_gaps`, CORE.17); an in-app notice in the Manager platform space for the Catalog and moderation role when a safety case is overdue; open points of the CMP.3 review: link the notice only to languages in which the product page is published, a composite foreign key `(product, vendor)` on `SafetyCase` as in the catalog, `no` vs `nb`/`nn` matching for Norway, and Northern Ireland (GPSR applies, ships as `GB`, not checked) | P1 | 6 | CMP.3, ORD.3, ORD.5, CAT.7, CORE.17 | A cart line with warnings only in German cannot be checked out to a French-only country and the checkout shows why, with a link to the German warnings; the same cart checks out to a German-speaking country; the vendor's Manager page lists the missing country languages; an overdue safety case shows a notice to a Catalog and moderation user and not to a Finance user |
 | CMP.27 | Remainder of CMP.3 article 22 duties (spec 11 CMP.3: "check Safety Gate alerts and take them into account", "suspend repeat offenders after a warning", "cooperate on recalls, including contacting buyers", "rapid recall or removal procedure"): a periodic check of published products against EU Safety Gate alerts with a staff review queue; a repeat-offender rule (a warning first, then vendor suspension, with the thresholds as platform data and every step in the `AuditLog`); a recall procedure that removes or blocks the product, lists affected orders and notifies the buyers through the transactional outbox, with the working-day deadlines tracked per notice | P2 | 12 | CMP.3, CMP.26 | A Safety Gate match opens a review item; a vendor with repeated confirmed cases gets a warning and then a suspension, each audited; a recall blocks the product, lists the affected orders and sends the buyer notices once |
+| CMP.29 | Order retention jobs (D-29, D-30, D-31) on the ORD.2 scrub service, scheduled in the business time zone with dry-run reports and an `AuditLog` entry per run, following the `privacy_status` states: `active` to `restricted_tax_only` after the active phase (setting, default 24 months), dropping the non-fiscal fields (carrier phone, delivery notes) on entry; `restricted_tax_only` to `anonymized` from the day after `tax_retention_until`, and at once for orders never paid (draft, payment failed), with fixed placeholders and deletion of transport-proof files that hold names or signatures from the private bucket, keeping amounts, countries, dates, rates and nature codes; no job touches the fiscal fields before its period | P1 | 10 | ORD.2, CMP.4, ARC.9, ARC.27 | With a frozen clock a seed order is `active` at 23 months, `restricted_tax_only` at 25 months (setting changed in the test) with the carrier phone and delivery notes dropped, keeps the fiscal fields until 31 Dec of year 10, is still `restricted_tax_only` on that day and `anonymized` on the day after with amount, country, rate and nature code intact; a draft and a payment-failed order are anonymised at once; a transport-proof file with a name is deleted; ledger, payout and CMP.12 totals are identical before and after anonymisation; `dry_run` changes nothing and lists the orders; each run is in the `AuditLog`; the immutability trigger still refuses a direct update |
+| CMP.30 | Customer account erasure (D-30; spec 02 covers only the vendor-owner flow of Q-16, so CORE has no task for it): a customer-area web flow with a POST confirm and re-authentication, a verified-email request for guests; always accepted, never refused with an error: login blocked, marketing removed, saved carts, addresses, payment methods, preferences and logs deleted, the profile anonymised, concluded orders moved to `restricted_tax_only` at once and never otherwise touched; with open orders (in shipment, return or withdrawal window, open dispute) the rest completes automatically when the last one closes and the user is told so; the confirmation email goes out before the address is removed with the article 17(3)(b) wording as a translatable template; third parties (email provider) revoked; audited | P1 | 10 | CMP.4, ORD.2, ORD.11, ORD.14, ARC.16 | A customer with two concluded orders erases: profile anonymised, cart, addresses and preferences gone, email unsubscribed, both orders `restricted_tax_only` with their amounts unchanged, confirmation email sent before the address is removed and stating the retention period; a guest erases through a verified-email request; a customer with an open order is accepted, blocked from login, and the erasure completes when the order closes; no refusal path; the audit entry holds no personal data |
+| CMP.31 | Privacy-policy retention line (D-29, D-30) as a CMS-managed legal text requirement: the `LegalPage` privacy policy must contain "order, billing, shipping and VAT-validation data are kept 10 years from the close of the fiscal year…" with the legal basis and the account-erasure behaviour (orders kept restricted for the legal period), in all five languages; the period shown comes from the same setting as the CMP.29 jobs; wording approved through CMP.24 (L) | P1 | 2 | CMS.5, I18N.9, CMP.24, CMP.4 | The privacy page of a seed site renders the retention line in each language with the configured years; publishing the privacy page without the line is refused by the release check; the line text is an (L) text needing CMP.24 approval |

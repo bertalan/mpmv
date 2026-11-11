@@ -1,5 +1,7 @@
 {% extends "layouts/base.html" %}
-{% load i18n %}
+{% load i18n cms_tags session_levels %}
+{# This page shows its messages in place; the base layout must not repeat them. #}
+{% block messages %}{% endblock %}
 {% comment %}
 The Manager shell (CORE.17, spec 02 §Backoffice): one layout for both spaces, on the active
 theme's components (THM.3, THM.4). The header holds the site name (the space's dashboard), the
@@ -11,9 +13,9 @@ The Manager has no language prefix and no CMS page, like the account area. Stric
 script or style.
 {% endcomment %}
 {% block title %}{{ title }} · {{ site_name }}{% endblock %}
-{% block description %}<meta name="robots" content="noindex">{% endblock %}
+{% block description %}{% robots_meta "noindex" %}{% endblock %}
 {% block header %}
-  {% get_current_language as current_language %}{% get_available_languages as available %}{% get_language_info_list for available as languages %}
+  {% switch_next_url as next_url %}{% get_current_language as current_language %}{% get_available_languages as available %}{% get_language_info_list for available as languages %}
   <header class="site-header manager-header">
     <div class="site-header__inner">
       <a class="site-name" href="{{ manager_home }}">{{ site_name }}<span class="manager-header__space">{% if manager.space == "shop" %}{% translate "Shop" %}{% else %}{% translate "Platform" %}{% endif %}</span></a>
@@ -33,7 +35,7 @@ script or style.
           {% csrf_token %}
           {% include "components/button.html" with label=_("Sign out") type="submit" variant="ghost" size="small" only %}
         </form>
-        {% include "components/language_switcher.html" with languages=languages current_language=current_language next_url=request.get_full_path only %}
+        {% include "components/language_switcher.html" with languages=languages current_language=current_language next_url=next_url csrf_token=csrf_token only %}
       </div>
     </div>
     {% if manager_menu %}
@@ -43,6 +45,7 @@ script or style.
         </ul>
       </nav>
     {% endif %}
+    {% session_level_banner %}
   </header>
 {% endblock %}
 {% block content %}

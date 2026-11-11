@@ -1,0 +1,37 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}Notices of illegal content (DSA art. 16, CMP.5): the review queue, newest first.{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <form method="get" class="manager-filters" role="search" aria-label="{% translate 'Filters' %}">
+    <div class="field">
+      <label for="filter-status">{% translate "Status" %}</label>
+      <select id="filter-status" name="status">
+        <option value="">{% translate "All" %}</option>
+        {% for value, label in statuses %}<option value="{{ value }}"{% if value == status %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    {% include "components/button.html" with label=_("Filter") type="submit" variant="secondary" only %}
+  </form>
+  <div class="table-scroll" role="region" aria-labelledby="notices-caption" tabindex="0">
+    <table class="table">
+      <caption id="notices-caption">{{ title }}</caption>
+      <thead><tr>
+        <th scope="col">{% translate "Reference" %}</th>
+        <th scope="col">{% translate "Received" %}</th>
+        <th scope="col">{% translate "Reported" %}</th>
+        <th scope="col">{% translate "Status" %}</th>
+      </tr></thead>
+      <tbody>
+        {% for notice in notices %}<tr>
+          <th scope="row"><a href="{% url 'manager:platform:notice' notice.public_id %}">{{ notice.public_id|slice:":8" }}</a></th>
+          <td>{{ notice.created_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+          <td>{{ notice.get_target_kind_display }}</td>
+          <td>{{ notice.get_status_display }}</td>
+        </tr>
+        {% empty %}<tr><td colspan="4">{% translate "Nothing to show." %}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "components/pagination.html" with page=page_obj.number page_count=page_obj.paginator.num_pages previous_url="" next_url="" only %}
+{% endblock %}

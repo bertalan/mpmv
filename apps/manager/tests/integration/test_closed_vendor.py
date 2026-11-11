@@ -173,7 +173,7 @@ def test_an_inactive_user_of_a_closed_vendor_still_gets_404(
     verified_login(client, owner)
     User.objects.filter(pk=owner.pk).update(is_active=False)
     response = client.get(SHOP)
-    assert response.status_code in (302, 404)
+    assert response.status_code in (302, 403, 404)
     assert CLOSED_TEXT not in response.content.decode()
 
 
@@ -185,13 +185,13 @@ def test_platform_staff_are_not_affected_by_a_closed_vendor(
     assert client.get(PLATFORM).status_code == 200
     for path in sample_paths(Space.SHOP):
         response = client.get(path)
-        assert response.status_code == 404, path
+        assert response.status_code == 403, path
         assert CLOSED_TEXT not in response.content.decode(), path
 
 
-def test_a_customer_gets_404_not_the_closed_page(client: Client, vendor: Vendor) -> None:
+def test_a_customer_gets_403_not_the_closed_page(client: Client, vendor: Vendor) -> None:
     _close(vendor)
     verified_login(client, UserFactory.create())
     response = client.get(SHOP)
-    assert response.status_code == 404
+    assert response.status_code == 403
     assert CLOSED_TEXT not in response.content.decode()

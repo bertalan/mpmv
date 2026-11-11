@@ -27,7 +27,7 @@ from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import SafeString
 
-from apps.accounts.decorators import step_up_required
+from apps.accounts.decorators import requires_level, step_up_required
 from apps.accounts.models import User
 from apps.core.admin import step_up
 from apps.core.audit import audit_context
@@ -136,6 +136,7 @@ class VendorTaxProfileForm(StartCheckedForm[VendorTaxProfile]):
             "regime",
             "exempt_reason",
             "exempt_country",
+            "exemption_nature",
             "oss_registered_since",
             "valid_from",
         )
@@ -243,7 +244,7 @@ class VendorTaxProfileTranslationAdmin(NoDeleteAdmin[VendorTaxProfileTranslation
 class VatValidationAdmin(HistoryAdmin[VatValidation]):
     """Answers are recorded by the VIES client (TAX.5); staff only look at them."""
 
-    list_display = ("checked_at", "country", "vat_number", "result", "name")
+    list_display = ("checked_at", "country", "vat_number", "result", "name", "requester")
     list_filter = ("result", "country")
     search_fields = ("vat_number", "name")
     readonly_fields = (
@@ -254,6 +255,10 @@ class VatValidationAdmin(HistoryAdmin[VatValidation]):
         "name",
         "address",
         "request_id",
+        "requester",
+        "requester_kind",
+        "detail",
+        "vies_request_date",
         "checked_at",
         "created_at",
     )
@@ -437,12 +442,16 @@ class TaxRegimeChangeRequestAdmin(HistoryAdmin[TaxRegimeChangeRequest]):
         review = [
             path(
                 "<path:object_id>/approve/",
-                self.admin_site.admin_view(step_up_required()(self.approve_view)),
+                self.admin_site.admin_view(
+                    requires_level("vat_regime")(step_up_required()(self.approve_view))
+                ),
                 name=f"{prefix}_approve",
             ),
             path(
                 "<path:object_id>/reject/",
-                self.admin_site.admin_view(step_up_required()(self.reject_view)),
+                self.admin_site.admin_view(
+                    requires_level("vat_regime")(step_up_required()(self.reject_view))
+                ),
                 name=f"{prefix}_reject",
             ),
         ]
