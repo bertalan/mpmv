@@ -11,8 +11,6 @@ import importlib
 import secrets
 
 import pytest
-from django.contrib.auth.models import Permission
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.utils import timezone
 
@@ -29,15 +27,8 @@ CTX = AuditContext(actor_label="staff:support", source=AuditLog.Source.ADMIN, ip
 
 
 def _platform_staff() -> User:
-    """A user holding `vendors.view_all_vendors` directly (the platform staff rule)."""
-    permission, _ = Permission.objects.get_or_create(
-        content_type=ContentType.objects.get(app_label="vendors", model="vendor"),
-        codename="view_all_vendors",
-        defaults={"name": "Can view all vendors"},
-    )
-    user = UserFactory.create(staff=True)
-    user.user_permissions.add(permission)
-    return User.objects.get(pk=user.pk)
+    """A Support role holder (CORE.18: the audited unlock is a Support action)."""
+    return User.objects.get(pk=UserFactory.create(platform_role="support").pk)
 
 
 def _locked_user() -> User:

@@ -37,6 +37,7 @@ from apps.core.services import (
     clear_throttle,
     consume_rate_limit,
     enqueue_email,
+    holds_permission,
     record_throttle_failure,
     run_mutation,
     save_audited,
@@ -699,6 +700,9 @@ ACCOUNT_UNLOCKED_BY_RESET = "accounts.user.unlocked_by_reset"  # by a completed 
 # The platform staff permission (Q-34). The same string as `PLATFORM_STAFF_PERMISSION` in
 # `apps.vendors.scoping`; accounts must not import vendors, so a guard test pins both.
 UNLOCK_PERMISSION = "vendors.view_all_vendors"
+# Who may unlock (spec 02 CORE.18 matrix: the audited Support action): the Support role and the
+# platform owner. Another role's platform-wide read of vendors (view_all_vendors) is not enough.
+UNLOCK_ROLE_PERMISSIONS = ("manager.platform_support", "core.platform_owner")
 
 
 def _account_lock_changeset(user: User, now: dt.datetime) -> tuple[ChangeSet, str | None]:
@@ -727,8 +731,9 @@ def unlock_account(
 ) -> ChangeSet:
     """Clear the login lockout of `user`, audited. Platform staff only.
 
-    The actor must be active and hold `vendors.view_all_vendors` (superusers pass through
-    Django's rule). The refusal is the same whatever the target's state, so it reveals nothing
+    The actor must be active and hold the Support or platform owner role permission and
+    `vendors.view_all_vendors` (superusers pass through).
+    The refusal is the same whatever the target's state, so it reveals nothing
     about it. A target that is not locked is a no-op without an audit entry.
 
     The audit actor is always `actor`: `ctx` only supplies the IP and request id. Platform staff
@@ -737,7 +742,10 @@ def unlock_account(
     same rule as the staff password and MFA reset). Every refusal is the same exception.
     """
     privileged = user.is_staff or user.is_superuser
-    if not (actor.is_active and actor.has_perm(UNLOCK_PERMISSION)):
+    allowed = actor.is_active and (
+        actor.is_superuser or holds_permission(actor, *UNLOCK_ROLE_PERMISSIONS)
+    )
+    if not (allowed and actor.has_perm(UNLOCK_PERMISSION)):
         raise PermissionDenied
     if privileged and not actor.is_superuser:
         raise PermissionDenied

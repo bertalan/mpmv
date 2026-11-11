@@ -79,11 +79,25 @@ def is_platform_staff(user: AnyUser) -> bool:
     `is_staff` (Wagtail or Django admin login) does not count: an editor sees no vendor data.
     The permission comes from a role group (CORE.18) or, for a superuser, from the superuser flag.
     """
-    return bool(
+    if not (
         isinstance(user, PermissionsMixin)
         and user.is_active
         and user.has_perm(PLATFORM_STAFF_PERMISSION)
-    )
+    ):
+        return False
+    from .models import VendorMember  # models import this module
+
+    # Platform roles and vendor membership never mix (spec 02 Roles, CORE.18): a member in a role
+    # group gets no all-vendor powers.
+    if VendorMember.objects.filter(user_id=user.pk).exists():
+        return False
+    # A permission that comes only from a group (a role) also needs admin access, so a customer
+    # put in a role group by mistake is not staff. A direct grant and a superuser are unchanged.
+    if user.is_superuser or getattr(user, "is_staff", False):
+        return True
+    return user.user_permissions.filter(
+        content_type__app_label="vendors", codename="view_all_vendors"
+    ).exists()
 
 
 class VendorScopedQuerySet[M: models.Model](models.QuerySet[M]):
