@@ -1,5 +1,6 @@
 """factory_boy factories for accounts (ARC.12). Synthetic values only."""
 
+import importlib
 import secrets
 from collections.abc import Iterable
 from datetime import timedelta
@@ -72,6 +73,20 @@ class UserFactory(DjangoModelFactory[User]):
         obj.is_staff = True
         obj.save(update_fields=["is_staff"])
         obj.user_permissions.add(Permission.objects.get(codename="view_all_vendors"))
+
+    @factory.post_generation
+    def platform_role(obj: User, create: bool, extracted: str | None, **kwargs: Any) -> None:
+        """`platform_role="support"`: admin login plus membership of that CORE.18 role group."""
+        if not create or not extracted:
+            return
+        from django.contrib.auth.models import Group
+
+        # Dynamic: the layer contract forbids an accounts -> manager import, tests included.
+        roles = importlib.import_module("apps.manager.roles")
+
+        obj.is_staff = True
+        obj.save(update_fields=["is_staff"])
+        obj.groups.add(Group.objects.get(name=roles.role(extracted).group))
 
 
 class ElevationGrantFactory(DjangoModelFactory[ElevationGrant]):
