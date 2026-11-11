@@ -504,3 +504,39 @@ def test_a_duplicate_po_entry_is_refused(locale: Path, tmp_path: Path) -> None:
     report = _import(locale, path)
     assert {e.rule for e in report.errors} == {Rule.DUPLICATE}
     assert _catalog(locale)["Contact us"] == "Kontakt"
+
+
+def test_the_unpacked_limit_counts_real_bytes_not_declared_sizes(
+    locale: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import zipfile
+
+    bomb = tmp_path / "bomb.xlsx"
+    with zipfile.ZipFile(bomb, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("big.bin", b"\0" * 5000)
+        archive.filelist[0].file_size = 10  # the declared size lies
+    monkeypatch.setattr("apps.core.i18n_review.services.MAX_UNCOMPRESSED_BYTES", 1000)
+    # Python's reader stops at the declared size and fails the CRC, so a lying header is
+    # refused either way; the real byte count is what the limit uses.
+    with pytest.raises(ValueError, match=r"too large|not a valid"):
+        _import(locale, bomb)
+
+
+def test_existing_file_modes_are_kept_and_new_files_are_0644(locale: Path, tmp_path: Path) -> None:
+    folder = locale / "de" / "LC_MESSAGES"
+    (folder / "django.po").chmod(0o640)
+    (folder / "django.mo").chmod(0o664)
+    path = _export(locale, tmp_path)
+    _edit(path, {"Contact us": "Kontaktieren Sie uns"})
+    _import(locale, path)
+    assert (folder / "django.po").stat().st_mode & 0o777 == 0o640
+    assert (folder / "django.mo").stat().st_mode & 0o777 == 0o664
+
+    fr = export_catalog(lang="fr", scope="all", fmt="xlsx", out_dir=tmp_path, locale_dir=locale)
+    wb = load_workbook(fr)
+    wb.worksheets[1].cell(row=3, column=6).value = "Bonjour %(name)s"
+    wb.save(fr)
+    import_file(fr, locale_dir=locale, ctx=CTX)
+    created = locale / "fr" / "LC_MESSAGES"
+    assert (created / "django.po").stat().st_mode & 0o777 == 0o644
+    assert (created / "django.mo").stat().st_mode & 0o777 == 0o644

@@ -8,6 +8,7 @@ language needs an entry in `RULES` and `READ_ME` (today: English and Italian).
 import hashlib
 import html
 import re
+import string
 from collections import Counter
 from enum import StrEnum
 from html.parser import HTMLParser
@@ -431,16 +432,32 @@ def row_message(row: int, rule: Rule, reader: str) -> str:
 
 _TEMPLATE = re.compile(r"\{\{.*?\}\}|\{%.*?%\}|\{#.*?#\}", re.DOTALL)
 _PRINTF = re.compile(
-    r"%(?:\([^)]*\))?[#0\-+]*(?:\d+|\*)?(?:\.(?:\d+|\*))?[hlL]?[diouxXeEfFgGcrsa%]"
+    r"%(?:\([^)]*\))?[#0\- +]*(?:\d+|\*)?(?:\.(?:\d+|\*))?[hlL]?[diouxXeEfFgGcrsa%]"
 )
-_FIELD = re.compile(r"\{[^{}]*\}")
 _REST = r"""[^\s"'<>]*"""
 _LINKS = (
-    re.compile(r"(?:https?|ftp|mailto|javascript|data):" + _REST, re.IGNORECASE),
+    re.compile(
+        r"(?:https?|ftp|mailto|javascript|vbscript|data|file|tel|sms):" + _REST, re.IGNORECASE
+    ),
     re.compile(r"(?<![A-Za-z0-9:/])//(?=[A-Za-z0-9\[])" + _REST),
     re.compile(r"\bwww\." + _REST, re.IGNORECASE),
 )
 _HIDDEN = re.compile(r"[\x00-\x1f\u200b-\u200f\u2028\u2029\ufeff]")
+
+
+def _format_fields(text: str, depth: int = 0) -> list[tuple[str, str, str]]:
+    """Every `str.format` field of `text` as (name, conversion, spec), nested fields of a format
+    spec included (`{0!s:>{1}}` gives both `0` and `1`). ValueError when braces are unbalanced."""
+    if depth > 3:
+        raise ValueError("format fields nested too deeply")
+    fields: list[tuple[str, str, str]] = []
+    for _literal, name, spec, conv in string.Formatter().parse(text):
+        if name is None:
+            continue
+        fields.append((name, conv or "", spec or ""))
+        if spec:
+            fields += _format_fields(spec, depth + 1)
+    return fields
 
 
 def placeholders(text: str) -> Counter[str]:
@@ -457,7 +474,11 @@ def placeholders(text: str) -> Counter[str]:
 
     rest = take(_TEMPLATE, "tpl", text)
     rest = take(_PRINTF, "printf", rest)
-    take(_FIELD, "field", rest)
+    try:
+        for name, conv, spec in _format_fields(rest):
+            found[f"field:{name}!{conv}:{spec}"] += 1
+    except ValueError:
+        found["field:unbalanced braces"] += 1
     return found
 
 

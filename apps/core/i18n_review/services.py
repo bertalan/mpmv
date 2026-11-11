@@ -451,6 +451,10 @@ def _write_catalog(po: polib.POFile, target: Path) -> None:
                 backups.append((backup, dest))
             else:
                 backups.append((None, dest))
+        for tmp, dest in ((tmp_po, target), (tmp_mo, mo_target)):
+            # keep the mode of the file being replaced; a new file is world-readable like any
+            # catalog (mkstemp makes 0600)
+            os.chmod(tmp, dest.stat().st_mode & 0o777 if dest.exists() else 0o644)
         try:
             os.replace(tmp_po, target)
             os.replace(tmp_mo, mo_target)
@@ -469,9 +473,13 @@ def _write_catalog(po: polib.POFile, target: Path) -> None:
 def _open_workbook(path: Path) -> Any:
     try:
         with zipfile.ZipFile(path) as archive:
-            total = sum(info.file_size for info in archive.infolist())
-        if total > MAX_UNCOMPRESSED_BYTES:
-            raise ValueError(f"{path.name} is too large once unpacked")
+            total = 0  # real decompressed bytes: the declared sizes are not trusted
+            for info in archive.infolist():
+                with archive.open(info) as member:
+                    while chunk := member.read(4096):
+                        total += len(chunk)
+                        if total > MAX_UNCOMPRESSED_BYTES:
+                            raise ValueError(f"{path.name} is too large once unpacked")
         wb = load_workbook(path)
     except (zipfile.BadZipFile, InvalidFileException, KeyError, OSError, SyntaxError) as exc:
         raise ValueError(f"{path.name} is not a valid .xlsx file") from exc

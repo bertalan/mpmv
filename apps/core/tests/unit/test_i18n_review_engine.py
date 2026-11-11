@@ -190,3 +190,41 @@ def test_the_rules_for_formulas_and_duplicates_have_texts_in_every_language() ->
     for lang in LANGUAGES:
         assert engine.rule_text(Rule.FORMULA, lang)
         assert engine.rule_text(Rule.DUPLICATE, lang)
+
+
+# --- second review of #305 ---------------------------------------------------------------------
+
+
+def test_a_nested_format_field_cannot_hide_attribute_access() -> None:
+    src = "{0!s:>{1}} items"
+    assert _broken(src, "x", "{0!s:>{1}} Artikel") == []
+    assert Rule.PLACEHOLDERS in _broken(src, "x", "{0.__globals__!s:>{1}} Artikel")
+    assert Rule.PLACEHOLDERS in _broken(src, "x", "{0!s:>{1.x}} Artikel")
+    assert Rule.PLACEHOLDERS in _broken(src, "x", "{0!r:>{1}} Artikel")
+    assert Rule.PLACEHOLDERS in _broken(src, "x", "{0!s:<{1}} Artikel")
+    assert Rule.PLACEHOLDERS in _broken(src, "x", "{0!s:>{2}} Artikel")
+
+
+@pytest.mark.parametrize("bad", ["{0!s:>{1} items", "0!s:>{1}} items", "{0 items", "items }"])
+def test_unbalanced_braces_are_refused_when_the_source_is_well_formed(bad: str) -> None:
+    assert Rule.PLACEHOLDERS in _broken("{0} items", "x", bad)
+
+
+def test_a_lone_brace_that_is_in_the_source_too_is_not_a_new_problem() -> None:
+    assert _broken("Use { to start", "x", "Mit { starten") == []
+
+
+def test_index_access_in_a_nested_spec_is_refused() -> None:
+    assert Rule.PLACEHOLDERS in _broken("{0:{1}}", "x", "{0:{1[0]}}")
+
+
+@pytest.mark.parametrize(
+    "text", ["file:///etc/passwd", "call tel:+390000", "sms:123", "VBScript:x", "FILE:x"]
+)
+def test_more_schemes_are_refused(text: str) -> None:
+    assert Rule.NEW_URL in _broken("Plain", "x", text)
+
+
+def test_the_printf_space_flag_is_part_of_the_placeholder() -> None:
+    assert Rule.PLACEHOLDERS in _broken("% d items", "x", "%d Artikel")
+    assert _broken("% d items", "x", "% d Artikel") == []
