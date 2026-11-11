@@ -17,6 +17,7 @@ from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.db import connection, transaction
 from django.db.models import Sum
 from django.utils import timezone
+from django.utils.module_loading import import_string
 
 from apps.accounts.models import User
 from apps.cart import engine as cart_engine
@@ -380,6 +381,13 @@ def transition_order(
     return changeset
 
 
+def _orders_frozen(vendor: Vendor) -> bool:
+    """Whether a hook in `settings.ORDER_FREEZE_HOOKS` freezes the vendor's open orders. Hooks
+    are dotted paths (orders never imports the apps that freeze); a voluntary closure freezes
+    nothing."""
+    return any(import_string(path)(vendor) for path in settings.ORDER_FREEZE_HOOKS)
+
+
 def transition_vendor_order(
     sub: VendorOrder,
     target: str,
@@ -404,9 +412,9 @@ def transition_vendor_order(
                 .select_related("vendor", "order")
                 .get(pk=sub.pk)
             )
-            if locked.vendor.status == "closed":  # CMP.5 part 4: frozen pending staff review
+            if _orders_frozen(locked.vendor):  # CMP.5 part 4: frozen pending staff review
                 raise ValueError(
-                    "the vendor is closed: its open orders are frozen pending staff review"
+                    "the vendor's open orders are frozen pending staff review (termination)"
                 )
             before = _vendor_order_snapshot(locked)
             engine.check_vendor_order_transition(locked.state, target)

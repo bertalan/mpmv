@@ -213,6 +213,11 @@ VENDOR_CLOSURE_HOOKS: list[str] = [
     "apps.api.services.revoke_vendor_keys",  # the vendor's API keys
 ]
 
+# Freezes of a vendor's open orders (CMP.5 part 4): each hook takes the vendor and returns True
+# when its orders must not move (a vendor closed by a termination notice, until staff review it).
+# `orders` cannot import `compliance`, so the path is named here.
+ORDER_FREEZE_HOOKS: list[str] = ["apps.compliance.services.orders_frozen"]
+
 # Allowed vendor countries (CMP.13): `core` cannot import `vendors`, so this names the function
 # that lists the active vendors established outside a new allowed set.
 VENDORS_OUTSIDE_COUNTRIES_HOOK = "apps.vendors.services.active_vendors_outside"

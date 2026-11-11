@@ -1961,6 +1961,13 @@ def payouts_frozen(vendor: Vendor) -> bool:
     ).exists()
 
 
+def orders_frozen(vendor: Vendor) -> bool:
+    """Whether the vendor's open orders must not move: it was closed by a termination notice and
+    staff have not reviewed the freeze yet (`settings.ORDER_FREEZE_HOOKS`). A voluntary closure
+    is not frozen."""
+    return payouts_frozen(vendor)
+
+
 def review_termination_freeze(
     staff: Any,
     public_id: Any,

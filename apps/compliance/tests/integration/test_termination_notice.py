@@ -521,6 +521,27 @@ def test_closing_by_termination_freezes_the_open_orders_and_the_payouts(
         order_services.transition_vendor_order(sub, "accepted", ctx=CTX)
     sub.refresh_from_db()
     assert sub.state == "pending"
+    assert services.orders_frozen(vendor)
+
+
+def test_a_voluntarily_closed_vendor_can_still_move_its_placed_orders(vendor: Vendor) -> None:
+    sub = paid_vendor_order(vendor)
+    Vendor.objects.filter(pk=vendor.pk).update(status=Vendor.Status.CLOSED)
+    vendor.refresh_from_db()
+    assert not services.orders_frozen(vendor)
+    order_services.transition_vendor_order(sub, "accepted", ctx=CTX)
+    sub.refresh_from_db()
+    assert sub.state == "accepted"
+
+
+def test_the_review_releases_the_frozen_orders(staff: Any, vendor: Vendor) -> None:
+    sub = paid_vendor_order(vendor)
+    notice = issue(staff, vendor).notice
+    assert notice is not None
+    services.apply_due_terminations(now=DAY30, ctx=CTX)
+    services.review_termination_freeze(staff, notice.public_id, note="Settled.", ctx=CTX)
+    assert not services.orders_frozen(vendor)
+    order_services.transition_vendor_order(sub, "accepted", ctx=CTX)
 
 
 def test_staff_review_ends_the_payout_freeze_and_only_the_owner_may(
