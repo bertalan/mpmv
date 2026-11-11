@@ -127,6 +127,7 @@ OPERATOR_FIELDS = (
     "dac7_authority_country",
     "support_email",
     "compliance_email",
+    "session_policy",
     "authority_contact_email",
     "authority_contact_languages",
     "user_contact_url",

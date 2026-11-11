@@ -15,9 +15,15 @@ from apps.core.audit import audit_context
 from . import engine, services
 
 VERIFIED_AT_SESSION_KEY = "mfa_verified_at"
+VERIFIED_KIND_SESSION_KEY = "mfa_verified_kind"  # the factor kind of the last verification
+VERIFIED_UV_SESSION_KEY = (
+    "mfa_verified_uv"  # that verification was a passkey with user verification
+)
 
 
-def complete_verification(request: HttpRequest, device: object) -> None:
+def complete_verification(
+    request: HttpRequest, device: object, *, user_verified: bool = False
+) -> None:
     """Mark the session as verified by `device` (which must belong to `request.user`), now.
 
     The session key is rotated, as on any privilege change, so a fixed session id from before
@@ -26,6 +32,8 @@ def complete_verification(request: HttpRequest, device: object) -> None:
     request.session.cycle_key()
     django_otp.login(request, device)
     request.session[VERIFIED_AT_SESSION_KEY] = time.time()
+    request.session[VERIFIED_KIND_SESSION_KEY] = services.kind_of(device)
+    request.session[VERIFIED_UV_SESSION_KEY] = user_verified
     services.record_mfa_verified(device, ctx=audit_context(request))
 
 
@@ -45,4 +53,14 @@ def is_recently_verified(request: HttpRequest, max_age: int | None = None) -> bo
         float(verified_at) if isinstance(verified_at, int | float) else None,
         now=time.time(),
         max_age=limit,
+    )
+
+
+def is_recently_passkey_verified(request: HttpRequest, max_age: int | None = None) -> bool:
+    """Like `is_recently_verified`, but the last verification must be a passkey checked with user
+    verification (D-32 group 3: a code, a recovery code or a plain login passkey does not count)."""
+    return (
+        is_recently_verified(request, max_age)
+        and request.session.get(VERIFIED_KIND_SESSION_KEY) == services.PASSKEY
+        and request.session.get(VERIFIED_UV_SESSION_KEY) is True
     )
