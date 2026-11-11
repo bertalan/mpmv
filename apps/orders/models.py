@@ -431,3 +431,50 @@ class OrderLine(BaseModel):
 
     def delete(self, *args: Any, **kwargs: Any) -> Any:
         raise PermissionError("An order line is an immutable snapshot")
+
+
+class StockReservation(BaseModel):
+    """Units held back from sale so two buyers cannot take the last one (ORD.4).
+
+    A hold belongs to a cart while the customer is browsing, and to an order once `place_order`
+    confirms it; it never has both. It counts against the available stock until `expires_at`.
+    Stock itself is decremented only when the payment succeeds.
+    """
+
+    vendor_scope: ClassVar[str] = "product__vendor"
+    objects: ClassVar[VendorScopedManager["StockReservation"]] = VendorScopedManager()
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="reservations")
+    variant = models.ForeignKey(
+        "catalog.Variant",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="reservations",
+    )
+    cart = models.ForeignKey(
+        "cart.Cart", on_delete=models.CASCADE, null=True, blank=True, related_name="reservations"
+    )
+    order = models.ForeignKey(
+        Order, on_delete=models.CASCADE, null=True, blank=True, related_name="reservations"
+    )
+    quantity = models.PositiveIntegerField()
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["expires_at", "id"]
+        indexes = [models.Index(fields=["product", "variant", "expires_at"])]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(quantity__gte=1),
+                name="orders_stockreservation_quantity_positive",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(cart__isnull=True) | models.Q(order__isnull=True),
+                name="orders_stockreservation_cart_or_order",
+                violation_error_message="A hold belongs to a cart or an order, not both.",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.quantity} x {self.variant or self.product} until {self.expires_at:%H:%M}"
