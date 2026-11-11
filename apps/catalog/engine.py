@@ -559,6 +559,11 @@ RESERVED_PREFIXES = (
     "/_styleguide/",
 )
 
+# The reserved roots that are public pages: they exist in every language (`/it/vendor/apply/`),
+# so a configured language prefix is stripped before matching these, and only these. The others
+# (files, API, admins) have no language prefix: `/it/media/` is an ordinary path.
+I18N_RESERVED_PREFIXES = ("/vendor/apply/",)
+
 
 def normalise_redirect_source(path: str) -> str:
     """A source as Django hands over a request path: percent-decoded once, as UTF-8.
@@ -582,7 +587,11 @@ def prefix_source_error(path: str, *, languages: Iterable[str]) -> str | None:
         return 'A prefix ends with "/", e.g. /author/.'
     if path == "/" or path.strip("/") in set(languages):
         return "A prefix cannot cover the whole site or a whole language."
-    reserved = next((root for root in RESERVED_PREFIXES if path.startswith(root)), None)
+    first, _, rest = path.lstrip("/").partition("/")
+    unprefixed = f"/{rest}" if first in set(languages) and rest else path
+    reserved = next((root for root in RESERVED_PREFIXES if path.startswith(root)), None) or next(
+        (root for root in I18N_RESERVED_PREFIXES if unprefixed.startswith(root)), None
+    )
     if reserved is not None:
         return f"A prefix cannot cover {reserved}: it is reserved (admin, API, files, sign-in)."
     return None

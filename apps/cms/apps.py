@@ -64,11 +64,12 @@ class CmsConfig(AppConfig):
     def ready(self) -> None:
         from wagtail.signals import page_published
 
-        from .checks import check_base_url
+        from .checks import check_base_url, check_no_page_restrictions
         from .models import LegalPage
         from .signals import record_published_legal_page, sanitise_before_save
 
         checks.register(check_base_url, deploy=True)
+        checks.register(check_no_page_restrictions, checks.Tags.database)
         # After every migrate (and every test database flush): one Locale per configured
         # language, so adding a language to settings.LANGUAGES needs no migration (spec 09).
         post_migrate.connect(_sync_locales, sender=self, dispatch_uid="cms.sync_locales")

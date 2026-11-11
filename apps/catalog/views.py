@@ -21,9 +21,9 @@ from django.http import Http404, HttpRequest, HttpResponse, HttpResponsePermanen
 from django.http.response import HttpResponseBase
 from django.shortcuts import render
 from django.utils import translation
-from django.utils.html import linebreaks
 from django.views.decorators.http import require_safe
 from wagtail import hooks
+from wagtail.rich_text import RichText
 from wagtail.views import serve
 
 from apps.core import translations
@@ -194,7 +194,7 @@ def _listing(
         "store_categories": store_categories,
         "vendor_profile": vendor_profile,
         "policy_items": [
-            {"title": title, "content": linebreaks(text)}
+            {"title": title, "content": RichText(text)}
             for title, text in (vendor_profile.policies if vendor_profile else ())
         ],
         "price_min": _amount(params.price_min),
