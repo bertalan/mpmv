@@ -24,7 +24,7 @@ from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.fakes import FakeCaptchaVerifier
 from apps.core.models import AuditLog, Throttle
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("admin_open")]  # OPS.5
 
 LOGIN_URL = "/django-admin/login/"
 IP = "203.0.113.7"
