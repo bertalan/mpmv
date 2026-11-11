@@ -29,7 +29,7 @@ from apps.core.audit import VENDOR_FIELD, AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.countries import normalize_country
 from apps.core.models import Versioned
-from apps.core.services import current_operator, run_mutation, save_audited
+from apps.core.services import NoPlatformOperator, current_operator, run_mutation, save_audited
 from apps.core.validity import NoValidRow, next_start_error, pick_valid
 from apps.vendors import engine as vendors_engine
 from apps.vendors.engine import VendorAction, split_vat_number
@@ -843,6 +843,10 @@ def record_vat_validation(
     name: str = "",
     address: str = "",
     request_id: str = "",
+    requester: str = "",
+    requester_kind: str = "",
+    detail: str = "",
+    vies_request_date: dt.datetime | None = None,
     checked_at: dt.datetime | None = None,
 ) -> VatValidation:
     """Store one VIES answer about a VAT number (prefix and separators removed). Append-only."""
@@ -854,6 +858,10 @@ def record_vat_validation(
         name=name,
         address=address,
         request_id=request_id,
+        requester=requester,
+        requester_kind=requester_kind,
+        detail=detail,
+        vies_request_date=vies_request_date,
         checked_at=checked_at or timezone.now(),
     )
     check.full_clean()
@@ -921,6 +929,10 @@ class VatCheck:
             "reason": self.reason,
             "detail": self.detail,
             "request_id": self.request_id,
+            "requester": self.validation.requester if self.validation is not None else "",
+            "requester_kind": (
+                self.validation.requester_kind if self.validation is not None else ""
+            ),
             "checked_at": self.checked_at.isoformat() if self.checked_at else None,
             "validation": _public_id(self.validation),
         }
@@ -947,32 +959,93 @@ def _vat_check(
     )
 
 
-def _cached_vat_validation(query: engine.ViesQuery, now: dt.datetime) -> VatValidation | None:
+def _cached_vat_validation(
+    query: engine.ViesQuery, now: dt.datetime, requester: engine.ViesQuery | None = None
+) -> VatValidation | None:
     """The newest valid or invalid answer within `VIES_CACHE_SECONDS`; failing that, an
     `unavailable` answer within `VIES_UNAVAILABLE_CACHE_SECONDS`, so that an outage does not
-    make every checkout wait for the timeout. Older answers are never used."""
+    make every checkout wait for the timeout. Older answers are never used.
+
+    With a `requester` (D-28) a definitive answer is reused only when it was asked for that
+    same requester and carries a consultation number: the order needs its own usable log."""
     rows = VatValidation.objects.filter(country=query.country, vat_number=query.number)
     newest = ("-checked_at", "-id")
     definitive_since = now - dt.timedelta(seconds=settings.VIES_CACHE_SECONDS)
-    definitive = (
-        rows.filter(result__in=(engine.VAT_VALID, engine.VAT_INVALID))
-        .filter(checked_at__gte=definitive_since)
-        .order_by(*newest)
-        .first()
+    definitive_rows = rows.filter(result__in=(engine.VAT_VALID, engine.VAT_INVALID)).filter(
+        checked_at__gte=definitive_since
     )
+    if requester is not None:
+        definitive_rows = definitive_rows.filter(requester=requester.full_number).exclude(
+            request_id=""
+        )
+    definitive = definitive_rows.order_by(*newest).first()
     if definitive is not None:
         return definitive
+    if requester is not None:
+        # VIES refused this requester: do not hammer it for every checkout.
+        refused_since = now - dt.timedelta(seconds=settings.VIES_INVALID_REQUESTER_CACHE_SECONDS)
+        refused = (
+            rows.filter(
+                result=engine.VAT_UNAVAILABLE,
+                detail=engine.DETAIL_INVALID_REQUESTER,
+                requester=requester.full_number,
+                checked_at__gte=refused_since,
+            )
+            .order_by(*newest)
+            .first()
+        )
+        if refused is not None:
+            return refused
     down_since = now - dt.timedelta(seconds=settings.VIES_UNAVAILABLE_CACHE_SECONDS)
     return (
+        # Only genuine service-down rows are shared; a refused requester is that requester's.
         rows.filter(result=engine.VAT_UNAVAILABLE, checked_at__gte=down_since)
+        .exclude(detail=engine.DETAIL_INVALID_REQUESTER)
         .order_by(*newest)
         .first()
     )
 
 
-def _ask_vies(client: ViesClient, query: engine.ViesQuery) -> engine.ViesAnswer:
+REQUESTER_VENDOR = "vendor"
+REQUESTER_OPERATOR = "operator"
+
+
+def vendor_requester(country: str, vat_number: str) -> engine.ViesQuery | None:
+    """The requester for an order's VIES check: the vendor's VAT number, or None when the
+    vendor has none VIES can use. Pass the result as `requester`: with None the check runs
+    on the operator's number and the log says so (`requester_kind` "operator", "no vendor
+    proof"), never silently as the vendor's."""
     try:
-        answer = client.check(query)
+        return engine.vies_query(country, vat_number)
+    except engine.NotCheckable:
+        return None
+
+
+def _operator_requester() -> tuple[engine.ViesQuery | None, str]:
+    """The platform operator's VAT number as the requester actually sent, when there is one."""
+    try:
+        operator = current_operator()
+        return engine.vies_query(operator.country, operator.vat_number), REQUESTER_OPERATOR
+    except (NoPlatformOperator, engine.NotCheckable):
+        return None, ""
+
+
+def _parse_vies_date(value: str) -> dt.datetime | None:
+    try:
+        parsed = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=dt.UTC)
+
+
+def _ask_vies(
+    client: ViesClient, query: engine.ViesQuery, requester: engine.ViesQuery | None = None
+) -> engine.ViesAnswer:
+    try:
+        # A client that predates the requester is still asked the plain question.
+        answer = (
+            client.check(query) if requester is None else client.check(query, requester=requester)
+        )
     except Exception:  # a client must not raise; if it does, VIES is unavailable
         logger.exception("VIES client %s raised", type(client).__name__)
         return engine.ViesAnswer(result=engine.VAT_UNAVAILABLE, detail=engine.DETAIL_CLIENT_ERROR)
@@ -993,14 +1066,26 @@ def verify_vat_number(
     *,
     client: ViesClient | None = None,
     refresh: bool = False,
+    requester: engine.ViesQuery | None = None,
 ) -> VatCheck:
     """Check a customer's VAT number for reverse charge; fails closed (spec 05 §5.2, T2).
+
+    FOR CART DISPLAY AND GENERIC CHECKS ONLY. An order's reverse-charge decision must use
+    `verify_vat_number_for_order` (fresh, vendor as requester, consultation number required);
+    this function may serve a cached answer up to 24 h old and, without `requester`, falls back
+    to the operator's number, which is never an order's proof.
 
     A recent answer is reused (`_cached_vat_validation`) unless `refresh`; otherwise VIES is
     asked once through `client` (default: `get_vies_client()`), with its timeout and no retry,
     and the answer is stored. A number VIES cannot be asked about (country outside VIES,
     another country's prefix, malformed) is not verified and stores nothing: every
     `VatValidation` row is a VIES answer. Never raises because of VIES.
+
+    `requester` is the VAT number VIES is told is asking. For an order it is the VENDOR's
+    (D-28: VIES returns the consultation number, `request_id`, only to an identified
+    requester); build it with `engine.vies_query(vendor_country, vendor_vat_number)`. The row
+    and `VatCheck.snapshot()` keep date and time (`checked_at`), the consultation number and
+    the requester. Without one, the client's own requester is used (the platform operator's).
     """
     try:
         query = engine.vies_query(country, vat_number)
@@ -1012,15 +1097,25 @@ def verify_vat_number(
             reason=exc.reason,
             message=exc.message,
         )
+    requester_kind = REQUESTER_VENDOR if requester is not None else ""
+    if requester is None:
+        requester, requester_kind = _operator_requester()
     if not refresh:
-        cached = _cached_vat_validation(query, timezone.now())
+        cached = _cached_vat_validation(query, timezone.now(), requester)
         if cached is not None:
             return _vat_check(query, cached, from_cache=True)
 
-    answer = _ask_vies(client if client is not None else get_vies_client(), query)
+    answer = _ask_vies(client if client is not None else get_vies_client(), query, requester)
     if answer.result == engine.VAT_UNAVAILABLE:
         logger.warning(
             "VIES unavailable for %s%s: %s", query.prefix, query.number, answer.detail or "-"
+        )
+    if answer.detail == engine.DETAIL_INVALID_REQUESTER:
+        logger.warning(
+            "VIES refused the requester %s for a check of %s%s",
+            requester.full_number if requester is not None else "-",
+            query.prefix,
+            query.number,
         )
     row = record_vat_validation(
         query.country,
@@ -1029,8 +1124,53 @@ def verify_vat_number(
         name=_fit(answer.name, "name"),
         address=answer.address,
         request_id=_fit(answer.request_id, "request_id"),
+        requester=_fit(requester.full_number if requester is not None else "", "requester"),
+        requester_kind=requester_kind,
+        detail=_fit(answer.detail, "detail"),
+        vies_request_date=_parse_vies_date(answer.request_date),
     )
     return _vat_check(query, row, detail=answer.detail, from_cache=False)
+
+
+def verify_vat_number_for_order(
+    country: str,
+    vat_number: str,
+    *,
+    vendor: Vendor,
+    client: ViesClient | None = None,
+) -> VatCheck:
+    """The VIES check an order's reverse-charge decision rests on (D-28, owner answers on #224).
+
+    Always a fresh VIES call (never the 24 h cache, which is for the cart display only), sent
+    with the VENDOR's VAT number as requester so the consultation number in the snapshot is the
+    vendor's. A vendor without a VAT number VIES can use cannot make an intra-EU supply
+    (art. 138): the check is not verified with `VAT_REASON_NO_VENDOR_VAT`, VIES is not asked,
+    and the operator's number is never substituted. VIES down: fails closed like
+    `verify_vat_number`. The requester is derived from the vendor record (`country`,
+    `vat_number`), never from caller strings. A `valid` answer without a consultation number is
+    not verified (`VAT_REASON_NO_CONSULTATION_NUMBER`): the order has no proof.
+    """
+    requester = vendor_requester(str(vendor.country), vendor.vat_number)
+    if requester is None:
+        return VatCheck(
+            country=country.strip().upper(),
+            vat_number=vat_number.strip(),
+            verified=False,
+            reason=engine.VAT_REASON_NO_VENDOR_VAT,
+            message=engine.vat_check_message(
+                engine.VAT_REASON_NO_VENDOR_VAT, country=country.strip().upper()
+            ),
+        )
+    check = verify_vat_number(country, vat_number, client=client, refresh=True, requester=requester)
+    if check.verified and not check.request_id:
+        reason = engine.VAT_REASON_NO_CONSULTATION_NUMBER
+        return dataclasses.replace(
+            check,
+            verified=False,
+            reason=reason,
+            message=engine.vat_check_message(reason, country=check.country),
+        )
+    return check
 
 
 def recheck_vat_number(country: str, vat_number: str) -> VatCheck:

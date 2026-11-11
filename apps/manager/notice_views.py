@@ -10,6 +10,7 @@ import uuid
 from typing import Any
 
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.http import Http404, HttpRequest, HttpResponseRedirect
 from django.http.response import HttpResponseBase
@@ -17,8 +18,8 @@ from django.urls import reverse
 from django.utils.translation import gettext as _
 
 from apps.compliance import services
-from apps.compliance.forms import DecisionForm
-from apps.compliance.models import Notice
+from apps.compliance.forms import AuthoritiesForm, DecisionForm, RestrictionForm
+from apps.compliance.models import Notice, StatementOfReasons
 from apps.core.audit import audit_context
 
 from .views import ManagerView
@@ -67,7 +68,15 @@ class NoticeDetailView(ManagerView):
         if self.request.method == "GET":
             services.record_notice_view(notice.public_id, ctx=audit_context(self.request))
         context.setdefault("decision_form", DecisionForm())
-        context.update(notice=notice, title=_("Notice"))
+        context.setdefault(
+            "restriction_form", RestrictionForm(initial={"target_kind": notice.target_kind})
+        )
+        context.setdefault("authorities_form", AuthoritiesForm())
+        context.update(
+            notice=notice,
+            statements=StatementOfReasons.objects.filter(notice=notice),
+            title=_("Notice"),
+        )
         return context
 
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
@@ -92,8 +101,39 @@ class NoticeDetailView(ManagerView):
                     ctx=ctx,
                 )
                 messages.success(request, _("The decision is recorded and the notifier is told."))
+            elif action == "restrict":
+                restriction_form = RestrictionForm(request.POST)
+                if not restriction_form.is_valid():
+                    return self.render_to_response(
+                        self.get_context_data(restriction_form=restriction_form, **kwargs)
+                    )
+                services.issue_statement(
+                    request.user,
+                    notice_id=public_id,
+                    ctx=ctx,
+                    **restriction_form.cleaned_data,
+                )
+                messages.success(request, _("The content is restricted and the vendor is told."))
+            elif action == "authorities":
+                authorities_form = AuthoritiesForm(request.POST)
+                if not authorities_form.is_valid():
+                    return self.render_to_response(
+                        self.get_context_data(authorities_form=authorities_form, **kwargs)
+                    )
+                services.notify_authorities(
+                    request.user, public_id, ctx=ctx, **authorities_form.cleaned_data
+                )
+                messages.success(request, _("The notification to the authorities is recorded."))
             else:
                 raise Http404("No such action.")
+        except PermissionDenied:
+            raise Http404("No such action.") from None
         except services.NoticeError:
+            if action == "restrict":
+                messages.error(
+                    request,
+                    _("The content could not be restricted: check the notice status and target."),
+                )
+                return HttpResponseRedirect(reverse("manager:platform:notice", args=[public_id]))
             messages.error(request, _("This step is not possible for the notice in its status."))
         return HttpResponseRedirect(reverse("manager:platform:notice", args=[public_id]))

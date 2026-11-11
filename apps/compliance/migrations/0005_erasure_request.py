@@ -10,7 +10,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("compliance", "0003_notice"),
+        ("compliance", "0004_statement_of_reasons"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
