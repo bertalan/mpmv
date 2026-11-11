@@ -478,3 +478,70 @@ def test_rejecting_a_batch_records_the_released_product_ids() -> None:
     entry = AuditLog.objects.get(action=brands.BRAND_REJECTED)
     assert entry.after is not None
     assert entry.after["products_released"] == [product.staff_ref]
+
+
+# --- Approved vs pending: the key is compared under one lock
+
+
+def test_approving_a_pending_brand_whose_key_is_taken_by_an_approved_one_is_refused() -> None:
+    pending = BrandFactory.create(name="Acme & Sons", status=Brand.Status.PENDING)
+    BrandFactory.create(name="ACME and sons")  # approved, created around the checks
+    with pytest.raises(ValidationError):
+        brands.approve_brand(pending, ctx=CTX)
+    pending.refresh_from_db()
+    assert pending.status == Brand.Status.PENDING
+
+
+def test_approving_a_batch_with_a_taken_key_is_refused_whole() -> None:
+    vendor = VendorFactory.create()
+    outcome = brands.propose_batch(vendor, ["Fresh", "Acme & Sons"], source="run", ctx=CTX)
+    BrandFactory.create(name="ACME and sons")
+    assert outcome.batch is not None
+    with pytest.raises(ValidationError):
+        brands.approve_batch(outcome.batch, ctx=CTX)
+    assert Brand.objects.filter(status=Brand.Status.APPROVED).count() == 1
+
+
+def test_a_legacy_approved_duplicate_stays_editable_and_rejecting_is_never_blocked() -> None:
+    first = BrandFactory.create(name="Acme & Sons")
+    legacy = BrandFactory.create(name="ACME and sons")
+    legacy.url = "https://acme.example/"
+    brands.save_brand(legacy, ctx=CTX)
+    assert first.pk != legacy.pk
+    pending = BrandFactory.create(name="Acme, Sons", status=Brand.Status.PENDING)
+    brands.reject_brand(pending, ctx=CTX)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_staff_brand_and_a_vendor_proposal_of_one_name_at_once_make_one_brand() -> None:
+    vendor = VendorFactory.create()
+    barrier = threading.Barrier(2)
+    results: list[str] = []
+
+    def staff() -> None:
+        try:
+            barrier.wait()
+            brands.save_brand(Brand(name="Acme & Sons"), ctx=CTX)
+            results.append("ok")
+        except ValidationError:
+            results.append("refused")
+        finally:
+            connection.close()
+
+    def propose() -> None:
+        try:
+            barrier.wait()
+            brands.propose_brand(vendor, "ACME and sons", ctx=CTX)
+            results.append("ok")
+        except ValidationError:
+            results.append("refused")
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=staff), threading.Thread(target=propose)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert sorted(results) == ["ok", "refused"]
+    assert Brand.objects.count() == 1

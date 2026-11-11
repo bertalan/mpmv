@@ -17,7 +17,7 @@ from typing import Any
 
 from django.conf import settings
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import Q, QuerySet
 
 from apps.core import translations
@@ -136,6 +136,31 @@ DUPLICATE_MESSAGE = (
 )
 
 
+BRAND_NAMES_LOCK = 0x42524E44  # one advisory lock key for every change to the brand names
+
+
+def lock_brand_names() -> None:
+    """Serialise changes to the shared brand names until the transaction ends. The unique
+    constraints cover pending against pending; this covers approved against pending (a
+    proposal racing a staff brand, an approval racing a proposal)."""
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_advisory_xact_lock(%s)", [BRAND_NAMES_LOCK])
+
+
+def _refuse_taken_keys(brands_: Iterable[Brand]) -> None:
+    """Refuse when a brand's normalised name belongs to another approved or pending brand
+    outside `brands_` (call under `lock_brand_names`)."""
+    chosen = list(brands_)
+    taken = (
+        Brand.objects.exclude(pk__in=[brand.pk for brand in chosen])
+        .exclude(status=Brand.Status.REJECTED)
+        .filter(name_key__in=[brand.name_key for brand in chosen if brand.name_key])
+        .exists()
+    )
+    if taken:
+        raise ValidationError({"name": DUPLICATE_MESSAGE})
+
+
 @contextmanager
 def _duplicate_guard() -> Iterator[None]:
     """Turn a brand uniqueness violation (the database has the last word when two requests race
@@ -188,6 +213,7 @@ def propose_brand(
     is already a brand, a link is not https, or the vendor already has `pending_limit()` manual
     proposals waiting."""
     with transaction.atomic():
+        lock_brand_names()
         # Lock the vendor row so two requests cannot both take the last slot.
         Vendor.objects.select_for_update().get(pk=vendor.pk)
         limit = pending_limit()
@@ -225,6 +251,7 @@ def propose_batch(
     nothing is new."""
     batch_limit = int(settings.MPMV_BRAND_BATCH_LIMIT)
     with transaction.atomic():
+        lock_brand_names()
         # One batch at a time per vendor: the ceiling below is checked on a stable count.
         Vendor.objects.select_for_update().get(pk=vendor.pk)
         chosen: dict[str, Brand] = {}
@@ -318,6 +345,9 @@ def _review(
     changes.update(BRAND_MODEL, str(brand.public_id), before, after)
 
     def apply() -> None:
+        if status == Brand.Status.APPROVED:
+            lock_brand_names()
+            _refuse_taken_keys([brand])
         stored = Brand.objects.select_for_update().get(pk=brand.pk)
         _pending_only(stored)
         if status == Brand.Status.REJECTED:
@@ -369,6 +399,9 @@ def _review_batch(
         stored = BrandBatch.objects.select_for_update().get(pk=batch.pk)
         if stored.status != BrandBatch.Status.PENDING:
             raise ValidationError("This batch has already been reviewed.")
+        if status == Brand.Status.APPROVED:
+            lock_brand_names()
+            _refuse_taken_keys(pending)
         if status == Brand.Status.REJECTED:
             Product.objects.filter(brand__in=pending).update(brand=None)
         Brand.objects.filter(pk__in=[brand.pk for brand in pending]).update(status=status)
@@ -504,17 +537,19 @@ def merge_brands(
 
 def save_brand(brand: Brand, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Create or change a brand (validated: name and Wikidata duplicates, https links)."""
-    brand.full_clean()
-    with _duplicate_guard():
-        return save_audited(
-            brand,
-            brand_snapshot,
-            key=str(brand.public_id),
-            ctx=ctx,
-            created=BRAND_CREATED,
-            updated=BRAND_UPDATED,
-            dry_run=dry_run,
-        )
+    with transaction.atomic():
+        lock_brand_names()
+        brand.full_clean()
+        with _duplicate_guard():
+            return save_audited(
+                brand,
+                brand_snapshot,
+                key=str(brand.public_id),
+                ctx=ctx,
+                created=BRAND_CREATED,
+                updated=BRAND_UPDATED,
+                dry_run=dry_run,
+            )
 
 
 def delete_brand(brand: Brand, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
