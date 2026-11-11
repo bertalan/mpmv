@@ -15,6 +15,7 @@ class ComplianceConfig(AppConfig):
         "countrywarninglanguages",
         "notice",
         "erasurerequest",
+        "suppressedemail",
         "statementofreasons",
         "productrestriction",
         "transparencysubmission",

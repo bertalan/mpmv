@@ -107,6 +107,7 @@ database_url="$(printf 'postgres://%s:%s@%s:5432/%s?sslmode=verify-full&sslrootc
   mpmv "$db_password" "$db_host" mpmv)"
 declare -A fill=(
   [DJANGO_SECRET_KEY]="$(random)"
+  [MPMV_PRIVACY_PEPPER]="$(random)"
   [MPMV_FIELD_ENCRYPTION_KEYS]="$field_key"
   [DJANGO_ALLOWED_HOSTS]="$site"
   [MPMV_BASE_URL]="https://$site"
