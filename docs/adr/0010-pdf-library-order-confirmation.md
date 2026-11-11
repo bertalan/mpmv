@@ -1,6 +1,6 @@
 # ADR-0010: PDF library for the per-vendor order confirmation
 
-- **Status:** Proposed (owner or lane-a to accept)
+- **Status:** Accepted (owner and lane-a, 2026-11-11)
 - **Date:** 2026-11-11
 - **Deciders:** project owner, tech lead
 - **Backlog:** ORD.9 (part 3/3) · **Open decision:** none
@@ -63,8 +63,14 @@ Notes on the options:
 
 ## Decision
 
-**Option 1, WeasyPrint, with the hardening below.** Status stays Proposed until the owner or lane-a
-accepts; no dependency is added by this ADR.
+**Option 1, WeasyPrint, with the hardening below.** No dependency is added by this ADR; the
+implementation plan at the end does that.
+
+### Decision outcome (2026-11-11)
+
+- **Library (owner):** WeasyPrint with the hardened `url_fetcher` (`data:` and static files only,
+  no network), as described below.
+- **Storage (lane-a):** generate the PDF on the fly and store nothing (plan step 5).
 
 Hardening (each point is a test in the implementation task):
 
