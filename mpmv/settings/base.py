@@ -452,6 +452,8 @@ VIES_API_URL = (
     or "https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-number"
 )
 VIES_TIMEOUT_SECONDS = 8  # per socket operation (connect, each read), not for the whole check
+# Used twice: the lookup cache TTL of VIES answers, and the conservative maximum age of a valid
+# answer the goods tax engine trusts (`build_tax_context`): an older one is treated as B2C.
 VIES_CACHE_SECONDS = 24 * 60 * 60
 VIES_UNAVAILABLE_CACHE_SECONDS = 5 * 60
 
