@@ -15,14 +15,29 @@ never sends invoices or receipts: the per-vendor confirmation is a non-fiscal do
 Emails render in the order's language snapshot, English when it is not configured.
 """
 
+import logging
 from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
 
-from apps.core.services import enqueue_email
+from apps.core.services import enqueue_email as _enqueue_email
 
 from .models import Order, OrderLine, PrivacyStatus, VendorOrder
+
+logger = logging.getLogger(__name__)
+
+
+def enqueue_email(**kwargs: Any) -> None:
+    """Queue one email; a refused one (malformed recipient, SEC.5) is logged and skipped so it
+    never rolls back the order or payment transition that called us. Nothing was written."""
+    try:
+        _enqueue_email(**kwargs)
+    except ValueError as exc:
+        logger.warning(
+            "order email %s not queued: %s", kwargs.get("template_key"), exc.__class__.__name__
+        )
+
 
 ORDER_RECEIVED = "orders.order_received"
 PAYMENT_CONFIRMED = "orders.payment_confirmed"

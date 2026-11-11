@@ -8,6 +8,7 @@ from apps.core.mail import html_violations
 from apps.core.models import OutboxEmail
 from apps.orders import notifications, services
 from apps.orders.models import Order, VendorOrder
+from apps.orders.tests.factories import unchecked
 from apps.orders.tests.integration.test_services import CTX, line_input, pay, place, vendor_input
 from apps.vendors.tests.factories import VendorFactory
 
@@ -186,7 +187,8 @@ def test_italian_and_english_wording_differ_per_the_catalog() -> None:
 
 def test_a_malformed_customer_address_never_blocks_the_payment() -> None:
     order = two_vendor_order()
-    Order.objects.filter(pk=order.pk).update(email="not an address")
+    with unchecked():  # the email is immutable by trigger: break it on purpose
+        Order.objects.filter(pk=order.pk).update(email="not an address")
     order.refresh_from_db()
     services.transition_order(order, "awaiting_payment", ctx=CTX)
     services.transition_order(order, "paid", ctx=CTX)
@@ -198,7 +200,8 @@ def test_a_malformed_customer_address_never_blocks_the_payment() -> None:
 def test_a_malformed_address_never_blocks_shipping() -> None:
     order = place()
     pay(order)
-    Order.objects.filter(pk=order.pk).update(email="bad\nBcc: x@example.com")
+    with unchecked():
+        Order.objects.filter(pk=order.pk).update(email="bad\nBcc: x@example.com")
     sub = order.vendor_orders.get()
     services.transition_vendor_order(sub, "accepted", ctx=CTX)
     services.transition_vendor_order(sub, "shipped", ctx=CTX, tracking_number="T1")
