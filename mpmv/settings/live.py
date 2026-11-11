@@ -22,6 +22,10 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_CSP = {**SECURE_CSP, "upgrade-insecure-requests": True}
 
+# SEO.6: anonymous CMS pages are served from the cache (docs/dev/page-cache.md). Off with
+# MPMV_PAGE_CACHE=0, the switch to flip if a page ever shows stale content.
+PAGE_CACHE_ENABLED = env_bool("MPMV_PAGE_CACHE", default=True)
+
 # Static files are collected into the image at build time (ARC.5) and served by WhiteNoise with
 # hashed, compressed names (apps.cms.staticfiles: WhiteNoise's storage, tolerant only of
 # Wagtail's references to Wagtail apps left out). A new list, so the base settings stay untouched.

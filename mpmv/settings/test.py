@@ -41,6 +41,10 @@ GEOCODING_OPENCAGE_KEY = ""
 # Uploaded images and their renditions (I18N.3) go to a directory of this test process only.
 MEDIA_ROOT = Path(tempfile.mkdtemp(prefix="mpmv-test-media-"))
 
+# SEO.6: the page cache of this test process only, off unless a test turns it on.
+CACHES["pagecache"]["LOCATION"] = tempfile.mkdtemp(prefix="mpmv-test-pagecache-")  # noqa: F405
+PAGE_CACHE_ENABLED = False
+
 # Transactional email (ARC.16): the in-memory backend, and the templates of the outbox tests.
 EMAIL_SENDER = "apps.core.mail.MemoryEmailSender"
 TEMPLATES[0]["DIRS"] = [*TEMPLATES[0]["DIRS"], BASE_DIR / "apps" / "core" / "tests" / "templates"]  # noqa: F405

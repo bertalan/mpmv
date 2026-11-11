@@ -101,6 +101,12 @@ PUBLIC: dict[str, str] = {
 # Views that do not check the CSRF token, and what protects them instead.
 CSRF_EXEMPT: dict[str, str] = {
     "email_webhook": "Server-to-server call from the email provider, verified by its signature.",
+    "switch_language": (
+        "Language switcher on every cached public page (SEO.6), which can hold no CSRF token: the "
+        "view refuses a POST whose `Sec-Fetch-Site` or `Origin` is not this site "
+        "(`test_switcher_refuses_a_cross_site_post_and_changes_nothing`), and it only changes the "
+        "visitor's display language."
+    ),
 }
 # Every API v1 operation (django-ninja) is CSRF-exempt: it authenticates with a bearer API key
 # only (CORE.13), never with the session cookie, so a cross-site form cannot act through it.

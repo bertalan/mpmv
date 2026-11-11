@@ -81,11 +81,11 @@ def test_switcher_needs_no_csrf_token_so_public_pages_can_be_cached() -> None:
 @pytest.mark.parametrize(
     "headers",
     [
-        {"HTTP_ORIGIN": "https://attacker.example"},
-        {"HTTP_ORIGIN": "null"},
-        {"HTTP_SEC_FETCH_SITE": "cross-site"},
-        {"HTTP_SEC_FETCH_SITE": "same-site"},
-        {"HTTP_SEC_FETCH_SITE": "none"},
+        {"Origin": "https://attacker.example"},
+        {"Origin": "null"},
+        {"Sec-Fetch-Site": "cross-site"},
+        {"Sec-Fetch-Site": "same-site"},
+        {"Sec-Fetch-Site": "none"},
     ],
 )
 def test_switcher_refuses_a_cross_site_post_and_changes_nothing(
@@ -94,7 +94,9 @@ def test_switcher_refuses_a_cross_site_post_and_changes_nothing(
     user = UserFactory.create()
     client = Client(enforce_csrf_checks=True)
     client.force_login(user)
-    response = client.post(reverse("switch_language"), {"language": "de", "next": "/"}, **headers)
+    response = client.post(
+        reverse("switch_language"), {"language": "de", "next": "/"}, headers=headers
+    )
     assert response.status_code == 403
     user.refresh_from_db()
     assert user.preferred_language == "en"
@@ -103,14 +105,16 @@ def test_switcher_refuses_a_cross_site_post_and_changes_nothing(
 @pytest.mark.parametrize(
     "headers",
     [
-        {"HTTP_ORIGIN": "http://testserver"},
-        {"HTTP_SEC_FETCH_SITE": "same-origin"},
-        {"HTTP_ORIGIN": "http://testserver", "HTTP_SEC_FETCH_SITE": "same-origin"},
+        {"Origin": "http://testserver"},
+        {"Sec-Fetch-Site": "same-origin"},
+        {"Origin": "http://testserver", "Sec-Fetch-Site": "same-origin"},
     ],
 )
 def test_switcher_accepts_a_same_origin_post(headers: dict[str, str]) -> None:
     client = Client(enforce_csrf_checks=True)
-    response = client.post(reverse("switch_language"), {"language": "de", "next": "/"}, **headers)
+    response = client.post(
+        reverse("switch_language"), {"language": "de", "next": "/"}, headers=headers
+    )
     assert response.status_code == 302
 
 

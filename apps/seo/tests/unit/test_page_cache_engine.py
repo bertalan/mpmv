@@ -109,7 +109,7 @@ def skip(**override: object) -> str | None:
         "streaming": False,
         "sets_cookie": False,
         "cache_control": "",
-        "session_accessed": False,
+        "session_modified": False,
         "nonce_used": False,
         "csrf_used": False,
         "body": b"<html><body>Hello</body></html>",
@@ -134,7 +134,7 @@ def test_a_plain_html_page_is_stored() -> None:
         {"cache_control": "no-store"},
         {"cache_control": "no-cache"},
         {"cache_control": "max-age=0"},
-        {"session_accessed": True},
+        {"session_modified": True},
         {"nonce_used": True},
         {"csrf_used": True},
         {"body": b'<form><input name="csrfmiddlewaretoken" value="x"></form>'},
@@ -190,7 +190,8 @@ def test_a_countdown_already_reached_does_not_count() -> None:
 
 
 def test_a_countdown_under_a_second_away_is_not_stored() -> None:
-    assert engine.lifetime(300, "", countdown(NOW + dt.timedelta(milliseconds=400)), NOW) == 0
+    body = countdown(NOW + dt.timedelta(seconds=1))
+    assert engine.lifetime(300, "", body, NOW + dt.timedelta(milliseconds=600)) == 0
 
 
 def test_a_malformed_target_is_ignored() -> None:

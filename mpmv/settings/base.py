@@ -1,6 +1,7 @@
 """Settings shared by every environment."""
 
 from pathlib import Path
+from typing import Any
 
 import dj_database_url
 import django_stubs_ext
@@ -117,6 +118,9 @@ MIDDLEWARE = [
     "apps.themes.middleware.ThemeMiddleware",  # the site's theme for the template loader (THM.1)
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
+    # SEO.6: anonymous CMS pages from the cache. After Locale (the key has the language), before
+    # CSRF, authentication and messages (a hit costs no query and holds nothing per request).
+    "apps.seo.middleware.PageCacheMiddleware",
     # OPS.5: the Django admin answers the normal 404 outside the networks; before CommonMiddleware
     # so `/django-admin` gets no slash redirect, after Locale and Theme for the normal 404 page.
     "apps.core.middleware.AdminNetworkAllowlistMiddleware",
@@ -412,6 +416,30 @@ STATICFILES_FINDERS = [
 ]
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# Anonymous page cache (SEO.6, docs/dev/page-cache.md). The app and the task worker both mount the
+# media volume and the root file system is read-only, so the cache lives next to the media: files
+# are shared by every gunicorn worker and by the worker that publishes scheduled pages, which
+# is what makes a global invalidation reach every process without Redis (ADR-0001). The default
+# cache (LocMem) stays per process and holds nothing that must be shared.
+CACHES: dict[str, dict[str, Any]] = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    "pagecache": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": env_str("MPMV_PAGE_CACHE_DIR", "") or str(MEDIA_ROOT / ".page-cache"),
+        "OPTIONS": {"MAX_ENTRIES": 2000, "CULL_FREQUENCY": 4},
+    },
+}
+PAGE_CACHE_ENABLED = env_bool("MPMV_PAGE_CACHE", default=False)
+# Default lifetime of a stored page, the safety net for content that changes without a signal
+# (a product shown in a block, a vendor storefront); publish, unpublish, move and settings
+# changes drop everything at once. A running countdown shortens it (spec 10 §10.2).
+PAGE_CACHE_SECONDS = env_int("MPMV_PAGE_CACHE_SECONDS", 300)
+PAGE_CACHE_MAX_BYTES = 512 * 1024
+# Only these routes are cached: the Wagtail page tree (`home` and Wagtail's own catch-all).
+PAGE_CACHE_URL_NAMES = ("home", "wagtail_serve")
+# A request with one of these cookies, besides the session and CSRF cookies, never uses the cache.
+PAGE_CACHE_BYPASS_COOKIES = ("messages",)
 
 # HTTP hardening shared by every environment (SEC.1, spec 12 SEC.3). Transport-only settings
 # (HSTS, HTTPS redirect, Secure cookies) live in live.py, since dev runs over plain HTTP.

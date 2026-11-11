@@ -10,6 +10,7 @@ from collections.abc import Callable, Iterator
 from typing import Any
 
 import pytest
+from django.apps import apps as django_apps
 from django.core.cache import caches
 from django.http import HttpRequest, HttpResponse
 from django.test import Client, RequestFactory, override_settings
@@ -17,19 +18,25 @@ from django.utils.csp import LazyNonce
 from wagtail.models import Page, Site
 
 from apps.accounts.tests.factories import UserFactory
-from apps.cms.services import SeedReport
+from apps.cms.services import SeedReport, seed_site
 from apps.cms.tests.factories import StandardPageFactory
 from apps.seo import page_cache
 from apps.seo.middleware import PageCacheMiddleware
-from apps.themes.models import ThemeSettings
 
-pytestmark = [pytest.mark.django_db, override_settings(PAGE_CACHE_ENABLED=True)]
+pytestmark = pytest.mark.django_db
 
 NONCE_IN_HTML = re.compile(r"\bnonce=")
 
 
+@pytest.fixture
+def seeded(db: None) -> SeedReport:
+    """The sample home, About page and menus in every configured language."""
+    return seed_site()
+
+
 @pytest.fixture(autouse=True)
-def empty_cache() -> Iterator[None]:
+def empty_cache(settings: Any) -> Iterator[None]:
+    settings.PAGE_CACHE_ENABLED = True
     caches["pagecache"].clear()
     yield
     caches["pagecache"].clear()
@@ -160,7 +167,7 @@ def page_request(**extra: Any) -> HttpRequest:
     from django.contrib.sessions.backends.signed_cookies import SessionStore
 
     request = RequestFactory().get("/about-seo6/", HTTP_HOST="testserver", **extra)
-    request.LANGUAGE_CODE = "en"  # type: ignore[attr-defined]
+    request.LANGUAGE_CODE = "en"
     request.session = SessionStore()
     request._csp_nonce = LazyNonce()  # type: ignore[attr-defined]
     from django.urls import ResolverMatch
@@ -202,7 +209,7 @@ def test_a_page_with_a_csrf_token_or_a_cookie_is_never_stored() -> None:
         return response
 
     def session(request: HttpRequest) -> HttpResponse:
-        request.session.get("key")
+        request.session["key"] = "value"
         return served()
 
     for view in (csrf, cookie, session):
@@ -253,7 +260,7 @@ def test_a_signed_in_visitor_never_gets_or_fills_the_cache(
 
 def _plain_request(path: str) -> HttpRequest:
     request = RequestFactory().get(path, HTTP_HOST="testserver")
-    request.LANGUAGE_CODE = "en"  # type: ignore[attr-defined]
+    request.LANGUAGE_CODE = "en"
     return request
 
 
@@ -330,7 +337,8 @@ def test_changing_the_site_theme_setting_drops_the_cache(
 ) -> None:
     client.get("/")
     assert status(client.get("/")) == "HIT"
-    setting = ThemeSettings.for_site(Site.objects.get(is_default_site=True))
+    theme_settings = django_apps.get_model("themes", "ThemeSettings")  # no app imports themes
+    setting = theme_settings.for_site(Site.objects.get(is_default_site=True))
     setting.save()
     assert status(client.get("/")) == "MISS"
 

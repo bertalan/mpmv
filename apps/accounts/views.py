@@ -2,6 +2,7 @@
 
 import datetime as dt
 import math
+from urllib.parse import urlsplit
 
 from django.contrib import messages
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
@@ -9,6 +10,7 @@ from django.http.response import HttpResponseBase
 from django.utils import translation
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from apps.core.http import client_ip
@@ -24,6 +26,18 @@ SWITCH_LIMIT = 30
 SWITCH_WINDOW = dt.timedelta(minutes=1)
 
 
+def _is_same_origin(request: HttpRequest) -> bool:
+    """A browser tells where a POST comes from: `Sec-Fetch-Site`, and `Origin` on every POST.
+
+    No header at all is a script or a test client, which cannot ride on a victim's cookies.
+    """
+    fetch_site = request.META.get("HTTP_SEC_FETCH_SITE")
+    if fetch_site is not None and fetch_site != "same-origin":
+        return False
+    origin = request.META.get("HTTP_ORIGIN")
+    return origin is None or urlsplit(origin).netloc == request.get_host()
+
+
 @public_form(
     protection=Protection.ALLOW,
     purpose="Language switcher (redirect to the same page in another language)",
@@ -31,6 +45,7 @@ SWITCH_WINDOW = dt.timedelta(minutes=1)
     reason="stores nothing for an anonymous visitor and redirects only to this host",
     rate_limit="per IP, generous",
 )
+@csrf_exempt  # SEO.6: the form is on every cached public page, which can hold no CSRF token
 @require_POST
 def switch_language(request: HttpRequest) -> HttpResponseBase:
     """Language switcher: redirect to the current page in the chosen language (I18N.1).
@@ -38,7 +53,16 @@ def switch_language(request: HttpRequest) -> HttpResponseBase:
     The URL prefix decides the language, so no cookie is set; a signed-in user's choice is also
     stored as `preferred_language`, an anonymous visitor's in the session. Unknown languages and
     off-site `next` URLs are ignored.
+
+    No CSRF token (SEO.6: the cached public pages carry no per-request secret). The same check
+    comes from the browser's own headers instead: a POST from another site (`Sec-Fetch-Site`,
+    `Origin`) is refused, and the session cookie is SameSite=Lax. The worst a forged request
+    could do is change the display language, which the visitor changes back in one click.
     """
+    if not _is_same_origin(request):
+        return HttpResponse("Cross-site request refused.", status=403)
+    if not request.POST.get("language"):
+        return HttpResponse("Missing language.", status=400)
     wait = consume_rate_limit(
         f"language_switch:ip:{client_ip(request)}", limit=SWITCH_LIMIT, window=SWITCH_WINDOW
     )

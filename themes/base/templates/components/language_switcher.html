@@ -1,7 +1,9 @@
 {% load i18n %}{% comment %}
 Language switcher (THM.3): one button per language, each in its own small form that posts to
 `switch_language`, so it works without JavaScript. The current language is marked
-`aria-current` and disabled.
+`aria-current` and disabled. No `{% csrf_token %}` on purpose (SEO.6): the switcher is on every
+cached public page, which can hold nothing per request; `switch_language` checks the request's
+origin instead.
 
 Context: `languages`, either the CMS `LanguageLink`s (`code`, `name`, `url`, `current`) or
 Django's language info dicts (`code`, `name_local`) together with `current_language` and
@@ -11,7 +13,6 @@ Django's language info dicts (`code`, `name_local`) together with `current_langu
     {% for language in languages %}
       <li>
         <form action="{% url 'switch_language' %}" method="post">
-          {% csrf_token %}
           {% if language.url %}<input type="hidden" name="exact" value="1">
           <input type="hidden" name="notice" value="{% if language.available %}0{% else %}1{% endif %}">
           {% endif %}<input type="hidden" name="next" value="{% firstof language.url next_url %}">
