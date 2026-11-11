@@ -360,6 +360,11 @@ def _notify_rejected(rejected: Sequence[tuple[Brand, Sequence[Product]]], *, key
     transaction. A refused address is logged and skipped so it never blocks the review."""
     per_vendor: dict[int, tuple[Vendor, list[tuple[Brand, list[Product]]]]] = {}
     for brand, products in rejected:
+        # Whoever proposed the brand is told even when no product used it, so it can pick another.
+        proposer = brand.proposed_by
+        if proposer is not None:
+            _, entries = per_vendor.setdefault(proposer.pk, (proposer, []))
+            entries.append((brand, []))
         for product in products:
             vendor, entries = per_vendor.setdefault(product.vendor_id, (product.vendor, []))
             if not entries or entries[-1][0].pk != brand.pk:

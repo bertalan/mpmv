@@ -73,9 +73,38 @@ def test_a_dry_run_and_a_brand_without_products_send_nothing() -> None:
     ProductFactory.create(vendor=vendor, brand=brand)
     brands.reject_brand(brand, ctx=CTX, dry_run=True)
     assert not _rejected_notices()
-    empty = BrandFactory.create(status=Brand.Status.PENDING)
-    brands.reject_brand(empty, ctx=CTX)
+    nobody = BrandFactory.create(status=Brand.Status.PENDING)  # no proposer, no products
+    brands.reject_brand(nobody, ctx=CTX)
     assert not _rejected_notices()
+
+
+def test_the_proposing_vendor_is_told_even_when_no_product_used_the_brand() -> None:
+    proposer, user = VendorFactory.create(), VendorFactory.create()
+    brand = BrandFactory.create(name="Acmee", status=Brand.Status.PENDING, proposed_by=proposer)
+    ProductFactory.create(vendor=user, brand=brand)
+    brands.reject_brand(brand, ctx=CTX)
+    by_recipient = {n.recipient: n for n in _rejected_notices()}
+    assert set(by_recipient) == {proposer.contact_email, user.contact_email}
+    notice = by_recipient[proposer.contact_email]
+    rendered = render_email(TEMPLATE, notice.language, notice.context_data)
+    assert "Acmee" in rendered.text_body
+    assert "No products used it." in rendered.text_body
+    assert "No products used it." in rendered.html_body
+    other = render_email(TEMPLATE, "en", by_recipient[user.contact_email].context_data)
+    assert "No products used it." not in other.text_body
+
+
+def test_a_rejected_batch_tells_its_vendor_once_with_every_brand() -> None:
+    vendor = VendorFactory.create()
+    outcome = brands.propose_batch(vendor, ["Alpha", "Beta"], source="run", ctx=CTX)
+    assert outcome.batch is not None
+    ProductFactory.create(vendor=vendor, brand=outcome.created[0])
+    brands.reject_batch(outcome.batch, ctx=CTX)
+    (notice,) = _rejected_notices()
+    text = render_email(TEMPLATE, notice.language, notice.context_data).text_body
+    assert "Alpha" in text
+    assert "Beta" in text
+    assert text.count("No products used it.") == 1
 
 
 def test_an_approval_sends_no_rejection_notice() -> None:

@@ -2,5 +2,6 @@
 
 {% for brand in brands %}{{ brand.name }}
 {% for product in brand.products %}- {{ product.title }} ({{ product.sku }})
+{% empty %}{% translate "No products used it." %}
 {% endfor %}
 {% endfor %}
