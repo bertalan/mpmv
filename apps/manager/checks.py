@@ -166,6 +166,9 @@ def check_roles_matrix(app_configs: object = None, **kwargs: object) -> list[che
     ]
 
 
+SEED_MIGRATION = ("manager", "0002_seed_role_groups")  # first group seed; later ones follow
+
+
 def _manager_migrations_pending(connection: Any) -> bool:
     """True while any manager migration (the group seeds) or any orders migration is unapplied."""
     from django.db.migrations.executor import MigrationExecutor
@@ -174,8 +177,9 @@ def _manager_migrations_pending(connection: Any) -> bool:
     applied = executor.loader.applied_migrations
     if not any(app == "orders" for app, _ in applied):
         return True
-    targets = [n for n in executor.loader.graph.leaf_nodes() if n[0] == "manager"]
-    return bool(executor.migration_plan(targets))
+    # Every manager node must be recorded, not only the leaf: a missing earlier one (the first
+    # group seed) is as pending as a missing later one.
+    return any(key not in applied for key in executor.loader.graph.nodes if key[0] == "manager")
 
 
 def check_role_drift(

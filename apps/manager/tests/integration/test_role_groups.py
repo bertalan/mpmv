@@ -181,3 +181,16 @@ def test_migrate_with_checks_applies_the_pending_seed_then_the_check_fires_on_dr
     finally:
         call_command("migrate", verbosity=0, skip_checks=True)  # leave the database migrated
         _seed()  # and the groups seeded for later tests
+
+
+def test_before_the_seed_migration_missing_groups_do_not_block_migrate() -> None:
+    """`migrate` runs the database checks first: on a database that predates the seed migration the
+    groups are missing by design, and the check must let the migration that creates them run."""
+    from django.db.migrations.recorder import MigrationRecorder
+
+    from apps.manager.checks import SEED_MIGRATION
+
+    app, name = SEED_MIGRATION
+    MigrationRecorder.Migration.objects.filter(app=app, name=name).delete()
+    Group.objects.filter(name__in=[r.group for r in roles.ROLES]).delete()
+    assert check_role_drift() == []

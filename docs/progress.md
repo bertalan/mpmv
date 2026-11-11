@@ -104,11 +104,13 @@ part of the done-when still open) · `not started`.
 | SEC.14 | done | #251 | Rate limit (per IP and per restriction) and captcha on Wagtail page view restriction forms; the interim block is lifted. Declared in the public forms register. Security code, needs human review |
 | OPS.2 | done | #250 | JSON logs, error tracker interface (`MPMV_ERROR_TRACKER`: none or log), `/healthz` and `/readyz`, alert hooks (disk space, WAL archiving, backup age). New `MPMV_OPS_*` variables in the server env example |
 | ORD.4 | done | #247 | Transactional `place_order` with `StockReservation` (migration `orders/0011`) and price verification, concurrency test on stock 1. Order code, needs human review |
-| VEN.31 | partial: 1 of 2 (images); documents open | #248 | Manager image chooser and upload into the vendor's own collection `vendor-<id>` (`apps/manager/media.py`, section `shop.media`, owner only): crafted collection or foreign image id answers 404 and is audited (`vendor.media_denied`), `upload_storefront_image` with SEC.2 checks, own-work licence, hourly limit, `vendor.media_uploaded` audit; `link` feature dropped from the editor and `linktype="page"` refused on save. The spec row is in the open PR #244. Security code (media, tenancy), needs human review |
+| VEN.31 | partial: 1 of 2 (images); documents open | #248, #244 | Manager image chooser and upload into the vendor's own collection `vendor-<id>` (`apps/manager/media.py`, section `shop.media`, owner only): crafted collection or foreign image id answers 404 and is audited (`vendor.media_denied`), `upload_storefront_image` with SEC.2 checks, own-work licence, hourly limit, `vendor.media_uploaded` audit; `link` feature dropped from the editor and `linktype="page"` refused on save. Spec row added by #244 (spec 04). Security code (media, tenancy), needs human review |
 | CORE.18 | partial: 1 of 2 (roles and matrix); staff UI and assignment open | #253 | `apps/manager/roles.py` (five roles, incompatible pairs, 17-section matrix, role membership never `has_perm`), unmanaged `PlatformAccess` permissions (`manager/0001`), idempotent `sync_role_groups` data migration (`manager/0002`), system checks `manager.E003` (static) and `manager.E004` (group drift), generated `docs/dev/platform-roles.md`. Part 2: Staff and roles UI, assignment service, step-up, audit, one-person team. Permissions code, needs human review |
 | ORD.6 | done | #249 | Vendor fulfilment from the Manager shop space: orders list and detail, accept, ship with tracking, delivered (`fulfil_vendor_order`, engine rules, tracking validation, audit row per step), tenant isolation tests, e2e screenshots. No model change. Customer notification on shipped is not in the row. Order code, needs human review |
 | SHP.3 | done | #254 | `quote_shipping` pure engine and service with Rates, IndicativeRates, NeedsQuote and Blocked outcomes, over-band policy, pickup, free-shipping threshold per method, special areas; cases 8 to 13, 15, 16, 19. No migration. `WeightBand.surcharge_net` is not yet defined in the spec |
 | TAX.4 | done | #255 | `resolve_shipping_tax` with proportional split by goods net (ROUND_HALF_UP, remainder on the largest share), `TaxPortion`, fail-closed `UnsupportedShippingTreatment` for non-default treatments; T8 to T13 plus T1, T7, T14. D-03 stays open for the advisor (default: shipping follows the goods). Tax code, needs human review |
+| CMP.4 | partial: 1 of 2 (customer export and anonymisation); closed vendor owner, sub-processor register and retention job open | #256 | `apps/compliance/gdpr.py`: `export_customer_data` (articles 15 and 20, JSON) and `anonymise_customer` (D-29, D-30) with dry run, idempotent, audit rows without personal data; concluded orders go to `restricted_tax_only` through ORD.2, open orders keep the request pending (`ErasureRequest`, `compliance/0005`), queued mail cancelled, sessions and staff rights purged. Audit actor label by public id; lockout audit key as a keyed hash; `core/0021` rewrites old customer actor labels and lockout keys (one-off, the documented append-only exception). Services only, no UI or command yet. Compliance code, needs human review |
+| OPS.5 | done (STAGE verification at deploy) | #252 | Technical Django admin loopback only (Q-18, MQ-24): Caddy `@admin_denied` matcher plus `AdminNetworkAllowlistMiddleware` (fail closed, the normal 404, no slash redirect), `MPMV_ADMIN_ALLOWED_NETWORKS` in both env examples, system checks `core.E003` and `core.W002`, SSH tunnel procedure in `docs/dev/admin-access.md`. Security code, needs human review |
 | SEC.13 | done | #236 | Anonymous POST form sweep: a system check fails for an undeclared anonymous POST endpoint, `@public_form(...)` declarations and the generated public forms register (`tools/build_public_forms.py`). Security code, needs human review |
 | I18N.7 | partial: 1 of n (Manager and account strings in Italian) | #245 | Italian catalog for the Manager and account strings through `tools/i18n_catalog.py` (extract, compile, check; `make check` runs the check) |
 | CAT.19 | done | #154 | Vendor products in the Manager shop space |
@@ -815,6 +817,10 @@ Compliance, security and content:
 | #249 | ORD.6 | Vendor fulfilment: accept, ship with tracking, delivered |
 | #254 | SHP.3 | quote_shipping with Rates, IndicativeRates, NeedsQuote, Blocked |
 | #255 | TAX.4 | resolve_shipping_tax, shipping follows the goods |
+| #256 | CMP.4 | GDPR customer export and anonymisation (1/2) |
+| #252 | OPS.5 | Django admin loopback only: proxy and app allow-list, SSH tunnel |
+| #262 | none | Coherence check 17 |
+| #244 | VEN.31 | Spec: VEN.31 Manager media chooser row (D-34), ARC.29 row |
 
 ## Coherence checks
 
@@ -1564,3 +1570,24 @@ Findings and actions:
 4. Info. TAX.4 and SHP.3 are not wired to checkout yet: ORD.3 and SHP.4 pass the shipping rate and goods decisions. D-03 and D-06 stay open for the advisor and the owner.
 
 Verdict: GO with follow-ups. One major spec-gap finding (VEN.31 row in #244), no blocker. VEN.31 (media, tenancy), CORE.18 (permissions), ORD.6 (orders) and TAX.4 (tax) need human review.
+
+### Coherence check 18, release gate v0.1.6 (main at 76ae69322d4c9032ef98afac895816605122958c)
+
+Scope: main at 76ae693 (merge of #244), the merges since check 17 (1e6dab6): #256 (CMP.4 1/2), #252 (OPS.5), #262 (check 17), #244 (spec: VEN.31 row, ARC.29 row).
+
+| Area | Result |
+|---|---|
+| Code vs spec | CMP.4 1/2: export and erasure on seed orders covered by 22 integration tests in `test_gdpr.py` (concluded orders restricted, open order keeps the request pending, dry run, idempotent, audit without personal data, outbox, sessions, staff rights, a guard test that every user foreign key has an export and erasure decision), plus `test_audit_actor_pseudonymised.py` for `core/0021`. The closed vendor owner (Q-16), the sub-processor register and the retention job with a frozen clock are part 2. OPS.5: app-level check tested (unit and integration, trusted proxy and tunnel cases, the normal 404, no slash redirect, Wagtail admin unaffected); the proxy matcher is in the Caddyfile; the STAGE half of the done-when (404 from outside, works through the tunnel) is verified at deploy. |
+| Spec and docs | Check 17's major finding is closed: the VEN.31 row is in spec 04 and in `90-backlog.md` and `backlog.csv` (#244); #244 also adds ARC.29 (spec 01, not started). `make docs` freshness passes inside `make check`. `docs/dev/admin-access.md`, `docs/dev/release.md` and `docs/dev/audit-trail.md` match the code. |
+| Hygiene | `makemigrations --check` clean. New since v0.1.5: compliance 0005, core 0021, manager 0001..0002 (new app). Chains linear: compliance 0001..0005, core 0001..0021, manager 0001..0002, orders 0001..0011, vendors ..0026, accounts ..0007, tax ..0009, shipping ..0010, cms ..0014, catalog ..0010; no duplicate numbers. Only documentation (RFC 5737) and private test addresses, no credential-like literal, no private name in the four diffs. |
+| Gates | `make check` pass on 76ae693. Main CI on 76ae693: success. Full suite not run locally. |
+
+Findings and actions:
+
+1. Minor. CMP.4 1/2 is services only: no customer page, staff action or command calls `export_customer_data` or `anonymise_customer` yet. Action: part 2 or a follow-up row adds the adapter.
+2. Minor. `PRIVACY_PEPPER` (key of the lockout audit hash) is read with a `SECRET_KEY` fallback but is not in `settings/base.py` or the env example, so rotating `SECRET_KEY` changes new lockout keys. Action: declare it as an optional variable in a later PR.
+3. Minor. VEN.31 row asks for the page-scoped CSP hash for the editor styles; still open with the documents chooser (2/2).
+4. Minor, carried over: SHP.3 `WeightBand.surcharge_net` not in spec 06, ORD.6 customer notification on shipped, CMP.5 3 of 4, `time.sleep(1.0)` in the orders concurrency test, CMP.7 `KEY_PAGES`, SEO.8 2/2 and CORE.9 3/3 open, OPS.7 Wagtail deprecation warning.
+5. Info. `core/0021` disables the audit append-only trigger inside its transaction (`ALTER TABLE`), so the migrating database role must own `core_auditlog`; take a backup first. If the SSH tunnel still gets 404 on STAGE, check that the address Caddy sees for a loopback connection is loopback (container port publishing can change it).
+
+Verdict: GO. No blocker, no major. CMP.4 (compliance, audit rewrite) and OPS.5 (security) need human review.
