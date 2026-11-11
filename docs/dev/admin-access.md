@@ -21,8 +21,12 @@ is never reachable from the public internet.
 ## Reaching the admin: SSH tunnel
 
 The tunnel ends on the server's own port 443, so Caddy and the app both see the request come
-from `127.0.0.1`. Caddy matches the site by host name and not by port, so the local port does
-not matter.
+from `127.0.0.1`. That holds because Caddy does not publish its ports through Podman: systemd
+listens on 80 and 443 on the host (`deploy/systemd/mpmv-caddy.socket`) and hands the sockets to
+Caddy by socket activation, so Caddy reads the real source address of each connection. A
+published port would put Podman's port forwarder in between, and Caddy would see the container's
+own address for every client, the tunnel included. Caddy matches the site by host name and not by
+port, so the local port does not matter.
 
 1. Add a hosts-file line on your computer that maps the site name to loopback
    (`/etc/hosts`, or `C:\Windows\System32\drivers\etc\hosts` on Windows):
@@ -54,10 +58,17 @@ not matter.
 - **Still 404 with the tunnel up.** Check that both env files carry the loopback value, that the
   app was restarted and Caddy reloaded after the change, and that `MPMV_TRUSTED_PROXIES` covers
   the Caddy subnet (`manage check --deploy` warns about both, `core.W001` and `core.W002`).
+- **Still 404, and every client looks the same to the app.** Caddy must get its sockets from
+  systemd: `systemctl --user is-active mpmv-caddy.socket` says `active`, and
+  `podman inspect --format '{{json .HostConfig.PortBindings}}' mpmv-caddy` shows no binding. A
+  release from before the socket unit publishes the ports; deploy a newer one (see
+  [release](release.md)).
 
 ## Deploy check
 
-After setting both env files, restart the app and reload Caddy, then verify from your computer:
+After setting both env files, restart the app and restart Caddy
+(`systemctl --user restart mpmv-caddy.service`; the socket unit keeps listening meanwhile), then
+verify from your computer:
 
 1. With the tunnel open, `https://<site-name>:8443/django-admin/` shows the admin sign-in page.
 2. Without the tunnel (and without the hosts-file line), `https://<site-name>/django-admin/`

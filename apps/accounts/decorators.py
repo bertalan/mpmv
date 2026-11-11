@@ -25,7 +25,7 @@ from apps.core.http import client_ip
 
 from . import levels
 from .captcha import captcha_passes
-from .http import wants_json
+from .http import return_url, wants_json
 from .mfa_session import is_recently_passkey_verified, is_recently_verified
 from .services import has_second_factor, record_registration_attempt, registration_retry_after
 
@@ -74,10 +74,14 @@ def mfa_exempt[**P](view: View[P]) -> View[P]:
 
 
 def mfa_redirect(request: HttpRequest, name: str, next_url: str | None = None) -> HttpResponse:
-    """Send the user to an MFA page (or answer 403 to JSON clients), keeping `next`."""
+    """Send the user to an MFA page (or answer 403 to JSON clients), keeping `next`.
+
+    Without `next_url`, a GET comes back to itself and a POST to a safe same-origin Referer
+    (see `return_url`), never to the POST endpoint.
+    """
     if wants_json(request):
         return JsonResponse({"error": "mfa_required", "url": reverse(name)}, status=403)
-    query = urlencode({"next": next_url if next_url is not None else request.get_full_path()})
+    query = urlencode({"next": next_url if next_url is not None else return_url(request)})
     return HttpResponseRedirect(f"{reverse(name)}?{query}")
 
 
