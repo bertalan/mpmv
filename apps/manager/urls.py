@@ -7,7 +7,7 @@ outside `/manager/`.
 
 from django.urls import include, path
 
-from . import views
+from . import notice_views, views
 
 app_name = "manager"
 
@@ -23,6 +23,8 @@ shop = (
 platform = (
     [
         path("", views.PlatformDashboardView.as_view(), name="dashboard"),
+        path("notices/", notice_views.NoticeListView.as_view(), name="notices"),
+        path("notices/<uuid:public_id>/", notice_views.NoticeDetailView.as_view(), name="notice"),
     ],
     "platform",
 )

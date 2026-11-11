@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **282** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **2278 h** (P1 1833 h · P2 413 h · P3 32 h)
+- Micro-tasks: **283** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **2281 h** (P1 1833 h · P2 416 h · P3 32 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -18,7 +18,7 @@
 | CORE | Identity, permissions, API, backoffice | 25 | 196 | 4 | 6 | 206 |
 | CAT | Product catalog | 20 | 150 | 60 | 0 | 210 |
 | VEN | Vendors, commissions, ledger | 29 | 224 | 26 | 0 | 250 |
-| TAX | Tax engine | 13 | 53 | 28 | 0 | 81 |
+| TAX | Tax engine | 14 | 53 | 31 | 0 | 84 |
 | SHP | Shipping and quotes | 14 | 96 | 28 | 0 | 124 |
 | ORD | Cart, orders, returns | 12 | 102 | 14 | 0 | 116 |
 | PAY | Payments (Stripe Connect) | 4 | 40 | 0 | 0 | 40 |
@@ -33,7 +33,7 @@
 | SEC | Security | 11 | 70 | 0 | 0 | 70 |
 | OPS | Operations | 10 | 19 | 30 | 8 | 57 |
 | MIG | Migration and cutover | 15 | 121 | 23 | 0 | 144 |
-| **Total** | | **282** | **1833** | **413** | **32** | **2278** |
+| **Total** | | **283** | **1833** | **416** | **32** | **2281** |
 
 ## By phase
 
@@ -291,7 +291,7 @@
 | MIG.11 | Staggered product and tag URL switch (owner decisions Q-91 and D-07): per-product and per-term `url_mode` and frozen legacy paths, traffic ranking from analytics (SEO.5) or the MIG.1 legacy access-log counts, configurable batch size and cadence, batch switch and rollback as a management command and staff action with dry-run and audit, sitemap, canonical and hreflang by mode, gate on 404 rate, Search Console impressions and clicks against baseline, and errors with configurable thresholds | P1 | 6 | MIG.6, CAT.5, CAT.8 | A batch switch gives a single 301 hop and an updated sitemap; a rollback leaves no redirect loop; a legacy-mode page is 200 with a self-canonical; a switched legacy tag URL is a single 301 to `/{taxonomy}/{term}/`; the next batch is refused when a gate metric is over threshold; the MIG.6 "no URL lost" count still holds after a switch and a rollback; products and terms created after go-live start in new mode |
 | MIG.12 | Source-connector interface (owner decision 2026-11-09, spec 13 §13.2 "Source connectors"): `ShopConnector` protocol (`capabilities`, `check`, `extract`), registry by decorator and `MPMV_IMPORT_CONNECTORS`, intermediate format `mpmv-import/1` (JSON Schema and Pydantic models, an evolution of the MIG.1 JSON) read by the MIG.3 and MIG.4 loaders only; shared HTTP client `apps/core/http.py` (HTTPS only, per-connector rate limit, timeouts, backoff honouring `Retry-After`, one log line per call without credentials, SSRF guard refusing loopback, private, link-local, CGNAT and metadata addresses and redirects to them); `ingest.services.import_from_source(..., dry_run=True) -> ChangeSet` with one AuditLog entry per run and an import-origin map on `(source, source_id)`; `fetched_at` in the run manifest; RFC 9457 errors; secrets by reference from the environment or a vault; schema validation of every record (SEC.9); read-only, dry-run by default, idempotent; the MIG.1 extractor wrapped as the `wordpress_db` connector; connectors import no app models (import-linter contract) | P1 | 9 | MIG.1 | A fake connector registered from settings appears in the registry and the loaders load its output with no change to their code; a record that fails the schema is rejected with a report and nothing of it is written; a canary secret never appears in logs, output or the database; two runs on the same source give byte-identical records (the manifest aside); a source resolving to 127.0.0.1, 10.x, 169.254.x, 100.64.x or a private IPv6 address is refused, also when reached by a redirect; a run interrupted halfway resumes without duplicates; a dry run writes nothing and returns the ChangeSet; the MIG.1 output validates against `mpmv-import/1`; a connector that sends a non-GET request fails its test |
 
-### F6 — After go-live (P2) (53 tasks, 413 h)
+### F6 — After go-live (P2) (54 tasks, 416 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -311,6 +311,7 @@
 | TAX.8 | `distance_sales_eu` + `suggest_regime` from the ledger | P2 | 6 | VEN.4 | T16 green |
 | TAX.9 | Cart tax simulator in admin and API (`/tax/simulate`) | P2 | 6 | TAX.4, SHP.4 | Staff simulate a mixed cart |
 | TAX.10 | Quarterly OSS report per country and per-vendor report | P2 | 8 | ORD.4 | CSV export verified on seed orders |
+| TAX.14 | Vendor territory in `TaxContext` (follow-up of TAX.3, D-26): the context carries the vendor's territory code, so a vendor established in a territory with its own rates or outside the VAT area can sell to its mainland and abroad; TAX.3 refuses such a vendor with `UnresolvedTerritory` when `registered_postal_code` shows it | P2 | 3 | TAX.3 | A vendor established in Madeira selling to mainland Portugal and to Italy gets the rates of its own rules; the blocking error is gone; the vendor territory comes from the territory table, not from a postcode guess |
 | SHP.6 | Admin zone/rate editor with diff, impact and versions/rollback | P2 | 12 | SHP.12, CORE.8 | Rollback to a previous version works |
 | SHP.7 | Cart simulator (admin + `/shipping/simulate`) | P2 | 6 | SHP.4 | Parity with the current simulator on seed cases |
 | SHP.8 | Daily health check + report | P2 | 6 | SHP.1, ARC.9, ARC.16 | Email report with the 7 checks |
