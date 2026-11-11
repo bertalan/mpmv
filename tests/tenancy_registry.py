@@ -52,19 +52,34 @@ from apps.catalog.tests.factories import (
 )
 from apps.cms.models import VendorLandingPage
 from apps.cms.tests.factories import VendorLandingPageFactory
-from apps.compliance.models import GpsrInfo, GpsrSafetyText, SafetyCase, VendorGpsrDefaults
+from apps.compliance.models import (
+    GpsrInfo,
+    GpsrSafetyText,
+    ProductRestriction,
+    SafetyCase,
+    StatementOfReasons,
+    TransparencySubmission,
+    VendorGpsrDefaults,
+)
 from apps.compliance.tests.factories import (
     GpsrInfoFactory,
     GpsrSafetyTextFactory,
+    ProductRestrictionFactory,
     SafetyCaseFactory,
+    StatementOfReasonsFactory,
+    TransparencySubmissionFactory,
     VendorGpsrDefaultsFactory,
 )
 from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage, VendorEventPolicy
 from apps.events.tests.factories import EventPageFactory, VendorEventPolicyFactory
-from apps.orders.models import OrderLine, VendorOrder
-from apps.orders.tests.factories import OrderLineFactory, VendorOrderFactory
+from apps.orders.models import OrderLine, StockReservation, VendorOrder
+from apps.orders.tests.factories import (
+    OrderLineFactory,
+    StockReservationFactory,
+    VendorOrderFactory,
+)
 from apps.shipping.models import (
     PickupOption,
     PickupOptionTranslation,
@@ -179,6 +194,14 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     SafetyCase: lambda vendor: SafetyCaseFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
+    StatementOfReasons: lambda vendor: StatementOfReasonsFactory.create(vendor=vendor),
+    ProductRestriction: lambda vendor: ProductRestrictionFactory.create(
+        product=ProductFactory.create(vendor=vendor),
+        statement=StatementOfReasonsFactory.create(vendor=vendor),
+    ),
+    TransparencySubmission: lambda vendor: TransparencySubmissionFactory.create(
+        statement=StatementOfReasonsFactory.create(vendor=vendor)
+    ),
     ShippingZone: lambda vendor: ShippingZoneFactory.create(vendor=vendor),  # a vendor zone
     ShippingMethod: lambda vendor: ShippingMethodFactory.create(vendor=vendor),
     ShippingMethodTranslation: lambda vendor: ShippingMethodTranslationFactory.create(
@@ -205,6 +228,9 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     # ORD.2: a sub-order of its own order, and a line of such a sub-order.
     VendorOrder: lambda vendor: VendorOrderFactory.create(vendor=vendor),
     OrderLine: lambda vendor: OrderLineFactory.create(vendor_order__vendor=vendor),
+    StockReservation: lambda vendor: StockReservationFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
     # EVT.1: a draft event page under the primary language's events index.
     EventPage: lambda vendor: EventPageFactory.create(vendor=vendor),
     VendorEventPolicy: lambda vendor: VendorEventPolicyFactory.create(vendor=vendor),
