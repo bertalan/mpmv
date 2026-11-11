@@ -559,6 +559,11 @@ RESERVED_PREFIXES = (
     "/_styleguide/",
 )
 
+# The reserved roots that are public pages: they exist in every language (`/it/vendor/apply/`),
+# so a configured language prefix is stripped before matching these, and only these. The others
+# (files, API, admins) have no language prefix: `/it/media/` is an ordinary path.
+I18N_RESERVED_PREFIXES = ("/vendor/apply/",)
+
 
 def normalise_redirect_source(path: str) -> str:
     """A source as Django hands over a request path: percent-decoded once, as UTF-8.
@@ -582,7 +587,11 @@ def prefix_source_error(path: str, *, languages: Iterable[str]) -> str | None:
         return 'A prefix ends with "/", e.g. /author/.'
     if path == "/" or path.strip("/") in set(languages):
         return "A prefix cannot cover the whole site or a whole language."
-    reserved = next((root for root in RESERVED_PREFIXES if path.startswith(root)), None)
+    first, _, rest = path.lstrip("/").partition("/")
+    unprefixed = f"/{rest}" if first in set(languages) and rest else path
+    reserved = next((root for root in RESERVED_PREFIXES if path.startswith(root)), None) or next(
+        (root for root in I18N_RESERVED_PREFIXES if unprefixed.startswith(root)), None
+    )
     if reserved is not None:
         return f"A prefix cannot cover {reserved}: it is reserved (admin, API, files, sign-in)."
     return None
@@ -797,3 +806,72 @@ def rank_search_hits(hits: Iterable[SearchHit], *, limit: int = SEARCH_RESULT_LI
         return (not hit.sku_exact, not hit.sku_prefix, -search_score(hit), -hit.product_id)
 
     return [hit.product_id for hit in sorted(best.values(), key=key)[:limit]]
+
+
+# --- Brands and manufacturers (CAT.20): the pure rules behind duplicate detection and links.
+
+WIKIDATA_ID_RE = re.compile(r"Q[1-9][0-9]{0,9}")
+
+
+def brand_name_key(name: str) -> str:
+    """The key two spellings of one brand share (`Acme & Sons`, `ACME and sons`): NFKD without
+    accents, case-folded, `&` read as `and`, punctuation dropped, whitespace collapsed. A key of
+    `A.C.M.E.` and `ACME` is the same on purpose. Empty for a name with no letters or digits."""
+    text = unicodedata.normalize("NFKC", name).replace("&", " and ")
+    text = unicodedata.normalize("NFKD", text.casefold())
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    # Dots and apostrophes vanish (A.C.M.E. = ACME); other punctuation separates words.
+    text = re.sub("[.'\u2019]", "", text)
+    text = re.sub("[^0-9a-z\u0080-\uffff]+", " ", text)
+    return " ".join(text.split())
+
+
+def wikidata_id_error(value: str) -> str | None:
+    """None for an empty value or a Wikidata item ID like `Q42`; the format only, nothing is
+    fetched."""
+    if value == "" or WIKIDATA_ID_RE.fullmatch(value):
+        return None
+    return "A Wikidata item ID is a Q followed by a number, e.g. Q42."
+
+
+def https_url_error(value: str) -> str | None:
+    """None for an absolute `https://` URL with a host, no credentials and no spaces."""
+    text = value.strip()
+    if text != value or any(ch.isspace() for ch in value):
+        return "A link cannot contain spaces."
+    try:
+        parts = urlsplit(value)
+        host = parts.hostname
+    except ValueError:
+        return "This is not a valid link."
+    if parts.scheme != "https" or not host:
+        return "Links must be absolute https:// addresses."
+    if parts.username is not None or parts.password is not None:
+        return "A link cannot contain a user name or password."
+    return None
+
+
+def same_as_errors(urls: Sequence[str]) -> list[str]:
+    """One message per refused entry of a `sameAs` list: not an https link, or listed twice."""
+    errors: list[str] = []
+    seen: set[str] = set()
+    for url in urls:
+        problem = https_url_error(url) if isinstance(url, str) else "Links must be text."
+        if problem:
+            errors.append(f"{url!r}: {problem}")
+        elif url in seen:
+            errors.append(f"{url!r}: listed twice.")
+        seen.add(url)
+    return errors
+
+
+def link_field_errors(url: str, same_as: object) -> dict[str, list[str]]:
+    """The errors of an official `url` and a `sameAs` list, by field name."""
+    errors: dict[str, list[str]] = {}
+    if url and (problem := https_url_error(url)):
+        errors["url"] = [problem]
+    if not isinstance(same_as, list):
+        errors["same_as"] = ["Enter a list of links."]
+    elif found := same_as_errors(same_as):
+        errors["same_as"] = found
+    return errors

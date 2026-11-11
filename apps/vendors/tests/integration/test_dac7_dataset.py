@@ -360,14 +360,19 @@ def test_the_admin_refuses_a_new_vendor_with_dac7_data_without_a_fresh_second_fa
     client: Client, staff: User
 ) -> None:
     verified_login(client, staff, verified_at=time.time() - 3600)
-    response = client.post(reverse("admin:vendors_vendor_add"), add_form())
+    # No bank field in the form: the DAC7 step-up is what refuses it (a bank field would ask
+    # for the group 3 passkey first, `payout_details`).
+    response = client.post(
+        reverse("admin:vendors_vendor_add"),
+        add_form(iban="", bic="", bank_name="", account_holder_name=""),
+    )
     assert response.status_code == 200
     assert "fresh second-factor verification" in response.content.decode()
     assert not Vendor.objects.exists()
 
 
 def test_the_admin_adds_a_vendor_with_dac7_data_after_step_up(client: Client, staff: User) -> None:
-    verified_login(client, staff)
+    verified_login(client, staff, passkey=True)
     response = client.post(reverse("admin:vendors_vendor_add"), add_form())
     assert response.status_code == 302, response.content.decode()
     vendor = Vendor.objects.get()

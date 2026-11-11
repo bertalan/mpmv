@@ -215,21 +215,6 @@ def test_unchanged_saves_and_dry_runs_do_not_use_the_rate_limit(
     save_storefront_profile(vendor, "en", {"tagline": "a"}, actor=owner, ctx=CTX)  # no change
 
 
-@pytest.mark.parametrize("text", ["<script>alert(1)</script>", "Hello <b>world</b>", "<!-- x -->"])
-def test_html_is_refused_and_nothing_is_stored(vendor: Vendor, owner: User, text: str) -> None:
-    for field in ("tagline", "description", "refund_policy"):
-        with pytest.raises(ValidationError):
-            save_storefront_profile(vendor, "en", {field: text}, actor=owner, ctx=CTX)
-    assert not VendorTranslation.objects.filter(vendor=vendor).exists()
-    assert not AuditLog.objects.filter(action=ACTION).exists()
-
-
-def test_plain_text_with_angle_brackets_is_kept_as_typed(vendor: Vendor, owner: User) -> None:
-    text = "Orders under 5 kg < 20 EUR & over 2 > 1 ship free"
-    save_storefront_profile(vendor, "en", {"refund_policy": text}, actor=owner, ctx=CTX)
-    assert VendorTranslation.objects.get(vendor=vendor, language="en").refund_policy == text
-
-
 def test_saving_a_machine_draft_without_edits_does_not_publish_it(
     vendor: Vendor, owner: User
 ) -> None:

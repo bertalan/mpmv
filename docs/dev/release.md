@@ -131,6 +131,25 @@ deploying a release that contains it:
 2. Deploy; `migrate` applies the same reslug and writes the audit entries.
 3. Rerunning changes nothing. Reverse is a no-op: the old slugs stay in SlugHistory.
 
+### v0.1.4 on STAGE (EVT.5, I18N.11, CAT.5, CORE.17)
+
+Changes since v0.1.3: product slugs without the language suffix (above), the language switch,
+the vendor events API and the Manager fixes of #212 (which came after the v0.1.3 candidate).
+
+- No new environment variable or setting, no one-off command beyond the slug dry run above.
+  The only migration is `catalog/0010_d25_product_slugs`.
+- The vendor events API needs no setup: `events:read` and `events:write` are in the vendor-grantable
+  scope set (`apps/api/engine.py`), so a vendor key can hold them. Existing keys gain nothing.
+- Owner checks on STAGE: (1) in the Manager the language switcher posts with a valid CSRF token,
+  `/manager/` redirects, and a user without access sees the explanatory 403; (2) on a product, a
+  category, a vendor storefront, an event and a CMS page, switching language lands on the same
+  object, and an untranslated object lands on the target home with the notice once; on a
+  confirmation or action-link page the switch goes home and the secret URL is never copied;
+  (3) product URLs have no `-it`, `-de` suffix, and an old `{title}-{lang}` or SKU URL answers a
+  single 301; (4) with a vendor key, `POST /api/v1/events?dry_run=true` returns the diff and
+  writes nothing, an invalid `rrule` returns a 422 problem naming the field, and another
+  vendor's event is a 404.
+
 ### Activation gate and tax territories (CMP.25, TAX.7)
 
 - Migration `vendors/0023` seeds the `activation` requirements (DSA article 30 trader data) and
@@ -139,6 +158,12 @@ deploying a release that contains it:
 - Migration `tax/0006` seeds the special territories (Livigno, Canary Islands, French overseas
   departments and others) without overwriting rows staff changed. The postcode lists are for
   the owner to review in the tax admin; Northern Ireland is not seeded (D-02).
+
+### Django admin network allow-list (OPS.5, MQ-24)
+
+On STAGE and LIVE set `MPMV_ADMIN_ALLOWED_NETWORKS` to loopback only in both `mpmv.env` and
+`caddy.env`, restart the app, reload Caddy, then verify the SSH tunnel and the direct 404 as
+described in [admin access](admin-access.md).
 
 ## Promoting to LIVE
 

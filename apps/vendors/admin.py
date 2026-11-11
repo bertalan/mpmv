@@ -22,7 +22,7 @@ from django.utils.html import format_html, format_html_join
 from django.utils.http import urlencode
 from django.utils.safestring import SafeString
 
-from apps.accounts.decorators import step_up_required
+from apps.accounts.decorators import level_gated_action, requires_level, step_up_required
 from apps.accounts.mfa_session import is_recently_verified
 from apps.accounts.models import User
 from apps.core.admin import step_up
@@ -159,6 +159,7 @@ def _address(prefix: str) -> tuple[str, ...]:
     )
 
 
+BANK_FIELDS = ("iban", "bic", "bank_name", "account_holder_name")  # D-32 `payout_details`
 ClaimAction = Callable[
     [admin.ModelAdmin[Vendor], HttpRequest, QuerySet[Vendor]], HttpResponse | None
 ]
@@ -186,11 +187,16 @@ def step_up_action(action: ClaimAction) -> ClaimAction:
     return guarded
 
 
-def _claim_admin_action(name: str, description: str, action: ClaimAction) -> ClaimAction:
+def _claim_admin_action(
+    name: str, description: str, action: ClaimAction, *, level: str | None = None
+) -> ClaimAction:
     action.__name__ = name
     # TODO(CORE.18): granting the owner role (approve) needs its own permission from the
     # staff role matrix, not just `vendors.change_vendor`.
-    return admin.action(description=description, permissions=["change"])(step_up_action(action))
+    guarded = step_up_action(action)
+    if level is not None:  # D-32: a per-action passkey on top of the second factor
+        guarded = level_gated_action(level)(guarded)
+    return admin.action(description=description, permissions=["change"])(guarded)
 
 
 def send_claim_link_action(
@@ -302,7 +308,10 @@ CLAIM_ACTIONS = (
         send_claim_link_action,
     ),
     _claim_admin_action(
-        "approve_claim", "Approve the submitted claim", decision_action("approve_claim")
+        "approve_claim",
+        "Approve the submitted claim",
+        decision_action("approve_claim"),
+        level="owner_role_grant",  # D-32 group 3: it grants the owner role
     ),
     _claim_admin_action(
         "reject_claim", "Reject the submitted claim", decision_action("reject_claim")
@@ -416,7 +425,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         ),
         (
             "Invoicing bank details",
-            {"fields": ("iban", "bic", "bank_name", "account_holder_name")},
+            {"fields": BANK_FIELDS},
         ),
         ("Contact", {"fields": ("contact_email", "phone")}),
         ("Sales", {"fields": ("sales_mode_default", "enquiries_enabled")}),
@@ -510,6 +519,34 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
             '<a class="button" href="{}">Reopen this vendor</a>',
             reverse("admin:vendors_vendor_reopen", args=[obj.pk]),
         )
+
+    def changeform_view(
+        self,
+        request: HttpRequest,
+        object_id: str | None = None,
+        form_url: str = "",
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        """Changing the invoicing bank details needs a per-action passkey (D-32 group 3,
+        `payout_details`); other edits do not."""
+        parent = super().changeform_view
+
+        def view(req: HttpRequest) -> HttpResponse:
+            return parent(req, object_id, form_url, extra_context)
+
+        if request.method == "POST" and self._posts_bank_change(request, object_id):
+            return requires_level("payout_details")(step_up(view))(request)
+        return view(request)
+
+    def _posts_bank_change(self, request: HttpRequest, object_id: str | None) -> bool:
+        stored = self.get_object(request, unquote(object_id)) if object_id else None
+        for name in BANK_FIELDS:
+            if name not in request.POST:
+                continue
+            before = "" if stored is None else str(getattr(stored, name, "") or "")
+            if request.POST[name] != before:
+                return True
+        return False
 
     def changelist_view(
         self, request: HttpRequest, extra_context: dict[str, Any] | None = None

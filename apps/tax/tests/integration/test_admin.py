@@ -93,7 +93,9 @@ def test_a_rate_added_in_the_admin_goes_through_the_audited_service(staff_client
     assert (stored.country, stored.valid_to) == ("EE", None)
     entry = domain_entries().get()
     assert entry.action == "tax.rate.configured"
-    assert (entry.source, entry.actor_label) == ("admin", "staff:staff@example.com")
+    assert entry.source == "admin"
+    assert entry.actor_label.startswith("staff:")
+    assert "@" not in entry.actor_label
 
 
 def test_a_rate_change_is_visible_in_the_audit_view_with_the_old_and_new_rate(

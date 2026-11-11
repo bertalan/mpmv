@@ -19,4 +19,7 @@ if not os.environ.get("MPMV_FIELD_ENCRYPTION_KEYS"):
 from .base import *  # noqa: F403
 
 DEBUG = True
+
+# OPS.5: the technical admin from this machine only (empty would deny everybody).
+ADMIN_ALLOWED_NETWORKS = ["127.0.0.1/32", "::1/128"]
 ALLOW_SEED = True  # `make seed` (ARC.10)

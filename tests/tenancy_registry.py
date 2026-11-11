@@ -52,17 +52,53 @@ from apps.catalog.tests.factories import (
 )
 from apps.cms.models import VendorLandingPage
 from apps.cms.tests.factories import VendorLandingPageFactory
-from apps.compliance.models import GpsrInfo, GpsrSafetyText, SafetyCase, VendorGpsrDefaults
+from apps.compliance.models import (
+    GpsrInfo,
+    GpsrSafetyText,
+    ProductRestriction,
+    SafetyCase,
+    StatementOfReasons,
+    TransparencySubmission,
+    VendorGpsrDefaults,
+)
 from apps.compliance.tests.factories import (
     GpsrInfoFactory,
     GpsrSafetyTextFactory,
+    ProductRestrictionFactory,
     SafetyCaseFactory,
+    StatementOfReasonsFactory,
+    TransparencySubmissionFactory,
     VendorGpsrDefaultsFactory,
 )
 from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage, VendorEventPolicy
 from apps.events.tests.factories import EventPageFactory, VendorEventPolicyFactory
+from apps.ingest.models import (
+    ImportRun,
+    MappingTable,
+    ProductDraft,
+    ReviewItem,
+    SourceItem,
+    SourceObservation,
+    SupplierSource,
+)
+from apps.ingest.tests.factories import (
+    ImportRunFactory,
+    MappingTableFactory,
+    ProductDraftFactory,
+    ReviewItemFactory,
+    SourceItemFactory,
+    SourceObservationFactory,
+    SupplierSourceFactory,
+)
+from apps.orders.models import OrderLine, StockReservation, VendorOrder
+from apps.orders.tests.factories import (
+    OrderLineFactory,
+    StockReservationFactory,
+    VendorOrderFactory,
+    paid_vendor_order,
+)
 from apps.shipping.models import (
     PickupOption,
     PickupOptionTranslation,
@@ -115,7 +151,9 @@ from tests.tenancy import (
     StaffOnly,
     VendorScoped,
     VendorScopedList,
+    by_public_id,
     member_session,
+    vendor_api_key,
 )
 
 # --- Vendor-owned models: how to make one object owned by a given vendor
@@ -170,11 +208,26 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     ),
     GpsrInfo: lambda vendor: GpsrInfoFactory.create(product=ProductFactory.create(vendor=vendor)),
     VendorGpsrDefaults: lambda vendor: VendorGpsrDefaultsFactory.create(vendor=vendor),
+    SupplierSource: lambda vendor: SupplierSourceFactory.create(vendor=vendor),
+    SourceItem: lambda vendor: SourceItemFactory.create(source__vendor=vendor),
+    SourceObservation: lambda vendor: SourceObservationFactory.create(item__source__vendor=vendor),
+    ProductDraft: lambda vendor: ProductDraftFactory.create(item__source__vendor=vendor),
+    ImportRun: lambda vendor: ImportRunFactory.create(source__vendor=vendor),
+    ReviewItem: lambda vendor: ReviewItemFactory.create(run__source__vendor=vendor),
+    MappingTable: lambda vendor: MappingTableFactory.create(vendor=vendor),
     GpsrSafetyText: lambda vendor: GpsrSafetyTextFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
     SafetyCase: lambda vendor: SafetyCaseFactory.create(
         product=ProductFactory.create(vendor=vendor)
+    ),
+    StatementOfReasons: lambda vendor: StatementOfReasonsFactory.create(vendor=vendor),
+    ProductRestriction: lambda vendor: ProductRestrictionFactory.create(
+        product=ProductFactory.create(vendor=vendor),
+        statement=StatementOfReasonsFactory.create(vendor=vendor),
+    ),
+    TransparencySubmission: lambda vendor: TransparencySubmissionFactory.create(
+        statement=StatementOfReasonsFactory.create(vendor=vendor)
     ),
     ShippingZone: lambda vendor: ShippingZoneFactory.create(vendor=vendor),  # a vendor zone
     ShippingMethod: lambda vendor: ShippingMethodFactory.create(vendor=vendor),
@@ -199,6 +252,12 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         )
     ),
     CartLine: lambda vendor: CartLineFactory.create(product=ProductFactory.create(vendor=vendor)),
+    # ORD.2: a sub-order of its own order, and a line of such a sub-order.
+    VendorOrder: lambda vendor: VendorOrderFactory.create(vendor=vendor),
+    OrderLine: lambda vendor: OrderLineFactory.create(vendor_order__vendor=vendor),
+    StockReservation: lambda vendor: StockReservationFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
     # EVT.1: a draft event page under the primary language's events index.
     EventPage: lambda vendor: EventPageFactory.create(vendor=vendor),
     VendorEventPolicy: lambda vendor: VendorEventPolicyFactory.create(vendor=vendor),
@@ -246,12 +305,37 @@ def manager_vendor(vendor: Vendor) -> Vendor:
     return vendor
 
 
+def vendor_image(vendor: Vendor) -> models.Model:
+    """An image in the vendor's own collection (VEN.31)."""
+    from wagtail.models import Collection
+
+    from apps.core.tests.factories import MediaImageFactory
+    from apps.vendors.engine import vendor_collection_name
+
+    root = Collection.get_first_root_node()
+    collection = root.add_child(name=vendor_collection_name(str(vendor.public_id)))
+    return MediaImageFactory.create(collection=collection)
+
+
+def by_pk(obj: models.Model) -> dict[str, str]:
+    return {"pk": str(obj.pk)}
+
+
+def by_image_id(obj: models.Model) -> dict[str, str]:
+    return {"image_id": str(obj.pk)}
+
+
 def vendor_display_name(vendor: models.Model) -> str:
     return str(vendor.display_name)  # type: ignore[attr-defined]
 
 
+NIL_UUID = "00000000-0000-0000-0000-000000000000"
+
+
 ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
+    "readyz": NoVendorData("Readiness probe: a status only, no data."),
+    "robots_txt": NoVendorData("robots.txt (SEO.8): constant text for crawlers; no vendor data."),
     "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
     "media": NoVendorData(
         "Public image files (THM.12): published images and their renditions, no vendor data.",
@@ -268,6 +352,11 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "switch_language": NoVendorData("Stores the visitor's language choice."),
     "themes:styleguide": StaffOnly("Component samples of the active theme (THM.4), staff only."),
+    "levels:options": NoVendorData(OWN_ACCOUNT),
+    "levels:operational": NoVendorData(OWN_ACCOUNT),
+    "levels:once_options": NoVendorData(OWN_ACCOUNT),
+    "levels:once": NoVendorData(OWN_ACCOUNT),
+    "levels:end": NoVendorData(OWN_ACCOUNT),
     "mfa:overview": NoVendorData(OWN_ACCOUNT),
     "mfa:setup": NoVendorData(OWN_ACCOUNT),
     "mfa:totp": NoVendorData(OWN_ACCOUNT),
@@ -318,9 +407,53 @@ ENDPOINTS: dict[str, Access] = {
     "logout": NoVendorData("Sign-out of the Manager."),
     "manager:shop:dashboard": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     "manager:shop:profile": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    # The image chooser of the storefront editor (VEN.31): vendor B's image id is a 404 for A.
+    "manager:shop:image_chosen": VendorScoped(make=vendor_image, kwargs=by_pk),
+    "manager:shop:image_select_format": VendorScoped(make=vendor_image, kwargs=by_image_id),
+    "manager:shop:image_choose": VendorScopedList(
+        make=vendor_image,
+        identify=lambda o: str(o.title),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:image_results": VendorScopedList(
+        make=vendor_image,
+        identify=lambda o: str(o.title),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:image_create": NoVendorData(
+        "The upload tab of the image chooser (VEN.31): the form and the upload answer, the file "
+        "goes into the caller's own collection only; owner only, other roles get 404 "
+        "(`test_staff_and_other_users_get_404...` and the upload tests in test_image_chooser)."
+    ),
     "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    # ORD.6: the vendor's own orders; another vendor's id is a 404 on the detail and every action.
+    "manager:shop:orders": VendorScopedList(
+        make=paid_vendor_order,
+        identify=lambda sub: str(sub.order.number),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:order": VendorScoped(make=paid_vendor_order, sample={"public_id": NIL_UUID}),
+    "manager:shop:order_action": VendorScoped(
+        make=paid_vendor_order,
+        kwargs=lambda obj: {**by_public_id(obj), "action": "accept"},
+        methods=("POST",),
+        sample={"public_id": NIL_UUID},
+    ),
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
+    ),
+    "manager:platform:notices": StaffOnly(
+        "Notices of illegal content (CMP.5): platform data, not vendor-owned; needs the "
+        "compliance.review_notices permission, so a vendor member gets 404."
+    ),
+    "manager:platform:notice": StaffOnly(
+        "One notice of illegal content (CMP.5): platform data, not vendor-owned; needs the "
+        "compliance.review_notices permission, so a vendor member gets 404.",
+        kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
+    "dsa_notice": NoVendorData(
+        "Public report form for illegal content (DSA art. 16, CMP.5): no vendor data is shown, "
+        "the form only stores a notice; captcha and a rate limit guard the POST."
+    ),
+    "dsa_notice_received": NoVendorData(
+        "Thanks page after a report (CMP.5): shows only the reference kept in the session."
     ),
     "admin:login": NoVendorData("Staff sign-in page."),
     "admin:logout": NoVendorData("Staff sign-out."),
@@ -332,6 +465,10 @@ ENDPOINTS: dict[str, Access] = {
         "Unknown API paths: a 404 problem document.", path="/api/v1/no-such-operation"
     ),
     # CMS (CMS.1): public pages and the editors' sign-in. The rest of /admin/ is CMS_ADMIN.
+    "dsa_contact_points": NoVendorData(
+        "DSA points of contact (CMP.5): the platform operator's own contact data, the same for "
+        "every visitor; no vendor data."
+    ),
     "wagtail_serve": NoVendorData(
         "Public CMS pages (home, static pages); no vendor data until the CMS.4 landing pages.",
         path="/no-such-page/",
@@ -390,6 +527,14 @@ def classify(endpoint: Endpoint) -> Access | None:
 # --- API v1 operations ("METHOD /path" as in the OpenAPI description), called with Vendor A's
 # API key (CORE.13)
 
+
+def active_vendor_events_key(client: Client, tenants: CrossTenant) -> dict[str, str]:
+    """A write key is refused (403) while its vendor is not active (CORE.14): activate Vendor A."""
+    Vendor.objects.filter(pk=tenants.a.vendor.pk).update(status=Vendor.Status.ACTIVE)
+    tenants.a.vendor.refresh_from_db()
+    return vendor_api_key(["events:read", "events:write"])(client, tenants)
+
+
 API_OPERATIONS: dict[str, Access] = {
     "GET /api/v1/me": NoVendorData("The calling API client itself, with its own vendor."),
     # CAT.3
@@ -402,5 +547,28 @@ API_OPERATIONS: dict[str, Access] = {
     ),
     "GET /api/v1/catalog/products/{public_id}": VendorScoped(
         make=lambda vendor: ProductFactory.create(vendor=vendor)
+    ),
+    # EVT.5
+    "GET /api/v1/events": VendorScopedList(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor)
+    ),
+    "POST /api/v1/events": NoVendorData(
+        "Creates a draft for the caller's own vendor; a platform key is refused. Shows only the "
+        "ChangeSet of what it creates."
+    ),
+    "GET /api/v1/events/{public_id}": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor)
+    ),
+    "PATCH /api/v1/events/{public_id}": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        login=active_vendor_events_key,
+    ),
+    "POST /api/v1/events/{public_id}/submit": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        login=active_vendor_events_key,
+    ),
+    "POST /api/v1/events/{public_id}/cancel": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        login=active_vendor_events_key,
     ),
 }

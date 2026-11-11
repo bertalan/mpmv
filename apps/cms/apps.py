@@ -69,6 +69,7 @@ class CmsConfig(AppConfig):
         from .signals import record_published_legal_page, sanitise_before_save
 
         checks.register(check_base_url, deploy=True)
+        _declare_page_restriction_forms()
         # After every migrate (and every test database flush): one Locale per configured
         # language, so adding a language to settings.LANGUAGES needs no migration (spec 09).
         post_migrate.connect(_sync_locales, sender=self, dispatch_uid="cms.sync_locales")
@@ -91,6 +92,41 @@ class CmsConfig(AppConfig):
         # Rich text written outside the editor is stored with the editor's allow-list (CMS.12).
         pre_save.connect(sanitise_before_save, dispatch_uid="cms.sanitise_rich_text")
         _guard_editor()
+
+
+def _declare_page_restriction_forms() -> None:
+    """SEC.14: Wagtail's page privacy forms are anonymous POSTs we do not own; the sweep (SEC.13)
+    reads their protection from these declarations."""
+    from apps.core.public_forms import FormSpec, Kind, Protection, declare_public_form
+
+    templates = ("wagtailcore/password_required.html",)
+    declare_public_form(
+        "wagtailcore_authenticate_with_password",
+        FormSpec(
+            Kind.PUBLIC,
+            "Open a page shared by password",
+            "SEC.14",
+            Protection.CAPTCHA,
+            rate_limit="per IP bucket, and per restriction on wrong passwords only with a higher "
+            "threshold (locking a page needs captcha-solved wrong guesses), in "
+            "PageRestrictionProtectionMiddleware",
+            templates=templates,
+        ),
+        view="wagtail.views.authenticate_with_password",
+    )
+    declare_public_form(
+        "wagtailcore_login",
+        FormSpec(
+            Kind.PUBLIC,
+            "Sign in to see a page shared with logged-in users",
+            "SEC.14",
+            Protection.CAPTCHA,
+            rate_limit="per IP bucket in PageRestrictionProtectionMiddleware; lockout in "
+            "authenticate() (CORE.5)",
+            templates=("wagtailcore/login.html",),
+        ),
+        view="django.contrib.auth.views.LoginView",
+    )
 
 
 def _guard_editor() -> None:

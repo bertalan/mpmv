@@ -38,7 +38,7 @@ from apps.api.models import ApiRateCounter
 from apps.api.tests.factories import ApiClientFactory
 from apps.core.models import Throttle
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("admin_open")]  # OPS.5
 
 IP = "203.0.113.41"
 OTHER_IP = "198.51.100.41"

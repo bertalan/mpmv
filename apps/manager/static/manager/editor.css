@@ -1,0 +1,80 @@
+/* D-34: the variables Wagtail's Draftail stylesheet reads, set for the Manager theme. Wagtail's own
+   core.css is not loaded here: it restyles buttons and headings across the whole page. */
+.manager-form {
+  --w-direction-factor: 1;
+  --w-font-sans: inherit;
+  --w-color-surface-menus: #fff;
+  --w-color-surface-page: #fff;
+  --w-color-surface-field: #fff;
+  --w-color-surface-field-inactive: #f3f4f6;
+  --w-color-surface-header: #f3f4f6;
+  --w-color-surface-tooltip: #1f2937;
+  --w-color-surface-button-default: #00676a;
+  --w-color-text-placeholder: #5b6470;
+  --w-color-text-context: #374151;
+  --w-color-text-meta: #4b5563;
+  --w-color-text-button: #fff;
+  --w-color-text-button-outline-default: #00676a;
+  --w-color-text-button-outline-hover: #004b4d;
+  --w-color-border-field-default: #6b7280;
+  --w-color-border-field-hover: #374151;
+  --w-color-border-field-inactive: #d1d5db;
+  --w-color-border-furniture: #d1d5db;
+  --w-color-border-interactive-more-contrast: #6b7280;
+  --w-color-border-interactive-more-contrast-hover: #374151;
+  --w-color-border-button-small-outline-default: #00676a;
+  --w-color-critical-100: #fde8e8;
+  --w-color-critical-200: #b42318;
+  --w-color-focus: #0b5fff;
+  --w-color-black-35: rgb(0 0 0 / 35%);
+}
+
+/* VEN.31: the chooser modal (Wagtail's modal-workflow.js builds it; its own CSS is not loaded). */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 50%);
+  z-index: 1040;
+}
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  overflow: auto;
+  z-index: 1050;
+}
+.modal.in {
+  display: block;
+}
+.modal-dialog {
+  max-width: 48rem;
+  margin: 2rem auto;
+}
+.modal-content {
+  background: #fff;
+  color: #1f2937;
+  border-radius: 0.5rem;
+  padding: 1rem 1.5rem;
+}
+.modal-content .tab-content,
+.modal-content .w-tabs__list {
+  list-style: none;
+  padding: 0;
+}
+.modal-content ul.listing,
+.modal-content .fields {
+  list-style: none;
+  padding: 0;
+}
+.modal-content .image-choice img {
+  max-width: 8rem;
+  height: auto;
+}
+.modal-content ul.grid,
+.modal-content .listing.horiz {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0;
+  list-style: none;
+}

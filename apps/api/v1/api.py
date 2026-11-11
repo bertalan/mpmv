@@ -17,6 +17,7 @@ from ninja.openapi.docs import Swagger
 from .catalog import router as catalog_router
 from .endpoints import router as v1_router
 from .errors import install_problem_handlers
+from .events import router as events_router
 from .mutations import track_calls
 from .openapi import ApiV1Schema
 
@@ -62,3 +63,4 @@ def create_api(*, urls_namespace: str = "api-v1") -> ApiV1:
 api = create_api()
 api.add_router("", v1_router)
 api.add_router("/catalog", catalog_router)
+api.add_router("/events", events_router)

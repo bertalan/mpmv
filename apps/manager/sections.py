@@ -8,6 +8,8 @@ whose role checks CORE.18 defines.
 from django.utils.translation import gettext_lazy as _
 
 from .navigation import Registry, Section, anyone, vendor_action
+from .notice_views import SECTION as NOTICES_SECTION
+from .notice_views import can_review
 from .spaces import Space
 
 BUILT_IN = (
@@ -28,6 +30,25 @@ BUILT_IN = (
         order=20,
         allowed=vendor_action("profile"),
     ),
+    # The image chooser of the storefront editor (VEN.31): a modal, not a page, so not in the
+    # menu. Owners only, like the profile it serves.
+    Section(
+        "shop.media",
+        Space.SHOP,
+        _("Images"),
+        "manager:shop:image_choose",
+        order=25,
+        in_menu=False,
+        allowed=vendor_action("profile"),
+    ),
+    Section(
+        "shop.orders",
+        Space.SHOP,
+        _("Orders"),
+        "manager:shop:orders",
+        order=30,
+        allowed=vendor_action("orders"),
+    ),
     # The vendor picker: reached from the header, so not in the menu, and before any choice.
     Section(
         "shop.vendor",
@@ -46,6 +67,14 @@ BUILT_IN = (
         "manager:platform:dashboard",
         order=10,
         allowed=anyone,
+    ),
+    Section(
+        NOTICES_SECTION,
+        Space.PLATFORM,
+        _("Notices"),
+        "manager:platform:notices",
+        order=60,
+        allowed=can_review,
     ),
 )
 
