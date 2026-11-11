@@ -17,8 +17,9 @@ from django.template.response import TemplateResponse
 from django.urls import reverse
 
 from apps.core.audit import audit_context
+from apps.core.public_forms import Protection, public_form
 
-from . import services
+from . import levels, services
 from .models import User
 
 
@@ -33,10 +34,22 @@ class AuditedPasswordChangeView(PasswordChangeView):
             services.record_password_change(
                 user, had_usable_password=had_usable_password, ctx=audit_context(self.request)
             )
+        # The password is a credential change: back to restricted, the key was cycled anyway.
+        levels.end_operational(self.request, "password")
         return response
 
 
 class AuditedAdminSite(AdminSite):
+    @public_form(
+        protection=Protection.CAPTCHA,
+        purpose="Sign in to the staff admin",
+        task="CORE.5",
+        rate_limit="per account and IP lockout (CORE.5)",
+        templates=("accounts/admin/login.html",),
+    )
+    def login(self, request: HttpRequest, extra_context: dict[str, Any] | None = None) -> Any:
+        return super().login(request, extra_context)
+
     def password_change(
         self, request: HttpRequest, extra_context: dict[str, Any] | None = None
     ) -> TemplateResponse:

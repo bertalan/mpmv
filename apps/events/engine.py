@@ -14,6 +14,8 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from apps.vendors.engine import vendor_collection_name as vendor_collection_name  # moved (D-34)
+
 # Event types (spec 15 "Page models"). There is deliberately no closure type: a vendor's
 # holiday or shop closure is a vendor setting (owner decision Q-73, VEN.20).
 PROMOTION = "promotion"
@@ -564,8 +566,13 @@ def next_sequence(
 
 # --- Vendor-safe body (spec 15 "How vendors author an `EventPage`") ----------------------------
 
-# The CMS.10 product grid and the CMS.9 countdown join when those tasks add the blocks.
-VENDOR_SAFE_BLOCKS = frozenset({"paragraph", "figure", "gallery", "cta", "faq"})
+# Spec 15: product blocks of a vendor show its own products only. The services check it
+# (`_check_vendor_body`): every product of a `product_cards` block (`product_ids`) is the vendor's,
+# and a `product_grid` is sourced from the vendor itself (`grid_sources`), never from a category,
+# term or brand, which would list other vendors' products. The CMS.9 countdown joins later.
+VENDOR_SAFE_BLOCKS = frozenset(
+    {"paragraph", "figure", "gallery", "cta", "faq", "product_cards", "product_grid"}
+)
 
 _HREF = re.compile(r"""\b(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""", re.IGNORECASE)
 _ENTITY = re.compile(r"&#(x[0-9a-f]+|[0-9]+);?", re.IGNORECASE)
@@ -612,12 +619,6 @@ _FOREIGN_REFERENCE = re.compile(
 )
 
 
-def vendor_collection_name(vendor_public_id: str) -> str:
-    """The name of a vendor's own Wagtail image collection (a child of the root collection);
-    the vendor-area upload stores there and the services accept only images from it."""
-    return f"vendor-{vendor_public_id}"
-
-
 def has_foreign_reference(html: str) -> bool:
     """Whether vendor rich text embeds media or links a document by id: neither is a vendor
     feature, and an id could name another tenant's file."""
@@ -645,6 +646,40 @@ def image_ids(raw: Any) -> list[Any]:
     return found
 
 
+def product_ids(raw: Any) -> list[Any]:
+    """Every product reference of the `product_cards` blocks of a raw body, as sent: a plain
+    id, or Wagtail's `{"type": "item", "value": id}` list wrapper. Nothing is trusted: the
+    caller checks each one is the id of one of the vendor's own products."""
+    found: list[Any] = []
+    for block in raw:
+        value = block.get("value")
+        if block.get("type") != "product_cards" or not isinstance(value, Mapping):
+            continue
+        items = value.get("products")
+        if not isinstance(items, list | tuple):
+            continue
+        for item in items:
+            found.append(item.get("value") if isinstance(item, Mapping) else item)
+    return found
+
+
+def grid_sources(raw: Any) -> list[tuple[Any, Any]]:
+    """The `(kind, value)` source of every `product_grid` block of a raw body, as sent. A grid
+    with no readable source gives `(None, None)`, so it is never trusted by omission."""
+    found: list[tuple[Any, Any]] = []
+    for block in raw:
+        value = block.get("value")
+        if block.get("type") != "product_grid":
+            continue
+        source = value.get("source") if isinstance(value, Mapping) else None
+        first = source[0] if isinstance(source, list | tuple) and len(source) == 1 else None
+        if isinstance(first, Mapping):
+            found.append((first.get("type"), first.get("value")))
+        else:
+            found.append((None, None))
+    return found
+
+
 def cta_links(raw: Any) -> list[Mapping[str, Any]]:
     """The `link` values of the `cta` blocks of a raw body."""
     links: list[Mapping[str, Any]] = []
@@ -657,17 +692,29 @@ def cta_links(raw: Any) -> list[Mapping[str, Any]]:
     return links
 
 
-def cta_url_problem(url: str) -> str | None:
-    """Why a vendor CTA may not use `url`, or None: only `https://` addresses (spec 15)."""
+def https_url_problem(url: str, subject: str = "A link") -> str | None:
+    """Why `url` may not be shown as a vendor's link, or None: only plain `https://` addresses.
+
+    Refuses any control, format, line or paragraph separator character (DEL, C1, bidi controls,
+    U+2028/2029 included), whitespace such as NBSP, and a user name before the host.
+    """
     text = url.strip()
     if not text.lower().startswith("https://") or len(text) <= len("https://"):
-        return "A call-to-action link must start with https://."
-    if any(ch <= " " for ch in text):
-        return "A call-to-action link must not contain spaces."
+        return f"{subject} must start with https://."
+    if any(
+        ch <= " " or ch.isspace() or unicodedata.category(ch) in {"Cc", "Cf", "Zl", "Zp"}
+        for ch in url
+    ):
+        return f"{subject} must not contain spaces or control characters."
     authority = text[len("https://") :].split("/", 1)[0].split("?", 1)[0].split("#", 1)[0]
     if "@" in authority or "\\" in text:
-        return "A call-to-action link must not contain a user name."
+        return f"{subject} must not contain a user name."
     return None
+
+
+def cta_url_problem(url: str) -> str | None:
+    """Why a vendor CTA may not use `url`, or None: only `https://` addresses (spec 15)."""
+    return https_url_problem(url, "A call-to-action link")
 
 
 def body_limit_problem(raw: Any) -> str | None:

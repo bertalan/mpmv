@@ -1,6 +1,7 @@
 """Small request helpers shared by the HTTP adapters of every app."""
 
 import ipaddress
+from collections.abc import Sequence
 from functools import lru_cache
 
 from django.conf import settings
@@ -32,6 +33,19 @@ def _is_trusted_proxy(remote_addr: str) -> bool:
         return False
     ip = ipaddress.ip_address(address)
     return any(ip in network for network in networks)
+
+
+def ip_in_networks(ip: str | None, entries: Sequence[str]) -> bool:
+    """True when `ip` is in one of the addresses or CIDR networks; anything else fails closed."""
+    address = _parse_ip(ip) if ip else None
+    if address is None:
+        return False
+    try:
+        networks = trusted_proxy_networks(tuple(entries))
+    except ValueError:  # reported by the core.E003 system check
+        return False
+    parsed = ipaddress.ip_address(address)
+    return any(parsed.version == network.version and parsed in network for network in networks)
 
 
 def client_ip(request: HttpRequest) -> str | None:

@@ -1,30 +1,33 @@
 {% extends "layouts/account.html" %}
-{% block title %}Two-factor settings · MPMV{% endblock %}
+{% load i18n %}
+{# This page shows its messages in place; the base layout must not repeat them. #}
+{% block messages %}{% endblock %}
+{% block title %}{% translate "Two-factor settings" %} · MPMV{% endblock %}
 {% block account_content %}
-<h1>Two-factor authentication</h1>
+<h1>{% translate "Two-factor authentication" %}</h1>
 {% if messages %}<ul class="messages">{% for message in messages %}<li>{{ message }}</li>{% endfor %}</ul>{% endif %}
 
-<h2>Your factors</h2>
+<h2>{% translate "Your factors" %}</h2>
 {% if factors %}
 <ul>
   {% for factor in factors %}
-  <li>{{ factor.device.name }} ({% if factor.kind == "passkey" %}passkey{% else %}authenticator app{% endif %})
+  <li>{{ factor.device.name }} ({% if factor.kind == "passkey" %}{% translate "passkey" %}{% else %}{% translate "authenticator app" %}{% endif %})
     <form method="post" action="{{ factor.remove_url }}">
       {% csrf_token %}
-      <button type="submit">Remove</button>
+      <button type="submit">{% translate "Remove" %}</button>
     </form>
   </li>
   {% endfor %}
 </ul>
 {% else %}
-<p>No second factor yet.</p>
+<p>{% translate "No second factor yet." %}</p>
 {% endif %}
 
-<h2>Add a factor</h2>
-<p><a href="{{ totp_url }}">Add an authenticator app</a></p>
+<h2>{% translate "Add a factor" %}</h2>
+<p><a href="{{ totp_url }}">{% translate "Add an authenticator app" %}</a></p>
 {% include "accounts/mfa/_passkey_register_form.html" %}
 
-<h2>Recovery codes</h2>
-<p>{{ unused_codes }} unused. <a href="{% url 'mfa:recovery_codes' %}">Manage recovery codes</a></p>
+<h2>{% translate "Recovery codes" %}</h2>
+<p>{% blocktranslate count counter=unused_codes %}{{ counter }} unused.{% plural %}{{ counter }} unused.{% endblocktranslate %} <a href="{% url 'mfa:recovery_codes' %}">{% translate "Manage recovery codes" %}</a></p>
 {% include "accounts/mfa/_passkey_script.html" %}
 {% endblock %}

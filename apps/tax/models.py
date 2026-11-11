@@ -295,6 +295,13 @@ class VendorTaxProfile(Versioned):
     exempt_country = CountryField(
         "country of the exemption law", blank=True, help_text=EXEMPT_COUNTRY_HELP
     )
+    exemption_nature = models.CharField(
+        "exemption nature",
+        max_length=4,
+        choices=[(code, code) for code in engine.NATURE_CODES],
+        blank=True,
+        help_text="`Other` exemptions: the e-invoice nature code (D-28).",
+    )
     oss_registered_since = models.DateField("OSS registered since", null=True, blank=True)
     requested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -563,6 +570,20 @@ class VatValidation(BaseModel):
     address = models.TextField(blank=True)
     request_id = models.CharField(
         max_length=64, blank=True, help_text="VIES consultation number, when given."
+    )
+    requester = models.CharField(
+        max_length=32,
+        blank=True,
+        help_text=("VAT number with prefix sent to VIES as requester (the vendor's)."),
+    )
+    requester_kind = models.CharField(
+        max_length=8,
+        blank=True,
+        help_text="vendor, operator (no vendor proof) or empty (anonymous).",
+    )
+    detail = models.CharField(max_length=64, blank=True, help_text="VIES error code or reason.")
+    vies_request_date = models.DateTimeField(
+        null=True, blank=True, help_text="VIES requestDate, next to the local checked_at."
     )
     checked_at = models.DateTimeField()
 

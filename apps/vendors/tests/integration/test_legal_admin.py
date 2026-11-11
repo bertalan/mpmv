@@ -123,7 +123,8 @@ def test_saving_an_iban_writes_a_masked_audit_row(staff_client: Client) -> None:
     assert vendor.iban == "IT60X0542811101000000123456"
     entry = AuditLog.objects.get(action="vendor.dac7_corrected")  # the IBAN is DAC7 data
     assert entry.source == "admin"
-    assert entry.actor_label == "staff:staff@example.com"
+    assert entry.actor_label.startswith("staff:")
+    assert "@" not in entry.actor_label
     assert entry.after is not None
     assert entry.after["iban"] == engine.mask_iban(vendor.iban)
     assert vendor.iban not in str(entry.after)

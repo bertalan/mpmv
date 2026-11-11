@@ -141,6 +141,45 @@ def test_vendors_get_the_vendor_safe_blocks_only() -> None:
     ]
 
 
+def test_vendors_get_the_product_blocks_checked_against_their_own_products() -> None:
+    # Cards are checked with `product_ids`, a grid with `grid_sources` (services).
+    assert refused_blocks(["product_cards", "product_grid"], is_staff=False) == []
+    assert refused_blocks(["countdown"], is_staff=False) == ["countdown"]
+
+
+def test_the_grid_sources_of_a_raw_body() -> None:
+    raw = [
+        {"type": "product_grid", "value": {"source": [{"type": "vendor", "value": 7}]}},
+        {"type": "product_grid", "value": {"source": [{"type": "brand", "value": 2}]}},
+        {"type": "product_grid", "value": {"source": []}},
+        {"type": "product_grid", "value": {"source": [{"type": "vendor", "value": 1}] * 2}},
+        {"type": "product_grid", "value": "nope"},
+        {"type": "paragraph", "value": "<p>x</p>"},
+    ]
+    assert engine.grid_sources(raw) == [
+        ("vendor", 7),
+        ("brand", 2),
+        (None, None),
+        (None, None),
+        (None, None),
+    ]
+
+
+def test_the_product_ids_of_a_raw_body_come_from_the_cards_blocks_only() -> None:
+    raw = [
+        {"type": "product_cards", "value": {"heading": "", "products": [3, {"value": 4}]}},
+        {"type": "product_cards", "value": {"products": [{"type": "item", "value": 5, "id": "x"}]}},
+        {"type": "paragraph", "value": "<p>9</p>"},
+        {"type": "countdown", "value": {"product": 8}},
+    ]
+    assert engine.product_ids(raw) == [3, 4, 5]
+
+
+def test_a_malformed_cards_value_gives_no_ids_to_trust() -> None:
+    raw = [{"type": "product_cards", "value": "nope"}, {"type": "product_cards", "value": {}}]
+    assert engine.product_ids(raw) == []
+
+
 def test_staff_get_every_block() -> None:
     assert refused_blocks(["embed", "raw_html"], is_staff=True) == []
 

@@ -1770,8 +1770,12 @@ def check_establishment(establishment: Establishment, allowed: Collection[str]) 
         raise EstablishmentNotAllowed(establishment, error)
 
 
-# --- Storefront profile (CORE.9): plain text only, with length caps (change the numbers here)
+# --- Storefront profile (CORE.9, D-34): the tagline is plain text; the description and the three
+# policies are Wagtail rich text (HTML stored, cleaned by the CMS.12 hook).
 
+# The limits count the STORED text, tags included: it is what the database holds and what every
+# render parses, so it is the number that bounds cost. A formatted text therefore has a little
+# less room for visible words than a plain one (change the numbers here).
 PROFILE_MAX_LENGTH: Final[dict[str, int]] = {
     "tagline": 200,
     "description": 10_000,
@@ -1779,6 +1783,8 @@ PROFILE_MAX_LENGTH: Final[dict[str, int]] = {
     "refund_policy": 5_000,
     "cancellation_policy": 5_000,
 }
+# Fields that hold rich text (the tagline is a one-line plain text).
+RICH_TEXT_FIELDS: Final = ("description", "shipping_policy", "refund_policy", "cancellation_policy")
 # An HTML tag, comment or declaration. A lone "<" in prose ("under 5 kg < 20 EUR") is fine.
 _HTML_MARKUP: Final = re.compile(r"<\s*[A-Za-z!/?]")
 # Control characters other than tab, line feed and carriage return (a NUL byte makes
@@ -1786,9 +1792,90 @@ _HTML_MARKUP: Final = re.compile(r"<\s*[A-Za-z!/?]")
 _CONTROL: Final = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
+def vendor_collection_name(vendor_public_id: str) -> str:
+    """The name of a vendor's own Wagtail collection (a child of the root collection, depth 2):
+    the vendor's images and documents live there and below it, and the services accept only
+    those (events and the storefront texts)."""
+    return f"vendor-{vendor_public_id}"
+
+
+_TAG_START: Final = re.compile(r"<[A-Za-z!/?]")
+
+
+def has_markup(text: str) -> bool:
+    """Whether `text` already contains HTML (so it is not a legacy plain text). A "<" followed
+    by a space or a digit ("a < b", "<5 kg") is prose, as in a browser."""
+    return _TAG_START.search(text) is not None
+
+
+def plain_to_html(text: str) -> str:
+    """A legacy plain text as rich text: blank lines split paragraphs, single newlines become
+    `<br/>`, the text is escaped. A value that already has markup, or is empty, is returned
+    unchanged, so the conversion is idempotent."""
+    if not text.strip():
+        return ""
+    if has_markup(text):
+        return text
+    paragraphs = re.split(r"\n\s*\n", text.replace("\r\n", "\n").replace("\r", "\n").strip())
+    return "".join(
+        "<p>" + "<br/>".join(_escape(line.strip()) for line in chunk.split("\n")) + "</p>"
+        for chunk in paragraphs
+        if chunk.strip()
+    )
+
+
+def _escape(text: str) -> str:
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+_TAG: Final = re.compile(r"<(embed|a)\b([^>]*)>", re.IGNORECASE)
+_ATTR: Final = re.compile(r"""([a-zA-Z_:][-\w:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>/]+))""")
+
+
+def media_references(html: str) -> tuple[list[str], list[str]]:
+    """The ids of the images and documents a stored rich text embeds or links
+    (`<embed embedtype="image" id=..>` and `<a linktype="document" id=..>`), as written (an id
+    that is not a number is returned as is and refused by the caller)."""
+    images: list[str] = []
+    documents: list[str] = []
+    for tag, raw in _TAG.findall(html):
+        attrs = {m[0].lower(): m[1] or m[2] or m[3] for m in _ATTR.findall(raw)}
+        if tag.lower() == "embed" and attrs.get("embedtype", "").lower() == "image":
+            images.append(attrs.get("id", ""))
+        elif tag.lower() == "a" and attrs.get("linktype", "").lower() == "document":
+            documents.append(attrs.get("id", ""))
+    return images, documents
+
+
+def has_page_link(html: str) -> bool:
+    """Whether a stored rich text links a Wagtail page (`<a linktype="page" id=..>`): such a link
+    resolves any page id, a draft or another vendor's page included, so vendors may not use it."""
+    return any(
+        tag.lower() == "a"
+        and {m[0].lower(): m[1] or m[2] or m[3] for m in _ATTR.findall(raw)}.get(
+            "linktype", ""
+        ).lower()
+        == "page"
+        for tag, raw in _TAG.findall(html)
+    )
+
+
+def image_embed_formats(html: str) -> list[str]:
+    """The `format` of every image embed of a stored rich text, as written ("" when missing)."""
+    return [
+        {m[0].lower(): m[1] or m[2] or m[3] for m in _ATTR.findall(raw)}.get("format", "")
+        for tag, raw in _TAG.findall(html)
+        if tag.lower() == "embed"
+        and {m[0].lower(): m[1] or m[2] or m[3] for m in _ATTR.findall(raw)}.get(
+            "embedtype", ""
+        ).lower()
+        == "image"
+    ]
+
+
 def profile_text_errors(values: Mapping[str, str]) -> dict[str, str]:
-    """What is wrong with the storefront texts: too long, or HTML (they are plain text,
-    escaped on output and never rendered as markup)."""
+    """What is wrong with the storefront texts: too long (stored HTML counted) or with control
+    characters. The tagline is plain text: HTML there is refused, never stripped."""
     errors: dict[str, str] = {}
     for name, value in values.items():
         limit = PROFILE_MAX_LENGTH[name]
@@ -1796,6 +1883,22 @@ def profile_text_errors(values: Mapping[str, str]) -> dict[str, str]:
             errors[name] = f"At most {limit} characters (now {len(value)})."
         elif _CONTROL.search(value):
             errors[name] = "Remove the control characters."
-        elif _HTML_MARKUP.search(value):
+        elif name not in RICH_TEXT_FIELDS and _HTML_MARKUP.search(value):
             errors[name] = "Write plain text: HTML tags are not accepted."
     return errors
+
+
+LOGO_ALT_MAX_LENGTH: Final = 125
+
+
+def logo_alt_errors(alt: str) -> str | None:
+    """Why this logo description is refused, or None: required, short, plain text."""
+    if not alt.strip():
+        return "Describe the logo for people who cannot see it."
+    if len(alt) > LOGO_ALT_MAX_LENGTH:
+        return f"At most {LOGO_ALT_MAX_LENGTH} characters (now {len(alt)})."
+    if _CONTROL.search(alt):
+        return "Remove the control characters."
+    if _HTML_MARKUP.search(alt):
+        return "Write plain text: HTML tags are not accepted."
+    return None

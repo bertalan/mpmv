@@ -27,6 +27,8 @@ from django.views.decorators.http import require_http_methods
 from apps.accounts.decorators import protect_registration
 from apps.core.audit import audit_context
 from apps.core.http import client_ip
+from apps.core.i18n import language_switch_home
+from apps.core.public_forms import Protection, public_form
 
 from . import services
 from .forms import MAX_BODY_BYTES, ApplicationForm, ConfirmForm
@@ -75,6 +77,13 @@ def limit_body(view: View) -> View:
     return wrapped
 
 
+@public_form(
+    protection=Protection.CAPTCHA,
+    purpose="Sell with us: a vendor application",
+    task="VEN.22",
+    rate_limit="per IP (registration throttle)",
+    templates=("vendors/apply/form.html",),
+)
 @require_http_methods(["GET", "POST"])
 @limit_body
 @protect_registration
@@ -109,6 +118,14 @@ def _refused(request: HttpRequest) -> HttpResponse:
     return _page(request, "invalid", {}, status=403)
 
 
+@public_form(
+    protection=Protection.SIGNED_TOKEN,
+    purpose="Confirm a vendor application and choose a password",
+    task="VEN.22",
+    reason="the link must have been opened in this session from its one-time signed token",
+    rate_limit="per IP (application throttle)",
+)
+@language_switch_home
 @require_http_methods(["GET", "HEAD", "POST"])
 def confirm(request: HttpRequest, user_key: str) -> HttpResponse:
     """Where the emailed link leads, after its Continue page opened it in this session."""
@@ -138,6 +155,14 @@ def confirm(request: HttpRequest, user_key: str) -> HttpResponse:
     return _page(request, "confirm", {"form": form})
 
 
+@public_form(
+    protection=Protection.SIGNED_TOKEN,
+    purpose='Cancel a vendor application ("this was not me")',
+    task="VEN.22",
+    reason="the link must have been opened in this session from its one-time signed token",
+    rate_limit="per IP (application throttle)",
+)
+@language_switch_home
 @require_http_methods(["GET", "HEAD", "POST"])
 def cancel(request: HttpRequest, user_key: str) -> HttpResponse:
     """ "This was not me": the page the cancel link of every application mail leads to.

@@ -21,12 +21,13 @@ from django.http import Http404, HttpRequest, HttpResponse, HttpResponsePermanen
 from django.http.response import HttpResponseBase
 from django.shortcuts import render
 from django.utils import translation
-from django.utils.html import linebreaks
 from django.views.decorators.http import require_safe
 from wagtail import hooks
+from wagtail.rich_text import RichText
 from wagtail.views import serve
 
 from apps.core import translations
+from apps.core.i18n import hreflang_alternates
 from apps.core.money import CURRENCY
 from apps.vendors import services as vendors_services
 
@@ -148,13 +149,17 @@ def _listing(
     def in_language(lang: str) -> listings.ListingParams | None:
         return services.listing_params_in(params, language, lang)
 
-    alternates: list[tuple[str, str]] = []
+    # The object in each language it is published in: the one source of the `hreflang` links
+    # and of the language switcher (`language_urls`, read by the `language_links` tag).
+    language_urls: dict[str, str] = {}
     for lang in anchor.published:
         lang_params = in_language(lang)
         if lang in anchor.paths and lang_params is not None:
-            alternates.append((lang, absolute(lang, lang_params)))
+            language_urls[lang] = listings.listing_url(anchor.paths[lang], lang_params)
+    alternates = hreflang_alternates(
+        {lang: request.build_absolute_uri(url) for lang, url in language_urls.items()}
+    )
     source = translations.source_language()
-    alternates.extend(("x-default", url) for lang, url in list(alternates) if lang == source)
 
     canonical_url = absolute(language, params)
     if anchor.is_fallback(language) and source in anchor.paths:
@@ -189,7 +194,7 @@ def _listing(
         "store_categories": store_categories,
         "vendor_profile": vendor_profile,
         "policy_items": [
-            {"title": title, "content": linebreaks(text)}
+            {"title": title, "content": RichText(text)}
             for title, text in (vendor_profile.policies if vendor_profile else ())
         ],
         "price_min": _amount(params.price_min),
@@ -207,6 +212,7 @@ def _listing(
         "is_fallback": anchor.is_fallback(language),
         "canonical_url": canonical_url,
         "alternates": alternates,
+        "language_urls": language_urls,
         "robots": listings.listing_robots(params, total=window.total),
         "previous_url": (
             listings.listing_url(location, params.with_page(window.previous_page))

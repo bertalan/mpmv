@@ -132,6 +132,10 @@ DRY_RUN_EXCEPTIONS: Final[dict[str, tuple[str, str]]] = {
         TELEMETRY,
         "asking VIES stores its answer in the append-only validation log; a check is a lookup",
     ),
+    "apps.tax.services.verify_vat_number_for_order": (
+        TELEMETRY,
+        "same lookup as verify_vat_number, always fresh and keyed to the vendor, for an order",
+    ),
     "apps.tax.services.recheck_vat_number": (
         TELEMETRY,
         "same lookup as verify_vat_number, forced past the cache by the background job",

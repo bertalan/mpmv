@@ -1,0 +1,1 @@
+{% load i18n %}{% blocktranslate %}We received your order {{ order_number }}{% endblocktranslate %}

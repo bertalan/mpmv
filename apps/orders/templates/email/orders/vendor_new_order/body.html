@@ -1,0 +1,10 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate %}{{ vendor_name }}: new paid order {{ order_number }} to ship:{% endblocktranslate %}</p>
+<ul>
+{% for line in lines %}<li>{{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %} x {{ line.quantity }}: {{ line.total }} EUR</li>
+{% endfor %}</ul>
+<p>{% translate "Ship to:" %}<br>{% for part in ship_to %}{{ part }}<br>{% endfor %}</p>
+</body>
+</html>

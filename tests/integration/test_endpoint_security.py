@@ -41,11 +41,13 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import pytest
+from django.conf import settings
 from django.db import connection, models
 from django.http.response import HttpResponseBase
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls import resolve, reverse
+from django.utils import translation
 from wagtail.contrib.routable_page.models import RoutablePageMixin
 from wagtail.models import Page, PageViewRestriction
 
@@ -133,6 +135,8 @@ def sample_path(endpoint: Endpoint, access: object = None) -> str:
     if isinstance(access, NoVendorData) and access.path:
         return access.path
     kwargs = access.kwargs if isinstance(access, NoVendorData | StaffOnly) else {}
+    if isinstance(access, VendorScoped):
+        kwargs = access.sample
     return endpoint.path(**{name: kwargs.get(name, "0") for name in endpoint.params})
 
 
@@ -232,7 +236,10 @@ def check_refused(
 
 
 def routes_to(endpoint: Endpoint, path: str) -> bool:
-    match = resolve(path)
+    # The sample paths are the primary language's, unprefixed (`i18n_patterns`): resolve them in
+    # that language, whichever one a request of an earlier test left active in this thread.
+    with translation.override(settings.LANGUAGE_CODE):
+        match = resolve(path)
     found = match.view_name if match.url_name else match.route
     return found == endpoint.key
 
@@ -306,6 +313,15 @@ def test_every_non_public_sample_path_reaches_its_endpoint() -> None:
     """The anonymous checks below prove nothing if the sample path routes somewhere else."""
     wrong = sorted(e.key for e in NON_PUBLIC if not routes_to(e, sample_path(e)))
     assert not wrong, "Sample paths route elsewhere: " + ", ".join(wrong)
+
+
+@pytest.mark.parametrize("language", [code for code, _ in settings.LANGUAGES])
+def test_sample_paths_reach_their_endpoint_whatever_language_is_active(language: str) -> None:
+    """A test that ran before may leave a language active; `i18n_patterns` routes then need that
+    language's prefix, and the unprefixed sample paths of the primary language did not resolve."""
+    with translation.override(language):
+        wrong = sorted(e.key for e in NON_PUBLIC if not routes_to(e, sample_path(e)))
+    assert not wrong, f"Sample paths route elsewhere under {language!r}: " + ", ".join(wrong)
 
 
 def test_sign_in_pages_are_public() -> None:
@@ -445,7 +461,15 @@ def test_a_customer_cannot_open_vendor_b_objects(
 
 NON_OWNER_ROLES = [role for role in VendorMember.Role if role != VendorMember.Role.OWNER]
 # Pages the role matrix gives to owners only: other roles get 404 instead of their own data.
-OWNER_ONLY_WEB = frozenset({"manager:shop:profile"})  # CORE.9
+OWNER_ONLY_WEB = frozenset(
+    {
+        "manager:shop:profile",  # CORE.9
+        "manager:shop:image_choose",  # VEN.31
+        "manager:shop:image_results",
+        "manager:shop:image_chosen",
+        "manager:shop:image_select_format",
+    }
+)
 
 
 @pytest.mark.parametrize("role", NON_OWNER_ROLES, ids=str)

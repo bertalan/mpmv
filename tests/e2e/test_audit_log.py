@@ -24,7 +24,7 @@ def test_staff_see_a_vendor_change_with_before_and_after(
     device = TOTPDeviceFactory.create(user=user)
     vendor = VendorFactory.create(display_name="Vendor A", vat_number="IT00000010025")
     admin_login(page, live_server.url, "staff@example.com", password)
-    verify_with_totp(page, totp_token(device))
+    verify_with_totp(page, totp_token(device), operational=True)
 
     page.goto(f"{live_server.url}/django-admin/vendors/vendor/{vendor.pk}/change/")
     page.locator("#id_vat_number").fill("IT00000020032")

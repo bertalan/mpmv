@@ -87,7 +87,8 @@ def test_staff_pull_a_kill_switch_from_the_admin(staff_client: Client) -> None:
     assert entry.after is not None
     assert entry.after["state"] == "off"
     assert entry.after["note"] == "Incident 42"
-    assert entry.actor_label == "staff:staff@example.com"
+    assert entry.actor_label.startswith("staff:")
+    assert "@" not in entry.actor_label  # pseudonymous: the public id, never the address
 
 
 def test_the_name_of_a_flag_cannot_be_changed(staff_client: Client) -> None:

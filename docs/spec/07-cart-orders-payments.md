@@ -57,6 +57,16 @@ class ReturnRequest(Model):                    # withdrawal / return
     state (requested → authorized → received → refunded | rejected); refund_amount
 ```
 
+### Order privacy fields (owner decisions D-29, D-30)
+- `Order.tax_retention_until`: 31 December of the order year plus 10, computed at order build in
+  the business time zone (D-31). `Order.privacy_status`: `active`, `restricted_tax_only`,
+  `anonymized`, changed only by the scrub service (see [11](11-compliance.md), "Order data
+  retention and archive").
+- The VIES log in the snapshot keeps the consultation time, the consultation number and the name
+  returned by VIES.
+- `Order.user` is a foreign key with `SET NULL`. The snapshot never joins live user or address
+  tables: names, addresses and email are copied at order build.
+
 ### State machines
 
 ```mermaid
@@ -72,6 +82,7 @@ stateDiagram-v2
   in_fulfillment --> fulfilled: all VendorOrders shipped or delivered
   fulfilled --> closed: end of return window
   paid --> partially_refunded
+  in_fulfillment --> partially_refunded: one vendor order refunded while others are fulfilled
   fulfilled --> partially_refunded
   partially_refunded --> refunded
 ```
@@ -190,3 +201,5 @@ webhooks, quotes about to expire).
 | ORD.10 | Checkout and payments kill-switch, alert on payment without transfer | P1 | 4 | ARC.8, PAY.3 | Kill-switch verified on STAGE |
 | ORD.11 | Customer account: preferences and request history (scope to be defined with the owner): one section listing the customer's product information and quote requests and holding preferences such as followed vendors and event notifications; placeholder, hours to be re-estimated once the scope is agreed | P2 | 4 | ORD.7, SHP.10 | The owner has agreed the scope, this row is re-estimated and the section is detailed in §7.2 before any code is written |
 | ORD.12 | Free-gift promotion (owner decision MQ-9): triggered by a coupon code or a cart condition; adds the gift product at full price plus a 100% discount line; discount funding by the bundle funding rules (vendor, marketplace or split), gift stock reserved like any line, a per-customer limit; VAT and commission per line; the gift VAT treatment confirmed by the accountant (⚖️) | P2 | 10 | ORD.4, CAT.17 | A qualifying cart gets the gift line at full price and a 100% discount line; no line is priced 0.00; a vendor-funded and a marketplace-funded gift give the expected ledger rows; a customer over the limit gets no second gift; an out-of-stock gift is not added; VAT and commission are computed per line |
+| ORD.14 | Order privacy masking, the vendor "accounting" role and the Tax/Audit permission (D-29, D-30): in `restricted_tax_only` the personal fields (name, addresses, email, phone, tax ids) are masked (for example `j***@example.com`) in every ordinary vendor, support and customer-facing UI, in the API and in exports; in clear only for the vendor owner, a new vendor role "accounting" (assigned by the owner, own orders only) and the platform Tax/Audit permission (a CORE.18 role); every in-clear view needs a reason and writes an `AuditLog` entry with actor, order, time and reason; Support impersonation never reveals the clear fields | P1 | 10 | ORD.2, CORE.18, CORE.17, ARC.9 | A `restricted_tax_only` seed order is masked for a vendor member, a Support user, the API and the CSV export, and in clear for the vendor owner, a vendor accounting member (own vendor only) and a platform Tax/Audit holder; a reasonless reveal is refused; each reveal writes an `AuditLog` entry with actor, order, time and reason; an `active` order is shown normally; the owner can assign and remove the accounting role and no other member can |
+| ORD.15 | Vendor fiscal evidence package (D-30): a download per order for the vendor, while the order is `active` or `restricted_tax_only`, holding the order snapshot, the VIES log (time, number, returned name) and the transport proofs; personal fields in clear only to those allowed by ORD.14 (every download audited with a reason); no invoices, the platform issues none; refused once the order is `anonymized` | P1 | 6 | ORD.2, ORD.14, VEN.12 | A seed order's package holds the snapshot, the VIES log with the returned name and the transport proofs; a vendor member without the owner or accounting role gets the masked version; the download is in the `AuditLog`; an `anonymized` order has no package |

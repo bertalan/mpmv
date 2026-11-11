@@ -18,11 +18,14 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.sessions.backends.base import SessionBase
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, connection, transaction
-from django.db.models import OuterRef, QuerySet, Subquery
+from django.db.models import OuterRef, ProtectedError, QuerySet, Subquery
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.module_loading import import_string
 from django.utils.translation import gettext_lazy
+from wagtail.documents import get_document_model
+from wagtail.images import get_image_model
+from wagtail.models import Collection as ImageCollection
 
 from apps.accounts import engine as accounts_engine
 from apps.accounts.models import ActionLinkUse, User, normalize_email_address
@@ -43,7 +46,7 @@ from apps.accounts.services import (
 )
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import Change, ChangeSet
-from apps.core.models import AuditLog, resolve_translation
+from apps.core.models import AuditLog, ImageLicence, MediaImage, resolve_translation
 from apps.core.services import (
     NoPlatformOperator,
     allowed_vendor_countries,
@@ -124,6 +127,53 @@ class StorefrontProfile:
     is_fallback: bool
 
 
+def _clean_rich_text(html: str) -> str:
+    """Wagtail's default editor allow-list (CMS.12). Loaded by path: cms sits above vendors."""
+    clean: str = import_string("apps.cms.engine.sanitise_rich_text")(html, None)
+    return clean
+
+
+def media_problem(vendor: Vendor, html: str) -> str | None:
+    """Why a stored rich text may not be published for `vendor`, or None: every image it embeds
+    and every document it links must be in the vendor's own collection (depth 2, named by
+    `engine.vendor_collection_name`) or below it. A foreign, missing or non-numeric id is a
+    problem, so crafted HTML cannot reach another vendor's files (D-34)."""
+    if engine.has_page_link(html):
+        return "Links to other pages of the site are not allowed here."
+    images, documents = engine.media_references(html)
+    if not images and not documents:
+        return None
+    if not all(ref.isdecimal() for ref in (*images, *documents)):
+        return "Choose images and documents from your own library."
+    own = ImageCollection.objects.filter(
+        depth=2, name=engine.vendor_collection_name(str(vendor.public_id))
+    ).first()
+    if own is None:
+        return "Choose images and documents from your own library."
+    allowed = ImageCollection.objects.descendant_of(own, inclusive=True)
+    for model, refs in ((get_image_model(), images), (get_document_model(), documents)):
+        wanted = {int(ref) for ref in refs}
+        if wanted and model.objects.filter(pk__in=wanted, collection__in=allowed).count() != len(
+            wanted
+        ):
+            return "Choose images and documents from your own library."
+    return None
+
+
+def storefront_html(vendor: Vendor, stored: str) -> str:
+    """A stored storefront text ready for `|richtext` (D-34): a legacy plain text becomes
+    paragraphs, the HTML goes through the allow-list again (it was cleaned on save, but a write
+    that skipped the hook must not reach a page), and a text that embeds another vendor's image
+    or document is not shown at all."""
+    html = _clean_rich_text(engine.plain_to_html(stored))
+    if media_problem(vendor, html) is not None:
+        logger.warning(
+            "Storefront text of vendor %s hidden: media outside its collection", vendor.pk
+        )
+        return ""
+    return html
+
+
 def storefront_profile(vendor: Vendor, language: str) -> StorefrontProfile | None:
     """The published text of `vendor` in `language`, else in the source language, else None.
     Drafts and machine translations awaiting review are never public."""
@@ -132,13 +182,13 @@ def storefront_profile(vendor: Vendor, language: str) -> StorefrontProfile | Non
     if text is None or resolved.language is None:
         return None
     policies = (
-        (gettext_lazy("Shipping"), text.shipping_policy),
-        (gettext_lazy("Returns and refunds"), text.refund_policy),
-        (gettext_lazy("Cancellation"), text.cancellation_policy),
+        (gettext_lazy("Shipping"), storefront_html(vendor, text.shipping_policy)),
+        (gettext_lazy("Returns and refunds"), storefront_html(vendor, text.refund_policy)),
+        (gettext_lazy("Cancellation"), storefront_html(vendor, text.cancellation_policy)),
     )
     return StorefrontProfile(
         tagline=text.tagline,
-        description=text.description,
+        description=storefront_html(vendor, text.description),
         policies=tuple((str(title), body) for title, body in policies if body.strip()),
         language=resolved.language,
         is_fallback=resolved.is_fallback,
@@ -1837,6 +1887,41 @@ def _profile_identity(row: VendorTranslation, **extra: Any) -> dict[str, Any]:
     return {"vendor": str(row.vendor.public_id), "language": row.language, **extra}
 
 
+def _spend_profile_budget(actor: User, vendor: Vendor) -> None:
+    """Count one real change to the storefront profile (texts or logo) against the owner's and
+    the vendor's hourly limits, so that neither one owner nor several can flood the moderators.
+    Raises `ValidationError` when a limit is reached (the caller's transaction rolls back)."""
+    # Per owner, and per vendor so that several owners cannot multiply the moderator emails.
+    waits = (
+        consume_rate_limit(
+            f"vendor-profile:user:{actor.pk}",
+            limit=settings.VENDOR_PROFILE_SAVE_LIMIT,
+            window=PROFILE_RATE_WINDOW,
+        ),
+        consume_rate_limit(
+            f"vendor-profile:vendor:{vendor.pk}",
+            limit=settings.VENDOR_PROFILE_VENDOR_SAVE_LIMIT,
+            window=PROFILE_RATE_WINDOW,
+        ),
+    )
+    wait = max(waits)
+    if wait:
+        raise ValidationError(
+            f"Too many changes: try again in {max(1, int(wait.total_seconds() // 60))} minutes."
+        )
+
+
+def _lock_profile_vendor(vendor: Vendor, actor: User) -> Vendor:
+    """The owner check, then the vendor row under lock: a suspension or closure that commits
+    first is seen. Applicants and vendors in onboarding may set up their shop page."""
+    if not has_vendor_permission(actor, vendor, "profile"):
+        raise PermissionDenied("Only the vendor owner edits the storefront profile.")
+    locked = Vendor.objects.select_for_update(of=("self",)).select_related("logo").get(pk=vendor.pk)
+    if locked.status in PROFILE_LOCKED:
+        raise PermissionDenied("A suspended or closed vendor cannot change its profile.")
+    return locked
+
+
 def save_storefront_profile(
     vendor: Vendor,
     language: str,
@@ -1850,10 +1935,11 @@ def save_storefront_profile(
 
     Only an owner of `vendor` may (`profile` in the role matrix, CORE.2); staff, members of other
     vendors and strangers get `PermissionDenied` before anything is read, and so does a suspended
-    or closed vendor. The texts are plain text with length caps (`engine.PROFILE_MAX_LENGTH`):
-    HTML is refused with a `ValidationError`, never stripped, and every consumer must escape on
-    output. The change is live at once (post-moderation): the row becomes `published` only when a
-    text really changes (saving a machine draft unchanged leaves it a draft). One
+    or closed vendor. The tagline is plain text (HTML refused); the description and policies are
+    rich text, cleaned with the CMS.12 allow-list, capped on the stored HTML
+    (`engine.PROFILE_MAX_LENGTH`), and may embed only images and documents of the vendor's own
+    collection (D-34). The change is live at once (post-moderation): the row becomes `published`
+    only when a text really changes (saving a machine draft unchanged leaves it a draft). One
     `vendor.profile_changed` audit entry holds the changed fields before and after (so staff can
     revert); when the source-language row changes, the other languages sent back to review get a
     `vendor.profile_translation_stale` entry each. The moderators are told through the email
@@ -1869,7 +1955,31 @@ def save_storefront_profile(
     unknown = sorted(set(values) - set(PROFILE_FIELDS))
     if unknown:
         raise ValidationError(f"Not storefront profile fields: {', '.join(unknown)}.")
+    # A bogus image format would make the page fail: refused on the raw text, before the cleaning
+    # (which would drop such an embed without a word).
+    formats = import_string("apps.cms.engine.image_format_names")()
+    format_problems = {
+        name: "Choose an image format from the editor."
+        for name, value in values.items()
+        if name in engine.RICH_TEXT_FIELDS
+        and any(fmt not in formats for fmt in engine.image_embed_formats(value))
+    }
+    if format_problems:
+        raise ValidationError(format_problems)
+    # Rich text is cleaned first (the CMS.12 hook would do it on `save` anyway): the caps, the
+    # media rule and the before/after audit all see the text that would be stored.
+    values = {
+        name: _clean_rich_text(value) if name in engine.RICH_TEXT_FIELDS else value
+        for name, value in values.items()
+    }
     problems = engine.profile_text_errors(values)
+    if not problems:
+        problems = {
+            name: problem
+            for name, value in values.items()
+            if name in engine.RICH_TEXT_FIELDS
+            if (problem := media_problem(vendor, value)) is not None
+        }
     if problems:
         raise ValidationError(problems)
     with transaction.atomic():
@@ -1907,24 +2017,7 @@ def save_storefront_profile(
                 changes.update(PROFILE_LABEL, key, old, new)
         if dry_run or changes.is_empty:
             return changes
-        # Per owner, and per vendor so that several owners cannot multiply the moderator emails.
-        waits = (
-            consume_rate_limit(
-                f"vendor-profile:user:{actor.pk}",
-                limit=settings.VENDOR_PROFILE_SAVE_LIMIT,
-                window=PROFILE_RATE_WINDOW,
-            ),
-            consume_rate_limit(
-                f"vendor-profile:vendor:{vendor.pk}",
-                limit=settings.VENDOR_PROFILE_VENDOR_SAVE_LIMIT,
-                window=PROFILE_RATE_WINDOW,
-            ),
-        )
-        wait = max(waits)
-        if wait:
-            raise ValidationError(
-                f"Too many changes: try again in {max(1, int(wait.total_seconds() // 60))} minutes."
-            )
+        _spend_profile_budget(actor, vendor)
         siblings = dict(
             VendorTranslation.objects.filter(vendor=vendor)
             .exclude(language=language)
@@ -1984,6 +2077,303 @@ def _notify_profile_changed(vendor: Vendor, language: str, changed: list[str]) -
             "fields": ", ".join(changed),
         },
     )
+
+
+# --- Vendor logo (CORE.9 part 2b)
+
+LOGO_CHANGED = "vendor.logo_changed"
+LOGO_LICENCE_CODE = "own-work"
+
+
+def _logo_snapshot(logo: Any, alt: str) -> dict[str, Any]:
+    """The audited state: the image as `image:<id>` (its file is deleted when replaced, so the
+    id only says that it was a different image) and the alt text."""
+    return {"logo": None if logo is None else f"image:{logo.pk}", "logo_alt": alt}
+
+
+def vendor_logo_collection(vendor: Vendor) -> ImageCollection:
+    """The vendor's own image collection `vendor-<public id>` (created on first use, under the
+    root; no group permissions, so only the superuser sees it in the Wagtail admin).
+
+    Call it with the vendor row locked (the same vendor twice) and it also locks the root
+    collection row: the collections are one shared tree, so two vendors' first uploads would
+    otherwise compute the same child path. Found by name among the root's children, the oldest
+    first: staff can rename or duplicate collections in the Wagtail admin, and a duplicate never
+    changes which one an upload goes to.
+    """
+    name = f"vendor-{vendor.public_id}"
+    root = ImageCollection.objects.select_for_update().get(
+        pk=ImageCollection.get_first_root_node().pk
+    )
+    found = root.get_children().filter(name=name).order_by("pk").first()
+    return found if found is not None else root.add_child(name=name)
+
+
+def _new_logo_image(
+    vendor: Vendor, upload: Any, actor: User, collection: ImageCollection
+) -> MediaImage:
+    """The unsaved image for `upload`, validated by `MediaImage.clean` (SEC.2: content checks,
+    caps, safe name; the file is re-encoded when saved). Own work of the vendor."""
+    licence = ImageLicence.objects.filter(code=LOGO_LICENCE_CODE).first()
+    if licence is None:  # the seeded allow list (core migration 0013) is incomplete
+        raise ValidationError({"logo": "Logos cannot be uploaded right now: contact support."})
+    image = MediaImage(
+        title=f"Logo of {vendor.display_name}"[:255],
+        file=upload,
+        collection=collection,
+        licence=licence,
+        author=vendor.display_name[:200],
+        uploaded_by_user=actor,
+    )
+    try:
+        image.full_clean()
+    except ValidationError as error:
+        messages = [m for items in error.message_dict.values() for m in items]
+        raise ValidationError({"logo": messages}) from error
+    return image
+
+
+def set_vendor_logo(
+    vendor: Vendor,
+    *,
+    upload: Any,
+    alt: str,
+    actor: User,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """The vendor owner sets or replaces the logo, or only its alt text (`upload=None`).
+
+    Owner only, and not for a suspended or closed vendor (`PermissionDenied`, before any file is
+    read). The alt text is required, short plain text. A new file goes through the SEC.2 checks
+    of `MediaImage` into the vendor's own collection; the previous image is deleted, and a
+    refused file leaves the current logo as it is. One `vendor.logo_changed` audit entry holds
+    the logo and alt text before and after. It counts against the profile save limits.
+    """
+    alt = alt.strip()
+    spent = False
+    if upload is not None and not dry_run:
+        # A refused file costs decode work: count every attempt, in its own transaction so that
+        # the refusal below does not roll the count back.
+        if not has_vendor_permission(actor, vendor, "profile"):
+            raise PermissionDenied("Only the vendor owner edits the storefront profile.")
+        _spend_profile_budget(actor, vendor)
+        spent = True
+    stored: tuple[Any, str] | None = None
+    try:
+        with transaction.atomic():
+            locked = _lock_profile_vendor(vendor, actor)
+            problem = engine.logo_alt_errors(alt)
+            if problem:
+                raise ValidationError({"logo_alt": problem})
+            if upload is None and locked.logo is None:
+                raise ValidationError({"logo": "Choose an image."})
+            before = _logo_snapshot(locked.logo, locked.logo_alt)
+            image = locked.logo
+            if upload is not None:
+                collection = ImageCollection.get_first_root_node() if dry_run else None
+                collection = collection or vendor_logo_collection(locked)
+                image = _new_logo_image(locked, upload, actor, collection)
+            after = _logo_snapshot(image if upload is None else _PendingImage(), alt)
+            changes = ChangeSet()
+            changes.update(MODEL_LABEL, str(vendor.public_id), before, after)
+            if dry_run or changes.is_empty:
+                return changes
+            if not spent:
+                _spend_profile_budget(actor, vendor)
+            previous = locked.logo
+            if upload is not None:
+                image.save()  # type: ignore[union-attr]
+                stored = (image.file.storage, image.file.name)  # type: ignore[union-attr]
+                after = _logo_snapshot(image, alt)
+                changes = ChangeSet()
+                changes.update(MODEL_LABEL, str(vendor.public_id), before, after)
+            Vendor.objects.filter(pk=vendor.pk).update(
+                logo=image, logo_alt=alt, updated_at=timezone.now()
+            )
+            audit_changes(changes, ctx=ctx, action=LOGO_CHANGED)
+            if upload is not None and previous is not None:
+                _discard_logo_image(previous, vendor)
+            _notify_profile_changed(vendor, "all languages", ["logo"])
+    except BaseException:
+        if stored is not None:  # the row rolls back; the file would stay on disk
+            stored[0].delete(stored[1])
+        raise
+    vendor.logo, vendor.logo_alt = image, alt
+    return changes
+
+
+def _discard_logo_image(image: MediaImage, vendor: Vendor) -> None:
+    """Delete a replaced or removed logo image, unless something else still uses it (another
+    vendor, or a protected reference): then it is only unlinked from `vendor`."""
+    if Vendor.objects.filter(logo=image).exclude(pk=vendor.pk).exists():
+        return
+    try:
+        with transaction.atomic():  # a savepoint: a protected row must not poison the caller's
+            image.delete()
+    except ProtectedError:
+        logger.info("logo image %s is still referenced: kept", image.pk)
+
+
+def remove_vendor_logo(
+    vendor: Vendor, *, actor: User, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """The vendor owner removes the logo: the image is deleted, `vendor.logo_changed` audited."""
+    with transaction.atomic():
+        locked = _lock_profile_vendor(vendor, actor)
+        changes = ChangeSet()
+        if locked.logo is None:
+            return changes
+        changes.update(
+            MODEL_LABEL,
+            str(vendor.public_id),
+            _logo_snapshot(locked.logo, locked.logo_alt),
+            _logo_snapshot(None, ""),
+        )
+        if dry_run:
+            return changes
+        _spend_profile_budget(actor, vendor)
+        previous = locked.logo
+        Vendor.objects.filter(pk=vendor.pk).update(
+            logo=None, logo_alt="", updated_at=timezone.now()
+        )
+        audit_changes(changes, ctx=ctx, action=LOGO_CHANGED)
+        _discard_logo_image(previous, vendor)
+    vendor.logo, vendor.logo_alt = None, ""
+    return changes
+
+
+# --- Storefront media chooser (VEN.31, D-34)
+
+MEDIA_UPLOADED = "vendor.media_uploaded"
+MEDIA_DENIED = "vendor.media_denied"
+MEDIA_DENIED_AUDIT_LIMIT = 20  # denial rows per vendor and hour
+MEDIA_UPLOAD_LIMIT = 30  # uploads per owner and hour: every attempt costs image decode work
+
+
+def vendor_media_collection(vendor: Vendor) -> ImageCollection | None:
+    """The vendor's own collection `vendor-<public id>` (depth 2), or None before the first
+    upload. Read only: the chooser creates nothing."""
+    # The oldest by pk, as `vendor_logo_collection` finds it: reads and writes use one collection
+    # even when staff create a duplicate name.
+    return (
+        ImageCollection.objects.filter(
+            depth=2, name=engine.vendor_collection_name(str(vendor.public_id))
+        )
+        .order_by("pk")
+        .first()
+    )
+
+
+def vendor_media_images(vendor: Vendor) -> QuerySet[Any]:
+    """The images the vendor may list and choose: its collection and the ones below it."""
+    own = vendor_media_collection(vendor)
+    images: QuerySet[Any] = get_image_model().objects.all()
+    if own is None:
+        return images.none()
+    allowed = ImageCollection.objects.descendant_of(own, inclusive=True)
+    found: QuerySet[Any] = images.filter(collection__in=allowed)
+    return found
+
+
+def audit_media_denied(vendor: Vendor, *, ctx: AuditContext, what: str, target: str = "") -> None:
+    """A chooser or upload request named something outside the vendor's own collection.
+
+    Rate limited per vendor and hour: past the limit the request still answers 404, but no row
+    is written, so a loop on random ids cannot grow the audit table."""
+    if consume_rate_limit(
+        f"vendor-media-denied:vendor:{vendor.pk}",
+        limit=MEDIA_DENIED_AUDIT_LIMIT,
+        window=PROFILE_RATE_WINDOW,
+    ):
+        return
+    record(
+        ctx,
+        MEDIA_DENIED,
+        MODEL_LABEL,
+        str(vendor.public_id),
+        None,
+        {"request": what, "target": target[:100], "vendor": str(vendor.public_id)},
+    )
+
+
+def upload_storefront_image(
+    vendor: Vendor,
+    *,
+    upload: Any,
+    title: str,
+    actor: User,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> MediaImage:
+    """The vendor owner uploads an image from the storefront editor, into the vendor's own
+    collection only (the caller cannot name another). The SEC.2 checks of `MediaImage` apply
+    (content type, caps, re-encoding without metadata, no SVG); the image is the vendor's own
+    work (CMS.8). Owner only, and not for a suspended or closed vendor (`PermissionDenied`).
+    Counted against an hourly limit per owner; one `vendor.media_uploaded` audit entry.
+    Raises `ValidationError({"file": [...]})` for a refused file. With `dry_run` the file is
+    checked and the unsaved image returned: nothing is written, counted or audited."""
+    if not has_vendor_permission(actor, vendor, "profile"):
+        raise PermissionDenied("Only the vendor owner uploads storefront images.")
+    wait = (
+        None
+        if dry_run
+        else consume_rate_limit(
+            f"vendor-media:user:{actor.pk}", limit=MEDIA_UPLOAD_LIMIT, window=PROFILE_RATE_WINDOW
+        )
+    )
+    if wait:
+        minutes = max(1, int(wait.total_seconds() // 60))
+        raise ValidationError({"file": f"Too many uploads: try again in {minutes} minutes."})
+    stored: tuple[Any, str] | None = None
+    try:
+        with transaction.atomic():
+            locked = _lock_profile_vendor(vendor, actor)
+            licence = ImageLicence.objects.filter(code=LOGO_LICENCE_CODE).first()
+            if licence is None:  # the seeded allow list (core migration 0013) is incomplete
+                raise ValidationError({"file": "Uploads are not available: contact support."})
+            root = ImageCollection.get_first_root_node()
+            target = root if dry_run else vendor_logo_collection(locked)
+            image = MediaImage(
+                title=(title.strip() or "Image")[:255],
+                file=upload,
+                collection=target,
+                licence=licence,
+                author=vendor.display_name[:200],
+                uploaded_by_user=actor,
+            )
+            try:
+                image.full_clean()
+            except ValidationError as error:
+                messages = [m for items in error.message_dict.values() for m in items]
+                raise ValidationError({"file": messages}) from error
+            if dry_run:
+                return image
+            image.save()
+            stored = (image.file.storage, image.file.name)
+            record(
+                ctx,
+                MEDIA_UPLOADED,
+                MODEL_LABEL,
+                str(vendor.public_id),
+                None,
+                {
+                    "image": f"image:{image.pk}",
+                    "title": image.title,
+                    "vendor": str(vendor.public_id),
+                },
+            )
+    except BaseException:
+        if stored is not None:  # the row rolls back; the file would stay on disk
+            stored[0].delete(stored[1])
+        raise
+    return image
+
+
+class _PendingImage:
+    """Stands for the image of a dry run, which is never saved."""
+
+    pk = "new"
 
 
 # --- Public "Sell with us" application (VEN.22, owner decision Q-55)
