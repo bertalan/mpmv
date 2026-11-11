@@ -170,6 +170,10 @@ msgstr "Scegli come confermare la tua identità dopo la password."
 msgid "Confirm"
 msgstr "Conferma"
 
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid "Confirm and delete the old logo"
+msgstr "Conferma ed elimina il vecchio logo"
+
 #: apps/accounts/templates/accounts/action_link/continue.html
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 #: apps/accounts/templates/accounts/mfa/recovery_codes_new.html
@@ -836,6 +840,10 @@ msgid "Tagline"
 msgstr "Slogan"
 
 #: apps/manager/views.py
+msgid "The change is confirmed and the old logo is deleted."
+msgstr "La modifica è confermata e il vecchio logo è stato eliminato."
+
+#: apps/manager/views.py
 msgid "The change was reverted and the owners were told."
 msgstr "La modifica è stata annullata e i titolari sono stati avvisati."
 
@@ -899,6 +907,14 @@ msgstr "La passkey non ha funzionato."
 #: apps/accounts/mfa_views.py
 msgid "the passkey was not accepted"
 msgstr "la passkey non è stata accettata"
+
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid ""
+"The previous logo is kept until the review window closes, so a revert can restore it. Confirm the "
+"change to delete it now."
+msgstr ""
+"Il logo precedente viene conservato fino alla chiusura del periodo di verifica, così un "
+"annullamento può ripristinarlo. Conferma la modifica per eliminarlo subito."
 
 #: themes/base/templates/400.html
 msgid "The request could not be understood. Check the address and try again."

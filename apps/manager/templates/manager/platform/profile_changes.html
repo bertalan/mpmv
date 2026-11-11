@@ -25,6 +25,13 @@ values are escaped by the template engine: rich text shows as its stored HTML so
             {% for item in row.diff %}<tr><th scope="row">{{ item.field }}</th><td>{{ item.before|linebreaksbr }}</td><td>{{ item.after|linebreaksbr }}</td></tr>{% endfor %}
           </tbody>
         </table>
+        {% if row.confirmable %}
+          <form method="post" action="{% url 'manager:platform:profile_confirm' entry=row.entry.public_id %}" class="manager-form">
+            {% csrf_token %}
+            <p class="manager-help">{% translate "The previous logo is kept until the review window closes, so a revert can restore it. Confirm the change to delete it now." %}</p>
+            {% include "components/button.html" with label=_("Confirm and delete the old logo") type="submit" only %}
+          </form>
+        {% endif %}
         {% if not row.is_revert and not row.reverted %}
           <form method="post" action="{% url 'manager:platform:profile_revert' entry=row.entry.public_id %}" class="manager-form">
             {% csrf_token %}

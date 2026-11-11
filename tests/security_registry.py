@@ -123,6 +123,11 @@ IDOR_REVIEWED: dict[str, str] = {
         "The signed token is bound to one user and one object (CORE.15); a token of another "
         "user or object is refused (apps/accounts/tests/integration/test_action_links.py)."
     ),
+    "manager:platform:profile_confirm": (
+        "Platform space, for staff holding the revert permission only (a vendor member gets 403 "
+        "from the gate); the entry is an audit entry of any vendor, which staff may review by "
+        "design."
+    ),
     "manager:platform:profile_revert": (
         "Platform space, for staff holding the revert permission only (a vendor member gets 403 "
         "from the gate, `test_a_vendor_member_cannot_reach_the_page_or_the_revert`); the entry is "

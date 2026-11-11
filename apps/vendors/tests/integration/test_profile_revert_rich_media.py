@@ -172,18 +172,6 @@ def test_reverting_an_alt_text_change_restores_the_alt_and_keeps_the_logo(
     assert vendor.logo_alt == "Shop mark"
 
 
-def test_reverting_a_replaced_logo_takes_the_new_one_down(
-    vendor: Vendor, owner: User, staff: User
-) -> None:
-    """The previous image file was deleted when it was replaced, so it cannot come back: the
-    vendor is left without a logo and the audit entry says so."""
-    _logo(vendor, owner)
-    entry = _logo(vendor, owner, alt="Other mark")
-    revert_logo_change(entry.public_id, REASON, actor=staff, ctx=STAFF_CTX)
-    vendor.refresh_from_db()
-    assert vendor.logo is None
-
-
 def test_a_logo_revert_tells_the_owners_and_needs_a_reason(
     vendor: Vendor, owner: User, staff: User
 ) -> None:

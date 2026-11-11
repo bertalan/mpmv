@@ -52,6 +52,11 @@ platform = (
             views.ProfileRevertView.as_view(),
             name="profile_revert",
         ),
+        path(
+            "profile-changes/<uuid:entry>/confirm/",
+            views.ProfileConfirmView.as_view(),
+            name="profile_confirm",
+        ),
         path("notices/", notice_views.NoticeListView.as_view(), name="notices"),
         path("notices/<uuid:public_id>/", notice_views.NoticeDetailView.as_view(), name="notice"),
     ],

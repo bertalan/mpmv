@@ -2181,7 +2181,6 @@ def set_vendor_logo(
                 return changes
             if not spent:
                 _spend_profile_budget(actor, vendor)
-            previous = locked.logo
             if upload is not None:
                 image.save()  # type: ignore[union-attr]
                 stored = (image.file.storage, image.file.name)  # type: ignore[union-attr]
@@ -2192,8 +2191,8 @@ def set_vendor_logo(
                 logo=image, logo_alt=alt, updated_at=timezone.now()
             )
             audit_changes(changes, ctx=ctx, action=LOGO_CHANGED)
-            if upload is not None and previous is not None:
-                _discard_logo_image(previous, vendor)
+            # The previous file stays until the review window closes or staff confirm the change,
+            # so a revert can put it back (owner decision Q1; `purge_retained_logos`).
             _notify_profile_changed(vendor, "all languages", ["logo"])
     except BaseException:
         if stored is not None:  # the row rolls back; the file would stay on disk
@@ -2218,7 +2217,8 @@ def _discard_logo_image(image: MediaImage, vendor: Vendor) -> None:
 def remove_vendor_logo(
     vendor: Vendor, *, actor: User, ctx: AuditContext, dry_run: bool = False
 ) -> ChangeSet:
-    """The vendor owner removes the logo: the image is deleted, `vendor.logo_changed` audited."""
+    """The vendor owner removes the logo: `vendor.logo_changed` is audited and the image file is
+    kept for the review window, like a replaced one."""
     with transaction.atomic():
         locked = _lock_profile_vendor(vendor, actor)
         changes = ChangeSet()
@@ -2233,12 +2233,11 @@ def remove_vendor_logo(
         if dry_run:
             return changes
         _spend_profile_budget(actor, vendor)
-        previous = locked.logo
         Vendor.objects.filter(pk=vendor.pk).update(
             logo=None, logo_alt="", updated_at=timezone.now()
         )
         audit_changes(changes, ctx=ctx, action=LOGO_CHANGED)
-        _discard_logo_image(previous, vendor)
+        # The image file stays, like a replaced one (see `set_vendor_logo`).
     vendor.logo, vendor.logo_alt = None, ""
     return changes
 
@@ -2936,6 +2935,8 @@ def purge_unconfirmed_applications(
 
 PROFILE_REVERTED = "vendor.profile_reverted"
 LOGO_REVERTED = "vendor.logo_reverted"
+LOGO_CONFIRMED = "vendor.logo_confirmed"
+LOGO_PURGED = "vendor.logo_purged"
 PROFILE_REVERT_PERMISSION = "vendors.revert_storefront_profile"
 PROFILE_REVERT_EMAIL_TEMPLATE = "vendors.profile_reverted"
 PROFILE_REASON_MAX_LENGTH = 1000
@@ -3129,9 +3130,10 @@ def revert_logo_change(
 
     Same rules as `revert_profile_change`: `PROFILE_REVERT_PERMISSION`, a plain-text `reason`,
     refused when the entry is unknown or already reverted or when the logo or its alt text changed
-    since. An alt-text change is undone to the previous text. When the entry set or replaced the
-    image the previous file is gone (a replaced logo is deleted), so the vendor is left without a
-    logo and the audit entry says so. One `vendor.logo_reverted` entry and a
+    since. The previous logo and its alt text are restored when the entry still names a kept file
+    in the vendor's own collection (the file is kept until the review window closes or staff
+    confirm the change); the logo it replaced is deleted. When nothing is kept (first logo, file
+    purged, confirmed) the vendor is left without a logo. One `vendor.logo_reverted` entry and a
     `vendors.profile_reverted` email to each owner; a dry run returns the ChangeSet only.
     """
     if not can_review_profiles(actor):
@@ -3163,10 +3165,8 @@ def revert_logo_change(
             raise ValidationError(
                 {"entry": "The logo changed after this change: revert the later change first."}
             )
-        keeps_image = before.get("logo") is not None and before.get("logo") == after.get("logo")
-        target = _logo_snapshot(vendor.logo if keeps_image else None, "")
-        if keeps_image:
-            target["logo_alt"] = str(before.get("logo_alt", ""))
+        restored = _kept_logo_image(vendor, before.get("logo"))
+        target = _logo_snapshot(restored, str(before.get("logo_alt", "")) if restored else "")
         changes = ChangeSet()
         changes.update(
             MODEL_LABEL,
@@ -3178,12 +3178,188 @@ def revert_logo_change(
             return changes
         previous = vendor.logo
         Vendor.objects.filter(pk=vendor.pk).update(
-            logo=vendor.logo if keeps_image else None,
-            logo_alt=target["logo_alt"],
-            updated_at=timezone.now(),
+            logo=restored, logo_alt=target["logo_alt"], updated_at=timezone.now()
         )
         audit_changes(changes, ctx=ctx, action=LOGO_REVERTED)
-        if previous is not None and not keeps_image:
+        if previous is not None and (restored is None or restored.pk != previous.pk):
             _discard_logo_image(previous, vendor)
         _notify_profile_reverted(vendor, "all languages", ["logo"], reason)
     return changes
+
+
+# --- Kept logo files: the review window (owner decision Q1)
+
+
+def _image_id(reference: Any) -> int | None:
+    """The id in an audited `image:<id>` reference, or None."""
+    if isinstance(reference, str) and reference.startswith("image:"):
+        value = reference.removeprefix("image:")
+        return int(value) if value.isdecimal() else None
+    return None
+
+
+def _own_logo_collection(vendor: Vendor) -> ImageCollection | None:
+    return ImageCollection.objects.filter(
+        depth=2, name=engine.vendor_collection_name(str(vendor.public_id))
+    ).first()
+
+
+def _kept_logo_image(vendor: Vendor, reference: Any) -> MediaImage | None:
+    """The kept file `reference` names, if it still exists and is in the vendor's own collection
+    (a crafted entry never reaches another vendor's image), else None."""
+    image_id = _image_id(reference)
+    own = _own_logo_collection(vendor)
+    if image_id is None or own is None:
+        return None
+    found: MediaImage | None = MediaImage.objects.filter(pk=image_id, collection=own).first()
+    return found
+
+
+def _logo_entry_done(entry: AuditLog) -> bool:
+    """Whether a logo change was already reverted, confirmed or purged."""
+    sid = str(entry.public_id)
+    return (
+        AuditLog.objects.filter(action=LOGO_REVERTED, after__reverts=sid).exists()
+        or AuditLog.objects.filter(
+            action__in=(LOGO_CONFIRMED, LOGO_PURGED), after__entry=sid
+        ).exists()
+    )
+
+
+def _delete_kept_image(vendor: Vendor, image_id: int) -> str:
+    """Delete a kept logo file unless a vendor uses it now; the outcome for the audit entry."""
+    image = MediaImage.objects.filter(pk=image_id).first()
+    if image is None:
+        return "gone"
+    if Vendor.objects.filter(logo=image).exists():
+        return "in_use"
+    _discard_logo_image(image, vendor)
+    return "deleted" if not MediaImage.objects.filter(pk=image_id).exists() else "kept"
+
+
+def confirm_logo_change(
+    entry_public_id: Any, *, actor: User, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Staff accept an owner's logo change: the previous file kept for a revert is deleted now
+    (owner decision Q1). `PROFILE_REVERT_PERMISSION`. Refused when the entry is unknown, names
+    no kept file, or was already reverted, confirmed or purged. After it a revert can only take
+    the logo down. One `vendor.logo_confirmed` audit entry; a dry run returns the ChangeSet."""
+    if not can_review_profiles(actor):
+        raise PermissionDenied("Only platform staff confirm storefront profile changes.")
+    with transaction.atomic():
+        entry = AuditLog.objects.filter(public_id=entry_public_id, action=LOGO_CHANGED).first()
+        before = entry.before if entry is not None else None
+        image_id = _image_id(before.get("logo")) if isinstance(before, dict) else None
+        if entry is None or image_id is None:
+            raise ValidationError({"entry": "Nothing is kept for this logo change."})
+        try:
+            vendor = (
+                Vendor.objects.select_for_update(of=("self",))
+                .filter(public_id=entry.vendor_key)
+                .first()
+            )
+        except (ValueError, ValidationError, TypeError):
+            vendor = None
+        if vendor is None:
+            raise ValidationError({"entry": "Unknown logo change."})
+        if _logo_entry_done(entry):
+            raise ValidationError({"entry": "This change was already handled."})
+        if _kept_logo_image(vendor, before.get("logo")) is None:  # type: ignore[union-attr]
+            raise ValidationError({"entry": "Nothing is kept for this logo change."})
+        changes = ChangeSet()
+        changes.update(
+            MODEL_LABEL,
+            str(vendor.public_id),
+            {"logo_kept": f"image:{image_id}"},
+            {"logo_kept": None, "entry": str(entry.public_id), "outcome": "confirmed"},
+        )
+        if dry_run:
+            return changes
+        _delete_kept_image(vendor, image_id)
+        audit_changes(changes, ctx=ctx, action=LOGO_CONFIRMED)
+    return changes
+
+
+def purge_retained_logos(
+    *, ctx: AuditContext, now: dt.datetime | None = None, dry_run: bool = False, batch: int = 200
+) -> ChangeSet:
+    """Delete the logo files kept for a revert once the review window
+    (`settings.VENDOR_LOGO_REVIEW_DAYS`) has closed (owner decision Q1). For each older
+    `vendor.logo_changed` entry that names a file and has no revert, confirmation or purge yet:
+    the file goes unless a vendor uses it now, and one `vendor.logo_purged` entry records the
+    outcome (`deleted`, `gone` or `in_use`). Idempotent; at most `batch` entries a run; a dry
+    run returns the ChangeSet only."""
+    cutoff = (now or timezone.now()) - dt.timedelta(days=settings.VENDOR_LOGO_REVIEW_DAYS)
+    handled = set(
+        AuditLog.objects.filter(action__in=(LOGO_CONFIRMED, LOGO_PURGED)).values_list(
+            "after__entry", flat=True
+        )
+    ) | set(AuditLog.objects.filter(action=LOGO_REVERTED).values_list("after__reverts", flat=True))
+    changes = ChangeSet()
+    todo = []
+    old = AuditLog.objects.filter(action=LOGO_CHANGED, created_at__lte=cutoff).order_by("id")
+    for entry in old:
+        before = entry.before if isinstance(entry.before, dict) else {}
+        if str(entry.public_id) in handled or _image_id(before.get("logo")) is None:
+            continue
+        todo.append(entry)
+        if len(todo) >= batch:
+            break
+    for entry in todo:
+        before = entry.before if isinstance(entry.before, dict) else {}
+        image_id = _image_id(before.get("logo"))
+        if image_id is None:  # pragma: no cover
+            continue
+        with transaction.atomic():
+            vendor = (
+                Vendor.objects.select_for_update(of=("self",))
+                .filter(public_id=entry.vendor_key)
+                .first()
+            )
+            if vendor is None or _logo_entry_done(entry):
+                continue
+            outcome = "pending" if dry_run else _delete_kept_image(vendor, image_id)
+            step = ChangeSet()
+            step.update(
+                MODEL_LABEL,
+                str(vendor.public_id),
+                {"logo_kept": f"image:{image_id}"},
+                {"logo_kept": None, "entry": str(entry.public_id), "outcome": outcome},
+            )
+            changes.update(
+                MODEL_LABEL,
+                str(vendor.public_id),
+                {"logo_kept": f"image:{image_id}"},
+                {"logo_kept": None, "entry": str(entry.public_id), "outcome": outcome},
+            )
+            if not dry_run:
+                audit_changes(step, ctx=ctx, action=LOGO_PURGED)
+    return changes
+
+
+def confirmable_logo_entry_ids(entries: Collection[AuditLog]) -> set[str]:
+    """Public ids of the logo changes among `entries` that still have a kept file and were not
+    reverted, confirmed or purged (the history page offers "confirm" for these)."""
+    wanted = {
+        str(e.public_id): _image_id(e.before.get("logo"))
+        for e in entries
+        if e.action == LOGO_CHANGED and isinstance(e.before, dict)
+    }
+    wanted = {k: v for k, v in wanted.items() if v is not None}
+    if not wanted:
+        return set()
+    done = set(
+        AuditLog.objects.filter(
+            action__in=(LOGO_CONFIRMED, LOGO_PURGED), after__entry__in=list(wanted)
+        ).values_list("after__entry", flat=True)
+    ) | set(
+        AuditLog.objects.filter(action=LOGO_REVERTED, after__reverts__in=list(wanted)).values_list(
+            "after__reverts", flat=True
+        )
+    )
+    existing = set(
+        MediaImage.objects.filter(pk__in={v for v in wanted.values() if v}).values_list(
+            "pk", flat=True
+        )
+    )
+    return {k for k, v in wanted.items() if k not in done and v in existing}

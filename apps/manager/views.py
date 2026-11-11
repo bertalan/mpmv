@@ -42,6 +42,8 @@ from apps.vendors.scoping import Source, VendorScopedQuerySet
 from apps.vendors.services import (
     PROFILE_FIELDS,
     PROFILE_LOCKED,
+    confirm_logo_change,
+    confirmable_logo_entry_ids,
     profile_history,
     remove_vendor_logo,
     revert_logo_change,
@@ -414,6 +416,7 @@ class ProfileChangesView(ManagerView):
         user = self.manager.user
         entries = profile_history(user, vendor=vendor) if isinstance(user, User) else []
         reverted = reverted_entry_ids(entries)
+        confirmable = confirmable_logo_entry_ids(entries)
         keys = {e.vendor_key for e in entries if _is_uuid(e.vendor_key)}
         names = {
             str(k): v
@@ -433,6 +436,7 @@ class ProfileChangesView(ManagerView):
                     "is_revert": entry.action in REVERT_ACTIONS,
                     "reason": after.get("reason", ""),
                     "reverted": str(entry.public_id) in reverted,
+                    "confirmable": str(entry.public_id) in confirmable,
                     "diff": [
                         {"field": name, "before": before.get(name, ""), "after": after[name]}
                         for name in (*PROFILE_FIELDS, "logo", "logo_alt")
@@ -474,6 +478,35 @@ class ProfileRevertView(ManagerView):
             raise Http404("No Manager page here.") from error
         else:
             messages.success(request, _("The change was reverted and the owners were told."))
+        return HttpResponseRedirect(reverse("manager:platform:profile_changes"))
+
+
+class ProfileConfirmView(ManagerView):
+    """Confirm a logo change: the previous file kept for a revert is deleted now (owner decision
+    Q1). POST only, CSRF-protected, same level and step-up as the revert."""
+
+    section = "platform.profile_changes"
+    http_method_names = ["post"]
+
+    @requires_level_method("profile_revert")  # group 2 (CORE.25)
+    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        actor = self.manager.user
+        if not isinstance(actor, User):
+            raise Http404("No Manager page here.")
+        if not is_recently_verified(request):
+            target = "mfa:verify" if has_second_factor(actor) else "mfa:setup"
+            return mfa_redirect(
+                request, target, next_url=reverse("manager:platform:profile_changes")
+            )
+        ctx = replace(audit_context(request), source=AuditLog.Source.ADMIN)
+        try:
+            confirm_logo_change(kwargs["entry"], actor=actor, ctx=ctx)
+        except ValidationError as error:
+            messages.error(request, " ".join(error.messages))
+        except PermissionDenied as error:
+            raise Http404("No Manager page here.") from error
+        else:
+            messages.success(request, _("The change is confirmed and the old logo is deleted."))
         return HttpResponseRedirect(reverse("manager:platform:profile_changes"))
 
 

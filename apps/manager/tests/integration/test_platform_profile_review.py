@@ -251,3 +251,31 @@ def test_the_notice_decisions_are_a_group_2_action(client: Client) -> None:
     assert client.post(url, {"action": "review"}).status_code == 403
     verified_login(client, staff, level=levels.OPERATIONAL)
     assert client.post(url, {"action": "review"}).status_code == 404  # past the gate
+
+
+def test_confirming_a_logo_replacement_deletes_the_kept_file_and_is_gated(
+    client: Client, reviewer: User, vendor: Vendor, owner: User
+) -> None:
+    from apps.core.models import MediaImage
+
+    for alt in ("First mark", "Second mark"):
+        set_vendor_logo(
+            vendor, upload=SimpleUploadedFile("logo.png", png()), alt=alt, actor=owner, ctx=CTX
+        )
+    entry = AuditLog.objects.filter(action="vendor.logo_changed").latest("id")
+    assert entry.before is not None
+    kept = int(entry.before["logo"].removeprefix("image:"))
+    confirm = f"{PAGE}{entry.public_id}/confirm/"
+    verified_login(client, reviewer, level=levels.RESTRICTED)
+    assert client.post(confirm).status_code == 403
+    assert MediaImage.objects.filter(pk=kept).exists()
+    verified_login(client, reviewer)
+    assert confirm in client.get(PAGE).text
+    client.post(confirm, follow=True)
+    assert not MediaImage.objects.filter(pk=kept).exists()
+    assert AuditLog.objects.filter(action="vendor.logo_confirmed").count() == 1
+
+
+def test_a_vendor_member_cannot_confirm(client: Client, owner: User, changed: AuditLog) -> None:
+    verified_login(client, owner)
+    assert client.post(f"{PAGE}{changed.public_id}/confirm/").status_code == 403
