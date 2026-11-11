@@ -19,7 +19,9 @@ from dataclasses import dataclass, replace
 from decimal import Decimal
 from urllib.parse import parse_qs, parse_qsl, quote, urlencode
 
-from apps.core.indexing import NOINDEX, is_noindex_forced
+from django.http import HttpRequest
+
+from apps.core.indexing import NOINDEX, is_noindex_forced, site_allows_indexing
 
 from .engine import to_price
 
@@ -248,11 +250,18 @@ ROBOTS_NOINDEX = "noindex, follow"
 INDEXED_PAGES = 10
 
 
-def listing_robots(params: ListingParams, *, total: int, indexed_pages: int = INDEXED_PAGES) -> str:
+def listing_robots(
+    params: ListingParams,
+    *,
+    total: int,
+    indexed_pages: int = INDEXED_PAGES,
+    request: HttpRequest | None = None,
+) -> str:
     """`noindex, follow` for a page past `indexed_pages` and for a filtered listing with no
     products (like an internal search with no results); `index, follow` otherwise. Filtered
-    listings with products are indexable on their canonical URL (CAT.8)."""
-    if is_noindex_forced():
+    listings with products are indexable on their canonical URL (CAT.8). `noindex, nofollow`
+    when the environment forces it or, given the `request`, its site has not allowed indexing."""
+    if is_noindex_forced() or (request is not None and not site_allows_indexing(request)):
         return NOINDEX
     if params.page > indexed_pages or (params.has_filters and total == 0):
         return ROBOTS_NOINDEX
