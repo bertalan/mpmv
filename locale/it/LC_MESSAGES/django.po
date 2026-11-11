@@ -1020,3 +1020,23 @@ msgstr "Il tuo ruolo"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your role requires a second factor before you can continue."
 msgstr "Il tuo ruolo richiede un secondo fattore prima di poter continuare."
+
+#: apps/manager/templates/manager/shop/link_dialog.html
+msgid "Add an external link"
+msgstr "Aggiungi un link esterno"
+
+#: apps/manager/media.py
+msgid "Enter a valid web address starting with https://"
+msgstr "Inserisci un indirizzo web valido che inizi con https://"
+
+#: apps/manager/templates/manager/shop/link_dialog.html
+msgid "Insert link"
+msgstr "Inserisci link"
+
+#: apps/manager/media.py
+msgid "Link text"
+msgstr "Testo del link"
+
+#: apps/manager/media.py
+msgid "Web address"
+msgstr "Indirizzo web"

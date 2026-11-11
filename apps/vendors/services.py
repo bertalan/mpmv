@@ -46,6 +46,7 @@ from apps.accounts.services import (
 )
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import Change, ChangeSet
+from apps.core.fields import read_upload
 from apps.core.models import AuditLog, ImageLicence, MediaImage, resolve_translation
 from apps.core.services import (
     NoPlatformOperator,
@@ -59,6 +60,7 @@ from apps.core.services import (
     save_audited,
 )
 from apps.core.throttling import ip_bucket
+from apps.core.uploads import UploadRefused, check_document
 
 from . import engine
 from .models import (
@@ -2368,6 +2370,85 @@ def upload_storefront_image(
             stored[0].delete(stored[1])
         raise
     return image
+
+
+def vendor_media_documents(vendor: Vendor) -> QuerySet[Any]:
+    """The documents the vendor may list and choose: its collection and the ones below it."""
+    own = vendor_media_collection(vendor)
+    documents: QuerySet[Any] = get_document_model().objects.all()
+    if own is None:
+        return documents.none()
+    allowed = ImageCollection.objects.descendant_of(own, inclusive=True)
+    found: QuerySet[Any] = documents.filter(collection__in=allowed)
+    return found
+
+
+def upload_storefront_document(
+    vendor: Vendor,
+    *,
+    upload: Any,
+    title: str,
+    actor: User,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> Any:
+    """The vendor owner uploads a PDF from the storefront editor, into the vendor's own
+    collection only (the caller cannot name another). The SEC.2 document checks apply (PDF by
+    content, size cap, no HTML or archive polyglot, a name the app makes). Owner only, and not
+    for a suspended or closed vendor (`PermissionDenied`). Shares the hourly upload limit of the
+    images; one `vendor.media_uploaded` audit entry (`after.document`). Raises
+    `ValidationError({"file": [...]})` for a refused file. With `dry_run` the file is checked and
+    the unsaved document returned: nothing is written, counted or audited."""
+    if not has_vendor_permission(actor, vendor, "profile"):
+        raise PermissionDenied("Only the vendor owner uploads storefront documents.")
+    wait = (
+        None
+        if dry_run
+        else consume_rate_limit(
+            f"vendor-media:user:{actor.pk}", limit=MEDIA_UPLOAD_LIMIT, window=PROFILE_RATE_WINDOW
+        )
+    )
+    if wait:
+        minutes = max(1, int(wait.total_seconds() // 60))
+        raise ValidationError({"file": f"Too many uploads: try again in {minutes} minutes."})
+    limit = settings.WAGTAILDOCS_MAX_UPLOAD_SIZE
+    try:
+        upload.name = check_document(read_upload(upload, limit), upload.name, max_bytes=limit)
+    except UploadRefused as refusal:
+        raise ValidationError({"file": refusal.message}) from None
+    stored: tuple[Any, str] | None = None
+    try:
+        with transaction.atomic():
+            locked = _lock_profile_vendor(vendor, actor)
+            root = ImageCollection.get_first_root_node()
+            target = root if dry_run else vendor_logo_collection(locked)
+            document = get_document_model()(
+                title=(title.strip() or "Document")[:255],
+                file=upload,
+                collection=target,
+                uploaded_by_user=actor,
+            )
+            if dry_run:
+                return document
+            document.save()
+            stored = (document.file.storage, document.file.name)
+            record(
+                ctx,
+                MEDIA_UPLOADED,
+                MODEL_LABEL,
+                str(vendor.public_id),
+                None,
+                {
+                    "document": f"document:{document.pk}",
+                    "title": document.title,
+                    "vendor": str(vendor.public_id),
+                },
+            )
+    except BaseException:
+        if stored is not None:  # the row rolls back; the file would stay on disk
+            stored[0].delete(stored[1])
+        raise
+    return document
 
 
 class _PendingImage:
