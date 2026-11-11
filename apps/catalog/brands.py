@@ -10,6 +10,7 @@ in the same transaction. Staff edits of brands and manufacturers (`save_*`, `del
 audited too; the admin calls these.
 """
 
+import logging
 from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -23,11 +24,13 @@ from django.db.models import Q, QuerySet
 from apps.core import translations
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
-from apps.core.services import audit_changes, run_mutation, save_audited
-from apps.vendors.models import Vendor
+from apps.core.services import audit_changes, enqueue_email, run_mutation, save_audited
+from apps.vendors.models import Vendor, VendorMember
 
 from . import engine, services
 from .models import Brand, BrandBatch, Manufacturer, Product, Redirect
+
+logger = logging.getLogger(__name__)
 
 BRAND_CREATED = "catalog.brand.created"
 BRAND_UPDATED = "catalog.brand.updated"
@@ -326,6 +329,68 @@ def _products_of(brands_: Iterable[Brand]) -> dict[int, list[str]]:
     return found
 
 
+REJECTED_TEMPLATE = "catalog.brand_rejected"
+
+
+def _owner_language(vendor: Vendor) -> str:
+    """The language of the vendor's owner (a vendor has none of its own yet); unknown or
+    unconfigured languages fall back to English when the email is queued."""
+    owner = (
+        VendorMember.objects.filter(vendor=vendor, role=VendorMember.Role.OWNER)
+        .select_related("user")
+        .order_by("id")
+        .first()
+    )
+    return owner.user.preferred_language if owner is not None else translations.source_language()
+
+
+def _product_title(product: Product, language: str) -> str:
+    """The product's name in `language`, else the source language, else any; the SKU when it has
+    no text yet. Drafts count: the vendor must recognise its own product."""
+    texts = {text.language: text.title for text in product.translations.all() if text.title}
+    for code in (language, translations.source_language()):
+        if code in texts:
+            return texts[code]
+    return next(iter(texts.values()), product.sku)
+
+
+def _notify_rejected(rejected: Sequence[tuple[Brand, Sequence[Product]]], *, key: str) -> None:
+    """One notice per vendor that lost a brand on its products, naming the rejected brand(s) and
+    that vendor's own products (nothing of other vendors), through the outbox in the caller's
+    transaction. A refused address is logged and skipped so it never blocks the review."""
+    per_vendor: dict[int, tuple[Vendor, list[tuple[Brand, list[Product]]]]] = {}
+    for brand, products in rejected:
+        for product in products:
+            vendor, entries = per_vendor.setdefault(product.vendor_id, (product.vendor, []))
+            if not entries or entries[-1][0].pk != brand.pk:
+                entries.append((brand, []))
+            entries[-1][1].append(product)
+    for vendor, entries in per_vendor.values():
+        language = _owner_language(vendor)
+        try:
+            enqueue_email(
+                recipient=vendor.contact_email,
+                template_key=REJECTED_TEMPLATE,
+                language=language,
+                idempotency_key=f"brand-rejected:{key}:{vendor.pk}",
+                context={
+                    "vendor_name": vendor.display_name,
+                    "brands": [
+                        {
+                            "name": brand.name,
+                            "products": [
+                                {"title": _product_title(p, language), "sku": p.sku}
+                                for p in products
+                            ],
+                        }
+                        for brand, products in entries
+                    ],
+                },
+            )
+        except ValueError:
+            logger.warning("brand rejection notice not queued for vendor %s", vendor.public_id)
+
+
 def _pending_only(brand: Brand) -> None:
     if brand.status != Brand.Status.PENDING:
         raise ValidationError("Only a brand waiting for review can be approved or rejected.")
@@ -351,7 +416,11 @@ def _review(
         stored = Brand.objects.select_for_update().get(pk=brand.pk)
         _pending_only(stored)
         if status == Brand.Status.REJECTED:
+            affected = list(
+                Product.objects.filter(brand=brand).select_related("vendor").order_by("pk")
+            )
             Product.objects.filter(brand=brand).update(brand=None)
+            _notify_rejected([(brand, affected)], key=str(brand.public_id))
         brand.status = status
         brand.save(update_fields=["status", "updated_at"])
 
@@ -403,7 +472,16 @@ def _review_batch(
             lock_brand_names()
             _refuse_taken_keys(pending)
         if status == Brand.Status.REJECTED:
+            used = list(
+                Product.objects.filter(brand__in=pending)
+                .select_related("vendor")
+                .order_by("brand_id", "pk")
+            )
             Product.objects.filter(brand__in=pending).update(brand=None)
+            _notify_rejected(
+                [(b, [p for p in used if p.brand_id == b.pk]) for b in pending],
+                key=str(batch.public_id),
+            )
         Brand.objects.filter(pk__in=[brand.pk for brand in pending]).update(status=status)
         BrandBatch.objects.filter(pk=batch.pk).update(status=status)
         batch.status = status
