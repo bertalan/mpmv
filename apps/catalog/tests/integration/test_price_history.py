@@ -9,7 +9,11 @@ from django.db import IntegrityError, connection, transaction
 
 from apps.catalog import engine, services
 from apps.catalog.models import PriceHistory, Product
-from apps.catalog.tests.factories import ProductFactory, VariantFactory
+from apps.catalog.tests.factories import (
+    PriceHistoryFactory,
+    ProductFactory,
+    VariantFactory,
+)
 from apps.core.audit import AuditContext
 from apps.vendors.tests.factories import VendorFactory
 
@@ -79,9 +83,7 @@ def _raw_update() -> None:
 
 
 def test_rows_cannot_be_updated_or_changed() -> None:
-    product = ProductFactory.create(price_net=Decimal("10.00"))
-    set_price(product, 1, "12.00")
-    row = PriceHistory.objects.get()
+    row = PriceHistoryFactory.create(price_net=Decimal("12.00"))
     row.price_net = Decimal("1.00")
     with pytest.raises(PermissionError):
         row.save()
