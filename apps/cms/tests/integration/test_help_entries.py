@@ -235,3 +235,55 @@ def test_the_vendor_guide_is_linked_only_when_asked_and_configured(settings: obj
     HelpEntry.objects.filter(~Q(kind="general")).update(show_vendor_guide=False)
     cache.clear()
     assert "help-entry__guide" not in client.get(URL, {"route": "home"}).content.decode()
+
+
+# --- Security review of #279
+
+
+def test_a_row_written_around_the_save_hook_is_sanitised_when_rendered() -> None:
+    entry = HelpEntryFactory.create(kind="route", key="home", body="<p>clean</p>")
+    HelpEntry.objects.filter(pk=entry.pk).update(
+        body='<p>kept</p><script>alert(1)</script><img src=x onerror="alert(2)">'
+    )
+    cache.clear()
+    found = help_lookup.help_for("home", "", "en")
+    assert found is not None
+    assert "kept" in found.html
+    assert hi.active_markup(found.html) == []
+    body = signed_in().get(URL, {"route": "home"}).content.decode()
+    assert "<script>alert" not in body
+    assert "onerror" not in body
+
+
+def test_two_long_keys_make_cache_keys_within_the_backend_limit() -> None:
+    first, second = "a" * 120, "b" * 119 + "c"
+    HelpEntryFactory.create(kind="route", key=first, title="First")
+    HelpEntryFactory.create(kind="page_type", key=second, title="Second")
+    found = help_lookup.help_for(first, second, "en")
+    assert found is not None
+    assert found.title == "First"
+    keys = [str(key) for key in cache._cache]  # type: ignore[attr-defined]
+    assert any(key.startswith(":1:cms:help:") for key in keys)
+    assert all(len(key) < 250 for key in keys)
+
+
+def test_an_unknown_key_gets_the_general_entry_and_caches_no_new_key() -> None:
+    HelpEntryFactory.create(kind="route", key="home", title="Known")
+    help_lookup.help_for("home", "", "en")
+    before = set(cache._cache)  # type: ignore[attr-defined]
+    for n in range(20):
+        found = help_lookup.help_for(f"made:up:{n}", f"cms.Made{n}", "en")
+        assert found is not None
+        assert found.source == "general"
+    after = set(cache._cache)  # type: ignore[attr-defined]
+    assert len(after - before) <= 1  # the one shared answer of "no known key", not one per key
+
+
+def test_the_endpoint_ignores_unknown_routes_without_growing_the_cache() -> None:
+    client = signed_in()
+    client.get(URL, {"route": "known-none-0"})
+    before = set(cache._cache)  # type: ignore[attr-defined]
+    for n in range(10):
+        response = client.get(URL, {"route": f"made:up:{n}", "page_type": f"x.Made{n}"})
+        assert 'data-help-source="general"' in response.content.decode()
+    assert set(cache._cache) == before  # type: ignore[attr-defined]

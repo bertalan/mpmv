@@ -638,3 +638,24 @@ def pick_help_row(
             if (row := by_key.get((kind, key, code))) is not None:
                 return row
     return None
+
+
+def help_guide_url_valid(url: object) -> bool:
+    """Whether `url` may be the vendor guide address: empty, or an absolute https URL with a
+    host and no whitespace or control character (never http, relative, `javascript:` or `data:`)."""
+    if url is None or (isinstance(url, str) and not url.strip()):
+        return True
+    if not isinstance(url, str) or any(c.isspace() or ord(c) < 32 for c in url):
+        return False
+    from urllib.parse import urlsplit
+
+    try:
+        parts = urlsplit(url)
+        return parts.scheme == "https" and bool(parts.hostname)
+    except ValueError:
+        return False
+
+
+def help_guide_url(url: object) -> str:
+    """The vendor guide address to link, or "" when there is none or it is not valid."""
+    return url if isinstance(url, str) and url.strip() and help_guide_url_valid(url) else ""

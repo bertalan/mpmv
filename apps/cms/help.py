@@ -7,6 +7,7 @@ entry's save or delete bumps, so a change shows at once on every worker sharing 
 no entry at all the answer is None: callers show a polite empty message, never an error.
 """
 
+import hashlib
 from dataclasses import dataclass
 from typing import Any
 
@@ -16,7 +17,7 @@ from django.db.models import Q
 from wagtail.rich_text import expand_db_html
 
 from . import engine
-from .models import HelpEntry
+from .models import HELP_FEATURES, HelpEntry
 
 GENERATION_KEY = "cms:help:generation"
 TIMEOUT = 3600
@@ -63,12 +64,27 @@ def _rows(candidates: list[tuple[str, str]], languages: set[str]) -> list[tuple[
     ]
 
 
+def _known_keys() -> frozenset[tuple[str, str]]:
+    """The (kind, key) pairs that have an entry in some language, cached per generation. A
+    request key outside it can match nothing, so it never makes a cache entry of its own."""
+    key = f"cms:help:{_generation()}:known"
+    known: frozenset[tuple[str, str]] | None = cache.get(key)
+    if known is None:
+        known = frozenset(HelpEntry.objects.values_list("kind", "key").distinct())
+        cache.set(key, known, TIMEOUT)
+    return known
+
+
 def help_for(route_name: str, page_type: str, language: str) -> HelpContent | None:
     """The help that answers a screen in `language`, or None when nothing is configured."""
-    candidates = engine.help_candidates(route_name, page_type)
+    known = _known_keys()
+    candidates = [c for c in engine.help_candidates(route_name, page_type) if c in known]
+    if not candidates or candidates[-1] != (engine.HELP_GENERAL, ""):
+        candidates.append((engine.HELP_GENERAL, ""))
     primary = settings.LANGUAGE_CODE
     wanted = ",".join(f"{kind}={value}" for kind, value in candidates)
-    key = f"cms:help:{_generation()}:{language}:{wanted}"
+    digest = hashlib.sha256(wanted.encode()).hexdigest()[:32]  # keys can be 120 characters each
+    key = f"cms:help:{_generation()}:{language}:{digest}"
     cached = cache.get(key)
     if cached is not None:
         return None if cached == _MISSING else cached
@@ -79,7 +95,9 @@ def help_for(route_name: str, page_type: str, language: str) -> HelpContent | No
         if row is None
         else HelpContent(
             title=row.title,
-            html=str(expand_db_html(row.body)),
+            # Sanitised again here: a row written by `update()`, `bulk_create` or `loaddata`
+            # skips the save hook (CMS.12).
+            html=str(expand_db_html(engine.sanitise_rich_text(row.body, HELP_FEATURES))),
             vendor_guide=row.vendor_guide,
             source=row.kind,
         )

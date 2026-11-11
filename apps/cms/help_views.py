@@ -24,12 +24,6 @@ def _no_store(response: HttpResponse) -> HttpResponse:
     return response
 
 
-def _guide_url() -> str:
-    """The configured vendor guide address when it is a web or site-relative link, else ""."""
-    url = str(settings.MPMV_VENDOR_GUIDE_URL).strip()
-    return url if url.startswith(("https://", "http://", "/")) and not url.startswith("//") else ""
-
-
 @require_GET
 def help_entry(request: HttpRequest) -> HttpResponse:
     if not (request.user.is_authenticated and request.user.is_active):
@@ -41,12 +35,15 @@ def help_entry(request: HttpRequest) -> HttpResponse:
     page_type = engine.help_page_type(request.GET.get("page_type"))
     with translation.override(language):
         content = help_lookup.help_for(route, page_type, language)
+        guide_url = ""
+        if content and content.vendor_guide:
+            guide_url = engine.help_guide_url(settings.MPMV_VENDOR_GUIDE_URL)
         response = render(
             request,
             "components/help_entry.html",
             {
                 "help": content,
-                "vendor_guide_url": _guide_url() if content and content.vendor_guide else "",
+                "vendor_guide_url": guide_url,
             },
         )
     return _no_store(response)
