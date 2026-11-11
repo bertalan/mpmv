@@ -299,6 +299,11 @@ class CountryWarningLanguages(Model):   # platform data: country -> accepted war
 - Geo-blocking: no discrimination based on residence in the countries served.
 - Omnibus: strikethrough price = lowest price in the last 30 days (price history in `catalog`);
   information on how reviews are verified.
+  - Decided (owner, 2026-11-11): a variant's own price override wins over the product's sale; a
+    sale never reaches an overridden variant (a vendor who wants it discounted sets that variant's
+    price separately). The reference price follows the same rule.
+  - Decided (owner, 2026-11-11): history stores the list price as entered (net); the reference
+    price is converted at display time with the same tax decision as the price shown.
 
 ### CMP.7 — European Accessibility Act `[P1]`
 - E-commerce services fall under the EAA. ⚖️ Service **microenterprises** (fewer than 10 employees
