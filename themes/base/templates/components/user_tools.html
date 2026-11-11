@@ -12,7 +12,7 @@ name, page type and language, and the script lists the page's form fields under 
 openers are `hidden` until the script runs: without it there is nothing that does nothing.
 
 Context: `help` (url, route, page_type, language) and the CSRF token for the sign-out form.
-{% endcomment %}{% if help %}<div class="user-tools" data-help-url="{{ help.url }}" data-help-route="{{ help.route }}" data-help-page-type="{{ help.page_type }}" data-help-lang="{{ help.language }}" data-help-fields-title="{% translate 'Fields on this page' %}" data-help-error="{% translate 'The help text could not be loaded. Try again.' %}">
+{% endcomment %}{% if help %}<div class="user-tools" data-help-url="{{ help.url }}" data-help-route="{{ help.route }}" data-help-type="{{ help.page_type }}" data-help-lang="{{ help.language }}" data-help-fields-title="{% translate 'Fields on this page' %}" data-help-error="{% translate 'The help text could not be loaded. Try again.' %}">
   <button type="button" class="help-button" data-help-open aria-haspopup="dialog" aria-controls="help-dialog" aria-label="{% translate 'Help for this page' %}" hidden>{% include "components/icon.html" with name="help" only %}</button>
   <details class="user-menu">
     <summary class="user-menu__summary">{% translate "Account" %}</summary>

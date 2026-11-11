@@ -114,6 +114,15 @@ jobs:
         run: >-
           uv run pytest -n auto --dist loadgroup --durations=40 -m "unit or integration"
           --junitxml=build/reports/junit.xml
+      # CORE.18 follow-up: an upgrade from the previous release runs the database checks before
+      # `migrate` applies anything. Migrate fully, step the manager app back and drop the role
+      # groups, then migrate again with the checks on (no --skip-checks): it must exit 0.
+      - name: Upgrade path (migrate with checks over an older schema)
+        run: |
+          uv run python manage.py migrate
+          uv run python manage.py migrate manager 0001
+          uv run python manage.py shell -c "from django.contrib.auth.models import Group; Group.objects.all().delete()"
+          uv run python manage.py migrate
       - name: Store reports
         if: failure()
         uses: actions/upload-artifact@v7
@@ -228,8 +237,30 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('uv.lock') }}
       - name: Install Chromium
-        run: uv run playwright install --with-deps chromium
+        timeout-minutes: 10
+        run: |
+          # The ubuntu-24.04 image already has Chromium's system libraries; install-deps only adds
+          # fonts. When the apt mirror is unreachable, each package waits for its timeout, so a
+          # retried install-deps took 32 minutes (2026-11-11). Fail fast: short apt timeouts, one
+          # attempt with a hard time limit, then continue without the extra fonts.
+          printf '%s\n' 'Acquire::Retries "1";' 'Acquire::http::Timeout "10";' 'Acquire::https::Timeout "10";' | sudo tee /etc/apt/apt.conf.d/80-retries >/dev/null
+          if ! timeout -k 10 150 uv run playwright install-deps chromium; then
+            echo "::warning::Playwright system dependencies could not be installed within 150 s (apt mirror unreachable?); fonts may be missing"
+          fi
+          for attempt in 1 2 3; do
+            if uv run playwright install chromium; then
+              exit 0
+            fi
+            echo "playwright install failed (attempt $attempt of 3)"
+            sleep $((attempt * 20))
+          done
+          exit 1
       - name: Pytest (e2e)
         run: uv run pytest -m e2e --junitxml=build/reports/junit-e2e.xml
       - name: Store screenshots

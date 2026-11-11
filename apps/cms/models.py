@@ -78,6 +78,7 @@ from .blocks import (
     LaunchCountdownBlock,
     LegalSectionBlock,
     PageCardBlock,
+    ProductCardsBlock,
     ProductGridBlock,
     countdown_targets,
 )
@@ -93,9 +94,13 @@ def body_field(
 ) -> StreamField:
     """A page body. `countdown`: also offer the launch countdown (CMS.9: home and standard
     pages; the page class then needs `CountdownCacheMixin`). `products`: also offer the product
-    grid (CMS.10: home and standard pages)."""
+    grid (CMS.10) and the product cards (CMS.11): home, standard, landing pages."""
     extra = [("countdown", LaunchCountdownBlock())] if countdown else []
-    grid = [("product_grid", ProductGridBlock())] if products else []
+    grid = (
+        [("product_grid", ProductGridBlock()), ("product_cards", ProductCardsBlock())]
+        if products
+        else []
+    )
     sections = [("legal_section", LegalSectionBlock())] if legal_sections else []
     return StreamField(
         [
@@ -945,6 +950,8 @@ class BlogPostPage(Page):  # type: ignore[misc]
             ("cta", CallToActionBlock()),
             ("faq", FaqBlock()),
             ("featured", ArticleLinksBlock()),
+            ("product_grid", ProductGridBlock()),
+            ("product_cards", ProductCardsBlock()),
         ],
         blank=True,
         verbose_name=_("body"),
@@ -1029,7 +1036,7 @@ class TermLandingPage(Page):  # type: ignore[misc]
         related_name="+",
         help_text=_("A term of a taxonomy with term pages."),
     )
-    body = body_field(_("introduction"))
+    body = body_field(_("introduction"), products=True)
     category_products = models.PositiveSmallIntegerField(
         _("products per category"),
         default=engine.LANDING_CATEGORY_DEFAULT,

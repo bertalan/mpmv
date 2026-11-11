@@ -84,7 +84,7 @@ if (root && dialog) {
     body.textContent = loadingText;
     const query = new URLSearchParams({
       route: root.dataset.helpRoute,
-      page_type: root.dataset.helpPageType,
+      page_type: root.dataset.helpType,
       lang: root.dataset.helpLang,
     });
     try {
