@@ -62,6 +62,7 @@ CAPTCHA_LOGINS = {
     "login": _login_form("/account/login/", "username"),
     "wagtailadmin_login": _login_form("/admin/login/", "username"),
     "admin:login": _login_form("/django-admin/login/", "username"),
+    "wagtailcore_login": _login_form("/_util/login/", "username"),  # SEC.14
 }
 
 
@@ -89,7 +90,11 @@ def test_every_captcha_declaration_is_tested() -> None:
         for row in public_form_report().public
         if row.spec.protection is Protection.CAPTCHA
     }
-    assert declared == set(CAPTCHA_LOGINS) | {"vendors:apply", "dsa_notice"}
+    assert declared == set(CAPTCHA_LOGINS) | {
+        "vendors:apply",
+        "dsa_notice",
+        "wagtailcore_authenticate_with_password",  # tested in apps/cms (SEC.14)
+    }
 
 
 # --- Signed-token forms
@@ -136,47 +141,6 @@ def test_every_signed_token_declaration_is_tested() -> None:
         "vendors:apply_cancel",
         "vendor_claim:claim",
     }
-
-
-# --- Wagtail page view restriction forms: blocked until SEC.14
-
-
-@pytest.mark.parametrize("prefix", ["", "/it"])
-@pytest.mark.parametrize("route", ["/_util/authenticate_with_password/1/2/", "/_util/login/"])
-def test_the_page_restriction_routes_answer_404_to_every_method(
-    client: Client, prefix: str, route: str
-) -> None:
-    for method in ("get", "post", "put", "patch", "delete"):
-        assert getattr(client, method)(prefix + route).status_code == 404
-
-
-def test_the_restriction_routes_work_again_when_the_block_is_lifted(client: Client) -> None:
-    with override_settings(BLOCK_PAGE_RESTRICTION_ROUTES=False):
-        assert client.get("/_util/login/").status_code != 404
-
-
-def test_a_password_page_restriction_fails_the_check_while_the_routes_are_blocked() -> None:
-    from django.db import DEFAULT_DB_ALIAS
-    from wagtail.models import PageViewRestriction
-
-    from apps.cms.checks import check_no_page_restrictions
-    from apps.cms.tests.factories import StandardPageFactory
-
-    assert check_no_page_restrictions(None, databases=[DEFAULT_DB_ALIAS]) == []
-    page = StandardPageFactory.create()
-    PageViewRestriction.objects.create(page=page, restriction_type=PageViewRestriction.GROUPS)
-    assert (
-        check_no_page_restrictions(None, databases=[DEFAULT_DB_ALIAS]) == []
-    )  # groups need a login
-    PageViewRestriction.objects.create(
-        page=StandardPageFactory.create(),
-        restriction_type=PageViewRestriction.PASSWORD,
-        password=secrets.token_urlsafe(8),
-    )
-    messages = check_no_page_restrictions(None, databases=[DEFAULT_DB_ALIAS])
-    assert [m.id for m in messages] == ["cms.E002"]
-    with override_settings(BLOCK_PAGE_RESTRICTION_ROUTES=False):
-        assert check_no_page_restrictions(None, databases=[DEFAULT_DB_ALIAS]) == []
 
 
 # --- The language switch has a cheap rate limit

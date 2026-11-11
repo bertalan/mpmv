@@ -558,15 +558,22 @@ VAT_REASON_TIMEOUT: Final = "vies_timeout"
 VAT_REASON_MALFORMED: Final = "malformed_vat_number"
 VAT_REASON_PREFIX_MISMATCH: Final = "prefix_mismatch"
 VAT_REASON_NOT_IN_VIES: Final = "country_not_in_vies"
+#: The vendor has no VAT number VIES can use as requester: no reverse-charge supply (art. 138).
+VAT_REASON_NO_VENDOR_VAT: Final = "no_vendor_vat_number"
+#: VIES said valid but gave no consultation number: no usable proof for an order.
+VAT_REASON_NO_CONSULTATION_NUMBER: Final = "no_consultation_number"
 
 # Why VIES gave no answer, when it is not one of VIES's own error codes (MS_UNAVAILABLE…).
 DETAIL_TIMEOUT: Final = "timeout"
 DETAIL_CONNECTION: Final = "connection_failed"
 DETAIL_BAD_RESPONSE: Final = "bad_response"
 DETAIL_CLIENT_ERROR: Final = "client_error"
+#: VIES refused the requester (the vendor's or the operator's VAT number) of the consultation.
+DETAIL_INVALID_REQUESTER: Final = "invalid_requester"
 
 _TIMEOUT_DETAILS: Final = frozenset({DETAIL_TIMEOUT, "TIMEOUT"})
 _INVALID_INPUT = "INVALID_INPUT"
+_INVALID_REQUESTER_INFO = "INVALID_REQUESTER_INFO"
 _VIES_UNDISCLOSED = "---"  # a name or address the member state does not disclose
 
 _MESSAGES: Final = {
@@ -577,6 +584,8 @@ _MESSAGES: Final = {
     VAT_REASON_MALFORMED: "This is not a well-formed VAT number",
     VAT_REASON_PREFIX_MISMATCH: "The VAT number's prefix is not the one of {country}",
     VAT_REASON_NOT_IN_VIES: "VIES does not cover {country}",
+    VAT_REASON_NO_VENDOR_VAT: "The seller has no VAT number for an intra-EU supply",
+    VAT_REASON_NO_CONSULTATION_NUMBER: "VIES gave no consultation number for this check",
 }
 _NOT_VERIFIED = ": the VAT number is not verified and VAT is charged."
 
@@ -605,6 +614,7 @@ class ViesAnswer:
     name: str = ""
     address: str = ""
     request_id: str = ""
+    request_date: str = ""  # VIES `requestDate`, as sent
 
 
 class NotCheckable(ValueError):
@@ -669,11 +679,15 @@ def read_vies_answer(query: ViesQuery, payload: Mapping[str, Any]) -> ViesAnswer
         if not isinstance(wrappers, list) or not wrappers or not isinstance(wrappers[0], dict):
             return bad
         code = str(wrappers[0].get("error") or DETAIL_BAD_RESPONSE)
+        if code == _INVALID_REQUESTER_INFO:
+            return ViesAnswer(result=VAT_UNAVAILABLE, detail=DETAIL_INVALID_REQUESTER)
         return ViesAnswer(
             result=VAT_INVALID if code == _INVALID_INPUT else VAT_UNAVAILABLE, detail=code
         )
 
     error = _text(payload, "userError")
+    if error == _INVALID_REQUESTER_INFO:
+        return ViesAnswer(result=VAT_UNAVAILABLE, detail=DETAIL_INVALID_REQUESTER)
     if error not in ("", "VALID", "INVALID", _INVALID_INPUT):
         return ViesAnswer(result=VAT_UNAVAILABLE, detail=error)
     valid = payload.get("valid")
@@ -693,6 +707,7 @@ def read_vies_answer(query: ViesQuery, payload: Mapping[str, Any]) -> ViesAnswer
         name=_text(payload, "name"),
         address=_text(payload, "address"),
         request_id=_text(payload, "requestIdentifier"),
+        request_date=_text(payload, "requestDate"),
     )
 
 

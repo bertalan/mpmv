@@ -318,18 +318,12 @@ def settings_problems() -> list[str]:
     options = getattr(settings, "WAGTAIL_PRIVATE_PAGE_OPTIONS", {})
     if (
         options.get("SHARED_PASSWORD", True)
-        and not settings.BLOCK_PAGE_RESTRICTION_ROUTES
         and "wagtailcore_authenticate_with_password" not in _declared
     ):
         problems.append(
             "page privacy by shared password adds an anonymous POST form: declare "
-            "wagtailcore_authenticate_with_password, or keep BLOCK_PAGE_RESTRICTION_ROUTES on"
+            "wagtailcore_authenticate_with_password"
         )
-    if (
-        "_util/" in settings.PUBLIC_FORM_GATED_PREFIXES
-        and not settings.BLOCK_PAGE_RESTRICTION_ROUTES
-    ):
-        problems.append("the _util/ gated prefix needs BLOCK_PAGE_RESTRICTION_ROUTES (SEC.14)")
     return problems
 
 
