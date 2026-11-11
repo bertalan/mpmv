@@ -23,6 +23,7 @@ from apps.core.models import AuditLog, OutboxEmail, OutboxEmailEvent
 from apps.orders import services as order_services
 from apps.orders.models import Order
 from apps.orders.services import LineInput, VendorOrderInput
+from apps.orders.tests.factories import unchecked
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 
 pytestmark = pytest.mark.django_db
@@ -341,8 +342,11 @@ def test_erasure_cancels_queued_and_retrying_mail_and_clears_every_row() -> None
 
 def test_an_abandoned_never_paid_order_does_not_block_the_erasure() -> None:
     user = UserFactory.create(email="mario@example.com")
-    for state in ("checkout", "awaiting_payment"):
-        place(user, state=state)
+    place(user, state="checkout")
+    old = place(user, state="awaiting_payment")
+    long_ago = PLACED - dt.timedelta(days=45)
+    with unchecked():
+        Order.objects.filter(pk=old.pk).update(created_at=long_ago)
 
     gdpr.anonymise_customer(user, ctx=CTX)
 
@@ -451,3 +455,21 @@ def test_every_model_pointing_at_the_user_has_an_export_and_erasure_decision() -
             ):
                 found.add(model._meta.label_lower)
     assert sorted(found - set(handled)) == [], "decide export and erasure for these models"
+
+
+def test_a_recent_awaiting_payment_order_may_still_be_captured_so_the_erasure_waits() -> None:
+    user = UserFactory.create(email="mario@example.com")
+    recent = place(user, state="awaiting_payment")
+    gdpr.anonymise_customer(user, ctx=CTX, now=PLACED + dt.timedelta(days=1))
+    user.refresh_from_db()
+    assert not user.is_active  # blocked at once
+    assert user.email == "mario@example.com"  # not anonymised yet
+    assert Order.objects.get(pk=recent.pk).state == "awaiting_payment"
+    assert Order.objects.get(pk=recent.pk).privacy_status == "active"
+    assert ErasureRequest.objects.get(user=user).completed_at is None
+
+    # past the payment window a rerun cancels and anonymises it, and completes
+    gdpr.anonymise_customer(user, ctx=CTX, now=PLACED + dt.timedelta(days=45))
+    user.refresh_from_db()
+    assert user.email.endswith("@anonymised.invalid")
+    assert Order.objects.get(pk=recent.pk).privacy_status == "anonymized"
