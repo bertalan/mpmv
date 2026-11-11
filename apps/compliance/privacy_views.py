@@ -3,7 +3,9 @@
 The target is always `request.user`: no view reads a user id from the input. Every action is a
 POST (CSRF is enforced by the middleware), rate limited per account, and needs a fresh
 re-authentication: the account password, or a second factor verified within
-`MFA_STEP_UP_MAX_AGE`. Audit rows come from the services (`gdpr`) and hold public ids only.
+`MFA_STEP_UP_MAX_AGE`. An account that has a second factor must use the factor for the export
+(CMP.33) and the erasure (D-32); the password alone is not enough.
+Audit rows come from the services (`gdpr`) and hold public ids only.
 """
 
 import datetime as dt
@@ -76,17 +78,29 @@ def _limited(user: User, scope: str, limit: tuple[int, dt.timedelta]) -> HttpRes
     return _too_many(wait) if wait else None
 
 
-def _reauth_refusal(request: HttpRequest, *, factor_required: bool = False) -> HttpResponse | None:
+def _reauth_refusal(
+    request: HttpRequest, *, factor_required: bool = False, refused_action: str | None = None
+) -> HttpResponse | None:
     """None when the caller is freshly re-authenticated, else the response to send.
 
     An account without a usable password (passkey-only) cannot type one: it is sent to the
     second-factor step and comes back to the account page. With `factor_required` (erasure,
-    D-32) an account that has a second factor must verify it again, a password is not enough.
+    D-32; data export, CMP.33) an account that has a second factor must verify it again, a
+    password is not enough. `refused_action` audits that refusal (public id only).
     """
     user = cast(User, request.user)
     if is_recently_verified(request):
         return None
     if factor_required and has_second_factor(user):
+        if refused_action:
+            record(
+                audit_context(request),
+                refused_action,
+                "accounts.user",
+                str(user.public_id),
+                None,
+                {"reason": "second_factor_required"},
+            )
         return mfa_redirect(request, "mfa:verify", next_url=reverse("privacy_account"))
     if not user.has_usable_password():
         target = "mfa:verify" if has_second_factor(user) else "mfa:setup"
@@ -127,7 +141,9 @@ def download_data(request: HttpRequest) -> HttpResponse:
     user = cast(User, request.user)
     if limited := _limited(user, "export", EXPORT_LIMIT):
         return limited
-    if refusal := _reauth_refusal(request):
+    if refusal := _reauth_refusal(
+        request, factor_required=True, refused_action=gdpr.ACTION_EXPORT_REFUSED
+    ):
         return refusal
     body = gdpr.export_customer_json(user, ctx=audit_context(request))
     response = HttpResponse(body, content_type="application/json")

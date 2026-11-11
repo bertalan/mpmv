@@ -290,7 +290,7 @@ def test_a_refused_export_is_audited_without_personal_data() -> None:
     client.post(reverse("privacy_export"), {"password": password})
 
     entry = AuditLog.objects.get(action=REFUSED)
-    assert entry.target_id == str(user.public_id)
+    assert entry.target_key == str(user.public_id)
     assert "mario@example.com" not in f"{entry.before}{entry.after}{entry.actor_label}"
 
 
