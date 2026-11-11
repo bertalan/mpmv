@@ -62,3 +62,30 @@ def test_the_migration_audits_itself_with_counts_only_and_restores_the_trigger()
     assert (entry.after or {})["unknown"] == 1
     with pytest.raises(Exception, match="append-only"):
         AuditLog.objects.filter(pk=entry.pk).update(actor_label="x")
+
+
+def test_old_lockout_target_keys_with_an_address_become_a_keyed_hash() -> None:
+    from apps.core.privacy import keyed_hash
+
+    row = AuditLog.objects.create(
+        actor_label="anonymous",
+        source="system",
+        action="accounts.login.locked_out",
+        target_model="core.throttle",
+        target_key="login:account:mario@example.com",
+    )
+    ip_row = AuditLog.objects.create(
+        actor_label="anonymous",
+        source="system",
+        action="accounts.login.locked_out",
+        target_model="core.throttle",
+        target_key="login:ip:203.0.113.9",
+    )
+    _run()
+    row.refresh_from_db()
+    ip_row.refresh_from_db()
+    assert row.target_key == "login:account:" + keyed_hash(
+        "mario@example.com", purpose="audit-login-account"
+    )
+    assert "@" not in row.target_key
+    assert ip_row.target_key == "login:ip:203.0.113.9"
