@@ -22,11 +22,12 @@ from django.db.models import Model, Q, QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.template.response import TemplateResponse
 from django.utils.module_loading import import_string
+from wagtail.models import Collection
 
 from . import flags
 from .audit import audit_context
 from .changeset import diff
-from .models import AuditLog, FeatureFlag, ImageLicence, PlatformOperator
+from .models import AuditLog, FeatureFlag, ImageLicence, MediaImage, PlatformOperator
 from .services import (
     NoPlatformOperator,
     check_operator_start,
@@ -57,8 +58,22 @@ class PlatformOperatorForm(forms.ModelForm[PlatformOperator]):
             "authority_contact_languages",
             "user_contact_url",
             "user_contact_languages",
+            "logo",
+            "official_profiles",
             "valid_from",
         )
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        # Only the platform logos collection (or one below it), never a vendor's or page image.
+        if "logo" not in self.fields:  # a stored row is shown read-only
+            return
+        paths = Collection.objects.filter(svg_policy__isnull=False).values_list("path", flat=True)
+        condition = Q(pk__in=[])
+        for path in paths:
+            condition |= Q(collection__path__startswith=path)
+        field: Any = self.fields["logo"]
+        field.queryset = MediaImage.objects.filter(condition)
 
     def clean_session_policy(self) -> Any:
         return self.cleaned_data.get("session_policy") or {}

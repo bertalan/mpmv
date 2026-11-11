@@ -6,6 +6,7 @@ import json
 import posixpath
 import uuid
 from typing import Any, ClassVar, Self
+from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.contrib.postgres.constraints import ExclusionConstraint
@@ -343,6 +344,28 @@ def validate_language_code(value: str) -> None:
 validate_https_url = URLValidator(schemes=["https"], message="Enter an https:// address.")
 
 
+def official_profile_errors(urls: Any) -> list[str]:
+    """One message per refused entry of a list of official profile links: not a string, not an
+    https link, with a user name or password in it, or listed twice."""
+    if not isinstance(urls, list):
+        return ["Enter a list of links."]
+    errors: list[str] = []
+    seen: set[str] = set()
+    for url in urls:
+        text = url.strip() if isinstance(url, str) else ""
+        try:
+            validate_https_url(text)
+        except ValidationError:
+            errors.append(f"{text or url!r} is not an https:// link.")
+            continue
+        if "@" in urlsplit(text).netloc:
+            errors.append(f"{text!r} must not contain a user name or password.")
+        elif text in seen:
+            errors.append(f"{text!r} is listed twice.")
+        seen.add(text)
+    return errors
+
+
 class PlatformOperator(Versioned):
     """The legal entity running the marketplace, as versioned configuration (ARC.7).
 
@@ -410,6 +433,24 @@ class PlatformOperator(Versioned):
         verbose_name="users' contact languages",
         help_text="Language codes the support team answers in.",
     )
+    # SEO.8 follow-up (owner decision): the public face of the operator in its Organization
+    # JSON-LD. The logo comes from the platform logos collection with its image licence fields.
+    logo = models.ForeignKey(
+        "core.MediaImage",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="The platform's logo, shown to search engines. Pick an image from the "
+        "'Logos and icons' collection that has its licence and author filled in.",
+    )
+    official_profiles = ArrayField(
+        models.URLField(max_length=300),
+        default=list,
+        blank=True,
+        help_text="Official profiles of the platform, one https:// link each, for search "
+        "engines. Example: its Wikidata item, its LinkedIn page. No user names or passwords.",
+    )
     # D-21, CMP.13: changed only by a platform owner through
     # `apps.core.services.set_allowed_vendor_countries`; other new versions carry it over.
     # D-32 (CORE.25): the session level timers and the three action lists, sparse over the D-32
@@ -461,6 +502,19 @@ class PlatformOperator(Versioned):
             session_policy.parse_policy(self.session_policy)
         except ValueError as exc:
             raise ValidationError({"session_policy": str(exc)}) from exc
+        problems = official_profile_errors(self.official_profiles)
+        if problems:
+            raise ValidationError({"official_profiles": problems})
+        logo = self.logo
+        if logo is not None:
+            if svg_collection_refusal(logo.collection) is not None:
+                raise ValidationError(
+                    {"logo": "Choose an image from the 'Logos and icons' collection."}
+                )
+            if logo.needs_review:
+                raise ValidationError(
+                    {"logo": "This image has no licence or author yet: complete them first."}
+                )
         # Codes are stored lower-case (`PT-BR` -> `pt-br`), without duplicates.
         for name in ("authority_contact_languages", "user_contact_languages"):
             codes = [code.strip().lower() for code in getattr(self, name) or []]

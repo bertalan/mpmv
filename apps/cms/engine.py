@@ -42,6 +42,7 @@ from functools import lru_cache
 from html import escape, unescape
 from html.parser import HTMLParser
 from typing import Any
+from urllib.parse import urlsplit
 
 NEUTRAL = ""  # the `language` of an image shown in every language without dedicated images
 
@@ -76,7 +77,23 @@ def faq_page_jsonld(questions: Iterable[tuple[str, str]]) -> dict[str, Any]:
     }
 
 
-def organization_jsonld(name: str, url: str, support_email: str = "") -> dict[str, Any]:
+def profile_links(urls: Iterable[str]) -> list[str]:
+    """The https profile links without a user name or password, each once, Wikidata first."""
+    seen: dict[str, None] = {}
+    for url in urls:
+        parts = urlsplit(url)
+        if parts.scheme == "https" and parts.netloc and "@" not in parts.netloc:
+            seen.setdefault(url, None)
+    return sorted(seen, key=lambda u: urlsplit(u).hostname != "www.wikidata.org")
+
+
+def organization_jsonld(
+    name: str,
+    url: str,
+    support_email: str = "",
+    logo_url: str = "",
+    profiles: Iterable[str] = (),
+) -> dict[str, Any]:
     """A minimal schema.org Organization for the platform operator (SEO.8 follow-up).
 
     SEO.7 replaces it with the shared `@graph` node. No `sameAs` until the operator has verified
@@ -88,6 +105,10 @@ def organization_jsonld(name: str, url: str, support_email: str = "") -> dict[st
         "name": name,
         "url": url,
     }
+    if logo_url:
+        node["logo"] = logo_url
+    if links := profile_links(profiles):
+        node["sameAs"] = links
     if support_email:
         node["contactPoint"] = {
             "@type": "ContactPoint",

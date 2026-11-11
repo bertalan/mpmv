@@ -71,3 +71,56 @@ def test_home_page_has_one_organization_node() -> None:
 def test_home_page_without_operator_has_no_organization() -> None:
     body = Client().get("/").content.decode()
     assert "Organization" not in body
+
+
+def test_organization_node_has_logo_and_profiles_wikidata_first() -> None:
+    from apps.cms.engine import organization_jsonld
+
+    node = organization_jsonld(
+        "Acme",
+        "https://example.org/",
+        logo_url="https://example.org/logo.svg",
+        profiles=[
+            "https://example.org/p",
+            "http://insecure.example/x",
+            "https://user:pw@example.org/y",
+            "https://www.wikidata.org/wiki/Q1",
+            "https://example.org/p",
+        ],
+    )
+    assert node["logo"] == "https://example.org/logo.svg"
+    assert node["sameAs"] == ["https://www.wikidata.org/wiki/Q1", "https://example.org/p"]
+
+
+def test_no_logo_no_profiles_no_fields() -> None:
+    from apps.cms.engine import organization_jsonld
+
+    node = organization_jsonld("Acme", "https://example.org/")
+    assert "logo" not in node
+    assert "sameAs" not in node
+
+
+def test_operator_refuses_bad_profiles() -> None:
+    from django.core.exceptions import ValidationError
+
+    from apps.core.models import PlatformOperator
+
+    for bad in (["http://x.example/a"], ["https://u:p@x.example/a"], ["https://x.example/a"] * 2):
+        op = PlatformOperatorFactory.build(official_profiles=bad)
+        with pytest.raises(ValidationError) as caught:
+            PlatformOperator.clean(op)
+        assert "official_profiles" in caught.value.message_dict
+
+
+def test_operator_refuses_logo_outside_logos_collection() -> None:
+    from django.core.exceptions import ValidationError
+
+    from apps.core.models import MediaImage
+    from apps.core.tests.factories import MediaImageFactory
+
+    image = MediaImageFactory.create()
+    assert isinstance(image, MediaImage)
+    op = PlatformOperatorFactory.build(logo=image)
+    with pytest.raises(ValidationError) as caught:
+        op.clean()
+    assert "logo" in caught.value.message_dict

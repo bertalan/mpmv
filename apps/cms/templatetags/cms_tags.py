@@ -186,8 +186,16 @@ def operator_organization_jsonld(context: template.Context) -> SafeString:
         operator = current_operator()
     except NoPlatformOperator:
         return mark_safe("")
+    logo_url = ""
+    logo = operator.logo
+    if logo is not None and logo.file:
+        logo_url = request.build_absolute_uri(logo.file.url)
     return jsonld_script(
         organization_jsonld(
-            operator.legal_name, request.build_absolute_uri("/"), operator.support_email
+            operator.legal_name,
+            request.build_absolute_uri("/"),
+            operator.support_email,
+            logo_url,
+            operator.official_profiles,
         )
     )
