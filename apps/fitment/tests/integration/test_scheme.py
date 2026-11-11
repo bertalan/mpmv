@@ -23,12 +23,19 @@ def labels(singular: str, plural: str) -> dict[str, LevelLabels]:
     return {"en": LevelLabels(label=singular, plural_label=plural)}
 
 
-def test_the_scheme_is_created_on_first_use_with_the_safe_defaults() -> None:
+def test_the_scheme_is_the_one_seeded_row_with_the_safe_defaults() -> None:
     scheme = services.current_scheme()
     assert scheme.contains_special_category is False
     assert scheme.max_profiles == 10
     assert FitmentScheme.objects.count() == 1
     assert services.current_scheme().pk == scheme.pk
+
+
+def test_reading_the_scheme_never_creates_it() -> None:
+    FitmentScheme.objects.all().delete()
+    with pytest.raises(FitmentError):
+        services.current_scheme()
+    assert not FitmentScheme.objects.exists()
 
 
 def test_a_two_level_scheme_in_one_sector_and_a_four_level_in_another() -> None:

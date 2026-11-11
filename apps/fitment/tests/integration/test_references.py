@@ -5,7 +5,7 @@ from django.apps import apps
 from django.db import models
 
 from apps.core.audit import AuditContext
-from apps.fitment import services
+from apps.fitment import references
 from apps.fitment.models import (
     FitmentCategory,
     FitmentNode,
@@ -53,12 +53,12 @@ def test_the_scan_finds_the_foreign_keys_to_nodes() -> None:
 def test_every_foreign_key_to_a_node_is_registered_and_protects_the_node() -> None:
     """FIT.2 and FIT.5 register their product rows and profiles from their own `ready()`;
     this fails for the project when a relation to a node is added without it."""
-    registered = services.registered_fields()
+    registered = references.registered_fields()
     for model, name, field in foreign_keys_to_nodes():
         if model in NODE_OWNED:
             continue
         assert (model._meta.label_lower, name) in registered, (
-            f"Register {model._meta.label}.{name} with services.register_node_reference "
+            f"Register {model._meta.label}.{name} with references.register_node_reference "
             "in the app's ready()"
         )
         assert field.remote_field.on_delete is models.PROTECT, (
@@ -67,12 +67,12 @@ def test_every_foreign_key_to_a_node_is_registered_and_protects_the_node() -> No
 
 
 def test_the_references_are_registered_once_the_apps_are_ready() -> None:
-    assert ("fitment.fitmentnodemerge", "into_node") in services.registered_fields()
+    assert ("fitment.fitmentnodemerge", "into_node") in references.registered_fields()
 
 
 def test_registering_the_same_name_twice_is_refused() -> None:
     with pytest.raises(ValueError, match="already registered"):
-        services.register_node_reference(FitmentNodeMerge, "into_node")
+        references.register_node_reference(FitmentNodeMerge, "into_node")
 
 
 def test_deleting_a_node_a_merge_points_at_is_blocked_by_the_database() -> None:

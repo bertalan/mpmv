@@ -2,6 +2,7 @@
 
 # ruff: noqa: E501
 import uuid
+from typing import Any
 
 import django.core.validators
 import django.db.models.deletion
@@ -9,6 +10,13 @@ from django.db import migrations, models
 
 import apps.core.fields
 import apps.core.i18n
+
+
+def seed_scheme(apps: Any, schema_editor: Any) -> None:
+    """The installation's one scheme row, with the defaults: services only read it."""
+    FitmentScheme = apps.get_model("fitment", "FitmentScheme")
+    if not FitmentScheme.objects.exists():
+        FitmentScheme.objects.create()
 
 
 class Migration(migrations.Migration):
@@ -569,4 +577,5 @@ class Migration(migrations.Migration):
                 ],
             },
         ),
+        migrations.RunPython(seed_scheme, migrations.RunPython.noop),
     ]

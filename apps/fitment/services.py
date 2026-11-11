@@ -9,16 +9,16 @@ Who may call them (Configuration and tax with step-up for the scheme, Catalog an
 the nodes) is the adapter's job (CORE.18), never decided here.
 
 Other parts of the garage add what points at a node (product rows, customer profiles) through
-`register_reference`, so a merge moves them and a delete is refused while they exist.
+`apps.fitment.references`, so a merge moves them and a delete is refused while they exist.
 """
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, models, transaction
+from django.db import transaction
 from django.db.models import Count
 
 from apps.catalog.models import Category
@@ -28,7 +28,7 @@ from apps.core.changeset import ChangeSet
 from apps.core.models import TranslationStatus
 from apps.core.services import run_mutation
 
-from . import engine
+from . import engine, references
 from .models import (
     FitmentCategory,
     FitmentLevel,
@@ -89,16 +89,11 @@ class Applied[T]:
 
 
 def current_scheme() -> FitmentScheme:
-    """The installation's scheme record, created with the defaults on first use."""
+    """The installation's scheme record: a read. The one row is seeded by migration 0001 with the
+    defaults, and the database allows no second row."""
     scheme = FitmentScheme.objects.order_by("id").first()
     if scheme is None:
-        try:
-            with transaction.atomic():
-                scheme = FitmentScheme.objects.create()
-        except IntegrityError:  # another request created it first: the database allows one row
-            scheme = FitmentScheme.objects.order_by("id").first()
-    if scheme is None:  # pragma: no cover - the row exists once any request has created it
-        raise FitmentError("The scheme could not be created.")
+        raise FitmentError("The fitment scheme row is missing: run the migrations.")
     return scheme
 
 
@@ -357,83 +352,6 @@ def reorder_levels(codes: Iterable[str], *, ctx: AuditContext, dry_run: bool = F
         return run_mutation(changeset, apply, ctx=ctx, action=LEVEL_UPDATED, dry_run=dry_run)
 
 
-# --- References: what else points at a node (FIT.2 product rows, FIT.5 profiles)
-#
-# Whatever holds a foreign key to `FitmentNode` registers it, so a merge moves it and a delete is
-# refused while it exists. The registration is explicit and happens in the owning app's
-# `AppConfig.ready()` (never as an import side effect):
-#
-#     def ready(self) -> None:
-#         from apps.fitment.services import register_node_reference
-#         register_node_reference(ProductFitment, "node")
-#
-# Declare the key with `on_delete=PROTECT`: a node is merged or retired, never deleted under a
-# reference. `apps/fitment/tests/integration/test_references.py` lists every foreign key to a
-# node in the project and fails when one is not registered. A writer that inserts a reference
-# (a FIT.2 product row, a FIT.5 profile) must lock the node first (`select_for_update`) in the
-# same transaction, so a concurrent merge cannot move references past it. Relations that are not
-# plain foreign keys use `register_reference` with their own `count` and `move`.
-
-
-@dataclass(frozen=True)
-class Reference:
-    count: Callable[[FitmentNode], int]
-    move: Callable[[FitmentNode, FitmentNode], object]
-    field: tuple[str, str] | None = None  # (model label, field name) of a registered foreign key
-
-
-_references: dict[str, Reference] = {}
-
-
-def register_reference(
-    name: str,
-    *,
-    count: Callable[[FitmentNode], int],
-    move: Callable[[FitmentNode, FitmentNode], object],
-    field: tuple[str, str] | None = None,
-) -> None:
-    """Declare something that points at nodes: `count` how many point at one, `move` re-point
-    them from `source` to `target`. A merge moves them, a delete is refused while any exist."""
-    if name in _references:
-        raise ValueError(f"Node reference {name!r} is already registered.")
-    _references[name] = Reference(count, move, field)
-
-
-def register_node_reference(
-    model: type[models.Model], field: str, *, name: str | None = None
-) -> None:
-    """Register `model.field`, a foreign key to `FitmentNode`, from the owning app's `ready()`."""
-    label = (model._meta.label_lower, field)
-    reference_name = name or f"{label[0]}.{field}"
-
-    def count(node: FitmentNode) -> int:
-        return model._default_manager.filter(**{field: node}).count()
-
-    def move(source: FitmentNode, target: FitmentNode) -> object:
-        return model._default_manager.filter(**{field: source}).update(**{field: target})
-
-    register_reference(reference_name, count=count, move=move, field=label)
-
-
-def unregister_reference(name: str) -> None:
-    _references.pop(name, None)
-
-
-def registered_fields() -> set[tuple[str, str]]:
-    """The (model label, field) pairs registered with `register_node_reference`."""
-    return {r.field for r in _references.values() if r.field is not None}
-
-
-def reference_count(node: FitmentNode) -> int:
-    return sum(reference.count(node) for reference in _references.values())
-
-
-def register_builtin_references() -> None:
-    """This app's own references, called from `FitmentConfig.ready()`."""
-    if ("fitment.fitmentnodemerge", "into_node") not in registered_fields():
-        register_node_reference(FitmentNodeMerge, "into_node")
-
-
 def resolve_node(node_id: int) -> FitmentNode | None:
     """The node an id stands for: itself, or the node it was merged into, or None."""
     node: FitmentNode | None = FitmentNode.objects.filter(pk=node_id).first()
@@ -585,7 +503,7 @@ def refuse_node(
         subtree = [node, *node.get_descendants()]
         if any(n.status != engine.PROPOSED for n in subtree):
             raise FitmentError("Only proposed nodes can be refused.")
-        if any(reference_count(n) for n in subtree):
+        if any(references.reference_count(n) for n in subtree):
             raise FitmentError("Something still refers to this node.")
         changeset = ChangeSet()
         changeset.delete("fitment.fitmentnode", str(node.public_id), _node_snapshot(node))
@@ -626,7 +544,7 @@ def delete_node(node: FitmentNode, *, ctx: AuditContext, dry_run: bool = False) 
         node.refresh_from_db()
         if node.get_children_count():
             raise FitmentError("This node has children.")
-        if reference_count(node):
+        if references.reference_count(node):
             raise FitmentError("Something still refers to this node: merge it instead.")
         changeset = ChangeSet()
         changeset.delete("fitment.fitmentnode", str(node.public_id), _node_snapshot(node))
@@ -759,9 +677,7 @@ def merge_nodes(
                 raise FitmentError(
                     f"The child {child.name!r} clashes with a child of the target: merge it first."
                 )
-        moved_references = {
-            name: reference.count(source) for name, reference in _references.items()
-        }
+        moved_references = references.reference_counts(source)
         # The source's name and aliases become aliases of the target, unless the target already
         # answers to them or a sibling of the target uses them: those are skipped, and listed.
         taken_by_others = _taken_names(_parent_of(target), skip=source)
@@ -798,8 +714,7 @@ def merge_nodes(
             for child in children:
                 child.refresh_from_db()
                 child.move(FitmentNode.objects.get(pk=target.pk), pos="last-child")
-            for reference in _references.values():
-                reference.move(source, target)
+            references.move_references(source, target)
             for name in added.values():
                 FitmentNodeAlias.objects.create(node=target, alias=name, language=None)
             FitmentNodeMerge.objects.create(old_node_id=source.pk, into_node=target)

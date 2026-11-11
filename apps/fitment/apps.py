@@ -10,8 +10,8 @@ class FitmentConfig(AppConfig):
     # `apps.fitment.services`, which writes one AuditLog entry per change.
     def ready(self) -> None:
         # What points at a node is registered here, not as an import side effect. FIT.2 and FIT.5
-        # call `register_node_reference` from their own `ready()` (see services.py).
-        from .services import register_builtin_references
+        # call `register_node_reference` from their own `ready()` (see references.py).
+        from .references import register_builtin_references
 
         register_builtin_references()
 

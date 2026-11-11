@@ -4,7 +4,7 @@ import pytest
 
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
-from apps.fitment import services
+from apps.fitment import references, services
 from apps.fitment.models import FitmentLevel, FitmentNode, FitmentNodeAlias, FitmentNodeMerge
 from apps.fitment.services import FitmentError
 from apps.fitment.tests.factories import (
@@ -274,19 +274,19 @@ def test_a_registered_reference_is_counted_moved_and_blocks_deletion() -> None:
     make = make_node("Make One")
     duplicate = make_node("Make Uno")
     moved: list[tuple[int, int]] = []
-    services.register_reference(
+    references.register_reference(
         "test-reference",
         count=lambda node: 2 if node.pk == duplicate.pk else 0,
         move=lambda source, target: moved.append((source.pk, target.pk)),
     )
     try:
-        assert services.reference_count(duplicate) >= 2
+        assert references.reference_count(duplicate) >= 2
         with pytest.raises(FitmentError):
             services.delete_node(duplicate, ctx=CTX)
         services.merge_nodes(duplicate, make, ctx=CTX)
         assert moved
     finally:
-        services.unregister_reference("test-reference")
+        references.unregister_reference("test-reference")
 
 
 def test_the_factory_makes_distinct_valid_nodes() -> None:
