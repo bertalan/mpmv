@@ -35,6 +35,7 @@ from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models.functions import Lower
+from django.utils.translation import gettext_lazy as _
 from treebeard.mp_tree import MP_Node
 from wagtail.models import Page
 
@@ -373,6 +374,56 @@ class Manufacturer(BaseModel):
             raise ValidationError(errors)
 
 
+class BrandBatch(BaseModel):
+    """The new brands one feed or import run brought (CAT.20), proposed and reviewed together.
+
+    One row per run, however many brands: they do not count against the vendor's limit on
+    manual proposals. Staff approve or reject the whole run in one step."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", _("Pending review")
+        APPROVED = "approved", _("Approved")
+        REJECTED = "rejected", _("Rejected")
+
+    vendor = models.ForeignKey(
+        "vendors.Vendor",
+        on_delete=models.CASCADE,
+        related_name="brand_batches",
+        verbose_name=_("vendor"),
+        help_text=_(
+            "The vendor whose feed or import brought these brands. It lets the review team "
+            "ask the right person. Example: the vendor that uploaded the product file."
+        ),
+    )
+    source = models.CharField(
+        _("source"),
+        max_length=200,
+        help_text=_(
+            "A short label of the import run. It tells reviewers where the brands come "
+            "from. Example: 'spring price list, import of 2026-11-02'."
+        ),
+    )
+    status = models.CharField(
+        _("status"),
+        max_length=16,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+        help_text=_(
+            "Where the review stands. Set by the approve and reject actions, never by hand. "
+            "Example: Pending review."
+        ),
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = _("brand batch")
+        verbose_name_plural = _("brand batches")
+
+    def __str__(self) -> str:
+        return f"{self.source} ({self.vendor_id})"
+
+
 class Brand(BaseModel):
     """A brand (`g:brand` in feeds) as a linked entity (CAT.20); its name is the same in every
     language. One shared list for all vendors: a vendor picks any `approved` brand and proposes a
@@ -409,6 +460,32 @@ class Brand(BaseModel):
     logo_alt = models.CharField(max_length=125, blank=True)
     manufacturer = models.ForeignKey(
         Manufacturer, null=True, blank=True, on_delete=models.SET_NULL, related_name="brands"
+    )
+    proposed_by = models.ForeignKey(
+        "vendors.Vendor",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="proposed_brands",
+        verbose_name=_("proposed by"),
+        help_text=_(
+            "The vendor that suggested this brand. While the brand is pending only this "
+            "vendor can use it, and the review team knows whom to ask. Empty for brands "
+            "staff created. Example: the vendor that sells it."
+        ),
+    )
+    batch = models.ForeignKey(
+        BrandBatch,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="brands",
+        verbose_name=_("import batch"),
+        help_text=_(
+            "The import run that brought this brand, when it was not proposed by hand. "
+            "Brands of a batch are reviewed together and do not count against the vendor's "
+            "limit on manual proposals. Example: 'spring price list'."
+        ),
     )
 
     class Meta:

@@ -13,22 +13,29 @@ which searches term names, slugs and taxonomy codes, and a term's place among th
 taxonomy only.
 """
 
-from typing import Any
+from collections.abc import Callable
+from typing import Any, cast
 
 from django import forms
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.admin.widgets import AutocompleteSelect
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse
+from django.template.response import TemplateResponse
 from django.utils.html import format_html
 from django.utils.http import urlencode
+from django.utils.translation import gettext_lazy as _
 from treebeard.forms import MoveNodeForm
 
+from apps.core.audit import audit_context
 from apps.core.text import ascii_int
 
+from . import brands
 from .models import Product
 from .taxonomy import (
     Brand,
+    BrandBatch,
     BrandTranslation,
     Category,
     CategoryTranslation,
@@ -319,13 +326,33 @@ class BrandForm(forms.ModelForm[Brand]):
         return str(self.cleaned_data.get("status") or Brand.Status.APPROVED)
 
 
+class BrandMergeForm(forms.Form):
+    """The brand the selected ones are merged into."""
+
+    target = forms.ModelChoiceField(
+        queryset=Brand.objects.none(),
+        widget=AutocompleteSelect(Product._meta.get_field("brand"), admin.site),
+        label=_("Merge into"),
+        help_text=_(
+            "The approved brand that keeps the products and takes over the old page address. "
+            "Example: merge the proposal 'Acmee' into the existing brand 'Acme'."
+        ),
+    )
+
+    def __init__(self, *args: Any, exclude: list[int], **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        field = cast("forms.ModelChoiceField[Brand]", self.fields["target"])
+        field.queryset = Brand.objects.filter(status=Brand.Status.APPROVED).exclude(pk__in=exclude)
+
+
 @admin.register(Brand)
 class BrandAdmin(admin.ModelAdmin[Brand]):
     form = BrandForm
-    list_display = ("name", "status", "manufacturer", "wikidata_id")
+    list_display = ("name", "status", "proposed_by", "batch", "manufacturer", "wikidata_id")
     list_filter = ("status",)
     search_fields = ("name", "wikidata_id")
-    readonly_fields = TIMESTAMPS
+    readonly_fields = (*TIMESTAMPS, "proposed_by", "batch")
+    list_select_related = ("proposed_by", "batch", "manufacturer")
     fields = (
         "name",
         "status",
@@ -335,10 +362,143 @@ class BrandAdmin(admin.ModelAdmin[Brand]):
         "logo",
         "logo_alt",
         "manufacturer",
+        "proposed_by",
+        "batch",
         *TIMESTAMPS,
     )
     autocomplete_fields = ("manufacturer",)
     inlines = (BrandTranslationInline,)
+    actions = ("approve_selected", "reject_selected", "merge_selected")
+
+    def save_model(
+        self, request: HttpRequest, obj: Brand, form: forms.ModelForm[Brand], change: bool
+    ) -> None:
+        brands.save_brand(obj, ctx=audit_context(request))
+
+    def delete_model(self, request: HttpRequest, obj: Brand) -> None:
+        brands.delete_brand(obj, ctx=audit_context(request))
+
+    def delete_queryset(self, request: HttpRequest, queryset: "models.QuerySet[Brand]") -> None:
+        ctx = audit_context(request)
+        for brand in queryset:
+            brands.delete_brand(brand, ctx=ctx)
+
+    def _each(
+        self,
+        request: HttpRequest,
+        queryset: "models.QuerySet[Brand]",
+        step: Callable[..., Any],
+        done: str,
+    ) -> None:
+        ctx = audit_context(request)
+        count = 0
+        for brand in queryset:
+            try:
+                step(brand, ctx=ctx)
+            except ValidationError as error:
+                self.message_user(request, f"{brand}: {' '.join(error.messages)}", messages.ERROR)
+            else:
+                count += 1
+        if count:
+            self.message_user(request, done.format(count=count), messages.SUCCESS)
+
+    @admin.action(description=_("Approve the selected proposals"), permissions=("change",))
+    def approve_selected(self, request: HttpRequest, queryset: "models.QuerySet[Brand]") -> None:
+        self._each(request, queryset, brands.approve_brand, "Approved {count} brand(s).")
+
+    @admin.action(description=_("Reject the selected proposals"), permissions=("change",))
+    def reject_selected(self, request: HttpRequest, queryset: "models.QuerySet[Brand]") -> None:
+        self._each(request, queryset, brands.reject_brand, "Rejected {count} brand(s).")
+
+    @admin.action(
+        description=_("Merge the selected brands into another brand"), permissions=("change",)
+    )
+    def merge_selected(
+        self, request: HttpRequest, queryset: "models.QuerySet[Brand]"
+    ) -> HttpResponse | None:
+        chosen = list(queryset)
+        confirmed = "confirm" in request.POST
+        form = BrandMergeForm(
+            request.POST if confirmed else None, exclude=[brand.pk for brand in chosen]
+        )
+        if confirmed and form.is_valid():
+            target = form.cleaned_data["target"]
+            self._each(
+                request,
+                queryset,
+                lambda brand, ctx: brands.merge_brands(brand, target, ctx=ctx),
+                f"Merged {{count}} brand(s) into {target}.",
+            )
+            return None
+        context = {
+            **self.admin_site.each_context(request),
+            "title": _("Merge brands"),
+            "opts": self.model._meta,
+            "form": form,
+            "brands": chosen,
+            "action": "merge_selected",
+            "selected": [brand.pk for brand in chosen],
+        }
+        return TemplateResponse(request, "admin/catalog/brand/merge.html", context)
+
+
+@admin.register(BrandBatch)
+class BrandBatchAdmin(admin.ModelAdmin[BrandBatch]):
+    """Import runs whose new brands wait for review: approved or rejected together."""
+
+    list_display = ("source", "vendor", "status", "created_at")
+    list_filter = ("status",)
+    search_fields = ("source",)
+    list_select_related = ("vendor",)
+    actions = ("approve_selected", "reject_selected")
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj: BrandBatch | None = None) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: BrandBatch | None = None) -> bool:
+        return False
+
+    def _each(
+        self,
+        request: HttpRequest,
+        queryset: "models.QuerySet[BrandBatch]",
+        step: Callable[..., Any],
+        done: str,
+    ) -> None:
+        ctx = audit_context(request)
+        count = 0
+        for batch in queryset:
+            try:
+                step(batch, ctx=ctx)
+            except ValidationError as error:
+                self.message_user(request, f"{batch}: {' '.join(error.messages)}", messages.ERROR)
+            else:
+                count += 1
+        if count:
+            self.message_user(request, done.format(count=count), messages.SUCCESS)
+
+    @admin.action(
+        description=_("Approve all brands of the selected batches"), permissions=("review",)
+    )
+    def approve_selected(
+        self, request: HttpRequest, queryset: "models.QuerySet[BrandBatch]"
+    ) -> None:
+        self._each(request, queryset, brands.approve_batch, "Approved {count} batch(es).")
+
+    @admin.action(
+        description=_("Reject all brands of the selected batches"), permissions=("review",)
+    )
+    def reject_selected(
+        self, request: HttpRequest, queryset: "models.QuerySet[BrandBatch]"
+    ) -> None:
+        self._each(request, queryset, brands.reject_batch, "Rejected {count} batch(es).")
+
+    def has_review_permission(self, request: HttpRequest) -> bool:
+        """Who may approve or reject a batch: whoever may change brands."""
+        return request.user.has_perm("catalog.change_brand")
 
 
 @admin.register(Manufacturer)
@@ -347,3 +507,22 @@ class ManufacturerAdmin(admin.ModelAdmin[Manufacturer]):
     search_fields = ("legal_name",)
     readonly_fields = TIMESTAMPS
     fields = ("legal_name", "url", "same_as", "country", *TIMESTAMPS)
+
+    def save_model(
+        self,
+        request: HttpRequest,
+        obj: Manufacturer,
+        form: forms.ModelForm[Manufacturer],
+        change: bool,
+    ) -> None:
+        brands.save_manufacturer(obj, ctx=audit_context(request))
+
+    def delete_model(self, request: HttpRequest, obj: Manufacturer) -> None:
+        brands.delete_manufacturer(obj, ctx=audit_context(request))
+
+    def delete_queryset(
+        self, request: HttpRequest, queryset: "models.QuerySet[Manufacturer]"
+    ) -> None:
+        ctx = audit_context(request)
+        for maker in queryset:
+            brands.delete_manufacturer(maker, ctx=ctx)

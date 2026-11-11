@@ -16,6 +16,7 @@ from apps.catalog.tests.factories import (
 )
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
+from apps.core.translations import PUBLISHED
 from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
@@ -204,7 +205,7 @@ def test_approving_makes_the_brand_public_and_audits_it(client: Client) -> None:
     vendor = VendorFactory.create()
     brand = brands.propose_brand(vendor, "Acme", ctx=CTX).brand
     assert brand is not None
-    BrandTranslationFactory.create(brand=brand, slug="acme")
+    BrandTranslationFactory.create(brand=brand, slug="acme", status=PUBLISHED)
     assert client.get("/brand/acme/").status_code == 404
     brands.approve_brand(brand, ctx=CTX)
     brand.refresh_from_db()
@@ -249,8 +250,8 @@ def test_merging_moves_products_deletes_the_brand_and_redirects_its_page(
 ) -> None:
     source = BrandFactory.create(name="Acme Old")
     target = BrandFactory.create(name="Acme")
-    BrandTranslationFactory.create(brand=source, slug="acme-old")
-    BrandTranslationFactory.create(brand=target, slug="acme")
+    BrandTranslationFactory.create(brand=source, slug="acme-old", status=PUBLISHED)
+    BrandTranslationFactory.create(brand=target, slug="acme", status=PUBLISHED)
     ProductFactory.create_batch(2, brand=source)
     other = ProductFactory.create(brand=target)
     assert client.get("/brand/acme-old/").status_code == 200
@@ -269,17 +270,20 @@ def test_merging_moves_products_deletes_the_brand_and_redirects_its_page(
     assert response.status_code == 301
     assert response["Location"] == "/brand/acme/"
     assert not changes.is_empty
-    assert _audits(brands.BRAND_MERGED) == 1
-    assert _audits("catalog.redirect.created") == 1
+    # The removed brand, and the target with its new product count.
+    assert _audits(brands.BRAND_MERGED) == 2
+    assert AuditLog.objects.filter(
+        action="catalog.redirect.created", target_key="/brand/acme-old/"
+    ).exists()
 
 
 def test_merging_redirects_every_language_and_keeps_earlier_redirects_one_hop() -> None:
     source = BrandFactory.create(name="Old")
     target = BrandFactory.create(name="New")
-    BrandTranslationFactory.create(brand=source, slug="old", language="en")
-    BrandTranslationFactory.create(brand=source, slug="vecchio", language="it")
-    BrandTranslationFactory.create(brand=target, slug="new", language="en")
-    BrandTranslationFactory.create(brand=target, slug="nuovo", language="it")
+    BrandTranslationFactory.create(brand=source, slug="old", language="en", status=PUBLISHED)
+    BrandTranslationFactory.create(brand=source, slug="vecchio", language="it", status=PUBLISHED)
+    BrandTranslationFactory.create(brand=target, slug="new", language="en", status=PUBLISHED)
+    BrandTranslationFactory.create(brand=target, slug="nuovo", language="it", status=PUBLISHED)
     earlier = Redirect.objects.create(
         source_path="/brand/older/",
         code=301,

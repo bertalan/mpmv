@@ -1813,6 +1813,11 @@ def brand_anchor(slug: str, language: str) -> ListingAnchor | None:
     return _brand_anchor(found.brand)
 
 
+def brand_page_paths(brand: Brand) -> dict[str, str]:
+    """The public page paths of `brand` by language (empty while no text is published)."""
+    return _brand_anchor(brand).paths
+
+
 def _brand_anchor(brand: Brand) -> ListingAnchor:
     published = _published_slugs(BrandTranslation.objects.filter(brand=brand), "brand")
     brand_slugs = published.get(brand.pk, {})
