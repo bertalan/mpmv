@@ -50,6 +50,12 @@ listing page); the grid shows the newest products as the listing's product cards
 editor turns it off, a "See all" link to the canonical listing page in the page's language. It is
 offered in `HomePage` and `StandardPage` bodies; a grid with no public product is left out.
 
+**Help on every field.** Every panel, snippet field and StreamField block field an editor fills in
+has a plain-language help text (what to enter, why it matters, an example or limit; what happens if
+a required field is empty), translated into Italian. The rule is the "Field help" convention in
+[01](01-stack-and-architecture.md#cross-cutting-conventions), enforced by ARC.30; events and CMS are
+the first part of the ARC.31 backfill.
+
 ### Launch countdown block (CMS.9)
 
 A StreamField block that announces a product launch, available in `HomePage`, `StandardPage`,
