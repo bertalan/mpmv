@@ -1,4 +1,4 @@
-# ADR-0009: PDF library for the per-vendor order confirmation
+# ADR-0010: PDF library for the per-vendor order confirmation
 
 - **Status:** Proposed (owner or lane-a to accept)
 - **Date:** 2026-11-11
