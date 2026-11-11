@@ -16,6 +16,7 @@ from wagtail.models import Locale, Revision, Site, WorkflowState
 
 from apps.accounts.tests.factories import UserFactory
 from apps.catalog.tests.factories import CategoryFactory, ProductFactory
+from apps.cms.blocks import ProductCardsBlock, ProductGridBlock
 from apps.core.models import AuditLog
 from apps.events import services
 from apps.events.models import (
@@ -220,6 +221,79 @@ def test_a_vendor_cannot_use_a_block_outside_the_vendor_safe_set(owner: User) ->
     with pytest.raises(ValidationError) as excinfo:
         save_event_draft(owner, _data(body=body), vendor=_vendor_of(owner))
     assert "body" in excinfo.value.message_dict
+
+
+def test_the_event_body_offers_the_product_cards_and_the_grid() -> None:
+    children = EventPage._meta.get_field("body").stream_block.child_blocks
+    assert isinstance(children["product_cards"], ProductCardsBlock)
+    assert isinstance(children["product_grid"], ProductGridBlock)
+
+
+def _cards_body(*pks: Any) -> list[dict[str, Any]]:
+    return [
+        {
+            "type": "product_cards",
+            "value": {"heading": "Our products", "layout": "grid", "products": list(pks)},
+        }
+    ]
+
+
+def test_a_vendor_may_pick_its_own_products_in_a_cards_block(owner: User) -> None:
+    mine = ProductFactory.create(vendor=_vendor_of(owner))
+    page = _create(owner, body=_cards_body(mine.pk))
+    stored = page.get_latest_revision_as_object().body
+    assert [block.block_type for block in stored] == ["product_cards"]
+
+
+def test_a_vendor_cannot_pick_another_vendors_product_in_a_cards_block(owner: User) -> None:
+    mine = ProductFactory.create(vendor=_vendor_of(owner))
+    theirs = ProductFactory.create()
+    for ids in ([theirs.pk], [mine.pk, theirs.pk], [True], ["abc"], [999_999_999]):
+        with pytest.raises(ValidationError) as excinfo:
+            save_event_draft(owner, _data(body=_cards_body(*ids)), vendor=_vendor_of(owner))
+        assert "body" in excinfo.value.message_dict, ids
+
+
+def _grid_body(kind: str, target: Any) -> list[dict[str, Any]]:
+    return [
+        {
+            "type": "product_grid",
+            "value": {
+                "heading": "",
+                "source": [{"type": kind, "value": target}],
+                "limit": 4,
+                "see_all": True,
+            },
+        }
+    ]
+
+
+def test_a_vendor_may_show_a_grid_of_its_own_products(owner: User) -> None:
+    page = _create(owner, body=_grid_body("vendor", _vendor_of(owner).pk))
+    assert [b.block_type for b in page.get_latest_revision_as_object().body] == ["product_grid"]
+
+
+def test_a_vendor_cannot_show_a_grid_of_anything_but_its_own_products(owner: User) -> None:
+    other = ProductFactory.create()
+    category = CategoryFactory.create()
+    bodies = (
+        _grid_body("vendor", other.vendor_id),
+        _grid_body("category", category.pk),
+        _grid_body("brand", 1),
+        _grid_body("vendor", True),
+        [{"type": "product_grid", "value": {"heading": "", "source": [], "limit": 4}}],
+    )
+    for body in bodies:
+        with pytest.raises(ValidationError) as excinfo:
+            save_event_draft(owner, _data(body=body), vendor=_vendor_of(owner))
+        assert "body" in excinfo.value.message_dict, body
+
+
+def test_staff_may_pick_any_product_in_a_cards_block() -> None:
+    staff = UserFactory.create(platform_staff=True)
+    product = ProductFactory.create()
+    page = _create(staff, body=_cards_body(product.pk))
+    assert [b.block_type for b in page.get_latest_revision_as_object().body] == ["product_cards"]
 
 
 def test_a_vendor_cannot_link_a_script_url(owner: User) -> None:
