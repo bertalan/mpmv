@@ -5,6 +5,8 @@ vendor is a Catalog and moderation action (and the owner's). A vendor member or 
 role group gets no role powers anywhere.
 """
 
+from typing import Any
+
 import pytest
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
@@ -64,7 +66,7 @@ def test_view_all_vendors_alone_no_longer_unlocks() -> None:
 
 
 @pytest.mark.parametrize("key", roles.ROLE_KEYS)
-def test_duplicate_needs_the_catalog_or_owner_role(key: str, attributes: dict) -> None:  # noqa: F811
+def test_duplicate_needs_the_catalog_or_owner_role(key: str, attributes: dict[str, Any]) -> None:  # noqa: F811
     source = VendorFactory.create()
     create_product(source, tee(), ctx=CTX)
     original, target = Product.objects.get(sku="TEE-1"), VendorFactory.create()

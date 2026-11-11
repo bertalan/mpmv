@@ -291,10 +291,10 @@ def holds_permission(user: AbstractBaseUser | AnonymousUser, *labels: str) -> bo
         wanted |= Q(content_type__app_label=app_label, codename=codename)
     # Platform roles and vendor membership never mix: a member holds no platform permission. A
     # role (group) also needs admin access; a customer put in a role group by mistake holds none.
-    if apps.get_model("vendors", "VendorMember").objects.filter(user=user).exists():
+    if apps.get_model("vendors", "VendorMember").objects.filter(user_id=user.pk).exists():
         return False
     granted = Q(user=user)
-    if user.is_staff or user.is_superuser:  # type: ignore[union-attr]
+    if getattr(user, "is_staff", False) or user.is_superuser:
         granted |= Q(group__user=user)
     return Permission.objects.filter(granted).filter(wanted).exists()
 

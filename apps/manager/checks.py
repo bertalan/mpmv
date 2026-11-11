@@ -181,19 +181,22 @@ def check_role_drift(
         problems, conflicts = role_drift(), role_conflicts()
     except DatabaseError:  # not migrated yet
         return []
-    return [
-        checks.Error(
-            problem,
-            hint="Remove the user from the role group, or the vendor membership.",
-            id="manager.E005",
+    found: list[checks.CheckMessage] = []
+    for problem in conflicts:
+        found.append(
+            checks.Error(
+                problem,
+                hint="Remove the user from the role group, or the vendor membership.",
+                id="manager.E005",
+            )
         )
-        for problem in conflicts
-    ] + [
-        checks.Error(
-            problem,
-            hint="Restore the group from apps/manager/roles.py (sync_role_groups), or change "
-            "roles.py and add a data migration; do not edit role groups in the admin.",
-            id="manager.E004",
+    for problem in problems:
+        found.append(
+            checks.Error(
+                problem,
+                hint="Restore the group from apps/manager/roles.py (sync_role_groups), or change "
+                "roles.py and add a data migration; do not edit role groups in the admin.",
+                id="manager.E004",
+            )
         )
-        for problem in problems
-    ]
+    return found
