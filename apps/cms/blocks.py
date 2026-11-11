@@ -703,6 +703,7 @@ class ProductGridBlock(blocks.StructBlock):  # type: ignore[misc]
 # --- Product cards (CMS.11)
 
 PRODUCT_CARDS_LAYOUTS = ("grid", "row")
+PRODUCT_CARDS_MAX = 12  # one listing row of a page; more is the product grid's job
 
 
 def _shown_in_language(products: Iterable[Product | None], language: str) -> list[Product]:
@@ -750,10 +751,12 @@ class ProductCardsBlock(blocks.StructBlock):  # type: ignore[misc]
             help_text=_("Search by name, SKU, brand or vendor, then click the product.")
         ),
         min_num=1,
+        max_num=PRODUCT_CARDS_MAX,
         label=_("Products"),
         help_text=_(
-            "The products to show, in this order. Add at least one. A product that is no "
-            "longer for sale, or has no text in the page language, is left out by itself."
+            "The products to show, in this order. Add at least one and at most 12. A product "
+            "that is no longer for sale, or has no text in the page language, is left out by "
+            "itself."
         ),
     )
 
@@ -763,8 +766,20 @@ class ProductCardsBlock(blocks.StructBlock):  # type: ignore[misc]
         template = "cms/blocks/product_cards.html"
 
     def _cards(self, value: Any, parent_context: Mapping[str, Any] | None) -> list[ProductCard]:
+        """The cards, computed once per block value and request: the page render and the
+        SEO.7 graph both ask for them."""
         language = _page_language(dict(parent_context) if parent_context else None)
-        return product_cards(_shown_in_language(value["products"], language), language)
+        request = (parent_context or {}).get("request")
+        cache: dict[tuple[int, str], tuple[Any, list[ProductCard]]] | None = None
+        if request is not None:
+            cache = request.__dict__.setdefault("_product_cards_cache", {})
+            hit = cache.get((id(value), language))
+            if hit is not None and hit[0] is value:
+                return hit[1]
+        cards = product_cards(_shown_in_language(value["products"], language), language)
+        if cache is not None:
+            cache[(id(value), language)] = (value, cards)
+        return cards
 
     def get_context(self, value: Any, parent_context: dict[str, Any] | None = None) -> Any:
         context = super().get_context(value, parent_context=parent_context)

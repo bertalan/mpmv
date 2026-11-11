@@ -241,3 +241,47 @@ def test_a_product_name_cannot_break_out_of_the_json(seeded: SeedReport) -> None
     text = jsonld_text({"@graph": nodes})
     assert "</script>" not in text
     assert "<img" not in text
+
+
+# --- Limit and one computation per request
+
+
+def test_the_block_takes_at_most_twelve_products() -> None:
+    from django.core.exceptions import ValidationError
+
+    products = ProductCardsBlock().child_blocks["products"]
+    assert products.meta.max_num == 12
+    assert "12" in str(products.meta.help_text)
+    block = ProductCardsBlock()
+    too_many = [listed(f"Bowl {n}") for n in range(13)]
+    value = block.to_python({"heading": "", "layout": "grid", "products": [p.pk for p in too_many]})
+    with pytest.raises(ValidationError):
+        block.clean(value)
+
+
+def test_the_cards_are_computed_once_for_the_page_and_the_graph(
+    seeded: SeedReport, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from django.test import RequestFactory
+
+    import apps.catalog.services as catalog_services
+    import apps.cms.blocks as blocks_module
+
+    calls: list[int] = []
+    real = catalog_services.product_cards
+
+    def counting(products: Any, language: str) -> Any:
+        calls.append(1)
+        return real(products, language)
+
+    monkeypatch.setattr(blocks_module, "product_cards", counting)
+    home = _home()
+    home.body = [_cards(listed("Blue bowl"))]
+    home.save_revision().publish()
+    home.refresh_from_db()
+    request = RequestFactory().get(home.url)
+    context = {"request": request, "page": home}
+    block = home.body[0]
+    block.block.get_context(block.value, parent_context=context)
+    page_graph_nodes(home.body, context)
+    assert len(calls) == 1
