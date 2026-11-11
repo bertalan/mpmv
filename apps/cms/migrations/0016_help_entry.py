@@ -34,7 +34,7 @@ def seed_general_entry(apps: Any, schema_editor: Any) -> None:
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("cms", "0014_cmp5_contacts_legal_sections"),
+        ("cms", "0015_product_cards_blocks"),
         ("wagtailcore", "0098_apitoken"),
     ]
 
