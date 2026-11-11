@@ -72,6 +72,7 @@ vendor's change page links to its trail (`?vendor=<public id>`).
 | Site themes (THM.1) | `themes.theme_settings.configured` (the site's hostname and theme, before and after; see [themes.md](themes.md)) |
 | Legal pages (CMS.5, I18N.9) | `cms.legal_page_version.recorded` (a published legal page version), `cms.legal_page_review.recorded` (a per-language review), `cms.legal_page.effective_date_set` |
 | Tax regime changes (TAX.2) | `tax.regime_change.requested`, `.approved`, `.rejected` (who, the requested regime, the review reason); an approval also writes `tax.vendor_tax_profile.configured` and, when it moves the declared fiscal regime, `vendor.updated` |
+| Garage scheme and nodes (FIT.1, D-38) | `fitment.scheme.updated` (wording, year range, limits: before and after); `fitment.level.created`, `.updated` (labels, naming, order), `.deleted`; `fitment.node.created` (a node or a proposal), `.updated` (rename, translated name), `.status_changed` (approve, retire, reactivate: one entry per node), `.merged` (the merged node, its target, the children and references moved), `.refused` (a proposal removed, with the reason), `.deleted`; `fitment.alias.created`, `.deleted`; `fitment.category.relevance_changed` (one entry per category the operator marks as expected to declare fitment). Through `fitment.services`, with `dry_run` |
 
 Not audited here on purpose: blog articles created by `cms.services.import_article` (CMS.3) and
 other CMS page content. Wagtail's page history and revisions record them, like an editor's

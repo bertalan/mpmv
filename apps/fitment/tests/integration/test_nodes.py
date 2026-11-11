@@ -5,7 +5,7 @@ import pytest
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 from apps.fitment import services
-from apps.fitment.models import FitmentNode, FitmentNodeAlias, FitmentNodeMerge
+from apps.fitment.models import FitmentLevel, FitmentNode, FitmentNodeAlias, FitmentNodeMerge
 from apps.fitment.services import FitmentError
 from apps.fitment.tests.factories import (
     FitmentLevelFactory,
@@ -77,9 +77,11 @@ def test_a_translated_name_needs_a_level_that_translates_names() -> None:
     make = make_node("Make One")
     with pytest.raises(FitmentError):
         services.set_node_name(make, "it", "Marca Uno", ctx=CTX)
-    services.set_translate_names(make.level, True, ctx=CTX)
-    services.set_node_name(make, "it", "Marca Uno", ctx=CTX)
-    assert make.translations.get(language="it").name == "Marca Uno"
+    services.set_translate_names(FitmentLevel.objects.get(code="model"), True, ctx=CTX)
+    model = make_node("Model A", make)
+    services.set_node_name(model, "it", "Modello A", ctx=CTX)
+    services.set_node_name(model, "it", "Modello Uno", ctx=CTX)
+    assert model.translations.get(language="it").name == "Modello Uno"
 
 
 def test_aliases_are_added_and_removed_with_audit() -> None:
