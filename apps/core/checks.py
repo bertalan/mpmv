@@ -176,6 +176,39 @@ def check_trusted_proxy_for_deploy(
     ]
 
 
+def check_admin_network_settings(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """OPS.5: every allowed network of the technical admin is an address or a CIDR network."""
+    try:
+        trusted_proxy_networks(tuple(settings.ADMIN_ALLOWED_NETWORKS))
+    except ValueError as error:
+        return [
+            checks.Error(
+                f"ADMIN_ALLOWED_NETWORKS has an entry that is not an IP address or network: "
+                f"{error}.",
+                hint="List addresses or CIDR networks, comma separated, never host names.",
+                id="core.E003",
+            )
+        ]
+    return []
+
+
+def check_admin_network_for_deploy(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """OPS.5: with no allowed network the Django admin answers everybody (only Caddy limits it)."""
+    if settings.ADMIN_ALLOWED_NETWORKS:
+        return []
+    return [
+        checks.Warning(
+            "ADMIN_ALLOWED_NETWORKS is empty: the app does not restrict the Django admin.",
+            hint="Set MPMV_ADMIN_ALLOWED_NETWORKS as in deploy/server/mpmv.env.example.",
+            id="core.W002",
+        )
+    ]
+
+
 # --- Audit policy (SEC.4, docs/dev/audit-trail.md)
 #
 # Each AppConfig declares `audited_models` (names whose writes are audited) and

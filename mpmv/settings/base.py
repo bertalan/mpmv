@@ -107,6 +107,7 @@ MIDDLEWARE = [
     "apps.core.middleware.CrossOriginResourcePolicyMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
+    "apps.core.middleware.AdminNetworkAllowlistMiddleware",  # OPS.5: 404 outside the networks
     "apps.cms.middleware.WagtailAdminPickerNonceMiddleware",  # Wagtail's inline pickers (CMS.1)
     "apps.core.middleware.PermissionsPolicyMiddleware",
     "apps.seo.middleware.ForceNoindexMiddleware",  # X-Robots-Tag when forced (SEO.8)
@@ -427,6 +428,12 @@ SECURE_CSP: dict[str, list[str] | bool] = {
 # CIDR networks). Empty: REMOTE_ADDR, right when nothing sits in front of the app.
 TRUSTED_PROXY_HEADER = env_str("MPMV_TRUSTED_PROXY_HEADER", "")
 TRUSTED_PROXIES = env_list("MPMV_TRUSTED_PROXIES")
+
+# OPS.5 (owner decision Q-18): networks (addresses or CIDR, comma separated) the technical Django
+# admin (`/django-admin/`) answers to, judged on client_ip(); everybody else gets a 404. The
+# reverse proxy has the same list (deploy/caddy/Caddyfile); this is the second layer. Empty: no
+# restriction here (development, tests); `check --deploy` warns (core.W002).
+ADMIN_ALLOWED_NETWORKS = env_list("MPMV_ADMIN_ALLOWED_NETWORKS")
 
 # Bot protection on login and registration forms (CORE.5): Cloudflare Turnstile behind
 # apps.accounts.captcha.CaptchaVerifier. Off unless explicitly enabled; keys from the environment

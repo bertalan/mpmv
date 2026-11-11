@@ -3,10 +3,13 @@
 from collections.abc import Callable
 
 from django.conf import settings
-from django.http import HttpRequest
+from django.http import Http404, HttpRequest
 from django.http.response import HttpResponseBase
+from django.urls import NoReverseMatch, reverse
 from django.utils.cache import add_never_cache_headers
+from django.views.defaults import page_not_found
 
+from .http import client_ip, ip_in_networks
 from .security import build_permissions_policy
 
 
@@ -70,3 +73,33 @@ class PrivateCacheForSignedInUsersMiddleware:
         if user is not None and user.is_authenticated:
             add_never_cache_headers(response)
         return response
+
+
+class AdminNetworkAllowlistMiddleware:
+    """Answer 404 on the Django admin path to a client outside `ADMIN_ALLOWED_NETWORKS` (OPS.5).
+
+    Defence in depth behind the reverse proxy's allow-list. The client address is `client_ip()`,
+    so a forwarded header counts only from a trusted proxy. The refusal is the 404 page of any
+    unknown address: nothing says an admin lives there. With no network configured the app does
+    not restrict (the deploy check core.W002 warns).
+    """
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponseBase]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
+        networks = settings.ADMIN_ALLOWED_NETWORKS
+        if (
+            networks
+            and request.path.startswith(self._prefix())
+            and not ip_in_networks(client_ip(request), networks)
+        ):
+            return page_not_found(request, Http404())
+        return self.get_response(request)
+
+    @staticmethod
+    def _prefix() -> str:
+        try:
+            return reverse("admin:index")
+        except NoReverseMatch:  # a URLconf without the Django admin (some tests)
+            return "/\0"
