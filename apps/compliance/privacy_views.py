@@ -15,6 +15,7 @@ from typing import Any, cast
 from django.conf import settings
 from django.contrib.auth import logout
 from django.contrib.auth.views import redirect_to_login
+from django.db.models import F
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render, resolve_url
 from django.urls import reverse
@@ -22,9 +23,10 @@ from django.utils.translation import gettext as _
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
-from apps.accounts.decorators import step_up_required
+from apps.accounts.decorators import mfa_redirect, step_up_required
 from apps.accounts.mfa_session import is_recently_verified
 from apps.accounts.models import User
+from apps.accounts.services import has_second_factor
 from apps.core.audit import audit_context, record
 from apps.core.public_forms import not_anonymous
 from apps.core.services import consume_rate_limit
@@ -66,20 +68,36 @@ def _limited(user: User, scope: str, limit: tuple[int, dt.timedelta]) -> HttpRes
     return _too_many(wait) if wait else None
 
 
-def _reauthenticated(request: HttpRequest) -> bool:
-    user = request.user
+def _reauth_refusal(request: HttpRequest) -> HttpResponse | None:
+    """None when the caller is freshly re-authenticated, else the response to send.
+
+    An account without a usable password (passkey-only) cannot type one: it is sent to the
+    second-factor step and comes back to the account page.
+    """
+    user = cast(User, request.user)
     if is_recently_verified(request):
-        return True
+        return None
+    if not user.has_usable_password():
+        target = "mfa:verify" if has_second_factor(user) else "mfa:setup"
+        return mfa_redirect(request, target, next_url=reverse("privacy_account"))
     password = request.POST.get("password", "")
-    return bool(password) and isinstance(user, User) and user.check_password(password)
+    if password and user.check_password(password):
+        return None
+    return HttpResponse(_("Please confirm your password."), status=403)
 
 
 def _page(request: HttpRequest, *, status: int = 200, **extra: Any) -> HttpResponse:
-    context = {"years": engine.FISCAL_RETENTION_YEARS, **extra}
+    user = cast(User, request.user)
+    context = {
+        "years": engine.FISCAL_RETENTION_YEARS,
+        "has_password": user.has_usable_password(),
+        **extra,
+    }
     return render(request, "compliance/privacy_account.html", context, status=status)
 
 
 @require_GET
+@never_cache
 @_signed_in
 def account(request: HttpRequest) -> HttpResponse:
     return _page(request)
@@ -92,13 +110,13 @@ def account(request: HttpRequest) -> HttpResponse:
 )
 @require_POST
 @_signed_in
-def export(request: HttpRequest) -> HttpResponse:
+def download_data(request: HttpRequest) -> HttpResponse:
     """Data export (articles 15 and 20): the signed-in user's own data as a JSON download."""
     user = cast(User, request.user)
     if limited := _limited(user, "export", EXPORT_LIMIT):
         return limited
-    if not _reauthenticated(request):
-        return HttpResponse(_("Please confirm your password."), status=403)
+    if refusal := _reauth_refusal(request):
+        return refusal
     body = gdpr.export_customer_json(user, ctx=audit_context(request))
     response = HttpResponse(body, content_type="application/json")
     response["Content-Disposition"] = 'attachment; filename="mpmv-data-export.json"'
@@ -119,8 +137,8 @@ def erase(request: HttpRequest) -> HttpResponse:
     user = cast(User, request.user)
     if limited := _limited(user, "erase", ERASE_LIMIT):
         return limited
-    if not _reauthenticated(request):
-        return HttpResponse(_("Please confirm your password."), status=403)
+    if refusal := _reauth_refusal(request):
+        return refusal
     if request.POST.get("confirm") != "erase":
         return _page(request, status=400, error=_("Tick the confirmation to erase your account."))
     try:
@@ -163,10 +181,13 @@ def _staff(view: View) -> View:
 
 
 @require_GET
+@never_cache
 @_staff
 def requests_list(request: HttpRequest) -> HttpResponse:
     """Erasure requests by public id and state; never a name or an address."""
-    rows = ErasureRequest.objects.order_by("completed_at", "requested_at")[:200]
+    rows = ErasureRequest.objects.order_by(F("completed_at").asc(nulls_first=True), "requested_at")[
+        :200
+    ]
     return render(request, "compliance/privacy_requests.html", {"rows": rows})
 
 

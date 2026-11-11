@@ -11,7 +11,7 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.models import User
-from apps.accounts.tests.factories import UserFactory
+from apps.accounts.tests.factories import PasskeyDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.cart.tests.factories import CartFactory
 from apps.compliance import gdpr
@@ -117,6 +117,24 @@ def test_export_is_rate_limited_and_audited_without_personal_data() -> None:
     assert "mario@example.com" not in f"{entry.before}{entry.after}{entry.actor_label}"
 
 
+@pytest.mark.parametrize("name", ["privacy_export", "privacy_erase"])
+def test_a_passkey_only_account_is_sent_to_the_second_factor_step(name: str) -> None:
+    user = UserFactory.create()
+    user.set_unusable_password()
+    user.save(update_fields=["password"])
+    PasskeyDeviceFactory.create(user=user)
+    client = Client()
+    client.force_login(user)
+
+    response = client.post(reverse(name), {"confirm": "erase"})
+
+    assert response.status_code == 302
+    assert reverse("mfa:verify") in response["Location"]
+    assert "next=" in response["Location"]
+    page = client.get(reverse("privacy_account")).content.decode()
+    assert 'type="password"' not in page
+
+
 # --- erasure -----------------------------------------------------------------------------------
 
 
@@ -215,6 +233,14 @@ def test_staff_processes_a_pending_request_with_a_reason_and_it_is_audited() -> 
     pending.refresh_from_db()
     assert pending.completed_at is not None
     assert AuditLog.objects.filter(action="compliance.erasure_processed").exists()
+
+
+def test_pending_requests_are_listed_before_completed_ones() -> None:
+    for _ in range(3):
+        ErasureRequestFactory.create(completed_at=ago(days=1))
+    pending = ErasureRequestFactory.create()
+    response = staff_client("compliance.change_erasurerequest").get(reverse("privacy_requests"))
+    assert next(iter(response.context["rows"])).pk == pending.pk
 
 
 def test_processing_an_unknown_request_is_404() -> None:
