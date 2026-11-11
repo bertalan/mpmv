@@ -93,9 +93,9 @@ def test_a_signed_in_user_has_the_help_button_on_the_page(name: str) -> None:
     assert tools["data-help-url"] == "/_help/entry/"
     assert tools["data-help-lang"] == lang
     assert "data-help-route" in tools.attrs
-    assert "data-help-page-type" in tools.attrs
+    assert "data-help-type" in tools.attrs
     if name.startswith(PAGE_TYPE_CLASSES):
-        assert tools["data-help-page-type"], f"{case.url}: no page type"
+        assert tools["data-help-type"], f"{case.url}: no page type"
     elif not name.startswith("error-"):  # an error page names no screen: the general entry
         assert tools["data-help-route"], f"{case.url}: no route name"
     # The dialog and the static script; nothing inline.
