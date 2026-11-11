@@ -46,7 +46,12 @@ started by the previous release's script. This catches what only appears when a 
 over existing data, or when an older deploy script installs a newer one (a drift check, a data
 migration, a role sync, the Caddy socket switch). The job log names both versions. With no
 previous tag, or when its image cannot be pulled, the smoke prints a `::notice::` or `::warning::`
-and runs the candidate on an empty database as before.
+and runs the candidate on an empty database as before (on main and on release tags those two cases
+fail the job instead). A previous script from before the hand-over (release 0.1.7 and older, found
+by [deploy/ci/hands-over.sh](../../deploy/ci/hands-over.sh): its hand-over message is missing)
+would install the candidate's units its own old way, so the smoke applies the one-time script
+refresh described under the Caddy socket switch below, exactly as an operator does, and logs a
+notice.
 
 The smoke rewrites the runner's MPMV configuration and leaves it, its containers and its sysctl
 changes behind, so it runs only on GitHub-hosted (ephemeral) runners: it refuses to start

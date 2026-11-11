@@ -235,6 +235,12 @@ fi
 if [ -n "$previous" ]; then
   group "Upgrade: previous release $previous, candidate $good, same database (doctor, units, migrate, restart, check)"
   # The previous release's script runs first; it hands over to the candidate's when they differ.
+  # A script from before the hand-over would install the candidate's units its own old way: the
+  # documented one-time refresh (docs/dev/release.md) installs the candidate's script first.
+  if ! "$repo/deploy/ci/hands-over.sh" "$deployer"; then
+    echo "::notice::previous release predates the re-exec; applying the one-time script refresh (release.md)"
+    install_deployer "$good"
+  fi
 else
   group "Install mpmv-deploy from the image, then deploy it (doctor, units, migrate, restart, check)"
   install_deployer "$good"

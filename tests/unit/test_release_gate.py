@@ -313,6 +313,41 @@ def test_the_upgrade_path_is_required_on_main_and_release_tags_only(
     assert result.stdout == f"{expected}\n"
 
 
+HANDS_OVER = ROOT / "deploy" / "ci" / "hands-over.sh"
+
+
+def hands_over(script: Path) -> int:
+    return subprocess.run(  # noqa: S603 (fixed script path)
+        ["bash", str(HANDS_OVER), str(script)],  # noqa: S607
+        capture_output=True,
+        check=False,
+    ).returncode
+
+
+def test_a_script_with_the_re_exec_is_used_as_it_is_and_an_older_one_is_refreshed(
+    tmp_path: Path,
+) -> None:
+    current = ROOT / "deploy" / "server" / "mpmv-deploy"
+    assert hands_over(current) == 0
+    # A script from before the hand-over: the same script without it.
+    older = tmp_path / "mpmv-deploy"
+    older.write_text(current.read_text().replace("continuing with the deploy script of", "x"))
+    assert hands_over(older) == 1
+
+
+def test_the_smoke_refreshes_the_script_first_when_the_previous_one_predates_the_re_exec() -> None:
+    text = SMOKE.read_text()
+    assert "hands-over.sh" in text
+    assert (
+        "::notice::previous release predates the re-exec; "
+        "applying the one-time script refresh (release.md)"
+    ) in text
+    refresh = text.index("applying the one-time script refresh")
+    assert text.index('"$deployer" deploy "$previous"') < refresh
+    assert refresh < text.index('"$deployer" deploy "$good"')
+    assert 'install_deployer "$good"' in text[refresh:]
+
+
 def test_the_smoke_fails_a_required_context_that_cannot_upgrade_and_only_warns_otherwise() -> None:
     text = SMOKE.read_text()
     assert "upgrade-policy.sh" in text
