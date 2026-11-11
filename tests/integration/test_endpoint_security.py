@@ -461,7 +461,6 @@ OWNER_ONLY_WEB = frozenset(
         "manager:shop:profile",  # CORE.9
         "manager:shop:image_choose",  # VEN.31
         "manager:shop:image_results",
-        "manager:shop:image_create",
         "manager:shop:image_chosen",
         "manager:shop:image_select_format",
     }

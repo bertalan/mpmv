@@ -2298,18 +2298,29 @@ def audit_media_denied(vendor: Vendor, *, ctx: AuditContext, what: str, target: 
 
 
 def upload_storefront_image(
-    vendor: Vendor, *, upload: Any, title: str, actor: User, ctx: AuditContext
+    vendor: Vendor,
+    *,
+    upload: Any,
+    title: str,
+    actor: User,
+    ctx: AuditContext,
+    dry_run: bool = False,
 ) -> MediaImage:
     """The vendor owner uploads an image from the storefront editor, into the vendor's own
     collection only (the caller cannot name another). The SEC.2 checks of `MediaImage` apply
     (content type, caps, re-encoding without metadata, no SVG); the image is the vendor's own
     work (CMS.8). Owner only, and not for a suspended or closed vendor (`PermissionDenied`).
     Counted against an hourly limit per owner; one `vendor.media_uploaded` audit entry.
-    Raises `ValidationError({"file": [...]})` for a refused file."""
+    Raises `ValidationError({"file": [...]})` for a refused file. With `dry_run` the file is
+    checked and the unsaved image returned: nothing is written, counted or audited."""
     if not has_vendor_permission(actor, vendor, "profile"):
         raise PermissionDenied("Only the vendor owner uploads storefront images.")
-    wait = consume_rate_limit(
-        f"vendor-media:user:{actor.pk}", limit=MEDIA_UPLOAD_LIMIT, window=PROFILE_RATE_WINDOW
+    wait = (
+        None
+        if dry_run
+        else consume_rate_limit(
+            f"vendor-media:user:{actor.pk}", limit=MEDIA_UPLOAD_LIMIT, window=PROFILE_RATE_WINDOW
+        )
     )
     if wait:
         minutes = max(1, int(wait.total_seconds() // 60))
@@ -2321,10 +2332,12 @@ def upload_storefront_image(
             licence = ImageLicence.objects.filter(code=LOGO_LICENCE_CODE).first()
             if licence is None:  # the seeded allow list (core migration 0013) is incomplete
                 raise ValidationError({"file": "Uploads are not available: contact support."})
+            root = ImageCollection.get_first_root_node()
+            target = root if dry_run else vendor_logo_collection(locked)
             image = MediaImage(
                 title=(title.strip() or "Image")[:255],
                 file=upload,
-                collection=vendor_logo_collection(locked),
+                collection=target,
                 licence=licence,
                 author=vendor.display_name[:200],
                 uploaded_by_user=actor,
@@ -2334,6 +2347,8 @@ def upload_storefront_image(
             except ValidationError as error:
                 messages = [m for items in error.message_dict.values() for m in items]
                 raise ValidationError({"file": messages}) from error
+            if dry_run:
+                return image
             image.save()
             stored = (image.file.storage, image.file.name)
             record(

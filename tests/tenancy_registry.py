@@ -356,8 +356,10 @@ ENDPOINTS: dict[str, Access] = {
         make=vendor_image,
         identify=lambda o: str(o.title),  # type: ignore[attr-defined]
     ),
-    "manager:shop:image_create": VendorScopedList(
-        make=manager_vendor, identify=vendor_display_name
+    "manager:shop:image_create": NoVendorData(
+        "The upload tab of the image chooser (VEN.31): the form and the upload answer, the file "
+        "goes into the caller's own collection only; owner only, other roles get 404 "
+        "(`test_staff_and_other_users_get_404...` and the upload tests in test_image_chooser)."
     ),
     "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     "manager:platform:dashboard": StaffOnly(
