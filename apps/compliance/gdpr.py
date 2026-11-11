@@ -16,6 +16,7 @@ import datetime as dt
 import json
 from typing import Any
 
+from django.contrib.sessions.models import Session
 from django.db import transaction
 from django.db.models import QuerySet
 from django.utils import timezone
@@ -24,8 +25,8 @@ from django_otp import devices_for_user
 from apps.accounts.models import User
 from apps.cart.models import Cart
 from apps.core.audit import AuditContext, record
-from apps.core.changeset import ChangeSet
-from apps.core.models import AuditLog, OutboxEmail
+from apps.core.changeset import Change, ChangeSet
+from apps.core.models import AuditLog, OutboxEmail, OutboxEmailEvent
 from apps.core.services import audit_changes
 from apps.orders import services as order_services
 from apps.orders.models import Order
@@ -37,6 +38,9 @@ EXPORT_FORMAT_VERSION = 1
 ANONYMISED_DOMAIN = "anonymised.invalid"
 # Orders that still have a payment, shipment, return or withdrawal window ahead (D-30).
 CONCLUDED_ORDER_STATES = frozenset({"closed", "cancelled", "refunded"})
+# Never paid and still in checkout: not "open" for the erasure; cancelled, then anonymised at
+# once (D-30). `paid_at` is set by the database the first time an order is paid.
+_NEVER_PAID_LIVE_STATES = ("checkout", "quote_flow", "awaiting_payment")
 
 ACTION_EXPORT = "compliance.gdpr_export"
 ACTION_ERASURE = "compliance.gdpr_erasure"
@@ -52,7 +56,13 @@ class _DryRunRollback(Exception):
 
 
 def is_anonymised(user: User) -> bool:
-    return user.email.endswith(f"@{ANONYMISED_DOMAIN}")
+    """True once the erasure of this account completed (the request row says so, not the
+    address: anyone may register an address in the placeholder domain)."""
+    return ErasureRequest.objects.filter(user=user, completed_at__isnull=False).exists()
+
+
+def _tombstone_email(user: User) -> str:
+    return f"erased-{user.public_id}@{ANONYMISED_DOMAIN}"
 
 
 def _orders(user: User) -> QuerySet[Order]:
@@ -205,7 +215,42 @@ def _user_state(user: User) -> dict[str, Any]:
         "active": user.is_active,
         "usable_password": user.has_usable_password(),
         "anonymised": is_anonymised(user),
+        "staff": user.is_staff or user.is_superuser,
     }
+
+
+def _anonymise_never_paid(order: Order, ctx: AuditContext, stamp: dt.datetime) -> list[Change]:
+    """A checkout that never reached `paid`: cancel it, then anonymise it at once (D-30)."""
+    changes: list[Change] = []
+    if order.state != "cancelled":
+        if order.state == "checkout" or order.state == "quote_flow":
+            changes += order_services.transition_order(order, "awaiting_payment", ctx=ctx).changes
+        changes += order_services.transition_order(order, "cancelled", ctx=ctx).changes
+    if order.privacy_status != "anonymized":
+        changes += order_services.anonymise_order(order, ctx=ctx, now=stamp).changes
+    return changes
+
+
+def _purge_sessions(user: User) -> None:
+    key = str(user.pk)
+    for session in Session.objects.filter(expire_date__gt=timezone.now()):
+        if session.get_decoded().get("_auth_user_id") == key:
+            session.delete()
+
+
+def _erase_outbox(address: str, tombstone: str) -> None:
+    """Cancel mail still waiting for this address, then empty every row's recipient and
+    context. The append-only event rows may hold provider feedback text (documented in
+    docs/dev/audit-trail.md)."""
+    rows = OutboxEmail.objects.filter(recipient__iexact=address)
+    for row in rows.exclude(status__in=OutboxEmail.FINAL):
+        row.status = OutboxEmail.Status.SUPPRESSED
+        row.next_attempt_at = None
+        row.save(update_fields=["status", "next_attempt_at", "updated_at"])
+        OutboxEmailEvent.objects.create(
+            email=row, status=OutboxEmailEvent.Kind.SUPPRESSED, detail="account erased"
+        )
+    rows.update(recipient=tombstone, context="")
 
 
 def anonymise_customer(
@@ -242,36 +287,41 @@ def anonymise_customer(
                 )
             open_orders = 0
             for order in _orders(locked).order_by("id"):
-                if order.state not in CONCLUDED_ORDER_STATES:
+                never_paid = order.paid_at is None and (
+                    order.state in _NEVER_PAID_LIVE_STATES or order.state == "cancelled"
+                )
+                if never_paid:
+                    changeset.changes.extend(_anonymise_never_paid(order, ctx, stamp))
+                elif order.state not in CONCLUDED_ORDER_STATES:
                     open_orders += 1
                 elif order.privacy_status == "active":
                     changeset.changes.extend(
                         order_services.restrict_order(
-                            order,
-                            ctx=ctx,
-                            reason="account_erasure",
-                            dry_run=dry_run,
-                            now=stamp,
+                            order, ctx=ctx, reason="account_erasure", now=stamp
                         ).changes
                     )
             Cart.objects.filter(user=locked).delete()
             for device in list(devices_for_user(locked, confirmed=None)):
                 device.delete()
             complete = open_orders == 0
-            values: dict[str, Any] = {"is_active": False, "updated_at": stamp}
+            old_email = locked.email
+            _purge_sessions(locked)
+            locked.groups.clear()
+            locked.user_permissions.clear()
+            values: dict[str, Any] = {
+                "is_active": False,
+                "is_staff": False,
+                "is_superuser": False,
+                "updated_at": stamp,
+            }
             if complete:
-                values.update(
-                    email=f"erased-{key}@{ANONYMISED_DOMAIN}", full_name="", date_joined=stamp
-                )
+                values.update(email=_tombstone_email(locked), full_name="", date_joined=stamp)
             User.objects.filter(pk=locked.pk).update(**values)
             locked.refresh_from_db()
             if locked.has_usable_password():
                 locked.set_unusable_password()
                 locked.save(update_fields=["password"])
-            if complete:
-                OutboxEmail.objects.filter(
-                    recipient__iexact=user.email, status__in=OutboxEmail.FINAL
-                ).update(recipient=locked.email, context="")
+            _erase_outbox(old_email, _tombstone_email(locked))
             own.update("accounts.user", key, before, _user_state(locked))
             request, _ = ErasureRequest.objects.get_or_create(
                 user=locked, defaults={"requested_at": stamp}
@@ -281,7 +331,7 @@ def anonymise_customer(
                 request.save(update_fields=["completed_at", "updated_at"])
             changeset.changes.extend(own.changes)
             if dry_run:
-                raise _DryRunRollback
+                raise _DryRunRollback  # rolls back the sub-services' writes and audit rows too
             audit_changes(own, ctx=ctx, action=ACTION_ERASURE)
     except _DryRunRollback:
         pass

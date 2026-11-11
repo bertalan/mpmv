@@ -150,3 +150,17 @@ add a regression test that a rate change is listed under `?target_model=tax.taxr
 old and new rate in its *Changes* table (see
 `apps/core/tests/integration/test_audit_admin.py` for the platform operator version). A
 vendor-specific shipping zone or commission rule also puts `"vendor"` in its snapshot.
+
+## Personal data in the audit trail (CMP.4)
+
+- `actor_label` is `user:<public id>` or `staff:<public id>` (`apps.core.audit.user_context`),
+  never the email. The table is append-only (database trigger), so an address written there could
+  not be removed with the account. Rows written before this change keep the old label with the
+  email: a one-off update is impossible under the trigger. This is a documented residual, raised
+  as an owner question (retention of the old rows).
+- `ip` is kept as security-log evidence (GDPR article 6(1)(f), the platform's legitimate interest
+  in detecting abuse, and article 17(3)(e) for legal claims). It is not erased with the account.
+  A retention period for it (null the column after N months) is a CMP.4 2/2 / CMP.29 decision.
+- `before` and `after` of the GDPR actions hold public ids, flags and counts only.
+- `OutboxEmailEvent` rows are append-only too. The erasure writes the detail `account erased`;
+  provider feedback text in older rows may quote an address and is a documented residual.

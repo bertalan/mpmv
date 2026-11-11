@@ -59,7 +59,8 @@ def test_granting_staff_access_is_audited_with_before_and_after(staff_client: Cl
     assert entry.before is not None
     assert entry.after is not None
     assert (entry.before["is_staff"], entry.after["is_staff"]) == (False, True)
-    assert entry.actor_label == "staff:staff@example.com"
+    assert entry.actor_label.startswith("staff:")
+    assert "@" not in entry.actor_label
     assert entry.source == "admin"
 
 
@@ -146,7 +147,8 @@ def test_changing_ones_own_password_in_the_admin_is_audited_without_the_hash(
     assert staff.check_password(new_password)
     entry = AuditLog.objects.get(action="accounts.user.password_changed")
     assert entry.target_key == str(staff.public_id)
-    assert entry.actor_label == "staff:staff@example.com"
+    assert entry.actor_label.startswith("staff:")
+    assert "@" not in entry.actor_label
     assert entry.source == "admin"
     assert entry.before == {"has_usable_password": True}
     assert entry.after == {"has_usable_password": True}

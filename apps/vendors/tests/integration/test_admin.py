@@ -187,7 +187,8 @@ def test_status_action_moves_vendors_through_the_transition_service(staff_client
     entry = AuditLog.objects.get(target_model="vendors.vendor")  # the login is audited too
     assert entry.action == "vendor.status_changed"
     assert entry.source == "admin"
-    assert entry.actor_label == "staff:staff@example.com"
+    assert entry.actor_label.startswith("staff:")
+    assert "@" not in entry.actor_label
 
 
 def test_status_action_reports_invalid_transitions_and_changes_nothing(
@@ -240,7 +241,8 @@ def test_staff_with_change_permission_can_run_status_actions(client: Client) -> 
     vendor.refresh_from_db()
     assert vendor.status == Vendor.Status.ONBOARDING
     entry = AuditLog.objects.get(target_model="vendors.vendor")
-    assert entry.actor_label == "staff:limited@example.com"
+    assert entry.actor_label.startswith("staff:")
+    assert "@" not in entry.actor_label
 
 
 # --- SEC.4: staff edits are audited, and visible with before/after in the audit view
@@ -255,7 +257,8 @@ def test_adding_a_vendor_in_the_admin_is_audited(staff_client: Client) -> None:
     entry = AuditLog.objects.get(action="vendor.created")
     assert entry.target_key == str(vendor.public_id)
     assert entry.source == "admin"
-    assert entry.actor_label == "staff:staff@example.com"
+    assert entry.actor_label.startswith("staff:")
+    assert "@" not in entry.actor_label
 
 
 def test_a_vendor_field_change_is_visible_in_the_audit_view_with_before_and_after(
@@ -283,7 +286,8 @@ def test_a_vendor_field_change_is_visible_in_the_audit_view_with_before_and_afte
     (entry,) = listing.context["cl"].result_list
     detail = staff_client.get(reverse("admin:core_auditlog_change", args=[entry.pk]))
     assert ("vat_number", "IT00000010025", "IT00000020032") in detail.context["audit_changes"]
-    assert entry.actor_label == "staff:staff@example.com"
+    assert entry.actor_label.startswith("staff:")
+    assert "@" not in entry.actor_label
 
 
 def test_deleting_a_vendor_in_the_admin_is_audited(staff_client: Client) -> None:

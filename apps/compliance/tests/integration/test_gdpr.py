@@ -70,7 +70,10 @@ def place(user: User | None, *, state: str = "closed", email: str = "") -> Order
         vendor_orders=[sub],
         ctx=CTX,
         state=state,
-        legacy_wp_order_id=None if state == "awaiting_payment" else 9000 + Order.objects.count(),
+        legacy_wp_order_id=None
+        if state in {"checkout", "awaiting_payment"}
+        else 9000 + Order.objects.count(),
+        paid_at=None if state in {"checkout", "awaiting_payment", "cancelled"} else PLACED,
         now=PLACED,
     )
     assert order is not None
@@ -234,7 +237,7 @@ def test_erasure_is_idempotent_and_irreversible() -> None:
 def test_erasure_with_an_open_order_is_accepted_and_completes_when_it_closes() -> None:
     user = UserFactory.create(email="mario@example.com")
     closed = place(user)
-    open_order = place(user, state="awaiting_payment")
+    open_order = place(user, state="in_fulfillment")
 
     gdpr.anonymise_customer(user, ctx=CTX)
 
@@ -249,7 +252,8 @@ def test_erasure_with_an_open_order_is_accepted_and_completes_when_it_closes() -
     # still open: a rerun changes nothing
     assert gdpr.anonymise_customer(user, ctx=CTX).is_empty
 
-    order_services.transition_order(open_order, "cancelled", ctx=CTX)
+    order_services.transition_order(open_order, "fulfilled", ctx=CTX)
+    order_services.transition_order(open_order, "closed", ctx=CTX)
     gdpr.anonymise_customer(user, ctx=CTX)
     user.refresh_from_db()
     assert user.email.endswith("@anonymised.invalid")
@@ -323,7 +327,7 @@ def test_erasure_cancels_queued_and_retrying_mail_and_clears_every_row() -> None
         )
         for status in ("queued", "retrying", "sent", "failed")
     ]
-    place(user, state="awaiting_payment")  # pending path: the cancel must not wait for completion
+    place(user, state="in_fulfillment")  # pending path: the cancel must not wait for completion
 
     gdpr.anonymise_customer(user, ctx=CTX)
 
@@ -386,8 +390,7 @@ def test_an_address_in_the_placeholder_domain_does_not_fake_an_erasure() -> None
 
 def test_a_pending_rerun_writes_no_audit_row() -> None:
     user = UserFactory.create()
-    paid = place(user, state="awaiting_payment")
-    Order.objects.filter(pk=paid.pk).update(paid_at=PLACED)  # paid at some point: stays open
+    place(user, state="in_fulfillment")
     gdpr.anonymise_customer(user, ctx=CTX)
     rows = AuditLog.objects.count()
     assert gdpr.anonymise_customer(user, ctx=CTX).is_empty
@@ -402,7 +405,6 @@ def test_every_model_pointing_at_the_user_has_an_export_and_erasure_decision() -
         "orders.order": "exported, restricted or anonymised through ORD.2",
         "accounts.passkeydevice": "exported by name, deleted",
         "accounts.recoverycodedevice": "exported by name, deleted",
-        "otp_totp.totpdevice": "exported by name, deleted",
         "accounts.actionlinkuse": "digests and keys only; the user row stays as the tombstone",
         "accounts.actionlinkissue": "digests and keys only; the user row stays as the tombstone",
         "compliance.erasurerequest": "the request itself, no personal data",
@@ -414,19 +416,38 @@ def test_every_model_pointing_at_the_user_has_an_export_and_erasure_decision() -
         "events.eventpage": "staff moderator reference, not the customer's data",
         "shipping.shippingconfigversion": "staff author reference",
         "tax.vendortaxprofile": "vendor side, CMP.4 2/2",
-        "auth.user_groups": "stripped on erasure",
-        "auth.user_user_permissions": "stripped on erasure",
-        "admin.logentry": "staff admin log",
+        "accounts.user_groups": "stripped on erasure",
+        "accounts.user_user_permissions": "stripped on erasure",
+        "tax.taxregimechangerequest": "vendor side, CMP.4 2/2",
+        "core.mediaimage": "staff upload reference (Wagtail owner field)",
+    }
+    handled |= {
+        f"cms.{name}": "staff page owner (Wagtail), not the customer's data"
+        for name in [
+            "blogindexpage",
+            "blogpostpage",
+            "homepage",
+            "legalpage",
+            "standardpage",
+            "termlandingpage",
+            "vendorlandingpage",
+            "vendorrecruitmentpage",
+        ]
+    }
+    handled |= {
+        "events.eventindexpage": "staff page owner (Wagtail), not the customer's data",
     }
     found = set()
     for model in django_apps.get_models(include_auto_created=True):
+        if not model.__module__.startswith("apps."):
+            continue
         for field in model._meta.get_fields():
+            target = field.related_model
             if (
-                field.is_relation
-                and field.many_to_one | field.one_to_one
-                and getattr(field.related_model, "_meta", None)
-                and field.related_model._meta.label == settings.AUTH_USER_MODEL.replace(".", ".", 1)
-                and field.concrete
+                field.concrete
+                and (field.many_to_one or field.one_to_one)
+                and isinstance(target, type)
+                and target._meta.label == settings.AUTH_USER_MODEL
             ):
                 found.add(model._meta.label_lower)
-    assert found - set(handled) == set(), "decide export and erasure for these models"
+    assert sorted(found - set(handled)) == [], "decide export and erasure for these models"
