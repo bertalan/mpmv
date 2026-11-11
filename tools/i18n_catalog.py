@@ -29,7 +29,12 @@ import polib
 ROOT = Path(__file__).resolve().parent.parent
 LOCALE = ROOT / "locale"
 LANGUAGES = ("it",)  # grows with I18N.7 slices: de, fr, es
-SCOPES = ("apps/manager", "apps/accounts", "themes/base/templates/layouts")
+SCOPES = (
+    "apps/manager",
+    "apps/accounts",
+    "apps/orders/templates",
+    "themes/base/templates/layouts",
+)
 # Theme files rendered by the Manager and account pages (the rest of the theme is storefront).
 THEME_FILES = (
     "400.html",

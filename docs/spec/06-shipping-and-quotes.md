@@ -61,6 +61,25 @@ class ShippingConfigVersion(Model):            # replaces the option backups
     snapshot (JSON); created_by; created_at; note   # one-click rollback
 ```
 
+**`WeightBand.surcharge_net`** (SHP.1, used by SHP.3) is an extra amount a vendor adds to the band's
+`cost_net` for the same weight range, for example a fuel or handling supplement that changes more
+often than the carrier tariff. Rules:
+
+- Unit and type: an amount in the platform currency, `MoneyField` (`DecimalField(12, 2)`), **net of
+  VAT** like `cost_net`; default `0.00`; never negative (check constraint with `cost_net`).
+- The price of a band is `cost_net + surcharge_net` (`BandSnap.price`). Both are exact two-decimal
+  amounts, so the sum needs no extra rounding; the rate is still quantised to cents with
+  `ROUND_HALF_UP` as a guard. Never floats.
+- `quote_shipping` picks the band for the package weight, then prices the method with the band price.
+  The surcharge is part of that price, not a separate line: the buyer and the order see one net
+  shipping amount per method, and the tax engine splits VAT on that amount (`resolve_shipping_tax`).
+- Free shipping (rule 6) waives the whole band price, surcharge included. A special-area treatment
+  (SHP.14) then applies to the band price: a fixed amount is added, a percentage is taken on the band
+  price (surcharge included), a per-kg amount multiplies the package weight. The area surcharge
+  (`SpecialAreaTreatment.surcharge`) is a different field and stays separate from `surcharge_net`.
+- `surcharge_net` is part of the SHP.13 export and import (`methods[].bands[].surcharge_net`, absent
+  means `0.00`) and of the `ShippingConfigVersion` snapshot.
+
 `ShippingMethod` replaces the SHP.1 `VendorZoneRate` (renamed in place: every existing rate became
 the default method of its vendor and zone, with its bands, public id and history). The legacy
 "one carrier per vendor and zone" is superseded by owner decision (2026-11-07): a vendor can offer

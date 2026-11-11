@@ -28,3 +28,53 @@
   --w-color-focus: #0b5fff;
   --w-color-black-35: rgb(0 0 0 / 35%);
 }
+
+/* VEN.31: the chooser modal (Wagtail's modal-workflow.js builds it; its own CSS is not loaded). */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 50%);
+  z-index: 1040;
+}
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  overflow: auto;
+  z-index: 1050;
+}
+.modal.in {
+  display: block;
+}
+.modal-dialog {
+  max-width: 48rem;
+  margin: 2rem auto;
+}
+.modal-content {
+  background: #fff;
+  color: #1f2937;
+  border-radius: 0.5rem;
+  padding: 1rem 1.5rem;
+}
+.modal-content .tab-content,
+.modal-content .w-tabs__list {
+  list-style: none;
+  padding: 0;
+}
+.modal-content ul.listing,
+.modal-content .fields {
+  list-style: none;
+  padding: 0;
+}
+.modal-content .image-choice img {
+  max-width: 8rem;
+  height: auto;
+}
+.modal-content ul.grid,
+.modal-content .listing.horiz {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0;
+  list-style: none;
+}

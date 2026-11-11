@@ -4,18 +4,24 @@ Names, addresses and contacts are synthetic (example.* domains), never real manu
 """
 
 import datetime as dt
+import uuid
 
 import factory
 from django.utils import timezone
 from factory.django import DjangoModelFactory
 
+from apps.accounts.tests.factories import UserFactory
 from apps.catalog.tests.factories import ProductFactory
 from apps.compliance.models import (
     CountryWarningLanguages,
+    ErasureRequest,
     GpsrInfo,
     GpsrSafetyText,
     Notice,
+    ProductRestriction,
     SafetyCase,
+    StatementOfReasons,
+    TransparencySubmission,
     VendorGpsrDefaults,
 )
 from apps.vendors.tests.factories import VendorFactory
@@ -98,3 +104,51 @@ class NoticeFactory(DjangoModelFactory[Notice]):
     decided_at = factory.LazyAttribute(
         lambda n: timezone.now() if n.status in ("action_taken", "no_action") else None
     )
+
+
+class ErasureRequestFactory(DjangoModelFactory[ErasureRequest]):
+    """A pending account erasure for a new user."""
+
+    class Meta:
+        model = ErasureRequest
+
+    user = factory.SubFactory(UserFactory)
+
+
+class StatementOfReasonsFactory(DjangoModelFactory[StatementOfReasons]):
+    """A sent statement for a removed product of a vendor, on the platform's own initiative."""
+
+    class Meta:
+        model = StatementOfReasons
+
+    vendor = factory.SubFactory(VendorFactory)
+    target_kind = StatementOfReasons.TargetKind.PRODUCT
+    target_ref = factory.LazyFunction(uuid.uuid4)
+    restriction = "remove"
+    scope = "The product is no longer shown or sold"
+    facts = "The listing offers a counterfeit item."
+    ground_kind = "illegal_content"
+    ground = "Trade mark infringement"
+    transparency_explanation = "Counterfeit item offered."
+    language = "en"
+    sent_at = factory.LazyFunction(timezone.now)
+
+
+class TransparencySubmissionFactory(DjangoModelFactory[TransparencySubmission]):
+    """A pending article 24(5) record of a statement."""
+
+    class Meta:
+        model = TransparencySubmission
+
+    statement = factory.SubFactory(StatementOfReasonsFactory)
+    payload = factory.LazyFunction(lambda: {"puid": "x"})
+
+
+class ProductRestrictionFactory(DjangoModelFactory[ProductRestriction]):
+    """An active hold on a product."""
+
+    class Meta:
+        model = ProductRestriction
+
+    product = factory.SubFactory(ProductFactory)
+    statement = factory.SubFactory(StatementOfReasonsFactory)

@@ -13,6 +13,8 @@ a one-time signed token (CORE.15), or an allow-list entry with its reason.
 
 | URL name | Path | View | Purpose | Protection | Rate limit | Task |
 |---|---|---|---|---|---|---|
+| `wagtailcore_authenticate_with_password` | `/[<lang>/]_util/authenticate_with_password/<int:page_view_restriction_id>/<int:page_id>/` | `wagtail.views.authenticate_with_password` | Open a page shared by password | captcha | per IP bucket, and per restriction on wrong passwords only with a higher threshold (locking a page needs captcha-solved wrong guesses), in PageRestrictionProtectionMiddleware | SEC.14 |
+| `wagtailcore_login` | `/[<lang>/]_util/login/` | `django.contrib.auth.views.LoginView` | Sign in to see a page shared with logged-in users | captcha | per IP bucket in PageRestrictionProtectionMiddleware; lockout in authenticate() (CORE.5) | SEC.14 |
 | `dsa_notice` | `/[<lang>/]report/` | `apps.compliance.views.notice_form` | Report illegal content (DSA notice) | captcha | per IP (notice and captcha-failure budgets) | CMP.5 |
 | `vendors:apply` | `/[<lang>/]vendor/apply/` | `apps.vendors.application_views.apply` | Sell with us: a vendor application | captcha | per IP (registration throttle) | VEN.22 |
 | `vendors:apply_cancel` | `/[<lang>/]vendor/apply/cancel/<str:user_key>/` | `apps.vendors.application_views.cancel` | Cancel a vendor application ("this was not me") | signed token: the link must have been opened in this session from its one-time signed token | per IP (application throttle) | VEN.22 |
@@ -48,7 +50,6 @@ an anonymous request. An anonymous exception under one (a login form) is declare
 | Prefix | Why it is gated |
 |---|---|
 | `/_styleguide/` | staff only (THM.4) |
-| `/_util/` | Wagtail page view restriction forms answer 404 while BLOCK_PAGE_RESTRICTION_ROUTES is on and no restriction exists (cms.E002); SEC.14 protects them |
 | `/admin/` | the editors' admin requires a signed-in editor; its sign-in form is declared |
 | `/api/` | API v1 authenticates every operation (API key or session) |
 | `/django-admin/` | the staff admin requires a signed-in staff user; its sign-in is declared |
