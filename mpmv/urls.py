@@ -13,6 +13,7 @@ from django.conf.urls.i18n import i18n_patterns
 from django.contrib import admin
 from django.http import HttpRequest, JsonResponse
 from django.urls import include, path
+from django.views.decorators.http import require_safe
 from wagtail.admin import urls as wagtailadmin_urls
 
 from apps.accounts.views import switch_language
@@ -29,6 +30,7 @@ def healthz(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"status": "ok"})
 
 
+@require_safe
 def readyz(request: HttpRequest) -> JsonResponse:
     """Readiness probe (OPS.2): database, cache and storage answer. Status only, no detail."""
     from apps.core.health import readiness_failures
