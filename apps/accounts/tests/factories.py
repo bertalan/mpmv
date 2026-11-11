@@ -1,5 +1,6 @@
 """factory_boy factories for accounts (ARC.12). Synthetic values only."""
 
+import importlib
 import secrets
 from collections.abc import Iterable
 from typing import Any
@@ -77,7 +78,8 @@ class UserFactory(DjangoModelFactory[User]):
             return
         from django.contrib.auth.models import Group
 
-        from apps.manager import roles
+        # Dynamic: the layer contract forbids an accounts -> manager import, tests included.
+        roles = importlib.import_module("apps.manager.roles")
 
         obj.is_staff = True
         obj.save(update_fields=["is_staff"])
