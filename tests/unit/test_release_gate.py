@@ -285,6 +285,43 @@ def test_an_unreachable_origin_is_an_error_not_an_empty_answer(tmp_path: Path) -
     assert result.stdout == ""
 
 
+POLICY = ROOT / "deploy" / "ci" / "upgrade-policy.sh"
+
+
+@pytest.mark.parametrize(
+    ("event", "ref", "expected"),
+    [
+        ("push", "refs/heads/main", "required"),
+        ("push", "refs/tags/v0.2.0", "required"),
+        ("pull_request", "refs/pull/295/merge", "optional"),
+        ("push", "refs/heads/lane-b/some-branch", "optional"),
+        ("workflow_dispatch", "refs/heads/main", "optional"),
+        ("", "", "optional"),
+    ],
+)
+def test_the_upgrade_path_is_required_on_main_and_release_tags_only(
+    event: str, ref: str, expected: str
+) -> None:
+    result = subprocess.run(  # noqa: S603 (fixed script path)
+        ["bash", str(POLICY)],  # noqa: S607
+        env={"PATH": os.environ["PATH"], "GITHUB_EVENT_NAME": event, "GITHUB_REF": ref},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == f"{expected}\n"
+
+
+def test_the_smoke_fails_a_required_context_that_cannot_upgrade_and_only_warns_otherwise() -> None:
+    text = SMOKE.read_text()
+    assert "upgrade-policy.sh" in text
+    assert "::error::parity smoke:" in text
+    assert text.count("skip_upgrade ") == 2  # unreadable tag list, unpullable image
+    # The first release (no earlier tag) stays allowed everywhere: a notice, not a failure.
+    assert "::notice::parity smoke: no previous release tag" in text
+
+
 def test_the_smoke_deploys_the_previous_release_then_upgrades_to_the_candidate() -> None:
     text = SMOKE.read_text()
     assert "previous-release.sh" in text

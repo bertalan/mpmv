@@ -13,7 +13,9 @@
 # same database, started by the previous release's script (which hands over to the candidate's).
 # MPMV_PARITY_PREVIOUS_IMAGE overrides the registry repository the previous image is pulled from
 # (default ghcr.io/<owner>/mpmv-app, anonymous pull). Without a previous tag, or when its image
-# cannot be pulled, the smoke runs the candidate on an empty database and logs the fallback.
+# cannot be pulled, a pull request runs the candidate on an empty database and logs a warning; on
+# main and on release tags (upgrade-policy.sh) those two cases fail the job. The very first
+# release, with no earlier tag at all, runs on an empty database everywhere.
 #
 # Every secret is generated here, for this run only. The script changes the runner (sysctl,
 # lingering, apt packages) and OVERWRITES the runner user's ~/.config/mpmv env files, CA, units
@@ -191,6 +193,15 @@ install_deployer() { # install_deployer <image tag>: the deploy script that imag
 # image, its script, its migrations and seed), then the candidate over the same database. The
 # previous tag comes from the repository's tags; the build's own tag is left out. Without one, or
 # when its image cannot be pulled, the smoke deploys the candidate on an empty database and says so.
+# On main and on release tags the upgrade run is required (deploy/ci/upgrade-policy.sh): an
+# unreadable tag list or an unpullable previous image fails the job there. Pull requests warn.
+skip_upgrade() {
+  if [ "$("$repo/deploy/ci/upgrade-policy.sh")" = required ]; then
+    echo "::error::parity smoke: $1, and the upgrade path is required on main and release tags"
+    exit 1
+  fi
+  echo "::warning::parity smoke: $1; deploying the candidate on an empty database"
+}
 previous=""
 building=""
 if [ "${GITHUB_REF_TYPE:-}" = tag ]; then building="${GITHUB_REF_NAME:-}"; fi
@@ -199,7 +210,7 @@ if previous="$("$repo/deploy/ci/previous-release.sh" "$repo" "$building")"; then
     echo "::notice::parity smoke: no previous release tag; deploying the candidate on an empty database"
   fi
 else
-  echo "::warning::parity smoke: the repository's tags could not be read; deploying the candidate on an empty database"
+  skip_upgrade "the repository's tags could not be read"
   previous=""
 fi
 if [ -n "$previous" ]; then
@@ -215,7 +226,7 @@ if [ -n "$previous" ]; then
     podman exec -e MPMV_ALLOW_SEED=1 mpmv-app python manage.py seed | tail -n 1
     "$deployer" check || fail "the previous release $previous does not pass its own check"
   else
-    echo "::warning::parity smoke: cannot pull $previous_image:$previous; deploying the candidate on an empty database"
+    skip_upgrade "cannot pull $previous_image:$previous"
     previous=""
   fi
   endgroup
