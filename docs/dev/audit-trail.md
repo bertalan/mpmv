@@ -169,3 +169,6 @@ vendor-specific shipping zone or commission rule also puts `"vendor"` in its sna
 - `before` and `after` of the GDPR actions hold public ids, flags and counts only.
 - `OutboxEmailEvent` rows are append-only too. The erasure writes the detail `account erased`;
   provider feedback text in older rows may quote an address and is a documented residual.
+- A lockout entry's target key (`login:account:<keyed hash>`) never holds the address; the same
+  migration rewrote old ones. A former staff member keeps the `staff:<email>` label of rows
+  written while they were staff (article 17(3)(e) basis above).

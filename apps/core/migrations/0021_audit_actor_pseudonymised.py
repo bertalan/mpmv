@@ -8,10 +8,16 @@ claims (GDPR article 17(3)(e)) and for the accounting duties of D-29 and D-30 (a
 
 This is the single exception to the append-only rule of `core_auditlog` (docs/dev/audit-trail.md):
 the migration disables the append-only trigger for this one UPDATE, inside the migration's
-transaction, and enables it again straight after. It writes one audit row with counts only.
+transaction, and enables it again straight after. It writes one audit row with counts only. It
+also replaces an address inside the target key of old lockout entries (`login:account:<email>`)
+with a keyed hash. One UPDATE per distinct row set is fine: no real audit data exists before
+LIVE, so the table is small. A staff member who later lost the role keeps the `staff:` label
+(article 17(3)(e) basis above).
 """
 
 from django.db import migrations
+
+from apps.core.privacy import keyed_hash
 
 TRIGGER = "core_auditlog_no_update_delete"
 
@@ -26,17 +32,35 @@ def pseudonymise(apps, schema_editor) -> None:  # type: ignore[no-untyped-def]
             "AND NOT EXISTS (SELECT 1 FROM accounts_user u WHERE u.id = a.actor_id)"
         )
         unknown = cursor.fetchone()[0]
-        if not total:
+        cursor.execute(
+            "SELECT count(*) FROM core_auditlog WHERE target_key LIKE 'login:account:%%@%%'"
+        )
+        if not total and not cursor.fetchone()[0]:
             return
+        keys = 0
+        # The migration runs in one transaction: a failure rolls the DISABLE back too, so the
+        # trigger cannot stay off and no try/finally is needed.
         cursor.execute(f"ALTER TABLE core_auditlog DISABLE TRIGGER {TRIGGER}")
-        try:
+        cursor.execute(
+            "UPDATE core_auditlog a SET actor_label = 'user:' || COALESCE("
+            "(SELECT u.public_id::text FROM accounts_user u WHERE u.id = a.actor_id), "
+            "'unknown') WHERE a.actor_label LIKE 'user:%%@%%'"
+        )
+        cursor.execute(
+            "SELECT DISTINCT target_key FROM core_auditlog "
+            "WHERE target_key LIKE 'login:account:%%@%%'"
+        )
+        for (old,) in cursor.fetchall():
             cursor.execute(
-                "UPDATE core_auditlog a SET actor_label = 'user:' || COALESCE("
-                "(SELECT u.public_id::text FROM accounts_user u WHERE u.id = a.actor_id), "
-                "'unknown') WHERE a.actor_label LIKE 'user:%%@%%'"
+                "UPDATE core_auditlog SET target_key = %s WHERE target_key = %s",
+                [
+                    "login:account:"
+                    + keyed_hash(old.removeprefix("login:account:"), purpose="audit-login-account"),
+                    old,
+                ],
             )
-        finally:
-            cursor.execute(f"ALTER TABLE core_auditlog ENABLE TRIGGER {TRIGGER}")
+            keys += 1
+        cursor.execute(f"ALTER TABLE core_auditlog ENABLE TRIGGER {TRIGGER}")
     AuditLog = apps.get_model("core", "AuditLog")
     AuditLog.objects.create(
         actor_label="system:migration",
@@ -45,7 +69,7 @@ def pseudonymise(apps, schema_editor) -> None:  # type: ignore[no-untyped-def]
         target_model="core.auditlog",
         target_key="actor_label",
         before=None,
-        after={"rewritten": total, "unknown": unknown},
+        after={"rewritten": total, "unknown": unknown, "lockout_keys": keys},
     )
 
 
