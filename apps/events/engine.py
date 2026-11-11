@@ -566,8 +566,11 @@ def next_sequence(
 
 # --- Vendor-safe body (spec 15 "How vendors author an `EventPage`") ----------------------------
 
-# The CMS.10 product grid and the CMS.9 countdown join when those tasks add the blocks.
-VENDOR_SAFE_BLOCKS = frozenset({"paragraph", "figure", "gallery", "cta", "faq"})
+# The CMS.11 product cards are vendor-safe because the services check every chosen product is the
+# vendor's own (`product_ids`). The CMS.10 product grid is not: it queries the whole catalog by
+# category, term or brand and so could show other vendors' products on a vendor's page. The CMS.9
+# countdown stays staff-only too.
+VENDOR_SAFE_BLOCKS = frozenset({"paragraph", "figure", "gallery", "cta", "faq", "product_cards"})
 
 _HREF = re.compile(r"""\b(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""", re.IGNORECASE)
 _ENTITY = re.compile(r"&#(x[0-9a-f]+|[0-9]+);?", re.IGNORECASE)
@@ -638,6 +641,23 @@ def image_ids(raw: Any) -> list[Any]:
     for block in raw:
         if block.get("type") in ("figure", "gallery"):
             walk(block.get("value"))
+    return found
+
+
+def product_ids(raw: Any) -> list[Any]:
+    """Every product reference of the `product_cards` blocks of a raw body, as sent: a plain
+    id, or Wagtail's `{"type": "item", "value": id}` list wrapper. Nothing is trusted: the
+    caller checks each one is the id of one of the vendor's own products."""
+    found: list[Any] = []
+    for block in raw:
+        value = block.get("value")
+        if block.get("type") != "product_cards" or not isinstance(value, Mapping):
+            continue
+        items = value.get("products")
+        if not isinstance(items, list | tuple):
+            continue
+        for item in items:
+            found.append(item.get("value") if isinstance(item, Mapping) else item)
     return found
 
 

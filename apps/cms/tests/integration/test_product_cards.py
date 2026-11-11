@@ -47,7 +47,7 @@ def _cards(
 ) -> tuple[str, dict[str, Any]]:
     return (
         "product_cards",
-        {"heading": heading, "layout": layout, "products": [("item", p) for p in products]},
+        {"heading": heading, "layout": layout, "products": list(products)},
     )
 
 
@@ -68,9 +68,9 @@ def test_the_cards_show_the_chosen_products_in_order(seeded: SeedReport) -> None
     first, second, third = listed("Blue bowl"), listed("Red jug"), listed("Tin cup")
     html = _publish(_home(), [_cards(third, first, second)])
     assert _titles(html) == ["Tin cup", "Blue bowl", "Red jug"]
-    assert html.find("section", class_="block-product-cards").find("h2").get_text() == (
-        "Picked for you"
-    )
+    heading = _section(html).find("h2")
+    assert heading is not None
+    assert heading.get_text() == "Picked for you"
     assert "style=" not in str(html)
 
 
@@ -157,7 +157,7 @@ def test_the_cards_cost_the_same_queries_for_more_products(seeded: SeedReport) -
 
 
 @pytest.mark.parametrize("page_model", [HomePage, StandardPage, BlogPostPage, VendorLandingPage])
-def test_the_cards_and_the_grid_are_offered_in_these_bodies(page_model: type) -> None:
+def test_the_cards_and_the_grid_are_offered_in_these_bodies(page_model: Any) -> None:
     children = page_model._meta.get_field("body").stream_block.child_blocks
     assert isinstance(children["product_cards"], ProductCardsBlock)
     assert "product_grid" in children
@@ -166,14 +166,6 @@ def test_the_cards_and_the_grid_are_offered_in_these_bodies(page_model: type) ->
 def test_the_cards_are_offered_in_a_term_landing_body() -> None:
     children = TermLandingPage._meta.get_field("body").stream_block.child_blocks
     assert "product_cards" in children
-
-
-def test_the_event_body_offers_the_cards_and_the_grid() -> None:
-    from apps.events.models import EventPage
-
-    children = EventPage._meta.get_field("body").stream_block.child_blocks
-    assert isinstance(children["product_cards"], ProductCardsBlock)
-    assert "product_grid" in children
 
 
 def test_legal_pages_do_not_offer_product_blocks() -> None:

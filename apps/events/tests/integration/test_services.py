@@ -16,6 +16,7 @@ from wagtail.models import Locale, Revision, Site, WorkflowState
 
 from apps.accounts.tests.factories import UserFactory
 from apps.catalog.tests.factories import CategoryFactory, ProductFactory
+from apps.cms.blocks import ProductCardsBlock, ProductGridBlock
 from apps.core.models import AuditLog
 from apps.events import services
 from apps.events.models import (
@@ -220,6 +221,12 @@ def test_a_vendor_cannot_use_a_block_outside_the_vendor_safe_set(owner: User) ->
     with pytest.raises(ValidationError) as excinfo:
         save_event_draft(owner, _data(body=body), vendor=_vendor_of(owner))
     assert "body" in excinfo.value.message_dict
+
+
+def test_the_event_body_offers_the_product_cards_and_the_grid() -> None:
+    children = EventPage._meta.get_field("body").stream_block.child_blocks
+    assert isinstance(children["product_cards"], ProductCardsBlock)
+    assert isinstance(children["product_grid"], ProductGridBlock)
 
 
 def _cards_body(*pks: Any) -> list[dict[str, Any]]:

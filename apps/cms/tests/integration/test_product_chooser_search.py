@@ -204,6 +204,8 @@ def _member_view(url_name: str, user: User, *view_args: Any, **params: Any) -> H
         "chosen_multiple": product_chooser.chosen_multiple_view,
     }[url_name]
     response: HttpResponse = view(request, *view_args)
+    if hasattr(response, "render"):
+        response.render()
     return response
 
 

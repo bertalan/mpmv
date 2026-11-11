@@ -75,6 +75,8 @@ from apps.cms.blocks import (
     FigureBlock,
     GalleryBlock,
     LaunchCountdownBlock,
+    ProductCardsBlock,
+    ProductGridBlock,
 )
 from apps.cms.models import CountdownCacheMixin
 from apps.core.fields import CountryField
@@ -126,8 +128,9 @@ def event_blocks() -> list[tuple[str, blocks.Block]]:
     """The body blocks of an event, from the CMS.2 library (spec 15 "Body").
 
     The CMS.9 launch countdown is offered (spec 10 §10.2; `EventPage` caps its cache at the
-    target). The CMS.10 product grid joins when that task adds it; embeds only with the SEO.5
-    consent rules. The EVT.3 services give vendors `engine.VENDOR_SAFE_BLOCKS` only.
+    target), and so are the CMS.10 product grid and the CMS.11 product cards; embeds only with
+    the SEO.5 consent rules. The EVT.3 services give vendors `engine.VENDOR_SAFE_BLOCKS` only:
+    the cards (checked against the vendor's own products), not the grid.
     """
     return [
         ("paragraph", blocks.RichTextBlock(features=RICH_TEXT_FEATURES, label=_("Rich text"))),
@@ -136,6 +139,8 @@ def event_blocks() -> list[tuple[str, blocks.Block]]:
         ("cta", CallToActionBlock()),
         ("faq", FaqBlock()),
         ("countdown", LaunchCountdownBlock()),
+        ("product_grid", ProductGridBlock()),
+        ("product_cards", ProductCardsBlock()),
     ]
 
 
