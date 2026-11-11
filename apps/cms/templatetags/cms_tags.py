@@ -23,9 +23,10 @@ from apps.core.i18n import (
     translate_path,
 )
 from apps.core.image_licences import Credit
+from apps.core.services import NoPlatformOperator, current_operator
 
 from .. import services
-from ..engine import faq_page_jsonld, jsonld_text
+from ..engine import faq_page_jsonld, jsonld_text, organization_jsonld
 from ..models import NavigationMenu
 
 register = template.Library()
@@ -172,3 +173,21 @@ def jsonld_script(data: Mapping[str, Any] | None) -> SafeString:
     if not data:
         return mark_safe("")
     return mark_safe(f'<script type="application/ld+json">{jsonld_text(data)}</script>')  # noqa: S308
+
+
+@register.simple_tag(takes_context=True)
+def operator_organization_jsonld(context: template.Context) -> SafeString:
+    """The platform operator as one Organization JSON-LD script (home page); "" without a
+    request or a configured operator."""
+    request: HttpRequest | None = context.get("request")
+    if request is None:
+        return mark_safe("")
+    try:
+        operator = current_operator()
+    except NoPlatformOperator:
+        return mark_safe("")
+    return jsonld_script(
+        organization_jsonld(
+            operator.legal_name, request.build_absolute_uri("/"), operator.support_email
+        )
+    )

@@ -97,3 +97,16 @@ def set_site_indexing(
         updated=SEO_SETTINGS_CONFIGURED,
         dry_run=dry_run,
     )
+
+
+def golive_indexing_messages(languages: Any = None) -> list[str]:
+    """A `golive_readiness` line when the LIVE environment has indexing off for the default site.
+
+    Silent under the environment floor (STAGE, demo): indexing is meant to be off there.
+    """
+    if is_noindex_forced() or site_allows_indexing(None):
+        return []
+    return [
+        "Search engine indexing is still off: search engines are told to skip every page. "
+        "Turn it on in Settings > SEO when the platform opens to the public."
+    ]
