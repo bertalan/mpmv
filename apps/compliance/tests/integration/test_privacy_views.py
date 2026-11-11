@@ -5,8 +5,11 @@ a rate limit, an audit entry without personal data."""
 
 import json
 import secrets
+import time
+from urllib.parse import urlencode
 
 import pytest
+from django.conf import settings
 from django.test import Client
 from django.urls import reverse
 
@@ -124,15 +127,65 @@ def test_a_passkey_only_account_is_sent_to_the_second_factor_step(name: str) -> 
     user.save(update_fields=["password"])
     PasskeyDeviceFactory.create(user=user)
     client = Client()
-    client.force_login(user)
+    verified_login(client, user, verified_at=time.time() - settings.MFA_STEP_UP_MAX_AGE - 600)
 
     response = client.post(reverse(name), {"confirm": "erase"})
 
     assert response.status_code == 302
-    assert reverse("mfa:verify") in response["Location"]
-    assert "next=" in response["Location"]
+    assert response["Location"] == (
+        f"{reverse('mfa:verify')}?{urlencode({'next': reverse('privacy_account')})}"
+    )
     page = client.get(reverse("privacy_account")).content.decode()
     assert 'type="password"' not in page
+
+
+def test_an_account_with_no_password_and_no_factor_is_sent_to_enrolment() -> None:
+    user = UserFactory.create()
+    user.set_unusable_password()
+    user.save(update_fields=["password"])
+    client = Client()
+    client.force_login(user)
+
+    response = client.post(reverse("privacy_erase"), {"confirm": "erase"})
+
+    assert response.status_code == 302
+    assert response["Location"] == (
+        f"{reverse('mfa:setup')}?{urlencode({'next': reverse('privacy_account')})}"
+    )
+    user.refresh_from_db()
+    assert user.is_active
+
+
+def test_erasure_refuses_a_second_factor_verified_outside_the_step_up_window() -> None:
+    user = UserFactory.create()
+    client = Client()
+    verified_login(client, user, verified_at=time.time() - settings.MFA_STEP_UP_MAX_AGE - 600)
+
+    response = client.post(reverse("privacy_erase"), {"confirm": "erase"})
+
+    assert response.status_code == 302
+    assert reverse("mfa:verify") in response["Location"]
+    user.refresh_from_db()
+    assert user.is_active
+    assert not ErasureRequest.objects.filter(user=user).exists()
+
+
+def test_a_json_client_gets_403_with_the_verify_url_when_the_factor_is_stale() -> None:
+    password = secrets.token_urlsafe(16)
+    user = UserFactory.create(password=password)
+    client = Client()
+    verified_login(client, user, verified_at=time.time() - settings.MFA_STEP_UP_MAX_AGE - 600)
+
+    response = client.post(
+        reverse("privacy_erase"),
+        {"password": password, "confirm": "erase"},
+        headers={"Accept": "application/json"},
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"error": "mfa_required", "url": reverse("mfa:verify")}
+    user.refresh_from_db()
+    assert user.is_active
 
 
 # --- erasure -----------------------------------------------------------------------------------
