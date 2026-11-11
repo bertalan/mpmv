@@ -600,6 +600,8 @@ BLOCK_PAGE_RESTRICTION_ROUTES = True
 
 # Optional prefix of order numbers, e.g. "MP-" gives "MP-2027-000123" (ORD.2). Empty by default.
 ORDER_NUMBER_PREFIX = ""
+# How long `place_order` holds the stock of an order awaiting payment (ORD.4); paying releases it.
+ORDER_HOLD_MINUTES = 60
 
 # Months after an order during which its non-fiscal data is kept; then `minimise_order` may
 # drop it (D-29). The fiscal snapshot is kept 10 years from the end of the order's year.
