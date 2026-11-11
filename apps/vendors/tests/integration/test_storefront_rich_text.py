@@ -232,6 +232,9 @@ def test_the_data_migration_converts_plain_text_and_is_idempotent() -> None:
         row.shipping_policy,
         row.cancellation_policy,
     )
+    # Leave the shared test database at the latest schema for the tests that follow.
+    executor = MigrationExecutor(connection)
+    executor.migrate(executor.loader.graph.leaf_nodes())
     assert again.source_hash == row.source_hash
     assert not VendorTranslation.objects.get(pk=it.pk).is_stale
 
