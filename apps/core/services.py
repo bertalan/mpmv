@@ -127,6 +127,7 @@ OPERATOR_FIELDS = (
     "dac7_authority_country",
     "support_email",
     "compliance_email",
+    "session_policy",
     "authority_contact_email",
     "authority_contact_languages",
     "user_contact_url",
@@ -601,6 +602,13 @@ def consume_rate_limit(
         row.failures += 1
         row.save(update_fields=["failures", "expires_at", "updated_at"])
     return dt.timedelta(0)
+
+
+def rate_limit_wait(key: str, *, limit: int, now: dt.datetime | None = None) -> dt.timedelta:
+    """The time until the window of `key` ends when it is full, else zero. Counts nothing."""
+    now = now or timezone.now()
+    row = Throttle.objects.filter(key=key, expires_at__gt=now, failures__gte=limit).first()
+    return row.expires_at - now if row else dt.timedelta(0)
 
 
 def purge_expired_throttles(*, now: dt.datetime | None = None) -> int:

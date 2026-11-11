@@ -74,8 +74,12 @@ from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage, VendorEventPolicy
 from apps.events.tests.factories import EventPageFactory, VendorEventPolicyFactory
-from apps.orders.models import OrderLine, VendorOrder
-from apps.orders.tests.factories import OrderLineFactory, VendorOrderFactory
+from apps.orders.models import OrderLine, StockReservation, VendorOrder
+from apps.orders.tests.factories import (
+    OrderLineFactory,
+    StockReservationFactory,
+    VendorOrderFactory,
+)
 from apps.shipping.models import (
     PickupOption,
     PickupOptionTranslation,
@@ -224,6 +228,9 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     # ORD.2: a sub-order of its own order, and a line of such a sub-order.
     VendorOrder: lambda vendor: VendorOrderFactory.create(vendor=vendor),
     OrderLine: lambda vendor: OrderLineFactory.create(vendor_order__vendor=vendor),
+    StockReservation: lambda vendor: StockReservationFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
     # EVT.1: a draft event page under the primary language's events index.
     EventPage: lambda vendor: EventPageFactory.create(vendor=vendor),
     VendorEventPolicy: lambda vendor: VendorEventPolicyFactory.create(vendor=vendor),
@@ -294,6 +301,11 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "switch_language": NoVendorData("Stores the visitor's language choice."),
     "themes:styleguide": StaffOnly("Component samples of the active theme (THM.4), staff only."),
+    "levels:options": NoVendorData(OWN_ACCOUNT),
+    "levels:operational": NoVendorData(OWN_ACCOUNT),
+    "levels:once_options": NoVendorData(OWN_ACCOUNT),
+    "levels:once": NoVendorData(OWN_ACCOUNT),
+    "levels:end": NoVendorData(OWN_ACCOUNT),
     "mfa:overview": NoVendorData(OWN_ACCOUNT),
     "mfa:setup": NoVendorData(OWN_ACCOUNT),
     "mfa:totp": NoVendorData(OWN_ACCOUNT),

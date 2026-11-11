@@ -113,8 +113,6 @@ MIDDLEWARE = [
     # With the other header middleware, so responses returned early by an inner middleware
     # (CommonMiddleware's APPEND_SLASH redirect, LIVE's static files) carry it too (SEC.5).
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    # SEC.13/SEC.14: Wagtail's page view restriction forms answer 404 until they are protected.
-    "apps.cms.middleware.PageRestrictionBlockMiddleware",
     "apps.themes.middleware.ThemeMiddleware",  # the site's theme for the template loader (THM.1)
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
@@ -124,6 +122,8 @@ MIDDLEWARE = [
     # CAT.5: a 404 on a product's old slug becomes a 301 to its current slug.
     "apps.catalog.middleware.OldProductSlugRedirectMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
+    # SEC.14: rate limit and captcha for Wagtail's page view restriction forms (after CSRF).
+    "apps.cms.middleware.PageRestrictionProtectionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     # I18N.12: the stored language of a signed-in user on unprefixed areas (Manager, account).
     "apps.accounts.middleware.PreferredLanguageMiddleware",
@@ -132,6 +132,7 @@ MIDDLEWARE = [
     # CORE.4: which device verified the session, then confine required roles to the MFA pages.
     "django_otp.middleware.OTPMiddleware",
     "apps.accounts.middleware.MfaRequiredMiddleware",
+    "apps.accounts.middleware.SessionLevelMiddleware",  # CORE.25 (D-32): operational mode timers
     # CORE.17: one gate per Manager space (404, login or MFA) for every URL under /manager/.
     "apps.manager.middleware.ManagerGateMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -164,6 +165,9 @@ MFA_REQUIRED_POLICIES: list[str] = [
 MFA_STEP_UP_MAX_AGE = 300  # seconds a verification counts as fresh for sensitive actions
 # Step-up for sensitive views of apps that cannot import accounts (the core audit log view, SEC.4).
 STEP_UP_DECORATOR = "apps.accounts.decorators.step_up_required"
+# Path prefixes whose requests (polling) do not count as activity for operational mode (CORE.25).
+SESSION_LEVEL_POLL_PATHS: tuple[str, ...] = ()
+LEVEL_DECORATOR = "apps.accounts.decorators.requires_level"  # CORE.25 (D-32)
 # The Manager login (CORE.17): where the Manager gate sends anonymous visitors.
 LOGIN_URL = "login"
 MFA_LOGIN_URL = "admin:login"  # until the site and vendor login pages exist
@@ -456,6 +460,7 @@ VIES_TIMEOUT_SECONDS = 8  # per socket operation (connect, each read), not for t
 # answer the goods tax engine trusts (`build_tax_context`): an older one is treated as B2C.
 VIES_CACHE_SECONDS = 24 * 60 * 60
 VIES_UNAVAILABLE_CACHE_SECONDS = 5 * 60
+VIES_INVALID_REQUESTER_CACHE_SECONDS = 60 * 60  # VIES refused the requester: ask again later
 
 # Field-level encryption (SEC.3, docs/dev/field-encryption.md): keys live outside the database,
 # in the file named by MPMV_FIELD_ENCRYPTION_KEYS_FILE (one per line) or in
@@ -585,17 +590,17 @@ PUBLIC_FORM_GATED_PREFIXES = {
     "django-admin/": "the staff admin requires a signed-in staff user; its sign-in is declared",
     "api/": "API v1 authenticates every operation (API key or session)",
     "_styleguide/": "staff only (THM.4)",
-    "_util/": "Wagtail page view restriction forms answer 404 while BLOCK_PAGE_RESTRICTION_ROUTES "
-    "is on and no restriction exists (cms.E002); SEC.14 protects them",
 }
 
-# SEC.13/SEC.14: Wagtail's page view restriction forms (`/_util/...`) have no rate limit or captcha
-# yet, so apps.cms.middleware.PageRestrictionBlockMiddleware answers 404 to them and `check` fails
-# (cms.E002) while any password or login restriction exists. SEC.14 lifts the block.
-BLOCK_PAGE_RESTRICTION_ROUTES = True
+# SEC.14: Wagtail's page view restriction forms (`/_util/...`) take POSTs per 15-minute window:
+# per IP bucket on both routes, and per restriction on the password route (apps.cms.middleware).
+PAGE_RESTRICTION_IP_LIMIT = 10
+PAGE_RESTRICTION_LIMIT = 60
 
 # Optional prefix of order numbers, e.g. "MP-" gives "MP-2027-000123" (ORD.2). Empty by default.
 ORDER_NUMBER_PREFIX = ""
+# How long `place_order` holds the stock of an order awaiting payment (ORD.4); paying releases it.
+ORDER_HOLD_MINUTES = 60
 
 # Months after an order during which its non-fiscal data is kept; then `minimise_order` may
 # drop it (D-29). The fiscal snapshot is kept 10 years from the end of the order's year.

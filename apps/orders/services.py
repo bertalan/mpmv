@@ -10,15 +10,18 @@ import datetime as dt
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any
+from typing import Any, Protocol
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connection, transaction
+from django.db.models import Sum
 from django.utils import timezone
 
 from apps.accounts.models import User
-from apps.catalog.models import Product
+from apps.cart import engine as cart_engine
+from apps.cart.models import Cart
+from apps.catalog.models import Product, Variant
 from apps.core.audit import VENDOR_FIELD, AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.money import CENT
@@ -26,7 +29,7 @@ from apps.core.services import audit_changes
 from apps.vendors.models import Vendor
 
 from . import engine
-from .models import Order, OrderLine, OrderNumberSequence, VendorOrder
+from .models import Order, OrderLine, OrderNumberSequence, StockReservation, VendorOrder
 from .tz import business_tz
 
 DRY_RUN_NUMBER = "(assigned when placed)"
@@ -574,3 +577,358 @@ def anonymise_order(
     (`paid_at` is empty). Raises `ScrubNotDue` before
     that. Idempotent."""
     return _scrub(order, "anonymized", reason="", ctx=ctx, dry_run=dry_run, now=now)
+
+
+# --- placing an order (ORD.4) ----------------------------------------------------------------
+
+
+class TaxOutcome(Protocol):
+    """What the order reads from a tax decision (`apps.tax.engine.TaxDecision`, TAX.3). The
+    order takes the VAT nature code from here and nowhere else: a caller cannot type one."""
+
+    @property
+    def rate(self) -> Decimal: ...
+    @property
+    def reason(self) -> Any: ...
+    @property
+    def legal_note_key(self) -> str | None: ...
+    @property
+    def nature_code(self) -> str | None: ...
+
+
+@dataclass(frozen=True)
+class PlaceLine:
+    """A cart line as the checkout previewed it. `expected_unit_price_net` is the price the
+    customer saw: it is only compared with the live price, never stored."""
+
+    product: Product
+    variant: Variant | None
+    quantity: int
+    title: str
+    expected_unit_price_net: Decimal
+    tax: TaxOutcome
+    variant_label: str = ""
+    discount_net: Decimal = Decimal("0.00")
+
+
+@dataclass(frozen=True)
+class PlaceVendor:
+    vendor: Vendor
+    lines: Sequence[PlaceLine]
+    shipping_net: Decimal = Decimal("0.00")
+    shipping_tax: TaxOutcome | None = None  # from resolve_shipping_tax; required with shipping
+    shipping_choice: dict[str, Any] = field(default_factory=dict)
+    commission_snapshot: dict[str, Any] = field(default_factory=dict)
+    tax_profile_snapshot: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.shipping_net > 0 and self.shipping_tax is None:
+            raise ValueError("shipping needs a tax decision (shipping_tax)")
+
+
+@dataclass(frozen=True)
+class CheckoutPreview:
+    """The checkout's result (ORD.3 builds it): everything `place_order` needs."""
+
+    email: str
+    language: str
+    billing_address: dict[str, Any]
+    billing_country: str
+    shipping_address: dict[str, Any]
+    shipping_country: str
+    vendors: Sequence[PlaceVendor]
+    cart: Cart | None = None
+    customer: User | None = None
+    customer_name: str = ""
+    customer_vat_number: str = ""
+    customer_tax_id: str = ""
+    customer_tax_status: str = "b2c"
+    vat_validation: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class Refusal:
+    code: str  # price_changed | unavailable | out_of_stock
+    product_id: int
+    detail: str
+
+
+class OrderRefused(Exception):
+    """The order was not placed: nothing was saved. `reasons` says why, for every line."""
+
+    def __init__(self, reasons: Sequence[Refusal]) -> None:
+        self.reasons = list(reasons)
+        super().__init__("; ".join(f"{r.code}: {r.detail}" for r in self.reasons))
+
+
+@dataclass(frozen=True)
+class _NoTax:
+    rate: Decimal = Decimal("0")
+    reason: str = ""
+    legal_note_key: str | None = None
+    nature_code: str | None = None
+
+
+_NO_TAX = _NoTax()
+
+
+def _stock_key(product: Product, variant: Variant | None) -> tuple[int, int | None]:
+    return (product.pk, variant.pk if variant is not None else None)
+
+
+def _lock_live_rows(
+    lines: Sequence[PlaceLine],
+) -> tuple[dict[int, Product], dict[int, Variant]]:
+    """Lock the products and variants of the order, always in primary-key order (products
+    first), so concurrent placements queue instead of deadlocking."""
+    product_ids = sorted({entry.product.pk for entry in lines})
+    variant_ids = sorted({entry.variant.pk for entry in lines if entry.variant is not None})
+    products = {
+        p.pk: p
+        for p in Product.objects.select_for_update(of=("self",))
+        .select_related("vendor")
+        .filter(pk__in=product_ids)
+        .order_by("pk")
+    }
+    variants = {
+        v.pk: v
+        for v in Variant.objects.select_for_update().filter(pk__in=variant_ids).order_by("pk")
+    }
+    return products, variants
+
+
+def _held(product_id: int, variant_id: int | None, *, now: dt.datetime, cart: Cart | None) -> int:
+    holds = StockReservation.objects.filter(product_id=product_id, expires_at__gt=now)
+    holds = (
+        holds.filter(variant__isnull=True)
+        if variant_id is None
+        else holds.filter(variant_id=variant_id)
+    )
+    if cart is not None:
+        holds = holds.exclude(cart=cart)  # the cart's own hold is the one being confirmed
+    return int(holds.aggregate(total=Sum("quantity"))["total"] or 0)
+
+
+def _verify(
+    preview: CheckoutPreview, *, now: dt.datetime
+) -> tuple[dict[int, Product], dict[int, Variant], dict[tuple[int, int | None], int]]:
+    """Check the live price and stock of every line (rows locked). Returns the live rows and the
+    units to hold per stock key (None-stock products need no hold). Raises `OrderRefused` with
+    every reason found; never reprices."""
+    lines = [entry for item in preview.vendors for entry in item.lines]
+    products, variants = _lock_live_rows(lines)
+    reasons: list[Refusal] = []
+    wanted: dict[tuple[int, int | None], int] = {}
+    limits: dict[tuple[int, int | None], int | None] = {}
+    for entry in lines:
+        product = products.get(entry.product.pk)
+        variant = variants.get(entry.variant.pk) if entry.variant is not None else None
+        if product is None or (entry.variant is not None and variant is None):
+            reasons.append(Refusal("unavailable", entry.product.pk, "This item no longer exists."))
+            continue
+        error = cart_engine.purchase_error(
+            product_status=product.status,
+            sales_mode=product.sales_mode,
+            vendor_status=product.vendor.status,
+            is_variable=product.kind == Product.Kind.VARIABLE,
+            has_variant=variant is not None,
+        )
+        if error is not None:
+            reasons.append(Refusal("unavailable", product.pk, error))
+            continue
+        live = cart_engine.display_unit_price(
+            product.price_net, product.sales_mode, variant.price_net_override if variant else None
+        )
+        if live != entry.expected_unit_price_net:
+            reasons.append(
+                Refusal(
+                    "price_changed",
+                    product.pk,
+                    f"The price changed from {entry.expected_unit_price_net} to {live} "
+                    "(net, per unit).",
+                )
+            )
+            continue
+        key = _stock_key(product, variant)
+        stock = variant if variant is not None else product
+        limits[key] = cart_engine.available_quantity(
+            product.stock_policy, stock.stock_qty, stock.stock_status
+        )
+        wanted[key] = wanted.get(key, 0) + entry.quantity
+    holds: dict[tuple[int, int | None], int] = {}
+    for key, quantity in wanted.items():
+        limit = limits[key]
+        if limit is None:
+            continue
+        free = max(0, limit - _held(key[0], key[1], now=now, cart=preview.cart))
+        if quantity > free:
+            reasons.append(Refusal("out_of_stock", key[0], f"Only {free} available."))
+        else:
+            holds[key] = quantity
+    if reasons:
+        raise OrderRefused(reasons)
+    return products, variants, holds
+
+
+def place_order(
+    preview: CheckoutPreview,
+    *,
+    ctx: AuditContext,
+    dry_run: bool = False,
+    now: dt.datetime | None = None,
+) -> tuple[Order | None, ChangeSet]:
+    """Place the order in one transaction: verify the live prices and stock (rows locked), create
+    the order awaiting payment with its snapshots, and confirm the stock holds.
+
+    A price that differs from the one the customer saw refuses the whole order
+    (`OrderRefused`, reason `price_changed`): the order is never silently repriced. Stock is held
+    until `ORDER_HOLD_MINUTES` pass or the payment succeeds, when it is decremented. The tax
+    rate, reason and VAT nature code come from each line's tax decision. Dry run verifies and
+    returns the change set without saving or holding anything.
+
+    The payment (PAY.1) starts only after this transaction commits (`transaction.on_commit`).
+    """
+    now = now or timezone.now()
+    with transaction.atomic():
+        products, variants, holds = _verify(preview, now=now)
+        vendor_inputs = [
+            VendorOrderInput(
+                vendor=item.vendor,
+                lines=[
+                    _line_input(entry, products[entry.product.pk], variants) for entry in item.lines
+                ],
+                shipping_net=item.shipping_net,
+                shipping_tax_rate=item.shipping_tax.rate if item.shipping_tax else Decimal("0"),
+                shipping_tax_reason=_reason(item.shipping_tax),
+                shipping_vat_nature_code=(item.shipping_tax.nature_code or "")
+                if item.shipping_tax
+                else "",
+                shipping_choice=item.shipping_choice,
+                commission_snapshot=item.commission_snapshot,
+                tax_profile_snapshot=item.tax_profile_snapshot,
+            )
+            for item in preview.vendors
+        ]
+        order, changeset = create_order(
+            email=preview.email,
+            language=preview.language,
+            billing_address=preview.billing_address,
+            billing_country=preview.billing_country,
+            shipping_address=preview.shipping_address,
+            shipping_country=preview.shipping_country,
+            vendor_orders=vendor_inputs,
+            ctx=ctx,
+            customer=preview.customer,
+            customer_name=preview.customer_name,
+            customer_vat_number=preview.customer_vat_number,
+            customer_tax_id=preview.customer_tax_id,
+            customer_tax_status=preview.customer_tax_status,
+            vat_validation=preview.vat_validation,
+            state="awaiting_payment",
+            dry_run=dry_run,
+            now=now,
+        )
+        if dry_run or order is None:
+            return None, changeset
+        if preview.cart is not None:
+            StockReservation.objects.filter(cart=preview.cart).delete()
+        expires = now + dt.timedelta(minutes=int(getattr(settings, "ORDER_HOLD_MINUTES", 60)))
+        StockReservation.objects.bulk_create(
+            [
+                StockReservation(
+                    product_id=product_id,
+                    variant_id=variant_id,
+                    order=order,
+                    quantity=quantity,
+                    expires_at=expires,
+                )
+                for (product_id, variant_id), quantity in holds.items()
+            ]
+        )
+    return order, changeset
+
+
+def _line_input(entry: PlaceLine, product: Product, variants: dict[int, Variant]) -> LineInput:
+    variant = variants.get(entry.variant.pk) if entry.variant is not None else None
+    unit_price = cart_engine.display_unit_price(
+        product.price_net, product.sales_mode, variant.price_net_override if variant else None
+    )
+    if unit_price is None:  # _verify refused anything not for sale
+        raise OrderRefused([Refusal("unavailable", product.pk, "This item is not for sale.")])
+    return LineInput(
+        product=product,
+        sku=variant.sku if variant is not None else product.sku,
+        title=entry.title,
+        variant_label=entry.variant_label,
+        unit_price_net=unit_price,  # the live price, equal to the one the customer saw
+        quantity=entry.quantity,
+        tax_rate=entry.tax.rate,
+        tax_reason=_reason(entry.tax),
+        vat_nature_code=entry.tax.nature_code or "",  # from the decision, never from a caller
+        discount_net=entry.discount_net,
+        legal_note_key=entry.tax.legal_note_key or "",
+    )
+
+
+def _reason(tax: TaxOutcome | None) -> str:
+    if tax is None:
+        return ""
+    return str(getattr(tax.reason, "value", tax.reason))
+
+
+def hold_stock(
+    cart: Cart,
+    product: Product,
+    variant: Variant | None,
+    quantity: int,
+    *,
+    now: dt.datetime | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Hold `quantity` units for a cart for ORDER_HOLD_MINUTES, replacing the cart's previous
+    hold on the same item. Takes the same row locks as `place_order`, so a hold and an order for
+    the last unit cannot both succeed. Raises `OrderRefused` (`out_of_stock`) when too few units
+    are free. Returns the change set (empty when the item has no stock limit); a dry run
+    verifies the stock and writes nothing."""
+    now = now or timezone.now()
+    with transaction.atomic():
+        products, variants = _lock_live_rows(
+            [PlaceLine(product, variant, quantity, "", Decimal("0"), _NO_TAX)]
+        )
+        live = products.get(product.pk)
+        live_variant = variants.get(variant.pk) if variant is not None else None
+        if live is None or (variant is not None and live_variant is None):
+            raise OrderRefused([Refusal("unavailable", product.pk, "This item no longer exists.")])
+        stock = live_variant if live_variant is not None else live
+        limit = cart_engine.available_quantity(
+            live.stock_policy, stock.stock_qty, stock.stock_status
+        )
+        changeset = ChangeSet()
+        if limit is None:
+            return changeset
+        key = _stock_key(live, live_variant)
+        free = max(0, limit - _held(key[0], key[1], now=now, cart=cart))
+        if quantity > free:
+            raise OrderRefused([Refusal("out_of_stock", live.pk, f"Only {free} available.")])
+        expires = now + dt.timedelta(minutes=int(getattr(settings, "ORDER_HOLD_MINUTES", 60)))
+        snapshot = {
+            "cart": cart.pk,
+            "product": key[0],
+            "variant": key[1],
+            "quantity": quantity,
+            "expires_at": expires,
+        }
+        if dry_run:
+            changeset.create(
+                "orders.stockreservation", f"cart{cart.pk}:{key[0]}:{key[1]}", snapshot
+            )
+            return changeset
+        own = StockReservation.objects.filter(cart=cart, product_id=key[0])
+        (
+            own.filter(variant__isnull=True) if key[1] is None else own.filter(variant_id=key[1])
+        ).delete()
+        hold = StockReservation.objects.create(
+            product_id=key[0], variant_id=key[1], cart=cart, quantity=quantity, expires_at=expires
+        )
+        changeset.create("orders.stockreservation", str(hold.public_id), snapshot)
+        return changeset
