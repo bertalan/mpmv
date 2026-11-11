@@ -52,11 +52,22 @@ from apps.catalog.tests.factories import (
 )
 from apps.cms.models import VendorLandingPage
 from apps.cms.tests.factories import VendorLandingPageFactory
-from apps.compliance.models import GpsrInfo, GpsrSafetyText, SafetyCase, VendorGpsrDefaults
+from apps.compliance.models import (
+    GpsrInfo,
+    GpsrSafetyText,
+    ProductRestriction,
+    SafetyCase,
+    StatementOfReasons,
+    TransparencySubmission,
+    VendorGpsrDefaults,
+)
 from apps.compliance.tests.factories import (
     GpsrInfoFactory,
     GpsrSafetyTextFactory,
+    ProductRestrictionFactory,
     SafetyCaseFactory,
+    StatementOfReasonsFactory,
+    TransparencySubmissionFactory,
     VendorGpsrDefaultsFactory,
 )
 from apps.core.models import TranslationStatus
@@ -86,6 +97,7 @@ from apps.orders.tests.factories import (
     OrderLineFactory,
     StockReservationFactory,
     VendorOrderFactory,
+    paid_vendor_order,
 )
 from apps.shipping.models import (
     PickupOption,
@@ -139,6 +151,7 @@ from tests.tenancy import (
     StaffOnly,
     VendorScoped,
     VendorScopedList,
+    by_public_id,
     member_session,
     vendor_api_key,
 )
@@ -207,6 +220,14 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     ),
     SafetyCase: lambda vendor: SafetyCaseFactory.create(
         product=ProductFactory.create(vendor=vendor)
+    ),
+    StatementOfReasons: lambda vendor: StatementOfReasonsFactory.create(vendor=vendor),
+    ProductRestriction: lambda vendor: ProductRestrictionFactory.create(
+        product=ProductFactory.create(vendor=vendor),
+        statement=StatementOfReasonsFactory.create(vendor=vendor),
+    ),
+    TransparencySubmission: lambda vendor: TransparencySubmissionFactory.create(
+        statement=StatementOfReasonsFactory.create(vendor=vendor)
     ),
     ShippingZone: lambda vendor: ShippingZoneFactory.create(vendor=vendor),  # a vendor zone
     ShippingMethod: lambda vendor: ShippingMethodFactory.create(vendor=vendor),
@@ -284,12 +305,36 @@ def manager_vendor(vendor: Vendor) -> Vendor:
     return vendor
 
 
+def vendor_image(vendor: Vendor) -> models.Model:
+    """An image in the vendor's own collection (VEN.31)."""
+    from wagtail.models import Collection
+
+    from apps.core.tests.factories import MediaImageFactory
+    from apps.vendors.engine import vendor_collection_name
+
+    root = Collection.get_first_root_node()
+    collection = root.add_child(name=vendor_collection_name(str(vendor.public_id)))
+    return MediaImageFactory.create(collection=collection)
+
+
+def by_pk(obj: models.Model) -> dict[str, str]:
+    return {"pk": str(obj.pk)}
+
+
+def by_image_id(obj: models.Model) -> dict[str, str]:
+    return {"image_id": str(obj.pk)}
+
+
 def vendor_display_name(vendor: models.Model) -> str:
     return str(vendor.display_name)  # type: ignore[attr-defined]
 
 
+NIL_UUID = "00000000-0000-0000-0000-000000000000"
+
+
 ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
+    "readyz": NoVendorData("Readiness probe: a status only, no data."),
     "robots_txt": NoVendorData("robots.txt (SEO.8): constant text for crawlers; no vendor data."),
     "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
     "media": NoVendorData(
@@ -362,7 +407,35 @@ ENDPOINTS: dict[str, Access] = {
     "logout": NoVendorData("Sign-out of the Manager."),
     "manager:shop:dashboard": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     "manager:shop:profile": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    # The image chooser of the storefront editor (VEN.31): vendor B's image id is a 404 for A.
+    "manager:shop:image_chosen": VendorScoped(make=vendor_image, kwargs=by_pk),
+    "manager:shop:image_select_format": VendorScoped(make=vendor_image, kwargs=by_image_id),
+    "manager:shop:image_choose": VendorScopedList(
+        make=vendor_image,
+        identify=lambda o: str(o.title),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:image_results": VendorScopedList(
+        make=vendor_image,
+        identify=lambda o: str(o.title),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:image_create": NoVendorData(
+        "The upload tab of the image chooser (VEN.31): the form and the upload answer, the file "
+        "goes into the caller's own collection only; owner only, other roles get 404 "
+        "(`test_staff_and_other_users_get_404...` and the upload tests in test_image_chooser)."
+    ),
     "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    # ORD.6: the vendor's own orders; another vendor's id is a 404 on the detail and every action.
+    "manager:shop:orders": VendorScopedList(
+        make=paid_vendor_order,
+        identify=lambda sub: str(sub.order.number),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:order": VendorScoped(make=paid_vendor_order, sample={"public_id": NIL_UUID}),
+    "manager:shop:order_action": VendorScoped(
+        make=paid_vendor_order,
+        kwargs=lambda obj: {**by_public_id(obj), "action": "accept"},
+        methods=("POST",),
+        sample={"public_id": NIL_UUID},
+    ),
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
     ),

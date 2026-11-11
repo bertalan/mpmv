@@ -28,5 +28,33 @@
       {% include "components/button.html" with label=_("Record the decision") type="submit" only %}
     </form>
   {% endif %}
+  {% if notice.status == "action_taken" %}
+    <h2>{% translate "Act on the content" %}</h2>
+    <form method="post" novalidate>
+      {% csrf_token %}<input type="hidden" name="action" value="restrict">
+      {% include "components/error_summary.html" with form=restriction_form only %}
+      {% for field in restriction_form %}{% include "components/field.html" with field=field only %}{% endfor %}
+      {% include "components/button.html" with label=_("Restrict and send the statement of reasons") type="submit" only %}
+    </form>
+  {% endif %}
+  {% if statements %}
+    <h2>{% translate "Statements of reasons" %}</h2>
+    <ul>
+      {% for statement in statements %}
+        <li>{{ statement.sent_at|date:"SHORT_DATETIME_FORMAT" }}: {{ statement.get_target_kind_display }}, {{ statement.scope }} ({{ statement.facts|truncatechars:80 }})</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  <h2>{% translate "Suspected criminal offence (DSA article 18)" %}</h2>
+  {% if notice.authorities_notified_at %}
+    <p>{% blocktranslate with authority=notice.authorities_notified_to at=notice.authorities_notified_at|date:"SHORT_DATETIME_FORMAT" %}Authorities told: {{ authority }}, {{ at }}.{% endblocktranslate %}</p>
+  {% else %}
+    <form method="post" novalidate>
+      {% csrf_token %}<input type="hidden" name="action" value="authorities">
+      {% include "components/error_summary.html" with form=authorities_form only %}
+      {% for field in authorities_form %}{% include "components/field.html" with field=field only %}{% endfor %}
+      {% include "components/button.html" with label=_("Record the notification") type="submit" only %}
+    </form>
+  {% endif %}
   <p><a href="{% url 'manager:platform:notices' %}">{% translate "Back to the notices" %}</a></p>
 {% endblock %}

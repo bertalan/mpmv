@@ -1,0 +1,6 @@
+{% load i18n %}{% blocktranslate %}An operations alert was raised on the platform.{% endblocktranslate %}
+
+{% translate "Alert" %}: {{ key }}
+{{ summary }}
+{% for name, value in details.items %}{{ name }}: {{ value }}
+{% endfor %}

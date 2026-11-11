@@ -28,9 +28,17 @@ msgstr "%(name)s rimosso."
 msgid "About the shop"
 msgstr "Informazioni sul negozio"
 
+#: apps/manager/templates/manager/shop/order.html
+msgid "Accept the order"
+msgstr "Accetta l'ordine"
+
 #: themes/base/templates/403.html
 msgid "Access denied"
 msgstr "Accesso negato"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Act on the content"
+msgstr "Interveni sul contenuto"
 
 #: apps/manager/templates/manager/list.html
 msgid "Action on the selected rows"
@@ -50,6 +58,7 @@ msgstr "Aggiungi un altro fattore prima di rimuovere l’ultimo."
 
 #: apps/manager/templates/manager/list.html
 #: apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/shop/orders.html
 msgid "All"
 msgstr "Tutti"
 
@@ -72,8 +81,16 @@ msgid "Authenticator app"
 msgstr "App di autenticazione"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Authorities told: %(authority)s, %(at)s."
+msgstr "Autorità informate: %(authority)s, %(at)s."
+
+#: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Back to the notices"
 msgstr "Torna alle segnalazioni"
+
+#: apps/manager/templates/manager/shop/order.html
+msgid "Back to the orders"
+msgstr "Torna agli ordini"
 
 #: apps/manager/templates/manager/forbidden.html
 msgid "Back to the site"
@@ -98,6 +115,10 @@ msgstr "Condizioni di annullamento"
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Cannot scan? Enter this key:"
 msgstr "Non riesci a scansionare? Inserisci questa chiave:"
+
+#: apps/manager/forms.py apps/manager/templates/manager/shop/order.html
+msgid "Carrier"
+msgstr "Corriere"
 
 #: apps/manager/sections.py
 #: apps/manager/templates/manager/shop/vendor_picker.html
@@ -130,6 +151,10 @@ msgstr ""
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid "Continue to your request"
 msgstr "Continua con la tua richiesta"
+
+#: apps/manager/templates/manager/shop/order.html
+msgid "Customer"
+msgstr "Cliente"
 
 #: apps/manager/forms.py
 msgid ""
@@ -178,6 +203,15 @@ msgstr ""
 msgid "Email"
 msgstr "Email"
 
+#: apps/manager/forms.py
+msgid "Enter a valid carrier name."
+msgstr "Inserisci un nome di corriere valido."
+
+#: apps/manager/forms.py
+msgid "Enter the tracking number: letters, digits, spaces and . / _ - only."
+msgstr ""
+"Inserisci il numero di tracciamento: solo lettere, cifre, spazi e . / _ -"
+
 #: themes/base/templates/components/alert.html
 msgid "Error"
 msgstr "Errore"
@@ -190,13 +224,19 @@ msgstr "Posizione esatta"
 msgid "Explanation"
 msgstr "Spiegazione"
 
+#: apps/manager/media.py
+msgid "File"
+msgstr "File"
+
 #: apps/manager/templates/manager/list.html
 #: apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/shop/orders.html
 msgid "Filter"
 msgstr "Filtra"
 
 #: apps/manager/templates/manager/list.html
 #: apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/shop/orders.html
 msgid "Filters"
 msgstr "Filtri"
 
@@ -235,6 +275,10 @@ msgstr ""
 "questo link; prima di approvare o rifiutare qualsiasi cosa dovrai comunque "
 "confermare la tua identità con il secondo fattore."
 
+#: apps/manager/sections.py
+msgid "Images"
+msgstr "Immagini"
+
 #: themes/base/templates/components/alert.html
 msgid "Information"
 msgstr "Informazione"
@@ -247,6 +291,10 @@ msgstr "Codice non valido. Controlla l’ora del tuo dispositivo e riprova."
 msgid "Invalid code. Try again."
 msgstr "Codice non valido. Riprova."
 
+#: apps/manager/templates/manager/shop/order.html
+msgid "Items"
+msgstr "Articoli"
+
 #: themes/base/templates/components/language_switcher.html
 msgid "Language"
 msgstr "Lingua"
@@ -258,6 +306,10 @@ msgstr "Lingua dei testi"
 #: themes/base/templates/components/footer.html
 msgid "Legal"
 msgstr "Note legali"
+
+#: apps/manager/forms.py
+msgid "Letters, digits, spaces and . / _ - only."
+msgstr "Solo lettere, cifre, spazi e . / _ -"
 
 #: themes/base/templates/components/button.html
 msgid "Loading"
@@ -294,6 +346,14 @@ msgstr "Gestisci i codici di recupero"
 #: apps/manager/templates/manager/layout.html
 msgid "Manager sections"
 msgstr "Sezioni del Manager"
+
+#: apps/manager/templates/manager/shop/order.html
+msgid "Mark as delivered"
+msgstr "Segna come consegnato"
+
+#: apps/manager/templates/manager/shop/order.html
+msgid "Mark as shipped"
+msgstr "Segna come spedito"
 
 #: apps/manager/templates/manager/platform/dashboard.html
 msgid ""
@@ -356,6 +416,7 @@ msgstr ""
 
 #: apps/manager/templates/manager/list.html
 #: apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/shop/orders.html
 msgid "Nothing to show."
 msgstr "Niente da mostrare."
 
@@ -375,6 +436,18 @@ msgstr "Segnalante"
 #: apps/manager/forms.py
 msgid "One line under the shop name. Plain text."
 msgstr "Una riga sotto il nome del negozio. Testo semplice."
+
+#: apps/manager/templates/manager/shop/orders.html
+msgid "Order"
+msgstr "Ordine"
+
+#: apps/manager/templates/manager/shop/order.html
+msgid "Order %(number)s"
+msgstr "Ordine %(number)s"
+
+#: apps/manager/sections.py apps/manager/templates/manager/shop/orders.html
+msgid "Orders"
+msgstr "Ordini"
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Out of stock"
@@ -422,6 +495,11 @@ msgstr "Le passkey richiedono JavaScript."
 msgid "Password"
 msgstr "Password"
 
+#: apps/manager/templates/manager/shop/order.html
+#: apps/manager/templates/manager/shop/orders.html
+msgid "Placed"
+msgstr "Effettuato il"
+
 #: apps/manager/forms.py
 msgid ""
 "Plain text for people who cannot see the image, for example the shop name."
@@ -454,6 +532,10 @@ msgstr "Anteprima: %(action)s"
 msgid "Previous"
 msgstr "Indietro"
 
+#: apps/manager/templates/manager/shop/order.html
+msgid "Product"
+msgstr "Prodotto"
+
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Products"
 msgstr "Prodotti"
@@ -461,6 +543,10 @@ msgstr "Prodotti"
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Published"
 msgstr "Pubblicati"
+
+#: apps/manager/templates/manager/shop/order.html
+msgid "Quantity"
+msgstr "Quantità"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Reason"
@@ -474,6 +560,10 @@ msgstr "Ricevuta"
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Record the decision"
 msgstr "Registra la decisione"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Record the notification"
+msgstr "Registra la comunicazione"
 
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Recovery code"
@@ -509,6 +599,10 @@ msgstr "Segnalato"
 #: themes/base/templates/components/field.html
 msgid "required"
 msgstr "obbligatorio"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Restrict and send the statement of reasons"
+msgstr "Limita e invia la motivazione"
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Retired"
@@ -550,6 +644,14 @@ msgstr "Configura un’app di autenticazione"
 msgid "Set up two-factor authentication"
 msgstr "Configura la verifica in due passaggi"
 
+#: apps/manager/templates/manager/shop/order.html
+msgid "Ship the order"
+msgstr "Spedisci l'ordine"
+
+#: apps/manager/templates/manager/shop/order.html
+msgid "Ship to"
+msgstr "Spedire a"
+
 #: apps/manager/forms.py
 msgid "Shipping policy"
 msgstr "Condizioni di spedizione"
@@ -576,6 +678,10 @@ msgstr "Esci"
 msgid "Skip to main content"
 msgstr "Vai al contenuto principale"
 
+#: apps/manager/templates/manager/shop/order.html
+msgid "SKU"
+msgstr "SKU"
+
 #: themes/base/templates/500.html
 msgid "Something went wrong"
 msgstr "Qualcosa è andato storto"
@@ -589,7 +695,13 @@ msgid "Start review"
 msgstr "Avvia la revisione"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Statements of reasons"
+msgstr "Motivazioni"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/shop/order.html
+#: apps/manager/templates/manager/shop/orders.html
 msgid "Status"
 msgstr "Stato"
 
@@ -605,6 +717,10 @@ msgstr "Profilo del negozio salvato."
 msgid "Success"
 msgstr "Operazione riuscita"
 
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Suspected criminal offence (DSA article 18)"
+msgstr "Sospetto reato (DSA articolo 18)"
+
 #: apps/manager/templates/manager/layout.html
 msgid "Switch"
 msgstr "Cambia"
@@ -612,6 +728,17 @@ msgstr "Cambia"
 #: apps/manager/forms.py
 msgid "Tagline"
 msgstr "Slogan"
+
+#: apps/manager/notice_views.py
+msgid ""
+"The content could not be restricted: check the notice status and target."
+msgstr ""
+"Non è stato possibile limitare il contenuto: controlla lo stato e il "
+"bersaglio della segnalazione."
+
+#: apps/manager/notice_views.py
+msgid "The content is restricted and the vendor is told."
+msgstr "Il contenuto è limitato e il venditore ne è informato."
 
 #: apps/manager/notice_views.py
 msgid "The decision is recorded and the notifier is told."
@@ -645,6 +772,14 @@ msgstr ""
 #: apps/manager/notice_views.py
 msgid "The notice is under review."
 msgstr "La segnalazione è in revisione."
+
+#: apps/manager/notice_views.py
+msgid "The notification to the authorities is recorded."
+msgstr "La comunicazione alle autorità è registrata."
+
+#: apps/manager/views.py
+msgid "The order was updated."
+msgstr "L'ordine è stato aggiornato."
 
 #: themes/base/templates/404.html
 msgid "The page you asked for does not exist or has moved."
@@ -724,6 +859,10 @@ msgid "This step is not possible for the notice in its status."
 msgstr ""
 "Questo passaggio non è possibile per la segnalazione nel suo stato attuale."
 
+#: apps/manager/views.py
+msgid "This step is not possible in the order's current state."
+msgstr "Questo passaggio non è possibile nello stato attuale dell'ordine."
+
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid "This vendor is closed, so its shop pages are no longer available."
 msgstr ""
@@ -737,6 +876,10 @@ msgid ""
 msgstr ""
 "Questo venditore è sospeso o chiuso, quindi il profilo del negozio non può "
 "essere modificato. Contatta l’assistenza per farlo riaprire."
+
+#: apps/manager/media.py
+msgid "Title"
+msgstr "Titolo"
 
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid ""
@@ -752,6 +895,14 @@ msgstr ""
 msgid "Too many attempts. Please try again later."
 msgstr "Troppi tentativi. Riprova più tardi."
 
+#: apps/manager/templates/manager/shop/orders.html
+msgid "Total"
+msgstr "Totale"
+
+#: apps/manager/forms.py apps/manager/templates/manager/shop/order.html
+msgid "Tracking number"
+msgstr "Numero di tracciamento"
+
 #: apps/accounts/templates/accounts/mfa/overview.html
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Two-factor authentication"
@@ -764,6 +915,14 @@ msgstr "La verifica in due passaggi è attiva"
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Two-factor settings"
 msgstr "Impostazioni della verifica in due passaggi"
+
+#: apps/manager/media.py
+msgid "Upload"
+msgstr "Carica"
+
+#: apps/manager/media.py
+msgid "Uploading…"
+msgstr "Caricamento…"
 
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Use a passkey"

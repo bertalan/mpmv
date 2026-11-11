@@ -33,7 +33,7 @@ from apps.core import translations
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.models import MediaImage
-from apps.core.services import audit_changes, run_mutation, save_audited
+from apps.core.services import audit_changes, holds_permission, run_mutation, save_audited
 from apps.core.text import ascii_int
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedQuerySet, is_platform_staff
@@ -636,6 +636,9 @@ def _copy[M: models.Model](instance: M, **overrides: Any) -> M:
     return model(**values)
 
 
+DUPLICATE_ROLE_PERMISSIONS = ("manager.platform_catalog", "core.platform_owner")
+
+
 def duplicate_product_to_vendor(
     product: Product,
     vendor: Vendor,
@@ -654,7 +657,15 @@ def duplicate_product_to_vendor(
     Raises PermissionDenied for non-staff and ValidationError for an empty reason, the same
     vendor or a SKU the target vendor already uses.
     """
-    if not is_platform_staff(actor):
+    # The Catalog and moderation role or the platform owner (spec 02 CORE.18 matrix); another
+    # role's platform-wide vendor read is not enough.
+    if not (
+        is_platform_staff(actor)
+        and (
+            getattr(actor, "is_superuser", False)
+            or holds_permission(actor, *DUPLICATE_ROLE_PERMISSIONS)
+        )
+    ):
         raise PermissionDenied("Only staff can duplicate a product to another vendor.")
     reason = reason.strip()
     if not reason:
