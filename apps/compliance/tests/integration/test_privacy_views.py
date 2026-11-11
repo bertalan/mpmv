@@ -283,6 +283,46 @@ def test_export_and_erasure_share_one_reauthentication_helper(
     assert calls == [True, True]
 
 
+def test_refusals_for_a_missing_factor_do_not_use_up_the_export_attempts() -> None:
+    password = secrets.token_urlsafe(16)
+    client, user = stale_factor_client(password=password)
+    for _ in range(4):
+        assert client.post(reverse("privacy_export"), {"password": password}).status_code == 302
+
+    fresh = Client()
+    verified_login(fresh, user)
+
+    assert fresh.post(reverse("privacy_export")).status_code == 200
+
+
+def test_refused_exports_have_their_own_limit_that_bounds_the_audit() -> None:
+    password = secrets.token_urlsafe(16)
+    client, _user = stale_factor_client(password=password)
+    statuses = [
+        client.post(reverse("privacy_export"), {"password": password}).status_code
+        for _ in range(14)
+    ]
+    assert statuses[:10] == [302] * 10
+    assert set(statuses[10:]) == {429}
+    assert AuditLog.objects.filter(action=REFUSED).count() == 10
+
+
+def test_a_wrong_password_still_uses_the_export_limit() -> None:
+    client, _user, _password = signed_in()
+    statuses = [
+        client.post(reverse("privacy_export"), {"password": "x"}).status_code for _ in range(5)
+    ]
+    assert statuses == [403, 403, 403, 429, 429]
+
+
+@pytest.mark.parametrize("name", ["privacy_export", "privacy_erase"])
+def test_actions_are_never_cached(name: str) -> None:
+    password = secrets.token_urlsafe(16)
+    client, _user = stale_factor_client(password=password)
+    response = client.post(reverse(name), {"password": password, "confirm": "erase"})
+    assert "no-store" in response["Cache-Control"]
+
+
 def test_a_refused_export_is_audited_without_personal_data() -> None:
     password = secrets.token_urlsafe(16)
     client, user = stale_factor_client(password=password)
