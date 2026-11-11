@@ -176,7 +176,11 @@ is a normal deploy; nothing is copied by hand.
 
 1. Before the deploy, as the deploy user: `cat /proc/sys/net/ipv4/ip_unprivileged_port_start`
    prints 80 or lower (the doctor checks it too), and the host has IPv6 enabled (the unit also
-   listens on `[::]`).
+   listens on `[::]`). Refresh the installed deploy script from the release image first (the usual
+   `podman run --rm --network none --entrypoint cat <image>:<version> /app/deploy/server/mpmv-deploy`
+   into `~/.local/bin/mpmv-deploy`): scripts older than this release do not know the socket unit and
+   would install a Caddy unit without it. From this release on, `deploy` hands itself over to the
+   release's own script, so this step is only needed once.
 2. `ssh <host> '~/.local/bin/mpmv-deploy deploy <version>'`. The deploy installs the socket unit in
    `~/.config/systemd/user/`, enables it, stops the old Caddy (which held 80 and 443 itself),
    starts the socket unit, then Caddy. Expect a few seconds without the proxy.

@@ -213,6 +213,11 @@ class Host:
         default_proc = self.root / "proc-sys-default"
         (default_proc / "net" / "ipv4").mkdir(parents=True, exist_ok=True)
         (default_proc / "net" / "ipv4" / "ip_unprivileged_port_start").write_text("80\n")
+        default_net = self.root / "proc-net-default"
+        default_net.mkdir(exist_ok=True)
+        (default_net / "if_inet6").write_text(
+            "00000000000000000000000000000001 01 80 10 80       lo\n"
+        )
         env = {
             "PATH": f"{self.root / 'bin'}{os.pathsep}{os.environ['PATH']}",
             "HOME": str(self.root),
@@ -224,6 +229,7 @@ class Host:
             "MPMV_CHECK_INTERVAL": "0",
             "MPMV_MIN_FREE_MB": "1",
             "MPMV_PROC_SYS": str(default_proc),
+            "MPMV_PROC_NET": str(default_net),
             **extra,
         }
         return subprocess.run(  # noqa: S603 (fixed script path, test-controlled arguments)
@@ -709,3 +715,29 @@ def test_doctor_stops_the_deploy_on_a_broken_host(host: Host, breakage: str, mes
     assert "nothing changed" in result.stderr
     assert actions(host.log) == []
     assert host.run("doctor", **extra).returncode != 0
+
+
+def test_without_ipv6_a_socket_release_is_refused_before_any_change(host: Host) -> None:
+    net = host.root / "proc-net-empty"
+    net.mkdir()
+    (net / "if_inet6").write_text("")
+
+    result = host.run("deploy", "1.0.0", MPMV_PROC_NET=str(net))
+
+    assert result.returncode != 0
+    assert "no IPv6 address" in result.stderr
+    assert actions(host.log) == [f"podman pull {REGISTRY}:1.0.0"]
+    assert not (host.systemd / "mpmv-caddy.socket").exists()
+
+
+def test_deploy_continues_with_the_release_own_script(host: Host) -> None:
+    """An older installed script hands the deploy to the release's script (socket switch)."""
+    own = host.root / "images" / "1.0.0" / "server" / "mpmv-deploy"
+    marker = host.root / "reexec-marker"
+    own.write_text(f'#!/bin/sh\necho "$MPMV_REEXEC $*" > "{marker}"\n')
+
+    result = host.run("deploy", "1.0.0")
+
+    assert result.returncode == 0, result.stderr
+    assert marker.read_text().strip() == "1 deploy 1.0.0"
+    assert "continuing with the deploy script of 1.0.0" in result.stderr

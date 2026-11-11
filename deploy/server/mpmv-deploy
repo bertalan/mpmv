@@ -32,6 +32,7 @@ SYSTEMD_DIR="${MPMV_SYSTEMD_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user}
 PROXY_SOCKET=mpmv-caddy.socket
 # Where the doctor reads the lowest port a user may bind (the socket unit binds 80 and 443).
 PROC_SYS="${MPMV_PROC_SYS:-/proc/sys}"
+PROC_NET="${MPMV_PROC_NET:-/proc/net}"
 BIN_PATH="${MPMV_BIN:-$HOME/.local/bin/mpmv-deploy}"
 # Total time the post-deploy check may take before the release counts as bad (ARC.23: detection
 # and rollback stay under a minute).
@@ -267,6 +268,11 @@ doctor_release() {
   if quadlet_dry_run "$set_dir/quadlet"; then pass "units of $1 convert on this host's podman"; else fail "units of $1 do not convert on this host's podman (quadlet -dryrun)"; fi
   if needs_socket "$set_dir/quadlet"; then
     if socket_ok "$set_dir/systemd/$PROXY_SOCKET"; then pass "units of $1 carry the proxy socket unit"; else fail "units of $1 need $PROXY_SOCKET and do not carry it"; fi
+    # The socket unit listens on [::] too: without IPv6 it cannot start once the old proxy is gone.
+    if grep -q '^Listen[A-Za-z]*=\[::\]' "$set_dir/systemd/$PROXY_SOCKET" 2>/dev/null; then
+      v6="$(grep -c . "$PROC_NET/if_inet6" 2>/dev/null || true)"
+      if [ "${v6:-0}" -gt 0 ] 2>/dev/null; then pass "IPv6 available for the proxy socket"; else fail "the proxy socket of $1 listens on [::] but this host has no IPv6 address"; fi
+    fi
   fi
   for name in $ENV_FILES; do
     example="$set_dir/server/$name.env.example"
@@ -399,6 +405,13 @@ deploy() {
     podman pull "$REGISTRY_IMAGE:$version" >/dev/null
   fi
   extract "$version" || die "cannot read the units of $version; nothing changed"
+  # A release can need a newer deploy script than the installed one (the Caddy socket switch did):
+  # hand the rest of the deploy to the release's own script, once. Nothing has changed yet.
+  own="$UNIT_SETS/$version/server/mpmv-deploy"
+  if [ -z "${MPMV_REEXEC:-}" ] && [ -f "$own" ] && ! cmp -s "$own" "$0"; then
+    log "continuing with the deploy script of $version"
+    MPMV_REEXEC=1 exec /bin/sh "$own" deploy "$version"
+  fi
   doctor_release "$version"
   [ "$FAILURES" -eq 0 ] || die "doctor: $version does not fit this host; nothing changed"
   if [ -n "$live" ] && [ ! -d "$UNIT_SETS/$live" ]; then snapshot_installed "$live"; fi
