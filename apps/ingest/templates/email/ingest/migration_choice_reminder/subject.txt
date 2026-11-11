@@ -1,0 +1,1 @@
+{% load i18n %}{% blocktranslate %}Choose what to migrate by {{ deadline }}{% endblocktranslate %}

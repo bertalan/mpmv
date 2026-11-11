@@ -27,6 +27,7 @@ E edit, R read only, A audited support action, I impersonation within the policy
 | Platform: moderation (vendor events, storefront changes, content) |  | E |  |  | R |  |
 | Platform: notices of illegal content (CMP.5) |  | E |  |  | R |  |
 | Platform: vendors (applications, plans) | R | R | R | R | E |  |
+| Platform: vendor migration choices (MIG.16) | R | R | R | A | E |  |
 | Platform: approve or suspend a vendor (step-up, reason) |  | E |  |  | E |  |
 | Platform: close a vendor definitively |  |  |  |  | E |  |
 | Platform: orders and customers |  |  | R | R+A | R |  |

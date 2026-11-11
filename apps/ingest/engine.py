@@ -1,10 +1,12 @@
 """Pure rules of the ingest app (ING.1): run status machine, review decisions, SKU matching and
 mapping lookup. No ORM, no Django: the services load the rows and call these functions."""
 
+import calendar
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Any, Final, Literal
 
 from apps.catalog.engine import sku_match_key
@@ -152,3 +154,88 @@ def payload_hash(payload: Mapping[str, Any]) -> str:
     """Stable digest of an observation payload (key order does not matter)."""
     text = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(text.encode()).hexdigest()
+
+
+# --- Vendor migration choices (MIG.16, owner decision D-16, 2026-11-11)
+
+PERIOD_CHOICES: Final = (12, 24, 36)  # months of orders kept active; None means "all"
+LOGIN_WINDOWS: Final = (1, 2, 3, 6, 12, 24, 36)  # months, owner 2026-11-11 (L-11)
+DATA_ORDERS: Final = "orders"
+DATA_CUSTOMERS: Final = "customers"  # the customers of the orders in scope
+DATA_PRODUCTS: Final = "products"
+DATA_REVIEWS: Final = "reviews"
+DATA_TYPES: Final = (DATA_ORDERS, DATA_CUSTOMERS, DATA_PRODUCTS, DATA_REVIEWS)
+DEADLINE_DAYS: Final = 14  # the choice is due this many days before the cutover
+REMINDER_DAYS_BEFORE_DEADLINE: Final = (14, 7, 1)
+CHOICE_SOURCES: Final = ("vendor", "staff", "default")
+SOURCE_VENDOR, SOURCE_STAFF, SOURCE_DEFAULT = CHOICE_SOURCES
+
+
+@dataclass(frozen=True)
+class ChoiceValues:
+    """What a vendor chose to migrate. `period_months` None means all orders."""
+
+    period_months: int | None
+    data_types: tuple[str, ...]
+    include_unpublished: bool  # drafts and archived products come along as hidden products
+    login_window_months: int
+
+
+DEFAULT_CHOICE: Final = ChoiceValues(
+    period_months=24, data_types=DATA_TYPES, include_unpublished=False, login_window_months=12
+)
+
+
+def normalise_data_types(chosen: Sequence[str]) -> tuple[str, ...]:
+    """Unique values in canonical order; unknown ones come last so validation sees them."""
+    known = tuple(t for t in DATA_TYPES if t in chosen)
+    return known + tuple(sorted({t for t in chosen if t not in DATA_TYPES}))
+
+
+def validate_choice(values: ChoiceValues) -> dict[str, str]:
+    """Field -> message; empty when the choice is valid. Nothing outside the lists is accepted."""
+    errors: dict[str, str] = {}
+    if values.period_months is not None and values.period_months not in PERIOD_CHOICES:
+        errors["period_months"] = "Choose 12, 24 or 36 months, or all."
+    if values.login_window_months not in LOGIN_WINDOWS:
+        errors["login_window_months"] = "Choose 1, 2, 3, 6, 12, 24 or 36 months."
+    unknown = [t for t in values.data_types if t not in DATA_TYPES]
+    if unknown:
+        errors["data_types"] = "Unknown data type."
+    elif DATA_CUSTOMERS in values.data_types and DATA_ORDERS not in values.data_types:
+        errors["data_types"] = "Customers are migrated with their orders: choose orders too."
+    return errors
+
+
+def choice_snapshot(values: ChoiceValues) -> dict[str, Any]:
+    return {
+        "period_months": values.period_months,
+        "data_types": list(values.data_types),
+        "include_unpublished": values.include_unpublished,
+        "login_window_months": values.login_window_months,
+    }
+
+
+def choice_deadline(cutover: datetime) -> datetime:
+    """The moment the choice is due: 14 days before the cutover (a `datetime`)."""
+    return cutover - timedelta(days=DEADLINE_DAYS)
+
+
+def due_reminder(now: datetime, deadline: datetime) -> int | None:
+    """The reminder (days before the deadline) to send at `now`, or None.
+
+    The closest offset already reached wins, so a late start sends one reminder, not three.
+    Nothing is due once the deadline has passed.
+    """
+    if now >= deadline:
+        return None
+    reached = [d for d in REMINDER_DAYS_BEFORE_DEADLINE if deadline - timedelta(days=d) <= now]
+    return min(reached) if reached else None
+
+
+def months_before(moment: datetime, months: int) -> datetime:
+    """`moment` shifted back by whole calendar months, the day clamped to the month's length."""
+    index = moment.year * 12 + (moment.month - 1) - months
+    year, month = divmod(index, 12)
+    day = min(moment.day, calendar.monthrange(year, month + 1)[1])
+    return moment.replace(year=year, month=month + 1, day=day)

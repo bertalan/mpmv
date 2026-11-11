@@ -79,6 +79,7 @@ from apps.events.tests.factories import EventPageFactory, VendorEventPolicyFacto
 from apps.ingest.models import (
     ImportRun,
     MappingTable,
+    MigrationChoice,
     ProductDraft,
     ReviewItem,
     SourceItem,
@@ -88,6 +89,7 @@ from apps.ingest.models import (
 from apps.ingest.tests.factories import (
     ImportRunFactory,
     MappingTableFactory,
+    MigrationChoiceFactory,
     ProductDraftFactory,
     ReviewItemFactory,
     SourceItemFactory,
@@ -218,6 +220,8 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
     SourceObservation: lambda vendor: SourceObservationFactory.create(item__source__vendor=vendor),
     ProductDraft: lambda vendor: ProductDraftFactory.create(item__source__vendor=vendor),
     ImportRun: lambda vendor: ImportRunFactory.create(source__vendor=vendor),
+    # MIG.16: a vendor's migration choice.
+    MigrationChoice: lambda vendor: MigrationChoiceFactory.create(vendor=vendor),
     ReviewItem: lambda vendor: ReviewItemFactory.create(run__source__vendor=vendor),
     MappingTable: lambda vendor: MappingTableFactory.create(vendor=vendor),
     GpsrSafetyText: lambda vendor: GpsrSafetyTextFactory.create(
@@ -441,6 +445,8 @@ ENDPOINTS: dict[str, Access] = {
         methods=("POST",),
         sample={"public_id": NIL_UUID},
     ),
+    # MIG.16: the owner's migration choices; a `vendor` id of another vendor is a 404 and audited.
+    "manager:shop:migration": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
     ),
@@ -451,6 +457,13 @@ ENDPOINTS: dict[str, Access] = {
     "manager:platform:notice": StaffOnly(
         "One notice of illegal content (CMP.5): platform data, not vendor-owned; needs the "
         "compliance.review_notices permission, so a vendor member gets 404.",
+        kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
+    "manager:platform:migration_choices": StaffOnly(
+        "Migration choices of every vendor (MIG.16): platform staff only; a vendor member gets 404."
+    ),
+    "manager:platform:migration_choice": StaffOnly(
+        "One vendor's migration choice (MIG.16): platform staff only, a vendor member gets 404.",
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
     ),
     "dsa_notice": NoVendorData(

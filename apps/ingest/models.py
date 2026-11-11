@@ -10,6 +10,7 @@ with its counters, a `ReviewItem` a case a person must decide, and `MappingTable
 Everything is vendor-owned (CORE.3) through `vendor_scope`. Rows are written by the services.
 """
 
+import datetime as dt
 from typing import Any, ClassVar
 
 from django.conf import settings
@@ -28,6 +29,8 @@ from . import engine
 __all__ = [
     "ImportRun",
     "MappingTable",
+    "MigrationChoice",
+    "MigrationRun",
     "ProductDraft",
     "ReviewItem",
     "SourceItem",
@@ -348,3 +351,85 @@ class MappingTable(BaseModel):
     def save(self, *args: Any, **kwargs: Any) -> None:
         self.key_norm = engine.mapping_key(self.key)
         super().save(*args, **kwargs)
+
+
+class MigrationRun(BaseModel):
+    """One planned migration cutover (MIG.16). Platform data: no vendor owns it.
+
+    Vendors record their choices against a run; the choice is due 14 days before `cutover_at`.
+    """
+
+    label = models.SlugField(max_length=60, unique=True)
+    cutover_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["cutover_at", "id"]
+
+    def __str__(self) -> str:
+        return self.label
+
+    @property
+    def choice_deadline(self) -> dt.datetime:
+        return engine.choice_deadline(self.cutover_at)
+
+
+class MigrationChoice(BaseModel):
+    """What one vendor chose to migrate for one run (MIG.16, owner decision D-16).
+
+    Append-only and versioned: a change adds a row with the next `version`; the current choice is
+    the highest version. `period_months` null means all orders. `source` tells whether the vendor,
+    a staff member on its behalf, or the deadline defaults recorded it. Every write goes through
+    `services.record_choice`, which audits it with the previous value.
+    """
+
+    vendor_scope: ClassVar[str] = "vendor"
+
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="migration_choices")
+    run = models.ForeignKey(MigrationRun, on_delete=models.PROTECT, related_name="choices")
+    version = models.PositiveIntegerField()
+    period_months = models.PositiveSmallIntegerField(null=True, blank=True)
+    data_types = models.JSONField(default=list)
+    include_unpublished = models.BooleanField(default=False)
+    login_window_months = models.PositiveSmallIntegerField()
+    source = models.CharField(max_length=10, choices=[(s, s) for s in engine.CHOICE_SOURCES])
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+
+    objects = VendorScopedManager()
+
+    class Meta:
+        ordering = ["vendor", "run", "-version"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["vendor", "run", "version"], name="ingest_choice_vendor_run_version"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(version__gte=1), name="ingest_choice_version_positive"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(period_months__isnull=True)
+                | models.Q(period_months__in=engine.PERIOD_CHOICES),
+                name="ingest_choice_period_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(login_window_months__in=engine.LOGIN_WINDOWS),
+                name="ingest_choice_login_window_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(source__in=engine.CHOICE_SOURCES),
+                name="ingest_choice_source_valid",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.vendor} / {self.run} v{self.version}"
+
+    @property
+    def values(self) -> engine.ChoiceValues:
+        return engine.ChoiceValues(
+            period_months=self.period_months,
+            data_types=engine.normalise_data_types(list(self.data_types)),
+            include_unpublished=self.include_unpublished,
+            login_window_months=self.login_window_months,
+        )

@@ -12,6 +12,8 @@ from apps.ingest import engine
 from apps.ingest.models import (
     ImportRun,
     MappingTable,
+    MigrationChoice,
+    MigrationRun,
     ProductDraft,
     ReviewItem,
     SourceItem,
@@ -99,3 +101,27 @@ def make_stale(item: SourceItem, days: int = 3) -> SourceItem:
     item.last_seen_at = timezone.now() - dt.timedelta(days=days)
     item.save(update_fields=["last_seen_at"])
     return item
+
+
+class MigrationRunFactory(DjangoModelFactory[MigrationRun]):
+    """A cutover far enough away that the choice deadline is still open."""
+
+    class Meta:
+        model = MigrationRun
+
+    label = factory.Sequence(lambda n: f"cutover-{n}")
+    cutover_at = factory.LazyFunction(lambda: timezone.now() + dt.timedelta(days=60))
+
+
+class MigrationChoiceFactory(DjangoModelFactory[MigrationChoice]):
+    class Meta:
+        model = MigrationChoice
+
+    vendor = factory.SubFactory(VendorFactory)
+    run = factory.SubFactory(MigrationRunFactory)
+    version = 1
+    period_months = 24
+    data_types = factory.LazyFunction(lambda: list(engine.DATA_TYPES))
+    include_unpublished = False
+    login_window_months = 12
+    source = engine.SOURCE_VENDOR

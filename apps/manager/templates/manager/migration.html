@@ -1,0 +1,73 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Migration choices (MIG.16, owner decision D-16): what a vendor brings to the new platform. Shared
+by the shop space (the owner) and the platform space (staff, on a vendor's behalf). States the
+legal floor and the restricted tax-only archive. No inline script or style (strict CSP).
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Migration choices" %}</h1>
+  {% if manager.space == "platform" %}<p><a href="{% url 'manager:platform:migration_choices' %}">{% translate "Back to the vendors" %}</a></p>{% endif %}
+  <p class="manager-lead">{% blocktranslate with vendor=vendor.display_name %}What {{ vendor }} brings to the new platform.{% endblocktranslate %}</p>
+  {% if not run %}
+    <p>{% translate "No migration is scheduled yet." %}</p>
+  {% else %}
+    <dl class="manager-facts">
+      <dt>{% translate "Vendor" %}</dt><dd>{{ vendor.display_name }}</dd>
+      <dt>{% translate "Migration" %}</dt><dd>{{ run.label }}</dd>
+      <dt>{% translate "Choose by" %}</dt><dd data-deadline>{{ deadline|date:"DATE_FORMAT" }}</dd>
+      <dt>{% translate "Status" %}</dt>
+      <dd data-choice-status>{% if current %}{% blocktranslate with version=current.version source=current.get_source_display %}Recorded (version {{ version }}, by {{ source }}){% endblocktranslate %}{% else %}{% translate "Not chosen yet: the defaults apply after the deadline" %}{% endif %}</dd>
+    </dl>
+    {% if closed %}{% include "components/alert.html" with level="warning" message=_("The deadline has passed. The defaults apply unless staff change them for you.") live="polite" only %}{% endif %}
+
+    <section aria-labelledby="floor-heading">
+      <h2 id="floor-heading">{% translate "What always stays" %}</h2>
+      <p data-legal-floor>{% translate "Whatever you choose, what a legal retention duty requires stays on the platform and is flagged in the migration report: it is never silently dropped." %}</p>
+      <p data-restricted-archive>{% blocktranslate with years=restricted_years %}Your choice decides only what is active and visible to you. All orders of the last {{ years }} years are migrated anyway, in a restricted tax-only state: only the platform Tax and Audit permission can see them, they are hidden from the normal screens, and they are deleted automatically at {{ years }} years. Older orders are only anonymised, or not migrated.{% endblocktranslate %}</p>
+      <p>{% translate "A customer with no order inside the chosen period and no recent login is not migrated." %}</p>
+    </section>
+
+    <section aria-labelledby="choice-heading">
+      <h2 id="choice-heading">{% translate "Your choice" %}</h2>
+      {% include "components/error_summary.html" with form=form autofocus=True only %}
+      {% if can_edit %}
+        <form method="post" action="{{ post_url }}" class="manager-form" novalidate>
+          {% csrf_token %}
+          <input type="hidden" name="vendor" value="{{ vendor.public_id }}">
+          {% for field in form.visible_fields %}{% include "components/field.html" with field=field only %}{% endfor %}
+          {% include "components/button.html" with label=_("Save my choice") type="submit" only %}
+        </form>
+      {% else %}
+        <p>{% translate "This choice can no longer be changed here." %}</p>
+      {% endif %}
+    </section>
+
+    {% if history %}
+      <section aria-labelledby="history-heading">
+        <h2 id="history-heading">{% translate "Versions" %}</h2>
+        <div class="table-scroll" role="region" aria-labelledby="history-caption" tabindex="0">
+          <table class="table">
+            <caption id="history-caption">{% translate "Versions of this choice" %}</caption>
+            <thead><tr>
+              <th scope="col">{% translate "Version" %}</th>
+              <th scope="col">{% translate "Recorded by" %}</th>
+              <th scope="col">{% translate "Period (months)" %}</th>
+              <th scope="col">{% translate "Login window (months)" %}</th>
+              <th scope="col">{% translate "Recorded" %}</th>
+            </tr></thead>
+            <tbody>
+              {% for item in history %}<tr>
+                <th scope="row">{{ item.version }}</th>
+                <td>{{ item.get_source_display }}</td>
+                <td>{% if item.period_months %}{{ item.period_months }}{% else %}{% translate "All" %}{% endif %}</td>
+                <td>{{ item.login_window_months }}</td>
+                <td>{{ item.created_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+              </tr>{% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {% endif %}
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Staff view of the vendors' migration choices (MIG.16). Read for every platform role; the owner
+can open a vendor and enter its choice on its behalf. No inline script or style (strict CSP).
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Migration choices" %}</h1>
+  {% if not run %}
+    <p>{% translate "No migration is scheduled yet." %}</p>
+  {% else %}
+    <p class="manager-lead">{% blocktranslate with label=run.label date=deadline|date:"DATE_FORMAT" %}Migration {{ label }}: vendors choose by {{ date }}.{% endblocktranslate %}</p>
+    <div class="table-scroll" role="region" aria-labelledby="choices-caption" tabindex="0">
+      <table class="table">
+        <caption id="choices-caption">{% translate "Migration choices by vendor" %}</caption>
+        <thead><tr>
+          <th scope="col">{% translate "Vendor" %}</th>
+          <th scope="col">{% translate "Status" %}</th>
+          <th scope="col">{% translate "Period (months)" %}</th>
+          <th scope="col">{% translate "Login window (months)" %}</th>
+        </tr></thead>
+        <tbody>
+          {% for row in rows %}<tr>
+            <th scope="row"><a href="{{ row.url }}">{{ row.vendor.display_name }}</a></th>
+            <td>{% if row.choice %}{{ row.choice.get_source_display }} (v{{ row.choice.version }}){% else %}{% translate "Not chosen" %}{% endif %}</td>
+            <td>{% if row.choice %}{% if row.choice.period_months %}{{ row.choice.period_months }}{% else %}{% translate "All" %}{% endif %}{% endif %}</td>
+            <td>{% if row.choice %}{{ row.choice.login_window_months }}{% endif %}</td>
+          </tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+{% endblock %}

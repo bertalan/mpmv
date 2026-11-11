@@ -5,9 +5,11 @@ from typing import Any
 from django import forms
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 from wagtail.admin.rich_text import DraftailRichTextArea
 from wagtail.rich_text import features as feature_registry
 
+from apps.ingest import engine as ingest_engine
 from apps.orders import engine as orders_engine
 from apps.vendors.engine import LOGO_ALT_MAX_LENGTH, PROFILE_MAX_LENGTH
 
@@ -129,3 +131,81 @@ class ShipmentForm(forms.Form):
             return orders_engine.normalise_carrier(self.cleaned_data["carrier"])
         except orders_engine.InvalidTracking:
             raise forms.ValidationError(_("Enter a valid carrier name."), code="invalid") from None
+
+
+ALL_PERIODS = "all"
+
+
+def _window_choices() -> list[tuple[int, str]]:
+    return [
+        (m, ngettext("%(count)d month", "%(count)d months", m) % {"count": m})
+        for m in ingest_engine.LOGIN_WINDOWS
+    ]
+
+
+class MigrationChoiceForm(forms.Form):
+    """What to migrate to the new platform (MIG.16). The engine and the service re-validate."""
+
+    period = forms.ChoiceField(
+        label=_("Period of orders to keep active"),
+        choices=[
+            *(
+                (str(m), _("Last %(count)d months") % {"count": m})
+                for m in ingest_engine.PERIOD_CHOICES
+            ),
+            (ALL_PERIODS, _("All orders")),
+        ],
+        widget=forms.RadioSelect,
+        help_text=_("Older orders are kept for the legal retention period, but not active."),
+    )
+    data_types = forms.MultipleChoiceField(
+        label=_("Data to migrate"),
+        choices=[
+            (ingest_engine.DATA_ORDERS, _("Orders")),
+            (ingest_engine.DATA_CUSTOMERS, _("The customers of those orders")),
+            (ingest_engine.DATA_PRODUCTS, _("Products")),
+            (ingest_engine.DATA_REVIEWS, _("Product reviews")),
+        ],
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        help_text=_("A customer with no order in the chosen period is not migrated."),
+    )
+    include_unpublished = forms.BooleanField(
+        label=_("Bring drafts and archived products along, as hidden products"),
+        required=False,
+    )
+    login_window_months = forms.TypedChoiceField(
+        label=_("Customers who logged in within"),
+        choices=_window_choices,
+        coerce=int,
+        help_text=_(
+            "A customer account is migrated when it has an order in the last 24 months or a "
+            "login within this window."
+        ),
+    )
+
+    def clean(self) -> dict[str, Any]:
+        data = super().clean() or {}
+        if not self.errors:
+            for name, message in ingest_engine.validate_choice(self.to_values()).items():
+                self.add_error(name if name in self.fields else None, message)
+        return data
+
+    def to_values(self) -> ingest_engine.ChoiceValues:
+        data = self.cleaned_data
+        period = data["period"]
+        return ingest_engine.ChoiceValues(
+            period_months=None if period == ALL_PERIODS else int(period),
+            data_types=ingest_engine.normalise_data_types(data["data_types"]),
+            include_unpublished=data["include_unpublished"],
+            login_window_months=data["login_window_months"],
+        )
+
+    @classmethod
+    def initial_for(cls, values: ingest_engine.ChoiceValues) -> dict[str, object]:
+        return {
+            "period": ALL_PERIODS if values.period_months is None else str(values.period_months),
+            "data_types": list(values.data_types),
+            "include_unpublished": values.include_unpublished,
+            "login_window_months": values.login_window_months,
+        }

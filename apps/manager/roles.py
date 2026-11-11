@@ -103,6 +103,7 @@ MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
     "platform.moderation": {CATALOG: E, OWNER: R},
     "platform.notices": {CATALOG: E, OWNER: R},  # CMP.5; still gated by compliance.review_notices
     "platform.vendors": {CONFIG: R, CATALOG: R, FINANCE: R, SUPPORT: R, OWNER: E},
+    "platform.migration": {CONFIG: R, CATALOG: R, FINANCE: R, SUPPORT: A, OWNER: E},  # MIG.16
     "platform.vendor_approval": {CATALOG: E, OWNER: E},
     "platform.vendor_closure": {OWNER: E},
     "platform.orders_customers": {FINANCE: R, SUPPORT: RA, OWNER: R},
@@ -124,6 +125,7 @@ SECTION_LABELS: Final[Mapping[str, str]] = {
     "platform.moderation": "Platform: moderation (vendor events, storefront changes, content)",
     "platform.notices": "Platform: notices of illegal content (CMP.5)",
     "platform.vendors": "Platform: vendors (applications, plans)",
+    "platform.migration": "Platform: vendor migration choices (MIG.16)",
     "platform.vendor_approval": "Platform: approve or suspend a vendor (step-up, reason)",
     "platform.vendor_closure": "Platform: close a vendor definitively",
     "platform.orders_customers": "Platform: orders and customers",

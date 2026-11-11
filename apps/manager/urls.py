@@ -7,7 +7,7 @@ outside `/manager/`.
 
 from django.urls import include, path
 
-from . import media, notice_views, views
+from . import media, migration_views, notice_views, views
 
 app_name = "manager"
 
@@ -23,6 +23,11 @@ shop = (
             name="order_action",
         ),
         path("vendor/", views.VendorPickerView.as_view(), name="vendor"),
+        path(
+            "migration/",
+            migration_views.ShopMigrationChoiceView.as_view(),
+            name="migration",
+        ),
         # The image chooser of the storefront editor (VEN.31, D-34): Wagtail's modal protocol.
         path("media/images/", media.ManagerImageChooseView.as_view(), name="image_choose"),
         path(
@@ -48,6 +53,16 @@ platform = (
         path("", views.PlatformDashboardView.as_view(), name="dashboard"),
         path("notices/", notice_views.NoticeListView.as_view(), name="notices"),
         path("notices/<uuid:public_id>/", notice_views.NoticeDetailView.as_view(), name="notice"),
+        path(
+            "migration/",
+            migration_views.PlatformMigrationListView.as_view(),
+            name="migration_choices",
+        ),
+        path(
+            "migration/<uuid:public_id>/",
+            migration_views.PlatformMigrationChoiceView.as_view(),
+            name="migration_choice",
+        ),
     ],
     "platform",
 )

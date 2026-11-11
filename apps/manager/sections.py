@@ -7,6 +7,9 @@ whose role checks CORE.18 defines.
 
 from django.utils.translation import gettext_lazy as _
 
+from .migration_views import PLATFORM_SECTION as MIGRATION_PLATFORM_SECTION
+from .migration_views import SHOP_SECTION as MIGRATION_SHOP_SECTION
+from .migration_views import can_read_choices
 from .navigation import Registry, Section, anyone, vendor_action
 from .notice_views import SECTION as NOTICES_SECTION
 from .notice_views import can_review
@@ -49,6 +52,15 @@ BUILT_IN = (
         order=30,
         allowed=vendor_action("orders"),
     ),
+    # MIG.16: the owner chooses what to migrate; it is personal data scope, so owners only.
+    Section(
+        MIGRATION_SHOP_SECTION,
+        Space.SHOP,
+        _("Migration choices"),
+        "manager:shop:migration",
+        order=40,
+        allowed=vendor_action("profile"),
+    ),
     # The vendor picker: reached from the header, so not in the menu, and before any choice.
     Section(
         "shop.vendor",
@@ -75,6 +87,14 @@ BUILT_IN = (
         "manager:platform:notices",
         order=60,
         allowed=can_review,
+    ),
+    Section(
+        MIGRATION_PLATFORM_SECTION,
+        Space.PLATFORM,
+        _("Migration choices"),
+        "manager:platform:migration_choices",
+        order=70,
+        allowed=can_read_choices,
     ),
 )
 

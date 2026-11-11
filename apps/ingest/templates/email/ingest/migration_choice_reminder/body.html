@@ -1,0 +1,7 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% blocktranslate %}{{ vendor_name }} has not yet chosen what to migrate to the new platform. The choice is due on {{ deadline }} ({{ days_left }} days left). After that date the defaults apply: the last 24 months of orders, all data types, no drafts or archived products, and a login window of 12 months.{% endblocktranslate %}</p>
+<p>{% translate "Sign in to the Manager and open Migration choices to record your choice." %}</p>
+</body>
+</html>

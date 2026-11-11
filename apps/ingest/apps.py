@@ -7,7 +7,14 @@ class IngestConfig(AppConfig):
 
     # Audit policy (SEC.4, docs/dev/audit-trail.md). Sources, mappings, runs and review
     # decisions change what the catalogue imports: written through the audited services.
-    audited_models = ("suppliersource", "importrun", "reviewitem", "mappingtable")
+    audited_models = (
+        "suppliersource",
+        "importrun",
+        "reviewitem",
+        "mappingtable",
+        "migrationrun",
+        "migrationchoice",
+    )
     unaudited_models = {
         "sourceitem": "staging row rebuilt from the supplier feed on every run",
         "sourceobservation": "append-only copy of what the supplier published",

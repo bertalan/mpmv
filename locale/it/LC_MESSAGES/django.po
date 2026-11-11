@@ -14,6 +14,12 @@ msgid_plural "%(action)s: %(count)d rows done."
 msgstr[0] "%(action)s: %(count)d riga completata."
 msgstr[1] "%(action)s: %(count)d righe completate."
 
+#: apps/manager/forms.py
+msgid "%(count)d month"
+msgid_plural "%(count)d months"
+msgstr[0] "%(count)d mese"
+msgstr[1] "%(count)d mesi"
+
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "%(counter)s unused."
 msgid_plural "%(counter)s unused."
@@ -33,6 +39,26 @@ msgstr "%(vendor_name)s ha spedito la sua parte dell’ordine %(order_number)s."
 #: apps/orders/templates/email/orders/vendor_new_order/body.txt
 msgid "%(vendor_name)s: new paid order %(order_number)s to ship:"
 msgstr "%(vendor_name)s: nuovo ordine pagato %(order_number)s da spedire:"
+
+#: apps/manager/forms.py
+msgid ""
+"A customer account is migrated when it has an order in the last 24 months or"
+" a login within this window."
+msgstr ""
+"Un account cliente viene migrato se ha un ordine negli ultimi 24 mesi o un "
+"accesso entro questa finestra."
+
+#: apps/manager/forms.py
+msgid "A customer with no order in the chosen period is not migrated."
+msgstr "Un cliente senza ordini nel periodo scelto non viene migrato."
+
+#: apps/manager/templates/manager/migration.html
+msgid ""
+"A customer with no order inside the chosen period and no recent login is not"
+" migrated."
+msgstr ""
+"Un cliente senza ordini nel periodo scelto e senza accessi recenti non viene"
+" migrato."
 
 #: apps/manager/forms.py
 msgid "About the shop"
@@ -67,10 +93,16 @@ msgid "Add another factor before removing your last one."
 msgstr "Aggiungi un altro fattore prima di rimuovere l’ultimo."
 
 #: apps/manager/templates/manager/list.html
+#: apps/manager/templates/manager/migration.html
+#: apps/manager/templates/manager/platform/migration_choices.html
 #: apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "All"
 msgstr "Tutti"
+
+#: apps/manager/forms.py
+msgid "All orders"
+msgstr "Tutti gli ordini"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Anonymous"
@@ -106,6 +138,10 @@ msgstr "Torna agli ordini"
 msgid "Back to the site"
 msgstr "Torna al sito"
 
+#: apps/manager/templates/manager/migration.html
+msgid "Back to the vendors"
+msgstr "Torna ai venditori"
+
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 msgid "Back to two-factor settings"
 msgstr "Torna alle impostazioni della verifica in due passaggi"
@@ -113,6 +149,10 @@ msgstr "Torna alle impostazioni della verifica in due passaggi"
 #: themes/base/templates/400.html
 msgid "Bad request"
 msgstr "Richiesta non valida"
+
+#: apps/manager/forms.py
+msgid "Bring drafts and archived products along, as hidden products"
+msgstr "Porta con te bozze e prodotti archiviati, come prodotti nascosti"
 
 #: apps/manager/templates/manager/bulk_preview.html
 msgid "Cancel"
@@ -139,6 +179,10 @@ msgstr "Corriere: %(carrier)s. Numero di tracking: %(tracking_number)s."
 #: apps/manager/templates/manager/shop/vendor_picker.html
 msgid "Choose a vendor"
 msgstr "Scegli un venditore"
+
+#: apps/manager/templates/manager/migration.html
+msgid "Choose by"
+msgstr "Scegli entro"
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Choose how you will confirm it is you after your password."
@@ -179,11 +223,19 @@ msgstr ""
 "I clienti vedono questo testo. Una modifica è visibile subito e i moderatori"
 " vengono avvisati."
 
+#: apps/manager/forms.py
+msgid "Customers who logged in within"
+msgstr "Clienti che hanno effettuato l'accesso negli ultimi"
+
 #: apps/manager/sections.py
 #: apps/manager/templates/manager/platform/dashboard.html
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Dashboard"
 msgstr "Dashboard"
+
+#: apps/manager/forms.py
+msgid "Data to migrate"
+msgstr "Dati da migrare"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Decided"
@@ -340,6 +392,10 @@ msgstr "Lingua"
 msgid "Language of the texts"
 msgstr "Lingua dei testi"
 
+#: apps/manager/forms.py
+msgid "Last %(count)d months"
+msgstr "Ultimi %(count)d mesi"
+
 #: themes/base/templates/components/footer.html
 msgid "Legal"
 msgstr "Note legali"
@@ -355,6 +411,11 @@ msgstr "Caricamento"
 #: apps/accounts/templates/accounts/admin/login.html
 msgid "Log in"
 msgstr "Accedi"
+
+#: apps/manager/templates/manager/migration.html
+#: apps/manager/templates/manager/platform/migration_choices.html
+msgid "Login window (months)"
+msgstr "Finestra di accesso (mesi)"
 
 #: apps/manager/templates/manager/shop/profile.html
 msgid "Logo"
@@ -403,6 +464,27 @@ msgstr ""
 msgid "Menu"
 msgstr "Menu"
 
+#: apps/manager/templates/manager/migration.html
+msgid "Migration"
+msgstr "Migrazione"
+
+#: apps/manager/templates/manager/platform/migration_choices.html
+msgid "Migration %(label)s: vendors choose by %(date)s."
+msgstr "Migrazione %(label)s: i venditori scelgono entro il %(date)s."
+
+#: apps/manager/migration_views.py
+msgid "Migration choice saved."
+msgstr "Scelta di migrazione salvata."
+
+#: apps/manager/sections.py apps/manager/templates/manager/migration.html
+#: apps/manager/templates/manager/platform/migration_choices.html
+msgid "Migration choices"
+msgstr "Scelte di migrazione"
+
+#: apps/manager/templates/manager/platform/migration_choices.html
+msgid "Migration choices by vendor"
+msgstr "Scelte di migrazione per venditore"
+
 #: apps/orders/templates/email/orders/vendor_new_order/subject.txt
 msgid "New paid order %(order_number)s"
 msgstr "Nuovo ordine pagato %(order_number)s"
@@ -423,6 +505,11 @@ msgstr "Nessun accesso"
 msgid "No logo yet."
 msgstr "Nessun logo per ora."
 
+#: apps/manager/templates/manager/migration.html
+#: apps/manager/templates/manager/platform/migration_choices.html
+msgid "No migration is scheduled yet."
+msgstr "Nessuna migrazione è ancora pianificata."
+
 #: apps/accounts/mfa_views.py
 msgid "no passkey registered"
 msgstr "nessuna passkey registrata"
@@ -439,7 +526,15 @@ msgstr "nessuna registrazione di passkey in corso"
 msgid "No second factor yet."
 msgstr "Nessun secondo fattore per ora."
 
-#: apps/manager/views.py
+#: apps/manager/templates/manager/platform/migration_choices.html
+msgid "Not chosen"
+msgstr "Non scelto"
+
+#: apps/manager/templates/manager/migration.html
+msgid "Not chosen yet: the defaults apply after the deadline"
+msgstr "Non ancora scelto: dopo la scadenza si applicano i valori predefiniti"
+
+#: apps/manager/migration_views.py apps/manager/views.py
 msgid "Nothing changed."
 msgstr "Nessuna modifica."
 
@@ -475,6 +570,12 @@ msgid "Notifier"
 msgstr "Segnalante"
 
 #: apps/manager/forms.py
+msgid "Older orders are kept for the legal retention period, but not active."
+msgstr ""
+"Gli ordini più vecchi sono conservati per il periodo legale, ma non sono "
+"attivi."
+
+#: apps/manager/forms.py
 msgid "One line under the shop name. Plain text."
 msgstr "Una riga sotto il nome del negozio. Testo semplice."
 
@@ -499,7 +600,8 @@ msgstr "Ordine %(order_number)s: una spedizione è in arrivo"
 msgid "Order %(order_number)s: confirmation from %(vendor_name)s"
 msgstr "Ordine %(order_number)s: conferma di %(vendor_name)s"
 
-#: apps/manager/sections.py apps/manager/templates/manager/shop/orders.html
+#: apps/manager/forms.py apps/manager/sections.py
+#: apps/manager/templates/manager/shop/orders.html
 msgid "Orders"
 msgstr "Ordini"
 
@@ -553,6 +655,15 @@ msgstr "Password"
 msgid "Payment received for order %(order_number)s"
 msgstr "Pagamento ricevuto per l’ordine %(order_number)s"
 
+#: apps/manager/templates/manager/migration.html
+#: apps/manager/templates/manager/platform/migration_choices.html
+msgid "Period (months)"
+msgstr "Periodo (mesi)"
+
+#: apps/manager/forms.py
+msgid "Period of orders to keep active"
+msgstr "Periodo di ordini da mantenere attivi"
+
 #: apps/manager/templates/manager/shop/order.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Placed"
@@ -594,7 +705,11 @@ msgstr "Indietro"
 msgid "Product"
 msgstr "Prodotto"
 
-#: apps/manager/templates/manager/shop/dashboard.html
+#: apps/manager/forms.py
+msgid "Product reviews"
+msgstr "Recensioni dei prodotti"
+
+#: apps/manager/forms.py apps/manager/templates/manager/shop/dashboard.html
 msgid "Products"
 msgstr "Prodotti"
 
@@ -622,6 +737,18 @@ msgstr "Registra la decisione"
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Record the notification"
 msgstr "Registra la comunicazione"
+
+#: apps/manager/templates/manager/migration.html
+msgid "Recorded"
+msgstr "Registrato"
+
+#: apps/manager/templates/manager/migration.html
+msgid "Recorded (version %(version)s, by %(source)s)"
+msgstr "Registrato (versione %(version)s, da %(source)s)"
+
+#: apps/manager/templates/manager/migration.html
+msgid "Recorded by"
+msgstr "Registrato da"
 
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Recovery code"
@@ -677,6 +804,10 @@ msgstr "Salva"
 #: apps/manager/templates/manager/shop/profile.html
 msgid "Save logo"
 msgstr "Salva logo"
+
+#: apps/manager/templates/manager/migration.html
+msgid "Save my choice"
+msgstr "Salva la mia scelta"
 
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid ""
@@ -766,6 +897,8 @@ msgstr "Avvia la revisione"
 msgid "Statements of reasons"
 msgstr "Motivazioni"
 
+#: apps/manager/templates/manager/migration.html
+#: apps/manager/templates/manager/platform/migration_choices.html
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/shop/order.html
@@ -807,6 +940,18 @@ msgstr ""
 #: apps/manager/notice_views.py
 msgid "The content is restricted and the vendor is told."
 msgstr "Il contenuto è limitato e il venditore ne è informato."
+
+#: apps/manager/forms.py
+msgid "The customers of those orders"
+msgstr "I clienti di quegli ordini"
+
+#: apps/manager/templates/manager/migration.html
+msgid ""
+"The deadline has passed. The defaults apply unless staff change them for "
+"you."
+msgstr ""
+"La scadenza è passata. Si applicano i valori predefiniti, salvo modifica "
+"dello staff per tuo conto."
 
 #: apps/manager/notice_views.py
 msgid "The decision is recorded and the notifier is told."
@@ -909,6 +1054,10 @@ msgstr "Questa azione non modifica nulla."
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "This browser does not support passkeys."
 msgstr "Questo browser non supporta le passkey."
+
+#: apps/manager/templates/manager/migration.html
+msgid "This choice can no longer be changed here."
+msgstr "Questa scelta non può più essere modificata qui."
 
 #: apps/accounts/views.py
 msgid "This content is not available in this language."
@@ -1015,6 +1164,8 @@ msgstr ""
 "Usa il blocco schermo di questo dispositivo o una chiave di sicurezza."
 
 #: apps/manager/templates/manager/layout.html
+#: apps/manager/templates/manager/migration.html
+#: apps/manager/templates/manager/platform/migration_choices.html
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Vendor"
 msgstr "Venditore"
@@ -1030,6 +1181,18 @@ msgstr "Verifica"
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Verify it is you"
 msgstr "Verifica la tua identità"
+
+#: apps/manager/templates/manager/migration.html
+msgid "Version"
+msgstr "Versione"
+
+#: apps/manager/templates/manager/migration.html
+msgid "Versions"
+msgstr "Versioni"
+
+#: apps/manager/templates/manager/migration.html
+msgid "Versions of this choice"
+msgstr "Versioni di questa scelta"
 
 #: themes/base/templates/components/alert.html
 msgid "Warning"
@@ -1062,6 +1225,24 @@ msgstr ""
 "Abbiamo ricevuto il tuo pagamento di %(total)s EUR per l’ordine "
 "%(order_number)s. Ogni venditore preparerà la sua parte e riceverai un "
 "messaggio quando verrà spedita."
+
+#: apps/manager/templates/manager/migration.html
+msgid "What %(vendor)s brings to the new platform."
+msgstr "Ciò che %(vendor)s porta sulla nuova piattaforma."
+
+#: apps/manager/templates/manager/migration.html
+msgid "What always stays"
+msgstr "Ciò che resta sempre"
+
+#: apps/manager/templates/manager/migration.html
+msgid ""
+"Whatever you choose, what a legal retention duty requires stays on the "
+"platform and is flagged in the migration report: it is never silently "
+"dropped."
+msgstr ""
+"Qualunque cosa tu scelga, ciò che un obbligo legale di conservazione "
+"richiede resta sulla piattaforma ed è segnalato nel rapporto di migrazione: "
+"non viene mai scartato in silenzio."
 
 #: apps/manager/templates/manager/shop/vendor_picker.html
 msgid ""
@@ -1100,6 +1281,25 @@ msgid "You have %(counter)s unused recovery code."
 msgid_plural "You have %(counter)s unused recovery codes."
 msgstr[0] "Hai %(counter)s codice di recupero non usato."
 msgstr[1] "Hai %(counter)s codici di recupero non usati."
+
+#: apps/manager/templates/manager/migration.html
+msgid "Your choice"
+msgstr "La tua scelta"
+
+#: apps/manager/templates/manager/migration.html
+msgid ""
+"Your choice decides only what is active and visible to you. All orders of "
+"the last %(years)s years are migrated anyway, in a restricted tax-only "
+"state: only the platform Tax and Audit permission can see them, they are "
+"hidden from the normal screens, and they are deleted automatically at "
+"%(years)s years. Older orders are only anonymised, or not migrated."
+msgstr ""
+"La tua scelta decide solo ciò che è attivo e visibile a te. Tutti gli ordini"
+" degli ultimi %(years)s anni vengono comunque migrati, in uno stato "
+"riservato solo fiscale: li vede solo il permesso Fiscale e Audit della "
+"piattaforma, sono nascosti nelle schermate normali e vengono eliminati "
+"automaticamente dopo %(years)s anni. Gli ordini più vecchi vengono solo "
+"anonimizzati, oppure non migrati."
 
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Your factors"

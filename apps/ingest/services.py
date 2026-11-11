@@ -4,6 +4,7 @@ Every mutating service takes `ctx` (who acts) and `dry_run`, returns the `Change
 what it applies. Rows are changed in place so the caller keeps using the instance.
 """
 
+import datetime as dt
 from collections.abc import Mapping
 from typing import Any
 
@@ -14,13 +15,22 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.catalog.models import Product, SkuAlias, Variant
-from apps.core.audit import AuditContext
+from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
-from apps.core.services import run_mutation, save_audited
-from apps.vendors.models import Vendor
+from apps.core.models import AuditLog
+from apps.core.services import enqueue_email, run_mutation, save_audited
+from apps.vendors.models import Vendor, VendorMember
 
 from . import engine
-from .models import ImportRun, MappingTable, ReviewItem, SourceItem, SupplierSource
+from .models import (
+    ImportRun,
+    MappingTable,
+    MigrationChoice,
+    MigrationRun,
+    ReviewItem,
+    SourceItem,
+    SupplierSource,
+)
 
 RUN_CREATED = "ingest.run.created"
 RUN_STATUS_CHANGED = "ingest.run.status_changed"
@@ -31,6 +41,12 @@ MAPPING_UPDATED = "ingest.mapping.updated"
 MAPPING_DELETED = "ingest.mapping.deleted"
 SOURCE_CREATED = "ingest.source.created"
 SOURCE_UPDATED = "ingest.source.updated"
+MIGRATION_RUN_CREATED = "ingest.migration_run.created"
+MIGRATION_CHOICE_RECORDED = "ingest.migration_choice.recorded"
+MIGRATION_CHOICE_DEFAULTED = "ingest.migration_choice.defaulted"
+MIGRATION_CHOICE_REMINDER = "ingest.migration_choice.reminder_sent"
+MIGRATION_CHOICE_DENIED = "ingest.migration_choice.access_denied"
+MIGRATION_REMINDER_TEMPLATE = "ingest.migration_choice_reminder"
 
 
 class WriteNotEnabled(Exception):
@@ -367,3 +383,225 @@ def delete_mapping(entry: MappingTable, *, ctx: AuditContext, dry_run: bool = Fa
     changes = ChangeSet()
     changes.delete("ingest.mappingtable", str(entry.public_id), mapping_snapshot(entry))
     return run_mutation(changes, entry.delete, ctx=ctx, action=MAPPING_DELETED, dry_run=dry_run)
+
+
+# --- Vendor migration choices (MIG.16)
+
+
+class ChoiceClosed(Exception):
+    """The vendor's choice deadline has passed: the defaults apply, the vendor can no longer
+    change them (staff can, on the vendor's behalf)."""
+
+
+class ChoiceMissing(Exception):
+    """No migration choice is recorded for the vendor and run: the dry run must not start."""
+
+
+def choice_snapshot(choice: MigrationChoice) -> dict[str, Any]:
+    return {
+        "vendor": _vendor_key(choice.vendor),
+        "run": choice.run.label,
+        "version": choice.version,
+        **engine.choice_snapshot(choice.values),
+        "source": choice.source,
+    }
+
+
+def create_run(
+    label: str, cutover_at: dt.datetime, *, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Plan a migration cutover; vendors record their choices against it."""
+    run = MigrationRun(label=label, cutover_at=cutover_at)
+    run.full_clean(validate_unique=True)
+    changes = ChangeSet()
+    snapshot = {"label": label, "cutover_at": cutover_at, "choice_deadline": run.choice_deadline}
+    changes.create(MigrationRun._meta.label_lower, str(run.public_id), snapshot)
+    return run_mutation(changes, run.save, ctx=ctx, action=MIGRATION_RUN_CREATED, dry_run=dry_run)
+
+
+def active_run(now: dt.datetime) -> MigrationRun | None:
+    """The next cutover not yet passed (the one vendors are choosing for)."""
+    return MigrationRun.objects.filter(cutover_at__gt=now).order_by("cutover_at", "id").first()
+
+
+def current_choice(vendor: Vendor, run: MigrationRun) -> MigrationChoice | None:
+    """The latest version of the vendor's choice for `run`, if any."""
+    return (
+        MigrationChoice.objects.filter(vendor=vendor, run=run)
+        .select_related("vendor", "run")
+        .order_by("-version")
+        .first()
+    )
+
+
+def choice_history(vendor: Vendor, run: MigrationRun) -> list[MigrationChoice]:
+    return list(
+        MigrationChoice.objects.filter(vendor=vendor, run=run)
+        .select_related("vendor", "run")
+        .order_by("version")
+    )
+
+
+def require_recorded_choice(vendor: Vendor, run: MigrationRun) -> MigrationChoice:
+    """The guard the dry run and the loaders (MIG.3, MIG.4) call first: a recorded choice
+    (a default applied after the deadline counts) or `ChoiceMissing`."""
+    choice = current_choice(vendor, run)
+    if choice is None:
+        raise ChoiceMissing(f"No migration choice recorded for {vendor} and run {run.label}.")
+    return choice
+
+
+def record_choice(
+    vendor: Vendor,
+    run: MigrationRun,
+    values: engine.ChoiceValues,
+    *,
+    source: str,
+    ctx: AuditContext,
+    actor: User | None = None,
+    now: dt.datetime | None = None,
+    dry_run: bool = False,
+) -> ChangeSet:
+    """Record a new version of the vendor's choice and audit it with the previous value.
+
+    Values are checked against the allowed lists (`ValidationError` otherwise). A vendor cannot
+    record after the deadline (`ChoiceClosed`); staff and the deadline job can. Saving the same
+    values from the same source again changes nothing.
+    """
+    errors = engine.validate_choice(values)
+    if errors:
+        raise ValidationError(errors)
+    if source not in engine.CHOICE_SOURCES:
+        raise ValueError(f"unknown choice source {source!r}")
+    moment = now or timezone.now()
+    if source == engine.SOURCE_VENDOR and moment >= run.choice_deadline:
+        raise ChoiceClosed(f"The choice for {run.label} closed on {run.choice_deadline:%Y-%m-%d}.")
+    changes = ChangeSet()
+    with transaction.atomic():
+        Vendor.objects.select_for_update().get(pk=vendor.pk)  # serialises versions per vendor
+        previous = current_choice(vendor, run)
+        if previous is not None and previous.values == values and previous.source == source:
+            return changes
+        choice = MigrationChoice(
+            vendor=vendor,
+            run=run,
+            version=1 if previous is None else previous.version + 1,
+            period_months=values.period_months,
+            data_types=list(values.data_types),
+            include_unpublished=values.include_unpublished,
+            login_window_months=values.login_window_months,
+            source=source,
+            decided_by=actor if source != engine.SOURCE_DEFAULT else None,
+        )
+        changes.create(
+            MigrationChoice._meta.label_lower,
+            f"{vendor.public_id}/{run.label}/{choice.version}",
+            choice_snapshot(choice),
+            supersedes=None if previous is None else choice_snapshot(previous),
+        )
+        action = (
+            MIGRATION_CHOICE_DEFAULTED
+            if source == engine.SOURCE_DEFAULT
+            else MIGRATION_CHOICE_RECORDED
+        )
+        return run_mutation(changes, choice.save, ctx=ctx, action=action, dry_run=dry_run)
+
+
+def apply_defaults(
+    run: MigrationRun, *, now: dt.datetime, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """After the deadline, record the defaults for every open vendor that has not chosen.
+
+    Each default is a choice version with source "default" and its own audit entry. Running it
+    again changes nothing.
+    """
+    combined = ChangeSet()
+    if now < run.choice_deadline:
+        return combined
+    chosen = MigrationChoice.objects.filter(run=run).values("vendor_id")
+    pending = Vendor.objects.exclude(status=Vendor.Status.CLOSED).exclude(pk__in=chosen)
+    for vendor in pending.order_by("pk"):
+        result = record_choice(
+            vendor,
+            run,
+            engine.DEFAULT_CHOICE,
+            source=engine.SOURCE_DEFAULT,
+            ctx=ctx,
+            now=now,
+            dry_run=dry_run,
+        )
+        combined.changes.extend(result.changes)
+    return combined
+
+
+def _reminder_target(run: MigrationRun, vendor: Vendor) -> str:
+    return f"{run.public_id}/{vendor.public_id}"
+
+
+def send_reminders(
+    run: MigrationRun, *, now: dt.datetime, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Remind the owners of every open vendor with no choice yet, before the deadline.
+
+    One reminder per vendor and offset (14, 7 and 1 days before the deadline), through the email
+    outbox, each with one audit entry (vendor, run, offset and number of recipients; never an
+    address). Running it again in the same window sends nothing.
+    """
+    combined = ChangeSet()
+    offset = engine.due_reminder(now, run.choice_deadline)
+    if offset is None:
+        return combined
+    chosen = MigrationChoice.objects.filter(run=run).values("vendor_id")
+    pending = Vendor.objects.exclude(status=Vendor.Status.CLOSED).exclude(pk__in=chosen)
+    for vendor in pending.order_by("pk"):
+        target = _reminder_target(run, vendor)
+        if AuditLog.objects.filter(
+            action=MIGRATION_CHOICE_REMINDER, target_key=target, after__offset_days=offset
+        ).exists():
+            continue
+        owners = list(
+            VendorMember.objects.filter(vendor=vendor, role=VendorMember.Role.OWNER).select_related(
+                "user"
+            )
+        )
+        after = {
+            "vendor": _vendor_key(vendor),
+            "run": run.label,
+            "offset_days": offset,
+            "recipients": len(owners),
+        }
+        combined.create(MigrationChoice._meta.label_lower + ".reminder", target, after)
+        if dry_run:
+            continue
+        with transaction.atomic():
+            for member in owners:
+                enqueue_email(
+                    recipient=member.user.email,
+                    template_key=MIGRATION_REMINDER_TEMPLATE,
+                    language=member.user.preferred_language,
+                    context={
+                        "vendor_name": vendor.display_name,
+                        "deadline": run.choice_deadline.date().isoformat(),
+                        "days_left": (run.choice_deadline - now).days,
+                    },
+                    idempotency_key=f"mig16:{run.public_id}:{vendor.public_id}:{offset}:"
+                    f"{member.user.public_id}",
+                )
+            record(
+                ctx,
+                MIGRATION_CHOICE_REMINDER,
+                MigrationChoice._meta.label_lower,
+                target,
+                None,
+                after,
+            )
+    return combined
+
+
+def record_denied_access(*, ctx: AuditContext, own_vendor: Vendor, requested: str) -> None:
+    """Audit an attempt to read or change another vendor's migration choice (answered 404).
+
+    Attributed to the caller's own vendor; the requested id is kept as typed, cut to 64 chars.
+    """
+    after = {"vendor": _vendor_key(own_vendor), "requested_vendor": requested[:64]}
+    record(ctx, MIGRATION_CHOICE_DENIED, MigrationChoice._meta.label_lower, "", None, after)
