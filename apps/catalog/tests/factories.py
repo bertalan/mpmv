@@ -23,6 +23,7 @@ from apps.catalog.models import (
     BrandTranslation,
     Category,
     CategoryTranslation,
+    Manufacturer,
     Product,
     ProductAttribute,
     ProductTranslation,
@@ -225,6 +226,13 @@ class BrandFactory(DjangoModelFactory[Brand]):
         model = Brand
 
     name = factory.Sequence(lambda n: f"Brand {n}")
+
+
+class ManufacturerFactory(DjangoModelFactory[Manufacturer]):
+    class Meta:
+        model = Manufacturer
+
+    legal_name = factory.Sequence(lambda n: f"Maker {n} Ltd")
 
 
 class BrandTranslationFactory(DjangoModelFactory[BrandTranslation]):
