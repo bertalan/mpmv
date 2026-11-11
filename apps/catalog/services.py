@@ -1805,7 +1805,9 @@ def _term_anchor(term: Term, language: str) -> ListingAnchor:
 
 def brand_anchor(slug: str, language: str) -> ListingAnchor | None:
     """The brand page at `/brand/{slug}/`; None when there is none."""
-    found = _by_slug(BrandTranslation.objects.select_related("brand"), slug, language)
+    # A pending or rejected brand (CAT.20) has no public page.
+    approved = BrandTranslation.objects.filter(brand__status=Brand.Status.APPROVED)
+    found = _by_slug(approved.select_related("brand"), slug, language)
     if found is None:
         return None
     return _brand_anchor(found.brand)
