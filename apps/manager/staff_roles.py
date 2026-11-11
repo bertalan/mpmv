@@ -101,7 +101,19 @@ def grant_role(
     """Give `target` the platform role `role_key`; a role already held is a no-op."""
     _authorise(actor)
     _check_role(role_key)
-    reason = reason.strip()
+    # The eligibility checks and the change run in one transaction with the target row locked, so
+    # a concurrent change to the account (vendor membership, an order, deactivation) cannot slip
+    # between the check and the grant.
+    with transaction.atomic():
+        locked = type(target).objects.select_for_update().get(pk=target.pk)
+        return _grant_locked(
+            locked, role_key, actor=actor, ctx=ctx, reason=reason.strip(), dry_run=dry_run
+        )
+
+
+def _grant_locked(
+    target: Any, role_key: str, *, actor: Any, ctx: AuditContext, reason: str, dry_run: bool
+) -> ChangeSet:
     if not target.is_active:
         raise RoleAssignmentError("That account is inactive.")
     if is_vendor_member(target):

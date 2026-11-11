@@ -86,22 +86,28 @@ def role_drift() -> list[str]:
 
 
 def role_conflicts() -> list[str]:
-    """Users in a role group who are vendor members or have no admin access (manager.E005)."""
+    """Users in a role group who are vendor members, customers or have no admin access (E005).
+
+    A customer is an account with orders: the assignment service refuses it, but the Django admin
+    can still put one in a role group, so the check reports it.
+    """
     from django.contrib.auth import get_user_model
     from django.db.models import Q
 
+    from apps.orders.models import Order
     from apps.vendors.models import VendorMember
 
     members = VendorMember.objects.values("user_id")
+    buyers = Order.objects.values("customer_id")
     bad = (
         get_user_model()
         .objects.filter(groups__name__in=roles.group_names())
-        .filter(Q(pk__in=members) | Q(is_staff=False, is_superuser=False))
+        .filter(Q(pk__in=members) | Q(pk__in=buyers) | Q(is_staff=False, is_superuser=False))
         .distinct()
     )
     return [
-        f"{user.get_username()} is in a platform role group but is a vendor member or has no "
-        "admin access; platform roles never mix with vendor membership"
+        f"{user.get_username()} is in a platform role group but is a vendor member, a customer "
+        "or has no admin access; platform roles never mix with vendor membership or shopping"
         for user in bad
     ]
 

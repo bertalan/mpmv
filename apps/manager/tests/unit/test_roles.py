@@ -16,7 +16,7 @@ EXPECTED = {
     },
     "finance": {"manager.platform_finance", "vendors.view_all_vendors"},
     "support": {"manager.platform_support", "vendors.view_all_vendors"},
-    "owner": {"core.platform_owner", "vendors.view_all_vendors"},
+    "owner": {"core.platform_owner", "vendors.view_all_vendors", "compliance.review_notices"},
 }
 
 

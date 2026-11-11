@@ -95,6 +95,14 @@ def test_a_customer_account_is_refused_a_role() -> None:
     assert not customer.is_staff
 
 
+def test_a_superuser_account_without_is_staff_is_eligible() -> None:
+    target = UserFactory.create(superuser=True)
+    target.is_staff = False
+    target.save(update_fields=["is_staff"])
+    staff_roles.grant_role(target, "support", actor=staff("owner"), ctx=CTX)
+    assert held(target) == {"support"}
+
+
 def test_an_account_with_orders_is_refused_even_when_marked_staff() -> None:
     from apps.orders.tests.factories import OrderFactory
 

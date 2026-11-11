@@ -82,7 +82,7 @@ ROLES: Final[tuple[Role, ...]] = (
         OWNER,
         "Platform: owner",
         "Platform owner",
-        (PLATFORM_OWNER_PERMISSION, VIEW_ALL_VENDORS_PERMISSION),
+        (PLATFORM_OWNER_PERMISSION, VIEW_ALL_VENDORS_PERMISSION, REVIEW_NOTICES_PERMISSION),
     ),
 )
 
