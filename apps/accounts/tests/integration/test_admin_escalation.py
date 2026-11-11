@@ -44,8 +44,8 @@ def attacker() -> User:
     )
 
 
-def login(client: Client, user: User, *, fresh: bool = False) -> None:
-    verified_login(client, user, verified_at=None if fresh else STALE)
+def login(client: Client, user: User, *, fresh: bool = False, passkey: bool = False) -> None:
+    verified_login(client, user, verified_at=None if fresh else STALE, passkey=passkey)
 
 
 def user_form(user: User, **overrides: Any) -> dict[str, Any]:
@@ -244,7 +244,7 @@ def test_staff_can_still_reset_mfa_of_a_customer_after_stepping_up(
 ) -> None:
     customer = UserFactory.create(email="customer@example.com")
     TOTPDeviceFactory.create(user=customer)
-    login(client, attacker, fresh=True)
+    login(client, attacker, fresh=True, passkey=True)
     _reset_mfa(client, customer)
     assert not services.has_second_factor(customer)
 
@@ -252,7 +252,7 @@ def test_staff_can_still_reset_mfa_of_a_customer_after_stepping_up(
 def test_a_superuser_still_resets_mfa_of_a_staff_account(client: Client, superuser: User) -> None:
     colleague = UserFactory.create(staff=True)
     TOTPDeviceFactory.create(user=colleague)
-    login(client, superuser, fresh=True)
+    login(client, superuser, fresh=True, passkey=True)
     _reset_mfa(client, colleague)
     assert not services.has_second_factor(colleague)
 
@@ -415,7 +415,7 @@ def test_staff_cannot_reset_mfa_of_an_account_that_holds_permissions(
 def test_a_superuser_still_manages_a_group_editor(client: Client, superuser: User) -> None:
     editor = _group_editor()
     TOTPDeviceFactory.create(user=editor)
-    login(client, superuser, fresh=True)
+    login(client, superuser, fresh=True, passkey=True)
     status, password = _set_password(client, editor)
     assert status == 302
     editor.refresh_from_db()

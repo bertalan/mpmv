@@ -132,6 +132,7 @@ MIDDLEWARE = [
     # CORE.4: which device verified the session, then confine required roles to the MFA pages.
     "django_otp.middleware.OTPMiddleware",
     "apps.accounts.middleware.MfaRequiredMiddleware",
+    "apps.accounts.middleware.SessionLevelMiddleware",  # CORE.25 (D-32): operational mode timers
     # CORE.17: one gate per Manager space (404, login or MFA) for every URL under /manager/.
     "apps.manager.middleware.ManagerGateMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -164,6 +165,9 @@ MFA_REQUIRED_POLICIES: list[str] = [
 MFA_STEP_UP_MAX_AGE = 300  # seconds a verification counts as fresh for sensitive actions
 # Step-up for sensitive views of apps that cannot import accounts (the core audit log view, SEC.4).
 STEP_UP_DECORATOR = "apps.accounts.decorators.step_up_required"
+# Path prefixes whose requests (polling) do not count as activity for operational mode (CORE.25).
+SESSION_LEVEL_POLL_PATHS: tuple[str, ...] = ()
+LEVEL_DECORATOR = "apps.accounts.decorators.requires_level"  # CORE.25 (D-32)
 # The Manager login (CORE.17): where the Manager gate sends anonymous visitors.
 LOGIN_URL = "login"
 MFA_LOGIN_URL = "admin:login"  # until the site and vendor login pages exist
@@ -596,6 +600,8 @@ BLOCK_PAGE_RESTRICTION_ROUTES = True
 
 # Optional prefix of order numbers, e.g. "MP-" gives "MP-2027-000123" (ORD.2). Empty by default.
 ORDER_NUMBER_PREFIX = ""
+# How long `place_order` holds the stock of an order awaiting payment (ORD.4); paying releases it.
+ORDER_HOLD_MINUTES = 60
 
 # Months after an order during which its non-fiscal data is kept; then `minimise_order` may
 # drop it (D-29). The fiscal snapshot is kept 10 years from the end of the order's year.

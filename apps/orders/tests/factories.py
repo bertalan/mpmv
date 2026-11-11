@@ -5,6 +5,7 @@ new order and vendor; `OrderLineFactory` one 10.00 net line at 22% VAT. Totals a
 build real orders through `apps.orders.services.create_order`.
 """
 
+import datetime as dt
 import itertools
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -14,7 +15,8 @@ import factory
 from django.db import connection
 from factory.django import DjangoModelFactory
 
-from apps.orders.models import Order, OrderLine, OrderNumberSequence, VendorOrder
+from apps.catalog.tests.factories import ProductFactory
+from apps.orders.models import Order, OrderLine, OrderNumberSequence, StockReservation, VendorOrder
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -112,3 +114,12 @@ def paid_vendor_order(vendor: Vendor | None = None, **fields: object) -> VendorO
     services.transition_order(sub.order, "paid", ctx=ctx)
     sub.refresh_from_db()
     return sub
+
+
+class StockReservationFactory(DjangoModelFactory[StockReservation]):
+    class Meta:
+        model = StockReservation
+
+    product = factory.SubFactory(ProductFactory)
+    quantity = 1
+    expires_at = factory.LazyFunction(lambda: dt.datetime(2999, 1, 1, tzinfo=dt.UTC))

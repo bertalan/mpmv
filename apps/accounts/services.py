@@ -483,7 +483,12 @@ def register_passkey(
 
 
 def authenticate_passkey(
-    user: User, rp: engine.RelyingParty, credential: Mapping[str, Any], *, challenge: bytes
+    user: User,
+    rp: engine.RelyingParty,
+    credential: Mapping[str, Any],
+    *,
+    challenge: bytes,
+    require_user_verification: bool = False,
 ) -> PasskeyDevice:
     """Verify an assertion from one of `user`'s passkeys and advance its counter."""
     credential_id = engine.credential_id_from(credential)
@@ -501,6 +506,7 @@ def authenticate_passkey(
             challenge=challenge,
             public_key=bytes(device.public_key),
             sign_count=device.sign_count,
+            require_user_verification=require_user_verification,
         )
         device.last_used_at = timezone.now()
         device.save(update_fields=["sign_count", "last_used_at", "updated_at"])
@@ -534,6 +540,19 @@ def remove_device(device: AnyDevice, *, ctx: AuditContext, dry_run: bool = False
             factors = sorted({kind} | ({RECOVERY_CODES} if recovery else set()))
             record(ctx, DISABLED, "accounts.user", str(user.public_id), {"factors": factors}, None)
     return changeset
+
+
+def removal_weakens_mfa(device: AnyDevice) -> bool:
+    """Removing `device` would disable MFA or remove the user's last passkey (D-32 group 3)."""
+    kind = kind_of(device)
+    if kind == RECOVERY_CODES:
+        return False
+    others = [
+        d for d in second_factors(device.user) if (type(d), d.pk) != (type(device), device.pk)
+    ]
+    if not any(kind_of(d) != RECOVERY_CODES for d in others):
+        return True
+    return kind == PASSKEY and not any(kind_of(d) == PASSKEY for d in others)
 
 
 def reset_mfa(user: User, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
