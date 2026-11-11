@@ -43,6 +43,7 @@ DEFAULT_OPERATIONAL_ACTIONS: Final = frozenset(
         "audit_in_clear",
         "bulk_edit",
         "impersonation",
+        "termination_notice",  # CMP.5 part 4: give or withdraw a vendor's notice of termination
     }
 )
 DEFAULT_PASSKEY_ACTIONS: Final = frozenset(

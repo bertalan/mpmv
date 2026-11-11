@@ -476,6 +476,23 @@ class TerminationNotice(BaseModel):
     withdrawn_at = models.DateTimeField(null=True, blank=True, editable=False)
     withdraw_reason = models.TextField(blank=True, editable=False)
     applied_at = models.DateTimeField(null=True, blank=True, editable=False)
+    statement = models.OneToOneField(
+        StatementOfReasons,
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.PROTECT,
+        related_name="termination",
+        help_text="The statement of reasons (DSA art. 17) stored with the notice.",
+    )
+    # The freeze at the closure date (owner decision Q2): the vendor's open orders and its
+    # payouts wait for staff review. `frozen_at` is set when the notice is applied.
+    frozen_at = models.DateTimeField(null=True, blank=True, editable=False)
+    frozen_orders = models.PositiveIntegerField(
+        null=True, blank=True, editable=False, help_text="Open sub-orders at the closure date."
+    )
+    freeze_reviewed_at = models.DateTimeField(null=True, blank=True, editable=False)
+    freeze_review_note = models.TextField(blank=True, editable=False)
 
     objects = VendorScopedManager()
 
@@ -504,6 +521,11 @@ class TerminationNotice(BaseModel):
                 condition=~models.Q(exception="")
                 | models.Q(notice_days__gte=engine.MIN_NOTICE_DAYS),
                 name="compliance_termination_days_thirty",
+            ),
+            # An exception shortens the notice; it never puts the end before the notice itself.
+            models.CheckConstraint(
+                condition=models.Q(effective_at__gte=models.F("issued_at")),
+                name="compliance_termination_not_before_notice",
             ),
             models.UniqueConstraint(
                 fields=["vendor"],

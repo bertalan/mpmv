@@ -209,6 +209,17 @@ class TerminationForm(forms.Form):
         ),
     )
 
+    transparency_explanation = forms.CharField(
+        label=_("Public explanation"),
+        required=False,
+        max_length=2000,
+        widget=forms.Textarea(attrs={"rows": 2}),
+        help_text=_(
+            "Published in the EU transparency database: no names, emails, web addresses or "
+            "phone numbers. Leave empty for the standard text."
+        ),
+    )
+
     def __init__(self, *args: Any, vendors: Any = (), **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.fields["vendor"].choices = [  # type: ignore[attr-defined]
@@ -222,5 +233,17 @@ class WithdrawTerminationForm(forms.Form):
     reason = forms.CharField(
         label=_("Reason"),
         widget=forms.Textarea(attrs={"rows": 3}),
-        help_text=_("Sent to the vendor with the news that its service goes on."),
+        help_text=_(
+            "Shared with the vendor: it is sent in the email that says its service goes on."
+        ),
+    )
+
+
+class FreezeReviewForm(forms.Form):
+    """The owner records that the frozen orders and payouts of a terminated vendor were reviewed."""
+
+    note = forms.CharField(
+        label=_("Review note"),
+        widget=forms.Textarea(attrs={"rows": 3}),
+        help_text=_("Kept with the notice, not shown to the vendor. Ends the payout freeze."),
     )

@@ -19,7 +19,7 @@
       <dt>{% translate "Applied" %}</dt><dd>{{ notice.applied_at|date:"SHORT_DATETIME_FORMAT" }}</dd>
     {% endif %}
   </dl>
-  {% if notice.status == "pending" %}
+  {% if notice.status == "pending" and can_write %}
     <h2>{% translate "Withdraw the notice" %}</h2>
     <form method="post" novalidate>
       {% csrf_token %}<input type="hidden" name="action" value="withdraw">
@@ -27,6 +27,20 @@
       {% for field in form %}{% include "components/field.html" with field=field only %}{% endfor %}
       {% include "components/button.html" with label=_("Withdraw and tell the vendor") type="submit" only %}
     </form>
+  {% endif %}
+  {% if notice.frozen_at %}
+    <h2>{% translate "Frozen orders and payouts" %}</h2>
+    <p>{% blocktranslate with count=notice.frozen_orders %}The vendor is closed. {{ count }} open orders and its payouts wait for review.{% endblocktranslate %}</p>
+    {% if notice.freeze_reviewed_at %}
+      <p>{% translate "Reviewed" %}: {{ notice.freeze_reviewed_at|date:"SHORT_DATETIME_FORMAT" }}</p>
+    {% elif can_write %}
+      <form method="post" novalidate>
+        {% csrf_token %}<input type="hidden" name="action" value="freeze">
+        {% include "components/error_summary.html" with form=freeze_form only %}
+        {% for field in freeze_form %}{% include "components/field.html" with field=field only %}{% endfor %}
+        {% include "components/button.html" with label=_("Record the review") type="submit" only %}
+      </form>
+    {% endif %}
   {% endif %}
   <p><a href="{% url 'manager:platform:terminations' %}">{% translate "Back to the terminations" %}</a></p>
 {% endblock %}

@@ -8,6 +8,7 @@ import json
 from typing import Any
 
 import pytest
+from django.contrib.auth.models import Group
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -15,15 +16,20 @@ from django.utils import timezone
 from apps.accounts.tests.factories import UserFactory
 from apps.catalog.tests.factories import ProductFactory
 from apps.compliance import engine, services, tasks
-from apps.compliance.models import TerminationNotice
+from apps.compliance.models import StatementOfReasons, TerminationNotice, TransparencySubmission
 from apps.compliance.tests.factories import TerminationNoticeFactory
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog, OutboxEmail
 from apps.core.tests.factories import PlatformOperatorFactory
+from apps.orders import services as order_services
+from apps.orders.tests.factories import paid_vendor_order
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 
 pytestmark = pytest.mark.django_db
+
+# The CORE.18 catalog role group (apps/manager/roles.py); not imported: compliance sits below.
+CATALOG_GROUP = "Platform: catalog and moderation"
 
 CTX = AuditContext(actor_id=1, actor_label="staff:ops", source="admin", ip="127.0.0.1")
 NOW = dt.datetime(2026, 3, 1, 10, 0, tzinfo=dt.UTC)
@@ -39,7 +45,20 @@ def _operator() -> None:
 
 @pytest.fixture
 def staff() -> Any:
-    return UserFactory.create(platform_staff=True, permissions=["compliance.review_notices"])
+    return UserFactory.create(
+        platform_staff=True,
+        permissions=["core.platform_owner", "compliance.review_notices"],
+    )
+
+
+@pytest.fixture
+def catalog_reviewer() -> Any:
+    """Catalog staff read the terminations (CORE.18 matrix: R) but never write them."""
+    user = UserFactory.create(
+        platform_staff=True, is_staff=True, permissions=["compliance.review_notices"]
+    )
+    user.groups.add(Group.objects.get(name=CATALOG_GROUP))
+    return user
 
 
 @pytest.fixture
@@ -150,7 +169,10 @@ def test_the_database_refuses_a_short_notice_without_an_exception(vendor: Vendor
 
 def test_the_database_allows_a_short_notice_with_an_exception(vendor: Vendor) -> None:
     TerminationNoticeFactory.create(
-        vendor=vendor, exception="legal_obligation", effective_at=NOW + dt.timedelta(days=1)
+        vendor=vendor,
+        exception="legal_obligation",
+        issued_at=NOW,
+        effective_at=NOW + dt.timedelta(days=1),
     )
 
 
@@ -235,7 +257,9 @@ def test_staff_withdraw_a_pending_notice_and_the_vendor_is_told(staff: Any, vend
 def test_a_withdrawn_notice_is_never_applied(staff: Any, vendor: Vendor) -> None:
     notice = issue(staff, vendor).notice
     assert notice is not None
-    services.withdraw_termination_notice(staff, notice.public_id, reason="Resolved.", ctx=CTX)
+    services.withdraw_termination_notice(
+        staff, notice.public_id, reason="Resolved.", now=NOW, ctx=CTX
+    )
     services.apply_due_terminations(now=DAY30 + dt.timedelta(days=5), ctx=CTX)
     vendor.refresh_from_db()
     assert vendor.status == Vendor.Status.ACTIVE
@@ -359,10 +383,170 @@ def test_the_data_bundle_holds_the_vendor_data_and_the_notice(staff: Any, vendor
     mine = ProductFactory.create(vendor=vendor)
     theirs = ProductFactory.create()
     issue(staff, vendor)
-    bundle = services.vendor_data_bundle(vendor, ctx=CTX)
+    bundle = json.loads("".join(services.vendor_data_chunks(vendor, ctx=CTX)))
     text = json.dumps(bundle)
     assert mine.sku in text
     assert theirs.sku not in text
     assert bundle["termination_notice"]["effective_at"] == DAY30.isoformat()
     assert "forbid" in bundle["termination_notice"]["facts"]
     assert AuditLog.objects.filter(action="compliance.vendor_data.downloaded").exists()
+
+
+def test_the_data_is_available_only_while_a_notice_is_pending(vendor: Vendor) -> None:
+    with pytest.raises(services.NoticeError) as error:
+        services.vendor_data_chunks(vendor, ctx=CTX)
+    assert error.value.args == ("pending",)
+
+
+def test_the_data_download_is_rate_limited_per_vendor(vendor: Vendor) -> None:
+    TerminationNoticeFactory.create(vendor=vendor)
+    other = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    TerminationNoticeFactory.create(vendor=other)
+    for _ in range(services.DATA_DOWNLOADS_PER_HOUR):
+        assert services.data_download_wait(vendor) == dt.timedelta(0)
+    assert services.data_download_wait(vendor) > dt.timedelta(0)
+    assert services.data_download_wait(other) == dt.timedelta(0)
+
+
+def test_the_data_is_streamed_in_chunks(vendor: Vendor) -> None:
+    TerminationNoticeFactory.create(vendor=vendor)
+    chunks = services.vendor_data_chunks(vendor, ctx=CTX)
+    assert not isinstance(chunks, (list, dict, str))
+    assert json.loads("".join(chunks))["vendor"]["display_name"] == vendor.display_name
+
+
+# --- Review fixes: due notices, roles, the database floor
+
+
+def test_a_notice_that_is_already_due_cannot_be_withdrawn(staff: Any, vendor: Vendor) -> None:
+    notice = issue(staff, vendor).notice
+    assert notice is not None
+    before = DAY30 - dt.timedelta(seconds=1)
+    with pytest.raises(services.NoticeError) as error:
+        services.withdraw_termination_notice(
+            staff, notice.public_id, reason="Late.", now=DAY30, ctx=CTX
+        )
+    assert error.value.args == ("due",)
+    notice.refresh_from_db()
+    assert notice.status == TerminationNotice.Status.PENDING
+    # One second earlier it still works.
+    services.withdraw_termination_notice(
+        staff, notice.public_id, reason="On time.", now=before, ctx=CTX
+    )
+
+
+def test_only_the_platform_owner_issues_and_withdraws(
+    staff: Any, catalog_reviewer: Any, vendor: Vendor
+) -> None:
+    with pytest.raises(PermissionDenied):
+        issue(catalog_reviewer, vendor)
+    notice = issue(staff, vendor).notice
+    assert notice is not None
+    with pytest.raises(PermissionDenied):
+        services.withdraw_termination_notice(
+            catalog_reviewer, notice.public_id, reason="x", ctx=CTX
+        )
+    assert services.can_read_terminations(catalog_reviewer)
+    assert not services.can_write_terminations(catalog_reviewer)
+    assert services.can_write_terminations(staff)
+
+
+def test_the_database_refuses_an_end_before_the_notice_even_with_an_exception(
+    vendor: Vendor,
+) -> None:
+    with pytest.raises(IntegrityError), transaction.atomic():
+        TerminationNoticeFactory.create(
+            vendor=vendor,
+            exception="legal_obligation",
+            effective_at=NOW - dt.timedelta(days=1),
+            issued_at=NOW,
+        )
+
+
+# --- Statement of reasons and transparency record (CMP.5 3/4, owner decision Q6)
+
+
+def test_a_notice_also_stores_the_statement_of_reasons_and_the_transparency_record(
+    staff: Any, vendor: Vendor
+) -> None:
+    notice = issue(staff, vendor, transparency_explanation="Seller account terminated.").notice
+    assert notice is not None
+    notice.refresh_from_db()
+    statement = notice.statement
+    assert isinstance(statement, StatementOfReasons)
+    assert statement.vendor == vendor
+    assert statement.restriction == engine.RESTRICTION_TERMINATE
+    assert statement.target_kind == "vendor"
+    assert statement.target_ref == vendor.public_id
+    assert statement.facts == notice.facts
+    assert statement.ground_kind == engine.GROUND_TERMS
+    record = TransparencySubmission.objects.get(statement=statement)
+    assert record.status == TransparencySubmission.Status.PENDING
+    assert record.payload["decision_account"] == "DECISION_ACCOUNT_TERMINATED"
+    assert record.payload["puid"] == str(statement.public_id)
+    assert AuditLog.objects.filter(action="compliance.statement.issued").exists()
+
+
+def test_an_illegal_content_exception_makes_the_statement_an_illegal_content_one(
+    staff: Any, vendor: Vendor
+) -> None:
+    notice = issue(staff, vendor, exception="illegal_content").notice
+    assert notice is not None
+    notice.refresh_from_db()
+    assert notice.statement.ground_kind == engine.GROUND_ILLEGAL  # type: ignore[union-attr]
+
+
+def test_a_dry_run_stores_no_statement(staff: Any, vendor: Vendor) -> None:
+    issue(staff, vendor, dry_run=True)
+    assert not StatementOfReasons.objects.exists()
+    assert not TransparencySubmission.objects.exists()
+
+
+# --- At the closure date the open orders and the payouts are frozen (owner decision Q2)
+
+
+def test_closing_by_termination_freezes_the_open_orders_and_the_payouts(
+    staff: Any, vendor: Vendor
+) -> None:
+    sub = paid_vendor_order(vendor)
+    notice = issue(staff, vendor).notice
+    assert notice is not None
+    assert not services.payouts_frozen(vendor)
+    services.apply_due_terminations(now=DAY30, ctx=CTX)
+    notice.refresh_from_db()
+    assert notice.frozen_at == DAY30
+    assert notice.frozen_orders == 1
+    assert services.payouts_frozen(vendor)
+    with pytest.raises(ValueError, match="frozen"):
+        order_services.transition_vendor_order(sub, "accepted", ctx=CTX)
+    sub.refresh_from_db()
+    assert sub.state == "pending"
+
+
+def test_staff_review_ends_the_payout_freeze_and_only_the_owner_may(
+    staff: Any, catalog_reviewer: Any, vendor: Vendor
+) -> None:
+    notice = issue(staff, vendor).notice
+    assert notice is not None
+    services.apply_due_terminations(now=DAY30, ctx=CTX)
+    with pytest.raises(PermissionDenied):
+        services.review_termination_freeze(catalog_reviewer, notice.public_id, note="ok", ctx=CTX)
+    services.review_termination_freeze(
+        staff, notice.public_id, note="Orders settled by hand.", now=DAY30, ctx=CTX
+    )
+    notice.refresh_from_db()
+    assert notice.freeze_reviewed_at == DAY30
+    assert not services.payouts_frozen(vendor)
+    assert AuditLog.objects.filter(action="compliance.termination.freeze_reviewed").exists()
+    with pytest.raises(services.NoticeError):  # a second review
+        services.review_termination_freeze(staff, notice.public_id, note="again", ctx=CTX)
+
+
+def test_a_freeze_review_needs_an_applied_notice_and_a_note(staff: Any, vendor: Vendor) -> None:
+    pending = issue(staff, vendor).notice
+    assert pending is not None
+    with pytest.raises(services.NoticeError):
+        services.review_termination_freeze(staff, pending.public_id, note="x", ctx=CTX)
+    services.apply_due_terminations(now=DAY30, ctx=CTX)
+    with pytest.raises(services.NoticeError):
+        services.review_termination_freeze(staff, pending.public_id, note=" ", ctx=CTX)

@@ -1255,3 +1255,31 @@ msgstr "Puoi contestare questa decisione con un reclamo interno (articolo 20 DSA
 #: apps/manager/templates/manager/shop/termination.html
 msgid "Your data"
 msgstr "I tuoi dati"
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "Frozen orders and payouts"
+msgstr "Ordini e pagamenti congelati"
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "Record the review"
+msgstr "Registra la verifica"
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "Reviewed"
+msgstr "Verificato il"
+
+#: apps/manager/termination_views.py
+msgid "The freeze cannot be reviewed for this notice."
+msgstr "Per questo preavviso non si può registrare la verifica del congelamento."
+
+#: apps/manager/termination_views.py
+msgid "The review is recorded and the payouts are released."
+msgstr "La verifica è registrata e i pagamenti sono sbloccati."
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "The vendor is closed. %(count)s open orders and its payouts wait for review."
+msgstr "Il venditore è chiuso. %(count)s ordini aperti e i suoi pagamenti attendono la verifica."
+
+#: apps/manager/termination_views.py
+msgid "Too many downloads. Try again later."
+msgstr "Troppi download. Riprova più tardi."

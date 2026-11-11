@@ -404,6 +404,10 @@ def transition_vendor_order(
                 .select_related("vendor", "order")
                 .get(pk=sub.pk)
             )
+            if locked.vendor.status == "closed":  # CMP.5 part 4: frozen pending staff review
+                raise ValueError(
+                    "the vendor is closed: its open orders are frozen pending staff review"
+                )
             before = _vendor_order_snapshot(locked)
             engine.check_vendor_order_transition(locked.state, target)
             if target == "shipped":

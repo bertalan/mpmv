@@ -500,6 +500,7 @@ WIRED = {
     "owner_role_grant",
     "payout_details",
     "api_key",
+    "termination_notice",
 }
 # Actions whose web view does not exist yet: nothing to decorate (follow-ups in the PR).
 NOT_BUILT = {"tax_in_clear", "export", "backup", "bulk_edit", "impersonation"}

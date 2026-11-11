@@ -7,6 +7,7 @@ import json
 from typing import Any
 
 import pytest
+from django.contrib.auth.models import Group
 from django.test import Client
 from django.utils import timezone
 
@@ -23,6 +24,9 @@ from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 
 pytestmark = pytest.mark.django_db
+
+# The CORE.18 catalog role group (apps/manager/roles.py); not imported: compliance sits below.
+CATALOG_GROUP = "Platform: catalog and moderation"
 
 PLATFORM = "/manager/platform/terminations/"
 SHOP = "/manager/shop/termination/"
@@ -45,6 +49,14 @@ def reviewer() -> Any:
 @pytest.fixture
 def vendor() -> Vendor:
     return VendorFactory.create(status=Vendor.Status.ACTIVE, display_name="Shop One")
+
+
+def catalog_reviewer() -> Any:
+    user = UserFactory.create(
+        platform_staff=True, is_staff=True, permissions=["compliance.review_notices"]
+    )
+    user.groups.add(Group.objects.get(name=CATALOG_GROUP))
+    return user
 
 
 def issue_form(vendor: Vendor, **extra: str) -> dict[str, str]:
@@ -196,7 +208,7 @@ def test_the_owner_downloads_its_data_during_the_notice_period(
     response = client.get(f"{SHOP}data/")
     assert response.status_code == 200
     assert "attachment" in response["Content-Disposition"]
-    body = json.loads(response.content)
+    body = json.loads(b"".join(response.streaming_content))  # type: ignore[attr-defined]
     assert mine.sku in json.dumps(body)
     assert theirs.sku not in json.dumps(body)
     assert AuditLog.objects.filter(action="compliance.vendor_data.downloaded").exists()
@@ -213,3 +225,43 @@ def test_vendor_staff_members_see_the_notice_too(client: Client, vendor: Vendor)
 def test_service_pending_lookup_matches_the_page(vendor: Vendor) -> None:
     notice = TerminationNoticeFactory.create(vendor=vendor)
     assert services.pending_termination(vendor) == notice
+
+
+def test_catalog_reviewers_read_but_cannot_give_or_withdraw(client: Client, vendor: Vendor) -> None:
+    notice = TerminationNoticeFactory.create(vendor=vendor)
+    catalog = catalog_reviewer()
+    verified_login(client, catalog)
+    assert client.get(PLATFORM).status_code == 200
+    assert client.get(f"{PLATFORM}{notice.public_id}/").status_code == 200
+    assert client.post(PLATFORM, issue_form(vendor)).status_code == 404
+    response = client.post(f"{PLATFORM}{notice.public_id}/", {"action": "withdraw", "reason": "x"})
+    assert response.status_code == 404
+    notice.refresh_from_db()
+    assert notice.status == TerminationNotice.Status.PENDING
+
+
+def test_the_owner_pages_hide_the_write_forms_from_catalog_reviewers(
+    client: Client, vendor: Vendor
+) -> None:
+    notice = TerminationNoticeFactory.create(vendor=vendor)
+    catalog = catalog_reviewer()
+    verified_login(client, catalog)
+    assert 'name="action" value="issue"' not in client.get(PLATFORM).text
+    assert 'value="withdraw"' not in client.get(f"{PLATFORM}{notice.public_id}/").text
+
+
+def test_the_download_needs_a_pending_notice(client: Client, vendor: Vendor) -> None:
+    owner = VendorMemberFactory.create(vendor=vendor, role="owner").user
+    verified_login(client, owner)
+    assert client.get(f"{SHOP}data/").status_code == 404
+
+
+def test_the_download_is_rate_limited_per_vendor(client: Client, vendor: Vendor) -> None:
+    TerminationNoticeFactory.create(vendor=vendor)
+    owner = VendorMemberFactory.create(vendor=vendor, role="owner").user
+    verified_login(client, owner)
+    for _ in range(services.DATA_DOWNLOADS_PER_HOUR):
+        assert client.get(f"{SHOP}data/").status_code == 200
+    limited = client.get(f"{SHOP}data/")
+    assert limited.status_code == 429
+    assert int(limited["Retry-After"]) > 0

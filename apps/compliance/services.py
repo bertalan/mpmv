@@ -18,10 +18,11 @@ job flags any published product that fails the check anyway
 """
 
 import datetime as dt
+import json
 import logging
 import re
 import uuid
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import urlsplit, urlunsplit
@@ -54,6 +55,7 @@ from apps.core.services import (
     current_operator,
     email_language,
     enqueue_email,
+    is_platform_owner,
     save_audited,
 )
 from apps.events.models import EventPage
@@ -1644,6 +1646,9 @@ TERMINATION_MODEL: Final = "compliance.terminationnotice"
 TERMINATION_ISSUED: Final = "compliance.termination.issued"
 TERMINATION_WITHDRAWN: Final = "compliance.termination.withdrawn"
 TERMINATION_APPLIED: Final = "compliance.termination.applied"
+TERMINATION_FREEZE_REVIEWED: Final = "compliance.termination.freeze_reviewed"
+#: The public (transparency database) text when staff write none: no vendor identity in it.
+TERMINATION_PUBLIC_TEXT: Final = "The seller account was terminated under the platform terms."
 TERMINATION_TEMPLATE: Final = "compliance.termination_notice"
 TERMINATION_WITHDRAWN_TEMPLATE: Final = "compliance.termination_withdrawn"
 VENDOR_DATA_DOWNLOADED: Final = "compliance.vendor_data.downloaded"
@@ -1688,8 +1693,19 @@ def pending_termination(vendor: Vendor) -> TerminationNotice | None:
     ).first()
 
 
+def can_read_terminations(user: Any) -> bool:
+    """Who sees the notices of termination: staff with `review_notices` (catalog reads, CORE.18)."""
+    return bool(is_platform_staff(user) and can_review_notices(user))
+
+
+def can_write_terminations(user: Any) -> bool:
+    """Who gives or withdraws a notice: the platform owner (matrix row `platform.terminations`: E)
+    who also holds `review_notices`."""
+    return bool(can_read_terminations(user) and is_platform_owner(user))
+
+
 def _may_terminate(staff: Any) -> bool:
-    return bool(is_platform_staff(staff) and can_review_notices(staff))
+    return can_write_terminations(staff)
 
 
 def issue_termination_notice(
@@ -1700,6 +1716,7 @@ def issue_termination_notice(
     ground: str,
     exception: str = "",
     effective_at: dt.datetime | None = None,
+    transparency_explanation: str = "",
     now: dt.datetime | None = None,
     ctx: AuditContext,
     dry_run: bool = False,
@@ -1711,7 +1728,10 @@ def issue_termination_notice(
     it is exactly that. An `exception` from `engine.TERMINATION_EXCEPTIONS` allows an earlier
     time (and, without `effective_at`, immediate effect). The vendor stays in its status: only
     `apply_due_terminations` closes it. The notice is queued by email in the vendor's language
-    (English fallback). Raises `PermissionDenied` unless `staff` is platform staff with
+    (English fallback). The statement of reasons (DSA art. 17) and its pending transparency record
+    are stored with the notice (`transparency_explanation` is the public text, a generic one when
+    empty); the notice email is the statement the vendor receives.
+    Raises `PermissionDenied` unless `staff` is the platform owner with
     `review_notices`, and `NoticeError` for a rule broken (codes: `facts`, `ground`, `exception`,
     `effective_at`), an unknown or out-of-service vendor (`vendor`) or a vendor that already has
     a pending notice (`pending`), also on dry-run.
@@ -1764,11 +1784,51 @@ def issue_termination_notice(
             language=language,
         )
         changes.notice = notice
+        public_text = engine.scrub_public_text(
+            transparency_explanation.strip() or TERMINATION_PUBLIC_TEXT
+        )
+        ground_kind = (
+            engine.GROUND_ILLEGAL if exception == "illegal_content" else engine.GROUND_TERMS
+        )
+        statement = StatementOfReasons(
+            vendor=vendor,
+            target_kind=StatementOfReasons.TargetKind.VENDOR,
+            target_ref=vendor.public_id,
+            restriction=engine.RESTRICTION_TERMINATE,
+            scope=f"The whole service ends on {effective_at.date().isoformat()}",
+            facts=notice.facts,
+            ground_kind=ground_kind,
+            ground=notice.ground,
+            transparency_explanation=public_text,
+            redress_text=redress_text(language),
+            language=language,
+            sent_at=now,
+        )
         changes.create(TERMINATION_MODEL, str(notice.public_id), termination_snapshot(notice))
+        changes.create(STATEMENT_MODEL, str(statement.public_id), statement_snapshot(statement))
         if dry_run:
             return changes
+        statement.save()
+        notice.statement = statement
         notice.save()
-        audit_changes(changes, ctx=ctx, action=TERMINATION_ISSUED)
+        TransparencySubmission.objects.create(
+            statement=statement,
+            payload=engine.transparency_payload(
+                restriction=engine.RESTRICTION_TERMINATE,
+                ground_kind=ground_kind,
+                target_kind="vendor",
+                explanation=public_text,
+                based_on_notice=False,
+                automated_detection=False,
+                automated_decision=False,
+                applied_on=timezone.localdate(now),
+                valid_until=None,
+                reference=str(statement.public_id),
+            ),
+        )
+        for change in changes.changes:
+            action = TERMINATION_ISSUED if change.model == TERMINATION_MODEL else STATEMENT_ISSUED
+            record(ctx, action, change.model, change.key, change.before, change.after)
         enqueue_email(
             recipient=vendor.contact_email,
             template_key=TERMINATION_TEMPLATE,
@@ -1799,8 +1859,9 @@ def withdraw_termination_notice(
     dry_run: bool = False,
 ) -> TerminationChangeSet:
     """Withdraw a pending notice: the vendor keeps its service and is told. A reason is required.
-    Raises `PermissionDenied` unless `staff` may give notices, and `NoticeError` (`reason`,
-    `notice`, `status`) for a missing reason, an unknown notice or one no longer pending."""
+    Raises `PermissionDenied` unless `staff` is the platform owner with `review_notices`, and
+    `NoticeError` (`reason`, `notice`, `status`, `due`) for a missing reason, an unknown notice,
+    one no longer pending or one whose effective time has come."""
     if not _may_terminate(staff):
         raise PermissionDenied("withdrawing a notice needs platform staff with review_notices")
     if not str(reason).strip():
@@ -1818,6 +1879,8 @@ def withdraw_termination_notice(
             raise NoticeError("notice") from None
         if notice.status != TerminationNotice.Status.PENDING:
             raise NoticeError("status")
+        if engine.termination_due(notice.effective_at, now=now):
+            raise NoticeError("due")  # the notice ran out: the hourly job closes the vendor
         before = termination_snapshot(notice)
         notice.status = TerminationNotice.Status.WITHDRAWN
         notice.withdrawn_at = now
@@ -1863,10 +1926,87 @@ def _apply_termination(notice_id: int, now: dt.datetime, ctx: AuditContext) -> l
         before = termination_snapshot(notice)
         notice.status = TerminationNotice.Status.APPLIED
         notice.applied_at = now
-        own.update(TERMINATION_MODEL, str(notice.public_id), before, termination_snapshot(notice))
-        notice.save(update_fields=["status", "applied_at", "updated_at"])
+        # Owner decision Q2: the open orders and the payouts wait for staff review. Nothing
+        # completes or pays by itself; `payouts_frozen` is what a payout run asks, and the order
+        # service refuses to move a closed vendor's orders.
+        notice.frozen_at = now
+        notice.frozen_orders = VendorOrder.objects.filter(
+            vendor=notice.vendor, state__in=OPEN_ORDER_STATES
+        ).count()
+        own.update(
+            TERMINATION_MODEL,
+            str(notice.public_id),
+            before,
+            termination_snapshot(notice) | {"frozen_orders": notice.frozen_orders},
+        )
+        notice.save(
+            update_fields=["status", "applied_at", "frozen_at", "frozen_orders", "updated_at"]
+        )
         audit_changes(own, ctx=ctx, action=TERMINATION_APPLIED)
         return [*found, *own.changes]
+
+
+#: Vendor sub-order states that are still open (not completed, cancelled or refunded).
+OPEN_ORDER_STATES: Final = ("pending", "accepted", "shipped", "delivered")
+
+
+def payouts_frozen(vendor: Vendor) -> bool:
+    """Whether the vendor's payouts wait for staff review after a termination (owner decision
+    Q2). A payout run must skip a vendor for which this is true."""
+    return TerminationNotice.objects.filter(
+        vendor=vendor,
+        status=TerminationNotice.Status.APPLIED,
+        frozen_at__isnull=False,
+        freeze_reviewed_at__isnull=True,
+    ).exists()
+
+
+def review_termination_freeze(
+    staff: Any,
+    public_id: Any,
+    *,
+    note: str,
+    now: dt.datetime | None = None,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> TerminationChangeSet:
+    """Staff (the platform owner) record that the frozen orders and payouts of a terminated
+    vendor were reviewed: `payouts_frozen` is false from then on. A note is required. Raises
+    `PermissionDenied` and `NoticeError` (`note`, `notice`, `status`, `reviewed`)."""
+    if not can_write_terminations(staff):
+        raise PermissionDenied("reviewing the freeze needs the platform owner")
+    if not str(note).strip():
+        raise NoticeError("note")
+    now = now or timezone.now()
+    changes = TerminationChangeSet()
+    with transaction.atomic():
+        try:
+            notice = (
+                TerminationNotice.objects.select_for_update(of=("self",))
+                .select_related("vendor")
+                .get(public_id=public_id)
+            )
+        except (TerminationNotice.DoesNotExist, ValidationError, ValueError):
+            raise NoticeError("notice") from None
+        if notice.status != TerminationNotice.Status.APPLIED or notice.frozen_at is None:
+            raise NoticeError("status")
+        if notice.freeze_reviewed_at is not None:
+            raise NoticeError("reviewed")
+        before = termination_snapshot(notice) | {"freeze_reviewed": False}
+        notice.freeze_reviewed_at = now
+        notice.freeze_review_note = str(note).strip()
+        changes.notice = notice
+        changes.update(
+            TERMINATION_MODEL,
+            str(notice.public_id),
+            before,
+            termination_snapshot(notice) | {"freeze_reviewed": True},
+        )
+        if dry_run:
+            return changes
+        notice.save(update_fields=["freeze_reviewed_at", "freeze_review_note", "updated_at"])
+        audit_changes(changes, ctx=ctx, action=TERMINATION_FREEZE_REVIEWED)
+    return changes
 
 
 def apply_due_terminations(
@@ -1899,39 +2039,21 @@ def apply_due_terminations(
     return changes
 
 
-def vendor_data_bundle(vendor: Vendor, *, ctx: AuditContext) -> dict[str, Any]:
-    """The vendor's own data as one JSON-ready document, for the vendor to keep (P2B art. 4 and 9).
+DATA_DOWNLOADS_PER_HOUR: Final = 5
 
-    The profile, every product, its sub-orders (amounts and states only, never a buyer's name,
-    email or address) and the notice with its reason. Audited as a download.
-    """
-    notice = pending_termination(vendor)
-    products = [
-        {
-            "sku": product.sku,
-            "kind": product.kind,
-            "status": product.status,
-            "sales_mode": product.sales_mode,
-            "price_net": None if product.price_net is None else str(product.price_net),
-            "stock_qty": product.stock_qty,
-        }
-        for product in Product.objects.filter(vendor=vendor).order_by("sku")
-    ]
-    orders = [
-        {
-            "order": sub.order.number,
-            "state": sub.state,
-            "goods_net": str(sub.goods_net),
-            "shipping_net": str(sub.shipping_net),
-            "tax_total": str(sub.tax_total),
-            "gross_total": str(sub.gross_total),
-            "created_at": sub.created_at.isoformat(),
-        }
-        for sub in VendorOrder.objects.filter(vendor=vendor)
-        .select_related("order")
-        .order_by("created_at", "id")
-    ]
-    bundle: dict[str, Any] = {
+
+def data_download_wait(vendor: Vendor) -> dt.timedelta:
+    """Count one download of the vendor's data; zero when allowed, else the time to wait."""
+    return consume_rate_limit(
+        f"vendor-data:{vendor.public_id}",
+        limit=DATA_DOWNLOADS_PER_HOUR,
+        window=dt.timedelta(hours=1),
+    )
+
+
+def _data_chunks(vendor: Vendor, notice: TerminationNotice) -> Iterator[str]:
+    """The JSON document piece by piece: sub-orders are read with a cursor, never all at once."""
+    head = {
         "generated_at": timezone.now().isoformat(),
         "vendor": {
             "legal_name": vendor.legal_name,
@@ -1941,11 +2063,7 @@ def vendor_data_bundle(vendor: Vendor, *, ctx: AuditContext) -> dict[str, Any]:
             "vat_number": vendor.vat_number,
             "status": vendor.status,
         },
-        "products": products,
-        "orders": orders,
-        "termination_notice": None
-        if notice is None
-        else {
+        "termination_notice": {
             "reference": str(notice.public_id),
             "status": notice.status,
             "exception": notice.exception,
@@ -1955,12 +2073,60 @@ def vendor_data_bundle(vendor: Vendor, *, ctx: AuditContext) -> dict[str, Any]:
             "effective_at": notice.effective_at.isoformat(),
         },
     }
+    opening = json.dumps(head, ensure_ascii=False)
+    yield opening[:-1] + ', "products": ['
+    products = Product.objects.filter(vendor=vendor).order_by("sku").iterator(chunk_size=500)
+    for position, product in enumerate(products):
+        row = {
+            "sku": product.sku,
+            "kind": product.kind,
+            "status": product.status,
+            "sales_mode": product.sales_mode,
+            "price_net": None if product.price_net is None else str(product.price_net),
+            "stock_qty": product.stock_qty,
+        }
+        yield (", " if position else "") + json.dumps(row, ensure_ascii=False)
+    yield '], "orders": ['
+    subs = (
+        VendorOrder.objects.filter(vendor=vendor)
+        .select_related("order")
+        .order_by("created_at", "id")
+        .iterator(chunk_size=500)
+    )
+    for position, sub in enumerate(subs):
+        row = {
+            "order": sub.order.number,
+            "state": sub.state,
+            "goods_net": str(sub.goods_net),
+            "shipping_net": str(sub.shipping_net),
+            "tax_total": str(sub.tax_total),
+            "gross_total": str(sub.gross_total),
+            "created_at": sub.created_at.isoformat(),
+        }
+        yield (", " if position else "") + json.dumps(row, ensure_ascii=False)
+    yield "]}"
+
+
+def vendor_data_chunks(vendor: Vendor, *, ctx: AuditContext) -> Iterator[str]:
+    """The vendor's own data as a JSON document in pieces, for the vendor to keep (P2B art. 4, 9).
+
+    Only while a notice of termination is pending (`NoticeError("pending")` otherwise). The
+    profile, every product, its sub-orders (amounts and states only, never a buyer's name, email
+    or address) and the notice with its reason. The download is audited when it starts (counts
+    only); the rows are read lazily, while the response is sent.
+    """
+    notice = pending_termination(vendor)
+    if notice is None:
+        raise NoticeError("pending")
     record(
         ctx,
         VENDOR_DATA_DOWNLOADED,
         "vendors.vendor",
         str(vendor.public_id),
         None,
-        {"products": len(products), "orders": len(orders)},
+        {
+            "products": Product.objects.filter(vendor=vendor).count(),
+            "orders": VendorOrder.objects.filter(vendor=vendor).count(),
+        },
     )
-    return bundle
+    return _data_chunks(vendor, notice)

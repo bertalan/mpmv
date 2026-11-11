@@ -391,7 +391,8 @@ def decision_problems(outcome: str, reason: str) -> list[str]:
 
 RESTRICTION_REMOVE: Final = "remove"
 RESTRICTION_SUSPEND: Final = "suspend_account"
-RESTRICTIONS: Final = (RESTRICTION_REMOVE, RESTRICTION_SUSPEND)
+RESTRICTION_TERMINATE: Final = "terminate"  # the whole service ends (P2B art. 4, CMP.5 part 4)
+RESTRICTIONS: Final = (RESTRICTION_REMOVE, RESTRICTION_SUSPEND, RESTRICTION_TERMINATE)
 #: What the restriction is based on: a law (illegal content) or the platform terms.
 GROUND_ILLEGAL: Final = "illegal_content"
 GROUND_TERMS: Final = "terms"
@@ -482,7 +483,9 @@ def transparency_payload(
             "AUTOMATED_DECISION_FULLY" if automated_decision else "AUTOMATED_DECISION_NOT_AUTOMATED"
         ),
     }
-    if restriction == RESTRICTION_SUSPEND:
+    if restriction == RESTRICTION_TERMINATE:
+        payload["decision_account"] = "DECISION_ACCOUNT_TERMINATED"
+    elif restriction == RESTRICTION_SUSPEND:
         payload["decision_account"] = "DECISION_ACCOUNT_SUSPENDED"
         if valid_until is not None:
             payload["end_date_account_restriction"] = valid_until.isoformat()

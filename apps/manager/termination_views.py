@@ -7,7 +7,6 @@ Thin adapters over `apps.compliance.services`.
 """
 
 import datetime as dt
-import json
 import uuid
 from dataclasses import replace
 from typing import Any
@@ -17,14 +16,20 @@ from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
+from django.http import (
+    Http404,
+    HttpRequest,
+    HttpResponse,
+    HttpResponseRedirect,
+    StreamingHttpResponse,
+)
 from django.http.response import HttpResponseBase
 from django.urls import reverse
 from django.utils.translation import gettext as _
 
 from apps.accounts.decorators import requires_level
 from apps.compliance import engine, services
-from apps.compliance.forms import TerminationForm, WithdrawTerminationForm
+from apps.compliance.forms import FreezeReviewForm, TerminationForm, WithdrawTerminationForm
 from apps.compliance.models import TerminationNotice
 from apps.core.audit import audit_context
 from apps.core.models import AuditLog
@@ -39,7 +44,7 @@ LEVEL_ACTION = "termination_notice"
 
 
 def can_give_notice(ctx: Any) -> bool:
-    return services.can_review_notices(ctx.user)
+    return services.can_read_terminations(ctx.user)
 
 
 def _effective_at(day: dt.date | None) -> dt.datetime | None:
@@ -83,11 +88,12 @@ class TerminationListView(ManagerView):
             status=status,
             statuses=TerminationNotice.Status.choices,
             min_days=engine.MIN_NOTICE_DAYS,
+            can_write=services.can_write_terminations(self.request.user),
         )
         return context
 
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
-        return requires_level(LEVEL_ACTION)(self._post)(request, *args, **kwargs)
+        return requires_level("termination_notice")(self._post)(request, *args, **kwargs)
 
     def _post(self, request: HttpRequest, /, *args: Any, **kwargs: Any) -> HttpResponse:
         if request.POST.get("action") != "issue":
@@ -104,6 +110,7 @@ class TerminationListView(ManagerView):
                 facts=data["facts"],
                 ground=data["ground"],
                 exception=data["exception"],
+                transparency_explanation=data["transparency_explanation"],
                 effective_at=_effective_at(data["effective_on"]),
                 ctx=audit_context(request),
             )
@@ -141,15 +148,22 @@ class TerminationDetailView(ManagerView):
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
         context.setdefault("form", WithdrawTerminationForm())
-        context.update(notice=self.notice(kwargs["public_id"]), title=_("Notice of termination"))
+        context.setdefault("freeze_form", FreezeReviewForm())
+        context.update(
+            notice=self.notice(kwargs["public_id"]),
+            title=_("Notice of termination"),
+            can_write=services.can_write_terminations(self.request.user),
+        )
         return context
 
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponseBase:
-        return requires_level(LEVEL_ACTION)(self._post)(request, *args, **kwargs)
+        return requires_level("termination_notice")(self._post)(request, *args, **kwargs)
 
     def _post(self, request: HttpRequest, /, *args: Any, **kwargs: Any) -> HttpResponse:
         public_id = kwargs["public_id"]
         self.notice(public_id)
+        if request.POST.get("action") == "freeze":
+            return self._freeze(request, public_id)
         if request.POST.get("action") != "withdraw":
             raise Http404("No such action.")
         form = WithdrawTerminationForm(request.POST)
@@ -168,6 +182,24 @@ class TerminationDetailView(ManagerView):
             messages.error(request, _("Only a pending notice can be withdrawn."))
         else:
             messages.success(request, _("The notice is withdrawn and the vendor is told."))
+        return HttpResponseRedirect(reverse("manager:platform:termination", args=[public_id]))
+
+    def _freeze(self, request: HttpRequest, public_id: uuid.UUID) -> HttpResponse:
+        form = FreezeReviewForm(request.POST)
+        if not form.is_valid():
+            return self.render_to_response(
+                self.get_context_data(freeze_form=form, public_id=public_id)
+            )
+        try:
+            services.review_termination_freeze(
+                request.user, public_id, note=form.cleaned_data["note"], ctx=audit_context(request)
+            )
+        except PermissionDenied:
+            raise Http404("No such action.") from None
+        except services.NoticeError:
+            messages.error(request, _("The freeze cannot be reviewed for this notice."))
+        else:
+            messages.success(request, _("The review is recorded and the payouts are released."))
         return HttpResponseRedirect(reverse("manager:platform:termination", args=[public_id]))
 
 
@@ -194,14 +226,20 @@ class VendorDataDownloadView(ManagerView):
 
     section = SHOP_SECTION
 
-    def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+    def get(  # type: ignore[override]
+        self, request: HttpRequest, *args: Any, **kwargs: Any
+    ) -> HttpResponseBase:
         vendor = self.manager.vendor
-        if vendor is None:
-            raise Http404("No vendor selected.")
+        if vendor is None or services.pending_termination(vendor) is None:
+            raise Http404("No termination notice.")  # only while a notice is pending
+        wait = services.data_download_wait(vendor)
+        if wait:
+            limited = HttpResponse(_("Too many downloads. Try again later."), status=429)
+            limited["Retry-After"] = str(max(1, int(wait.total_seconds())))
+            return limited
         ctx = replace(audit_context(request), source=AuditLog.Source.VENDOR)
-        bundle = services.vendor_data_bundle(vendor, ctx=ctx)
-        response = HttpResponse(
-            json.dumps(bundle, indent=2, ensure_ascii=False),
+        response = StreamingHttpResponse(
+            services.vendor_data_chunks(vendor, ctx=ctx),
             content_type="application/json; charset=utf-8",
         )
         response["Content-Disposition"] = f'attachment; filename="{vendor.slug}-data.json"'

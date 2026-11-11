@@ -311,6 +311,13 @@ def manager_vendor(vendor: Vendor) -> Vendor:
     return vendor
 
 
+def vendor_with_pending_termination(vendor: Vendor) -> Vendor:
+    """The vendor itself, with a pending notice of termination (CMP.5 part 4) if it has none."""
+    if not TerminationNotice.objects.filter(vendor=vendor, status="pending").exists():
+        TerminationNoticeFactory.create(vendor=vendor)
+    return vendor
+
+
 def vendor_image(vendor: Vendor) -> models.Model:
     """An image in the vendor's own collection (VEN.31)."""
     from wagtail.models import Collection
@@ -432,8 +439,9 @@ ENDPOINTS: dict[str, Access] = {
     "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     # CMP.5 part 4: the notice of termination and the data download show the selected vendor only.
     "manager:shop:termination": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    # The download exists only while a notice is pending: the vendor made here has one.
     "manager:shop:termination_data": VendorScopedList(
-        make=manager_vendor, identify=vendor_display_name
+        make=vendor_with_pending_termination, identify=vendor_display_name
     ),
     # ORD.6: the vendor's own orders; another vendor's id is a 404 on the detail and every action.
     "manager:shop:orders": VendorScopedList(

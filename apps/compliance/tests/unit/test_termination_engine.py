@@ -78,3 +78,20 @@ def test_a_termination_is_due_at_its_effective_time_and_never_before() -> None:
     assert not engine.termination_due(effective, now=effective - dt.timedelta(seconds=1))
     assert engine.termination_due(effective, now=effective)
     assert engine.termination_due(effective, now=effective + dt.timedelta(days=3))
+
+
+def test_the_transparency_payload_of_a_termination_says_terminated() -> None:
+    payload = engine.transparency_payload(
+        restriction=engine.RESTRICTION_TERMINATE,
+        ground_kind=engine.GROUND_TERMS,
+        target_kind="vendor",
+        explanation="Seller account terminated.",
+        based_on_notice=False,
+        automated_detection=False,
+        automated_decision=False,
+        applied_on=ISSUED.date(),
+        valid_until=None,
+        reference="ref",
+    )
+    assert payload["decision_account"] == "DECISION_ACCOUNT_TERMINATED"
+    assert "end_date_account_restriction" not in payload
