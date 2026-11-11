@@ -98,6 +98,7 @@ def test_a_member_of_two_vendors_signs_in_and_switches_vendor(
     assert response.status == 403
 
     page.goto(f"{live_server.url}/manager/shop/")
+    page.locator("header .user-menu summary").click()  # sign-out sits in the user menu (ARC.32)
     page.get_by_role("button", name="Sign out").click()
     expect(page).to_have_url(re.compile(r"/account/login/"))
 
