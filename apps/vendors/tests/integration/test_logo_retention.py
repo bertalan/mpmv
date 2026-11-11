@@ -9,6 +9,7 @@ logo down.
 import datetime as dt
 
 import pytest
+from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
@@ -21,6 +22,7 @@ from apps.vendors.models import Vendor
 from apps.vendors.services import (
     PROFILE_REVERT_PERMISSION,
     confirm_logo_change,
+    confirmable_logo_entry_ids,
     purge_retained_logos,
     remove_vendor_logo,
     revert_logo_change,
@@ -185,6 +187,36 @@ def test_confirm_refuses_a_change_with_nothing_kept_or_already_reverted(
     revert_logo_change(entry.public_id, REASON, actor=staff, ctx=STAFF_CTX)
     with pytest.raises(ValidationError):
         confirm_logo_change(entry.public_id, actor=staff, ctx=STAFF_CTX)
+
+
+def test_an_alt_only_edit_keeps_no_file_and_never_purges_the_one_a_later_replace_keeps(
+    vendor: Vendor, owner: User, staff: User
+) -> None:
+    _set(vendor, owner, alt="First mark")
+    kept = Vendor.objects.get(pk=vendor.pk).logo
+    assert kept is not None
+    set_vendor_logo(vendor, upload=None, alt="Only the alt", actor=owner, ctx=CTX)
+    alt_only = AuditLog.objects.filter(action=CHANGED).latest("id")
+    assert confirmable_logo_entry_ids([alt_only]) == set()  # nothing is kept for it
+    with pytest.raises(ValidationError):
+        confirm_logo_change(alt_only.public_id, actor=staff, ctx=STAFF_CTX)
+    replace = _set(vendor, owner, alt="Second mark")
+    assert confirmable_logo_entry_ids([replace]) == {str(replace.public_id)}
+    # The audit log is append-only: pick the job's clock so that the window has closed for the alt
+    # edit and is still open for the replacement.
+    window = dt.timedelta(days=settings.VENDOR_LOGO_REVIEW_DAYS)
+    assert replace.created_at > alt_only.created_at
+    now = alt_only.created_at + window + (replace.created_at - alt_only.created_at) / 2
+    purge_retained_logos(ctx=SYSTEM, now=now)
+    assert MediaImage.objects.filter(pk=kept.pk).exists()  # still inside the replace window
+    assert not AuditLog.objects.filter(
+        action="vendor.logo_purged", after__entry=str(alt_only.public_id)
+    ).exists()
+    revert_logo_change(replace.public_id, REASON, actor=staff, ctx=STAFF_CTX)
+    vendor.refresh_from_db()
+    assert vendor.logo is not None
+    assert vendor.logo.pk == kept.pk
+    assert vendor.logo_alt == "Only the alt"
 
 
 def test_a_crafted_entry_cannot_restore_an_image_of_another_vendor(

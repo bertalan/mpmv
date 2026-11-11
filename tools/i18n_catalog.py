@@ -33,6 +33,7 @@ SCOPES = (
     "apps/manager",
     "apps/accounts",
     "apps/orders/templates",
+    "apps/vendors/templates/email/vendors/profile_reverted",
     "themes/base/templates/layouts",
 )
 # Theme files rendered by the Manager and account pages (the rest of the theme is storefront).

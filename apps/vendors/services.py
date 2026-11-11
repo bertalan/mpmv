@@ -2086,8 +2086,8 @@ LOGO_LICENCE_CODE = "own-work"
 
 
 def _logo_snapshot(logo: Any, alt: str) -> dict[str, Any]:
-    """The audited state: the image as `image:<id>` (its file is deleted when replaced, so the
-    id only says that it was a different image) and the alt text."""
+    """The audited state: the image as `image:<id>` (a replaced file is kept for the review
+    window, so a revert can restore it by this id) and the alt text."""
     return {"logo": None if logo is None else f"image:{logo.pk}", "logo_alt": alt}
 
 
@@ -2146,9 +2146,10 @@ def set_vendor_logo(
 
     Owner only, and not for a suspended or closed vendor (`PermissionDenied`, before any file is
     read). The alt text is required, short plain text. A new file goes through the SEC.2 checks
-    of `MediaImage` into the vendor's own collection; the previous image is deleted, and a
-    refused file leaves the current logo as it is. One `vendor.logo_changed` audit entry holds
-    the logo and alt text before and after. It counts against the profile save limits.
+    of `MediaImage` into the vendor's own collection; the previous image is kept for the review
+    window (`settings.VENDOR_LOGO_REVIEW_DAYS`) so staff can revert, and a refused file leaves
+    the current logo as it is. One `vendor.logo_changed` audit entry holds the logo and alt text
+    before and after. It counts against the profile save limits.
     """
     alt = alt.strip()
     spent = False
@@ -2996,18 +2997,15 @@ def revert_profile_change(
     with a `ValidationError` when the entry is unknown or already reverted, or when one of those
     fields has changed since (revert the later change first): a revert never overwrites newer
     text. Works on a suspended or closed vendor too, and does not lock the owner's own edits
-    (`PROFILE_LOCKED` is about the vendor's status only). Translations are not sent back to
-    review. One `vendor.profile_reverted` audit entry holds the restored fields, the reason and
-    the id of the entry it reverts; each vendor owner gets a `vendors.profile_reverted` email
-    with the reason, in the caller's transaction. A dry run returns the ChangeSet only.
+    (`PROFILE_LOCKED` is about the vendor's status only). As with an edit of the source text,
+    reviewed and published translations go back to review (D-33). One `vendor.profile_reverted`
+    audit entry holds the restored fields, the reason and the id of the entry it reverts; each
+    vendor owner gets a `vendors.profile_reverted` email with the reason, in the caller's
+    transaction. A dry run returns the ChangeSet only.
     """
     if not can_review_profiles(actor):
         raise PermissionDenied("Only platform staff revert storefront profile changes.")
     reason = reason.strip()
-    if not reason:
-        raise ValidationError({"reason": "A reason is required."})
-    if len(reason) > PROFILE_REASON_MAX_LENGTH:
-        raise ValidationError({"reason": "The reason is too long."})
     _check_revert_reason(reason)
     with transaction.atomic():
         entry = AuditLog.objects.filter(public_id=entry_public_id, action=PROFILE_CHANGED).first()
@@ -3026,8 +3024,6 @@ def revert_profile_change(
             vendor = None
         if vendor is None or not isinstance(language, str):
             raise ValidationError({"entry": "Unknown storefront profile change."})
-        if vendor is None:
-            raise ValidationError({"entry": "The vendor no longer exists."})
         if AuditLog.objects.filter(action=PROFILE_REVERTED, after__reverts=entry_id).exists():
             raise ValidationError({"entry": "This change was already reverted."})
         row = (
@@ -3088,8 +3084,11 @@ def revert_profile_change(
     return changes
 
 
-def _notify_profile_reverted(vendor: Vendor, language: str, fields: list[str], reason: str) -> None:
-    """Tell each vendor owner, in their own language, through the outbox."""
+def _notify_profile_reverted(
+    vendor: Vendor, language: str | None, fields: list[str], reason: str
+) -> None:
+    """Tell each vendor owner, in their own language, through the outbox. No `language` means a
+    logo revert (the email has its own wording)."""
     owners = User.objects.filter(
         vendor_memberships__vendor=vendor, vendor_memberships__role="owner"
     ).distinct()
@@ -3100,7 +3099,7 @@ def _notify_profile_reverted(vendor: Vendor, language: str, fields: list[str], r
             language=owner.preferred_language,
             context={
                 "vendor_name": vendor.display_name,
-                "language": language,
+                "language": language or "",
                 "fields": ", ".join(fields),
                 "reason": reason,
             },
@@ -3183,7 +3182,7 @@ def revert_logo_change(
         audit_changes(changes, ctx=ctx, action=LOGO_REVERTED)
         if previous is not None and (restored is None or restored.pk != previous.pk):
             _discard_logo_image(previous, vendor)
-        _notify_profile_reverted(vendor, "all languages", ["logo"], reason)
+        _notify_profile_reverted(vendor, None, ["logo"], reason)
     return changes
 
 
@@ -3196,6 +3195,20 @@ def _image_id(reference: Any) -> int | None:
         value = reference.removeprefix("image:")
         return int(value) if value.isdecimal() else None
     return None
+
+
+def _kept_image_id(entry: AuditLog) -> int | None:
+    """The id of the file a `vendor.logo_changed` entry keeps for its review window, or None.
+
+    An entry keeps a file only when the logo itself changed (`before["logo"] != after["logo"]`):
+    an alt-text-only edit has the same image on both sides, which is still the vendor's logo or a
+    file a later entry keeps."""
+    before, after = entry.before, entry.after
+    if not isinstance(before, dict) or not isinstance(after, dict):
+        return None
+    if before.get("logo") == after.get("logo"):
+        return None
+    return _image_id(before.get("logo"))
 
 
 def _own_logo_collection(vendor: Vendor) -> ImageCollection | None:
@@ -3248,8 +3261,7 @@ def confirm_logo_change(
         raise PermissionDenied("Only platform staff confirm storefront profile changes.")
     with transaction.atomic():
         entry = AuditLog.objects.filter(public_id=entry_public_id, action=LOGO_CHANGED).first()
-        before = entry.before if entry is not None else None
-        image_id = _image_id(before.get("logo")) if isinstance(before, dict) else None
+        image_id = _kept_image_id(entry) if entry is not None else None
         if entry is None or image_id is None:
             raise ValidationError({"entry": "Nothing is kept for this logo change."})
         try:
@@ -3264,7 +3276,7 @@ def confirm_logo_change(
             raise ValidationError({"entry": "Unknown logo change."})
         if _logo_entry_done(entry):
             raise ValidationError({"entry": "This change was already handled."})
-        if _kept_logo_image(vendor, before.get("logo")) is None:  # type: ignore[union-attr]
+        if _kept_logo_image(vendor, f"image:{image_id}") is None:
             raise ValidationError({"entry": "Nothing is kept for this logo change."})
         changes = ChangeSet()
         changes.update(
@@ -3299,15 +3311,13 @@ def purge_retained_logos(
     todo = []
     old = AuditLog.objects.filter(action=LOGO_CHANGED, created_at__lte=cutoff).order_by("id")
     for entry in old:
-        before = entry.before if isinstance(entry.before, dict) else {}
-        if str(entry.public_id) in handled or _image_id(before.get("logo")) is None:
+        if str(entry.public_id) in handled or _kept_image_id(entry) is None:
             continue
         todo.append(entry)
         if len(todo) >= batch:
             break
     for entry in todo:
-        before = entry.before if isinstance(entry.before, dict) else {}
-        image_id = _image_id(before.get("logo"))
+        image_id = _kept_image_id(entry)
         if image_id is None:  # pragma: no cover
             continue
         with transaction.atomic():
@@ -3326,12 +3336,7 @@ def purge_retained_logos(
                 {"logo_kept": f"image:{image_id}"},
                 {"logo_kept": None, "entry": str(entry.public_id), "outcome": outcome},
             )
-            changes.update(
-                MODEL_LABEL,
-                str(vendor.public_id),
-                {"logo_kept": f"image:{image_id}"},
-                {"logo_kept": None, "entry": str(entry.public_id), "outcome": outcome},
-            )
+            changes.changes.extend(step.changes)
             if not dry_run:
                 audit_changes(step, ctx=ctx, action=LOGO_PURGED)
     return changes
@@ -3340,12 +3345,8 @@ def purge_retained_logos(
 def confirmable_logo_entry_ids(entries: Collection[AuditLog]) -> set[str]:
     """Public ids of the logo changes among `entries` that still have a kept file and were not
     reverted, confirmed or purged (the history page offers "confirm" for these)."""
-    wanted = {
-        str(e.public_id): _image_id(e.before.get("logo"))
-        for e in entries
-        if e.action == LOGO_CHANGED and isinstance(e.before, dict)
-    }
-    wanted = {k: v for k, v in wanted.items() if v is not None}
+    kept = {str(e.public_id): _kept_image_id(e) for e in entries if e.action == LOGO_CHANGED}
+    wanted = {k: v for k, v in kept.items() if v is not None}
     if not wanted:
         return set()
     done = set(
