@@ -6,8 +6,9 @@ province > explicit country > country group), and the rest of the world (`*`) on
 resort. SHP.2 checks the legacy regression cases 1-7 against these functions, normalises the
 destination country once (`EL` -> `GR`, `UK` -> `GB`) and parses a zone's postcode patterns once,
 when its snapshot is built. Special areas (SHP.14) are resolved here too: which area an address
-is in and which treatment a method gives it. The quote calculation (SHP.3) also lives here when
-that task adds it.
+is in and which treatment a method gives it. The quote calculation (SHP.3, `quote_shipping`)
+lives here too: one vendor's package in, an outcome out (Rates, IndicativeRates, NeedsQuote or
+Blocked), net of VAT; the VAT on shipping is the tax engine's (TAX.4).
 """
 
 import re
@@ -611,3 +612,326 @@ def special_area_treatment(
     if zone is not None and area.kind != EXTRA_VAT and zone_within_area(zone, area, dest):
         return SpecialAreaDecision(area, PRICED_BY_ZONE_TREATMENT, is_default=False)
     return SpecialAreaDecision(area, DEFAULT_AREA_TREATMENT, is_default=True)
+
+
+# --- The quote of one vendor's package (SHP.3)
+
+_THOUSANDTH: Final = Decimal("0.001")
+
+# Kinds of rate.
+METHOD_RATE: Final = "method"
+PICKUP_RATE: Final = "pickup"
+
+# Why a package gets no rate (`NeedsQuote.reason`, `Blocked.reason`).
+COUNTRY_NOT_COVERED: Final = "country_not_covered"
+OVER_MAX_WEIGHT: Final = "over_max_weight"
+NO_WEIGHT: Final = "no_weight"
+NO_BAND: Final = "no_band"
+AREA_QUOTE_ONLY: Final = "area_quote_only"
+AREA_BLOCKED: Final = "area_blocked"
+QUOTES_DISABLED: Final = "quotes_disabled"
+
+_MESSAGES: Final = {
+    COUNTRY_NOT_COVERED: "This vendor has no shipping rate for the destination.",
+    OVER_MAX_WEIGHT: "The package is heavier than the vendor's shipping rates cover.",
+    NO_WEIGHT: "The package has no weight, so no shipping rate can be computed.",
+    NO_BAND: "The vendor has no shipping rate for the weight of the package.",
+    AREA_QUOTE_ONLY: "Shipping to this area is priced on request.",
+    AREA_BLOCKED: "The vendor does not ship to this area.",
+    QUOTES_DISABLED: "The destination needs a quote, and quotes are not available.",
+}
+
+
+@dataclass(frozen=True)
+class PackageLine:
+    """A line of a package: unit weight in kg, quantity and the line's net goods value."""
+
+    weight_kg: Decimal
+    quantity: int
+    net_goods: Decimal
+
+
+@dataclass(frozen=True)
+class VendorPackage:
+    """The lines of ONE vendor (the cart is split into one package per vendor, spec rule 1)."""
+
+    vendor_id: int
+    lines: tuple[PackageLine, ...]
+
+    @property
+    def weight_kg(self) -> Decimal:
+        """Sum of weight x quantity, kg to 3 decimals, half up."""
+        total = sum((line.weight_kg * line.quantity for line in self.lines), Decimal(0))
+        return total.quantize(_THOUSANDTH, rounding=ROUND_HALF_UP)
+
+    @property
+    def goods_net(self) -> Decimal:
+        """Net goods value, the base of the free-shipping threshold."""
+        total = sum((line.net_goods for line in self.lines), ZERO_AMOUNT)
+        return total.quantize(_CENT, rounding=ROUND_HALF_UP)
+
+
+@dataclass(frozen=True)
+class BandSnap:
+    """A weight band: (from_kg, to_kg], `to_kg` None meaning unlimited."""
+
+    from_kg: Decimal
+    to_kg: Decimal | None
+    cost_net: Decimal
+    surcharge_net: Decimal = ZERO_AMOUNT
+
+    def holds(self, weight_kg: Decimal) -> bool:
+        return self.from_kg < weight_kg and (self.to_kg is None or weight_kg <= self.to_kg)
+
+    @property
+    def price(self) -> Decimal:
+        return self.cost_net + self.surcharge_net
+
+
+@dataclass(frozen=True)
+class MethodSnap:
+    """A shipping method as the quote sees it. `treatments` are its special-area treatments by
+    area code; `over_max_weight` empty means the platform default."""
+
+    key: str
+    name: str
+    vendor_id: int
+    zone: ZoneSnap
+    carrier_code: str
+    bands: tuple[BandSnap, ...]
+    carrier_active: bool = True
+    service_level: str = STANDARD
+    min_delivery_days: int | None = None
+    max_delivery_days: int | None = None
+    is_default: bool = False
+    free_shipping_threshold: Decimal | None = None
+    tax_treatment: str = DEFAULT_TAX_TREATMENT
+    over_max_weight: str = PLATFORM_DEFAULT
+    treatments: Mapping[str, AreaTreatment] = field(default_factory=dict, compare=False)
+
+
+@dataclass(frozen=True)
+class PickupSnap:
+    vendor_id: int
+    key: str
+    label: str
+    cost_net: Decimal
+    address: str = ""
+
+
+@dataclass(frozen=True)
+class ShippingConfigSnap:
+    """Everything `quote_shipping` reads. `default_over_max_weight` is the platform policy for
+    methods that set none: D-06 is open and its proposal is a quote."""
+
+    methods: tuple[MethodSnap, ...]
+    pickups: tuple[PickupSnap, ...] = ()
+    areas: tuple[SpecialAreaSnap, ...] = ()
+    quotes_enabled: bool = True
+    default_over_max_weight: str = QUOTE
+
+
+@dataclass(frozen=True)
+class ShippingRate:
+    """One choice offered to the buyer, net of VAT. Besides the price it carries what the tax
+    engine needs (`tax_treatment`, `zone_code`, `territory_code` of an extra-VAT area)."""
+
+    key: str
+    kind: str
+    label: str
+    net: Decimal
+    vendor_id: int
+    is_default: bool = False
+    is_indicative: bool = False
+    free_shipping: bool = False
+    min_days: int | None = None
+    max_days: int | None = None
+    tax_treatment: str = DEFAULT_TAX_TREATMENT
+    zone_code: str = ""
+    carrier_code: str = ""
+    service_level: str = ""
+    area_code: str = ""
+    territory_code: str = ""
+    address: str = ""
+
+
+@dataclass(frozen=True)
+class Rates:
+    """Exact rates: the buyer picks one (the default is preselected)."""
+
+    rates: tuple[ShippingRate, ...]
+
+
+@dataclass(frozen=True)
+class IndicativeRates:
+    """Estimates subject to quote (special areas, SHP.14). At checkout it behaves like
+    NeedsQuote; the quote request starts from the estimate. A pickup rate stays exact."""
+
+    rates: tuple[ShippingRate, ...]
+
+
+@dataclass(frozen=True)
+class NeedsQuote:
+    """No rate: the vendor quotes the price (SHP.9). `pickups` stay available."""
+
+    reason: str
+    message: str
+    pickups: tuple[ShippingRate, ...] = ()
+
+
+@dataclass(frozen=True)
+class Blocked:
+    """No rate and no quote: the package cannot be shipped, with a message for the buyer."""
+
+    reason: str
+    message: str
+
+
+type ShippingOutcome = Rates | IndicativeRates | NeedsQuote | Blocked
+
+
+@dataclass(frozen=True)
+class _Priced:
+    rate: ShippingRate | None = None
+    quote: str = ""
+    blocked: str = ""
+
+
+def _band_for(method: MethodSnap, weight: Decimal, default_policy: str) -> BandSnap | str:
+    """The band that prices `weight`, or the reason there is none (OVER_MAX_WEIGHT with the
+    policy applied by the caller, NO_BAND for a gap)."""
+    for band in method.bands:
+        if band.holds(weight):
+            return band
+    bounded = [band for band in method.bands if band.to_kg is not None]
+    if bounded and len(bounded) == len(method.bands):
+        last = max(bounded, key=lambda band: band.to_kg or ZERO_AMOUNT)
+        if last.to_kg is not None and weight > last.to_kg:
+            policy = method.over_max_weight or default_policy
+            if policy == LAST_BAND:
+                return last
+            return BLOCK if policy == BLOCK else QUOTE
+    return NO_BAND
+
+
+def _price_method(
+    method: MethodSnap, package: VendorPackage, dest: Destination, cfg: ShippingConfigSnap
+) -> _Priced:
+    weight = package.weight_kg
+    decision = special_area_treatment(cfg.areas, method.treatments, dest, method.zone)
+    if decision is not None:
+        if decision.is_blocked:
+            return _Priced(blocked=AREA_BLOCKED)
+        if decision.is_unavailable:
+            return _Priced()
+        if decision.requests_quote and not decision.offers_rate:
+            return _Priced(quote=AREA_QUOTE_ONLY)
+    band = _band_for(method, weight, cfg.default_over_max_weight)
+    if isinstance(band, str):
+        if band == BLOCK:
+            return _Priced(blocked=OVER_MAX_WEIGHT)
+        return _Priced(quote=OVER_MAX_WEIGHT if band == QUOTE else NO_BAND)
+    threshold = method.free_shipping_threshold
+    free = threshold is not None and package.goods_net >= threshold
+    base = ZERO_AMOUNT if free else band.price
+    min_days, max_days = method.min_delivery_days, method.max_delivery_days
+    indicative = False
+    area_code = territory = ""
+    net = base.quantize(_CENT, rounding=ROUND_HALF_UP)
+    if decision is not None:
+        cost = decision.cost(base, weight)
+        net = cost if cost is not None else net
+        min_days, max_days = decision.delivery_days(min_days, max_days)
+        indicative = decision.is_indicative
+        area_code, territory = decision.area.code, decision.area.territory_code
+    return _Priced(
+        rate=ShippingRate(
+            key=method.key,
+            kind=METHOD_RATE,
+            label=method.name,
+            net=net,
+            vendor_id=method.vendor_id,
+            is_default=method.is_default,
+            is_indicative=indicative,
+            free_shipping=free,
+            min_days=min_days,
+            max_days=max_days,
+            tax_treatment=method.tax_treatment,
+            zone_code=method.zone.code,
+            carrier_code=method.carrier_code,
+            service_level=method.service_level,
+            area_code=area_code,
+            territory_code=territory,
+        )
+    )
+
+
+def _pickup_rates(vendor_id: int, cfg: ShippingConfigSnap) -> tuple[ShippingRate, ...]:
+    return tuple(
+        ShippingRate(
+            key=pickup.key,
+            kind=PICKUP_RATE,
+            label=pickup.label,
+            net=pickup.cost_net.quantize(_CENT, rounding=ROUND_HALF_UP),
+            vendor_id=vendor_id,
+            address=pickup.address,
+        )
+        for pickup in sorted(cfg.pickups, key=lambda item: item.key)
+        if pickup.vendor_id == vendor_id
+    )
+
+
+def _no_rate(reason: str, cfg: ShippingConfigSnap) -> NeedsQuote | Blocked:
+    """A package nobody can price: a quote when quotes are enabled, otherwise blocked."""
+    if cfg.quotes_enabled:
+        return NeedsQuote(reason, _MESSAGES[reason])
+    return Blocked(reason, _MESSAGES[reason])
+
+
+def quote_shipping(
+    package: VendorPackage, dest: Destination, cfg: ShippingConfigSnap
+) -> ShippingOutcome:
+    """The shipping of ONE vendor's package to `dest`, net of VAT (spec 06 §6.2).
+
+    Rates: one per method of the resolved zone (default first), then pickups.
+    IndicativeRates: every priced method is a special-area estimate subject to quote.
+    NeedsQuote: no zone, weight 0 or beyond the bands with the "quote" policy, a quote-only area.
+    Blocked: quotes are disabled, or the weight policy or the special area blocks the package.
+    Never a silent empty list. A pickup is offered only in a covered zone (case 13) and never
+    turns a quote into Rates, except when quotes are disabled and it is all that is left.
+    """
+    own = [m for m in cfg.methods if m.vendor_id == package.vendor_id and m.carrier_active]
+    zones = {(m.zone.vendor_id, m.zone.code): m.zone for m in own}
+    zone = resolve_zone(zones.values(), package.vendor_id, dest)
+    if zone is None:
+        return _no_rate(COUNTRY_NOT_COVERED, cfg)
+    if package.weight_kg <= 0:
+        return _no_rate(NO_WEIGHT, cfg)
+    in_zone = [m for m in own if (m.zone.vendor_id, m.zone.code) == (zone.vendor_id, zone.code)]
+    priced = [_price_method(m, package, dest, cfg) for m in in_zone]
+    rates = [p.rate for p in priced if p.rate is not None]
+    pickups = _pickup_rates(package.vendor_id, cfg)
+
+    def order(rate: ShippingRate) -> tuple[bool, Decimal, str]:
+        return (not rate.is_default, rate.net, rate.key)
+
+    exact = sorted((r for r in rates if not r.is_indicative), key=order)
+    estimates = sorted((r for r in rates if r.is_indicative), key=order)
+    if exact:
+        return Rates((*exact, *pickups))
+    quote = next((p.quote for p in priced if p.quote), "")
+    if estimates and cfg.quotes_enabled:
+        return IndicativeRates((*estimates, *pickups))
+    if not cfg.quotes_enabled and pickups:
+        return Rates(pickups)
+    if estimates or quote:
+        reason = quote or QUOTES_DISABLED
+        if cfg.quotes_enabled:
+            return NeedsQuote(reason, _MESSAGES[reason], pickups)
+        return Blocked(reason if quote else QUOTES_DISABLED, _MESSAGES[reason])
+    blocked = next((p.blocked for p in priced if p.blocked), "")
+    if blocked:
+        if pickups:
+            return Rates(pickups)
+        return Blocked(blocked, _MESSAGES[blocked])
+    return _no_rate(COUNTRY_NOT_COVERED, cfg)
