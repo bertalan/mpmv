@@ -25,6 +25,7 @@ E edit, R read only, A audited support action, I impersonation within the policy
 | Platform: owner-only settings (CMP.13, CMP.11 approvals) | R |  |  |  | E |  |
 | Platform: catalog, categories, attributes, taxonomies, imports |  | E |  | R | R |  |
 | Platform: moderation (vendor events, storefront changes, content) |  | E |  |  | R |  |
+| Platform: notices of illegal content (CMP.5) |  | E |  |  | R |  |
 | Platform: vendors (applications, plans) | R | R | R | R | E |  |
 | Platform: approve or suspend a vendor (step-up, reason) |  | E |  |  | E |  |
 | Platform: close a vendor definitively |  |  |  |  | E |  |

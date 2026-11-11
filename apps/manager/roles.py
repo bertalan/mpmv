@@ -101,6 +101,7 @@ MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
     "platform.owner_settings": {CONFIG: R, OWNER: E},
     "platform.catalog": {CATALOG: E, SUPPORT: R, OWNER: R},
     "platform.moderation": {CATALOG: E, OWNER: R},
+    "platform.notices": {CATALOG: E, OWNER: R},  # CMP.5; still gated by compliance.review_notices
     "platform.vendors": {CONFIG: R, CATALOG: R, FINANCE: R, SUPPORT: R, OWNER: E},
     "platform.vendor_approval": {CATALOG: E, OWNER: E},
     "platform.vendor_closure": {OWNER: E},
@@ -121,6 +122,7 @@ SECTION_LABELS: Final[Mapping[str, str]] = {
     "platform.owner_settings": "Platform: owner-only settings (CMP.13, CMP.11 approvals)",
     "platform.catalog": "Platform: catalog, categories, attributes, taxonomies, imports",
     "platform.moderation": "Platform: moderation (vendor events, storefront changes, content)",
+    "platform.notices": "Platform: notices of illegal content (CMP.5)",
     "platform.vendors": "Platform: vendors (applications, plans)",
     "platform.vendor_approval": "Platform: approve or suspend a vendor (step-up, reason)",
     "platform.vendor_closure": "Platform: close a vendor definitively",
