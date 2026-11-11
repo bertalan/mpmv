@@ -277,7 +277,12 @@ class DocumentUploadForm(forms.Form):
 
     title = forms.CharField(label=_("Title"), max_length=255, required=False)
     file = forms.FileField(
-        label=_("File"), widget=forms.ClearableFileInput(attrs={"accept": "application/pdf"})
+        label=_("File"),
+        help_text=_(
+            "A PDF document, for example your return policy. It is stored in your own shop "
+            "collection and no other shop can see it."
+        ),
+        widget=forms.ClearableFileInput(attrs={"accept": "application/pdf"}),
     )
 
 
@@ -396,8 +401,24 @@ def https_address(value: str) -> str:
 
 
 class ExternalLinkForm(forms.Form):
-    url = forms.CharField(label=_("Web address"), required=True, max_length=LINK_MAX_LENGTH + 100)
-    link_text = forms.CharField(label=_("Link text"), required=False, max_length=255)
+    url = forms.CharField(
+        label=_("Web address"),
+        help_text=_(
+            "The full address of the page to open, starting with https://, for example "
+            "https://www.example.com/guide. Required: the link has nowhere to go without it."
+        ),
+        required=True,
+        max_length=LINK_MAX_LENGTH + 100,
+    )
+    link_text = forms.CharField(
+        label=_("Link text"),
+        help_text=_(
+            "The words buyers click on. If you leave it empty, the words you selected are "
+            "used, or the address itself when nothing is selected."
+        ),
+        required=False,
+        max_length=255,
+    )
 
     def clean_url(self) -> str:
         return https_address(self.cleaned_data["url"])

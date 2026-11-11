@@ -138,6 +138,9 @@ jobs:
     # ARC.23: the parity smoke deploys the image with mpmv-deploy under the real Quadlet units, the
     # production Caddyfile and PostgreSQL over TLS verify-full (deploy/ci/parity-smoke.sh).
     name: Container image (${{ matrix.arch }})
+    # Draft PRs run the light jobs only (runner time, owner 2026-11-11); ready PRs, merge trains and
+    # main run everything, so nothing reaches main without this job.
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     strategy:
       fail-fast: false
       matrix:
@@ -213,12 +216,16 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       BUILD_RESULT: ${{ needs.image-build.result }}
+      IS_DRAFT: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}
     steps:
-      - name: Both architectures built and passed
-        run: test "$BUILD_RESULT" = success
+      - name: Both architectures built and passed (skipped only on a draft PR)
+        run: test "$BUILD_RESULT" = success || { test "$IS_DRAFT" = true && test "$BUILD_RESULT" = skipped; }
 
   e2e:
     name: E2E (Playwright)
+    # Draft PRs run the light jobs only (runner time, owner 2026-11-11); ready PRs, merge trains and
+    # main run everything, so nothing reaches main without this job.
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ubuntu-24.04
     services:
       postgres:
@@ -237,8 +244,30 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('uv.lock') }}
       - name: Install Chromium
-        run: uv run playwright install --with-deps chromium
+        timeout-minutes: 10
+        run: |
+          # The ubuntu-24.04 image already has Chromium's system libraries; install-deps only adds
+          # fonts. When the apt mirror is unreachable, each package waits for its timeout, so a
+          # retried install-deps took 32 minutes (2026-11-11). Fail fast: short apt timeouts, one
+          # attempt with a hard time limit, then continue without the extra fonts.
+          printf '%s\n' 'Acquire::Retries "1";' 'Acquire::http::Timeout "10";' 'Acquire::https::Timeout "10";' | sudo tee /etc/apt/apt.conf.d/80-retries >/dev/null
+          if ! timeout -k 10 150 uv run playwright install-deps chromium; then
+            echo "::warning::Playwright system dependencies could not be installed within 150 s (apt mirror unreachable?); fonts may be missing"
+          fi
+          for attempt in 1 2 3; do
+            if uv run playwright install chromium; then
+              exit 0
+            fi
+            echo "playwright install failed (attempt $attempt of 3)"
+            sleep $((attempt * 20))
+          done
+          exit 1
       - name: Pytest (e2e)
         run: uv run pytest -m e2e --junitxml=build/reports/junit-e2e.xml
       - name: Store screenshots
