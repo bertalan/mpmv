@@ -14,7 +14,7 @@ import pytest
 from hypothesis import HealthCheck, settings
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
     from django.test import Client
 
@@ -123,6 +123,17 @@ def _reproducible_factories(factory_seed: int) -> None:
     factory.random.reseed_random(factory_seed)
     for factory_class in app_factories():
         factory_class.reset_sequence()
+
+
+@pytest.fixture(autouse=True)
+def _no_language_leaks_between_tests() -> "Iterator[None]":
+    """A request activates its language (LocaleMiddleware, a user's preference) and nothing
+    deactivates it, so the next test of the thread would resolve `i18n_patterns` URLs in it."""
+    from django.utils import translation
+
+    translation.deactivate()
+    yield
+    translation.deactivate()
 
 
 @pytest.fixture
