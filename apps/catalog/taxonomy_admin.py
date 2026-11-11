@@ -22,7 +22,8 @@ from django.db import models, transaction
 from django.http import HttpRequest
 from django.utils.html import format_html
 from django.utils.http import urlencode
-from treebeard.forms import MoveNodeForm
+from django.utils.translation import gettext_lazy as _
+from treebeard.forms import MoveNodeForm, TreeNodeChoiceField
 
 from apps.core.text import ascii_int
 
@@ -72,6 +73,25 @@ class TreeNodeForm(MoveNodeForm):  # type: ignore[misc]  # treebeard is untyped
     moves it, so for a moment a term "after X" is a child of X, which a flat taxonomy refuses.
     """
 
+    treebeard_position = forms.ChoiceField(
+        required=True,
+        label=_("Position"),
+        help_text=_(
+            "Where to place this item next to the one chosen below: first inside it, before it "
+            "or after it. Required."
+        ),
+    )
+    treebeard_ref_node = TreeNodeChoiceField(
+        required=False,
+        label=_("Relative to"),
+        empty_label=_("-- root --"),
+        queryset=None,  # populated in __init__
+        help_text=_(
+            "The item to place this one next to. Leave it empty to put this one at the top "
+            "level of the list."
+        ),
+    )
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         field = self.fields["treebeard_ref_node"]
@@ -114,6 +134,17 @@ class TermForm(TreeNodeForm):
         model = Term
         fields = ("taxonomy", "attributes")
 
+    treebeard_ref_node = TreeNodeChoiceField(
+        required=False,
+        label=_("Relative to"),
+        empty_label=_("-- root --"),
+        queryset=None,  # populated in __init__
+        help_text=_(
+            "The category or tag to place this one next to. Leave it empty to put this one at "
+            "the top level of its set."
+        ),
+    )
+
     def _get_initial(self, instance: Term) -> dict[str, Any]:
         if instance._state.adding or not instance.is_root():
             initial: dict[str, Any] = super()._get_initial(instance)
@@ -146,7 +177,6 @@ class TermForm(TreeNodeForm):
         field = self.fields["treebeard_ref_node"]
         field.widget = TermReferenceWidget(self._known_taxonomy())
         field.widget.is_required = field.required
-        field.help_text = "Empty: the top level of the taxonomy."
         # Setting the queryset also gives the new widget its choices.
         field.queryset = field.queryset.select_related("taxonomy")
         if self.instance.taxonomy_id is not None:
