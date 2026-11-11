@@ -63,6 +63,7 @@ apps/
   ledger/                 # LedgerEntry, commissions, payouts, reconciliation
   ingest/                 # supplier sources, adapters, staging, catalog upsert
   cms/                    # Wagtail pages: Home, Standard, Blog, Taxonomy landing, Vendor storefront, Legal
+  fitment/                # D-38 proposal: fitment scheme and nodes, product fitment, matching engine, garage profiles (spec 17)
   events/                 # EventIndexPage and EventPage (Wagtail), recurrence, moderation, RSS/ICS feeds, maps (spec 15)
   themes/                 # theme registry, theme-aware template loader, design tokens (spec 14); theme files in themes/<slug>/
   seo/                    # sitemap, JSON-LD, Google/Meta feeds, llms.txt, robots
@@ -96,6 +97,12 @@ flowchart TD
   catalog --> seo
   cms --> seo
   catalog --> events
+  accounts --> fitment
+  catalog --> fitment
+  fitment --> cms
+  fitment --> events
+  fitment --> seo
+  ingest --> fitment
   cms --> events
   events --> seo
   events --> compliance
