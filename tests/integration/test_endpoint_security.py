@@ -134,6 +134,8 @@ def sample_path(endpoint: Endpoint, access: object = None) -> str:
     if isinstance(access, NoVendorData) and access.path:
         return access.path
     kwargs = access.kwargs if isinstance(access, NoVendorData | StaffOnly) else {}
+    if isinstance(access, VendorScoped):
+        kwargs = access.sample
     return endpoint.path(**{name: kwargs.get(name, "0") for name in endpoint.params})
 
 
