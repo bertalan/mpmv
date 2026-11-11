@@ -162,7 +162,7 @@ def test_a_document_with_remote_resources_fetches_none_of_them(
         f'<style>@import url("{base}/b.css"); p {{ background: url({base}/c.png) }}</style>'
         f'</head><body><p>text</p><img src="{base}/d.png"></body></html>'
     )
-    pdf = documents.render_html(html, lang="en")
+    pdf = documents.render_html(html)
     assert pdf.startswith(b"%PDF")
     assert hits == []
 
@@ -172,7 +172,8 @@ def _python_files() -> list[Path]:
     return [
         path
         for path in (ROOT / "apps").rglob("*.py")
-        if not skipped & set(path.parts) and "tests" not in path.parts
+        if not skipped & set(path.relative_to(ROOT).parts)
+        and "tests" not in path.relative_to(ROOT).parts
     ]
 
 

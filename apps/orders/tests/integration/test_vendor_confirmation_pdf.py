@@ -10,10 +10,10 @@ from pypdf import PdfReader
 from apps.core import mail
 from apps.core import services as core_services
 from apps.core.models import OutboxEmail, OutboxEmailEvent
-from apps.orders import documents, notifications
+from apps.orders import documents, notifications, services
 from apps.orders.models import Order, PrivacyStatus, VendorOrder
 from apps.orders.tests.integration.test_notifications import BANNED, LANGS, two_vendor_order
-from apps.orders.tests.integration.test_services import line_input, pay, place, vendor_input
+from apps.orders.tests.integration.test_services import CTX, line_input, pay, place, vendor_input
 from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
@@ -46,6 +46,16 @@ def text_of(pdf: bytes) -> str:
 
 def sub_orders(order: Order) -> list[VendorOrder]:
     return list(order.vendor_orders.order_by("id"))
+
+
+def make_inactive(order: Order, state: str) -> None:
+    """Through the scrub services: the database refuses any other write of the privacy status."""
+    if state == PrivacyStatus.ANONYMIZED:
+        services.transition_order(order, "awaiting_payment", ctx=CTX)
+        services.transition_order(order, "cancelled", ctx=CTX)  # never paid: due at once
+        services.anonymise_order(order, ctx=CTX)
+    else:
+        services.restrict_order(order, ctx=CTX, reason="account_erasure")
 
 
 def sub_with(order: Order, title: str) -> VendorOrder:
@@ -126,10 +136,11 @@ def test_the_pdf_is_tagged_with_language_and_title() -> None:
     order = two_vendor_order(language="de")
     pdf = documents.render_vendor_confirmation_pdf(sub_orders(order)[0])
     rd = reader(pdf)
-    root = rd.trailer["/Root"]
-    assert root["/MarkInfo"]["/Marked"] is True or bool(root["/MarkInfo"]["/Marked"])
+    root: Any = rd.trailer["/Root"]
+    assert bool(root["/MarkInfo"]["/Marked"])
     assert "/StructTreeRoot" in root
     assert str(root["/Lang"]).lower().startswith("de")
+    assert rd.metadata is not None
     title = str(rd.metadata.title)
     assert LABELS["de"] in title
     assert order.number in title
@@ -139,8 +150,8 @@ def test_the_pdf_is_tagged_with_language_and_title() -> None:
 def test_nothing_is_produced_for_an_order_that_is_not_active(state: str) -> None:
     order = two_vendor_order()
     sub = sub_orders(order)[0]
-    Order.objects.filter(pk=order.pk).update(privacy_status=state)
-    sub = VendorOrder.objects.get(pk=sub.pk)
+    make_inactive(order, state)
+    sub = VendorOrder.objects.select_related("order").get(pk=sub.pk)
     with pytest.raises(documents.ConfirmationUnavailable):
         documents.render_vendor_confirmation_pdf(sub)
 
@@ -240,7 +251,7 @@ def test_an_order_restricted_before_sending_gets_the_email_without_the_pdf(
 ) -> None:
     order = two_vendor_order()
     pay(order)
-    Order.objects.filter(pk=order.pk).update(privacy_status=PrivacyStatus.RESTRICTED_TAX_ONLY)
+    make_inactive(order, PrivacyStatus.RESTRICTED_TAX_ONLY)
     email = confirmations()[0]
     core_services.deliver_email(email.public_id)
     assert sender.sent[-1].attachments == ()
