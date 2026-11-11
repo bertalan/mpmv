@@ -16,7 +16,7 @@ from enum import StrEnum
 from typing import Final
 
 PLATFORM_OWNER_PERMISSION: Final = "core.platform_owner"
-VIEW_ALL_VENDORS: Final = "vendors.view_all_vendors"  # Q-34
+VIEW_ALL_VENDORS_PERMISSION: Final = "vendors.view_all_vendors"  # Q-34
 
 
 class Access(StrEnum):
@@ -63,25 +63,25 @@ ROLES: Final[tuple[Role, ...]] = (
         CATALOG,
         "Platform: catalog and moderation",
         "Catalog and moderation",
-        ("manager.platform_catalog", VIEW_ALL_VENDORS),
+        ("manager.platform_catalog", VIEW_ALL_VENDORS_PERMISSION),
     ),
     Role(
         FINANCE,
         "Platform: finance and payments",
         "Finance and payments",
-        ("manager.platform_finance", VIEW_ALL_VENDORS),
+        ("manager.platform_finance", VIEW_ALL_VENDORS_PERMISSION),
     ),
     Role(
         SUPPORT,
         "Platform: support",
         "Support",
-        ("manager.platform_support", VIEW_ALL_VENDORS),
+        ("manager.platform_support", VIEW_ALL_VENDORS_PERMISSION),
     ),
     Role(
         OWNER,
         "Platform: owner",
         "Platform owner",
-        (PLATFORM_OWNER_PERMISSION, VIEW_ALL_VENDORS),
+        (PLATFORM_OWNER_PERMISSION, VIEW_ALL_VENDORS_PERMISSION),
     ),
 )
 

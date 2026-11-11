@@ -28,7 +28,7 @@ def test_only_the_owner_role_holds_platform_owner() -> None:
 
 
 def test_the_configuration_role_has_no_platform_wide_vendor_read() -> None:
-    assert roles.VIEW_ALL_VENDORS not in roles.role("config").permissions
+    assert roles.VIEW_ALL_VENDORS_PERMISSION not in roles.role("config").permissions
 
 
 def test_group_names_are_unique() -> None:
