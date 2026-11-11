@@ -8,6 +8,8 @@ whose role checks CORE.18 defines.
 from django.utils.translation import gettext_lazy as _
 
 from .navigation import Registry, Section, anyone, vendor_action
+from .notice_views import SECTION as NOTICES_SECTION
+from .notice_views import can_review
 from .spaces import Space
 
 BUILT_IN = (
@@ -57,6 +59,14 @@ BUILT_IN = (
         "manager:platform:dashboard",
         order=10,
         allowed=anyone,
+    ),
+    Section(
+        NOTICES_SECTION,
+        Space.PLATFORM,
+        _("Notices"),
+        "manager:platform:notices",
+        order=60,
+        allowed=can_review,
     ),
 )
 

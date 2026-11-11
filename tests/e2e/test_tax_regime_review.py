@@ -28,7 +28,7 @@ def test_staff_approve_a_tax_regime_change(
     staff = UserFactory.create(email="staff@example.com", password=password, superuser=True)
     device = TOTPDeviceFactory.create(user=staff)
     admin_login(page, live_server.url, "staff@example.com", password)
-    verify_with_totp(page, totp_token(device))
+    verify_with_totp(page, totp_token(device), operational=True)
 
     page.goto(f"{live_server.url}/django-admin/tax/taxregimechangerequest/")
     expect(page.locator(".messagelist")).to_contain_text("waiting for review")
