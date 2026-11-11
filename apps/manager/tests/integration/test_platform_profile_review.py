@@ -240,3 +240,14 @@ def test_the_reason_field_warns_against_personal_data(
 ) -> None:
     verified_login(client, reviewer)
     assert "personal data" in client.get(PAGE).text
+
+
+def test_the_notice_decisions_are_a_group_2_action(client: Client) -> None:
+    import uuid
+
+    staff = UserFactory.create(permissions=["core.platform_owner", "compliance.review_notices"])
+    url = f"{PLATFORM}notices/{uuid.uuid4()}/"
+    verified_login(client, staff, level=levels.RESTRICTED)
+    assert client.post(url, {"action": "review"}).status_code == 403
+    verified_login(client, staff, level=levels.OPERATIONAL)
+    assert client.post(url, {"action": "review"}).status_code == 404  # past the gate

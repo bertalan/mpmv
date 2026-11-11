@@ -501,9 +501,11 @@ WIRED = {
     "payout_details",
     "api_key",
     "profile_revert",
+    "notice_decision",
+    "bulk_edit",
 }
 # Actions whose web view does not exist yet: nothing to decorate (follow-ups in the PR).
-NOT_BUILT = {"tax_in_clear", "export", "backup", "bulk_edit", "impersonation"}
+NOT_BUILT = {"tax_in_clear", "export", "backup", "impersonation"}
 # Actions that are not web views: `manage.py bootstrap_platform_owner` runs with shell access on
 # the server, outside any browser session, so session levels cannot apply to it.
 NO_SESSION = {"bootstrap_platform_owner"}
@@ -516,7 +518,8 @@ def _source_files() -> list[Path]:
 
 def _gated_actions() -> set[str]:
     """Action keys named at `requires_level`, `level_gated_action` or `level=` in app code."""
-    pattern = re.compile(r"""(?:requires_level\(|level_gated_action\(|level=)\s*["'](\w+)["']""")
+    gate = r"requires_level(?:_method)?\(|level_gated_action\(|level="
+    pattern = re.compile(rf"""(?:{gate})\s*["'](\w+)["']""")
     found: set[str] = set()
     for path in _source_files():
         found |= set(pattern.findall(path.read_text()))
@@ -545,34 +548,119 @@ def test_no_unclassified_view_looks_like_a_sensitive_action() -> None:
     assert not hits, f"sensitive-looking views with no level gate: {hits}"
 
 
-# Manager POST views that run in any session (group 1: shop owners' own data, picking a vendor,
-# notice handling). Every other Manager view with a `post` must name `requires_level`.
-MANAGER_FREE_POST = {
-    "StorefrontProfileView",
-    "VendorOrderActionView",
-    "VendorPickerView",
-    "NoticeDetailView",
-    "ManagerImageUploadView",
-    "ManagerListView",
-    "LoginView",
+# Manager views that change state in any session level on purpose: {dotted view path: why}.
+# Everything else that accepts POST, PUT, PATCH or DELETE must carry a `session_action` set by
+# `requires_level` / `requires_level_method` (CORE.25, D-32), group 1 actions included, so that
+# CORE.26 can tighten one by configuration.
+MANAGER_UNGATED: dict[str, str] = {
+    "apps.manager.views.VendorPickerView": "choosing which own vendor to work on changes no data",
+    "apps.manager.media.ManagerImageSelectFormatView": (
+        "answers with the format form and the embed of an own image already chosen: stores nothing"
+    ),
+    "apps.manager.views.LoginView": "the sign-in form itself, before any session level exists",
+    "apps.manager.views.logout": "sign-out: ends the session, nothing to protect",
 }
+MUTATING = ("post", "put", "patch", "delete")
 
 
-def test_every_mutating_manager_post_view_is_gated_or_listed_as_free() -> None:
-    import ast
+def _manager_views() -> dict[str, Any]:
+    """Every view callable of apps.manager reached from the root URL resolver, by dotted path."""
+    from django.urls import URLPattern, URLResolver, get_resolver
 
-    root = Path(__file__).resolve().parents[4] / "apps" / "manager"
-    ungated = []
-    for name in ("views.py", "notice_views.py", "lists.py", "media.py"):
-        source = (root / name).read_text()
-        for node in ast.walk(ast.parse(source)):
-            if not isinstance(node, ast.ClassDef) or node.name in MANAGER_FREE_POST:
-                continue
-            has_post = any(isinstance(m, ast.FunctionDef) and m.name == "post" for m in node.body)
-            text = ast.get_source_segment(source, node) or ""
-            if has_post and "requires_level(" not in text:
-                ungated.append(f"{name}:{node.name}")
-    assert not ungated, f"Manager POST views with no requires_level: {ungated}"
+    found: dict[str, Any] = {}
+
+    def walk(patterns: Any) -> None:
+        for entry in patterns:
+            if isinstance(entry, URLResolver):
+                walk(entry.url_patterns)
+            elif isinstance(entry, URLPattern):
+                callback = entry.callback
+                target = getattr(callback, "view_class", callback)
+                if target.__module__.startswith("apps.manager"):
+                    found[f"{target.__module__}.{target.__qualname__}"] = callback
+
+    walk(get_resolver().url_patterns)
+    return found
+
+
+def _ungated_mutating(views: dict[str, Any]) -> list[str]:
+    """Dotted paths of views that accept a mutating method without a session level gate."""
+    bad = []
+    for path, callback in views.items():
+        cls = getattr(callback, "view_class", None)
+        if cls is None:  # a function view: it must carry the gate itself
+            if getattr(callback, "session_action", None) is None:
+                bad.append(path)
+            continue
+        allowed = {m.lower() for m in cls.http_method_names}
+        for method in MUTATING:
+            handler = getattr(cls, method, None)
+            gated = getattr(handler, "session_action", None) is not None
+            if handler is not None and method in allowed and not gated:
+                bad.append(f"{path}.{method}")
+    return bad
+
+
+def test_every_manager_view_that_can_change_state_has_a_session_gate() -> None:
+    views = _manager_views()
+    assert len(views) > 10, "the URL walk found too few Manager views"
+    ungated = [
+        item
+        for item in _ungated_mutating(views)
+        if not any(item == k or item.startswith(f"{k}.") for k in MANAGER_UNGATED)
+    ]
+    assert not ungated, f"Manager views accepting POST/PUT/PATCH/DELETE with no gate: {ungated}"
+
+
+def test_the_ungated_list_has_no_stale_entries() -> None:
+    views = _manager_views()
+    bad = _ungated_mutating(views)
+    for path, reason in MANAGER_UNGATED.items():
+        assert reason.strip()
+        assert path in views, f"{path} is not a Manager view any more: drop it from the list"
+        assert any(item == path or item.startswith(f"{path}.") for item in bad), (
+            f"{path} is gated or read only now: drop it from the list"
+        )
+
+
+def test_the_sweep_fails_on_an_ungated_view_and_passes_a_gated_one() -> None:
+    from django.http import HttpResponse
+    from django.views import View
+
+    from apps.accounts.decorators import requires_level_method
+
+    class Ungated(View):
+        def post(self, request: Any) -> HttpResponse:
+            return HttpResponse()
+
+    class Gated(View):
+        @requires_level_method("bulk_edit")
+        def post(self, request: Any) -> HttpResponse:
+            return HttpResponse()
+
+    class Overrides(Gated):
+        def post(self, request: Any) -> HttpResponse:  # drops the gate of its parent
+            return HttpResponse()
+
+    class ReadOnly(View):
+        def get(self, request: Any) -> HttpResponse:
+            return HttpResponse()
+
+    def function_view(request: Any) -> HttpResponse:
+        return HttpResponse()
+
+    views = {
+        "t.Ungated": Ungated.as_view(),
+        "t.Gated": Gated.as_view(),
+        "t.Overrides": Overrides.as_view(),
+        "t.ReadOnly": ReadOnly.as_view(),
+        "t.function_view": function_view,
+    }
+    assert sorted(_ungated_mutating(views)) == [
+        "t.Overrides.post",
+        "t.Ungated.post",
+        "t.function_view",
+    ]
 
 
 # --- Security review fixes (PR 234)

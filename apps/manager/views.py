@@ -23,7 +23,7 @@ from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 
-from apps.accounts.decorators import mfa_exempt, mfa_redirect, requires_level
+from apps.accounts.decorators import mfa_exempt, mfa_redirect, requires_level_method
 from apps.accounts.forms import ManagerLoginForm
 from apps.accounts.mfa_session import is_recently_verified
 from apps.accounts.models import User
@@ -199,6 +199,7 @@ class StorefrontProfileView(ManagerView):
                 return HttpResponseRedirect(reverse("manager:shop:profile"))
         return self.render_to_response(self.get_context_data(logo_form=form))
 
+    @requires_level_method("content_edit")  # group 1: any session, CORE.26 can tighten it
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         vendor, actor = self.manager.vendor, self.manager.user
         if vendor is None or not isinstance(actor, User):
@@ -344,6 +345,7 @@ class VendorOrderActionView(VendorOrderDetailView):
         )
         return self.render_to_response(context, status=409)
 
+    @requires_level_method("orders_in_progress")  # group 1: any session, CORE.26 can tighten it
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         action = self.kwargs["action"]
         if action not in orders_engine.FULFILMENT_ACTIONS:
@@ -449,12 +451,8 @@ class ProfileRevertView(ManagerView):
     section = "platform.profile_changes"
     http_method_names = ["post"]
 
+    @requires_level_method("profile_revert")  # group 2 (CORE.25)
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
-        # Group 2 (CORE.25): a restricted session is prompted, an operational one goes on.
-        gated = requires_level("profile_revert")(self._revert)
-        return gated(request, *args, **kwargs)
-
-    def _revert(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         actor = self.manager.user
         if not isinstance(actor, User):
             raise Http404("No Manager page here.")
