@@ -93,7 +93,7 @@ class StorefrontProfileForm(forms.Form):
         help_text=_(
             "When and how a customer can cancel an order. Customers see it in the 'Cancellation' "
             "section of your shop page. Leave it empty and the section is not shown. Up to 5,000 "
-            "characters. If you are not sure what the law requires, ask your accountant."
+            "characters. If you are unsure what the law requires, ask a legal adviser."
         ),
     )
 
