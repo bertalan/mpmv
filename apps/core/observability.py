@@ -108,6 +108,13 @@ _PATTERNS: Final = (
     (re.compile(r"(?<![\d])(?:\d[ -]?){13,19}(?!\d)"), REDACTED),  # card-like numbers
 )
 
+# A canonical UUID is an identifier, not a secret: kept intact (its last group would otherwise
+# look like an IBAN or a key). Not protected right after `=` or `:`-less key assignments, so
+# `token=<uuid>` is still redacted by the generic patterns.
+_UUID: Final = re.compile(
+    r"(?<![\w=-])[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(?![\w-])"
+)
+
 MAX_DEPTH: Final = 6
 MAX_ITEMS: Final = 50
 MAX_NODES: Final = 400
@@ -124,9 +131,16 @@ def _clip(text: str, limit: int, *, keep_tail: bool = False) -> str:
 
 def redact_unbounded(text: str) -> str:
     """The patterns on `text` as it is (tests only; callers use `redact_text`)."""
+    kept: list[str] = []
+
+    def keep(match: re.Match[str]) -> str:
+        kept.append(match.group(0))
+        return f"\x00{len(kept) - 1}\x00"
+
+    text = _UUID.sub(keep, text)
     for pattern, replacement in _PATTERNS:
         text = pattern.sub(replacement, text)
-    return text
+    return re.sub(r"\x00(\d+)\x00", lambda m: kept[int(m.group(1))], text) if kept else text
 
 
 def redact_text(text: str, *, limit: int = MAX_TEXT, keep_tail: bool = False) -> str:

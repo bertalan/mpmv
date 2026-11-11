@@ -176,3 +176,12 @@ def test_stack_info_is_redacted() -> None:
 
 def test_percent_encoded_email_is_redacted() -> None:
     assert "user%40example.com" not in redact_text("mail=user%40example.com&x=1")
+
+
+def test_a_canonical_uuid_stays_intact_but_a_uuid_secret_does_not() -> None:
+    ident = "73d91555-6306-464b-b514-bc350456c401"
+    assert redact_text(f"case {ident} overdue") == f"case {ident} overdue"
+    assert redact_text(f"{ident}, {ident}") == f"{ident}, {ident}"
+    assert ident not in redact_text(f"token={ident}")
+    assert ident not in redact_text(f"password: {ident}")
+    assert "ada@example.org" not in redact_text(f"{ident} ada@example.org")
