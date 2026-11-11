@@ -55,8 +55,8 @@ msgid ""
 "A short line under your shop name, up to 200 characters, for example 'Handmade ceramics from "
 "Umbria'. Leave it empty to show none."
 msgstr ""
-"Una breve frase sotto il nome del negozio, al massimo 200 caratteri, per esempio «Ceramiche fatte "
-"a mano in Umbria». Lasciala vuota se non ne vuoi una."
+"Una breve frase sotto il nome del negozio, al massimo 200 caratteri, per esempio 'Ceramiche fatte "
+"a mano in Umbria'. Lasciala vuota se non ne vuoi una."
 
 #: apps/manager/forms.py
 msgid "About the shop"
@@ -994,8 +994,8 @@ msgid ""
 "Tell buyers until when they can cancel an order and how, for example 'before the parcel is handed "
 "to the courier'. Buyers read it in your shop before they order."
 msgstr ""
-"Spiega ai clienti fino a quando possono annullare un ordine e come, per esempio «prima che il "
-"pacco sia consegnato al corriere». I clienti la leggono nel tuo negozio prima di ordinare."
+"Spiega ai clienti fino a quando possono annullare un ordine e come, per esempio 'prima che il "
+"pacco sia consegnato al corriere'. I clienti la leggono nel tuo negozio prima di ordinare."
 
 #: apps/vendors/models.py
 msgid ""
@@ -1184,7 +1184,7 @@ msgid ""
 "The name of your business or shop, for example 'Rossi Ceramics'. Required: the application needs "
 "it."
 msgstr ""
-"Il nome della tua attività o del tuo negozio, per esempio «Ceramiche Rossi». Obbligatorio: la "
+"Il nome della tua attività o del tuo negozio, per esempio 'Ceramiche Rossi'. Obbligatorio: la "
 "candidatura lo richiede."
 
 #: apps/manager/notice_views.py
@@ -1252,7 +1252,7 @@ msgid ""
 "The shop name your buyers see, for example 'Rossi Ceramics'. Required: the shop cannot be shown "
 "without a name."
 msgstr ""
-"Il nome del negozio che i clienti vedono, per esempio «Ceramiche Rossi». Obbligatorio: senza nome "
+"Il nome del negozio che i clienti vedono, per esempio 'Ceramiche Rossi'. Obbligatorio: senza nome "
 "il negozio non può essere mostrato."
 
 #: apps/vendors/models.py
@@ -1260,7 +1260,7 @@ msgid ""
 "The short name in your shop's web address, for example 'rossi-ceramics'. Leave it empty and we "
 "make it from the shop name. Changing it later breaks the links people already have."
 msgstr ""
-"Il nome breve nell'indirizzo web del tuo negozio, per esempio «ceramiche-rossi». Se lo lasci vuoto"
+"Il nome breve nell'indirizzo web del tuo negozio, per esempio 'ceramiche-rossi'. Se lo lasci vuoto"
 " lo ricaviamo dal nome del negozio. Se lo cambi dopo, i link che le persone hanno già smettono di "
 "funzionare."
 
@@ -1535,7 +1535,7 @@ msgid ""
 "published is shown to visitors. Only published texts are shown."
 msgstr ""
 "A che punto è questa versione nella revisione: una bozza automatica va ancora controllata, "
-"«Reviewed» è controllata, «Published» è mostrata ai visitatori. Si mostrano solo i testi "
+"'Reviewed' è controllata, 'Published' è mostrata ai visitatori. Si mostrano solo i testi "
 "pubblicati."
 
 #: apps/vendors/models.py
