@@ -24,6 +24,9 @@
 #             client_ip_headers CF-Connecting-IP }
 # with the CDN's published ranges, and allow only those ranges to reach ports 80 and 443.
 #
+# Django admin (OPS.5): MPMV_ADMIN_ALLOWED_NETWORKS in caddy.env lists the networks (space
+# separated CIDR or addresses) that may reach /django-admin/; the rest get 404.
+#
 # Security headers (SEC.3, SEC.5): Caddy answers some requests itself (public media, the /media/
 # 404, its error pages, the HTTP-to-HTTPS redirect), so every site and handle_errors imports the
 # `security_headers` snippet. Its headers are defaults (`?`): a value the app already sent is kept,
@@ -91,6 +94,25 @@
 
 	handle /media/* {
 		respond 404
+	}
+
+	# The technical Django admin (OPS.5, owner decision Q-18): only from MPMV_ADMIN_ALLOWED_NETWORKS
+	# (space separated; the app has its own comma separated copy, settings ADMIN_ALLOWED_NETWORKS).
+	# Anybody else gets the app's own 404 for an unknown address (the request is rewritten to a
+	# path that does not exist), so body and headers match any other 404. `client_ip` honours the
+	# trusted proxies of the global options (a CDN in front); without them it is the connecting
+	# address. Unset means loopback only, so a missing variable closes the admin. Caddy counts a
+	# variable that is set but empty as set, and `not client_ip` with no argument fails to load:
+	# leave the variable out of caddy.env instead of leaving it empty.
+	@admin_denied {
+		path /django-admin /django-admin/*
+		not client_ip {$MPMV_ADMIN_ALLOWED_NETWORKS:127.0.0.1/32}
+	}
+	handle @admin_denied {
+		rewrite * /__not-found__
+		reverse_proxy mpmv-app:8000 {
+			header_up X-Real-IP {client_ip}
+		}
 	}
 
 	handle {

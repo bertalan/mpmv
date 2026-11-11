@@ -30,6 +30,8 @@ class CoreConfig(AppConfig):
         from django.conf import settings
 
         from .checks import (
+            check_admin_network_for_deploy,
+            check_admin_network_settings,
             check_audit_policy,
             check_avif_support,
             check_client_ip_settings,
@@ -48,6 +50,8 @@ class CoreConfig(AppConfig):
         checks.register(check_public_forms, checks.Tags.security, checks.Tags.urls)
         checks.register(check_client_ip_settings, checks.Tags.security)
         checks.register(check_trusted_proxy_for_deploy, checks.Tags.security, deploy=True)
+        checks.register(check_admin_network_settings, checks.Tags.security)
+        checks.register(check_admin_network_for_deploy, checks.Tags.security, deploy=True)
         checks.register(check_field_encryption_keys, checks.Tags.security)
         checks.register(check_encrypted_data, checks.Tags.database)
         checks.register(check_feature_flag_settings)

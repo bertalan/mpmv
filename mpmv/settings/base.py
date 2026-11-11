@@ -117,6 +117,9 @@ MIDDLEWARE = [
     "apps.themes.middleware.ThemeMiddleware",  # the site's theme for the template loader (THM.1)
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
+    # OPS.5: the Django admin answers the normal 404 outside the networks; before CommonMiddleware
+    # so `/django-admin` gets no slash redirect, after Locale and Theme for the normal 404 page.
+    "apps.core.middleware.AdminNetworkAllowlistMiddleware",
     "django.middleware.common.CommonMiddleware",
     # CAT.6: legacy redirect rules on a 404 (after CAT.5) and GET ?add-to-cart= to the product.
     "apps.catalog.middleware.LegacyRedirectMiddleware",
@@ -432,6 +435,13 @@ SECURE_CSP: dict[str, list[str] | bool] = {
 # CIDR networks). Empty: REMOTE_ADDR, right when nothing sits in front of the app.
 TRUSTED_PROXY_HEADER = env_str("MPMV_TRUSTED_PROXY_HEADER", "")
 TRUSTED_PROXIES = env_list("MPMV_TRUSTED_PROXIES")
+
+# OPS.5 (owner decision Q-18): networks (addresses or CIDR, comma separated) the technical Django
+# admin (`/django-admin/`) answers to, judged on client_ip(); everybody else gets a 404. The
+# reverse proxy has the same list (deploy/caddy/Caddyfile); this is the second layer. Fail
+# closed: empty denies everybody (STAGE and LIVE until the variable is set; `check --deploy`
+# hints at it, core.W002). dev.py and test.py list loopback explicitly.
+ADMIN_ALLOWED_NETWORKS = env_list("MPMV_ADMIN_ALLOWED_NETWORKS")
 
 # Bot protection on login and registration forms (CORE.5): Cloudflare Turnstile behind
 # apps.accounts.captcha.CaptchaVerifier. Off unless explicitly enabled; keys from the environment
