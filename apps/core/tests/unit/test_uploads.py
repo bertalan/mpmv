@@ -104,6 +104,54 @@ def test_active_names_are_still_found_around_a_stream() -> None:
         check_document(data, "a.pdf", max_bytes=MAX_DOCUMENT_BYTES)
 
 
+@pytest.mark.parametrize(
+    "middle",
+    [
+        pytest.param(
+            b"% stream\n<< /OpenAction << /S /JavaScript /JS (x) >> >>\n% endstream\n",
+            id="stream-words-in-comments",
+        ),
+        pytest.param(
+            b"<< /X (stream\n) /OpenAction << /S /JavaScript >> /Y (endstream) >>\n",
+            id="stream-words-in-strings",
+        ),
+        pytest.param(
+            b"<< /Length 9 0 R >>\nstream\n/JS (x) /OpenAction\nendstream\n",
+            id="indirect-length",
+        ),
+        pytest.param(b"<< >>\nstream\n/JS (x)\nendstream\n", id="missing-length"),
+        pytest.param(b"<< /Length 3 >>\nstream\n/JS (x)\nendstream\n", id="wrong-length"),
+        pytest.param(
+            b"<< /Length 2 /X (>>\nstream\n) /Y << /OpenAction << /S /JavaScript >> >> % >>\n"
+            b"stream\nxx\nendstream\n",
+            id="stream-keyword-inside-a-string",
+        ),
+        pytest.param(
+            b"<< /K << /Length 10 >> >>\nstream\n/JS (x) 1\nendstream\n",
+            id="length-of-a-nested-dictionary-is-not-used",
+        ),
+    ],
+)
+def test_active_syntax_is_not_hidden_behind_stream_words(middle: bytes) -> None:
+    """Only a real stream body is blanked: a dictionary, `stream`, exactly `/Length` bytes and
+    `endstream`. Anything else is scanned as it is (a false refusal is fine, a bypass is not)."""
+    data = b"%PDF-1.5\n1 0 obj\n" + middle + b"endobj\nstartxref\n0\n%%EOF\n"
+    with pytest.raises(UploadRefused):
+        check_document(data, "a.pdf", max_bytes=MAX_DOCUMENT_BYTES)
+
+
+def test_a_real_stream_with_name_like_bytes_is_blanked_for_both_eol_styles() -> None:
+    for eol in (b"\n", b"\r\n"):
+        data = (
+            b"%PDF-1.5\n1 0 obj\n<< /Length 12 >>\nstream"
+            + eol
+            + b"/JS /OpenAct"
+            + eol
+            + b"endstream\nendobj\nstartxref\n0\n%%EOF\n"
+        )
+        assert check_document(data, "a.pdf", max_bytes=MAX_DOCUMENT_BYTES) == "a.pdf"
+
+
 def test_a_bomb_is_refused_before_its_pixels_are_decoded() -> None:
     """The caps apply to the header: 10 gigapixels are never allocated."""
     case = next(c for c in image_cases() if c.id == "huge-dimensions-tiny-file")
