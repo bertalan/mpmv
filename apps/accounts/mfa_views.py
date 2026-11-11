@@ -26,7 +26,7 @@ from apps.core.audit import audit_context
 from apps.core.public_forms import not_anonymous, pre_mfa_step
 
 from . import engine, services
-from .decorators import mfa_exempt, mfa_redirect, step_up_required
+from .decorators import mfa_exempt, mfa_redirect, requires_level, step_up_required
 from .http import relying_party, safe_next
 from .mfa_session import complete_verification, is_recently_verified
 from .models import PasskeyDevice, User
@@ -47,6 +47,12 @@ def _user(request: HttpRequest) -> User:
 def _may_enrol(request: HttpRequest) -> bool:
     """First factor: always. Further factors: only right after a verification (step-up)."""
     return not services.has_second_factor(_user(request)) or is_recently_verified(request)
+
+
+def _wants_uv(request: HttpRequest) -> bool:
+    """`?factor=passkey`: a sensitive action (D-32 group 3) asks for a passkey with user
+    verification; only such a verification counts for it."""
+    return request.GET.get("factor") == "passkey"
 
 
 def _with_next(name: str, next_url: str) -> str:
@@ -144,9 +150,11 @@ def verify(request: HttpRequest) -> HttpResponse:
     if not services.has_second_factor(user):
         return mfa_redirect(request, "mfa:setup", next_url=safe_next(request))
     next_url = safe_next(request)
+    # D-32 group 3: the action asked for a passkey, so a code or recovery code is not offered.
+    passkey_only = (request.POST.get("factor") or request.GET.get("factor")) == "passkey"
     error = ""
     method: str | None = None
-    if request.method == "POST":
+    if request.method == "POST" and not passkey_only:
         method = request.POST.get("method")
         device: object | None = None
         if method == "totp":
@@ -167,11 +175,15 @@ def verify(request: HttpRequest) -> HttpResponse:
             "next": next_url,
             "error": error,
             "error_method": method if error else None,  # the field the error is tied to (CMP.9)
-            "has_totp": TOTPDevice.objects.filter(user=user, confirmed=True).exists(),
+            "passkey_only": passkey_only,
+            "has_totp": not passkey_only
+            and TOTPDevice.objects.filter(user=user, confirmed=True).exists(),
             "has_passkey": PasskeyDevice.objects.filter(user=user, confirmed=True).exists(),
-            "has_recovery": services.unused_recovery_codes(user) > 0,
-            "auth_options_url": reverse("mfa:passkey_auth_options"),
-            "auth_url": _with_next("mfa:passkey_auth", next_url),
+            "has_recovery": not passkey_only and services.unused_recovery_codes(user) > 0,
+            "auth_options_url": reverse("mfa:passkey_auth_options")
+            + ("?factor=passkey" if passkey_only else ""),
+            "auth_url": _with_next("mfa:passkey_auth", next_url)
+            + ("&factor=passkey" if passkey_only else ""),
         },
     )
 
@@ -234,6 +246,7 @@ def passkey_register(request: HttpRequest) -> JsonResponse:
 @signed_in
 @require_POST
 def passkey_auth_options(request: HttpRequest) -> JsonResponse:
+    uv = _wants_uv(request)
     credential_ids = list(
         PasskeyDevice.objects.filter(user=_user(request), confirmed=True).values_list(
             "credential_id", flat=True
@@ -242,7 +255,7 @@ def passkey_auth_options(request: HttpRequest) -> JsonResponse:
     if not credential_ids:
         return _bad_request(gettext("no passkey registered"))
     options = engine.passkey_authentication_options(
-        relying_party(request), credential_ids=credential_ids
+        relying_party(request), credential_ids=credential_ids, require_user_verification=uv
     )
     request.session[AUTHENTICATION_CHALLENGE] = engine.b64url(options.challenge)
     return JsonResponse({"publicKey": options.public_key})
@@ -253,6 +266,7 @@ def passkey_auth_options(request: HttpRequest) -> JsonResponse:
 @signed_in
 @require_POST
 def passkey_auth(request: HttpRequest) -> JsonResponse:
+    uv = _wants_uv(request)
     challenge = request.session.pop(AUTHENTICATION_CHALLENGE, None)
     body = _json_body(request)
     if not challenge or not isinstance(body.get("credential"), dict):
@@ -263,11 +277,12 @@ def passkey_auth(request: HttpRequest) -> JsonResponse:
             relying_party(request),
             body["credential"],
             challenge=engine.from_b64url(challenge),
+            require_user_verification=uv,
         )
     except engine.PasskeyError:
         services.record_mfa_failure(_user(request), services.PASSKEY, ctx=audit_context(request))
         return _bad_request(gettext("the passkey was not accepted"))
-    complete_verification(request, device)
+    complete_verification(request, device, user_verified=uv)
     return JsonResponse({"redirect": safe_next(request)})
 
 
@@ -350,10 +365,16 @@ def _own_device(user: User, kind: str, public_id: str) -> services.SecondFactor:
 @require_POST
 def remove_device(request: HttpRequest, kind: str, public_id: str) -> HttpResponse:
     device = _own_device(_user(request), kind, public_id)
-    try:
-        services.remove_device(device, ctx=audit_context(request))
-    except services.MfaPolicyError:
-        messages.error(request, gettext("Add another factor before removing your last one."))
-    else:
-        messages.success(request, gettext("%(name)s removed.") % {"name": device.name})
-    return HttpResponseRedirect(reverse("mfa:overview"))
+
+    def remove(req: HttpRequest) -> HttpResponse:
+        try:
+            services.remove_device(device, ctx=audit_context(req))
+        except services.MfaPolicyError:
+            messages.error(req, gettext("Add another factor before removing your last one."))
+        else:
+            messages.success(req, gettext("%(name)s removed.") % {"name": device.name})
+        return HttpResponseRedirect(reverse("mfa:overview"))
+
+    if services.removal_weakens_mfa(device):  # D-32 group 3: the last factor or last passkey
+        return requires_level("mfa_disable")(remove)(request)
+    return remove(request)

@@ -105,7 +105,7 @@ def test_reset_mfa_dry_run_changes_nothing() -> None:
 
 def test_the_overview_lists_factors_and_removes_one_with_step_up(client: Client) -> None:
     user = _enrolled_staff()
-    verified_login(client, user, TOTPDevice.objects.get(user=user))
+    verified_login(client, user, TOTPDevice.objects.get(user=user), passkey=True)
     passkey = PasskeyDevice.objects.get(user=user)
     page = client.get(reverse("mfa:overview")).content.decode()
     assert passkey.name in page
@@ -134,7 +134,7 @@ def test_a_user_cannot_remove_another_users_factor(client: Client) -> None:
 
 def test_staff_reset_mfa_from_the_admin(client: Client) -> None:
     admin_user = UserFactory.create(superuser=True)
-    verified_login(client, admin_user)
+    verified_login(client, admin_user, passkey=True)
     target = _enrolled_staff()
     response = client.post(
         reverse("admin:accounts_user_changelist"),

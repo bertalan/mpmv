@@ -12,6 +12,7 @@ its password, resetting its MFA, changing its email or active flag, and deleting
 change form, the password form and deletion need a fresh step-up (CORE.4).
 """
 
+from collections.abc import Callable
 from typing import Any, ClassVar
 
 from django.contrib import admin, messages
@@ -20,7 +21,7 @@ from django.contrib.admin.utils import unquote
 from django.contrib.auth.admin import GroupAdmin as DjangoGroupAdmin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.forms import AdminPasswordChangeForm
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest, HttpResponse
@@ -28,9 +29,10 @@ from django.utils.translation import gettext_lazy
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
 from apps.core.audit import audit_context
+from apps.core.models import PLATFORM_OWNER_CODENAME
 
 from . import services
-from .decorators import step_up_required
+from .decorators import level_gated_action, requires_level, step_up_required
 from .forms import StaffLoginForm
 from .mfa_session import is_recently_verified
 from .models import User
@@ -122,6 +124,7 @@ class UserAdmin(DjangoUserAdmin[User]):
         description="Reset two-factor authentication (user must enrol again)",
         permissions=["change"],
     )
+    @level_gated_action("mfa_disable")
     def reset_mfa(self, request: HttpRequest, queryset: QuerySet[User]) -> None:
         if not is_recently_verified(request):
             self.message_user(
@@ -147,6 +150,7 @@ class UserAdmin(DjangoUserAdmin[User]):
         description=gettext_lazy("Delete selected %(verbose_name_plural)s"),
         permissions=["delete"],
     )
+    @level_gated_action("role_grant")  # same level as deleting one user
     def delete_selected(self, request: HttpRequest, queryset: QuerySet[User]) -> Any:
         """Django's bulk delete behind step-up, refused as a whole for privileged accounts."""
         if not is_recently_verified(request):
@@ -194,7 +198,18 @@ class UserAdmin(DjangoUserAdmin[User]):
         def view(req: HttpRequest) -> HttpResponse:
             return parent(req, object_id, form_url, extra_context)
 
-        return step_up_required()(view)(request)
+        target = self.get_object(request, unquote(object_id))
+        return _role_grant_gate(request, view, target)(request)
+
+    def add_view(
+        self, request: HttpRequest, form_url: str = "", extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        parent = super().add_view
+
+        def view(req: HttpRequest) -> HttpResponse:
+            return parent(req, form_url, extra_context)
+
+        return _role_grant_gate(request, view, None)(request)
 
     def user_change_password(
         self, request: HttpRequest, id: str, form_url: str = ""
@@ -207,7 +222,7 @@ class UserAdmin(DjangoUserAdmin[User]):
                 raise PermissionDenied
             return parent(req, id, form_url)
 
-        return step_up_required()(view)(request)
+        return requires_level("role_grant")(step_up_required()(view))(request)
 
     def delete_view(
         self, request: HttpRequest, object_id: str, extra_context: dict[str, Any] | None = None
@@ -217,7 +232,7 @@ class UserAdmin(DjangoUserAdmin[User]):
         def view(req: HttpRequest) -> HttpResponse:
             return parent(req, object_id, extra_context)
 
-        return step_up_required()(view)(request)
+        return requires_level("role_grant")(step_up_required()(view))(request)
 
     # --- Audited writes (SEC.4)
 
@@ -257,6 +272,53 @@ class UserAdmin(DjangoUserAdmin[User]):
         return super().construct_change_message(request, form, formsets, add)
 
 
+def _posts_owner_grant(request: HttpRequest, target: User | None) -> bool:
+    """The form grants the superuser flag or the platform owner permission (D-32 group 3)."""
+    if request.method != "POST":
+        return False
+    if request.POST.get("is_superuser") and not (target is not None and target.is_superuser):
+        return True
+    return _posts_platform_owner_permission(request) or _posts_owner_group(request)
+
+
+def _posts_owner_group(request: HttpRequest) -> bool:
+    """The form puts the user in a group that holds the platform owner permission."""
+    ids = [i for i in request.POST.getlist("groups") if i.isdigit()]
+    return (
+        bool(ids)
+        and Group.objects.filter(
+            pk__in=ids,
+            permissions__content_type__app_label="core",
+            permissions__codename=PLATFORM_OWNER_CODENAME,
+        ).exists()
+    )
+
+
+def _posts_platform_owner_permission(request: HttpRequest) -> bool:
+    ids = [
+        i
+        for i in request.POST.getlist("user_permissions") + request.POST.getlist("permissions")
+        if i.isdigit()
+    ]
+    return (
+        bool(ids)
+        and Permission.objects.filter(
+            pk__in=ids, content_type__app_label="core", codename=PLATFORM_OWNER_CODENAME
+        ).exists()
+    )
+
+
+def _role_grant_gate(
+    request: HttpRequest, view: Callable[[HttpRequest], HttpResponse], target: User | None
+) -> Callable[[HttpRequest], HttpResponse]:
+    """Roles and permissions need operational mode (`role_grant`); making a superuser or a
+    platform owner also needs a per-action passkey (`owner_role_grant`)."""
+    gated = step_up_required()(view)
+    if _posts_owner_grant(request, target):
+        gated = requires_level("owner_role_grant")(gated)
+    return requires_level("role_grant")(gated)
+
+
 @admin.register(Group)
 class GroupAdmin(DjangoGroupAdmin):
     """Django's group admin, with every write audited (a group grants permissions).
@@ -282,6 +344,37 @@ class GroupAdmin(DjangoGroupAdmin):
 
     def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         return _is_superuser(request)
+
+    def changeform_view(
+        self,
+        request: HttpRequest,
+        object_id: str | None = None,
+        form_url: str = "",
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        if not _is_superuser(request):
+            raise PermissionDenied  # before any prompt: staff get a 403, not a step-up
+        parent = super().changeform_view
+
+        def view(req: HttpRequest) -> HttpResponse:
+            return parent(req, object_id, form_url, extra_context)
+
+        gated = step_up_required()(view)
+        if request.method == "POST" and _posts_platform_owner_permission(request):
+            gated = requires_level("owner_role_grant")(gated)
+        return requires_level("role_grant")(gated)(request)
+
+    def delete_view(
+        self, request: HttpRequest, object_id: str, extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        if not _is_superuser(request):
+            raise PermissionDenied
+        parent = super().delete_view
+
+        def view(req: HttpRequest) -> HttpResponse:
+            return parent(req, object_id, extra_context)
+
+        return requires_level("role_grant")(step_up_required()(view))(request)
 
     def save_model(self, request: HttpRequest, obj: Group, form: Any, change: bool) -> None:
         services.save_group(obj, ctx=audit_context(request))
