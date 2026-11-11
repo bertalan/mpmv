@@ -453,6 +453,18 @@ ENDPOINTS: dict[str, Access] = {
         "compliance.review_notices permission, so a vendor member gets 404.",
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
     ),
+    "garage_save": NoVendorData(
+        "Anonymous garage cookie control (FIT.6): reads and writes only the visitor's own cookie "
+        "and the vehicle scheme; no vendor data."
+    ),
+    "garage_remove": NoVendorData(
+        "Anonymous garage cookie control (FIT.6): reads and writes only the visitor's own cookie "
+        "and the vehicle scheme; no vendor data."
+    ),
+    "garage_forget": NoVendorData(
+        "Anonymous garage cookie control (FIT.6): reads and writes only the visitor's own cookie "
+        "and the vehicle scheme; no vendor data."
+    ),
     "dsa_notice": NoVendorData(
         "Public report form for illegal content (DSA art. 16, CMP.5): no vendor data is shown, "
         "the form only stores a notice; captcha and a rate limit guard the POST."

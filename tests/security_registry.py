@@ -56,6 +56,18 @@ PUBLIC: dict[str, str] = {
     "switch_language": "Stores the visitor's language choice in a cookie.",
     "action_link:open": "Secure action link (CORE.15): the signed token is the credential.",
     "action_link:continue": "Secure action link (CORE.15): the signed token is the credential.",
+    "garage_save": (
+        "Anonymous garage cookie control (FIT.6, Q-G1): a POST that only writes or clears the "
+        "visitor's own technical cookie, CSRF-checked, nothing stored or logged on the server."
+    ),
+    "garage_remove": (
+        "Anonymous garage cookie control (FIT.6, Q-G1): a POST that only writes or clears the "
+        "visitor's own technical cookie, CSRF-checked, nothing stored or logged on the server."
+    ),
+    "garage_forget": (
+        "Anonymous garage cookie control (FIT.6, Q-G1): a POST that only writes or clears the "
+        "visitor's own technical cookie, CSRF-checked, nothing stored or logged on the server."
+    ),
     "dsa_notice": (
         "Public report form for illegal content (DSA art. 16, CMP.5): the page is public by "
         "design; the POST is CSRF-checked, behind Turnstile and rate limited per address, and "

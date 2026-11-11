@@ -23,6 +23,7 @@ from django.conf import settings
 
 from apps.core.services import enqueue_email as _enqueue_email
 
+from . import engine
 from .models import Order, OrderLine, PrivacyStatus, VendorOrder
 
 logger = logging.getLogger(__name__)
@@ -73,6 +74,12 @@ def _line(line: OrderLine) -> dict[str, Any]:
 
 def _lines(sub: VendorOrder) -> list[dict[str, Any]]:
     return [_line(line) for line in sub.lines.order_by("id")]
+
+
+def _vehicle(order: Order, language: str | None = None) -> str:
+    """FIT.17: the sentence naming the vehicle the customer selected, in the email's language;
+    empty without one."""
+    return engine.vehicle_line(order.vehicle_snapshot or {}, language or order.language)
 
 
 def _ship_to(order: Order) -> list[str]:
@@ -126,6 +133,7 @@ def notify_order_paid(order: Order) -> None:
                 **base,
                 "vendor_order_ref": str(sub.public_id),
                 "vendor_name": _vendor_name(sub),
+                "vehicle_line": _vehicle(order),
                 "lines": _lines(sub),
                 "shipping": _money(sub.shipping_net + sub.shipping_tax_amount),
                 "total": _money(sub.gross_total),
@@ -140,6 +148,7 @@ def notify_order_paid(order: Order) -> None:
                 context={
                     "order_number": order.number,
                     "vendor_name": _vendor_name(sub),
+                    "vehicle_line": _vehicle(order, settings.LANGUAGE_CODE),
                     "lines": _lines(sub),
                     "ship_to": _ship_to(order),
                     "total": _money(sub.gross_total),

@@ -342,6 +342,15 @@ def test_an_order_summary_lists_its_lines_and_the_total() -> None:
     assert "VAT included" in html
 
 
+def test_an_order_summary_shows_the_vehicle_line_only_when_given() -> None:
+    """FIT.17: the sentence arrives worded by the caller and is escaped."""
+    sentence = "Vehicle selected by the customer in the compatibility filter: <b>Acme</b>"
+    html = render("order_summary", id="os2", lines=[], total="€ 1", vehicle=sentence)
+    assert '<p class="order-summary__vehicle">Vehicle selected by the customer' in html
+    assert "<b>" not in html
+    assert "order-summary__vehicle" not in render("order_summary", id="os3", lines=[], total="€ 1")
+
+
 STEPS = [
     {"label": "Cart", "url": "/cart/"},
     {"label": "Address", "url": "/checkout/address/"},

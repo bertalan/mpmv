@@ -4,7 +4,8 @@
 <p><strong>{% include "email/orders/_non_fiscal.txt" %}</strong></p>
 <p>{% if customer_name %}{% blocktranslate %}Hello {{ customer_name }},{% endblocktranslate %}{% else %}{% translate "Hello," %}{% endif %}</p>
 <p>{% blocktranslate %}Order {{ order_number }}, sold by {{ vendor_name }}:{% endblocktranslate %}</p>
-<ul>
+{% if vehicle_line %}<p>{{ vehicle_line }}</p>
+{% endif %}<ul>
 {% for line in lines %}<li>{{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %} x {{ line.quantity }}: {{ line.total }} EUR</li>
 {% endfor %}</ul>
 <p>{% blocktranslate %}Shipping: {{ shipping }} EUR{% endblocktranslate %}<br>{% blocktranslate %}Total: {{ total }} EUR{% endblocktranslate %}</p>

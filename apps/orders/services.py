@@ -129,6 +129,7 @@ def _order_snapshot(order: Order) -> dict[str, Any]:
         "billing_country": order.billing_country,
         "shipping_country": order.shipping_country,
         "customer_tax_status": order.customer_tax_status,
+        "has_vehicle": bool(order.vehicle_snapshot),
         "goods_net": order.goods_net,
         "shipping_net": order.shipping_net,
         "tax_total": order.tax_total,
@@ -261,6 +262,7 @@ def create_order(
     customer_tax_id: str = "",
     customer_tax_status: str = "b2c",
     vat_validation: dict[str, Any] | None = None,
+    vehicle: dict[str, Any] | None = None,
     state: str = "checkout",
     legacy_wp_order_id: int | None = None,
     placed_at: dt.datetime | None = None,
@@ -311,6 +313,7 @@ def create_order(
         shipping_country=shipping_country,
         customer_tax_status=customer_tax_status,
         vat_validation=vat_validation or {},
+        vehicle_snapshot=engine.clean_vehicle_snapshot(vehicle),
         state=state,
         legacy_wp_order_id=legacy_wp_order_id,
     )
@@ -564,7 +567,12 @@ def _scrub(
             before = _scrub_snapshot(locked)
             _set_scrub_mode(mode)
             _clear_non_fiscal(locked, changeset)
-            values: dict[str, Any] = {"updated_at": stamp, "privacy_status": target}
+            # FIT.17: the vehicle is not a fiscal fact: it goes with the first scrub step.
+            values: dict[str, Any] = {
+                "updated_at": stamp,
+                "privacy_status": target,
+                "vehicle_snapshot": {},
+            }
             if target == "anonymized":
                 values.update(
                     engine.ANONYMISED_ORDER_FIELDS,
@@ -685,6 +693,9 @@ class CheckoutPreview:
     customer_tax_id: str = ""
     customer_tax_status: str = "b2c"
     vat_validation: dict[str, Any] | None = None
+    #: FIT.17: the garage vehicle active at checkout as opaque JSON (make, model, year labels);
+    #: `orders` never imports `fitment`, the checkout adapter passes what the garage shows.
+    vehicle: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -865,6 +876,7 @@ def place_order(
             customer_tax_id=preview.customer_tax_id,
             customer_tax_status=preview.customer_tax_status,
             vat_validation=preview.vat_validation,
+            vehicle=preview.vehicle,
             state="awaiting_payment",
             dry_run=dry_run,
             now=now,

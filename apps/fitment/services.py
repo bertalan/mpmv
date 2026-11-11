@@ -20,6 +20,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count
+from django.http import HttpRequest
+from django.utils import timezone
 
 from apps.catalog.models import Category
 from apps.core import translations
@@ -28,7 +30,7 @@ from apps.core.changeset import ChangeSet
 from apps.core.models import TranslationStatus
 from apps.core.services import run_mutation
 
-from . import engine, references
+from . import engine, garage, references
 from .models import (
     FitmentCategory,
     FitmentLevel,
@@ -38,6 +40,7 @@ from .models import (
     FitmentNodeMerge,
     FitmentNodeTranslation,
     FitmentScheme,
+    NodeStatus,
     code_validator,
 )
 
@@ -765,3 +768,64 @@ def set_fitment_relevant(
         return run_mutation(
             changeset, apply, ctx=ctx, action=CATEGORY_RELEVANCE_CHANGED, dry_run=dry_run
         )
+
+
+# --- Anonymous garage cookie (FIT.6) ------------------------------------------------------------
+
+
+def anon_storage_enabled() -> bool:
+    """Whether the garage may be written to the visitor's browser: the operator setting is
+    `exempt` and the scheme does not hold sensitive items (then the garage lasts for the visit
+    only, as for accounts)."""
+    if getattr(settings, "GARAGE_ANON_STORAGE", "exempt") != "exempt":
+        return False
+    return not current_scheme().contains_special_category
+
+
+def read_garage(request: HttpRequest) -> garage.Garage:
+    """The garage in the request's cookie; empty when the storage is off. Nothing is logged or
+    stored server-side."""
+    if not anon_storage_enabled():
+        return garage.EMPTY
+    return garage.parse(request.COOKIES.get(garage.COOKIE_NAME))
+
+
+def active_vehicle(request: HttpRequest) -> dict[str, str] | None:
+    """The active vehicle as make, model and year labels, for the checkout to hand to
+    `orders` as opaque JSON (FIT.17); None without one."""
+    return read_garage(request).active_snapshot()
+
+
+def vehicle_from_labels(make: object, model: object, year: object = "") -> garage.Vehicle:
+    """A vehicle a visitor chose, checked against the scheme: the make is an active root node,
+    the model an active child of it, the year a plain year in the scheme's range (or empty when
+    the scheme uses no year). Raises `FitmentError`."""
+    vehicle = garage.make_vehicle(make, model, year)
+    if vehicle is None:
+        raise FitmentError("The vehicle is not valid.")
+    root = (
+        FitmentNode.objects.pickable()
+        .filter(depth=1, normalized_name=engine.normalize_name(vehicle.make))
+        .first()
+    )
+    child = (
+        root.get_children()
+        .filter(status=NodeStatus.ACTIVE, normalized_name=engine.normalize_name(vehicle.model))
+        .first()
+        if root is not None
+        else None
+    )
+    if root is None or child is None:
+        raise FitmentError("The vehicle is not in the catalogue of vehicles.")
+    scheme = current_scheme()
+    label = ""
+    if scheme.year_enabled and vehicle.year:
+        latest = timezone.now().year + scheme.year_max_offset
+        if not (
+            vehicle.year.isascii()
+            and vehicle.year.isdigit()
+            and scheme.year_min <= int(vehicle.year) <= latest
+        ):
+            raise FitmentError("The year is outside the range of the scheme.")
+        label = vehicle.year
+    return garage.Vehicle(root.name, child.name, label)

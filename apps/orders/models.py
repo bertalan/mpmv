@@ -158,6 +158,11 @@ class Order(_StateGuarded):
     vat_validation = models.JSONField(
         default=dict, blank=True, help_text="Snapshot of the VAT number check, if any."
     )
+    vehicle_snapshot = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=("FIT.17: the selected vehicle (make, model, year labels)."),
+    )
     state = models.CharField(
         max_length=24, choices=OrderState.choices, default=OrderState.CHECKOUT, db_index=True
     )

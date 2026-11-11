@@ -299,7 +299,7 @@ first error summary takes the focus on load.
       </ul>
     </form>
     <div class="styleguide__forms">
-      {% include "components/order_summary.html" with id="sg-summary" lines=library.summary total="€ 227.00" note=_("VAT included") heading_level=3 only %}
+      {% include "components/order_summary.html" with id="sg-summary" lines=library.summary total="€ 227.00" note=_("VAT included") vehicle=library.summary_vehicle heading_level=3 only %}
       {% include "components/order_summary.html" with id="sg-summary-pending" title=_("Order summary, before shipping") lines=library.summary_pending total="€ 39.00" total_label=_("Total so far") heading_level=3 only %}
     </div>
   </section>
