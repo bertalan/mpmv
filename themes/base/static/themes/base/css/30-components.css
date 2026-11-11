@@ -254,6 +254,14 @@
     display: grid;
   }
 
+  /* The product cards block's "row" layout (CMS.11): one scrollable line of tiles. */
+  .block-product-cards--row .product-grid {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(13rem, 16rem);
+    grid-template-columns: none;
+    overflow-x: auto;
+  }
+
   .card,
   .product-tile {
     position: relative;

@@ -20,7 +20,7 @@ from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.catalog.models import Product, ProductStatus
-from apps.catalog.tests.factories import ProductFactory
+from apps.catalog.tests.factories import CategoryFactory, ProductFactory
 from apps.cms import roles
 from apps.events.models import EventPage
 from apps.events.tests.factories import EventPageFactory, primary_index
@@ -335,3 +335,61 @@ def test_staff_reopen_an_event_after_saving_a_draft(client: Client) -> None:
     response = client.get(_edit_url(page))
     assert response.status_code == 200
     assert f'value="{linked.pk}"' in response.content.decode()
+
+
+# --- Product blocks of a vendor's event: defence in depth behind the admin middleware
+
+
+def test_a_vendor_member_cannot_post_an_event_edit_with_a_foreign_product(client: Client) -> None:
+    member = VendorMemberFactory.create()
+    member.user.groups.add(Group.objects.get(name=roles.PAGE_EDITORS))
+    verified_login(client, member.user)
+    own = EventPageFactory.create(vendor=member.vendor)
+    foreign = ProductFactory.create()
+    body = (
+        '[{"type": "product_cards", "value": {"heading": "", "layout": "grid", '
+        f'"products": [{foreign.pk}]}}}}]'
+    )
+    response = client.post(_edit_url(own), {"title": own.title, "body": body})
+    assert response.status_code == 302
+    assert "/login/" in response["Location"]
+    own.refresh_from_db()
+    assert all(block.block_type != "product_cards" for block in own.body)
+
+
+def test_the_model_refuses_foreign_products_in_a_vendor_events_body() -> None:
+    from django.core.exceptions import ValidationError
+
+    page = EventPageFactory.create()
+    own = ProductFactory.create(vendor=page.vendor)
+    foreign = ProductFactory.create()
+    page.body = [("product_cards", {"heading": "", "layout": "grid", "products": [own]})]
+    page.clean()  # own products are fine
+    page.body = [("product_cards", {"heading": "", "layout": "grid", "products": [own, foreign]})]
+    with pytest.raises(ValidationError) as excinfo:
+        page.clean()
+    assert "body" in excinfo.value.message_dict
+
+
+def test_the_model_refuses_a_grid_not_sourced_from_the_events_vendor() -> None:
+    from django.core.exceptions import ValidationError
+
+    page = EventPageFactory.create()
+    other = ProductFactory.create()
+    category = CategoryFactory.create()
+    mine = {"heading": "", "source": [("vendor", page.vendor)], "limit": 4, "see_all": True}
+    page.body = [("product_grid", mine)]
+    page.clean()
+    for source in ([("vendor", other.vendor)], [("category", category)]):
+        page.body = [("product_grid", {**mine, "source": source})]
+        with pytest.raises(ValidationError) as excinfo:
+            page.clean()
+        assert "body" in excinfo.value.message_dict
+
+
+def test_a_platform_event_may_show_any_product_in_its_body() -> None:
+    page = EventPageFactory.create(platform=True)
+    page.body = [
+        ("product_cards", {"heading": "", "layout": "grid", "products": [ProductFactory.create()]})
+    ]
+    page.clean()
