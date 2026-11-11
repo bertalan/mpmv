@@ -14,6 +14,7 @@ from django.utils.translation import get_language
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
+from apps.core.public_forms import not_anonymous
 from apps.core.services import consume_rate_limit
 
 from . import AddressQuery
@@ -32,6 +33,11 @@ def _language(request: HttpRequest) -> str:
     return current if current in known else str(settings.LANGUAGE_CODE)
 
 
+@not_anonymous(
+    reason="only staff and vendor members may geocode; anyone else gets a 403",
+    purpose="Find coordinates for an address",
+    task="EVT.12",
+)
 @never_cache
 @require_POST
 def find_coordinates(request: HttpRequest) -> JsonResponse:

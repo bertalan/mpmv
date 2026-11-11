@@ -46,6 +46,7 @@ from apps.accounts.services import (
 from apps.core.audit import audit_context
 from apps.core.http import client_ip
 from apps.core.i18n import language_switch_home
+from apps.core.public_forms import Protection, public_form
 
 from . import engine, services
 from .models import Vendor
@@ -183,6 +184,14 @@ def _sign_in(request: HttpRequest, vendor: Vendor, link: ActionLinkCheck) -> Htt
     return _page(request, "submitted", {"vendor": vendor, "codes": []})
 
 
+@public_form(
+    protection=Protection.SIGNED_TOKEN,
+    purpose="Claim an imported vendor: identity, then sign in or create the account",
+    task="VEN.24",
+    reason="the signed claim link must have been opened in this session first, then the claim "
+    "lock; only the sign-in step also runs the captcha (through authenticate())",
+    rate_limit="per IP (claim throttle) and the claim lock",
+)
 @language_switch_home
 @mfa_exempt
 @require_http_methods(["GET", "POST"])

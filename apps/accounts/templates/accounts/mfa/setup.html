@@ -1,15 +1,16 @@
 {% extends "layouts/account.html" %}
-{% block title %}Two-factor authentication · MPMV{% endblock %}
+{% load i18n %}
+{% block title %}{% translate "Two-factor authentication" %} · MPMV{% endblock %}
 {% block account_content %}
-<h1>Set up two-factor authentication</h1>
-{% if required %}<p>Your role requires a second factor before you can continue.</p>{% endif %}
-<p>Choose how you will confirm it is you after your password.</p>
+<h1>{% translate "Set up two-factor authentication" %}</h1>
+{% if required %}<p>{% translate "Your role requires a second factor before you can continue." %}</p>{% endif %}
+<p>{% translate "Choose how you will confirm it is you after your password." %}</p>
 
-<h2>Authenticator app</h2>
-<p><a href="{{ totp_url }}">Use an authenticator app</a></p>
+<h2>{% translate "Authenticator app" %}</h2>
+<p><a href="{{ totp_url }}">{% translate "Use an authenticator app" %}</a></p>
 
-<h2>Passkey</h2>
-<p>Use this device's screen lock or a security key.</p>
+<h2>{% translate "Passkey" %}</h2>
+<p>{% translate "Use this device's screen lock or a security key." %}</p>
 {% include "accounts/mfa/_passkey_register_form.html" %}
 {% include "accounts/mfa/_passkey_script.html" %}
 {% endblock %}
