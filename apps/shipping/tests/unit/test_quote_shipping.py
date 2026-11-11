@@ -223,11 +223,11 @@ class TestRatesList:  # spec rule 7, case 16
         assert outcome.rates[1].net == D("19.00")
 
     def test_rates_carry_what_tax_4_needs(self) -> None:
-        std = method(tax_treatment=engine.EXEMPT)
+        std = method(tax_treatment=engine.FOLLOWS_GOODS)
         outcome = quote_shipping(package(), ROME, cfg(std))
         assert isinstance(outcome, Rates)
         rate = outcome.rates[0]
-        assert rate.tax_treatment == engine.EXEMPT
+        assert rate.tax_treatment == engine.FOLLOWS_GOODS
         assert rate.zone_code == "it"
         assert rate.carrier_code == "main"
         assert rate.vendor_id == VENDOR
