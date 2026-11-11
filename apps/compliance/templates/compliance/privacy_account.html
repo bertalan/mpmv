@@ -25,7 +25,7 @@
       <p>{% blocktranslate %}Erasing your account blocks your login and deletes your carts and preferences. Order, billing, shipping and VAT data are kept for {{ years }} years from the end of the fiscal year, restricted to what the law requires (GDPR article 17(3)(b)), and then anonymised. If you have an order still open, the erasure completes when the last open order closes.{% endblocktranslate %}</p>
       <form method="post" action="{% url 'privacy_erase' %}">
         {% csrf_token %}
-        {% if has_password %}
+        {% if has_password and not has_factor %}
         <label for="erase-password">{% translate "Password" %}</label>
         <input id="erase-password" type="password" name="password" autocomplete="current-password">
         {% else %}

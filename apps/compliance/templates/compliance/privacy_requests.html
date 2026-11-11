@@ -16,7 +16,11 @@
             {% if not row.completed_at %}
               <form method="post" action="{% url 'privacy_request_process' row.public_id %}">
                 {% csrf_token %}
-                <label>{% translate "Reason (no personal data)" %} <input name="reason" maxlength="200" required></label>
+                <label>{% translate "Reason" %}
+                  <select name="reason" required>
+                    {% for code, label in reasons %}<option value="{{ code }}">{% translate label %}</option>{% endfor %}
+                  </select>
+                </label>
                 <button type="submit">{% translate "Process now" %}</button>
               </form>
             {% endif %}

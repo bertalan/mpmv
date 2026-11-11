@@ -11,7 +11,7 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.models import User
-from apps.accounts.tests.factories import PasskeyDeviceFactory, UserFactory
+from apps.accounts.tests.factories import PasskeyDeviceFactory, TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.cart.tests.factories import CartFactory
 from apps.compliance import gdpr
@@ -226,13 +226,52 @@ def test_staff_processes_a_pending_request_with_a_reason_and_it_is_audited() -> 
     url = reverse("privacy_request_process", kwargs={"public_id": pending.public_id})
 
     refused = client.post(url, {"reason": ""})
-    ok = client.post(url, {"reason": "owner asked by letter"})
+    free_text = client.post(url, {"reason": "mario rossi asked by letter"})
+    ok = client.post(url, {"reason": "customer_written_request"})
 
     assert refused.status_code == 400
+    assert free_text.status_code == 400
     assert ok.status_code == 302
     pending.refresh_from_db()
     assert pending.completed_at is not None
-    assert AuditLog.objects.filter(action="compliance.erasure_processed").exists()
+    entry = AuditLog.objects.get(action="compliance.erasure_processed")
+    assert entry.after is not None
+    assert entry.after["reason"] == "customer_written_request"
+    assert "mario" not in f"{entry.before}{entry.after}"
+
+
+def test_the_staff_form_offers_only_fixed_reasons() -> None:
+    ErasureRequestFactory.create()
+    html = (
+        staff_client("compliance.change_erasurerequest")
+        .get(reverse("privacy_requests"))
+        .content.decode()
+    )
+    assert '<select name="reason"' in html
+    assert 'name="reason" maxlength' not in html
+
+
+def test_erasure_with_a_second_factor_needs_it_fresh_even_with_the_password() -> None:
+    client, user, password = signed_in()
+    TOTPDeviceFactory.create(user=user)
+
+    stale = client.post(reverse("privacy_erase"), {"password": password, "confirm": "erase"})
+
+    assert stale.status_code == 302
+    assert reverse("mfa:verify") in stale["Location"]
+    user.refresh_from_db()
+    assert user.is_active
+    assert not ErasureRequest.objects.filter(user=user).exists()
+
+
+def test_erasure_with_a_fresh_second_factor_goes_through() -> None:
+    user = UserFactory.create()
+    client = Client()
+    verified_login(client, user)
+    response = client.post(reverse("privacy_erase"), {"confirm": "erase"})
+    assert response.status_code == 302
+    user.refresh_from_db()
+    assert gdpr.is_anonymised(user)
 
 
 def test_pending_requests_are_listed_before_completed_ones() -> None:
@@ -248,4 +287,4 @@ def test_processing_an_unknown_request_is_404() -> None:
     url = reverse(
         "privacy_request_process", kwargs={"public_id": "00000000-0000-0000-0000-000000000000"}
     )
-    assert client.post(url, {"reason": "x"}).status_code == 404
+    assert client.post(url, {"reason": "customer_written_request"}).status_code == 404

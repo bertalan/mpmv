@@ -20,6 +20,7 @@ from django.http import Http404, HttpRequest, HttpResponse, HttpResponseBadReque
 from django.shortcuts import get_object_or_404, redirect, render, resolve_url
 from django.urls import reverse
 from django.utils.translation import gettext as _
+from django.utils.translation import gettext_noop
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
@@ -37,7 +38,14 @@ from .models import ErasureRequest
 
 EXPORT_LIMIT = (3, dt.timedelta(hours=1))
 ERASE_LIMIT = (5, dt.timedelta(hours=1))
-REASON_MAX = 200
+# Why staff ran a pending request now. A fixed list, never free text: the audit trail must not
+# collect personal data again (lane-a decision on PR 266).
+REASONS: dict[str, str] = {
+    "customer_written_request": gettext_noop("Customer asked in writing"),
+    "customer_support_case": gettext_noop("Customer asked through a support case"),
+    "open_order_closed": gettext_noop("Last open order is closed"),
+    "legal_deadline": gettext_noop("Legal deadline is near"),
+}
 ACTION_PROCESSED = "compliance.erasure_processed"
 PERMISSION = "compliance.change_erasurerequest"
 
@@ -68,15 +76,18 @@ def _limited(user: User, scope: str, limit: tuple[int, dt.timedelta]) -> HttpRes
     return _too_many(wait) if wait else None
 
 
-def _reauth_refusal(request: HttpRequest) -> HttpResponse | None:
+def _reauth_refusal(request: HttpRequest, *, factor_required: bool = False) -> HttpResponse | None:
     """None when the caller is freshly re-authenticated, else the response to send.
 
     An account without a usable password (passkey-only) cannot type one: it is sent to the
-    second-factor step and comes back to the account page.
+    second-factor step and comes back to the account page. With `factor_required` (erasure,
+    D-32) an account that has a second factor must verify it again, a password is not enough.
     """
     user = cast(User, request.user)
     if is_recently_verified(request):
         return None
+    if factor_required and has_second_factor(user):
+        return mfa_redirect(request, "mfa:verify", next_url=reverse("privacy_account"))
     if not user.has_usable_password():
         target = "mfa:verify" if has_second_factor(user) else "mfa:setup"
         return mfa_redirect(request, target, next_url=reverse("privacy_account"))
@@ -91,6 +102,7 @@ def _page(request: HttpRequest, *, status: int = 200, **extra: Any) -> HttpRespo
     context = {
         "years": engine.FISCAL_RETENTION_YEARS,
         "has_password": user.has_usable_password(),
+        "has_factor": has_second_factor(user),
         **extra,
     }
     return render(request, "compliance/privacy_account.html", context, status=status)
@@ -137,7 +149,7 @@ def erase(request: HttpRequest) -> HttpResponse:
     user = cast(User, request.user)
     if limited := _limited(user, "erase", ERASE_LIMIT):
         return limited
-    if refusal := _reauth_refusal(request):
+    if refusal := _reauth_refusal(request, factor_required=True):
         return refusal
     if request.POST.get("confirm") != "erase":
         return _page(request, status=400, error=_("Tick the confirmation to erase your account."))
@@ -188,7 +200,9 @@ def requests_list(request: HttpRequest) -> HttpResponse:
     rows = ErasureRequest.objects.order_by(F("completed_at").asc(nulls_first=True), "requested_at")[
         :200
     ]
-    return render(request, "compliance/privacy_requests.html", {"rows": rows})
+    return render(
+        request, "compliance/privacy_requests.html", {"rows": rows, "reasons": REASONS.items()}
+    )
 
 
 @not_anonymous(
@@ -202,9 +216,9 @@ def requests_list(request: HttpRequest) -> HttpResponse:
 def request_process(request: HttpRequest, public_id: uuid.UUID) -> HttpResponse:
     """Run a pending request now (the nightly job does it too), with a reason, audited."""
     erasure = get_object_or_404(ErasureRequest.objects.select_related("user"), public_id=public_id)
-    reason = request.POST.get("reason", "").strip()[:REASON_MAX]
-    if not reason:
-        return HttpResponseBadRequest(_("A reason is required."))
+    reason = request.POST.get("reason", "")
+    if reason not in REASONS:
+        return HttpResponseBadRequest(_("Choose one of the listed reasons."))
     ctx = audit_context(request)
     try:
         gdpr.anonymise_customer(erasure.user, ctx=ctx)
