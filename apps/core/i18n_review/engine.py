@@ -6,9 +6,11 @@ language needs an entry in `RULES` and `READ_ME` (today: English and Italian).
 """
 
 import hashlib
+import html
 import re
 from collections import Counter
 from enum import StrEnum
+from html.parser import HTMLParser
 
 
 class Rule(StrEnum):
@@ -18,12 +20,15 @@ class Rule(StrEnum):
     LENGTH = "length"
     CHECKSUM = "checksum"
     STALE = "stale"
+    FORMULA = "formula"
+    DUPLICATE = "duplicate"
 
 
 RULES: dict[str, dict[Rule, str]] = {
     "en": {
         Rule.PLACEHOLDERS: (
-            "Keep every placeholder exactly as it is, such as %(name)s, {name} and %s: do not "
+            "Keep every placeholder exactly as it is, such as %(name)s, %d, %.2f, {name}, {0}, "
+            "{{ name }} and {% tag %}: do not "
             "translate, add, remove or rename them."
         ),
         Rule.HTML_TAGS: (
@@ -31,7 +36,8 @@ RULES: dict[str, dict[Rule, str]] = {
             "add, remove or change tags or their attributes."
         ),
         Rule.NEW_URL: (
-            "Do not add links: a web address (http://, https://, www.) that is not in the "
+            "Do not add links: a web address (http:, https:, ftp:, mailto:, javascript:, data:, "
+            "//host, www.) that is not in the "
             "English source is refused."
         ),
         Rule.LENGTH: (
@@ -49,7 +55,8 @@ RULES: dict[str, dict[Rule, str]] = {
     },
     "it": {
         Rule.PLACEHOLDERS: (
-            "Lascia ogni segnaposto esattamente com'è, come %(name)s, {name} e %s: non tradurli, "
+            "Lascia ogni segnaposto esattamente com'è, come %(name)s, %d, %.2f, {name}, {0}, {{ "
+            "name }} e {% tag %}: non tradurli, "
             "non aggiungerli, non toglierli e non rinominarli."
         ),
         Rule.HTML_TAGS: (
@@ -57,7 +64,8 @@ RULES: dict[str, dict[Rule, str]] = {
             "aggiungere, togliere o cambiare tag o i loro attributi."
         ),
         Rule.NEW_URL: (
-            "Non aggiungere link: un indirizzo web (http://, https://, www.) che non è nel testo "
+            "Non aggiungere link: un indirizzo web (http:, https:, ftp:, mailto:, javascript:, "
+            "data:, //host, www.) che non è nel testo "
             "inglese viene rifiutato."
         ),
         Rule.LENGTH: (
@@ -157,7 +165,8 @@ BANNERS = {
 
 RULES["de"] = {
     Rule.PLACEHOLDERS: (
-        "Lass jeden Platzhalter genau so, wie er ist, zum Beispiel %(name)s, {name} und %s: "
+        "Lass jeden Platzhalter genau so, wie er ist, zum Beispiel %(name)s, %d, %.2f, {name}, "
+        "{0}, {{ name }} und {% tag %}: "
         "nicht übersetzen, nicht hinzufügen, nicht entfernen und nicht umbenennen."
     ),
     Rule.HTML_TAGS: (
@@ -165,7 +174,8 @@ RULES["de"] = {
         "keine Tags oder Attribute hinzufügen, entfernen oder ändern."
     ),
     Rule.NEW_URL: (
-        "Füge keine Links hinzu: Eine Webadresse (http://, https://, www.), die nicht im "
+        "Füge keine Links hinzu: Eine Webadresse (http:, https:, ftp:, mailto:, javascript:, "
+        "data:, //host, www.), die nicht im "
         "englischen Text steht, wird abgelehnt."
     ),
     Rule.LENGTH: (
@@ -183,7 +193,8 @@ RULES["de"] = {
 }
 RULES["fr"] = {
     Rule.PLACEHOLDERS: (
-        "Garde chaque variable exactement telle quelle, par exemple %(name)s, {name} et %s : ne "
+        "Garde chaque variable exactement telle quelle, par exemple %(name)s, %d, %.2f, {name}, "
+        "{0}, {{ name }} et {% tag %} : ne "
         "les traduis pas, ne les ajoute pas, ne les supprime pas et ne les renomme pas."
     ),
     Rule.HTML_TAGS: (
@@ -191,7 +202,8 @@ RULES["fr"] = {
         "n'ajoute, ne supprime et ne modifie ni balise ni attribut."
     ),
     Rule.NEW_URL: (
-        "N'ajoute pas de lien : une adresse web (http://, https://, www.) qui n'est pas dans le "
+        "N'ajoute pas de lien : une adresse web (http:, https:, ftp:, mailto:, javascript:, "
+        "data:, //host, www.) qui n'est pas dans le "
         "texte anglais est refusée."
     ),
     Rule.LENGTH: (
@@ -209,7 +221,8 @@ RULES["fr"] = {
 }
 RULES["es"] = {
     Rule.PLACEHOLDERS: (
-        "Deja cada marcador exactamente como está, por ejemplo %(name)s, {name} y %s: no los "
+        "Deja cada marcador exactamente como está, por ejemplo %(name)s, %d, %.2f, {name}, {0}, "
+        "{{ name }} y {% tag %}: no los "
         "traduzcas, no los añadas, no los quites y no los cambies de nombre."
     ),
     Rule.HTML_TAGS: (
@@ -217,7 +230,8 @@ RULES["es"] = {
         "añadas, quites ni cambies etiquetas ni sus atributos."
     ),
     Rule.NEW_URL: (
-        "No añadas enlaces: una dirección web (http://, https://, www.) que no esté en el texto "
+        "No añadas enlaces: una dirección web (http:, https:, ftp:, mailto:, javascript:, data:, "
+        "//host, www.) que no esté en el texto "
         "inglés se rechaza."
     ),
     Rule.LENGTH: (
@@ -233,6 +247,43 @@ RULES["es"] = {
         "y edita ese."
     ),
 }
+
+RULES["en"][Rule.FORMULA] = (
+    "Write plain text only: a cell in Reviewer translation or Notes that starts with = (a "
+    "formula) is refused."
+)
+RULES["en"][Rule.DUPLICATE] = (
+    "Do not copy or add rows: a text that appears twice in the file is refused."
+)
+RULES["it"][Rule.FORMULA] = (
+    "Scrivi solo testo semplice: una cella di Reviewer translation o Notes che inizia con = "
+    "(una formula) viene rifiutata."
+)
+RULES["it"][Rule.DUPLICATE] = (
+    "Non copiare né aggiungere righe: un testo che compare due volte nel file viene rifiutato."
+)
+RULES["de"][Rule.FORMULA] = (
+    "Schreib nur einfachen Text: Eine Zelle in Reviewer translation oder Notes, die mit = "
+    "beginnt (eine Formel), wird abgelehnt."
+)
+RULES["de"][Rule.DUPLICATE] = (
+    "Kopiere oder ergänze keine Zeilen: Ein Text, der zweimal in der Datei steht, wird abgelehnt."
+)
+RULES["fr"][Rule.FORMULA] = (
+    "Écris du texte simple uniquement : une cellule de Reviewer translation ou Notes qui "
+    "commence par = (une formule) est refusée."
+)
+RULES["fr"][Rule.DUPLICATE] = (
+    "Ne copie et n'ajoute pas de lignes : un texte qui apparaît deux fois dans le fichier est "
+    "refusé."
+)
+RULES["es"][Rule.FORMULA] = (
+    "Escribe solo texto sin formato: una celda de Reviewer translation o Notes que empiece por = "
+    "(una fórmula) se rechaza."
+)
+RULES["es"][Rule.DUPLICATE] = (
+    "No copies ni añadas filas: un texto que aparece dos veces en el archivo se rechaza."
+)
 
 READ_ME["de"] = {
     "title": "Zuerst lesen: Übersetzungsprüfung für die Sprache {lang}",
@@ -378,21 +429,82 @@ def row_message(row: int, rule: Rule, reader: str) -> str:
     return f"{label} {row}: {rule_text(rule, reader)}"
 
 
-_PLACEHOLDER = re.compile(r"%\([A-Za-z_][A-Za-z0-9_]*\)[sdifrc]|%[sdifrc]|\{[A-Za-z0-9_]*\}")
-_TAG = re.compile(r"</?[A-Za-z][^<>]*>")
-_URL = re.compile(r"""(?:https?://|www\.)[^\s<>"']+""", re.IGNORECASE)
+_TEMPLATE = re.compile(r"\{\{.*?\}\}|\{%.*?%\}|\{#.*?#\}", re.DOTALL)
+_PRINTF = re.compile(
+    r"%(?:\([^)]*\))?[#0\-+]*(?:\d+|\*)?(?:\.(?:\d+|\*))?[hlL]?[diouxXeEfFgGcrsa%]"
+)
+_FIELD = re.compile(r"\{[^{}]*\}")
+_REST = r"""[^\s"'<>]*"""
+_LINKS = (
+    re.compile(r"(?:https?|ftp|mailto|javascript|data):" + _REST, re.IGNORECASE),
+    re.compile(r"(?<![A-Za-z0-9:/])//(?=[A-Za-z0-9\[])" + _REST),
+    re.compile(r"\bwww\." + _REST, re.IGNORECASE),
+)
+_HIDDEN = re.compile(r"[\x00-\x1f\u200b-\u200f\u2028\u2029\ufeff]")
 
 
 def placeholders(text: str) -> Counter[str]:
-    return Counter(_PLACEHOLDER.findall(text))
+    """Every placeholder of `text`: Django template syntax, printf and str.format fields.
+
+    Each one is compared whole (flags, width, precision, conversion, format spec, attribute or
+    index access included), so a translation can reorder them but never change or add one."""
+    found: Counter[str] = Counter()
+
+    def take(pattern: re.Pattern[str], kind: str, value: str) -> str:
+        for m in pattern.finditer(value):
+            found[f"{kind}:{m.group(0)}"] += 1
+        return pattern.sub(" ", value)
+
+    rest = take(_TEMPLATE, "tpl", text)
+    rest = take(_PRINTF, "printf", rest)
+    take(_FIELD, "field", rest)
+    return found
+
+
+class _Tags(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.found: Counter[str] = Counter()
+        self.events = False
+
+    def _start(self, tag: str, attrs: list[tuple[str, str | None]], kind: str) -> None:
+        names = sorted((n.lower(), v or "") for n, v in attrs)
+        if any(n.startswith("on") for n, _ in names):
+            self.events = True
+        self.found[f"{kind}:{tag.lower()}:{names!r}"] += 1
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self._start(tag, attrs, "start")
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self._start(tag, attrs, "empty")
+
+    def handle_endtag(self, tag: str) -> None:
+        self.found[f"end:{tag.lower()}"] += 1
 
 
 def html_tags(text: str) -> Counter[str]:
-    return Counter(_TAG.findall(text))
+    """Tags and attributes of `text` read with a real HTML parser; a `<` that does not open a
+    parsed tag (a broken or unclosed one) is counted too."""
+    parser = _Tags()
+    parser.feed(text)
+    parser.close()
+    found = parser.found
+    found["event-handler"] += 1 if parser.events else 0
+    found["lt"] = text.count("<")
+    return found
 
 
 def urls(text: str) -> set[str]:
-    return set(_URL.findall(text))
+    """Link-like tokens: schemes (also hidden by entities, case or control characters),
+    protocol-relative `//host` and `www.`."""
+    plain = html.unescape(text)
+    compact = _HIDDEN.sub("", plain)
+    tokens: set[str] = set()
+    for value in (plain, compact):
+        for pattern in _LINKS:
+            tokens.update(m.group(0).lower() for m in pattern.finditer(value))
+    return tokens
 
 
 def max_length(msgid: str) -> int:
@@ -405,7 +517,8 @@ def validate(source: str, _current: str, reviewer: str, _limit: int) -> list[Rul
     broken: list[Rule] = []
     if placeholders(source) != placeholders(reviewer):
         broken.append(Rule.PLACEHOLDERS)
-    if html_tags(source) != html_tags(reviewer):
+    theirs = html_tags(reviewer)
+    if html_tags(source) != theirs or theirs["event-handler"]:
         broken.append(Rule.HTML_TAGS)
     if urls(reviewer) - urls(source):
         broken.append(Rule.NEW_URL)

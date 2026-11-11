@@ -330,3 +330,177 @@ def test_po_round_trip_with_the_same_validation(locale: Path, tmp_path: Path) ->
     report = _import(locale, path, skip_invalid=True)
     assert [e.rule for e in report.errors] == [Rule.PLACEHOLDERS]
     assert _catalog(locale)["Contact us"] == "Kontaktieren Sie uns"
+
+
+# --- hardening (review of #305) ---------------------------------------------------------------
+
+
+def _set_description(path: Path, description: str) -> None:
+    wb = load_workbook(path)
+    wb.properties.description = description
+    wb.save(path)
+
+
+@pytest.mark.parametrize("lang", ["../../evil", "de/../../x", "xx", "DE", ""])
+def test_a_language_outside_the_configured_ones_is_refused_before_any_write(
+    locale: Path, tmp_path: Path, lang: str
+) -> None:
+    path = _export(locale, tmp_path)
+    _edit(path, {"Contact us": "Kontaktieren Sie uns"})
+    _set_description(path, f"{engine_marker()} lang={lang} readme=en")
+    with pytest.raises(ValueError, match="language"):
+        _import(locale, path)
+    assert sorted(p.name for p in locale.parent.iterdir() if p.is_dir()) == ["locale"]
+    assert sorted(p.name for p in locale.iterdir()) == ["de"]
+
+
+def engine_marker() -> str:
+    from apps.core.i18n_review.services import MARKER
+
+    return MARKER
+
+
+def test_a_po_file_with_a_bad_language_is_refused(locale: Path, tmp_path: Path) -> None:
+    path = export_catalog(lang="de", scope="all", fmt="po", out_dir=tmp_path, locale_dir=locale)
+    po = polib.pofile(str(path))
+    po.metadata["Language"] = "../../evil"
+    po.save()
+    with pytest.raises(ValueError, match="language"):
+        _import(locale, path)
+    assert not (tmp_path.parent / "evil").exists()
+
+
+def test_export_refuses_a_bad_language(locale: Path, tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="language"):
+        export_catalog(lang="../x", scope="all", fmt="xlsx", out_dir=tmp_path, locale_dir=locale)
+
+
+def test_a_file_over_the_size_limit_is_refused(
+    locale: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = _export(locale, tmp_path)
+    monkeypatch.setattr("apps.core.i18n_review.services.MAX_FILE_BYTES", 100)
+    with pytest.raises(ValueError, match="too large"):
+        _import(locale, path)
+
+
+def test_a_zip_bomb_is_refused(
+    locale: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = _export(locale, tmp_path)
+    monkeypatch.setattr("apps.core.i18n_review.services.MAX_UNCOMPRESSED_BYTES", 1000)
+    with pytest.raises(ValueError, match="too large"):
+        _import(locale, path)
+
+
+def test_too_many_rows_are_refused(
+    locale: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = _export(locale, tmp_path)
+    monkeypatch.setattr("apps.core.i18n_review.services.MAX_ROWS", 2)
+    with pytest.raises(ValueError, match="rows"):
+        _import(locale, path)
+
+
+@pytest.mark.parametrize("content", [b"not a zip at all", b"PK\x03\x04broken", b""])
+def test_a_corrupt_workbook_gives_a_clean_message(
+    locale: Path, tmp_path: Path, content: bytes
+) -> None:
+    bad = tmp_path / "bad.xlsx"
+    bad.write_bytes(content)
+    with pytest.raises(ValueError, match="not a valid"):
+        _import(locale, bad)
+
+
+def test_a_formula_in_the_reviewer_or_notes_column_is_refused(locale: Path, tmp_path: Path) -> None:
+    before = _catalog(locale)
+    path = _export(locale, tmp_path)
+    wb = load_workbook(path)
+    ws = wb.worksheets[1]
+    ws.cell(row=3, column=6).value = "=1+1"  # a real formula (openpyxl stores "=..." as one)
+    ws.cell(row=4, column=7).value = '=HYPERLINK("http://evil.example")'
+    wb.save(path)
+    report = _import(locale, path)
+    assert {(e.row, e.rule) for e in report.errors} == {(3, Rule.FORMULA), (4, Rule.FORMULA)}
+    assert _catalog(locale) == before
+
+
+def test_a_duplicate_row_is_refused_on_every_copy(locale: Path, tmp_path: Path) -> None:
+    path = _export(locale, tmp_path)
+    wb = load_workbook(path)
+    ws = wb.worksheets[1]
+    source = [c.value for c in ws[3]]
+    new_row = ws.max_row + 1
+    for col, value in enumerate(source, start=1):
+        ws.cell(row=new_row, column=col).value = value
+    wb.save(path)
+    last = load_workbook(path).worksheets[1].max_row
+    report = _import(locale, path)
+    assert {(e.row, e.rule) for e in report.errors} == {(3, Rule.DUPLICATE), (last, Rule.DUPLICATE)}
+
+
+def test_a_failed_write_leaves_the_catalog_and_the_mo_untouched(
+    locale: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import os
+
+    path = _export(locale, tmp_path)
+    _edit(path, {"Contact us": "Kontaktieren Sie uns"})
+    folder = locale / "de" / "LC_MESSAGES"
+    po_before = (folder / "django.po").read_bytes()
+    mo_before = (folder / "django.mo").read_bytes()
+    real, calls = os.replace, []
+
+    def flaky(src: object, dst: object) -> None:
+        calls.append(dst)
+        if len(calls) == 2:
+            raise OSError("disk full")
+        real(src, dst)  # type: ignore[arg-type]
+
+    monkeypatch.setattr("apps.core.i18n_review.services.os.replace", flaky)
+    with pytest.raises(OSError, match="disk full"):
+        _import(locale, path)
+    # the first replace landed, so a rollback must restore it; no temp files remain
+    assert (folder / "django.po").read_bytes() == po_before
+    assert (folder / "django.mo").read_bytes() == mo_before
+    assert sorted(p.name for p in folder.iterdir()) == ["django.mo", "django.po"]
+
+
+def test_a_po_row_changed_in_the_catalog_since_the_export_is_stale(
+    locale: Path, tmp_path: Path
+) -> None:
+    path = export_catalog(lang="de", scope="all", fmt="po", out_dir=tmp_path, locale_dir=locale)
+    po = polib.pofile(str(path))
+    po.find("Contact us").msgstr = "Kontaktieren Sie uns"
+    po.save()
+    catalog = locale / "de" / "LC_MESSAGES" / "django.po"
+    cat = polib.pofile(str(catalog))
+    cat.find("Contact us").msgstr = "Neu"
+    cat.save()
+    report = _import(locale, path)
+    assert [e.rule for e in report.errors] == [Rule.STALE]
+    assert _catalog(locale)["Contact us"] == "Neu"
+
+
+def test_a_po_file_without_the_export_marker_is_stale_when_edited(
+    locale: Path, tmp_path: Path
+) -> None:
+    path = export_catalog(lang="de", scope="all", fmt="po", out_dir=tmp_path, locale_dir=locale)
+    po = polib.pofile(str(path))
+    entry = po.find("Contact us")
+    entry.tcomment = ""
+    entry.msgstr = "Kontaktieren Sie uns"
+    po.save()
+    report = _import(locale, path)
+    assert [e.rule for e in report.errors] == [Rule.STALE]
+
+
+def test_a_duplicate_po_entry_is_refused(locale: Path, tmp_path: Path) -> None:
+    path = export_catalog(lang="de", scope="all", fmt="po", out_dir=tmp_path, locale_dir=locale)
+    po = polib.pofile(str(path))
+    entry = po.find("Contact us")
+    po.append(polib.POEntry(msgid=entry.msgid, msgstr="Anders", tcomment=entry.tcomment))
+    po.save()
+    report = _import(locale, path)
+    assert {e.rule for e in report.errors} == {Rule.DUPLICATE}
+    assert _catalog(locale)["Contact us"] == "Kontakt"

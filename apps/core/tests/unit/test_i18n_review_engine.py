@@ -1,5 +1,7 @@
 """Validation rules for the translation review files (I18N.13), pure functions."""
 
+import pytest
+
 from apps.core.i18n_review import engine
 from apps.core.i18n_review.engine import Rule
 
@@ -84,7 +86,7 @@ def test_read_me_language_falls_back_to_english_for_others() -> None:
 def test_read_me_keeps_the_technical_examples_in_every_language() -> None:
     for lang in LANGUAGES:
         joined = " ".join(engine.read_me_lines(lang, "de"))
-        for token in ("%(name)s", "{name}", "%s", "<b>", "Notes", "Max length"):
+        for token in ("%(name)s", "{name}", "%d", "<b>", "Notes", "Max length"):
             assert token in joined
 
 
@@ -97,3 +99,94 @@ def test_read_me_names_the_tone_per_language() -> None:
 
 def test_banner_is_short() -> None:
     assert len(engine.banner("en", "de")) < 300
+
+
+# --- hardened rules (review of #305) ----------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("source", "ok"),
+    [
+        ("%(price)08.2f total", "total %(price)08.2f"),
+        ("%.2f and %5s", "%5s und %.2f"),
+        ("100%% sure %s", "%s: 100%% sicher"),
+        ("{0:.2f} and {name!r}", "{name!r} {0:.2f}"),
+        ("{{ user.name }} and {% url 'x' %}", "{% url 'x' %} {{ user.name }}"),
+    ],
+)
+def test_placeholders_of_every_syntax_are_compared_exactly(source: str, ok: str) -> None:
+    assert _broken(source, "x", ok) == []
+    assert _broken(source, "x", "plain") == [Rule.PLACEHOLDERS]
+
+
+@pytest.mark.parametrize(
+    ("source", "bad"),
+    [
+        ("%(price)08.2f", "%(price)8.2f"),
+        ("%.2f", "%.3f"),
+        ("%s", "%r"),
+        ("100%%", "100%"),
+        ("{0:.2f}", "{0:.3f}"),
+        ("{name!r}", "{name!s}"),
+        ("{name}", "{name} {name}"),
+        ("{{ user.name }}", "{{ user.email }}"),
+        ("{% url 'x' %}", "{% url 'y' %}"),
+    ],
+)
+def test_a_changed_placeholder_is_refused(source: str, bad: str) -> None:
+    assert Rule.PLACEHOLDERS in _broken(source, "x", bad)
+
+
+@pytest.mark.parametrize("bad", ["{name.__class__}", "{name[0]}", "{0.x}", "{name.__globals__}"])
+def test_attribute_and_index_access_cannot_be_introduced(bad: str) -> None:
+    assert Rule.PLACEHOLDERS in _broken("Hi {name} {0}", "x", bad + " {0}")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "see HTTP://evil.example",
+        "see https://evil.example",
+        "ftp://evil.example/x",
+        "mail mailto:a@evil.example",
+        '<a href="JavaScript:alert(1)">x</a>',
+        "data:text/html;base64,AAAA",
+        "go to //evil.example/x",
+        "visit WWW.evil.example",
+        "java\tscript:alert(1)",
+        "&#104;ttp://evil.example",
+    ],
+)
+def test_every_kind_of_new_link_is_refused(text: str) -> None:
+    assert Rule.NEW_URL in _broken("Plain", "x", text)
+
+
+def test_a_link_already_in_the_source_is_kept() -> None:
+    src = '<a href="https://example.com/a">x</a>'
+    assert _broken(src, "x", '<a href="https://example.com/a">y</a>') == []
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "<b>hi",  # unclosed
+        "<b>hi</b",  # broken end tag
+        "<b class='x'>hi</b>",  # new attribute
+        '<b onclick="x()">hi</b>',  # event handler
+        "<B>hi</B><i>",  # extra tag
+    ],
+)
+def test_html_is_parsed_and_must_match_tags_and_attributes(bad: str) -> None:
+    assert Rule.HTML_TAGS in _broken("<b>hi</b>", "x", bad)
+
+
+def test_html_attribute_values_must_match_and_case_or_order_is_free() -> None:
+    src = '<a href="/a" title="T">x</a>'
+    assert _broken(src, "x", '<A title="T" href="/a">y</A>') == []
+    assert Rule.HTML_TAGS in _broken(src, "x", '<a href="/b" title="T">y</a>')
+
+
+def test_the_rules_for_formulas_and_duplicates_have_texts_in_every_language() -> None:
+    for lang in LANGUAGES:
+        assert engine.rule_text(Rule.FORMULA, lang)
+        assert engine.rule_text(Rule.DUPLICATE, lang)

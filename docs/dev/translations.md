@@ -75,16 +75,28 @@ Each failing row is reported with its row number and the rule, in the words of t
 
 | Rule | Refused when |
 |---|---|
-| placeholders | the set of `%(name)s`, `%s`, `%d` and `{name}` differs from the English source (order may change) |
-| HTML tags | the tags or their attributes differ from the English source |
-| new link | the text has an address (`http://`, `https://`, `www.`) that is not in the English source |
+| placeholders | the multiset of placeholders differs from the English source: printf forms with flags, width and precision (`%(name)s`, `%.2f`, `%5s`, `%%`), `str.format` fields compared whole (`{0}`, `{0:.2f}`, `{name!r}`), and Django template syntax (`{{ }}`, `{% %}`, `{# #}`). Order may change. A field with attribute or index access (`{a.__class__}`, `{a[0]}`) is refused unless the English source has the same one |
+| HTML tags | read with a real HTML parser (`html.parser`): the tags (unclosed or broken ones included) and their attribute names and values differ from the source, or an event-handler attribute (`on...`) appears |
+| new link | the text has a link-like token that is not in the English source: `http:`, `https:`, `ftp:`, `mailto:`, `javascript:`, `data:`, `//host`, `www.` (any case, also inside attributes, and also when hidden by HTML entities or control characters) |
+| formula | an XLSX cell in Reviewer translation or Notes is a formula (starts with `=`) |
+| duplicate | the same msgid, context and form appears twice in the file (every copy is refused) |
 | checksum | msgid, context, form, English source, Current translation or Checksum was changed in the file, or the row names a text that is not in the catalog |
-| stale | the catalog changed after the export (Current translation differs from the catalog) |
+| stale | the catalog changed after the export (XLSX: Current translation differs from the catalog; `.po`: the export marker in the entry's translator comment, `mpmv-base:`, no longer matches the catalog, or is missing) |
+
+File-level limits, refused with a plain message before anything is read: the language must be one
+of `settings.LANGUAGES` (exact code; it names the catalog folder, so a file naming any other
+language is refused), the file is at most 5 MB (50 MB unpacked, which stops zip bombs) and at most
+20,000 rows, and a corrupt or non-XLSX file gives "is not a valid .xlsx file".
+
+The `.po` and `.mo` are written through temporary files in the same folder, fsynced, then
+`os.replace`d; if the second replace fails the first is rolled back, so the catalog and its `.mo`
+never end up out of step.
 
 Length is a **warning**, not a rule: a text longer than Max length (German is often longer) is applied anyway and listed as `warning row N: ...` in the import output and in the report. Catalog entries do not know the field they fill, so no hard limit is enforced today; a real limit (a model field `max_length` mapped to the msgid) would be added as a refusal later.
 
-A `.po` file is checked with the same rules (row = line of the entry in the file); the checksum
-does not apply to it, the entry must exist in the catalog.
+A `.po` file is checked with the same rules (row = line of the entry in the file); it has no
+checksum column, so the stale check above uses the `mpmv-base:` marker that the export writes in each
+entry (keep Poedit's translator comments).
 
 ## Tone
 

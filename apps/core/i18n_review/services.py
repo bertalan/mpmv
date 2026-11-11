@@ -8,13 +8,19 @@ their own PO export and import in wagtail-localize (docs/dev/translations.md).
 """
 
 import hashlib
+import os
+import tempfile
+import zipfile
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import polib
+from django.conf import settings
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, Protection
+from openpyxl.utils.exceptions import InvalidFileException
 from openpyxl.worksheet.worksheet import Worksheet
 
 from apps.core.audit import AuditContext, record
@@ -26,6 +32,10 @@ IMPORT_ACTION = "core.i18n.imported"
 SCOPES = ("emails", "vendor-help", "all")
 READ_ME_SHEET = "Read me"
 MARKER = "mpmv-i18n:1"
+BASE_MARK = "mpmv-base:"  # translator comment of an exported .po entry
+MAX_FILE_BYTES = 5_000_000
+MAX_UNCOMPRESSED_BYTES = 50_000_000
+MAX_ROWS = 20_000
 HEADER = [
     "msgid",
     "context",
@@ -83,8 +93,20 @@ class ImportReport:
 # --- catalogs ---------------------------------------------------------------------------------
 
 
+def validate_lang(lang: str) -> str:
+    """`lang` itself when it is one of the configured language codes, else ValueError.
+
+    The code names a directory, so only an exact match is accepted (never path characters)."""
+    if lang not in {code for code, _ in settings.LANGUAGES}:
+        raise ValueError(f"unknown language {lang!r}: not one of the configured languages")
+    return lang
+
+
 def catalog_path(locale_dir: Path, lang: str) -> Path:
-    return locale_dir / lang / "LC_MESSAGES" / "django.po"
+    path = locale_dir / validate_lang(lang) / "LC_MESSAGES" / "django.po"
+    if not path.resolve().is_relative_to(locale_dir.resolve()):
+        raise ValueError("the catalog path leaves the locale directory")
+    return path
 
 
 def load_catalog(locale_dir: Path, lang: str) -> polib.POFile:
@@ -136,6 +158,19 @@ def _forms(entry: polib.POEntry) -> list[tuple[int | None, str, str]]:
     return [(None, entry.msgid, entry.msgstr)]
 
 
+def _form_key(form: int | None) -> str:
+    return "s" if form is None else str(form)
+
+
+def _base_marks(entry: polib.POEntry) -> list[str]:
+    """One `form=hash` token per form: the hash of the current translation at export time."""
+    ctx = entry.msgctxt or ""
+    return [
+        f"{_form_key(f)}={engine.checksum(ctx, entry.msgid, f, english, current)}"
+        for f, english, current in _forms(entry)
+    ]
+
+
 def _cell(ws: Worksheet, row: int, col: int, value: Any) -> Any:
     cell = ws.cell(row=row, column=col + 1)
     cell.value = value
@@ -158,6 +193,7 @@ def export_catalog(
 ) -> Path:
     if scope not in SCOPES:
         raise ValueError(f"unknown scope {scope!r}")
+    validate_lang(lang)
     po = load_catalog(locale_dir, lang)
     entries = [e for e in po if not e.obsolete and in_scope(e, scope)]
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -187,6 +223,7 @@ def _export_po(
                 flags=list(e.flags),
                 occurrences=e.occurrences,
                 comment=f"max length: {engine.max_length(e.msgid)}",
+                tcomment=BASE_MARK + " " + " ".join(_base_marks(e)),
             )
         )
     path = out_dir / f"i18n-{lang}-{scope}.po"
@@ -279,6 +316,8 @@ def import_file(
     Nothing is written when a row fails, unless `skip_invalid` (the failing rows are skipped and
     reported). `dry_run` validates and reports without writing or auditing.
     """
+    if path.stat().st_size > MAX_FILE_BYTES:
+        raise ValueError(f"{path.name} is too large (limit {MAX_FILE_BYTES // 1_000_000} MB)")
     sha = hashlib.sha256(path.read_bytes()).hexdigest()
     if path.suffix == ".po":
         lang, reader, edits = _read_po(path, locale_dir)
@@ -334,10 +373,7 @@ def import_file(
             entry.msgstr_plural[change.form] = change.new
         if "fuzzy" in entry.flags:
             entry.flags.remove("fuzzy")
-    target = catalog_path(locale_dir, lang)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    po.save(str(target))
-    po.save_as_mofile(str(target.with_suffix(".mo")))
+    _write_catalog(po, catalog_path(locale_dir, lang))
     record(
         ctx,
         IMPORT_ACTION,
@@ -378,17 +414,117 @@ def _lookup(po: polib.POFile, edit: _Edit) -> tuple[polib.POEntry, str, str] | N
     return None
 
 
+def _tmp_file(folder: Path) -> Path:
+    fd, name = tempfile.mkstemp(dir=folder, suffix=".tmp")
+    os.close(fd)
+    return Path(name)
+
+
+def _fsync(path: Path) -> None:
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def _write_catalog(po: polib.POFile, target: Path) -> None:
+    """Write the .po and the .mo through temporary files in the same folder, fsync, then
+    `os.replace`; when the second replace fails the first is rolled back."""
+    folder = target.parent
+    folder.mkdir(parents=True, exist_ok=True)
+    mo_target = target.with_suffix(".mo")
+    leftovers: list[Path] = []
+    try:
+        tmp_po, tmp_mo = _tmp_file(folder), _tmp_file(folder)
+        leftovers += [tmp_po, tmp_mo]
+        po.save(str(tmp_po))
+        po.save_as_mofile(str(tmp_mo))
+        _fsync(tmp_po)
+        _fsync(tmp_mo)
+        backups: list[tuple[Path | None, Path]] = []
+        for dest in (target, mo_target):
+            if dest.exists():
+                backup = _tmp_file(folder)
+                leftovers.append(backup)
+                backup.write_bytes(dest.read_bytes())
+                backups.append((backup, dest))
+            else:
+                backups.append((None, dest))
+        try:
+            os.replace(tmp_po, target)
+            os.replace(tmp_mo, mo_target)
+        except BaseException:
+            for saved, original in backups:
+                if saved is not None:
+                    os.replace(saved, original)
+                else:
+                    original.unlink(missing_ok=True)
+            raise
+    finally:
+        for leftover in leftovers:
+            leftover.unlink(missing_ok=True)
+
+
+def _open_workbook(path: Path) -> Any:
+    try:
+        with zipfile.ZipFile(path) as archive:
+            total = sum(info.file_size for info in archive.infolist())
+        if total > MAX_UNCOMPRESSED_BYTES:
+            raise ValueError(f"{path.name} is too large once unpacked")
+        wb = load_workbook(path)
+    except (zipfile.BadZipFile, InvalidFileException, KeyError, OSError, SyntaxError) as exc:
+        raise ValueError(f"{path.name} is not a valid .xlsx file") from exc
+    except ValueError as exc:
+        if "too large" in str(exc):
+            raise
+        raise ValueError(f"{path.name} is not a valid .xlsx file") from exc
+    return wb
+
+
+def _is_formula(cells: Any, col: int) -> bool:
+    return len(cells) > col and getattr(cells[col], "data_type", "") == "f"
+
+
+def _mark_duplicates(
+    edits: list[_Edit], keys: list[tuple[int, tuple[str, str, int | None]]]
+) -> list[_Edit]:
+    counts = Counter(key for _, key in keys)
+    dupes = {row for row, key in keys if counts[key] > 1}
+    out = []
+    for edit in edits:
+        if edit.row in dupes and edit.error in (None, Rule.FORMULA):
+            edit = _Edit(
+                edit.row,
+                edit.msgid,
+                edit.ctx,
+                edit.form,
+                edit.current,
+                edit.reviewer,
+                error=Rule.DUPLICATE,
+            )
+        out.append(edit)
+    present = {e.row for e in out}
+    for row, key in keys:
+        if row in dupes and row not in present:
+            out.append(_Edit(row, key[0], key[1], key[2], "", "", error=Rule.DUPLICATE))
+    return sorted(out, key=lambda e: e.row)
+
+
 def _read_xlsx(path: Path) -> tuple[str, str, list[_Edit]]:
-    wb = load_workbook(path)
+    wb = _open_workbook(path)
     description = wb.properties.description or ""
     if not description.startswith(MARKER) or len(wb.worksheets) < 2:
         raise ValueError(f"{path.name} is not an export of i18n_export")
     meta = dict(p.split("=", 1) for p in description.split()[1:] if "=" in p)
-    lang, reader = meta.get("lang", ""), meta.get("readme", "en")
+    lang, reader = validate_lang(meta.get("lang", "")), meta.get("readme", "en")
     ws = wb.worksheets[1]
+    if ws.max_row - FIRST_ROW + 1 > MAX_ROWS:
+        raise ValueError(f"{path.name} has too many rows (limit {MAX_ROWS})")
     if [c.value for c in ws[2]][: len(HEADER)] != HEADER:
         raise ValueError(f"{path.name} is not an export of i18n_export: header changed")
     edits: list[_Edit] = []
+    keys: list[tuple[int, tuple[str, str, int | None]]] = []
     for cells in ws.iter_rows(min_row=FIRST_ROW):
         row = cells[0].row
         v = [c.value for c in cells] + [None] * len(HEADER)
@@ -404,32 +540,49 @@ def _read_xlsx(path: Path) -> tuple[str, str, list[_Edit]]:
             form = _form(v[C_FORM])
         except (TypeError, ValueError):
             form = -1
+        keys.append((row, (msgid, ctx, form)))
         expected = engine.checksum(ctx, msgid, form, english, current)
         reviewer = _text(v[C_REVIEWER]).strip()
         error = None if _text(v[C_SUM]) == expected else Rule.CHECKSUM
+        if error is None and (_is_formula(cells, C_REVIEWER) or _is_formula(cells, C_NOTES)):
+            error = Rule.FORMULA
         if error is None and not reviewer:
             continue
         edits.append(_Edit(row, msgid, ctx, form, current, reviewer, error=error))
-    return lang, reader, edits
+    return lang, reader, _mark_duplicates(edits, keys)
 
 
 def _read_po(path: Path, locale_dir: Path) -> tuple[str, str, list[_Edit]]:
-    po = polib.pofile(str(path))
-    lang = po.metadata.get("Language", "")
+    try:
+        po = polib.pofile(str(path))
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"{path.name} is not a valid .po file") from exc
+    if len(po) > MAX_ROWS:
+        raise ValueError(f"{path.name} has too many rows (limit {MAX_ROWS})")
+    lang = validate_lang(po.metadata.get("Language", ""))
     reader = engine.read_me_language(lang)
     catalog = load_catalog(locale_dir, lang)
     edits: list[_Edit] = []
+    keys: list[tuple[int, tuple[str, str, int | None]]] = []
     for e in po:
         row = e.linenum
+        ctx = e.msgctxt or ""
+        keys.append((row, (e.msgid, ctx, None)))
         known = catalog.find(e.msgid, msgctxt=e.msgctxt or None)
         if known is None:
-            edits.append(_Edit(row, e.msgid, e.msgctxt or "", None, "", "", error=Rule.CHECKSUM))
+            edits.append(_Edit(row, e.msgid, ctx, None, "", "", error=Rule.CHECKSUM))
             continue
+        marks = dict(
+            t.split("=", 1) for t in (e.tcomment or "").replace(BASE_MARK, "").split() if "=" in t
+        )
         theirs = {f: text for f, _, text in _forms(e)}
-        for form, _english, current in _forms(known):
+        for form, english, current in _forms(known):
             text = theirs.get(form, "").strip()
-            if text and text != current:
-                edits.append(
-                    _Edit(row, e.msgid, e.msgctxt or "", form, current, text, stale_check=False)
-                )
-    return lang, reader, edits
+            if not text or text == current:
+                continue
+            base = engine.checksum(ctx, e.msgid, form, english, current)
+            error = None if marks.get(_form_key(form)) == base else Rule.STALE
+            edits.append(
+                _Edit(row, e.msgid, ctx, form, current, text, stale_check=False, error=error)
+            )
+    return lang, reader, _mark_duplicates(edits, keys)
