@@ -385,3 +385,115 @@ def decision_problems(outcome: str, reason: str) -> list[str]:
     if not reason.strip():
         problems.append("reason")
     return problems
+
+
+# --- Statement of reasons (DSA art. 17, CMP.5 part 3) and the transparency database (art. 24(5))
+
+RESTRICTION_REMOVE: Final = "remove"
+RESTRICTION_SUSPEND: Final = "suspend_account"
+RESTRICTIONS: Final = (RESTRICTION_REMOVE, RESTRICTION_SUSPEND)
+#: What the restriction is based on: a law (illegal content) or the platform terms.
+GROUND_ILLEGAL: Final = "illegal_content"
+GROUND_TERMS: Final = "terms"
+GROUND_KINDS: Final = (GROUND_ILLEGAL, GROUND_TERMS)
+
+
+PUBLIC_TEXT_LIMIT: Final = 2000  # the transparency database caps explanations here
+_PUBLIC_PATTERNS: Final = tuple(
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in (
+        r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+",  # email
+        r"(?:https?://|www\.)\S+",  # URL
+        r"\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,4})?\b",  # IBAN
+        r"\b(?:\d[ -]?){13,19}\b",  # card number
+        r"(?<!\w)\+?\d[\d ()./-]{6,}\d",  # phone number
+    )
+)
+
+
+def scrub_public_text(text: str) -> str:
+    """`text` for a public database: emails, URLs, IBANs, card and phone numbers removed, at most
+    `PUBLIC_TEXT_LIMIT` characters (art. 24(5): no personal data). Defence in depth: staff write
+    this text for the public and are warned that it is published."""
+    for pattern in _PUBLIC_PATTERNS:
+        text = pattern.sub("[removed]", text)
+    return text.strip()[:PUBLIC_TEXT_LIMIT]
+
+
+def statement_problems(
+    *,
+    restriction: str,
+    scope: str,
+    facts: str,
+    ground_kind: str,
+    ground: str,
+    transparency_explanation: str,
+) -> list[str]:
+    """Article 17(3) needs the restriction and its scope, the facts relied on and the legal or
+    contractual ground; art. 24(5) the separate public explanation. The notice basis, automation
+    and redress are filled in by the service."""
+    problems: list[str] = []
+    if restriction not in RESTRICTIONS:
+        problems.append("restriction")
+    if not scope.strip():
+        problems.append("scope")
+    if not facts.strip():
+        problems.append("facts")
+    if ground_kind not in GROUND_KINDS:
+        problems.append("ground_kind")
+    if not ground.strip():
+        problems.append("ground")
+    if not scrub_public_text(transparency_explanation):
+        problems.append("transparency_explanation")
+    return problems
+
+
+def transparency_payload(
+    *,
+    restriction: str,
+    ground_kind: str,
+    target_kind: str,
+    explanation: str,
+    based_on_notice: bool,
+    automated_detection: bool,
+    automated_decision: bool,
+    applied_on: dt.date,
+    valid_until: dt.date | None,
+    reference: str,
+) -> dict[str, str]:
+    """The article 24(5) record for the EU transparency database. Fixed codes plus the one
+    free-text field written for the public (`explanation`, scrubbed and capped): never the
+    vendor-facing facts, ground or scope, a vendor identity, URL or email. Field names follow the
+    database's statement-of-reasons schema; the exact schema is verified when the submitter is
+    built."""
+    payload: dict[str, str] = {
+        "puid": reference,
+        "application_date": applied_on.isoformat(),
+        "content_type": f"CONTENT_TYPE_{target_kind.upper()}",
+        "territorial_scope": "EU",
+        "decision_ground": (
+            "DECISION_GROUND_ILLEGAL_CONTENT"
+            if ground_kind == GROUND_ILLEGAL
+            else "DECISION_GROUND_INCOMPATIBLE_CONTENT"
+        ),
+        "source_type": "SOURCE_ARTICLE_16" if based_on_notice else "SOURCE_VOLUNTARY",
+        "automated_detection": "Yes" if automated_detection else "No",
+        "automated_decision": (
+            "AUTOMATED_DECISION_FULLY" if automated_decision else "AUTOMATED_DECISION_NOT_AUTOMATED"
+        ),
+    }
+    if restriction == RESTRICTION_SUSPEND:
+        payload["decision_account"] = "DECISION_ACCOUNT_SUSPENDED"
+        if valid_until is not None:
+            payload["end_date_account_restriction"] = valid_until.isoformat()
+    else:
+        payload["decision_visibility"] = "DECISION_VISIBILITY_CONTENT_REMOVED"
+        if valid_until is not None:
+            payload["end_date_visibility_restriction"] = valid_until.isoformat()
+    key = (
+        "illegal_content_explanation"
+        if ground_kind == GROUND_ILLEGAL
+        else "incompatible_content_explanation"
+    )
+    payload[key] = scrub_public_text(explanation)
+    return payload
