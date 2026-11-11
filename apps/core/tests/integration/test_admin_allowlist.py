@@ -1,6 +1,7 @@
 """OPS.5: the app-level check on the Django admin path (defence in depth behind Caddy)."""
 
 import re
+from pathlib import Path
 
 import pytest
 from django.test import Client, override_settings
@@ -53,6 +54,18 @@ def test_the_refusal_is_the_normal_404(client: Client, path: str, language: str)
     assert {k for k in refused.headers if k not in ignore} == {
         k for k in unknown.headers if k not in ignore
     }
+
+
+def test_the_proxy_rewrite_target_is_a_plain_404() -> None:
+    """deploy/caddy/Caddyfile rewrites a refused admin request to this path. Without the
+    trailing slash APPEND_SLASH would answer 301 to the slashed path instead of the 404."""
+    caddyfile = (Path(__file__).resolve().parents[4] / "deploy" / "caddy" / "Caddyfile").read_text()
+    target = re.search(r"^\t\trewrite \* (\S+)$", caddyfile, re.M)
+    assert target
+    client = Client()
+    response = client.get(target.group(1), REMOTE_ADDR="203.0.113.9")
+    assert response.status_code == 404
+    assert "Location" not in response
 
 
 @override_settings(ADMIN_ALLOWED_NETWORKS=ALLOWED)

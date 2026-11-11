@@ -532,6 +532,14 @@ def _vendor_images_allowed(vendor: Vendor, ids: list[Any]) -> bool:
     return bool(found.count() == len(wanted))
 
 
+def _vendor_products_allowed(vendor: Vendor, ids: list[Any]) -> bool:
+    """Whether every id is a product of `vendor` (any status: the page shows listed ones only)."""
+    if not all(isinstance(pk, int) and not isinstance(pk, bool) for pk in ids):
+        return False
+    wanted = set(ids)
+    return Product.objects.filter(pk__in=wanted, vendor=vendor).count() == len(wanted)
+
+
 def _check_vendor_body(page: EventPage, raw: list[Mapping[str, Any]]) -> None:
     """The vendor-only body rules (spec 15 "Vendor-safe block subset"), for every entry point:
     size limits first (they bound every later walk), unsafe links, no embeds by id, own images
@@ -547,6 +555,13 @@ def _check_vendor_body(page: EventPage, raw: list[Mapping[str, Any]]) -> None:
     ids = engine.image_ids(raw)
     if ids and (vendor is None or not _vendor_images_allowed(vendor, ids)):
         raise ValidationError({"body": _("Choose images from your own image library.")})
+    products = engine.product_ids(raw)
+    if products and (vendor is None or not _vendor_products_allowed(vendor, products)):
+        raise ValidationError({"body": _("Choose only your own products.")})
+    for kind, source in engine.grid_sources(raw):
+        own = vendor is not None and kind == "vendor" and source == vendor.pk
+        if not own or isinstance(source, bool):
+            raise ValidationError({"body": _("A product grid can show only your own products.")})
     own_pages: set[int] = set()
     for link in engine.cta_links(raw):
         url, target = link.get("url"), link.get("page")
