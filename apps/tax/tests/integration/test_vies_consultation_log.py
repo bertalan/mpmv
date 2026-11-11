@@ -225,7 +225,11 @@ def test_an_invalid_requester_has_its_own_detail_a_warning_and_a_long_negative_c
         check = services.verify_vat_number("DE", "DE123456789", client=client, requester=VENDOR)
     assert check.verified is False
     assert check.detail == engine.DETAIL_INVALID_REQUESTER
-    assert "IT01234567897" in caplog.text
+    # the warning names the refusal; the log redacts the VAT numbers (personal data for a sole
+    # trader, OPS.2): the full values stay in the consultation log table
+    assert "VIES refused the requester" in caplog.text
+    assert "IT01234567897" not in caplog.text
+    assert "DE123456789" not in caplog.text
     # an hour later (past the 5 minute outage cache) the same vendor is still not asked again
     VatValidation.objects.filter().count()
     row = check.validation

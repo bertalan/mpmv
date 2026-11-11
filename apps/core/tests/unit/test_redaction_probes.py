@@ -223,3 +223,10 @@ def test_a_uuid_shaped_credential_is_still_redacted(template: str) -> None:
 def test_a_uuid_identifier_is_kept(template: str) -> None:
     text = template.format(u=_UUID_ID)
     assert redact_text(text) == text
+
+
+def test_a_vat_number_in_a_log_line_is_redacted() -> None:
+    out = redact_text("VIES refused the requester IT01234567897 for a check of DE123456789")
+    assert "IT01234567897" not in out
+    assert "DE123456789" not in out
+    assert "VIES refused the requester" in out
