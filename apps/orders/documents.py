@@ -6,21 +6,20 @@ confirmation email is sent (in the queue worker, never in a request) and stored 
 platform never issues invoices or receipts, so the document says "non-fiscal" in the order's
 language and carries the order reference, never an invoice number.
 
-WeasyPrint is the only renderer and `render_html` the only place it is called: the HTML is
-rendered with `StaticOnlyFetcher`, which loads `data:` URIs and files under the static roots and
-nothing else. There is no network access, so no request forgery through `url()`, `<link>` or
-`<img>`, and no redirect to follow. The template is autoescaped and loads no resource at all;
-`base_url` is a fixed internal value. WeasyPrint is imported on first use, because the build
-stage and the web process do not need its system libraries.
+WeasyPrint runs only in `pdf_render` (no Django), in a child process with a hard timeout and no
+application secrets; see there for the locked-down fetcher (`data:` URIs and static files only, no
+network, no redirects). The template is autoescaped and loads no resource at all. WeasyPrint is
+never imported in the worker itself, because the build stage and the web process do not need its
+system libraries.
 """
 
+import json
 import logging
-import time
-from collections.abc import Iterable
+import os
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
-from urllib.request import url2pathname
 
 from django.apps import apps as django_apps
 from django.conf import settings
@@ -37,8 +36,6 @@ logger = logging.getLogger(__name__)
 
 ATTACHMENT_KIND = CONFIRMATION_PDF_KIND
 TEMPLATE = "documents/orders/vendor_confirmation.html"
-#: Not a real address: relative references in the document resolve to nothing.
-BASE_URL = "mpmv-document:///"
 #: The PDF is 1 to 3 pages; anything bigger or slower is a fault, and the email goes without it.
 MAX_PDF_BYTES = 1_048_576
 MAX_RENDER_SECONDS = 10.0
@@ -46,10 +43,6 @@ MAX_RENDER_SECONDS = 10.0
 
 class ConfirmationUnavailable(AttachmentUnavailable):
     """No document for this order: it is not `active` any more (D-30) or does not exist."""
-
-
-class ForbiddenResource(ValueError):
-    """The document asked for a resource that only static files and `data:` URIs may provide."""
 
 
 def static_roots() -> tuple[Path, ...]:
@@ -65,62 +58,44 @@ def static_roots() -> tuple[Path, ...]:
     return tuple(sorted(roots))
 
 
-class StaticOnlyFetcher:
-    """A WeasyPrint URL fetcher that allows `data:` URIs and files under `roots` only.
+def _renderer_command() -> list[str]:
+    return [sys.executable, "-m", "apps.orders.pdf_render"]
 
-    `file:` paths are resolved with `realpath` before the check, so `..`, encoded dots and
-    symlinks cannot leave the roots. Every other scheme, and `file:` with a remote host, raises
-    `ForbiddenResource` before anything is opened. Redirects are never followed: no HTTP request
-    is ever made. It wraps WeasyPrint's own fetcher, built on first use (WeasyPrint is imported
-    lazily), which only ever sees `data:` and checked `file:` URLs.
-    """
 
-    _fail_on_errors = False  # read by WeasyPrint: a refused resource is logged, not fatal
+#: What the renderer child inherits: enough to find fonts and temp space, no application secret.
+_CHILD_ENV_KEYS = (
+    "PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "FONTCONFIG_PATH", "FONTCONFIG_FILE",
+    "XDG_CACHE_HOME", "XDG_DATA_DIRS",
+)  # fmt: skip
 
-    def __init__(self, roots: Iterable[Path] | None = None) -> None:
-        source = static_roots() if roots is None else roots
-        self._roots = tuple(Path(root).resolve() for root in source)
-        self._wrapped: Any = None
 
-    @property
-    def _inner(self) -> Any:
-        if self._wrapped is None:
-            from weasyprint.urls import URLFetcher
-
-            self._wrapped = URLFetcher(
-                timeout=1, allowed_protocols={"data", "file"}, allow_redirects=False
-            )
-        return self._wrapped
-
-    @property
-    def handlers(self) -> list[Any]:
-        return list(self._inner.handlers)
-
-    def __call__(self, url: str) -> Any:
-        return self.fetch(url)
-
-    def fetch(self, url: str, headers: Any = None) -> Any:
-        parts = urlsplit(url)
-        scheme = parts.scheme.lower()
-        if scheme == "data":
-            return self._inner.fetch(url, headers)
-        if scheme != "file":
-            raise ForbiddenResource(f"resource scheme {scheme or '(none)'!r} is not allowed")
-        if parts.netloc not in ("", "localhost"):
-            raise ForbiddenResource("file resources on another host are not allowed")
-        path = Path(url2pathname(parts.path)).resolve()
-        if not any(path.is_relative_to(root) for root in self._roots):
-            raise ForbiddenResource("file resource is outside the static roots")
-        return self._inner.fetch(path.as_uri(), headers)
+def _renderer_env() -> dict[str, str]:
+    return {key: os.environ[key] for key in _CHILD_ENV_KEYS if key in os.environ}
 
 
 def render_html(html: str) -> bytes:
-    """Render `html` to a tagged PDF (PDF/UA-1 variant) through the locked-down fetcher. The one
-    place WeasyPrint is called. The document language and title come from the HTML."""
-    from weasyprint import HTML
-
-    document = HTML(string=html, base_url=BASE_URL, url_fetcher=StaticOnlyFetcher())
-    return bytes(document.write_pdf(pdf_variant="pdf/ua-1", pdf_tags=True))
+    """Render `html` to a tagged PDF in a child process (`pdf_render`), which is killed when it
+    runs past `MAX_RENDER_SECONDS`, so a pathological layout cannot hang the worker. Raises
+    `AttachmentUnavailable` on a timeout, a crash or output over `MAX_PDF_BYTES`."""
+    request = json.dumps({"html": html, "roots": [str(root) for root in static_roots()]})
+    try:
+        done = subprocess.run(  # noqa: S603 - fixed command, no shell, no user input in argv
+            _renderer_command(),
+            input=request.encode(),
+            capture_output=True,
+            timeout=MAX_RENDER_SECONDS,
+            env=_renderer_env(),
+            cwd=settings.BASE_DIR,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:  # `run` has already killed the child
+        raise AttachmentUnavailable(f"PDF render timed out after {MAX_RENDER_SECONDS} s") from exc
+    if done.returncode != 0:
+        logger.warning("PDF renderer failed: %s", done.stderr.decode(errors="replace")[-500:])
+        raise AttachmentUnavailable(f"PDF renderer failed (exit {done.returncode})")
+    if len(done.stdout) > MAX_PDF_BYTES:
+        raise AttachmentUnavailable(f"PDF is {len(done.stdout)} bytes (cap {MAX_PDF_BYTES})")
+    return done.stdout
 
 
 def _context(sub: VendorOrder, language: str) -> dict[str, Any]:
@@ -148,10 +123,13 @@ def render_vendor_confirmation_pdf(vendor_order: VendorOrder) -> bytes:
     return render_html(html)
 
 
-def vendor_confirmation_attachment(ref: str) -> mail.Attachment:
-    """The email attachment for the vendor order with public id `ref` (the outbox builds it when
-    the email is sent). Raises `AttachmentUnavailable` when it cannot or may not be produced, or
-    when the render is over the size or time cap; the email then goes out without it."""
+def vendor_confirmation_attachment(ref: str, recipient: str) -> mail.Attachment:
+    """The email attachment for the vendor order with public id `ref`, for an email to
+    `recipient` (the outbox builds it when the email is sent). The document is the buyer's, so it
+    is built only when `recipient` is the order's own address: a forged reference in an outbox
+    context never sends one buyer's document to someone else. Raises `AttachmentUnavailable`
+    when it cannot or may not be produced, or is over the time or size cap; the email then goes
+    out without it."""
     sub = (
         VendorOrder.objects.select_related("order", "vendor").filter(public_id=ref).first()
         if _is_uuid(ref)
@@ -159,13 +137,9 @@ def vendor_confirmation_attachment(ref: str) -> mail.Attachment:
     )
     if sub is None:
         raise ConfirmationUnavailable("vendor order not found")
-    started = time.monotonic()
+    if mail.normalise_address(sub.order.email) != mail.normalise_address(recipient):
+        raise AttachmentUnavailable("attachment does not belong to the recipient")
     pdf = render_vendor_confirmation_pdf(sub)
-    elapsed = time.monotonic() - started
-    if elapsed > MAX_RENDER_SECONDS:
-        raise AttachmentUnavailable(f"PDF render took {elapsed:.1f} s (cap {MAX_RENDER_SECONDS} s)")
-    if len(pdf) > MAX_PDF_BYTES:
-        raise AttachmentUnavailable(f"PDF is {len(pdf)} bytes (cap {MAX_PDF_BYTES})")
     return mail.Attachment(
         filename=f"order-{sub.order.number}-{str(sub.public_id)[:8]}.pdf",
         content_type="application/pdf",

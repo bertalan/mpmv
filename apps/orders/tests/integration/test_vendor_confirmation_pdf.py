@@ -10,7 +10,7 @@ from pypdf import PdfReader
 from apps.core import mail
 from apps.core import services as core_services
 from apps.core.models import OutboxEmail, OutboxEmailEvent
-from apps.orders import documents, notifications, services
+from apps.orders import documents, notifications, pdf_render, services
 from apps.orders.models import Order, PrivacyStatus, VendorOrder
 from apps.orders.tests.integration.test_notifications import BANNED, LANGS, two_vendor_order
 from apps.orders.tests.integration.test_services import CTX, line_input, pay, place, vendor_input
@@ -103,13 +103,19 @@ def test_an_unknown_order_language_renders_in_english() -> None:
 
 def test_hostile_names_are_inert_and_shown_as_text(monkeypatch: pytest.MonkeyPatch) -> None:
     fetched: list[str] = []
-    real = documents.StaticOnlyFetcher.fetch
+    real = pdf_render.StaticOnlyFetcher.fetch
 
     def spy(self: Any, url: str, headers: Any = None) -> Any:
         fetched.append(url)
         return real(self, url, headers)
 
-    monkeypatch.setattr(documents.StaticOnlyFetcher, "fetch", spy)
+    monkeypatch.setattr(pdf_render.StaticOnlyFetcher, "fetch", spy)
+    # In this process, so the spy sees every fetch (production renders in a child process).
+    monkeypatch.setattr(
+        documents,
+        "render_html",
+        lambda html: pdf_render.render_pdf(html, [str(r) for r in documents.static_roots()]),
+    )
     hostile = "<img src=x onerror=alert(1)> url(http://169.254.169.254/x) </style><p>"
     vendor = VendorFactory.create(display_name=hostile)
     order = place(
@@ -275,3 +281,36 @@ def test_an_unregistered_attachment_kind_is_left_out(sender: mail.MemoryEmailSen
     core_services.deliver_email(email.public_id)
     assert sender.sent[-1].attachments == ()
     assert "attachment omitted" in omitted(email)
+
+
+def test_a_forged_reference_does_not_attach_another_buyers_document(
+    sender: mail.MemoryEmailSender,
+) -> None:
+    order = two_vendor_order()
+    sub = sub_orders(order)[0]
+    core_services.enqueue_email(
+        recipient="someone.else@example.com",
+        template_key="orders.order_confirmation",
+        language="en",
+        context={
+            "order_number": "X",
+            "vendor_name": "V",
+            "lines": [],
+            "shipping": "0.00",
+            "total": "0.00",
+            "attachment": {"kind": documents.ATTACHMENT_KIND, "ref": str(sub.public_id)},
+        },
+    )
+    email = OutboxEmail.objects.get()
+    core_services.deliver_email(email.public_id)
+    assert sender.sent[-1].attachments == ()
+    assert "does not belong" in omitted(email)
+
+
+def test_the_buyers_own_address_matches_regardless_of_case(
+    sender: mail.MemoryEmailSender,
+) -> None:
+    order = two_vendor_order()
+    sub = sub_orders(order)[0]
+    attachment = documents.vendor_confirmation_attachment(str(sub.public_id), order.email.upper())
+    assert attachment.content.startswith(b"%PDF")

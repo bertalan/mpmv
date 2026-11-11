@@ -862,8 +862,9 @@ class AttachmentUnavailable(Exception):
     email's history, so it must say why without any personal data."""
 
 
-#: Builds one attachment from the reference in the email context (ORD.9 3/3).
-AttachmentBuilder = Callable[[str], mail.Attachment]
+#: Builds one attachment from the reference in the email context and the recipient it is
+#: addressed to, which it must check (ORD.9 3/3).
+AttachmentBuilder = Callable[[str, str], mail.Attachment]
 _ATTACHMENT_BUILDERS: dict[str, AttachmentBuilder] = {}
 
 
@@ -874,7 +875,9 @@ def register_email_attachment(kind: str, builder: AttachmentBuilder) -> None:
     _ATTACHMENT_BUILDERS[kind] = builder
 
 
-def _attachments(context: Mapping[str, Any]) -> tuple[tuple[mail.Attachment, ...], str]:
+def _attachments(
+    context: Mapping[str, Any], recipient: str
+) -> tuple[tuple[mail.Attachment, ...], str]:
     """The attachment an email asks for, and the history note when it is left out: the email is
     sent without it (never blocked) if it cannot be built."""
     marker = context.get("attachment")
@@ -886,7 +889,7 @@ def _attachments(context: Mapping[str, Any]) -> tuple[tuple[mail.Attachment, ...
         logger.warning("email attachment kind %r is not registered", kind)
         return (), "attachment omitted: unknown kind"
     try:
-        return (builder(ref),), ""
+        return (builder(ref, recipient),), ""
     except AttachmentUnavailable as exc:
         logger.warning("email attachment %s omitted: %s", kind, exc)
         return (), f"attachment omitted: {exc}"
@@ -915,7 +918,7 @@ def _attempt(email: OutboxEmail, *, dry_run: bool) -> str:
         email.status = status.SENT
         return ""
     email.attempts += 1
-    attachments, note = _attachments(email.context_data)
+    attachments, note = _attachments(email.context_data, email.recipient)
     outgoing = mail.OutgoingEmail(
         recipient=email.recipient,
         from_address=settings.DEFAULT_FROM_EMAIL,
