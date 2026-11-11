@@ -13,7 +13,9 @@ content; pages without a `page` skip it.
 Strict CSP: no inline script or style. The theme module registers its Alpine components before
 the vendored Alpine CSP build starts (both are deferred and run in document order); htmx reads
 its configuration from the meta tag. The launch countdown module (CMS.9) does nothing on a page
-without a countdown.
+without a countdown. The consent banner (SEO.5, SEO.9) closes the body: the same markup on every
+page, hidden until consent.js finds no valid choice, so a cached page never holds one visitor's
+state; fixed to the bottom of the viewport, last in reading order like in the tab order.
 {% endcomment %}
 <html lang="{{ LANGUAGE_CODE }}" data-theme="{{ theme.slug }}">
 <head>
@@ -25,6 +27,7 @@ without a countdown.
   {% with "themes/"|add:theme.slug|add:"/theme.css" as theme_css %}<link rel="stylesheet" href="{% static theme_css %}">{% endwith %}
   <script type="module" src="{% static 'themes/base/js/base.js' %}"></script>
   <script type="module" src="{% static 'themes/base/js/countdown.js' %}"></script>
+  <script type="module" src="{% static 'themes/base/js/consent.js' %}"></script>
   <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
   <script src="{% static 'vendor/alpine-csp.min.js' %}" defer></script>
   {% if page %}{% faq_jsonld page %}{% endif %}
@@ -48,5 +51,6 @@ without a countdown.
     {% navigation_links "footer" as footer_links %}
     {% include "components/footer.html" with site_name=site_name links=footer_links %}
   {% endblock %}
+  {% block consent %}{% consent_banner %}{% endblock %}
 </body>
 </html>

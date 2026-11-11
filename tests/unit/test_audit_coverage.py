@@ -43,6 +43,8 @@ NOT_SENSITIVE_SERVICES = {
     "apps.orders.services.hold_stock": "a short-lived cart hold on stock, like the cart itself; "
     "the order that confirms it is audited",
     "apps.cart.services.merge_carts": "a shopper's cart, not a financial or security fact",
+    "apps.seo.services.record_consent": "the visitor's own consent decision, itself the "
+    "append-only proof log, with no personal data beyond a random id (SEO.5)",
 }
 
 

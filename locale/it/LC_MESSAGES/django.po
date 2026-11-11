@@ -29,14 +29,34 @@ msgstr "%(name)s rimosso."
 msgid "%(vendor_name)s shipped its part of order %(order_number)s."
 msgstr "%(vendor_name)s ha spedito la sua parte dell’ordine %(order_number)s."
 
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+msgid "%(vendor_name)s's part of order %(order_number)s was cancelled."
+msgstr ""
+"La parte dell’ordine %(order_number)s di %(vendor_name)s è stata annullata."
+
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
+msgid "%(vendor_name)s's part of order %(order_number)s was delivered."
+msgstr ""
+"La parte dell’ordine %(order_number)s di %(vendor_name)s è stata consegnata."
+
 #: apps/orders/templates/email/orders/vendor_new_order/body.html
 #: apps/orders/templates/email/orders/vendor_new_order/body.txt
 msgid "%(vendor_name)s: new paid order %(order_number)s to ship:"
 msgstr "%(vendor_name)s: nuovo ordine pagato %(order_number)s da spedire:"
 
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/subject.txt
+msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
+msgstr "%(vendor_name)s: ordine %(order_number)s annullato, non spedire"
+
 #: apps/manager/forms.py
 msgid "About the shop"
 msgstr "Informazioni sul negozio"
+
+#: apps/seo/templates/seo/consent/_actions.html
+msgid "Accept all"
+msgstr "Accetta tutti"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Accept the order"
@@ -71,6 +91,14 @@ msgstr "Aggiungi un altro fattore prima di rimuovere l’ultimo."
 #: apps/manager/templates/manager/shop/orders.html
 msgid "All"
 msgstr "Tutti"
+
+#: apps/seo/admin_views.py
+msgid "Allow search engines to index this site"
+msgstr "Consenti ai motori di ricerca di indicizzare questo sito"
+
+#: apps/seo/models.py
+msgid "allow search engines to index this site"
+msgstr "consenti ai motori di ricerca di indicizzare questo sito"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Anonymous"
@@ -140,6 +168,10 @@ msgstr "Corriere: %(carrier)s. Numero di tracking: %(tracking_number)s."
 msgid "Choose a vendor"
 msgstr "Scegli un venditore"
 
+#: apps/seo/templates/seo/consent/banner.html
+msgid "Choose categories"
+msgstr "Scegli le categorie"
+
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Choose how you will confirm it is you after your password."
 msgstr "Scegli come confermare la tua identità dopo la password."
@@ -166,6 +198,19 @@ msgstr ""
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid "Continue to your request"
 msgstr "Continua con la tua richiesta"
+
+#: apps/seo/templates/seo/consent/_categories.html
+msgid "Cookie categories"
+msgstr "Categorie di cookie"
+
+#: apps/seo/templates/seo/consent/preferences.html
+#: apps/seo/templatetags/consent.py
+msgid "Cookie settings"
+msgstr "Impostazioni dei cookie"
+
+#: apps/seo/templates/seo/consent/banner.html
+msgid "Cookies and your privacy"
+msgstr "Cookie e la tua privacy"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Customer"
@@ -280,23 +325,35 @@ msgstr ""
 msgid "Go to the home page"
 msgstr "Vai alla home page"
 
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Hello %(customer_name)s,"
 msgstr "Ciao %(customer_name)s,"
 
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Hello,"
@@ -316,6 +373,14 @@ msgstr ""
 msgid "Images"
 msgstr "Immagini"
 
+#: apps/seo/templates/seo/admin/settings.html
+msgid ""
+"Indexing is forced off by the server (MPMV_FORCE_NOINDEX or demo mode). "
+"Every page is noindex and this switch cannot be turned on here."
+msgstr ""
+"Il server impone la non indicizzazione (MPMV_FORCE_NOINDEX o modalità demo)."
+" Ogni pagina è noindex e qui non puoi attivare questo interruttore."
+
 #: themes/base/templates/components/alert.html
 msgid "Information"
 msgstr "Informazione"
@@ -332,6 +397,10 @@ msgstr "Codice non valido. Riprova."
 msgid "Items"
 msgstr "Articoli"
 
+#: apps/seo/providers.py
+msgid "Keeps the site working: sign-in, cart and security. Always on."
+msgstr "Fa funzionare il sito: accesso, carrello e sicurezza. Sempre attivi."
+
 #: themes/base/templates/components/language_switcher.html
 msgid "Language"
 msgstr "Lingua"
@@ -343,6 +412,12 @@ msgstr "Lingua dei testi"
 #: themes/base/templates/components/footer.html
 msgid "Legal"
 msgstr "Note legali"
+
+#: apps/seo/providers.py
+msgid "Lets us measure our adverts and show you offers on other sites."
+msgstr ""
+"Ci permette di misurare le nostre pubblicità e di mostrarti offerte su altri"
+" siti."
 
 #: apps/manager/forms.py
 msgid "Letters, digits, spaces and . / _ - only."
@@ -392,6 +467,10 @@ msgstr "Segna come consegnato"
 msgid "Mark as shipped"
 msgstr "Segna come spedito"
 
+#: apps/seo/providers.py
+msgid "Marketing"
+msgstr "Marketing"
+
 #: apps/manager/templates/manager/platform/dashboard.html
 msgid ""
 "Marketplace work across vendors. The menu lists the sections you may open."
@@ -402,6 +481,10 @@ msgstr ""
 #: themes/base/templates/components/header.html
 msgid "Menu"
 msgstr "Menu"
+
+#: apps/seo/providers.py
+msgid "Necessary"
+msgstr "Necessari"
 
 #: apps/orders/templates/email/orders/vendor_new_order/subject.txt
 msgid "New paid order %(order_number)s"
@@ -474,6 +557,29 @@ msgstr "Segnalazioni"
 msgid "Notifier"
 msgstr "Segnalante"
 
+#: apps/seo/models.py
+msgid ""
+"Off (the default): search engines are told not to index any page of this "
+"site. On: pages can appear in search results. It has no effect while the "
+"server forces noindex (STAGE or demo)."
+msgstr ""
+"Disattivato (predefinito): ai motori di ricerca viene chiesto di non "
+"indicizzare nessuna pagina di questo sito. Attivato: le pagine possono "
+"comparire nei risultati di ricerca. Non ha effetto finché il server impone "
+"noindex (STAGE o demo)."
+
+#: apps/seo/admin_views.py
+msgid ""
+"Off keeps every page noindex (meta tag, X-Robots-Tag header and robots.txt)."
+" A new site starts off. Turn it on only when the shop is open to the public."
+" A stored value takes effect as soon as the server floor is lifted: re-check"
+" it when moving from STAGE to LIVE."
+msgstr ""
+"Disattivato mantiene ogni pagina noindex (meta tag, intestazione X-Robots-"
+"Tag e robots.txt). Un sito nuovo parte disattivato. Attivalo solo quando il "
+"negozio è aperto al pubblico. Un valore salvato ha effetto non appena il "
+"server toglie il blocco: ricontrollalo quando passi da STAGE a LIVE."
+
 #: apps/manager/forms.py
 msgid "One line under the shop name. Plain text."
 msgstr "Una riga sotto il nome del negozio. Testo semplice."
@@ -486,6 +592,24 @@ msgstr "Ordine"
 msgid "Order %(number)s"
 msgstr "Ordine %(number)s"
 
+#: apps/orders/templates/email/orders/order_cancelled/subject.txt
+msgid "Order %(order_number)s was cancelled"
+msgstr "L’ordine %(order_number)s è stato annullato"
+
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
+msgid ""
+"Order %(order_number)s was cancelled before payment. Nothing was charged."
+msgstr ""
+"L’ordine %(order_number)s è stato annullato prima del pagamento. Non è stato"
+" addebitato nulla."
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.txt
+msgid "Order %(order_number)s was cancelled. Do not ship these items:"
+msgstr ""
+"L’ordine %(order_number)s è stato annullato. Non spedire questi articoli:"
+
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Order %(order_number)s, sold by %(vendor_name)s:"
@@ -495,9 +619,17 @@ msgstr "Ordine %(order_number)s, venduto da %(vendor_name)s:"
 msgid "Order %(order_number)s: a shipment is on its way"
 msgstr "Ordine %(order_number)s: una spedizione è in arrivo"
 
+#: apps/orders/templates/email/orders/vendor_order_delivered/subject.txt
+msgid "Order %(order_number)s: a shipment was delivered"
+msgstr "Ordine %(order_number)s: una spedizione è stata consegnata"
+
 #: apps/orders/templates/email/orders/order_confirmation/subject.txt
 msgid "Order %(order_number)s: confirmation from %(vendor_name)s"
 msgstr "Ordine %(order_number)s: conferma di %(vendor_name)s"
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled/subject.txt
+msgid "Order %(order_number)s: part of your order was cancelled"
+msgstr "Ordine %(order_number)s: una parte del tuo ordine è stata annullata"
 
 #: apps/manager/sections.py apps/manager/templates/manager/shop/orders.html
 msgid "Orders"
@@ -578,6 +710,10 @@ msgstr[1] "Correggi gli errori qui sotto."
 msgid "PNG, JPEG or WebP. Leave empty to keep the current image."
 msgstr "PNG, JPEG o WebP. Lascia vuoto per mantenere l’immagine attuale."
 
+#: apps/seo/providers.py
+msgid "Preferences"
+msgstr "Preferenze"
+
 #: apps/manager/templates/manager/list.html
 msgid "Preview"
 msgstr "Anteprima"
@@ -605,6 +741,10 @@ msgstr "Pubblicati"
 #: apps/manager/templates/manager/shop/order.html
 msgid "Quantity"
 msgstr "Quantità"
+
+#: apps/seo/templates/seo/consent/banner.html
+msgid "Read more and choose"
+msgstr "Scopri di più e scegli"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Reason"
@@ -641,6 +781,16 @@ msgstr "Riferimento"
 msgid "Register a passkey"
 msgstr "Registra una passkey"
 
+#: apps/seo/templates/seo/consent/_actions.html
+msgid "Reject all"
+msgstr "Rifiuta tutti"
+
+#: apps/seo/providers.py
+msgid "Remembers choices you make, such as your garage or your layout."
+msgstr ""
+"Ricorda le scelte che fai, come il tuo garage o la disposizione della "
+"pagina."
+
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Remove"
 msgstr "Rimuovi"
@@ -670,13 +820,18 @@ msgstr "Ritirati"
 msgid "Returns and refunds policy"
 msgstr "Condizioni di reso e rimborso"
 
-#: apps/manager/templates/manager/shop/profile.html
+#: apps/manager/templates/manager/shop/profile.html apps/seo/admin_views.py
 msgid "Save"
 msgstr "Salva"
 
 #: apps/manager/templates/manager/shop/profile.html
 msgid "Save logo"
 msgstr "Salva logo"
+
+#: apps/seo/templates/seo/consent/banner.html
+#: apps/seo/templates/seo/consent/preferences.html
+msgid "Save my choices"
+msgstr "Salva le mie scelte"
 
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid ""
@@ -693,6 +848,18 @@ msgstr "Seleziona"
 #: apps/manager/lists.py
 msgid "Select at least one row."
 msgstr "Seleziona almeno una riga."
+
+#: apps/seo/wagtail_hooks.py
+msgid "SEO"
+msgstr "SEO"
+
+#: apps/seo/admin_views.py apps/seo/models.py
+msgid "SEO settings"
+msgstr "Impostazioni SEO"
+
+#: apps/seo/admin_views.py
+msgid "SEO settings saved."
+msgstr "Impostazioni SEO salvate."
 
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Set up an authenticator app"
@@ -732,6 +899,13 @@ msgstr "Negozio"
 msgid "Show password"
 msgstr "Mostra password"
 
+#: apps/seo/providers.py
+msgid ""
+"Shows us, in aggregate, which pages are used so we can improve the shop."
+msgstr ""
+"Ci mostra, in forma aggregata, quali pagine vengono usate, così possiamo "
+"migliorare il negozio."
+
 #: apps/manager/templates/manager/login.html
 msgid "Sign in"
 msgstr "Accedi"
@@ -741,6 +915,14 @@ msgstr "Accedi"
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid "Sign out"
 msgstr "Esci"
+
+#: apps/seo/admin_views.py
+msgid "Site"
+msgstr "Sito"
+
+#: apps/seo/models.py
+msgid "site"
+msgstr "sito"
 
 #: themes/base/templates/components/skip_link.html
 msgid "Skip to main content"
@@ -765,6 +947,10 @@ msgstr "Avvia la revisione"
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Statements of reasons"
 msgstr "Motivazioni"
+
+#: apps/seo/providers.py
+msgid "Statistics"
+msgstr "Statistiche"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/notices.html
@@ -876,6 +1062,12 @@ msgstr ""
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "The request failed."
 msgstr "La richiesta non è riuscita."
+
+#: apps/seo/admin_views.py
+msgid "The site these settings belong to; each site has its own switch."
+msgstr ""
+"Il sito a cui appartengono queste impostazioni; ogni sito ha il proprio "
+"interruttore."
 
 #: apps/manager/templates/manager/shop/profile.html
 msgid ""
@@ -1035,6 +1227,22 @@ msgstr "Verifica la tua identità"
 msgid "Warning"
 msgstr "Attenzione"
 
+#: apps/seo/templates/seo/consent/banner.html
+msgid ""
+"We always use the cookies the site needs to work. We only use the others if "
+"you say yes, and saying no costs you nothing."
+msgstr ""
+"Usiamo sempre i cookie di cui il sito ha bisogno per funzionare. Usiamo gli "
+"altri solo se dici di sì, e dire di no non ti costa nulla."
+
+#: apps/seo/templates/seo/consent/preferences.html
+msgid ""
+"We always use the cookies the site needs to work. We only use the others if "
+"you say yes. You can change your mind here at any time."
+msgstr ""
+"Usiamo sempre i cookie di cui il sito ha bisogno per funzionare. Usiamo gli "
+"altri solo se dici di sì. Qui puoi cambiare idea in qualsiasi momento."
+
 #: themes/base/templates/500.html
 msgid "We could not complete your request. Please try again in a few minutes."
 msgstr ""
@@ -1101,6 +1309,14 @@ msgid_plural "You have %(counter)s unused recovery codes."
 msgstr[0] "Hai %(counter)s codice di recupero non usato."
 msgstr[1] "Hai %(counter)s codici di recupero non usati."
 
+#: apps/seo/templates/seo/consent/preferences.html
+msgid "Your choice is saved on this device for six months."
+msgstr "La tua scelta resta salvata su questo dispositivo per sei mesi."
+
+#: apps/seo/templates/seo/consent/banner.html
+msgid "Your cookie choice was saved."
+msgstr "La tua scelta sui cookie è stata salvata."
+
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Your factors"
 msgstr "I tuoi fattori"
@@ -1116,39 +1332,3 @@ msgstr "Il tuo ruolo"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your role requires a second factor before you can continue."
 msgstr "Il tuo ruolo richiede un secondo fattore prima di poter continuare."
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
-#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
-msgid "%(vendor_name)s's part of order %(order_number)s was cancelled."
-msgstr "La parte dell’ordine %(order_number)s di %(vendor_name)s è stata annullata."
-
-#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
-#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
-msgid "%(vendor_name)s's part of order %(order_number)s was delivered."
-msgstr "La parte dell’ordine %(order_number)s di %(vendor_name)s è stata consegnata."
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/subject.txt
-msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
-msgstr "%(vendor_name)s: ordine %(order_number)s annullato, non spedire"
-
-#: apps/orders/templates/email/orders/order_cancelled/subject.txt
-msgid "Order %(order_number)s was cancelled"
-msgstr "L’ordine %(order_number)s è stato annullato"
-
-#: apps/orders/templates/email/orders/order_cancelled/body.html
-#: apps/orders/templates/email/orders/order_cancelled/body.txt
-msgid "Order %(order_number)s was cancelled before payment. Nothing was charged."
-msgstr "L’ordine %(order_number)s è stato annullato prima del pagamento. Non è stato addebitato nulla."
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.html
-#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.txt
-msgid "Order %(order_number)s was cancelled. Do not ship these items:"
-msgstr "L’ordine %(order_number)s è stato annullato. Non spedire questi articoli:"
-
-#: apps/orders/templates/email/orders/vendor_order_delivered/subject.txt
-msgid "Order %(order_number)s: a shipment was delivered"
-msgstr "Ordine %(order_number)s: una spedizione è stata consegnata"
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled/subject.txt
-msgid "Order %(order_number)s: part of your order was cancelled"
-msgstr "Ordine %(order_number)s: una parte del tuo ordine è stata annullata"

@@ -356,6 +356,14 @@ ENDPOINTS: dict[str, Access] = {
         kwargs={"segment": "shop"},
     ),
     "switch_language": NoVendorData("Stores the visitor's language choice."),
+    "consent_save": NoVendorData(
+        "Cookie consent choice (SEO.5): records the caller's own decision with a random id; "
+        "no vendor data."
+    ),
+    "consent_preferences": NoVendorData(
+        "Cookie settings page (SEO.5): the caller's own choice from their own cookie; no vendor "
+        "data."
+    ),
     "themes:styleguide": StaffOnly("Component samples of the active theme (THM.4), staff only."),
     "levels:options": NoVendorData(OWN_ACCOUNT),
     "levels:operational": NoVendorData(OWN_ACCOUNT),

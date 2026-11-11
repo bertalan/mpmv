@@ -236,7 +236,7 @@ TEMPLATES = [
                 "django.template.context_processors.csp",
                 "apps.themes.context_processors.theme",
             ],
-            "builtins": ["apps.seo.templatetags.seo_robots"],
+            "builtins": ["apps.seo.templatetags.seo_robots", "apps.seo.templatetags.consent"],
             "loaders": [
                 "apps.themes.loaders.ThemeLoader",
                 (
@@ -262,6 +262,13 @@ MPMV_THEME_BUILD_DIR = BASE_DIR / "build" / "themes"
 # Help/contact link shown in the same place in the header and footer of every public page
 # (THM.3, WCAG 3.2.6 consistent help); empty = no help link until a contact page exists.
 MPMV_HELP_URL = env_str("MPMV_HELP_URL", "")
+
+# Consent provider (SEO.9, D-10): the name of the consent tool in use. `self-hosted` is our own
+# minimal banner; an operator adds another by naming its class in MPMV_CONSENT_PROVIDERS
+# ({name: "dotted.path.Class"}) and selecting the name here (docs/dev/consent-providers.md). An
+# unknown name fails the seo.E001 system check.
+MPMV_CONSENT_PROVIDER = env_str("MPMV_CONSENT_PROVIDER", "self-hosted")
+MPMV_CONSENT_PROVIDERS: dict[str, str] = {}
 
 # PostgreSQL is the only datastore (ADR-0001).
 DATABASES = {
