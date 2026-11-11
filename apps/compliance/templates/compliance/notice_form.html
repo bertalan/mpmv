@@ -1,0 +1,17 @@
+{% extends "layouts/content.html" %}
+{% load i18n captcha %}
+{% block title %}{% translate "Report illegal content" %} · {{ site_name }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">
+{% captcha_script %}{% endblock %}
+{% block page_content %}
+  <article class="notice-form">
+    <h1>{% translate "Report illegal content" %}</h1>
+    {% include "components/error_summary.html" with form=form autofocus=True only %}
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% for field in form %}{% include "components/field.html" with field=field only %}{% endfor %}
+      {% captcha_widget %}
+      {% include "components/button.html" with label=_("Send the report") type="submit" only %}
+    </form>
+  </article>
+{% endblock %}
