@@ -114,3 +114,44 @@ def test_a_role_holder_who_is_a_vendor_member_enters_neither_space() -> None:
     member.groups.add(Group.objects.get(name=roles.role("catalog").group))
     assert not may_enter(Space.PLATFORM, member)
     assert not may_enter(Space.SHOP, member)
+
+
+def test_before_the_orders_tables_the_check_skips_cleanly() -> None:
+    """The customer test of manager.E005 reads orders: without orders migrations, skip."""
+    from django.db.migrations.recorder import MigrationRecorder
+
+    MigrationRecorder.Migration.objects.filter(app="orders").delete()
+    Group.objects.filter(name=roles.role("catalog").group).first().permissions.clear()  # type: ignore[union-attr]
+    assert check_role_drift() == []
+
+
+def test_the_check_skips_while_any_manager_migration_is_unapplied() -> None:
+    from django.db.migrations.recorder import MigrationRecorder
+
+    MigrationRecorder.Migration.objects.filter(app="manager").exclude(
+        name__startswith="0001"
+    ).delete()
+    Group.objects.filter(name__in=[r.group for r in roles.ROLES]).delete()
+    assert check_role_drift() == []
+
+
+def test_the_check_skips_for_another_database_alias() -> None:
+    Group.objects.filter(name=roles.role("catalog").group).first().permissions.clear()  # type: ignore[union-attr]
+    assert check_role_drift(databases=["other"]) == []
+    assert check_role_drift(databases=["default"]) != []
+
+
+@pytest.mark.django_db(transaction=True)
+def test_migrate_with_checks_applies_the_pending_seed_then_the_check_fires_on_drift() -> None:
+    """The deploy failure: 0002 recorded, 0003 not, roles.py already newer. `migrate` runs the
+    database checks first and must not be blocked by drift the pending migration repairs."""
+    from django.core.management import call_command
+
+    call_command("migrate", "manager", "0002", verbosity=0, skip_checks=True)
+    Group.objects.filter(name=roles.role("catalog").group).first().permissions.clear()  # type: ignore[union-attr]
+    call_command("migrate", verbosity=0, skip_checks=False)  # runs the checks, applies 0003
+    assert check_role_drift() == []
+    # Positive control: everything applied, a group edited in the admin, the check fires.
+    Group.objects.get(name=roles.role("catalog").group).permissions.clear()
+    assert {e.id for e in check_role_drift()} == {"manager.E004"}
+    sync_role_groups(Group, Permission, ContentType, apps.get_model)  # reseed for later tests

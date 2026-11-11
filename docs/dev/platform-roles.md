@@ -2,6 +2,8 @@
 
 <!-- Generated from apps/manager/roles.py by `make docs`; do not edit by hand. -->
 
+Every change to the permissions of a role needs a new `manager` data migration that calls `sync_role_groups`: the drift check (manager.E004) skips only while a manager migration is pending, so without one `migrate` on a deployed database fails.
+
 ## Roles
 
 | Role | Group | Permissions |
