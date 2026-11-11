@@ -17,6 +17,7 @@ class VendorsConfig(AppConfig):
         "selfcertification",
         "vendorfeatureflag",
         "crossvendorconsent",
+        "notincountry",
     )
     unaudited_models = {
         "vendortranslation": "storefront texts under the translation workflow, no legal or "
