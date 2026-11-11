@@ -1,0 +1,4 @@
+{% load i18n %}{% blocktranslate %}We withdrew the notice of termination of {{ vendor_name }}. Your service goes on.{% endblocktranslate %}
+
+{% translate "Reference" %}: {{ reference }}
+{% translate "Reason" %}: {{ reason }}

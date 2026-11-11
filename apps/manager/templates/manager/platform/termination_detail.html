@@ -1,0 +1,32 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}One notice of termination: the reason sent to the vendor, the dates, and the withdrawal.{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}: {{ notice.vendor.display_name }}</h1>
+  <dl class="manager-details">
+    <dt>{% translate "Status" %}</dt><dd>{{ notice.get_status_display }}</dd>
+    <dt>{% translate "Notice given" %}</dt><dd>{{ notice.issued_at|date:"SHORT_DATETIME_FORMAT" }}</dd>
+    <dt>{% translate "The service ends on" %}</dt><dd>{{ notice.effective_at|date:"SHORT_DATETIME_FORMAT" }}</dd>
+    <dt>{% translate "Notice period (days)" %}</dt><dd>{{ notice.notice_days }}</dd>
+    {% if notice.exception %}<dt>{% translate "Shorter notice because" %}</dt><dd>{{ notice.get_exception_display }}</dd>{% endif %}
+    <dt>{% translate "Facts and circumstances" %}</dt><dd>{{ notice.facts|linebreaksbr }}</dd>
+    <dt>{% translate "Ground" %}</dt><dd>{{ notice.ground|linebreaksbr }}</dd>
+    {% if notice.withdrawn_at %}
+      <dt>{% translate "Withdrawn" %}</dt><dd>{{ notice.withdrawn_at|date:"SHORT_DATETIME_FORMAT" }}</dd>
+      <dt>{% translate "Reason" %}</dt><dd>{{ notice.withdraw_reason|linebreaksbr }}</dd>
+    {% endif %}
+    {% if notice.applied_at %}
+      <dt>{% translate "Applied" %}</dt><dd>{{ notice.applied_at|date:"SHORT_DATETIME_FORMAT" }}</dd>
+    {% endif %}
+  </dl>
+  {% if notice.status == "pending" %}
+    <h2>{% translate "Withdraw the notice" %}</h2>
+    <form method="post" novalidate>
+      {% csrf_token %}<input type="hidden" name="action" value="withdraw">
+      {% include "components/error_summary.html" with form=form only %}
+      {% for field in form %}{% include "components/field.html" with field=field only %}{% endfor %}
+      {% include "components/button.html" with label=_("Withdraw and tell the vendor") type="submit" only %}
+    </form>
+  {% endif %}
+  <p><a href="{% url 'manager:platform:terminations' %}">{% translate "Back to the terminations" %}</a></p>
+{% endblock %}

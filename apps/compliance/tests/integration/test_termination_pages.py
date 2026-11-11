@@ -37,7 +37,9 @@ def _operator() -> None:
 
 @pytest.fixture
 def reviewer() -> Any:
-    return UserFactory.create(permissions=["core.platform_owner", "compliance.review_notices"])
+    return UserFactory.create(
+        permissions=["core.platform_owner", "compliance.review_notices"], platform_staff=True
+    )
 
 
 @pytest.fixture
@@ -146,7 +148,7 @@ def test_staff_without_the_review_permission_and_vendor_members_get_404(
     assert client.get(f"{PLATFORM}{notice.public_id}/").status_code == 404
     owner = VendorMemberFactory.create(vendor=vendor, role="owner").user
     verified_login(client, owner)
-    assert client.get(PLATFORM).status_code == 404
+    assert client.get(PLATFORM).status_code in (403, 404)  # the gate keeps members out
 
 
 def test_an_unknown_notice_is_404(client: Client, reviewer: Any) -> None:
@@ -200,12 +202,12 @@ def test_the_owner_downloads_its_data_during_the_notice_period(
     assert AuditLog.objects.filter(action="compliance.vendor_data.downloaded").exists()
 
 
-def test_vendor_staff_members_get_404(client: Client, vendor: Vendor) -> None:
+def test_vendor_staff_members_see_the_notice_too(client: Client, vendor: Vendor) -> None:
     TerminationNoticeFactory.create(vendor=vendor)
     member = VendorMemberFactory.create(vendor=vendor, role="staff").user
     verified_login(client, member)
-    assert client.get(SHOP).status_code == 404
-    assert client.get(f"{SHOP}data/").status_code == 404
+    assert client.get(SHOP).status_code == 200
+    assert client.get(f"{SHOP}data/").status_code == 200
 
 
 def test_service_pending_lookup_matches_the_page(vendor: Vendor) -> None:

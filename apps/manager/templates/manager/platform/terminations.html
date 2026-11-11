@@ -1,0 +1,45 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}Notices of termination (P2B art. 4, CMP.5 part 4): the list and the form to give one.{% endcomment %}
+{% block manager_content %}
+  <h1>{{ title }}</h1>
+  <p>{% blocktranslate %}A vendor's service ends at least {{ min_days }} days after the notice, unless one of the listed exceptions applies. The vendor keeps selling and can download its data until then.{% endblocktranslate %}</p>
+  <form method="get" class="manager-filters" role="search" aria-label="{% translate 'Filters' %}">
+    <div class="field">
+      <label for="filter-status">{% translate "Status" %}</label>
+      <select id="filter-status" name="status">
+        <option value="">{% translate "All" %}</option>
+        {% for value, label in statuses %}<option value="{{ value }}"{% if value == status %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    {% include "components/button.html" with label=_("Filter") type="submit" variant="secondary" only %}
+  </form>
+  <div class="table-scroll" role="region" aria-labelledby="terminations-caption" tabindex="0">
+    <table class="table">
+      <caption id="terminations-caption">{{ title }}</caption>
+      <thead><tr>
+        <th scope="col">{% translate "Vendor" %}</th>
+        <th scope="col">{% translate "Notice given" %}</th>
+        <th scope="col">{% translate "The service ends on" %}</th>
+        <th scope="col">{% translate "Status" %}</th>
+      </tr></thead>
+      <tbody>
+        {% for notice in notices %}<tr>
+          <th scope="row"><a href="{% url 'manager:platform:termination' notice.public_id %}">{{ notice.vendor.display_name }}</a></th>
+          <td>{{ notice.issued_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+          <td>{{ notice.effective_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+          <td>{{ notice.get_status_display }}</td>
+        </tr>
+        {% empty %}<tr><td colspan="4">{% translate "Nothing to show." %}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "components/pagination.html" with page=page_obj.number page_count=page_obj.paginator.num_pages previous_url="" next_url="" only %}
+  <h2>{% translate "Give notice of termination" %}</h2>
+  <form method="post" novalidate>
+    {% csrf_token %}<input type="hidden" name="action" value="issue">
+    {% include "components/error_summary.html" with form=form only %}
+    {% for field in form %}{% include "components/field.html" with field=field only %}{% endfor %}
+    {% include "components/button.html" with label=_("Give notice and tell the vendor") type="submit" only %}
+  </form>
+{% endblock %}

@@ -52,14 +52,17 @@ from apps.core.services import (
     audit_changes,
     consume_rate_limit,
     current_operator,
+    email_language,
     enqueue_email,
     save_audited,
 )
 from apps.events.models import EventPage
 from apps.events.services import hide_event
+from apps.orders.models import VendorOrder
+from apps.vendors.engine import CLOSED as _CLOSED
 from apps.vendors.engine import SUSPENDED as _SUSPENDED
 from apps.vendors.engine import InvalidTransition
-from apps.vendors.models import Vendor
+from apps.vendors.models import Vendor, VendorMember
 from apps.vendors.scoping import is_platform_staff
 from apps.vendors.services import change_status as change_vendor_status
 
@@ -72,6 +75,7 @@ from .models import (
     ProductRestriction,
     SafetyCase,
     StatementOfReasons,
+    TerminationNotice,
     TransparencySubmission,
     VendorGpsrDefaults,
 )
@@ -1632,3 +1636,331 @@ def lift_restriction(
         row.save(update_fields=["lifted_at", "lift_reason", "updated_at"])
         audit_changes(changes, ctx=ctx, action=RESTRICTION_LIFTED)
     return changes
+
+
+# --- Termination of the whole service after 30 days' notice (P2B art. 4, CMP.5 part 4)
+
+TERMINATION_MODEL: Final = "compliance.terminationnotice"
+TERMINATION_ISSUED: Final = "compliance.termination.issued"
+TERMINATION_WITHDRAWN: Final = "compliance.termination.withdrawn"
+TERMINATION_APPLIED: Final = "compliance.termination.applied"
+TERMINATION_TEMPLATE: Final = "compliance.termination_notice"
+TERMINATION_WITHDRAWN_TEMPLATE: Final = "compliance.termination_withdrawn"
+VENDOR_DATA_DOWNLOADED: Final = "compliance.vendor_data.downloaded"
+#: A vendor in one of these statuses has a service that can be given notice of.
+TERMINABLE_STATUSES: Final = (Vendor.Status.ACTIVE, Vendor.Status.SUSPENDED)
+
+
+class TerminationChangeSet(ChangeSet):
+    """The change report of a termination mutation, with the notice it concerns."""
+
+    notice: TerminationNotice | None = None
+
+
+def termination_snapshot(notice: TerminationNotice) -> dict[str, Any]:
+    """Ids, status and dates only: the facts and the ground stay in the model."""
+    return {
+        "vendor": str(notice.vendor.public_id),
+        "status": notice.status,
+        "exception": notice.exception,
+        "notice_days": notice.notice_days,
+        "issued_at": notice.issued_at.isoformat(),
+        "effective_at": notice.effective_at.isoformat(),
+    }
+
+
+def vendor_language(vendor: Vendor) -> str:
+    """The language the vendor reads: its first owner's, English when there is none or the
+    language is not configured."""
+    owner = (
+        VendorMember.objects.filter(vendor=vendor, role=VendorMember.Role.OWNER)
+        .select_related("user")
+        .order_by("id")
+        .first()
+    )
+    return email_language(owner.user.preferred_language if owner else settings.LANGUAGE_CODE)
+
+
+def pending_termination(vendor: Vendor) -> TerminationNotice | None:
+    """The notice the vendor is working under, or None."""
+    return TerminationNotice.objects.filter(
+        vendor=vendor, status=TerminationNotice.Status.PENDING
+    ).first()
+
+
+def _may_terminate(staff: Any) -> bool:
+    return bool(is_platform_staff(staff) and can_review_notices(staff))
+
+
+def issue_termination_notice(
+    staff: Any,
+    vendor_ref: Any,
+    *,
+    facts: str,
+    ground: str,
+    exception: str = "",
+    effective_at: dt.datetime | None = None,
+    now: dt.datetime | None = None,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> TerminationChangeSet:
+    """Give a vendor notice that its whole service ends, and send it the notice.
+
+    The notice is also the statement of reasons (`facts`, `ground`). The effective time is at
+    least `settings.TERMINATION_NOTICE_DAYS` (never below 30) after `now`; without `effective_at`
+    it is exactly that. An `exception` from `engine.TERMINATION_EXCEPTIONS` allows an earlier
+    time (and, without `effective_at`, immediate effect). The vendor stays in its status: only
+    `apply_due_terminations` closes it. The notice is queued by email in the vendor's language
+    (English fallback). Raises `PermissionDenied` unless `staff` is platform staff with
+    `review_notices`, and `NoticeError` for a rule broken (codes: `facts`, `ground`, `exception`,
+    `effective_at`), an unknown or out-of-service vendor (`vendor`) or a vendor that already has
+    a pending notice (`pending`), also on dry-run.
+    """
+    if not _may_terminate(staff):
+        raise PermissionDenied("a notice of termination needs platform staff with review_notices")
+    now = now or timezone.now()
+    exception = exception.strip()
+    days = engine.notice_days(getattr(settings, "TERMINATION_NOTICE_DAYS", None))
+    if effective_at is None:
+        effective_at = (
+            now
+            if exception in engine.TERMINATION_EXCEPTIONS
+            else (engine.default_effective_at(now, days))
+        )
+    problems = engine.termination_problems(
+        facts=facts,
+        ground=ground,
+        exception=exception,
+        issued_at=now,
+        effective_at=effective_at,
+        days=days,
+    )
+    if problems:
+        raise NoticeError(*problems)
+    changes = TerminationChangeSet()
+    with transaction.atomic():
+        try:
+            ref = uuid.UUID(str(vendor_ref))
+        except ValueError:
+            raise NoticeError("vendor") from None
+        vendor = (
+            Vendor.objects.select_for_update()
+            .filter(public_id=ref, status__in=TERMINABLE_STATUSES)
+            .first()
+        )
+        if vendor is None:
+            raise NoticeError("vendor")
+        if pending_termination(vendor) is not None:
+            raise NoticeError("pending")
+        language = vendor_language(vendor)
+        notice = TerminationNotice(
+            vendor=vendor,
+            exception=exception,
+            facts=facts.strip(),
+            ground=ground.strip(),
+            notice_days=max(0, (effective_at - now).days),
+            issued_at=now,
+            effective_at=effective_at,
+            language=language,
+        )
+        changes.notice = notice
+        changes.create(TERMINATION_MODEL, str(notice.public_id), termination_snapshot(notice))
+        if dry_run:
+            return changes
+        notice.save()
+        audit_changes(changes, ctx=ctx, action=TERMINATION_ISSUED)
+        enqueue_email(
+            recipient=vendor.contact_email,
+            template_key=TERMINATION_TEMPLATE,
+            language=language,
+            context={
+                "reference": str(notice.public_id),
+                "vendor_name": vendor.display_name,
+                "facts": notice.facts,
+                "ground": notice.ground,
+                "exception": notice.exception,
+                "issued_at": notice.issued_at.isoformat(),
+                "effective_at": notice.effective_at.isoformat(),
+                "notice_days": notice.notice_days,
+                "redress_text": redress_text(language),
+            },
+            idempotency_key=f"compliance:termination:{notice.public_id}",
+        )
+    return changes
+
+
+def withdraw_termination_notice(
+    staff: Any,
+    public_id: Any,
+    *,
+    reason: str,
+    now: dt.datetime | None = None,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> TerminationChangeSet:
+    """Withdraw a pending notice: the vendor keeps its service and is told. A reason is required.
+    Raises `PermissionDenied` unless `staff` may give notices, and `NoticeError` (`reason`,
+    `notice`, `status`) for a missing reason, an unknown notice or one no longer pending."""
+    if not _may_terminate(staff):
+        raise PermissionDenied("withdrawing a notice needs platform staff with review_notices")
+    if not str(reason).strip():
+        raise NoticeError("reason")
+    now = now or timezone.now()
+    changes = TerminationChangeSet()
+    with transaction.atomic():
+        try:
+            notice = (
+                TerminationNotice.objects.select_for_update(of=("self",))
+                .select_related("vendor")
+                .get(public_id=public_id)
+            )
+        except (TerminationNotice.DoesNotExist, ValidationError, ValueError):
+            raise NoticeError("notice") from None
+        if notice.status != TerminationNotice.Status.PENDING:
+            raise NoticeError("status")
+        before = termination_snapshot(notice)
+        notice.status = TerminationNotice.Status.WITHDRAWN
+        notice.withdrawn_at = now
+        notice.withdraw_reason = str(reason).strip()
+        changes.notice = notice
+        changes.update(
+            TERMINATION_MODEL, str(notice.public_id), before, termination_snapshot(notice)
+        )
+        if dry_run:
+            return changes
+        notice.save(update_fields=["status", "withdrawn_at", "withdraw_reason", "updated_at"])
+        audit_changes(changes, ctx=ctx, action=TERMINATION_WITHDRAWN)
+        enqueue_email(
+            recipient=notice.vendor.contact_email,
+            template_key=TERMINATION_WITHDRAWN_TEMPLATE,
+            language=vendor_language(notice.vendor),
+            context={
+                "reference": str(notice.public_id),
+                "vendor_name": notice.vendor.display_name,
+                "reason": notice.withdraw_reason,
+            },
+            idempotency_key=f"compliance:termination-withdrawn:{notice.public_id}",
+        )
+    return changes
+
+
+def _apply_termination(notice_id: int, now: dt.datetime, ctx: AuditContext) -> list[Any]:
+    """Close the vendor of one due notice and mark it applied; [] when it is no longer due."""
+    with transaction.atomic():
+        notice = (
+            TerminationNotice.objects.select_for_update(of=("self",))
+            .select_related("vendor")
+            .get(pk=notice_id)
+        )
+        if notice.status != TerminationNotice.Status.PENDING or not engine.termination_due(
+            notice.effective_at, now=now
+        ):
+            return []
+        found: list[Any] = []
+        if notice.vendor.status != Vendor.Status.CLOSED:
+            found.extend(change_vendor_status(notice.vendor, _CLOSED, ctx=ctx).changes)
+        own = ChangeSet()
+        before = termination_snapshot(notice)
+        notice.status = TerminationNotice.Status.APPLIED
+        notice.applied_at = now
+        own.update(TERMINATION_MODEL, str(notice.public_id), before, termination_snapshot(notice))
+        notice.save(update_fields=["status", "applied_at", "updated_at"])
+        audit_changes(own, ctx=ctx, action=TERMINATION_APPLIED)
+        return [*found, *own.changes]
+
+
+def apply_due_terminations(
+    *, now: dt.datetime | None = None, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Close every vendor whose notice has run out, through the vendor closure service.
+
+    A notice is applied at its effective time and never before (the time is compared again under
+    the row lock). A vendor that is already closed just has its notice marked applied. A notice
+    whose closure the state machine refuses is logged and left pending, to be retried.
+    """
+    now = now or timezone.now()
+    changes = ChangeSet()
+    due = TerminationNotice.objects.filter(
+        status=TerminationNotice.Status.PENDING, effective_at__lte=now
+    ).order_by("effective_at", "id")
+    for notice in due:
+        if dry_run:
+            changes.update(
+                TERMINATION_MODEL,
+                str(notice.public_id),
+                {"status": notice.status},
+                {"status": TerminationNotice.Status.APPLIED},
+            )
+            continue
+        try:
+            changes.changes.extend(_apply_termination(notice.pk, now, ctx))
+        except InvalidTransition:
+            logger.error("Termination %s could not close its vendor", notice.public_id)
+    return changes
+
+
+def vendor_data_bundle(vendor: Vendor, *, ctx: AuditContext) -> dict[str, Any]:
+    """The vendor's own data as one JSON-ready document, for the vendor to keep (P2B art. 4 and 9).
+
+    The profile, every product, its sub-orders (amounts and states only, never a buyer's name,
+    email or address) and the notice with its reason. Audited as a download.
+    """
+    notice = pending_termination(vendor)
+    products = [
+        {
+            "sku": product.sku,
+            "kind": product.kind,
+            "status": product.status,
+            "sales_mode": product.sales_mode,
+            "price_net": None if product.price_net is None else str(product.price_net),
+            "stock_qty": product.stock_qty,
+        }
+        for product in Product.objects.filter(vendor=vendor).order_by("sku")
+    ]
+    orders = [
+        {
+            "order": sub.order.number,
+            "state": sub.state,
+            "goods_net": str(sub.goods_net),
+            "shipping_net": str(sub.shipping_net),
+            "tax_total": str(sub.tax_total),
+            "gross_total": str(sub.gross_total),
+            "created_at": sub.created_at.isoformat(),
+        }
+        for sub in VendorOrder.objects.filter(vendor=vendor)
+        .select_related("order")
+        .order_by("created_at", "id")
+    ]
+    bundle: dict[str, Any] = {
+        "generated_at": timezone.now().isoformat(),
+        "vendor": {
+            "legal_name": vendor.legal_name,
+            "display_name": vendor.display_name,
+            "country": vendor.country,
+            "contact_email": vendor.contact_email,
+            "vat_number": vendor.vat_number,
+            "status": vendor.status,
+        },
+        "products": products,
+        "orders": orders,
+        "termination_notice": None
+        if notice is None
+        else {
+            "reference": str(notice.public_id),
+            "status": notice.status,
+            "exception": notice.exception,
+            "facts": notice.facts,
+            "ground": notice.ground,
+            "issued_at": notice.issued_at.isoformat(),
+            "effective_at": notice.effective_at.isoformat(),
+        },
+    }
+    record(
+        ctx,
+        VENDOR_DATA_DOWNLOADED,
+        "vendors.vendor",
+        str(vendor.public_id),
+        None,
+        {"products": len(products), "orders": len(orders)},
+    )
+    return bundle

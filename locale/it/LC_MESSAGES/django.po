@@ -1116,3 +1116,142 @@ msgstr "Il tuo ruolo"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your role requires a second factor before you can continue."
 msgstr "Il tuo ruolo richiede un secondo fattore prima di poter continuare."
+
+#: apps/manager/templates/manager/platform/terminations.html
+msgid "A vendor's service ends at least %(min_days)s days after the notice, unless one of the listed exceptions applies. The vendor keeps selling and can download its data until then."
+msgstr "Il servizio di un venditore termina almeno %(min_days)s giorni dopo il preavviso, salvo che valga una delle eccezioni elencate. Fino ad allora il venditore continua a vendere e può scaricare i propri dati."
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "Applied"
+msgstr "Applicata"
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "Back to the terminations"
+msgstr "Torna alle cessazioni"
+
+#: apps/manager/termination_views.py
+msgid "Choose a vendor that is active or suspended."
+msgstr "Scegli un venditore attivo o sospeso."
+
+#: apps/manager/termination_views.py
+msgid "Describe the facts relied on."
+msgstr "Descrivi i fatti su cui si basa la decisione."
+
+#: apps/manager/templates/manager/shop/termination.html
+msgid "Download my data"
+msgstr "Scarica i miei dati"
+
+#: apps/manager/templates/manager/shop/termination.html
+msgid "Download your shop profile, products and order amounts as a JSON file."
+msgstr "Scarica il profilo del negozio, i prodotti e gli importi degli ordini in un file JSON."
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+#: apps/manager/templates/manager/shop/termination.html
+msgid "Facts and circumstances"
+msgstr "Fatti e circostanze"
+
+#: apps/manager/templates/manager/platform/terminations.html
+msgid "Give notice and tell the vendor"
+msgstr "Dai il preavviso e avvisa il venditore"
+
+#: apps/manager/templates/manager/platform/terminations.html
+msgid "Give notice of termination"
+msgstr "Dai il preavviso di cessazione"
+
+#: apps/manager/termination_views.py
+msgid "Give the legal ground or the term of the terms."
+msgstr "Indica la base giuridica o la clausola dei termini."
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+#: apps/manager/templates/manager/shop/termination.html
+msgid "Ground"
+msgstr "Motivo giuridico"
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+#: apps/manager/templates/manager/platform/terminations.html
+#: apps/manager/templates/manager/shop/termination.html
+msgid "Notice given"
+msgstr "Preavviso dato il"
+
+#: apps/manager/termination_views.py
+msgid "Notice of termination"
+msgstr "Preavviso di cessazione"
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "Notice period (days)"
+msgstr "Durata del preavviso (giorni)"
+
+#: apps/manager/termination_views.py
+msgid "Only a pending notice can be withdrawn."
+msgstr "Si può ritirare solo un preavviso in corso."
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+#: apps/manager/templates/manager/shop/termination.html
+msgid "Shorter notice because"
+msgstr "Preavviso più breve perché"
+
+#: apps/manager/sections.py
+msgid "Termination notice"
+msgstr "Preavviso di cessazione"
+
+#: apps/manager/sections.py
+msgid "Terminations"
+msgstr "Cessazioni"
+
+#: apps/manager/termination_views.py
+msgid "That date is too early: the notice is at least 30 days unless an exception applies."
+msgstr "La data è troppo vicina: il preavviso è di almeno 30 giorni, salvo un’eccezione."
+
+#: apps/manager/termination_views.py
+msgid "That reason for a shorter notice is not on the list."
+msgstr "Questo motivo di preavviso più breve non è nell’elenco."
+
+#: apps/manager/termination_views.py
+msgid "The notice is recorded and the vendor is told."
+msgstr "Il preavviso è registrato e il venditore ne viene informato."
+
+#: apps/manager/termination_views.py
+msgid "The notice is withdrawn and the vendor is told."
+msgstr "Il preavviso è ritirato e il venditore ne viene informato."
+
+#: apps/manager/templates/manager/shop/termination.html
+msgid "The platform will end your service on %(date)s. Until then you can keep selling and you can download your data."
+msgstr "La piattaforma terminerà il tuo servizio il %(date)s. Fino ad allora puoi continuare a vendere e puoi scaricare i tuoi dati."
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+#: apps/manager/templates/manager/platform/terminations.html
+#: apps/manager/templates/manager/shop/termination.html
+msgid "The service ends on"
+msgstr "Il servizio termina il"
+
+#: apps/manager/templates/manager/shop/termination.html
+msgid "There is no termination notice for your shop."
+msgstr "Per il tuo negozio non c’è nessun preavviso di cessazione."
+
+#: apps/manager/termination_views.py
+msgid "This notice is not possible."
+msgstr "Questo preavviso non è possibile."
+
+#: apps/manager/termination_views.py
+msgid "This vendor already has a notice of termination."
+msgstr "Questo venditore ha già un preavviso di cessazione."
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "Withdraw and tell the vendor"
+msgstr "Ritira e avvisa il venditore"
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "Withdraw the notice"
+msgstr "Ritira il preavviso"
+
+#: apps/manager/templates/manager/platform/termination_detail.html
+msgid "Withdrawn"
+msgstr "Ritirato"
+
+#: apps/manager/templates/manager/shop/termination.html
+msgid "You can challenge this decision with an internal complaint (DSA article 20), out-of-court dispute settlement (DSA article 21) or a court. The platform terms say how."
+msgstr "Puoi contestare questa decisione con un reclamo interno (articolo 20 DSA), con la risoluzione extragiudiziale delle controversie (articolo 21 DSA) o davanti a un giudice. I termini della piattaforma spiegano come."
+
+#: apps/manager/templates/manager/shop/termination.html
+msgid "Your data"
+msgstr "I tuoi dati"

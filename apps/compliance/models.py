@@ -13,6 +13,7 @@ language; `SafetyCase` an authority order or a safety notice with its working-da
 for warnings, edited by staff.
 """
 
+import datetime as dt
 from typing import Any, ClassVar
 
 from django.conf import settings
@@ -426,3 +427,93 @@ class ProductRestriction(BaseModel):
 
     def __str__(self) -> str:
         return f"Restriction of {self.product_id} ({'lifted' if self.lifted_at else 'active'})"
+
+
+class TerminationNotice(BaseModel):
+    """The notice that a vendor's whole service will be terminated (P2B art. 4, CMP.5 part 4).
+
+    The notice is also the statement of reasons for the termination (`facts` and `ground`). It
+    takes effect at `effective_at`, which is at least 30 days after `issued_at` unless an
+    `exception` from the closed list applies; the database enforces it. While the notice is
+    `pending` the vendor keeps its service, sees the reason and can download its data. Staff can
+    withdraw it; the scheduled job closes the vendor at `effective_at` and marks it `applied`.
+    Written only through `services.issue_termination_notice`, `withdraw_termination_notice` and
+    `apply_due_terminations`; never deleted.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        WITHDRAWN = "withdrawn", "Withdrawn"
+        APPLIED = "applied", "Applied"
+
+    vendor_scope: ClassVar[str] = "vendor"
+
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="termination_notices")
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.PENDING,
+        help_text="Pending until staff withdraw it or the job applies it.",
+    )
+    exception = models.CharField(
+        max_length=24,
+        blank=True,
+        choices=[(e, e) for e in engine.TERMINATION_EXCEPTIONS],
+        help_text="Why under 30 days' notice is given; empty for the full notice.",
+    )
+    facts = models.TextField(
+        help_text="The facts and circumstances relied on, as sent to the vendor."
+    )
+    ground = models.TextField(help_text="The legal ground or the term of the platform terms.")
+    notice_days = models.PositiveIntegerField(
+        help_text="Days between the notice and its effective time, as given."
+    )
+    issued_at = models.DateTimeField(help_text="When the notice was given and sent to the vendor.")
+    effective_at = models.DateTimeField(
+        help_text="When the vendor is closed: never before the notice period ends."
+    )
+    language = LanguageField(help_text="The language of the notice email sent to the vendor.")
+    withdrawn_at = models.DateTimeField(null=True, blank=True, editable=False)
+    withdraw_reason = models.TextField(blank=True, editable=False)
+    applied_at = models.DateTimeField(null=True, blank=True, editable=False)
+
+    objects = VendorScopedManager()
+
+    class Meta:
+        ordering = ("-issued_at", "-id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(status__in=["pending", "withdrawn", "applied"]),
+                name="compliance_termination_status_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(exception="")
+                | models.Q(exception__in=engine.TERMINATION_EXCEPTIONS),
+                name="compliance_termination_exception_valid",
+            ),
+            # Never below 30 days without an exception from the closed list (P2B art. 4(1)).
+            models.CheckConstraint(
+                condition=~models.Q(exception="")
+                | models.Q(
+                    effective_at__gte=models.F("issued_at")
+                    + dt.timedelta(days=engine.MIN_NOTICE_DAYS)
+                ),
+                name="compliance_termination_thirty_days",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(exception="")
+                | models.Q(notice_days__gte=engine.MIN_NOTICE_DAYS),
+                name="compliance_termination_days_thirty",
+            ),
+            models.UniqueConstraint(
+                fields=["vendor"],
+                condition=models.Q(status="pending"),
+                name="compliance_termination_one_pending",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Termination of {self.vendor_id} ({self.status})"
+
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
+        raise PermissionDenied("a notice of termination is kept")

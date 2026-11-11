@@ -402,6 +402,9 @@ COMPLIANCE_PUBLIC_HOLIDAYS: list[str] = []
 # The country -> accepted warnings languages map (CMP.3) is cached per process this long; a staff
 # edit drops this process's copy at once, other processes reload within this time.
 COMPLIANCE_COUNTRY_LANGUAGES_CACHE_SECONDS = 300
+# Days between a notice of termination and the closure of the vendor (P2B art. 4, CMP.5 part 4).
+# Never below 30: a lower value is raised to 30 by `compliance.engine.notice_days`.
+TERMINATION_NOTICE_DAYS = 30
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"

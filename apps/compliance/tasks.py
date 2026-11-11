@@ -2,6 +2,8 @@
 
 import logging
 
+from apps.core.audit import AuditContext
+from apps.core.models import AuditLog
 from apps.core.tasks import NO_RETRY, locked, periodic, task
 
 from . import services
@@ -17,6 +19,18 @@ def flag_overdue_safety_cases(timestamp: int) -> None:
     (spec 11 CMP.3, GPSR art. 22). Each case is flagged once, with an error in the log."""
     changes = services.flag_overdue_safety_cases()
     logger.info("compliance.flag_overdue_safety_cases flagged %d case(s)", len(changes.changes))
+
+
+@periodic("10 * * * *")
+@locked()
+@task("compliance.apply_due_terminations", retry=NO_RETRY)
+def apply_due_terminations(timestamp: int) -> None:
+    """Every hour: close each vendor whose notice of termination has run out (spec 11 CMP.5, P2B
+    art. 4). Never before the notice's effective time; each closure goes through the vendor
+    closure service and is audited."""
+    ctx = AuditContext(actor_label="system:termination", source=AuditLog.Source.SYSTEM)
+    changes = services.apply_due_terminations(ctx=ctx)
+    logger.info("compliance.apply_due_terminations made %d change(s)", len(changes.changes))
 
 
 @periodic("15 3 * * *")

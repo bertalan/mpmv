@@ -18,6 +18,7 @@ class ComplianceConfig(AppConfig):
         "statementofreasons",
         "productrestriction",
         "transparencysubmission",
+        "terminationnotice",
     )
 
     def ready(self) -> None:
