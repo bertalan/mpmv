@@ -17,6 +17,7 @@ from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Any
 from urllib.parse import urlencode, urlsplit
+from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
@@ -48,6 +49,7 @@ from .models import (
     Category,
     CategoryTranslation,
     FiscalCategory,
+    PriceHistory,
     Product,
     ProductAttribute,
     ProductKind,
@@ -106,6 +108,72 @@ def variant_price_snapshot(variant: Variant) -> dict[str, Any]:
     }
 
 
+def record_price_history(product: Product, variant: Variant | None = None) -> PriceHistory:
+    """Append the current price setting of `product` (or of `variant`'s override) to its history.
+
+    Called by every service that writes a price, in the same transaction (CMP.6).
+    """
+    return PriceHistory.objects.create(
+        product=product,
+        variant=variant,
+        price_net=product.price_net if variant is None else variant.price_net_override,
+        sale_price_net=product.sale_price_net if variant is None else None,
+        sale_from=product.sale_from if variant is None else None,
+        sale_to=product.sale_to if variant is None else None,
+        recorded_at=timezone.now(),
+    )
+
+
+def price_points(product: Product, variant: Variant | None = None) -> list[engine.PricePoint]:
+    """The price settings of `product` over time, or of what `variant` sells for.
+
+    A variant follows its product's price unless it has an override, and a product sale applies
+    to it only while it has none (the sale price is the product's own).
+    """
+    rows = PriceHistory.objects.filter(product=product)
+    if variant is not None:
+        rows = rows.filter(Q(variant=None) | Q(variant=variant))
+    points: list[engine.PricePoint] = []
+    product_row: PriceHistory | None = None
+    override: Decimal | None = None
+    for row in rows.order_by("recorded_at", "id"):
+        if row.variant_id is None:
+            product_row = row
+        else:
+            override = row.price_net
+        if variant is None:
+            points.append(_point(row, row.price_net))
+        elif product_row is not None or override is not None:
+            base = product_row
+            price = override if override is not None else (base.price_net if base else None)
+            sale = override is None and base is not None
+            points.append(
+                engine.PricePoint(
+                    row.recorded_at,
+                    price,
+                    base.sale_price_net if sale and base else None,
+                    base.sale_from if sale and base else None,
+                    base.sale_to if sale and base else None,
+                )
+            )
+    return points
+
+
+def _point(row: PriceHistory, price: Decimal | None) -> engine.PricePoint:
+    return engine.PricePoint(row.recorded_at, price, row.sale_price_net, row.sale_from, row.sale_to)
+
+
+def reference_price(
+    product: Product, *, variant: Variant | None = None, at: dt.datetime | None = None
+) -> engine.ReferencePrice | None:
+    """The Omnibus prior price to show beside the reduced one, or None (CMP.6)."""
+    return engine.reference_price(
+        price_points(product, variant),
+        at=at or timezone.now(),
+        tz=ZoneInfo(settings.BUSINESS_TIME_ZONE),
+    )
+
+
 def set_product_price(
     product: Product,
     *,
@@ -151,6 +219,7 @@ def set_product_price(
             for name, value in prices.items():
                 setattr(current, name, value)
             current.save(update_fields=[*PRODUCT_PRICE_FIELDS, "updated_at"])
+            record_price_history(current)
 
         run_mutation(changes, apply, ctx=ctx, action=PRODUCT_PRICE_CHANGED, dry_run=dry_run)
 
@@ -185,6 +254,7 @@ def set_variant_price(
         def apply() -> None:
             current.price_net_override = prices["price_net_override"]
             current.save(update_fields=[*VARIANT_PRICE_FIELDS, "updated_at"])
+            record_price_history(current.product, current)
 
         run_mutation(changes, apply, ctx=ctx, action=VARIANT_PRICE_CHANGED, dry_run=dry_run)
 
@@ -295,6 +365,8 @@ def save_product(product: Product, *, ctx: AuditContext, dry_run: bool = False) 
         if dry_run:
             return changes
         product.save()
+        if action == PRODUCT_CREATED and product.price_net is not None:
+            record_price_history(product)
         audit_changes(changes, ctx=ctx, action=action)
     return changes
 
@@ -371,6 +443,8 @@ def save_variant(variant: Variant, *, ctx: AuditContext, dry_run: bool = False) 
         if dry_run:
             return changes
         variant.save()
+        if action == VARIANT_CREATED and variant.price_net_override is not None:
+            record_price_history(variant.product, variant)
         audit_changes(changes, ctx=ctx, action=action)
     return changes
 

@@ -80,7 +80,7 @@ def test_the_price_in_force_when_the_window_opens_counts() -> None:
 
 
 def test_price_increase_before_the_sale_does_not_raise_the_reference() -> None:
-    points = [point(1, "100.00"), point(30, "150.00"), point(40, "150.00", "120.00")]
+    points = [point(1, "100.00"), point(30, "150.00"), point(40, "150.00", "90.00")]
     found = ref(points, day(41))
     assert found is not None
     assert found.price_net == Decimal("100.00")
@@ -96,7 +96,7 @@ def test_several_changes_in_one_day_all_count() -> None:
         point(1, "100.00"),
         point(30, "80.00", hour=8),
         point(30, "100.00", hour=9),
-        point(40, "100.00", "90.00"),
+        point(40, "100.00", "70.00"),
     ]
     found = ref(points, day(41))
     assert found is not None
@@ -108,7 +108,7 @@ def test_a_price_replaced_at_the_same_instant_never_applied() -> None:
         point(1, "100.00"),
         point(30, "10.00"),
         point(30, "100.00"),
-        point(40, "100.00", "90.00"),
+        point(40, "100.00", "70.00"),
     ]
     found = ref(points, day(41))
     assert found is not None

@@ -8,9 +8,10 @@ import pytest
 from django.db import IntegrityError, connection, transaction
 
 from apps.catalog import services
-from apps.catalog.models import PriceHistory
+from apps.catalog.models import PriceHistory, Product
 from apps.catalog.tests.factories import ProductFactory, VariantFactory
 from apps.core.audit import AuditContext
+from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -58,18 +59,23 @@ def test_refused_price_records_nothing() -> None:
 
 
 def test_a_new_product_with_a_price_starts_its_history() -> None:
-    product = ProductFactory.build(price_net=Decimal("10.00"))
+    product = ProductFactory.build(price_net=Decimal("10.00"), vendor=VendorFactory.create())
     services.save_product(product, ctx=CTX)
     row = PriceHistory.objects.get(product=product)
     assert (row.price_net, row.variant_id) == (Decimal("10.00"), None)
 
 
 def test_variant_override_changes_are_recorded_on_the_variant() -> None:
-    product = ProductFactory.create(price_net=Decimal("10.00"))
+    product = ProductFactory.create(price_net=Decimal("10.00"), kind=Product.Kind.VARIABLE)
     variant = VariantFactory.create(product=product)
     services.set_variant_price(variant, price_net_override=Decimal("15.00"), ctx=CTX)
     row = PriceHistory.objects.get(variant=variant)
     assert (row.product_id, row.price_net) == (product.pk, Decimal("15.00"))
+
+
+def _raw_update() -> None:
+    with transaction.atomic(), connection.cursor() as cursor:
+        cursor.execute("UPDATE catalog_pricehistory SET price_net = 1")
 
 
 def test_rows_cannot_be_updated_or_changed() -> None:
@@ -79,25 +85,21 @@ def test_rows_cannot_be_updated_or_changed() -> None:
     row.price_net = Decimal("1.00")
     with pytest.raises(PermissionError):
         row.save()
-    with (
-        transaction.atomic(),
-        pytest.raises(Exception, match="append-only"),
-        connection.cursor() as cursor,
-    ):
-        cursor.execute("UPDATE catalog_pricehistory SET price_net = 1")
+    with pytest.raises(Exception, match="append-only"):
+        _raw_update()
     assert PriceHistory.objects.get().price_net == Decimal("12.00")
 
 
 def test_prices_must_be_positive_and_currency_is_three_letters() -> None:
     product = ProductFactory.create()
-    with transaction.atomic(), pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError), transaction.atomic():
         PriceHistory.objects.bulk_create(
             [PriceHistory(product=product, price_net=Decimal("-1.00"), currency="EUR")]
         )
 
 
 def test_reference_price_for_a_product_on_sale() -> None:
-    product = ProductFactory.create(price_net=Decimal("100.00"))
+    product = ProductFactory.create(price_net=Decimal("90.00"))
     set_price(product, 1, "100.00")
     set_price(product, 40, "100.00", "70.00")
     found = services.reference_price(product, at=at(41))
@@ -106,10 +108,16 @@ def test_reference_price_for_a_product_on_sale() -> None:
 
 
 def test_variant_history_follows_the_product_price_when_not_overridden() -> None:
-    product = ProductFactory.create(price_net=Decimal("100.00"))
+    product = ProductFactory.create(price_net=Decimal("90.00"), kind=Product.Kind.VARIABLE)
     variant = VariantFactory.create(product=product)
     set_price(product, 1, "100.00")
     set_price(product, 40, "100.00", "70.00")
     found = services.reference_price(product, variant=variant, at=at(41))
     assert found is not None
     assert found.price_net == Decimal("100.00")
+
+
+def test_an_unchanged_price_appends_nothing() -> None:
+    product = ProductFactory.create(price_net=Decimal("10.00"))
+    set_price(product, 1, "10.00")
+    assert not PriceHistory.objects.exists()
