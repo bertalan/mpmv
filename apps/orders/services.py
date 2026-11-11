@@ -25,7 +25,7 @@ from apps.core.money import CENT
 from apps.core.services import audit_changes
 from apps.vendors.models import Vendor
 
-from . import engine
+from . import engine, notifications
 from .models import Order, OrderLine, OrderNumberSequence, VendorOrder
 from .tz import business_tz
 
@@ -368,6 +368,8 @@ def transition_order(
             if dry_run:
                 raise _DryRunRollback
             audit_changes(changeset, ctx=ctx, action="orders.transition")
+            if target == "paid":  # ORD.9: in this transaction, so a rollback sends nothing
+                notifications.notify_order_paid(locked)
     except _DryRunRollback:
         pass
     order.refresh_from_db()
@@ -425,6 +427,8 @@ def transition_vendor_order(
             if dry_run:
                 raise _DryRunRollback
             audit_changes(changeset, ctx=ctx, action="orders.transition")
+            if target == "shipped":  # ORD.9
+                notifications.notify_vendor_order_shipped(locked)
     except _DryRunRollback:
         pass
     sub.refresh_from_db()

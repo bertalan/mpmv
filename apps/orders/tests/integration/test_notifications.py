@@ -20,6 +20,7 @@ BANNED = ("invoice", "receipt", "fattura", "ricevuta", "rechnung", "facture", "r
 def two_vendor_order(**overrides: object) -> Order:
     a = vendor_input(VendorFactory.create(), lines=[line_input(title="Cup from A")])
     b = vendor_input(VendorFactory.create(), lines=[line_input(title="Bowl from B", sku="B-1")])
+    overrides.setdefault("billing_address", {"line1": "9 Billing Road", "city": "Milano"})
     return place(vendor_orders=[a, b], **overrides)
 
 
@@ -160,8 +161,7 @@ def test_a_dry_run_sends_nothing() -> None:
 
 def test_a_restricted_order_gets_no_email() -> None:
     order = place()
-    Order.objects.filter(pk=order.pk).update(privacy_status="restricted_tax_only")
-    order.refresh_from_db()
+    order.privacy_status = "restricted_tax_only"  # in memory: the scrub service has its own tests
     notifications.notify_order_placed(order)
     assert OutboxEmail.objects.count() == 0
 
@@ -173,3 +173,12 @@ def test_no_payment_data_or_internal_fields_in_any_context() -> None:
         blob = mail.context.lower()
         for forbidden in ("payment_intent", "transfer_group", "vat_number", "commission", "pi_"):
             assert forbidden not in blob
+
+
+def test_italian_and_english_wording_differ_per_the_catalog() -> None:
+    order = place(language="it")
+    notifications.notify_order_placed(order)
+    mail = OutboxEmail.objects.get()
+    assert "Abbiamo ricevuto" in render(mail).text_body
+    english = core_services.render_email(mail.template_key, "en", mail.context_data)
+    assert "We received your order" in english.text_body

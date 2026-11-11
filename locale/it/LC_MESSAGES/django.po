@@ -24,6 +24,16 @@ msgstr[1] "%(counter)s non usati."
 msgid "%(name)s removed."
 msgstr "%(name)s rimosso."
 
+#: apps/orders/templates/email/orders/vendor_order_shipped/body.html
+#: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
+msgid "%(vendor_name)s shipped its part of order %(order_number)s."
+msgstr "%(vendor_name)s ha spedito la sua parte dell’ordine %(order_number)s."
+
+#: apps/orders/templates/email/orders/vendor_new_order/body.html
+#: apps/orders/templates/email/orders/vendor_new_order/body.txt
+msgid "%(vendor_name)s: new paid order %(order_number)s to ship:"
+msgstr "%(vendor_name)s: nuovo ordine pagato %(order_number)s da spedire:"
+
 #: apps/manager/forms.py
 msgid "About the shop"
 msgstr "Informazioni sul negozio"
@@ -98,6 +108,11 @@ msgstr "Condizioni di annullamento"
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Cannot scan? Enter this key:"
 msgstr "Non riesci a scansionare? Inserisci questa chiave:"
+
+#: apps/orders/templates/email/orders/vendor_order_shipped/body.html
+#: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
+msgid "Carrier: %(carrier)s. Tracking number: %(tracking_number)s."
+msgstr "Corriere: %(carrier)s. Numero di tracking: %(tracking_number)s."
 
 #: apps/manager/sections.py
 #: apps/manager/templates/manager/shop/vendor_picker.html
@@ -225,6 +240,28 @@ msgstr ""
 msgid "Go to the home page"
 msgstr "Vai alla home page"
 
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+#: apps/orders/templates/email/orders/order_received/body.html
+#: apps/orders/templates/email/orders/order_received/body.txt
+#: apps/orders/templates/email/orders/payment_confirmed/body.html
+#: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/vendor_order_shipped/body.html
+#: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
+msgid "Hello %(customer_name)s,"
+msgstr "Ciao %(customer_name)s,"
+
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+#: apps/orders/templates/email/orders/order_received/body.html
+#: apps/orders/templates/email/orders/order_received/body.txt
+#: apps/orders/templates/email/orders/payment_confirmed/body.html
+#: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/vendor_order_shipped/body.html
+#: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
+msgid "Hello,"
+msgstr "Ciao,"
+
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid ""
 "If you are not signed in, Continue signs you in once with this link; you "
@@ -306,6 +343,10 @@ msgstr ""
 msgid "Menu"
 msgstr "Menu"
 
+#: apps/orders/templates/email/orders/vendor_new_order/subject.txt
+msgid "New paid order %(order_number)s"
+msgstr "Nuovo ordine pagato %(order_number)s"
+
 #: apps/accounts/templates/accounts/mfa/recovery_codes_new.html
 msgid "New recovery codes"
 msgstr "Nuovi codici di recupero"
@@ -376,6 +417,19 @@ msgstr "Segnalante"
 msgid "One line under the shop name. Plain text."
 msgstr "Una riga sotto il nome del negozio. Testo semplice."
 
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+msgid "Order %(order_number)s, sold by %(vendor_name)s:"
+msgstr "Ordine %(order_number)s, venduto da %(vendor_name)s:"
+
+#: apps/orders/templates/email/orders/vendor_order_shipped/subject.txt
+msgid "Order %(order_number)s: a shipment is on its way"
+msgstr "Ordine %(order_number)s: una spedizione è in arrivo"
+
+#: apps/orders/templates/email/orders/order_confirmation/subject.txt
+msgid "Order %(order_number)s: confirmation from %(vendor_name)s"
+msgstr "Ordine %(order_number)s: conferma di %(vendor_name)s"
+
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Out of stock"
 msgstr "Esaurito"
@@ -421,6 +475,10 @@ msgstr "Le passkey richiedono JavaScript."
 #: apps/manager/templates/manager/login.html
 msgid "Password"
 msgstr "Password"
+
+#: apps/orders/templates/email/orders/payment_confirmed/subject.txt
+msgid "Payment received for order %(order_number)s"
+msgstr "Pagamento ricevuto per l’ordine %(order_number)s"
 
 #: apps/manager/forms.py
 msgid ""
@@ -550,9 +608,19 @@ msgstr "Configura un’app di autenticazione"
 msgid "Set up two-factor authentication"
 msgstr "Configura la verifica in due passaggi"
 
+#: apps/orders/templates/email/orders/vendor_new_order/body.html
+#: apps/orders/templates/email/orders/vendor_new_order/body.txt
+msgid "Ship to:"
+msgstr "Spedire a:"
+
 #: apps/manager/forms.py
 msgid "Shipping policy"
 msgstr "Condizioni di spedizione"
+
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+msgid "Shipping: %(shipping)s EUR"
+msgstr "Spedizione: %(shipping)s EUR"
 
 #: apps/manager/templates/manager/layout.html
 msgid "Shop"
@@ -752,6 +820,11 @@ msgstr ""
 msgid "Too many attempts. Please try again later."
 msgstr "Troppi tentativi. Riprova più tardi."
 
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+msgid "Total: %(total)s EUR"
+msgstr "Totale: %(total)s EUR"
+
 #: apps/accounts/templates/accounts/mfa/overview.html
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Two-factor authentication"
@@ -807,6 +880,29 @@ msgstr "Attenzione"
 msgid "We could not complete your request. Please try again in a few minutes."
 msgstr ""
 "Non siamo riusciti a completare la richiesta. Riprova tra qualche minuto."
+
+#: apps/orders/templates/email/orders/order_received/subject.txt
+msgid "We received your order %(order_number)s"
+msgstr "Abbiamo ricevuto il tuo ordine %(order_number)s"
+
+#: apps/orders/templates/email/orders/order_received/body.html
+#: apps/orders/templates/email/orders/order_received/body.txt
+msgid ""
+"We received your order %(order_number)s (total %(total)s EUR). We will "
+"confirm it when the payment is complete."
+msgstr ""
+"Abbiamo ricevuto il tuo ordine %(order_number)s (totale %(total)s EUR). Te "
+"lo confermeremo quando il pagamento sarà completato."
+
+#: apps/orders/templates/email/orders/payment_confirmed/body.html
+#: apps/orders/templates/email/orders/payment_confirmed/body.txt
+msgid ""
+"We received your payment of %(total)s EUR for order %(order_number)s. Each "
+"seller will prepare its part and you will get a message when it ships."
+msgstr ""
+"Abbiamo ricevuto il tuo pagamento di %(total)s EUR per l’ordine "
+"%(order_number)s. Ogni venditore preparerà la sua parte e riceverai un "
+"messaggio quando verrà spedita."
 
 #: apps/manager/templates/manager/shop/vendor_picker.html
 msgid ""
