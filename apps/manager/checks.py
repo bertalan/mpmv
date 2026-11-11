@@ -166,6 +166,9 @@ def check_roles_matrix(app_configs: object = None, **kwargs: object) -> list[che
     ]
 
 
+SEED_MIGRATION = ("manager", "0002_seed_role_groups")
+
+
 def check_role_drift(
     app_configs: object = None, databases: Sequence[str] | None = None, **kwargs: object
 ) -> list[checks.CheckMessage]:
@@ -173,11 +176,16 @@ def check_role_drift(
 
     Needs the database: runs with `manage.py check --database default` and in the test suite.
     """
-    from django.db import DatabaseError
+    from django.db import DatabaseError, connection
+    from django.db.migrations.recorder import MigrationRecorder
 
     from .role_groups import role_conflicts, role_drift
 
     try:
+        # `migrate` runs the database checks before it applies anything: until the seed migration
+        # has run, missing groups are expected and must not block the migration that creates them.
+        if SEED_MIGRATION not in MigrationRecorder(connection).applied_migrations():
+            return []
         problems, conflicts = role_drift(), role_conflicts()
     except DatabaseError:  # not migrated yet
         return []
