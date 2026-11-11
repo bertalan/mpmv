@@ -187,12 +187,16 @@ def verify_passkey_registration(
 
 
 def passkey_authentication_options(
-    rp: RelyingParty, *, credential_ids: Sequence[str]
+    rp: RelyingParty, *, credential_ids: Sequence[str], require_user_verification: bool = False
 ) -> PasskeyOptions:
     options = generate_authentication_options(
         rp_id=rp.id,
         allow_credentials=_descriptors(credential_ids),
-        user_verification=UserVerificationRequirement.PREFERRED,
+        user_verification=(
+            UserVerificationRequirement.REQUIRED
+            if require_user_verification
+            else UserVerificationRequirement.PREFERRED
+        ),
     )
     return PasskeyOptions(json.loads(options_to_json(options)), options.challenge)
 
@@ -212,8 +216,13 @@ def verify_passkey_authentication(
     challenge: bytes,
     public_key: bytes,
     sign_count: int,
+    require_user_verification: bool = False,
 ) -> int:
-    """Check an assertion against the stored public key; return the new signature counter."""
+    """Check an assertion against the stored public key; return the new signature counter.
+
+    `require_user_verification` also needs the authenticator's UV flag (PIN or biometric): the
+    session levels of D-32 use it.
+    """
     try:
         verified = verify_authentication_response(
             credential=credential if isinstance(credential, str) else dict(credential),
@@ -222,6 +231,7 @@ def verify_passkey_authentication(
             expected_origin=rp.origin,
             credential_public_key=public_key,
             credential_current_sign_count=sign_count,
+            require_user_verification=require_user_verification,
         )
     except (WebAuthnException, ValueError, KeyError, TypeError, AttributeError) as exc:
         raise PasskeyError(str(exc)) from exc

@@ -27,6 +27,7 @@ Keys are the namespaced URL name, or the route when the pattern has no name (as 
 from collections.abc import Callable
 
 from apps.accounts.tests.factories import TOTPDeviceFactory
+from apps.compliance.tests.factories import NoticeFactory
 from tests.tenancy import CrossTenant
 
 PUBLIC_CATALOG = "Public catalog listing (CAT.8): published products of active vendors only."
@@ -43,6 +44,7 @@ PASSWORD_RESET = "Password reset flow of the editors' admin: answers before sign
 # Endpoints an anonymous visitor may reach (a 2xx, or a redirect that is not to a sign-in page).
 PUBLIC: dict[str, str] = {
     "healthz": "Liveness probe with a constant answer.",
+    "readyz": "Readiness probe: a status only, no data.",
     "robots_txt": "robots.txt (SEO.8): constant text for crawlers, no vendor data.",
     "email_webhook": "Email provider feedback: refused unless the payload is signed (ARC.16).",
     "home": "Public home page.",
@@ -54,6 +56,15 @@ PUBLIC: dict[str, str] = {
     "switch_language": "Stores the visitor's language choice in a cookie.",
     "action_link:open": "Secure action link (CORE.15): the signed token is the credential.",
     "action_link:continue": "Secure action link (CORE.15): the signed token is the credential.",
+    "dsa_notice": (
+        "Public report form for illegal content (DSA art. 16, CMP.5): the page is public by "
+        "design; the POST is CSRF-checked, behind Turnstile and rate limited per address, and "
+        "it only stores a notice."
+    ),
+    "dsa_notice_received": (
+        "Thanks page after a report (CMP.5): shows only the reference kept in the visitor's "
+        "own session, a 404 without one."
+    ),
     "dsa_contact_points": (
         "DSA points of contact (CMP.5): the operator's own contact data, read-only, public by law "
         "(DSA art. 11 and 12)."
@@ -146,6 +157,7 @@ OBJECT_PATHS: dict[str, ObjectKwargs] = {
         "public_id": str(TOTPDeviceFactory.create(user=tenants.b.owner).pk),
     },
     "vendor_claim:claim": lambda tenants: {"vendor_key": str(tenants.b.vendor.public_id)},
+    "manager:platform:notice": lambda tenants: {"public_id": str(NoticeFactory.create().public_id)},
     "vendors:apply_confirm": lambda tenants: {"user_key": str(tenants.b.owner.public_id)},
     "vendors:apply_cancel": lambda tenants: {"user_key": str(tenants.b.owner.public_id)},
 }

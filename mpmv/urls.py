@@ -13,6 +13,7 @@ from django.conf.urls.i18n import i18n_patterns
 from django.contrib import admin
 from django.http import HttpRequest, JsonResponse
 from django.urls import include, path
+from django.views.decorators.http import require_safe
 from wagtail.admin import urls as wagtailadmin_urls
 
 from apps.accounts.views import switch_language
@@ -29,8 +30,20 @@ def healthz(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"status": "ok"})
 
 
+@require_safe
+def readyz(request: HttpRequest) -> JsonResponse:
+    """Readiness probe (OPS.2): database, cache and storage answer. Status only, no detail."""
+    from apps.core.health import readiness_failures
+
+    ok = not readiness_failures()
+    response = JsonResponse({"status": "ok" if ok else "unavailable"}, status=200 if ok else 503)
+    response["Cache-Control"] = "no-store"
+    return response
+
+
 urlpatterns = [
     path("healthz", healthz, name="healthz"),
+    path("readyz", readyz, name="readyz"),
     path("robots.txt", robots_view, name="robots_txt"),  # SEO.8
     path("webhooks/email/", email_webhook, name="email_webhook"),
     # Uploaded images and renditions, as images only (THM.12, apps.core.media).
@@ -42,6 +55,7 @@ urlpatterns = [
     path("i18n/switch/", switch_language, name="switch_language"),
     path("api/v1/", include("apps.api.urls")),
     path("account/mfa/", include("apps.accounts.urls")),
+    path("account/level/", include("apps.accounts.level_urls")),  # CORE.25 (D-32)
     path("account/link/", include("apps.accounts.action_link_urls")),  # CORE.15
     path("account/", include("apps.manager.account_urls")),  # Manager sign-in (CORE.17)
     path("manager/", include("apps.manager.urls")),  # the Manager's two spaces (CORE.17)

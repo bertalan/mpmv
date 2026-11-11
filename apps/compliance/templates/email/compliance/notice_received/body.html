@@ -1,0 +1,10 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% translate "We received your report and will review it." %}</p>
+<ul>
+<li>{% translate "Reference" %}: {{ reference }}</li>
+<li>{% translate "Reported location" %}: {{ url }}</li>
+</ul>
+</body>
+</html>

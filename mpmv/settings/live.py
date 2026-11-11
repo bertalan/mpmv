@@ -14,7 +14,7 @@ SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", default=True)
 # The container runtime probes the app directly over HTTP (mpmv.healthcheck, ARC.5); a redirect
 # would fail the probe. This exemption is the only way the probe gets through: it sends no
 # forged X-Forwarded-Proto header.
-SECURE_REDIRECT_EXEMPT = [r"^healthz$"]
+SECURE_REDIRECT_EXEMPT = [r"^healthz$", r"^readyz$"]
 SECURE_HSTS_SECONDS = 60 * 60 * 24 * 365
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True

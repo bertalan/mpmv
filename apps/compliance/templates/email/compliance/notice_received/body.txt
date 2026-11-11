@@ -1,0 +1,4 @@
+{% load i18n %}{% translate "We received your report and will review it." %}
+
+{% translate "Reference" %}: {{ reference }}
+{% translate "Reported location" %}: {{ url }}

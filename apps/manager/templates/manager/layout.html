@@ -1,5 +1,5 @@
 {% extends "layouts/base.html" %}
-{% load i18n cms_tags %}
+{% load i18n cms_tags session_levels %}
 {# This page shows its messages in place; the base layout must not repeat them. #}
 {% block messages %}{% endblock %}
 {% comment %}
@@ -45,6 +45,7 @@ script or style.
         </ul>
       </nav>
     {% endif %}
+    {% session_level_banner %}
   </header>
 {% endblock %}
 {% block content %}
