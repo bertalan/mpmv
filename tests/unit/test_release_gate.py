@@ -201,6 +201,108 @@ def test_the_smoke_checks_pages_media_health_and_rollback() -> None:
         assert needle in text, needle
 
 
+# --- The upgrade path (OPS.11): the previous release first, then the candidate over its data.
+
+PREVIOUS = ROOT / "deploy" / "ci" / "previous-release.sh"
+
+
+def git(*args: str, cwd: Path) -> None:
+    subprocess.run(  # noqa: S603 (fixed git calls in a temporary repository)
+        ["git", *args],  # noqa: S607
+        cwd=cwd,
+        check=True,
+        capture_output=True,
+        env={
+            "PATH": os.environ["PATH"],
+            "HOME": str(cwd),
+            "GIT_AUTHOR_NAME": "t",
+            "GIT_AUTHOR_EMAIL": "t@example.invalid",
+            "GIT_COMMITTER_NAME": "t",
+            "GIT_COMMITTER_EMAIL": "t@example.invalid",
+        },
+    )
+
+
+def clone_with_tags(tmp_path: Path, tags: list[str]) -> Path:
+    """A clone whose origin carries `tags`; the clone itself has none (a CI checkout)."""
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    git("init", "-q", "-b", "main", cwd=origin)
+    git("commit", "-q", "--allow-empty", "-m", "x", cwd=origin)
+    for tag in tags:
+        git("tag", tag, cwd=origin)
+    clone = tmp_path / "clone"
+    git("clone", "-q", "--no-tags", str(origin), str(clone), cwd=tmp_path)
+    return clone
+
+
+def previous_release(clone: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(  # noqa: S603 (fixed script path)
+        ["bash", str(PREVIOUS), str(clone), *args],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=False,
+        env={"PATH": os.environ["PATH"], "HOME": str(clone)},
+    )
+
+
+def test_the_previous_release_is_the_highest_release_tag_of_the_repository(
+    tmp_path: Path,
+) -> None:
+    # Version order, not text order; pre-release and unrelated tags never count.
+    tags = ["v0.1.9", "v0.1.10", "v0.1.2", "v0.2.0-rc.1", "stage-2026", "v1.0"]
+    clone = clone_with_tags(tmp_path, tags)
+
+    result = previous_release(clone)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "0.1.10\n"
+
+
+def test_the_previous_release_of_a_tag_build_is_the_tag_before_it(tmp_path: Path) -> None:
+    clone = clone_with_tags(tmp_path, ["v0.1.5", "v0.1.6", "v0.1.7"])
+
+    assert previous_release(clone, "v0.1.7").stdout == "0.1.6\n"
+    assert previous_release(clone, "v0.1.5").stdout == ""
+
+
+def test_with_no_release_tag_there_is_no_previous_release(tmp_path: Path) -> None:
+    clone = clone_with_tags(tmp_path, ["not-a-release"])
+
+    result = previous_release(clone)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
+
+
+def test_an_unreachable_origin_is_an_error_not_an_empty_answer(tmp_path: Path) -> None:
+    clone = clone_with_tags(tmp_path, ["v0.1.0"])
+    git("remote", "set-url", "origin", str(tmp_path / "gone"), cwd=clone)
+
+    result = previous_release(clone)
+
+    assert result.returncode != 0
+    assert result.stdout == ""
+
+
+def test_the_smoke_deploys_the_previous_release_then_upgrades_to_the_candidate() -> None:
+    text = SMOKE.read_text()
+    assert "previous-release.sh" in text
+    # Both versions are named in the log, and the previous one is deployed with its own script
+    # and images before the candidate goes over the same database.
+    assert "previous release $previous" in text
+    assert '"$deployer" deploy "$previous"' in text
+    assert '"$deployer" deploy "$good"' in text
+    assert text.index('"$deployer" deploy "$previous"') < text.index('"$deployer" deploy "$good"')
+    # Upgrade path: the candidate's script replaces the previous one on the host.
+    assert 'cmp -s "$repo/deploy/server/mpmv-deploy" "$deployer"' in text
+    # No previous tag (or no readable image): the old path, said out loud.
+    assert "no previous release" in text
+    assert "::notice::" in text or "::warning::" in text
+    assert "ghcr.io/" in text
+    assert not CREDENTIAL_LITERAL.search(text)
+
+
 def test_the_production_caddyfile_has_no_test_branches() -> None:
     caddyfile = (ROOT / "deploy" / "caddy" / "Caddyfile").read_text()
     for needle in ("localhost", "tls internal", "local_certs", "parity", "{$CI"):
