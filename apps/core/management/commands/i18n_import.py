@@ -72,6 +72,8 @@ class Command(BaseCommand):
             raise CommandError(f"Nothing applied. Rows refused:\n{lines}")
         for error in report.errors:
             self.stdout.write(f"skipped {error.message}")
+        for warning in report.warnings:
+            self.stdout.write(f"warning {warning.message}")
         self.stdout.write(
             f"{verb} {len(report.applied)} text(s) in {report.lang}; skipped {report.skipped}; "
             f"file sha256 {report.sha256}."

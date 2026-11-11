@@ -49,7 +49,7 @@ Commit the changed `.po` and `.mo` in a normal PR (task I18N.14 records the revi
 ## The XLSX file
 
 Sheet 1 is **Read me**: the rules, in the reviewer's language when a translation of the Read me
-exists (English and Italian today), otherwise English. Sheet 2 is the language table: a frozen
+exists (English, Italian, German, French and Spanish today), otherwise English. Sheet 2 is the language table: a frozen
 banner with the short rules in row 1, the header in row 2, one row per text from row 3.
 
 | Column | Content | Editable |
@@ -62,7 +62,7 @@ banner with the short rules in row 1, the header in row 2, one row per text from
 | **Reviewer translation** | empty; the reviewer's proposal | **yes** |
 | **Notes** | doubts and comments | **yes** |
 | Flags | `fuzzy`, `missing` | no |
-| Max length | longest accepted text: twice the English length, at least 60 characters | no |
+| Max length | guide value: twice the English length, at least 60 characters; a soft guide, never a refusal | no |
 | Checksum (hidden) | SHA-256 of context, msgid, form, English source and current translation | no |
 
 Sheets are protected without a password, with only Reviewer translation and Notes unlocked; the
@@ -78,9 +78,10 @@ Each failing row is reported with its row number and the rule, in the words of t
 | placeholders | the set of `%(name)s`, `%s`, `%d` and `{name}` differs from the English source (order may change) |
 | HTML tags | the tags or their attributes differ from the English source |
 | new link | the text has an address (`http://`, `https://`, `www.`) that is not in the English source |
-| length | the text is longer than Max length |
 | checksum | msgid, context, form, English source, Current translation or Checksum was changed in the file, or the row names a text that is not in the catalog |
 | stale | the catalog changed after the export (Current translation differs from the catalog) |
+
+Length is a **warning**, not a rule: a text longer than Max length (German is often longer) is applied anyway and listed as `warning row N: ...` in the import output and in the report. Catalog entries do not know the field they fill, so no hard limit is enforced today; a real limit (a model field `max_length` mapped to the msgid) would be added as a refusal later.
 
 A `.po` file is checked with the same rules (row = line of the entry in the file); the checksum
 does not apply to it, the entry must exist in the catalog.
@@ -92,5 +93,5 @@ Customer emails use the informal form of address: tu (Italian), du (German), tu 
 
 ## Adding a Read me language
 
-Add the language to `RULES`, `READ_ME` and `BANNERS` in `apps/core/i18n_review/engine.py`. The
+The Read me, the banner and the rule wording exist in EN, IT, DE, FR and ES (informal register: tu, du, tu, tú; the same content in each). To add another language, add it to `RULES`, `READ_ME` and `BANNERS` in `apps/core/i18n_review/engine.py`. The
 rule texts are shown in the Read me and quoted in row errors, so one entry serves both.

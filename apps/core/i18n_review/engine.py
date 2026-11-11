@@ -34,7 +34,10 @@ RULES: dict[str, dict[Rule, str]] = {
             "Do not add links: a web address (http://, https://, www.) that is not in the "
             "English source is refused."
         ),
-        Rule.LENGTH: "Respect the limit in the Max length column: a longer text is refused.",
+        Rule.LENGTH: (
+            "Max length is a guide, not a limit: a longer text is accepted but reported as a "
+            "warning, so keep it short where the space is tight."
+        ),
         Rule.CHECKSUM: (
             "Do not touch the msgid, context, form, English source, Current translation or "
             "Checksum columns: a row changed in any of them is refused."
@@ -58,7 +61,8 @@ RULES: dict[str, dict[Rule, str]] = {
             "inglese viene rifiutato."
         ),
         Rule.LENGTH: (
-            "Rispetta il limite della colonna Max length: un testo più lungo viene rifiutato."
+            "Max length è un valore guida, non un limite: un testo più lungo viene accettato ma "
+            "segnalato come avviso, quindi tienilo breve dove lo spazio è poco."
         ),
         Rule.CHECKSUM: (
             "Non toccare le colonne msgid, context, form, English source, Current translation e "
@@ -151,6 +155,194 @@ BANNERS = {
 }
 
 
+RULES["de"] = {
+    Rule.PLACEHOLDERS: (
+        "Lass jeden Platzhalter genau so, wie er ist, zum Beispiel %(name)s, {name} und %s: "
+        "nicht übersetzen, nicht hinzufügen, nicht entfernen und nicht umbenennen."
+    ),
+    Rule.HTML_TAGS: (
+        "Lass jeden HTML-Tag genau so, wie er ist, zum Beispiel <b>, </b> und <a href=...>: "
+        "keine Tags oder Attribute hinzufügen, entfernen oder ändern."
+    ),
+    Rule.NEW_URL: (
+        "Füge keine Links hinzu: Eine Webadresse (http://, https://, www.), die nicht im "
+        "englischen Text steht, wird abgelehnt."
+    ),
+    Rule.LENGTH: (
+        "Max length ist ein Richtwert, keine Grenze: Ein längerer Text wird angenommen, aber als "
+        "Warnung gemeldet. Halte ihn kurz, wo wenig Platz ist."
+    ),
+    Rule.CHECKSUM: (
+        "Ändere nichts in den Spalten msgid, context, form, English source, Current translation "
+        "und Checksum: Eine Zeile, die dort geändert wurde, wird abgelehnt."
+    ),
+    Rule.STALE: (
+        "Der Text wurde im System geändert, nachdem diese Datei exportiert wurde: Frag nach einer "
+        "neuen Datei und bearbeite diese."
+    ),
+}
+RULES["fr"] = {
+    Rule.PLACEHOLDERS: (
+        "Garde chaque variable exactement telle quelle, par exemple %(name)s, {name} et %s : ne "
+        "les traduis pas, ne les ajoute pas, ne les supprime pas et ne les renomme pas."
+    ),
+    Rule.HTML_TAGS: (
+        "Garde chaque balise HTML exactement telle quelle, par exemple <b>, </b> et <a href=...> : "
+        "n'ajoute, ne supprime et ne modifie ni balise ni attribut."
+    ),
+    Rule.NEW_URL: (
+        "N'ajoute pas de lien : une adresse web (http://, https://, www.) qui n'est pas dans le "
+        "texte anglais est refusée."
+    ),
+    Rule.LENGTH: (
+        "Max length est une valeur indicative, pas une limite : un texte plus long est accepté "
+        "mais signalé par un avertissement. Reste bref là où la place manque."
+    ),
+    Rule.CHECKSUM: (
+        "Ne touche pas aux colonnes msgid, context, form, English source, Current translation et "
+        "Checksum : une ligne modifiée dans l'une d'elles est refusée."
+    ),
+    Rule.STALE: (
+        "Le texte a été modifié dans le système après l'export de ce fichier : demande un "
+        "nouveau fichier et modifie celui-là."
+    ),
+}
+RULES["es"] = {
+    Rule.PLACEHOLDERS: (
+        "Deja cada marcador exactamente como está, por ejemplo %(name)s, {name} y %s: no los "
+        "traduzcas, no los añadas, no los quites y no los cambies de nombre."
+    ),
+    Rule.HTML_TAGS: (
+        "Deja cada etiqueta HTML exactamente como está, por ejemplo <b>, </b> y <a href=...>: no "
+        "añadas, quites ni cambies etiquetas ni sus atributos."
+    ),
+    Rule.NEW_URL: (
+        "No añadas enlaces: una dirección web (http://, https://, www.) que no esté en el texto "
+        "inglés se rechaza."
+    ),
+    Rule.LENGTH: (
+        "Max length es una guía, no un límite: un texto más largo se acepta pero se avisa con una "
+        "advertencia. Sé breve donde falta espacio."
+    ),
+    Rule.CHECKSUM: (
+        "No toques las columnas msgid, context, form, English source, Current translation y "
+        "Checksum: una fila cambiada en cualquiera de ellas se rechaza."
+    ),
+    Rule.STALE: (
+        "El texto se cambió en el sistema después de exportar este archivo: pide un archivo nuevo "
+        "y edita ese."
+    ),
+}
+
+READ_ME["de"] = {
+    "title": "Zuerst lesen: Übersetzungsprüfung für die Sprache {lang}",
+    "intro": (
+        "Danke für die Prüfung. Jede Zeile ist ein Text, den Kunden oder Verkäufer sehen. Lies den "
+        "englischen Text und die aktuelle Übersetzung und schreib nur dann eine bessere Fassung, "
+        "wenn die aktuelle falsch ist oder unnatürlich klingt."
+    ),
+    "edit": (
+        "Bearbeite nur die Spalte 'Reviewer translation' (und schreib Zweifel in 'Notes'). Lass "
+        "sie leer, wenn die aktuelle Übersetzung bleiben soll. Fass keine andere Spalte an: Sie "
+        "sind gesperrt."
+    ),
+    "tone": (
+        "Ton: E-Mails an Kunden verwenden die vertraute Anrede ('{form}'). Halte in jedem Text "
+        "denselben Ton."
+    ),
+    "doubts": (
+        "Zweifel: Schreib sie in die Spalte 'Notes'. Ändere nie den englischen Text und ändere "
+        "einen Text nicht nur, weil du ihn anders sagen würdest."
+    ),
+    "rules": "Diese Regeln werden beim Import geprüft:",
+    "send": (
+        "Wenn du fertig bist, speichere die Datei und schick sie per E-Mail an die Person "
+        "zurück, die sie dir geschickt hat. Benenne die Blätter nicht um und füge keine Zeilen "
+        "oder Spalten hinzu."
+    ),
+    "columns": (
+        "Flags: 'fuzzy' ist eine maschinelle oder unbestätigte Übersetzung, 'missing' heißt, "
+        "dass es noch keine Übersetzung gibt."
+    ),
+}
+READ_ME["fr"] = {
+    "title": "À lire d'abord : relecture des traductions pour la langue {lang}",
+    "intro": (
+        "Merci de relire ces textes. Chaque ligne est un texte que voient les clients ou les "
+        "vendeurs. Lis le texte anglais et la traduction actuelle, et écris une meilleure version "
+        "seulement si l'actuelle est fausse ou sonne mal."
+    ),
+    "edit": (
+        "Modifie uniquement la colonne 'Reviewer translation' (et écris tes doutes dans 'Notes'). "
+        "Laisse-la vide pour garder la traduction actuelle. Ne touche à aucune autre colonne : "
+        "elles sont verrouillées."
+    ),
+    "tone": (
+        "Ton : les e-mails aux clients utilisent la forme familière ('{form}'). Garde le même "
+        "ton dans tous les textes."
+    ),
+    "doubts": (
+        "Doutes : écris-les dans la colonne 'Notes'. Ne change jamais le texte anglais et ne "
+        "change pas un texte seulement parce que tu le dirais autrement."
+    ),
+    "rules": "Règles vérifiées à l'import du fichier :",
+    "send": (
+        "Quand tu as fini, enregistre le fichier et renvoie-le par e-mail à la personne qui te "
+        "l'a envoyé. Ne renomme pas les feuilles et n'ajoute ni ligne ni colonne."
+    ),
+    "columns": (
+        "Flags : 'fuzzy' signale une traduction automatique ou non confirmée, 'missing' signale "
+        "qu'il n'y a pas encore de traduction."
+    ),
+}
+READ_ME["es"] = {
+    "title": "Lee esto primero: revisión de traducciones para el idioma {lang}",
+    "intro": (
+        "Gracias por revisar estos textos. Cada fila es un texto que ven los clientes o los "
+        "vendedores. Lee el texto en inglés y la traducción actual, y escribe una versión mejor "
+        "solo si la actual es incorrecta o suena poco natural."
+    ),
+    "edit": (
+        "Edita solo la columna 'Reviewer translation' (y escribe tus dudas en 'Notes'). Déjala "
+        "vacía para mantener la traducción actual. No toques ninguna otra columna: están "
+        "bloqueadas."
+    ),
+    "tone": (
+        "Tono: los correos a los clientes usan el trato informal ('{form}'). Mantén el mismo tono "
+        "en todos los textos."
+    ),
+    "doubts": (
+        "Dudas: escríbelas en la columna 'Notes'. No cambies nunca el texto en inglés y no "
+        "cambies un texto solo porque tú lo dirías de otra forma."
+    ),
+    "rules": "Reglas que se comprueban al importar el archivo:",
+    "send": (
+        "Cuando termines, guarda el archivo y devuélvelo por correo a la persona que te lo envió. "
+        "No cambies el nombre de las hojas ni añadas filas o columnas."
+    ),
+    "columns": (
+        "Flags: 'fuzzy' indica una traducción automática o sin confirmar, 'missing' indica que "
+        "todavía no hay traducción."
+    ),
+}
+
+BANNERS["de"] = (
+    "Bearbeite nur 'Reviewer translation' (Zweifel in 'Notes'). %(name)s, {name}, %s und "
+    "HTML-Tags unverändert lassen. Keine neuen Links. 'Max length' ist ein Richtwert. Vertraute "
+    "Anrede ('{form}'). Alle Regeln: Blatt 'Read me'."
+)
+BANNERS["fr"] = (
+    "Modifie seulement 'Reviewer translation' (doutes dans 'Notes'). Garde %(name)s, {name}, %s "
+    "et les balises HTML tels quels. Aucun nouveau lien. 'Max length' est indicatif. Ton "
+    "familier ('{form}'). Toutes les règles : feuille 'Read me'."
+)
+BANNERS["es"] = (
+    "Edita solo 'Reviewer translation' (dudas en 'Notes'). Deja %(name)s, {name}, %s y las "
+    "etiquetas HTML tal cual. Sin enlaces nuevos. 'Max length' es una guía. Trato informal "
+    "('{form}'). Todas las reglas: hoja 'Read me'."
+)
+
+
 def read_me_language(lang: str) -> str:
     """The language of the Read me for a reviewer of `lang`: theirs when it exists, else English."""
     return lang if lang in READ_ME else "en"
@@ -182,7 +374,7 @@ def banner(reader: str, lang: str) -> str:
 
 
 def row_message(row: int, rule: Rule, reader: str) -> str:
-    label = "riga" if reader == "it" else "row"
+    label = {"it": "riga", "de": "Zeile", "fr": "ligne", "es": "fila"}.get(reader, "row")
     return f"{label} {row}: {rule_text(rule, reader)}"
 
 
@@ -208,8 +400,8 @@ def max_length(msgid: str) -> int:
     return max(60, 2 * len(msgid))
 
 
-def validate(source: str, _current: str, reviewer: str, limit: int) -> list[Rule]:
-    """The rules a reviewer's text breaks, in a stable order (empty when it is fine)."""
+def validate(source: str, _current: str, reviewer: str, _limit: int) -> list[Rule]:
+    """The rules that refuse a reviewer's text, in a stable order (empty when it is fine)."""
     broken: list[Rule] = []
     if placeholders(source) != placeholders(reviewer):
         broken.append(Rule.PLACEHOLDERS)
@@ -217,9 +409,12 @@ def validate(source: str, _current: str, reviewer: str, limit: int) -> list[Rule
         broken.append(Rule.HTML_TAGS)
     if urls(reviewer) - urls(source):
         broken.append(Rule.NEW_URL)
-    if len(reviewer) > limit:
-        broken.append(Rule.LENGTH)
     return broken
+
+
+def over_guide(reviewer: str, limit: int) -> bool:
+    """True when a text is longer than the Max length guide (a warning, never a refusal)."""
+    return len(reviewer) > limit
 
 
 def checksum(ctx: str, msgid: str, form: int | None, english: str, current: str) -> str:

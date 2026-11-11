@@ -87,7 +87,7 @@ def test_read_me_is_the_first_sheet_and_the_banner_is_frozen(locale: Path, tmp_p
     assert wb.sheetnames[0] == "Read me"
     ws = wb.worksheets[1]
     assert ws.freeze_panes == "A3"
-    assert ws["A1"].value == engine.banner("en", "de")
+    assert ws["A1"].value == engine.banner("de", "de")
     header = [c.value for c in ws[2]]
     assert header == [
         "msgid",
@@ -103,11 +103,11 @@ def test_read_me_is_the_first_sheet_and_the_banner_is_frozen(locale: Path, tmp_p
     ]
 
 
-def test_read_me_lists_every_rule_in_english_for_german(locale: Path, tmp_path: Path) -> None:
+def test_read_me_lists_every_rule_in_german_for_german(locale: Path, tmp_path: Path) -> None:
     wb = load_workbook(_export(locale, tmp_path))
     text = [r[0].value for r in wb["Read me"].iter_rows() if r[0].value]
     for rule in Rule:
-        assert engine.rule_text(rule, "en") in text
+        assert engine.rule_text(rule, "de") in text
 
 
 @pytest.mark.parametrize("lang", ["en", "it", "de", "fr", "es"])
@@ -230,7 +230,7 @@ def test_each_rule_is_refused_with_the_row_number_and_the_rule_text(
     report = _import(locale, path)
     row = _row_of(path, msgid)
     assert [(e.row, e.rule) for e in report.errors] == [(row, rule)]
-    assert engine.rule_text(rule, "en") in report.errors[0].message
+    assert engine.rule_text(rule, "de") in report.errors[0].message
     assert f"{row}" in report.errors[0].message
     # nothing applied on any error, not even the valid row
     assert _catalog(locale) == before

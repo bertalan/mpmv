@@ -76,6 +76,7 @@ class ImportReport:
     sha256: str
     applied: list[Change] = field(default_factory=list)
     errors: list[RowError] = field(default_factory=list)
+    warnings: list[RowError] = field(default_factory=list)
     skipped: int = 0
 
 
@@ -309,6 +310,9 @@ def import_file(
         if edit.reviewer == current:
             continue
         broken = engine.validate(english, current, edit.reviewer, engine.max_length(edit.msgid))
+        if engine.over_guide(edit.reviewer, engine.max_length(edit.msgid)):
+            message = engine.row_message(edit.row, Rule.LENGTH, reader)
+            report.warnings.append(RowError(edit.row, Rule.LENGTH, message))
         for rule in broken:
             message = engine.row_message(edit.row, rule, reader)
             report.errors.append(RowError(edit.row, rule, message))
@@ -346,6 +350,7 @@ def import_file(
             "sha256": sha,
             "applied": len(report.applied),
             "skipped": report.skipped,
+            "warnings": len(report.warnings),
         },
     )
     return report

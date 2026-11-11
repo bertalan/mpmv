@@ -58,7 +58,7 @@ def test_import_with_an_error_fails_and_names_the_row(locale: Path, tmp_path: Pa
         if row[0].value == "Hello %(name)s":
             row[5].value = "Hallo"
     wb.save(path)
-    with pytest.raises(CommandError, match=r"row [34]"):
+    with pytest.raises(CommandError, match=r"Zeile [34]"):
         call_command(
             "i18n_import", str(path), "--locale-dir", str(locale), "--skip-check", stdout=StringIO()
         )
