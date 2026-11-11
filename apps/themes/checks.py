@@ -13,7 +13,8 @@ from typing import Any
 
 from django.apps import AppConfig
 from django.core import checks
-from django.db import connections
+from django.db import DatabaseError, connections, transaction
+from django.db.migrations.executor import MigrationExecutor
 
 from .engine import MISSING_BASE
 from .services import default_theme, get_registry, themes_dir
@@ -53,6 +54,13 @@ def check_themes(
     return messages
 
 
+def _migrations_pending(alias: str) -> bool:
+    """True while any `themes` migration is unapplied on this database."""
+    executor = MigrationExecutor(connections[alias])
+    leaves = executor.loader.graph.leaf_nodes("themes")
+    return any(m.app_label == "themes" for m, _backwards in executor.migration_plan(leaves))
+
+
 def check_site_themes(
     app_configs: Iterable[AppConfig] | None,
     databases: Sequence[str] | None = None,
@@ -65,7 +73,15 @@ def check_site_themes(
     for alias in databases or ():
         if ThemeSettings._meta.db_table not in connections[alias].introspection.table_names():
             continue  # a partial migrate has not created the table yet
-        stored = ThemeSettings.objects.using(alias).exclude(theme="").select_related("site")
+        if _migrations_pending(alias):
+            continue  # `migrate` checks first: the table may lack columns the migration adds
+        try:
+            with transaction.atomic(using=alias):
+                stored = list(
+                    ThemeSettings.objects.using(alias).exclude(theme="").select_related("site")
+                )
+        except DatabaseError:
+            continue  # not migrated yet
         for setting in stored:
             if setting.theme not in registry:
                 messages.append(
