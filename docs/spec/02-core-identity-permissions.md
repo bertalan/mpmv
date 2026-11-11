@@ -220,7 +220,8 @@ Three groups of actions (platform defaults; a vendor may only make them stricter
    - VAT regime changes;
    - in-clear Tax and Audit views;
    - bulk edits;
-   - impersonation (CORE.10).
+   - impersonation (CORE.10);
+   - changes to the `PlatformOperator` configuration (`operator_config`).
 3. **Per-action fresh passkey, even inside operational mode**: payout and bank details; granting
    the owner, superuser or `platform_owner` role; disabling MFA or removing the last passkey;
    `bootstrap_platform_owner` (CORE.23).

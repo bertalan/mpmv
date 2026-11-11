@@ -44,6 +44,8 @@ from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import urlsplit
 
+from apps.core.profile_links import profile_key
+
 NEUTRAL = ""  # the `language` of an image shown in every language without dedicated images
 
 
@@ -78,13 +80,16 @@ def faq_page_jsonld(questions: Iterable[tuple[str, str]]) -> dict[str, Any]:
 
 
 def profile_links(urls: Iterable[str]) -> list[str]:
-    """The https profile links without a user name or password, each once, Wikidata first."""
+    """The https profile links without a user name or password, each once (same link up to host
+    case, IDN form and a trailing slash), Wikidata first."""
     seen: dict[str, None] = {}
     for url in urls:
-        parts = urlsplit(url)
-        if parts.scheme == "https" and parts.netloc and "@" not in parts.netloc:
-            seen.setdefault(url, None)
-    return sorted(seen, key=lambda u: urlsplit(u).hostname != "www.wikidata.org")
+        if (key := profile_key(url)) is not None:
+            seen.setdefault(key, None)
+    return sorted(
+        seen,
+        key=lambda u: urlsplit(u).hostname not in {"wikidata.org", "www.wikidata.org"},
+    )
 
 
 def organization_jsonld(
@@ -96,8 +101,9 @@ def organization_jsonld(
 ) -> dict[str, Any]:
     """A minimal schema.org Organization for the platform operator (SEO.8 follow-up).
 
-    SEO.7 replaces it with the shared `@graph` node. No `sameAs` until the operator has verified
-    https profiles; the contact point is the public support address.
+    SEO.7 replaces it with the shared `@graph` node. `sameAs` lists the operator's verified https
+    profiles and `logo` its logo, each only when set; the contact point is the public support
+    address.
     """
     node: dict[str, Any] = {
         "@context": "https://schema.org",

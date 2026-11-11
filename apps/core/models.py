@@ -36,6 +36,7 @@ from .image_licences import (
     metadata_errors,
     restricted_licence_error,
 )
+from .profile_links import profile_key
 from .svg import LOGO_COLLECTION_NAME, MAX_SVG_BYTES, UnsafeSvgError, sanitise_svg
 
 # The dedicated platform owner permission (spec 02 roles, CMP.13): never implied by staff or
@@ -344,6 +345,9 @@ def validate_language_code(value: str) -> None:
 validate_https_url = URLValidator(schemes=["https"], message="Enter an https:// address.")
 
 
+MAX_OFFICIAL_PROFILES = 10
+
+
 def official_profile_errors(urls: Any) -> list[str]:
     """One message per refused entry of a list of official profile links: not a string, not an
     https link, with a user name or password in it, or listed twice."""
@@ -351,6 +355,8 @@ def official_profile_errors(urls: Any) -> list[str]:
         return ["Enter a list of links."]
     errors: list[str] = []
     seen: set[str] = set()
+    if len(urls) > MAX_OFFICIAL_PROFILES:
+        errors.append(f"List at most {MAX_OFFICIAL_PROFILES} profile links.")
     for url in urls:
         text = url.strip() if isinstance(url, str) else ""
         try:
@@ -360,9 +366,10 @@ def official_profile_errors(urls: Any) -> list[str]:
             continue
         if "@" in urlsplit(text).netloc:
             errors.append(f"{text!r} must not contain a user name or password.")
-        elif text in seen:
+        elif (key := profile_key(text)) in seen:
             errors.append(f"{text!r} is listed twice.")
-        seen.add(text)
+        else:
+            seen.add(key or text)
     return errors
 
 

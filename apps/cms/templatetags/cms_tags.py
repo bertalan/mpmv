@@ -4,6 +4,7 @@ the page-level FAQPage structured data (CMS.2); the page's image credits (CMS.8)
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urljoin
 
 from django import template
 from django.conf import settings
@@ -12,7 +13,7 @@ from django.urls import reverse
 from django.utils import translation
 from django.utils.html import format_html_join
 from django.utils.safestring import SafeString, mark_safe
-from wagtail.models import Locale, Page
+from wagtail.models import Locale, Page, Site
 
 from apps.core.i18n import (
     LanguageLink,
@@ -179,21 +180,28 @@ def jsonld_script(data: Mapping[str, Any] | None) -> SafeString:
 def operator_organization_jsonld(context: template.Context) -> SafeString:
     """The platform operator as one Organization JSON-LD script (home page); "" without a
     request or a configured operator."""
-    request: HttpRequest | None = context.get("request")
-    if request is None:
-        return mark_safe("")
     try:
         operator = current_operator()
     except NoPlatformOperator:
         return mark_safe("")
+    # Absolute URLs come from the default site, never from the request's Host header (the page
+    # may be served from a cache): the home page of the page's language, and the logo file.
+    site = Site.objects.filter(is_default_site=True).first()
+    if site is None:
+        return mark_safe("")
+    page: Page | None = context.get("page")
+    home = (page.relative_url(site) if page is not None else None) or "/"
     logo_url = ""
     logo = operator.logo
     if logo is not None and logo.file:
-        logo_url = request.build_absolute_uri(logo.file.url)
+        try:
+            logo_url = urljoin(site.root_url, logo.file.url)
+        except ValueError:  # no file behind the field
+            logo_url = ""
     return jsonld_script(
         organization_jsonld(
             operator.legal_name,
-            request.build_absolute_uri("/"),
+            urljoin(site.root_url, home),
             operator.support_email,
             logo_url,
             operator.official_profiles,

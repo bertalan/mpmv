@@ -124,3 +124,47 @@ def test_operator_refuses_logo_outside_logos_collection() -> None:
     with pytest.raises(ValidationError) as caught:
         op.clean()
     assert "logo" in caught.value.message_dict
+
+
+def test_profiles_dedupe_normalised_and_wikidata_first_both_hosts() -> None:
+    from apps.cms.engine import profile_links
+
+    links = profile_links(
+        [
+            "https://Example.org/a/",
+            "https://example.org/a",
+            "https://wikidata.org/wiki/Q2",
+            "https://bücher.example/x",
+            "https://xn--bcher-kva.example/x/",
+            "https://www.wikidata.org/wiki/Q1",
+        ]
+    )
+    assert links == [
+        "https://wikidata.org/wiki/Q2",
+        "https://www.wikidata.org/wiki/Q1",
+        "https://example.org/a",
+        "https://xn--bcher-kva.example/x",
+    ]
+
+
+@override_settings(ALLOWED_HOSTS=["*"])
+def test_url_and_logo_ignore_the_host_header_and_a_missing_file() -> None:
+    from wagtail.models import Collection
+
+    from apps.core.tests.factories import MediaImageFactory
+
+    logo = MediaImageFactory.create(collection=Collection.objects.get(svg_policy__isnull=False))
+    operator(logo=logo, official_profiles=["https://example.org/p?a=1&b=</script>"])
+    site = default_site()
+    response = Client().get("/", HTTP_HOST="evil.example")
+    body = response.content.decode()
+    assert "evil.example" not in body
+    assert "</script>?" not in body
+    node = json.loads(LD.findall(body)[0])
+    assert node["url"].startswith(site.root_url)
+    assert node["logo"].startswith(site.root_url)
+    logo.file.storage.delete(logo.file.name)  # the file is gone from storage: still no crash
+    assert Client().get("/", HTTP_HOST="evil.example").status_code == 200
+    type(logo).objects.filter(pk=logo.pk).update(file="")  # no file behind the field
+    node = json.loads(LD.findall(Client().get("/", HTTP_HOST="evil.example").content.decode())[0])
+    assert "logo" not in node

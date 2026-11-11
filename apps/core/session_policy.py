@@ -43,6 +43,7 @@ DEFAULT_OPERATIONAL_ACTIONS: Final = frozenset(
         "audit_in_clear",
         "bulk_edit",
         "impersonation",
+        "operator_config",
     }
 )
 DEFAULT_PASSKEY_ACTIONS: Final = frozenset(
