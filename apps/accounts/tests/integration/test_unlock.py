@@ -189,7 +189,7 @@ def test_the_audit_actor_is_the_authorizing_actor_whatever_ctx_says() -> None:
     services.unlock_account(user, actor=actor, ctx=forged)
     entry = AuditLog.objects.get(action=services.ACCOUNT_UNLOCKED)
     assert entry.actor_id == actor.pk
-    assert entry.actor_label == f"staff:{actor.email}"
+    assert entry.actor_label == f"staff:{actor.public_id}"
     assert entry.ip == IP
 
 
