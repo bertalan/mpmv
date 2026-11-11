@@ -67,7 +67,7 @@ def _edit(path: Path, edits: dict[str, str]) -> None:
 
 def _row_of(path: Path, msgid: str) -> int:
     ws = load_workbook(path).worksheets[1]
-    return next(r[0].row for r in ws.iter_rows(min_row=3) if r[0].value == msgid)
+    return int(next(r[0].row for r in ws.iter_rows(min_row=3) if r[0].value == msgid))
 
 
 def _catalog(locale: Path) -> dict[str, str]:
@@ -181,7 +181,7 @@ def test_round_trip_changes_exactly_the_edited_strings(locale: Path, tmp_path: P
     assert len(report.applied) == 2
     # the .mo is recompiled
     mo = polib.mofile(str(locale / "de" / "LC_MESSAGES" / "django.mo"))
-    assert mo.find("Contact us").msgstr == "Kontaktieren Sie uns"  # type: ignore[union-attr]
+    assert mo.find("Contact us").msgstr == "Kontaktieren Sie uns"
 
 
 def test_an_untouched_file_changes_nothing(locale: Path, tmp_path: Path) -> None:
@@ -202,12 +202,12 @@ def test_a_reviewer_clears_nothing_by_leaving_the_cell_empty(locale: Path, tmp_p
 def test_a_fuzzy_entry_loses_its_flag_when_edited(locale: Path, tmp_path: Path) -> None:
     pofile = locale / "de" / "LC_MESSAGES" / "django.po"
     po = polib.pofile(str(pofile))
-    po.find("Contact us").flags.append("fuzzy")  # type: ignore[union-attr]
+    po.find("Contact us").flags.append("fuzzy")
     po.save()
     path = _export(locale, tmp_path)
     _edit(path, {"Contact us": "Kontaktieren Sie uns"})
     _import(locale, path)
-    assert "fuzzy" not in polib.pofile(str(pofile)).find("Contact us").flags  # type: ignore[union-attr]
+    assert "fuzzy" not in polib.pofile(str(pofile)).find("Contact us").flags
 
 
 # --- refusals ---------------------------------------------------------------------------------
@@ -265,7 +265,7 @@ def test_a_catalog_changed_since_the_export_is_refused(locale: Path, tmp_path: P
     path = _export(locale, tmp_path)
     pofile = locale / "de" / "LC_MESSAGES" / "django.po"
     po = polib.pofile(str(pofile))
-    po.find("Contact us").msgstr = "Neu"  # type: ignore[union-attr]
+    po.find("Contact us").msgstr = "Neu"
     po.save()
     _edit(path, {"Contact us": "Kontaktieren Sie uns"})
     report = _import(locale, path)
@@ -301,6 +301,7 @@ def test_an_import_is_audited_with_the_file_hash(locale: Path, tmp_path: Path) -
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     _import(locale, path)
     entry = AuditLog.objects.get(action="core.i18n.imported")
+    assert entry.after is not None
     assert entry.actor_label == "command:i18n_import"
     assert entry.after["sha256"] == digest
     assert entry.after["applied"] == 1
@@ -312,8 +313,8 @@ def test_an_import_is_audited_with_the_file_hash(locale: Path, tmp_path: Path) -
 def test_po_round_trip_with_the_same_validation(locale: Path, tmp_path: Path) -> None:
     path = export_catalog(lang="de", scope="all", fmt="po", out_dir=tmp_path, locale_dir=locale)
     po = polib.pofile(str(path))
-    po.find("Contact us").msgstr = "Kontaktieren Sie uns"  # type: ignore[union-attr]
-    po.find("Hello %(name)s").msgstr = "Hallo"  # type: ignore[union-attr]
+    po.find("Contact us").msgstr = "Kontaktieren Sie uns"
+    po.find("Hello %(name)s").msgstr = "Hallo"
     po.save()
     report = _import(locale, path, skip_invalid=True)
     assert [e.rule for e in report.errors] == [Rule.PLACEHOLDERS]
