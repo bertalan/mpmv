@@ -61,7 +61,10 @@ def source_snapshot(source: SupplierSource) -> dict[str, Any]:
         "vendor": _vendor_key(source.vendor),
         "code": source.code,
         "adapter_code": source.adapter_code,
-        "config": source.config,
+        # Credentials are named by env reference, never stored in `config`; even so the audit
+        # trail keeps only the keys and a digest, so a changed value still shows as a change.
+        "config_keys": sorted(source.config),
+        "config_hash": engine.payload_hash(source.config),
         "schedule": source.schedule,
         "is_active": source.is_active,
         "write_enabled": source.write_enabled,
@@ -181,6 +184,8 @@ def transition_run(
             raise InvalidTransition(f"{locked.status} -> {target}")
         if target == engine.SUCCEEDED and open_blocking_items(locked):
             raise BlockedByReview(f"{open_blocking_items(locked)} blocking review item(s) open")
+        if target == engine.RUNNING and not locked.dry_run and not locked.source.write_enabled:
+            raise WriteNotEnabled(f"{locked.source} is no longer enabled for write runs")
         before = run_snapshot(locked)
         now = timezone.now()
         locked.status = target
@@ -209,43 +214,74 @@ def match_item(
 ) -> tuple[engine.SkuMatch, ChangeSet]:
     """Match `item` to the vendor's products by SKU match key, then alias history.
 
-    An ambiguous match opens one blocking `duplicate_sku` review item for the run (none is
-    opened twice) and nothing else is written.
+    An ambiguous match, or another feed row of the vendor with the same SKU, opens one blocking
+    `duplicate_sku` review item for the run (none is opened twice) and nothing else is written.
+    The run must be queued or running and the item must belong to its vendor.
     """
-    vendor_id = run.source.vendor_id
-    key = item.sku_key or engine.mapping_key(item.sku)
-    by_key: dict[str, list[int]] = {}
-    for pk in Product.objects.filter(vendor_id=vendor_id, sku_key=key).values_list("pk", flat=True):
-        by_key.setdefault(key, []).append(pk)
-    for product_id in Variant.objects.filter(vendor_id=vendor_id, sku_key=key).values_list(
-        "product_id", flat=True
-    ):
-        by_key.setdefault(key, []).append(product_id)
-    by_alias: dict[str, list[int]] = {}
-    for alias in SkuAlias.objects.filter(vendor_id=vendor_id, sku_key=key).select_related(
-        "variant"
-    ):
-        owner = alias.product_id or (alias.variant.product_id if alias.variant else None)
-        if owner is not None:
-            by_alias.setdefault(key, []).append(owner)
+    with transaction.atomic():
+        locked = (
+            ImportRun.objects.select_for_update().select_related("source__vendor").get(pk=run.pk)
+        )
+        if engine.is_terminal_run(locked.status):
+            raise InvalidTransition(f"run is {locked.status}")
+        vendor_id = locked.source.vendor_id
+        if item.vendor_id != vendor_id:
+            raise ValidationError("The item belongs to another vendor than the run.")
+        key = item.sku_key or engine.mapping_key(item.sku)
+        by_key: dict[str, list[int]] = {}
+        for pk in Product.objects.filter(vendor_id=vendor_id, sku_key=key).values_list(
+            "pk", flat=True
+        ):
+            by_key.setdefault(key, []).append(pk)
+        for product_id in Variant.objects.filter(vendor_id=vendor_id, sku_key=key).values_list(
+            "product_id", flat=True
+        ):
+            by_key.setdefault(key, []).append(product_id)
+        by_alias: dict[str, list[int]] = {}
+        for alias in SkuAlias.objects.filter(vendor_id=vendor_id, sku_key=key).select_related(
+            "variant"
+        ):
+            owner = alias.product_id or (alias.variant.product_id if alias.variant else None)
+            if owner is not None:
+                by_alias.setdefault(key, []).append(owner)
 
-    match = engine.match_sku(key, by_key=by_key, by_alias=by_alias)
-    changes = ChangeSet()
-    if match.kind != "ambiguous":
-        return match, changes
-    if ReviewItem.objects.filter(
-        run=run, item=item, kind=ReviewItem.Kind.DUPLICATE_SKU, decision__in=engine.OPEN_DECISIONS
-    ).exists():
-        return match, changes
-    review = ReviewItem(
-        run=run,
-        item=item,
-        kind=ReviewItem.Kind.DUPLICATE_SKU,
-        blocking=engine.is_blocking("duplicate_sku"),
-        payload={"sku": item.sku, "sku_key": key, "product_ids": list(match.product_ids)},
-    )
-    changes.create("ingest.reviewitem", str(review.public_id), review_snapshot(review))
-    run_mutation(changes, review.save, ctx=ctx, action=REVIEW_OPENED, dry_run=dry_run)
+        match = engine.match_sku(key, by_key=by_key, by_alias=by_alias)
+        twins = (
+            list(
+                SourceItem.objects.filter(vendor_id=vendor_id, sku_key=key)
+                .exclude(pk=item.pk)
+                .values_list("pk", flat=True)
+            )
+            if key
+            else []
+        )
+        changes = ChangeSet()
+        if match.kind != "ambiguous" and not twins:
+            return match, changes
+        if match.kind != "ambiguous":
+            match = engine.SkuMatch("ambiguous", match.product_ids)
+        if ReviewItem.objects.filter(
+            run=locked,
+            item=item,
+            kind=ReviewItem.Kind.DUPLICATE_SKU,
+            decision__in=engine.OPEN_DECISIONS,
+        ).exists():
+            return match, changes
+        review = ReviewItem(
+            run=locked,
+            item=item,
+            kind=ReviewItem.Kind.DUPLICATE_SKU,
+            blocking=engine.is_blocking("duplicate_sku"),
+            payload={
+                "sku": item.sku,
+                "sku_key": key,
+                "product_ids": list(match.product_ids),
+                "item_ids": twins,
+            },
+        )
+        review.full_clean()
+        changes.create("ingest.reviewitem", str(review.public_id), review_snapshot(review))
+        run_mutation(changes, review.save, ctx=ctx, action=REVIEW_OPENED, dry_run=dry_run)
     return match, changes
 
 
@@ -309,6 +345,10 @@ def save_mapping(entry: MappingTable, *, ctx: AuditContext, dry_run: bool = Fals
     """Create or update a mapping entry; it needs a target object or a target value."""
     if not entry.target_value and not (entry.target_type_id and entry.target_id):
         raise ValidationError("A mapping needs a target object or a target value.")
+    target = entry.target if entry.target_type_id else None
+    target_vendor = getattr(target, "vendor_id", None)
+    if target_vendor is not None and target_vendor != entry.vendor_id:
+        raise ValidationError("A mapping can only point at an object of its own vendor.")
     entry.key_norm = engine.mapping_key(entry.key)
     if not entry.key_norm:
         raise ValidationError({"key": "A mapping key cannot be empty."})

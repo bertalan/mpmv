@@ -321,14 +321,19 @@ def test_a_pending_blocking_item_stops_the_run() -> None:
 
 def test_the_audit_trail_keeps_config_keys_never_values() -> None:
     secret = "token-" + "x" * 8
-    source = SupplierSourceFactory.build(config={"feed_url": secret, "auth_env": "FEED_AUTH"})
+    source = SupplierSourceFactory.build(
+        vendor=VendorFactory.create(), config={"feed_url": secret, "auth_env": "FEED_AUTH"}
+    )
     services.save_source(source, ctx=CTX)
     entry = AuditLog.objects.get(action="ingest.source.created")
+    assert entry.after is not None
     assert secret not in str(entry.after)
     assert entry.after["config_keys"] == ["auth_env", "feed_url"]
     source.config = {**source.config, "feed_url": "other"}
     services.save_source(source, ctx=CTX)
     update = AuditLog.objects.get(action="ingest.source.updated")
+    assert update.before is not None
+    assert update.after is not None
     assert "other" not in str(update.after)
     assert update.before["config_hash"] != update.after["config_hash"]
 
@@ -356,7 +361,7 @@ def test_two_workers_cannot_both_finish_a_run() -> None:
         thread.start()
     for thread in threads:
         thread.join(timeout=30)
-    assert sorted(outcomes)[0] == "refused"
+    assert "refused" in outcomes
     assert len(outcomes) == 2
     run.refresh_from_db()
     assert run.status in {"succeeded", "failed"}
@@ -387,5 +392,5 @@ def test_two_reviewers_cannot_both_decide_an_item() -> None:
         thread.start()
     for thread in threads:
         thread.join(timeout=30)
-    assert sorted(outcomes)[0] == "refused"
+    assert "refused" in outcomes
     assert AuditLog.objects.filter(action="ingest.review.decided").count() == 1

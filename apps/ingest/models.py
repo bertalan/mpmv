@@ -138,11 +138,6 @@ class SourceItem(BaseModel):
         ordering = ["vendor", "sku_key"]
         constraints = [
             models.UniqueConstraint(fields=["source", "source_url"], name="ingest_item_source_url"),
-            models.UniqueConstraint(
-                fields=["vendor", "sku_key"],
-                condition=~models.Q(sku_key=""),
-                name="ingest_item_vendor_sku_key",
-            ),
         ]
 
     def __str__(self) -> str:
@@ -153,8 +148,10 @@ class SourceItem(BaseModel):
             raise ValidationError({"vendor": "An item belongs to the vendor of its source."})
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        if self.sku and not self.sku_key:
-            self.sku_key = engine.mapping_key(self.sku)
+        self.sku_key = engine.mapping_key(self.sku)
+        fields = kwargs.get("update_fields")
+        if fields is not None and "sku" in fields:
+            kwargs["update_fields"] = {*fields, "sku_key"}
         super().save(*args, **kwargs)
 
 
@@ -230,6 +227,7 @@ class ImportRun(BaseModel):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [models.Index(fields=["source", "status"], name="ingest_run_source_status")]
         constraints = [
             _in("status", RunStatus, "ingest_run_status_valid"),
             _in("kind", RunKind, "ingest_run_kind_valid"),
@@ -269,6 +267,9 @@ class ReviewItem(BaseModel):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["run", "blocking", "decision"], name="ingest_review_run_block_dec")
+        ]
         constraints = [
             _in("kind", ReviewKind, "ingest_review_kind_valid"),
             _in("decision", ReviewDecision, "ingest_review_decision_valid"),
@@ -280,6 +281,13 @@ class ReviewItem(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.kind} ({self.decision})"
+
+    def clean(self) -> None:
+        vendor_id = self.run.source.vendor_id if self.run_id else None
+        if self.item is not None and self.item.vendor_id != vendor_id:
+            raise ValidationError({"item": "The item belongs to another vendor than the run."})
+        if self.product is not None and self.product.vendor_id != vendor_id:
+            raise ValidationError({"product": "The product belongs to another vendor."})
 
 
 class MappingTable(BaseModel):
