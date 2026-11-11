@@ -35,6 +35,8 @@ SCOPES = (
     "apps/orders/templates",
     "themes/base/templates/layouts",
 )
+# Single storefront modules whose strings the Manager texts quote (shop policy headings).
+EXTRA_FILES = ("apps/vendors/services.py",)
 # Theme files rendered by the Manager and account pages (the rest of the theme is storefront).
 THEME_FILES = (
     "400.html",
@@ -75,6 +77,8 @@ def _files() -> Iterator[Path]:
             if SKIP_PARTS & set(rel.parts) or path.suffix not in {".py", ".html", ".txt"}:
                 continue
             yield path
+    for extra in EXTRA_FILES:
+        yield ROOT / extra
     for name in THEME_FILES:
         yield ROOT / "themes/base/templates" / name
 

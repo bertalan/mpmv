@@ -118,6 +118,10 @@ msgstr "Richiesta non valida"
 msgid "Cancel"
 msgstr "Annulla"
 
+#: apps/vendors/services.py
+msgid "Cancellation"
+msgstr "Annullamento"
+
 #: apps/manager/forms.py
 msgid "Cancellation policy"
 msgstr "Condizioni di annullamento"
@@ -308,7 +312,7 @@ msgid ""
 "shop page. Leave it empty and the section is not shown. Up to about 5,000 "
 "characters including formatting."
 msgstr ""
-"Come e quando spedisci. I clienti la vedono nella sezione 'Spedizione' della"
+"Come e quando spedisci. I clienti la vedono nella sezione ‘Spedizione’ della"
 " pagina del tuo negozio. Se la lasci vuota, la sezione non viene mostrata. "
 "Fino a circa 5.000 caratteri, formattazione compresa."
 
@@ -494,7 +498,7 @@ msgid ""
 "customer gets it in the shipping email together with the tracking number."
 msgstr ""
 "Facoltativo. Il nome del corriere, per esempio quello scritto sul pacco. Il "
-"cliente lo riceve nell'email di spedizione insieme al numero di tracking."
+"cliente lo riceve nell’email di spedizione insieme al numero di tracking."
 
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Order"
@@ -601,7 +605,7 @@ msgid ""
 "PNG, JPEG, WebP or GIF (SVG is not accepted). The image is checked and saved"
 " again without its hidden data. It goes into your own images only."
 msgstr ""
-"PNG, JPEG, WebP o GIF (gli SVG non sono accettati). L'immagine viene "
+"PNG, JPEG, WebP o GIF (gli SVG non sono accettati). L’immagine viene "
 "controllata e salvata di nuovo senza i suoi dati nascosti. Finisce solo tra "
 "le tue immagini."
 
@@ -693,6 +697,10 @@ msgstr "Limita e invia la motivazione"
 msgid "Retired"
 msgstr "Ritirati"
 
+#: apps/vendors/services.py
+msgid "Returns and refunds"
+msgstr "Resi e rimborsi"
+
 #: apps/manager/forms.py
 msgid "Returns and refunds policy"
 msgstr "Condizioni di reso e rimborso"
@@ -731,11 +739,15 @@ msgstr "Configura la verifica in due passaggi"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Ship the order"
-msgstr "Spedisci l'ordine"
+msgstr "Spedisci l’ordine"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Ship to"
 msgstr "Spedire a"
+
+#: apps/vendors/services.py
+msgid "Shipping"
+msgstr "Spedizione"
 
 #: apps/orders/templates/email/orders/vendor_new_order/body.html
 #: apps/orders/templates/email/orders/vendor_new_order/body.txt
@@ -977,7 +989,7 @@ msgid ""
 "Tick it and save to delete the current logo. A new image and the description"
 " above are then ignored."
 msgstr ""
-"Spunta e salva per eliminare il logo attuale. Un'eventuale nuova immagine e "
+"Spunta e salva per eliminare il logo attuale. Un’eventuale nuova immagine e "
 "la descrizione qui sopra vengono ignorate."
 
 #: apps/manager/media.py
@@ -1106,7 +1118,7 @@ msgid ""
 "unsure what the law requires, ask a legal adviser."
 msgstr ""
 "Quando e come un cliente può annullare un ordine. I clienti la vedono nella "
-"sezione 'Annullamento' della pagina del tuo negozio. Se la lasci vuota, la "
+"sezione ‘Annullamento’ della pagina del tuo negozio. Se la lasci vuota, la "
 "sezione non viene mostrata. Fino a circa 5.000 caratteri, formattazione "
 "compresa. Se non sei sicuro di cosa preveda la legge, chiedi a un consulente"
 " legale."
@@ -1173,4 +1185,4 @@ msgid ""
 msgstr ""
 "La tua storia, mostrata nella pagina del tuo negozio nella lingua scelta qui"
 " sopra. Fino a circa 10.000 caratteri, formattazione compresa. Viene "
-"mantenuta solo la formattazione che offre l'editor."
+"mantenuta solo la formattazione che offre l’editor."
