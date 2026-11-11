@@ -197,7 +197,10 @@ def notify_vendor_order_cancelled(sub: VendorOrder) -> None:
             context={
                 "order_number": order.number,
                 "vendor_name": _vendor_name(sub),
-                "lines": _lines(sub),
+                "lines": [
+                    {key: value for key, value in line.items() if key != "total"}
+                    for line in _lines(sub)
+                ],
             },
         )
 

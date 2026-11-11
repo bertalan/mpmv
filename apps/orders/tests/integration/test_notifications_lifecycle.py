@@ -1,6 +1,7 @@
 """Delivered and cancelled order emails (ORD.9, part 2), queued by the state transitions."""
 
 import pytest
+from django.db import transaction
 
 from apps.core import services as core_services
 from apps.core.mail import html_violations
@@ -10,6 +11,7 @@ from apps.orders.models import Order
 from apps.orders.tests.factories import unchecked
 from apps.orders.tests.integration.test_notifications import render, two_vendor_order
 from apps.orders.tests.integration.test_services import CTX, pay, place
+from apps.vendors.models import Vendor
 
 pytestmark = pytest.mark.django_db
 
@@ -76,6 +78,63 @@ def test_a_cancelled_vendor_order_tells_customer_and_vendor() -> None:
     text = render(vendor)
     assert order.email not in text.subject + text.text_body + text.html_body
     assert "Bowl from B" not in text.text_body  # the other vendor's lines
+    blob = vendor.context.lower()
+    buyer = [order.email, order.customer_name, "via test", "billing road"]
+    phone = getattr(order, "phone", "")
+    if phone:
+        buyer.append(phone)
+    for secret in buyer:
+        if secret:
+            assert secret.lower() not in blob
+            assert secret.lower() not in (text.text_body + text.html_body).lower()
+    assert "total" not in vendor.context_data["lines"][0]
+
+
+def test_a_vendor_without_contact_email_is_skipped_cleanly() -> None:
+    order = place()
+    pay(order)
+    sub = order.vendor_orders.get()
+    Vendor.objects.filter(pk=sub.vendor_id).update(contact_email="")
+    services.transition_vendor_order(sub, "cancelled", ctx=CTX)
+    assert len(mails("orders.vendor_order_cancelled")) == 1
+    assert mails("orders.vendor_order_cancelled_notice") == []
+
+
+@pytest.mark.parametrize("kind", ["delivered", "cancelled"])
+def test_non_active_orders_get_no_vendor_lifecycle_email(kind: str) -> None:
+    order = place()
+    pay(order)
+    sub = order.vendor_orders.get()
+    if kind == "delivered":
+        ship(sub)
+    before = OutboxEmail.objects.count()
+    sub.order.privacy_status = "restricted_tax_only"
+    if kind == "delivered":
+        notifications.notify_vendor_order_delivered(sub)
+    else:
+        notifications.notify_vendor_order_cancelled(sub)
+    assert OutboxEmail.objects.count() == before
+
+
+def test_a_rolled_back_cancellation_sends_nothing() -> None:
+    order = place()
+    services.transition_order(order, "awaiting_payment", ctx=CTX)
+
+    def cancel_then_fail() -> None:
+        with transaction.atomic():
+            services.transition_order(order, "cancelled", ctx=CTX)
+            raise RuntimeError("later step failed")
+
+    with pytest.raises(RuntimeError):
+        cancel_then_fail()
+    assert OutboxEmail.objects.count() == 0
+
+
+def test_a_dry_run_order_cancel_sends_nothing() -> None:
+    order = place()
+    services.transition_order(order, "awaiting_payment", ctx=CTX)
+    services.transition_order(order, "cancelled", ctx=CTX, dry_run=True)
+    assert OutboxEmail.objects.count() == 0
 
 
 def test_dry_run_and_rollback_send_nothing_new() -> None:
