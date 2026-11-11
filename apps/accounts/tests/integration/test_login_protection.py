@@ -232,7 +232,9 @@ def test_a_lockout_is_audited_once_with_the_ip(client: Client, staff: User) -> N
     _fail(client, staff.email, 3)  # the lock starts, then two attempts during it
     [entry] = AuditLog.objects.filter(action="accounts.login.locked_out")
     assert entry.target_model == "core.throttle"
-    assert entry.target_key == f"login:account:{staff.email}"
+    assert entry.target_key.startswith("login:account:")
+    assert "@" not in entry.target_key  # a keyed hash, never the address
+    assert not AuditLog.objects.filter(target_key__contains="@").exists()
     assert entry.ip == IP
     assert entry.source == AuditLog.Source.SYSTEM
     assert entry.after is not None

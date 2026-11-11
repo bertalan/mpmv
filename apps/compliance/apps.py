@@ -14,6 +14,7 @@ class ComplianceConfig(AppConfig):
         "safetycase",
         "countrywarninglanguages",
         "notice",
+        "erasurerequest",
         "statementofreasons",
         "productrestriction",
         "transparencysubmission",

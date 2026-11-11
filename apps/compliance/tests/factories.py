@@ -10,9 +10,11 @@ import factory
 from django.utils import timezone
 from factory.django import DjangoModelFactory
 
+from apps.accounts.tests.factories import UserFactory
 from apps.catalog.tests.factories import ProductFactory
 from apps.compliance.models import (
     CountryWarningLanguages,
+    ErasureRequest,
     GpsrInfo,
     GpsrSafetyText,
     Notice,
@@ -102,6 +104,15 @@ class NoticeFactory(DjangoModelFactory[Notice]):
     decided_at = factory.LazyAttribute(
         lambda n: timezone.now() if n.status in ("action_taken", "no_action") else None
     )
+
+
+class ErasureRequestFactory(DjangoModelFactory[ErasureRequest]):
+    """A pending account erasure for a new user."""
+
+    class Meta:
+        model = ErasureRequest
+
+    user = factory.SubFactory(UserFactory)
 
 
 class StatementOfReasonsFactory(DjangoModelFactory[StatementOfReasons]):
