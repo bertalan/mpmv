@@ -13,13 +13,14 @@ language; `SafetyCase` an authority order or a safety notice with its working-da
 for warnings, edited by staff.
 """
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from django.contrib.postgres.fields import ArrayField
+from django.core.exceptions import PermissionDenied
 from django.db import models
 
 from apps.catalog.models import Product
-from apps.core.fields import CountryField, LanguageField
+from apps.core.fields import CountryField, EncryptedCharField, LanguageField
 from apps.core.models import BaseModel
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager
@@ -211,3 +212,197 @@ class CountryWarningLanguages(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.country}: {', '.join(self.languages)}"
+
+
+class Notice(BaseModel):
+    """A report of illegal content under DSA article 16 (CMP.5 part 2).
+
+    Platform-level data, not vendor-owned: a notice may be about a product, an event, a vendor
+    storefront or other content, and anyone may send one without an account. `url` is the exact
+    location the notifier gave. The notifier's name and email are encrypted at rest and never
+    copied to the audit log; both stay empty for the anonymous category (art. 16(2)(c)).
+    Written only through the audited services in `services.py`.
+    """
+
+    class Status(models.TextChoices):
+        RECEIVED = engine.NOTICE_RECEIVED, "Received"
+        UNDER_REVIEW = engine.NOTICE_UNDER_REVIEW, "Under review"
+        ACTION_TAKEN = engine.NOTICE_ACTION_TAKEN, "Action taken"
+        NO_ACTION = engine.NOTICE_NO_ACTION, "No action"
+
+    class TargetKind(models.TextChoices):
+        PRODUCT = "product", "Product"
+        EVENT = "event", "Event"
+        VENDOR = "vendor", "Vendor storefront"
+        CONTENT = "content", "Other site content"
+
+    class Category(models.TextChoices):
+        GENERAL = "general", "Illegal content"
+        CHILD_ABUSE = engine.NOTICE_ANONYMOUS_CATEGORY, "Child sexual abuse material"
+
+    target_kind = models.CharField(max_length=10, choices=TargetKind.choices)
+    url = models.URLField(max_length=2000, help_text="The exact location of the content.")
+    category = models.CharField(max_length=12, choices=Category.choices, default=Category.GENERAL)
+    explanation = models.TextField(help_text="Why the notifier considers the content illegal.")
+    notifier_name = EncryptedCharField(max_length=255, blank=True)
+    notifier_email = EncryptedCharField(max_length=254, blank=True)
+    notifier_language = LanguageField(blank=True)
+    good_faith = models.BooleanField(
+        help_text="The notifier stated that the notice is accurate and complete."
+    )
+    status = models.CharField(max_length=14, choices=Status.choices, default=Status.RECEIVED)
+    decision_reason = models.TextField(blank=True)
+    decided_at = models.DateTimeField(null=True, blank=True, editable=False)
+    # Article 18: staff told the authorities of a suspected threat to life or safety. Recorded
+    # only; nothing is sent from here. The note stays out of the audit log.
+    authorities_notified_at = models.DateTimeField(null=True, blank=True, editable=False)
+    authorities_notified_to = models.CharField(max_length=255, blank=True, editable=False)
+    authorities_note = models.TextField(blank=True, editable=False)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        permissions = [
+            ("review_notices", "Review notices of illegal content (DSA art. 16)"),
+            ("notify_authorities", "Record a report to the authorities (DSA art. 18)"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(good_faith=True), name="compliance_notice_good_faith"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    status__in=["action_taken", "no_action"], decided_at__isnull=False
+                )
+                | models.Q(status__in=["received", "under_review"], decided_at__isnull=True),
+                name="compliance_notice_decided_at_iff_decided",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(authorities_notified_at__isnull=True, authorities_notified_to="")
+                | models.Q(authorities_notified_at__isnull=False)
+                & ~models.Q(authorities_notified_to=""),
+                name="compliance_notice_authority_with_time",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Notice {self.public_id} ({self.status})"
+
+
+class StatementOfReasons(BaseModel):
+    """The statement of reasons a vendor gets for a restriction (DSA art. 17, P2B art. 4).
+
+    Created and sent in one step by `services.issue_statement`, then immutable: the text the
+    vendor received is the record. The redress wording is a snapshot of the live CMS terms page
+    (sections `complaint_handling` and `redress`), never legal text written in code.
+    `target_ref` is the public id of the product, event or vendor that was restricted.
+    """
+
+    class TargetKind(models.TextChoices):
+        PRODUCT = "product", "Product"
+        EVENT = "event", "Event"
+        VENDOR = "vendor", "Vendor storefront"
+
+    vendor_scope: ClassVar[str] = "vendor"
+
+    vendor = models.ForeignKey(Vendor, on_delete=models.PROTECT, related_name="statements")
+    notice = models.ForeignKey(
+        Notice, null=True, blank=True, on_delete=models.PROTECT, related_name="statements"
+    )
+    target_kind = models.CharField(max_length=10, choices=TargetKind.choices)
+    target_ref = models.UUIDField()
+    restriction = models.CharField(max_length=16, choices=[(r, r) for r in engine.RESTRICTIONS])
+    scope = models.TextField(help_text="What is restricted and where.")
+    valid_until = models.DateField(
+        null=True, blank=True, help_text="When the restriction ends; empty means no end date."
+    )
+    facts = models.TextField(help_text="The facts and circumstances relied on.")
+    ground_kind = models.CharField(max_length=16, choices=[(g, g) for g in engine.GROUND_KINDS])
+    ground = models.TextField(help_text="The legal ground or the term of the platform terms.")
+    transparency_explanation = models.TextField(
+        help_text="Written for the public transparency database (art. 24(5)): no personal data."
+    )
+    automated_detection = models.BooleanField(default=False)
+    automated_decision = models.BooleanField(default=False)
+    redress_text = models.TextField(blank=True)
+    language = LanguageField()
+    sent_at = models.DateTimeField()
+
+    objects = VendorScopedManager()
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        verbose_name_plural = "statements of reasons"
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(restriction__in=engine.RESTRICTIONS),
+                name="compliance_statement_restriction_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(ground_kind__in=engine.GROUND_KINDS),
+                name="compliance_statement_ground_kind_valid",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Statement {self.public_id} ({self.restriction})"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self._state.adding:
+            raise PermissionDenied("a sent statement of reasons never changes")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
+        raise PermissionDenied("a sent statement of reasons is kept")
+
+
+class TransparencySubmission(BaseModel):
+    """The article 24(5) record of a statement, waiting for the EU transparency database.
+
+    Built with the statement and stored as `pending`. Nothing here calls the database; a later
+    submitter behind our own interface (follow-up) moves the row to `submitted`.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        SUBMITTED = "submitted", "Submitted"
+
+    vendor_scope: ClassVar[str] = "statement__vendor"
+
+    statement = models.OneToOneField(
+        StatementOfReasons, on_delete=models.PROTECT, related_name="transparency"
+    )
+    payload = models.JSONField()
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+
+    objects = VendorScopedManager()
+
+    class Meta:
+        ordering = ("created_at", "id")
+
+    def __str__(self) -> str:
+        return f"Transparency record of {self.statement_id} ({self.status})"
+
+
+class ProductRestriction(BaseModel):
+    """The hold a statement of reasons puts on a product: while `lifted_at` is empty the product
+    cannot be published again (the CMP.5 publication check). Staff lift it, audited, when an
+    appeal (art. 20) succeeds. Written only through `services.issue_statement` and
+    `services.lift_restriction`."""
+
+    vendor_scope: ClassVar[str] = "product__vendor"
+
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="restrictions")
+    statement = models.OneToOneField(
+        StatementOfReasons, on_delete=models.PROTECT, related_name="product_restriction"
+    )
+    lifted_at = models.DateTimeField(null=True, blank=True, editable=False)
+    lift_reason = models.TextField(blank=True, editable=False)
+
+    objects = VendorScopedManager()
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+
+    def __str__(self) -> str:
+        return f"Restriction of {self.product_id} ({'lifted' if self.lifted_at else 'active'})"

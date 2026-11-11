@@ -13,6 +13,10 @@ class ComplianceConfig(AppConfig):
         "gpsrsafetytext",
         "safetycase",
         "countrywarninglanguages",
+        "notice",
+        "statementofreasons",
+        "productrestriction",
+        "transparencysubmission",
     )
 
     def ready(self) -> None:
@@ -24,6 +28,7 @@ class ComplianceConfig(AppConfig):
             SALE_CHECK_NAME,
             golive_messages,
             gpsr_blocking_messages,
+            restriction_blocking_messages,
             warnings_sale_messages,
         )
 
@@ -32,6 +37,9 @@ class ComplianceConfig(AppConfig):
 
         # CMP.3: a product without complete GPSR data cannot be published (CAT.10 asks).
         register_publication_check("gpsr", gpsr_blocking_messages)
+        # CMP.5: a product restricted by a statement of reasons stays unpublished until staff
+        # lift the restriction (appeal, DSA art. 20).
+        register_publication_check("restriction", restriction_blocking_messages)
         # CMP.3 (owner decision 2026-11-09): no sale into a country without warnings in one of
         # its languages; the checkout (ORD.3) asks.
         register_sale_check(SALE_CHECK_NAME, warnings_sale_messages)
