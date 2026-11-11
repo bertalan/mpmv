@@ -14,6 +14,9 @@ os.environ.setdefault("MPMV_FIELD_ENCRYPTION_KEYS", generate_key("test"))
 
 from .base import *  # noqa: F403
 
+# OPS.5: the technical admin from loopback only, as the test client connects (empty denies all).
+ADMIN_ALLOWED_NETWORKS = ["127.0.0.1/32", "::1/128"]
+
 # Feature flags: the code defaults, whatever the shell exports, read from the database on every
 # check (tests roll back their writes, so a cached value could leak into the next test).
 ALLOW_SEED = True  # the `demo_seed` fixture (ARC.10)

@@ -5,10 +5,13 @@ import uuid
 from collections.abc import Callable
 
 from django.conf import settings
-from django.http import HttpRequest
+from django.http import Http404, HttpRequest
 from django.http.response import HttpResponseBase
+from django.urls import NoReverseMatch, reverse
 from django.utils.cache import add_never_cache_headers
+from django.views.defaults import page_not_found
 
+from .http import client_ip, ip_in_networks
 from .observability import reset_request_id, set_request_id
 from .security import build_permissions_policy
 
@@ -98,3 +101,33 @@ class RequestIdMiddleware:
             reset_request_id(token)
         response.headers["X-Request-ID"] = request_id
         return response
+
+
+class AdminNetworkAllowlistMiddleware:
+    """Answer 404 on the Django admin path to a client outside `ADMIN_ALLOWED_NETWORKS` (OPS.5).
+
+    Defence in depth behind the reverse proxy's allow-list, and fail closed: an empty list denies
+    everybody (development and tests list loopback explicitly). The client address is
+    `client_ip()`, so a forwarded header counts only from a trusted proxy. Listed after
+    LocaleMiddleware and before CommonMiddleware: the refusal is the 404 page of any unknown
+    address, in the negotiated language and theme, with the same headers, and `/django-admin`
+    without the slash gets no APPEND_SLASH redirect that would give the route away.
+    """
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponseBase]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
+        if self._is_admin_path(request.path) and not ip_in_networks(
+            client_ip(request), settings.ADMIN_ALLOWED_NETWORKS
+        ):
+            return page_not_found(request, Http404())
+        return self.get_response(request)
+
+    @staticmethod
+    def _is_admin_path(path: str) -> bool:
+        try:
+            bare = reverse("admin:index").rstrip("/")
+        except NoReverseMatch:  # a URLconf without the Django admin (some tests)
+            return False
+        return path == bare or path.startswith(bare + "/")
