@@ -345,6 +345,22 @@ ENDPOINTS: dict[str, Access] = {
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
     ),
+    "manager:platform:notices": StaffOnly(
+        "Notices of illegal content (CMP.5): platform data, not vendor-owned; needs the "
+        "compliance.review_notices permission, so a vendor member gets 404."
+    ),
+    "manager:platform:notice": StaffOnly(
+        "One notice of illegal content (CMP.5): platform data, not vendor-owned; needs the "
+        "compliance.review_notices permission, so a vendor member gets 404.",
+        kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
+    "dsa_notice": NoVendorData(
+        "Public report form for illegal content (DSA art. 16, CMP.5): no vendor data is shown, "
+        "the form only stores a notice; captcha and a rate limit guard the POST."
+    ),
+    "dsa_notice_received": NoVendorData(
+        "Thanks page after a report (CMP.5): shows only the reference kept in the session."
+    ),
     "admin:login": NoVendorData("Staff sign-in page."),
     "admin:logout": NoVendorData("Staff sign-out."),
     "admin:jsi18n": NoVendorData("Admin JavaScript translation catalog."),

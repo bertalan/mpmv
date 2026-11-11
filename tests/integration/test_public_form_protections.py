@@ -11,10 +11,12 @@ from collections.abc import Callable, Iterator
 
 import pytest
 from django.test import Client, override_settings
+from django.urls import reverse
 
 from apps.accounts.captcha import TOKEN_FIELD
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.fakes import FakeCaptchaVerifier
+from apps.compliance.models import Notice
 from apps.core.public_forms import Protection, public_form_report
 
 pytestmark = pytest.mark.django_db
@@ -74,13 +76,20 @@ def test_sell_with_us_refuses_a_failed_captcha(client: Client) -> None:
     assert FakeCaptchaVerifier.calls  # the verifier was asked
 
 
+def test_the_dsa_notice_form_refuses_a_failed_captcha(client: Client) -> None:
+    response = client.post(reverse("dsa_notice"), {"explanation": "x", TOKEN_FIELD: "wrong"})
+    assert response.status_code == 200  # the form again, nothing recorded
+    assert not Notice.objects.exists()
+    assert FakeCaptchaVerifier.calls  # the verifier was asked
+
+
 def test_every_captcha_declaration_is_tested() -> None:
     declared = {
         row.leaf.name
         for row in public_form_report().public
         if row.spec.protection is Protection.CAPTCHA
     }
-    assert declared == set(CAPTCHA_LOGINS) | {"vendors:apply"}
+    assert declared == set(CAPTCHA_LOGINS) | {"vendors:apply", "dsa_notice"}
 
 
 # --- Signed-token forms

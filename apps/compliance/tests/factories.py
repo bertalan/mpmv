@@ -14,6 +14,7 @@ from apps.compliance.models import (
     CountryWarningLanguages,
     GpsrInfo,
     GpsrSafetyText,
+    Notice,
     SafetyCase,
     VendorGpsrDefaults,
 )
@@ -77,3 +78,23 @@ class CountryWarningLanguagesFactory(DjangoModelFactory[CountryWarningLanguages]
 
     country = factory.Iterator(["CH", "GB", "TR", "AL", "RS", "UA", "MD", "ME", "MK", "BA"])
     languages = factory.LazyFunction(lambda: ["de"])
+
+
+class NoticeFactory(DjangoModelFactory[Notice]):
+    """A received notice about a product, with a notifier (synthetic example.* data)."""
+
+    class Meta:
+        model = Notice
+
+    target_kind = Notice.TargetKind.PRODUCT
+    url = factory.Sequence(lambda n: f"https://shop.example.com/products/item-{n}/")
+    category = Notice.Category.GENERAL
+    explanation = "The item is counterfeit."
+    notifier_name = "Ada Reporter"
+    notifier_email = factory.Sequence(lambda n: f"reporter{n}@example.org")
+    notifier_language = "en"
+    status = Notice.Status.RECEIVED
+    good_faith = True
+    decided_at = factory.LazyAttribute(
+        lambda n: timezone.now() if n.status in ("action_taken", "no_action") else None
+    )
