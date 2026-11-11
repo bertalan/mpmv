@@ -1,11 +1,14 @@
 """factory_boy factories for accounts (ARC.12). Synthetic values only."""
 
+import importlib
 import secrets
 from collections.abc import Iterable
+from datetime import timedelta
 from typing import Any
 
 import factory
 from django.contrib.auth.models import Permission
+from django.utils import timezone
 from django_otp.plugins.otp_totp.models import TOTPDevice
 from factory.django import DjangoModelFactory
 
@@ -13,6 +16,7 @@ from apps.accounts import engine
 from apps.accounts.models import (
     ActionLinkIssue,
     ActionLinkUse,
+    ElevationGrant,
     PasskeyDevice,
     RecoveryCode,
     RecoveryCodeDevice,
@@ -69,6 +73,33 @@ class UserFactory(DjangoModelFactory[User]):
         obj.is_staff = True
         obj.save(update_fields=["is_staff"])
         obj.user_permissions.add(Permission.objects.get(codename="view_all_vendors"))
+
+    @factory.post_generation
+    def platform_role(obj: User, create: bool, extracted: str | None, **kwargs: Any) -> None:
+        """`platform_role="support"`: admin login plus membership of that CORE.18 role group."""
+        if not create or not extracted:
+            return
+        from django.contrib.auth.models import Group
+
+        # Dynamic: the layer contract forbids an accounts -> manager import, tests included.
+        roles = importlib.import_module("apps.manager.roles")
+
+        obj.is_staff = True
+        obj.save(update_fields=["is_staff"])
+        obj.groups.add(Group.objects.get(name=roles.role(extracted).group))
+
+
+class ElevationGrantFactory(DjangoModelFactory[ElevationGrant]):
+    """A live "Do it once" grant for a given user (session hash and digest are random)."""
+
+    class Meta:
+        model = ElevationGrant
+
+    user = factory.SubFactory(UserFactory)
+    session_hash = factory.LazyFunction(lambda: secrets.token_hex(32))
+    action = "audit_in_clear"
+    digest = factory.LazyFunction(lambda: secrets.token_hex(32))
+    expires_at = factory.LazyFunction(lambda: timezone.now() + timedelta(seconds=120))
 
 
 class TOTPDeviceFactory(DjangoModelFactory[TOTPDevice]):

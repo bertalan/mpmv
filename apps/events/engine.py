@@ -14,6 +14,8 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from apps.vendors.engine import vendor_collection_name as vendor_collection_name  # moved (D-34)
+
 # Event types (spec 15 "Page models"). There is deliberately no closure type: a vendor's
 # holiday or shop closure is a vendor setting (owner decision Q-73, VEN.20).
 PROMOTION = "promotion"
@@ -612,12 +614,6 @@ _FOREIGN_REFERENCE = re.compile(
 )
 
 
-def vendor_collection_name(vendor_public_id: str) -> str:
-    """The name of a vendor's own Wagtail image collection (a child of the root collection);
-    the vendor-area upload stores there and the services accept only images from it."""
-    return f"vendor-{vendor_public_id}"
-
-
 def has_foreign_reference(html: str) -> bool:
     """Whether vendor rich text embeds media or links a document by id: neither is a vendor
     feature, and an id could name another tenant's file."""
@@ -657,17 +653,29 @@ def cta_links(raw: Any) -> list[Mapping[str, Any]]:
     return links
 
 
-def cta_url_problem(url: str) -> str | None:
-    """Why a vendor CTA may not use `url`, or None: only `https://` addresses (spec 15)."""
+def https_url_problem(url: str, subject: str = "A link") -> str | None:
+    """Why `url` may not be shown as a vendor's link, or None: only plain `https://` addresses.
+
+    Refuses any control, format, line or paragraph separator character (DEL, C1, bidi controls,
+    U+2028/2029 included), whitespace such as NBSP, and a user name before the host.
+    """
     text = url.strip()
     if not text.lower().startswith("https://") or len(text) <= len("https://"):
-        return "A call-to-action link must start with https://."
-    if any(ch <= " " for ch in text):
-        return "A call-to-action link must not contain spaces."
+        return f"{subject} must start with https://."
+    if any(
+        ch <= " " or ch.isspace() or unicodedata.category(ch) in {"Cc", "Cf", "Zl", "Zp"}
+        for ch in url
+    ):
+        return f"{subject} must not contain spaces or control characters."
     authority = text[len("https://") :].split("/", 1)[0].split("?", 1)[0].split("#", 1)[0]
     if "@" in authority or "\\" in text:
-        return "A call-to-action link must not contain a user name."
+        return f"{subject} must not contain a user name."
     return None
+
+
+def cta_url_problem(url: str) -> str | None:
+    """Why a vendor CTA may not use `url`, or None: only `https://` addresses (spec 15)."""
+    return https_url_problem(url, "A call-to-action link")
 
 
 def body_limit_problem(raw: Any) -> str | None:

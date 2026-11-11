@@ -54,7 +54,7 @@ def test_a_first_slug_is_generated_without_history_or_audit() -> None:
     translation = ProductTranslationFactory.create(title="Leather Bag", language="en", slug="")
     changes = sync_product_slug(translation, ctx=CTX)
     translation.refresh_from_db()
-    assert translation.slug == "leather-bag-en"
+    assert translation.slug == "leather-bag"
     assert changes.summary() == {"create": 0, "update": 1, "delete": 0}
     assert history(translation) == []
     assert not slug_entries().exists()
@@ -62,19 +62,19 @@ def test_a_first_slug_is_generated_without_history_or_audit() -> None:
 
 def test_a_title_change_regenerates_the_slug_and_keeps_the_old_one() -> None:
     translation = ProductTranslationFactory.create(
-        title="Leather Bag", language="en", slug="leather-bag-en"
+        title="Leather Bag", language="en", slug="leather-bag"
     )
     translation.title = "Leather Travel Bag"
     translation.save()
     changes = sync_product_slug(translation, ctx=CTX)
     translation.refresh_from_db()
-    assert translation.slug == "leather-travel-bag-en"
-    assert history(translation) == ["leather-bag-en"]
+    assert translation.slug == "leather-travel-bag"
+    assert history(translation) == ["leather-bag"]
     assert changes.summary() == {"create": 1, "update": 1, "delete": 0}
     entry = slug_entries().get()
     vendor = str(translation.product.vendor.public_id)
-    assert entry.before == {"vendor": vendor, "language": "en", "slug": "leather-bag-en"}
-    assert entry.after == {"vendor": vendor, "language": "en", "slug": "leather-travel-bag-en"}
+    assert entry.before == {"vendor": vendor, "language": "en", "slug": "leather-bag"}
+    assert entry.after == {"vendor": vendor, "language": "en", "slug": "leather-travel-bag"}
     assert entry.target_model == "catalog.product"
     assert entry.target_key == str(translation.product.public_id)
     assert entry.vendor_key == vendor
@@ -82,7 +82,7 @@ def test_a_title_change_regenerates_the_slug_and_keeps_the_old_one() -> None:
 
 def test_an_unchanged_title_changes_nothing() -> None:
     translation = ProductTranslationFactory.create(
-        title="Leather Bag", language="en", slug="leather-bag-en"
+        title="Leather Bag", language="en", slug="leather-bag"
     )
     changes = sync_product_slug(translation, ctx=CTX)
     assert changes.is_empty
@@ -103,32 +103,32 @@ def test_dry_run_writes_nothing() -> None:
 
 
 def test_a_slug_taken_by_another_product_gets_a_suffix() -> None:
-    ProductTranslationFactory.create(title="Leather Bag", language="en", slug="leather-bag-en")
+    ProductTranslationFactory.create(title="Leather Bag", language="en", slug="leather-bag")
     translation = ProductTranslationFactory.create(title="Leather Bag", language="en", slug="")
     sync_product_slug(translation, ctx=CTX)
     translation.refresh_from_db()
-    assert translation.slug == "leather-bag-en-2"
+    assert translation.slug == "leather-bag-2"
 
 
 def test_the_same_slug_in_another_language_is_no_collision() -> None:
-    ProductTranslationFactory.create(title="Bag", language="en", slug="bag-en")
+    ProductTranslationFactory.create(title="Bag", language="en", slug="bag")
     translation = ProductTranslationFactory.create(title="Bag", language="it", slug="")
     sync_product_slug(translation, ctx=CTX)
     translation.refresh_from_db()
-    assert translation.slug == "bag-it"
+    assert translation.slug == "bag"
 
 
 def test_a_slug_in_another_products_history_is_not_reused() -> None:
-    SlugHistoryFactory.create(language="en", slug="leather-bag-en")
+    SlugHistoryFactory.create(language="en", slug="leather-bag")
     translation = ProductTranslationFactory.create(title="Leather Bag", language="en", slug="")
     sync_product_slug(translation, ctx=CTX)
     translation.refresh_from_db()
-    assert translation.slug == "leather-bag-en-2"
+    assert translation.slug == "leather-bag-2"
 
 
 def test_going_back_to_an_old_title_reclaims_its_slug_without_a_loop() -> None:
     translation = ProductTranslationFactory.create(
-        title="Leather Bag", language="en", slug="leather-bag-en"
+        title="Leather Bag", language="en", slug="leather-bag"
     )
     translation.title = "Travel Bag"
     translation.save()
@@ -137,10 +137,10 @@ def test_going_back_to_an_old_title_reclaims_its_slug_without_a_loop() -> None:
     translation.save()
     changes = sync_product_slug(translation, ctx=CTX)
     translation.refresh_from_db()
-    assert translation.slug == "leather-bag-en"
-    assert history(translation) == ["travel-bag-en"]
+    assert translation.slug == "leather-bag"
+    assert history(translation) == ["travel-bag"]
     assert changes.summary() == {"create": 1, "update": 1, "delete": 1}
-    assert old_slug_redirect("en", "leather-bag-en") is None
+    assert old_slug_redirect("en", "leather-bag") is None
 
 
 # --- Current SKU slugs loaded as history
@@ -157,7 +157,7 @@ def test_rebuild_turns_current_sku_slugs_into_history() -> None:
     changes = rebuild_product_slugs(ctx=CTX)
     en.refresh_from_db()
     it.refresh_from_db()
-    assert (en.slug, it.slug) == ("leather-bag-en", "borsa-in-pelle-it")
+    assert (en.slug, it.slug) == ("leather-bag", "borsa-in-pelle")
     assert "sku" not in en.slug
     assert "sku" not in it.slug
     assert history(en) == ["leather-bag-en-sku-00001"]
@@ -189,17 +189,17 @@ def test_rebuild_command_has_a_dry_run() -> None:
 
     call_command("rebuild_product_slugs", stdout=StringIO())
     translation.refresh_from_db()
-    assert translation.slug == "leather-bag-en"
+    assert translation.slug == "leather-bag"
     entry = slug_entries().get()
     assert entry.source == "command"
 
 
 def test_old_slugs_are_recorded_as_history() -> None:
-    translation = ProductTranslationFactory.create(language="it", title="Borsa", slug="borsa-it")
+    translation = ProductTranslationFactory.create(language="it", title="Borsa", slug="borsa")
     changes = record_old_slugs(
         translation.product,
         "it",
-        ["borsa-it-sku-1", "borsa-vecchia-it-sku-1", "borsa-it", "borsa-it-sku-1"],
+        ["borsa-it-sku-1", "borsa-vecchia-it-sku-1", "borsa", "borsa-it-sku-1"],
         ctx=CTX,
     )
     # The current slug and the repeated one are skipped.
@@ -208,10 +208,10 @@ def test_old_slugs_are_recorded_as_history() -> None:
 
 
 def test_an_old_slug_of_another_product_stops_the_load() -> None:
-    ProductTranslationFactory.create(language="en", title="Hat", slug="hat-en")
-    translation = ProductTranslationFactory.create(language="en", title="Bag", slug="bag-en")
-    with pytest.raises(ValidationError, match="hat-en"):
-        record_old_slugs(translation.product, "en", ["bag-en-sku-1", "hat-en"], ctx=CTX)
+    ProductTranslationFactory.create(language="en", title="Hat", slug="hat")
+    translation = ProductTranslationFactory.create(language="en", title="Bag", slug="bag")
+    with pytest.raises(ValidationError, match="hat"):
+        record_old_slugs(translation.product, "en", ["bag-en-sku-1", "hat"], ctx=CTX)
     assert not SlugHistory.objects.exists()
 
 
@@ -224,10 +224,10 @@ def test_an_old_slug_resolves_to_the_current_path() -> None:
     )
     rebuild_product_slugs(ctx=CTX)
     assert old_slug_redirect("it", "borsa-in-pelle-it-sku-00001") == (
-        "/it/prodotto/borsa-in-pelle-it/"
+        "/it/prodotto/borsa-in-pelle/"
     )
     assert old_slug_redirect("en", "borsa-in-pelle-it-sku-00001") is None
-    assert old_slug_redirect("it", "unknown-it") is None
+    assert old_slug_redirect("it", "unknown") is None
 
 
 def test_an_old_slug_of_a_product_without_a_current_slug_does_not_redirect() -> None:
@@ -243,7 +243,7 @@ def test_a_current_sku_slug_answers_301_to_the_new_slug(client: Client) -> None:
     rebuild_product_slugs(ctx=CTX)
     response = client.get("/product/leather-bag-en-sku-00001/")
     assert response.status_code == 301
-    assert response["Location"] == "/product/leather-bag-en/"
+    assert response["Location"] == "/product/leather-bag/"
 
 
 def test_the_italian_old_slug_redirects_under_the_italian_prefix(client: Client) -> None:
@@ -253,7 +253,7 @@ def test_the_italian_old_slug_redirects_under_the_italian_prefix(client: Client)
     rebuild_product_slugs(ctx=CTX)
     response = client.get("/it/prodotto/borsa-in-pelle-it-sku-00001/?utm_source=feed")
     assert response.status_code == 301
-    assert response["Location"] == "/it/prodotto/borsa-in-pelle-it/?utm_source=feed"
+    assert response["Location"] == "/it/prodotto/borsa-in-pelle/?utm_source=feed"
 
 
 def test_every_old_slug_redirects_in_a_single_hop(client: Client) -> None:
@@ -264,18 +264,18 @@ def test_every_old_slug_redirects_in_a_single_hop(client: Client) -> None:
         translation.title = title
         translation.save()
         sync_product_slug(translation, ctx=CTX)
-    for old in ("leather-bag-en-sku-00001", "leather-bag-en", "leather-travel-bag-en"):
+    for old in ("leather-bag-en-sku-00001", "leather-bag", "leather-travel-bag"):
         response = client.get(f"/product/{old}/")
         assert response.status_code == 301
-        assert response["Location"] == "/product/big-leather-travel-bag-en/"
+        assert response["Location"] == "/product/big-leather-travel-bag/"
 
 
 def test_unknown_product_slugs_stay_404(client: Client) -> None:
-    ProductTranslationFactory.create(language="en", title="Leather Bag", slug="leather-bag-en")
-    assert client.get("/product/no-such-product-en/").status_code == 404
+    ProductTranslationFactory.create(language="en", title="Leather Bag", slug="leather-bag")
+    assert client.get("/product/no-such-product/").status_code == 404
     # An English old slug is not found under the Italian prefix.
-    SlugHistoryFactory.create(language="en", slug="old-bag-en")
-    assert client.get("/it/prodotto/old-bag-en/").status_code == 404
+    SlugHistoryFactory.create(language="en", slug="old-bag")
+    assert client.get("/it/prodotto/old-bag/").status_code == 404
 
 
 # --- The admin keeps the slug derived from the title
@@ -320,6 +320,69 @@ def test_the_admin_regenerates_the_slug_on_a_title_change(
     response = staff.post(reverse("admin:catalog_product_change", args=[product.pk]), data)
     assert response.status_code == 302, response.content.decode()
     translation.refresh_from_db()
-    assert translation.slug == "leather-travel-bag-en"
+    assert translation.slug == "leather-travel-bag"
     assert history(translation) == ["leather-bag-en-bag-01"]
     assert slug_entries().get().source == "admin"
+
+
+# --- D-25: no language suffix; the `{title}-{lang}` slugs and the legacy SKU slugs are history
+
+
+def test_a_first_generation_title_lang_slug_becomes_history_and_redirects_once(
+    client: Client,
+) -> None:
+    ProductTranslationFactory.create(
+        language="it", title="Borsa in pelle", slug="borsa-in-pelle-it"
+    )
+    rebuild_product_slugs(ctx=CTX)
+    response = client.get("/it/prodotto/borsa-in-pelle-it/")
+    assert response.status_code == 301
+    assert response["Location"] == "/it/prodotto/borsa-in-pelle/"
+
+
+def test_title_lang_and_legacy_sku_slugs_all_land_on_the_same_new_slug_in_one_hop(
+    client: Client,
+) -> None:
+    translation = ProductTranslationFactory.create(
+        language="en", title="Leather Bag", slug="leather-bag-en"
+    )
+    record_old_slugs(translation.product, "en", ["leather-bag-en-sku-00001"], ctx=CTX)
+    rebuild_product_slugs(ctx=CTX)
+    translation.refresh_from_db()
+    assert translation.slug == "leather-bag"
+    for old in ("leather-bag-en", "leather-bag-en-sku-00001"):
+        first = client.get(f"/product/{old}/")
+        assert first.status_code == 301
+        assert first["Location"] == "/product/leather-bag/"
+    assert old_slug_redirect("en", "leather-bag") is None  # the target never redirects again
+
+
+def test_the_same_title_in_two_languages_gets_the_same_slug() -> None:
+    product = ProductFactory.create()
+    en = ProductTranslationFactory.create(product=product, language="en", title="Safari", slug="")
+    it = ProductTranslationFactory.create(product=product, language="it", title="Safari", slug="")
+    sync_product_slug(en, ctx=CTX)
+    sync_product_slug(it, ctx=CTX)
+    assert (en.slug, it.slug) == ("safari", "safari")
+
+
+def test_two_products_with_the_same_title_in_a_language_get_a_numbered_slug() -> None:
+    first = ProductTranslationFactory.create(language="en", title="Safari", slug="")
+    second = ProductTranslationFactory.create(language="en", title="Safari", slug="")
+    third = ProductTranslationFactory.create(language="en", title="Safari", slug="")
+    for translation in (first, second, third):
+        sync_product_slug(translation, ctx=CTX)
+    assert (first.slug, second.slug, third.slug) == ("safari", "safari-2", "safari-3")
+
+
+def test_the_new_slug_is_at_most_80_characters_without_a_language_suffix() -> None:
+    translation = ProductTranslationFactory.create(language="de", title="x" * 120, slug="")
+    sync_product_slug(translation, ctx=CTX)
+    assert translation.slug == "x" * 80
+
+
+def test_rebuild_twice_is_idempotent() -> None:
+    ProductTranslationFactory.create(language="en", title="Leather Bag", slug="leather-bag-en")
+    rebuild_product_slugs(ctx=CTX)
+    assert rebuild_product_slugs(ctx=CTX).is_empty
+    assert SlugHistory.objects.count() == 1

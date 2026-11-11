@@ -3,11 +3,11 @@
 {% comment %}
 Storefront profile changes (CORE.9 3/3, platform space, revert permission only): who changed what
 and when, before and after of every changed text, and a revert form with a required reason. All
-values are escaped by the template engine; the texts are plain text.
+values are escaped by the template engine: rich text shows as its stored HTML source, never rendered.
 {% endcomment %}
 {% block manager_content %}
   <h1>{% translate "Storefront changes" %}</h1>
-  <p class="manager-lead">{% translate "Changes owners made to their storefront texts and policies. They are live at once; revert one with a reason and the owners are told. A change can be reverted only while the text has not changed again." %}</p>
+  <p class="manager-lead">{% translate "Changes owners made to their storefront texts, policies and logo. They are live at once; revert one with a reason and the owners are told. A change can be reverted only while the text has not changed again." %}</p>
   {% if filter_vendor %}<p>{% blocktranslate with vendor=filter_vendor.display_name %}Showing {{ vendor }} only.{% endblocktranslate %} <a href="{% url 'manager:platform:profile_changes' %}">{% translate "Show all" %}</a></p>{% endif %}
   {% if rows %}
     {% for row in rows %}

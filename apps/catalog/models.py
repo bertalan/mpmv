@@ -61,6 +61,7 @@ from .taxonomy import (
     BrandTranslation,
     Category,
     CategoryTranslation,
+    Manufacturer,
     Taxonomy,
     TaxonomyTranslation,
     Term,
@@ -78,6 +79,7 @@ __all__ = [
     "Category",
     "CategoryTranslation",
     "FiscalCategory",
+    "Manufacturer",
     "Product",
     "ProductAttribute",
     "ProductKind",
@@ -540,8 +542,9 @@ class ProductTranslation(TranslationModel):
     title = models.CharField(max_length=255)
     short_description = models.TextField(blank=True)
     description = models.TextField(blank=True, help_text="HTML.")
-    # Derived {title}-{lang} from the title by `services.sync_product_slug` (CAT.5), never the
-    # SKU; empty until generated. Replaced slugs move to SlugHistory and answer a 301.
+    # Derived {title} (no language suffix, D-25) from the title by `services.sync_product_slug`
+    # (CAT.5), never the SKU; empty until generated. Replaced slugs move to SlugHistory and answer
+    # a 301.
     slug = models.SlugField(max_length=80, blank=True, editable=False)
     seo_title = models.CharField("SEO title", max_length=255, blank=True)
     seo_description = models.TextField("SEO description", blank=True)
@@ -584,9 +587,9 @@ class SlugHistory(BaseModel):
     """A product's former slug in one language (CAT.5); it answers a 301 to the current slug.
 
     Replaces the legacy `_legacy_old_slugs` meta, without its limit of 10. The legacy
-    `{title}-{lang}-{sku}` slugs are loaded here. One slug belongs to at most one product per
-    language, among current and old slugs alike (checked by the services), so every old slug
-    redirects in a single hop.
+    `{title}-{lang}` and `{title}-{lang}-{sku}` slugs are loaded here. One slug belongs to
+    at most one product per language, among current and old slugs alike (checked by the
+    services), so every old slug redirects in a single hop.
     """
 
     vendor_scope: ClassVar[str] = "product__vendor"

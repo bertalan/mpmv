@@ -689,6 +689,12 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
             zoneinfo.ZoneInfo(self.timezone)
         except (zoneinfo.ZoneInfoNotFoundError, ValueError):
             add("timezone", _("Choose a time zone such as Europe/Rome."))
+        if self.rrule:
+            try:
+                engine.validate_rrule(self.rrule, self.all_day)
+            except engine.RecurrenceError as exc:
+                add("rrule", str(exc))
+                return
         if engine.has_count_and_until(self.rrule):
             add("rrule", _("A recurrence ends after a number of times or on a date, not both."))
 
@@ -730,8 +736,8 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
         if self.online_url:
             if self.attendance not in (Attendance.ONLINE, Attendance.MIXED):
                 add("online_url", _("Only online and mixed events have a link."))
-            elif not self.online_url.startswith("https://"):
-                add("online_url", _("The link must start with https://."))
+            elif (problem := engine.https_url_problem(self.online_url, "The link")) is not None:
+                add("online_url", problem)
 
 
 # --- Moderation policy and settings

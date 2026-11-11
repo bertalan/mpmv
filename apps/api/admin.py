@@ -23,7 +23,7 @@ from django.urls import URLPattern, path, reverse
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
 
-from apps.accounts.decorators import step_up_required
+from apps.accounts.decorators import level_gated_action, step_up_required
 from apps.core.audit import audit_context
 
 from .engine import InvalidRateLimit, key_wide_rate
@@ -112,6 +112,7 @@ class ApiClientAdmin(admin.ModelAdmin[ApiClient]):
         return request.user.has_perm(CHANGE_PERMISSION)
 
     @admin.action(description="Revoke the selected API keys", permissions=["revoke"])
+    @level_gated_action("api_key")  # D-32 group 2
     def revoke(self, request: HttpRequest, queryset: QuerySet[ApiClient]) -> None:
         ctx = audit_context(request)
         revoked = 0

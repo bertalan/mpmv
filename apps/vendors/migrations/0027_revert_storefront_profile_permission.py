@@ -5,7 +5,7 @@ from django.db import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("vendors", "0024_vendor_application"),
+        ("vendors", "0026_storefront_rich_text"),
     ]
 
     operations = [

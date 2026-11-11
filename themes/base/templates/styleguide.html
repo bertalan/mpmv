@@ -15,7 +15,7 @@ library (apps.themes.styleguide.sample_library); `focus_errors` (`?focus=errors`
 first error summary takes the focus on load.
 {% endcomment %}
 {% block title %}{% translate "Styleguide" %} · {{ site_name }}{% endblock %}
-{% block description %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block description %}{% robots_meta "noindex, nofollow" %}{% endblock %}
 {% block content %}
 <div class="styleguide">
   <h1>{% translate "Styleguide" %}</h1>

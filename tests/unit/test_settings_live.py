@@ -18,10 +18,12 @@ def live_settings() -> dict[str, Any]:
 # so it runs inside all of them and static responses carry the headers too (SEC.5).
 HEADER_MIDDLEWARE = [
     "apps.core.middleware.CrossOriginResourcePolicyMiddleware",  # outermost: wraps the 301 (SEC.12)
+    "apps.core.middleware.RequestIdMiddleware",  # OPS.2
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "apps.cms.middleware.WagtailAdminPickerNonceMiddleware",
     "apps.core.middleware.PermissionsPolicyMiddleware",
+    "apps.seo.middleware.ForceNoindexMiddleware",  # SEO.8
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 

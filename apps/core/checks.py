@@ -176,6 +176,39 @@ def check_trusted_proxy_for_deploy(
     ]
 
 
+def check_admin_network_settings(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """OPS.5: every allowed network of the technical admin is an address or a CIDR network."""
+    try:
+        trusted_proxy_networks(tuple(settings.ADMIN_ALLOWED_NETWORKS))
+    except ValueError as error:
+        return [
+            checks.Error(
+                f"ADMIN_ALLOWED_NETWORKS has an entry that is not an IP address or network: "
+                f"{error}.",
+                hint="List addresses or CIDR networks, comma separated, never host names.",
+                id="core.E003",
+            )
+        ]
+    return []
+
+
+def check_admin_network_for_deploy(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """OPS.5: with no allowed network the Django admin answers 404 to everybody (fail closed)."""
+    if settings.ADMIN_ALLOWED_NETWORKS:
+        return []
+    return [
+        checks.Warning(
+            "ADMIN_ALLOWED_NETWORKS is empty: the Django admin is unreachable (404 for everybody).",
+            hint="Set MPMV_ADMIN_ALLOWED_NETWORKS (deploy/server/mpmv.env.example) to reach it.",
+            id="core.W002",
+        )
+    ]
+
+
 # --- Audit policy (SEC.4, docs/dev/audit-trail.md)
 #
 # Each AppConfig declares `audited_models` (names whose writes are audited) and
@@ -600,3 +633,16 @@ def check_image_upload_limits(
             )
         ]
     return []
+
+
+def check_public_forms(app_configs: Any = None, **kwargs: Any) -> list[checks.CheckMessage]:
+    """The anonymous POST form sweep (SEC.13, apps/core/public_forms.py)."""
+    from .public_forms import public_form_report
+
+    report = public_form_report()
+    messages: list[checks.CheckMessage] = [
+        checks.Error(message, hint="See docs/dev/public-forms.md.", id=check_id)
+        for check_id, message in report.errors
+    ]
+    messages += [checks.Info(message, id=check_id) for check_id, message in report.warnings]
+    return messages

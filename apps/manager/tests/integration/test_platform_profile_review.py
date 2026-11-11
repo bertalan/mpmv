@@ -1,6 +1,8 @@
 """CORE.9 part 3: the platform space page where staff review and revert storefront changes."""
 
 import pytest
+from django.contrib.auth.models import Group
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
 
 from apps.accounts.models import User
@@ -8,9 +10,15 @@ from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
+from apps.manager import roles
 from apps.vendors.models import Vendor, VendorTranslation
-from apps.vendors.services import PROFILE_REVERT_PERMISSION, save_storefront_profile
+from apps.vendors.services import (
+    PROFILE_REVERT_PERMISSION,
+    save_storefront_profile,
+    set_vendor_logo,
+)
 from apps.vendors.tests.factories import VendorTranslationFactory
+from tests.upload_corpus import png
 
 from .conftest import PLATFORM, SHOP
 
@@ -137,3 +145,45 @@ def test_a_revert_marks_the_change_reverted_without_a_limit_on_the_list(
     page = client.get(PAGE).text
     assert "Reverted" in page
     assert f'action="{revert_url(changed)}"' not in page
+
+
+def test_the_reviewer_reverts_a_logo_change(
+    client: Client, reviewer: User, vendor: Vendor, owner: User
+) -> None:
+    set_vendor_logo(
+        vendor,
+        upload=SimpleUploadedFile("logo.png", png()),
+        alt="Shop mark",
+        actor=owner,
+        ctx=CTX,
+    )
+    entry = AuditLog.objects.get(action="vendor.logo_changed")
+    verified_login(client, reviewer)
+    page = client.get(PAGE).text
+    assert "Shop mark" in page
+    assert f'action="{revert_url(entry)}"' in page
+    client.post(revert_url(entry), {"reason": "Not the vendor's own logo."}, follow=True)
+    vendor.refresh_from_db()
+    assert vendor.logo is None
+    assert AuditLog.objects.filter(action="vendor.logo_reverted").count() == 1
+
+
+@pytest.mark.parametrize("key", [roles.CATALOG, roles.OWNER])
+def test_the_catalog_and_owner_roles_review_and_revert(
+    client: Client, changed: AuditLog, vendor: Vendor, key: str
+) -> None:
+    member = UserFactory.create()
+    member.groups.add(Group.objects.get(name=roles.role(key).group))
+    verified_login(client, member)
+    assert client.get(PAGE).status_code == 200
+    client.post(revert_url(changed), {"reason": "Not acceptable."}, follow=True)
+    assert VendorTranslation.objects.get(vendor=vendor, language="en").tagline == "Old tagline"
+
+
+@pytest.mark.parametrize("key", [roles.CONFIG, roles.FINANCE, roles.SUPPORT])
+def test_the_other_platform_roles_get_404(client: Client, changed: AuditLog, key: str) -> None:
+    member = UserFactory.create()
+    member.groups.add(Group.objects.get(name=roles.role(key).group))
+    verified_login(client, member)
+    assert client.get(PAGE).status_code == 404
+    assert client.post(revert_url(changed), {"reason": "x"}).status_code == 404

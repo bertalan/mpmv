@@ -133,6 +133,8 @@ def sample_path(endpoint: Endpoint, access: object = None) -> str:
     if isinstance(access, NoVendorData) and access.path:
         return access.path
     kwargs = access.kwargs if isinstance(access, NoVendorData | StaffOnly) else {}
+    if isinstance(access, VendorScoped):
+        kwargs = access.sample
     return endpoint.path(**{name: kwargs.get(name, "0") for name in endpoint.params})
 
 
@@ -445,7 +447,15 @@ def test_a_customer_cannot_open_vendor_b_objects(
 
 NON_OWNER_ROLES = [role for role in VendorMember.Role if role != VendorMember.Role.OWNER]
 # Pages the role matrix gives to owners only: other roles get 404 instead of their own data.
-OWNER_ONLY_WEB = frozenset({"manager:shop:profile"})  # CORE.9
+OWNER_ONLY_WEB = frozenset(
+    {
+        "manager:shop:profile",  # CORE.9
+        "manager:shop:image_choose",  # VEN.31
+        "manager:shop:image_results",
+        "manager:shop:image_chosen",
+        "manager:shop:image_select_format",
+    }
+)
 
 
 @pytest.mark.parametrize("role", NON_OWNER_ROLES, ids=str)

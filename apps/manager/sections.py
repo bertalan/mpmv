@@ -5,12 +5,21 @@ pages of CORE.9, VEN.9, VEN.15, VEN.20, EVT.4, ORD.6 and CAT.18, and the platfor
 whose role checks CORE.18 defines.
 """
 
+from typing import Any
+
 from django.utils.translation import gettext_lazy as _
 
-from apps.vendors.services import PROFILE_REVERT_PERMISSION
+from apps.vendors.services import can_review_profiles
 
-from .navigation import Registry, Section, anyone, platform_permission, vendor_action
+from .navigation import Registry, Section, anyone, vendor_action
+from .notice_views import SECTION as NOTICES_SECTION
+from .notice_views import can_review
 from .spaces import Space
+
+
+def can_review_profiles_section(ctx: Any) -> bool:
+    return can_review_profiles(ctx.user)
+
 
 BUILT_IN = (
     Section(
@@ -29,6 +38,25 @@ BUILT_IN = (
         "manager:shop:profile",
         order=20,
         allowed=vendor_action("profile"),
+    ),
+    # The image chooser of the storefront editor (VEN.31): a modal, not a page, so not in the
+    # menu. Owners only, like the profile it serves.
+    Section(
+        "shop.media",
+        Space.SHOP,
+        _("Images"),
+        "manager:shop:image_choose",
+        order=25,
+        in_menu=False,
+        allowed=vendor_action("profile"),
+    ),
+    Section(
+        "shop.orders",
+        Space.SHOP,
+        _("Orders"),
+        "manager:shop:orders",
+        order=30,
+        allowed=vendor_action("orders"),
     ),
     # The vendor picker: reached from the header, so not in the menu, and before any choice.
     Section(
@@ -56,7 +84,15 @@ BUILT_IN = (
         _("Storefront changes"),
         "manager:platform:profile_changes",
         order=20,
-        allowed=platform_permission(PROFILE_REVERT_PERMISSION),
+        allowed=can_review_profiles_section,
+    ),
+    Section(
+        NOTICES_SECTION,
+        Space.PLATFORM,
+        _("Notices"),
+        "manager:platform:notices",
+        order=60,
+        allowed=can_review,
     ),
 )
 

@@ -13,9 +13,11 @@ from django.conf import settings
 from django.contrib import auth, messages
 from django.contrib.auth import views as auth_views
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.paginator import Paginator
 from django.db.models import Model
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.http.response import HttpResponseBase
+from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
@@ -30,19 +32,27 @@ from apps.catalog.models import Product
 from apps.catalog.services import product_kpis
 from apps.core.audit import audit_context
 from apps.core.models import AuditLog
+from apps.core.public_forms import Protection, pre_mfa_step, public_form
+from apps.orders import engine as orders_engine
+from apps.orders.models import VendorOrder, VendorOrderState
+from apps.orders.services import fulfil_vendor_order
+from apps.vendors.engine import RICH_TEXT_FIELDS, plain_to_html
 from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.scoping import Source, VendorScopedQuerySet
 from apps.vendors.services import (
     PROFILE_FIELDS,
     PROFILE_LOCKED,
     profile_history,
+    remove_vendor_logo,
+    revert_logo_change,
     revert_profile_change,
     reverted_entry_ids,
     save_storefront_profile,
+    set_vendor_logo,
 )
 
 from .access import ManagerContext, home_url
-from .forms import StorefrontProfileForm
+from .forms import ShipmentForm, StorefrontProfileForm, VendorLogoForm
 from .middleware import manager_context
 from .navigation import Section, registry
 from .spaces import Space
@@ -132,9 +142,13 @@ class StorefrontProfileView(ManagerView):
 
     def stored_values(self, language: str) -> dict[str, str]:
         row = self.stored_row(language)
-        return (
-            {} if row is None else {n: getattr(row, n) for n in StorefrontProfileForm.base_fields}
-        )
+        if row is None:
+            return {}
+        # A legacy plain text is shown to the editor as the paragraphs it will be stored as.
+        return {
+            n: plain_to_html(getattr(row, n)) if n in RICH_TEXT_FIELDS else getattr(row, n)
+            for n in StorefrontProfileForm.base_fields
+        }
 
     def locked(self) -> bool:
         vendor = self.manager.vendor
@@ -147,6 +161,13 @@ class StorefrontProfileView(ManagerView):
         context.setdefault("form", StorefrontProfileForm(initial=self.stored_values(language)))
         context["language"] = language
         context["locked"] = self.locked()
+        vendor = self.manager.vendor
+        current = vendor.logo if vendor is not None else None
+        context.setdefault(
+            "logo_form",
+            VendorLogoForm(initial={"logo_alt": vendor.logo_alt if vendor else ""}),
+        )
+        context["logo"] = current
         context["machine_draft"] = (
             row is not None and row.status == VendorTranslation.Status.MACHINE
         )
@@ -156,12 +177,36 @@ class StorefrontProfileView(ManagerView):
         ]
         return context
 
+    def post_logo(self, request: HttpRequest, vendor: Vendor, actor: User) -> HttpResponse:
+        """The logo form: remove, or a new image and/or its description (the service checks)."""
+        form = VendorLogoForm(request.POST, request.FILES)
+        if form.is_valid():
+            ctx = replace(audit_context(request), source=AuditLog.Source.VENDOR)
+            data = form.cleaned_data
+            try:
+                if data["remove"]:
+                    remove_vendor_logo(vendor, actor=actor, ctx=ctx)
+                else:
+                    set_vendor_logo(
+                        vendor, upload=data["logo"], alt=data["logo_alt"], actor=actor, ctx=ctx
+                    )
+            except ValidationError as error:
+                form.add_error(None, error)
+            except PermissionDenied:  # suspended between the page and the save
+                return self.render_to_response(self.get_context_data(), status=403)
+            else:
+                messages.success(request, _("Logo saved."))
+                return HttpResponseRedirect(reverse("manager:shop:profile"))
+        return self.render_to_response(self.get_context_data(logo_form=form))
+
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         vendor, actor = self.manager.vendor, self.manager.user
         if vendor is None or not isinstance(actor, User):
             raise Http404("No vendor selected.")
         if self.locked():  # the reason is on the page; the service refuses it too
             return self.render_to_response(self.get_context_data(), status=403)
+        if request.POST.get("action") == "logo":
+            return self.post_logo(request, vendor, actor)
         language = self.language()
         form = StorefrontProfileForm(request.POST, initial=self.stored_values(language))
         if form.is_valid():
@@ -190,6 +235,142 @@ class StorefrontProfileView(ManagerView):
         return self.render_to_response(self.get_context_data(form=form))
 
 
+class VendorOrderListView(ManagerView):
+    """The selected vendor's sub-orders, newest first, filtered by state (ORD.6)."""
+
+    section = "shop.orders"
+    template_name = "manager/shop/orders.html"
+    paginate_by = 25
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        rows = (
+            self.scoped(VendorOrder).select_related("order").order_by("-order__created_at", "-id")
+        )
+        state = self.request.GET.get("state", "")
+        if state in VendorOrderState.values:
+            rows = rows.filter(state=state)
+        else:
+            state = ""
+        page = Paginator(rows, self.paginate_by).get_page(self.request.GET.get("page"))
+        query = f"state={state}&" if state else ""
+        context.update(
+            page_obj=page,
+            orders=[
+                {
+                    "number": sub.order.number,
+                    "placed": sub.order.created_at,
+                    "state": sub.get_state_display(),
+                    "total": sub.gross_total,
+                    "url": reverse("manager:shop:order", args=[sub.public_id]),
+                }
+                for sub in page.object_list
+            ],
+            states=VendorOrderState.choices,
+            state=state,
+            previous_url=f"?{query}page={page.previous_page_number()}"
+            if page.has_previous()
+            else "",
+            next_url=f"?{query}page={page.next_page_number()}" if page.has_next() else "",
+        )
+        return context
+
+
+def address_lines(address: Any) -> list[str]:
+    """The text values of a stored address, in stored order (an anonymised one has none)."""
+    if not isinstance(address, dict):
+        return []
+    return [str(v) for v in address.values() if isinstance(v, str) and v]
+
+
+class VendorOrderDetailView(ManagerView):
+    """One sub-order with what the vendor needs to ship it, and the actions it may take now.
+
+    Privacy: fields are picked one by one; the buyer's e-mail and billing data never reach the
+    template (VendorOrder docstring).
+    """
+
+    section = "shop.orders"
+    template_name = "manager/shop/order.html"
+
+    def sub_order(self) -> VendorOrder:
+        return get_object_or_404(
+            self.scoped(VendorOrder).select_related("order"), public_id=self.kwargs["public_id"]
+        )
+
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        sub = self.sub_order()
+        order = sub.order
+        context.update(
+            sub=sub,
+            number=order.number,
+            placed=order.created_at,
+            customer_name=order.customer_name,
+            # Minimisation (D-30): the address is for shipping, so not after delivery nor once
+            # the order is restricted or anonymised.
+            show_address=sub.state in {"pending", "accepted", "shipped"}
+            and order.privacy_status == "active",
+            address=address_lines(order.shipping_address),
+            country=order.shipping_country,
+            lines=[
+                {
+                    "title": line.title,
+                    "variant": line.variant_label,
+                    "sku": line.sku,
+                    "quantity": line.quantity,
+                }
+                for line in sub.lines.all()
+            ],
+            can_accept=sub.state == "pending",
+            can_ship=sub.state == "accepted",
+            can_deliver=sub.state == "shipped",
+            accept_url=reverse("manager:shop:order_action", args=[sub.public_id, "accept"]),
+            ship_url=reverse("manager:shop:order_action", args=[sub.public_id, "ship"]),
+            deliver_url=reverse("manager:shop:order_action", args=[sub.public_id, "deliver"]),
+        )
+        context.setdefault("form", ShipmentForm(initial={"carrier": sub.carrier}))
+        return context
+
+
+class VendorOrderActionView(VendorOrderDetailView):
+    """POST accept / ship / deliver on one of the vendor's own sub-orders (ORD.6)."""
+
+    http_method_names = ["post", "options"]
+
+    def refused(self, sub: VendorOrder) -> HttpResponse:
+        context = self.get_context_data(
+            action_error=_("This step is not possible in the order's current state.")
+        )
+        return self.render_to_response(context, status=409)
+
+    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        action = self.kwargs["action"]
+        if action not in orders_engine.FULFILMENT_ACTIONS:
+            raise Http404("No such action.")
+        sub = self.sub_order()  # another vendor's id is 404 here, before anything runs
+        actor = self.manager.user
+        if not isinstance(actor, User):
+            raise Http404("No such order.")
+        tracking, carrier = "", ""
+        if action == "ship":
+            if sub.state != "accepted":  # the state first: a form for it is not even shown
+                return self.refused(sub)
+            form = ShipmentForm(request.POST)
+            if not form.is_valid():
+                return self.render_to_response(self.get_context_data(form=form), status=400)
+            tracking, carrier = form.cleaned_data["tracking_number"], form.cleaned_data["carrier"]
+        ctx = replace(audit_context(request), source=AuditLog.Source.VENDOR)
+        try:
+            fulfil_vendor_order(
+                sub, action, actor=actor, ctx=ctx, tracking_number=tracking, carrier=carrier
+            )
+        except (orders_engine.IllegalTransition, ValueError):
+            return self.refused(sub)
+        messages.success(request, _("The order was updated."))
+        return HttpResponseRedirect(reverse("manager:shop:order", args=[sub.public_id]))
+
+
 class PlatformDashboardView(ManagerView):
     section = "platform.dashboard"
     template_name = "manager/platform/dashboard.html"
@@ -201,6 +382,9 @@ def _is_uuid(value: str) -> bool:
     except (ValueError, AttributeError):
         return False
     return True
+
+
+REVERT_ACTIONS = ("vendor.profile_reverted", "vendor.logo_reverted")
 
 
 class ProfileChangesView(ManagerView):
@@ -243,13 +427,13 @@ class ProfileChangesView(ManagerView):
                 {
                     "entry": entry,
                     "vendor": names.get(entry.vendor_key, entry.vendor_key),
-                    "language": after.get("language", ""),
-                    "is_revert": entry.action == "vendor.profile_reverted",
+                    "language": after.get("language") or _("all languages"),
+                    "is_revert": entry.action in REVERT_ACTIONS,
                     "reason": after.get("reason", ""),
                     "reverted": str(entry.public_id) in reverted,
                     "diff": [
                         {"field": name, "before": before.get(name, ""), "after": after[name]}
-                        for name in PROFILE_FIELDS
+                        for name in (*PROFILE_FIELDS, "logo", "logo_alt")
                         if name in after
                     ],
                 }
@@ -275,10 +459,12 @@ class ProfileRevertView(ManagerView):
                 request, target, next_url=reverse("manager:platform:profile_changes")
             )
         ctx = replace(audit_context(request), source=AuditLog.Source.ADMIN)
+        is_logo = AuditLog.objects.filter(
+            public_id=kwargs["entry"], action="vendor.logo_changed"
+        ).exists()
+        revert = revert_logo_change if is_logo else revert_profile_change
         try:
-            revert_profile_change(
-                kwargs["entry"], request.POST.get("reason", ""), actor=actor, ctx=ctx
-            )
+            revert(kwargs["entry"], request.POST.get("reason", ""), actor=actor, ctx=ctx)
         except ValidationError as error:
             messages.error(request, " ".join(error.messages))
         except PermissionDenied as error:
@@ -302,6 +488,13 @@ class VendorPickerView(ManagerView):
 # --- Sign-in and sign-out: outside /manager/, so the sweep keeps every Manager URL gated
 
 
+@public_form(
+    protection=Protection.CAPTCHA,
+    purpose="Sign in to the Manager (every Manager user)",
+    task="CORE.17",
+    rate_limit="per account and IP lockout (CORE.5)",
+    templates=("manager/login.html",),
+)
 class LoginView(auth_views.LoginView):
     """One login for every Manager user (spec 02 §Backoffice).
 
@@ -316,6 +509,7 @@ class LoginView(auth_views.LoginView):
         return home_url(self.request.user)
 
 
+@pre_mfa_step(purpose="Sign out, also before the second factor is verified", task="CORE.17")
 @mfa_exempt
 @require_POST
 def logout(request: HttpRequest) -> HttpResponse:
