@@ -630,6 +630,14 @@ def sanitise_image(
 PDF_MAGIC = b"%PDF-"
 SNIFFABLE = re.compile(rb"<\s*(html|script|body|head|iframe|svg|!doctype)", re.IGNORECASE)
 SNIFF_WINDOW = 1024  # browsers sniff the first 512 bytes; twice that for good measure
+# Names of PDF actions and objects that run code, launch programs, carry files or send data.
+# Readers other than a browser's (Acrobat and others) do not sandbox them.
+ACTIVE_PDF_NAMES = re.compile(
+    rb"/(JavaScript|JS|Launch|EmbeddedFiles?|OpenAction|AA|RichMedia|XFA|SubmitForm|ImportData"
+    rb"|GoToR|GoToE)(?![A-Za-z0-9#])"
+)
+# `/J#61vaScript` is the same name as `/JavaScript`: no name with a hex escape is accepted.
+ESCAPED_PDF_NAME = re.compile(rb"/[^\s/<>\[\]()%]*#[0-9A-Fa-f]{2}")
 ZIP_END_RECORD = b"PK\x05\x06"
 ZIP_END_WINDOW = 22 + 0xFFFF  # the record and the longest archive comment
 
@@ -651,4 +659,6 @@ def check_document(data: bytes, name: str, *, max_bytes: int) -> str:
         raise UploadRefused("polyglot", "The file mixes a PDF with an archive.")
     if not data.rstrip().endswith(b"%%EOF"):
         raise UploadRefused("polyglot", "The file has data after the end of the PDF.")
+    if ACTIVE_PDF_NAMES.search(data) or ESCAPED_PDF_NAME.search(data):
+        raise UploadRefused("active_content", "The PDF contains scripts or embedded actions.")
     return safe_filename(name, "pdf")

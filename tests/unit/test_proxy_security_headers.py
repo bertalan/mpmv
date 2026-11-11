@@ -48,6 +48,42 @@ def public_media_block() -> str:
     return block.group(1)
 
 
+def public_documents_block() -> str:
+    block = re.search(r"^\thandle @public_documents \{\n(.*?)\n\t\}$", site_block(), re.M | re.S)
+    assert block, "the PDF documents vendors link (VEN.31) must be served by Caddy"
+    return block.group(1)
+
+
+def test_pdf_documents_are_served_as_inert_downloads() -> None:
+    """A document link in a storefront text must not be a 404 (VEN.31): only `.pdf` files of the
+    `documents/` folder, downloaded (never rendered inline), not sniffed, no scripts."""
+    text = site_block()
+    matcher = re.search(r"^\t@public_documents path_regexp public_documents (\S+)$", text, re.M)
+    assert matcher
+    pattern = re.compile(matcher.group(1))
+    assert pattern.match("/media/documents/guide.pdf")
+    assert pattern.match("/media/documents/Guide_ab12cd3.PDF")
+    for bad in (
+        "/media/documents/guide.html",
+        "/media/documents/guide.pdf.html",
+        "/media/documents/sub/guide.pdf",
+        "/media/documents/",
+        "/media/documents/../x.pdf",
+        "/media/other/guide.pdf",
+        "/media/original_images/guide.pdf",
+    ):
+        assert not pattern.match(bad), bad
+    body = public_documents_block()
+    assert re.search(r"^\t\theader X-Content-Type-Options nosniff$", body, re.M)
+    assert re.search(r"^\t\theader Content-Disposition \"attachment\"$", body, re.M)
+    assert re.search(r"^\t\theader Content-Type \"application/pdf\"$", body, re.M)
+    csp = re.search(r"^\t\theader Content-Security-Policy \"([^\"]*)\"$", body, re.M)
+    assert csp
+    assert "default-src 'none'" in csp.group(1)
+    assert "sandbox" in csp.group(1)
+    assert "script-src" not in csp.group(1)
+
+
 def snippet_headers() -> dict[str, str]:
     """{field: operation} of the `security_headers` snippet's single `header` block."""
     snippet = top_level_block("(security_headers)")

@@ -119,3 +119,41 @@ def test_an_external_link_is_kept_with_a_safe_rel_and_a_script_link_is_dropped()
 def test_internal_page_links_stay_refused(vendor: Vendor) -> None:
     assert media_problem(vendor, '<p><a linktype="page" id="1">p</a></p>') is not None
     assert media_problem(vendor, '<p><a href="https://example.com">p</a></p>') is None
+
+
+@pytest.mark.parametrize(
+    "href",
+    [
+        "http://example.com",
+        "//evil.example",
+        "mailto:a@example.com",
+        "tel:+390000",
+        "ftp://example.com/x",
+        "/relative",
+        "#top",
+        "https://user:pw@example.com/",
+        " https://example.com",
+        "\thttps://example.com",
+        "https:/example.com",
+        "https://",
+    ],
+)
+def test_the_save_refuses_a_link_that_is_not_https_whatever_the_dialog_did(
+    vendor: Vendor, href: str
+) -> None:
+    """The https-only policy is server-side: a crafted POST cannot skip the dialog."""
+    clean = sanitise_rich_text(f'<p><a href="{href}">x</a></p>', None)
+    if "<a" in clean:  # the sanitiser dropped the link or kept it: either way the save decides
+        assert media_problem(vendor, clean) is not None
+    assert media_problem(vendor, f'<p><a href="{href}">x</a></p>') is not None
+
+
+def test_https_links_and_document_links_pass_the_link_policy(vendor: Vendor) -> None:
+    assert media_problem(vendor, '<p><a href="https://example.com/a?b=1&amp;c=2">x</a></p>') is None
+    assert media_problem(vendor, "<p>no link</p>") is None
+
+
+def test_an_external_link_asks_search_engines_not_to_follow_it() -> None:
+    clean = sanitise_rich_text('<p><a href="https://example.com/x">ok</a></p>', None)
+    assert "nofollow" in clean
+    assert "ugc" in clean

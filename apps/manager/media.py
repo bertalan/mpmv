@@ -10,7 +10,6 @@ collection, is audited (`vendor.media_denied`) and answers 404. Uploads go throu
 
 from dataclasses import replace
 from typing import Any
-from urllib.parse import urlsplit
 
 from django import forms
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -42,6 +41,7 @@ from wagtail.images.views.chooser import (
 from apps.accounts.models import User
 from apps.core.audit import audit_context
 from apps.core.models import AuditLog
+from apps.vendors import engine
 from apps.vendors.models import Vendor
 from apps.vendors.services import (
     audit_media_denied,
@@ -382,22 +382,15 @@ class ManagerDocumentUploadView(
 # --- External links (VEN.31 part 2): a Manager-native dialog, https only ---------------------
 
 LINK_PREFIX = "external-link-chooser"
-LINK_MAX_LENGTH = 2000
+LINK_MAX_LENGTH = engine.LINK_MAX_LENGTH
 
 
 def https_address(value: str) -> str:
-    """`value` as a plain https address, or `ValidationError`: no other scheme (`javascript:`,
-    `data:`, `http:`, `mailto:`), no relative or scheme-relative address, no credentials, no
-    whitespace or control characters. The CMS.12 sanitiser still runs on save and on render."""
+    """`value` as a plain https address, or `ValidationError` (the rule is
+    `engine.is_https_address`). The save enforces the same rule on the stored text
+    (`media_problem`), so this dialog is a convenience, not the policy."""
     value = value.strip()
-    if len(value) > LINK_MAX_LENGTH or any(ord(c) <= 32 or ord(c) == 127 for c in value):
-        raise ValidationError(_("Enter a valid web address starting with https://"))
-    parts = urlsplit(value)
-    try:
-        host, _port = parts.hostname, parts.port
-    except ValueError:
-        host = None
-    if parts.scheme.lower() != "https" or not host or "@" in parts.netloc or "\\" in value:
+    if not engine.is_https_address(value):
         raise ValidationError(_("Enter a valid web address starting with https://"))
     return value
 

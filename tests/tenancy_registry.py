@@ -303,7 +303,9 @@ def vendor_document(vendor: Vendor) -> models.Model:
 
     root = Collection.get_first_root_node()
     collection = root.add_child(name=vendor_collection_name(str(vendor.public_id)))
-    document = get_document_model()(title="Terms", collection=collection)
+    # A title unique per vendor, so a page that echoes the caller's own document
+    # cannot be mistaken for a leak of the other vendor's (the image factory does the same).
+    document = get_document_model()(title=f"Terms {vendor.public_id}", collection=collection)
     document.file.save("terms.pdf", ContentFile(PDF), save=False)
     document.save()
     return document  # type: ignore[no-any-return]

@@ -61,7 +61,7 @@ def _save(vendor: Vendor, owner: User, field: str, html: str) -> None:
 
 @pytest.mark.parametrize("field", FIELDS)
 def test_formatting_is_kept(vendor: Vendor, owner: User, field: str) -> None:
-    link = '<a href="https://example.org/" rel="noopener noreferrer">x</a>'
+    link = '<a href="https://example.org/" rel="noopener noreferrer nofollow ugc">x</a>'
     html = f"<p><b>Bold</b> <i>it</i></p><ul><li>one</li></ul><p>{link}</p>"
     _save(vendor, owner, field, html)
     assert _stored(vendor, field) == html

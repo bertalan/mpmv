@@ -10,7 +10,9 @@ import re
 from collections.abc import Collection, Container, Iterable, Mapping, Sequence
 from decimal import Decimal
 from enum import StrEnum
+from html import unescape
 from typing import Any, Final
+from urllib.parse import urlsplit
 
 from apps.core.countries import EU_MEMBER_STATES as EU_MEMBER_STATES  # TIN_FORMATS covers them
 from apps.core.countries import ISO_3166_ALPHA2, is_eu
@@ -1858,6 +1860,42 @@ def has_page_link(html: str) -> bool:
         == "page"
         for tag, raw in _TAG.findall(html)
     )
+
+
+LINK_MAX_LENGTH: Final = 2000
+
+
+def is_https_address(value: str) -> bool:
+    """Whether `value` is a plain https address as written (no stripping): no other scheme
+    (`javascript:`, `data:`, `http:`, `mailto:`), no relative or scheme-relative address, no
+    credentials, no whitespace, control character or backslash, at most `LINK_MAX_LENGTH`."""
+    if len(value) > LINK_MAX_LENGTH or any(ord(c) <= 32 or ord(c) == 127 for c in value):
+        return False
+    parts = urlsplit(value)
+    try:
+        host, _port = parts.hostname, parts.port
+    except ValueError:
+        return False
+    return (
+        parts.scheme.lower() == "https"
+        and bool(host)
+        and "@" not in parts.netloc
+        and ("\\" not in value)
+    )
+
+
+def has_unsafe_link(html: str) -> bool:
+    """Whether a stored rich text has an `<a href>` that is not a plain https address. Document
+    links (`linktype="document"`, no href) are checked elsewhere (`media_references`). The
+    sanitiser lets `http:`, `mailto:`, relative and scheme-relative addresses through, but a
+    vendor text may only link out over https (VEN.31), whatever the form posted."""
+    for tag, raw in _TAG.findall(html):
+        if tag.lower() != "a":
+            continue
+        attrs = {m[0].lower(): m[1] or m[2] or m[3] for m in _ATTR.findall(raw)}
+        if "href" in attrs and not is_https_address(unescape(attrs["href"])):
+            return True
+    return False
 
 
 def image_embed_formats(html: str) -> list[str]:

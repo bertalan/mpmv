@@ -136,12 +136,15 @@ def _clean_rich_text(html: str) -> str:
 
 
 def media_problem(vendor: Vendor, html: str) -> str | None:
-    """Why a stored rich text may not be published for `vendor`, or None: every image it embeds
+    """Why a stored rich text may not be published for `vendor`, or None: its links are https
+    addresses (or the vendor's own documents), and every image it embeds
     and every document it links must be in the vendor's own collection (depth 2, named by
     `engine.vendor_collection_name`) or below it. A foreign, missing or non-numeric id is a
     problem, so crafted HTML cannot reach another vendor's files (D-34)."""
     if engine.has_page_link(html):
         return "Links to other pages of the site are not allowed here."
+    if engine.has_unsafe_link(html):
+        return "Links must be web addresses starting with https://"
     images, documents = engine.media_references(html)
     if not images and not documents:
         return None
