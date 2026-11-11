@@ -116,18 +116,31 @@ def test_a_role_holder_who_is_a_vendor_member_enters_neither_space() -> None:
     assert not may_enter(Space.SHOP, member)
 
 
+def _seed() -> None:
+    """Make the role groups exist whatever earlier tests (transaction=True flushes) left behind."""
+    sync_role_groups(Group, Permission, ContentType, apps.get_model)
+
+
+def _group(key: str) -> Group:
+    group = Group.objects.get(name=roles.role(key).group)
+    assert group.permissions.exists()  # precondition: seeded
+    return group
+
+
 def test_before_the_orders_tables_the_check_skips_cleanly() -> None:
     """The customer test of manager.E005 reads orders: without orders migrations, skip."""
     from django.db.migrations.recorder import MigrationRecorder
 
+    _seed()
     MigrationRecorder.Migration.objects.filter(app="orders").delete()
-    Group.objects.filter(name=roles.role("catalog").group).first().permissions.clear()  # type: ignore[union-attr]
+    _group("catalog").permissions.clear()
     assert check_role_drift() == []
 
 
 def test_the_check_skips_while_any_manager_migration_is_unapplied() -> None:
     from django.db.migrations.recorder import MigrationRecorder
 
+    _seed()
     MigrationRecorder.Migration.objects.filter(app="manager").exclude(
         name__startswith="0001"
     ).delete()
@@ -136,7 +149,8 @@ def test_the_check_skips_while_any_manager_migration_is_unapplied() -> None:
 
 
 def test_the_check_skips_for_another_database_alias() -> None:
-    Group.objects.filter(name=roles.role("catalog").group).first().permissions.clear()  # type: ignore[union-attr]
+    _seed()
+    _group("catalog").permissions.clear()
     assert check_role_drift(databases=["other"]) == []
     assert check_role_drift(databases=["default"]) != []
 
@@ -147,11 +161,23 @@ def test_migrate_with_checks_applies_the_pending_seed_then_the_check_fires_on_dr
     database checks first and must not be blocked by drift the pending migration repairs."""
     from django.core.management import call_command
 
-    call_command("migrate", "manager", "0002", verbosity=0, skip_checks=True)
-    Group.objects.filter(name=roles.role("catalog").group).first().permissions.clear()  # type: ignore[union-attr]
-    call_command("migrate", verbosity=0, skip_checks=False)  # runs the checks, applies 0003
-    assert check_role_drift() == []
-    # Positive control: everything applied, a group edited in the admin, the check fires.
-    Group.objects.get(name=roles.role("catalog").group).permissions.clear()
-    assert {e.id for e in check_role_drift()} == {"manager.E004"}
-    sync_role_groups(Group, Permission, ContentType, apps.get_model)  # reseed for later tests
+    try:
+        call_command("migrate", "manager", "0002", verbosity=0, skip_checks=True)
+        # The 0002-era state, built explicitly (a flush may have emptied the tables, and
+        # migrating back does not re-run 0002): groups exist, Catalog and Owner lack the notices
+        # permission.
+        _seed()
+        for key in ("catalog", "owner"):
+            group = _group(key)
+            group.permissions.remove(*group.permissions.filter(codename="review_notices"))
+        assert {e.id for e in check_role_drift()} == set()  # skipped: 0003 pending
+        call_command("migrate", verbosity=0, skip_checks=False)  # runs the checks, applies 0003
+        for key in ("catalog", "owner"):
+            assert _group(key).permissions.filter(codename="review_notices").exists()
+        assert check_role_drift() == []
+        # Positive control: everything applied, a group edited in the admin, the check fires.
+        _group("catalog").permissions.clear()
+        assert {e.id for e in check_role_drift()} == {"manager.E004"}
+    finally:
+        call_command("migrate", verbosity=0, skip_checks=True)  # leave the database migrated
+        _seed()  # and the groups seeded for later tests
