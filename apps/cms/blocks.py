@@ -728,11 +728,34 @@ class ProductCardsBlock(blocks.StructBlock):  # type: ignore[misc]
     the page's language disappears without editing the page; a block with none left is left
     out. Editors search the product chooser; the cards show the price as the grid does."""
 
-    heading = blocks.CharBlock(required=False, max_length=120)
-    layout = blocks.ChoiceBlock(
-        choices=[("grid", _("Grid")), ("row", _("Row"))], default="grid", label=_("Layout")
+    heading = blocks.CharBlock(
+        required=False,
+        max_length=120,
+        help_text=_(
+            "A title shown above the products, for example 'Our favourites'. "
+            "Up to 120 characters. If you leave it empty, no title is shown."
+        ),
     )
-    products = blocks.ListBlock(ProductChooserBlock(), min_num=1, label=_("Products"))
+    layout = blocks.ChoiceBlock(
+        choices=[("grid", _("Grid")), ("row", _("Row"))],
+        default="grid",
+        label=_("Layout"),
+        help_text=_(
+            "Grid shows the products in rows and columns. Row puts them on one line "
+            "that the visitor can scroll sideways."
+        ),
+    )
+    products = blocks.ListBlock(
+        ProductChooserBlock(
+            help_text=_("Search by name, SKU, brand or vendor, then click the product.")
+        ),
+        min_num=1,
+        label=_("Products"),
+        help_text=_(
+            "The products to show, in this order. Add at least one. A product that is no "
+            "longer for sale, or has no text in the page language, is left out by itself."
+        ),
+    )
 
     class Meta:
         icon = "pick"

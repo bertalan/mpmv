@@ -566,11 +566,13 @@ def next_sequence(
 
 # --- Vendor-safe body (spec 15 "How vendors author an `EventPage`") ----------------------------
 
-# The CMS.11 product cards are vendor-safe because the services check every chosen product is the
-# vendor's own (`product_ids`). The CMS.10 product grid is not: it queries the whole catalog by
-# category, term or brand and so could show other vendors' products on a vendor's page. The CMS.9
-# countdown stays staff-only too.
-VENDOR_SAFE_BLOCKS = frozenset({"paragraph", "figure", "gallery", "cta", "faq", "product_cards"})
+# Spec 15: product blocks of a vendor show its own products only. The services check it
+# (`_check_vendor_body`): every product of a `product_cards` block (`product_ids`) is the vendor's,
+# and a `product_grid` is sourced from the vendor itself (`grid_sources`), never from a category,
+# term or brand, which would list other vendors' products. The CMS.9 countdown joins later.
+VENDOR_SAFE_BLOCKS = frozenset(
+    {"paragraph", "figure", "gallery", "cta", "faq", "product_cards", "product_grid"}
+)
 
 _HREF = re.compile(r"""\b(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""", re.IGNORECASE)
 _ENTITY = re.compile(r"&#(x[0-9a-f]+|[0-9]+);?", re.IGNORECASE)
@@ -658,6 +660,23 @@ def product_ids(raw: Any) -> list[Any]:
             continue
         for item in items:
             found.append(item.get("value") if isinstance(item, Mapping) else item)
+    return found
+
+
+def grid_sources(raw: Any) -> list[tuple[Any, Any]]:
+    """The `(kind, value)` source of every `product_grid` block of a raw body, as sent. A grid
+    with no readable source gives `(None, None)`, so it is never trusted by omission."""
+    found: list[tuple[Any, Any]] = []
+    for block in raw:
+        value = block.get("value")
+        if block.get("type") != "product_grid":
+            continue
+        source = value.get("source") if isinstance(value, Mapping) else None
+        first = source[0] if isinstance(source, list | tuple) and len(source) == 1 else None
+        if isinstance(first, Mapping):
+            found.append((first.get("type"), first.get("value")))
+        else:
+            found.append((None, None))
     return found
 
 

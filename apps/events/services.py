@@ -558,6 +558,10 @@ def _check_vendor_body(page: EventPage, raw: list[Mapping[str, Any]]) -> None:
     products = engine.product_ids(raw)
     if products and (vendor is None or not _vendor_products_allowed(vendor, products)):
         raise ValidationError({"body": _("Choose only your own products.")})
+    for kind, source in engine.grid_sources(raw):
+        own = vendor is not None and kind == "vendor" and source == vendor.pk
+        if not own or isinstance(source, bool):
+            raise ValidationError({"body": _("A product grid can show only your own products.")})
     own_pages: set[int] = set()
     for link in engine.cta_links(raw):
         url, target = link.get("url"), link.get("page")

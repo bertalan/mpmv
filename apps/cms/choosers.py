@@ -132,6 +132,7 @@ class ProductFilterForm(BaseFilterForm):  # type: ignore[misc]
     q = forms.CharField(
         label=_("Search term"),
         required=False,
+        help_text=_("Type part of a product name, SKU, brand or vendor name."),
         widget=forms.TextInput(attrs={"placeholder": _("Name, SKU, brand or vendor")}),
     )
 
@@ -144,6 +145,7 @@ class ProductFilterForm(BaseFilterForm):  # type: ignore[misc]
                 required=False,
                 empty_label=_("All vendors"),
                 label=_("Vendor"),
+                help_text=_("Show only the products of one vendor."),
                 widget=forms.Select(attrs=attrs),
             )
         self.fields["brand"] = forms.ModelChoiceField(
@@ -151,6 +153,7 @@ class ProductFilterForm(BaseFilterForm):  # type: ignore[misc]
             required=False,
             empty_label=_("All brands"),
             label=_("Brand"),
+            help_text=_("Show only the products of one brand."),
             widget=forms.Select(attrs=attrs),
         )
         self.fields["category"] = forms.ModelChoiceField(
@@ -158,6 +161,7 @@ class ProductFilterForm(BaseFilterForm):  # type: ignore[misc]
             required=False,
             empty_label=_("All categories"),
             label=_("Category"),
+            help_text=_("Show only the products of one category and the categories below it."),
             widget=forms.Select(attrs=attrs),
         )
 

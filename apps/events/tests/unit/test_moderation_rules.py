@@ -141,13 +141,27 @@ def test_vendors_get_the_vendor_safe_blocks_only() -> None:
     ]
 
 
-def test_vendors_get_product_cards_but_not_the_product_grid() -> None:
-    # Hand-picked cards are checked against the vendor's own products (`product_ids`); a grid
-    # queries the whole catalog (a category, term or brand), so it is staff-only.
-    assert refused_blocks(["product_cards"], is_staff=False) == []
-    assert refused_blocks(["product_grid", "countdown"], is_staff=False) == [
-        "product_grid",
-        "countdown",
+def test_vendors_get_the_product_blocks_checked_against_their_own_products() -> None:
+    # Cards are checked with `product_ids`, a grid with `grid_sources` (services).
+    assert refused_blocks(["product_cards", "product_grid"], is_staff=False) == []
+    assert refused_blocks(["countdown"], is_staff=False) == ["countdown"]
+
+
+def test_the_grid_sources_of_a_raw_body() -> None:
+    raw = [
+        {"type": "product_grid", "value": {"source": [{"type": "vendor", "value": 7}]}},
+        {"type": "product_grid", "value": {"source": [{"type": "brand", "value": 2}]}},
+        {"type": "product_grid", "value": {"source": []}},
+        {"type": "product_grid", "value": {"source": [{"type": "vendor", "value": 1}] * 2}},
+        {"type": "product_grid", "value": "nope"},
+        {"type": "paragraph", "value": "<p>x</p>"},
+    ]
+    assert engine.grid_sources(raw) == [
+        ("vendor", 7),
+        ("brand", 2),
+        (None, None),
+        (None, None),
+        (None, None),
     ]
 
 

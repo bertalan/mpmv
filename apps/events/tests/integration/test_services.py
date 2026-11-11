@@ -254,22 +254,39 @@ def test_a_vendor_cannot_pick_another_vendors_product_in_a_cards_block(owner: Us
         assert "body" in excinfo.value.message_dict, ids
 
 
-def test_a_vendor_cannot_use_the_product_grid(owner: User) -> None:
-    other = ProductFactory.create()
-    grid = [
+def _grid_body(kind: str, target: Any) -> list[dict[str, Any]]:
+    return [
         {
             "type": "product_grid",
             "value": {
                 "heading": "",
-                "source": [{"type": "vendor", "value": other.vendor_id}],
+                "source": [{"type": kind, "value": target}],
                 "limit": 4,
                 "see_all": True,
             },
         }
     ]
-    with pytest.raises(ValidationError) as excinfo:
-        save_event_draft(owner, _data(body=grid), vendor=_vendor_of(owner))
-    assert "body" in excinfo.value.message_dict
+
+
+def test_a_vendor_may_show_a_grid_of_its_own_products(owner: User) -> None:
+    page = _create(owner, body=_grid_body("vendor", _vendor_of(owner).pk))
+    assert [b.block_type for b in page.get_latest_revision_as_object().body] == ["product_grid"]
+
+
+def test_a_vendor_cannot_show_a_grid_of_anything_but_its_own_products(owner: User) -> None:
+    other = ProductFactory.create()
+    category = CategoryFactory.create()
+    bodies = (
+        _grid_body("vendor", other.vendor_id),
+        _grid_body("category", category.pk),
+        _grid_body("brand", 1),
+        _grid_body("vendor", True),
+        [{"type": "product_grid", "value": {"heading": "", "source": [], "limit": 4}}],
+    )
+    for body in bodies:
+        with pytest.raises(ValidationError) as excinfo:
+            save_event_draft(owner, _data(body=body), vendor=_vendor_of(owner))
+        assert "body" in excinfo.value.message_dict, body
 
 
 def test_staff_may_pick_any_product_in_a_cards_block() -> None:
