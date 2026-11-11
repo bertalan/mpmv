@@ -85,3 +85,17 @@ def test_a_rate_limit_counts_uses_in_a_fixed_window() -> None:
     after = T0 + window
     assert consume_rate_limit("geo:user:1", limit=3, window=window, now=after) == dt.timedelta(0)
     assert Throttle.objects.get(key="geo:user:1").failures == 1
+
+
+def test_rate_limit_wait_reads_a_window_without_counting() -> None:
+    from apps.core.services import consume_rate_limit, rate_limit_wait
+
+    window = dt.timedelta(minutes=1)
+    assert rate_limit_wait("peek:1", limit=2, now=T0) == dt.timedelta(0)
+    assert not Throttle.objects.filter(key="peek:1").exists()  # a read creates nothing
+    for _ in range(2):
+        consume_rate_limit("peek:1", limit=2, window=window, now=T0)
+    later = T0 + dt.timedelta(seconds=20)
+    assert rate_limit_wait("peek:1", limit=2, now=later) == dt.timedelta(seconds=40)
+    assert rate_limit_wait("peek:1", limit=3, now=later) == dt.timedelta(0)
+    assert rate_limit_wait("peek:1", limit=2, now=T0 + window) == dt.timedelta(0)

@@ -17,6 +17,7 @@ class AccountsConfig(AppConfig):
         "actionlinkuse",  # CORE.15: each spent link writes `accounts.action_link.signed_in`
         # CORE.15: an emailed link writes `accounts.action_link.sent` with its generation
         "actionlinkissue",
+        "elevationgrant",  # CORE.25: grant and use are audited as `accounts.session.single_*`
     )
 
     def ready(self) -> None:

@@ -38,39 +38,3 @@ def check_base_url(
             id="cms.E001",
         )
     ]
-
-
-def check_no_page_restrictions(
-    app_configs: Iterable[AppConfig] | None,
-    databases: Iterable[str] | None = None,
-    **kwargs: Any,
-) -> list[checks.CheckMessage]:
-    """cms.E002: no page view restriction (password or login) may exist while the routes of their
-    forms are blocked (BLOCK_PAGE_RESTRICTION_ROUTES, SEC.13/SEC.14): the page could never be
-    opened, and the form it needs is not protected yet. Runs only when a database is checked."""
-    from django.conf import settings
-    from django.db import DatabaseError
-    from wagtail.models import PageViewRestriction
-
-    if not databases or not settings.BLOCK_PAGE_RESTRICTION_ROUTES:
-        return []
-    messages: list[checks.CheckMessage] = []
-    for alias in databases:
-        try:
-            count = (
-                PageViewRestriction.objects.using(alias)
-                .exclude(restriction_type=PageViewRestriction.GROUPS)
-                .count()
-            )
-        except DatabaseError:
-            continue  # not migrated yet
-        if count:
-            messages.append(
-                checks.Error(
-                    f"{count} page view restriction(s) use a password or login while their form "
-                    "routes are blocked (SEC.14 has not protected them yet).",
-                    hint="Remove the restriction in the editors' admin (page privacy).",
-                    id="cms.E002",
-                )
-            )
-    return messages
