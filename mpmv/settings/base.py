@@ -460,6 +460,7 @@ VIES_TIMEOUT_SECONDS = 8  # per socket operation (connect, each read), not for t
 # answer the goods tax engine trusts (`build_tax_context`): an older one is treated as B2C.
 VIES_CACHE_SECONDS = 24 * 60 * 60
 VIES_UNAVAILABLE_CACHE_SECONDS = 5 * 60
+VIES_INVALID_REQUESTER_CACHE_SECONDS = 60 * 60  # VIES refused the requester: ask again later
 
 # Field-level encryption (SEC.3, docs/dev/field-encryption.md): keys live outside the database,
 # in the file named by MPMV_FIELD_ENCRYPTION_KEYS_FILE (one per line) or in

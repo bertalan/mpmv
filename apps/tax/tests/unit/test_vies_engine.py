@@ -102,6 +102,7 @@ def test_a_valid_answer_keeps_name_address_and_consultation_number() -> None:
         name="Example Customer GmbH",
         address="Example Strasse 1\n10115 Berlin",
         request_id="WAPIAAAAZ1x2y3",
+        request_date="2026-11-07T10:00:00.000Z",
     )
 
 
@@ -109,7 +110,11 @@ def test_an_invalid_answer_is_invalid() -> None:
     answer = engine.read_vies_answer(
         DE, _payload(valid=False, userError="INVALID", name="---", address="---")
     )
-    assert answer == ViesAnswer(result=engine.VAT_INVALID, request_id="WAPIAAAAZ1x2y3")
+    assert answer == ViesAnswer(
+        result=engine.VAT_INVALID,
+        request_id="WAPIAAAAZ1x2y3",
+        request_date="2026-11-07T10:00:00.000Z",
+    )
 
 
 def test_the_placeholder_for_undisclosed_name_and_address_is_dropped() -> None:
@@ -130,7 +135,6 @@ def test_input_vies_refuses_counts_as_invalid() -> None:
         "TIMEOUT",
         "MS_MAX_CONCURRENT_REQ",
         "GLOBAL_MAX_CONCURRENT_REQ",
-        "INVALID_REQUESTER_INFO",
         "IP_BLOCKED",
         "SOMETHING_NEW",
     ],
