@@ -30,6 +30,17 @@ BUILT_IN = (
         order=20,
         allowed=vendor_action("profile"),
     ),
+    # The image chooser of the storefront editor (VEN.31): a modal, not a page, so not in the
+    # menu. Owners only, like the profile it serves.
+    Section(
+        "shop.media",
+        Space.SHOP,
+        _("Images"),
+        "manager:shop:image_choose",
+        order=25,
+        in_menu=False,
+        allowed=vendor_action("profile"),
+    ),
     # The vendor picker: reached from the header, so not in the menu, and before any choice.
     Section(
         "shop.vendor",

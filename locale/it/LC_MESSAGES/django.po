@@ -198,6 +198,10 @@ msgstr "Posizione esatta"
 msgid "Explanation"
 msgstr "Spiegazione"
 
+#: apps/manager/media.py
+msgid "File"
+msgstr "File"
+
 #: apps/manager/templates/manager/list.html
 #: apps/manager/templates/manager/platform/notices.html
 msgid "Filter"
@@ -242,6 +246,10 @@ msgstr ""
 "Se non hai effettuato l’accesso, Continua ti fa accedere una volta con "
 "questo link; prima di approvare o rifiutare qualsiasi cosa dovrai comunque "
 "confermare la tua identità con il secondo fattore."
+
+#: apps/manager/sections.py
+msgid "Images"
+msgstr "Immagini"
 
 #: themes/base/templates/components/alert.html
 msgid "Information"
@@ -777,6 +785,10 @@ msgstr ""
 "Questo venditore è sospeso o chiuso, quindi il profilo del negozio non può "
 "essere modificato. Contatta l’assistenza per farlo riaprire."
 
+#: apps/manager/media.py
+msgid "Title"
+msgstr "Titolo"
+
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid ""
 "To ask to reopen it, write to the platform staff. Staff reopen a closed "
@@ -803,6 +815,14 @@ msgstr "La verifica in due passaggi è attiva"
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Two-factor settings"
 msgstr "Impostazioni della verifica in due passaggi"
+
+#: apps/manager/media.py
+msgid "Upload"
+msgstr "Carica"
+
+#: apps/manager/media.py
+msgid "Uploading…"
+msgstr "Caricamento…"
 
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Use a passkey"
