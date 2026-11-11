@@ -69,6 +69,7 @@ vendor's change page links to its trail (`?vendor=<public id>`).
 | Shipping configuration import (SHP.13, SHP.14) | `shipping.config.imported` (one entry per import run, besides the per-row `shipping.<model>.*` entries) |
 | Tax configuration (TAX.1) | `tax.rate.configured`, `tax.vendor_tax_profile.configured` (versioned: the replaced row is `before`), `tax.territory.created`, `.updated`, `tax.legal_note.created`, `.updated`; VIES answers (`tax.vatvalidation`) are an append-only cache, not audited |
 | Site themes (THM.1) | `themes.theme_settings.configured` (the site's hostname and theme, before and after; see [themes.md](themes.md)) |
+| Search engine visibility (SEO.8) | `seo.settings.configured` (platform staff turn a site's indexing switch on or off in the SEO panel; the site id and `allow_indexing`, before and after; allowing is refused while `MPMV_FORCE_NOINDEX` or demo mode is on) |
 | Legal pages (CMS.5, I18N.9) | `cms.legal_page_version.recorded` (a published legal page version), `cms.legal_page_review.recorded` (a per-language review), `cms.legal_page.effective_date_set` |
 | Tax regime changes (TAX.2) | `tax.regime_change.requested`, `.approved`, `.rejected` (who, the requested regime, the review reason); an approval also writes `tax.vendor_tax_profile.configured` and, when it moves the declared fiscal regime, `vendor.updated` |
 

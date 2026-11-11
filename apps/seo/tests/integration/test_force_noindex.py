@@ -16,7 +16,7 @@ from apps.catalog.tests.factories import (
     CategoryTranslationFactory,
     ProductFactory,
 )
-from apps.seo.models import SeoSettings
+from apps.seo.tests.factories import SeoSettingsFactory
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -91,7 +91,7 @@ def test_demo_mode_forces_noindex(client: Client) -> None:
 @pytest.fixture
 def indexing_allowed() -> None:
     """The site has turned its own switch on (SEO.8 2/2): only the floor is left to test."""
-    SeoSettings.objects.create(site=Site.objects.get(is_default_site=True), allow_indexing=True)
+    SeoSettingsFactory.create(allow_indexing=True)
 
 
 @override_settings(FORCE_NOINDEX=False, DEMO_MODE=False)
