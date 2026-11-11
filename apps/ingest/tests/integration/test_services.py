@@ -1,7 +1,10 @@
 """ING.1: run status machine, blocking review items for ambiguous SKU matches, mappings."""
 
+import threading
+
 import pytest
 from django.core.exceptions import ValidationError
+from django.db import connection
 
 from apps.accounts.tests.factories import UserFactory
 from apps.catalog.tests.factories import ProductFactory
@@ -244,3 +247,145 @@ def test_a_mapping_target_is_a_catalog_object_or_a_value() -> None:
         services.save_mapping(
             MappingTable(vendor=product.vendor, kind=MappingTable.Kind.TERM, key="k"), ctx=CTX
         )
+
+
+def test_a_queued_write_run_is_rechecked_when_it_starts() -> None:
+    source = SupplierSourceFactory.create(write_enabled=True)
+    run, _ = services.queue_run(source, ImportRun.Kind.PRICE, ctx=CTX, write=True)
+    source.write_enabled = False
+    source.save()
+    with pytest.raises(services.WriteNotEnabled):
+        services.transition_run(run, ImportRun.Status.RUNNING, ctx=CTX)
+    run.refresh_from_db()
+    assert run.status == "queued"
+    services.transition_run(run, ImportRun.Status.CANCELLED, ctx=CTX)
+
+
+def test_a_vendor_mapping_cannot_point_at_another_vendors_object() -> None:
+    mine = ProductFactory.create()
+    theirs = ProductFactory.create()
+    entry = MappingTable(vendor=mine.vendor, kind=MappingTable.Kind.CATEGORY, key="lamps")
+    entry.set_target(theirs)
+    with pytest.raises(ValidationError):
+        services.save_mapping(entry, ctx=CTX)
+    entry.set_target(mine)
+    services.save_mapping(entry, ctx=CTX)
+    platform = MappingTable(vendor=None, kind=MappingTable.Kind.CATEGORY, key="lamps")
+    platform.set_target(mine)
+    with pytest.raises(ValidationError):
+        services.save_mapping(platform, ctx=CTX)
+
+
+def test_match_item_refuses_an_item_of_another_vendor() -> None:
+    run = ImportRunFactory.create(status=ImportRun.Status.RUNNING)
+    stranger = SourceItemFactory.create(sku="X-1")
+    with pytest.raises(ValidationError):
+        services.match_item(run, stranger, ctx=CTX)
+
+
+def test_a_review_item_cannot_name_another_vendors_product() -> None:
+    review = ReviewItemFactory.build(product=ProductFactory.create())
+    with pytest.raises(ValidationError):
+        review.full_clean()
+
+
+@pytest.mark.parametrize("status", ["succeeded", "failed", "cancelled"])
+def test_match_item_refuses_a_finished_run(status: str) -> None:
+    run = ImportRunFactory.create(status=status)
+    item = SourceItemFactory.create(source=run.source)
+    with pytest.raises(services.InvalidTransition):
+        services.match_item(run, item, ctx=CTX)
+
+
+def test_duplicate_feed_skus_across_sources_open_a_blocking_review_item() -> None:
+    run = ImportRunFactory.create(status=ImportRun.Status.RUNNING)
+    vendor = run.source.vendor
+    first = SourceItemFactory.create(source=run.source, sku="DUP-1")
+    other = SourceItemFactory.create(
+        source=SupplierSourceFactory.create(vendor=vendor), sku="dup-1"
+    )
+    match, _ = services.match_item(run, other, ctx=CTX)
+    assert match.kind == "ambiguous"
+    review = ReviewItem.objects.get()
+    assert (review.kind, review.blocking, review.item) == ("duplicate_sku", True, other)
+    assert review.payload["item_ids"] == [first.pk]
+
+
+def test_a_pending_blocking_item_stops_the_run() -> None:
+    run = ImportRunFactory.create(status=ImportRun.Status.RUNNING)
+    review = ReviewItemFactory.create(run=run, blocking=True)
+    assert review.decision == "pending"
+    with pytest.raises(services.BlockedByReview):
+        services.transition_run(run, ImportRun.Status.SUCCEEDED, ctx=CTX)
+
+
+def test_the_audit_trail_keeps_config_keys_never_values() -> None:
+    secret = "token-" + "x" * 8
+    source = SupplierSourceFactory.build(config={"feed_url": secret, "auth_env": "FEED_AUTH"})
+    services.save_source(source, ctx=CTX)
+    entry = AuditLog.objects.get(action="ingest.source.created")
+    assert secret not in str(entry.after)
+    assert entry.after["config_keys"] == ["auth_env", "feed_url"]
+    source.config = {**source.config, "feed_url": "other"}
+    services.save_source(source, ctx=CTX)
+    update = AuditLog.objects.get(action="ingest.source.updated")
+    assert "other" not in str(update.after)
+    assert update.before["config_hash"] != update.after["config_hash"]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_two_workers_cannot_both_finish_a_run() -> None:
+    run = ImportRunFactory.create(status=ImportRun.Status.RUNNING)
+    outcomes: list[str] = []
+    barrier = threading.Barrier(2)
+
+    def worker(target: str) -> None:
+        try:
+            barrier.wait(timeout=10)
+            services.transition_run(
+                ImportRun.objects.get(pk=run.pk), target, ctx=CTX, counters={"seen": 1}
+            )
+            outcomes.append(target)
+        except services.InvalidTransition:
+            outcomes.append("refused")
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=worker, args=(t,)) for t in ("succeeded", "failed")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+    assert sorted(outcomes)[0] == "refused"
+    assert len(outcomes) == 2
+    run.refresh_from_db()
+    assert run.status in {"succeeded", "failed"}
+    assert run.seen == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_two_reviewers_cannot_both_decide_an_item() -> None:
+    review = ReviewItemFactory.create()
+    user = UserFactory.create(platform_staff=True)
+    outcomes: list[str] = []
+    barrier = threading.Barrier(2)
+
+    def worker(decision: str) -> None:
+        try:
+            barrier.wait(timeout=10)
+            services.decide_review(
+                ReviewItem.objects.get(pk=review.pk), decision, user=user, ctx=CTX
+            )
+            outcomes.append(decision)
+        except services.InvalidDecision:
+            outcomes.append("refused")
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=worker, args=(d,)) for d in ("accepted", "rejected")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+    assert sorted(outcomes)[0] == "refused"
+    assert AuditLog.objects.filter(action="ingest.review.decided").count() == 1

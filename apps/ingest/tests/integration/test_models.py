@@ -20,13 +20,23 @@ from apps.vendors.tests.factories import VendorFactory
 pytestmark = pytest.mark.django_db
 
 
-def test_a_sku_match_key_is_unique_per_vendor_across_its_sources() -> None:
+def test_the_sku_match_key_follows_the_sku() -> None:
+    item = SourceItemFactory.create(sku="ab 1")
+    assert item.sku_key == "ab 1"
+    item.sku = "  AB   2 "
+    item.save()
+    item.refresh_from_db()
+    assert item.sku_key == "ab 2"
+    item.sku = ""
+    item.save()
+    assert item.sku_key == ""
+
+
+def test_two_feed_rows_with_one_sku_are_stored_and_left_to_the_review() -> None:
     vendor = VendorFactory.create()
-    first = SourceItemFactory.create(source__vendor=vendor, sku="ab 1")
-    other_source = SupplierSourceFactory.create(vendor=vendor)
-    with pytest.raises(IntegrityError), transaction.atomic():
-        SourceItemFactory.create(source=other_source, sku="AB  1")
-    assert first.sku_key == "ab 1"
+    SourceItemFactory.create(source__vendor=vendor, sku="ab 1")
+    SourceItemFactory.create(source=SupplierSourceFactory.create(vendor=vendor), sku="AB  1")
+    assert SourceItem.objects.filter(vendor=vendor, sku_key="ab 1").count() == 2
 
 
 def test_the_same_sku_may_exist_for_two_vendors() -> None:
@@ -124,3 +134,8 @@ def test_a_global_mapping_key_is_unique_too() -> None:
 def test_a_mapping_has_a_target_value_or_a_target_object_not_neither() -> None:
     with pytest.raises(IntegrityError), transaction.atomic():
         MappingTableFactory.create(target_value="")
+
+
+def test_the_review_and_run_lookups_are_indexed() -> None:
+    names = {i.name for model in (ReviewItem, ImportRun) for i in model._meta.indexes}
+    assert {"ingest_review_run_block_dec", "ingest_run_source_status"} <= names
