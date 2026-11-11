@@ -197,7 +197,12 @@ def test_caddy_serves_only_the_configured_site_name() -> None:
         "http://",
     ]
     text = CADDYFILE.read_text()
-    assert re.search(r"^http:// \{\n\tabort\n\}$", text, re.M), "catch-all must serve nothing"
+    catch_all = re.search(r"^http:// \{\n(.*?)\n\}$", text, re.M | re.S)
+    assert catch_all, "a catch-all for plain HTTP"
+    body = [line for line in catch_all.group(1).splitlines() if not line.lstrip().startswith("#")]
+    assert body == ["\tbind fd/3 fd/4 {", "\t\tprotocols h1", "\t}", "\tabort"], (
+        "catch-all must serve nothing"
+    )
     assert re.search(r"^\t\tstrict_sni_host on$", text, re.M)
     assert "tls internal" not in text, "Let's Encrypt only"
     assert "on_demand" not in text, "Let's Encrypt only, for the configured name"
@@ -386,3 +391,101 @@ def test_caddy_media_svg_matchers_are_exclusive() -> None:
 
 def test_caddy_media_cache_control_matches_the_app_view() -> None:
     assert header_lines(public_media_block(), "Cache-Control") == [("", CACHE_CONTROL)]
+
+
+# --- Caddy behind systemd socket activation (OPS.5 follow-up): the proxy sees the client address.
+
+SOCKET_UNIT = ROOT / "deploy" / "systemd" / "mpmv-caddy.socket"
+# (directive, address) in fd order: fd 3 is the first line. The Caddyfile binds by these numbers.
+EXPECTED_LISTENERS = [
+    ("ListenStream", "0.0.0.0:80"),
+    ("ListenStream", "[::]:80"),
+    ("ListenStream", "0.0.0.0:443"),
+    ("ListenStream", "[::]:443"),
+    ("ListenDatagram", "0.0.0.0:443"),
+    ("ListenDatagram", "[::]:443"),
+]
+FIRST_FD = 3  # sd_listen_fds(3): 0-2 are stdio
+
+
+def socket_listeners() -> list[tuple[str, str]]:
+    unit = parse_unit(SOCKET_UNIT.read_text())
+    return [(k, v) for k, v in unit["Socket"] if k.startswith("Listen")]
+
+
+def fds_for(directive: str, port: str) -> list[str]:
+    """`fd/N` (stream) or `fdgram/N` (datagram) of the socket unit's listeners on a port."""
+    prefix = "fd" if directive == "ListenStream" else "fdgram"
+    return [
+        f"{prefix}/{FIRST_FD + index}"
+        for index, (kind, address) in enumerate(socket_listeners())
+        if kind == directive and address.rsplit(":", 1)[1] == port
+    ]
+
+
+def binds(head: str) -> list[tuple[list[str], list[str]]]:
+    """(addresses, protocols) of every `bind` in a top-level Caddyfile block."""
+    block = re.search(rf"^{re.escape(head)} \{{\n(.*?)\n\}}$", CADDYFILE.read_text(), re.M | re.S)
+    assert block, head
+    found = re.findall(r"^\tbind ([^{\n]+) \{\n\t\tprotocols ([^\n]+)\n\t\}$", block.group(1), re.M)
+    return [(addresses.split(), protocols.split()) for addresses, protocols in found]
+
+
+def test_the_socket_unit_listens_on_80_and_443_per_address_family_in_a_fixed_order() -> None:
+    assert socket_listeners() == EXPECTED_LISTENERS
+    unit = parse_unit(SOCKET_UNIT.read_text())
+    # IPv4 clients keep their IPv4 address (127.0.0.1 through an SSH tunnel), never ::ffff:...
+    assert values(unit, "Socket", "BindIPv6Only") == ["ipv6-only"]
+    assert values(unit, "Install", "WantedBy") == ["sockets.target"]
+    assert not values(unit, "Socket", "Accept"), "one Caddy for all connections"
+    assert not values(unit, "Socket", "Service"), "activates the unit of the same name"
+
+
+def test_the_socket_unit_is_not_a_quadlet_unit() -> None:
+    """Quadlet converts only its own unit types; the socket goes to ~/.config/systemd/user."""
+    assert not list(QUADLET_DIR.glob("*.socket"))
+    assert values(load("mpmv-caddy.container"), "Container", "ContainerName") == ["mpmv-caddy"]
+    assert SOCKET_UNIT.stem == "mpmv-caddy", "same name as the service Quadlet generates"
+
+
+def test_caddy_publishes_no_port_and_needs_its_socket_unit() -> None:
+    """Rootless Podman's port forwarder replaces the client address with the container's own."""
+    unit = load("mpmv-caddy.container")
+    assert not values(unit, "Container", "PublishPort")
+    assert values(unit, "Container", "Network") == ["mpmv.network"], "reaches the app by name"
+    assert values(unit, "Unit", "Requires") == ["mpmv-caddy.socket"]
+    assert "mpmv-caddy.socket" in values(unit, "Unit", "After")[0].split()
+
+
+def test_the_caddyfile_binds_the_socket_fds_in_the_unit_order() -> None:
+    http = [(fds_for("ListenStream", "80"), ["h1"])]
+    assert fds_for("ListenStream", "80") == ["fd/3", "fd/4"]
+    assert binds("http://{$MPMV_SITE_ADDRESS}") == http
+    assert binds("http://") == http
+    assert binds("{$MPMV_SITE_ADDRESS}") == [
+        (fds_for("ListenStream", "443"), ["h1", "h2"]),
+        (fds_for("ListenDatagram", "443"), ["h3"]),
+    ]
+    assert fds_for("ListenStream", "443") == ["fd/5", "fd/6"]
+    assert fds_for("ListenDatagram", "443") == ["fdgram/7", "fdgram/8"]
+
+
+def test_the_caddyfile_documents_the_fd_order_of_the_socket_unit() -> None:
+    text = CADDYFILE.read_text()
+    socket = SOCKET_UNIT.read_text()
+    for index, (kind, address) in enumerate(EXPECTED_LISTENERS):
+        fd = FIRST_FD + index
+        proto = "TCP" if kind == "ListenStream" else "UDP"
+        name = f"fd/{fd}" if proto == "TCP" else f"fdgram/{fd}"
+        assert re.search(rf"^#   {re.escape(name)} +{proto} {re.escape(address)}", text, re.M), name
+        assert re.search(rf"^#   fd {fd}  {proto} {re.escape(address)}", socket, re.M), fd
+
+
+def test_caddy_opens_no_listener_of_its_own() -> None:
+    """Every site binds a socket fd, and Caddy's automatic redirect, which would listen on port 80
+    inside the container where nobody reaches it, is off (the site has its own redirect)."""
+    text = CADDYFILE.read_text()
+    assert re.search(r"^\tauto_https disable_redirects$", text, re.M)
+    for head in caddy_sites():
+        if head and not head.startswith("("):
+            assert binds(head), f"{head} must bind the socket fds"
