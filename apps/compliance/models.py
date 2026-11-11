@@ -19,7 +19,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 
 from apps.catalog.models import Product
-from apps.core.fields import CountryField, LanguageField
+from apps.core.fields import CountryField, EncryptedCharField, LanguageField
 from apps.core.models import BaseModel
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager
@@ -211,3 +211,63 @@ class CountryWarningLanguages(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.country}: {', '.join(self.languages)}"
+
+
+class Notice(BaseModel):
+    """A report of illegal content under DSA article 16 (CMP.5 part 2).
+
+    Platform-level data, not vendor-owned: a notice may be about a product, an event, a vendor
+    storefront or other content, and anyone may send one without an account. `url` is the exact
+    location the notifier gave. The notifier's name and email are encrypted at rest and never
+    copied to the audit log; both stay empty for the anonymous category (art. 16(2)(c)).
+    Written only through the audited services in `services.py`.
+    """
+
+    class Status(models.TextChoices):
+        RECEIVED = engine.NOTICE_RECEIVED, "Received"
+        UNDER_REVIEW = engine.NOTICE_UNDER_REVIEW, "Under review"
+        ACTION_TAKEN = engine.NOTICE_ACTION_TAKEN, "Action taken"
+        NO_ACTION = engine.NOTICE_NO_ACTION, "No action"
+
+    class TargetKind(models.TextChoices):
+        PRODUCT = "product", "Product"
+        EVENT = "event", "Event"
+        VENDOR = "vendor", "Vendor storefront"
+        CONTENT = "content", "Other site content"
+
+    class Category(models.TextChoices):
+        GENERAL = "general", "Illegal content"
+        CHILD_ABUSE = engine.NOTICE_ANONYMOUS_CATEGORY, "Child sexual abuse material"
+
+    target_kind = models.CharField(max_length=10, choices=TargetKind.choices)
+    url = models.URLField(max_length=2000, help_text="The exact location of the content.")
+    category = models.CharField(max_length=12, choices=Category.choices, default=Category.GENERAL)
+    explanation = models.TextField(help_text="Why the notifier considers the content illegal.")
+    notifier_name = EncryptedCharField(max_length=255, blank=True)
+    notifier_email = EncryptedCharField(max_length=254, blank=True)
+    notifier_language = LanguageField(blank=True)
+    good_faith = models.BooleanField(
+        help_text="The notifier stated that the notice is accurate and complete."
+    )
+    status = models.CharField(max_length=14, choices=Status.choices, default=Status.RECEIVED)
+    decision_reason = models.TextField(blank=True)
+    decided_at = models.DateTimeField(null=True, blank=True, editable=False)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        permissions = [("review_notices", "Review notices of illegal content (DSA art. 16)")]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(good_faith=True), name="compliance_notice_good_faith"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    status__in=["action_taken", "no_action"], decided_at__isnull=False
+                )
+                | models.Q(status__in=["received", "under_review"], decided_at__isnull=True),
+                name="compliance_notice_decided_at_iff_decided",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"Notice {self.public_id} ({self.status})"

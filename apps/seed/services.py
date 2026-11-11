@@ -670,12 +670,16 @@ def _vendor(run: _Run, index: int, spec: data.VendorSeed, contract: VendorContra
         )
 
     def text(language: str) -> VendorTranslation:
-        policies = {name: _text(texts, language) for name, texts in data.POLICIES.items()}
+        # Rich text (D-34): the seed writes paragraphs, as the editor does.
+        policies = {
+            name: vendors_engine.plain_to_html(_text(texts, language))
+            for name, texts in data.POLICIES.items()
+        }
         return VendorTranslation(
             vendor=vendor,
             language=language,
             tagline=_text(spec.tagline, language),
-            description=_text(spec.description, language),
+            description=vendors_engine.plain_to_html(_text(spec.description, language)),
             **policies,
         )
 
