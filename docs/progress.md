@@ -93,6 +93,10 @@ part of the done-when still open) · `not started`.
 | I18N.9 | done | #142 | Customer legal and checkout pages per language |
 | I18N.11 | done | #220 | Language switch stays on the same object, from the one `{language: URL}` mapping shared with hreflang (`apps/core/i18n.py`); untranslated object goes to the target home with a notice once; pages with secret-bearing URLs opt out |
 | EVT.5 | done | #180 | Vendor events API `/api/v1/events` (list, get, create, update, submit, cancel), scopes `events:read` and `events:write`, vendor-scoped keys, dry run, RFC 9457 errors. Event code, needs human review |
+| ORD.2 | done | #214 | `Order`, `VendorOrder`, `OrderLine` with price, tax and commission snapshots, per-vendor numbering with dry-run preview, order and vendor-order state machines in `apps/orders/engine.py` enforced by model validation and database triggers (illegal transition cannot be saved), fiscal snapshot immutability (D-29), tax retention and privacy lifecycle with scrub gates (D-30), `paid_at`, legacy id for MIG.4. Migrations `orders/0001` to `0010`. `OrderEvent` and `ReturnRequest` are not in this row. Order and money code, needs human review |
+| SEO.8 | partial: 1 of 2 (environment floor); the owner toggle is open | #240 | 1/2 `MPMV_FORCE_NOINDEX` (true in STAGE settings, implied by demo mode): robots meta, `X-Robots-Tag` header (`ForceNoindexMiddleware`) and `/robots.txt` all noindex, listings keep their rules when not forced. Security-relevant, needs human review |
+| I18N.12 | done | #237 | A signed-in user's `preferred_language` applies on unprefixed areas (Manager, account, admins) through a middleware after `AuthenticationMiddleware`; prefixed public URLs ignore it. Manager strings stay English until I18N.7 |
+| CMP.7 | partial: automated audit in CI; manual review and statement open | #217 | axe (wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa) on the key public pages in the e2e suite (`tests/e2e/test_axe_audit.py`), any violation fails, report uploaded as the `e2e-axe` artifact. Cart, checkout and product detail are not yet in `KEY_PAGES` |
 | CAT.19 | done | #154 | Vendor products in the Manager shop space |
 | VEN.24 | done | #141 | Claim an imported vendor (legal email or registered PEC) |
 | SEC.5 | partial: items 6, 7, 9 and 10 of the security wave open | #162, #169, #166, #171 | Security headers by response type, endpoint sweep, hostile-input corpus, rate-limit tests |
@@ -100,7 +104,7 @@ part of the done-when still open) · `not started`.
 | CORE.20 | done | #171 | Per-IP limit on refused API keys |
 | CMS.3 | done | #156 | Blog: index and post pages, scheduling, translatable authors with author pages, ProfilePage/Person and BlogPosting JSON-LD, choosers, `import_article` |
 | CMS.4 | done | #168 | Term and vendor landing pages |
-| THM.12 | done | #151 | WebP and AVIF renditions, sanitised SVG logos |
+| THM.12 | done | #151, #211 | WebP and AVIF renditions, sanitised SVG logos. #211 de-flaked the SVG sanitiser timing test (load-robust ratio) |
 | CMP.3 | partial: Safety Gate checks, repeat-offender suspension and recall procedure not built | #175 | Done-when met (spec 11, row CMP.3): GPSR data (`GpsrInfo`, vendor defaults, per-language safety texts), publication gate in `apps.catalog.publishing`, write guards on published products, nightly check, `SafetyCase` with working-day deadlines and overdue staff alert, per-country warnings languages (owner decisions 2026-11-09). Not built, though the spec row names them: recall procedure, Safety Gate checks, repeat-offender suspension (CMP.26 covers only checkout and sale blockers). Compliance code, needs human review |
 | SEC.2 | done | #164 | Secure uploads (spec 12 task row; not the "Tenant isolation" requirement of the same ID): content-checked, re-encoded uploads with app-made names on every upload path (`apps/core/uploads.py`); caps on bytes, pixels, side and animation frames; originals over 40 megapixels downscaled; bounded decode memory and one decode per process; MPO and ICC handled; malicious-upload corpus. The final caps are in code only, not yet in spec 12. Security code, needs human review |
 | CMS.9 | done | #129 | Launch countdown block: pure `countdown_state`, server-rendered absolute date and expired state, page cache capped at the target, CSP-safe ES module with visitor time zone, minute updates, pause button, single polite announcement |
@@ -113,10 +117,10 @@ part of the done-when still open) · `not started`.
 | CMP.25 | done | #181 | Activation gate for platform duties: `activation` purpose in `LegalFieldRequirement` seeded with the DSA article 30 trader data, append-only `SelfCertification` (version, language, text hash, no IP), checked by the VEN.5 activation next to CMP.13; DAC7 data still blocks payouts only (migrations vendors 0022, 0023). Compliance code, needs human review |
 | VEN.10 | done | #182 | Public vendor storefront per language: bio, policies, products and store categories, category sidebar correct in IT |
 | THM.6 | done | #184 | First vertical theme `ride`: operator palette tokens (light and dark), type scale and shapes, self-hosted Barlow and Barlow Condensed (OFL 1.1), Lucide icon subset (ISC), header, hero and home blocks, placeholder art, `LICENSES.toml` complete |
-| VEN.22 | done | #202 | Public "Sell with us" application at `/vendor/apply/`: account and applicant vendor in one form with no password (the person who opens the emailed link chooses it), Turnstile through the CORE.5 verifier, confirmation mail plus one reminder at 48 h each with a cancel link, GET never changes state and a second POST is idempotent, unconfirmed applications deleted after 3 days (D-24, hourly jobs), MFA at first login (CORE.4); migration vendors 0024. Account and compliance code, needs human review |
+| VEN.22 | done | #202, #229 | Public "Sell with us" application at `/vendor/apply/`: account and applicant vendor in one form with no password (the person who opens the emailed link chooses it), Turnstile through the CORE.5 verifier, confirmation mail plus one reminder at 48 h each with a cancel link, GET never changes state and a second POST is idempotent, unconfirmed applications deleted after 3 days (D-24, hourly jobs), MFA at first login (CORE.4); migration vendors 0024. Account and compliance code, needs human review. #229: the attacker-chosen test password is generated, no literal |
 | CMS.12 | done | #201 | Server-side rich-text sanitiser: `engine.sanitise_rich_text` on the editor's own allow-list, applied by a `pre_save` receiver to every rich-text field and StreamField block, so any write path is covered; the editor opens stored HTML it would not write; the F1 and F2 strict xfails are plain tests. Security code, needs human review |
 | ARC.17 | done | #198 | `PlatformOperator.einvoice_channel` and its choices removed (migration core 0018, admin, seed, factory, spec 01); a guard test; no comment says the platform writes FatturaPA XML |
-| CORE.9 | partial: 2 of 3 (dashboard and owner-only profile); staff revert from the platform space open | #200, #204 | 1/3 shop dashboard with product KPIs on a queryset scoped by `for_actor` and the selected vendor. 2/3 `save_storefront_profile`: owners only, plain text with length caps, rate limit, post-moderation email to the operator support address, `vendor.profile_changed` audit with before and after, form at `/manager/shop/profile/` that vendor staff cannot reach |
+| CORE.9 | partial: 2 of 3 (dashboard and owner-only profile, logo included); platform review and revert open | #200, #204, #208 | 1/3 shop dashboard with product KPIs on a queryset scoped by `for_actor` and the selected vendor. 2/3 `save_storefront_profile`: owners only, plain text with length caps, rate limit, post-moderation email to the operator support address, `vendor.profile_changed` audit with before and after, form at `/manager/shop/profile/` that vendor staff cannot reach. #208 (2b): owner-only vendor logo upload through `MediaImage` validation into a per-vendor collection, replaced image deleted, audited; migration `vendors/0025`. Security (file upload), needs human review |
 | CORE.23 | done | #212 | `manage.py bootstrap_platform_owner EMAIL [--create] [--dry-run]`: idempotent, ChangeSet, audit `core.platform_owner.grant`, step in release.md |
 | OPS.10 | partial: the workflow has not run yet (manual run after merge) | #213 | Nightly line-only coverage workflow (`coverage-nightly.yml`), report only, `coverage-report` artifact and job summary table |
 
@@ -767,6 +771,15 @@ Compliance, security and content:
 | #228 | none | Coherence check 12 |
 | #220 | I18N.11 | Language switch stays on the same object |
 | #180 | EVT.5 | Vendor events API |
+| #232 | none | Coherence check 13 (release gate v0.1.4) |
+| #211 | THM.12 | De-flake the SVG sanitiser timing test |
+| #229 | VEN.22 | Generate the test password instead of a literal |
+| #217 | CMP.7 | Axe accessibility audit of key public pages in CI |
+| #237 | I18N.12 | Preferred language on unprefixed areas |
+| #214 | ORD.2 | Order, VendorOrder, OrderLine models, numbering, snapshots, D-29 and D-30 guards |
+| #240 | SEO.8 | Force noindex floor (1 of 2) |
+| #208 | CORE.9 | Vendor logo upload, owner only (2b) |
+| #246 | none | Coherence check 14 |
 
 ## Coherence checks
 
@@ -1432,3 +1445,26 @@ Findings and actions:
 4. Minor. Carried over from check 12: the credential-like test password in the application tests (item 2 there) and CORE.9 3/3 are still open; none touches this delta.
 
 Verdict: GO for v0.1.4 from 81a2f11. No blocker or major finding. Conditions: no other merge between this PR and the tag, run the slug dry run on STAGE before deploying, and have the owner run the STAGE checks listed in release.md ("v0.1.4 on STAGE"). EVT.5 is event code and needs human review.
+
+
+### Coherence check 14 (main at f56549f)
+
+Scope: main at f56549f, the merges since check 13 (81a2f11): #211 (THM.12 test), #229 (VEN.22 test), #217 (CMP.7), #237 (I18N.12), #214 (ORD.2), #240 (SEO.8 1/2) and #208 (CORE.9 2b); #232 is docs. 88 files and about 6.6k lines, mostly ORD.2 (10 migrations, models, engine, services, 7 test modules).
+
+| Area | Result |
+|---|---|
+| Code vs spec | ORD.2 done-when "illegal transitions impossible (test)": `ORDER_TRANSITIONS`, `VENDOR_ORDER_TRANSITIONS` and `PRIVACY_TRANSITIONS` in `apps/orders/engine.py:112,127,224`, tests `test_an_illegal_order_transition_cannot_be_saved` and the vendor-order twin (`apps/orders/tests/integration/test_models.py:70,98`), plus database triggers and checks (`orders/0003`, `0005`, `0008`, `0010`) with `test_db_guards.py`. SEO.8 1/2: `FORCE_NOINDEX` setting (`mpmv/settings/base.py:60`, `stage.py:9`, env example), `ForceNoindexMiddleware` (`apps/seo/middleware.py:11`), `apps/core/indexing.py`, tests for listing, signed-in Manager page, `/robots.txt`, demo mode and the not-forced case (`apps/seo/tests/integration/test_force_noindex.py`); 2/2 correctly left open. I18N.12: `apps/accounts/middleware.py`, tests `test_preferred_language.py`, e2e switch test in `tests/e2e/test_manager_shell.py:202`. CMP.7: `tests/e2e/test_axe_audit.py`, any violation fails, artifact in CI; manual review and statement are human steps and stay open. CORE.9 2b: `apps/vendors/services.py` and `apps/manager/views.py`, `vendors/0025_vendor_logo`, `test_vendor_logo.py`, `test_shop_logo.py`; 3/3 (#231) open |
+| Spec and docs | `make docs` leaves no diff and `make check` backlog freshness passes. D-35 is recorded in 92-open-decisions. D-29 (order retention) and D-30 are not: ORD.2 implements them (`tax_retention_until`, `privacy_status`, scrub gates, `docs/dev/audit-trail.md` cites D-29 and D-30) but they are only in the open PR #226, so spec 07 has no text for those fields yet. progress.md lacked ORD.2, SEO.8, I18N.12, CMP.7 and the PR rows (added here) |
+| Hygiene | `makemigrations --check` clean. One linear chain per app, no duplicate numbers: accounts 0005, api 0007, cart 0001, catalog 0010, cms 0013, compliance 0002, core 0018, events 0003, orders 0010 (new, 0001 to 0010 chained, 0002 depends on catalog 0009 and vendors 0024), shipping 0010, tax 0006, themes 0001, vendors 0025 (new, depends on core 0017 and vendors 0024); ingest, ledger, mcp, payments and seo have none. No print, breakpoint, TODO, FIXME or credential-like literal added in the delta; no legacy or private names. One `time.sleep(1.0)` in the concurrent-counter test (`apps/orders/tests/integration/test_services.py:455`), see finding 3. New setting `MPMV_FORCE_NOINDEX` is documented in `deploy/server/mpmv.env.example`. The `RemovedInWagtail90Warning` at `apps/cms/admin_views.py:30` is still open (OPS.7) |
+| Gates | `make check` pass (ruff, mypy strict over 967 files, import contracts kept, backlog freshness, Django checks, theme gates for base and ride). Main CI on f56549f: success. Full suite not run locally (CI is the gate) |
+
+Findings and actions:
+
+1. Major, spec. ORD.2 ships D-29 and D-30 behaviour (fiscal immutability, retention dates, privacy lifecycle, scrub gates) while the decisions are only in open PR #226 and no merged spec text describes them. Action for lane-a: merge #226 (and the D-30 text) so spec 07 and 92-open-decisions match the code. Not a code defect.
+2. Minor. progress.md lacked ORD.2, SEO.8, I18N.12, CMP.7 and eight PR rows. Action: this update.
+3. Minor. `time.sleep(1.0)` in the orders concurrency test makes the test slow and timing-dependent; replace with an event or a lock-wait query. Proposed row: ORD.2 follow-up.
+4. Minor. CMP.7 `KEY_PAGES` lacks cart, checkout and product detail (they do not exist yet): add when ORD.4 and the product page land.
+5. Minor. SEO.8 2/2 (owner toggle) and CORE.9 3/3 are open. The owner sets `MPMV_FORCE_NOINDEX=true` in STAGE's env (the STAGE settings already force it).
+6. Closed from check 13: the credential-like test password (#229) is fixed.
+
+Verdict: GO with follow-ups. No blocker; one major documentation gap (finding 1) that does not break the code. ORD.2, SEO.8 and CORE.9 2b are security or money code and need human review. Condition: CI on f56549f green.

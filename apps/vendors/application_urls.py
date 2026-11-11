@@ -1,5 +1,6 @@
-"""Public "Sell with us" application routes (VEN.22), without a language prefix under
-/vendor/apply/. `vendors:apply` is the URL the CMS recruitment page links to (CMS.5)."""
+"""Public "Sell with us" application routes (VEN.22) under /vendor/apply/, in `i18n_patterns`
+(English without a prefix, `/it/vendor/apply/` and so on). `vendors:apply` is the URL the CMS
+recruitment page links to (CMS.5)."""
 
 from django.urls import path
 

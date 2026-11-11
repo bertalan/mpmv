@@ -151,7 +151,7 @@ def test_the_madeira_azores_seed_is_idempotent_and_reversible() -> None:
 
     from apps.tax.models import TaxRate
 
-    migration = import_module("apps.tax.migrations.0008_seed_madeira_azores")
+    migration = import_module("apps.tax.migrations.0009_seed_madeira_azores")
     migration.seed(apps, None)
     assert TaxRate.objects.filter(territory__isnull=False).count() == 2
     migration.unseed(apps, None)
@@ -186,7 +186,7 @@ def test_the_madeira_azores_reverse_keeps_a_rate_staff_entered_later() -> None:
 
     from apps.tax.models import TaxRate
 
-    migration = import_module("apps.tax.migrations.0008_seed_madeira_azores")
+    migration = import_module("apps.tax.migrations.0009_seed_madeira_azores")
     madeira = Territory.objects.get(code="PT-MA")
     seeded = TaxRate.objects.get(territory=madeira, category="standard")
     TaxRate.objects.filter(pk=seeded.pk).update(valid_to=dt.datetime(2027, 1, 1, tzinfo=dt.UTC))

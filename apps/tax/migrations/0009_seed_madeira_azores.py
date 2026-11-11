@@ -72,7 +72,7 @@ def unseed(apps: Any, schema_editor: Any) -> None:
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("tax", "0007_vatvalidation_requester"),
+        ("tax", "0008_vatvalidation_requester"),
     ]
 
     operations = [

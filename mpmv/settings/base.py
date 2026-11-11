@@ -113,6 +113,8 @@ MIDDLEWARE = [
     # With the other header middleware, so responses returned early by an inner middleware
     # (CommonMiddleware's APPEND_SLASH redirect, LIVE's static files) carry it too (SEC.5).
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # SEC.13/SEC.14: Wagtail's page view restriction forms answer 404 until they are protected.
+    "apps.cms.middleware.PageRestrictionBlockMiddleware",
     "apps.themes.middleware.ThemeMiddleware",  # the site's theme for the template loader (THM.1)
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
@@ -450,6 +452,8 @@ VIES_API_URL = (
     or "https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-number"
 )
 VIES_TIMEOUT_SECONDS = 8  # per socket operation (connect, each read), not for the whole check
+# Used twice: the lookup cache TTL of VIES answers, and the conservative maximum age of a valid
+# answer the goods tax engine trusts (`build_tax_context`): an older one is treated as B2C.
 VIES_CACHE_SECONDS = 24 * 60 * 60
 VIES_UNAVAILABLE_CACHE_SECONDS = 5 * 60
 VIES_INVALID_REQUESTER_CACHE_SECONDS = 60 * 60  # VIES refused the requester: ask again later
@@ -572,6 +576,24 @@ LOGGING = {
     "loggers": {"django.request": {"filters": ["redact_secret_paths"]}},
     "root": {"handlers": ["console"], "level": "INFO"},
 }
+
+# SEC.13 (apps/core/public_forms.py): URL prefixes the anonymous-POST sweep does not walk, each
+# with the reason an anonymous request is refused there. A login form under one of them (the
+# admins' sign-in) is declared on its own view and listed in docs/dev/public-forms.md.
+PUBLIC_FORM_GATED_PREFIXES = {
+    "manager/": "the Manager gate answers 404 to anyone without a space (manager.E001, E002)",
+    "admin/": "the editors' admin requires a signed-in editor; its sign-in form is declared",
+    "django-admin/": "the staff admin requires a signed-in staff user; its sign-in is declared",
+    "api/": "API v1 authenticates every operation (API key or session)",
+    "_styleguide/": "staff only (THM.4)",
+    "_util/": "Wagtail page view restriction forms answer 404 while BLOCK_PAGE_RESTRICTION_ROUTES "
+    "is on and no restriction exists (cms.E002); SEC.14 protects them",
+}
+
+# SEC.13/SEC.14: Wagtail's page view restriction forms (`/_util/...`) have no rate limit or captcha
+# yet, so apps.cms.middleware.PageRestrictionBlockMiddleware answers 404 to them and `check` fails
+# (cms.E002) while any password or login restriction exists. SEC.14 lifts the block.
+BLOCK_PAGE_RESTRICTION_ROUTES = True
 
 # Optional prefix of order numbers, e.g. "MP-" gives "MP-2027-000123" (ORD.2). Empty by default.
 ORDER_NUMBER_PREFIX = ""

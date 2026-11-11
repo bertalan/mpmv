@@ -136,6 +136,7 @@ class VendorTaxProfileForm(StartCheckedForm[VendorTaxProfile]):
             "regime",
             "exempt_reason",
             "exempt_country",
+            "exemption_nature",
             "oss_registered_since",
             "valid_from",
         )

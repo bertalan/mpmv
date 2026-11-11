@@ -1,6 +1,6 @@
 """Tax integration tests start from an empty territory table.
 
-Migrations 0006 and 0008 seed the special territories (TAX.7, D-28); most tests create their
+Migrations 0006 and 0009 seed the special territories (TAX.7, D-28); most tests create their
 own territories with the codes the seed uses (`ES-CN`, `IT-LIVIGNO`), so the seed is removed
 before each test.
 A test module that works on the seed itself sets `pytest.mark.keep_seeded_territories`.

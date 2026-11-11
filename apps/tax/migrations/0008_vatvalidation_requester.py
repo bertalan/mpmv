@@ -26,7 +26,7 @@ DROP FUNCTION IF EXISTS tax_vatvalidation_append_only();
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("tax", "0006_seed_special_territories"),
+        ("tax", "0007_vendortaxprofile_exemption_nature"),
     ]
 
     operations = [

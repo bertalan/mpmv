@@ -1,15 +1,16 @@
 {% extends "layouts/account.html" %}
-{% block title %}Verify it is you · MPMV{% endblock %}
+{% load i18n %}
+{% block title %}{% translate "Verify it is you" %} · MPMV{% endblock %}
 {% block account_content %}
-<h1>Verify it is you</h1>
+<h1>{% translate "Verify it is you" %}</h1>
 {% comment %}CMP.9 (WCAG 2.2 SC 3.3.8): codes can be pasted and filled by the browser
 (autocomplete="one-time-code"); the error is tied to the field that was used.{% endcomment %}
 {% if error %}<p id="mfa-error" role="alert">{{ error }}</p>{% endif %}
 
 {% if has_passkey %}
-<form data-passkey="authenticate" data-csrf-token="{{ csrf_token }}" data-options-url="{{ auth_options_url }}" data-finish-url="{{ auth_url }}">
-  <button type="button" data-passkey-start>Use a passkey</button>
-  <noscript><p>Passkeys need JavaScript.</p></noscript>
+<form data-passkey="authenticate" data-csrf-token="{{ csrf_token }}" data-options-url="{{ auth_options_url }}" data-finish-url="{{ auth_url }}" data-text-request-failed="{% translate "The request failed." %}" data-text-unsupported="{% translate "This browser does not support passkeys." %}" data-text-failed="{% translate "The passkey did not work." %}">
+  <button type="button" data-passkey-start>{% translate "Use a passkey" %}</button>
+  <noscript><p>{% translate "Passkeys need JavaScript." %}</p></noscript>
   <p data-passkey-error role="alert" hidden></p>
 </form>
 {% include "accounts/mfa/_passkey_script.html" %}
@@ -20,22 +21,22 @@
   {% csrf_token %}
   <input type="hidden" name="method" value="totp">
   <input type="hidden" name="next" value="{{ next }}">
-  <p><label for="id_token">Authentication code</label>
+  <p><label for="id_token">{% translate "Authentication code" %}</label>
     <input id="id_token" name="token" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="8" required{% if not has_passkey %} autofocus{% endif %}{% if error_method == "totp" %} aria-invalid="true" aria-describedby="mfa-error"{% endif %}></p>
-  <button type="submit">Verify</button>
+  <button type="submit">{% translate "Verify" %}</button>
 </form>
 {% endif %}
 
 {% if has_recovery %}
 <section>
-  <h2>Lost your device?</h2>
+  <h2>{% translate "Lost your device?" %}</h2>
   <form method="post">
     {% csrf_token %}
     <input type="hidden" name="method" value="recovery">
     <input type="hidden" name="next" value="{{ next }}">
-    <p><label for="id_code">Recovery code</label>
+    <p><label for="id_code">{% translate "Recovery code" %}</label>
       <input id="id_code" name="code" autocomplete="one-time-code" autocapitalize="none" spellcheck="false" required{% if error_method == "recovery" %} aria-invalid="true" aria-describedby="mfa-error"{% endif %}></p>
-    <button type="submit">Use recovery code</button>
+    <button type="submit">{% translate "Use recovery code" %}</button>
   </form>
 </section>
 {% endif %}
