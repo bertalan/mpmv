@@ -266,6 +266,21 @@ def test_the_previous_release_of_a_tag_build_is_the_tag_before_it(tmp_path: Path
     assert previous_release(clone, "v0.1.5").stdout == ""
 
 
+def test_the_previous_release_of_a_pre_release_tag_is_the_release_below_its_version(
+    tmp_path: Path,
+) -> None:
+    # A candidate v0.2.0-rc.1 upgrades from 0.1.9, never from a release above its version.
+    clone = clone_with_tags(tmp_path, ["v0.1.9", "v0.2.0-rc.1", "v0.2.0", "v0.3.0", "v0.1.10"])
+
+    assert previous_release(clone, "v0.2.0-rc.1").stdout == "0.1.10\n"
+    assert previous_release(clone, "v0.2.0-rc.2").stdout == "0.1.10\n"
+    assert previous_release(clone, "v0.2.0").stdout == "0.1.10\n"
+    assert previous_release(clone, "v0.3.0-beta").stdout == "0.2.0\n"
+    # A tag build whose name is not a version (not a release tag) keeps the pull request answer.
+    assert previous_release(clone, "stage-2026").stdout == "0.3.0\n"
+    assert previous_release(clone, "refs/pull/1/merge").stdout == "0.3.0\n"
+
+
 def test_with_no_release_tag_there_is_no_previous_release(tmp_path: Path) -> None:
     clone = clone_with_tags(tmp_path, ["not-a-release"])
 
