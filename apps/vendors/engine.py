@@ -1847,6 +1847,19 @@ def media_references(html: str) -> tuple[list[str], list[str]]:
     return images, documents
 
 
+def has_page_link(html: str) -> bool:
+    """Whether a stored rich text links a Wagtail page (`<a linktype="page" id=..>`): such a link
+    resolves any page id, a draft or another vendor's page included, so vendors may not use it."""
+    return any(
+        tag.lower() == "a"
+        and {m[0].lower(): m[1] or m[2] or m[3] for m in _ATTR.findall(raw)}.get(
+            "linktype", ""
+        ).lower()
+        == "page"
+        for tag, raw in _TAG.findall(html)
+    )
+
+
 def image_embed_formats(html: str) -> list[str]:
     """The `format` of every image embed of a stored rich text, as written ("" when missing)."""
     return [
