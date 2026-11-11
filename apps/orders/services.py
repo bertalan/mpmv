@@ -13,7 +13,7 @@ from decimal import Decimal
 from typing import Any, Protocol
 
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.db import connection, transaction
 from django.db.models import Sum
 from django.utils import timezone
@@ -27,6 +27,7 @@ from apps.core.changeset import ChangeSet
 from apps.core.money import CENT
 from apps.core.services import audit_changes
 from apps.vendors.models import Vendor
+from apps.vendors.services import has_vendor_permission
 
 from . import engine, notifications
 from .models import Order, OrderLine, OrderNumberSequence, StockReservation, VendorOrder
@@ -436,6 +437,36 @@ def transition_vendor_order(
         pass
     sub.refresh_from_db()
     return changeset
+
+
+def fulfil_vendor_order(
+    sub: VendorOrder,
+    action: str,
+    *,
+    actor: User,
+    ctx: AuditContext,
+    tracking_number: str = "",
+    carrier: str = "",
+    dry_run: bool = False,
+) -> ChangeSet:
+    """A vendor member accepts, ships (with tracking) or delivers its own sub-order (ORD.6).
+
+    The actor must be an active member of the sub-order's vendor whose role holds the `orders`
+    action (CORE.2); anyone else gets `PermissionDenied`, checked before anything is read from
+    the arguments. Raises `engine.UnknownFulfilmentAction`, `engine.InvalidTracking` and
+    `engine.IllegalTransition` before any write; the move itself is `transition_vendor_order`.
+    """
+    if not has_vendor_permission(actor, sub.vendor, "orders"):
+        raise PermissionDenied("Only a member of the vendor can fulfil its orders.")
+    target = engine.fulfilment_target(action)
+    if target == "shipped":
+        tracking_number = engine.normalise_tracking(tracking_number)
+        carrier = engine.normalise_carrier(carrier)
+    else:
+        tracking_number = carrier = ""
+    return transition_vendor_order(
+        sub, target, ctx=ctx, tracking_number=tracking_number, carrier=carrier, dry_run=dry_run
+    )
 
 
 # --- retention: the scrub services (owner decision D-29) ---------------------------------------
