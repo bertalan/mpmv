@@ -110,14 +110,15 @@ def test_read_me_lists_every_rule_in_english_for_german(locale: Path, tmp_path: 
         assert engine.rule_text(rule, "en") in text
 
 
-def test_read_me_in_italian_when_the_reviewer_language_has_one(tmp_path: Path) -> None:
-    loc = tmp_path / "loc-it"
-    _po(loc, "it", ROWS)
-    path = export_catalog(
-        lang="it", scope="all", fmt="xlsx", out_dir=tmp_path, locale_dir=loc, readme_lang=None
-    )
-    text = [r[0].value for r in load_workbook(path)["Read me"].iter_rows() if r[0].value]
-    assert engine.rule_text(Rule.PLACEHOLDERS, "it") in text
+@pytest.mark.parametrize("lang", ["en", "it", "de", "fr", "es"])
+def test_each_language_gets_its_own_read_me_and_banner(tmp_path: Path, lang: str) -> None:
+    loc = tmp_path / "loc"
+    _po(loc, lang, ROWS)
+    path = export_catalog(lang=lang, scope="all", fmt="xlsx", out_dir=tmp_path, locale_dir=loc)
+    wb = load_workbook(path)
+    text = [r[0].value for r in wb["Read me"].iter_rows() if r[0].value]
+    assert engine.rule_text(Rule.PLACEHOLDERS, lang) in text
+    assert wb.worksheets[1]["A1"].value == engine.banner(lang, lang)
 
 
 def test_only_the_reviewer_and_notes_columns_are_unlocked(locale: Path, tmp_path: Path) -> None:
@@ -216,7 +217,6 @@ REFUSALS = [
     ("Hello %(name)s", "Hallo %(nome)s", Rule.PLACEHOLDERS),
     ("Open <b>the shop</b>", "Shop <i>öffnen</i>", Rule.HTML_TAGS),
     ("Contact us", "Kontakt https://evil.example/", Rule.NEW_URL),
-    ("Contact us", "k" * 500, Rule.LENGTH),
 ]
 
 
@@ -235,6 +235,17 @@ def test_each_rule_is_refused_with_the_row_number_and_the_rule_text(
     # nothing applied on any error, not even the valid row
     assert _catalog(locale) == before
     assert report.applied == []
+
+
+def test_over_the_guide_length_is_a_warning_and_is_applied(locale: Path, tmp_path: Path) -> None:
+    path = _export(locale, tmp_path)
+    _edit(path, {"Contact us": "k" * 500})
+    report = _import(locale, path)
+    row = _row_of(path, "Contact us")
+    assert report.errors == []
+    assert [(w.row, w.rule) for w in report.warnings] == [(row, Rule.LENGTH)]
+    assert _catalog(locale)["Contact us"] == "k" * 500
+    assert len(report.applied) == 1
 
 
 def test_skip_invalid_applies_the_valid_rows_and_reports_the_rest(

@@ -65,6 +65,22 @@ def test_import_with_an_error_fails_and_names_the_row(locale: Path, tmp_path: Pa
     assert not AuditLog.objects.filter(action="core.i18n.imported").exists()
 
 
+def test_import_prints_a_length_warning_and_applies(locale: Path, tmp_path: Path) -> None:
+    call_command(
+        "i18n_export", "--lang", "de", "--out", str(tmp_path), "--locale-dir", str(locale),
+        stdout=StringIO(),
+    )  # fmt: skip
+    path = tmp_path / "i18n-de-all.xlsx"
+    wb = load_workbook(path)
+    for row in wb.worksheets[1].iter_rows(min_row=3):
+        if row[0].value == "Contact us":
+            row[5].value = "k" * 500
+    wb.save(path)
+    out = StringIO()
+    call_command("i18n_import", str(path), "--locale-dir", str(locale), "--skip-check", stdout=out)
+    assert "warning" in out.getvalue().lower()
+
+
 def test_a_bad_scope_or_format_is_refused(locale: Path, tmp_path: Path) -> None:
     with pytest.raises(CommandError):
         call_command("i18n_export", "--lang", "de", "--scope", "nope", "--out", str(tmp_path))

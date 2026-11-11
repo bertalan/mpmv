@@ -33,14 +33,15 @@ def test_a_new_url_is_refused_but_an_existing_one_is_kept() -> None:
     assert _broken("Plain", "x", "Vai su www.example.org") == [Rule.NEW_URL]
 
 
-def test_length_limit() -> None:
-    assert _broken("Short", "x", "a" * 11, limit=10) == [Rule.LENGTH]
-    assert _broken("Short", "x", "a" * 10, limit=10) == []
+def test_length_is_a_guide_not_a_refusal() -> None:
+    assert _broken("Short", "x", "a" * 500, limit=10) == []
+    assert engine.over_guide("a" * 11, 10) is True
+    assert engine.over_guide("a" * 10, 10) is False
 
 
 def test_several_rules_are_all_reported_in_a_stable_order() -> None:
     got = _broken("<b>%s</b>", "x", "https://a.example/ " * 3, limit=5)
-    assert got == [Rule.PLACEHOLDERS, Rule.HTML_TAGS, Rule.NEW_URL, Rule.LENGTH]
+    assert got == [Rule.PLACEHOLDERS, Rule.HTML_TAGS, Rule.NEW_URL]
 
 
 def test_checksum_changes_with_any_identifying_part() -> None:
@@ -59,10 +60,32 @@ def test_rule_text_and_read_me_use_the_same_words() -> None:
             assert engine.rule_text(rule, lang) in lines
 
 
-def test_read_me_language_falls_back_to_english() -> None:
-    assert engine.read_me_language("it") == "it"
-    assert engine.read_me_language("fr") == "en"
-    assert engine.read_me_language("de") == "en"
+LANGUAGES = ("en", "it", "de", "fr", "es")
+
+
+def test_each_of_the_five_languages_has_its_own_read_me() -> None:
+    texts = {}
+    for lang in LANGUAGES:
+        assert engine.read_me_language(lang) == lang
+        texts[lang] = engine.read_me_lines(lang, "de")
+    assert len({tuple(t) for t in texts.values()}) == 5
+    for lang, lines in texts.items():
+        assert len(lines) == len(texts["en"])
+        for rule in Rule:
+            assert engine.rule_text(rule, lang) in lines
+            assert engine.rule_text(rule, lang) != engine.rule_text(rule, "en") or lang == "en"
+        assert engine.banner(lang, "de") != engine.banner("en", "de") or lang == "en"
+
+
+def test_read_me_language_falls_back_to_english_for_others() -> None:
+    assert engine.read_me_language("pt") == "en"
+
+
+def test_read_me_keeps_the_technical_examples_in_every_language() -> None:
+    for lang in LANGUAGES:
+        joined = " ".join(engine.read_me_lines(lang, "de"))
+        for token in ("%(name)s", "{name}", "%s", "<b>", "Notes", "Max length"):
+            assert token in joined
 
 
 def test_read_me_names_the_tone_per_language() -> None:
