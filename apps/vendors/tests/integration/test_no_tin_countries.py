@@ -210,6 +210,16 @@ def test_staff_with_only_the_add_permission_cannot_delete(client: Client, mfa_lo
     assert client.get(reverse("admin:vendors_notincountry_changelist")).status_code == 403
 
 
+def test_a_removal_without_the_permission_is_403_even_with_no_reason(
+    client: Client, mfa_login: Any
+) -> None:
+    client = mfa_login(client, UserFactory.create(staff=True))
+    row = NoTinCountry.objects.get(country="BS")
+    url = reverse("admin:vendors_notincountry_delete", args=[row.pk])
+    assert client.post(url, {"post": "yes", "reason": ""}).status_code == 403
+    assert NoTinCountry.objects.filter(country="BS").exists()
+
+
 def test_the_engine_does_not_import_django_or_apps() -> None:
     tree = ast.parse(Path(engine.__file__).read_text())
     imported: list[str] = []

@@ -851,6 +851,8 @@ class NoTinCountryAdmin(admin.ModelAdmin[NoTinCountry]):
     def delete_view(
         self, request: HttpRequest, object_id: str, extra_context: dict[str, Any] | None = None
     ) -> HttpResponse:
+        if not self.has_delete_permission(request):
+            raise PermissionDenied
         if request.method == "POST" and not request.POST.get("reason", "").strip():
             messages.error(request, "A reason is required to remove a country.")
             return redirect(request.get_full_path())

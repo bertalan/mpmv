@@ -18,7 +18,7 @@ def seed(apps, schema_editor):  # type: ignore[no-untyped-def]
 
 
 class Migration(migrations.Migration):
-    dependencies = [("vendors", "0024_vendor_application")]
+    dependencies = [("vendors", "0026_storefront_rich_text")]
 
     operations = [
         migrations.CreateModel(
