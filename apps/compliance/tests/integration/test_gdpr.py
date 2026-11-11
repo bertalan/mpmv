@@ -19,6 +19,7 @@ from apps.accounts.tests.factories import UserFactory
 from apps.cart.tests.factories import CartFactory, CartLineFactory
 from apps.compliance import gdpr
 from apps.compliance.models import ErasureRequest
+from apps.compliance.tests.factories import ErasureRequestFactory
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog, OutboxEmail, OutboxEmailEvent
 from apps.orders import services as order_services
@@ -471,3 +472,11 @@ def test_a_recent_awaiting_payment_order_may_still_be_captured_so_the_erasure_wa
     user.refresh_from_db()
     assert user.email.endswith("@anonymised.invalid")
     assert Order.objects.get(pk=recent.pk).privacy_status == "anonymized"
+
+
+def test_a_pending_request_row_completes_on_the_next_run() -> None:
+    request = ErasureRequestFactory.create()
+    gdpr.anonymise_customer(request.user, ctx=CTX)
+    request.refresh_from_db()
+    assert request.completed_at is not None
+    assert gdpr.is_anonymised(request.user)
