@@ -1,7 +1,7 @@
 # Anonymous page cache (SEO.6, part 1)
 
-LIVE and STAGE serve public CMS pages to anonymous visitors from a cache, so a hit costs no
-database query. Signed-in visitors never touch it. Responsive renditions and the Core Web Vitals
+With `MPMV_PAGE_CACHE=1` (LIVE and STAGE; off by default, enable after a STAGE soak), public CMS
+pages are served to anonymous visitors from a cache, so a hit costs no database query. Signed-in visitors never touch it. Responsive renditions and the Core Web Vitals
 budget are later parts of SEO.6.
 
 ## The hard rule
@@ -115,11 +115,11 @@ reachable. A cache that cannot be read or written is a miss: the page is rendere
 
 | Setting | Env | Default |
 |---|---|---|
-| `PAGE_CACHE_ENABLED` | `MPMV_PAGE_CACHE` | off in dev and tests, on in LIVE and STAGE |
+| `PAGE_CACHE_ENABLED` | `MPMV_PAGE_CACHE` | off everywhere by default; `MPMV_PAGE_CACHE=1` turns it on in LIVE and STAGE |
 | `PAGE_CACHE_SECONDS` | `MPMV_PAGE_CACHE_SECONDS` | 300 |
 | `CACHES["pagecache"]["LOCATION"]` | `MPMV_PAGE_CACHE_DIR` | `MEDIA_ROOT/.page-cache` |
 
-To turn it off in an incident: `MPMV_PAGE_CACHE=0` and restart. The next switch on starts with an
+To turn it off in an incident: set `MPMV_PAGE_CACHE=0` (or unset it) and restart. The next switch on starts with an
 empty cache only if something called `invalidate()` meanwhile, which every publish does.
 
 ## Tests
