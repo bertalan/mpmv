@@ -226,14 +226,13 @@ def test_staff_and_other_users_get_404_and_anonymous_is_sent_to_sign_in(
     assert not get_document_model().objects.exists()
 
 
-def test_the_editor_offers_the_document_link_and_points_at_the_manager_chooser(
-    client: Client, owner: User
-) -> None:
-    assert "document-link" in MANAGER_RICH_TEXT_FEATURES
+def test_the_editor_has_no_document_link_until_private_storage(client: Client, owner: User) -> None:
+    """Owner decision (ARC.15): no public-by-URL vendor PDFs, so no document link in the editor."""
+    assert "document-link" not in MANAGER_RICH_TEXT_FEATURES
     verified_login(client, owner)
     page = client.get(f"{SHOP}profile/").content.decode()
     assert "/admin/documents/chooser" not in page
-    assert BASE in page
+    assert BASE not in page
 
 
 def test_the_dry_run_of_the_service_writes_nothing(

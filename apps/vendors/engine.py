@@ -1886,7 +1886,7 @@ def is_https_address(value: str) -> bool:
 
 def has_unsafe_link(html: str) -> bool:
     """Whether a stored rich text has an `<a href>` that is not a plain https address. Document
-    links (`linktype="document"`, no href) are checked elsewhere (`media_references`). The
+    links (`linktype="document"`, no href) are refused by `media_problem` until ARC.15. The
     sanitiser lets `http:`, `mailto:`, relative and scheme-relative addresses through, but a
     vendor text may only link out over https (VEN.31), whatever the form posted."""
     for tag, raw in _TAG.findall(html):

@@ -247,30 +247,22 @@ for listing in /media/ "$(dirname "$media_url")/"; do
   [ "$got" != 200 ] || fail "GET $listing lists a media directory"
   echo "GET $listing -> $got (no listing)"
 done
-# Only images in the image folders and PDFs in `documents/` are public: any other file in
-# `documents/`, or a non-image in an image folder, is a 404 even though it exists in the volume.
+# Only images in the image folders are public: a document, or a non-image in an image folder,
+# is a 404 even though the file exists in the volume.
 podman exec mpmv-app sh -c 'mkdir -p /app/media/documents /app/media/images &&
-  echo x > /app/media/documents/parity.pdf && echo x > /app/media/documents/parity.html &&
-  echo x > /app/media/images/parity.html'
-expect_status /media/documents/parity.pdf 200
-expect_status /media/documents/parity.html 404
+  echo x > /app/media/documents/parity.pdf && echo x > /app/media/images/parity.html'
+expect_status /media/documents/parity.pdf 404
 expect_status /media/images/parity.html 404
-# A document is a download, never rendered inline, not sniffed, and sandboxed (VEN.31).
-headers="$(curl_site -D - -o /dev/null "https://$site/media/documents/parity.pdf" | tr -d '\r')"
-grep -qix 'content-disposition: attachment' <<<"$headers" || fail "a PDF is not an attachment"
-grep -qix 'content-type: application/pdf' <<<"$headers" || fail "a PDF is not served as application/pdf"
-grep -qix 'x-content-type-options: nosniff' <<<"$headers" || fail "a PDF without nosniff"
-grep -qi "^content-security-policy: default-src 'none'.*sandbox" <<<"$headers" || fail "a PDF without the sandbox CSP"
 # Caddy's own responses carry the security headers too, and nothing names the server software
 # (SEC.5): the media 404 here, and a proxied page from gunicorn.
-for url in /media/documents/parity.html /; do
+for url in /media/documents/parity.pdf /; do
   headers="$(curl_site -D - -o /dev/null "https://$site$url" | tr -d '\r')"
   grep -qix 'x-content-type-options: nosniff' <<<"$headers" || fail "GET $url without nosniff"
   grep -qi '^content-security-policy: ' <<<"$headers" || fail "GET $url without a CSP"
   grep -qi '^strict-transport-security: max-age=' <<<"$headers" || fail "GET $url without HSTS"
   ! grep -qiE '^(server|via):' <<<"$headers" || fail "GET $url names the server software"
 done
-podman exec mpmv-app rm /app/media/documents/parity.pdf /app/media/documents/parity.html /app/media/images/parity.html
+podman exec mpmv-app rm /app/media/documents/parity.pdf /app/media/images/parity.html
 # A missing image in a public folder is a 404 that no shared cache may keep (the media handler's
 # public Cache-Control must not leak into Caddy's error response).
 headers="$(curl_site -D - -o /dev/null "https://$site/media/images/parity-missing.png" | tr -d '\r')"

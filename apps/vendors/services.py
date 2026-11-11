@@ -137,31 +137,33 @@ def _clean_rich_text(html: str) -> str:
 
 def media_problem(vendor: Vendor, html: str) -> str | None:
     """Why a stored rich text may not be published for `vendor`, or None: its links are https
-    addresses (or the vendor's own documents), and every image it embeds
-    and every document it links must be in the vendor's own collection (depth 2, named by
-    `engine.vendor_collection_name`) or below it. A foreign, missing or non-numeric id is a
-    problem, so crafted HTML cannot reach another vendor's files (D-34)."""
+    addresses, it links no document (waits for ARC.15), and every image it embeds is in the
+    vendor's own collection (depth 2, named by `engine.vendor_collection_name`) or below it. A
+    foreign, missing or non-numeric id is a problem, so crafted HTML cannot reach another
+    vendor's files (D-34)."""
     if engine.has_page_link(html):
         return "Links to other pages of the site are not allowed here."
     if engine.has_unsafe_link(html):
         return "Links must be web addresses starting with https://"
     images, documents = engine.media_references(html)
-    if not images and not documents:
+    if documents:
+        # A vendor PDF would be public by URL: no document link until ARC.15 (private storage).
+        return "Links to documents are not available yet."
+    if not images:
         return None
-    if not all(ref.isdecimal() for ref in (*images, *documents)):
-        return "Choose images and documents from your own library."
+    if not all(ref.isdecimal() for ref in images):
+        return "Choose images from your own library."
     own = ImageCollection.objects.filter(
         depth=2, name=engine.vendor_collection_name(str(vendor.public_id))
     ).first()
     if own is None:
-        return "Choose images and documents from your own library."
+        return "Choose images from your own library."
     allowed = ImageCollection.objects.descendant_of(own, inclusive=True)
-    for model, refs in ((get_image_model(), images), (get_document_model(), documents)):
-        wanted = {int(ref) for ref in refs}
-        if wanted and model.objects.filter(pk__in=wanted, collection__in=allowed).count() != len(
-            wanted
-        ):
-            return "Choose images and documents from your own library."
+    wanted = {int(ref) for ref in images}
+    if get_image_model().objects.filter(pk__in=wanted, collection__in=allowed).count() != len(
+        wanted
+    ):
+        return "Choose images from your own library."
     return None
 
 

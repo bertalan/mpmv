@@ -638,6 +638,9 @@ ACTIVE_PDF_NAMES = re.compile(
 )
 # `/J#61vaScript` is the same name as `/JavaScript`: no name with a hex escape is accepted.
 ESCAPED_PDF_NAME = re.compile(rb"/[^\s/<>\[\]()%]*#[0-9A-Fa-f]{2}")
+# Stream bodies are compressed or binary data: random bytes there look like names, so only the
+# object and dictionary syntax around them is scanned.
+STREAM_BODY = re.compile(rb"(?<![A-Za-z])stream\r?\n.*?endstream", re.DOTALL)
 ZIP_END_RECORD = b"PK\x05\x06"
 ZIP_END_WINDOW = 22 + 0xFFFF  # the record and the longest archive comment
 
@@ -659,6 +662,7 @@ def check_document(data: bytes, name: str, *, max_bytes: int) -> str:
         raise UploadRefused("polyglot", "The file mixes a PDF with an archive.")
     if not data.rstrip().endswith(b"%%EOF"):
         raise UploadRefused("polyglot", "The file has data after the end of the PDF.")
-    if ACTIVE_PDF_NAMES.search(data) or ESCAPED_PDF_NAME.search(data):
+    syntax = STREAM_BODY.sub(b" ", data)
+    if ACTIVE_PDF_NAMES.search(syntax) or ESCAPED_PDF_NAME.search(syntax):
         raise UploadRefused("active_content", "The PDF contains scripts or embedded actions.")
     return safe_filename(name, "pdf")

@@ -70,9 +70,9 @@
 	encode zstd gzip
 
 	# Public media: only image files in Wagtail's image folders (the THM.12 allow-list), straight
-	# from the mpmv-media volume (read-only). Everything else under /media/ is a 404, so any private
-	# upload never becomes public by path (private files belong in ARC.15's private storage); the
-	# one exception is the `.pdf` documents below.
+	# from the mpmv-media volume (read-only). Everything else under /media/ is a 404, so documents
+	# and any private upload never become public by path (Wagtail documents have no serve view
+	# mounted; private files belong in ARC.15's private storage).
 	# The files are inert: no listing, no MIME sniffing (the type comes from the allowed extension),
 	# a sandbox CSP if one is opened directly (SEC.4). Originals and renditions are re-encoded by
 	# the app, without metadata, under names it makes (SEC.2, apps/core/uploads.py).
@@ -89,22 +89,6 @@
 		@not_svg not path_regexp (?i)\.svg$
 		header @svg Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; sandbox"
 		header @not_svg Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; sandbox"
-		file_server
-	}
-
-	# Public documents (VEN.31): only `.pdf` files straight in `documents/`, which a vendor links
-	# from a storefront text. A download, never rendered inline (Content-Disposition), not sniffed,
-	# and a sandbox CSP if opened directly. The app accepts only checked PDFs, under names it makes
-	# (apps/core/uploads.py `check_document`). Keep the pattern in sync with tests/upload_corpus.py.
-	@public_documents path_regexp public_documents ^/media/documents/[^/]+\.(?i:pdf)$
-	handle @public_documents {
-		uri strip_prefix /media
-		root * /srv/media
-		header X-Content-Type-Options nosniff
-		header Content-Type "application/pdf"
-		header Content-Disposition "attachment"
-		header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; sandbox"
-		header Cache-Control "public, max-age=86400"
 		file_server
 	}
 

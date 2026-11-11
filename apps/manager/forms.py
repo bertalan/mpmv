@@ -13,10 +13,12 @@ from apps.vendors.engine import LOGO_ALT_MAX_LENGTH, PROFILE_MAX_LENGTH
 
 # Wagtail's default editor features (D-34), minus the ones whose chooser the Manager does not
 # serve. Vendor members have no access to the Wagtail admin (`VendorAdminRefusalBackend`):
-# `image`, `document-link` and `link` use the Manager chooser and link dialog (VEN.31); `embed`
-# (media) would only fail for them. The service refuses any image or document outside the
-# vendor's own collection and any page link, so crafted HTML is no way around.
-CHOOSER_FEATURES = frozenset({"embed"})
+# `image` and `link` use the Manager chooser and link dialog (VEN.31); `embed` (media) would only
+# fail for them. `document-link` is off until ARC.15 (private storage with signed, expiring URLs):
+# a vendor PDF would be public by URL (owner decision). The service refuses any image outside the
+# vendor's own collection, any page or document link and any non-https link, so crafted HTML is
+# no way around.
+CHOOSER_FEATURES = frozenset({"embed", "document-link"})
 MANAGER_RICH_TEXT_FEATURES = [
     name for name in feature_registry.get_default_features() if name not in CHOOSER_FEATURES
 ]
@@ -40,10 +42,6 @@ def _editor() -> DraftailRichTextArea:
     for entity in widget.options.get("entityTypes", []):
         if entity.get("type") == "IMAGE":
             entity["chooserUrls"] = {"imageChooser": reverse_lazy("manager:shop:image_choose")}
-        elif entity.get("type") == "DOCUMENT":
-            entity["chooserUrls"] = {
-                "documentChooser": reverse_lazy("manager:shop:document_choose")
-            }
         elif entity.get("type") == "LINK":
             # The Manager dialog takes external links only: no page, email, phone or anchor chooser.
             link = reverse_lazy("manager:shop:link_choose")
