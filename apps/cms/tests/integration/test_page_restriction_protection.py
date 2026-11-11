@@ -173,3 +173,88 @@ def test_the_block_check_is_gone() -> None:
     from apps.cms import checks as cms_checks
 
     assert not hasattr(cms_checks, "check_no_page_restrictions")
+
+
+# --- Security review of #251
+
+
+def test_an_unknown_restriction_id_creates_no_restriction_bucket(client: Client) -> None:
+    from apps.core.models import Throttle
+
+    response = client.post(
+        "/_util/authenticate_with_password/987654/987654/",
+        {"password": "x", TOKEN_FIELD: GOOD},
+        REMOTE_ADDR="198.51.100.10",
+    )
+    assert response.status_code == 404
+    keys = list(Throttle.objects.values_list("key", flat=True))
+    assert not [k for k in keys if "restriction:" in k]  # only the IP bucket exists
+
+
+def test_only_failed_attempts_count_against_the_restriction(client: Client) -> None:
+    """A visitor who knows the password is never locked out by other people's good traffic, and
+    refusals before the view (captcha, IP bucket) do not use the restriction's budget."""
+    restriction, password = _restricted()
+    with override_settings(PAGE_RESTRICTION_LIMIT=2, PAGE_RESTRICTION_IP_LIMIT=100):
+        for _ in range(5):
+            assert _post(client, restriction, password) == 302  # successes are free
+            assert _post(client, restriction, password, token="bad") == 400  # captcha: free
+        assert _post(client, restriction, "wrong-1") == 200
+        assert _post(client, restriction, "wrong-2") == 200
+        assert _post(client, restriction, "wrong-3") == 429  # two failures used the budget
+        assert _post(client, restriction, password) == 429  # the lock is on the restriction
+
+
+def test_a_page_type_with_its_own_template_still_gets_the_captcha(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The verify runs before the view, whatever template a page type renders."""
+    from apps.cms.models import StandardPage
+
+    monkeypatch.setattr(StandardPage, "password_required_template", "wagtailcore/login.html")
+    restriction, password = _restricted()
+    assert _post(client, restriction, password, token=None) == 400
+    assert SESSION_KEY not in client.session
+
+
+def test_every_page_type_renders_a_template_with_the_captcha_widget() -> None:
+    from django.template.loader import get_template
+    from wagtail.models import Page
+
+    from apps.core.public_forms import _page_classes
+
+    templates = {
+        cls.password_required_template  # type: ignore[attr-defined]
+        for cls in _page_classes()
+        if issubclass(cls, Page)
+    }
+    assert templates == {"wagtailcore/password_required.html"}
+    assert "captcha_widget" in get_template(next(iter(templates))).template.source  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize("prefix", ["/it", "/en"])
+def test_the_language_prefixed_route_is_limited_and_verified(client: Client, prefix: str) -> None:
+    restriction, password = _restricted()
+    url = prefix + _url(restriction)
+    bad = client.post(url, {"password": password, "return_url": "/"}, REMOTE_ADDR="198.51.100.10")
+    assert bad.status_code == 400
+    for _ in range(settings.PAGE_RESTRICTION_IP_LIMIT - 1):
+        client.post(url, {"password": "x", TOKEN_FIELD: GOOD}, REMOTE_ADDR="198.51.100.10")
+    limited = client.post(url, {"password": "x", TOKEN_FIELD: GOOD}, REMOTE_ADDR="198.51.100.10")
+    assert limited.status_code == 429
+
+
+def test_a_route_without_the_trailing_slash_is_redirected_not_processed(client: Client) -> None:
+    from apps.core.models import Throttle
+
+    response = client.get("/_util/login", REMOTE_ADDR="198.51.100.10")
+    assert response.status_code == 301
+    assert response["Location"].endswith("/_util/login/")
+    assert not Throttle.objects.exists()
+
+
+def test_a_wrong_login_with_a_valid_captcha_is_counted_and_signs_nobody_in(client: Client) -> None:
+    user = UserFactory.create(password=secrets.token_urlsafe(12))
+    data = {"username": user.email, "password": "wrong-" + secrets.token_hex(4), TOKEN_FIELD: GOOD}
+    assert client.post("/_util/login/", data, REMOTE_ADDR="198.51.100.10").status_code == 200
+    assert "_auth_user_id" not in client.session
