@@ -1,6 +1,6 @@
 # ADR-0009: Private vendor documents (storage, versions, signed reads, audit)
 
-- **Status:** Proposed
+- **Status:** Accepted (owner and lane-a, 2026-11-11)
 - **Date:** 2026-11-11
 - **Deciders:** project owner, tech lead (storage backend choice: lane-a and owner, see Open points)
 - **Backlog:** ARC.15 (storage), VEN.32 (versioned documents), VEN.31 (document link), SEC.2,
@@ -58,8 +58,10 @@ Public media (product images, Wagtail images) stays on its own path and CDN and 
   referenced by an order. The "current" version is a pointer on the document.
 - **Upload pipeline:** SEC.2 (type sniffing, size cap, re-encoding of images, EXIF stripped).
   PDFs reuse the SEC.2 active-content check (no JavaScript, no launch or embedded-file actions,
-  no XFA, encrypted PDFs refused); an antivirus scan runs when SEC.2 provides one. A file that
-  fails is never stored.
+  no XFA, encrypted PDFs refused). **Every vendor upload is then scanned by an antivirus engine
+  before acceptance** (SEC.15, scanner container OPS.12): fail closed when the scanner is down or
+  times out; the scan result and the signature database version are recorded on the document
+  version. A file that fails is never stored.
 - **Access rules** (one function, `can_read_document(user, version)`, default deny):
   - vendor owner and members of the owning vendor (`current_vendor`, CORE.3);
   - platform staff only by CORE.18 section (Catalog and moderation, Finance and payments, Support,
@@ -116,6 +118,9 @@ Public media (product images, Wagtail images) stays on its own path and CDN and 
 | Overwrite or tampering with a relied-on version | Write-once blobs, hash-addressed, DB trigger on referenced versions, restore drill verifies hashes |
 | Path traversal or direct file access | Path built only from `(vendor id, sha256)`, volume outside `MEDIA_ROOT` and outside any static root, internal-only Caddy route (not reachable by a client) |
 | Bearer URL in phase 2 skipping our audit | TTL of 60 seconds or less, issue-time audit, bucket private with no public policy, access keys scoped to one bucket |
+| Scanner bypass (malware accepted when the engine is down, skipped or outdated) | Fail closed: no scan result, no acceptance; no code path stores a file without a recorded result; signature version stored per version; stale signatures alert (OPS.12); on-demand rescan of stored versions after an update |
+| Denial of service by large files, zip bombs or slow-scan files | Size cap before the scan, archive limits (depth, entry count, expanded size) refused rather than expanded, scan timeout (30 s), scanner container memory and CPU limits, upload rate limits per vendor, scanner isolated from the app's resources |
+| Scanner compromise through a crafted file | Own container, read-only root filesystem, no network except the private socket, no access to the document store or secrets, signatures volume only |
 | Customer privacy in the audit trail | Pseudonymised reader, no plain identifiers in `AuditLog` |
 | Staff over-reach | CORE.18 section check, each staff read audited with the user |
 
@@ -132,12 +137,30 @@ Public media (product images, Wagtail images) stays on its own path and CDN and 
 - ARC.15 changes from "Hetzner Object Storage" to "private storage interface, local backend
   first". Public media storage keeps its own path.
 
-## Open points (back to lane-a and the owner)
+## Decision outcome (2026-11-11)
 
-1. Backend for LIVE: stay local, or move to S3-compatible storage and when (cost, durability,
-   second host). Default proposal: local on STAGE, decide before the first LIVE vendor upload.
-2. Which document classes are single-use (proposal: contracts and anything a customer reads).
-3. Default link TTL (proposal 5 minutes) and maximum (15).
-4. Whether the antivirus scan (for example ClamAV in a container) is required in phase 1 or the
-   SEC.2 structural checks are enough.
-5. Whether the vendor may mark a document customer-visible, or only the platform.
+- **Backend:** local private backend on the server first; object storage later behind the same
+  interface (owner).
+- **Antivirus from phase 1** (owner): a ClamAV-class scanner in its own container with its own
+  Quadlet unit (OPS.12, lane-a deploys it on STAGE); every vendor upload is scanned before
+  acceptance (SEC.15); fail closed when the scanner is down or times out; signatures update
+  automatically; scan result and signature version are recorded with the document version.
+- **Customer visibility** (owner): the vendor marks documents customer-visible; the platform can
+  revoke the mark.
+- **Links** (lane-a): TTL 5 minutes, maximum 15; single-use for contracts and certificates.
+
+## Operational notes
+
+- Signature updates at least every 6 hours; alert after 24 h without a successful update and
+  when the database is older than 48 h.
+- Scanner health (ping plus an EICAR self-test), latency and the count of `upload.scan_unavailable`
+  events feed the OPS.2 alerts. While the scanner is down vendors cannot upload; reads of stored
+  documents are unaffected.
+- After a signature update staff can rescan stored versions on demand (audited); a version that
+  turns out infected is blocked from serving (kept for referenced orders, flagged for staff).
+- Runbook (OPS.3): restart, manual update, behaviour during an outage.
+
+## Open points
+
+1. Document classes beyond contracts and certificates that should be single-use (default: no).
+2. Switch date to object storage, to be decided once volume or a second host justifies it.
