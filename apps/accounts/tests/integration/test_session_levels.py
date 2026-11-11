@@ -500,6 +500,7 @@ WIRED = {
     "owner_role_grant",
     "payout_details",
     "api_key",
+    "profile_revert",
 }
 # Actions whose web view does not exist yet: nothing to decorate (follow-ups in the PR).
 NOT_BUILT = {"tax_in_clear", "export", "backup", "bulk_edit", "impersonation"}
@@ -542,6 +543,36 @@ def test_no_unclassified_view_looks_like_a_sensitive_action() -> None:
             if pattern.search(text) and "requires_level(" not in text and "level=" not in text:
                 hits.append(path.name)
     assert not hits, f"sensitive-looking views with no level gate: {hits}"
+
+
+# Manager POST views that run in any session (group 1: shop owners' own data, picking a vendor,
+# notice handling). Every other Manager view with a `post` must name `requires_level`.
+MANAGER_FREE_POST = {
+    "StorefrontProfileView",
+    "VendorOrderActionView",
+    "VendorPickerView",
+    "NoticeDetailView",
+    "ManagerImageUploadView",
+    "ManagerListView",
+    "LoginView",
+}
+
+
+def test_every_mutating_manager_post_view_is_gated_or_listed_as_free() -> None:
+    import ast
+
+    root = Path(__file__).resolve().parents[4] / "apps" / "manager"
+    ungated = []
+    for name in ("views.py", "notice_views.py", "lists.py", "media.py"):
+        source = (root / name).read_text()
+        for node in ast.walk(ast.parse(source)):
+            if not isinstance(node, ast.ClassDef) or node.name in MANAGER_FREE_POST:
+                continue
+            has_post = any(isinstance(m, ast.FunctionDef) and m.name == "post" for m in node.body)
+            text = ast.get_source_segment(source, node) or ""
+            if has_post and "requires_level(" not in text:
+                ungated.append(f"{name}:{node.name}")
+    assert not ungated, f"Manager POST views with no requires_level: {ungated}"
 
 
 # --- Security review fixes (PR 234)

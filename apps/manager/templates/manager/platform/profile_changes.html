@@ -29,7 +29,8 @@ values are escaped by the template engine: rich text shows as its stored HTML so
           <form method="post" action="{% url 'manager:platform:profile_revert' entry=row.entry.public_id %}" class="manager-form">
             {% csrf_token %}
             <label for="reason-{{ row.entry.public_id }}">{% translate "Reason (sent to the owners)" %}</label>
-            <textarea id="reason-{{ row.entry.public_id }}" name="reason" rows="3" maxlength="1000" required></textarea>
+            <p id="reason-help-{{ row.entry.public_id }}" class="manager-help">{% translate "Plain text. The owners and the audit trail keep it: do not write personal data, such as names, emails or phone numbers." %}</p>
+            <textarea id="reason-{{ row.entry.public_id }}" name="reason" aria-describedby="reason-help-{{ row.entry.public_id }}" rows="3" maxlength="1000" required></textarea>
             {% include "components/button.html" with label=_("Revert this change") type="submit" only %}
           </form>
         {% endif %}

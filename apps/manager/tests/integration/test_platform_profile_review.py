@@ -5,6 +5,7 @@ from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
 
+from apps.accounts import levels
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.mfa import verified_login
@@ -187,3 +188,55 @@ def test_the_other_platform_roles_get_404(client: Client, changed: AuditLog, key
     verified_login(client, member)
     assert client.get(PAGE).status_code == 404
     assert client.post(revert_url(changed), {"reason": "x"}).status_code == 404
+
+
+# --- CORE.25: the revert is a group 2 action (needs operational mode)
+
+
+@pytest.fixture
+def logo_entry(vendor: Vendor, owner: User) -> AuditLog:
+    set_vendor_logo(
+        vendor,
+        upload=SimpleUploadedFile("logo.png", png()),
+        alt="Shop mark",
+        actor=owner,
+        ctx=CTX,
+    )
+    return AuditLog.objects.get(action="vendor.logo_changed")
+
+
+def test_a_restricted_session_cannot_revert_a_text_change(
+    client: Client, reviewer: User, changed: AuditLog, vendor: Vendor
+) -> None:
+    verified_login(client, reviewer, level=levels.RESTRICTED)
+    response = client.post(revert_url(changed), {"reason": "Not acceptable."})
+    assert response.status_code == 403
+    assert VendorTranslation.objects.get(vendor=vendor, language="en").tagline == "New tagline"
+    assert not AuditLog.objects.filter(action="vendor.profile_reverted").exists()
+
+
+def test_a_restricted_session_cannot_revert_a_logo_change(
+    client: Client, reviewer: User, logo_entry: AuditLog, vendor: Vendor
+) -> None:
+    verified_login(client, reviewer, level=levels.RESTRICTED)
+    assert client.post(revert_url(logo_entry), {"reason": "Not theirs."}).status_code == 403
+    vendor.refresh_from_db()
+    assert vendor.logo is not None
+    assert not AuditLog.objects.filter(action="vendor.logo_reverted").exists()
+
+
+def test_an_operational_session_reverts_both_kinds(
+    client: Client, reviewer: User, changed: AuditLog, logo_entry: AuditLog, vendor: Vendor
+) -> None:
+    verified_login(client, reviewer, level=levels.OPERATIONAL)
+    client.post(revert_url(changed), {"reason": "Not acceptable."})
+    client.post(revert_url(logo_entry), {"reason": "Not theirs."})
+    assert AuditLog.objects.filter(action="vendor.profile_reverted").count() == 1
+    assert AuditLog.objects.filter(action="vendor.logo_reverted").count() == 1
+
+
+def test_the_reason_field_warns_against_personal_data(
+    client: Client, reviewer: User, changed: AuditLog
+) -> None:
+    verified_login(client, reviewer)
+    assert "personal data" in client.get(PAGE).text

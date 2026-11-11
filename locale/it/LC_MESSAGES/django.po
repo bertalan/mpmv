@@ -569,6 +569,14 @@ msgstr "Effettuato il"
 msgid "Plain text for people who cannot see the image, for example the shop name."
 msgstr "Testo semplice per chi non vede l’immagine, per esempio il nome del negozio."
 
+#: apps/manager/templates/manager/platform/profile_changes.html
+msgid ""
+"Plain text. The owners and the audit trail keep it: do not write personal data, such as names, "
+"emails or phone numbers."
+msgstr ""
+"Testo semplice. I titolari e il registro delle modifiche lo conservano: non scrivere dati "
+"personali, come nomi, email o numeri di telefono."
+
 #: apps/manager/templates/manager/layout.html
 msgid "Platform"
 msgstr "Piattaforma"

@@ -23,7 +23,7 @@ from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 
-from apps.accounts.decorators import mfa_exempt, mfa_redirect
+from apps.accounts.decorators import mfa_exempt, mfa_redirect, requires_level
 from apps.accounts.forms import ManagerLoginForm
 from apps.accounts.mfa_session import is_recently_verified
 from apps.accounts.models import User
@@ -450,6 +450,11 @@ class ProfileRevertView(ManagerView):
     http_method_names = ["post"]
 
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        # Group 2 (CORE.25): a restricted session is prompted, an operational one goes on.
+        gated = requires_level("profile_revert")(self._revert)
+        return gated(request, *args, **kwargs)
+
+    def _revert(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         actor = self.manager.user
         if not isinstance(actor, User):
             raise Http404("No Manager page here.")
