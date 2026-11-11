@@ -726,7 +726,12 @@ def blank_stream_bodies(data: bytes) -> bytes:
             if start == pos or length is None or length < 0:
                 continue
             end = start + length
-            if end <= len(data) and _PDF_END_STREAM.match(data, end):
+            # A body that holds an `endstream` is not one stream: a reader may stop there.
+            if (
+                end <= len(data)
+                and _PDF_END_STREAM.match(data, end)
+                and data.find(b"endstream", start, end) < 0
+            ):
                 pieces.append(data[kept_from:start])
                 kept_from = end
                 pos = end

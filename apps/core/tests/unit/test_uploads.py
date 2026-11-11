@@ -81,6 +81,7 @@ def test_a_large_pdf_with_compressed_streams_is_not_mistaken_for_active_content(
     """Random bytes inside a stream contain `/xx#41`-like runs and name-like tokens by chance:
     only the object syntax is scanned, never the stream bodies."""
     body = random.Random(20261111).randbytes(size)  # noqa: S311  # deterministic test data
+    assert b"endstream" not in body  # fixed seed: change it if this ever fires
     data = (
         b"%PDF-1.5\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
         b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
@@ -136,6 +137,18 @@ def test_active_syntax_is_not_hidden_behind_stream_words(middle: bytes) -> None:
     """Only a real stream body is blanked: a dictionary, `stream`, exactly `/Length` bytes and
     `endstream`. Anything else is scanned as it is (a false refusal is fine, a bypass is not)."""
     data = b"%PDF-1.5\n1 0 obj\n" + middle + b"endobj\nstartxref\n0\n%%EOF\n"
+    with pytest.raises(UploadRefused):
+        check_document(data, "a.pdf", max_bytes=MAX_DOCUMENT_BYTES)
+
+
+def test_a_length_that_swallows_a_later_endstream_and_object_is_scanned() -> None:
+    body = b"x\nendstream\nendobj\n5 0 obj\n<< /OpenAction << /S /JavaScript >> >>\nendobj\n6 0 obj"
+    data = (
+        b"%PDF-1.5\n1 0 obj\n"
+        + b"<< /Length %d >>\nstream\n" % len(body)
+        + body
+        + b"\nendstream\nendobj\nstartxref\n0\n%%EOF\n"
+    )
     with pytest.raises(UploadRefused):
         check_document(data, "a.pdf", max_bytes=MAX_DOCUMENT_BYTES)
 
