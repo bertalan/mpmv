@@ -225,7 +225,12 @@ def test_an_invalid_requester_has_its_own_detail_a_warning_and_a_long_negative_c
         check = services.verify_vat_number("DE", "DE123456789", client=client, requester=VENDOR)
     assert check.verified is False
     assert check.detail == engine.DETAIL_INVALID_REQUESTER
-    assert "IT01234567897" in caplog.text
+    # the warning names the refusal; the log redacts the VAT numbers (personal data for a sole
+    # trader, OPS.2): the full values stay in the consultation log table
+    assert "VIES refused the requester" in caplog.text
+    assert "invalid_requester" in caplog.text
+    assert "IT01234567897" not in caplog.text
+    assert "DE123456789" not in caplog.text
     # an hour later (past the 5 minute outage cache) the same vendor is still not asked again
     VatValidation.objects.filter().count()
     row = check.validation
@@ -355,3 +360,19 @@ def test_an_order_check_with_the_wrong_prefix_is_not_verified_and_asks_nothing()
     assert check.verified is False
     assert check.reason == engine.VAT_REASON_PREFIX_MISMATCH
     assert client.calls == []
+
+
+def test_the_unavailable_warning_names_the_reason_but_not_the_vat_number(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class Down(RequesterAwareClient):
+        def check(self, query: ViesQuery, *, requester: ViesQuery | None = None) -> ViesAnswer:
+            self.calls.append(query)
+            return ViesAnswer(result=engine.VAT_UNAVAILABLE, detail=engine.DETAIL_TIMEOUT)
+
+    with caplog.at_level("WARNING"):
+        services.verify_vat_number("DE", "DE123456789", client=Down(), requester=VENDOR)
+    assert "VIES unavailable" in caplog.text
+    assert engine.DETAIL_TIMEOUT in caplog.text
+    assert "DE123456789" not in caplog.text
+    assert "123456789" not in caplog.text
