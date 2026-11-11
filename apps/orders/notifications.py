@@ -12,7 +12,8 @@ address it must ship to, never the buyer's email, billing address or other vendo
 payment reference, commission or tax identifier of the buyer enters any context. The platform
 never sends invoices or receipts: the per-vendor confirmation is a non-fiscal document.
 
-Emails render in the order's language snapshot, English when it is not configured.
+Customer emails render in the order's language snapshot, vendor emails in the vendor's mail
+language (ORD.16); the platform language (English) stands in when it is not configured.
 """
 
 import logging
@@ -81,6 +82,12 @@ def _ship_to(order: Order) -> list[str]:
     return [part for part in parts if part] + [order.shipping_country]
 
 
+def _vendor_language(sub: VendorOrder) -> str:
+    """The vendor's mail language (ORD.16), the platform language when it has none. One that is
+    no longer configured falls back the same way when the email is queued."""
+    return str(sub.vendor.mail_language or settings.LANGUAGE_CODE)
+
+
 def _vendor_name(sub: VendorOrder) -> str:
     return str(sub.vendor_snapshot.get("display_name") or sub.vendor.display_name)
 
@@ -135,7 +142,7 @@ def notify_order_paid(order: Order) -> None:
             enqueue_email(
                 recipient=sub.vendor.contact_email,
                 template_key=VENDOR_NEW_ORDER,
-                language=settings.LANGUAGE_CODE,  # vendors have no language of their own yet
+                language=_vendor_language(sub),
                 idempotency_key=f"vendor-order:{sub.public_id}:new",
                 context={
                     "order_number": order.number,
@@ -192,7 +199,7 @@ def notify_vendor_order_cancelled(sub: VendorOrder) -> None:
         enqueue_email(
             recipient=sub.vendor.contact_email,
             template_key=VENDOR_ORDER_CANCELLED_NOTICE,
-            language=settings.LANGUAGE_CODE,
+            language=_vendor_language(sub),
             idempotency_key=f"vendor-order:{sub.public_id}:cancelled-notice",
             context={
                 "order_number": order.number,

@@ -28,13 +28,21 @@ import polib
 
 ROOT = Path(__file__).resolve().parent.parent
 LOCALE = ROOT / "locale"
-LANGUAGES = ("it",)  # grows with I18N.7 slices: de, fr, es
+LANGUAGES = ("it", "de", "fr", "es")  # grows with I18N.7 slices
 SCOPES = (
     "apps/manager",
     "apps/accounts",
     "apps/orders/templates",
+    "apps/vendors/models.py",
     "themes/base/templates/layouts",
 )
+# German, French and Spanish start with the order emails (ORD.16); the Manager and account pages
+# join them with their own I18N.7 slices. Italian covers every scope.
+LANGUAGE_SCOPES: dict[str, tuple[str, ...]] = {
+    "de": ("apps/orders/templates",),
+    "fr": ("apps/orders/templates",),
+    "es": ("apps/orders/templates",),
+}
 # Theme files rendered by the Manager and account pages (the rest of the theme is storefront).
 THEME_FILES = (
     "400.html",
@@ -68,15 +76,17 @@ PLURAL = {"ngettext", "ngettext_lazy"}
 CONTEXT_PLURAL = {"npgettext", "npgettext_lazy"}
 
 
-def _files() -> Iterator[Path]:
-    for scope in SCOPES:
-        for path in sorted((ROOT / scope).rglob("*")):
+def _files(scopes: tuple[str, ...] = SCOPES) -> Iterator[Path]:
+    for scope in scopes:
+        root = ROOT / scope
+        for path in [root] if root.is_file() else sorted(root.rglob("*")):
             rel = path.relative_to(ROOT)
             if SKIP_PARTS & set(rel.parts) or path.suffix not in {".py", ".html", ".txt"}:
                 continue
             yield path
-    for name in THEME_FILES:
-        yield ROOT / "themes/base/templates" / name
+    if scopes == SCOPES:
+        for name in THEME_FILES:
+            yield ROOT / "themes/base/templates" / name
 
 
 def _source(path: Path) -> str:
@@ -151,9 +161,11 @@ def _entries(path: Path) -> Iterator[tuple[str, str | None, str | None, int]]:
             yield args[1], args[0], args[2], node.lineno
 
 
-def collect() -> dict[tuple[str, str | None], tuple[str | None, list[str]]]:
+def collect(
+    scopes: tuple[str, ...] = SCOPES,
+) -> dict[tuple[str, str | None], tuple[str | None, list[str]]]:
     found: dict[tuple[str, str | None], tuple[str | None, list[str]]] = {}
-    for path in _files():
+    for path in _files(scopes):
         rel = str(path.relative_to(ROOT))
         for msgid, ctx, plural, _line in _entries(path):
             plural0, places = found.get((msgid, ctx), (plural, []))
@@ -168,8 +180,8 @@ def _po_path(lang: str) -> Path:
 
 
 def extract() -> None:
-    found = collect()
     for lang in LANGUAGES:
+        found = collect(LANGUAGE_SCOPES.get(lang, SCOPES))
         path = _po_path(lang)
         old = polib.pofile(str(path)) if path.exists() else None
         known = {(e.msgid, e.msgctxt): e for e in old} if old else {}
@@ -221,9 +233,9 @@ def compile_all() -> None:
 
 
 def check() -> int:
-    found = collect()
     bad = 0
     for lang in LANGUAGES:
+        found = collect(LANGUAGE_SCOPES.get(lang, SCOPES))
         path = _po_path(lang)
         po = polib.pofile(str(path))
         have = {(e.msgid, e.msgctxt) for e in po}

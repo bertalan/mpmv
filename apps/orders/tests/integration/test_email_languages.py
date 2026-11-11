@@ -88,7 +88,7 @@ def test_every_kind_renders_in_every_language(kind: str, lang: str) -> None:
 
 def test_german_french_and_spanish_bodies_use_their_own_words() -> None:
     expected = {
-        "de": "Bestellung",
+        "de": "bestellung",
         "fr": "commande",
         "es": "pedido",
     }

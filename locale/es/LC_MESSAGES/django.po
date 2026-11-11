@@ -1,0 +1,159 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: MPMV\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: apps/orders/templates/email/orders/vendor_order_shipped/body.html
+#: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
+msgid "%(vendor_name)s shipped its part of order %(order_number)s."
+msgstr "%(vendor_name)s ha enviado su parte del pedido %(order_number)s."
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+msgid "%(vendor_name)s's part of order %(order_number)s was cancelled."
+msgstr ""
+"La parte del pedido %(order_number)s de %(vendor_name)s se ha cancelado."
+
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
+msgid "%(vendor_name)s's part of order %(order_number)s was delivered."
+msgstr ""
+"La parte del pedido %(order_number)s de %(vendor_name)s se ha entregado."
+
+#: apps/orders/templates/email/orders/vendor_new_order/body.html
+#: apps/orders/templates/email/orders/vendor_new_order/body.txt
+msgid "%(vendor_name)s: new paid order %(order_number)s to ship:"
+msgstr "%(vendor_name)s: nuevo pedido pagado %(order_number)s para enviar:"
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/subject.txt
+msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
+msgstr "%(vendor_name)s: pedido %(order_number)s cancelado, no enviar"
+
+#: apps/orders/templates/email/orders/vendor_order_shipped/body.html
+#: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
+msgid "Carrier: %(carrier)s. Tracking number: %(tracking_number)s."
+msgstr ""
+"Transportista: %(carrier)s. Número de seguimiento: %(tracking_number)s."
+
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+#: apps/orders/templates/email/orders/order_received/body.html
+#: apps/orders/templates/email/orders/order_received/body.txt
+#: apps/orders/templates/email/orders/payment_confirmed/body.html
+#: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
+#: apps/orders/templates/email/orders/vendor_order_shipped/body.html
+#: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
+msgid "Hello %(customer_name)s,"
+msgstr "Hola %(customer_name)s,"
+
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+#: apps/orders/templates/email/orders/order_received/body.html
+#: apps/orders/templates/email/orders/order_received/body.txt
+#: apps/orders/templates/email/orders/payment_confirmed/body.html
+#: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
+#: apps/orders/templates/email/orders/vendor_order_shipped/body.html
+#: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
+msgid "Hello,"
+msgstr "Hola,"
+
+#: apps/orders/templates/email/orders/vendor_new_order/subject.txt
+msgid "New paid order %(order_number)s"
+msgstr "Nuevo pedido pagado %(order_number)s"
+
+#: apps/orders/templates/email/orders/order_cancelled/subject.txt
+msgid "Order %(order_number)s was cancelled"
+msgstr "El pedido %(order_number)s se ha cancelado"
+
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
+msgid ""
+"Order %(order_number)s was cancelled before payment. Nothing was charged."
+msgstr ""
+"El pedido %(order_number)s se ha cancelado antes del pago. No se ha cobrado "
+"nada."
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.txt
+msgid "Order %(order_number)s was cancelled. Do not ship these items:"
+msgstr ""
+"El pedido %(order_number)s se ha cancelado. No envíes estos artículos:"
+
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+msgid "Order %(order_number)s, sold by %(vendor_name)s:"
+msgstr "Pedido %(order_number)s, vendido por %(vendor_name)s:"
+
+#: apps/orders/templates/email/orders/vendor_order_shipped/subject.txt
+msgid "Order %(order_number)s: a shipment is on its way"
+msgstr "Pedido %(order_number)s: un envío está en camino"
+
+#: apps/orders/templates/email/orders/vendor_order_delivered/subject.txt
+msgid "Order %(order_number)s: a shipment was delivered"
+msgstr "Pedido %(order_number)s: un envío ha sido entregado"
+
+#: apps/orders/templates/email/orders/order_confirmation/subject.txt
+msgid "Order %(order_number)s: confirmation from %(vendor_name)s"
+msgstr "Pedido %(order_number)s: confirmación de %(vendor_name)s"
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled/subject.txt
+msgid "Order %(order_number)s: part of your order was cancelled"
+msgstr "Pedido %(order_number)s: una parte de tu pedido se ha cancelado"
+
+#: apps/orders/templates/email/orders/payment_confirmed/subject.txt
+msgid "Payment received for order %(order_number)s"
+msgstr "Pago recibido del pedido %(order_number)s"
+
+#: apps/orders/templates/email/orders/vendor_new_order/body.html
+#: apps/orders/templates/email/orders/vendor_new_order/body.txt
+msgid "Ship to:"
+msgstr "Enviar a:"
+
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+msgid "Shipping: %(shipping)s EUR"
+msgstr "Envío: %(shipping)s EUR"
+
+#: apps/orders/templates/email/orders/order_confirmation/body.html
+#: apps/orders/templates/email/orders/order_confirmation/body.txt
+msgid "Total: %(total)s EUR"
+msgstr "Total: %(total)s EUR"
+
+#: apps/orders/templates/email/orders/order_received/subject.txt
+msgid "We received your order %(order_number)s"
+msgstr "Hemos recibido tu pedido %(order_number)s"
+
+#: apps/orders/templates/email/orders/order_received/body.html
+#: apps/orders/templates/email/orders/order_received/body.txt
+msgid ""
+"We received your order %(order_number)s (total %(total)s EUR). We will "
+"confirm it when the payment is complete."
+msgstr ""
+"Hemos recibido tu pedido %(order_number)s (total %(total)s EUR). Te lo "
+"confirmaremos cuando se complete el pago."
+
+#: apps/orders/templates/email/orders/payment_confirmed/body.html
+#: apps/orders/templates/email/orders/payment_confirmed/body.txt
+msgid ""
+"We received your payment of %(total)s EUR for order %(order_number)s. Each "
+"seller will prepare its part and you will get a message when it ships."
+msgstr ""
+"Hemos recibido tu pago de %(total)s EUR del pedido %(order_number)s. Cada "
+"vendedor preparará su parte y recibirás un mensaje cuando se envíe."

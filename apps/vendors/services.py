@@ -97,6 +97,7 @@ VENDOR_FIELDS = (
     "tin_same_as_vat",
     "contact_email",
     "phone",
+    "mail_language",
     "sales_mode_default",
     "enquiries_enabled",
     "legacy_wp_user_id",

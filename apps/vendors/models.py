@@ -14,6 +14,7 @@ from typing import Any, ClassVar
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
+from django.utils.translation import gettext_lazy
 from wagtail.fields import RichTextField
 
 from apps.core.fields import (
@@ -149,6 +150,19 @@ class Vendor(BaseModel):
     country = CountryField(help_text="Country of establishment (ISO 3166-1 alpha-2).")
     contact_email = models.EmailField()
     phone = models.CharField(max_length=32, blank=True)
+    # ORD.16: the language of the vendor's order emails (new order, cancelled order). Empty means
+    # the platform language (`settings.LANGUAGE_CODE`); a language that is no longer configured
+    # falls back to it as well (`core.services.email_language`).
+    mail_language = models.CharField(
+        gettext_lazy("Email language"),
+        max_length=8,
+        blank=True,
+        choices=settings.LANGUAGES,
+        help_text=gettext_lazy(
+            "The language of the order emails we send you, for example a new order to ship. "
+            "Leave it empty to receive them in English."
+        ),
+    )
     sales_mode_default = models.CharField(
         max_length=16, choices=SalesMode.choices, default=SalesMode.BUY
     )

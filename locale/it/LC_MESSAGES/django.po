@@ -29,10 +29,26 @@ msgstr "%(name)s rimosso."
 msgid "%(vendor_name)s shipped its part of order %(order_number)s."
 msgstr "%(vendor_name)s ha spedito la sua parte dell’ordine %(order_number)s."
 
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+msgid "%(vendor_name)s's part of order %(order_number)s was cancelled."
+msgstr ""
+"La parte dell’ordine %(order_number)s di %(vendor_name)s è stata annullata."
+
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
+msgid "%(vendor_name)s's part of order %(order_number)s was delivered."
+msgstr ""
+"La parte dell’ordine %(order_number)s di %(vendor_name)s è stata consegnata."
+
 #: apps/orders/templates/email/orders/vendor_new_order/body.html
 #: apps/orders/templates/email/orders/vendor_new_order/body.txt
 msgid "%(vendor_name)s: new paid order %(order_number)s to ship:"
 msgstr "%(vendor_name)s: nuovo ordine pagato %(order_number)s da spedire:"
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/subject.txt
+msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
+msgstr "%(vendor_name)s: ordine %(order_number)s annullato, non spedire"
 
 #: apps/manager/forms.py
 msgid "About the shop"
@@ -218,6 +234,10 @@ msgstr ""
 msgid "Email"
 msgstr "Email"
 
+#: apps/vendors/models.py
+msgid "Email language"
+msgstr "Lingua delle email"
+
 #: apps/manager/forms.py
 msgid "Enter a valid carrier name."
 msgstr "Inserisci un nome di corriere valido."
@@ -280,23 +300,35 @@ msgstr ""
 msgid "Go to the home page"
 msgstr "Vai alla home page"
 
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Hello %(customer_name)s,"
 msgstr "Ciao %(customer_name)s,"
 
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Hello,"
@@ -486,6 +518,24 @@ msgstr "Ordine"
 msgid "Order %(number)s"
 msgstr "Ordine %(number)s"
 
+#: apps/orders/templates/email/orders/order_cancelled/subject.txt
+msgid "Order %(order_number)s was cancelled"
+msgstr "L’ordine %(order_number)s è stato annullato"
+
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
+msgid ""
+"Order %(order_number)s was cancelled before payment. Nothing was charged."
+msgstr ""
+"L’ordine %(order_number)s è stato annullato prima del pagamento. Non è stato"
+" addebitato nulla."
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.txt
+msgid "Order %(order_number)s was cancelled. Do not ship these items:"
+msgstr ""
+"L’ordine %(order_number)s è stato annullato. Non spedire questi articoli:"
+
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Order %(order_number)s, sold by %(vendor_name)s:"
@@ -495,9 +545,17 @@ msgstr "Ordine %(order_number)s, venduto da %(vendor_name)s:"
 msgid "Order %(order_number)s: a shipment is on its way"
 msgstr "Ordine %(order_number)s: una spedizione è in arrivo"
 
+#: apps/orders/templates/email/orders/vendor_order_delivered/subject.txt
+msgid "Order %(order_number)s: a shipment was delivered"
+msgstr "Ordine %(order_number)s: una spedizione è stata consegnata"
+
 #: apps/orders/templates/email/orders/order_confirmation/subject.txt
 msgid "Order %(order_number)s: confirmation from %(vendor_name)s"
 msgstr "Ordine %(order_number)s: conferma di %(vendor_name)s"
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled/subject.txt
+msgid "Order %(order_number)s: part of your order was cancelled"
+msgstr "Ordine %(order_number)s: una parte del tuo ordine è stata annullata"
 
 #: apps/manager/sections.py apps/manager/templates/manager/shop/orders.html
 msgid "Orders"
@@ -828,6 +886,14 @@ msgstr ""
 "Il modulo è stato inviato da una pagina vecchia o scaduta. Torna indietro, "
 "ricarica la pagina e invialo di nuovo."
 
+#: apps/vendors/models.py
+msgid ""
+"The language of the order emails we send you, for example a new order to "
+"ship. Leave it empty to receive them in English."
+msgstr ""
+"La lingua delle email sugli ordini che ti inviamo, per esempio un nuovo "
+"ordine da spedire. Lasciala vuota per riceverle in inglese."
+
 #: apps/manager/templates/manager/forbidden.html
 msgid ""
 "The Manager is for platform staff and for vendor members. If you need "
@@ -1116,39 +1182,3 @@ msgstr "Il tuo ruolo"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your role requires a second factor before you can continue."
 msgstr "Il tuo ruolo richiede un secondo fattore prima di poter continuare."
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
-#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
-msgid "%(vendor_name)s's part of order %(order_number)s was cancelled."
-msgstr "La parte dell’ordine %(order_number)s di %(vendor_name)s è stata annullata."
-
-#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
-#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
-msgid "%(vendor_name)s's part of order %(order_number)s was delivered."
-msgstr "La parte dell’ordine %(order_number)s di %(vendor_name)s è stata consegnata."
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/subject.txt
-msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
-msgstr "%(vendor_name)s: ordine %(order_number)s annullato, non spedire"
-
-#: apps/orders/templates/email/orders/order_cancelled/subject.txt
-msgid "Order %(order_number)s was cancelled"
-msgstr "L’ordine %(order_number)s è stato annullato"
-
-#: apps/orders/templates/email/orders/order_cancelled/body.html
-#: apps/orders/templates/email/orders/order_cancelled/body.txt
-msgid "Order %(order_number)s was cancelled before payment. Nothing was charged."
-msgstr "L’ordine %(order_number)s è stato annullato prima del pagamento. Non è stato addebitato nulla."
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.html
-#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.txt
-msgid "Order %(order_number)s was cancelled. Do not ship these items:"
-msgstr "L’ordine %(order_number)s è stato annullato. Non spedire questi articoli:"
-
-#: apps/orders/templates/email/orders/vendor_order_delivered/subject.txt
-msgid "Order %(order_number)s: a shipment was delivered"
-msgstr "Ordine %(order_number)s: una spedizione è stata consegnata"
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled/subject.txt
-msgid "Order %(order_number)s: part of your order was cancelled"
-msgstr "Ordine %(order_number)s: una parte del tuo ordine è stata annullata"
