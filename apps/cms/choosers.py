@@ -149,7 +149,7 @@ class ProductFilterForm(BaseFilterForm):  # type: ignore[misc]
                 widget=forms.Select(attrs=attrs),
             )
         self.fields["brand"] = forms.ModelChoiceField(
-            queryset=Brand.objects.order_by("name"),
+            queryset=Brand.objects.filter(status=Brand.Status.APPROVED).order_by("name"),
             required=False,
             empty_label=_("All brands"),
             label=_("Brand"),

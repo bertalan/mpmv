@@ -264,3 +264,16 @@ def test_an_editor_without_a_vendor_sees_every_vendor(
     nail = _product("NAIL-1", "Iron nail", smithy)
     body = _results(client)
     assert _ids_in(body, bowl, nail) == [True, True]
+
+
+def test_the_brand_filter_offers_approved_brands_only(
+    client: Client, editor: User, pottery: Vendor
+) -> None:
+    BrandFactory.create(name="Approved Forge")
+    BrandFactory.create(name="Pending Forge", status="pending")
+    BrandFactory.create(name="Rejected Forge", status="rejected")
+    response = client.get(reverse("cms_product_chooser:choose"))
+    html = str(json.loads(response.content)["html"])
+    assert "Approved Forge" in html
+    assert "Pending Forge" not in html
+    assert "Rejected Forge" not in html
