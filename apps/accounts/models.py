@@ -190,3 +190,35 @@ class ActionLinkIssue(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.purpose} {self.object_key} (generation {self.generation})"
+
+
+class ElevationGrant(BaseModel):
+    """A "Do it once" authorisation (D-32, CORE.25): one action with one set of parameters.
+
+    Bound to the user and to a hash of the session key (never the key), short-lived and spent
+    by one conditional UPDATE (`used_at IS NULL`), so parallel requests cannot both use it.
+    """
+
+    session_hash = models.CharField(max_length=64)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="elevation_grants"
+    )
+    action = models.CharField(max_length=100)
+    digest = models.CharField(max_length=64)
+    expires_at = models.DateTimeField(db_index=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["session_hash", "action", "digest"])]
+        constraints = [
+            # At most one unspent grant per session, user, action and parameters: parallel
+            # requests replaying one assertion cannot mint two grants.
+            models.UniqueConstraint(
+                fields=["session_hash", "user", "action", "digest"],
+                condition=models.Q(used_at__isnull=True),
+                name="accounts_one_open_grant",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.action} for {self.user_id} until {self.expires_at:%H:%M:%S}"
