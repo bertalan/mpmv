@@ -238,3 +238,56 @@ def test_a_float_net_is_refused() -> None:
     c = ctx()
     with pytest.raises(TypeError):
         engine.resolve_shipping_tax(c, goods(c, ("10.00", "standard")), Rate(5.0))  # type: ignore[arg-type]
+
+
+def test_zero_net_portions_are_dropped_but_one_is_kept() -> None:
+    c = ctx()
+    portions = engine.resolve_shipping_tax(
+        c,
+        goods(c, ("10.00", "standard"), ("10.00", "reduced"), ("10.00", "books")),
+        Rate(D("0.01")),
+    )
+    assert [(p.rate, p.net) for p in portions] == [(D("22"), D("0.01"))]
+
+
+def test_a_nonzero_remainder_goes_to_the_first_tied_share_in_decision_order() -> None:
+    c = ctx()
+    lines = goods(c, ("10.00", "standard"), ("10.00", "reduced"), ("10.00", "books"))
+    expected = [(D("22"), D("0.04")), (D("10"), D("0.03")), (D("4"), D("0.03"))]
+    for order in (lines, lines[::-1], [lines[1], lines[2], lines[0]]):
+        portions = engine.resolve_shipping_tax(c, order, Rate(D("0.10")))
+        assert [(p.rate, p.net) for p in portions] == expected
+
+
+# T15 (shipping): outside the VAT area is 0% with N2.1
+def test_outside_vat_territory_shipping_is_zero_with_n21() -> None:
+    c = dataclasses.replace(
+        ctx(destination="ES"),
+        destination_postcode="35001",
+        territories=(engine.territory_rule("ES-CN", "ES", engine.OUTSIDE_VAT_AREA, ["35*"]),),
+    )
+    (p,) = engine.resolve_shipping_tax(c, goods(c, ("10.00", "standard")), Rate(D("5.00")))
+    assert (p.rate, p.tax, p.reason, p.nature_code) == (
+        D("0"),
+        D("0.00"),
+        "outside_vat_territory",
+        "N2.1",
+    )
+
+
+# T9: the engine never adds VAT to the net: net is the quote's net, VAT is separate
+def test_t9_net_is_untouched_and_vat_is_computed_on_top() -> None:
+    c = ctx()
+    portions = engine.resolve_shipping_tax(
+        c, goods(c, ("75.00", "standard"), ("25.00", "reduced")), Rate(D("9.90"))
+    )
+    assert sum(p.net for p in portions) == D("9.90")
+    assert sum(p.net + p.tax for p in portions) > D("9.90")
+
+
+def test_a_negative_goods_line_is_refused() -> None:
+    c = ctx()
+    with pytest.raises(ValueError, match="goods net"):
+        engine.resolve_shipping_tax(
+            c, [(D("-1.00"), engine.resolve_goods_tax(c, "standard"))], Rate(D("5.00"))
+        )
