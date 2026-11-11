@@ -446,3 +446,25 @@ def test_a_cart_hold_dry_run_checks_the_stock_and_writes_nothing() -> None:
     assert StockReservation.objects.count() == 0
     with pytest.raises(OrderRefused):
         hold_stock(cart, product, None, 2, now=NOW, dry_run=True)
+
+
+@pytest.mark.django_db
+def test_placing_an_order_queues_order_received_once_and_a_dry_run_none() -> None:
+    from apps.core.models import OutboxEmail
+
+    product = sellable()
+    place_order(preview(vendor_of(product, line(product))), ctx=CTX, now=NOW, dry_run=True)
+    assert OutboxEmail.objects.count() == 0
+    order = place(product)
+    mail = OutboxEmail.objects.get()
+    assert (mail.template_key, mail.recipient) == ("orders.order_received", order.email)
+
+
+@pytest.mark.django_db
+def test_a_refused_order_queues_no_email() -> None:
+    from apps.core.models import OutboxEmail
+
+    product = sellable()
+    with pytest.raises(OrderRefused):
+        place_order(preview(vendor_of(product, line(product, 99))), ctx=CTX, now=NOW)
+    assert OutboxEmail.objects.count() == 0

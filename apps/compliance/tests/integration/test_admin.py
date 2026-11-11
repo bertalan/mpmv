@@ -46,7 +46,8 @@ def test_vendor_defaults_are_added_through_the_service(staff_client: Client) -> 
         == PARTY["manufacturer_name"]
     )
     entry = AuditLog.objects.get(action="compliance.gpsr_defaults.created")
-    assert entry.actor_label == "staff:staff@example.com"
+    assert entry.actor_label.startswith("staff:")
+    assert "@" not in entry.actor_label
 
 
 def test_an_invalid_contact_is_shown_as_a_form_error(staff_client: Client) -> None:

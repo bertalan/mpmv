@@ -18,9 +18,12 @@ LOGIN = "/account/login/"
 
 
 def sample_paths(space: Space) -> list[str]:
-    """One concrete path per route registered in `space`, parameters filled with "0"."""
+    """One path per route registered in `space`: "0" for parameters, a nil UUID for `public_id`."""
+    nil = "00000000-0000-0000-0000-000000000000"
     return [
-        "/" + re.sub(r"<[^>]+>", "0", route) for route, found in manager_routes() if found is space
+        "/" + re.sub(r"<[^>]+>", "0", route.replace("<uuid:public_id>", nil))
+        for route, found in manager_routes()
+        if found is space
     ]
 
 

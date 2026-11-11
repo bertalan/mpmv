@@ -37,8 +37,35 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('uv.lock') }}
       - name: Install Chromium
-        run: uv run playwright install --with-deps chromium
+        run: |
+          printf '%s\n' 'Acquire::Retries "5";' 'Acquire::http::Timeout "30";' 'Acquire::https::Timeout "30";' | sudo tee /etc/apt/apt.conf.d/80-retries >/dev/null
+          deps_ok=0
+          for attempt in 1 2 3; do
+            if uv run playwright install-deps chromium; then
+              deps_ok=1
+              break
+            fi
+            echo "playwright install-deps failed (attempt $attempt of 3)"
+            sleep $((attempt * 20))
+          done
+          if [ "$deps_ok" -ne 1 ]; then
+            echo "::error::Playwright system dependencies could not be installed (apt mirror unreachable?); refusing to render baselines without system fonts"
+            exit 1
+          fi
+          for attempt in 1 2 3; do
+            if uv run playwright install chromium; then
+              exit 0
+            fi
+            echo "playwright install failed (attempt $attempt of 3)"
+            sleep $((attempt * 20))
+          done
+          exit 1
       - name: Render baselines
         env:
           MPMV_VISUAL: update

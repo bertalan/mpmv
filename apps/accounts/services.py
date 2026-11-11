@@ -31,11 +31,13 @@ from apps.core.audit import AuditContext, record, user_context
 from apps.core.changeset import ChangeSet
 from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog
+from apps.core.privacy import keyed_hash
 from apps.core.services import (
     audit_changes,
     clear_throttle,
     consume_rate_limit,
     enqueue_email,
+    holds_permission,
     record_throttle_failure,
     run_mutation,
     save_audited,
@@ -90,11 +92,15 @@ UNKNOWN_ACCOUNT = "unknown"  # target key of a failed login that named no accoun
 _EMAIL_MAX = 254
 
 
+ACCOUNT_KEY_PREFIX = "login:account:"
+AUDIT_ACCOUNT_PURPOSE = "audit-login-account"
+
+
 def _account_key(identifier: str | None) -> str | None:
     if identifier is None:
         return None
     normalized = normalize_email_address(identifier)[:_EMAIL_MAX]
-    return f"login:account:{normalized}" if normalized else None
+    return f"{ACCOUNT_KEY_PREFIX}{normalized}" if normalized else None
 
 
 def _ip_key(scope: str, ip: str | None) -> str | None:
@@ -131,6 +137,11 @@ def _audit_new_lock(
     if before.is_locked(now) or not after.is_locked(now):
         return
     ctx = AuditContext(actor_label="anonymous", source=AuditLog.Source.SYSTEM, ip=ip)
+    if key.startswith(ACCOUNT_KEY_PREFIX):
+        # The audit table is append-only: never write the address into it (CMP.4).
+        key = ACCOUNT_KEY_PREFIX + keyed_hash(
+            key.removeprefix(ACCOUNT_KEY_PREFIX), purpose=AUDIT_ACCOUNT_PURPOSE
+        )
     snapshot = {"failures": before.failures, "locked_until": before.locked_until}
     record(
         ctx,
@@ -689,6 +700,9 @@ ACCOUNT_UNLOCKED_BY_RESET = "accounts.user.unlocked_by_reset"  # by a completed 
 # The platform staff permission (Q-34). The same string as `PLATFORM_STAFF_PERMISSION` in
 # `apps.vendors.scoping`; accounts must not import vendors, so a guard test pins both.
 UNLOCK_PERMISSION = "vendors.view_all_vendors"
+# Who may unlock (spec 02 CORE.18 matrix: the audited Support action): the Support role and the
+# platform owner. Another role's platform-wide read of vendors (view_all_vendors) is not enough.
+UNLOCK_ROLE_PERMISSIONS = ("manager.platform_support", "core.platform_owner")
 
 
 def _account_lock_changeset(user: User, now: dt.datetime) -> tuple[ChangeSet, str | None]:
@@ -717,8 +731,9 @@ def unlock_account(
 ) -> ChangeSet:
     """Clear the login lockout of `user`, audited. Platform staff only.
 
-    The actor must be active and hold `vendors.view_all_vendors` (superusers pass through
-    Django's rule). The refusal is the same whatever the target's state, so it reveals nothing
+    The actor must be active and hold the Support or platform owner role permission and
+    `vendors.view_all_vendors` (superusers pass through).
+    The refusal is the same whatever the target's state, so it reveals nothing
     about it. A target that is not locked is a no-op without an audit entry.
 
     The audit actor is always `actor`: `ctx` only supplies the IP and request id. Platform staff
@@ -727,7 +742,10 @@ def unlock_account(
     same rule as the staff password and MFA reset). Every refusal is the same exception.
     """
     privileged = user.is_staff or user.is_superuser
-    if not (actor.is_active and actor.has_perm(UNLOCK_PERMISSION)):
+    allowed = actor.is_active and (
+        actor.is_superuser or holds_permission(actor, *UNLOCK_ROLE_PERMISSIONS)
+    )
+    if not (allowed and actor.has_perm(UNLOCK_PERMISSION)):
         raise PermissionDenied
     if privileged and not actor.is_superuser:
         raise PermissionDenied
