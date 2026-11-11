@@ -566,8 +566,13 @@ def next_sequence(
 
 # --- Vendor-safe body (spec 15 "How vendors author an `EventPage`") ----------------------------
 
-# The CMS.10 product grid and the CMS.9 countdown join when those tasks add the blocks.
-VENDOR_SAFE_BLOCKS = frozenset({"paragraph", "figure", "gallery", "cta", "faq"})
+# Spec 15: product blocks of a vendor show its own products only. The services check it
+# (`_check_vendor_body`): every product of a `product_cards` block (`product_ids`) is the vendor's,
+# and a `product_grid` is sourced from the vendor itself (`grid_sources`), never from a category,
+# term or brand, which would list other vendors' products. The CMS.9 countdown joins later.
+VENDOR_SAFE_BLOCKS = frozenset(
+    {"paragraph", "figure", "gallery", "cta", "faq", "product_cards", "product_grid"}
+)
 
 _HREF = re.compile(r"""\b(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""", re.IGNORECASE)
 _ENTITY = re.compile(r"&#(x[0-9a-f]+|[0-9]+);?", re.IGNORECASE)
@@ -638,6 +643,40 @@ def image_ids(raw: Any) -> list[Any]:
     for block in raw:
         if block.get("type") in ("figure", "gallery"):
             walk(block.get("value"))
+    return found
+
+
+def product_ids(raw: Any) -> list[Any]:
+    """Every product reference of the `product_cards` blocks of a raw body, as sent: a plain
+    id, or Wagtail's `{"type": "item", "value": id}` list wrapper. Nothing is trusted: the
+    caller checks each one is the id of one of the vendor's own products."""
+    found: list[Any] = []
+    for block in raw:
+        value = block.get("value")
+        if block.get("type") != "product_cards" or not isinstance(value, Mapping):
+            continue
+        items = value.get("products")
+        if not isinstance(items, list | tuple):
+            continue
+        for item in items:
+            found.append(item.get("value") if isinstance(item, Mapping) else item)
+    return found
+
+
+def grid_sources(raw: Any) -> list[tuple[Any, Any]]:
+    """The `(kind, value)` source of every `product_grid` block of a raw body, as sent. A grid
+    with no readable source gives `(None, None)`, so it is never trusted by omission."""
+    found: list[tuple[Any, Any]] = []
+    for block in raw:
+        value = block.get("value")
+        if block.get("type") != "product_grid":
+            continue
+        source = value.get("source") if isinstance(value, Mapping) else None
+        first = source[0] if isinstance(source, list | tuple) and len(source) == 1 else None
+        if isinstance(first, Mapping):
+            found.append((first.get("type"), first.get("value")))
+        else:
+            found.append((None, None))
     return found
 
 
