@@ -27,17 +27,27 @@ if (root && dialog) {
     opener.hidden = false;
   }
 
-  // The labelled controls of the main content's forms, with their help texts.
+  function text(node) {
+    return node ? node.textContent.replace(/\s+/g, " ").trim() : "";
+  }
+
+  // The labelled controls of the main content's forms, with their help texts: the field
+  // component's own markup (storefront, account and Manager forms) and, for a hand-written form
+  // (the second factor pages), a paragraph's label with the text its control points to with
+  // `aria-describedby`.
   function pageFields() {
     const fields = [];
-    const names = ".field > label, .field > fieldset > legend, .field__check > label";
+    const names =
+      ".field > label, .field > fieldset > legend, .field__check > label, p > label[for]";
     for (const name of document.querySelectorAll(`main form :is(${names})`)) {
       const field = name.closest(".field");
-      const help = field.querySelector(".helptext");
-      fields.push({
-        name: name.textContent.replace(/\s+/g, " ").trim(),
-        help: help ? help.textContent.replace(/\s+/g, " ").trim() : "",
-      });
+      let help = field ? field.querySelector(".helptext") : null;
+      if (!field && name.htmlFor) {
+        const control = document.getElementById(name.htmlFor);
+        const ids = control ? (control.getAttribute("aria-describedby") || "").split(/\s+/) : [];
+        help = ids.map((id) => document.getElementById(id)).find((node) => node) || null;
+      }
+      fields.push({ name: text(name), help: text(help) });
     }
     return fields;
   }
