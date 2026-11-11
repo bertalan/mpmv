@@ -563,23 +563,24 @@ MANAGER_UNGATED: dict[str, str] = {
 MUTATING = ("post", "put", "patch", "delete")
 
 
-def _manager_views() -> dict[str, Any]:
-    """Every view callable of apps.manager reached from the root URL resolver, by dotted path."""
+def _manager_views(patterns: Any = None) -> dict[str, Any]:
+    """Every view callable under the URL namespace `manager` (and its children), whatever module
+    it comes from, plus any apps.manager view mounted elsewhere (sign-in), by dotted path."""
     from django.urls import URLPattern, URLResolver, get_resolver
 
     found: dict[str, Any] = {}
 
-    def walk(patterns: Any) -> None:
-        for entry in patterns:
+    def walk(entries: Any, inside: bool) -> None:
+        for entry in entries:
             if isinstance(entry, URLResolver):
-                walk(entry.url_patterns)
+                walk(entry.url_patterns, inside or entry.namespace == "manager")
             elif isinstance(entry, URLPattern):
                 callback = entry.callback
                 target = getattr(callback, "view_class", callback)
-                if target.__module__.startswith("apps.manager"):
+                if inside or target.__module__.startswith("apps.manager"):
                     found[f"{target.__module__}.{target.__qualname__}"] = callback
 
-    walk(get_resolver().url_patterns)
+    walk(get_resolver().url_patterns if patterns is None else patterns, False)
     return found
 
 
@@ -602,6 +603,8 @@ def _ungated_mutating(views: dict[str, Any]) -> list[str]:
 
 
 def test_every_manager_view_that_can_change_state_has_a_session_gate() -> None:
+    # Not covered here: GET (and `dispatch`) must stay free of side effects, because only the
+    # mutating methods are checked. A view that changes state on GET is a bug on its own.
     views = _manager_views()
     assert len(views) > 10, "the URL walk found too few Manager views"
     ungated = [
@@ -661,6 +664,26 @@ def test_the_sweep_fails_on_an_ungated_view_and_passes_a_gated_one() -> None:
         "t.Ungated.post",
         "t.function_view",
     ]
+
+
+def test_a_foreign_view_mounted_under_the_manager_namespace_is_checked() -> None:
+    from django.http import HttpResponse
+    from django.urls import include, path
+    from django.views import View
+
+    class Foreign(View):  # not in apps.manager, like a Wagtail or DRF class routed there
+        def post(self, request: Any) -> HttpResponse:
+            return HttpResponse()
+
+    inner = ([path("x/", Foreign.as_view(), name="x")], "manager")
+    outside = ([path("y/", Foreign.as_view(), name="y")], "other")
+    patterns = [
+        path("manager/", include(inner, namespace="manager")),
+        path("other/", include(outside, namespace="other")),
+    ]
+    views = _manager_views(patterns)
+    assert len(views) == 1  # only the one under the namespace `manager`
+    assert [p.rsplit(".", 1)[-1] for p in _ungated_mutating(views)] == ["post"]
 
 
 # --- Security review fixes (PR 234)
