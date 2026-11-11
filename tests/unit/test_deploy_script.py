@@ -206,8 +206,11 @@ class Host:
         last = (self.units / "mpmv-app.container").read_text().splitlines()[-1]
         return last.removeprefix("# release ")
 
-    def run(
-        self, *args: str, script: Path = SCRIPT, **extra: str
+    def run(self, *args: str, **extra: str) -> subprocess.CompletedProcess[str]:
+        return self.run_script(SCRIPT, *args, **extra)
+
+    def run_script(
+        self, script: Path, *args: str, **extra: str
     ) -> subprocess.CompletedProcess[str]:
         (self.root / "log").unlink(missing_ok=True)
         # A host that may bind 80/443 unless a test says otherwise: never read the runner's own
@@ -766,7 +769,7 @@ def test_the_previous_scripts_deploy_re_execs_the_candidate_script(host: Host) -
     candidate.write_text(marked(text, 'echo "ran the candidate script $0" >&2'))
     assert old.read_text() != candidate.read_text()
 
-    result = host.run("deploy", "1.2.0", script=old)
+    result = host.run_script(old, "deploy", "1.2.0")
 
     assert result.returncode == 0, result.stderr
     lines = result.stderr.splitlines()

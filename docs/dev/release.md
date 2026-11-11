@@ -38,6 +38,16 @@ seeds, fetches `/healthz`, the home page, a category page and a seeded `/media/`
 Caddy, checks the containers' read-only root, capabilities and media volume, then deploys a
 deliberately bad release and requires the rollback, units included, in under 60 s.
 
+Upgrade path (OPS.11): when the repository has an earlier release tag (read from the remote by
+[deploy/ci/previous-release.sh](../../deploy/ci/previous-release.sh); on a tag build, the tag
+before it), the smoke first pulls that release's published image from `ghcr.io`, deploys it with
+its own `mpmv-deploy`, migrations and seed, and then deploys the candidate over the same database,
+started by the previous release's script. This catches what only appears when a release migrates
+over existing data, or when an older deploy script installs a newer one (a drift check, a data
+migration, a role sync, the Caddy socket switch). The job log names both versions. With no
+previous tag, or when its image cannot be pulled, the smoke prints a `::notice::` or `::warning::`
+and runs the candidate on an empty database as before.
+
 The smoke rewrites the runner's MPMV configuration and leaves it, its containers and its sysctl
 changes behind, so it runs only on GitHub-hosted (ephemeral) runners: it refuses to start
 elsewhere unless `MPMV_PARITY_THROWAWAY_HOST=1` declares the host disposable. Never point it at a
