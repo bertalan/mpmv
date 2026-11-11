@@ -15,7 +15,13 @@ from django.core.cache import caches
 from django.http import HttpRequest, HttpResponse
 from django.test import Client, RequestFactory, override_settings
 from django.utils.csp import LazyNonce
-from wagtail.models import Page, Site
+from wagtail.models import (
+    Collection,
+    CollectionViewRestriction,
+    Page,
+    PageViewRestriction,
+    Site,
+)
 
 from apps.accounts.tests.factories import UserFactory
 from apps.cms.services import SeedReport, seed_site
@@ -32,6 +38,21 @@ NONCE_IN_HTML = re.compile(r"\bnonce=")
 def seeded(db: None) -> SeedReport:
     """The sample home, About page and menus in every configured language."""
     return seed_site()
+
+
+@pytest.fixture(autouse=True)
+def commit_at_once(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests run inside a transaction that never commits; run `on_commit` callbacks at once,
+    except in tests that ask for `real_on_commit` and capture them."""
+    if "real_on_commit" not in request.fixturenames:
+        monkeypatch.setattr(
+            "apps.seo.signals.transaction.on_commit", lambda func, **_kw: func(), raising=True
+        )
+
+
+@pytest.fixture
+def real_on_commit() -> None:
+    """Marker fixture: keep Django's own `on_commit` (see `commit_at_once`)."""
 
 
 @pytest.fixture(autouse=True)
@@ -163,7 +184,7 @@ def make_middleware(
     return PageCacheMiddleware(response)  # type: ignore[return-value]
 
 
-def page_request(**extra: Any) -> HttpRequest:
+def page_request(*, unrestricted: bool = True, **extra: Any) -> HttpRequest:
     from django.contrib.sessions.backends.signed_cookies import SessionStore
 
     request = RequestFactory().get("/about-seo6/", HTTP_HOST="testserver", **extra)
@@ -173,6 +194,7 @@ def page_request(**extra: Any) -> HttpRequest:
     from django.urls import ResolverMatch
 
     request.resolver_match = ResolverMatch(lambda r: None, (), {}, url_name="wagtail_serve")
+    request._page_cache_unrestricted = unrestricted  # type: ignore[attr-defined]  # hook's mark
     return request
 
 
@@ -223,9 +245,9 @@ def test_a_clean_page_is_stored_and_a_countdown_caps_its_lifetime(
     lifetimes: list[int] = []
     real = page_cache.store
 
-    def spy(request: HttpRequest, response: HttpResponse, *, timeout: int) -> None:
-        lifetimes.append(timeout)
-        real(request, response, timeout=timeout)
+    def spy(request: HttpRequest, response: HttpResponse, **kwargs: Any) -> None:
+        lifetimes.append(kwargs["timeout"])
+        real(request, response, **kwargs)
 
     monkeypatch.setattr(page_cache, "store", spy)
     soon = (dt.datetime.now(dt.UTC) + dt.timedelta(seconds=40)).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -389,3 +411,128 @@ def test_an_indexable_page_is_never_served_noindex_and_back(
         again = client.get("/")
     assert "X-Robots-Tag" not in again
     assert "noindex" not in again.content.decode()
+
+
+# --- view restrictions: a restricted page is never served from, or stored in, the cache
+
+
+def test_restricting_a_cached_page_drops_it_and_the_restriction_applies(
+    client: Client, seeded: SeedReport
+) -> None:
+    page = StandardPageFactory.create(title="Members", slug="members-seo6", parent=home())
+    client.get("/members-seo6/")
+    assert status(client.get("/members-seo6/")) == "HIT"
+    PageViewRestriction.objects.create(page=page, restriction_type=PageViewRestriction.LOGIN)
+    response = client.get("/members-seo6/")
+    assert status(response) != "HIT"
+    assert response.status_code == 302  # to the sign-in page
+    assert "Members" not in response.content.decode()
+
+
+def test_restricting_an_ancestor_drops_its_cached_children(
+    client: Client, seeded: SeedReport
+) -> None:
+    parent = StandardPageFactory.create(title="Parent", slug="par-seo6", parent=home())
+    StandardPageFactory.create(title="Child", slug="child-seo6", parent=parent)
+    client.get("/par-seo6/child-seo6/")
+    assert status(client.get("/par-seo6/child-seo6/")) == "HIT"
+    PageViewRestriction.objects.create(page=parent, restriction_type=PageViewRestriction.LOGIN)
+    assert client.get("/par-seo6/child-seo6/").status_code == 302
+
+
+def test_lifting_a_restriction_drops_the_cache(client: Client, seeded: SeedReport) -> None:
+    page = StandardPageFactory.create(title="Was private", slug="wasp-seo6", parent=home())
+    restriction = PageViewRestriction.objects.create(
+        page=page, restriction_type=PageViewRestriction.LOGIN
+    )
+    client.get("/wasp-seo6/")
+    restriction.delete()
+    assert client.get("/wasp-seo6/").status_code == 200
+
+
+def test_a_collection_restriction_change_drops_the_cache(
+    client: Client, seeded: SeedReport
+) -> None:
+    client.get("/")
+    assert status(client.get("/")) == "HIT"
+    collection = Collection.get_first_root_node().add_child(name="Docs seo6")
+    CollectionViewRestriction.objects.create(
+        collection=collection, restriction_type=CollectionViewRestriction.LOGIN
+    )
+    assert status(client.get("/")) == "MISS"
+
+
+def test_a_page_the_hook_did_not_clear_is_never_stored() -> None:
+    make_middleware(lambda r: served())(page_request(unrestricted=False))
+    assert page_cache.lookup(page_request()) is None
+
+
+def test_a_restricted_page_is_not_marked_unrestricted(rf: RequestFactory) -> None:
+    from apps.seo.wagtail_hooks import mark_unrestricted_page
+
+    open_page = StandardPageFactory.create(title="Open", slug="open-seo6", parent=home())
+    shut_page = StandardPageFactory.create(title="Shut", slug="shut-seo6", parent=home())
+    PageViewRestriction.objects.create(page=shut_page, restriction_type=PageViewRestriction.LOGIN)
+    for page, expected in ((open_page, True), (shut_page, False)):
+        request = rf.get("/")
+        mark_unrestricted_page(page, request, [], {})
+        assert request._page_cache_unrestricted is expected  # type: ignore[attr-defined]
+
+
+# --- race: a render that began before a change is not stored under the new generation
+
+
+def test_a_render_started_before_a_publish_is_not_served_after_it() -> None:
+    def slow_view(request: HttpRequest) -> HttpResponse:
+        page_cache.invalidate()  # a publish commits while this page is being rendered
+        return served("<html><body>Rendered from the old content</body></html>")
+
+    make_middleware(slow_view)(page_request())
+    assert page_cache.lookup(page_request()) is None
+
+
+def test_the_key_is_computed_before_the_page_is_rendered(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    keys: list[str] = []
+    real = page_cache.key_for
+
+    def spy(request: HttpRequest) -> str:
+        keys.append(real(request))
+        return keys[-1]
+
+    monkeypatch.setattr(page_cache, "key_for", spy)
+
+    def view(request: HttpRequest) -> HttpResponse:
+        assert len(keys) == 1  # computed already
+        return served()
+
+    make_middleware(view)(page_request())
+
+
+def test_a_change_drops_the_cache_only_once_it_is_committed(
+    client: Client,
+    seeded: SeedReport,
+    real_on_commit: None,
+    django_capture_on_commit_callbacks: Any,
+) -> None:
+    page = StandardPageFactory.create(title="Pending", slug="pend-seo6", parent=home())
+    client.get("/pend-seo6/")
+    with django_capture_on_commit_callbacks(execute=False) as callbacks:
+        page.title = "Committed"
+        page.save_revision().publish()
+        assert status(client.get("/pend-seo6/")) == "HIT"  # not committed yet: nothing dropped
+    assert callbacks
+    for callback in callbacks:
+        callback()
+    assert status(client.get("/pend-seo6/")) == "MISS"
+
+
+# --- size caps
+
+
+def test_the_cache_is_bounded() -> None:
+    from django.conf import settings
+
+    assert settings.PAGE_CACHE_MAX_BYTES == 256 * 1024
+    assert settings.CACHES["pagecache"]["OPTIONS"]["MAX_ENTRIES"] == 500

@@ -427,7 +427,7 @@ CACHES: dict[str, dict[str, Any]] = {
     "pagecache": {
         "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
         "LOCATION": env_str("MPMV_PAGE_CACHE_DIR", "") or str(MEDIA_ROOT / ".page-cache"),
-        "OPTIONS": {"MAX_ENTRIES": 2000, "CULL_FREQUENCY": 4},
+        "OPTIONS": {"MAX_ENTRIES": 500, "CULL_FREQUENCY": 4},
     },
 }
 PAGE_CACHE_ENABLED = env_bool("MPMV_PAGE_CACHE", default=False)
@@ -435,7 +435,8 @@ PAGE_CACHE_ENABLED = env_bool("MPMV_PAGE_CACHE", default=False)
 # (a product shown in a block, a vendor storefront); publish, unpublish, move and settings
 # changes drop everything at once. A running countdown shortens it (spec 10 §10.2).
 PAGE_CACHE_SECONDS = env_int("MPMV_PAGE_CACHE_SECONDS", 300)
-PAGE_CACHE_MAX_BYTES = 512 * 1024
+# At most 500 entries of 256 KiB: about 128 MiB on the media volume in the worst case.
+PAGE_CACHE_MAX_BYTES = 256 * 1024
 # Only these routes are cached: the Wagtail page tree (`home` and Wagtail's own catch-all).
 PAGE_CACHE_URL_NAMES = ("home", "wagtail_serve")
 # A request with one of these cookies, besides the session and CSRF cookies, never uses the cache.

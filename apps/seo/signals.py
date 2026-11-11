@@ -9,9 +9,16 @@ panel) are caught by the model signals.
 
 from typing import Any
 
+from django.db import transaction
 from django.db.models.signals import post_delete, post_save
 from wagtail.contrib.settings.models import BaseGenericSetting, BaseSiteSetting
-from wagtail.models import Locale, Page, Site
+from wagtail.models import (
+    CollectionViewRestriction,
+    Locale,
+    Page,
+    PageViewRestriction,
+    Site,
+)
 from wagtail.signals import page_published, page_unpublished, post_page_move
 
 from . import page_cache
@@ -20,16 +27,26 @@ _UID = "seo-page-cache-drop"
 
 
 def drop_cache(**_kwargs: Any) -> None:
-    page_cache.invalidate()
+    """After the change is committed, never before: a page rendered between the signal and the
+    commit would still read the old rows and be stored under the new generation."""
+    transaction.on_commit(page_cache.invalidate, robust=True)
 
 
 def drop_for_content_model(instance: Any = None, **_kwargs: Any) -> None:
     """Model signals reach every model: look only at the ones a public page renders from."""
     if isinstance(instance, Page):
         if instance.live:  # a draft is not served to the public
-            page_cache.invalidate()
-    elif isinstance(instance, Site | Locale | BaseSiteSetting | BaseGenericSetting):
-        page_cache.invalidate()
+            drop_cache()
+    elif isinstance(
+        instance,
+        Site
+        | Locale
+        | BaseSiteSetting
+        | BaseGenericSetting
+        | PageViewRestriction
+        | CollectionViewRestriction,
+    ):
+        drop_cache()
 
 
 def connect() -> None:

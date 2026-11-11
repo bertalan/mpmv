@@ -57,14 +57,17 @@ class PageCacheMiddleware:
             response = self.get_response(request)
             response["X-Page-Cache"] = "BYPASS"
             return response
-        stored = page_cache.lookup(request)
+        key = page_cache.try_key(request)  # before the render: see `page_cache.try_key`
+        if key is None:
+            return self.get_response(request)
+        stored = page_cache.lookup(request, key=key)
         if stored is not None:
             response = stored.to_response()
             self._mark_shared(response, "HIT")
             return response
         response = self.get_response(request)
         response["X-Page-Cache"] = "MISS"
-        if self._is_cms_page(request) and self._store(request, response):
+        if self._is_cms_page(request) and self._store(request, response, key):
             self._mark_shared(response, "MISS")
         return response
 
@@ -85,8 +88,13 @@ class PageCacheMiddleware:
         return match is not None and match.url_name in names
 
     @staticmethod
-    def _store(request: HttpRequest, response: HttpResponseBase) -> bool:
+    def _store(request: HttpRequest, response: HttpResponseBase, key: str) -> bool:
         if response.streaming:
+            return False
+        if not getattr(request, "_page_cache_unrestricted", False):
+            # The `before_serve_page` hook (wagtail_hooks) clears a page with no view restriction
+            # on it or its ancestors; a page it did not clear (restricted, or not a page) is not
+            # stored, and a hit would skip the restriction check.
             return False
         content = getattr(response, "content", b"")
         cache_control = response.get("Cache-Control", "")
@@ -113,7 +121,7 @@ class PageCacheMiddleware:
         )
         if seconds <= 0:
             return False
-        page_cache.store(request, response, timeout=seconds)
+        page_cache.store(request, response, timeout=seconds, key=key)
         return True
 
     @staticmethod

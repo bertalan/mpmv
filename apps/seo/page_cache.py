@@ -78,20 +78,33 @@ def key_for(request: HttpRequest) -> str:
     )
 
 
-def lookup(request: HttpRequest) -> StoredPage | None:
+def try_key(request: HttpRequest) -> str | None:
+    """The key of this request, taken *before* the page is rendered (a publish that commits
+    during the render then leaves the stale page under the old generation), or None when the
+    cache cannot be reached."""
     try:
-        found = _cache().get(key_for(request))
+        return key_for(request)
+    except Exception:
+        logger.warning("page cache: could not build the key", exc_info=True)
+        return None
+
+
+def lookup(request: HttpRequest, *, key: str | None = None) -> StoredPage | None:
+    try:
+        found = _cache().get(key or key_for(request))
     except Exception:
         logger.warning("page cache: lookup failed", exc_info=True)
         return None
     return found if isinstance(found, StoredPage) else None
 
 
-def store(request: HttpRequest, response: HttpResponseBase, *, timeout: int) -> None:
+def store(
+    request: HttpRequest, response: HttpResponseBase, *, timeout: int, key: str | None = None
+) -> None:
     content = getattr(response, "content", b"")
     headers = tuple((name, response[name]) for name in STORED_HEADERS if response.has_header(name))
     page = StoredPage(status=response.status_code, content=bytes(content), headers=headers)
     try:
-        _cache().set(key_for(request), page, timeout)
+        _cache().set(key or key_for(request), page, timeout)
     except Exception:
         logger.warning("page cache: store failed", exc_info=True)

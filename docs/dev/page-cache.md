@@ -33,7 +33,7 @@ Consequences for templates and views on cached routes:
 ## What is cached
 
 `GET` of a route named in `PAGE_CACHE_URL_NAMES` (`home` and `wagtail_serve`: the Wagtail page
-tree), status 200, `text/html`, at most `PAGE_CACHE_MAX_BYTES`. Catalog listings, the Manager,
+tree), status 200, `text/html`, at most `PAGE_CACHE_MAX_BYTES` (256 KiB). Catalog listings, the Manager,
 accounts, the API, media and the admin are not cached.
 
 Never served from or stored in the cache:
@@ -64,16 +64,36 @@ token, which empties the cache for every process at once. It is called on:
 
 - Wagtail `page_published`, `page_unpublished` and `post_page_move`;
 - save or delete of a live page, a `Site`, a `Locale`, and every site or generic setting
-  (`BaseSiteSetting`, `BaseGenericSetting`: the theme choice, the event settings, the SEO panel).
+  (`BaseSiteSetting`, `BaseGenericSetting`: the theme choice, the event settings, the SEO panel);
+- save or delete of a `PageViewRestriction` or `CollectionViewRestriction`.
+
+The drop runs through `transaction.on_commit`, never at the signal: a page rendered between the
+signal and the commit would read the old rows and be stored under the new generation. For the same
+reason the middleware builds the key, generation included, **before** it renders the page, so a
+change that commits during a render leaves that page under the old, unreachable generation.
+
+A page with a view restriction on it or on an ancestor is never stored: a
+`before_serve_page` hook (`apps/seo/wagtail_hooks.py`, after Wagtail's own restriction check) marks
+a page clear of restrictions, and the middleware stores only marked pages. A hit would otherwise
+skip the restriction check and `PageRestrictionProtectionMiddleware`.
 
 Why global and not per URL: a page's HTML depends on its parents (menus, breadcrumbs, the language
 switcher's translated URLs), its site's settings and its theme. A wrong guess is a stale page; an
 unneeded miss costs one render.
 
-Things that change a page without one of these signals are bounded by the lifetime
-(`PAGE_CACHE_SECONDS`, default 300): a product shown in a block, a vendor storefront (spec 04
-asks to invalidate the storefront and product pages on a profile change: call `invalidate()` there
-when VEN adds the hook). A running countdown shortens the lifetime to its target (`data-target`,
+Things that change a page without one of these signals **rely on the lifetime**
+(`PAGE_CACHE_SECONDS`, default 300) and show up to five minutes late, unless someone wires them to
+`invalidate()`:
+
+- snippets, navigation menus and the footer (they are not Wagtail settings or pages);
+- products and categories shown in a page block (title, price, stock, availability);
+- events and event lists shown in a block (the event page's own publish is covered);
+- vendor storefront and profile changes (spec 04 asks to invalidate them on a profile change:
+  call `invalidate()` from the VEN service when it adds the hook);
+- images replaced in place, and translations edited without publishing.
+
+The SEO indexing toggle of PR #271 is covered if its model is a site or generic setting; otherwise
+its save must call `invalidate()`. A running countdown shortens the lifetime to its target (`data-target`,
 spec 10 §10.2), so a page never outlives a launch.
 
 ## Headers
@@ -88,7 +108,8 @@ A Django `FileBasedCache` (alias `pagecache`) in `MEDIA_ROOT/.page-cache`, becau
 task worker both mount the media volume while the root file system is read-only. A scheduled
 publish in the worker therefore reaches the app's cache. No Redis (ADR-0001) and no new
 dependency. Caddy only serves image files from the media volume, so the cache folder is not
-reachable. A cache that cannot be read or written is a miss: the page is rendered.
+reachable. A cache that cannot be read or written is a miss: the page is rendered. Size is bounded:
+`MAX_ENTRIES` 500 (older entries are culled) times 256 KiB per entry, about 128 MiB at most.
 
 | Setting | Env | Default |
 |---|---|---|
