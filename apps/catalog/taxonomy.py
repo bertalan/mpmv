@@ -43,6 +43,7 @@ from apps.core import translations
 from apps.core.fields import CountryField
 from apps.core.models import BaseModel, TranslationModel, resolve_translation
 from apps.core.translations import Resolved
+from apps.vendors.scoping import VendorScopedManager
 
 from . import engine, slugs
 
@@ -384,6 +385,9 @@ class BrandBatch(BaseModel):
         PENDING = "pending", _("Pending review")
         APPROVED = "approved", _("Approved")
         REJECTED = "rejected", _("Rejected")
+
+    vendor_scope: ClassVar[str] = "vendor"
+    objects = VendorScopedManager()
 
     vendor = models.ForeignKey(
         "vendors.Vendor",

@@ -20,6 +20,7 @@ from apps.catalog.models import (
     AttributeValue,
     AttributeValueTranslation,
     Brand,
+    BrandBatch,
     BrandTranslation,
     Category,
     CategoryTranslation,
@@ -226,6 +227,16 @@ class BrandFactory(DjangoModelFactory[Brand]):
         model = Brand
 
     name = factory.Sequence(lambda n: f"Brand {n}")
+
+
+class BrandBatchFactory(DjangoModelFactory[BrandBatch]):
+    """The brands of one import run, pending review (CAT.20)."""
+
+    class Meta:
+        model = BrandBatch
+
+    vendor = factory.SubFactory(VendorFactory)
+    source = factory.Sequence(lambda n: f"import run {n}")
 
 
 class ManufacturerFactory(DjangoModelFactory[Manufacturer]):

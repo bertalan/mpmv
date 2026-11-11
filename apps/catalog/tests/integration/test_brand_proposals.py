@@ -12,6 +12,7 @@ from django.test.utils import override_settings
 from apps.catalog import brands
 from apps.catalog.models import Brand, BrandBatch, Product, Redirect
 from apps.catalog.tests.factories import (
+    BrandBatchFactory,
     BrandFactory,
     BrandTranslationFactory,
     ManufacturerFactory,
@@ -545,3 +546,11 @@ def test_a_staff_brand_and_a_vendor_proposal_of_one_name_at_once_make_one_brand(
         thread.join()
     assert sorted(results) == ["ok", "refused"]
     assert Brand.objects.count() == 1
+
+
+def test_a_batch_built_by_the_factory_is_reviewed_like_any_other() -> None:
+    batch = BrandBatchFactory.create()
+    brand = BrandFactory.create(batch=batch, proposed_by=batch.vendor, status=Brand.Status.PENDING)
+    brands.approve_batch(batch, ctx=CTX)
+    brand.refresh_from_db()
+    assert brand.status == Brand.Status.APPROVED
