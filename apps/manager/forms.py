@@ -3,17 +3,19 @@
 from typing import Any
 
 from django import forms
+from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from wagtail.admin.rich_text import DraftailRichTextArea
 from wagtail.rich_text import features as feature_registry
 
 from apps.vendors.engine import LOGO_ALT_MAX_LENGTH, PROFILE_MAX_LENGTH
 
-# Wagtail's default editor features (D-34), minus the three that open Wagtail's admin choosers.
-# Vendor members have no access to the Wagtail admin (`VendorAdminRefusalBackend`), so those
-# choosers would only fail for them; the service still refuses any image or document outside the
-# vendor's own collection, so crafted HTML is not a way around it.
-CHOOSER_FEATURES = frozenset({"image", "embed", "document-link"})
+# Wagtail's default editor features (D-34), minus the ones whose chooser the Manager does not
+# serve yet. Vendor members have no access to the Wagtail admin (`VendorAdminRefusalBackend`):
+# `image` uses the Manager chooser (VEN.31); `embed` (media) and `link` (page chooser) would only
+# fail for them, and `document-link` waits for VEN.31 part 2. The service refuses any image or
+# document outside the vendor's own collection and any page link, so crafted HTML is no way around.
+CHOOSER_FEATURES = frozenset({"embed", "document-link", "link"})
 MANAGER_RICH_TEXT_FEATURES = [
     name for name in feature_registry.get_default_features() if name not in CHOOSER_FEATURES
 ]
@@ -32,7 +34,12 @@ class _Editor(DraftailRichTextArea):  # type: ignore[misc]  # Wagtail is untyped
 
 
 def _editor() -> DraftailRichTextArea:
-    return _Editor(features=MANAGER_RICH_TEXT_FEATURES)
+    widget = _Editor(features=MANAGER_RICH_TEXT_FEATURES)
+    # The image button opens the Manager chooser (VEN.31), not Wagtail's admin chooser.
+    for entity in widget.options.get("entityTypes", []):
+        if entity.get("type") == "IMAGE":
+            entity["chooserUrls"] = {"imageChooser": reverse_lazy("manager:shop:image_choose")}
+    return widget
 
 
 class StorefrontProfileForm(forms.Form):

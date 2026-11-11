@@ -1,5 +1,7 @@
 """HTTP middleware owned by the platform (thin adapters over apps.core.security)."""
 
+import re
+import uuid
 from collections.abc import Callable
 
 from django.conf import settings
@@ -7,6 +9,7 @@ from django.http import HttpRequest
 from django.http.response import HttpResponseBase
 from django.utils.cache import add_never_cache_headers
 
+from .observability import reset_request_id, set_request_id
 from .security import build_permissions_policy
 
 
@@ -69,4 +72,29 @@ class PrivateCacheForSignedInUsersMiddleware:
         user = getattr(request, "user", None)
         if user is not None and user.is_authenticated:
             add_never_cache_headers(response)
+        return response
+
+
+_REQUEST_ID = re.compile(r"[A-Za-z0-9-]{8,64}")
+
+
+class RequestIdMiddleware:
+    """Give every request an id for the logs and answer it in `X-Request-ID` (OPS.2).
+
+    A proxy's id is kept when it is 8 to 64 letters, digits or dashes, else a new one is made, so
+    a hostile header cannot inject log lines or response headers.
+    """
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponseBase]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
+        inbound = request.META.get("HTTP_X_REQUEST_ID", "")
+        request_id = inbound if _REQUEST_ID.fullmatch(inbound) else uuid.uuid4().hex
+        token = set_request_id(request_id)
+        try:
+            response = self.get_response(request)
+        finally:
+            reset_request_id(token)
+        response.headers["X-Request-ID"] = request_id
         return response
