@@ -4,9 +4,8 @@
 - Platform space: platform staff, meaning a user who holds a dedicated platform permission
   (spec 02 Q-34). Wagtail or Django admin access (`is_staff`) never counts, and neither does
   superuser status (spec 02 CORE.18: the technical superuser holds no Manager section without a
-  role). Until CORE.18 adds the staff roles, the only such permission is the platform owner's
-  (`core.platform_owner`); CORE.18 replaces `is_platform_staff` with the role membership of
-  `roles.py`.
+  role). Such a user is the platform owner (`core.platform_owner`) or a member of a platform role
+  group of `roles.py` (CORE.18).
 
 Platform roles and vendor membership never mix (spec 02 Roles): a user who is both is let into
 neither space, so a data error never opens a side door between them. A vendor member with admin
@@ -24,6 +23,7 @@ from apps.core.services import is_platform_owner
 from apps.vendors.models import Vendor, VendorMember
 from apps.vendors.services import is_vendor_member
 
+from .role_groups import user_roles
 from .spaces import Space
 
 type AnyUser = AbstractBaseUser | AnonymousUser
@@ -33,7 +33,7 @@ def is_platform_staff(user: AnyUser) -> bool:
     """Holds a dedicated platform permission; `is_staff` and superuser status do not count."""
     if not (user.is_authenticated and user.is_active):
         return False
-    return is_platform_owner(user)
+    return is_platform_owner(user) or bool(user_roles(user))
 
 
 def _has_admin_access(user: AnyUser) -> bool:

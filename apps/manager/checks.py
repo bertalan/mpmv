@@ -115,3 +115,78 @@ def check_gate_installed(app_configs: object = None, **kwargs: object) -> list[c
             )
         ]
     return []
+
+
+def matrix_problems() -> list[str]:
+    """Drift of the matrix from the code: static, no database (manager.E003)."""
+    from django.apps import apps
+
+    from . import roles
+
+    problems = []
+    for section in registry.all():
+        if section.space is Space.PLATFORM and section.key not in roles.MATRIX:
+            problems.append(f"Platform section {section.key!r} has no row in roles.MATRIX.")
+    for key, cells in roles.MATRIX.items():
+        if key not in roles.SECTION_LABELS:
+            problems.append(f"Matrix row {key!r} has no label.")
+        for role_key in cells:
+            if role_key not in (*roles.ROLE_KEYS, roles.SUPERUSER):
+                problems.append(f"Matrix row {key!r} names the unknown role {role_key!r}.")
+        if roles.SUPERUSER in cells and key not in roles.BREAK_GLASS_SECTIONS:
+            problems.append(f"Row {key!r} gives the technical superuser more than break-glass.")
+    for r in roles.ROLES:
+        for label in r.permissions:
+            app_label, codename = label.split(".")
+            try:
+                model_perms = {
+                    p
+                    for model in apps.get_app_config(app_label).get_models()
+                    for p in _model_codenames(model)
+                }
+            except LookupError:
+                model_perms = set()
+            if codename not in model_perms:
+                problems.append(f"Role {r.key!r} names {label}, which no model declares.")
+    return problems
+
+
+def _model_codenames(model: Any) -> Iterator[str]:
+    meta = model._meta
+    for action in meta.default_permissions:
+        yield f"{action}_{meta.model_name}"
+    for codename, _name in meta.permissions:
+        yield codename
+
+
+def check_roles_matrix(app_configs: object = None, **kwargs: object) -> list[checks.CheckMessage]:
+    return [
+        checks.Error(problem, hint="Fix apps/manager/roles.py.", id="manager.E003")
+        for problem in matrix_problems()
+    ]
+
+
+def check_role_drift(
+    app_configs: object = None, databases: Sequence[str] | None = None, **kwargs: object
+) -> list[checks.CheckMessage]:
+    """The role groups hold exactly the permissions of `roles.py` (manager.E004).
+
+    Needs the database: runs with `manage.py check --database default` and in the test suite.
+    """
+    from django.db import DatabaseError
+
+    from .role_groups import role_drift
+
+    try:
+        problems = role_drift()
+    except DatabaseError:  # not migrated yet
+        return []
+    return [
+        checks.Error(
+            problem,
+            hint="Restore the group from apps/manager/roles.py (sync_role_groups), or change "
+            "roles.py and add a data migration; do not edit role groups in the admin.",
+            id="manager.E004",
+        )
+        for problem in problems
+    ]

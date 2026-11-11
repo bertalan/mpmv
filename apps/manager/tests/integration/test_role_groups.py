@@ -42,7 +42,7 @@ def test_seeding_twice_changes_nothing() -> None:
 
 
 def test_seeding_repairs_a_missing_group_and_keeps_members() -> None:
-    user = UserFactory()
+    user = UserFactory.create()
     group = Group.objects.get(name=roles.role("support").group)
     user.groups.add(group)
     group.permissions.clear()
@@ -72,7 +72,7 @@ def test_a_removed_permission_and_a_deleted_group_fail_the_check() -> None:
 
 
 def test_a_member_of_a_role_group_is_platform_staff_with_that_role() -> None:
-    user = UserFactory()
+    user = UserFactory.create()
     user.groups.add(Group.objects.get(name=roles.role("support").group))
     assert user_roles(user) == {"support"}
     assert is_platform_staff(user)
@@ -82,7 +82,7 @@ def test_a_member_of_a_role_group_is_platform_staff_with_that_role() -> None:
 def test_the_owner_group_makes_a_platform_owner() -> None:
     from apps.core.services import is_platform_owner
 
-    user = UserFactory()
+    user = UserFactory.create()
     user.groups.add(Group.objects.get(name=roles.role("owner").group))
     assert is_platform_owner(user)
 
@@ -91,25 +91,25 @@ def test_no_other_role_group_makes_a_platform_owner() -> None:
     from apps.core.services import is_platform_owner
 
     for key in ("config", "catalog", "finance", "support"):
-        user = UserFactory()
+        user = UserFactory.create()
         user.groups.add(Group.objects.get(name=roles.role(key).group))
         assert not is_platform_owner(user)
 
 
 def test_a_superuser_or_staff_without_a_role_is_not_platform_staff() -> None:
-    assert not is_platform_staff(UserFactory(is_superuser=True, is_staff=True))
-    assert not is_platform_staff(UserFactory(is_staff=True))
+    assert not is_platform_staff(UserFactory.create(is_superuser=True, is_staff=True))
+    assert not is_platform_staff(UserFactory.create(is_staff=True))
 
 
 def test_an_inactive_role_holder_has_no_role() -> None:
-    user = UserFactory(is_active=False)
+    user = UserFactory.create(is_active=False)
     user.groups.add(Group.objects.get(name=roles.role("support").group))
     assert user_roles(user) == frozenset()
     assert not is_platform_staff(user)
 
 
 def test_a_role_holder_who_is_a_vendor_member_enters_neither_space() -> None:
-    member = VendorMemberFactory().user
+    member = VendorMemberFactory.create().user
     member.groups.add(Group.objects.get(name=roles.role("catalog").group))
     assert not may_enter(Space.PLATFORM, member)
     assert not may_enter(Space.SHOP, member)
