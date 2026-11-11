@@ -48,7 +48,7 @@ DROP FUNCTION IF EXISTS catalog_pricehistory_append_only();
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("catalog", "0010_d25_product_slugs"),
+        ("catalog", "0011_brand_entities"),
     ]
 
     operations = [

@@ -244,6 +244,30 @@ type = "forbidden"
 source_modules = ["apps.tax", "apps.shipping"]
 forbidden_modules = ["apps.orders", "apps.cart", "apps.payments", "apps.ledger", "apps.events"]
 
+# Spec 01 graph: `ingest` sits above `catalog` only (catalog --> ingest). It never reaches the
+# checkout, tax, shipping, payments, ledger, the CMS or the other apps of its layer.
+[[tool.importlinter.contracts]]
+name = "Ingest depends only on catalog, vendors, accounts and core (spec 01 graph)"
+type = "forbidden"
+source_modules = ["apps.ingest"]
+forbidden_modules = [
+  "apps.tax",
+  "apps.shipping",
+  "apps.cart",
+  "apps.orders",
+  "apps.payments",
+  "apps.ledger",
+  "apps.cms",
+  "apps.events",
+  "apps.seo",
+  "apps.compliance",
+  "apps.themes",
+  "apps.api",
+  "apps.manager",
+  "apps.mcp",
+  "apps.seed",
+]
+
 # Spec 15: nothing in the checkout reads events. cart and orders sit above events in the
 # layers, so this contract keeps them off it.
 [[tool.importlinter.contracts]]

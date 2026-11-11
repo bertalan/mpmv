@@ -1,0 +1,1 @@
+{% if email_language == "it" %}Documento non fiscale{% elif email_language == "de" %}Kein Steuerbeleg{% elif email_language == "fr" %}Document non fiscal{% elif email_language == "es" %}Documento no fiscal{% else %}Non-fiscal document{% endif %}

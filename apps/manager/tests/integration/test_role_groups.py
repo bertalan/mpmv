@@ -114,3 +114,16 @@ def test_a_role_holder_who_is_a_vendor_member_enters_neither_space() -> None:
     member.groups.add(Group.objects.get(name=roles.role("catalog").group))
     assert not may_enter(Space.PLATFORM, member)
     assert not may_enter(Space.SHOP, member)
+
+
+def test_before_the_seed_migration_missing_groups_do_not_block_migrate() -> None:
+    """`migrate` runs the database checks first: on a database that predates the seed migration the
+    groups are missing by design, and the check must let the migration that creates them run."""
+    from django.db.migrations.recorder import MigrationRecorder
+
+    from apps.manager.checks import SEED_MIGRATION
+
+    app, name = SEED_MIGRATION
+    MigrationRecorder.Migration.objects.filter(app=app, name=name).delete()
+    Group.objects.filter(name__in=[r.group for r in roles.ROLES]).delete()
+    assert check_role_drift() == []
