@@ -176,10 +176,17 @@ class WithdrawalLookupForm(forms.Form):
         label=_("Order number"),
         max_length=32,
         widget=forms.TextInput(attrs={"autocomplete": "off"}),
-        help_text=_("As in the confirmation email, for example 2027-000123."),
+        help_text=_(
+            "The reference from your order confirmation email, for example 2027-000123. "
+            "Required: without it we cannot find your order."
+        ),
     )
     email = forms.EmailField(
         label=_("Email address of the order"),
         max_length=254,
         widget=forms.EmailInput(attrs={"autocomplete": "email"}),
+        help_text=_(
+            "The address you gave when you ordered. It proves the order is yours, and the "
+            "confirmation of your withdrawal is sent there. Required."
+        ),
     )
