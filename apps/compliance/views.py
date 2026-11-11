@@ -8,16 +8,18 @@ from django.shortcuts import redirect, render
 from django.utils.translation import get_language
 from django.utils.translation import gettext as _
 from django.views.decorators.cache import cache_control
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 
 from apps.accounts.captcha import captcha_passes
+from apps.core.audit import audit_context
 from apps.core.http import client_ip
 from apps.core.public_forms import Protection, public_form
 from apps.core.services import NoPlatformOperator
+from apps.orders.models import Order
 
-from . import services
-from .forms import URL_MAX, NoticeForm
-from .models import Notice
+from . import engine, services, withdrawal
+from .forms import URL_MAX, NoticeForm, WithdrawalLookupForm
+from .models import Notice, WithdrawalStatement
 
 
 @require_GET
@@ -122,3 +124,155 @@ def notice_received(request: HttpRequest) -> HttpResponse:
     response = render(request, "compliance/notice_received.html", {"reference": reference})
     response["Cache-Control"] = "no-store"
     return response
+
+
+# --- Online withdrawal (CMP.6 2/2)
+
+WITHDRAWAL_SESSION_KEY = "compliance.withdrawal_statements"
+
+_WITHDRAWAL_ERRORS = {
+    "nothing_selected": _("Choose at least one part of the order to withdraw from."),
+    "unknown_vendor_order": _("That part does not belong to this order."),
+    "not_available": _("The withdrawal period for that part has ended."),
+    "already_withdrawn": _("A withdrawal for that part was already recorded."),
+}
+
+
+def _no_store(response: HttpResponse) -> HttpResponse:
+    response["Cache-Control"] = "no-store"
+    return response
+
+
+def _labels_context() -> dict[str, object]:
+    return {"labels": engine.withdrawal_labels(get_language() or "en")}
+
+
+def _render_lookup(request: HttpRequest, form: WithdrawalLookupForm) -> HttpResponse:
+    return _no_store(
+        render(request, "compliance/withdrawal_start.html", {"form": form, **_labels_context()})
+    )
+
+
+def _render_choice(
+    request: HttpRequest, order: Order, *, error: str = "", status: int = 200
+) -> HttpResponse:
+    options = withdrawal.options(order)
+    response = render(
+        request,
+        "compliance/withdrawal_choose.html",
+        {
+            "order": order,
+            "options": options,
+            "any_open": any(o.window.is_open and not o.withdrawn for o in options),
+            "token": withdrawal.make_token(order),
+            "error": error,
+            **_labels_context(),
+        },
+        status=status,
+    )
+    return _no_store(response)
+
+
+@public_form(
+    protection=Protection.CAPTCHA,
+    purpose="Withdrawal from a contract: identify the order (CMP.6)",
+    task="CMP.6",
+    rate_limit="per IP (lookup and captcha-failure budgets)",
+    templates=("compliance/withdrawal_start.html",),
+)
+def withdrawal_start(request: HttpRequest) -> HttpResponse:
+    """The first page of the withdrawal function, reachable by anyone for the whole period.
+
+    The consumer enters the order number and the email on the order. A wrong pair gets the same
+    answer whatever is wrong, so the page does not tell whether an order number exists.
+    """
+    if request.method != "POST":
+        return _render_lookup(request, WithdrawalLookupForm(initial={"order_number": ""}))
+    ip = client_ip(request)
+    form = WithdrawalLookupForm(request.POST)
+    if not captcha_passes(request):
+        wait = withdrawal.captcha_retry_after(ip)
+        if wait:
+            return _too_many(wait)
+        form.add_error(None, _("The verification failed. Please reload the page and try again."))
+        return _render_lookup(request, form)
+    wait = withdrawal.lookup_retry_after(ip)  # counted once the captcha passed
+    if wait:
+        return _too_many(wait)
+    if form.is_valid():
+        order = withdrawal.find_order(form.cleaned_data["order_number"], form.cleaned_data["email"])
+        if order is not None:
+            return _render_choice(request, order)
+        form.add_error(None, _("We could not find an order with this number and email address."))
+    return _render_lookup(request, form)
+
+
+@require_POST
+@public_form(
+    protection=Protection.SIGNED_TOKEN,
+    purpose="Withdrawal from a contract: confirm the statement (CMP.6)",
+    task="CMP.6",
+    reason=(
+        "The signed token is minted only after the order number and email matched behind the "
+        "captcha, expires after 30 minutes and names one order."
+    ),
+    rate_limit=(
+        "the token needs a captcha-protected lookup, and a statement is recorded once per "
+        "vendor order (unique), so a replay changes nothing"
+    ),
+)
+def withdrawal_confirm(request: HttpRequest) -> HttpResponse:
+    """The second step: 'confirm withdrawal'. Records one statement per chosen vendor order,
+    shows the acknowledgement page; the same content goes to the buyer's email."""
+    order = withdrawal.read_token(request.POST.get("token", ""))
+    if order is None:
+        return redirect("withdrawal")
+    if request.user.is_authenticated:
+        ctx = audit_context(request)
+    else:
+        ctx = services.anonymous_context(client_ip(request))
+    try:
+        changes = withdrawal.submit_withdrawal(
+            order, request.POST.getlist("vendor_orders"), ctx=ctx
+        )
+    except withdrawal.WithdrawalError as exc:
+        return _render_choice(request, order, error=str(_WITHDRAWAL_ERRORS[exc.code]))
+    request.session[WITHDRAWAL_SESSION_KEY] = [c.key for c in changes.changes]
+    return redirect("withdrawal_done")
+
+
+@require_GET
+def withdrawal_done(request: HttpRequest) -> HttpResponse:
+    """The acknowledgement page, shown from the visitor's own session (a 404 without one). The
+    email is the durable medium; this page repeats its content."""
+    references = request.session.get(WITHDRAWAL_SESSION_KEY) or []
+    statements = list(
+        WithdrawalStatement.objects.filter(public_id__in=references)
+        .select_related("order", "vendor_order__vendor")
+        .order_by("id")
+    )
+    if not statements:
+        raise Http404("No withdrawal was just recorded")
+    order = statements[0].order
+    return _no_store(
+        render(
+            request,
+            "compliance/withdrawal_done.html",
+            {
+                "order": order,
+                "statements": statements,
+                "submitted_at": withdrawal.display_time(statements[0].submitted_at),
+                "emailed": all(s.acknowledged_at for s in statements),
+                **_labels_context(),
+            },
+        )
+    )
+
+
+@require_GET
+@cache_control(public=True, max_age=300)
+def consumer_information(request: HttpRequest) -> HttpResponse:
+    """The pre-contractual information on the withdrawal right and where to exercise it (art.
+    49(1)(h)), and the legal guarantee. Public and cached: the same for every visitor."""
+    info = withdrawal.precontractual(get_language() or "en")
+    return render(request, "compliance/consumer_information.html", {"info": info})

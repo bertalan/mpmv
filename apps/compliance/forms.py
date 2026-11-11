@@ -167,3 +167,19 @@ class AuthoritiesForm(forms.Form):
         widget=forms.Textarea(attrs={"rows": 3}),
         help_text=_("Kept with the notice, not in the audit log."),
     )
+
+
+class WithdrawalLookupForm(forms.Form):
+    """Step one of the withdrawal function: which contract. Minimal data (CMP.6)."""
+
+    order_number = forms.CharField(
+        label=_("Order number"),
+        max_length=32,
+        widget=forms.TextInput(attrs={"autocomplete": "off"}),
+        help_text=_("As in the confirmation email, for example 2027-000123."),
+    )
+    email = forms.EmailField(
+        label=_("Email address of the order"),
+        max_length=254,
+        widget=forms.EmailInput(attrs={"autocomplete": "email"}),
+    )

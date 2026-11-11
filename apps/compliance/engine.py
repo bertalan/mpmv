@@ -497,3 +497,136 @@ def transparency_payload(
     )
     payload[key] = scrub_public_text(explanation)
     return payload
+
+
+# --- Online withdrawal (CMP.6 2/2, directive 2011/83/EU art. 11a as added by 2023/2673; Italy:
+# article 54-bis of the Codice del Consumo)
+
+#: The legal minimum of the withdrawal period (directive 2011/83/EU art. 9(1)).
+MIN_WITHDRAWAL_DAYS: Final = 14
+
+
+def effective_withdrawal_days(configured: int) -> int:
+    """The period to apply: the configured one, never below the 14 days the directive grants."""
+    return max(MIN_WITHDRAWAL_DAYS, int(configured))
+
+
+@dataclass(frozen=True)
+class WithdrawalLabels:
+    button: str  # the first step, visible for the whole withdrawal period
+    confirm: str  # the second step
+    verified: bool  # False until counsel has checked the wording against the transposition
+
+
+#: The two labels of the function. EN and IT are the directive's and the decree's own words;
+#: DE, FR and ES are provisional until counsel checks them against each destination country's
+#: transposition (spec 11 CMP.6), so they are listed as not verified.
+WITHDRAWAL_LABELS: Final[Mapping[str, WithdrawalLabels]] = {
+    "en": WithdrawalLabels("withdraw from contract here", "confirm withdrawal", True),
+    "it": WithdrawalLabels("recedere dal contratto qui", "conferma recesso", True),
+    "de": WithdrawalLabels("Vertrag hier widerrufen", "Widerruf bestätigen", False),
+    "fr": WithdrawalLabels("se rétracter du contrat ici", "confirmer la rétractation", False),
+    "es": WithdrawalLabels("desistir del contrato aquí", "confirmar el desistimiento", False),
+}
+
+
+def withdrawal_labels(language: str) -> WithdrawalLabels:
+    """The labels in `language`; English for a language without its own."""
+    return WITHDRAWAL_LABELS.get(language, WITHDRAWAL_LABELS["en"])
+
+
+@dataclass(frozen=True)
+class WithdrawalWindow:
+    """Whether the consumer may still withdraw from one vendor order, and until when.
+
+    `closes_at` is None while the goods have not been delivered: the period only starts to run
+    on delivery, but the consumer may withdraw from the conclusion of the contract (art. 9(2)(b)
+    and 12(b))."""
+
+    is_open: bool
+    reason: str  # "" when open, else why not: not_consumer, not_paid, cancelled, refunded, expired
+    opens_at: dt.datetime | None
+    closes_at: dt.datetime | None
+
+
+def withdrawal_window(
+    *,
+    is_consumer: bool,
+    contract_at: dt.datetime | None,
+    delivered_at: dt.datetime | None,
+    vendor_order_state: str,
+    period_days: int,
+    now: dt.datetime,
+    tz: dt.tzinfo,
+) -> WithdrawalWindow:
+    """The withdrawal window of a vendor order.
+
+    The period is `period_days` calendar days from the day the goods were received, and the last
+    day counts in full (it ends at the end of that day in `tz`, the business time zone). A
+    statement sent before it ends is on time. Only consumers have the right; an order that was
+    never paid is not a contract yet; a cancelled or refunded one has nothing left to withdraw.
+    """
+    if now.tzinfo is None or (delivered_at is not None and delivered_at.tzinfo is None):
+        raise ValueError("withdrawal_window needs aware datetimes")
+    if not is_consumer:
+        return WithdrawalWindow(False, "not_consumer", None, None)
+    if contract_at is None:
+        return WithdrawalWindow(False, "not_paid", None, None)
+    if vendor_order_state in ("cancelled", "refunded"):
+        return WithdrawalWindow(False, vendor_order_state, contract_at, None)
+    if delivered_at is None:
+        return WithdrawalWindow(True, "", contract_at, None)
+    last_day = delivered_at.astimezone(tz).date() + dt.timedelta(
+        days=effective_withdrawal_days(period_days)
+    )
+    closes_at = dt.datetime.combine(last_day, dt.time.max, tzinfo=tz)
+    if now > closes_at:
+        return WithdrawalWindow(False, "expired", contract_at, closes_at)
+    return WithdrawalWindow(True, "", contract_at, closes_at)
+
+
+@dataclass(frozen=True)
+class WithdrawalInfo:
+    period_days: int
+    url: str
+    button_label: str
+    confirm_label: str
+    labels_verified: bool
+
+
+@dataclass(frozen=True)
+class GuaranteeInfo:
+    months: int
+    #: The harmonised notice (directive (EU) 2024/825, Implementing Regulation (EU) 2025/1960)
+    #: has fixed wording that code does not make up: until counsel supplies it, the page shows
+    #: a plain summary and says so.
+    notice_is_draft: bool
+
+
+@dataclass(frozen=True)
+class PreContractualInfo:
+    """What the consumer is told before ordering (art. 49(1)(h) and (m) of the directive)."""
+
+    withdrawal: WithdrawalInfo
+    guarantee: GuaranteeInfo
+
+
+def precontractual_info(
+    *, language: str, period_days: int, withdrawal_url: str, legal_guarantee_months: int
+) -> PreContractualInfo:
+    """The withdrawal block (period, where the function is, its labels) and the legal guarantee
+    block for `language`. The trader status and the split of obligations per offer (art. 49-bis)
+    need the vendor declarations of CMP.10 and are not part of this slice."""
+    if not withdrawal_url:
+        raise ValueError("the pre-contractual information must say where the function is: url")
+    labels = withdrawal_labels(language)
+    return PreContractualInfo(
+        withdrawal=WithdrawalInfo(
+            effective_withdrawal_days(period_days),
+            withdrawal_url,
+            labels.button,
+            labels.confirm,
+            labels.verified,
+        ),
+        guarantee=GuaranteeInfo(legal_guarantee_months, notice_is_draft=True),
+    )

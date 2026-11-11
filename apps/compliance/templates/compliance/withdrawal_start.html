@@ -1,0 +1,18 @@
+{% extends "layouts/content.html" %}
+{% load i18n captcha %}
+{% block title %}{{ labels.button|capfirst }} · {{ site_name }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">
+{% captcha_script %}{% endblock %}
+{% block page_content %}
+  <article class="withdrawal">
+    <h1>{{ labels.button|capfirst }}</h1>
+    <p>{% translate "Enter the number of your order and the email address you used. Next you choose what to withdraw from and confirm." %}</p>
+    {% include "components/error_summary.html" with form=form autofocus=True only %}
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% for field in form %}{% include "components/field.html" with field=field only %}{% endfor %}
+      {% captcha_widget %}
+      {% include "components/button.html" with label=_("Continue") type="submit" only %}
+    </form>
+  </article>
+{% endblock %}

@@ -24,6 +24,7 @@ from django.utils import timezone
 from apps.catalog.models import Product
 from apps.core.fields import CountryField, EncryptedCharField, LanguageField
 from apps.core.models import BaseModel
+from apps.orders.models import Order, VendorOrder
 from apps.vendors.models import Vendor
 from apps.vendors.scoping import VendorScopedManager
 
@@ -426,3 +427,47 @@ class ProductRestriction(BaseModel):
 
     def __str__(self) -> str:
         return f"Restriction of {self.product_id} ({'lifted' if self.lifted_at else 'active'})"
+
+
+class WithdrawalStatement(BaseModel):
+    """A consumer's statement that they withdraw from one vendor order (CMP.6, spec 11).
+
+    The record of the online withdrawal function: it is what the acknowledgement on a durable
+    medium states. It is written once and never changed or deleted (a withdrawal is evidence),
+    one per vendor order, and it moves no order state: the refund and return flow (ORD.8) reads
+    it. The buyer's email stays on the order; this row holds none.
+    """
+
+    vendor_scope: ClassVar[str] = "vendor_order__vendor"
+    objects: ClassVar[VendorScopedManager["WithdrawalStatement"]] = VendorScopedManager()
+
+    order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name="withdrawals")
+    vendor_order = models.OneToOneField(
+        VendorOrder, on_delete=models.PROTECT, related_name="withdrawal"
+    )
+    submitted_at = models.DateTimeField(help_text="When the statement was confirmed.")
+    period_closes_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="End of the period when it was sent; empty if undelivered.",
+    )
+    language = LanguageField(help_text="The language of the page and of the acknowledgement.")
+    acknowledged_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the acknowledgement was queued for the buyer's email.",
+    )
+
+    class Meta:
+        ordering = ["-submitted_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"Withdrawal from {self.vendor_order}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self._state.adding:
+            raise PermissionError("A withdrawal statement is never changed")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> Any:
+        raise PermissionError("A withdrawal statement is never deleted")

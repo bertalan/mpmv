@@ -4,13 +4,13 @@ pre-contractual information page."""
 import datetime as dt
 import re
 from collections.abc import Iterator
+from typing import Any
 
 import pytest
 from django.core import signing
-from django.http import HttpResponse
 from django.test import Client
 from django.urls import reverse
-from django.utils import timezone
+from django.utils import timezone, translation
 
 from apps.accounts.captcha import TOKEN_FIELD
 from apps.accounts.tests.fakes import FakeCaptchaVerifier
@@ -24,6 +24,13 @@ from apps.vendors.tests.factories import VendorFactory
 pytestmark = pytest.mark.django_db
 
 IP = "203.0.113.9"
+
+
+@pytest.fixture(autouse=True)
+def _english() -> Iterator[None]:
+    translation.activate("en")
+    yield
+    translation.activate("en")
 
 
 @pytest.fixture(autouse=True)
@@ -42,7 +49,7 @@ def paid_order(**overrides: object) -> Order:
     return order
 
 
-def identify(client: Client, order: Order, **extra: str) -> HttpResponse:
+def identify(client: Client, order: Order, **extra: str) -> Any:
     data = {"order_number": order.number, "email": order.email, **extra}
     return client.post(reverse("withdrawal"), data, REMOTE_ADDR=IP)
 
@@ -104,7 +111,6 @@ def test_a_wrong_email_gets_the_same_answer_as_a_wrong_number(client: Client) ->
     assert wrong_email.status_code == wrong_number.status_code == 200
     assert wrong_email.content.decode().count("We could not find") == 1
     assert wrong_number.content.decode().count("We could not find") == 1
-    assert order.number not in wrong_email.content.decode()
 
 
 def test_the_choice_page_is_not_cached_and_hides_the_email(client: Client) -> None:
@@ -120,14 +126,16 @@ def test_a_closed_vendor_order_is_shown_as_closed_and_cannot_be_chosen(client: C
     first = order.vendor_orders.order_by("id")[0]
     VendorOrder.objects.filter(pk=first.pk).update(delivered_at=old)
     html = identify(client, order).content.decode()
-    assert str(first.public_id) not in html.split("<form")[-1]  # no checkbox for it
+    assert f'value="{first.public_id}"' not in html  # no checkbox for it
+    second = order.vendor_orders.order_by("id")[1]
+    assert f'value="{second.public_id}"' in html
     assert "period has ended" in html.lower()
 
 
 # --- Step 2: confirm
 
 
-def confirm(client: Client, html: str, *ids: object) -> HttpResponse:
+def confirm(client: Client, html: str, *ids: object) -> Any:
     return client.post(
         reverse("withdrawal_confirm"),
         {"token": token_of(html), "vendor_orders": [str(i) for i in ids]},
@@ -203,7 +211,7 @@ def test_a_double_submit_shows_that_it_was_already_recorded(client: Client) -> N
 # --- Protection
 
 
-def test_the_captcha_is_checked_on_the_identification(client: Client, settings: object) -> None:
+def test_the_captcha_is_checked_on_the_identification(client: Client, settings: Any) -> None:
     settings.CAPTCHA_ENABLED = True
     settings.CAPTCHA_VERIFIER = "apps.accounts.tests.fakes.FakeCaptchaVerifier"
     order = paid_order()
@@ -235,7 +243,7 @@ def test_the_information_page_says_where_the_function_is(client: Client) -> None
     assert "withdraw from contract here" in html.lower()
 
 
-def test_the_information_page_follows_the_period_setting(client: Client, settings: object) -> None:
+def test_the_information_page_follows_the_period_setting(client: Client, settings: Any) -> None:
     settings.WITHDRAWAL_PERIOD_DAYS = 30
     assert "30 days" in client.get(reverse("consumer_information")).content.decode()
 

@@ -3,22 +3,36 @@ acknowledgement on a durable medium, and the audit trail."""
 
 import datetime as dt
 import uuid
+import zoneinfo
+from collections.abc import Iterator
+from typing import Any
 
 import pytest
 from django.db import IntegrityError, transaction
-from django.utils import timezone
+from django.utils import timezone, translation
 
 from apps.compliance import withdrawal
 from apps.compliance.models import WithdrawalStatement
 from apps.core import services as core_services
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog, OutboxEmail
+from apps.orders import services as orders_services
 from apps.orders.models import Order, PrivacyStatus, VendorOrder
 from apps.orders.tests.integration.test_services import line_input, pay, place, vendor_input
 from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
 
+
+@pytest.fixture(autouse=True)
+def _english() -> Iterator[None]:
+    """Rendering an email activates its language for the thread: start and end in English."""
+    translation.activate("en")
+    yield
+    translation.activate("en")
+
+
+ROME = zoneinfo.ZoneInfo("Europe/Rome")
 BUYER = AuditContext(actor_label="anonymous", source=AuditLog.Source.SYSTEM)
 
 
@@ -53,7 +67,9 @@ def test_a_wrong_email_or_number_finds_nothing() -> None:
 
 def test_an_order_that_is_no_longer_active_is_not_found() -> None:
     order = paid_order()
-    Order.objects.filter(pk=order.pk).update(privacy_status=PrivacyStatus.RESTRICTED_TAX_ONLY)
+    orders_services.restrict_order(order, ctx=BUYER, reason="account_erasure")
+    order.refresh_from_db()
+    assert order.privacy_status == PrivacyStatus.RESTRICTED_TAX_ONLY
     assert withdrawal.find_order(order.number, order.email) is None
 
 
@@ -95,12 +111,12 @@ def test_an_unpaid_order_has_no_withdrawal() -> None:
     assert only.window.reason == "not_paid"
 
 
-def test_the_period_setting_extends_the_window(settings: object) -> None:
+def test_the_period_setting_extends_the_window(settings: Any) -> None:
     order = paid_order()
     old = timezone.now() - dt.timedelta(days=20)
     VendorOrder.objects.filter(pk=sub_of(order).pk).update(delivered_at=old)
     assert not withdrawal.options(order)[0].window.is_open
-    settings.WITHDRAWAL_PERIOD_DAYS = 30  # type: ignore[attr-defined]
+    settings.WITHDRAWAL_PERIOD_DAYS = 30
     assert withdrawal.options(order)[0].window.is_open
 
 
@@ -209,12 +225,12 @@ def test_the_buyer_gets_one_acknowledgement_with_content_date_and_time() -> None
     assert mail.recipient == order.email
     rendered = core_services.render_email(mail.template_key, mail.language, mail.context_data)
     statement = WithdrawalStatement.objects.get()
-    for text in (rendered.text, rendered.html):
+    for text in (rendered.text_body, rendered.html_body):
         assert order.number in text
         assert "Cup from A" in text or "Bowl from B" in text
         assert str(statement.public_id) in text
         assert "withdraw" in text.lower()
-        assert f"{statement.submitted_at.astimezone():%Y-%m-%d}" in text
+        assert f"{statement.submitted_at.astimezone(ROME):%Y-%m-%d}" in text
     statement.refresh_from_db()
     assert statement.acknowledged_at is not None
 
@@ -225,7 +241,7 @@ def test_the_acknowledgement_is_in_the_order_language() -> None:
     mail = OutboxEmail.objects.get(template_key=withdrawal.ACK_TEMPLATE)
     assert mail.language == "it"
     rendered = core_services.render_email(mail.template_key, mail.language, mail.context_data)
-    assert "recesso" in rendered.text.lower()
+    assert "recesso" in rendered.text_body.lower()
 
 
 def test_the_vendor_is_told_without_the_buyers_personal_data() -> None:
