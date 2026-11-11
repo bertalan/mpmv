@@ -534,6 +534,13 @@ if _MAP_TILE_ORIGIN:
         "img-src": [*SECURE_CSP["img-src"], _MAP_TILE_ORIGIN],  # type: ignore[misc]
     }
 
+# Payment provider (PAY.5, owner decision D-09): the registered provider checkout uses, set per
+# environment with MPMV_PAYMENT_PROVIDER. Empty means none is configured yet (PAY.1 registers
+# Stripe, the only provider at launch). An unknown code fails the system check payments.E001.
+# The in-memory fake provider exists only where PAYMENT_ALLOW_FAKE_PROVIDER is True (tests).
+PAYMENT_PROVIDER = env_str("MPMV_PAYMENT_PROVIDER", "")
+PAYMENT_ALLOW_FAKE_PROVIDER = False
+
 # Per-API-key rate limit (CORE.12, CORE.16, apps.api.engine): fixed windows counted in PostgreSQL,
 # so every app process shares one counter per key. API_RATE_LIMIT is the key-wide limit of every
 # key, set per environment with MPMV_API_RATE_LIMIT (default 120/minute, owner decision MQ-4);
