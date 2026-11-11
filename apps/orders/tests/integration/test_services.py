@@ -483,11 +483,13 @@ def test_a_rolled_back_number_is_reused_by_the_waiting_order_through_create_orde
     # B queued behind A's lock (A saw it waiting before rolling back) and took the freed number.
 
 
-def _wait_until_a_session_waits_for_a_lock(timeout: float = 10.0) -> None:
+def _wait_until_a_session_waits_for_a_lock(timeout: float = 30.0) -> None:
     """Return once another session of this database is blocked on a lock (no fixed sleep)."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         with connection.cursor() as cursor:
+            # Inside a transaction Postgres serves one cached snapshot of the activity view.
+            cursor.execute("SELECT pg_stat_clear_snapshot()")
             cursor.execute(
                 "SELECT count(*) FROM pg_stat_activity "
                 "WHERE datname = current_database() AND wait_event_type = 'Lock'"
