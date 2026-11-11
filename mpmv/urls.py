@@ -17,7 +17,7 @@ from wagtail.admin import urls as wagtailadmin_urls
 
 from apps.accounts.views import switch_language
 from apps.core.media import serve_media
-from apps.core.views import email_webhook
+from apps.core.views import email_webhook, robots_view
 
 # Error pages with the `base` layouts (THM.3); 400 and 500 render without the database.
 handler400 = "apps.themes.views.bad_request"
@@ -31,6 +31,7 @@ def healthz(request: HttpRequest) -> JsonResponse:
 
 urlpatterns = [
     path("healthz", healthz, name="healthz"),
+    path("robots.txt", robots_view, name="robots_txt"),  # SEO.8
     path("webhooks/email/", email_webhook, name="email_webhook"),
     # Uploaded images and renditions, as images only (THM.12, apps.core.media).
     path("media/<path:path>", serve_media, name="media"),
@@ -41,16 +42,18 @@ urlpatterns = [
     path("i18n/switch/", switch_language, name="switch_language"),
     path("api/v1/", include("apps.api.urls")),
     path("account/mfa/", include("apps.accounts.urls")),
+    path("account/level/", include("apps.accounts.level_urls")),  # CORE.25 (D-32)
     path("account/link/", include("apps.accounts.action_link_urls")),  # CORE.15
     path("account/", include("apps.manager.account_urls")),  # Manager sign-in (CORE.17)
     path("manager/", include("apps.manager.urls")),  # the Manager's two spaces (CORE.17)
     path("vendor/claim/", include("apps.vendors.urls")),  # claim an imported vendor (VEN.24)
-    path("vendor/apply/", include("apps.vendors.application_urls")),  # "Sell with us" (VEN.22)
     path("geocoding/", include("apps.core.geocoding.urls")),  # "Find coordinates" (EVT.12)
     # Staff-only styleguide of the active theme (THM.4); a string, as no app imports themes.
     path("_styleguide/", include("apps.themes.urls")),
     *i18n_patterns(
+        path("vendor/apply/", include("apps.vendors.application_urls")),  # "Sell with us" (VEN.22)
         path("", include("apps.catalog.urls")),  # listings (CAT.8): before the CMS catch-all
+        path("", include("apps.compliance.urls")),  # DSA contact points (CMP.5)
         path("", include("apps.cms.urls")),
         prefix_default_language=False,
     ),

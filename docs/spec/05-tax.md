@@ -115,8 +115,9 @@ class TaxContext:
 class TaxDecision:
     rate: Decimal                             # effective percentage, never a "class"
     reason: Literal["standard_destination", "domestic_vendor_country", "export",
-                    "reverse_charge", "art74_publishing", "flat_rate_vendor",
+                    "reverse_charge", "art74_publishing", "flat_rate_vendor", "exempt_other",
                     "outside_vat_territory"]
+    nature_code: str | None                   # N1-N7 e-invoice nature, None when VAT is charged
     country_of_taxation: str | None
     legal_note_key: str | None                # text on the order document
 
@@ -157,13 +158,27 @@ Intended differences from today:
   - Saint-Martin: ISO `MF`; French postcode `97150`. The French part is an outermost region excluded from the VAT territory.
   - Saint-Barthélemy: ISO `BL`; French postcode `97133`. An overseas country and territory outside the EU since 2012.
   - Both resolve to 0% with reason `outside_vat_territory` (case T15).
-- Country basis: **delivery country** for B2C distance sales (EU rule on distance sales of
-  goods), with the billing country used only for B2B. Today the billing country is used: **to be confirmed with the
-  tax advisor** (D-01).
+- Country basis (D-01, decided by the owner on 2026-11-10): **delivery country** for B2C goods
+  (VAT Directive art. 33, OSS since 2021). The billing country only validates B2B data: a
+  validated business receiving goods in the vendor's country pays the vendor country's VAT. The
+  basis is the named constant `GOODS_COUNTRY_BASIS` in the tax engine.
+- Fail closed until decided: a sale to Northern Ireland (`XI`, or GB with a `BT` postcode) or to a
+  `special` territory raises a blocking error (D-02 open), and so does a vendor established in
+  such a territory (not supported: the context has no vendor territory).
 - The carrier `force_vat` flag goes away, unless it turns out to be needed (D-03).
 - VIES fails closed: VIES unavailable, invalid number or prefix different from the country →
   VAT applied; result saved in `VatValidation` and in the order snapshot.
 - B2B in the same country as the vendor (including IT→IT) → VAT of the vendor's country.
+- D-26 (owner, 2026-11-10): a business with a valid number of the **vendor's own country**
+  receiving goods in another member state is charged vendor-country VAT (departure is the place of
+  supply, art. 32; no intra-community exemption without a number of another member state, art. 138;
+  confirmed by the advisor, D-28). A foreign EU number with delivery in the vendor's country is a domestic sale
+  (vendor-country VAT, no reverse charge). The wording of an `other` exemption is the profile's
+  translated `legal_note`, which must not be empty.
+- D-28 (owner, 2026-11-10): the decision carries an exemption-nature code (Italian e-invoice
+  `Natura`): `N3.2` for intra-EU B2B supplies (art. 138, IT art. 41 D.L. 331/93), and the other zero
+  reasons map as in [tax-nature-codes](../dev/tax-nature-codes.md). `exempt_other` takes a
+  structured nature (N1 to N7) plus the legal note; Italian vendors need both.
 - Rates are updated from an official source (the Commission's TEDB) with staff review and validity
   periods; past orders keep the rates in their snapshot.
 
@@ -226,5 +241,6 @@ number is sent, so the vendor's number is sent as requester. Fail closed stays.
 | TAX.11 | Shared postcode grammar for tax territories (coherence check 5): `Territory.postcode_patterns` validated and matched with `apps.core.postcodes` (SHP.12), data migration from the `a-b` range form to `a..b`, the tax-only pattern code removed | P1 | 2 | TAX.1, SHP.12 | A `22100-22199` pattern is refused with the `..` hint; stored rows are migrated; `9000..9999` is accepted and matches; Portuguese and Polish postcodes with a dash match as exact postcodes |
 | TAX.12 | Consumer price display, go-live gate (Directive 98/6/EC, national consumer codes): B2C prices on cards, product pages, cart and feeds include VAT. The gross amount uses the destination country's rate through the TAX.3 tax engine; before the buyer picks a country, an estimated country (geo or locale) is used with a clear "VAT included, estimated for <country>" note. A net price shows only to business buyers who opt in. The catalog stays free of tax imports: a tax-side adapter or template tag supplies the gross amount. The owner confirmed the destination rate, the estimated country and the business opt-in on 2026-11-08 (MQ-12) | P1 | 6 | TAX.3, CAT.8 | Regression tests for IT, DE and FR consumers (destination rate, estimated-country note); a business buyer's net view after opt-in; `on_request` products never priced; ROUND_HALF_UP per line; the catalog app has no tax import |
 | TAX.13 | Exemption reasons per country (owner decision MQ-3): each exemption reason declares the country of the law that defines it (IT for `art74_publishing` and `flat_rate_forfettario`; `other` stores the country of the law cited in its legal note), and the profile consistency check refuses a reason whose country differs from the country of the vendor's VAT registration, on the staff direct path and on TAX.2 approval alike; the check also runs on a VAT number change; staff enter the law country of existing `other` profiles by hand (MQ-15) | P1 | 3 | TAX.2, VEN.12 | An Italian vendor saves `art74_publishing`; a German vendor is refused `art74_publishing` and `flat_rate_forfettario`; a staff-added profile and an approved request give the same refusal; changing an exempt Italian vendor's VAT number to another country is reported; `other` without a country is refused; no data migration fills the country of an existing `other` profile, and such a profile stays in the inconsistency report until staff enter the country (owner decision MQ-15) |
+| TAX.14 | Vendor territory in `TaxContext` (follow-up of TAX.3, D-26): the context carries the vendor's territory code, so a vendor established in a territory with its own rates or outside the VAT area can sell to its mainland and abroad; TAX.3 refuses such a vendor with `UnresolvedTerritory` when `registered_postal_code` shows it | P2 | 3 | TAX.3 | A vendor established in Madeira selling to mainland Portugal and to Italy gets the rates of its own rules; the blocking error is gone; the vendor territory comes from the territory table, not from a postcode guess |
 | TAX.15 | Triangulation, art. 58 c.1 D.L. 331/93 (owner decision D-28): Italian vendors only; only when transport is by or on behalf of the vendor or by platform logistics; checkout collects a tracked declaration from the buyer (final consignee name, delivery address in the other member state, VIES-valid VAT number, explicit request for direct shipping); nature code `N3.2`; the vendor keeps proof of the direct transport (ORD.13) | P1 | 10 | TAX.3, TAX.5, ORD.5, ORD.13 | A non-Italian vendor never gets the triangulation outcome; buyer pickup or a carrier taking free orders from the buyer gives Italian VAT; a complete declaration with a VIES-valid consignee number gives 0% with `N3.2`; an invalid VAT number or a missing direct-shipping request gives Italian VAT; the declaration is stored with the order |
 | TAX.16 | Declaration of intent, Italy (owner decision D-28, art. 8 c.1 lett. c D.P.R. 633/72): buyer-side status, checkout captures the telematic protocol number of the buyer's declaration; nature code `N3.5`; Italian vendors only | P2 | 6 | TAX.3, ORD.5 | An Italian vendor order with a protocol number gets 0% with `N3.5` and stores the number in the snapshot; a missing number gives Italian VAT; a non-Italian vendor never gets it |

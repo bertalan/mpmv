@@ -51,7 +51,7 @@ def test_the_notice_is_shown_after_switching_to_a_missing_translation(
         {"language": "it", "next": "/it/", "exact": "1", "notice": "1"},
         follow=True,
     )
-    assert "not available in this language" in response.content.decode()
+    assert "Questo contenuto non è disponibile in questa lingua." in response.content.decode()
 
 
 def test_a_page_without_an_object_stays_on_its_path_with_no_notice(
@@ -70,7 +70,7 @@ def test_switch_ignores_the_notice_flag_without_exact(client: Client, seeded: An
     response = client.post(
         reverse("switch_language"), {"language": "it", "next": "/", "notice": "1"}, follow=True
     )
-    assert "not available in this language" not in response.content.decode()
+    assert "Questo contenuto non è disponibile" not in response.content.decode()
 
 
 def test_an_off_site_next_is_refused_even_with_exact(client: Client) -> None:

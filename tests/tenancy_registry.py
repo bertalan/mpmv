@@ -63,6 +63,8 @@ from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage, VendorEventPolicy
 from apps.events.tests.factories import EventPageFactory, VendorEventPolicyFactory
+from apps.orders.models import OrderLine, VendorOrder
+from apps.orders.tests.factories import OrderLineFactory, VendorOrderFactory
 from apps.shipping.models import (
     PickupOption,
     PickupOptionTranslation,
@@ -116,6 +118,7 @@ from tests.tenancy import (
     VendorScoped,
     VendorScopedList,
     member_session,
+    vendor_api_key,
 )
 
 # --- Vendor-owned models: how to make one object owned by a given vendor
@@ -199,6 +202,9 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         )
     ),
     CartLine: lambda vendor: CartLineFactory.create(product=ProductFactory.create(vendor=vendor)),
+    # ORD.2: a sub-order of its own order, and a line of such a sub-order.
+    VendorOrder: lambda vendor: VendorOrderFactory.create(vendor=vendor),
+    OrderLine: lambda vendor: OrderLineFactory.create(vendor_order__vendor=vendor),
     # EVT.1: a draft event page under the primary language's events index.
     EventPage: lambda vendor: EventPageFactory.create(vendor=vendor),
     VendorEventPolicy: lambda vendor: VendorEventPolicyFactory.create(vendor=vendor),
@@ -252,6 +258,7 @@ def vendor_display_name(vendor: models.Model) -> str:
 
 ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
+    "robots_txt": NoVendorData("robots.txt (SEO.8): constant text for crawlers; no vendor data."),
     "email_webhook": NoVendorData("Signed email provider feedback; answers with a status only."),
     "media": NoVendorData(
         "Public image files (THM.12): published images and their renditions, no vendor data.",
@@ -268,6 +275,11 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "switch_language": NoVendorData("Stores the visitor's language choice."),
     "themes:styleguide": StaffOnly("Component samples of the active theme (THM.4), staff only."),
+    "levels:options": NoVendorData(OWN_ACCOUNT),
+    "levels:operational": NoVendorData(OWN_ACCOUNT),
+    "levels:once_options": NoVendorData(OWN_ACCOUNT),
+    "levels:once": NoVendorData(OWN_ACCOUNT),
+    "levels:end": NoVendorData(OWN_ACCOUNT),
     "mfa:overview": NoVendorData(OWN_ACCOUNT),
     "mfa:setup": NoVendorData(OWN_ACCOUNT),
     "mfa:totp": NoVendorData(OWN_ACCOUNT),
@@ -322,6 +334,22 @@ ENDPOINTS: dict[str, Access] = {
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
     ),
+    "manager:platform:notices": StaffOnly(
+        "Notices of illegal content (CMP.5): platform data, not vendor-owned; needs the "
+        "compliance.review_notices permission, so a vendor member gets 404."
+    ),
+    "manager:platform:notice": StaffOnly(
+        "One notice of illegal content (CMP.5): platform data, not vendor-owned; needs the "
+        "compliance.review_notices permission, so a vendor member gets 404.",
+        kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
+    "dsa_notice": NoVendorData(
+        "Public report form for illegal content (DSA art. 16, CMP.5): no vendor data is shown, "
+        "the form only stores a notice; captcha and a rate limit guard the POST."
+    ),
+    "dsa_notice_received": NoVendorData(
+        "Thanks page after a report (CMP.5): shows only the reference kept in the session."
+    ),
     "admin:login": NoVendorData("Staff sign-in page."),
     "admin:logout": NoVendorData("Staff sign-out."),
     "admin:jsi18n": NoVendorData("Admin JavaScript translation catalog."),
@@ -332,6 +360,10 @@ ENDPOINTS: dict[str, Access] = {
         "Unknown API paths: a 404 problem document.", path="/api/v1/no-such-operation"
     ),
     # CMS (CMS.1): public pages and the editors' sign-in. The rest of /admin/ is CMS_ADMIN.
+    "dsa_contact_points": NoVendorData(
+        "DSA points of contact (CMP.5): the platform operator's own contact data, the same for "
+        "every visitor; no vendor data."
+    ),
     "wagtail_serve": NoVendorData(
         "Public CMS pages (home, static pages); no vendor data until the CMS.4 landing pages.",
         path="/no-such-page/",
@@ -390,6 +422,14 @@ def classify(endpoint: Endpoint) -> Access | None:
 # --- API v1 operations ("METHOD /path" as in the OpenAPI description), called with Vendor A's
 # API key (CORE.13)
 
+
+def active_vendor_events_key(client: Client, tenants: CrossTenant) -> dict[str, str]:
+    """A write key is refused (403) while its vendor is not active (CORE.14): activate Vendor A."""
+    Vendor.objects.filter(pk=tenants.a.vendor.pk).update(status=Vendor.Status.ACTIVE)
+    tenants.a.vendor.refresh_from_db()
+    return vendor_api_key(["events:read", "events:write"])(client, tenants)
+
+
 API_OPERATIONS: dict[str, Access] = {
     "GET /api/v1/me": NoVendorData("The calling API client itself, with its own vendor."),
     # CAT.3
@@ -402,5 +442,28 @@ API_OPERATIONS: dict[str, Access] = {
     ),
     "GET /api/v1/catalog/products/{public_id}": VendorScoped(
         make=lambda vendor: ProductFactory.create(vendor=vendor)
+    ),
+    # EVT.5
+    "GET /api/v1/events": VendorScopedList(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor)
+    ),
+    "POST /api/v1/events": NoVendorData(
+        "Creates a draft for the caller's own vendor; a platform key is refused. Shows only the "
+        "ChangeSet of what it creates."
+    ),
+    "GET /api/v1/events/{public_id}": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor)
+    ),
+    "PATCH /api/v1/events/{public_id}": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        login=active_vendor_events_key,
+    ),
+    "POST /api/v1/events/{public_id}/submit": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        login=active_vendor_events_key,
+    ),
+    "POST /api/v1/events/{public_id}/cancel": VendorScoped(
+        make=lambda vendor: EventPageFactory.create(vendor=vendor),
+        login=active_vendor_events_key,
     ),
 }

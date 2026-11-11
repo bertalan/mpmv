@@ -239,6 +239,19 @@ jobs:
           name: e2e-screenshots
           path: build/e2e/screenshots/
           if-no-files-found: ignore
+      # CMP.7: the axe audit of the key public pages (tests/e2e/test_axe_audit.py): a JSON file per
+      # page and a summary table. Any finding fails the e2e step above.
+      - name: Accessibility audit summary
+        if: always()
+        run: |
+          if [ -f build/e2e/axe/summary.md ]; then cat build/e2e/axe/summary.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Store accessibility audit
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-axe
+          path: build/e2e/axe/
+          if-no-files-found: ignore
       # THM.5, spec 14 §14.10: candidate baselines (pages without one or that differ) and diffs.
       - name: Store visual baselines and diffs
         if: always()

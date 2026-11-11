@@ -1,0 +1,42 @@
+{% extends "layouts/account.html" %}
+{% block title %}Operational mode needed · MPMV{% endblock %}
+{% block account_content %}
+{% comment %}D-32 (CORE.25): the refusal of a sensitive action in Secure (restricted) mode. Passkey
+forms are driven by accounts/passkey.js (data-passkey="elevate|once"); with no JavaScript the
+buttons do nothing and say so.{% endcomment %}
+<h1>This needs Operational mode</h1>
+<p>You are in Secure mode. This action ({{ action }}) is not available there.</p>
+{% if group == 3 %}
+<p>It also asks for a passkey of its own, even in Operational mode, and again each time you do it once.</p>
+{% endif %}
+{% if can_elevate %}
+  {% if can_do_once %}
+  <section>
+    <h2>Do it once</h2>
+    <p>Confirm with your passkey to allow this one action. You stay in Secure mode.</p>
+    <form data-passkey="once" data-csrf-token="{{ csrf_token }}" data-options-url="{% url 'levels:once_options' %}" data-finish-url="{% url 'levels:once' %}" data-action="{{ action }}" data-digest="{{ digest }}" data-replay="replay-form">
+      <button type="button" data-passkey-start>Do it once</button>
+      <noscript><p>Passkeys need JavaScript.</p></noscript>
+      <p data-passkey-error role="alert" hidden></p>
+    </form>
+    <form id="replay-form" method="{% if replay_method == 'POST' %}post{% else %}get{% endif %}" action="{{ replay_url }}">
+      {% if replay_method == 'POST' %}{% csrf_token %}{% for key, value in replay_fields %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}{% endif %}
+    </form>
+  </section>
+  {% endif %}
+  <section>
+    <h2>Operational mode</h2>
+    <p>Confirm with your passkey to switch. It ends when you sign out, after a period of inactivity or at a maximum duration.</p>
+    <form data-passkey="elevate" data-csrf-token="{{ csrf_token }}" data-options-url="{% url 'levels:options' %}" data-finish-url="{% url 'levels:operational' %}" data-next="{{ replay_url }}">
+      <button type="button" data-passkey-start>Switch to operational mode</button>
+      <noscript><p>Passkeys need JavaScript.</p></noscript>
+      <p data-passkey-error role="alert" hidden></p>
+    </form>
+  </section>
+  {% include "accounts/mfa/_passkey_script.html" %}
+{% elif not has_passkey %}
+<p>Your account has no passkey yet. <a href="{% url 'mfa:overview' %}">Add a passkey</a> to be able to switch.</p>
+{% else %}
+<p>Your role may not switch to Operational mode. Ask a platform owner.</p>
+{% endif %}
+{% endblock %}

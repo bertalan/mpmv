@@ -1,7 +1,7 @@
 {% extends "layouts/base.html" %}
 {% load i18n static %}
 {% block title %}{% translate "Confirm your email" %} · {{ site_name }}{% endblock %}
-{% block head %}<meta name="robots" content="noindex, nofollow">
+{% block head %}{% robots_meta "noindex, nofollow" %}
 <link rel="stylesheet" href="{% static 'accounts/password-toggle.css' %}">
 <script type="module" src="{% static 'accounts/password-toggle.js' %}"></script>{% endblock %}
 {% block content %}

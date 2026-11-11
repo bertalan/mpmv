@@ -1,7 +1,7 @@
+{% load i18n %}
 <section id="recovery-codes"{% if not codes %} hidden{% endif %}>
-  <h2>Your recovery codes</h2>
-  <p>Each code signs you in once if you lose your authenticator or passkey. Store them somewhere
-    safe now: they are shown only this time.</p>
+  <h2>{% translate "Your recovery codes" %}</h2>
+  <p>{% translate "Each code signs you in once if you lose your authenticator or passkey. Store them somewhere safe now: they are shown only this time." %}</p>
   <ol class="recovery-codes">{% for code in codes %}<li><code>{{ code }}</code></li>{% endfor %}</ol>
-  <p><a href="{{ next }}" data-continue>Continue</a></p>
+  <p><a href="{{ next }}" data-continue>{% translate "Continue" %}</a></p>
 </section>
