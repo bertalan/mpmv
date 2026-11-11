@@ -208,6 +208,11 @@ class Host:
 
     def run(self, *args: str, **extra: str) -> subprocess.CompletedProcess[str]:
         (self.root / "log").unlink(missing_ok=True)
+        # A host that may bind 80/443 unless a test says otherwise: never read the runner's own
+        # /proc/sys (GitHub runners keep the kernel default 1024, a workstation has no /proc).
+        default_proc = self.root / "proc-sys-default"
+        (default_proc / "net" / "ipv4").mkdir(parents=True, exist_ok=True)
+        (default_proc / "net" / "ipv4" / "ip_unprivileged_port_start").write_text("80\n")
         env = {
             "PATH": f"{self.root / 'bin'}{os.pathsep}{os.environ['PATH']}",
             "HOME": str(self.root),
@@ -218,6 +223,7 @@ class Host:
             "MPMV_CHECK_BUDGET": "0",
             "MPMV_CHECK_INTERVAL": "0",
             "MPMV_MIN_FREE_MB": "1",
+            "MPMV_PROC_SYS": str(default_proc),
             **extra,
         }
         return subprocess.run(  # noqa: S603 (fixed script path, test-controlled arguments)
