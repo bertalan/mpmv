@@ -121,3 +121,41 @@ def test_an_unchanged_price_appends_nothing() -> None:
     product = ProductFactory.create(price_net=Decimal("10.00"))
     set_price(product, 1, "10.00")
     assert not PriceHistory.objects.exists()
+
+
+def test_a_cleared_variant_override_is_a_point_even_without_a_product_row() -> None:
+    product = ProductFactory.create(price_net=Decimal("10.00"), kind=Product.Kind.VARIABLE)
+    variant = VariantFactory.create(product=product)
+    for n, value in ((1, Decimal("15.00")), (2, None)):
+        with mock.patch("apps.catalog.services.timezone.now", return_value=at(n)):
+            services.set_variant_price(variant, price_net_override=value, ctx=CTX)
+    points = services.price_points(product, variant)
+    assert [p.price_net for p in points] == [Decimal("15.00"), None]
+
+
+def test_the_sale_rule_for_overridden_variants_is_one_named_switch() -> None:
+    # Pending owner decision (cart/engine.py display_unit_price): sales do not reach an override.
+    assert services.engine.SALE_APPLIES_TO_OVERRIDDEN_VARIANT is False
+
+
+def test_a_direct_delete_is_refused() -> None:
+    product = ProductFactory.create(price_net=Decimal("10.00"))
+    set_price(product, 1, "12.00")
+    with pytest.raises(Exception, match="append-only"), transaction.atomic():
+        PriceHistory.objects.all().delete()
+    assert PriceHistory.objects.count() == 1
+
+
+def test_rows_go_with_their_product_through_delete_product() -> None:
+    product = ProductFactory.create(price_net=Decimal("10.00"))
+    set_price(product, 1, "12.00")
+    services.delete_product(product, ctx=CTX)
+    assert not PriceHistory.objects.exists()
+
+
+def test_rows_go_with_their_variant_through_delete_variant() -> None:
+    product = ProductFactory.create(price_net=Decimal("10.00"), kind=Product.Kind.VARIABLE)
+    variant = VariantFactory.create(product=product)
+    services.set_variant_price(variant, price_net_override=Decimal("15.00"), ctx=CTX)
+    services.delete_variant(variant, ctx=CTX)
+    assert not PriceHistory.objects.filter(variant__isnull=False).exists()

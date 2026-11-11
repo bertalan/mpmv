@@ -154,3 +154,45 @@ def test_a_cleared_price_is_not_a_price() -> None:
     found = ref(points, day(41))
     assert found is not None
     assert found.price_net == Decimal("100.00")
+
+
+def test_a_price_in_force_at_the_window_start_counts() -> None:
+    # Window opens 2027-01-11 00:00 Rome (2027-01-10 23:00 UTC); 50.00 holds until 23:01 UTC.
+    start = dt.datetime(2027, 2, 9, 23, 30, tzinfo=dt.UTC)
+    cheap_until = dt.datetime(2027, 1, 10, 23, 1, tzinfo=dt.UTC)
+    points = [
+        PricePoint(day(1), Decimal("50.00"), None, None, None),
+        PricePoint(cheap_until, Decimal("100.00"), None, None, None),
+        PricePoint(start, Decimal("100.00"), Decimal("60.00"), None, None),
+    ]
+    found = engine.reference_price(points, at=start + dt.timedelta(hours=1), tz=ROME)
+    assert found is not None
+    assert found.price_net == Decimal("50.00")
+
+
+def test_a_second_sale_after_a_gap_is_compared_with_the_first_sale_price() -> None:
+    points = [
+        point(1, "100.00"),
+        point(20, "100.00", "70.00", sale_to=day(25)),
+        point(40, "100.00", "80.00"),
+    ]
+    assert ref(points, day(41)) is None  # 70.00 within the window is not above 80.00
+    first = ref(points, day(22))
+    assert first is not None
+    assert first.price_net == Decimal("100.00")
+
+
+def test_a_sale_without_a_regular_price_is_no_reduction() -> None:
+    assert ref([point(1, "100.00"), point(40, None, "70.00")], day(41)) is None
+
+
+def test_the_reference_is_computed_per_currency() -> None:
+    points = [
+        PricePoint(day(1), Decimal("40.00"), None, None, None, currency="USD"),
+        PricePoint(day(2), Decimal("100.00"), None, None, None),
+        PricePoint(day(40), Decimal("100.00"), Decimal("70.00"), None, None),
+    ]
+    found = engine.reference_price(points, at=day(41), tz=ROME, currency="EUR")
+    assert found is not None
+    assert found.price_net == Decimal("100.00")
+    assert engine.reference_price(points, at=day(41), tz=ROME, currency="USD") is None
