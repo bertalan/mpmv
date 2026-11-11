@@ -28,6 +28,7 @@ from apps.core.audit import AuditContext, record
 from apps.core.changeset import Change, ChangeSet
 from apps.core.models import AuditLog, OutboxEmail, OutboxEmailEvent
 from apps.core.services import audit_changes
+from apps.orders import engine
 from apps.orders import services as order_services
 from apps.orders.models import Order
 from apps.vendors.models import ContractAcceptance, SelfCertification, VendorMember
@@ -219,6 +220,20 @@ def _user_state(user: User) -> dict[str, Any]:
     }
 
 
+def _never_paid_and_dead(order: Order, now: dt.datetime) -> bool:
+    """A checkout that can no longer be paid: `checkout` and `quote_flow` never reached the
+    payment provider; an `awaiting_payment` order may still be captured there, so it counts only
+    once it is older than the payment window (`engine.ABANDONED_AFTER_DAYS`, the same rule that
+    lets the scrub service anonymise it at once). A younger one keeps the erasure pending."""
+    if order.paid_at is not None:
+        return False
+    if order.state in ("cancelled", "checkout", "quote_flow"):
+        return True
+    return order.state == "awaiting_payment" and now - order.created_at > dt.timedelta(
+        days=engine.ABANDONED_AFTER_DAYS
+    )
+
+
 def _anonymise_never_paid(order: Order, ctx: AuditContext, stamp: dt.datetime) -> list[Change]:
     """A checkout that never reached `paid`: cancel it, then anonymise it at once (D-30)."""
     changes: list[Change] = []
@@ -287,10 +302,7 @@ def anonymise_customer(
                 )
             open_orders = 0
             for order in _orders(locked).order_by("id"):
-                never_paid = order.paid_at is None and (
-                    order.state in _NEVER_PAID_LIVE_STATES or order.state == "cancelled"
-                )
-                if never_paid:
+                if _never_paid_and_dead(order, stamp):
                     changeset.changes.extend(_anonymise_never_paid(order, ctx, stamp))
                 elif order.state not in CONCLUDED_ORDER_STATES:
                     open_orders += 1
