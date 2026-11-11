@@ -48,15 +48,18 @@ def test_a_header_from_an_untrusted_sender_is_ignored() -> None:
 
 
 def test_staff_act_from_the_admin() -> None:
-    ctx = audit_context(request_as(unsaved_user(staff=True), CLIENT))
+    user = unsaved_user(staff=True)
+    ctx = audit_context(request_as(user, CLIENT))
     assert ctx.actor_id == 7
-    assert ctx.actor_label == "staff:someone@example.test"
+    assert ctx.actor_label == f"staff:{user.public_id}"  # type: ignore[attr-defined]
+    assert "@" not in ctx.actor_label
     assert ctx.source == "admin"
 
 
 def test_other_users_act_on_their_own_account() -> None:
-    ctx = user_context(unsaved_user(staff=False), CLIENT)
-    assert ctx.actor_label == "user:someone@example.test"
+    user = unsaved_user(staff=False)
+    ctx = user_context(user, CLIENT)
+    assert ctx.actor_label == f"user:{user.public_id}"  # type: ignore[attr-defined]
     assert ctx.source == "system"
     assert ctx.ip == CLIENT
 

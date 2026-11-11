@@ -7,6 +7,11 @@ import json
 from decimal import Decimal
 
 import pytest
+from django.apps import apps as django_apps
+from django.conf import settings
+from django.contrib.auth.models import Group
+from django.contrib.sessions.backends.db import SessionStore
+from django.contrib.sessions.models import Session
 
 from apps.accounts.models import PasskeyDevice, User
 from apps.accounts.tests.factories import UserFactory
@@ -14,7 +19,7 @@ from apps.cart.tests.factories import CartFactory, CartLineFactory
 from apps.compliance import gdpr
 from apps.compliance.models import ErasureRequest
 from apps.core.audit import AuditContext
-from apps.core.models import AuditLog, OutboxEmail
+from apps.core.models import AuditLog, OutboxEmail, OutboxEmailEvent
 from apps.orders import services as order_services
 from apps.orders.models import Order
 from apps.orders.services import LineInput, VendorOrderInput
@@ -301,3 +306,127 @@ def test_a_user_with_vendor_ties_is_not_erased_here() -> None:
         gdpr.anonymise_customer(user, ctx=CTX)
     user.refresh_from_db()
     assert user.is_active
+
+
+# --- privacy review of #256 --------------------------------------------------------------------
+
+
+def test_erasure_cancels_queued_and_retrying_mail_and_clears_every_row() -> None:
+    user = UserFactory.create(email="mario@example.com")
+    rows = [
+        OutboxEmail.objects.create(
+            recipient=user.email,
+            template_key="order_confirmation",
+            language="it",
+            context='{"name": "Mario"}',
+            status=status,
+        )
+        for status in ("queued", "retrying", "sent", "failed")
+    ]
+    place(user, state="awaiting_payment")  # pending path: the cancel must not wait for completion
+
+    gdpr.anonymise_customer(user, ctx=CTX)
+
+    for row in OutboxEmail.objects.filter(pk__in=[r.pk for r in rows]):
+        assert row.recipient != "mario@example.com"
+        assert row.context == ""
+        assert row.status in OutboxEmail.FINAL
+    assert OutboxEmail.objects.filter(status="suppressed").count() == 2
+    assert OutboxEmailEvent.objects.filter(status="suppressed").count() == 2
+
+
+def test_an_abandoned_never_paid_order_does_not_block_the_erasure() -> None:
+    user = UserFactory.create(email="mario@example.com")
+    for state in ("checkout", "awaiting_payment"):
+        place(user, state=state)
+
+    gdpr.anonymise_customer(user, ctx=CTX)
+
+    user.refresh_from_db()
+    assert user.email.endswith("@anonymised.invalid")
+    assert ErasureRequest.objects.get(user=user).completed_at is not None
+    for order in Order.objects.filter(customer=user):
+        assert order.privacy_status == "anonymized"
+        assert order.customer_name == "ANONYMISED"
+
+
+def test_erasure_purges_the_users_sessions_and_keeps_other_sessions() -> None:
+    user, other = UserFactory.create(), UserFactory.create()
+    keys = []
+    for owner in (user, other):
+        store = SessionStore()
+        store["_auth_user_id"] = str(owner.pk)
+        store.create()
+        keys.append(store.session_key)
+    gdpr.anonymise_customer(user, ctx=CTX)
+    assert not Session.objects.filter(session_key=keys[0]).exists()
+    assert Session.objects.filter(session_key=keys[1]).exists()
+
+
+def test_erasure_strips_staff_flags_groups_and_permissions() -> None:
+    user = UserFactory.create(staff=True)
+    user.groups.add(Group.objects.create(name="ops"))
+    user.is_superuser = True
+    user.save()
+    gdpr.anonymise_customer(user, ctx=CTX)
+    user.refresh_from_db()
+    assert not user.is_staff
+    assert not user.is_superuser
+    assert user.groups.count() == 0
+    assert user.user_permissions.count() == 0
+
+
+def test_an_address_in_the_placeholder_domain_does_not_fake_an_erasure() -> None:
+    user = UserFactory.create(email="someone@anonymised.invalid", full_name="Real Person")
+    gdpr.anonymise_customer(user, ctx=CTX)
+    user.refresh_from_db()
+    assert user.full_name == ""
+    assert user.email != "someone@anonymised.invalid"
+
+
+def test_a_pending_rerun_writes_no_audit_row() -> None:
+    user = UserFactory.create()
+    paid = place(user, state="awaiting_payment")
+    Order.objects.filter(pk=paid.pk).update(paid_at=PLACED)  # paid at some point: stays open
+    gdpr.anonymise_customer(user, ctx=CTX)
+    rows = AuditLog.objects.count()
+    assert gdpr.anonymise_customer(user, ctx=CTX).is_empty
+    assert AuditLog.objects.count() == rows
+
+
+def test_every_model_pointing_at_the_user_has_an_export_and_erasure_decision() -> None:
+    """A new foreign key to the user model must be handled by the export and the erasure (or
+    listed here with the reason it is not personal data): fails until someone decides."""
+    handled = {
+        "cart.cart": "exported, deleted",
+        "orders.order": "exported, restricted or anonymised through ORD.2",
+        "accounts.passkeydevice": "exported by name, deleted",
+        "accounts.recoverycodedevice": "exported by name, deleted",
+        "otp_totp.totpdevice": "exported by name, deleted",
+        "accounts.actionlinkuse": "digests and keys only; the user row stays as the tombstone",
+        "accounts.actionlinkissue": "digests and keys only; the user row stays as the tombstone",
+        "compliance.erasurerequest": "the request itself, no personal data",
+        "vendors.vendormember": "vendor-linked users are refused (Q-16, CMP.4 2/2)",
+        "vendors.contractacceptance": "vendor-linked users are refused (Q-16, CMP.4 2/2)",
+        "vendors.selfcertification": "vendor-linked users are refused (Q-16, CMP.4 2/2)",
+        "vendors.vendorapplication": "applicant, purged by its own retention job",
+        "vendors.vendorclaim": "vendor side, CMP.4 2/2",
+        "events.eventpage": "staff moderator reference, not the customer's data",
+        "shipping.shippingconfigversion": "staff author reference",
+        "tax.vendortaxprofile": "vendor side, CMP.4 2/2",
+        "auth.user_groups": "stripped on erasure",
+        "auth.user_user_permissions": "stripped on erasure",
+        "admin.logentry": "staff admin log",
+    }
+    found = set()
+    for model in django_apps.get_models(include_auto_created=True):
+        for field in model._meta.get_fields():
+            if (
+                field.is_relation
+                and field.many_to_one | field.one_to_one
+                and getattr(field.related_model, "_meta", None)
+                and field.related_model._meta.label == settings.AUTH_USER_MODEL.replace(".", ".", 1)
+                and field.concrete
+            ):
+                found.add(model._meta.label_lower)
+    assert found - set(handled) == set(), "decide export and erasure for these models"
