@@ -40,6 +40,8 @@ NOT_SENSITIVE_SERVICES = {
     "apps.cart.services.add_to_cart": "a shopper's cart, not a financial or security fact",
     "apps.cart.services.set_line_quantity": "a shopper's cart, not a financial or security fact",
     "apps.cart.services.remove_line": "a shopper's cart, not a financial or security fact",
+    "apps.orders.services.hold_stock": "a short-lived cart hold on stock, like the cart itself; "
+    "the order that confirms it is audited",
     "apps.cart.services.merge_carts": "a shopper's cart, not a financial or security fact",
 }
 
