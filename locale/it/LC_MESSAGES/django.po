@@ -181,16 +181,26 @@ msgstr ""
 
 #: apps/vendors/models.py
 msgid ""
-"Companies only: the number from the company register (in Italy, the REA number). It is needed for "
-"the yearly DAC7 report."
+"Companies only: the number from the company register (in Italy, the REA number), if you have one. "
+"It is asked for the platform's yearly DAC7 reporting duty."
 msgstr ""
-"Solo società: il numero del registro delle imprese (in Italia, il numero REA). Serve per la "
-"comunicazione annuale DAC7."
+"Solo società: il numero del registro delle imprese (in Italia, il numero REA), se ce l'hai. Ci "
+"viene richiesto per l'obbligo di comunicazione annuale DAC7 della piattaforma."
 
 #: apps/vendors/models.py
 msgid "Companies only: the share capital as in the company register, for example 10000.00."
 msgstr ""
 "Solo società: il capitale sociale come risulta al registro delle imprese, per esempio 10000.00."
+
+#: apps/vendors/models.py
+msgid ""
+"Companies only: tick it if your tax identification number is the same as your VAT number. In the "
+"countries where this is allowed we fill it in once VIES confirms the VAT number. Not sure? Ask "
+"your accountant."
+msgstr ""
+"Solo società: spuntala se il tuo numero di identificazione fiscale coincide con la partita IVA. "
+"Nei paesi in cui è previsto lo compiliamo noi quando VIES conferma la partita IVA. Non sei sicuro?"
+" Chiedi al tuo commercialista."
 
 #: apps/accounts/templates/accounts/mfa/totp.html apps/manager/templates/manager/bulk_preview.html
 msgid "Confirm"
@@ -569,11 +579,11 @@ msgstr ""
 
 #: apps/vendors/models.py
 msgid ""
-"Only if the bank account is not in the name of your business: the name of the account holder. "
-"Needed for the yearly DAC7 report."
+"Only if the bank account is not in the name of your business: the name of the account holder. It "
+"is asked for the platform's yearly DAC7 reporting duty."
 msgstr ""
-"Solo se il conto bancario non è intestato alla tua attività: il nome dell'intestatario. Serve per "
-"la comunicazione annuale DAC7."
+"Solo se il conto bancario non è intestato alla tua attività: il nome dell'intestatario. Ci viene "
+"richiesto per l'obbligo di comunicazione annuale DAC7 della piattaforma."
 
 #: apps/vendors/models.py
 msgid ""
@@ -869,34 +879,37 @@ msgstr "SKU"
 
 #: apps/vendors/models.py
 msgid ""
-"Sole traders only, and only if your country issues no tax identification number: the city and "
-"country where you were born. It is needed for the same yearly report (DAC7) and is stored "
-"encrypted."
+"Sole traders only: if your country issues no tax identification number, the city and country where"
+" you were born. It is asked for the platform's yearly DAC7 reporting duty and stored encrypted. "
+"Not sure? Ask your accountant."
 msgstr ""
-"Solo ditte individuali, e solo se il tuo paese non rilascia un numero di identificazione fiscale: "
-"la città e il paese in cui sei nato. Serve per la stessa comunicazione annuale (DAC7) e viene "
-"conservato cifrato."
+"Solo ditte individuali: se il tuo paese non rilascia un numero di identificazione fiscale, la "
+"città e il paese in cui sei nato. Ci viene richiesto per l'obbligo di comunicazione annuale DAC7 "
+"della piattaforma e viene conservato cifrato. Non sei sicuro? Chiedi al tuo commercialista."
 
 #: apps/vendors/models.py
 msgid ""
-"Sole traders only: your date of birth. It is needed for the yearly sales report that platforms "
-"send to the tax authorities (DAC7). It is stored encrypted."
+"Sole traders only: your date of birth. It is asked for the platform's yearly DAC7 reporting duty, "
+"and it is stored encrypted."
 msgstr ""
-"Solo ditte individuali: la tua data di nascita. Serve per la comunicazione annuale delle vendite "
-"che le piattaforme inviano al fisco (DAC7). Viene conservata cifrata."
+"Solo ditte individuali: la tua data di nascita. Ci viene richiesta per l'obbligo di comunicazione "
+"annuale DAC7 della piattaforma e viene conservata cifrata."
 
 #: apps/vendors/models.py
 msgid ""
-"Sole traders only: your first name, as on your identity document. It goes on your e-invoices."
+"Sole traders only: your first name, as on your identity document. It goes on the invoices we issue"
+" to you."
 msgstr ""
-"Solo ditte individuali: il tuo nome, come sul documento d'identità. Compare nelle tue fatture "
-"elettroniche."
+"Solo ditte individuali: il tuo nome, come sul documento d'identità. Compare nelle fatture che ti "
+"emettiamo."
 
 #: apps/vendors/models.py
-msgid "Sole traders only: your last name, as on your identity document. It goes on your e-invoices."
+msgid ""
+"Sole traders only: your last name, as on your identity document. It goes on the invoices we issue "
+"to you."
 msgstr ""
-"Solo ditte individuali: il tuo cognome, come sul documento d'identità. Compare nelle tue fatture "
-"elettroniche."
+"Solo ditte individuali: il tuo cognome, come sul documento d'identità. Compare nelle fatture che "
+"ti emettiamo."
 
 #: themes/base/templates/500.html
 msgid "Something went wrong"
@@ -986,13 +999,15 @@ msgstr ""
 
 #: apps/vendors/models.py
 msgid ""
-"The 7-character code that tells the Italian tax system (SDI) where to deliver your invoices. "
-"0000000 means they go to your PEC address; XXXXXXX is for businesses established outside Italy. "
-"Your accountant or invoicing software gives you this code."
+"The 7-character code of the SDI channel (the Italian tax system) that receives e-invoices "
+"addressed to you. 0000000 is used together with a PEC address, which you give in the PEC field; "
+"XXXXXXX is for businesses established outside Italy. Your accountant or invoicing software can "
+"tell you the code."
 msgstr ""
-"Il codice di 7 caratteri che dice al Sistema di Interscambio (SDI) dove consegnare le tue fatture."
-" 0000000 significa che vanno alla tua PEC; XXXXXXX è per le imprese con sede fuori dall'Italia. Il"
-" codice te lo dà il tuo commercialista o il tuo programma di fatturazione."
+"Il codice di 7 caratteri del canale SDI (il Sistema di Interscambio) che riceve le fatture "
+"elettroniche a te intestate. 0000000 si usa insieme a un indirizzo PEC, che indichi nel campo PEC;"
+" XXXXXXX è per le imprese con sede fuori dall'Italia. Il codice te lo può dire il tuo "
+"commercialista o il tuo programma di fatturazione."
 
 #: apps/vendors/forms.py
 msgid ""
@@ -1037,11 +1052,19 @@ msgstr "Il paese della tua sede legale."
 
 #: apps/vendors/models.py
 msgid ""
-"The country that issued your tax identification number. We check the format for that country. "
-"Needed for the yearly DAC7 report."
+"The country that issued your tax identification number. We check the format for that country. It "
+"is asked for the platform's yearly DAC7 reporting duty."
 msgstr ""
 "Il paese che ha rilasciato il tuo numero di identificazione fiscale. Ne controlliamo il formato "
-"per quel paese. Serve per la comunicazione annuale DAC7."
+"per quel paese. Ci viene richiesto per l'obbligo di comunicazione annuale DAC7 della piattaforma."
+
+#: apps/vendors/models.py
+msgid ""
+"The country where you are resident for tax. It is asked for the platform's yearly DAC7 reporting "
+"duty. Not sure? Ask your accountant."
+msgstr ""
+"Il paese in cui hai la residenza fiscale. Ci viene richiesto per l'obbligo di comunicazione "
+"annuale DAC7 della piattaforma. Non sei sicuro? Chiedi al tuo commercialista."
 
 #: apps/vendors/models.py
 msgid ""
@@ -1075,14 +1098,6 @@ msgstr ""
 msgid ""
 "The email or the password is not correct, or the account is locked for a while. Please try again."
 msgstr "L’email o la password non sono corrette, oppure l’account è bloccato per un po’. Riprova."
-
-#: apps/vendors/models.py
-msgid ""
-"The EU country where you are resident for tax. Needed for the yearly DAC7 report. Not sure? Ask "
-"your accountant."
-msgstr ""
-"Il paese dell'UE in cui hai la residenza fiscale. Serve per la comunicazione annuale DAC7. Non sei"
-" sicuro? Chiedi al tuo commercialista."
 
 #: apps/vendors/models.py
 msgid "The feature to switch on or off for this vendor."
@@ -1266,13 +1281,13 @@ msgstr ""
 
 #: apps/vendors/models.py
 msgid ""
-"The tax regime you declare on your invoices, chosen from the official list (RF19 is the flat-rate "
-"regime, forfettario). Not sure which one applies? Ask your accountant: we cannot choose it for "
-"you."
+"The tax regime that applies to your business, chosen from the official FatturaPA list (RF19 is the"
+" flat-rate regime, forfettario). Not sure which one applies? Ask your accountant: we cannot choose"
+" it for you."
 msgstr ""
-"Il regime fiscale che indichi nelle fatture, scelto dall'elenco ufficiale (RF19 è il regime "
-"forfettario). Non sai quale ti riguarda? Chiedi al tuo commercialista: non possiamo sceglierlo noi"
-" per te."
+"Il regime fiscale che riguarda la tua attività, scelto dall'elenco ufficiale FatturaPA (RF19 è il "
+"regime forfettario). Non sai quale ti riguarda? Chiedi al tuo commercialista: non possiamo "
+"sceglierlo noi per te."
 
 #: apps/manager/templates/manager/shop/profile.html
 msgid ""
@@ -1357,15 +1372,6 @@ msgid ""
 msgstr ""
 "Spunta la casella se vuoi ricevere richieste di informazioni dai clienti sui tuoi prodotti. Senza "
 "spunta non ricevi richieste."
-
-#: apps/vendors/models.py
-msgid ""
-"Tick it if your tax identification number is the same as your VAT number. We fill it in for you "
-"once the VAT number is confirmed valid in VIES. Not sure? Ask your accountant."
-msgstr ""
-"Spunta la casella se il tuo numero di identificazione fiscale coincide con la partita IVA. Lo "
-"compiliamo noi quando la partita IVA risulta valida in VIES. Non sei sicuro? Chiedi al tuo "
-"commercialista."
 
 #: apps/vendors/models.py
 msgid ""
@@ -1578,11 +1584,11 @@ msgstr[1] "Hai %(counter)s codici di recupero non usati."
 
 #: apps/vendors/models.py
 msgid ""
-"Your certified email (PEC) address, if you have one. E-invoices are delivered to it when your "
-"recipient code is 0000000."
+"Your certified email (PEC) address, if you have one. It is required when the SDI recipient code is"
+" 0000000."
 msgstr ""
-"Il tuo indirizzo di posta elettronica certificata (PEC), se ce l'hai. Le fatture elettroniche "
-"arrivano qui quando il tuo codice destinatario è 0000000."
+"Il tuo indirizzo di posta elettronica certificata (PEC), se ce l'hai. È obbligatorio quando il "
+"codice destinatario SDI è 0000000."
 
 #: apps/vendors/models.py
 msgid ""
@@ -1618,8 +1624,8 @@ msgstr "Il tuo ruolo richiede un secondo fattore prima di poter continuare."
 
 #: apps/vendors/models.py
 msgid ""
-"Your VAT number, for example 12345678901 in Italy. We check it automatically in the EU VIES "
-"register. Not sure if you have one? Ask your accountant."
+"Your VAT number, with or without the country prefix, for example IT12345678901. We check it in the"
+" EU VIES register. Not sure if you have one? Ask your accountant."
 msgstr ""
-"La tua partita IVA, per esempio 12345678901 in Italia. La verifichiamo in automatico nel registro "
-"europeo VIES. Non sai se ne hai una? Chiedi al tuo commercialista."
+"La tua partita IVA, con o senza il prefisso del paese, per esempio IT12345678901. La verifichiamo "
+"nel registro europeo VIES. Non sai se ne hai una? Chiedi al tuo commercialista."

@@ -243,7 +243,7 @@ class Vendor(BaseModel):
         blank=True,
         help_text=_(
             "Sole traders only: your first name, as on your identity document. It goes on "
-            "your e-invoices."
+            "the invoices we issue to you."
         ),
     )
     last_name = models.CharField(
@@ -251,7 +251,7 @@ class Vendor(BaseModel):
         blank=True,
         help_text=_(
             "Sole traders only: your last name, as on your identity document. It goes on "
-            "your e-invoices."
+            "the invoices we issue to you."
         ),
     )
     # DAC7 (VEN.23), sole proprietors: personal data, encrypted at rest and masked in the audit
@@ -260,18 +260,17 @@ class Vendor(BaseModel):
         null=True,
         blank=True,
         help_text=_(
-            "Sole traders only: your date of birth. It is needed for the yearly sales "
-            "report that platforms send to the tax authorities (DAC7). It is stored "
-            "encrypted."
+            "Sole traders only: your date of birth. It is asked for the platform's yearly "
+            "DAC7 reporting duty, and it is stored encrypted."
         ),
     )
     place_of_birth = EncryptedCharField(
         max_length=100,
         blank=True,
         help_text=_(
-            "Sole traders only, and only if your country issues no tax identification "
-            "number: the city and country where you were born. It is needed for the same "
-            "yearly report (DAC7) and is stored encrypted."
+            "Sole traders only: if your country issues no tax identification number, the "
+            "city and country where you were born. It is asked for the platform's yearly "
+            "DAC7 reporting duty and stored encrypted. Not sure? Ask your accountant."
         ),
     )
     vat_number = models.CharField(
@@ -279,8 +278,9 @@ class Vendor(BaseModel):
         max_length=32,
         blank=True,
         help_text=_(
-            "Your VAT number, for example 12345678901 in Italy. We check it automatically "
-            "in the EU VIES register. Not sure if you have one? Ask your accountant."
+            "Your VAT number, with or without the country prefix, for example "
+            "IT12345678901. We check it in the EU VIES register. Not sure if you have one? "
+            "Ask your accountant."
         ),
     )
     # Written by `services.check_vat_number` only; reset when the VAT number changes.
@@ -309,7 +309,7 @@ class Vendor(BaseModel):
         blank=True,
         help_text=_(
             "The country that issued your tax identification number. We check the format "
-            "for that country. Needed for the yearly DAC7 report."
+            "for that country. It is asked for the platform's yearly DAC7 reporting duty."
         ),
     )
     tin_same_as_vat = models.BooleanField(
@@ -317,9 +317,9 @@ class Vendor(BaseModel):
         default=False,
         help_text=(
             _(
-                "Tick it if your tax identification number is the same as your VAT number. We "
-                "fill it in for you once the VAT number is confirmed valid in VIES. Not sure? "
-                "Ask your accountant."
+                "Companies only: tick it if your tax identification number is the same as your "
+                "VAT number. In the countries where this is allowed we fill it in once VIES "
+                "confirms the VAT number. Not sure? Ask your accountant."
             )
         ),
     )
@@ -327,8 +327,8 @@ class Vendor(BaseModel):
         "country of tax residence",
         blank=True,
         help_text=_(
-            "The EU country where you are resident for tax. Needed for the yearly DAC7 "
-            "report. Not sure? Ask your accountant."
+            "The country where you are resident for tax. It is asked for the platform's "
+            "yearly DAC7 reporting duty. Not sure? Ask your accountant."
         ),
     )
     fiscal_regime = models.CharField(
@@ -336,9 +336,9 @@ class Vendor(BaseModel):
         choices=FiscalRegime.choices,
         blank=True,
         help_text=_(
-            "The tax regime you declare on your invoices, chosen from the official list "
-            "(RF19 is the flat-rate regime, forfettario). Not sure which one applies? Ask "
-            "your accountant: we cannot choose it for you."
+            "The tax regime that applies to your business, chosen from the official "
+            "FatturaPA list (RF19 is the flat-rate regime, forfettario). Not sure which one"
+            " applies? Ask your accountant: we cannot choose it for you."
         ),
     )
     cross_border_franchise_number = models.CharField(
@@ -377,7 +377,8 @@ class Vendor(BaseModel):
         blank=True,
         help_text=_(
             "Companies only: the number from the company register (in Italy, the REA "
-            "number). It is needed for the yearly DAC7 report."
+            "number), if you have one. It is asked for the platform's yearly DAC7 reporting"
+            " duty."
         ),
     )
     registered_street = models.CharField(
@@ -467,10 +468,10 @@ class Vendor(BaseModel):
         blank=True,
         help_text=(
             _(
-                "The 7-character code that tells the Italian tax system (SDI) where to deliver "
-                "your invoices. 0000000 means they go to your PEC address; XXXXXXX is for "
-                "businesses established outside Italy. Your accountant or invoicing software "
-                "gives you this code."
+                "The 7-character code of the SDI channel (the Italian tax system) that receives"
+                " e-invoices addressed to you. 0000000 is used together with a PEC address, "
+                "which you give in the PEC field; XXXXXXX is for businesses established outside"
+                " Italy. Your accountant or invoicing software can tell you the code."
             )
         ),
     )
@@ -478,8 +479,8 @@ class Vendor(BaseModel):
         "PEC address",
         blank=True,
         help_text=_(
-            "Your certified email (PEC) address, if you have one. E-invoices are delivered "
-            "to it when your recipient code is 0000000."
+            "Your certified email (PEC) address, if you have one. It is required when the "
+            "SDI recipient code is 0000000."
         ),
     )
     fiscal_representative_name = models.CharField(
@@ -568,7 +569,7 @@ class Vendor(BaseModel):
         blank=True,
         help_text=_(
             "Only if the bank account is not in the name of your business: the name of the "
-            "account holder. Needed for the yearly DAC7 report."
+            "account holder. It is asked for the platform's yearly DAC7 reporting duty."
         ),
     )
 
