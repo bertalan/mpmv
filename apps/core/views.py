@@ -10,16 +10,24 @@ import time
 from django.db import transaction
 from django.http import Http404, HttpRequest, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_safe
 
-from . import mail, services
+from . import indexing, mail, services
 from .audit import AuditContext
 from .http import client_ip
 from .models import AuditLog
+from .public_forms import Protection, public_form
 
 WEBHOOK_ACTOR = "webhook:email"
 
 
+@public_form(
+    protection=Protection.ALLOW,
+    purpose="Email provider delivery feedback (bounces, complaints)",
+    task="ARC.16",
+    reason="machine to machine: the provider's signature and a replay window are checked first",
+    no_rate_limit="an unsigned request is refused before any work; off (404) with no secret",
+)
 @csrf_exempt  # the provider signs the request; it has no session or CSRF token
 @require_POST
 def email_webhook(request: HttpRequest) -> HttpResponse:
@@ -40,3 +48,12 @@ def email_webhook(request: HttpRequest) -> HttpResponse:
         for event in events:
             services.record_email_feedback(event, ctx=ctx)
     return HttpResponse(status=204)
+
+
+@require_safe
+def robots_view(request: HttpRequest) -> HttpResponse:
+    """`/robots.txt` (SEO.8): public, no language prefix, no vendor data."""
+    return HttpResponse(
+        indexing.robots_txt(forced=indexing.is_noindex_forced()),
+        content_type="text/plain; charset=utf-8",
+    )

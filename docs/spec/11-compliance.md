@@ -221,6 +221,11 @@ class CountryWarningLanguages(Model):   # platform data: country -> accepted war
   vendor for every restriction (article 17), and notification of suspected criminal offences
   (article 18). Notices can target products, vendor storefronts and event pages; hiding an event
   after a notice unpublishes it through the events service ([15](15-events.md), EVT.11).
+  Part 1 (D-27): the authority contact languages are an official language of the operator's
+  country plus English (article 11(3)); the platform terms and the ranking page exist in every
+  configured language, and the terms carry tagged sections for restrictions, moderation policy,
+  internal complaint handling (article 20) and out-of-court redress (article 21); `golive_readiness`
+  checks them with the native and counsel reviews.
 - Micro and small platforms are exempt from DSA articles 19–32 (articles 19 and 29) and from the
   transparency report (article 15(2)), until 12 months after they stop being small. The marketplace
   duties of articles 30–32 are still built at go-live (CMP.11), because GPSR article 22 and the

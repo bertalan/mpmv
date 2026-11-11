@@ -27,12 +27,19 @@ from apps.catalog.models import Product
 from apps.catalog.services import product_kpis
 from apps.core.audit import audit_context
 from apps.core.models import AuditLog
-from apps.vendors.models import VendorTranslation
+from apps.core.public_forms import Protection, pre_mfa_step, public_form
+from apps.vendors.engine import RICH_TEXT_FIELDS, plain_to_html
+from apps.vendors.models import Vendor, VendorTranslation
 from apps.vendors.scoping import Source, VendorScopedQuerySet
-from apps.vendors.services import PROFILE_LOCKED, save_storefront_profile
+from apps.vendors.services import (
+    PROFILE_LOCKED,
+    remove_vendor_logo,
+    save_storefront_profile,
+    set_vendor_logo,
+)
 
 from .access import ManagerContext, home_url
-from .forms import StorefrontProfileForm
+from .forms import StorefrontProfileForm, VendorLogoForm
 from .middleware import manager_context
 from .navigation import Section, registry
 from .spaces import Space
@@ -122,9 +129,13 @@ class StorefrontProfileView(ManagerView):
 
     def stored_values(self, language: str) -> dict[str, str]:
         row = self.stored_row(language)
-        return (
-            {} if row is None else {n: getattr(row, n) for n in StorefrontProfileForm.base_fields}
-        )
+        if row is None:
+            return {}
+        # A legacy plain text is shown to the editor as the paragraphs it will be stored as.
+        return {
+            n: plain_to_html(getattr(row, n)) if n in RICH_TEXT_FIELDS else getattr(row, n)
+            for n in StorefrontProfileForm.base_fields
+        }
 
     def locked(self) -> bool:
         vendor = self.manager.vendor
@@ -137,6 +148,13 @@ class StorefrontProfileView(ManagerView):
         context.setdefault("form", StorefrontProfileForm(initial=self.stored_values(language)))
         context["language"] = language
         context["locked"] = self.locked()
+        vendor = self.manager.vendor
+        current = vendor.logo if vendor is not None else None
+        context.setdefault(
+            "logo_form",
+            VendorLogoForm(initial={"logo_alt": vendor.logo_alt if vendor else ""}),
+        )
+        context["logo"] = current
         context["machine_draft"] = (
             row is not None and row.status == VendorTranslation.Status.MACHINE
         )
@@ -146,12 +164,36 @@ class StorefrontProfileView(ManagerView):
         ]
         return context
 
+    def post_logo(self, request: HttpRequest, vendor: Vendor, actor: User) -> HttpResponse:
+        """The logo form: remove, or a new image and/or its description (the service checks)."""
+        form = VendorLogoForm(request.POST, request.FILES)
+        if form.is_valid():
+            ctx = replace(audit_context(request), source=AuditLog.Source.VENDOR)
+            data = form.cleaned_data
+            try:
+                if data["remove"]:
+                    remove_vendor_logo(vendor, actor=actor, ctx=ctx)
+                else:
+                    set_vendor_logo(
+                        vendor, upload=data["logo"], alt=data["logo_alt"], actor=actor, ctx=ctx
+                    )
+            except ValidationError as error:
+                form.add_error(None, error)
+            except PermissionDenied:  # suspended between the page and the save
+                return self.render_to_response(self.get_context_data(), status=403)
+            else:
+                messages.success(request, _("Logo saved."))
+                return HttpResponseRedirect(reverse("manager:shop:profile"))
+        return self.render_to_response(self.get_context_data(logo_form=form))
+
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         vendor, actor = self.manager.vendor, self.manager.user
         if vendor is None or not isinstance(actor, User):
             raise Http404("No vendor selected.")
         if self.locked():  # the reason is on the page; the service refuses it too
             return self.render_to_response(self.get_context_data(), status=403)
+        if request.POST.get("action") == "logo":
+            return self.post_logo(request, vendor, actor)
         language = self.language()
         form = StorefrontProfileForm(request.POST, initial=self.stored_values(language))
         if form.is_valid():
@@ -199,6 +241,13 @@ class VendorPickerView(ManagerView):
 # --- Sign-in and sign-out: outside /manager/, so the sweep keeps every Manager URL gated
 
 
+@public_form(
+    protection=Protection.CAPTCHA,
+    purpose="Sign in to the Manager (every Manager user)",
+    task="CORE.17",
+    rate_limit="per account and IP lockout (CORE.5)",
+    templates=("manager/login.html",),
+)
 class LoginView(auth_views.LoginView):
     """One login for every Manager user (spec 02 §Backoffice).
 
@@ -213,6 +262,7 @@ class LoginView(auth_views.LoginView):
         return home_url(self.request.user)
 
 
+@pre_mfa_step(purpose="Sign out, also before the second factor is verified", task="CORE.17")
 @mfa_exempt
 @require_POST
 def logout(request: HttpRequest) -> HttpResponse:

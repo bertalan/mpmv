@@ -5,13 +5,14 @@ Error page layout (THM.3, spec 14 §14.9): the content shell with a heading, a m
 link to the home page. `400.html`, `403.html`, `403_csrf.html`, `404.html` and `500.html` fill
 `title`, `heading` and `message`.
 
-403, 404 and the CSRF failure are rendered with the request context and keep the full header
-and footer. The 400 and 500 handlers (apps/themes/views.py) set `minimal_chrome`: the header
-and footer then leave out the CMS menus and the language switcher, so nothing here needs the
+Only the 400 and 500 pages omit the language switcher. 403, 404 and the CSRF failure are
+rendered with the request context and keep the full header (with the switcher) and footer; a
+404 keeps its own path in the other language. The 400 and 500 handlers (apps/themes/views.py)
+set `minimal_chrome`: the header and footer then leave out the CMS menus and the switcher, so nothing here needs the
 database, the session or a CSRF token. The same minimal header serves a 404 raised under a
 URLconf without the public routes (test URLconfs), where the switcher could not be reversed.
 {% endcomment %}
-{% block description %}<meta name="robots" content="noindex">{% endblock %}
+{% block description %}{% robots_meta "noindex" %}{% endblock %}
 {% block header %}
   {% url 'switch_language' as switch_url %}
   {% if minimal_chrome or not switch_url %}

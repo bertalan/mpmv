@@ -14,6 +14,7 @@ from pytest_django.fixtures import Settings as SettingsWrapper
 
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
+from apps.accounts.tests.mfa import verified_login
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog, OutboxEmail
 from apps.vendors import engine, services
@@ -34,8 +35,10 @@ CHANGELIST = "admin:vendors_vendor_changelist"
 
 
 @pytest.fixture
-def staff_client(client: Client, superuser: User, mfa_login: MfaLogin) -> Client:
-    return mfa_login(client, superuser)
+def staff_client(client: Client, superuser: User) -> Client:
+    # Approving a claim grants the owner role: D-32 group 3, so the session has a fresh passkey.
+    verified_login(client, superuser, passkey=True)
+    return client
 
 
 def run_action(client: Client, action: str, vendor: Vendor) -> Any:
@@ -321,6 +324,9 @@ def test_each_claim_action_checks_the_step_up_itself(
     action = cast(Any, model_admin.get_actions(request)[name])[0]
     response = action(model_admin, request, Vendor.objects.filter(pk=vendor.pk))
     assert response is not None
+    if name == "approve_claim":  # group 3: a session with no operational mode is refused
+        assert response.status_code == 403
+        return
     assert response.status_code == 302
     assert urlsplit(response["Location"]).path in {reverse("mfa:verify"), reverse("mfa:setup")}
     assert not VendorMember.objects.filter(vendor=vendor).exists()

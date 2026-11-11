@@ -82,6 +82,7 @@ stateDiagram-v2
   in_fulfillment --> fulfilled: all VendorOrders shipped or delivered
   fulfilled --> closed: end of return window
   paid --> partially_refunded
+  in_fulfillment --> partially_refunded: one vendor order refunded while others are fulfilled
   fulfilled --> partially_refunded
   partially_refunded --> refunded
 ```
