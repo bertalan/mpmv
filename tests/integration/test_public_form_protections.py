@@ -60,6 +60,7 @@ CAPTCHA_LOGINS = {
     "login": _login_form("/account/login/", "username"),
     "wagtailadmin_login": _login_form("/admin/login/", "username"),
     "admin:login": _login_form("/django-admin/login/", "username"),
+    "wagtailcore_login": _login_form("/_util/login/", "username"),  # SEC.14
 }
 
 
@@ -80,7 +81,10 @@ def test_every_captcha_declaration_is_tested() -> None:
         for row in public_form_report().public
         if row.spec.protection is Protection.CAPTCHA
     }
-    assert declared == set(CAPTCHA_LOGINS) | {"vendors:apply"}
+    assert declared == set(CAPTCHA_LOGINS) | {
+        "vendors:apply",
+        "wagtailcore_authenticate_with_password",  # tested in apps/cms (SEC.14)
+    }
 
 
 # --- Signed-token forms

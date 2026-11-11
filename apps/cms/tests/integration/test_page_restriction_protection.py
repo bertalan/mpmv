@@ -170,5 +170,6 @@ def test_the_block_check_is_gone() -> None:
 
     ids = {m.id for m in checks.run_checks(include_deployment_checks=False)}
     assert "cms.E002" not in ids
-    with pytest.raises(ImportError):
-        from apps.cms.checks import check_no_page_restrictions  # noqa: F401
+    from apps.cms import checks as cms_checks
+
+    assert not hasattr(cms_checks, "check_no_page_restrictions")
