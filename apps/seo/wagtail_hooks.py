@@ -13,8 +13,9 @@ def mark_unrestricted_page(
 ) -> None:
     """Tell the page cache (SEO.6) this page has no view restriction on it or its ancestors.
 
-    Runs after Wagtail's own restriction check (order 0): when that check answers with a login
-    redirect or a password form, this hook never runs, so the request stays unmarked and the page
-    cache does not store the response. A restricted page is never cached, whatever its state.
+    The hook reads `get_view_restrictions()` itself and does not rely on Wagtail's restriction
+    check, which is the `on_serve_page` wrapper that runs after every `before_serve_page` hook
+    (wagtail/views.py). A restricted page is therefore marked `False`, and the middleware stores
+    only pages marked `True`; a request this hook never reached stays unmarked and is not stored.
     """
     request._page_cache_unrestricted = not page.get_view_restrictions().exists()  # type: ignore[attr-defined]

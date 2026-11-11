@@ -72,10 +72,12 @@ signal and the commit would read the old rows and be stored under the new genera
 reason the middleware builds the key, generation included, **before** it renders the page, so a
 change that commits during a render leaves that page under the old, unreachable generation.
 
-A page with a view restriction on it or on an ancestor is never stored: a
-`before_serve_page` hook (`apps/seo/wagtail_hooks.py`, after Wagtail's own restriction check) marks
-a page clear of restrictions, and the middleware stores only marked pages. A hit would otherwise
-skip the restriction check and `PageRestrictionProtectionMiddleware`.
+A page with a view restriction on it or on an ancestor is never stored. A
+`before_serve_page` hook (`apps/seo/wagtail_hooks.py`) marks the request with
+`not page.get_view_restrictions().exists()`; it reads the restrictions itself and does not rely on
+Wagtail's own check, which is the `on_serve_page` wrapper that runs after all `before_serve_page`
+hooks. The middleware stores only requests marked clear, so an unmarked request is not stored. A hit
+would otherwise skip the restriction check and `PageRestrictionProtectionMiddleware`.
 
 Why global and not per URL: a page's HTML depends on its parents (menus, breadcrumbs, the language
 switcher's translated URLs), its site's settings and its theme. A wrong guess is a stale page; an
