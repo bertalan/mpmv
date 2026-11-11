@@ -1,6 +1,7 @@
 """Language-prefix routing helpers (spec 09 §9.2, I18N.1).
 
-`/` is the primary language (settings.LANGUAGE_CODE, EN) with no prefix; every other language in
+`/` is the primary language (settings.LANGUAGE_CODE, the first of MPMV_LANGUAGES) with no
+prefix; every other language in
 settings.LANGUAGES gets `/<code>/`. Nothing here lists languages: adding one is a settings entry.
 """
 

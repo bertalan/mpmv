@@ -16,6 +16,7 @@ from .env import (
     env_str,
     map_tile_origin,
 )
+from .languages import language_settings
 
 # Allows `models.DecimalField[Any]`-style generics at runtime (django-stubs).
 django_stubs_ext.monkeypatch()
@@ -281,15 +282,9 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# Language order (spec 09, D-18): EN primary and source, then IT, DE, FR, ES; more are added here.
-LANGUAGE_CODE = "en"
-LANGUAGES = [
-    ("en", "English"),
-    ("it", "Italiano"),
-    ("de", "Deutsch"),
-    ("fr", "Français"),
-    ("es", "Español"),
-]
+# Site languages (spec 09, D-18, I18N.15): MPMV_LANGUAGES, an ordered list of codes; the first is
+# the primary (source) language without URL prefix. Default: en,it,de,fr,es. Checked by core.E901.
+LANGUAGE_CODE, LANGUAGES = language_settings(env_list("MPMV_LANGUAGES"))
 USE_I18N = True
 LOCALE_PATHS = [BASE_DIR / "locale"]
 

@@ -114,6 +114,12 @@ jobs:
         run: >-
           uv run pytest -n auto --dist loadgroup --durations=40 -m "unit or integration"
           --junitxml=build/reports/junit.xml
+      # I18N.15: the unit suite again with English absent from the site languages (primary Italian,
+      # then German): no test may assume `en`. Unit tests need no database; about one minute.
+      - name: Pytest (unit, MPMV_LANGUAGES=it,de)
+        env:
+          MPMV_LANGUAGES: it,de
+        run: uv run pytest -n auto -m unit
       # CORE.18 follow-up: an upgrade from the previous release runs the database checks before
       # `migrate` applies anything. Migrate fully, step the manager app back and drop the role
       # groups, then migrate again with the checks on (no --skip-checks): it must exit 0.

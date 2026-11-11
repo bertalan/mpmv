@@ -15,6 +15,8 @@ from django import forms
 from django.template.loader import render_to_string
 from pytest_django.fixtures import Settings as SettingsWrapper
 
+pytestmark = pytest.mark.usefixtures("english_interface")
+
 
 @pytest.fixture(autouse=True)
 def _base(settings: SettingsWrapper) -> None:

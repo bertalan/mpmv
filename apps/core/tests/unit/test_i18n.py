@@ -5,85 +5,77 @@ language-prefixed routes (health check, staff admin) are returned unchanged. Any
 CMS page path (CMS.1): it moves under the other prefix, slug unchanged. No database involved.
 """
 
+from typing import Any
+
 import pytest
-from django.test import override_settings
+from django.conf import settings
 
-from apps.core.i18n import language_choices, translate_path
-
-LANGUAGES_PLUS_PORTUGUESE = [
-    ("en", "English"),
-    ("it", "Italiano"),
-    ("de", "Deutsch"),
-    ("fr", "Français"),
-    ("es", "Español"),
-    ("pt", "Português"),
-]
+from apps.core.i18n import configured_languages, language_choices, translate_path
 
 
-@pytest.mark.parametrize(
-    ("path", "language", "expected"),
-    [
-        ("/", "it", "/it/"),
-        ("/", "de", "/de/"),
-        ("/", "fr", "/fr/"),
-        ("/", "es", "/es/"),
-        ("/", "en", "/"),
-        ("/it/", "de", "/de/"),
-        ("/it/", "en", "/"),
-        ("/de/", "it", "/it/"),
-        ("/de/", "en", "/"),
-        ("/it/", "it", "/it/"),
-        ("/fr/", "es", "/es/"),
-        ("/es/", "en", "/"),
-    ],
-)
-def test_translate_path_swaps_the_language_prefix(path: str, language: str, expected: str) -> None:
-    assert translate_path(path, language) == expected
+def _primary() -> str:
+    return str(settings.LANGUAGE_CODE)
+
+
+def _other() -> str:
+    """A configured language that is not the primary one."""
+    return configured_languages()[1]
+
+
+def test_translate_path_swaps_the_language_prefix() -> None:
+    primary, other = _primary(), _other()
+
+    assert translate_path("/", other) == f"/{other}/"
+    assert translate_path("/", primary) == "/"
+    assert translate_path(f"/{other}/", primary) == "/"
+    assert translate_path(f"/{other}/", other) == f"/{other}/"
+    for code in configured_languages()[1:]:
+        assert translate_path(f"/{other}/", code) == f"/{code}/"
+        assert translate_path(f"/{code}/", primary) == "/"
 
 
 def test_translate_path_keeps_the_query_string() -> None:
-    assert translate_path("/it/?page=2", "de") == "/de/?page=2"
-    assert translate_path("/?page=2", "it") == "/it/?page=2"
+    other = _other()
+
+    assert translate_path(f"/{other}/?page=2", _primary()) == "/?page=2"
+    assert translate_path("/?page=2", other) == f"/{other}/?page=2"
 
 
 @pytest.mark.parametrize("path", ["/healthz", "/django-admin/"])
-@pytest.mark.parametrize("language", ["en", "it", "de", "fr", "es"])
-def test_translate_path_leaves_unprefixed_routes_alone(path: str, language: str) -> None:
-    assert translate_path(path, language) == path
+def test_translate_path_leaves_unprefixed_routes_alone(path: str) -> None:
+    for language in configured_languages():
+        assert translate_path(path, language) == path
 
 
-@pytest.mark.parametrize(
-    ("path", "language", "expected"),
-    [("/about/", "it", "/it/about/"), ("/it/chi-siamo/", "en", "/chi-siamo/")],
-)
-def test_translate_path_moves_page_paths_under_the_other_prefix(
-    path: str, language: str, expected: str
-) -> None:
+def test_translate_path_moves_page_paths_under_the_other_prefix() -> None:
     # The CMS language switcher sends the translated page's own URL (slugs differ by language).
-    assert translate_path(path, language) == expected
+    primary, other = _primary(), _other()
+
+    assert translate_path("/about/", other) == f"/{other}/about/"
+    assert translate_path(f"/{other}/chi-siamo/", primary) == "/chi-siamo/"
 
 
 def test_translate_path_ignores_unknown_languages() -> None:
-    assert translate_path("/it/", "xx") == "/it/"
+    assert translate_path(f"/{_other()}/", "xx") == f"/{_other()}/"
 
 
-@override_settings(LANGUAGES=LANGUAGES_PLUS_PORTUGUESE)
-def test_a_language_added_in_settings_is_routed_without_code_changes() -> None:
+def test_a_language_added_in_settings_is_routed_without_code_changes(settings: Any) -> None:
+    settings.LANGUAGES = [*settings.LANGUAGES, ("pt", "Português")]
+    primary, other = _primary(), _other()
+
     assert translate_path("/", "pt") == "/pt/"
-    assert translate_path("/pt/", "it") == "/it/"
-    assert translate_path("/pt/", "en") == "/"
+    assert translate_path("/pt/", other) == f"/{other}/"
+    assert translate_path("/pt/", primary) == "/"
 
 
-def test_language_choices_are_read_from_settings_in_order() -> None:
-    assert language_choices() == [
-        ("en", "English"),
-        ("it", "Italiano"),
-        ("de", "Deutsch"),
-        ("fr", "Français"),
-        ("es", "Español"),
-    ]
+def test_language_choices_are_read_from_settings_in_order(settings: Any) -> None:
+    settings.LANGUAGES = [("de", "Deutsch"), ("fr", "Français"), ("es", "Español")]
+
+    assert language_choices() == [("de", "Deutsch"), ("fr", "Français"), ("es", "Español")]
 
 
-@override_settings(LANGUAGES=LANGUAGES_PLUS_PORTUGUESE)
-def test_language_choices_follow_settings_at_runtime() -> None:
-    assert [code for code, _name in language_choices()] == ["en", "it", "de", "fr", "es", "pt"]
+def test_language_choices_follow_settings_at_runtime(settings: Any) -> None:
+    settings.LANGUAGES = [*settings.LANGUAGES, ("pt", "Português")]
+
+    assert [code for code, _name in language_choices()] == [*configured_languages()]
+    assert configured_languages()[-1] == "pt"
