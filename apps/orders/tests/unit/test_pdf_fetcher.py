@@ -7,6 +7,7 @@ no redirect to follow. Each rule is a test here; the document tests are in the i
 import ast
 import http.server
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -266,3 +267,70 @@ def test_the_renderer_child_gets_no_application_secrets(
     assert "DJANGO_SECRET_KEY" not in env
     assert "DATABASE_URL" not in env
     assert "PATH" in env
+
+
+def test_output_over_the_cap_stops_the_read_early_and_kills_the_child(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from apps.core.services import AttachmentUnavailable
+
+    pid_file = tmp_path / "pid"
+    code = (
+        f"import os, sys, time; open({str(pid_file)!r}, 'w').write(str(os.getpid()))\n"
+        "sys.stdout.buffer.write(b'x' * 5000); sys.stdout.flush(); time.sleep(120)"
+    )
+    monkeypatch.setattr(documents, "_renderer_command", lambda: _child(code))
+    monkeypatch.setattr(documents, "MAX_PDF_BYTES", 1000)
+    started = time.monotonic()
+    with pytest.raises(AttachmentUnavailable, match="cap"):
+        documents.render_html("<p>x</p>")
+    assert time.monotonic() - started < 20  # did not wait for the child to finish
+    with pytest.raises(ProcessLookupError):
+        os.kill(int(pid_file.read_text()), 0)
+
+
+def test_the_whole_process_group_is_killed_on_timeout(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from apps.core.services import AttachmentUnavailable
+
+    pid_file = tmp_path / "grandchild"
+    code = (
+        "import subprocess, sys, time\n"
+        "g = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(120)'])\n"
+        f"open({str(pid_file)!r}, 'w').write(str(g.pid))\n"
+        "time.sleep(120)"
+    )
+    monkeypatch.setattr(documents, "_renderer_command", lambda: _child(code))
+    monkeypatch.setattr(documents, "MAX_RENDER_SECONDS", 1.5)
+    with pytest.raises(AttachmentUnavailable, match="timed out"):
+        documents.render_html("<p>x</p>")
+    time.sleep(0.5)
+    with pytest.raises(ProcessLookupError):
+        os.kill(int(pid_file.read_text()), 0)
+
+
+def _run_limited(body: str) -> int:
+    code = (
+        "from apps.orders import pdf_render\n"
+        "pdf_render.apply_limits(memory_bytes=100_000_000, cpu_seconds=1)\n" + body
+    )
+    return subprocess.run(  # noqa: S603
+        [sys.executable, "-c", code], cwd=ROOT, capture_output=True, timeout=60, check=False
+    ).returncode
+
+
+def test_a_memory_hog_hits_the_address_space_limit() -> None:
+    assert _run_limited("x = bytearray(400_000_000)") != 0
+    assert _run_limited("x = bytearray(1_000_000)") == 0
+
+
+def test_a_cpu_hog_is_stopped_by_the_cpu_limit() -> None:
+    started = time.monotonic()
+    assert _run_limited("while True: pass") != 0
+    assert time.monotonic() - started < 30
+
+
+def test_the_documented_limits_are_sane() -> None:
+    assert pdf_render.MEMORY_LIMIT_BYTES == 1 << 30
+    assert documents.cpu_limit_seconds() > documents.MAX_RENDER_SECONDS

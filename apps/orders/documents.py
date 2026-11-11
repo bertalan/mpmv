@@ -13,11 +13,17 @@ never imported in the worker itself, because the build stage and the web process
 system libraries.
 """
 
+import contextlib
 import json
 import logging
+import math
 import os
+import select
+import signal
 import subprocess
 import sys
+import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +35,7 @@ from django.utils import translation
 from apps.core import mail
 from apps.core.services import AttachmentUnavailable, email_language
 
+from . import pdf_render
 from .models import PrivacyStatus, VendorOrder
 from .notifications import CONFIRMATION_PDF_KIND, _lines, _money, _vendor_name
 
@@ -73,29 +80,83 @@ def _renderer_env() -> dict[str, str]:
     return {key: os.environ[key] for key in _CHILD_ENV_KEYS if key in os.environ}
 
 
+def cpu_limit_seconds() -> int:
+    """CPU seconds the child may use: a little above the wall-clock cap, as a second guard."""
+    return math.ceil(MAX_RENDER_SECONDS) + 2
+
+
+def _kill_group(process: subprocess.Popen[bytes]) -> None:
+    """Kill the child and everything it started (it leads its own session) and reap it."""
+    with contextlib.suppress(ProcessLookupError, PermissionError):
+        os.killpg(process.pid, signal.SIGKILL)
+    process.kill()
+    process.wait()
+
+
 def render_html(html: str) -> bytes:
-    """Render `html` to a tagged PDF in a child process (`pdf_render`), which is killed when it
-    runs past `MAX_RENDER_SECONDS`, so a pathological layout cannot hang the worker. Raises
-    `AttachmentUnavailable` on a timeout, a crash or output over `MAX_PDF_BYTES`."""
-    request = json.dumps({"html": html, "roots": [str(root) for root in static_roots()]})
-    try:
-        done = subprocess.run(  # noqa: S603 - fixed command, no shell, no user input in argv
+    """Render `html` to a tagged PDF in a child process (`pdf_render`) that leads its own
+    session, so a pathological layout cannot hang the worker: past `MAX_RENDER_SECONDS`, or as
+    soon as its output passes `MAX_PDF_BYTES`, the whole process group is killed. The child also
+    has an address-space and a CPU limit. Raises `AttachmentUnavailable` on a timeout, a crash
+    or too much output; nothing but the output cap is ever buffered beyond it."""
+    request = json.dumps(
+        {
+            "html": html,
+            "roots": [str(root) for root in static_roots()],
+            "memory_bytes": pdf_render.MEMORY_LIMIT_BYTES,
+            "cpu_seconds": cpu_limit_seconds(),
+        }
+    )
+    with tempfile.TemporaryFile() as stdin, tempfile.TemporaryFile() as stderr:
+        stdin.write(request.encode())
+        stdin.seek(0)
+        process = subprocess.Popen(  # noqa: S603 - fixed command, no shell, no user input in argv
             _renderer_command(),
-            input=request.encode(),
-            capture_output=True,
-            timeout=MAX_RENDER_SECONDS,
+            stdin=stdin,
+            stdout=subprocess.PIPE,
+            stderr=stderr,
             env=_renderer_env(),
             cwd=settings.BASE_DIR,
-            check=False,
+            start_new_session=True,
         )
-    except subprocess.TimeoutExpired as exc:  # `run` has already killed the child
-        raise AttachmentUnavailable(f"PDF render timed out after {MAX_RENDER_SECONDS} s") from exc
-    if done.returncode != 0:
-        logger.warning("PDF renderer failed: %s", done.stderr.decode(errors="replace")[-500:])
-        raise AttachmentUnavailable(f"PDF renderer failed (exit {done.returncode})")
-    if len(done.stdout) > MAX_PDF_BYTES:
-        raise AttachmentUnavailable(f"PDF is {len(done.stdout)} bytes (cap {MAX_PDF_BYTES})")
-    return done.stdout
+        stdout = process.stdout
+        if stdout is None:  # pragma: no cover - PIPE was requested
+            raise AttachmentUnavailable("PDF renderer has no output")
+        deadline = time.monotonic() + MAX_RENDER_SECONDS
+        chunks: list[bytes] = []
+        size = 0
+        try:
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise AttachmentUnavailable(
+                        f"PDF render timed out after {MAX_RENDER_SECONDS} s"
+                    )
+                if not select.select([stdout], [], [], remaining)[0]:
+                    continue
+                chunk = os.read(stdout.fileno(), 65536)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > MAX_PDF_BYTES:
+                    raise AttachmentUnavailable(f"PDF is over the size cap ({MAX_PDF_BYTES} bytes)")
+                chunks.append(chunk)
+            try:
+                code = process.wait(timeout=max(deadline - time.monotonic(), 0.1))
+            except subprocess.TimeoutExpired as exc:
+                raise AttachmentUnavailable(
+                    f"PDF render timed out after {MAX_RENDER_SECONDS} s"
+                ) from exc
+        except BaseException:
+            _kill_group(process)
+            raise
+        finally:
+            stdout.close()
+        if code != 0:
+            stderr.seek(0)
+            logger.warning("PDF renderer failed: %s", stderr.read()[-500:].decode(errors="replace"))
+            raise AttachmentUnavailable(f"PDF renderer failed (exit {code})")
+    return b"".join(chunks)
 
 
 def _context(sub: VendorOrder, language: str) -> dict[str, Any]:

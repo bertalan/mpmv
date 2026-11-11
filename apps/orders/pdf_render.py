@@ -11,12 +11,16 @@ network access and no redirect to follow. `base_url` is a fixed internal value.
 """
 
 import json
+import resource
 import sys
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 from urllib.request import url2pathname
+
+#: Address-space cap of the render child (a layout bomb gets MemoryError, not the host's RAM).
+MEMORY_LIMIT_BYTES = 1 << 30
 
 #: Not a real address: relative references in the document resolve to nothing.
 BASE_URL = "mpmv-document:///"
@@ -83,8 +87,18 @@ def render_pdf(html: str, roots: Iterable[Path | str]) -> bytes:
     return bytes(document.write_pdf(pdf_variant="pdf/ua-1", pdf_tags=True))
 
 
+def apply_limits(*, memory_bytes: int, cpu_seconds: int) -> None:
+    """Cap the address space and the CPU time of this process (the render child)."""
+    resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
+    resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds))
+
+
 def main() -> None:
     request = json.loads(sys.stdin.buffer.read())
+    apply_limits(
+        memory_bytes=int(request.get("memory_bytes", MEMORY_LIMIT_BYTES)),
+        cpu_seconds=int(request["cpu_seconds"]),
+    )
     sys.stdout.buffer.write(render_pdf(request["html"], request["roots"]))
     sys.stdout.buffer.flush()
 
