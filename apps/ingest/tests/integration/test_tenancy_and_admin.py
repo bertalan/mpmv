@@ -1,6 +1,7 @@
 """ING.1: staging data is vendor-scoped (CORE.3) and the admin is staff only."""
 
 from collections.abc import Callable
+from typing import Any
 
 import pytest
 from django.test import Client
@@ -26,6 +27,7 @@ from apps.ingest.tests.factories import (
     SourceObservationFactory,
     SupplierSourceFactory,
 )
+from apps.vendors.models import Vendor
 from tests.tenancy import CrossTenant
 
 pytestmark = pytest.mark.django_db
@@ -38,7 +40,7 @@ MODELS = (
 
 def test_vendor_a_cannot_see_vendor_bs_staging_data(cross_tenant: CrossTenant) -> None:
     a, b = cross_tenant.a, cross_tenant.b
-    makers = {
+    makers: dict[type[Any], Callable[[Vendor], Any]] = {
         SupplierSource: lambda v: SupplierSourceFactory.create(vendor=v),
         SourceItem: lambda v: SourceItemFactory.create(source__vendor=v),
         SourceObservation: lambda v: SourceObservationFactory.create(item__source__vendor=v),
@@ -50,7 +52,7 @@ def test_vendor_a_cannot_see_vendor_bs_staging_data(cross_tenant: CrossTenant) -
     for model in MODELS:
         mine = makers[model](a.vendor)
         theirs = makers[model](b.vendor)
-        visible = model.objects.for_member(a.owner)  # type: ignore[attr-defined]
+        visible = model.objects.for_member(a.owner)
         assert mine in visible, model
         assert theirs not in visible, model
 
@@ -71,7 +73,7 @@ def staff_client(
 
 
 @pytest.mark.parametrize("model", MODELS)
-def test_every_ingest_model_is_in_the_staff_admin(staff_client: Client, model: type) -> None:
+def test_every_ingest_model_is_in_the_staff_admin(staff_client: Client, model: type[Any]) -> None:
     url = reverse(f"admin:ingest_{model._meta.model_name}_changelist")
     assert staff_client.get(url).status_code == 200
 
@@ -81,7 +83,7 @@ def test_a_vendor_member_cannot_open_the_ingest_admin(
     cross_tenant: CrossTenant,
     client: Client,
     mfa_login: Callable[[Client, User], Client],
-    model: type,
+    model: type[Any],
 ) -> None:
     client = mfa_login(client, cross_tenant.a.owner)
     url = reverse(f"admin:ingest_{model._meta.model_name}_changelist")

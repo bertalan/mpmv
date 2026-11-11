@@ -194,16 +194,19 @@ def test_decide_dry_run_changes_nothing() -> None:
     assert review.decision == "pending"
 
 
+def _value(entry: MappingTable | None) -> str:
+    assert entry is not None
+    return entry.target_value
+
+
 def test_lookup_mapping_prefers_the_vendors_entry_over_the_platform_one() -> None:
     vendor = VendorFactory.create()
     MappingTableFactory.create(vendor=None, key="rosso", target_value="red")
-    assert services.lookup_mapping(vendor, MappingTable.Kind.COLOR, " Rosso ").target_value == "red"
+    assert _value(services.lookup_mapping(vendor, MappingTable.Kind.COLOR, " Rosso ")) == "red"
     MappingTableFactory.create(vendor=vendor, key="rosso", target_value="crimson")
-    assert (
-        services.lookup_mapping(vendor, MappingTable.Kind.COLOR, "ROSSO").target_value == "crimson"
-    )
+    assert _value(services.lookup_mapping(vendor, MappingTable.Kind.COLOR, "ROSSO")) == "crimson"
     other = VendorFactory.create()
-    assert services.lookup_mapping(other, MappingTable.Kind.COLOR, "rosso").target_value == "red"
+    assert _value(services.lookup_mapping(other, MappingTable.Kind.COLOR, "rosso")) == "red"
     assert services.lookup_mapping(vendor, MappingTable.Kind.COLOR, "verde") is None
 
 
