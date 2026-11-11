@@ -25,7 +25,11 @@ class Migration(migrations.Migration):
                     "allow_indexing",
                     models.BooleanField(
                         default=False,
-                        help_text="Off keeps every page noindex; the server floor always wins.",
+                        help_text=(
+                            "Off (the default): search engines are told not to index any page "
+                            "of this site. On: pages can appear in search results. It has no "
+                            "effect while the server forces noindex (STAGE or demo)."
+                        ),
                         verbose_name="allow search engines to index this site",
                     ),
                 ),

@@ -110,6 +110,34 @@ def test_a_toggle_change_shows_on_the_next_request_to_the_same_page(client: Clie
 
 
 @override_settings(FORCE_NOINDEX=False, DEMO_MODE=False)
+def test_a_disallowed_host_gets_djangos_400_and_nothing_from_the_seo_app(
+    client: Client, caplog: pytest.LogCaptureFixture
+) -> None:
+    set_indexing(True)
+    response = client.get("/", HTTP_HOST="evil.example.test")
+    assert response.status_code == 400
+    assert response["X-Robots-Tag"] == NOINDEX
+    # The policy failed closed (noindex) and logged a warning; no traceback from apps.seo.
+    assert not any(
+        r.name.startswith("apps.seo") and r.levelname == "ERROR" and r.exc_info
+        for r in caplog.records
+    )
+    assert any(r.name.startswith("apps.seo") and r.levelname == "WARNING" for r in caplog.records)
+
+
+def test_the_site_policy_fails_closed_on_a_disallowed_host() -> None:
+    from django.test import RequestFactory
+
+    set_indexing(True)
+    request = RequestFactory().get("/", HTTP_HOST="evil.example.test")
+    assert services.site_allows_indexing(request) is False
+
+
+@override_settings(
+    FORCE_NOINDEX=False,
+    DEMO_MODE=False,
+    ALLOWED_HOSTS=["testserver", "other.example.test"],
+)
 def test_only_the_site_of_the_request_is_affected(client: Client) -> None:
     other = Site.objects.create(
         hostname="other.example.test", root_page=default_site().root_page, port=80

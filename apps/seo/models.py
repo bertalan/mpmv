@@ -20,7 +20,11 @@ class SeoSettings(BaseSiteSetting):  # type: ignore[misc]  # Wagtail is untyped
     allow_indexing = models.BooleanField(
         _("allow search engines to index this site"),
         default=False,
-        help_text=_("Off keeps every page noindex; the server floor always wins."),
+        help_text=_(
+            "Off (the default): search engines are told not to index any page of this site. "
+            "On: pages can appear in search results. It has no effect while the server "
+            "forces noindex (STAGE or demo)."
+        ),
     )
 
     class Meta:

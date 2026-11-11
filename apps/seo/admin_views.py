@@ -25,13 +25,19 @@ from .models import SeoSettings
 
 
 class SeoSettingsForm(forms.Form):
-    site = forms.ModelChoiceField(label=gettext_lazy("Site"), queryset=Site.objects.all())
+    site = forms.ModelChoiceField(
+        label=gettext_lazy("Site"),
+        queryset=Site.objects.all(),
+        help_text=gettext_lazy("The site these settings belong to; each site has its own switch."),
+    )
     allow_indexing = forms.BooleanField(
         label=gettext_lazy("Allow search engines to index this site"),
         required=False,
         help_text=gettext_lazy(
             "Off keeps every page noindex (meta tag, X-Robots-Tag header and robots.txt). "
-            "A new site starts off. Turn it on only when the shop is open to the public."
+            "A new site starts off. Turn it on only when the shop is open to the public. "
+            "A stored value takes effect as soon as the server floor is lifted: "
+            "re-check it when moving from STAGE to LIVE."
         ),
     )
 

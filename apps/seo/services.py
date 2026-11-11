@@ -2,14 +2,18 @@
 
 - `site_allows_indexing(request)` is the policy `apps.core.indexing` calls (registered in
   `SeoConfig.ready`): the stored switch of the request's Wagtail Site, off when there is no row,
-  and off when the database cannot be read (it only ever adds noindex).
+  and off when the database cannot be read or the Host is not allowed (it only ever adds
+  noindex; Django still answers its own 400 for a bad Host).
+- A stored "allow" is dormant under the environment floor (D-35): it takes effect the moment
+  the floor is lifted, so staff re-check the switch when a site moves from STAGE to LIVE.
 - `set_site_indexing(...)` is the only writer of `SeoSettings`: staff only, audited, dry-run,
   and it refuses to allow indexing while the environment floor is on.
 """
 
+import logging
 from typing import Any
 
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import DisallowedHost, PermissionDenied, ValidationError
 from django.db import DatabaseError
 from django.http import HttpRequest
 from wagtail.models import Site
@@ -21,6 +25,8 @@ from apps.core.services import save_audited
 from apps.vendors.scoping import is_platform_staff
 
 from .models import SeoSettings
+
+logger = logging.getLogger(__name__)
 
 SEO_SETTINGS_CONFIGURED = "seo.settings.configured"
 FLOOR_MESSAGE = (
@@ -40,12 +46,17 @@ def site_for(request: HttpRequest | None) -> Site | None:
 def site_allows_indexing(request: HttpRequest | None) -> bool:
     """The stored switch of the request's site; never creates a row."""
     try:
+        if request is not None:
+            request.get_host()  # DisallowedHost: Django answers 400; we only add noindex
         site = site_for(request)
         if site is None:
             return False
         return bool(
             SeoSettings.objects.filter(site=site).values_list("allow_indexing", flat=True).first()
         )
+    except DisallowedHost:
+        logger.warning("SEO indexing policy: request with a disallowed Host, answering noindex")
+        return False
     except DatabaseError:
         return False
 
