@@ -22,6 +22,7 @@ import datetime as dt
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Final
 
 from apps.core.countries import (
@@ -497,3 +498,83 @@ def transparency_payload(
     )
     payload[key] = scrub_public_text(explanation)
     return payload
+
+
+# --- DAC7 consideration and fees (CMP.1, spec 11; decision T-6, adviser opinion 2026-11-11)
+
+_CENT: Final = Decimal("0.01")
+DAC7_MIN_SALES: Final = 30
+DAC7_MIN_CONSIDERATION: Final = Decimal("2000")
+
+
+def _cents(value: Decimal) -> Decimal:
+    return value.quantize(_CENT, rounding=ROUND_HALF_UP)
+
+
+@dataclass(frozen=True)
+class Dac7Amounts:
+    """What DAC7 reports for one order: `consideration` is paid or credited to the vendor net of
+    the platform's fees and taxes, and `fees` is the separate Fees field. `fees` is negative when a
+    platform coupon exceeds the order's fees; the excess is netted at quarter level."""
+
+    paid: Decimal  # what the customer pays for the goods, after both coupons
+    consideration: Decimal
+    fees: Decimal
+
+
+def dac7_order_amounts(
+    *,
+    order_total: Decimal,
+    vendor_coupon: Decimal,
+    platform_coupon: Decimal,
+    fees: Decimal,
+) -> Dac7Amounts:
+    """Consideration and fees of one order.
+
+    `order_total` is the goods total before any coupon, `fees` the platform's fees (commission,
+    payment fees, with their taxes) before the coupon. The customer pays the total less both
+    coupons. A vendor coupon leaves the fees alone; a platform coupon (Q-90 model, T-1) reduces
+    them by the same amount. On 100 with a coupon of 10 and fees of 15: vendor coupon gives
+    consideration 75 and fees 15, platform coupon gives 85 and 5."""
+    paid = _cents(order_total - vendor_coupon - platform_coupon)
+    effective_fees = _cents(fees - platform_coupon)
+    return Dac7Amounts(paid=paid, consideration=paid - effective_fees, fees=effective_fees)
+
+
+@dataclass(frozen=True)
+class Dac7Quarter:
+    transactions: int
+    consideration: Decimal
+    fees: Decimal
+
+
+def dac7_quarter(orders: Iterable[Dac7Amounts]) -> Dac7Quarter:
+    """Sum the orders of a quarter. Negative fees net against the other orders, and the quarter's
+    fees never go below zero (spec 11 CMP.2: the excess over the whole period is a vendor credit,
+    not reported)."""
+    items = list(orders)
+    fees = _cents(max(sum((item.fees for item in items), Decimal("0")), Decimal("0")))
+    paid = sum((item.paid for item in items), Decimal("0"))
+    return Dac7Quarter(transactions=len(items), consideration=_cents(paid - fees), fees=fees)
+
+
+def dac7_reportable(
+    *,
+    sales: int,
+    consideration: Decimal,
+    country: str | None = None,
+    operator_owned: bool = False,
+) -> bool:
+    """Whether a vendor of goods is reported for the year: not the operator's own shop (D-22,
+    VEN.26), an EU resident (non-EU data is collected, not reported) and not an excluded seller
+    (fewer than 30 sales and total consideration of 2,000 or less). `country` None skips the
+    residence check."""
+    if operator_owned:
+        return False
+    if country is not None:
+        try:
+            if normalize_country(country) not in EU_MEMBER_STATES:
+                return False
+        except InvalidCountry:
+            return False
+    return sales >= DAC7_MIN_SALES or consideration > DAC7_MIN_CONSIDERATION
