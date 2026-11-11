@@ -8,6 +8,7 @@
   no CSP violation under the strict policy, screenshots in build/e2e/screenshots.
 """
 
+import re
 from collections.abc import Callable
 from pathlib import Path
 
@@ -70,7 +71,7 @@ def test_the_wagtail_help_item_opens_the_page_help(
     page.add_init_script(RECORD_CSP_VIOLATIONS)
     sign_in(page, live_server)
     page.goto(f"{live_server.url}/admin/pages/{about.pk}/edit/")
-    page.get_by_role("button", name="Help", exact=True).click()
+    page.get_by_role("button", name=re.compile(r"^Help\d*")).click()  # a badge counts news
     item = page.get_by_role("button", name="Help for this page")
     expect(item).to_be_visible()
     shot("wagtail-menu")

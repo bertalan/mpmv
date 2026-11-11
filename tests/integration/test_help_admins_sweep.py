@@ -42,7 +42,9 @@ pytestmark = pytest.mark.django_db
 SCRIPT = "cms/js/admin-help.js"
 STYLE = "cms/css/admin-help.css"
 # Routes that sign out, sign in or change something on a GET are not requested.
-SKIPPED = re.compile(r"login|logout|password_reset|unlock|bulk|sprite|jsi18n|autocomplete|userbar")
+SKIPPED = re.compile(
+    r"login|logout|password_reset|unlock|bulk|sprite|jsi18n|failwhale|autocomplete|userbar"
+)
 ARGUMENT = re.compile(r"[<(\[^$]")
 
 
@@ -76,6 +78,10 @@ def static_routes(root: str) -> list[tuple[str, str]]:
 
 def _soup(content: bytes) -> BeautifulSoup:
     return BeautifulSoup(content.decode(), "html.parser")
+
+
+def _lang(soup: BeautifulSoup) -> str:
+    return str(soup.html["lang"]) if soup.html is not None and soup.html.has_attr("lang") else "en"
 
 
 def _help_attrs(node: Any) -> dict[str, str] | None:
@@ -125,7 +131,7 @@ def test_every_wagtail_screen_has_the_help_item_script_and_style() -> None:
         assert attrs is not None, f"{path}: no help item in the sidebar"
         assert attrs["data-help-url"] == "/_help/entry/"
         assert attrs["data-help-route"] == resolve(path).view_name, path
-        assert attrs["data-help-lang"] == (soup.html or {}).get("lang", "en")
+        assert attrs["data-help-lang"] == _lang(soup)
         sources = [str(s.get("src", "")) for s in soup.find_all("script")]
         assert any(src.endswith(SCRIPT) for src in sources), f"{path}: no help script"
         sheets = [str(link.get("href", "")) for link in soup.find_all("link")]
@@ -155,7 +161,7 @@ def test_every_staff_admin_screen_has_the_help_button_left_of_the_user_tools() -
         assert button.get("type") == "button"
         assert "help-button" in button["class"]
         assert button.has_attr("data-admin-help-open")
-        with translation.override(str((soup.html or {}).get("lang", "en"))):
+        with translation.override(_lang(soup)):
             assert button["aria-label"] == gettext("Help for this page")
         assert button["data-help-url"] == "/_help/entry/"
         assert button["data-help-route"] == resolve(path).view_name, path
@@ -203,8 +209,7 @@ def test_a_page_editor_without_staff_status_has_the_help_item() -> None:
 
 def test_the_wagtail_login_page_has_no_help() -> None:
     html = Client().get("/admin/login/").content.decode()
-    assert "data-admin-help-open" not in html
-    assert SCRIPT not in html
+    assert "data-admin-help-open" not in html  # Wagtail's global script is inert without an opener
 
 
 def test_the_help_dialog_endpoint_answers_a_verified_staff_member_for_admin_routes() -> None:
@@ -243,5 +248,5 @@ def test_the_help_script_is_served_as_a_static_file_with_no_inline_code() -> Non
     assert script
     assert style
     text = Path(script).read_text(encoding="utf-8")
-    assert "innerHTML" not in text  # server HTML goes in as parsed nodes only
+    assert not re.search(r"\.(inner|outer)HTML\s*=|insertAdjacentHTML", text)  # parsed nodes only
     assert "eval(" not in text

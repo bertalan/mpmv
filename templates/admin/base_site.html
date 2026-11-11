@@ -1,0 +1,13 @@
+{% extends "admin/base_site.html" %}{% load i18n static cms_tags %}{% comment %}
+The staff admin's base (ARC.32 part 4): Django's own `admin/base_site.html` plus the contextual help
+button, immediately left of the user tools in the header. A signed-in user only: `help_context`
+returns nothing for anyone else, so the login page carries none of this. The button is a real
+`<button>` named "Help for this page"; the static script (cms/js/admin-help.js) builds the modal
+`<dialog>` on the first click and fetches the entry for the screen (its URL name) from the help
+endpoint. Every text it needs is on the button, already translated. No inline script or style.
+{% endcomment %}
+{% block extrahead %}{{ block.super }}{% help_context as help %}{% if help and has_permission %}
+<link rel="stylesheet" href="{% static 'cms/css/admin-help.css' %}">
+<script src="{% static 'cms/js/admin-help.js' %}" defer></script>{% endif %}{% endblock %}
+
+{% block usertools %}{% help_context as help %}{% if help and has_permission %}<button type="button" class="help-button" data-admin-help-open aria-haspopup="dialog" aria-label="{% translate 'Help for this page' %}" data-help-url="{{ help.url }}" data-help-route="{{ help.route }}" data-help-page-type="" data-help-lang="{{ help.language }}" data-help-title="{% translate 'Help for this page' %}" data-help-loading="{% translate 'Loading help…' %}" data-help-error="{% translate 'The help text could not be loaded. Try again.' %}" data-help-fields-title="{% translate 'Fields on this page' %}" data-help-close="{% translate 'Close' %}"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 1-1 1.7M12 17.5v.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>{% endif %}{{ block.super }}{% endblock %}

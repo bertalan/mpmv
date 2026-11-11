@@ -16,16 +16,23 @@ listed under "Images to classify" until staff classify them.
 
 Landing pages (CMS.4): the catalog's listing pages ask the `catalog_listing_editorial` hook for
 editorial content, which this app gives from its term and vendor landing pages.
+
+Contextual help (ARC.32): "Help for this page" is an item of the sidebar's Help menu (Wagtail 8.1
+has no header and no hook for its account menu); the static script and style come in through
+`insert_global_admin_js` and `insert_global_admin_css`, so nothing is inline (`help_admin`).
 """
 
 from collections.abc import Callable
 from typing import Any
 
 from django.http import HttpRequest
+from django.templatetags.static import static
 from django.urls import URLPattern, path, reverse
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from wagtail import hooks
 from wagtail.admin.menu import MenuItem
+from wagtail.admin.ui.sidebar import LinkMenuItem as LinkMenuItemComponent
 from wagtail.snippets.models import register_snippet
 from wagtail.snippets.views.snippets import SnippetViewSet
 from wagtail.users import wagtail_hooks as wagtail_users_hooks
@@ -34,7 +41,7 @@ from apps.catalog.listings import EDITORIAL_HOOK, ListingEditorial
 from apps.catalog.services import ListingScope
 from apps.core.services import classified
 
-from . import roles
+from . import help_admin, roles
 from .admin_views import can_classify_images, image_review
 from .choosers import (
     brand_chooser,
@@ -97,6 +104,42 @@ def cms_only_menu(request: Any, menu_items: list[Any]) -> None:
     Manager (CORE.17), so whatever an app or package adds that is not in the allow list is
     dropped, and so are documents (installed for wagtail-localize only)."""
     menu_items[:] = [item for item in menu_items if item.name in roles.ADMIN_MENU_ALLOWED]
+
+
+class HelpForThisPageMenuItem(MenuItem):  # type: ignore[misc]  # Wagtail is untyped
+    """ "Help for this page" in the sidebar's Help menu (ARC.32). Menu items are built once, so the
+    screen's route name, page type and language are put on a component made for each request."""
+
+    def render_component(self, request: HttpRequest) -> Any:
+        return LinkMenuItemComponent(
+            self.name,
+            self.label,
+            self.url,
+            icon_name=self.icon_name,
+            classname=self.classname,
+            attrs={**self.attrs, **help_admin.menu_attrs(request)},
+        )
+
+
+@hooks.register("register_help_menu_item")  # type: ignore[untyped-decorator]
+def help_for_this_page_menu_item() -> MenuItem:
+    return HelpForThisPageMenuItem(
+        _("Help for this page"),
+        url="#",
+        name="help-for-this-page",
+        icon_name="help",
+        order=900,
+    )
+
+
+@hooks.register("insert_global_admin_js")  # type: ignore[untyped-decorator]
+def help_script() -> str:
+    return format_html('<script src="{}" defer></script>', static("cms/js/admin-help.js"))
+
+
+@hooks.register("insert_global_admin_css")  # type: ignore[untyped-decorator]
+def help_style() -> str:
+    return format_html('<link rel="stylesheet" href="{}">', static("cms/css/admin-help.css"))
 
 
 @hooks.register("construct_image_chooser_queryset")  # type: ignore[untyped-decorator]
