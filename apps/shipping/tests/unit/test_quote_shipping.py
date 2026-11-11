@@ -416,3 +416,11 @@ class TestSpecialAreas:  # case 19
 def test_a_package_of_another_vendor_than_the_config_is_refused() -> None:
     outcome = quote_shipping(package(vendor_id=2), ROME, cfg(method()))
     assert isinstance(outcome, NeedsQuote)
+
+
+def test_blocked_area_with_a_pickup_leaves_only_the_pickup() -> None:
+    treat = {"it-sardinia": AreaTreatment(mode=engine.BLOCKED)}
+    pickup = PickupSnap(vendor_id=VENDOR, key="shop", label="Shop", cost_net=D("0"), address="x")
+    outcome = quote_shipping(package(), CAGLIARI, cfg(method(treatments=treat), pickups=(pickup,)))
+    assert isinstance(outcome, Rates)
+    assert [rate.key for rate in outcome.rates] == ["shop"]

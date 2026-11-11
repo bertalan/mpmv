@@ -733,8 +733,10 @@ class ShippingConfigSnap:
 
 @dataclass(frozen=True)
 class ShippingRate:
-    """One choice offered to the buyer, net of VAT. Besides the price it carries what the tax
-    engine needs (`tax_treatment`, `zone_code`, `territory_code` of an extra-VAT area)."""
+    """One choice offered to the buyer, net of VAT. `free_shipping` means the band price was
+    waived by the method's threshold (a special-area surcharge may still be charged). Besides the
+    price it carries what the tax engine needs (`tax_treatment`, `zone_code`, `territory_code`
+    of an extra-VAT area)."""
 
     key: str
     kind: str
