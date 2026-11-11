@@ -428,10 +428,6 @@ msgid ""
 msgstr ""
 "Testo semplice per chi non vede l’immagine, per esempio il nome del negozio."
 
-#: apps/manager/forms.py
-msgid "Plain text, no HTML."
-msgstr "Testo semplice, senza HTML."
-
 #: apps/manager/templates/manager/layout.html
 msgid "Platform"
 msgstr "Piattaforma"

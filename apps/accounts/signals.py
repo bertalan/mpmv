@@ -3,14 +3,17 @@
 
 from typing import Any
 
+from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.http import HttpRequest
 
 from apps.core.audit import user_context
 from apps.core.http import client_ip
+from apps.core.i18n import configured_languages
 
 from .models import User
-from .services import record_failed_login, record_successful_login
+from .services import record_failed_login, record_successful_login, set_preferred_language
+from .session_language import SESSION_LANGUAGE_KEY
 
 
 def count_failed_login(
@@ -28,3 +31,24 @@ def reset_after_login(
         return
     ip = client_ip(request) if request is not None else None
     record_successful_login(user, ctx=user_context(user, ip))
+
+
+def seed_language_on_login(
+    sender: Any, request: HttpRequest | None, user: AbstractBaseUser, **kwargs: Any
+) -> None:
+    """The language an anonymous visitor chose before signing in becomes the user's preference,
+    but only when the user never chose one: a preference still equal to the default is taken as
+    unset (the field always holds a value). A stored choice is never overwritten.
+
+    Known limit: a user who deliberately chose the default language (English) is not told apart
+    from one who never chose, so the session choice made just before this login (an explicit,
+    recent act) can replace it. A `language_chosen` flag would need a migration; not worth it."""
+    session = getattr(request, "session", None)
+    chosen = session.get(SESSION_LANGUAGE_KEY) if session is not None else None
+    if (
+        isinstance(user, User)
+        and chosen in configured_languages()
+        and chosen != user.preferred_language
+        and user.preferred_language == settings.LANGUAGE_CODE
+    ):
+        set_preferred_language(user, chosen)

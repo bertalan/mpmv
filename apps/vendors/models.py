@@ -14,6 +14,7 @@ from typing import Any, ClassVar
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
+from wagtail.fields import RichTextField
 
 from apps.core.fields import (
     CountryField,
@@ -457,10 +458,10 @@ class VendorTranslation(TranslationModel):
 
     vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name="translations")
     tagline = models.CharField(max_length=200, blank=True)
-    description = models.TextField(blank=True)
-    shipping_policy = models.TextField(blank=True)
-    refund_policy = models.TextField(blank=True)
-    cancellation_policy = models.TextField(blank=True)
+    description = RichTextField(blank=True)
+    shipping_policy = RichTextField(blank=True)
+    refund_policy = RichTextField(blank=True)
+    cancellation_policy = RichTextField(blank=True)
 
     class Meta(TranslationModel.Meta):
         ordering = ["vendor", "language"]

@@ -106,7 +106,6 @@ def test_vendor_texts_are_escaped(client: Client) -> None:
     vendor.translations.filter(language="en").update(description="<script>alert(1)</script>")
     html = client.get(f"/shop/{vendor.slug}/").content.decode()
     assert "<script>alert(1)</script>" not in html
-    assert "&lt;script&gt;" in html
 
 
 def test_a_vendor_that_is_not_active_has_no_storefront(client: Client) -> None:
@@ -179,7 +178,6 @@ def test_tagline_and_policies_are_escaped(client: Client) -> None:
     html = client.get(f"/shop/{vendor.slug}/").content.decode()
     for raw in ("<b>tag</b>", "<script>ship()", "<img src=x", "<script>cancel()"):
         assert raw not in html
-    assert "&lt;script&gt;ship()" in html
     assert "&lt;b&gt;tag&lt;/b&gt;" in html
 
 
