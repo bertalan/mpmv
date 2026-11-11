@@ -386,6 +386,7 @@ class TransparencySubmission(BaseModel):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
         SUBMITTED = "submitted", "Submitted"
+        VOIDED = "voided", "Voided"  # the decision was withdrawn: never submitted
 
     vendor_scope: ClassVar[str] = "statement__vendor"
 
@@ -395,6 +396,8 @@ class TransparencySubmission(BaseModel):
     payload = models.JSONField()
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     submitted_at = models.DateTimeField(null=True, blank=True)
+    voided_at = models.DateTimeField(null=True, blank=True, editable=False)
+    void_reason = models.TextField(blank=True, editable=False)
 
     objects = VendorScopedManager()
 

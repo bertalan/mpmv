@@ -265,3 +265,21 @@ def test_the_download_is_rate_limited_per_vendor(client: Client, vendor: Vendor)
     limited = client.get(f"{SHOP}data/")
     assert limited.status_code == 429
     assert int(limited["Retry-After"]) > 0
+
+
+def test_a_frozen_vendors_order_action_is_a_4xx_not_a_500(client: Client, vendor: Vendor) -> None:
+    from apps.compliance import services
+    from apps.core.audit import AuditContext
+    from apps.orders.tests.factories import paid_vendor_order
+
+    sub = paid_vendor_order(vendor)
+    notice = TerminationNoticeFactory.create(vendor=vendor)
+    services.apply_due_terminations(
+        now=notice.effective_at, ctx=AuditContext(actor_label="system:test", source="system")
+    )
+    owner = VendorMemberFactory.create(vendor=vendor, role="owner").user
+    verified_login(client, owner)
+    response = client.post(f"/manager/shop/orders/{sub.public_id}/accept/")
+    assert 400 <= response.status_code < 500
+    sub.refresh_from_db()
+    assert sub.state == "pending"

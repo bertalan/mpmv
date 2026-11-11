@@ -571,3 +571,64 @@ def test_a_freeze_review_needs_an_applied_notice_and_a_note(staff: Any, vendor: 
     services.apply_due_terminations(now=DAY30, ctx=CTX)
     with pytest.raises(services.NoticeError):
         services.review_termination_freeze(staff, pending.public_id, note=" ", ctx=CTX)
+
+
+# --- Withdrawal voids the transparency record; the date is the effective date
+
+
+def test_withdrawing_voids_the_pending_transparency_record(staff: Any, vendor: Vendor) -> None:
+    notice = issue(staff, vendor).notice
+    assert notice is not None
+    notice.refresh_from_db()
+    record = TransparencySubmission.objects.get(statement=notice.statement)
+    assert record in services.transparency_to_submit()
+    services.withdraw_termination_notice(
+        staff, notice.public_id, reason="The infringement was corrected.", now=NOW, ctx=CTX
+    )
+    record.refresh_from_db()
+    assert record.status == TransparencySubmission.Status.VOIDED
+    assert record.voided_at == NOW
+    assert record.void_reason == "The infringement was corrected."
+    assert record not in services.transparency_to_submit()
+    entry = AuditLog.objects.get(action="compliance.transparency_voided")
+    assert str(notice.statement.public_id) in json.dumps(entry.after)  # type: ignore[union-attr]
+
+
+def test_a_voided_record_is_never_picked_up_even_next_to_pending_ones(
+    staff: Any, vendor: Vendor
+) -> None:
+    other = VendorFactory.create(status=Vendor.Status.ACTIVE)
+    issue(staff, other)
+    notice = issue(staff, vendor).notice
+    assert notice is not None
+    services.withdraw_termination_notice(
+        staff, notice.public_id, reason="Resolved.", now=NOW, ctx=CTX
+    )
+    pending = list(services.transparency_to_submit())
+    assert len(pending) == 1
+    assert pending[0].statement.vendor == other
+
+
+def test_a_withdrawal_dry_run_voids_nothing(staff: Any, vendor: Vendor) -> None:
+    notice = issue(staff, vendor).notice
+    assert notice is not None
+    services.withdraw_termination_notice(
+        staff, notice.public_id, reason="x", now=NOW, ctx=CTX, dry_run=True
+    )
+    assert TransparencySubmission.objects.get().status == TransparencySubmission.Status.PENDING
+
+
+def test_the_transparency_date_is_the_effective_date(staff: Any, vendor: Vendor) -> None:
+    notice = issue(staff, vendor).notice
+    assert notice is not None
+    notice.refresh_from_db()
+    payload = TransparencySubmission.objects.get(statement=notice.statement).payload
+    assert payload["application_date"] == timezone.localdate(DAY30).isoformat()
+
+
+def test_a_frozen_order_move_is_a_domain_error(staff: Any, vendor: Vendor) -> None:
+    sub = paid_vendor_order(vendor)
+    issue(staff, vendor)
+    services.apply_due_terminations(now=DAY30, ctx=CTX)
+    with pytest.raises(order_services.OrdersFrozen):
+        order_services.transition_vendor_order(sub, "accepted", ctx=CTX)

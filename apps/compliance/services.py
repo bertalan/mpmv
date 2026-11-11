@@ -1821,7 +1821,7 @@ def issue_termination_notice(
                 based_on_notice=False,
                 automated_detection=False,
                 automated_decision=False,
-                applied_on=timezone.localdate(now),
+                applied_on=timezone.localdate(effective_at),
                 valid_until=None,
                 reference=str(statement.public_id),
             ),
@@ -1893,6 +1893,7 @@ def withdraw_termination_notice(
             return changes
         notice.save(update_fields=["status", "withdrawn_at", "withdraw_reason", "updated_at"])
         audit_changes(changes, ctx=ctx, action=TERMINATION_WITHDRAWN)
+        _void_transparency(notice, now=now, ctx=ctx)
         enqueue_email(
             recipient=notice.vendor.contact_email,
             template_key=TERMINATION_WITHDRAWN_TEMPLATE,
@@ -1905,6 +1906,47 @@ def withdraw_termination_notice(
             idempotency_key=f"compliance:termination-withdrawn:{notice.public_id}",
         )
     return changes
+
+
+TRANSPARENCY_VOIDED: Final = "compliance.transparency_voided"
+
+
+def transparency_to_submit() -> "QuerySet[TransparencySubmission]":
+    """The records a submitter may send to the transparency database: pending ones only, never
+    a voided one (a withdrawn decision must not be published)."""
+    return TransparencySubmission.objects.filter(
+        status=TransparencySubmission.Status.PENDING
+    ).select_related("statement__vendor")
+
+
+def _void_transparency(notice: TerminationNotice, *, now: dt.datetime, ctx: AuditContext) -> None:
+    """Void the pending record of a withdrawn notice. The statement of reasons is immutable (the
+    vendor received it), so it stays; the audit entry says it was withdrawn."""
+    if notice.statement_id is None:
+        return
+    row = (
+        TransparencySubmission.objects.select_for_update()
+        .filter(statement_id=notice.statement_id, status=TransparencySubmission.Status.PENDING)
+        .first()
+    )
+    if row is None:
+        return
+    row.status = TransparencySubmission.Status.VOIDED
+    row.voided_at = now
+    row.void_reason = notice.withdraw_reason
+    row.save(update_fields=["status", "voided_at", "void_reason", "updated_at"])
+    record(
+        ctx,
+        TRANSPARENCY_VOIDED,
+        "compliance.transparencysubmission",
+        str(row.public_id),
+        {"status": "pending"},
+        {
+            "status": "voided",
+            "statement": str(notice.statement.public_id) if notice.statement else None,
+            "statement_withdrawn": True,
+        },
+    )
 
 
 def _apply_termination(notice_id: int, now: dt.datetime, ctx: AuditContext) -> list[Any]:

@@ -381,6 +381,11 @@ def transition_order(
     return changeset
 
 
+class OrdersFrozen(ValueError):
+    """The vendor's open orders are frozen (a termination awaiting staff review): views answer
+    with a 4xx."""
+
+
 def _orders_frozen(vendor: Vendor) -> bool:
     """Whether a hook in `settings.ORDER_FREEZE_HOOKS` freezes the vendor's open orders. Hooks
     are dotted paths (orders never imports the apps that freeze); a voluntary closure freezes
@@ -413,7 +418,7 @@ def transition_vendor_order(
                 .get(pk=sub.pk)
             )
             if _orders_frozen(locked.vendor):  # CMP.5 part 4: frozen pending staff review
-                raise ValueError(
+                raise OrdersFrozen(
                     "the vendor's open orders are frozen pending staff review (termination)"
                 )
             before = _vendor_order_snapshot(locked)
