@@ -21,15 +21,6 @@ The Django admin is classified as a whole: staff only, with the object pages of 
 models tested on Vendor B's objects.
 """
 
-from apps.ingest.models import (
-    ImportRun,
-    MappingTable,
-    ProductDraft,
-    ReviewItem,
-    SourceItem,
-    SourceObservation,
-    SupplierSource,
-)
 from django.contrib import admin
 from django.db import models
 from django.test import Client
@@ -72,6 +63,15 @@ from apps.core.models import TranslationStatus
 from apps.core.tests.factories import utc
 from apps.events.models import EventPage, VendorEventPolicy
 from apps.events.tests.factories import EventPageFactory, VendorEventPolicyFactory
+from apps.ingest.models import (
+    ImportRun,
+    MappingTable,
+    ProductDraft,
+    ReviewItem,
+    SourceItem,
+    SourceObservation,
+    SupplierSource,
+)
 from apps.ingest.tests.factories import (
     ImportRunFactory,
     MappingTableFactory,
