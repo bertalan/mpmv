@@ -39,6 +39,7 @@ from treebeard.mp_tree import MP_Node
 from wagtail.models import Page
 
 from apps.core import translations
+from apps.core.fields import CountryField
 from apps.core.models import BaseModel, TranslationModel, resolve_translation
 from apps.core.translations import Resolved
 
@@ -345,10 +346,70 @@ class TermTranslation(TranslationModel):
             )
 
 
+class Manufacturer(BaseModel):
+    """The company behind one or more brands (CAT.20): legal name, official URL, `sameAs` links
+    and country. Shared by all vendors; edited by Catalog staff only."""
+
+    legal_name = models.CharField(max_length=255)
+    url = models.URLField(blank=True, max_length=500, help_text="Official site, https only.")
+    same_as = models.JSONField(
+        "sameAs links",
+        default=list,
+        blank=True,
+        help_text="Absolute https links: Wikidata, Wikipedia, official profiles.",
+    )
+    country = CountryField(blank=True, help_text="Country of the registered office.")
+
+    class Meta:
+        ordering = ["legal_name"]
+
+    def __str__(self) -> str:
+        return str(self.legal_name)
+
+    def clean(self) -> None:
+        super().clean()
+        errors = engine.link_field_errors(self.url, self.same_as)
+        if errors:
+            raise ValidationError(errors)
+
+
 class Brand(BaseModel):
-    """A manufacturer brand (`g:brand` in feeds); its name is the same in every language."""
+    """A brand (`g:brand` in feeds) as a linked entity (CAT.20); its name is the same in every
+    language. One shared list for all vendors: a vendor picks any `approved` brand and proposes a
+    missing one, which stays `pending` (not public) until Catalog staff approve, reject or merge
+    it. Staff edit the shared data; vendors never do."""
+
+    class Status(models.TextChoices):
+        APPROVED = "approved", "Approved"
+        PENDING = "pending", "Pending review"
+        REJECTED = "rejected", "Rejected"
 
     name = models.CharField(max_length=200)
+    # What duplicate detection compares: `engine.brand_name_key(name)`, set by `save()`.
+    name_key = models.CharField(max_length=200, blank=True, editable=False, db_index=True)
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.APPROVED, db_index=True
+    )
+    wikidata_id = models.CharField(
+        "Wikidata item ID",
+        max_length=12,
+        blank=True,
+        help_text="E.g. Q42; the format is checked, nothing is fetched.",
+    )
+    url = models.URLField("official URL", blank=True, max_length=500, help_text="https only.")
+    same_as = models.JSONField(
+        "sameAs links",
+        default=list,
+        blank=True,
+        help_text="Absolute https links: Wikipedia per language, official profiles.",
+    )
+    logo = models.ForeignKey(
+        "core.MediaImage", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    logo_alt = models.CharField(max_length=125, blank=True)
+    manufacturer = models.ForeignKey(
+        Manufacturer, null=True, blank=True, on_delete=models.SET_NULL, related_name="brands"
+    )
 
     class Meta:
         ordering = ["name"]
@@ -358,10 +419,38 @@ class Brand(BaseModel):
                 name="catalog_brand_name_unique",
                 violation_error_message="A brand with this name already exists.",
             ),
+            models.UniqueConstraint(
+                fields=["wikidata_id"],
+                condition=~models.Q(wikidata_id=""),
+                name="catalog_brand_wikidata_unique",
+                violation_error_message="Another brand has this Wikidata ID.",
+            ),
         ]
 
     def __str__(self) -> str:
         return str(self.name)
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        self.name_key = engine.brand_name_key(self.name)
+        fields = kwargs.get("update_fields")
+        if fields is not None and "name" in fields:
+            kwargs["update_fields"] = {*fields, "name_key"}
+        super().save(*args, **kwargs)
+
+    def clean(self) -> None:
+        super().clean()
+        errors = engine.link_field_errors(self.url, self.same_as)
+        problem = engine.wikidata_id_error(self.wikidata_id)
+        if problem:
+            errors.setdefault("wikidata_id", []).append(problem)
+        others = Brand.objects.exclude(pk=self.pk)
+        key = engine.brand_name_key(self.name)
+        if key and others.filter(name_key=key).exists():
+            errors.setdefault("name", []).append("A brand with a very similar name exists.")
+        if self.wikidata_id and others.filter(wikidata_id=self.wikidata_id).exists():
+            errors.setdefault("wikidata_id", []).append("Another brand has this Wikidata ID.")
+        if errors:
+            raise ValidationError(errors)
 
     def translation(self, language: str) -> "Resolved[BrandTranslation]":
         """Texts to show in `language`: published, or EN with a fallback flag."""

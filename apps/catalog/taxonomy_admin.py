@@ -32,6 +32,7 @@ from .taxonomy import (
     BrandTranslation,
     Category,
     CategoryTranslation,
+    Manufacturer,
     Taxonomy,
     TaxonomyTranslation,
     Term,
@@ -296,8 +297,28 @@ class BrandTranslationInline(admin.StackedInline[BrandTranslation, Brand]):
 
 @admin.register(Brand)
 class BrandAdmin(admin.ModelAdmin[Brand]):
-    list_display = ("name",)
-    search_fields = ("name",)
+    list_display = ("name", "status", "manufacturer", "wikidata_id")
+    list_filter = ("status",)
+    search_fields = ("name", "wikidata_id")
     readonly_fields = TIMESTAMPS
-    fields = ("name", *TIMESTAMPS)
+    fields = (
+        "name",
+        "status",
+        "wikidata_id",
+        "url",
+        "same_as",
+        "logo",
+        "logo_alt",
+        "manufacturer",
+        *TIMESTAMPS,
+    )
+    autocomplete_fields = ("manufacturer",)
     inlines = (BrandTranslationInline,)
+
+
+@admin.register(Manufacturer)
+class ManufacturerAdmin(admin.ModelAdmin[Manufacturer]):
+    list_display = ("legal_name", "country", "url")
+    search_fields = ("legal_name",)
+    readonly_fields = TIMESTAMPS
+    fields = ("legal_name", "url", "same_as", "country", *TIMESTAMPS)

@@ -123,3 +123,28 @@ def test_staff_admin_edits_the_new_fields(staff_client: Client) -> None:
         staff_client.get(reverse("admin:catalog_manufacturer_change", args=[maker.pk])).status_code
         == 200
     )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_migration_keeps_every_brand_public_and_fills_keys_idempotently() -> None:
+    from django.db import connection
+    from django.db.migrations.executor import MigrationExecutor
+
+    BrandFactory.create(name="Café & Co")
+    BrandTranslationFactory.create(slug="kept", status=PUBLISHED)
+    before = list(Brand.objects.order_by("pk").values_list("name", flat=True))
+
+    executor = MigrationExecutor(connection)
+    executor.migrate([("catalog", "0010_d25_product_slugs")])
+    executor.loader.build_graph()
+    executor.migrate([("catalog", "0011_brand_entities")])
+    executor.loader.build_graph()
+    executor.migrate([("catalog", "0010_d25_product_slugs")])
+    executor.loader.build_graph()
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+    brands = Brand.objects.order_by("pk")
+    assert list(brands.values_list("name", flat=True)) == before
+    assert {b.status for b in brands} == {"approved"}
+    assert brands.get(name="Café & Co").name_key == "cafe and co"
+    assert brands.filter(translations__slug="kept").exists()
