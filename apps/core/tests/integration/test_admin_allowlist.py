@@ -91,3 +91,25 @@ def test_the_test_settings_allow_loopback_only(client: Client) -> None:
     assert settings.ADMIN_ALLOWED_NETWORKS == ["127.0.0.1/32", "::1/128"]
     assert _get(client, "127.0.0.1") == 302
     assert _get(client, "203.0.113.9") == 404
+
+
+LOOPBACK = ["127.0.0.1/32", "::1/128"]
+
+
+@override_settings(
+    ADMIN_ALLOWED_NETWORKS=LOOPBACK, TRUSTED_PROXY_HEADER="X-Real-IP", TRUSTED_PROXIES=[PROXY_NET]
+)
+def test_the_ssh_tunnel_path_reaches_the_admin_and_a_direct_visit_does_not(client: Client) -> None:
+    """Loopback-only policy (MQ-24): through the tunnel Caddy sees 127.0.0.1 and forwards it as
+    X-Real-IP, the browser's Host carries the local tunnel port; a public address gets 404."""
+    tunnel = {"Host": "testserver:8443", "X-Real-IP": "127.0.0.1"}
+    response = client.get(ADMIN, headers=tunnel, REMOTE_ADDR=PROXY)
+    assert response.status_code == 302
+    assert "login" in response["Location"]
+    assert client.get(ADMIN + "login/", headers=tunnel, REMOTE_ADDR=PROXY).status_code == 200
+    tunnel6 = {**tunnel, "X-Real-IP": "::1"}
+    assert client.get(ADMIN, headers=tunnel6, REMOTE_ADDR=PROXY).status_code == 302
+    direct = {**tunnel, "X-Real-IP": "203.0.113.9"}
+    assert client.get(ADMIN, headers=direct, REMOTE_ADDR=PROXY).status_code == 404
+    # a public client cannot claim to be loopback: the header counts only from the proxy
+    assert client.get(ADMIN, headers=tunnel, REMOTE_ADDR="203.0.113.9").status_code == 404

@@ -77,6 +77,14 @@ def test_without_a_requester_only_the_number_is_sent() -> None:
     assert transport.requests[0][1] == {"countryCode": "DE", "vatNumber": "123456789"}
 
 
+def test_a_per_call_requester_replaces_the_clients_own_one() -> None:
+    transport = RecordingTransport(VALID)
+    vendor = ViesQuery("IT", "IT", "01234567897")
+    HttpViesClient(transport=transport, requester=REQUESTER).check(DE, requester=vendor)
+    body = transport.requests[0][1]
+    assert (body["requesterMemberStateCode"], body["requesterNumber"]) == ("IT", "01234567897")
+
+
 def test_the_greek_prefix_is_sent_as_el() -> None:
     transport = RecordingTransport({**VALID, "countryCode": "EL"})
     answer = HttpViesClient(transport=transport).check(ViesQuery("GR", "EL", "123456789"))

@@ -150,6 +150,50 @@ def check_vendor_order_transition(source: str, target: str) -> None:
     _check(VENDOR_ORDER_TRANSITIONS, "a vendor order", source, target)
 
 
+# --- the vendor's fulfilment actions (ORD.6) ---------------------------------------------------
+
+FULFILMENT_ACTIONS: Mapping[str, str] = {
+    "accept": "accepted",
+    "ship": "shipped",
+    "deliver": "delivered",
+}
+
+TRACKING_MIN, TRACKING_MAX, CARRIER_MAX = 3, 100, 100
+_TRACKING_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ./_-]*")
+_CARRIER_RE = re.compile(r"[\w][\w .,&'()/-]*")
+
+
+class UnknownFulfilmentAction(ValueError):
+    """The action is not one of `FULFILMENT_ACTIONS`."""
+
+
+class InvalidTracking(ValueError):
+    """A tracking number or carrier name that cannot be right."""
+
+
+def fulfilment_target(action: str) -> str:
+    try:
+        return FULFILMENT_ACTIONS[action]
+    except KeyError:
+        raise UnknownFulfilmentAction(f"unknown fulfilment action {action!r}") from None
+
+
+def normalise_tracking(raw: str) -> str:
+    """The trimmed tracking number: letters, digits, space and `. / _ -`, 3 to 100 characters."""
+    value = raw.strip()
+    if not TRACKING_MIN <= len(value) <= TRACKING_MAX or not _TRACKING_RE.fullmatch(value):
+        raise InvalidTracking("the tracking number is missing or has characters it cannot have")
+    return value
+
+
+def normalise_carrier(raw: str) -> str:
+    """The trimmed carrier name; optional."""
+    value = raw.strip()
+    if value and (len(value) > CARRIER_MAX or not _CARRIER_RE.fullmatch(value)):
+        raise InvalidTracking("the carrier name is too long or has characters it cannot have")
+    return value
+
+
 _FULFILLED_STATES = frozenset({"shipped", "delivered", "completed"})
 _STARTED_STATES = frozenset({"accepted"}) | _FULFILLED_STATES
 _DEAD_STATES = frozenset({"cancelled", "refunded"})

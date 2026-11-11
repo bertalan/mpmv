@@ -67,12 +67,24 @@ def test_the_caddyfile_hands_the_admin_path_outside_the_networks_to_the_app_404(
     assert text.index("handle @admin_denied") < text.rindex("reverse_proxy mpmv-app:8000")
 
 
-def test_the_caddy_env_example_does_not_ship_an_empty_value() -> None:
-    """`{$VAR:default}` counts a variable that is set but empty as set: `not client_ip` would get
-    no argument. The example keeps the line commented out."""
-    lines = (ROOT / "deploy/server/caddy.env.example").read_text().splitlines()
-    assert "MPMV_ADMIN_ALLOWED_NETWORKS=" not in lines
-    assert any(line.startswith("# MPMV_ADMIN_ALLOWED_NETWORKS=") for line in lines)
+def test_the_caddy_site_address_is_a_bare_host_name() -> None:
+    """The SSH tunnel visits https://<site>:8443/: Caddy matches the host name and not the port,
+    which holds only while the site address carries none."""
+    text = (ROOT / "deploy" / "caddy" / "Caddyfile").read_text()
+    assert re.search(r"^\{\$MPMV_SITE_ADDRESS\} \{$", text, re.M)
+
+
+def test_the_env_examples_set_the_loopback_networks_explicitly() -> None:
+    """MQ-24: STAGE and LIVE allow loopback only (SSH tunnel). Caddy counts a variable that is set
+    but empty as set (`not client_ip` gets no argument), so the examples never ship it empty."""
+    caddy = (ROOT / "deploy/server/caddy.env.example").read_text().splitlines()
+    assert "MPMV_ADMIN_ALLOWED_NETWORKS=127.0.0.1/32 ::1/128" in caddy
+    assert "MPMV_ADMIN_ALLOWED_NETWORKS=" not in caddy
+    app = (ROOT / "deploy/server/mpmv.env.example").read_text().splitlines()
+    assert "MPMV_ADMIN_ALLOWED_NETWORKS=127.0.0.1/32,::1/128" in app
+    for example in ("caddy", "mpmv"):
+        text = (ROOT / f"deploy/server/{example}.env.example").read_text()
+        assert "docs/dev/admin-access.md" in text
 
 
 @pytest.mark.parametrize(

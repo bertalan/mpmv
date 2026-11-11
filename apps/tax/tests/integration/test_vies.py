@@ -9,6 +9,7 @@ import datetime as dt
 from typing import Any
 
 import pytest
+from django.db import connection
 from django.utils import timezone
 from pytest_django.fixtures import Settings as SettingsWrapper
 
@@ -192,7 +193,8 @@ def test_vies_down_is_remembered_only_briefly(settings: SettingsWrapper) -> None
     assert check.reason == engine.VAT_REASON_UNAVAILABLE
     assert client.calls == []
 
-    VatValidation.objects.all().delete()
+    with connection.cursor() as cursor:  # append-only: only TRUNCATE is allowed
+        cursor.execute("TRUNCATE tax_vatvalidation")
     VatValidationFactory.create(
         country="DE",
         vat_number="123456789",
@@ -248,6 +250,8 @@ def test_the_snapshot_holds_what_an_order_keeps() -> None:
         "reason": engine.VAT_REASON_VALID,
         "detail": "",
         "request_id": "WAPIAAAAZ1x2y3",
+        "requester": "",
+        "requester_kind": "",
         "checked_at": check.checked_at.isoformat() if check.checked_at else None,
         "validation": str(check.validation.public_id) if check.validation else None,
     }

@@ -142,11 +142,13 @@ def mfa_login(db: None) -> "Callable[[Client, User], Client]":
     """Log a user in with a verified second factor (CORE.4): staff need it for every page.
 
     Like `superuser`, it lets apps below `accounts` (spec 01 §1.3) act as staff in the admin.
+    The session also holds a fresh passkey with user verification, as D-32 group 3 actions
+    (bank details, owner role) ask; tests of the levels themselves use `verified_login`.
     """
     from apps.accounts.tests.mfa import verified_login
 
     def login(client: "Client", user: "User") -> "Client":
-        verified_login(client, user)
+        verified_login(client, user, passkey=True)
         return client
 
     return login

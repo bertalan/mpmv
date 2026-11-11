@@ -87,7 +87,11 @@ def test_a_duplicate_copies_attributes_axes_and_variant_options(
     original = Product.objects.get(sku="TEE-1")
     target = VendorFactory.create()
     changes = duplicate_product_to_vendor(
-        original, target, actor=UserFactory.create(platform_staff=True), reason="transfer", ctx=CTX
+        original,
+        target,
+        actor=UserFactory.create(platform_role="catalog"),
+        reason="transfer",
+        ctx=CTX,
     )
     copy = Product.objects.get(vendor=target)
     assert attribute_facts(copy) == attribute_facts(original)
@@ -108,7 +112,7 @@ def test_a_dry_run_duplicate_lists_attributes_and_options_without_writing(
     changes = duplicate_product_to_vendor(
         original,
         VendorFactory.create(),
-        actor=UserFactory.create(platform_staff=True),
+        actor=UserFactory.create(platform_role="catalog"),
         reason="transfer",
         ctx=CTX,
         dry_run=True,
@@ -156,7 +160,7 @@ def test_a_duplicate_regenerates_unique_slugs(attributes: dict[str, Attribute]) 
     changes = duplicate_product_to_vendor(
         original,
         VendorFactory.create(),
-        actor=UserFactory.create(platform_staff=True),
+        actor=UserFactory.create(platform_role="catalog"),
         reason="transfer",
         ctx=CTX,
     )

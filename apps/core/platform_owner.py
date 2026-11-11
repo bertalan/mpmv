@@ -3,8 +3,13 @@
 The platform owner is the `core.platform_owner` permission, granted directly to a user. Until the
 ARC.25 first-start wizard exists, `manage.py bootstrap_platform_owner` is the way to give it to the
 first person after a deploy. Idempotent, and audited like every sensitive mutation.
+
+Session levels (D-32, CORE.25): `bootstrap_platform_owner` is a group 3 action in the policy (and
+in its floor), but a command runs with shell access on the server, outside any browser session, so
+there is no session level to check; the control is who may open a shell on the deployment.
 """
 
+import uuid
 from typing import Any
 
 from django.apps import apps
@@ -39,10 +44,11 @@ def grant_platform_owner(
     validate_email(email)
     user = user_model.objects.filter(email__iexact=email).first()
     changes = ChangeSet()
+    new_key = uuid.uuid4()  # a new user's audit key is its public id, never the address
     if user is None:
         if not create:
             raise ValidationError("No user with that email; pass create to make one.")
-        changes.create(USER_MODEL, email, _snapshot(active=True, owner=True))
+        changes.create(USER_MODEL, str(new_key), _snapshot(active=True, owner=True))
     else:
         if not user.is_active:
             raise ValidationError("That user is inactive.")
@@ -55,7 +61,7 @@ def grant_platform_owner(
             )
         changes.update(
             USER_MODEL,
-            user.get_username(),
+            str(user.public_id),
             _snapshot(active=True, owner=False),
             _snapshot(active=True, owner=True),
         )
@@ -63,7 +69,7 @@ def grant_platform_owner(
     def apply() -> None:
         target: Any = user
         if target is None:
-            target = user_model(email=email, is_active=True)
+            target = user_model(email=email, is_active=True, public_id=new_key)
             target.set_unusable_password()
             target.full_clean(exclude=["password"])
             target.save()

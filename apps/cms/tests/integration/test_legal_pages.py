@@ -68,7 +68,7 @@ def test_publishing_a_legal_page_records_its_first_version(seeded: SeedReport) -
     assert version.language_code == "en"
     assert version.effective_date == dt.date(2027, 1, 1)
     assert "Sample terms." in str(version.body)
-    assert version.published_by == f"staff:{editor.get_username()}"
+    assert version.published_by == f"staff:{editor.public_id}"
 
 
 def test_each_recorded_version_is_audited(seeded: SeedReport) -> None:
