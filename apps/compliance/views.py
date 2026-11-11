@@ -144,7 +144,10 @@ def _no_store(response: HttpResponse) -> HttpResponse:
 
 
 def _labels_context() -> dict[str, object]:
-    return {"labels": engine.withdrawal_labels(get_language() or "en")}
+    return {
+        "labels": engine.withdrawal_labels(get_language() or "en"),
+        "platform_email": withdrawal.platform_contact_email(),
+    }
 
 
 def _render_lookup(request: HttpRequest, form: WithdrawalLookupForm) -> HttpResponse:
@@ -202,7 +205,7 @@ def withdrawal_start(request: HttpRequest) -> HttpResponse:
     if form.is_valid():
         number = form.cleaned_data["order_number"]
         # Counted on every attempt; when spent, the answer is the generic one.
-        limited = bool(withdrawal.order_lookup_retry_after(number))
+        limited = bool(withdrawal.order_lookup_retry_after(number, form.cleaned_data["email"]))
         order = None if limited else withdrawal.find_order(number, form.cleaned_data["email"])
         if order is not None:
             return _render_choice(request, order)
@@ -267,6 +270,11 @@ def withdrawal_done(request: HttpRequest) -> HttpResponse:
                 "statements": statements,
                 "submitted_at": withdrawal.display_time(statements[0].submitted_at),
                 "emailed": all(s.acknowledged_at for s in statements),
+                "vendor_contacts": [
+                    (s.vendor_order.vendor.display_name, s.vendor_order.vendor.contact_email)
+                    for s in statements
+                    if s.vendor_order.vendor.contact_email
+                ],
                 **_labels_context(),
             },
         )

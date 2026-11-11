@@ -14,5 +14,6 @@
       {% captcha_widget %}
       {% include "components/button.html" with label=_("Continue") type="submit" only %}
     </form>
+    {% if form.non_field_errors %}{% include "compliance/includes/other_ways.html" %}{% endif %}
   </article>
 {% endblock %}

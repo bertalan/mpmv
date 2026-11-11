@@ -40,7 +40,12 @@ from django.utils import timezone
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.privacy import keyed_hash
-from apps.core.services import consume_rate_limit, run_mutation
+from apps.core.services import (
+    NoPlatformOperator,
+    consume_rate_limit,
+    current_operator,
+    run_mutation,
+)
 from apps.core.services import enqueue_email as _enqueue_email
 from apps.orders.models import CustomerTaxStatus, Order, PrivacyStatus, VendorOrder
 from apps.orders.tz import business_tz
@@ -59,7 +64,8 @@ TOKEN_SALT: Final = "compliance.withdrawal"  # noqa: S105 (a signing salt, not a
 TOKEN_MAX_AGE: Final = 30 * 60  # seconds the choice page stays valid after the lookup
 
 LOOKUP_RATE_LIMIT: Final = 10
-ORDER_LOOKUP_RATE_LIMIT: Final = 5  # attempts per order number and window, from any address
+ORDER_LOOKUP_RATE_LIMIT: Final = 5  # attempts per (order number, submitted email) and window
+ORDER_BACKSTOP_LIMIT: Final = 30  # attempts per order number and window, whatever the email
 LOOKUP_RATE_WINDOW: Final = dt.timedelta(minutes=15)
 
 
@@ -128,14 +134,22 @@ def read_token(token: str, *, max_age: int = TOKEN_MAX_AGE) -> Order | None:
     return order
 
 
-def order_lookup_retry_after(number: str) -> dt.timedelta:
-    """Count one lookup of this order number, from any address and valid or not, so the pair
-    cannot be guessed by spreading attempts over many addresses. Zero when allowed."""
-    return consume_rate_limit(
-        f"withdrawal:order:{keyed_hash(number.strip().lower(), purpose='withdrawal-order')}",
-        limit=ORDER_LOOKUP_RATE_LIMIT,
+def order_lookup_retry_after(number: str, email: str) -> dt.timedelta:
+    """Count one lookup, from any address and valid or not, in two buckets: the (order number,
+    submitted email) pair, and the order number alone as a higher backstop. Wrong-email guesses
+    fill their own pair bucket, so they cannot lock the real buyer out; spreading guesses over
+    many emails meets the backstop. Zero when allowed."""
+    number = number.strip().lower()
+    pair_key = keyed_hash(f"{number}|{email.strip().lower()}", purpose="withdrawal-pair")
+    pair = consume_rate_limit(
+        f"withdrawal:pair:{pair_key}", limit=ORDER_LOOKUP_RATE_LIMIT, window=LOOKUP_RATE_WINDOW
+    )
+    backstop = consume_rate_limit(
+        f"withdrawal:order:{keyed_hash(number, purpose='withdrawal-order')}",
+        limit=ORDER_BACKSTOP_LIMIT,
         window=LOOKUP_RATE_WINDOW,
     )
+    return max(pair, backstop)
 
 
 def lookup_retry_after(ip: str | None) -> dt.timedelta:
@@ -344,3 +358,12 @@ def precontractual(language: str) -> engine.PreContractualInfo:
         withdrawal_url=reverse("withdrawal"),
         legal_guarantee_months=legal_guarantee_months(),
     )
+
+
+def platform_contact_email() -> str:
+    """The platform's own support address, from the operator record, for the other ways to
+    withdraw; empty when no operator is configured."""
+    try:
+        return str(current_operator().support_email).strip()
+    except NoPlatformOperator:
+        return ""

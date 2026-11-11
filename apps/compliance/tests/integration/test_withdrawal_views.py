@@ -257,22 +257,54 @@ def test_lookups_are_rate_limited_per_address(client: Client) -> None:
     assert Throttle.objects.exists()
 
 
-def test_lookups_are_rate_limited_per_order_from_many_addresses(client: Client) -> None:
+def _lookup(client: Client, number: str, email: str, n: int) -> Any:
+    return client.post(
+        reverse("withdrawal"),
+        {"order_number": number, "email": email},
+        REMOTE_ADDR=f"198.{n // 250}.51.{n % 250 + 1}",
+    )
+
+
+def test_wrong_emails_exhaust_only_their_own_bucket_not_the_real_buyers(client: Client) -> None:
+    order = paid_order()
+    for n in range(withdrawal.ORDER_LOOKUP_RATE_LIMIT + 3):  # many addresses, one wrong email
+        _lookup(client, order.number, "guess@example.com", n)
+    spent = _lookup(client, order.number, "guess@example.com", 99)
+    assert "We could not find" in spent.content.decode()
+    real = _lookup(client, order.number, order.email, 100)
+    assert "confirm withdrawal" in real.content.decode().lower()
+
+
+def test_the_pair_bucket_limits_the_real_pair_too(client: Client) -> None:
     order = paid_order()
     for n in range(withdrawal.ORDER_LOOKUP_RATE_LIMIT):
-        client.post(
-            reverse("withdrawal"),
-            {"order_number": order.number, "email": "guess@example.com"},
-            REMOTE_ADDR=f"198.51.100.{n + 1}",
-        )
-    limited = client.post(
-        reverse("withdrawal"),
-        {"order_number": order.number, "email": order.email},  # even the right pair
-        REMOTE_ADDR="198.51.100.200",
-    )
-    assert limited.status_code == 200  # the same generic answer, not a tell-tale 429
+        _lookup(client, order.number, order.email, n)
+    limited = _lookup(client, order.number, order.email, 50)
+    assert limited.status_code == 200  # the generic answer, not a tell-tale 429
     assert "We could not find" in limited.content.decode()
-    assert "confirm withdrawal" not in limited.content.decode().lower()
+
+
+def test_the_per_order_backstop_still_triggers(client: Client) -> None:
+    order = paid_order()
+    for n in range(withdrawal.ORDER_BACKSTOP_LIMIT):  # a different wrong email each time
+        _lookup(client, order.number, f"guess{n}@example.com", n)
+    real = _lookup(client, order.number, order.email, 400)
+    assert "We could not find" in real.content.decode()
+
+
+def test_the_not_found_page_shows_other_ways_to_withdraw(client: Client) -> None:
+    html = _lookup(client, "2999-000001", "x@example.com", 1).content.decode()
+    assert "also withdraw" in html
+    assert "model withdrawal form" in html
+
+
+def test_the_done_page_shows_the_vendor_contact_for_other_ways(client: Client) -> None:
+    order = paid_order()
+    html = identify(client, order).content.decode()
+    sub = order.vendor_orders.order_by("id")[0]
+    done = client.get(confirm(client, html, sub.public_id)["Location"]).content.decode()
+    assert "also withdraw" in done
+    assert sub.vendor.contact_email in done
 
 
 # --- Pre-contractual information (art. 49(1)(h))

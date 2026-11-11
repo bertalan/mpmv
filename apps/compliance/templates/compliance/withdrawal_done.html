@@ -10,5 +10,6 @@
       {% for statement in statements %}<li>{{ statement.vendor_order.vendor.display_name }}: {% translate "reference" %} <code>{{ statement.public_id }}</code></li>{% endfor %}
     </ul>
     {% if emailed %}<p>{% translate "We sent the same confirmation to the email address of the order. Keep it as proof." %}</p>{% else %}<p>{% translate "Keep this page's reference as proof; the confirmation email could not be queued." %}</p>{% endif %}
+    {% include "compliance/includes/other_ways.html" %}
   </article>
 {% endblock %}
