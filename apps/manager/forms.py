@@ -62,8 +62,8 @@ class StorefrontProfileForm(forms.Form):
         max_length=PROFILE_MAX_LENGTH["description"],
         widget=_editor(),
         help_text=_(
-            "Your story, shown on your shop page in the language selected above. Up to 10,000 "
-            "characters. Only the formatting the editor offers is kept."
+            "Your story, shown on your shop page in the language selected above. Up to about "
+            "10,000 characters including formatting. Only the formatting the editor offers is kept."
         ),
     )
     shipping_policy = forms.CharField(
@@ -73,7 +73,8 @@ class StorefrontProfileForm(forms.Form):
         widget=_editor(),
         help_text=_(
             "How and when you ship. Customers see it in the 'Shipping' section of your shop "
-            "page. Leave it empty and the section is not shown. Up to 5,000 characters."
+            "page. Leave it empty and the section is not shown. Up to about 5,000 characters "
+            "including formatting."
         ),
     )
     refund_policy = forms.CharField(
@@ -92,8 +93,9 @@ class StorefrontProfileForm(forms.Form):
         widget=_editor(),
         help_text=_(
             "When and how a customer can cancel an order. Customers see it in the 'Cancellation' "
-            "section of your shop page. Leave it empty and the section is not shown. Up to 5,000 "
-            "characters. If you are unsure what the law requires, ask a legal adviser."
+            "section of your shop page. Leave it empty and the section is not shown. Up to about "
+            "5,000 characters including formatting. If you are unsure what the law requires, ask a "
+            "legal adviser."
         ),
     )
 
