@@ -159,6 +159,12 @@ the vendor events API and the Manager fixes of #212 (which came after the v0.1.3
   departments and others) without overwriting rows staff changed. The postcode lists are for
   the owner to review in the tax admin; Northern Ireland is not seeded (D-02).
 
+### Django admin network allow-list (OPS.5, MQ-24)
+
+On STAGE and LIVE set `MPMV_ADMIN_ALLOWED_NETWORKS` to loopback only in both `mpmv.env` and
+`caddy.env`, restart the app, reload Caddy, then verify the SSH tunnel and the direct 404 as
+described in [admin access](admin-access.md).
+
 ## Promoting to LIVE
 
 LIVE gets only a tag that has run on STAGE without incident, and only on the owner's go. The same
