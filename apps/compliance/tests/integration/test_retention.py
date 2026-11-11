@@ -51,12 +51,12 @@ def test_an_order_is_anonymised_only_the_day_after_its_retention_date() -> None:
 
 def test_a_run_never_changes_the_fiscal_snapshot_of_an_order_not_yet_due() -> None:
     order = place(created=ago(days=26 * 30), state="closed", legacy_wp_order_id=8005)
-    totals = (order.total_gross, order.tax_retention_until, order.customer_name)
+    totals = (order.grand_total, order.tax_retention_until, order.customer_name)
 
     retention.run_retention(ctx=CTX)
 
     order.refresh_from_db()
-    assert (order.total_gross, order.tax_retention_until, order.customer_name) == totals
+    assert (order.grand_total, order.tax_retention_until, order.customer_name) == totals
 
 
 def test_dry_run_lists_the_candidates_and_changes_nothing() -> None:
@@ -85,7 +85,7 @@ def test_a_pending_erasure_completes_when_its_last_order_has_closed() -> None:
 
 def test_a_pending_erasure_with_an_open_order_keeps_waiting() -> None:
     user = UserFactory.create()
-    place(state="paid", customer=user, legacy_wp_order_id=None, paid_at=ago(days=1))
+    place(state="paid", customer=user, legacy_wp_order_id=8011, paid_at=ago(days=1))
     request = ErasureRequestFactory.create(user=user)
 
     retention.run_retention(ctx=CTX)
@@ -112,7 +112,7 @@ def test_each_run_writes_one_audit_entry_with_counts_only() -> None:
     retention.run_retention(ctx=CTX)
 
     [entry] = AuditLog.objects.filter(action="compliance.retention_run")
-    assert entry.after["restricted"] == 1
+    assert (entry.after or {})["restricted"] == 1
     assert "buyer.private" not in str(entry.after) + str(entry.before) + entry.actor_label
 
 

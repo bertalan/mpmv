@@ -1,0 +1,28 @@
+{% extends "layouts/content.html" %}
+{% load i18n %}
+{% block title %}{% translate "Erasure requests" %} · {{ site_name }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block page_content %}
+  <h1>{% translate "Erasure requests" %}</h1>
+  <table>
+    <thead><tr><th scope="col">{% translate "Request" %}</th><th scope="col">{% translate "Requested" %}</th><th scope="col">{% translate "State" %}</th><th scope="col"></th></tr></thead>
+    <tbody>
+      {% for row in rows %}
+        <tr>
+          <th scope="row"><code>{{ row.public_id }}</code></th>
+          <td>{{ row.requested_at|date:"Y-m-d" }}</td>
+          <td>{% if row.completed_at %}{% translate "Completed" %}{% else %}{% translate "Pending" %}{% endif %}</td>
+          <td>
+            {% if not row.completed_at %}
+              <form method="post" action="{% url 'privacy_request_process' row.public_id %}">
+                {% csrf_token %}
+                <label>{% translate "Reason (no personal data)" %} <input name="reason" maxlength="200" required></label>
+                <button type="submit">{% translate "Process now" %}</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

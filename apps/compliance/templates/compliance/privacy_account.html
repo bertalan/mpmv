@@ -1,0 +1,31 @@
+{% extends "layouts/content.html" %}
+{% load i18n %}
+{% block title %}{% translate "Your data" %} · {{ site_name }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block page_content %}
+  <article class="privacy-account">
+    <h1>{% translate "Your data" %}</h1>
+    {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+    <section>
+      <h2>{% translate "Download your data" %}</h2>
+      <p>{% translate "Get a copy of the data we hold about you as a JSON file." %}</p>
+      <form method="post" action="{% url 'privacy_export' %}">
+        {% csrf_token %}
+        <label for="export-password">{% translate "Password" %}</label>
+        <input id="export-password" type="password" name="password" autocomplete="current-password">
+        <button type="submit">{% translate "Download" %}</button>
+      </form>
+    </section>
+    <section>
+      <h2>{% translate "Erase your account" %}</h2>
+      <p>{% blocktranslate %}Erasing your account blocks your login and deletes your carts and preferences. Order, billing, shipping and VAT data are kept for {{ years }} years from the end of the fiscal year, restricted to what the law requires (GDPR article 17(3)(b)), and then anonymised. If you have an order still open, the erasure completes when the last open order closes.{% endblocktranslate %}</p>
+      <form method="post" action="{% url 'privacy_erase' %}">
+        {% csrf_token %}
+        <label for="erase-password">{% translate "Password" %}</label>
+        <input id="erase-password" type="password" name="password" autocomplete="current-password">
+        <label><input type="checkbox" name="confirm" value="erase"> {% translate "I understand and want to erase my account" %}</label>
+        <button type="submit">{% translate "Erase my account" %}</button>
+      </form>
+    </section>
+  </article>
+{% endblock %}

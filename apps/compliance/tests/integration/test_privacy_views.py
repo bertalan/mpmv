@@ -35,12 +35,14 @@ def signed_in(**fields: object) -> tuple[Client, User, str]:
 # --- access ------------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("name", ["privacy_account", "privacy_export", "privacy_erase"])
-def test_anonymous_visitors_are_sent_to_sign_in(name: str) -> None:
-    for method in ("get", "post"):
-        response = getattr(Client(), method)(reverse(name))
-        assert response.status_code in (302, 403)
-        assert response.status_code == 403 or "login" in response["Location"]
+@pytest.mark.parametrize(
+    ("name", "method"),
+    [("privacy_account", "get"), ("privacy_export", "post"), ("privacy_erase", "post")],
+)
+def test_anonymous_visitors_are_sent_to_sign_in(name: str, method: str) -> None:
+    response = getattr(Client(), method)(reverse(name))
+    assert response.status_code == 302
+    assert "login" in response["Location"]
 
 
 @pytest.mark.parametrize("name", ["privacy_export", "privacy_erase"])
@@ -146,7 +148,7 @@ def test_erasure_anonymises_the_account_and_ends_the_session() -> None:
 
 def test_erasure_with_an_open_order_is_accepted_and_the_user_is_told() -> None:
     client, user, password = signed_in()
-    place(state="paid", customer=user, legacy_wp_order_id=None, paid_at=ago(days=1))
+    place(state="paid", customer=user, legacy_wp_order_id=8011, paid_at=ago(days=1))
     response = client.post(
         reverse("privacy_erase"), {"password": password, "confirm": "erase"}, follow=True
     )
