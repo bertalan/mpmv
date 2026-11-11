@@ -1820,13 +1820,14 @@ def brand_page_paths(brand: Brand) -> dict[str, str]:
     return _brand_anchor(brand).paths
 
 
-def brand_node_id(brand: Brand, *, site: str) -> str:
+def brand_node_id(brand: Brand, *, site: str, paths: Mapping[str, str] | None = None) -> str:
     """The schema.org `@id` of `brand` (its page URL in the source language plus `#brand`): the
     one id every vendor's product and the brand page use (CAT.20, SEO.7). `site` is the origin,
-    like `https://shop.example`. Empty when the brand has no public page."""
-    return engine.brand_node_id(
-        brand_page_paths(brand), source=translations.source_language(), site=site
-    )
+    like `https://shop.example`. Empty when the brand has no public page. `paths` are the page
+    paths when the caller already has them (`ListingAnchor.paths`): no second lookup."""
+    if paths is None:
+        paths = brand_page_paths(brand)
+    return engine.brand_node_id(paths, source=translations.source_language(), site=site)
 
 
 @dataclass(frozen=True)
@@ -1872,11 +1873,13 @@ def _clean_rich_text(html: str) -> str:
     return clean
 
 
-def brand_graph(brand: Brand, language: str, *, site: str) -> dict[str, Any]:
+def brand_graph(
+    brand: Brand, language: str, *, site: str, paths: Mapping[str, str] | None = None
+) -> dict[str, Any]:
     """The JSON-LD `@graph` of a brand page: the `Brand` node and, when there is one, its
     manufacturer `Organization` (spec 10, SEO.7 conventions: stable `@id`s, https links only, a
     description only in the page language). `site` is the origin, without a trailing slash."""
-    node_id = brand_node_id(brand, site=site)
+    node_id = brand_node_id(brand, site=site, paths=paths)
     profile = brand_profile(brand, language)
     maker = profile.manufacturer
     maker_id = f"{site}/#manufacturer-{maker.public_id}" if maker is not None else ""

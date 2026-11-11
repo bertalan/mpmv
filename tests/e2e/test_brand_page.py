@@ -16,9 +16,9 @@ from apps.catalog.tests.factories import (
     BrandFactory,
     BrandTranslationFactory,
     ManufacturerFactory,
+    brand_logo_image,
 )
 from apps.core.models import TranslationStatus
-from apps.core.tests.factories import MediaImageFactory
 from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -32,7 +32,7 @@ def brand_page() -> None:
         name="Acme",
         wikidata_id="Q42",
         url="https://acme.example/",
-        logo=MediaImageFactory.create(),
+        logo=brand_logo_image(),
         logo_alt="Acme anvil",
         manufacturer=ManufacturerFactory.create(legal_name="Acme Holdings Ltd", country="GB"),
     )

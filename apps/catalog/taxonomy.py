@@ -37,11 +37,11 @@ from django.db import models
 from django.db.models.functions import Lower
 from django.utils.translation import gettext_lazy as _
 from treebeard.mp_tree import MP_Node
-from wagtail.models import Page
+from wagtail.models import Collection, Page
 
 from apps.core import translations
 from apps.core.fields import CountryField
-from apps.core.models import BaseModel, TranslationModel, resolve_translation
+from apps.core.models import BaseModel, MediaImage, TranslationModel, resolve_translation
 from apps.core.translations import Resolved
 from apps.vendors.scoping import VendorScopedManager
 
@@ -631,6 +631,10 @@ class Brand(BaseModel):
         if key and renamed and others.filter(name_key=key).exists():
             errors.setdefault("name", []).append("A brand with a very similar name exists.")
         logo = self.logo if self.logo_id else None
+        if logo is not None and not brand_logo_images().filter(pk=logo.pk).exists():
+            errors.setdefault("logo", []).append(
+                "A brand logo comes from the platform's logos collection: upload it there."
+            )
         if logo is not None and (logo.licence_id is None or not logo.author.strip()):
             # CMS.8: an image migrated without its licence or author is not chosen for new content.
             errors.setdefault("logo", []).append(
@@ -699,3 +703,14 @@ class BrandTranslation(TranslationModel):
 
     def __str__(self) -> str:
         return f"{self.brand} [{self.language}]"
+
+
+def brand_logo_images() -> models.QuerySet[MediaImage]:
+    """The images a brand logo may be: those in a collection that accepts SVG (the platform
+    logos collection, THM.12) or below one, never a vendor's or a page's image."""
+    paths = Collection.objects.filter(svg_policy__isnull=False).values_list("path", flat=True)
+    condition = models.Q(pk__in=[])
+    for path in paths:
+        condition |= models.Q(collection__path__startswith=path)
+    images: models.QuerySet[MediaImage] = MediaImage.objects.filter(condition)
+    return images

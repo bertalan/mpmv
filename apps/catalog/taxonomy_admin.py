@@ -29,7 +29,7 @@ from django.utils.translation import gettext_lazy as _
 from treebeard.forms import MoveNodeForm
 
 from apps.core.audit import audit_context
-from apps.core.models import ImageLicence
+from apps.core.models import ImageLicence, MediaImage
 from apps.core.text import ascii_int
 from apps.vendors import engine as vendors_engine
 
@@ -46,6 +46,7 @@ from .taxonomy import (
     TaxonomyTranslation,
     Term,
     TermTranslation,
+    brand_logo_images,
 )
 
 TIMESTAMPS = ("public_id", "created_at", "updated_at")
@@ -385,6 +386,10 @@ class BrandForm(forms.ModelForm[Brand]):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.fields["status"].required = False
+        # Only the platform's logos collection (a vendor's or a page's image is not offered).
+        cast(
+            "forms.ModelChoiceField[MediaImage]", self.fields["logo"]
+        ).queryset = brand_logo_images()
 
     def clean_status(self) -> str:
         return str(self.cleaned_data.get("status") or Brand.Status.APPROVED)
@@ -475,20 +480,22 @@ class BrandAdmin(admin.ModelAdmin[Brand]):
         self, request: HttpRequest, obj: Brand, form: forms.ModelForm[Brand], change: bool
     ) -> None:
         ctx = audit_context(request)
-        brands.save_brand(obj, ctx=ctx)
         data = form.cleaned_data
-        if data.get("logo_file") is not None:
-            brands.set_brand_logo(
-                obj,
-                upload=data["logo_file"],
-                alt=str(obj.logo_alt),
-                licence=data.get("logo_licence"),
-                author=str(data.get("logo_author") or ""),
-                source_url=str(data.get("logo_source_url") or ""),
-                credit_text=str(data.get("logo_credit_text") or ""),
-                permission_ref=str(data.get("logo_permission_ref") or ""),
-                ctx=ctx,
-            )
+        # One transaction: a logo that fails leaves the brand as it was.
+        with transaction.atomic():
+            brands.save_brand(obj, ctx=ctx)
+            if data.get("logo_file") is not None:
+                brands.set_brand_logo(
+                    obj,
+                    upload=data["logo_file"],
+                    alt=str(obj.logo_alt),
+                    licence=data.get("logo_licence"),
+                    author=str(data.get("logo_author") or ""),
+                    source_url=str(data.get("logo_source_url") or ""),
+                    credit_text=str(data.get("logo_credit_text") or ""),
+                    permission_ref=str(data.get("logo_permission_ref") or ""),
+                    ctx=ctx,
+                )
 
     def delete_model(self, request: HttpRequest, obj: Brand) -> None:
         brands.delete_brand(obj, ctx=audit_context(request))

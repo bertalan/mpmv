@@ -20,9 +20,9 @@ from apps.catalog.tests.factories import (
     BrandTranslationFactory,
     ManufacturerFactory,
     ProductFactory,
+    brand_logo_image,
 )
 from apps.core.audit import AuditContext
-from apps.core.tests.factories import MediaImageFactory
 from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
@@ -104,7 +104,7 @@ def test_the_description_is_sanitised(client: Client) -> None:
 
 
 def test_the_page_shows_logo_website_wikidata_and_manufacturer(client: Client) -> None:
-    logo = MediaImageFactory.create()
+    logo = brand_logo_image()
     maker = ManufacturerFactory.create(legal_name="Acme Holdings Ltd", country="GB")
     _brand(
         logo=logo, logo_alt="Acme anvil", url="https://acme.example/", wikidata_id="Q42",
@@ -214,7 +214,7 @@ def test_a_stored_non_https_link_is_not_in_the_graph(client: Client) -> None:
 
 
 def test_the_logo_is_in_the_node(client: Client) -> None:
-    logo = MediaImageFactory.create()
+    logo = brand_logo_image()
     _brand(logo=logo, logo_alt="Acme anvil")
     node = _node(_graph(_page(client, "/brand/acme/")), "Brand")
     assert node["logo"].startswith("http://testserver/")

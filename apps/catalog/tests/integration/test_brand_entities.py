@@ -151,9 +151,9 @@ def test_the_migration_keeps_every_brand_public_and_fills_keys_idempotently() ->
 
 
 def test_a_logo_needs_an_alt_text() -> None:
-    from apps.core.tests.factories import MediaImageFactory
+    from apps.catalog.tests.factories import brand_logo_image
 
-    brand = BrandFactory.build(logo=MediaImageFactory.create(), logo_alt="")
+    brand = BrandFactory.build(logo=brand_logo_image(), logo_alt="")
     with pytest.raises(ValidationError) as caught:
         brand.full_clean()
     assert "logo_alt" in caught.value.message_dict

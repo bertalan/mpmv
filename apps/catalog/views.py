@@ -198,7 +198,9 @@ def _listing(
         "brand_profile": services.brand_profile(brand, language) if brand else None,
         # One JSON-LD block per page (SEO.7): the brand page's graph until `seo.page_graph`.
         "jsonld": (
-            engine.jsonld_text(services.brand_graph(brand, language, site=site)) if brand else ""
+            engine.jsonld_text(services.brand_graph(brand, language, site=site, paths=anchor.paths))
+            if brand
+            else ""
         ),
         "policy_items": [
             {"title": title, "content": RichText(text)}

@@ -15,6 +15,7 @@ from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
@@ -684,11 +685,13 @@ def build_logo_image(
 def _logo_snapshot(image: MediaImage | None, alt: str) -> dict[str, Any]:
     """The audited state: the image as `image:<id>` with its licence code and author."""
     licence = None if image is None or image.licence is None else image.licence.code
+    host = None if image is None else urlsplit(image.source_url).hostname
+    # No free text about a person (the author): the image id leads to it in the library.
     return {
         "logo": None if image is None else f"image:{image.pk}",
         "logo_alt": alt,
         "licence": licence,
-        "author": None if image is None else image.author,
+        "source_host": host,
     }
 
 

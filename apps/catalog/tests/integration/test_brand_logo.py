@@ -20,7 +20,7 @@ from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
 from apps.catalog import brands
 from apps.catalog.models import Brand
-from apps.catalog.tests.factories import BrandFactory
+from apps.catalog.tests.factories import BrandFactory, brand_logo_image
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog, ImageLicence, MediaImage
 from apps.core.tests.factories import MediaImageFactory
@@ -184,7 +184,7 @@ def test_a_refused_file_keeps_the_current_logo(brand: Brand) -> None:
 
 
 def test_a_logo_that_still_needs_its_licence_cannot_be_chosen() -> None:
-    unclassified = MediaImageFactory.create(licence=None, author="")
+    unclassified = brand_logo_image(licence=None, author="")
     brand = BrandFactory.build(name="Acme", logo=unclassified, logo_alt="Acme anvil")
     with pytest.raises(ValidationError) as refused:
         brand.full_clean()
@@ -192,7 +192,7 @@ def test_a_logo_that_still_needs_its_licence_cannot_be_chosen() -> None:
 
 
 def test_a_classified_logo_can_be_chosen() -> None:
-    brand = BrandFactory.build(name="Acme", logo=MediaImageFactory.create(), logo_alt="Acme anvil")
+    brand = BrandFactory.build(name="Acme", logo=brand_logo_image(), logo_alt="Acme anvil")
     brand.full_clean()
 
 
@@ -307,3 +307,80 @@ def test_a_staff_user_without_change_permission_cannot_set_a_logo(
         _admin_form(logo_file=_file(), logo_licence=_licence().pk, logo_author="x"),
     )
     assert Brand.objects.get(pk=approved.pk).logo is None
+
+
+# --- Review fixes (#284)
+
+
+def test_the_audit_entry_keeps_no_free_text_author(brand: Brand) -> None:
+    _set(
+        brand,
+        licence=_licence("CC-BY-4.0"),
+        author="Jane Q. Photographer",
+        source_url="https://example.com/press/acme-logo",
+    )
+    entry = AuditLog.objects.get(action=brands.BRAND_LOGO_CHANGED)
+    assert entry.after is not None
+    assert "Jane" not in str(entry.before) + str(entry.after)
+    assert "author" not in entry.after
+    assert entry.after["licence"] == "CC-BY-4.0"
+    assert entry.after["source_host"] == "example.com"
+    assert str(entry.after["logo"]).startswith("image:")
+
+
+def test_a_logo_from_outside_the_logos_collection_is_refused() -> None:
+    image = MediaImageFactory.create()  # the root collection, like any vendor or page image
+    brand = BrandFactory.build(name="Acme", logo=image, logo_alt="Acme anvil")
+    with pytest.raises(ValidationError) as refused:
+        brand.full_clean()
+    assert "logo" in refused.value.message_dict
+
+
+def test_the_admin_logo_choice_offers_only_the_logos_collection(staff_client: Client) -> None:
+    allowed = brand_logo_image()
+    other = MediaImageFactory.create()
+    response = staff_client.get(reverse("admin:catalog_brand_add"))
+    form = response.context["adminform"].form
+    offered = set(form.fields["logo"].queryset.values_list("pk", flat=True))
+    assert allowed.pk in offered
+    assert other.pk not in offered
+
+
+def test_a_crafted_post_cannot_pick_a_vendor_image(staff_client: Client) -> None:
+    other = MediaImageFactory.create()
+    response = staff_client.post(reverse("admin:catalog_brand_add"), _admin_form(logo=other.pk))
+    assert response.status_code == 200
+    assert not Brand.objects.filter(name="Acme").exists()
+
+
+def test_a_logo_failure_leaves_the_brand_unsaved(
+    staff_client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(brands, "set_brand_logo", fail)
+    staff_client.raise_request_exception = False
+    staff_client.post(
+        reverse("admin:catalog_brand_add"),
+        _admin_form(logo_file=_file(), logo_licence=_licence().pk, logo_author="Acme Ltd"),
+    )
+    assert not Brand.objects.filter(name="Acme").exists()
+    assert not AuditLog.objects.filter(action=brands.BRAND_CREATED).exists()
+
+
+def test_the_graph_reuses_the_page_paths_it_is_given(brand: Brand) -> None:
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from apps.catalog import services
+    from apps.catalog.tests.factories import BrandTranslationFactory
+
+    BrandTranslationFactory.create(brand=brand, slug="acme", status="published")
+    paths = services.brand_page_paths(brand)
+    with CaptureQueriesContext(connection) as without:
+        first = services.brand_graph(brand, "en", site="http://x")
+    with CaptureQueriesContext(connection) as given:
+        second = services.brand_graph(brand, "en", site="http://x", paths=paths)
+    assert first == second
+    assert len(given) < len(without)
