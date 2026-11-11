@@ -1077,6 +1077,16 @@ class TaxPortion:
         return self.decision.nature_code
 
 
+def _decision_key(d: TaxDecision) -> tuple[Decimal, str, str, str, str]:
+    return (
+        -d.rate,
+        d.reason,
+        d.country_of_taxation or "",
+        d.legal_note_key or "",
+        d.nature_code or "",
+    )
+
+
 def resolve_shipping_tax(
     ctx: TaxContext,
     goods: Iterable[tuple[Decimal, TaxDecision]],
@@ -1089,7 +1099,9 @@ def resolve_shipping_tax(
     reverse-charge, export or outside-territory package has one zero portion with the goods'
     legal note and nature code. Each portion's net is rounded ROUND_HALF_UP; the largest share
     absorbs the rounding difference so the portions add up to the shipping net, and the VAT of
-    each is `tax_amount`. A package of zero-value goods uses the first decision. Free shipping
+    each is `tax_amount`. Portions come in decision order (highest rate first), zero-net ones
+    are dropped (at least one always remains). Callers pass the post-discount goods net; a
+    negative line raises. A package of zero-value goods uses the first decision. Free shipping
     gives no portions. `ctx` is kept for the signature of spec 05 (the decisions already carry
     the context's outcome).
     """
@@ -1122,13 +1134,18 @@ def resolve_shipping_tax(
         first = next(iter(totals))
         return [TaxPortion(net=net, tax=tax_amount(net, first.rate), decision=first)]
 
+    # Deterministic order, whatever the input order: highest rate first, then the other fields.
+    ordered = sorted(totals, key=_decision_key)
     shares = {
-        decision: (net * amount / goods_total).quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP)
-        for decision, amount in totals.items()
+        decision: (net * totals[decision] / goods_total).quantize(
+            MONEY_QUANTUM, rounding=ROUND_HALF_UP
+        )
+        for decision in ordered
     }
-    largest = max(totals, key=lambda d: totals[d])  # ties: the first one
+    largest = max(ordered, key=lambda d: totals[d])  # ties: first in decision order
     shares[largest] += net - sum(shares.values(), Decimal(0))
     return [
         TaxPortion(net=share, tax=tax_amount(share, decision.rate), decision=decision)
         for decision, share in shares.items()
+        if share != 0
     ]
