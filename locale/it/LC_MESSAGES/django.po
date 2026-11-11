@@ -302,6 +302,16 @@ msgstr "Ciao %(customer_name)s,"
 msgid "Hello,"
 msgstr "Ciao,"
 
+#: apps/manager/forms.py
+msgid ""
+"How and when you ship. Customers see it in the 'Shipping' section of your "
+"shop page. Leave it empty and the section is not shown. Up to 5,000 "
+"characters."
+msgstr ""
+"Come e quando spedisci. I clienti la vedono nella sezione 'Spedizione' della"
+" pagina del tuo negozio. Se la lasci vuota, la sezione non viene mostrata. "
+"Fino a 5.000 caratteri."
+
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid ""
 "If you are not signed in, Continue signs you in once with this link; you "
@@ -478,6 +488,14 @@ msgstr "Segnalante"
 msgid "One line under the shop name. Plain text."
 msgstr "Una riga sotto il nome del negozio. Testo semplice."
 
+#: apps/manager/forms.py
+msgid ""
+"Optional. The name of the courier, for example the one on the parcel. The "
+"customer gets it in the shipping email together with the tracking number."
+msgstr ""
+"Facoltativo. Il nome del corriere, per esempio quello scritto sul pacco. Il "
+"cliente lo riceve nell'email di spedizione insieme al numero di tracking."
+
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Order"
 msgstr "Ordine"
@@ -577,6 +595,15 @@ msgstr[1] "Correggi gli errori qui sotto."
 #: apps/manager/forms.py
 msgid "PNG, JPEG or WebP. Leave empty to keep the current image."
 msgstr "PNG, JPEG o WebP. Lascia vuoto per mantenere l’immagine attuale."
+
+#: apps/manager/media.py
+msgid ""
+"PNG, JPEG, WebP or GIF (SVG is not accepted). The image is checked and saved"
+" again without its hidden data. It goes into your own images only."
+msgstr ""
+"PNG, JPEG, WebP o GIF (gli SVG non sono accettati). L'immagine viene "
+"controllata e salvata di nuovo senza i suoi dati nascosti. Finisce solo tra "
+"le tue immagini."
 
 #: apps/manager/templates/manager/list.html
 msgid "Preview"
@@ -945,6 +972,14 @@ msgstr ""
 "Questo venditore è sospeso o chiuso, quindi il profilo del negozio non può "
 "essere modificato. Contatta l’assistenza per farlo riaprire."
 
+#: apps/manager/forms.py
+msgid ""
+"Tick it and save to delete the current logo. A new image and the description"
+" above are then ignored."
+msgstr ""
+"Spunta e salva per eliminare il logo attuale. Un'eventuale nuova immagine e "
+"la descrizione qui sopra vengono ignorate."
+
 #: apps/manager/media.py
 msgid "Title"
 msgstr "Titolo"
@@ -1063,6 +1098,18 @@ msgstr ""
 "%(order_number)s. Ogni venditore preparerà la sua parte e riceverai un "
 "messaggio quando verrà spedita."
 
+#: apps/manager/forms.py
+msgid ""
+"When and how a customer can cancel an order. Customers see it in the "
+"'Cancellation' section of your shop page. Leave it empty and the section is "
+"not shown. Up to 5,000 characters. If you are not sure what the law "
+"requires, ask your accountant."
+msgstr ""
+"Quando e come un cliente può annullare un ordine. I clienti la vedono nella "
+"sezione 'Annullamento' della pagina del tuo negozio. Se la lasci vuota, la "
+"sezione non viene mostrata. Fino a 5.000 caratteri. Se non sei sicuro di "
+"cosa richiede la legge, chiedi al tuo commercialista."
+
 #: apps/manager/templates/manager/shop/vendor_picker.html
 msgid ""
 "You are a member of several vendors. Choose the one to work on; you can "
@@ -1116,3 +1163,12 @@ msgstr "Il tuo ruolo"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your role requires a second factor before you can continue."
 msgstr "Il tuo ruolo richiede un secondo fattore prima di poter continuare."
+
+#: apps/manager/forms.py
+msgid ""
+"Your story, shown on your shop page in the language selected above. Up to "
+"10,000 characters. Only the formatting the editor offers is kept."
+msgstr ""
+"La tua storia, mostrata nella pagina del tuo negozio nella lingua scelta qui"
+" sopra. Fino a 10.000 caratteri. Viene mantenuta solo la formattazione che "
+"offre l'editor."

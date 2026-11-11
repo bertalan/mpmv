@@ -1,5 +1,5 @@
-# count: 624
-# Editor-facing fields without help text (ARC.30); ARC.31 backfills them.
+# count: 618
+# editor-facing fields have no help text
 # Only shrinks: delete a line when its field is fixed.
 admin:accounts.user.email
 admin:catalog.attribute.kind
@@ -552,12 +552,6 @@ form:apps.events.admin_views.PolicyForm.mode
 form:apps.events.admin_views.PolicyForm.vendor
 form:apps.events.admin_views.SettingsForm.cancelled_retention_days
 form:apps.events.admin_views.SettingsForm.site
-form:apps.manager.forms.ShipmentForm.carrier
-form:apps.manager.forms.StorefrontProfileForm.cancellation_policy
-form:apps.manager.forms.StorefrontProfileForm.description
-form:apps.manager.forms.StorefrontProfileForm.shipping_policy
-form:apps.manager.forms.VendorLogoForm.remove
-form:apps.manager.media.ImageUploadForm.file
 form:apps.vendors.forms.ApplicationForm.business_name
 form:apps.vendors.forms.ApplicationForm.country
 form:apps.vendors.forms.ApplicationForm.email

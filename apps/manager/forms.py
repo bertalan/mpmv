@@ -61,12 +61,20 @@ class StorefrontProfileForm(forms.Form):
         required=False,
         max_length=PROFILE_MAX_LENGTH["description"],
         widget=_editor(),
+        help_text=_(
+            "Your story, shown on your shop page in the language selected above. Up to 10,000 "
+            "characters. Only the formatting the editor offers is kept."
+        ),
     )
     shipping_policy = forms.CharField(
         label=_("Shipping policy"),
         required=False,
         max_length=PROFILE_MAX_LENGTH["shipping_policy"],
         widget=_editor(),
+        help_text=_(
+            "How and when you ship. Customers see it in the 'Shipping' section of your shop "
+            "page. Leave it empty and the section is not shown. Up to 5,000 characters."
+        ),
     )
     refund_policy = forms.CharField(
         label=_("Returns and refunds policy"),
@@ -82,6 +90,11 @@ class StorefrontProfileForm(forms.Form):
         required=False,
         max_length=PROFILE_MAX_LENGTH["cancellation_policy"],
         widget=_editor(),
+        help_text=_(
+            "When and how a customer can cancel an order. Customers see it in the 'Cancellation' "
+            "section of your shop page. Leave it empty and the section is not shown. Up to 5,000 "
+            "characters. If you are not sure what the law requires, ask your accountant."
+        ),
     )
 
 
@@ -100,7 +113,14 @@ class VendorLogoForm(forms.Form):
         max_length=LOGO_ALT_MAX_LENGTH,
         help_text=_("Plain text for people who cannot see the image, for example the shop name."),
     )
-    remove = forms.BooleanField(label=_("Remove the logo"), required=False)
+    remove = forms.BooleanField(
+        label=_("Remove the logo"),
+        required=False,
+        help_text=_(
+            "Tick it and save to delete the current logo. A new image and the description "
+            "above are then ignored."
+        ),
+    )
 
 
 class ShipmentForm(forms.Form):
@@ -112,7 +132,13 @@ class ShipmentForm(forms.Form):
         help_text=_("Letters, digits, spaces and . / _ - only."),
     )
     carrier = forms.CharField(
-        label=_("Carrier"), required=False, max_length=orders_engine.CARRIER_MAX
+        label=_("Carrier"),
+        required=False,
+        max_length=orders_engine.CARRIER_MAX,
+        help_text=_(
+            "Optional. The name of the courier, for example the one on the parcel. The customer "
+            "gets it in the shipping email together with the tracking number."
+        ),
     )
 
     def clean_tracking_number(self) -> str:

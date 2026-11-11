@@ -61,6 +61,10 @@ class ImageUploadForm(forms.Form):
         widget=forms.ClearableFileInput(
             attrs={"accept": "image/png,image/jpeg,image/webp,image/gif"}
         ),
+        help_text=_(
+            "PNG, JPEG, WebP or GIF (SVG is not accepted). The image is checked and saved again "
+            "without its hidden data. It goes into your own images only."
+        ),
     )
 
 
