@@ -16,6 +16,7 @@ from apps.catalog.tests.factories import (
     CategoryTranslationFactory,
     ProductFactory,
 )
+from apps.seo.models import SeoSettings
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -87,7 +88,14 @@ def test_demo_mode_forces_noindex(client: Client) -> None:
     assert client.get("/robots.txt").content.decode() == "User-agent: *\nDisallow: /\n"
 
 
+@pytest.fixture
+def indexing_allowed() -> None:
+    """The site has turned its own switch on (SEO.8 2/2): only the floor is left to test."""
+    SeoSettings.objects.create(site=Site.objects.get(is_default_site=True), allow_indexing=True)
+
+
 @override_settings(FORCE_NOINDEX=False, DEMO_MODE=False)
+@pytest.mark.usefixtures("indexing_allowed")
 def test_not_forced_listing_keeps_its_rules_and_sends_no_header(client: Client) -> None:
     response = client.get(category_url())
     assert metas(response) == ["index, follow"]
@@ -95,6 +103,7 @@ def test_not_forced_listing_keeps_its_rules_and_sends_no_header(client: Client) 
 
 
 @override_settings(FORCE_NOINDEX=False, DEMO_MODE=False)
+@pytest.mark.usefixtures("indexing_allowed")
 def test_not_forced_cms_page_prints_no_robots_meta(client: Client) -> None:
     response = client.get(cms_url())
     assert metas(response) == []
@@ -102,6 +111,7 @@ def test_not_forced_cms_page_prints_no_robots_meta(client: Client) -> None:
 
 
 @override_settings(FORCE_NOINDEX=False, DEMO_MODE=False)
+@pytest.mark.usefixtures("indexing_allowed")
 def test_not_forced_robots_txt_allows_with_private_disallows(client: Client) -> None:
     response = client.get("/robots.txt")
     assert response.status_code == 200

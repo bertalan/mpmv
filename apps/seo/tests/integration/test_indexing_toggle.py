@@ -177,6 +177,7 @@ def test_set_site_indexing_stores_and_audits() -> None:
     assert SeoSettings.objects.get(site=site).allow_indexing is True
     entry = AuditLog.objects.get(target_model="seo.seosettings")
     assert entry.action == services.SEO_SETTINGS_CONFIGURED
+    assert entry.after is not None
     assert entry.after["allow_indexing"] is True
     services.set_site_indexing(user, site, False, ctx=user_context(user, ip=None))
     assert AuditLog.objects.filter(target_model="seo.seosettings").count() == 2
