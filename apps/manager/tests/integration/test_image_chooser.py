@@ -108,6 +108,7 @@ def test_choosing_an_own_image_returns_it(client: Client, owner: User, own: Coll
     data = _json(client.get(_chosen(image.pk)))
     assert data["step"] == "chosen"
     assert data["result"]["id"] == str(image.pk)
+    assert data["result"].get("edit_url") in (None, "")  # never an admin URL for a vendor
 
 
 def test_the_format_step_serves_an_own_image(client: Client, owner: User, own: Collection) -> None:
@@ -241,3 +242,23 @@ def test_the_editor_points_at_the_manager_chooser_not_the_wagtail_admin(
 def test_the_manager_editor_has_no_link_or_chooser_feature_it_cannot_serve() -> None:
     assert "link" not in MANAGER_RICH_TEXT_FEATURES
     assert "image" in MANAGER_RICH_TEXT_FEATURES
+
+
+def test_the_denial_audit_is_rate_limited_but_the_answer_stays_404(
+    client: Client, owner: User, own: Collection
+) -> None:
+    from apps.vendors.services import MEDIA_DENIED_AUDIT_LIMIT
+
+    verified_login(client, owner)
+    for pk in range(900_000, 900_000 + MEDIA_DENIED_AUDIT_LIMIT + 5):
+        assert client.get(_chosen(pk)).status_code == 404
+    assert AuditLog.objects.filter(action=DENIED).count() == MEDIA_DENIED_AUDIT_LIMIT
+
+
+def test_a_duplicate_collection_name_does_not_split_reads_from_writes(
+    client: Client, owner: User, vendor: Vendor, own: Collection
+) -> None:
+    from apps.vendors.services import vendor_logo_collection, vendor_media_collection
+
+    _collection(vendor)  # staff create a second collection with the same name
+    assert vendor_media_collection(vendor) == vendor_logo_collection(vendor) == own

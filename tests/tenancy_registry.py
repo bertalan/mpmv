@@ -252,6 +252,26 @@ def manager_vendor(vendor: Vendor) -> Vendor:
     return vendor
 
 
+def vendor_image(vendor: Vendor) -> models.Model:
+    """An image in the vendor's own collection (VEN.31)."""
+    from wagtail.models import Collection
+
+    from apps.core.tests.factories import MediaImageFactory
+    from apps.vendors.engine import vendor_collection_name
+
+    root = Collection.get_first_root_node()
+    collection = root.add_child(name=vendor_collection_name(str(vendor.public_id)))
+    return MediaImageFactory.create(collection=collection)
+
+
+def by_pk(obj: models.Model) -> dict[str, str]:
+    return {"pk": str(obj.pk)}
+
+
+def by_image_id(obj: models.Model) -> dict[str, str]:
+    return {"image_id": str(obj.pk)}
+
+
 def vendor_display_name(vendor: models.Model) -> str:
     return str(vendor.display_name)  # type: ignore[attr-defined]
 
@@ -325,6 +345,20 @@ ENDPOINTS: dict[str, Access] = {
     "logout": NoVendorData("Sign-out of the Manager."),
     "manager:shop:dashboard": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     "manager:shop:profile": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    # The image chooser of the storefront editor (VEN.31): vendor B's image id is a 404 for A.
+    "manager:shop:image_chosen": VendorScoped(make=vendor_image, kwargs=by_pk),
+    "manager:shop:image_select_format": VendorScoped(make=vendor_image, kwargs=by_image_id),
+    "manager:shop:image_choose": VendorScopedList(
+        make=vendor_image,
+        identify=lambda o: str(o.title),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:image_results": VendorScopedList(
+        make=vendor_image,
+        identify=lambda o: str(o.title),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:image_create": VendorScopedList(
+        make=manager_vendor, identify=vendor_display_name
+    ),
     "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."

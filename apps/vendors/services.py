@@ -2247,15 +2247,22 @@ def remove_vendor_logo(
 
 MEDIA_UPLOADED = "vendor.media_uploaded"
 MEDIA_DENIED = "vendor.media_denied"
+MEDIA_DENIED_AUDIT_LIMIT = 20  # denial rows per vendor and hour
 MEDIA_UPLOAD_LIMIT = 30  # uploads per owner and hour: every attempt costs image decode work
 
 
 def vendor_media_collection(vendor: Vendor) -> ImageCollection | None:
     """The vendor's own collection `vendor-<public id>` (depth 2), or None before the first
     upload. Read only: the chooser creates nothing."""
-    return ImageCollection.objects.filter(
-        depth=2, name=engine.vendor_collection_name(str(vendor.public_id))
-    ).first()
+    # The oldest by pk, as `vendor_logo_collection` finds it: reads and writes use one collection
+    # even when staff create a duplicate name.
+    return (
+        ImageCollection.objects.filter(
+            depth=2, name=engine.vendor_collection_name(str(vendor.public_id))
+        )
+        .order_by("pk")
+        .first()
+    )
 
 
 def vendor_media_images(vendor: Vendor) -> QuerySet[Any]:
@@ -2270,7 +2277,16 @@ def vendor_media_images(vendor: Vendor) -> QuerySet[Any]:
 
 
 def audit_media_denied(vendor: Vendor, *, ctx: AuditContext, what: str, target: str = "") -> None:
-    """A chooser or upload request named something outside the vendor's own collection."""
+    """A chooser or upload request named something outside the vendor's own collection.
+
+    Rate limited per vendor and hour: past the limit the request still answers 404, but no row
+    is written, so a loop on random ids cannot grow the audit table."""
+    if consume_rate_limit(
+        f"vendor-media-denied:vendor:{vendor.pk}",
+        limit=MEDIA_DENIED_AUDIT_LIMIT,
+        window=PROFILE_RATE_WINDOW,
+    ):
+        return
     record(
         ctx,
         MEDIA_DENIED,

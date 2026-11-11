@@ -126,6 +126,10 @@ class _OwnListing(_OwnImages):
     def collections(self) -> None:
         return None  # one collection: no choice to offer
 
+    @property
+    def layout(self) -> str:
+        return "grid"  # the list layout adds a collection column: one collection, nothing to show
+
     def can_create(self) -> bool:
         return True  # the section check allows owners only
 
