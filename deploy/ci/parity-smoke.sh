@@ -39,6 +39,7 @@ bad=parity-bad
 deployer="$HOME/.local/bin/mpmv-deploy"
 config="$HOME/.config/mpmv"
 units="$HOME/.config/containers/systemd"
+user_units="$HOME/.config/systemd/user"
 started=$SECONDS
 # Pinned by digest, like third-party code in the release job (multi-arch index of postgres:17).
 postgres_image=docker.io/library/postgres:17@sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f
@@ -48,6 +49,7 @@ endgroup() { echo "::endgroup::"; }
 dump() {
   echo "::group::diagnostics"
   podman ps -a || true
+  systemctl --user --no-pager status mpmv-caddy.socket mpmv-caddy.service || true
   journalctl --user --no-pager -n 200 -u 'mpmv-*' || true
   for c in mpmv-app mpmv-worker mpmv-caddy mpmv-migrate; do podman logs --tail 50 "$c" 2>&1 || true; done
   echo "::endgroup::"
@@ -182,6 +184,14 @@ cmp -s "$repo/deploy/caddy/Caddyfile" "$config/Caddyfile" || fail "the installed
 for unit in "$repo"/deploy/quadlet/*; do
   cmp -s "$unit" "$units/${unit##*/}" || fail "installed ${unit##*/} differs from the release"
 done
+for unit in "$repo"/deploy/systemd/*; do
+  cmp -s "$unit" "$user_units/${unit##*/}" || fail "installed ${unit##*/} differs from the release"
+done
+# Caddy holds no port of its own: systemd listens and hands the sockets over (OPS.5 follow-up).
+systemctl --user is-active --quiet mpmv-caddy.socket || fail "mpmv-caddy.socket is not listening"
+systemctl --user is-enabled --quiet mpmv-caddy.socket || fail "mpmv-caddy.socket is not enabled for boot"
+bindings="$(podman inspect --format '{{json .HostConfig.PortBindings}}' mpmv-caddy)"
+case "$bindings" in "" | "{}" | null) ;; *) fail "mpmv-caddy publishes ports: $bindings" ;; esac
 endgroup
 
 group "The containers run as the units say"
@@ -285,6 +295,27 @@ grep -qix 'cache-control: no-store' <<<"$headers" || fail "the 413 is cacheable"
 ! grep -qiE '^(server|via):' <<<"$headers" || fail "the 413 names the server software"
 "$deployer" check || fail "mpmv-deploy check failed on a good release"
 "$deployer" doctor || fail "mpmv-deploy doctor failed on a good release"
+endgroup
+
+group "Client address through the proxy: the Django admin allow-list (OPS.5)"
+# The env examples allow loopback only. Caddy gets its sockets from systemd, so it sees the real
+# client: from 127.0.0.1 and ::1 (an SSH tunnel on a server) the admin answers its sign-in page,
+# from the runner's own non-loopback address it answers 404. Behind a port forwarder that hides
+# the client, both would get the same answer.
+admin_status() { # admin_status <address as curl --resolve takes it>
+  curl -sS --max-time 10 --resolve "$site:443:$1" --cacert "$MPMV_CHECK_CACERT" \
+    -o /dev/null -w '%{http_code}' "https://$site/django-admin/login/"
+}
+for address in 127.0.0.1 '[::1]'; do
+  got="$(admin_status "$address")"
+  [ "$got" = 200 ] || fail "the admin sign-in from $address answered $got, expected 200"
+  echo "GET /django-admin/login/ from $address -> $got"
+done
+outside="$(ip -4 route get 192.0.2.1 | sed -n 's/.* src \([0-9.]*\).*/\1/p')"
+[ -n "$outside" ] || fail "no non-loopback IPv4 address on the runner"
+got="$(admin_status "$outside")"
+[ "$got" = 404 ] || fail "the admin from a non-loopback address answered $got, expected 404"
+echo "GET /django-admin/login/ from a non-loopback address -> $got"
 endgroup
 
 group "A bad release rolls back, image and units, in under 60 s"
