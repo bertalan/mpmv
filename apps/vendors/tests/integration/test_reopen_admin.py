@@ -60,7 +60,8 @@ def test_staff_reopen_a_closed_vendor_with_a_reason(staff_client: Client) -> Non
     assert entry.after is not None
     assert entry.after["reason"] == REASON
     assert entry.source == "admin"
-    assert entry.actor_label == "staff:staff@example.com"
+    assert entry.actor_label.startswith("staff:")
+    assert "@" not in entry.actor_label
 
 
 def test_a_reopen_without_a_reason_is_a_form_error(staff_client: Client) -> None:

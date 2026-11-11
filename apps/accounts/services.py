@@ -31,6 +31,7 @@ from apps.core.audit import AuditContext, record, user_context
 from apps.core.changeset import ChangeSet
 from apps.core.i18n import configured_languages
 from apps.core.models import AuditLog
+from apps.core.privacy import keyed_hash
 from apps.core.services import (
     audit_changes,
     clear_throttle,
@@ -91,11 +92,15 @@ UNKNOWN_ACCOUNT = "unknown"  # target key of a failed login that named no accoun
 _EMAIL_MAX = 254
 
 
+ACCOUNT_KEY_PREFIX = "login:account:"
+AUDIT_ACCOUNT_PURPOSE = "audit-login-account"
+
+
 def _account_key(identifier: str | None) -> str | None:
     if identifier is None:
         return None
     normalized = normalize_email_address(identifier)[:_EMAIL_MAX]
-    return f"login:account:{normalized}" if normalized else None
+    return f"{ACCOUNT_KEY_PREFIX}{normalized}" if normalized else None
 
 
 def _ip_key(scope: str, ip: str | None) -> str | None:
@@ -132,6 +137,11 @@ def _audit_new_lock(
     if before.is_locked(now) or not after.is_locked(now):
         return
     ctx = AuditContext(actor_label="anonymous", source=AuditLog.Source.SYSTEM, ip=ip)
+    if key.startswith(ACCOUNT_KEY_PREFIX):
+        # The audit table is append-only: never write the address into it (CMP.4).
+        key = ACCOUNT_KEY_PREFIX + keyed_hash(
+            key.removeprefix(ACCOUNT_KEY_PREFIX), purpose=AUDIT_ACCOUNT_PURPOSE
+        )
     snapshot = {"failures": before.failures, "locked_until": before.locked_until}
     record(
         ctx,

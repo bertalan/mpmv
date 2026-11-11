@@ -210,9 +210,23 @@ def _deploy_check(module: str, **extra: str) -> subprocess.CompletedProcess[str]
 def test_deploy_check_passes(module: str) -> None:
     # Behind Caddy, as in deploy/server/mpmv.env.example (CORE.5).
     result = _deploy_check(
-        module, MPMV_TRUSTED_PROXY_HEADER="X-Real-IP", MPMV_TRUSTED_PROXIES="10.89.250.0/24"
+        module,
+        MPMV_TRUSTED_PROXY_HEADER="X-Real-IP",
+        MPMV_TRUSTED_PROXIES="10.89.250.0/24",
+        MPMV_ADMIN_ALLOWED_NETWORKS="192.0.2.0/24",  # OPS.5
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_deploy_check_hints_that_the_admin_is_unreachable_without_networks() -> None:
+    """OPS.5: an empty allow-list denies everybody; the deploy gate says so (core.W002)."""
+    result = _deploy_check(
+        "mpmv.settings.live",
+        MPMV_TRUSTED_PROXY_HEADER="X-Real-IP",
+        MPMV_TRUSTED_PROXIES="10.89.250.0/24",
+    )
+    assert result.returncode != 0
+    assert "core.W002" in result.stdout + result.stderr
 
 
 def test_deploy_check_fails_without_the_public_base_url() -> None:
@@ -247,6 +261,7 @@ def test_stage_keeps_the_console_sender_until_the_provider_is_wired() -> None:
         "mpmv.settings.stage",
         MPMV_TRUSTED_PROXY_HEADER="X-Real-IP",
         MPMV_TRUSTED_PROXIES="10.89.250.0/24",
+        MPMV_ADMIN_ALLOWED_NETWORKS="192.0.2.0/24",  # OPS.5
         MPMV_EMAIL_SENDER="",
         MPMV_EMAIL_FROM="",
     )
