@@ -13,9 +13,11 @@ from typing import Any
 
 import pytest
 from bs4 import BeautifulSoup
+from django.apps import apps
 from django.db import connection
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
+from wagtail.models import Site
 
 from apps.catalog import services
 from apps.catalog.models import Product, SalesMode
@@ -34,6 +36,15 @@ from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def _site_allows_indexing() -> None:
+    """These tests are about the listing rules: the site has turned its indexing switch on."""
+    apps.get_model("seo", "SeoSettings").objects.create(
+        site=Site.objects.get(is_default_site=True), allow_indexing=True
+    )
+
 
 PUBLISHED = TranslationStatus.PUBLISHED
 
