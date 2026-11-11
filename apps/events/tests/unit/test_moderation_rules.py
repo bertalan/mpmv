@@ -141,6 +141,31 @@ def test_vendors_get_the_vendor_safe_blocks_only() -> None:
     ]
 
 
+def test_vendors_get_product_cards_but_not_the_product_grid() -> None:
+    # Hand-picked cards are checked against the vendor's own products (`product_ids`); a grid
+    # queries the whole catalog (a category, term or brand), so it is staff-only.
+    assert refused_blocks(["product_cards"], is_staff=False) == []
+    assert refused_blocks(["product_grid", "countdown"], is_staff=False) == [
+        "product_grid",
+        "countdown",
+    ]
+
+
+def test_the_product_ids_of_a_raw_body_come_from_the_cards_blocks_only() -> None:
+    raw = [
+        {"type": "product_cards", "value": {"heading": "", "products": [3, {"value": 4}]}},
+        {"type": "product_cards", "value": {"products": [{"type": "item", "value": 5, "id": "x"}]}},
+        {"type": "paragraph", "value": "<p>9</p>"},
+        {"type": "countdown", "value": {"product": 8}},
+    ]
+    assert engine.product_ids(raw) == [3, 4, 5]
+
+
+def test_a_malformed_cards_value_gives_no_ids_to_trust() -> None:
+    raw = [{"type": "product_cards", "value": "nope"}, {"type": "product_cards", "value": {}}]
+    assert engine.product_ids(raw) == []
+
+
 def test_staff_get_every_block() -> None:
     assert refused_blocks(["embed", "raw_html"], is_staff=True) == []
 

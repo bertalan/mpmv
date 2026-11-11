@@ -222,6 +222,56 @@ def test_a_vendor_cannot_use_a_block_outside_the_vendor_safe_set(owner: User) ->
     assert "body" in excinfo.value.message_dict
 
 
+def _cards_body(*pks: Any) -> list[dict[str, Any]]:
+    return [
+        {
+            "type": "product_cards",
+            "value": {"heading": "Our products", "layout": "grid", "products": list(pks)},
+        }
+    ]
+
+
+def test_a_vendor_may_pick_its_own_products_in_a_cards_block(owner: User) -> None:
+    mine = ProductFactory.create(vendor=_vendor_of(owner))
+    page = _create(owner, body=_cards_body(mine.pk))
+    stored = page.get_latest_revision_as_object().body
+    assert [block.block_type for block in stored] == ["product_cards"]
+
+
+def test_a_vendor_cannot_pick_another_vendors_product_in_a_cards_block(owner: User) -> None:
+    mine = ProductFactory.create(vendor=_vendor_of(owner))
+    theirs = ProductFactory.create()
+    for ids in ([theirs.pk], [mine.pk, theirs.pk], [True], ["abc"], [999_999_999]):
+        with pytest.raises(ValidationError) as excinfo:
+            save_event_draft(owner, _data(body=_cards_body(*ids)), vendor=_vendor_of(owner))
+        assert "body" in excinfo.value.message_dict, ids
+
+
+def test_a_vendor_cannot_use_the_product_grid(owner: User) -> None:
+    other = ProductFactory.create()
+    grid = [
+        {
+            "type": "product_grid",
+            "value": {
+                "heading": "",
+                "source": [{"type": "vendor", "value": other.vendor_id}],
+                "limit": 4,
+                "see_all": True,
+            },
+        }
+    ]
+    with pytest.raises(ValidationError) as excinfo:
+        save_event_draft(owner, _data(body=grid), vendor=_vendor_of(owner))
+    assert "body" in excinfo.value.message_dict
+
+
+def test_staff_may_pick_any_product_in_a_cards_block() -> None:
+    staff = UserFactory.create(platform_staff=True)
+    product = ProductFactory.create()
+    page = _create(staff, body=_cards_body(product.pk))
+    assert [b.block_type for b in page.get_latest_revision_as_object().body] == ["product_cards"]
+
+
 def test_a_vendor_cannot_link_a_script_url(owner: User) -> None:
     body = [{"type": "paragraph", "value": '<p><a href="javascript:alert(1)">x</a></p>'}]
     with pytest.raises(ValidationError) as excinfo:
