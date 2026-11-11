@@ -107,7 +107,9 @@ def _declare_page_restriction_forms() -> None:
             "Open a page shared by password",
             "SEC.14",
             Protection.CAPTCHA,
-            rate_limit="per IP bucket and per restriction, in PageRestrictionProtectionMiddleware",
+            rate_limit="per IP bucket, and per restriction on wrong passwords only with a higher "
+            "threshold (locking a page needs captcha-solved wrong guesses), in "
+            "PageRestrictionProtectionMiddleware",
             templates=templates,
         ),
         view="wagtail.views.authenticate_with_password",

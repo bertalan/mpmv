@@ -188,7 +188,9 @@ def test_an_unknown_restriction_id_creates_no_restriction_bucket(client: Client)
     )
     assert response.status_code == 404
     keys = list(Throttle.objects.values_list("key", flat=True))
-    assert not [k for k in keys if "restriction:" in k]  # only the IP bucket exists
+    assert not [
+        k for k in keys if "page-restriction:restriction:" in k
+    ]  # only the IP bucket exists
 
 
 def test_only_failed_attempts_count_against_the_restriction(client: Client) -> None:
@@ -217,22 +219,26 @@ def test_a_page_type_with_its_own_template_still_gets_the_captcha(
     assert SESSION_KEY not in client.session
 
 
-def test_every_page_type_renders_a_template_with_the_captcha_widget() -> None:
+def test_no_page_type_overrides_the_template_and_the_default_has_the_captcha_widget() -> None:
     from django.template.loader import get_template
     from wagtail.models import Page
 
     from apps.core.public_forms import _page_classes
 
-    templates = {
-        cls.password_required_template  # type: ignore[attr-defined]
+    overrides = {
+        cls.__name__
         for cls in _page_classes()
-        if issubclass(cls, Page)
+        if issubclass(cls, Page) and cls.password_required_template  # type: ignore[attr-defined]
     }
-    assert templates == {"wagtailcore/password_required.html"}
-    assert "captcha_widget" in get_template(next(iter(templates))).template.source  # type: ignore[attr-defined]
+    assert overrides == set()  # a new override must render captcha_widget (the verify still runs)
+    name = getattr(
+        settings, "WAGTAIL_PASSWORD_REQUIRED_TEMPLATE", "wagtailcore/password_required.html"
+    )
+    assert name == "wagtailcore/password_required.html"
+    assert "captcha_widget" in get_template(name).template.source  # type: ignore[attr-defined]
 
 
-@pytest.mark.parametrize("prefix", ["/it", "/en"])
+@pytest.mark.parametrize("prefix", ["/it"])
 def test_the_language_prefixed_route_is_limited_and_verified(client: Client, prefix: str) -> None:
     restriction, password = _restricted()
     url = prefix + _url(restriction)

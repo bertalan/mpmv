@@ -13,7 +13,7 @@ a one-time signed token (CORE.15), or an allow-list entry with its reason.
 
 | URL name | Path | View | Purpose | Protection | Rate limit | Task |
 |---|---|---|---|---|---|---|
-| `wagtailcore_authenticate_with_password` | `/[<lang>/]_util/authenticate_with_password/<int:page_view_restriction_id>/<int:page_id>/` | `wagtail.views.authenticate_with_password` | Open a page shared by password | captcha | per IP bucket and per restriction, in PageRestrictionProtectionMiddleware | SEC.14 |
+| `wagtailcore_authenticate_with_password` | `/[<lang>/]_util/authenticate_with_password/<int:page_view_restriction_id>/<int:page_id>/` | `wagtail.views.authenticate_with_password` | Open a page shared by password | captcha | per IP bucket, and per restriction on wrong passwords only with a higher threshold (locking a page needs captcha-solved wrong guesses), in PageRestrictionProtectionMiddleware | SEC.14 |
 | `wagtailcore_login` | `/[<lang>/]_util/login/` | `django.contrib.auth.views.LoginView` | Sign in to see a page shared with logged-in users | captcha | per IP bucket in PageRestrictionProtectionMiddleware; lockout in authenticate() (CORE.5) | SEC.14 |
 | `vendors:apply` | `/[<lang>/]vendor/apply/` | `apps.vendors.application_views.apply` | Sell with us: a vendor application | captcha | per IP (registration throttle) | VEN.22 |
 | `vendors:apply_cancel` | `/[<lang>/]vendor/apply/cancel/<str:user_key>/` | `apps.vendors.application_views.cancel` | Cancel a vendor application ("this was not me") | signed token: the link must have been opened in this session from its one-time signed token | per IP (application throttle) | VEN.22 |

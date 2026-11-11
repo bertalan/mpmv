@@ -15,11 +15,12 @@ from django.http.response import HttpResponse, HttpResponseBase
 from django.middleware.csp import get_nonce
 from django.urls import NoReverseMatch, reverse
 from django.utils.translation import gettext
+from wagtail.models import PageViewRestriction
 
 from apps.accounts.captcha import captcha_passes
 from apps.accounts.decorators import TOO_MANY_ATTEMPTS, VERIFICATION_FAILED
 from apps.core.http import client_ip
-from apps.core.services import consume_rate_limit
+from apps.core.services import consume_rate_limit, rate_limit_wait
 from apps.core.throttling import ip_bucket
 
 from .csp import nonce_picker_scripts
@@ -73,10 +74,15 @@ def _too_many(wait: dt.timedelta) -> HttpResponse:
 class PageRestrictionProtectionMiddleware:
     """Rate limit and captcha for the two POST routes of Wagtail's page privacy.
 
-    Password route: a bucket per IP (`PAGE_RESTRICTION_IP_LIMIT`) and one per restriction
-    (`PAGE_RESTRICTION_LIMIT`), then the captcha, all before the view runs, so a refused request
-    stores nothing in the session. Login route: the captcha and the lockout already run inside
-    `authenticate()` (LoginProtectionBackend); the middleware adds the per-IP bucket only (a
+    Password route, all before the view runs, so a refused request stores nothing in the session:
+    a bucket per IP (`PAGE_RESTRICTION_IP_LIMIT`, every POST counts), then the restriction's
+    bucket (`PAGE_RESTRICTION_LIMIT`), then the captcha. The restriction's bucket counts only
+    wrong passwords (the form shown again, status 200) and has a higher threshold than the IP
+    bucket: other people's traffic, a failed captcha or a good password never use it up, so
+    locking a page's visitors out takes captcha-solved wrong guesses (the trade-off is written in
+    docs/dev/public-forms.md). An unknown restriction id creates no bucket. The captcha is checked
+    here, whatever template a page type renders. Login route: the captcha and the lockout already
+    run inside `authenticate()` (LoginProtectionBackend); only the per-IP bucket is added (a
     second verify would spend the single-use token).
     """
 
@@ -84,7 +90,13 @@ class PageRestrictionProtectionMiddleware:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponseBase:
-        return self.get_response(request)
+        response = self.get_response(request)
+        key = getattr(request, "_page_restriction_key", None)
+        if key and response.status_code == 200:  # the password form again: a wrong password
+            consume_rate_limit(
+                key, limit=settings.PAGE_RESTRICTION_LIMIT, window=RESTRICTION_WINDOW
+            )
+        return response
 
     def process_view(
         self,
@@ -110,14 +122,18 @@ class PageRestrictionProtectionMiddleware:
             limit=settings.PAGE_RESTRICTION_IP_LIMIT,
             window=RESTRICTION_WINDOW,
         )
-        if match.url_name == PASSWORD_ROUTE and not wait:
-            wait = consume_rate_limit(
-                f"page-restriction:restriction:{view_kwargs.get('page_view_restriction_id')}",
-                limit=settings.PAGE_RESTRICTION_LIMIT,
-                window=RESTRICTION_WINDOW,
-            )
         if wait:
             return _too_many(wait)
-        if match.url_name == PASSWORD_ROUTE and not captcha_passes(request):
+        if match.url_name == LOGIN_ROUTE:
+            return None
+        restriction_id = view_kwargs.get("page_view_restriction_id")
+        if not PageViewRestriction.objects.filter(pk=restriction_id).exists():
+            return None  # the view answers 404; nothing is stored for an id that does not exist
+        key = f"page-restriction:restriction:{restriction_id}"
+        wait = rate_limit_wait(key, limit=settings.PAGE_RESTRICTION_LIMIT)
+        if wait:
+            return _too_many(wait)
+        if not captcha_passes(request):
             return HttpResponseBadRequest(gettext(VERIFICATION_FAILED), content_type="text/plain")
+        request._page_restriction_key = key  # type: ignore[attr-defined]
         return None

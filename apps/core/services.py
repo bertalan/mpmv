@@ -603,6 +603,13 @@ def consume_rate_limit(
     return dt.timedelta(0)
 
 
+def rate_limit_wait(key: str, *, limit: int, now: dt.datetime | None = None) -> dt.timedelta:
+    """The time until the window of `key` ends when it is full, else zero. Counts nothing."""
+    now = now or timezone.now()
+    row = Throttle.objects.filter(key=key, expires_at__gt=now, failures__gte=limit).first()
+    return row.expires_at - now if row else dt.timedelta(0)
+
+
 def purge_expired_throttles(*, now: dt.datetime | None = None) -> int:
     """Delete the rows nobody needs any more; return how many were deleted."""
     deleted, _ = Throttle.objects.filter(expires_at__lte=now or timezone.now()).delete()
