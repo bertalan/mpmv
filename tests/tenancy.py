@@ -149,6 +149,8 @@ class VendorScoped:
     kwargs: Callable[[models.Model], dict[str, str]] = by_public_id
     methods: tuple[str, ...] = ("GET",)
     login: Login | None = None
+    # Parameters of the placeholder path, when "0" would not route (a `<uuid:...>` converter).
+    sample: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

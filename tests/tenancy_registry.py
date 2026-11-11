@@ -79,6 +79,7 @@ from apps.orders.tests.factories import (
     OrderLineFactory,
     StockReservationFactory,
     VendorOrderFactory,
+    paid_vendor_order,
 )
 from apps.shipping.models import (
     PickupOption,
@@ -132,6 +133,7 @@ from tests.tenancy import (
     StaffOnly,
     VendorScoped,
     VendorScopedList,
+    by_public_id,
     member_session,
     vendor_api_key,
 )
@@ -302,6 +304,9 @@ def vendor_display_name(vendor: models.Model) -> str:
     return str(vendor.display_name)  # type: ignore[attr-defined]
 
 
+NIL_UUID = "00000000-0000-0000-0000-000000000000"
+
+
 ENDPOINTS: dict[str, Access] = {
     "healthz": NoVendorData("Liveness probe with a constant answer."),
     "readyz": NoVendorData("Readiness probe: a status only, no data."),
@@ -394,6 +399,18 @@ ENDPOINTS: dict[str, Access] = {
         "(`test_staff_and_other_users_get_404...` and the upload tests in test_image_chooser)."
     ),
     "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
+    # ORD.6: the vendor's own orders; another vendor's id is a 404 on the detail and every action.
+    "manager:shop:orders": VendorScopedList(
+        make=paid_vendor_order,
+        identify=lambda sub: str(sub.order.number),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:order": VendorScoped(make=paid_vendor_order, sample={"public_id": NIL_UUID}),
+    "manager:shop:order_action": VendorScoped(
+        make=paid_vendor_order,
+        kwargs=lambda obj: {**by_public_id(obj), "action": "accept"},
+        methods=("POST",),
+        sample={"public_id": NIL_UUID},
+    ),
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
     ),

@@ -41,6 +41,14 @@ BUILT_IN = (
         in_menu=False,
         allowed=vendor_action("profile"),
     ),
+    Section(
+        "shop.orders",
+        Space.SHOP,
+        _("Orders"),
+        "manager:shop:orders",
+        order=30,
+        allowed=vendor_action("orders"),
+    ),
     # The vendor picker: reached from the header, so not in the menu, and before any choice.
     Section(
         "shop.vendor",
