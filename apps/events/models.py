@@ -75,6 +75,8 @@ from apps.cms.blocks import (
     FigureBlock,
     GalleryBlock,
     LaunchCountdownBlock,
+    ProductCardsBlock,
+    ProductGridBlock,
 )
 from apps.cms.models import CountdownCacheMixin
 from apps.core.fields import CountryField
@@ -126,8 +128,9 @@ def event_blocks() -> list[tuple[str, blocks.Block]]:
     """The body blocks of an event, from the CMS.2 library (spec 15 "Body").
 
     The CMS.9 launch countdown is offered (spec 10 §10.2; `EventPage` caps its cache at the
-    target). The CMS.10 product grid joins when that task adds it; embeds only with the SEO.5
-    consent rules. The EVT.3 services give vendors `engine.VENDOR_SAFE_BLOCKS` only.
+    target), and so are the CMS.10 product grid and the CMS.11 product cards; embeds only with
+    the SEO.5 consent rules. The EVT.3 services give vendors `engine.VENDOR_SAFE_BLOCKS` only:
+    the cards (checked against the vendor's own products), not the grid.
     """
     return [
         ("paragraph", blocks.RichTextBlock(features=RICH_TEXT_FEATURES, label=_("Rich text"))),
@@ -136,6 +139,8 @@ def event_blocks() -> list[tuple[str, blocks.Block]]:
         ("cta", CallToActionBlock()),
         ("faq", FaqBlock()),
         ("countdown", LaunchCountdownBlock()),
+        ("product_grid", ProductGridBlock()),
+        ("product_cards", ProductCardsBlock()),
     ]
 
 
@@ -659,8 +664,30 @@ class EventPage(CountdownCacheMixin, Page):  # type: ignore[misc]  # Wagtail is 
 
         self._clean_schedule(add)
         self._clean_location(add)
+        self._clean_body(add)
         if errors:
             raise ValidationError(errors)
+
+    def _clean_body(self, add: Any) -> None:
+        """A vendor's event shows that vendor's products only (spec 15), whoever saves it: the
+        cards hold its own products and a grid is sourced from the vendor itself. The EVT.3
+        services check the same rule on the raw body; this is the net under every other write
+        path (a raw admin POST, an import) and does not rely on the admin middleware."""
+        if self.vendor_id is None:
+            return
+        for child in self.body:
+            if child.block_type == "product_cards":
+                products = [p for p in child.value["products"] if p is not None]
+                if any(product.vendor_id != self.vendor_id for product in products):
+                    add("body", _("Choose only your own products."))
+            elif child.block_type == "product_grid":
+                chosen = next(iter(child.value["source"]), None)
+                if (
+                    chosen is None
+                    or chosen.block_type != "vendor"
+                    or (chosen.value is None or chosen.value.pk != self.vendor_id)
+                ):
+                    add("body", _("A product grid can show only your own products."))
 
     def _clean_schedule(self, add: Any) -> None:
         if self.all_day:

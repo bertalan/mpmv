@@ -20,10 +20,12 @@ install: ## Install Python deps (uv), the Playwright browser and git hooks
 docs: ## Regenerate backlog (md/csv) and the single-page HTML spec in build/
 	uv run tools/build_docs.py
 	uv run tools/build_public_forms.py
+	uv run tools/build_roles_doc.py
 
 docs-check: ## Fail if the committed backlog or the public forms register is out of date
 	uv run tools/build_docs.py --check
 	uv run tools/build_public_forms.py --check
+	uv run tools/build_roles_doc.py --check
 
 docs-open: docs ## Build and open the HTML spec
 	open build/mpmv-spec.html

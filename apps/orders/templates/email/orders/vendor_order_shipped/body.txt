@@ -1,0 +1,4 @@
+{% load i18n %}{% if customer_name %}{% blocktranslate %}Hello {{ customer_name }},{% endblocktranslate %}{% else %}{% translate "Hello," %}{% endif %}
+
+{% blocktranslate %}{{ vendor_name }} shipped its part of order {{ order_number }}.{% endblocktranslate %}
+{% blocktranslate %}Carrier: {{ carrier }}. Tracking number: {{ tracking_number }}.{% endblocktranslate %}

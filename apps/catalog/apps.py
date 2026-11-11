@@ -12,6 +12,8 @@ class CatalogConfig(AppConfig):
     # CAT.6: redirects through services.save_redirect, delete_redirect and import_redirects.
     audited_models = ("product", "variant", "slughistory", "redirect")
     unaudited_models = {
+        "pricehistory": "append-only record of price settings; every one is written by the audited "
+        "price services (set_product_price, set_variant_price) in the same transaction",
         "producttranslation": "storefront texts under the translation workflow",
         "varianttranslation": "storefront texts under the translation workflow",
         # CAT.13: written only by a database trigger on SKU renames, which services audit.
@@ -25,6 +27,7 @@ class CatalogConfig(AppConfig):
         "term": "navigation structure (taxonomy terms)",
         "termtranslation": "storefront texts under the translation workflow",
         "brand": "manufacturer names shown on product pages and feeds",
+        "manufacturer": "public company data; audited review and merge follow (CAT.20 2/3)",
         "brandtranslation": "storefront texts under the translation workflow",
         # CAT.3: attribute catalogue (platform data) and what products and variants say of it.
         "attribute": "attribute catalogue (codes, kinds, units); no money, access or legal facts",

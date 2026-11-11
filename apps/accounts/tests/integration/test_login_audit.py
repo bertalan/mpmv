@@ -17,7 +17,7 @@ from apps.accounts.tests.factories import TOTPDeviceFactory, UserFactory
 from apps.accounts.tests.mfa import password_login, totp_token
 from apps.core.models import AuditLog
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("admin_open")]  # OPS.5
 
 LOGIN_URL = "/django-admin/login/"
 IP = "203.0.113.7"
@@ -47,7 +47,8 @@ def test_a_successful_login_is_audited(client: Client, staff: User, password: st
     assert entry.target_model == "accounts.user"
     assert entry.target_key == str(staff.public_id)
     assert entry.actor_id == staff.pk
-    assert entry.actor_label == "staff:staff@example.com"
+    assert entry.actor_label.startswith("staff:")
+    assert "@" not in entry.actor_label
     assert entry.ip == IP
 
 

@@ -61,6 +61,7 @@ from .taxonomy import (
     BrandTranslation,
     Category,
     CategoryTranslation,
+    Manufacturer,
     Taxonomy,
     TaxonomyTranslation,
     Term,
@@ -78,6 +79,7 @@ __all__ = [
     "Category",
     "CategoryTranslation",
     "FiscalCategory",
+    "Manufacturer",
     "Product",
     "ProductAttribute",
     "ProductKind",
@@ -612,6 +614,56 @@ class SlugHistory(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.slug} [{self.language}]"
+
+
+class PriceHistory(BaseModel):
+    """One recorded price setting of a product or variant (CMP.6, Omnibus 30-day lowest price).
+
+    Append-only: written by the price services on every change, never edited (the model refuses
+    an update and database triggers refuse an update and a direct delete; rows go only with their
+    product or variant, through the delete services, which is intended). A row
+    with `variant` empty is the product's regular price and its optional scheduled sale; a row
+    with a variant records that variant's override (empty: it follows the product again).
+    Amounts are net, in `currency`.
+    """
+
+    vendor_scope: ClassVar[str] = "product__vendor"
+    objects = VendorScopedManager()
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="price_history")
+    variant = models.ForeignKey(
+        "Variant", on_delete=models.CASCADE, null=True, blank=True, related_name="price_history"
+    )
+    currency = models.CharField(max_length=3, default="EUR")
+    price_net = MoneyField("net price", null=True, blank=True)
+    sale_price_net = MoneyField("net sale price", null=True, blank=True)
+    sale_from = models.DateTimeField(null=True, blank=True)
+    sale_to = models.DateTimeField(null=True, blank=True)
+    recorded_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["product", "recorded_at", "id"]
+        verbose_name_plural = "price history"
+        indexes = [models.Index(fields=["product", "recorded_at"], name="catalog_ph_product_time")]
+        constraints = [
+            models.CheckConstraint(
+                condition=(models.Q(price_net__isnull=True) | models.Q(price_net__gte=0))
+                & (models.Q(sale_price_net__isnull=True) | models.Q(sale_price_net__gte=0)),
+                name="catalog_pricehistory_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(currency__regex=r"^[A-Z]{3}$"),
+                name="catalog_pricehistory_currency",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.product_id} {self.price_net} {self.currency} @ {self.recorded_at:%Y-%m-%d}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self._state.adding:
+            raise PermissionError("PriceHistory is append-only")
+        super().save(*args, **kwargs)
 
 
 def _only(kind: str, field: str | None) -> models.Q:

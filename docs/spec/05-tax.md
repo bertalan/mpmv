@@ -166,6 +166,7 @@ Intended differences from today:
   `special` territory raises a blocking error (D-02 open), and so does a vendor established in
   such a territory (not supported: the context has no vendor territory).
 - The carrier `force_vat` flag goes away, unless it turns out to be needed (D-03).
+- TAX.4 (D-03 default, advisor still to confirm): `resolve_shipping_tax(ctx, goods, shipping)` makes shipping follow the goods, split by net goods amount per distinct decision, remainder on the largest share; the portions carry the goods' reason, legal note and nature code. A `tax_treatment` other than `follows_goods` raises `UnsupportedShippingTreatment` until D-03 is answered. The input is a `ShippingChargeLike` protocol (`net`, `tax_treatment`) that SHP.3's rate satisfies; ORD.3 `build_checkout` wires it.
 - VIES fails closed: VIES unavailable, invalid number or prefix different from the country →
   VAT applied; result saved in `VatValidation` and in the order snapshot.
 - B2B in the same country as the vendor (including IT→IT) → VAT of the vendor's country.

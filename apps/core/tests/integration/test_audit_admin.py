@@ -171,7 +171,8 @@ def test_a_configuration_change_is_visible_in_the_audit_view_with_before_and_aft
     assert newest.before["country"] == "AT"
     assert newest.after is not None
     assert newest.after["country"] == "DE"
-    assert newest.actor_label == "staff:staff@example.com"
+    assert newest.actor_label.startswith("staff:")
+    assert "@" not in newest.actor_label
 
     detail = staff_client.get(reverse("admin:core_auditlog_change", args=[newest.pk]))
     assert detail.status_code == 200

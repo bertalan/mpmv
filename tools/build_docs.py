@@ -51,6 +51,7 @@ MACRO = {
     "CMS": "Wagtail content",
     "EVT": "Events, feeds and maps",
     "TRU": "Trust, reviews and community",
+    "FIT": "Garage and fitment (D-38)",
     "THM": "Frontend themes",
     "SEO": "SEO, feeds, analytics",
     "AI": "AI channels (MCP, agents)",
@@ -87,6 +88,7 @@ PHASE_BY_PREFIX = {
     "CMP": "F3",
     "CMS": "F4",
     "EVT": "F4",
+    "FIT": "F6",
     "THM": "F1",
     "SEO": "F4",
     "TRU": "F6",
@@ -94,6 +96,10 @@ PHASE_BY_PREFIX = {
     "MIG": "F5",
 }
 PHASE_OVERRIDE = {
+    "FIT.1": "F1",
+    "FIT.2": "F1",
+    "FIT.3": "F1",
+    "FIT.4": "F1",
     "ARC.10": "F2",
     "SEC.6": "F5",
     "CMS.1": "F1",

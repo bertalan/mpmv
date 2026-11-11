@@ -630,6 +630,31 @@ def legal_section_tags(kinds: Iterable[str]) -> dict[tuple[str, str], set[str]]:
     return found
 
 
+def legal_section_texts(kind: str, language: str, sections: Iterable[str]) -> dict[str, str]:
+    """The plain text of the tagged sections of the live legal page `kind` in `language`.
+
+    Read by `apps.compliance` (CMP.5) to put the editor's own wording (complaint handling,
+    out-of-court redress) in a statement of reasons. A section without text, or a page that is
+    not live in that language, is missing from the result: nothing is made up in code.
+    """
+    wanted = set(sections)
+    page = (
+        LegalPage.objects.live()
+        .filter(kind=kind, alias_of__isnull=True, locale__language_code=language)
+        .first()
+    )
+    found: dict[str, str] = {}
+    if page is None:
+        return found
+    for block in page.body:
+        if block.block_type != "legal_section" or block.value["section"] not in wanted:
+            continue
+        text = strip_tags(str(block.value["text"])).strip()
+        if text:
+            found.setdefault(block.value["section"], text)
+    return found
+
+
 def _seed_legal_placeholders(home: HomePage, report: SeedReport) -> None:
     """Make sure the five go-live legal pages exist and are published in every language.
 
