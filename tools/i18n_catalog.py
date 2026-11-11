@@ -33,6 +33,7 @@ SCOPES = (
     "apps/manager",
     "apps/accounts",
     "apps/orders/templates",
+    "apps/vendors/admin.py",  # help texts of the plan and commission rule forms (ARC.30)
     "themes/base/templates/layouts",
 )
 # Theme files rendered by the Manager and account pages (the rest of the theme is storefront).
@@ -70,7 +71,8 @@ CONTEXT_PLURAL = {"npgettext", "npgettext_lazy"}
 
 def _files() -> Iterator[Path]:
     for scope in SCOPES:
-        for path in sorted((ROOT / scope).rglob("*")):
+        base = ROOT / scope
+        for path in [base] if base.is_file() else sorted(base.rglob("*")):
             rel = path.relative_to(ROOT)
             if SKIP_PARTS & set(rel.parts) or path.suffix not in {".py", ".html", ".txt"}:
                 continue

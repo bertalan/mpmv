@@ -24,6 +24,7 @@ from django.utils.html import format_html, format_html_join
 from django.utils.http import urlencode
 from django.utils.module_loading import import_string
 from django.utils.safestring import SafeString
+from django.utils.translation import gettext_lazy as _
 
 from apps.accounts.decorators import level_gated_action, requires_level, step_up_required
 from apps.accounts.mfa_session import is_recently_verified
@@ -838,11 +839,36 @@ def _section_allowed(request: HttpRequest, section: str, *, write: bool) -> bool
     return bool(check(request.user, section, write=write))
 
 
+class VendorPlanForm(forms.ModelForm[VendorPlan]):
+    class Meta:
+        model = VendorPlan
+        fields = ("code", "name", "max_products", "features", "monthly_fee")
+        help_texts = {
+            "code": _(
+                "A short identifier in lowercase letters, digits and hyphens, for example "
+                "'standard'. Rules and limits refer to the plan by it."
+            ),
+            "name": _("The plan's name as staff see it, for example 'Standard'."),
+            "max_products": _(
+                "The most products a vendor on this plan can list. Leave it empty for no limit."
+            ),
+            "features": _(
+                'The plan\'s options as a JSON object, for example {"featured": true}. Leave '
+                "it as {} for none."
+            ),
+            "monthly_fee": _(
+                "The monthly fee in euro. Nothing is charged before paid plans open, so leave "
+                "it empty for now."
+            ),
+        }
+
+
 @admin.register(VendorPlan)
 class VendorPlanAdmin(admin.ModelAdmin[VendorPlan]):
     """Plans are data (VEN.2). Rules point at plans (PROTECT), so a plan is changed, never
     deleted. At launch a plan only scopes a commission rule and sets limits (D-04)."""
 
+    form = VendorPlanForm
     list_display = ("code", "name", "max_products", "monthly_fee")
     search_fields = ("code", "name")
     fields = ("code", "name", "max_products", "features", "monthly_fee")
@@ -894,6 +920,44 @@ class CommissionRuleForm(forms.ModelForm[CommissionRule]):
             "promo_label",
             "valid_from",
         )
+        help_texts = {
+            "vendor": _(
+                "Pick a vendor to give only that vendor this rule. Leave it empty, with the plan "
+                "also empty, for the platform default."
+            ),
+            "plan": _(
+                "Pick a plan to give only the vendors on that plan this rule. Leave it empty for "
+                "a rule that does not depend on the plan."
+            ),
+            "percent": _(
+                "The platform's commission, as a percentage of the base below, for example 20.00. "
+                "A zero needs a promo label."
+            ),
+            "base": _(
+                "What the commission percentage is applied to. It is frozen on every order at "
+                "the time of purchase."
+            ),
+            "fee_percent": _(
+                "The payment provider's percentage fee, for example 4.00. It is split between "
+                "vendors by the fee base below."
+            ),
+            "fee_fixed": _(
+                "The payment provider's fixed fee per payment, in euro, for example 2.00. "
+                "Enter 0 if there is none."
+            ),
+            "fee_base": _(
+                "How the payment fee is shared between vendors. The default follows the gross "
+                "amount paid."
+            ),
+            "promo_label": _(
+                "A short reason shown to staff when the commission is zero, for example "
+                "'Launch promo'. Leave it empty for a normal rule."
+            ),
+            "valid_from": _(
+                "The date and time the rule starts to apply, in Rome time. The rule before it "
+                "ends at this moment. A rule is never edited: add a new one to change a rate."
+            ),
+        }
 
     def validate_unique(self) -> None:
         super().validate_unique()
