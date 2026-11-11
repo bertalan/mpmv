@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **314** in **20** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **2582 h** (P1 2097 h · P2 439 h · P3 46 h)
+- Micro-tasks: **316** in **20** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **2596 h** (P1 2111 h · P2 439 h · P3 46 h)
 - P1 critical path (schedule lower bound with full parallelism): **153 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → CORE.2 → CORE.3 → CORE.17 → CORE.18 → FIT.1 → FIT.5 → FIT.7 → FIT.8 → FIT.10 → FIT.12
 
 ## By macro area
@@ -23,7 +23,7 @@
 | ORD | Cart, orders, returns | 14 | 118 | 14 | 0 | 132 |
 | PAY | Payments (Stripe Connect) | 4 | 40 | 0 | 0 | 40 |
 | ING | Supplier import and pipelines | 13 | 92 | 26 | 0 | 118 |
-| I18N | Multilingual | 12 | 54 | 9 | 0 | 63 |
+| I18N | Multilingual | 14 | 68 | 9 | 0 | 77 |
 | CMS | Wagtail content | 11 | 62 | 10 | 0 | 72 |
 | EVT | Events, feeds and maps | 17 | 111 | 12 | 0 | 123 |
 | FIT | Garage and fitment (D-38) | 17 | 170 | 0 | 14 | 184 |
@@ -34,7 +34,7 @@
 | SEC | Security | 11 | 70 | 0 | 0 | 70 |
 | OPS | Operations | 11 | 19 | 34 | 8 | 61 |
 | MIG | Migration and cutover | 15 | 121 | 23 | 0 | 144 |
-| **Total** | | **314** | **2097** | **439** | **46** | **2582** |
+| **Total** | | **316** | **2111** | **439** | **46** | **2596** |
 
 ## By phase
 
@@ -105,7 +105,7 @@
 | OPS.2 | Observability: JSON logs, error tracking, healthchecks, alerts (including database disk space, WAL archiving and backup age) | P1 | 8 | ARC.5 | Alert on a simulated checkout error |
 | OPS.5 | Technical Django admin reachable only from a restricted network (owner decision Q-18): allow-list at the reverse proxy plus an app-level check on the Django admin path (defence in depth), the allowed networks as environment configuration, staff operations moved to the Manager platform space (CORE.17) and editors to the Wagtail admin (CORE.8) | P1 | 3 | ARC.13, CORE.8 | On STAGE the Django admin answers 404 from outside the allowed networks and works from inside; a test covers the app-level check |
 
-### F1 — Catalog, import, base frontend (46 tasks, 420 h)
+### F1 — Catalog, import, base frontend (48 tasks, 434 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -143,6 +143,8 @@
 | I18N.9 | Customer legal and checkout pages at go-live (Q-42): terms of sale, privacy, withdrawal, shipping and returns as `LegalPage` translations in EN, IT, DE, FR and ES through wagtail-localize, each language with its own version and effective date; AI draft, native-speaker review and legal counsel check recorded per language; no EN fallback for these pages | P1 | 6 | CMS.5, I18N.3 | Every one of the five pages is published in all five languages; a go-live readiness check fails when a legal or checkout page lacks a published translation in a go-live language; a translation of a legal page shows its own effective date |
 | I18N.11 | Language switch stays on the same object (owner bug, priority 1): the public switch leads to the same page, listing, storefront or event in the chosen language (a product page when it exists), from the one `{language: URL}` mapping that also builds the `hreflang` alternates (`apps.core.i18n`); a language with no translation of the object leads to that language's home and shows a notice that the content is not available in it | P1 | 3 | I18N.1, I18N.6 | A term, brand, vendor and CMS page switch to their translation (the `hreflang` set equals the switch targets without notice); an untranslated object leads to the target home with the notice once; e2e screenshot of the switch |
 | I18N.12 | The stored language applies on unprefixed areas (owner bug on STAGE v0.1.4, priority 1, follow-up of I18N.11): the language switcher sets no cookie, so a middleware right after `AuthenticationMiddleware` activates a signed-in user's `preferred_language` for requests without a language prefix (Manager, account area, MFA pages, admins) and sets `request.LANGUAGE_CODE`; prefixed public URLs keep the prefix as the only source; anonymous users, an unknown or no longer configured language change nothing | P1 | 1 | I18N.1, I18N.11 | A signed-in user who switches language in the Manager sees the Manager in that language and can switch back; a prefixed public URL ignores `preferred_language`; anonymous and unknown-language cases unchanged; e2e screenshot of the Manager switch |
+| I18N.13 | Export and re-import of translatable texts for native-speaker review (owner request, lane-a design on #86): the gettext `.po` catalogs stay the source of truth, and CMS pages reuse the wagtail-localize PO export and import instead of a second mechanism. `manage.py i18n_export --lang <code> [--scope emails\|vendor-help\|all] --format xlsx\|po` writes one file per language: the XLSX has the columns msgid (stable key), context, English source, current translation, reviewer translation (empty), notes, flags (fuzzy, missing), max length and a hidden checksum, with only the reviewer column unlocked (sheet protection without a password); the `.po` format is for reviewers who use Poedit. The rules are at the top, so the reviewer reads them first: a first sheet "Read me" and a short frozen banner above the table on each language sheet, in the reviewer's language when a translation of the Read me exists, else English, covering which column to edit and which not to touch, keeping placeholders (`%(name)s`, `{name}`, `%s`) and HTML tags exactly, no new links, the length limit shown per row, the tone (informal tu/du/tu/tú for customer emails, owner decision), doubts go in the Notes column (the source is never changed) and how to send the file back. `manage.py i18n_import <file> [--dry-run] [--skip-invalid]` applies only the reviewer column and refuses a row whose msgid or checksum changed since export; it validates every changed row (same placeholders, same HTML tags, no new URL, length limit where the field has one), prints a diff, writes the `.po`, recompiles the `.mo` and runs the i18n check. A row that fails is reported by row number with the rule broken, in the same words as the Read me; nothing is applied when any row fails unless `--skip-invalid`, which applies the valid rows and reports the skipped ones. Every import is audited (`AuditLog`: who, when, SHA-256 of the file, counts of applied and skipped rows). Reviewer steps in `docs/dev/translations.md` | P1 | 10 | I18N.5, I18N.3, I18N.7 | Round trip export, edit, import changes exactly the edited strings and nothing else; a broken placeholder, changed HTML tags, a new URL, an over-length text, and a changed msgid or checksum are each refused and reported by row number with the rule in the Read me's words; with any error nothing is applied unless `--skip-invalid`, which reports the skipped rows; `--dry-run` writes nothing; the Read me is the first sheet and the banner is frozen on every language sheet; the import writes an audit entry with the file hash; `docs/dev/translations.md` exists |
+| I18N.14 | Pre-LIVE native-speaker review of the DE, FR and ES customer-facing texts (owner decision on #299, Q2): before go-live a native speaker per language reviews the customer emails, checkout, account and notification texts and the legal and checkout pages through the I18N.13 files (CMS pages through wagtail-localize), and the review is recorded per language (reviewer, date, file hash) | P1 | 4 | I18N.13, I18N.7, I18N.9 | For each of DE, FR and ES a reviewed file is imported (or the dry-run shows no change) and the review is recorded; the go-live readiness list shows the three languages as reviewed |
 | CMS.1 | Wagtail: site, locales, base page types, per-language navigation and footer | P1 | 8 | ARC.3 | Home and static pages in every configured language |
 | FIT.1 | Scheme and nodes (D-38, slice FIT-a): `FitmentScheme`, `FitmentLevel` (up to 4 node levels, translated labels), `FitmentNode` tree with status, aliases, optional translated names, `FitmentNote`; Manager platform pages for the scheme (Configuration and tax, step-up, dry run, no reorder or removal when nodes exist) and for nodes (Catalog and moderation: CRUD, merge with references moved, retire, proposals queue); the fitment-relevant categories as an operator setting seeded with none, bulk-settable, stored as `FitmentCategory` rows in the fitment app (a row means relevant) so the catalog never depends on fitment | P1 | 16 | CAT.2, CORE.17, CORE.18, I18N.2 | A two-level and a four-level scheme are created in two sectors' vocabularies; a scheme change that would orphan nodes is refused; a node merge moves the references; a proposed node is invisible to pickers until approved |
 | FIT.2 | Product declaration (D-38, slice FIT-a): `ProductFitmentState`, `ProductFitment` with year range, exclusion, note, source, constraints, validation rules of §17.2.4, pure `fitment/engine.py` (`fits`, `check`, `no`, `unknown`), `set_product_fitment` with dry run, ChangeSet and AuditLog, `always_visible` and `rows_version` upkeep | P1 | 16 | FIT.1, CAT.14 | The regression cases 1 to 3 of §17.11 pass as unit tests with no database; an overlapping contradictory row is refused; a replace of several rows writes one AuditLog entry |
