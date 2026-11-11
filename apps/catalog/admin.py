@@ -30,7 +30,7 @@ from apps.core.audit import audit_context
 from . import attribute_admin as attribute_admin  # registers the CAT.3 admins
 from . import engine
 from . import taxonomy_admin as taxonomy_admin  # registers the CAT.2 admins
-from .models import Category, Product, ProductTranslation, Term, Variant, VariantTranslation
+from .models import Brand, Category, Product, ProductTranslation, Term, Variant, VariantTranslation
 from .redirect_admin import RedirectAdmin as RedirectAdmin  # registers the CAT.6 admin
 from .services import (
     PRODUCT_PRICE_FIELDS,
@@ -191,6 +191,9 @@ class ProductAdmin(admin.ModelAdmin[Product]):
             # The tree in order, children indented under their parent.
             kwargs["form_class"] = TreeNodeChoiceField
             kwargs["queryset"] = Category.objects.prefetch_related("translations")
+        if db_field.name == "brand":
+            # Pending and rejected brands (CAT.20) are not offered.
+            kwargs["queryset"] = Brand.objects.filter(status=Brand.Status.APPROVED)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def formfield_for_manytomany(
