@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 from django.http.response import HttpResponseBase
 from django.test import Client
-from django.urls import reverse
+from django.urls import resolve, reverse
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
 from apps.accounts.models import User
@@ -78,26 +78,41 @@ def test_post_without_a_referer_falls_back_to_home(client: Client) -> None:
     assert _next_of(_post(client, None)) == HOME
 
 
-@pytest.mark.parametrize(
-    "path",
-    [
-        "/account/mfa/verify/",
-        "/account/mfa/setup/",
-        "/account/mfa/totp/?next=/",
-        "/account/login/",
-        "/account/logout/",
-        "/account/mfa/%76erify/",
-        "/account/%6Dfa/verify/",
-        "/admin/login/",
-        "/admin/logout/",
-        "/account/link/some-token/",
-        "/django-admin/login/?next=/django-admin/",
-        "/django-admin/logout/",
-    ],
-)
-def test_post_never_returns_to_an_auth_or_mfa_page(client: Client, path: str) -> None:
+DENIED = [
+    ("mfa:verify", {}),
+    ("mfa:setup", {}),
+    ("mfa:totp", {}),
+    ("login", {}),
+    ("logout", {}),
+    ("wagtailadmin_login", {}),
+    ("wagtailadmin_logout", {}),
+    ("admin:login", {}),
+    ("admin:logout", {}),
+    ("action_link:open", {"token": "some-token"}),
+]
+
+
+def _denied_paths() -> list[str]:
+    return [reverse(name, kwargs=kwargs) for name, kwargs in DENIED]
+
+
+@pytest.mark.parametrize(("name", "kwargs"), DENIED)
+def test_post_never_returns_to_an_auth_or_mfa_page(
+    client: Client, name: str, kwargs: dict[str, str]
+) -> None:
     _enrolled_staff(client)
-    assert _next_of(_post(client, f"http://testserver{path}")) == HOME
+    path = reverse(name, kwargs=kwargs)
+    assert resolve(path).route  # a real route: the test cannot pass on a silent 404
+    assert _next_of(_post(client, f"http://testserver{path}?next=/")) == HOME
+
+
+@pytest.mark.parametrize("index", range(len(DENIED)))
+def test_post_refuses_a_percent_encoded_auth_path(client: Client, index: int) -> None:
+    _enrolled_staff(client)
+    path = _denied_paths()[index]
+    encoded = path[:-1].replace(path[-2], f"%{ord(path[-2]):02X}", 1) + "/"
+    assert encoded != path
+    assert _next_of(_post(client, f"http://testserver{encoded}")) == HOME
 
 
 def test_get_keeps_the_current_path_and_ignores_the_referer(client: Client) -> None:
