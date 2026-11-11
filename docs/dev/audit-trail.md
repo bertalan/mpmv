@@ -155,9 +155,14 @@ vendor-specific shipping zone or commission rule also puts `"vendor"` in its sna
 
 - `actor_label` is `user:<public id>` or `staff:<public id>` (`apps.core.audit.user_context`),
   never the email. The table is append-only (database trigger), so an address written there could
-  not be removed with the account. Rows written before this change keep the old label with the
-  email: a one-off update is impossible under the trigger. This is a documented residual, raised
-  as an owner question (retention of the old rows).
+  not be removed with the account. Owner decision (lane-a answer 6784046561): customer rows
+  written before this change were rewritten to `user:<public id>` (`unknown` when the user no
+  longer exists) by the one-off migration `core/0021_audit_actor_pseudonymised`. It is the
+  single exception to the append-only rule: it disables the trigger for that one UPDATE inside
+  its transaction, enables it again, and writes one audit row with counts only. Staff rows keep
+  `staff:<email>`: the identity of staff is kept to establish and defend legal claims (GDPR
+  article 17(3)(e)) and for the order retention duties of D-29 and D-30 (article 17(3)(b)); it
+  goes no longer than those periods.
 - `ip` is kept as security-log evidence (GDPR article 6(1)(f), the platform's legitimate interest
   in detecting abuse, and article 17(3)(e) for legal claims). It is not erased with the account.
   A retention period for it (null the column after N months) is a CMP.4 2/2 / CMP.29 decision.
