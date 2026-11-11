@@ -618,7 +618,8 @@ class PriceHistory(BaseModel):
     """One recorded price setting of a product or variant (CMP.6, Omnibus 30-day lowest price).
 
     Append-only: written by the price services on every change, never edited (the model refuses
-    an update and a database trigger refuses it too; rows go only with their product). A row
+    an update and database triggers refuse an update and a direct delete; rows go only with their
+    product or variant, through the delete services, which is intended). A row
     with `variant` empty is the product's regular price and its optional scheduled sale; a row
     with a variant records that variant's override (empty: it follows the product again).
     Amounts are net, in `currency`.

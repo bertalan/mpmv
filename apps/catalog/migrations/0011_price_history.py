@@ -19,9 +19,28 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER catalog_pricehistory_no_update
     BEFORE UPDATE ON catalog_pricehistory
     FOR EACH ROW EXECUTE FUNCTION catalog_pricehistory_append_only();
+
+-- DELETE only inside the services that delete a product or variant (they set the flag for the
+-- transaction). TRUNCATE is not blocked: the test runner flushes with it; in STAGE/LIVE the
+-- application role is not granted TRUNCATE (OPS tasks), like api_apimutationlog.
+CREATE OR REPLACE FUNCTION catalog_pricehistory_guard_delete() RETURNS trigger AS $$
+BEGIN
+    IF coalesce(current_setting('mpmv.allow_price_history_delete', true), '') <> 'on' THEN
+        RAISE EXCEPTION 'catalog_pricehistory is append-only (DELETE refused)'
+            USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER catalog_pricehistory_no_direct_delete
+    BEFORE DELETE ON catalog_pricehistory
+    FOR EACH ROW EXECUTE FUNCTION catalog_pricehistory_guard_delete();
 """
 
 ALLOW_UPDATE = """
+DROP TRIGGER IF EXISTS catalog_pricehistory_no_direct_delete ON catalog_pricehistory;
+DROP FUNCTION IF EXISTS catalog_pricehistory_guard_delete();
 DROP TRIGGER IF EXISTS catalog_pricehistory_no_update ON catalog_pricehistory;
 DROP FUNCTION IF EXISTS catalog_pricehistory_append_only();
 """

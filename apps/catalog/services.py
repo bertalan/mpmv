@@ -24,7 +24,7 @@ from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.postgres.search import SearchQuery, SearchRank, TrigramStrictWordSimilarity
 from django.core.exceptions import NON_FIELD_ERRORS, PermissionDenied, ValidationError
-from django.db import models, transaction
+from django.db import connection, models, transaction
 from django.db.models import Case, Prefetch, Q, QuerySet, Value, When
 from django.db.models.functions import Length
 from django.utils import timezone
@@ -34,6 +34,7 @@ from apps.core import translations
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.models import MediaImage
+from apps.core.money import CURRENCY
 from apps.core.services import audit_changes, holds_permission, run_mutation, save_audited
 from apps.core.text import ascii_int
 from apps.vendors.models import Vendor
@@ -127,40 +128,47 @@ def record_price_history(product: Product, variant: Variant | None = None) -> Pr
 def price_points(product: Product, variant: Variant | None = None) -> list[engine.PricePoint]:
     """The price settings of `product` over time, or of what `variant` sells for.
 
-    A variant follows its product's price unless it has an override, and a product sale applies
-    to it only while it has none (the sale price is the product's own).
+    A variant follows its product's price unless it has an override. Whether the product's sale
+    reaches an overridden variant is `engine.SALE_APPLIES_TO_OVERRIDDEN_VARIANT` (pending owner
+    decision, cart/engine.py:107). A point is emitted at every row of the product or variant.
     """
     rows = PriceHistory.objects.filter(product=product)
     if variant is not None:
         rows = rows.filter(Q(variant=None) | Q(variant=variant))
     points: list[engine.PricePoint] = []
-    product_row: PriceHistory | None = None
+    base: PriceHistory | None = None
     override: Decimal | None = None
     for row in rows.order_by("recorded_at", "id"):
-        if row.variant_id is None:
-            product_row = row
-        else:
-            override = row.price_net
         if variant is None:
             points.append(_point(row, row.price_net))
-        elif product_row is not None or override is not None:
-            base = product_row
-            price = override if override is not None else (base.price_net if base else None)
-            sale = override is None and base is not None
-            points.append(
-                engine.PricePoint(
-                    row.recorded_at,
-                    price,
-                    base.sale_price_net if sale and base else None,
-                    base.sale_from if sale and base else None,
-                    base.sale_to if sale and base else None,
-                )
+            continue
+        if row.variant_id is None:
+            base = row
+        else:
+            override = row.price_net
+        price = override if override is not None else (base.price_net if base else None)
+        sale = (
+            base
+            if base and (override is None or engine.SALE_APPLIES_TO_OVERRIDDEN_VARIANT)
+            else None
+        )
+        points.append(
+            engine.PricePoint(
+                row.recorded_at,
+                price,
+                sale.sale_price_net if sale else None,
+                sale.sale_from if sale else None,
+                sale.sale_to if sale else None,
+                row.currency,
             )
+        )
     return points
 
 
 def _point(row: PriceHistory, price: Decimal | None) -> engine.PricePoint:
-    return engine.PricePoint(row.recorded_at, price, row.sale_price_net, row.sale_from, row.sale_to)
+    return engine.PricePoint(
+        row.recorded_at, price, row.sale_price_net, row.sale_from, row.sale_to, row.currency
+    )
 
 
 def reference_price(
@@ -171,6 +179,7 @@ def reference_price(
         price_points(product, variant),
         at=at or timezone.now(),
         tz=ZoneInfo(settings.BUSINESS_TIME_ZONE),
+        currency=CURRENCY,
     )
 
 
@@ -371,6 +380,13 @@ def save_product(product: Product, *, ctx: AuditContext, dry_run: bool = False) 
     return changes
 
 
+def _allow_history_delete() -> None:
+    """Let the price-history delete trigger pass for this transaction only: rows go with their
+    product or variant (cascade), through the delete services, never on their own."""
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT set_config('mpmv.allow_price_history_delete', 'on', true)")
+
+
 def delete_product(product: Product, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Delete `product` with its variants and translations, auditing the product and each
     variant. A product that others require as their companion is protected (ProtectedError)."""
@@ -385,6 +401,7 @@ def delete_product(product: Product, *, ctx: AuditContext, dry_run: bool = False
         for variant in stored.variants.select_for_update().select_related("product__vendor"):
             variant_changes.delete(VARIANT_MODEL, str(variant.public_id), variant_snapshot(variant))
         if not dry_run:
+            _allow_history_delete()
             stored.delete()
             audit_changes(product_changes, ctx=ctx, action=PRODUCT_DELETED)
             audit_changes(variant_changes, ctx=ctx, action=VARIANT_DELETED)
@@ -461,6 +478,7 @@ def delete_variant(variant: Variant, *, ctx: AuditContext, dry_run: bool = False
         changes.delete(VARIANT_MODEL, str(stored.public_id), variant_snapshot(stored))
         if dry_run:
             return changes
+        _allow_history_delete()
         stored.delete()
         audit_changes(changes, ctx=ctx, action=VARIANT_DELETED)
     return changes

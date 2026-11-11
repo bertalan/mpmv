@@ -163,7 +163,7 @@ def test_a_price_in_force_at_the_window_start_counts() -> None:
     points = [
         PricePoint(day(1), Decimal("50.00"), None, None, None),
         PricePoint(cheap_until, Decimal("100.00"), None, None, None),
-        PricePoint(start, Decimal("100.00"), Decimal("60.00"), None, None),
+        PricePoint(start, Decimal("100.00"), Decimal("40.00"), None, None),
     ]
     found = engine.reference_price(points, at=start + dt.timedelta(hours=1), tz=ROME)
     assert found is not None

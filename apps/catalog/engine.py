@@ -827,6 +827,13 @@ class PricePoint:
     sale_price_net: Decimal | None
     sale_from: dt.datetime | None
     sale_to: dt.datetime | None
+    currency: str = "EUR"
+
+
+# Pending owner decision (ORD.3, see cart/engine.py `display_unit_price`): whether a product's
+# sale reaches a variant that has its own price override. The cart does not apply sales yet, and
+# the history follows it: a variant with an override has no sale. Flip here only when decided.
+SALE_APPLIES_TO_OVERRIDDEN_VARIANT = False
 
 
 @dataclass(frozen=True)
@@ -882,7 +889,12 @@ def _window_start(reduction_start: dt.datetime, tz: ZoneInfo, days: int) -> dt.d
 
 
 def reference_price(
-    points: Iterable[PricePoint], *, at: dt.datetime, tz: ZoneInfo, days: int = OMNIBUS_DAYS
+    points: Iterable[PricePoint],
+    *,
+    at: dt.datetime,
+    tz: ZoneInfo,
+    days: int = OMNIBUS_DAYS,
+    currency: str = "EUR",
 ) -> ReferencePrice | None:
     """The lowest price of the `days` calendar days before the reduction in force at `at`.
 
@@ -891,7 +903,7 @@ def reference_price(
     price before the first one: the reduction starts when the continuous run of reduced
     prices does. The reduced price itself is never part of the window.
     """
-    segments = _segments(points)
+    segments = _segments(p for p in points if p.currency == currency)
     current = next((s for s in segments if s.start <= at and (s.end is None or at < s.end)), None)
     if current is None or not current.is_sale or current.price is None:
         return None

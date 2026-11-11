@@ -7,7 +7,7 @@ from unittest import mock
 import pytest
 from django.db import IntegrityError, connection, transaction
 
-from apps.catalog import services
+from apps.catalog import engine, services
 from apps.catalog.models import PriceHistory, Product
 from apps.catalog.tests.factories import ProductFactory, VariantFactory
 from apps.core.audit import AuditContext
@@ -135,7 +135,7 @@ def test_a_cleared_variant_override_is_a_point_even_without_a_product_row() -> N
 
 def test_the_sale_rule_for_overridden_variants_is_one_named_switch() -> None:
     # Pending owner decision (cart/engine.py display_unit_price): sales do not reach an override.
-    assert services.engine.SALE_APPLIES_TO_OVERRIDDEN_VARIANT is False
+    assert engine.SALE_APPLIES_TO_OVERRIDDEN_VARIANT is False
 
 
 def test_a_direct_delete_is_refused() -> None:
