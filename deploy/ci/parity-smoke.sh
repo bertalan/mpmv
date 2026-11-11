@@ -194,7 +194,7 @@ for c in mpmv-app mpmv-worker; do
   podman exec "$c" sh -c 'echo x > /app/media/parity-probe && rm /app/media/parity-probe' || fail "$c cannot write media"
 done
 [ "$(podman exec mpmv-app stat -c %u:%g /app/media)" = 10001:10001 ] || fail "media volume not owned by the image user"
-podman exec mpmv-app python manage.py check --deploy --fail-level ERROR
+podman exec mpmv-app python manage.py check --deploy --database default --fail-level ERROR
 # The app's own connection is TLS, and the server refuses one without it.
 app_ssl="$(podman exec mpmv-app python manage.py shell --verbosity 0 -c '
 from django.db import connection
