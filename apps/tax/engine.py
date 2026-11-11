@@ -13,7 +13,7 @@ import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any, Final, Literal
+from typing import Any, Final, Literal, Protocol
 
 from apps.core import postcodes
 from apps.core.countries import EU_MEMBER_STATES, InvalidCountry, normalize_country
@@ -1015,3 +1015,120 @@ def tax_amount(net: Decimal, rate: Decimal) -> Decimal:
     if not (net.is_finite() and rate.is_finite()):
         raise ValueError("net and rate must be finite")
     return (net * rate / 100).quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP)
+
+
+# --- TAX.4: VAT on shipping (D-03) -----------------------------------------------------------
+
+TREATMENT_FOLLOWS_GOODS: Final = "follows_goods"
+
+
+class UnsupportedShippingTreatment(BlockingTaxError):
+    """A shipping method stores a VAT treatment other than `follows_goods` (`standard_rate`,
+    `exempt`, the old carrier `force_vat`). D-03 is not decided for them: the quote is blocked
+    instead of guessing a VAT."""
+
+
+class ShippingChargeLike(Protocol):
+    """What the tax engine reads from a shipping quote: the net price and the stored treatment.
+    SHP.3's `ShippingRate` satisfies it; tax never imports shipping."""
+
+    @property
+    def net(self) -> Decimal: ...
+
+    @property
+    def tax_treatment(self) -> str: ...
+
+
+@dataclass(frozen=True)
+class ShippingCharge:
+    net: Decimal
+    tax_treatment: str = TREATMENT_FOLLOWS_GOODS
+
+
+@dataclass(frozen=True)
+class TaxPortion:
+    """The part of a vendor's shipping that falls under one goods decision.
+
+    Exposes the `TaxDecision` fields, so anything that accepts a decision (ORD.4's tax outcome)
+    accepts a portion."""
+
+    net: Decimal
+    tax: Decimal
+    decision: TaxDecision
+
+    @property
+    def rate(self) -> Decimal:
+        return self.decision.rate
+
+    @property
+    def reason(self) -> TaxReason:
+        return self.decision.reason
+
+    @property
+    def country_of_taxation(self) -> str | None:
+        return self.decision.country_of_taxation
+
+    @property
+    def legal_note_key(self) -> str | None:
+        return self.decision.legal_note_key
+
+    @property
+    def nature_code(self) -> str | None:
+        return self.decision.nature_code
+
+
+def resolve_shipping_tax(
+    ctx: TaxContext,
+    goods: Iterable[tuple[Decimal, TaxDecision]],
+    shipping: ShippingChargeLike,
+) -> list[TaxPortion]:
+    """Split a vendor package's shipping over the goods' tax decisions (spec 05 §5.1, D-03).
+
+    Shipping follows the goods: it is divided in proportion to the net goods amount under each
+    distinct decision (rate and reason), so a 22% / 10% package has two portions, an exempt,
+    reverse-charge, export or outside-territory package has one zero portion with the goods'
+    legal note and nature code. Each portion's net is rounded ROUND_HALF_UP; the largest share
+    absorbs the rounding difference so the portions add up to the shipping net, and the VAT of
+    each is `tax_amount`. A package of zero-value goods uses the first decision. Free shipping
+    gives no portions. `ctx` is kept for the signature of spec 05 (the decisions already carry
+    the context's outcome).
+    """
+    net, treatment = shipping.net, shipping.tax_treatment
+    if not isinstance(net, Decimal):
+        raise TypeError("shipping net must be Decimal")
+    if not net.is_finite() or net < 0:
+        raise ValueError("shipping net must be a finite amount, zero or more")
+    lines = list(goods)
+    if not lines:
+        raise ValueError("shipping VAT needs the package's goods: no goods given")
+    if treatment != TREATMENT_FOLLOWS_GOODS:
+        raise UnsupportedShippingTreatment(
+            f"shipping VAT treatment {treatment!r} is not supported (D-03): "
+            "shipping follows the goods"
+        )
+    if ctx.vendor_profile.regime == EXEMPT:
+        # Re-checked so a vendor profile that became incomplete blocks here too (never a silent 0%).
+        _exempt(ctx.vendor_profile, vendor_country=ctx.vendor_country)
+    if net == 0:
+        return []
+
+    totals: dict[TaxDecision, Decimal] = {}
+    for amount, decision in lines:
+        if not isinstance(amount, Decimal) or not amount.is_finite() or amount < 0:
+            raise ValueError("goods net must be a finite Decimal, zero or more")
+        totals[decision] = totals.get(decision, Decimal(0)) + amount
+    goods_total = sum(totals.values(), Decimal(0))
+    if goods_total == 0:
+        first = next(iter(totals))
+        return [TaxPortion(net=net, tax=tax_amount(net, first.rate), decision=first)]
+
+    shares = {
+        decision: (net * amount / goods_total).quantize(MONEY_QUANTUM, rounding=ROUND_HALF_UP)
+        for decision, amount in totals.items()
+    }
+    largest = max(totals, key=lambda d: totals[d])  # ties: the first one
+    shares[largest] += net - sum(shares.values(), Decimal(0))
+    return [
+        TaxPortion(net=share, tax=tax_amount(share, decision.rate), decision=decision)
+        for decision, share in shares.items()
+    ]
