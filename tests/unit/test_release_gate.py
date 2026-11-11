@@ -71,6 +71,7 @@ def test_the_image_carries_the_units_caddyfile_and_deploy_script() -> None:
         "deploy/quadlet/mpmv-app.container",
         "deploy/quadlet/mpmv-media.volume",
         "deploy/caddy/Caddyfile",
+        "deploy/systemd/mpmv-caddy.socket",
         "deploy/server/mpmv-deploy",
         "deploy/server/mpmv.env.example",
         "deploy/container/entrypoint.sh",
