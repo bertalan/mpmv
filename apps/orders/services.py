@@ -374,6 +374,8 @@ def transition_order(
             audit_changes(changeset, ctx=ctx, action="orders.transition")
             if target == "paid":  # ORD.9: in this transaction, so a rollback sends nothing
                 notifications.notify_order_paid(locked)
+            elif target == "cancelled":
+                notifications.notify_order_cancelled(locked)
     except _DryRunRollback:
         pass
     order.refresh_from_db()
@@ -433,6 +435,10 @@ def transition_vendor_order(
             audit_changes(changeset, ctx=ctx, action="orders.transition")
             if target == "shipped":  # ORD.9
                 notifications.notify_vendor_order_shipped(locked)
+            elif target == "delivered":
+                notifications.notify_vendor_order_delivered(locked)
+            elif target == "cancelled":
+                notifications.notify_vendor_order_cancelled(locked)
     except _DryRunRollback:
         pass
     sub.refresh_from_db()
