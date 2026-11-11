@@ -113,8 +113,6 @@ MIDDLEWARE = [
     # With the other header middleware, so responses returned early by an inner middleware
     # (CommonMiddleware's APPEND_SLASH redirect, LIVE's static files) carry it too (SEC.5).
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    # SEC.13/SEC.14: Wagtail's page view restriction forms answer 404 until they are protected.
-    "apps.cms.middleware.PageRestrictionBlockMiddleware",
     "apps.themes.middleware.ThemeMiddleware",  # the site's theme for the template loader (THM.1)
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
@@ -124,6 +122,8 @@ MIDDLEWARE = [
     # CAT.5: a 404 on a product's old slug becomes a 301 to its current slug.
     "apps.catalog.middleware.OldProductSlugRedirectMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
+    # SEC.14: rate limit and captcha for Wagtail's page view restriction forms (after CSRF).
+    "apps.cms.middleware.PageRestrictionProtectionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     # I18N.12: the stored language of a signed-in user on unprefixed areas (Manager, account).
     "apps.accounts.middleware.PreferredLanguageMiddleware",
@@ -589,14 +589,12 @@ PUBLIC_FORM_GATED_PREFIXES = {
     "django-admin/": "the staff admin requires a signed-in staff user; its sign-in is declared",
     "api/": "API v1 authenticates every operation (API key or session)",
     "_styleguide/": "staff only (THM.4)",
-    "_util/": "Wagtail page view restriction forms answer 404 while BLOCK_PAGE_RESTRICTION_ROUTES "
-    "is on and no restriction exists (cms.E002); SEC.14 protects them",
 }
 
-# SEC.13/SEC.14: Wagtail's page view restriction forms (`/_util/...`) have no rate limit or captcha
-# yet, so apps.cms.middleware.PageRestrictionBlockMiddleware answers 404 to them and `check` fails
-# (cms.E002) while any password or login restriction exists. SEC.14 lifts the block.
-BLOCK_PAGE_RESTRICTION_ROUTES = True
+# SEC.14: Wagtail's page view restriction forms (`/_util/...`) take POSTs per 15-minute window:
+# per IP bucket on both routes, and per restriction on the password route (apps.cms.middleware).
+PAGE_RESTRICTION_IP_LIMIT = 10
+PAGE_RESTRICTION_LIMIT = 60
 
 # Optional prefix of order numbers, e.g. "MP-" gives "MP-2027-000123" (ORD.2). Empty by default.
 ORDER_NUMBER_PREFIX = ""
