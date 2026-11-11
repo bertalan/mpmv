@@ -11,4 +11,6 @@ class OrdersConfig(AppConfig):
     unaudited_models = {
         "ordernumbersequence": "a counter row locked while a number is taken; the number is "
         "audited with the order it belongs to",
+        "stockreservation": "a short-lived technical hold on stock; the order that confirms it "
+        "is audited, and the stock change is audited when the payment succeeds",
     }
