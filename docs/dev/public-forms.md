@@ -13,6 +13,7 @@ a one-time signed token (CORE.15), or an allow-list entry with its reason.
 
 | URL name | Path | View | Purpose | Protection | Rate limit | Task |
 |---|---|---|---|---|---|---|
+| `dsa_notice` | `/[<lang>/]report/` | `apps.compliance.views.notice_form` | Report illegal content (DSA notice) | captcha | per IP (notice and captcha-failure budgets) | CMP.5 |
 | `vendors:apply` | `/[<lang>/]vendor/apply/` | `apps.vendors.application_views.apply` | Sell with us: a vendor application | captcha | per IP (registration throttle) | VEN.22 |
 | `vendors:apply_cancel` | `/[<lang>/]vendor/apply/cancel/<str:user_key>/` | `apps.vendors.application_views.cancel` | Cancel a vendor application ("this was not me") | signed token: the link must have been opened in this session from its one-time signed token | per IP (application throttle) | VEN.22 |
 | `vendors:apply_confirm` | `/[<lang>/]vendor/apply/confirm/<str:user_key>/` | `apps.vendors.application_views.confirm` | Confirm a vendor application and choose a password | signed token: the link must have been opened in this session from its one-time signed token | per IP (application throttle) | VEN.22 |
