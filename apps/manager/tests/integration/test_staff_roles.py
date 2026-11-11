@@ -166,6 +166,64 @@ def test_a_revocation_dry_run_changes_nothing() -> None:
     assert held(target) == {"support"}
 
 
+@pytest.mark.django_db(transaction=True)
+def test_two_owners_revoking_each_other_at_once_leave_exactly_one_owner() -> None:
+    import threading
+
+    from django.db import connection
+
+    first, second = staff("owner"), staff("owner")
+    barrier = threading.Barrier(2)
+    outcomes: list[str] = []
+
+    def revoke(actor_pk: int, target_pk: int) -> None:
+        try:
+            actor, target = User.objects.get(pk=actor_pk), User.objects.get(pk=target_pk)
+            barrier.wait(timeout=10)
+            try:
+                staff_roles.revoke_role(target, "owner", actor=actor, ctx=CTX)
+                outcomes.append("ok")
+            except staff_roles.RoleAssignmentError:
+                outcomes.append("refused")
+        finally:
+            connection.close()
+
+    threads = [
+        threading.Thread(target=revoke, args=(first.pk, second.pk)),
+        threading.Thread(target=revoke, args=(second.pk, first.pk)),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+    assert not any(thread.is_alive() for thread in threads)
+    assert sorted(outcomes) == ["ok", "refused"]
+    assert staff_roles.platform_owners().count() == 1
+
+
+def test_revoking_owner_also_removes_a_directly_granted_owner_permission() -> None:
+    owner = staff("owner")
+    mixed = staff("owner", permissions=["core.platform_owner"])  # group and direct permission
+    staff_roles.revoke_role(mixed, "owner", actor=owner, ctx=CTX)
+    mixed.refresh_from_db()
+    assert held(mixed) == frozenset()
+    assert not staff_roles.platform_owners().filter(pk=mixed.pk).exists()
+    entry = AuditLog.objects.get(action=staff_roles.REVOKE_ACTION)
+    assert entry.before is not None
+    assert entry.after is not None
+    assert entry.before["roles"] == ["owner"]
+    assert entry.after["roles"] == []
+
+
+def test_a_direct_only_owner_can_be_revoked_and_the_last_owner_rule_still_holds() -> None:
+    bootstrap = UserFactory.create(staff=True, permissions=["core.platform_owner"])
+    with pytest.raises(staff_roles.RoleAssignmentError, match="last platform owner"):
+        staff_roles.revoke_role(bootstrap, "owner", actor=bootstrap, ctx=CTX)
+    other = staff("owner")
+    staff_roles.revoke_role(bootstrap, "owner", actor=other, ctx=CTX)
+    assert not staff_roles.platform_owners().filter(pk=bootstrap.pk).exists()
+
+
 # --- The page
 
 
