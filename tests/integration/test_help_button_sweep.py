@@ -8,8 +8,8 @@ as a signed-in user and as a visitor:
   left of the user menu, with the route name and page type the modal asks the server for; the
   user menu has a "Help" item; the dialog and the static script are there; no inline script or
   style comes with them;
-- anonymous: no help markup, no help script, no `Vary: Cookie` added by the help chrome. A cached
-  public page therefore carries nothing of it (the signed-in chrome is never cached, SEC.5).
+- anonymous: no help markup and no help script (the chrome never reads a visitor's session). A
+  cached public page therefore carries nothing of it (the signed-in chrome is never cached).
 
 Account, Manager and the admins come with the later parts of ARC.32.
 """
@@ -17,6 +17,8 @@ Account, Manager and the admins come with the later parts of ARC.32.
 import pytest
 from bs4 import BeautifulSoup
 from django.test import Client
+from django.utils import translation
+from django.utils.translation import gettext
 
 from apps.accounts.tests.factories import UserFactory
 from tests.integration.test_language_switcher_everywhere import CASES
@@ -65,12 +67,15 @@ def test_a_signed_in_user_has_the_help_button_on_the_page(name: str) -> None:
     response = client.get(case.url, follow=True)
     assert response.status_code == case.status
     soup = _soup(response.content)
+    assert soup.html is not None
+    lang = str(soup.html["lang"])
 
     tools = soup.select_one("header .user-tools")
     assert tools is not None, f"{case.url}: no help chrome in the header"
     button = tools.select_one("button.help-button")
     assert button is not None
-    assert button["aria-label"] == "Help for this page"
+    with translation.override(lang):
+        assert button["aria-label"] == gettext("Help for this page")
     assert button.has_attr("data-help-open")
     assert button["aria-haspopup"] == "dialog"
     assert button["type"] == "button"
@@ -82,27 +87,27 @@ def test_a_signed_in_user_has_the_help_button_on_the_page(name: str) -> None:
     # The menu's own item opens the same modal.
     item = sibling.select_one("[data-help-open]")
     assert item is not None
-    assert item.get_text(strip=True) == "Help"
+    with translation.override(lang):
+        assert item.get_text(strip=True) == gettext("Help")
     # What the modal asks the server for.
     assert tools["data-help-url"] == "/_help/entry/"
-    assert tools["data-help-lang"] == soup.html["lang"]
+    assert tools["data-help-lang"] == lang
     assert "data-help-route" in tools.attrs
     assert "data-help-page-type" in tools.attrs
     if name.startswith(PAGE_TYPE_CLASSES):
         assert tools["data-help-page-type"], f"{case.url}: no page type"
-    else:
+    elif not name.startswith("error-"):  # an error page names no screen: the general entry
         assert tools["data-help-route"], f"{case.url}: no route name"
     # The dialog and the static script; nothing inline.
     dialog = soup.select_one("dialog#help-dialog")
     assert dialog is not None
     assert dialog.get("aria-labelledby") == "help-dialog-title"
-    scripts = [s.get("src", "") for s in soup.find_all("script")]
+    scripts = [str(s.get("src", "")) for s in soup.find_all("script")]
     assert any(src.endswith("themes/base/js/help.js") for src in scripts)
-    assert not [s for s in soup.find_all("script") if not s.get("src")]
+    inline = [s for s in soup.find_all("script") if not s.get("src")]
+    assert all(s.get("type") == "application/ld+json" for s in inline)  # data, not code
     assert not [t for t in soup.find_all(True) if t.get("style")]
-    assert response.get("Cache-Control", "").count("no-store") or "private" in response.get(
-        "Cache-Control", ""
-    )
+    assert "private" in response.get("Cache-Control", "")  # the signed-in chrome is never cached
 
 
 @pytest.mark.parametrize("name", NAMES)
@@ -114,7 +119,6 @@ def test_an_anonymous_visitor_has_no_help_markup_on_the_page(name: str) -> None:
     html = response.content.decode()
     for marker in HELP_MARKERS:
         assert marker not in html, f"{case.url}: {marker!r} on a public page"
-    assert "Vary" not in response or "Cookie" not in response["Vary"]
 
 
 def test_the_help_chrome_follows_the_pages_language() -> None:

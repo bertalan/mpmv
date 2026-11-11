@@ -70,11 +70,12 @@ def test_a_model_permission_alone_does_not_open_the_snippet() -> None:
 
 def test_the_instance_checks_follow_the_same_rule() -> None:
     entry = HelpEntry.objects.get(kind="general", locale__language_code="en")
-    assert POLICY.user_has_permission_for_instance(_with_role("catalog"), "change", entry)
-    assert not POLICY.user_has_permission_for_instance(_with_role("support"), "change", entry)
+    catalog, support = _with_role("catalog"), _with_role("support")
+    assert POLICY.user_has_permission_for_instance(catalog, "change", entry)
+    assert not POLICY.user_has_permission_for_instance(support, "change", entry)
     editors = POLICY.users_with_permission("change")
-    assert _with_role("catalog") in editors
-    assert _with_role("finance") not in editors
+    assert catalog in editors
+    assert support not in editors
 
 
 def test_the_snippet_list_opens_for_the_catalog_role_in_the_editors_admin() -> None:

@@ -25,6 +25,7 @@ without a countdown.
   {% with "themes/"|add:theme.slug|add:"/theme.css" as theme_css %}<link rel="stylesheet" href="{% static theme_css %}">{% endwith %}
   <script type="module" src="{% static 'themes/base/js/base.js' %}"></script>
   <script type="module" src="{% static 'themes/base/js/countdown.js' %}"></script>
+  {% help_context as help_chrome %}{% if help_chrome %}<script type="module" src="{% static 'themes/base/js/help.js' %}"></script>{% endif %}
   <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
   <script src="{% static 'vendor/alpine-csp.min.js' %}" defer></script>
   {% if page %}{% faq_jsonld page %}{% endif %}

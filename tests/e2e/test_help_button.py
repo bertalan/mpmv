@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 from django.test import Client
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Locator, Page, ViewportSize, expect
 from pytest_django.live_server_helper import LiveServer
 
 from apps.accounts.tests.factories import UserFactory
@@ -22,8 +22,8 @@ from tests.e2e.test_cms_pages import RECORD_CSP_VIOLATIONS, csp_violations
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
-DESKTOP = {"width": 1280, "height": 800}
-MOBILE = {"width": 375, "height": 740}
+DESKTOP = ViewportSize(width=1280, height=800)
+MOBILE = ViewportSize(width=375, height=740)
 
 
 def sign_in(page: Page, live_server: LiveServer) -> None:
@@ -34,7 +34,7 @@ def sign_in(page: Page, live_server: LiveServer) -> None:
     )
 
 
-def help_button(page: Page):  # type: ignore[no-untyped-def]
+def help_button(page: Page) -> Locator:
     return page.locator("header button.help-button")
 
 
@@ -79,12 +79,18 @@ def test_the_button_opens_the_page_help_and_the_dialog_behaves(
     violations = run_axe(page)
     assert violations == [], format_violations(violations)
 
-    # The focus is trapped: many tabs later it is still inside the dialog.
-    for _ in range(8):
-        page.keyboard.press("Tab")
-    assert page.evaluate("document.activeElement.closest('dialog') !== null")
-    page.keyboard.press("Shift+Tab")
-    assert page.evaluate("document.activeElement.closest('dialog') !== null")
+    # The focus is trapped: the page behind is inert, so in both directions the focus is in the
+    # dialog or has left the page for the browser's own controls, never on the page behind.
+    behind = (
+        "!document.activeElement.closest('dialog')"
+        " && document.activeElement.closest('header, main, footer') !== null"
+    )
+    for key in ["Tab"] * 8 + ["Shift+Tab"] * 3:
+        page.keyboard.press(key)
+        assert not page.evaluate(behind), f"the focus left the dialog on {key}"
+    page.locator("dialog#help-dialog .dialog__close").focus()
+    page.keyboard.press("Tab")
+    assert not page.evaluate(behind)
 
     page.keyboard.press("Escape")
     expect(dialog).not_to_be_visible()
@@ -149,7 +155,9 @@ def test_a_page_with_a_form_lists_its_fields_with_their_help_texts(
     page.goto(f"{live_server.url}/vendor/apply/")
     labels = [
         text.split(" (required)")[0].strip()
-        for text in page.locator("main form .field > label").all_inner_texts()
+        for text in page.locator(
+            "main form :is(.field > label, .field > fieldset > legend, .field__check > label)"
+        ).all_inner_texts()
     ]
     assert labels, "the page has no form field to list"
     open_modal(page)
@@ -160,7 +168,7 @@ def test_a_page_with_a_form_lists_its_fields_with_their_help_texts(
     )
     listed = page.locator("dialog#help-dialog .help-fields__name").all_inner_texts()
     assert [name.split(" (required)")[0].strip() for name in listed] == labels
-    helptexts = page.locator("main form .helptext").all_inner_texts()
+    helptexts = page.locator("main form .field .helptext").all_inner_texts()
     if helptexts:
         expect(fields).to_contain_text(helptexts[0].strip())
     shot("form-fields")

@@ -52,11 +52,13 @@ THEME_FILES = (
             "field",
             "footer",
             "header",
+            "help_entry",
             "icon",
             "language_switcher",
             "pagination",
             "skip_link",
             "table",
+            "user_tools",
         )
     ),
 )

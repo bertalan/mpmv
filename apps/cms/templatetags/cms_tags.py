@@ -24,7 +24,7 @@ from apps.core.i18n import (
 )
 from apps.core.image_licences import Credit
 
-from .. import services
+from .. import engine, services
 from ..engine import faq_page_jsonld, jsonld_text
 from ..models import NavigationMenu
 
@@ -172,3 +172,31 @@ def jsonld_script(data: Mapping[str, Any] | None) -> SafeString:
     if not data:
         return mark_safe("")
     return mark_safe(f'<script type="application/ld+json">{jsonld_text(data)}</script>')  # noqa: S308
+
+
+# --- Contextual help (ARC.32)
+
+
+@register.simple_tag(takes_context=True)
+def help_context(context: dict[str, Any]) -> dict[str, str] | None:
+    """What the help button needs, for a signed-in user only; None for anyone else.
+
+    The route name and the page type say which entry the dialog asks for. The user is not looked
+    up without a session cookie: that would read the session and add `Vary: Cookie` to every
+    public page, and a visitor has no help button anyway (the signed-in chrome is never cached).
+    """
+    request: HttpRequest | None = context.get("request")
+    if request is None or settings.SESSION_COOKIE_NAME not in request.COOKIES:
+        return None
+    user = getattr(request, "user", None)
+    if user is None or not (user.is_authenticated and user.is_active):
+        return None
+    match = getattr(request, "resolver_match", None)
+    page = context.get("page")
+    label = page.specific_class._meta.label if isinstance(page, Page) else ""
+    return {
+        "url": reverse("help_entry"),
+        "route": engine.help_route_name(getattr(match, "view_name", "")),
+        "page_type": engine.help_page_type(label),
+        "language": translation.get_language() or settings.LANGUAGE_CODE,
+    }

@@ -30,6 +30,9 @@ the schema.org data of articles and author pages (Person, ProfilePage, BlogPosti
 Rich text (CMS.12, spec 10 §10.2): the sanitiser every rich-text write outside the editor goes
 through. It is the editor's own allow-list (`DbWhitelister` of the Wagtail features), so only
 the elements and attributes the editor can write are stored.
+
+Contextual help (ARC.32): which help entry answers a screen (route name, then page type, then the
+general entry; the screen's language, then the primary one).
 """
 
 import datetime as dt
@@ -567,3 +570,71 @@ def sanitise_rich_text(html: str, features: Sequence[str] | None) -> str:
         return str(_whitelister(tuple(features)).clean(html))
     except RecursionError:
         return escape(_TAG_RE.sub("", unescape(html)))
+
+
+# --- Contextual help (ARC.32)
+
+HELP_ROUTE = "route"
+HELP_PAGE_TYPE = "page_type"
+HELP_GENERAL = "general"
+_HELP_KEY_RE = re.compile(r"[A-Za-z0-9_.:-]{1,120}")
+# The CMS catch-all names no screen: such a request is told apart by its page type instead.
+_HELP_ANONYMOUS_ROUTES = ("wagtail_serve",)
+
+
+@dataclass(frozen=True)
+class HelpRow:
+    """One help entry in one language, as the lookup sees it."""
+
+    kind: str
+    key: str
+    language: str
+    title: str
+    body: str = ""
+    vendor_guide: bool = False
+
+
+def _help_key(value: object) -> str:
+    return value if isinstance(value, str) and _HELP_KEY_RE.fullmatch(value) else ""
+
+
+def help_key_valid(key: object) -> bool:
+    """Whether `key` can key a route or page type entry (letters, digits and `. : _ -`)."""
+    return bool(_help_key(key))
+
+
+def help_route_name(view_name: object) -> str:
+    """The route name a help entry is keyed by: the request's URL name, or "" for a name that
+    cannot key one (none, malformed, or the CMS catch-all)."""
+    key = _help_key(view_name)
+    return "" if key.startswith(_HELP_ANONYMOUS_ROUTES) else key
+
+
+def help_page_type(label: object) -> str:
+    """The page type key (`app_label.ModelName`) of a CMS page, "" when malformed or absent."""
+    return _help_key(label)
+
+
+def help_candidates(route_name: str, page_type: str) -> list[tuple[str, str]]:
+    """The (kind, key) pairs to try, most specific first: route name, page type, then the
+    general entry, which always closes the list."""
+    found: list[tuple[str, str]] = []
+    if route_name := help_route_name(route_name):
+        found.append((HELP_ROUTE, route_name))
+    if page_type := help_page_type(page_type):
+        found.append((HELP_PAGE_TYPE, page_type))
+    found.append((HELP_GENERAL, ""))
+    return found
+
+
+def pick_help_row(
+    rows: Iterable[HelpRow], candidates: Sequence[tuple[str, str]], language: str, primary: str
+) -> HelpRow | None:
+    """The row that answers: the first candidate that has one, in `language` or else in the
+    primary language. A text of any other language is never shown instead."""
+    by_key = {(row.kind, row.key, row.language): row for row in rows}
+    for kind, key in candidates:
+        for code in (language, primary):
+            if (row := by_key.get((kind, key, code))) is not None:
+                return row
+    return None

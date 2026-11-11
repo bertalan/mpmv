@@ -262,6 +262,8 @@ MPMV_THEME_BUILD_DIR = BASE_DIR / "build" / "themes"
 # Help/contact link shown in the same place in the header and footer of every public page
 # (THM.3, WCAG 3.2.6 consistent help); empty = no help link until a contact page exists.
 MPMV_HELP_URL = env_str("MPMV_HELP_URL", "")
+# The vendor guide the help dialog links on vendor-facing screens (ARC.32); empty = no link.
+MPMV_VENDOR_GUIDE_URL = env_str("MPMV_VENDOR_GUIDE_URL", "")
 
 # PostgreSQL is the only datastore (ADR-0001).
 DATABASES = {

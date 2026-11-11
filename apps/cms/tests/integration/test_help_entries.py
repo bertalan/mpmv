@@ -77,10 +77,10 @@ def test_help_text_is_stored_through_the_sanitiser() -> None:
 
 
 def test_every_field_has_a_help_text() -> None:
-    editable = [f for f in HelpEntry._meta.get_fields() if getattr(f, "editable", False)]
-    names = {f.name for f in editable if not f.help_text and f.name not in {"id", "locale"}}
-    # translation_key and locale are Wagtail's own and hidden from the form.
-    assert names <= {"translation_key"}
+    # id, translation_key and locale are Wagtail's own and hidden from the form.
+    own = {"id", "translation_key", "locale"}
+    fields = [f for f in HelpEntry._meta.fields if f.name not in own]
+    assert [f.name for f in fields if not f.help_text] == []
 
 
 # --- The resolver

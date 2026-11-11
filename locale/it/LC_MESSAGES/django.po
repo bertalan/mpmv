@@ -46,6 +46,10 @@ msgstr "Accetta l'ordine"
 msgid "Access denied"
 msgstr "Accesso negato"
 
+#: themes/base/templates/components/user_tools.html
+msgid "Account"
+msgstr "Account"
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Act on the content"
 msgstr "Interveni sul contenuto"
@@ -239,6 +243,10 @@ msgstr "Posizione esatta"
 msgid "Explanation"
 msgstr "Spiegazione"
 
+#: themes/base/templates/components/user_tools.html
+msgid "Fields on this page"
+msgstr "Campi di questa pagina"
+
 #: apps/manager/media.py
 msgid "File"
 msgstr "File"
@@ -302,6 +310,18 @@ msgstr "Ciao %(customer_name)s,"
 msgid "Hello,"
 msgstr "Ciao,"
 
+#: themes/base/templates/components/user_tools.html
+msgid "Help"
+msgstr "Aiuto"
+
+#: themes/base/templates/components/user_tools.html
+msgid "Help for this page"
+msgstr "Aiuto per questa pagina"
+
+#: apps/manager/wagtail_hooks.py
+msgid "Help texts"
+msgstr "Testi di aiuto"
+
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid ""
 "If you are not signed in, Continue signs you in once with this link; you "
@@ -351,6 +371,10 @@ msgstr "Solo lettere, cifre, spazi e . / _ -"
 #: themes/base/templates/components/button.html
 msgid "Loading"
 msgstr "Caricamento"
+
+#: themes/base/templates/components/user_tools.html
+msgid "Loading help…"
+msgstr "Caricamento dell’aiuto…"
 
 #: apps/accounts/templates/accounts/admin/login.html
 msgid "Log in"
@@ -739,6 +763,7 @@ msgstr "Accedi"
 #: apps/manager/templates/manager/forbidden.html
 #: apps/manager/templates/manager/layout.html
 #: apps/manager/templates/manager/shop/vendor_closed.html
+#: themes/base/templates/components/user_tools.html
 msgid "Sign out"
 msgstr "Esci"
 
@@ -828,6 +853,10 @@ msgstr ""
 "Il modulo è stato inviato da una pagina vecchia o scaduta. Torna indietro, "
 "ricarica la pagina e invialo di nuovo."
 
+#: themes/base/templates/components/user_tools.html
+msgid "The help text could not be loaded. Try again."
+msgstr "Non è stato possibile caricare il testo di aiuto. Riprova."
+
 #: apps/manager/templates/manager/forbidden.html
 msgid ""
 "The Manager is for platform staff and for vendor members. If you need "
@@ -900,6 +929,10 @@ msgstr "La verifica non è riuscita. Ricarica la pagina e riprova."
 #: themes/base/templates/components/error_summary.html
 msgid "There is a problem"
 msgstr "Si è verificato un problema"
+
+#: themes/base/templates/components/help_entry.html
+msgid "There is no help text for this page yet."
+msgstr "Per questa pagina non c’è ancora un testo di aiuto."
 
 #: apps/manager/templates/manager/bulk_preview.html
 msgid "This action changes nothing."
@@ -1022,6 +1055,10 @@ msgstr "Venditore"
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid "Vendor closed"
 msgstr "Venditore chiuso"
+
+#: themes/base/templates/components/help_entry.html
+msgid "Vendor guide"
+msgstr "Guida per i venditori"
 
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Verify"
