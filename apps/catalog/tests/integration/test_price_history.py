@@ -134,7 +134,7 @@ def test_a_cleared_variant_override_is_a_point_even_without_a_product_row() -> N
 
 
 def test_the_sale_rule_for_overridden_variants_is_one_named_switch() -> None:
-    # Pending owner decision (cart/engine.py display_unit_price): sales do not reach an override.
+    # Owner decision 2026-11-11: a variant override wins over the product sale.
     assert engine.SALE_APPLIES_TO_OVERRIDDEN_VARIANT is False
 
 

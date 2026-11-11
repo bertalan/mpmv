@@ -830,9 +830,8 @@ class PricePoint:
     currency: str = "EUR"
 
 
-# Pending owner decision (ORD.3, see cart/engine.py `display_unit_price`): whether a product's
-# sale reaches a variant that has its own price override. The cart does not apply sales yet, and
-# the history follows it: a variant with an override has no sale. Flip here only when decided.
+# Owner decision Q1 (2026-11-11): a variant's own price override wins over the product's sale, so
+# a sale never reaches a variant that has an override. The Omnibus reference follows the same rule.
 SALE_APPLIES_TO_OVERRIDDEN_VARIANT = False
 
 
