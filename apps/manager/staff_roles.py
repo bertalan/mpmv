@@ -40,7 +40,7 @@ GRANT_ACTION = "manager.staff_role.grant"
 REVOKE_ACTION = "manager.staff_role.revoke"
 USER_MODEL = "accounts.user"
 ONE_PERSON_TEAM = "one_person_team"
-SELF_ASSIGNED_EMAIL = "manager.role_self_assigned"
+SELF_ASSIGNED_TEMPLATE = "manager.role_self_assigned"
 
 
 class RoleAssignmentError(ValueError):
@@ -222,7 +222,7 @@ def _notify_self_assignment(actor: Any, role_key: str, reason: str) -> None:
     for user in recipients.values():
         enqueue_email(
             recipient=user.email,
-            template_key=SELF_ASSIGNED_EMAIL,
+            template_key=SELF_ASSIGNED_TEMPLATE,
             language=getattr(user, "preferred_language", "en"),
             context={
                 "actor_name": actor.full_name or actor.email,

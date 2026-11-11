@@ -9,7 +9,9 @@ one-person-team setting and its permanent warning.
 import json
 
 import pytest
-from django.contrib.auth.models import Group
+from django.apps import apps as django_apps
+from django.contrib.auth.models import Group, Permission
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied
 from django.test import Client
 
@@ -20,7 +22,7 @@ from apps.accounts.tests.mfa import verified_login
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog, OutboxEmail
 from apps.manager import roles, staff_roles
-from apps.manager.role_groups import user_roles
+from apps.manager.role_groups import sync_role_groups, user_roles
 from apps.vendors.tests.factories import VendorMemberFactory
 
 pytestmark = pytest.mark.django_db
@@ -172,6 +174,8 @@ def test_two_owners_revoking_each_other_at_once_leave_exactly_one_owner() -> Non
 
     from django.db import connection
 
+    # transaction=True flushes the tables, the seeded role groups with them.
+    sync_role_groups(Group, Permission, ContentType, django_apps.get_model)
     first, second = staff("owner"), staff("owner")
     barrier = threading.Barrier(2)
     outcomes: list[str] = []
