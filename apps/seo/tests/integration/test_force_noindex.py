@@ -91,7 +91,7 @@ def test_demo_mode_forces_noindex(client: Client) -> None:
 @pytest.fixture
 def indexing_allowed() -> None:
     """The site has turned its own switch on (SEO.8 2/2): only the floor is left to test."""
-    SeoSettingsFactory.create(allow_indexing=True)
+    SeoSettingsFactory.create(site=Site.objects.get(is_default_site=True), allow_indexing=True)
 
 
 @override_settings(FORCE_NOINDEX=False, DEMO_MODE=False)
