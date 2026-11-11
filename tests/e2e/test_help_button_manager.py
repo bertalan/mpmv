@@ -134,6 +134,29 @@ def test_the_manager_button_stays_in_the_header_on_a_narrow_screen(
     assert other_csp_violations(page) == []
 
 
+def test_the_user_menu_closes_when_focus_leaves_it_and_stays_keyboard_usable(
+    page: Page, live_server: LiveServer
+) -> None:
+    page.set_viewport_size(DESKTOP)
+    sign_in_owner(page, live_server)
+    page.goto(f"{live_server.url}{PROFILE}")
+    menu = page.locator("header .user-menu")
+    summary = menu.locator("summary")
+    summary.focus()
+    page.keyboard.press("Enter")
+    assert menu.evaluate("(el) => el.open")
+    page.keyboard.press("Tab")  # into the menu: stays open
+    assert menu.evaluate("(el) => el.open")
+    for _ in range(3):  # past the last item and out of the menu
+        page.keyboard.press("Tab")
+    assert not menu.evaluate("(el) => el.open")
+    summary.focus()
+    page.keyboard.press("Enter")
+    page.keyboard.press("Escape")
+    assert not menu.evaluate("(el) => el.open")
+    expect(summary).to_be_focused()
+
+
 def test_the_account_page_opens_the_same_dialog(
     page: Page, live_server: LiveServer, shot: Callable[[str], Path]
 ) -> None:
