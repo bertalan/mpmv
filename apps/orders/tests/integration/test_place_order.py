@@ -31,6 +31,7 @@ from apps.orders.services import (
     place_order,
 )
 from apps.orders.tests.factories import StockReservationFactory
+from apps.tax.engine import NATURE_BY_REASON, TaxDecision
 from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
@@ -314,28 +315,21 @@ def test_a_caller_cannot_feed_the_nature_code() -> None:
     assert "vat_nature_code" not in {f.name for f in dataclasses.fields(PlaceLine)}
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="TODO(TAX.3, #218 not merged): feed the real TaxDecision;"
-    " drop this xfail when #218 is on main",
-)
 @pytest.mark.django_db
 def test_a_real_tax_decision_feeds_the_nature_code() -> None:
-    from apps.tax.engine import TaxDecision  # type: ignore[attr-defined]
-
     decision = TaxDecision(
         rate=Decimal("0"),
-        reason="eu_b2b_reverse_charge",
+        reason="reverse_charge",
         country_of_taxation=None,
         legal_note_key=None,
-        nature_code="N6.9",
+        nature_code=NATURE_BY_REASON["reverse_charge"],
     )
     product = sellable()
     order, _ = place_order(
         preview(vendor_of(product, line(product, tax=decision))), ctx=CTX, now=NOW
     )
     assert order is not None
-    assert OrderLine.objects.get(vendor_order__order=order).vat_nature_code == "N6.9"
+    assert OrderLine.objects.get(vendor_order__order=order).vat_nature_code == "N3.2"
 
 
 # --- concurrency (the row's Done-when) --------------------------------------------------------
