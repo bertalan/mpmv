@@ -182,3 +182,42 @@ def test_italian_and_english_wording_differ_per_the_catalog() -> None:
     assert "Abbiamo ricevuto" in render(mail).text_body
     english = core_services.render_email(mail.template_key, "en", mail.context_data)
     assert "We received your order" in english.text_body
+
+
+def test_a_malformed_customer_address_never_blocks_the_payment() -> None:
+    order = two_vendor_order()
+    Order.objects.filter(pk=order.pk).update(email="not an address")
+    order.refresh_from_db()
+    services.transition_order(order, "awaiting_payment", ctx=CTX)
+    services.transition_order(order, "paid", ctx=CTX)
+    order.refresh_from_db()
+    assert order.state == "paid"
+    assert kinds() == ["orders.vendor_new_order", "orders.vendor_new_order"]
+
+
+def test_a_malformed_address_never_blocks_shipping() -> None:
+    order = place()
+    pay(order)
+    Order.objects.filter(pk=order.pk).update(email="bad\nBcc: x@example.com")
+    sub = order.vendor_orders.get()
+    services.transition_vendor_order(sub, "accepted", ctx=CTX)
+    services.transition_vendor_order(sub, "shipped", ctx=CTX, tracking_number="T1")
+    sub.refresh_from_db()
+    assert sub.state == "shipped"
+    assert "orders.vendor_order_shipped" not in kinds()
+
+
+def test_markup_in_titles_and_addresses_is_escaped_in_html() -> None:
+    xss = "<script>alert(1)</script>"
+    vendor = VendorFactory.create()
+    order = place(
+        vendor_orders=[vendor_input(vendor, lines=[line_input(title=xss)])],
+        shipping_address={"line1": xss, "city": "Roma"},
+    )
+    pay(order)
+    for mail in OutboxEmail.objects.filter(
+        template_key__in=["orders.order_confirmation", "orders.vendor_new_order"]
+    ):
+        html = render(mail).html_body
+        assert "<script>" not in html
+        assert "&lt;script&gt;" in html
