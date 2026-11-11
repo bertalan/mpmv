@@ -11,7 +11,7 @@ FLAGS = ("DEMO_MODE", "FORCE_NOINDEX")
 
 def _ids(**overrides: bool) -> list[str]:
     with override_settings(**overrides):
-        return [m.id for m in check_live_site_flags(None)]
+        return [str(m.id) for m in check_live_site_flags(None)]
 
 
 @pytest.mark.parametrize("flag", FLAGS)
@@ -43,8 +43,9 @@ def test_stage_keeps_its_flags() -> None:
 
 
 def test_registered_under_the_deploy_tag() -> None:
-    deploy_checks = checks.registry.registry.get_checks(include_deployment_checks=True)
-    default_checks = checks.registry.registry.get_checks(include_deployment_checks=False)
+    registry = checks.registry.registry
+    deploy_checks: list[object] = list(registry.get_checks(include_deployment_checks=True))
+    default_checks: list[object] = list(registry.get_checks(include_deployment_checks=False))
     assert check_live_site_flags in deploy_checks
     assert check_live_site_flags not in default_checks
 
