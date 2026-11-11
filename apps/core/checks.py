@@ -242,6 +242,7 @@ class _AnyPermission:
     """A user who holds every permission: what could an admin let someone write?"""
 
     is_active = is_staff = is_superuser = is_authenticated = True
+    holds_all_platform_roles = True  # role-matrix checks (CORE.18) read this instead of groups
     pk = None
 
     def has_perm(self, perm: str, obj: Any = None) -> bool:

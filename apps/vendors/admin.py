@@ -10,6 +10,7 @@ from collections.abc import Callable
 from typing import Any, cast
 
 from django import forms
+from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.admin.utils import unquote
 from django.core.exceptions import FieldDoesNotExist, PermissionDenied, ValidationError
@@ -21,6 +22,7 @@ from django.urls import URLPattern, path, reverse
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.http import urlencode
+from django.utils.module_loading import import_string
 from django.utils.safestring import SafeString
 
 from apps.accounts.decorators import level_gated_action, requires_level, step_up_required
@@ -827,10 +829,13 @@ class LegalFieldRequirementAdmin(admin.ModelAdmin[LegalFieldRequirement]):
             delete_requirement(requirement, ctx=ctx)
 
 
-def _may_configure_commissions(request: HttpRequest) -> bool:
-    """Commissions and plans are configuration (spec 02, CORE.18): the Configuration and tax role
-    edits them; Finance and the platform owner only read. A superuser passes `has_perm`."""
-    return bool(request.user.has_perm("manager.platform_config"))
+def _section_allowed(request: HttpRequest, section: str, *, write: bool) -> bool:
+    """Role membership from the CORE.18 matrix (`apps/manager/roles.py`), never `has_perm`.
+
+    The check lives in the Manager app, which sits above this one in the dependency graph, so it
+    is reached through `settings.PLATFORM_SECTION_CHECK` (like the CORE.25 level decorator)."""
+    check = import_string(settings.PLATFORM_SECTION_CHECK)
+    return bool(check(request.user, section, write=write))
 
 
 @admin.register(VendorPlan)
@@ -845,11 +850,16 @@ class VendorPlanAdmin(admin.ModelAdmin[VendorPlan]):
     def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         return False
 
+    # The matrix row "Platform: vendors (applications, plans)": the platform owner edits plans,
+    # the other platform roles read them.
+    def has_view_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return _section_allowed(request, "platform.vendors", write=False)
+
     def has_add_permission(self, request: HttpRequest) -> bool:
-        return _may_configure_commissions(request) and super().has_add_permission(request)
+        return _section_allowed(request, "platform.vendors", write=True)
 
     def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
-        return _may_configure_commissions(request) and super().has_change_permission(request, obj)
+        return _section_allowed(request, "platform.vendors", write=True)
 
     def save_model(self, request: HttpRequest, obj: VendorPlan, form: Any, change: bool) -> None:
         save_plan(obj, ctx=audit_context(request))
@@ -931,8 +941,13 @@ class CommissionRuleAdmin(admin.ModelAdmin[CommissionRule]):
     def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         return False
 
+    # Commission rules are configuration (spec 02 line 55, matrix row "Platform: configuration"):
+    # the Configuration and tax role adds them, the platform owner reads them.
+    def has_view_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return _section_allowed(request, "platform.config", write=False)
+
     def has_add_permission(self, request: HttpRequest) -> bool:
-        return _may_configure_commissions(request) and super().has_add_permission(request)
+        return _section_allowed(request, "platform.config", write=True)
 
     def save_model(
         self, request: HttpRequest, obj: CommissionRule, form: Any, change: bool

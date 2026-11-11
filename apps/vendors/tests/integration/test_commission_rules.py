@@ -12,12 +12,13 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, ProgrammingError, connection, transaction
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.module_loading import import_string
 
 from apps.accounts import levels
 from apps.accounts.models import User
@@ -307,9 +308,9 @@ def test_a_snapshot_does_not_follow_the_live_rule() -> None:
 
 
 def test_staff_add_a_rule_in_the_admin_and_cannot_edit_or_delete_one(
-    client: Client, superuser: User, mfa_login: Any
+    client: Client, mfa_login: Any
 ) -> None:
-    staff: Client = mfa_login(client, superuser)
+    staff: Client = mfa_login(client, role_user("config"))
     url = reverse("admin:vendors_commissionrule_add")
     data = {
         "percent": "15.00",
@@ -339,10 +340,8 @@ def test_staff_add_a_rule_in_the_admin_and_cannot_edit_or_delete_one(
     )
 
 
-def test_the_admin_reads_the_start_in_business_time_not_utc(
-    client: Client, superuser: User, mfa_login: Any
-) -> None:
-    staff: Client = mfa_login(client, superuser)
+def test_the_admin_reads_the_start_in_business_time_not_utc(client: Client, mfa_login: Any) -> None:
+    staff: Client = mfa_login(client, role_user("config"))
     data = {
         "percent": "15.00",
         "base": "net_goods",
@@ -358,10 +357,8 @@ def test_the_admin_reads_the_start_in_business_time_not_utc(
     assert CommissionRule.objects.get().valid_from == dt.datetime(2029, 12, 31, 23, tzinfo=dt.UTC)
 
 
-def test_the_admin_form_never_offers_backdating(
-    client: Client, superuser: User, mfa_login: Any
-) -> None:
-    staff: Client = mfa_login(client, superuser)
+def test_the_admin_form_never_offers_backdating(client: Client, mfa_login: Any) -> None:
+    staff: Client = mfa_login(client, role_user("config"))
     page = staff.get(reverse("admin:vendors_commissionrule_add")).content.decode()
     assert "backdate" not in page
     past = {
@@ -463,6 +460,16 @@ def test_a_rule_cannot_leave_a_gap_after_a_closed_one() -> None:
 
 # --- CORE.25 session level and the Configuration and tax role (D-32 group 2, `commission_change`)
 
+
+def role_user(key: str) -> User:
+    """A staff user in the platform role group of `key`; roles come from the CORE.18 matrix. The
+    Manager sits above this app, so its `roles` module is reached by name."""
+    group = import_string("apps.manager.roles.role")(key).group
+    user = UserFactory.create(staff=True)
+    user.groups.add(Group.objects.get(name=group))
+    return user
+
+
 RULE_FORM = {
     "percent": "15.00",
     "base": "net_goods",
@@ -476,50 +483,58 @@ RULE_FORM = {
 PLAN_FORM = {"code": "gold", "name": "Gold", "max_products": "10", "features": "{}"}
 
 
-def config_staff(*, role: bool = True) -> User:
-    """A staff user with the model permissions, with or without the Configuration role."""
-    staff = UserFactory.create(staff=True)
-    codenames = ["add_commissionrule", "view_commissionrule", "add_vendorplan", "change_vendorplan"]
-    if role:
-        codenames.append("platform_config")
-    staff.user_permissions.add(*Permission.objects.filter(codename__in=codenames))
-    return staff
-
-
 def test_a_restricted_session_is_refused_on_a_rule_and_a_plan_change(client: Client) -> None:
-    verified_login(client, config_staff(), passkey=True, level=levels.RESTRICTED)
+    verified_login(client, role_user("config"), passkey=True, level=levels.RESTRICTED)
     rule_url = reverse("admin:vendors_commissionrule_add")
-    plan_url = reverse("admin:vendors_vendorplan_add")
     assert client.get(rule_url).status_code == 403
     assert client.post(rule_url, RULE_FORM).status_code == 403
-    assert client.post(plan_url, PLAN_FORM).status_code == 403
     assert not CommissionRule.objects.exists()
+    client = Client()
+    verified_login(client, role_user("owner"), passkey=True, level=levels.RESTRICTED)
+    assert client.post(reverse("admin:vendors_vendorplan_add"), PLAN_FORM).status_code == 403
     assert not VendorPlan.objects.filter(code="gold").exists()
 
 
-def test_an_operational_session_may_add_a_rule_and_a_plan(client: Client) -> None:
-    verified_login(client, config_staff(), passkey=True)  # operational by default
+def test_the_configuration_role_adds_rules_and_the_platform_owner_adds_plans(
+    client: Client,
+) -> None:
+    verified_login(client, role_user("config"), passkey=True)  # operational by default
     assert client.post(reverse("admin:vendors_commissionrule_add"), RULE_FORM).status_code == 302
-    assert client.post(reverse("admin:vendors_vendorplan_add"), PLAN_FORM).status_code == 302
     assert CommissionRule.objects.count() == 1
+    client = Client()
+    verified_login(client, role_user("owner"), passkey=True)
+    assert client.post(reverse("admin:vendors_vendorplan_add"), PLAN_FORM).status_code == 302
     assert VendorPlan.objects.filter(code="gold").exists()
 
 
 def test_a_plan_change_needs_the_operational_session_too(client: Client) -> None:
     plan = VendorPlanFactory.create(code="silver")
     url = reverse("admin:vendors_vendorplan_change", args=[plan.pk])
-    verified_login(client, config_staff(), passkey=True, level=levels.RESTRICTED)
+    verified_login(client, role_user("owner"), passkey=True, level=levels.RESTRICTED)
     assert client.post(url, {**PLAN_FORM, "code": "silver", "name": "Changed"}).status_code == 403
     plan.refresh_from_db()
     assert plan.name != "Changed"
 
 
-def test_a_user_without_the_configuration_role_is_refused(client: Client) -> None:
-    verified_login(client, config_staff(role=False), passkey=True)
-    assert client.get(reverse("admin:vendors_commissionrule_add")).status_code == 403
+@pytest.mark.parametrize("key", ["finance", "catalog", "support", "owner"])
+def test_other_roles_cannot_add_a_commission_rule(client: Client, key: str) -> None:
+    verified_login(client, role_user(key), passkey=True)
+    assert client.post(reverse("admin:vendors_commissionrule_add"), RULE_FORM).status_code == 403
+    assert not CommissionRule.objects.exists()
+
+
+@pytest.mark.parametrize("key", ["config", "finance", "catalog", "support"])
+def test_only_the_platform_owner_edits_plans(client: Client, key: str) -> None:
+    verified_login(client, role_user(key), passkey=True)
+    assert client.post(reverse("admin:vendors_vendorplan_add"), PLAN_FORM).status_code == 403
+    assert not VendorPlan.objects.filter(code="gold").exists()
+
+
+def test_a_superuser_without_a_role_has_no_access(client: Client, superuser: User) -> None:
+    verified_login(client, superuser, passkey=True)
+    assert client.post(reverse("admin:vendors_commissionrule_add"), RULE_FORM).status_code == 403
     assert client.post(reverse("admin:vendors_vendorplan_add"), PLAN_FORM).status_code == 403
     assert not CommissionRule.objects.exists()
-    assert not VendorPlan.objects.filter(code="gold").exists()
 
 
 # --- Edge cases of rounding, boundaries and races
