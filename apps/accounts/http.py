@@ -1,6 +1,6 @@
 """Request helpers shared by the MFA views, decorators and admin (CORE.4)."""
 
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from django.conf import settings
 from django.http import HttpRequest
@@ -25,7 +25,8 @@ def safe_next(request: HttpRequest, default: str = "/") -> str:
 _AUTH_VIEW_NAMES = frozenset(
     {"login", "logout", "admin:login", "admin:logout", "wagtailadmin_login", "wagtailadmin_logout"}
 )
-_AUTH_NAMESPACES = frozenset({"mfa"})
+# One-shot token URLs are never re-sent in a `next`.
+_AUTH_NAMESPACES = frozenset({"mfa", "action_link"})
 
 
 def _is_auth_page(path: str) -> bool:
@@ -51,7 +52,14 @@ def return_url(request: HttpRequest, default: str = "/") -> str:
     ):
         return default
     parts = urlsplit(referer)
-    if not parts.path.startswith("/") or parts.path.startswith("//") or _is_auth_page(parts.path):
+    decoded = unquote(parts.path)
+    if (
+        not decoded.startswith("/")
+        or "//" in decoded
+        or "\\" in decoded
+        or any(ord(char) < 32 or ord(char) == 127 for char in referer)
+        or _is_auth_page(decoded)
+    ):
         return default
     return f"{parts.path}?{parts.query}" if parts.query else parts.path or default
 
