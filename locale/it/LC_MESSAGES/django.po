@@ -581,15 +581,6 @@ msgstr ""
 "Come usare, montare, mantenere e smaltire il prodotto in sicurezza, in "
 "questa lingua."
 
-#: apps/shipping/models.py
-msgid ""
-"How VAT is applied to the shipping price: like the goods, at the standard "
-"rate, or exempt. Ask your accountant if you are not sure."
-msgstr ""
-"Come si applica l'IVA al prezzo della spedizione: come la merce, con "
-"l'aliquota ordinaria, oppure esente. Se non sei sicuro, chiedi al tuo "
-"commercialista."
-
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid ""
 "If you are not signed in, Continue signs you in once with this link; you "
@@ -603,6 +594,16 @@ msgstr ""
 #: apps/manager/sections.py
 msgid "Images"
 msgstr "Immagini"
+
+#: apps/shipping/models.py
+msgid ""
+"In the rate calculation, shipping is free when the goods in the package are "
+"worth at least this amount, without VAT. Leave it empty for no free "
+"shipping."
+msgstr ""
+"Nel calcolo delle tariffe la spedizione è gratuita quando la merce nel pacco"
+" vale almeno questo importo, IVA esclusa. Lascialo vuoto se non vuoi la "
+"spedizione gratuita."
 
 #: themes/base/templates/components/alert.html
 msgid "Information"
@@ -743,6 +744,15 @@ msgstr "nessuna registrazione di passkey in corso"
 msgid "No second factor yet."
 msgstr "Nessun secondo fattore per ora."
 
+#: apps/shipping/models.py
+msgid ""
+"Not used yet at checkout: marks the method to preselect once checkout uses "
+"shipping rates. A vendor can have only one default method per zone."
+msgstr ""
+"Non ancora usato al checkout: indica il metodo da preselezionare quando il "
+"checkout userà le tariffe di spedizione. Un venditore può avere un solo "
+"metodo predefinito per zona."
+
 #: apps/ingest/models.py
 msgid ""
 "Not used yet: saved for a future feature. Settings of the reader, as a JSON "
@@ -769,6 +779,15 @@ msgstr ""
 "Non ancora usato: viene salvato per una funzione futura. Il codice del "
 "lettore che capisce il flusso di questo fornitore."
 
+#: apps/core/models.py
+msgid ""
+"Not used yet: saved for a future feature. The EU country whose tax authority"
+" will get the DAC7 report. Ask your accountant if you are not sure."
+msgstr ""
+"Non ancora usato: viene salvato per una funzione futura. Il paese UE la cui "
+"autorità fiscale riceverà il report DAC7. Chiedi al tuo commercialista se "
+"non sei sicuro."
+
 #: apps/shipping/models.py
 msgid ""
 "Not used yet: saved for a future feature. Tick it if the carrier offers "
@@ -794,6 +813,16 @@ msgstr ""
 "Non ancora usato: viene salvato per una funzione futura. Quando leggere il "
 "flusso, come espressione cron, per esempio '0 3 * * *' (ogni giorno alle "
 "3:00). Lascia vuoto se non serve."
+
+#: apps/shipping/models.py
+msgid ""
+"Not used yet: saved for a future feature. Which VAT treatment the shipping "
+"price should get: like the goods, the standard rate, or exempt. Ask your "
+"accountant if you are not sure."
+msgstr ""
+"Non ancora usato: viene salvato per una funzione futura. Quale trattamento "
+"IVA dovrebbe avere il prezzo della spedizione: come la merce, l'aliquota "
+"ordinaria, oppure esente. Se non sei sicuro, chiedi al tuo commercialista."
 
 #: apps/manager/views.py
 msgid "Nothing changed."
@@ -1144,14 +1173,6 @@ msgstr "Spedire a"
 msgid "Ship to:"
 msgstr "Spedire a:"
 
-#: apps/shipping/models.py
-msgid ""
-"Shipping is free when the goods in the package are worth at least this "
-"amount, without VAT. Leave it empty for no free shipping."
-msgstr ""
-"La spedizione è gratuita quando la merce nel pacco vale almeno questo "
-"importo, IVA esclusa. Lascialo vuoto se non vuoi la spedizione gratuita."
-
 #: apps/manager/forms.py
 msgid "Shipping policy"
 msgstr "Condizioni di spedizione"
@@ -1278,10 +1299,11 @@ msgstr ""
 
 #: apps/shipping/models.py
 msgid ""
-"The address where buyers collect their order, with street, number, town and "
-"postcode."
+"The address where buyers will collect their order, with street, number, town"
+" and postcode. Not shown to buyers yet."
 msgstr ""
-"L'indirizzo dove i clienti ritirano l'ordine, con via, numero, città e CAP."
+"L'indirizzo dove i clienti ritireranno l'ordine, con via, numero, città e "
+"CAP. Non ancora mostrato ai clienti."
 
 #: apps/compliance/models.py
 msgid ""
@@ -1312,11 +1334,11 @@ msgstr "Il corriere che trasporta i pacchi con questo metodo."
 
 #: apps/shipping/models.py
 msgid ""
-"The carrier's name as buyers read it in this language, for example 'Standard"
-" courier'."
+"The carrier's name in this language, for example 'Standard courier'. Buyers "
+"will see it once checkout uses shipping."
 msgstr ""
-"Il nome del corriere come lo leggono i clienti in questa lingua, per esempio"
-" 'Corriere standard'."
+"Il nome del corriere in questa lingua, per esempio 'Corriere standard'. "
+"Compare ai clienti quando il checkout userà la spedizione."
 
 #: apps/ingest/models.py
 msgid "The catalogue product the case is about, if it is about one."
@@ -1421,14 +1443,6 @@ msgstr ""
 "L’email o la password non sono corrette, oppure l’account è bloccato per un "
 "po’. Riprova."
 
-#: apps/core/models.py
-msgid ""
-"The EU country whose tax authority receives the platform's DAC7 report on "
-"its sellers."
-msgstr ""
-"Il paese dell'UE la cui autorità fiscale riceve il rapporto DAC7 della "
-"piattaforma sui suoi venditori."
-
 #: apps/compliance/forms.py
 msgid ""
 "The facts and circumstances you relied on to decide. The vendor sees this "
@@ -1443,10 +1457,11 @@ msgstr "I dati del caso, in JSON."
 
 #: apps/shipping/models.py
 msgid ""
-"The fewest days a delivery takes. It is only an estimate, and buyers see it."
+"The fewest days a delivery takes. It is only an estimate. Not shown to "
+"buyers yet."
 msgstr ""
-"Il minimo di giorni che richiede una consegna. È solo una stima e i clienti "
-"la vedono."
+"Il minimo di giorni per la consegna. È solo una stima. Non ancora mostrato "
+"ai clienti."
 
 #: themes/base/templates/403_csrf.html
 msgid ""
@@ -1590,10 +1605,11 @@ msgstr ""
 
 #: apps/shipping/models.py
 msgid ""
-"The most days a delivery takes. It is only an estimate, and buyers see it."
+"The most days a delivery takes. It is only an estimate. Not shown to buyers "
+"yet."
 msgstr ""
-"Il massimo di giorni che richiede una consegna. È solo una stima e i clienti"
-" la vedono."
+"Il massimo di giorni per la consegna. È solo una stima. Non ancora mostrato "
+"ai clienti."
 
 #: apps/themes/admin.py apps/themes/models.py
 msgid ""
@@ -1631,19 +1647,19 @@ msgstr ""
 
 #: apps/shipping/models.py
 msgid ""
-"The name of the method as buyers read it in this language, for example "
-"'Standard delivery'."
+"The name of the method in this language, for example 'Standard delivery'. "
+"Buyers will see it once checkout uses shipping."
 msgstr ""
-"Il nome del metodo come lo leggono i clienti in questa lingua, per esempio "
-"'Consegna standard'."
+"Il nome del metodo in questa lingua, per esempio 'Consegna standard'. "
+"Compare ai clienti quando il checkout userà la spedizione."
 
 #: apps/shipping/models.py
 msgid ""
-"The name of the pickup point as buyers read it in this language, for example"
-" 'Pick up at the workshop'."
+"The name of the pickup point in this language, for example 'Pick up at the "
+"workshop'. Buyers will see it once checkout uses shipping."
 msgstr ""
-"Il nome del punto di ritiro come lo leggono i clienti in questa lingua, per "
-"esempio 'Ritiro in laboratorio'."
+"Il nome del punto di ritiro in questa lingua, per esempio 'Ritiro in "
+"laboratorio'. Compare ai clienti quando il checkout userà la spedizione."
 
 #: apps/tax/models.py
 msgid "The name of the territory, for example 'Canary Islands'."
@@ -2023,14 +2039,6 @@ msgstr ""
 "Spunta per permettere le esecuzioni che scrivono. Senza, ogni esecuzione di "
 "questa fonte è una prova che non cambia nulla."
 
-#: apps/shipping/models.py
-msgid ""
-"Tick it to preselect this method at checkout. A vendor can have only one "
-"default method per zone."
-msgstr ""
-"Spunta per preselezionare questo metodo alla cassa. Un venditore può avere "
-"un solo metodo predefinito per zona."
-
 #: apps/core/models.py
 msgid "Tick it when images under this licence must show a credit."
 msgstr ""
@@ -2174,13 +2182,14 @@ msgstr "Attenzione"
 
 #: apps/compliance/forms.py
 msgid ""
-"Warning: this text is published in the EU transparency database, cut at 2000"
-" characters. Write no personal data, no names, no email addresses or web "
-"addresses."
+"Warning: this text is meant for the EU transparency database (the submission"
+" is not built yet, so for now it is only stored). At most 2000 characters. "
+"Write no personal data, no names, no email addresses or web addresses."
 msgstr ""
-"Attenzione: questo testo viene pubblicato nella banca dati UE sulla "
-"trasparenza, tagliato a 2000 caratteri. Non scrivere dati personali, nomi, "
-"indirizzi email o indirizzi web."
+"Attenzione: questo testo è pensato per il database di trasparenza dell'UE "
+"(l'invio non c'è ancora, per ora viene solo salvato). Al massimo 2000 "
+"caratteri. Non scrivere dati personali, nomi, indirizzi email o indirizzi "
+"web."
 
 #: themes/base/templates/500.html
 msgid "We could not complete your request. Please try again in a few minutes."
@@ -2213,16 +2222,6 @@ msgstr ""
 #: apps/themes/styleguide.py
 msgid "We send the order confirmation here."
 msgstr "Qui ti mandiamo la conferma dell'ordine."
-
-#: apps/shipping/models.py
-msgid ""
-"What happens to a parcel heavier than the last weight band: charge the last "
-"band, ask for a quote or block the checkout. Leave it empty to follow the "
-"platform default."
-msgstr ""
-"Che cosa succede a un pacco più pesante dell'ultima fascia di peso: si "
-"addebita l'ultima fascia, si chiede un preventivo oppure si blocca la cassa."
-" Lascialo vuoto per seguire il valore predefinito della piattaforma."
 
 #: apps/compliance/forms.py
 msgid ""
@@ -2262,14 +2261,26 @@ msgstr ""
 
 #: apps/shipping/models.py
 msgid ""
-"What the method does in this area: an estimated cost that needs a quote, a "
-"rate with a surcharge, quote only, not offered, or blocked. Without a "
-"treatment the method gives an estimated cost that needs a quote."
+"What the rate calculation does for this method in this area: an estimated "
+"cost that needs a quote, a rate with a surcharge, quote only, not offered, "
+"or blocked. Without a treatment it gives an estimated cost that needs a "
+"quote."
 msgstr ""
-"Che cosa fa il metodo in quest'area: un costo stimato da confermare con un "
-"preventivo, una tariffa con supplemento, solo preventivo, non offerto oppure"
-" bloccato. Senza un trattamento il metodo dà un costo stimato da confermare "
-"con un preventivo."
+"Che cosa fa il calcolo delle tariffe per questo metodo in quest'area: un "
+"costo stimato da confermare con un preventivo, una tariffa con supplemento, "
+"solo preventivo, non offerto oppure bloccato. Senza un trattamento dà un "
+"costo stimato da confermare con un preventivo."
+
+#: apps/shipping/models.py
+msgid ""
+"What the rate calculation should do for a parcel heavier than the last "
+"weight band: charge the last band, ask for a quote or block the checkout. "
+"Leave it empty to follow the platform default, which is still to be decided."
+msgstr ""
+"Che cosa dovrebbe fare il calcolo delle tariffe per un pacco più pesante "
+"dell'ultima fascia di peso: addebitare l'ultima fascia, chiedere un "
+"preventivo oppure bloccare la cassa. Lascialo vuoto per seguire il valore "
+"predefinito della piattaforma, che deve ancora essere deciso."
 
 #: apps/ingest/models.py
 msgid "What the run does: scrape, stock, price, images or publish."
@@ -2321,11 +2332,11 @@ msgstr "Quando i dati del fornitore sono stati letti."
 
 #: apps/core/models.py
 msgid ""
-"When this version starts to apply. A change is a new version from a date: "
-"saving it closes the version before it."
+"When this version starts to apply. A change is a new version from a date; "
+"the service that adds it closes the previous one."
 msgstr ""
 "Da quando vale questa versione. Una modifica è una nuova versione da una "
-"certa data: salvandola si chiude la versione precedente."
+"data; il servizio che la aggiunge chiude la precedente."
 
 #: apps/core/models.py
 msgid ""

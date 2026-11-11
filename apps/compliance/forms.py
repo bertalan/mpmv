@@ -174,9 +174,9 @@ class RestrictionForm(forms.Form):
         max_length=engine.PUBLIC_TEXT_LIMIT,
         widget=forms.Textarea(attrs={"rows": 3}),
         help_text=_(
-            "Warning: this text is published in the EU transparency database, cut at 2000 "
-            "characters. Write no personal data, no names, no email addresses or web "
-            "addresses."
+            "Warning: this text is meant for the EU transparency database (the submission is "
+            "not built yet, so for now it is only stored). At most 2000 characters. Write no "
+            "personal data, no names, no email addresses or web addresses."
         ),
     )
     ground_kind = forms.ChoiceField(

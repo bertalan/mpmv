@@ -297,8 +297,8 @@ class Versioned(BaseModel):
 
     valid_from = models.DateTimeField(
         help_text=_(
-            "When this version starts to apply. A change is a new version from a date: "
-            "saving it closes the version before it."
+            "When this version starts to apply. A change is a new version from a date; the "
+            "service that adds it closes the previous one."
         )
     )
     valid_to = models.DateTimeField(null=True, blank=True, editable=False)
@@ -405,7 +405,8 @@ class PlatformOperator(Versioned):
     dac7_authority_country = CountryField(
         "DAC7 reporting authority country",
         help_text=_(
-            "The EU country whose tax authority receives the platform's DAC7 report on its sellers."
+            "Not used yet: saved for a future feature. The EU country whose tax authority "
+            "will get the DAC7 report. Ask your accountant if you are not sure."
         ),
     )
     # CMP.3 (owner decision 2026-11-09): staff alerts, e.g. an overdue GPSR safety case, go to

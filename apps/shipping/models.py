@@ -111,7 +111,8 @@ class CarrierTranslation(TranslationModel):
     label = models.CharField(
         max_length=100,
         help_text=_(
-            "The carrier's name as buyers read it in this language, for example 'Standard courier'."
+            "The carrier's name in this language, for example 'Standard courier'. "
+            "Buyers will see it once checkout uses shipping."
         ),
     )
 
@@ -451,26 +452,30 @@ class ShippingMethod(BaseModel):
     min_delivery_days = models.PositiveSmallIntegerField(
         null=True,
         blank=True,
-        help_text=_("The fewest days a delivery takes. It is only an estimate, and buyers see it."),
+        help_text=_(
+            "The fewest days a delivery takes. It is only an estimate. Not shown to buyers yet."
+        ),
     )
     max_delivery_days = models.PositiveSmallIntegerField(
         null=True,
         blank=True,
-        help_text=_("The most days a delivery takes. It is only an estimate, and buyers see it."),
+        help_text=_(
+            "The most days a delivery takes. It is only an estimate. Not shown to buyers yet."
+        ),
     )
     is_default = models.BooleanField(
         default=False,
         help_text=_(
-            "Tick it to preselect this method at checkout. A vendor can have only one "
-            "default method per zone."
+            "Not used yet at checkout: marks the method to preselect once checkout uses shipping "
+            "rates. A vendor can have only one default method per zone."
         ),
     )
     free_shipping_threshold = MoneyField(
         null=True,
         blank=True,
         help_text=_(
-            "Shipping is free when the goods in the package are worth at least this amount,"
-            " without VAT. Leave it empty for no free shipping."
+            "In the rate calculation, shipping is free when the goods in the package are worth at "
+            "least this amount, without VAT. Leave it empty for no free shipping."
         ),
     )
     # Stored only (SHP.12): the tax engine applies it (TAX.4); D-03 is open.
@@ -480,8 +485,9 @@ class ShippingMethod(BaseModel):
         choices=ShippingTaxTreatment.choices,
         default=engine.DEFAULT_TAX_TREATMENT,
         help_text=_(
-            "How VAT is applied to the shipping price: like the goods, at the standard "
-            "rate, or exempt. Ask your accountant if you are not sure."
+            "Not used yet: saved for a future feature. Which VAT treatment the shipping price "
+            "should get: like the goods, the standard rate, or exempt. Ask your accountant if "
+            "you are not sure."
         ),
     )
     # Hook for D-06 (open): empty means "no policy of its own"; SHP.3 then applies the platform
@@ -493,9 +499,9 @@ class ShippingMethod(BaseModel):
         blank=True,
         default=engine.PLATFORM_DEFAULT,
         help_text=_(
-            "What happens to a parcel heavier than the last weight band: charge the last "
-            "band, ask for a quote or block the checkout. Leave it empty to follow the "
-            "platform default."
+            "What the rate calculation should do for a parcel heavier than the last weight band: "
+            "charge the last band, ask for a quote or block the checkout. Leave it empty to "
+            "follow the platform default, which is still to be decided."
         ),
     )
 
@@ -571,8 +577,8 @@ class ShippingMethodTranslation(TranslationModel):
     name = models.CharField(
         max_length=100,
         help_text=_(
-            "The name of the method as buyers read it in this language, for example "
-            "'Standard delivery'."
+            "The name of the method in this language, for example "
+            "'Standard delivery'. Buyers will see it once checkout uses shipping."
         ),
     )
 
@@ -820,9 +826,9 @@ class SpecialAreaTreatment(BaseModel):
         choices=AreaTreatmentMode.choices,
         default=engine.DEFAULT_TREATMENT_MODE,
         help_text=_(
-            "What the method does in this area: an estimated cost that needs a quote, a "
-            "rate with a surcharge, quote only, not offered, or blocked. Without a "
-            "treatment the method gives an estimated cost that needs a quote."
+            "What the rate calculation does for this method in this area: an estimated cost that "
+            "needs a quote, a rate with a surcharge, quote only, not offered, or blocked. "
+            "Without a treatment it gives an estimated cost that needs a quote."
         ),
     )
     surcharge_type = models.CharField(
@@ -926,7 +932,8 @@ class PickupOption(BaseModel):
     )
     address = models.TextField(
         help_text=_(
-            "The address where buyers collect their order, with street, number, town and postcode."
+            "The address where buyers will collect their order, with street, number, town and "
+            "postcode. Not shown to buyers yet."
         )
     )
 
@@ -962,8 +969,8 @@ class PickupOptionTranslation(TranslationModel):
     label = models.CharField(
         max_length=100,
         help_text=_(
-            "The name of the pickup point as buyers read it in this language, for example "
-            "'Pick up at the workshop'."
+            "The name of the pickup point in this language, for example "
+            "'Pick up at the workshop'. Buyers will see it once checkout uses shipping."
         ),
     )
 
