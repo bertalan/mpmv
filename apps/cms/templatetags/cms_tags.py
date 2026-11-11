@@ -8,7 +8,7 @@ from typing import Any
 from django import template
 from django.conf import settings
 from django.http import HttpRequest
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils import translation
 from django.utils.html import format_html_join
 from django.utils.safestring import SafeString, mark_safe
@@ -191,11 +191,15 @@ def help_context(context: dict[str, Any]) -> dict[str, str] | None:
     user = getattr(request, "user", None)
     if user is None or not (user.is_authenticated and user.is_active):
         return None
+    try:
+        url = reverse("help_entry")
+    except NoReverseMatch:  # a URLconf without the endpoint (a test harness): no button
+        return None
     match = getattr(request, "resolver_match", None)
     page = context.get("page")
     label = page.specific_class._meta.label if isinstance(page, Page) else ""
     return {
-        "url": reverse("help_entry"),
+        "url": url,
         "route": engine.help_route_name(getattr(match, "view_name", "")),
         "page_type": engine.help_page_type(label),
         "language": translation.get_language() or settings.LANGUAGE_CODE,
