@@ -1,0 +1,9 @@
+{% load i18n %}{% include "email/orders/_non_fiscal.txt" %}
+
+{% if customer_name %}{% blocktranslate %}Hello {{ customer_name }},{% endblocktranslate %}{% else %}{% translate "Hello," %}{% endif %}
+
+{% blocktranslate %}Order {{ order_number }}, sold by {{ vendor_name }}:{% endblocktranslate %}
+
+{% for line in lines %}- {{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %} x {{ line.quantity }}: {{ line.total }} EUR
+{% endfor %}{% blocktranslate %}Shipping: {{ shipping }} EUR{% endblocktranslate %}
+{% blocktranslate %}Total: {{ total }} EUR{% endblocktranslate %}

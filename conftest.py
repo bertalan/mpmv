@@ -7,7 +7,7 @@ Test data comes from factory_boy factories, reseeded before every test (ARC.12).
 import os
 from datetime import timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import factory.random
 import pytest
@@ -21,6 +21,14 @@ if TYPE_CHECKING:
     from apps.accounts.models import User
     from apps.core.changeset import ChangeSet
     from tests.tenancy import CrossTenant
+
+
+@pytest.fixture
+def admin_open(settings: Any) -> None:
+    """OPS.5: the technical admin answers every address, for tests of the sign-in protections
+    that connect from several client addresses (the test settings allow loopback only)."""
+    settings.ADMIN_ALLOWED_NETWORKS = ["0.0.0.0/0", "::/0"]
+
 
 # Fixed seed for Faker and factory_boy, so a failure replays with the same data.
 FACTORY_SEED = int(os.environ.get("MPMV_TEST_SEED", "20271"))
@@ -134,11 +142,13 @@ def mfa_login(db: None) -> "Callable[[Client, User], Client]":
     """Log a user in with a verified second factor (CORE.4): staff need it for every page.
 
     Like `superuser`, it lets apps below `accounts` (spec 01 §1.3) act as staff in the admin.
+    The session also holds a fresh passkey with user verification, as D-32 group 3 actions
+    (bank details, owner role) ask; tests of the levels themselves use `verified_login`.
     """
     from apps.accounts.tests.mfa import verified_login
 
     def login(client: "Client", user: "User") -> "Client":
-        verified_login(client, user)
+        verified_login(client, user, passkey=True)
         return client
 
     return login

@@ -4,6 +4,8 @@ import uuid
 
 from django.http import HttpRequest, JsonResponse
 
+from apps.core.observability import current_request_id
+
 from .problems import PROBLEM_CONTENT_TYPE, Problem
 
 REQUEST_ID_HEADER = "X-Request-ID"
@@ -11,8 +13,11 @@ _REQUEST_ID_ATTR = "api_request_id"
 
 
 def assign_request_id(request: HttpRequest) -> str:
-    """Give the request a fresh id (never taken from the client, so it cannot be forged)."""
-    request_id = uuid.uuid4().hex
+    """Give the request its id: the one `RequestIdMiddleware` made (OPS.2), else a fresh one.
+
+    The middleware keeps a proxy's id only when it is a safe token, so no raw client text is used.
+    """
+    request_id = current_request_id() or uuid.uuid4().hex
     setattr(request, _REQUEST_ID_ATTR, request_id)
     return request_id
 

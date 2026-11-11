@@ -170,6 +170,90 @@ The second factor is a TOTP authenticator app or a passkey. The confirmed parame
 - Impersonation for support (equivalent of Login as User): the roles the impersonation policy
   allows, time-limited, with a reason, a banner, audit and a hard floor (CORE.10, see Backoffice).
 
+### Session lifetimes and control (CORE.24)
+
+Owner note 2026-11-10. Session cookies are `HttpOnly`, `SameSite=Lax` and `Secure` on STAGE and
+LIVE (SEC.1); the lifetime depends on the role:
+
+- **Customers** (no vendor membership, no staff flag): a rolling session, 14 days.
+- **Staff and vendor members**, in the Manager and in the admins: an idle timeout of 30 minutes and
+  an absolute lifetime of 12 hours, both values on the `PlatformOperator` configuration.
+- The account page lists the user's sessions and has "log out everywhere".
+- All of a user's sessions are invalidated when the password, an MFA device or a role changes.
+- A stolen session can never enrol a passkey or TOTP, or turn MFA off, without a fresh second
+  factor; this has its own test and does not rely on the session level below.
+
+### Session levels (D-32, CORE.25)
+
+Owner decision D-32 (2026-11-10, restated the same day). The two levels apply **per session**, for
+staff and vendor members. Names in code and UI: `restricted` (UI "Secure mode") and `operational`
+(UI "Operational mode").
+
+| | **Restricted mode** (`restricted`, UI "Secure mode") | **Operational mode** (`operational`, UI "Operational mode") |
+|---|---|---|
+| When | Default. Every session starts here after login and returns here on logout, idle timeout or cap | Only after the user turns it on with a fresh passkey |
+| Power | Fewer powers: everyday work only. Sensitive actions are refused, with a prompt to switch | More powers: the sensitive actions are allowed |
+| Duration | The whole session | Until logout, 15 min idle or a 2 h cap, whichever comes first; then back to restricted |
+| Who | Everyone | Only roles with the `elevate` permission, and only with an enrolled passkey |
+
+"Secure" means locked down, low privilege. It does not mean "verified or elevated": the elevated
+state is the operational one, and it is temporary.
+
+- Operational mode is turned on from the header only with a **fresh passkey** (WebAuthn with user
+  verification; TOTP is not accepted). A banner shows the mode with an "end now" button. Start and
+  end (with the reason: logout, idle, cap, manual) are written to `AuditLog`. The timers are on the
+  `PlatformOperator` configuration.
+- A user with no enrolled passkey cannot elevate until they enrol one, and enrolling needs a fresh
+  second factor.
+- In restricted mode a group 2 action is not a dead end: the prompt offers (a) **"Do it once"**: a fresh passkey authorises this single action only; it is bound to the action and its parameters (this export, this role grant), single use, valid about 2 minutes, audited as an elevation of kind `single`, and the session stays restricted; the roles that may use it are the same ones with `elevate`. or (b) "Switch to operational mode". Group 3 is unchanged.
+- A normal working day needs two passkey moments: login, and the switch to operational mode when
+  needed. Group 3 adds a prompt only for rare actions.
+
+Three groups of actions (platform defaults; a vendor may only make them stricter):
+
+1. **Free in restricted mode**: everyday work such as viewing and editing own catalogue items,
+   orders in progress and content.
+2. **Operational mode required**:
+   - bulk downloads, exports and backups: CSV and PDF exports, order, customer and vendor
+     exports, CMP.12 records, media archives, any backup or dump download;
+   - roles and permissions (grants), API key creation and rotation;
+   - VAT regime changes;
+   - in-clear Tax and Audit views;
+   - bulk edits;
+   - impersonation (CORE.10).
+3. **Per-action fresh passkey, even inside operational mode**: payout and bank details; granting
+   the owner, superuser or `platform_owner` role; disabling MFA or removing the last passkey;
+   `bootstrap_platform_owner` (CORE.23).
+
+The step-up list under Authentication above stays the list of actions that ask for a fresh second
+factor; for staff and vendor-member sessions the three groups above take precedence over it.
+
+Tests (CORE.25): restricted refuses group 2; elevation without a passkey refuses (and with TOTP);
+the mode expires on idle, on the cap and on logout; per-action prompts still fire inside the mode;
+a stolen session cannot elevate. Acceptance test pinning the direction: (1) right after login a bulk export is refused; (2) "do it once" with a fresh passkey succeeds once and a second export is refused again; (3) operational mode with a fresh passkey allows repeated exports; (4) after 16 minutes idle exports are refused again.
+
+### Trial, audit and vendor policy (D-32)
+
+D-32 is a **trial, review after STAGE**. The goal is a normal working day with two passkey
+moments, login and entering operational mode, plus a per-action passkey for the few critical
+actions. It is tunable without code:
+
+- The timers **and the three action lists** (restricted, operational, per-action) live in the
+  `PlatformOperator` configuration, with the D-32 defaults above.
+- `AuditLog` records every elevation (kind `session` and kind `single`) and every per-action
+  prompt. A small report counts prompts per user per day, for the friction review.
+- **Two policy layers.** The platform policy (`PlatformOperator`) covers platform-space actions and
+  sets the vendor defaults plus a hard floor. The vendor policy (per vendor, edited by its owner)
+  covers shop-space actions: its exports, payout details, members and roles, API keys, bulk edits.
+- **A vendor can only tighten.** It may shorten the timers, move an action from restricted to
+  operational, or from operational to per-action passkey; it never goes below the floor. The floor's
+  per-action list (payout and bank details, the owner-role grant, MFA disable or last-passkey
+  removal) can never be relaxed, the same pattern as the CORE.10 impersonation policy.
+- Changing a vendor policy needs operational mode plus a per-action passkey by the vendor owner,
+  is audited with a before/after diff and is shown in the platform's vendor view. A vendor that
+  changed nothing follows the platform defaults, and later changes to those defaults still apply
+  to it (CORE.26).
+
 ### Secure action links (CORE.15)
 
 Emails that ask a user to approve or decline something (bundle funding proposals CAT.18, CMP.10
@@ -567,6 +651,9 @@ platform space. This is part of CORE.9.
 | CORE.21 | Site editor role (follow-up of CORE.18, accepted by lane-a 2026-11-10): a platform role that may edit the home page and unlisted pages in the Wagtail admin and nothing else, with its row in the role-permission matrix (`apps/manager/roles.py`), the seeded group, and the parametric matrix test covering every cell | P2 | 4 | CORE.18, CMS.1 | The role edits the home page and unlisted pages, is refused every other page, snippet and Manager section, and the matrix test and the group drift check pass |
 | CORE.22 | Optional four-eyes rule for publishers (follow-up of CORE.18; the owner decides whether it is wanted, so no work starts before that decision is recorded in spec 92): a setting under which a page or product publication by one publisher needs approval from a second person with the publisher role, with an `AuditLog` entry for both | P3 | 6 | CORE.18, SEC.4 | With the rule on, a single publisher cannot publish alone and both people appear in the audit log; with the rule off, behaviour is unchanged |
 | CORE.23 | First platform owner bootstrap (owner request 2026-11-10, interim until the ARC.25 wizard): `manage.py bootstrap_platform_owner EMAIL [--create] [--dry-run]` grants `core.platform_owner` to an existing active user, or creates the account with no usable password; idempotent, returns a ChangeSet, writes an AuditLog entry, step documented in `docs/dev/release.md` | P1 | 2 | CORE.17 | A second run changes nothing and writes no second audit entry; `--dry-run` changes and audits nothing; an unknown or inactive user is refused without `--create` |
+| CORE.24 | Session theft hardening (owner note 2026-11-10; spec 02 §Session lifetimes and control): role-based lifetimes, customers rolling 14 days, staff and vendor members in the Manager and the admins idle 30 min and absolute 12 h, both on the `PlatformOperator` configuration; an account-page list of the user's sessions (device, last use, approximate place) with "log out everywhere" and per-session end; every session of a user is invalidated when the password, an MFA device or a role changes (the current one is kept after a self-service change, re-verified); a stolen session can never enrol a passkey or TOTP, or turn MFA off, without a fresh second factor (a passkey, also in restricted mode, see CORE.25), tested on its own | P1 | 10 | CORE.4, ARC.7 | Idle and absolute timeouts end a staff session in tests and a customer one stays rolling; a password, MFA device or role change ends the other sessions; the session list shows and ends sessions; a session with no fresh second factor cannot enrol a passkey or TOTP or disable MFA |
+| CORE.25 | Two session levels (owner decision D-32, 2026-11-10; spec 02 §Session levels, replaces the generic step-up of the CORE.24 note): `restricted` (UI "Secure mode", default, low privilege) and `operational` (UI "Operational mode", temporary, elevated) per session for staff and vendor members; operational is started from the header only with a fresh passkey (WebAuthn, user verification, TOTP refused) and only for roles with the new `elevate` permission (in the CORE.18 matrix) and an enrolled passkey; ends on logout, 15 min idle or a 2 h cap, timers on the `PlatformOperator` configuration; banner with "end now"; start and end in AuditLog; decorator `requires_operational_mode` for group 2 and `requires_fresh_passkey` for group 3 (reusing the existing step-up confirmations), a prompt in restricted mode offering "Do it once" (a fresh passkey authorises this single action only: bound to the action and its parameters, single use, valid about 2 minutes, audited as an elevation of kind `single`, session stays restricted, same `elevate` roles) or "Switch to operational mode"; platform defaults a vendor may only make stricter (CORE.26); timers and the three action lists in the `PlatformOperator` configuration with the D-32 defaults, tunable without code (trial, review after STAGE); AuditLog records every elevation (`session` and `single`) and every per-action prompt, and a report counts prompts per user per day; enrolling a passkey needs a fresh second factor | P1 | 14 | CORE.24, CORE.18, CORE.17 | Tests: restricted refuses each group 2 action; elevation without a passkey refuses (and with TOTP); the mode ends on idle, cap and logout; the per-action passkey prompt fires inside the mode; a stolen session cannot elevate; start and end audited; a sweep test fails when a group 2 or 3 action has no decorator; direction test: (1) bulk export refused after login; (2) "do it once" with a passkey succeeds once, a second export is refused; (3) operational mode allows repeated exports; (4) refused again after 16 min idle; a `single` authorisation is refused for another action or parameters and after 2 min; changing a timer or a list in the configuration changes the behaviour with no code change; every elevation and per-action prompt is audited and the report counts them per user per day |
+| CORE.26 | Vendor session policy (owner decision D-32 addition, 2026-11-10; spec 02 §Trial, audit and vendor policy): a per-vendor policy of the D-32 timers and action lists for shop-space actions (exports, payout details, members and roles, API keys, bulk edits), edited by the vendor owner in the Manager shop space; the platform policy on `PlatformOperator` sets the defaults and a hard floor; a vendor can only tighten (shorter timers, an action moved to a stricter group), never go below the floor, and the floor's per-action list (payout and bank details, the owner-role grant, MFA disable or last-passkey removal) can never be relaxed (same pattern as the CORE.10 policy); a change needs operational mode plus a per-action passkey by the owner, is audited with a before/after diff and shows in the platform vendor view; a vendor with no change follows the platform defaults and their later changes | P1 | 8 | CORE.25, VEN.1 | A vendor loosening below the floor or relaxing the floor list is refused; tightening applies; a change without operational mode or the passkey is refused; the AuditLog holds the diff; the platform vendor view shows it; changing a platform default reaches a vendor that has no override and not one that overrode it |
 | CORE.13 | `ApiClient.vendor`: optional vendor FK on API keys (empty = platform key), vendor-scoped API keys enforced through CORE.3 scoping, admin and tests | P1 | 3 | CORE.3, CORE.6 | A vendor key cannot read or change another vendor's data (negative tests) |
 | CORE.14 | Vendor API key policy (coherence check 5): a vendor-grantable scope set apart from platform-only scopes, keys of a suspended vendor limited to reads and keys of a closed vendor refused, one AuditLog entry per key when a vendor and its keys are deleted; needed before EVT.5 exposes vendor event scopes | P1 | 3 | CORE.13 | A vendor key cannot be issued with a platform-only scope; a suspended vendor's key gets 403 on writes and succeeds on reads; a closed vendor's key gets 401; deleting a vendor writes one audit entry per key |
 | CORE.17 | Manager shell (owner decision 2026-11-09, spec 02 §Backoffice): one adapter app `apps/manager/` (views, templates, navigation registry, no business logic), one layout, component set and login; two spaces by URL prefix, shop `/manager/shop/` for vendor members (vendor picker for people in several vendors, the choice re-checked against memberships on every request, all data through CORE.3 `for_actor`) and platform `/manager/platform/` for platform staff roles; one gate per prefix (middleware or base mixin) answering an explanatory 403 page to a signed-in user without the space's right (owner decision 2026-11-10; sections inside a space keep answering 404) and sending anonymous visitors to the login, `/manager/` itself redirecting to the user's own space; navigation registry where each section declares its space and permission, the menu showing only the sections the actor may open and each view checking the same permission; base list view with filters, pagination and bulk actions with dry-run; MFA (CORE.4) for every Manager user and step-up on sensitive actions; the vendor-area pages of CORE.9, VEN.9, VEN.15, VEN.20, EVT.4, ORD.6 and CAT.18 plug into the shop space | P1 | 18 | CORE.3, CORE.4 | A vendor member opens `/manager/shop/` and gets the 403 page on every `/manager/platform/` URL (GET and POST); a platform staff member gets it on `/manager/shop/` outside an impersonation session; a customer gets it on both spaces and an anonymous visitor is sent to the login; every form of the shell (language switcher, sign-out) posts through a real CSRF check; `/manager/` redirects to the user's home; a member of two vendors switches vendor and never sees the other vendor's rows (CORE.3 fixture), and a forged vendor id in the session or the request gives 404; a user without a confirmed second factor is sent to enrolment before any Manager page; a sweep test fails when a URL registered under `/manager/` is not under exactly one gated prefix; a section hidden from the menu still answers 404 when its URL is typed |
