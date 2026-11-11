@@ -6,7 +6,6 @@ import datetime
 import uuid
 
 import django.contrib.postgres.constraints
-from django.contrib.postgres.operations import BtreeGistExtension
 from django.db import migrations, models
 
 import apps.core.fields
@@ -29,7 +28,9 @@ class Migration(migrations.Migration):
     dependencies = [("vendors", "0026_storefront_rich_text")]
 
     operations = [
-        BtreeGistExtension(),
+        migrations.RunSQL(
+            "CREATE EXTENSION IF NOT EXISTS btree_gist", reverse_sql=migrations.RunSQL.noop
+        ),
         migrations.CreateModel(
             name="NoTinCountry",
             fields=[
