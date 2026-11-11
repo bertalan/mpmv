@@ -42,6 +42,10 @@ msgstr "Informazioni sul negozio"
 msgid "Access denied"
 msgstr "Accesso negato"
 
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Act on the content"
+msgstr "Interveni sul contenuto"
+
 #: apps/manager/templates/manager/list.html
 msgid "Action on the selected rows"
 msgstr "Azione sulle righe selezionate"
@@ -80,6 +84,10 @@ msgstr "app di autenticazione"
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Authenticator app"
 msgstr "App di autenticazione"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Authorities told: %(authority)s, %(at)s."
+msgstr "Autorità informate: %(authority)s, %(at)s."
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Back to the notices"
@@ -533,6 +541,10 @@ msgstr "Ricevuta"
 msgid "Record the decision"
 msgstr "Registra la decisione"
 
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Record the notification"
+msgstr "Registra la comunicazione"
+
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Recovery code"
 msgstr "Codice di recupero"
@@ -567,6 +579,10 @@ msgstr "Segnalato"
 #: themes/base/templates/components/field.html
 msgid "required"
 msgstr "obbligatorio"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Restrict and send the statement of reasons"
+msgstr "Limita e invia la motivazione"
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Retired"
@@ -657,6 +673,10 @@ msgid "Start review"
 msgstr "Avvia la revisione"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Statements of reasons"
+msgstr "Motivazioni"
+
+#: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/notices.html
 msgid "Status"
 msgstr "Stato"
@@ -673,6 +693,10 @@ msgstr "Profilo del negozio salvato."
 msgid "Success"
 msgstr "Operazione riuscita"
 
+#: apps/manager/templates/manager/platform/notice_detail.html
+msgid "Suspected criminal offence (DSA article 18)"
+msgstr "Sospetto reato (DSA articolo 18)"
+
 #: apps/manager/templates/manager/layout.html
 msgid "Switch"
 msgstr "Cambia"
@@ -680,6 +704,17 @@ msgstr "Cambia"
 #: apps/manager/forms.py
 msgid "Tagline"
 msgstr "Slogan"
+
+#: apps/manager/notice_views.py
+msgid ""
+"The content could not be restricted: check the notice status and target."
+msgstr ""
+"Non è stato possibile limitare il contenuto: controlla lo stato e il "
+"bersaglio della segnalazione."
+
+#: apps/manager/notice_views.py
+msgid "The content is restricted and the vendor is told."
+msgstr "Il contenuto è limitato e il venditore ne è informato."
 
 #: apps/manager/notice_views.py
 msgid "The decision is recorded and the notifier is told."
@@ -713,6 +748,10 @@ msgstr ""
 #: apps/manager/notice_views.py
 msgid "The notice is under review."
 msgstr "La segnalazione è in revisione."
+
+#: apps/manager/notice_views.py
+msgid "The notification to the authorities is recorded."
+msgstr "La comunicazione alle autorità è registrata."
 
 #: themes/base/templates/404.html
 msgid "The page you asked for does not exist or has moved."
