@@ -1,8 +1,11 @@
 """CAT.20 (2/3): vendors pick and propose brands, staff approve, reject or merge them, every
 change is audited, and a merged brand's old page redirects."""
 
+import threading
+
 import pytest
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, connection, transaction
 from django.test import Client
 from django.test.utils import override_settings
 
@@ -17,6 +20,7 @@ from apps.catalog.tests.factories import (
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 from apps.core.translations import PUBLISHED
+from apps.vendors.models import Vendor
 from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
@@ -359,3 +363,118 @@ def test_a_brand_with_products_is_not_deleted_but_merged() -> None:
     with pytest.raises(ValidationError):
         brands.delete_brand(brand, ctx=CTX)
     assert Brand.objects.filter(pk=brand.pk).exists()
+
+
+# --- Review fixes: races, batch caps, merge under lock, audit of released products
+
+
+def test_the_database_refuses_two_open_brands_with_one_name_key() -> None:
+    BrandFactory.create(name="Acme & Sons", status=Brand.Status.PENDING)
+    with pytest.raises(IntegrityError), transaction.atomic():
+        BrandFactory.create(name="ACME and sons", status=Brand.Status.PENDING)
+
+
+def test_a_duplicate_that_passes_validation_is_still_a_refusal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """What a concurrent insert looks like: the checks passed, the constraint fires."""
+    vendor = VendorFactory.create()
+    BrandFactory.create(name="Acme & Sons", status=Brand.Status.PENDING, wikidata_id="Q42")
+    monkeypatch.setattr(Brand, "full_clean", lambda self, *a, **k: None)
+    with pytest.raises(ValidationError):
+        brands.propose_brand(vendor, "ACME and sons", ctx=CTX)
+    with pytest.raises(ValidationError):
+        brands.propose_brand(vendor, "Other", ctx=CTX, wikidata_id="Q42")
+    with pytest.raises(ValidationError):
+        brands.save_brand(Brand(name="acme AND sons", status=Brand.Status.PENDING), ctx=CTX)
+    assert Brand.objects.count() == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_two_vendors_proposing_one_brand_at_once_make_one_brand() -> None:
+    vendors = [VendorFactory.create(), VendorFactory.create()]
+    names = ["Acme & Sons", "ACME and sons"]
+    barrier = threading.Barrier(2)
+    results: list[str] = []
+
+    def propose(vendor: Vendor, name: str) -> None:
+        try:
+            barrier.wait()
+            brands.propose_brand(vendor, name, ctx=CTX)
+            results.append("ok")
+        except ValidationError:
+            results.append("refused")
+        finally:
+            connection.close()
+
+    threads = [
+        threading.Thread(target=propose, args=pair) for pair in zip(vendors, names, strict=True)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert sorted(results) == ["ok", "refused"]
+    assert Brand.objects.count() == 1
+
+
+@override_settings(MPMV_BRAND_BATCH_LIMIT=3)
+def test_a_batch_has_a_size_cap() -> None:
+    vendor = VendorFactory.create()
+    with pytest.raises(ValidationError):
+        brands.propose_batch(vendor, ["A", "B", "C", "D"], source="run", ctx=CTX)
+    assert not Brand.objects.exists()
+    brands.propose_batch(vendor, ["A", "B", "C"], source="run", ctx=CTX)
+
+
+@override_settings(MPMV_BRAND_BATCH_LIMIT=10, MPMV_BRAND_BATCH_PENDING_LIMIT=5)
+def test_pending_batch_brands_count_toward_a_vendor_ceiling() -> None:
+    vendor, other = VendorFactory.create(), VendorFactory.create()
+    first = brands.propose_batch(vendor, ["A", "B", "C", "D"], source="run 1", ctx=CTX)
+    with pytest.raises(ValidationError):
+        brands.propose_batch(vendor, ["E", "F"], source="run 2", ctx=CTX)
+    brands.propose_batch(other, ["G", "H"], source="run 3", ctx=CTX)
+    assert first.batch is not None
+    brands.approve_batch(first.batch, ctx=CTX)
+    brands.propose_batch(vendor, ["E", "F"], source="run 2", ctx=CTX)
+
+
+def test_a_merge_rechecks_both_brands_under_the_lock() -> None:
+    source, target = BrandFactory.create(name="Old"), BrandFactory.create(name="New")
+    ProductFactory.create(brand=source)
+    # Another request rejected the target after this one loaded it.
+    Brand.objects.filter(pk=target.pk).update(status=Brand.Status.REJECTED)
+    with pytest.raises(ValidationError):
+        brands.merge_brands(source, target, ctx=CTX)
+    assert Product.objects.filter(brand=source).count() == 1
+    assert Brand.objects.filter(pk=source.pk).exists()
+
+
+def test_a_brand_already_merged_cannot_be_merged_again() -> None:
+    source, target = BrandFactory.create(name="Old"), BrandFactory.create(name="New")
+    stale = Brand.objects.get(pk=source.pk)
+    brands.merge_brands(source, target, ctx=CTX)
+    with pytest.raises(ValidationError):
+        brands.merge_brands(stale, target, ctx=CTX)
+    assert _audits(brands.BRAND_MERGED) == 2
+
+
+def test_rejecting_records_the_released_product_ids_in_the_audit() -> None:
+    vendor = VendorFactory.create()
+    brand = brands.propose_brand(vendor, "Acme", ctx=CTX).brand
+    products = ProductFactory.create_batch(2, vendor=vendor, brand=brand)
+    brands.reject_brand(brand, ctx=CTX)  # type: ignore[arg-type]
+    entry = AuditLog.objects.get(action=brands.BRAND_REJECTED)
+    assert entry.after is not None
+    assert sorted(entry.after["products_released"]) == sorted(p.staff_ref for p in products)
+
+
+def test_rejecting_a_batch_records_the_released_product_ids() -> None:
+    vendor = VendorFactory.create()
+    outcome = brands.propose_batch(vendor, ["A"], source="run", ctx=CTX)
+    product = ProductFactory.create(vendor=vendor, brand=outcome.created[0])
+    assert outcome.batch is not None
+    brands.reject_batch(outcome.batch, ctx=CTX)
+    entry = AuditLog.objects.get(action=brands.BRAND_REJECTED)
+    assert entry.after is not None
+    assert entry.after["products_released"] == [product.staff_ref]

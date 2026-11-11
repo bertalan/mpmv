@@ -502,6 +502,16 @@ class Brand(BaseModel):
                 name="catalog_brand_wikidata_unique",
                 violation_error_message="Another brand has this Wikidata ID.",
             ),
+            # Race-safe duplicate detection for proposals (CAT.20). Partial: brands that were
+            # approved before the key existed may share one (legacy data is not rewritten), and
+            # the services refuse a new duplicate of any brand. A rejected brand keeps its name
+            # reserved, so it cannot be proposed again unchanged.
+            models.UniqueConstraint(
+                fields=["name_key"],
+                condition=~models.Q(name_key="") & ~models.Q(status="approved"),
+                name="catalog_brand_name_key_open_unique",
+                violation_error_message="A brand with a very similar name exists.",
+            ),
         ]
 
     def __str__(self) -> str:

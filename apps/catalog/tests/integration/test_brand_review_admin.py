@@ -8,6 +8,7 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.models import User
+from apps.accounts.tests.factories import UserFactory
 from apps.catalog import brands
 from apps.catalog.models import Brand, BrandBatch, Manufacturer, Product
 from apps.catalog.tests.factories import BrandFactory, ProductFactory
@@ -122,3 +123,46 @@ def test_a_batch_is_reviewed_in_the_admin(staff_client: Client) -> None:
     )
     assert Brand.objects.filter(status=Brand.Status.APPROVED).count() == 2
     assert BrandBatch.objects.filter(pk=batch.pk).exists()
+
+
+@pytest.fixture
+def change_only_client(client: Client, mfa_login: MfaLogin) -> Client:
+    user = UserFactory.create(
+        staff=True,
+        permissions=["catalog.view_brand", "catalog.change_brand", "catalog.view_brandbatch"],
+    )
+    return mfa_login(client, user)
+
+
+def test_a_change_only_user_reviews_but_cannot_merge(change_only_client: Client) -> None:
+    first, second = _pending("Acmee"), _pending("Two")
+    target = BrandFactory.create(name="Acme")
+    change_only_client.post(
+        reverse(CHANGELIST),
+        {
+            "action": "merge_selected",
+            "_selected_action": [first.pk],
+            "target": target.pk,
+            "confirm": "1",
+        },
+        follow=True,
+    )
+    assert Brand.objects.filter(pk=first.pk).exists()
+    change_only_client.post(
+        reverse(CHANGELIST),
+        {"action": "approve_selected", "_selected_action": [second.pk]},
+        follow=True,
+    )
+    second.refresh_from_db()
+    assert second.status == Brand.Status.APPROVED
+
+
+def test_a_change_only_user_can_review_a_batch(change_only_client: Client) -> None:
+    batch = brands.propose_batch(VendorFactory.create(), ["A"], source="run", ctx=CTX).batch
+    assert batch is not None
+    change_only_client.post(
+        reverse("admin:catalog_brandbatch_changelist"),
+        {"action": "approve_selected", "_selected_action": [batch.pk]},
+        follow=True,
+    )
+    assert Brand.objects.get(name="A").status == Brand.Status.APPROVED

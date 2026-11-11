@@ -10,13 +10,14 @@ in the same transaction. Staff edits of brands and manufacturers (`save_*`, `del
 audited too; the admin calls these.
 """
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any
 
 from django.conf import settings
 from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q, QuerySet
 
 from apps.core import translations
@@ -129,6 +130,26 @@ def manufacturer_snapshot(maker: Manufacturer) -> dict[str, Any]:
 # --- Proposals
 
 
+DUPLICATE_MESSAGE = (
+    "A brand with this name or Wikidata ID already exists, or was proposed a moment ago. "
+    "Pick it from the list instead."
+)
+
+
+@contextmanager
+def _duplicate_guard() -> Iterator[None]:
+    """Turn a brand uniqueness violation (the database has the last word when two requests race
+    past the checks) into the same refusal as a duplicate found by validation. Savepoint, so the
+    caller's transaction stays usable."""
+    try:
+        with transaction.atomic():
+            yield
+    except IntegrityError as error:
+        if "catalog_brand" not in str(error):
+            raise
+        raise ValidationError({"name": DUPLICATE_MESSAGE}) from error
+
+
 def _candidate(
     name: str,
     *,
@@ -185,7 +206,8 @@ def propose_brand(
         changes.create(BRAND_MODEL, str(brand.public_id), brand_snapshot(brand))
         if dry_run:
             return BrandOutcome(None, changes)
-        brand.save()
+        with _duplicate_guard():
+            brand.save()
         audit_changes(changes, ctx=ctx, action=BRAND_PROPOSED)
     return BrandOutcome(brand, changes)
 
@@ -201,52 +223,80 @@ def propose_batch(
     """The brands one feed or import run brought: known ones are reused, the new ones become one
     pending batch (reviewed together, outside the manual-proposal limit). No batch is made when
     nothing is new."""
-    chosen: dict[str, Brand] = {}
-    by_key: dict[str, Brand] = {}
-    created: list[Brand] = []
-    existing: list[Brand] = []
-    refused: list[str] = []
-    usable = {brand.name_key: brand for brand in brand_choices(vendor)}
-    taken = set(Brand.objects.values_list("name_key", flat=True))
-    batch = BrandBatch(vendor=vendor, source=source.strip()[:200])
-    for raw in names:
-        name = raw.strip()
-        key = engine.brand_name_key(name)
-        if not key:
-            refused.append(raw)
-            continue
-        if key in by_key:
-            chosen[raw] = by_key[key]
-        elif key in usable:
-            by_key[key] = chosen[raw] = usable[key]
-            existing.append(usable[key])
-        elif key in taken:
-            refused.append(raw)
-        else:
-            brand = _candidate(name, vendor=vendor, batch=batch)
-            by_key[key] = chosen[raw] = brand
-            created.append(brand)
-    changes = ChangeSet()
-    if not created:
-        return BatchOutcome(None, [], chosen, refused, changes, existing)
-    names_made = [brand.name for brand in created]
-    batch_changes = ChangeSet()
-    batch_changes.create(BATCH_MODEL, str(batch.public_id), batch_snapshot(batch, names_made))
-    changes.changes.extend(batch_changes.changes)
-    for brand in created:
-        changes.create(BRAND_MODEL, str(brand.public_id), brand_snapshot(brand))
-    if dry_run:
-        return BatchOutcome(None, created, chosen, refused, changes, existing)
+    batch_limit = int(settings.MPMV_BRAND_BATCH_LIMIT)
     with transaction.atomic():
-        batch.save()
+        # One batch at a time per vendor: the ceiling below is checked on a stable count.
+        Vendor.objects.select_for_update().get(pk=vendor.pk)
+        chosen: dict[str, Brand] = {}
+        by_key: dict[str, Brand] = {}
+        created: list[Brand] = []
+        existing: list[Brand] = []
+        refused: list[str] = []
+        usable = {brand.name_key: brand for brand in brand_choices(vendor)}
+        taken = set(Brand.objects.values_list("name_key", flat=True))
+        batch = BrandBatch(vendor=vendor, source=source.strip()[:200])
+        for raw in names:
+            name = raw.strip()
+            key = engine.brand_name_key(name)
+            if not key:
+                refused.append(raw)
+                continue
+            if key in by_key:
+                chosen[raw] = by_key[key]
+            elif key in usable:
+                by_key[key] = chosen[raw] = usable[key]
+                existing.append(usable[key])
+            elif key in taken:
+                refused.append(raw)
+            else:
+                if len(created) >= batch_limit:
+                    raise ValidationError(
+                        f"One import can propose at most {batch_limit} new brands. "
+                        "Split the file, or ask the platform team to add the brands."
+                    )
+                brand = _candidate(name, vendor=vendor, batch=batch)
+                by_key[key] = chosen[raw] = brand
+                created.append(brand)
+        changes = ChangeSet()
+        if not created:
+            return BatchOutcome(None, [], chosen, refused, changes, existing)
+        ceiling = int(settings.MPMV_BRAND_BATCH_PENDING_LIMIT)
+        waiting = Brand.objects.filter(
+            proposed_by=vendor, status=Brand.Status.PENDING, batch__isnull=False
+        ).count()
+        if waiting + len(created) > ceiling:
+            raise ValidationError(
+                f"You already have {waiting} imported brands waiting for review (the limit is "
+                f"{ceiling}). Wait for a decision before importing more new brands."
+            )
+        batch_changes = ChangeSet()
+        batch_changes.create(
+            BATCH_MODEL, str(batch.public_id), batch_snapshot(batch, [b.name for b in created])
+        )
+        changes.changes.extend(batch_changes.changes)
         for brand in created:
-            brand.batch = batch
-            brand.save()
+            changes.create(BRAND_MODEL, str(brand.public_id), brand_snapshot(brand))
+        if dry_run:
+            return BatchOutcome(None, created, chosen, refused, changes, existing)
+        with _duplicate_guard():
+            batch.save()
+            for brand in created:
+                brand.batch = batch
+                brand.save()
         audit_changes(batch_changes, ctx=ctx, action=BATCH_PROPOSED)
-    return BatchOutcome(batch, created, chosen, refused, changes, existing)
+        return BatchOutcome(batch, created, chosen, refused, changes, existing)
 
 
 # --- Review
+
+
+def _products_of(brands_: Iterable[Brand]) -> dict[int, list[str]]:
+    """The staff references of the products using each brand (by brand id), for the audit."""
+    found: dict[int, list[str]] = {}
+    rows = Product.objects.filter(brand__in=list(brands_)).order_by("staff_ref")
+    for brand_id, ref in rows.values_list("brand_id", "staff_ref"):
+        found.setdefault(brand_id, []).append(ref)
+    return found
 
 
 def _pending_only(brand: Brand) -> None:
@@ -262,8 +312,9 @@ def _review(
     before = brand_snapshot(brand)
     after = {**before, "status": status}
     if status == Brand.Status.REJECTED:
-        # A rejected brand is never shown: the products that carried it lose the link.
-        after["products_released"] = Product.objects.filter(brand=brand).count()
+        # A rejected brand is never shown: the products that carried it lose the link, and
+        # the audit entry names them (staff references) so the link can be restored.
+        after["products_released"] = _products_of([brand]).get(brand.pk, [])
     changes.update(BRAND_MODEL, str(brand.public_id), before, after)
 
     def apply() -> None:
@@ -304,11 +355,12 @@ def _review_batch(
     before = batch_snapshot(batch)
     batch_changes.update(BATCH_MODEL, str(batch.public_id), before, {**before, "status": status})
     brand_changes = ChangeSet()
+    released = _products_of(pending) if status == Brand.Status.REJECTED else {}
     for brand in pending:
         snap = brand_snapshot(brand)
         after = {**snap, "status": status}
         if status == Brand.Status.REJECTED:
-            after["products_released"] = Product.objects.filter(brand=brand).count()
+            after["products_released"] = released.get(brand.pk, [])
         brand_changes.update(BRAND_MODEL, str(brand.public_id), snap, after)
     result = ChangeSet([*batch_changes.changes, *brand_changes.changes])
     if dry_run:
@@ -384,43 +436,59 @@ def merge_brands(
     old page redirects (301, kept through the catalog redirect rules) to the target's page."""
     if source.pk == target.pk:
         raise ValidationError("Choose a different brand to merge into.")
-    if target.status != Brand.Status.APPROVED:
-        raise ValidationError("A brand can only be merged into an approved brand.")
-    rules = _merge_redirects(source, target)
-    for rule in rules:
-        rule.full_clean()
-    problems = services.redirect_problems(rules)
-    if problems:
-        raise ValidationError({NON_FIELD_ERRORS: list(problems.values())})
-
-    moved = Product.objects.filter(brand=source).count()
-    brand_changes = ChangeSet()
-    brand_changes.delete(BRAND_MODEL, str(source.public_id), brand_snapshot(source))
-    product_count = Product.objects.filter(brand=target).count()
-    brand_changes.update(
-        BRAND_MODEL,
-        str(target.public_id),
-        {**brand_snapshot(target), "products": product_count},
-        {**brand_snapshot(target), "products": product_count + moved, "merged_from": source.name},
-    )
-    created, updated = ChangeSet(), ChangeSet()
-    for rule in rules:
-        after = services.redirect_snapshot(rule)
-        if rule.pk is None:
-            created.create(services.REDIRECT_MODEL, rule.source_path, after)
-        else:
-            stored = Redirect.objects.get(pk=rule.pk)
-            updated.update(
-                services.REDIRECT_MODEL,
-                rule.source_path,
-                services.redirect_snapshot(stored),
-                after,
-            )
-    result = ChangeSet([*brand_changes.changes, *created.changes, *updated.changes])
-    if dry_run:
-        return result
     with transaction.atomic():
-        Brand.objects.select_for_update().filter(pk__in=[source.pk, target.pk]).count()
+        # Both rows are locked in pk order and read again: another request may have rejected
+        # the target, or merged the source, since the caller loaded them.
+        locked = {
+            brand.pk: brand
+            for brand in Brand.objects.select_for_update()
+            .filter(pk__in=[source.pk, target.pk])
+            .order_by("pk")
+        }
+        if source.pk not in locked:
+            raise ValidationError("This brand no longer exists: it may already have been merged.")
+        if target.pk not in locked:
+            raise ValidationError("The brand to merge into no longer exists.")
+        source, target = locked[source.pk], locked[target.pk]
+        if target.status != Brand.Status.APPROVED:
+            raise ValidationError("A brand can only be merged into an approved brand.")
+        rules = _merge_redirects(source, target)
+        for rule in rules:
+            rule.full_clean()
+        problems = services.redirect_problems(rules)
+        if problems:
+            raise ValidationError({NON_FIELD_ERRORS: list(problems.values())})
+
+        moved = Product.objects.filter(brand=source).count()
+        brand_changes = ChangeSet()
+        brand_changes.delete(BRAND_MODEL, str(source.public_id), brand_snapshot(source))
+        product_count = Product.objects.filter(brand=target).count()
+        brand_changes.update(
+            BRAND_MODEL,
+            str(target.public_id),
+            {**brand_snapshot(target), "products": product_count},
+            {
+                **brand_snapshot(target),
+                "products": product_count + moved,
+                "merged_from": source.name,
+            },
+        )
+        created, updated = ChangeSet(), ChangeSet()
+        for rule in rules:
+            after = services.redirect_snapshot(rule)
+            if rule.pk is None:
+                created.create(services.REDIRECT_MODEL, rule.source_path, after)
+            else:
+                stored = Redirect.objects.get(pk=rule.pk)
+                updated.update(
+                    services.REDIRECT_MODEL,
+                    rule.source_path,
+                    services.redirect_snapshot(stored),
+                    after,
+                )
+        result = ChangeSet([*brand_changes.changes, *created.changes, *updated.changes])
+        if dry_run:
+            return result
         Product.objects.filter(brand=source).update(brand=target)
         for rule in rules:
             rule.save()
@@ -428,7 +496,7 @@ def merge_brands(
         audit_changes(brand_changes, ctx=ctx, action=BRAND_MERGED)
         audit_changes(created, ctx=ctx, action=services.REDIRECT_CREATED)
         audit_changes(updated, ctx=ctx, action=services.REDIRECT_UPDATED)
-    return result
+        return result
 
 
 # --- Staff edits (the admin writes through these)
@@ -437,15 +505,16 @@ def merge_brands(
 def save_brand(brand: Brand, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
     """Create or change a brand (validated: name and Wikidata duplicates, https links)."""
     brand.full_clean()
-    return save_audited(
-        brand,
-        brand_snapshot,
-        key=str(brand.public_id),
-        ctx=ctx,
-        created=BRAND_CREATED,
-        updated=BRAND_UPDATED,
-        dry_run=dry_run,
-    )
+    with _duplicate_guard():
+        return save_audited(
+            brand,
+            brand_snapshot,
+            key=str(brand.public_id),
+            ctx=ctx,
+            created=BRAND_CREATED,
+            updated=BRAND_UPDATED,
+            dry_run=dry_run,
+        )
 
 
 def delete_brand(brand: Brand, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:

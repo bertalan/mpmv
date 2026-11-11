@@ -108,4 +108,17 @@ class Migration(migrations.Migration):
                 verbose_name="import batch",
             ),
         ),
+        # Nothing is pending or rejected before this migration, so no row can break it.
+        migrations.AddConstraint(
+            model_name="brand",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(
+                    models.Q(("name_key", ""), _negated=True),
+                    models.Q(("status", "approved"), _negated=True),
+                ),
+                fields=("name_key",),
+                name="catalog_brand_name_key_open_unique",
+                violation_error_message="A brand with a very similar name exists.",
+            ),
+        ),
     ]

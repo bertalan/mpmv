@@ -370,6 +370,11 @@ class BrandAdmin(admin.ModelAdmin[Brand]):
     inlines = (BrandTranslationInline,)
     actions = ("approve_selected", "reject_selected", "merge_selected")
 
+    def has_merge_permission(self, request: HttpRequest) -> bool:
+        """A merge deletes brands and rewrites redirects: it needs both permissions (Django
+        offers an action when ANY of its listed permissions is held, so this checks both)."""
+        return self.has_change_permission(request) and self.has_delete_permission(request)
+
     def save_model(
         self, request: HttpRequest, obj: Brand, form: forms.ModelForm[Brand], change: bool
     ) -> None:
@@ -411,7 +416,8 @@ class BrandAdmin(admin.ModelAdmin[Brand]):
         self._each(request, queryset, brands.reject_brand, "Rejected {count} brand(s).")
 
     @admin.action(
-        description=_("Merge the selected brands into another brand"), permissions=("change",)
+        description=_("Merge the selected brands into another brand"),
+        permissions=("merge",),
     )
     def merge_selected(
         self, request: HttpRequest, queryset: "models.QuerySet[Brand]"
