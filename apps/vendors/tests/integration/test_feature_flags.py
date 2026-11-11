@@ -184,7 +184,8 @@ def test_staff_pull_a_kill_switch_for_one_vendor_from_the_admin(staff_client: Cl
     assert response.status_code == 302, response.content
     assert flag_enabled(flags.CHECKOUT, vendor=vendor) is False
     entry = AuditLog.objects.get(action="vendor.feature_flag_saved")
-    assert entry.actor_label == "staff:ops@example.com"
+    assert entry.actor_label.startswith("staff:")
+    assert "@" not in entry.actor_label
     assert entry.vendor_key == str(vendor.public_id)
 
 

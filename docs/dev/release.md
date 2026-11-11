@@ -58,11 +58,13 @@ ssh <stage> '~/.local/bin/mpmv-deploy deploy 0.2.0'
    files hold every variable name of the release's examples (names only, values are never
    printed), the database root CA is readable, the media volume belongs to the image user, the
    disk has room, the units convert (`quadlet -dryrun`). A failure here changes nothing.
-2. **units of the tag**: the units, Caddyfile and `mpmv-deploy` baked into the image under
-   `/app/deploy` replace the installed ones; the previous set is kept for rollback.
+2. **units of the tag**: the units, the proxy's socket unit, Caddyfile and `mpmv-deploy` baked
+   into the image under `/app/deploy` replace the installed ones; the previous set is kept for
+   rollback.
 3. **migrate**: the one-shot `mpmv-migrate` unit. If it fails, the previous units and image tag
    come back and nothing restarts.
-4. **restart** app and worker (Caddy too when its Caddyfile or unit changed).
+4. **restart** app and worker (Caddy too when its Caddyfile, unit or socket unit changed: stop
+   Caddy, restart `mpmv-caddy.socket`, start Caddy).
 5. **check**: `/healthz`, the home page and one `/media/` file through Caddy on the host, by the
    site name in `caddy.env`, within 40 s; a container that restarts on its own fails at once.
 6. **automatic rollback** if the check fails: the previous image and its units, restarted and
@@ -158,6 +160,39 @@ the vendor events API and the Manager fixes of #212 (which came after the v0.1.3
 - Migration `tax/0006` seeds the special territories (Livigno, Canary Islands, French overseas
   departments and others) without overwriting rows staff changed. The postcode lists are for
   the owner to review in the tax admin; Northern Ireland is not seeded (D-02).
+
+### Django admin network allow-list (OPS.5, MQ-24)
+
+On STAGE and LIVE set `MPMV_ADMIN_ALLOWED_NETWORKS` to loopback only in both `mpmv.env` and
+`caddy.env`, restart the app and Caddy, then verify the SSH tunnel and the direct 404 as
+described in [admin access](admin-access.md).
+
+### Caddy behind socket activation (OPS.5 follow-up)
+
+From this release on, Caddy publishes no port: the systemd user unit `mpmv-caddy.socket`
+(`deploy/systemd/`) listens on 80 and 443 and hands the sockets to Caddy, so the proxy and the app
+see each client's real address and the SSH tunnel reaches the Django admin. The switch on a host
+is a normal deploy; nothing is copied by hand.
+
+1. Before the deploy, as the deploy user: `cat /proc/sys/net/ipv4/ip_unprivileged_port_start`
+   prints 80 or lower (the doctor checks it too), and the host has IPv6 enabled (the unit also
+   listens on `[::]`). Refresh the installed deploy script from the release image first (the usual
+   `podman run --rm --network none --entrypoint cat <image>:<version> /app/deploy/server/mpmv-deploy`
+   into `~/.local/bin/mpmv-deploy`): scripts older than this release do not know the socket unit and
+   would install a Caddy unit without it. From this release on, `deploy` hands itself over to the
+   release's own script, so this step is only needed once.
+2. `ssh <host> '~/.local/bin/mpmv-deploy deploy <version>'`. The deploy installs the socket unit in
+   `~/.config/systemd/user/`, enables it, stops the old Caddy (which held 80 and 443 itself),
+   starts the socket unit, then Caddy. Expect a few seconds without the proxy.
+3. Verify on the host: `systemctl --user is-active mpmv-caddy.socket mpmv-caddy.service` prints
+   `active` twice; `systemctl --user is-enabled mpmv-caddy.socket` prints `enabled`;
+   `podman inspect --format '{{json .HostConfig.PortBindings}}' mpmv-caddy` shows no binding.
+4. Verify the client address from your computer: the SSH tunnel shows the admin sign-in page,
+   and the public address answers 404 on `/django-admin/` ([admin access](admin-access.md)).
+5. If the post-deploy check fails (for example the socket cannot bind), the deploy rolls back by
+   itself: the socket unit is stopped, disabled and removed, and the previous Caddy publishes its
+   ports again. `~/.local/bin/mpmv-deploy rollback` to a release from before this change does the
+   same.
 
 ## Promoting to LIVE
 

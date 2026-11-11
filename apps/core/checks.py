@@ -16,6 +16,8 @@
   provider adapter, not the console or test sender (core.E501), from a real address
   (core.E502); without live data (development, tests, STAGE) the console sender stays allowed
   until ARC.19.
+- Site flags (ARC.29): `check --deploy` refuses `MPMV_DEMO_MODE` and `MPMV_FORCE_NOINDEX` where
+  live data is held (core.E801).
 - Image formats (THM.12): a warning when Pillow cannot encode AVIF (core.W501).
 """
 
@@ -172,6 +174,39 @@ def check_trusted_proxy_for_deploy(
                 "deploy/server/mpmv.env.example."
             ),
             id="core.W001",
+        )
+    ]
+
+
+def check_admin_network_settings(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """OPS.5: every allowed network of the technical admin is an address or a CIDR network."""
+    try:
+        trusted_proxy_networks(tuple(settings.ADMIN_ALLOWED_NETWORKS))
+    except ValueError as error:
+        return [
+            checks.Error(
+                f"ADMIN_ALLOWED_NETWORKS has an entry that is not an IP address or network: "
+                f"{error}.",
+                hint="List addresses or CIDR networks, comma separated, never host names.",
+                id="core.E003",
+            )
+        ]
+    return []
+
+
+def check_admin_network_for_deploy(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """OPS.5: with no allowed network the Django admin answers 404 to everybody (fail closed)."""
+    if settings.ADMIN_ALLOWED_NETWORKS:
+        return []
+    return [
+        checks.Warning(
+            "ADMIN_ALLOWED_NETWORKS is empty: the Django admin is unreachable (404 for everybody).",
+            hint="Set MPMV_ADMIN_ALLOWED_NETWORKS (deploy/server/mpmv.env.example) to reach it.",
+            id="core.W002",
         )
     ]
 
@@ -517,6 +552,28 @@ def check_email_settings(
             )
         )
     return errors
+
+
+LIVE_FORBIDDEN_FLAGS = ("DEMO_MODE", "FORCE_NOINDEX")
+
+
+def check_live_site_flags(
+    app_configs: Iterable[AppConfig] | None, **kwargs: Any
+) -> list[checks.CheckMessage]:
+    """ARC.29: a stray demo or forced-noindex flag on LIVE would noindex the whole shop.
+
+    Runs under `manage.py check --deploy`. LIVE is the `LIVE_DATA` setting; STAGE keeps both."""
+    if not getattr(settings, "LIVE_DATA", False):
+        return []
+    return [
+        checks.Error(
+            f"MPMV_{flag} is on where live data is held: every page would be noindex.",
+            hint=f"Remove MPMV_{flag} from the LIVE environment (deploy/server/mpmv.env.example).",
+            id="core.E801",
+        )
+        for flag in LIVE_FORBIDDEN_FLAGS
+        if getattr(settings, flag, False)
+    ]
 
 
 # --- Image formats (THM.12, spec 14 §14.7)

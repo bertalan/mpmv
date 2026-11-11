@@ -1,0 +1,1 @@
+{% load i18n %}{% translate "Statement of reasons for a restriction on your content" %}
