@@ -330,7 +330,7 @@ class Product(BaseModel):
         help_text=_(
             "The VAT treatment of the product: Standard rate for most goods, Reduced rate for "
             "goods that qualify, Books for books under the special books regime. If you are "
-            "not sure, keep Standard rate and ask your accountant."
+            "not sure which one applies, ask your accountant."
         ),
     )
 
@@ -378,8 +378,8 @@ class Product(BaseModel):
         default=StockPolicy.TRACK,
         help_text=_(
             "How stock is managed. Track stock: you keep the quantity up to date. Always open: "
-            "buyers can order even when it is out of stock. From the supplier source: the "
-            "quantity comes from your supplier."
+            "buyers can order even when it is out of stock. From the supplier source: for "
+            "stock kept in your supplier's own system."
         ),
     )
     stock_qty = models.IntegerField(
@@ -407,8 +407,8 @@ class Product(BaseModel):
         null=True,
         blank=True,
         help_text=_(
-            "The weight of the packed product in kilograms, for example 0.350. Required to "
-            "publish a product that can be bought: shipping costs are calculated from it."
+            "The weight of the packed product in kilograms, for example 0.350. Shipping costs "
+            "are calculated from it: without a weight, buyers cannot get a shipping rate."
         ),
     )
     length_cm = models.DecimalField(
@@ -445,7 +445,7 @@ class Product(BaseModel):
         validators=[gtin_validator],
         help_text=_(
             "The barcode number (EAN, UPC or ISBN), 8 to 14 digits, for example 4006381333931. "
-            "If you leave it empty, your own code is used as the part number."
+            "Leave it empty if the product has no barcode."
         ),
     )
     mpn = models.CharField(
@@ -462,8 +462,8 @@ class Product(BaseModel):
         null=True,
         blank=True,
         help_text=_(
-            "The number of the matching Google product category, for example 2638. Optional: "
-            "product feeds for Google shopping use it."
+            "The number of the matching category in Google's product category list, for "
+            "example 2638. Optional: leave it empty if you do not know it."
         ),
     )
 
@@ -474,7 +474,7 @@ class Product(BaseModel):
         blank=True,
         related_name="required_by",
         help_text=_(
-            "Another product of yours that buyers must add to the cart with this one, for "
+            "Another product of yours that is meant to be bought together with this one, for "
             "example the battery for a toy. Leave it empty if there is none."
         ),
     )
@@ -484,8 +484,8 @@ class Product(BaseModel):
         blank=True,
         related_name="upsold_by",
         help_text=_(
-            "Other products suggested next to this one, for example a better model. Leave it "
-            "empty to suggest nothing."
+            "Other products you want to suggest with this one, for example a better model. "
+            "Optional: leave it empty to suggest nothing."
         ),
     )
 
@@ -1060,7 +1060,7 @@ class Variant(BaseModel):
         "default variant",
         default=False,
         help_text=_(
-            "Tick it for the version that is shown first. Only one version of a product can "
+            "Tick it to mark the main version of the product. Only one version of a product can "
             "be the default."
         ),
     )

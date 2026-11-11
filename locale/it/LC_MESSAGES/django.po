@@ -175,12 +175,11 @@ msgstr "Anonimo"
 
 #: apps/catalog/models.py
 msgid ""
-"Another product of yours that buyers must add to the cart with this one, for"
-" example the battery for a toy. Leave it empty if there is none."
+"Another product of yours that is meant to be bought together with this one, "
+"for example the battery for a toy. Leave it empty if there is none."
 msgstr ""
-"Un altro tuo prodotto che chi compra deve aggiungere al carrello insieme a "
-"questo, per esempio la batteria di un giocattolo. Lascialo vuoto se non ce "
-"n'è."
+"Un altro tuo prodotto pensato per essere comprato insieme a questo, per "
+"esempio la batteria di un giocattolo. Lascialo vuoto se non ce n'è."
 
 #: apps/catalog/taxonomy.py
 msgid ""
@@ -470,11 +469,11 @@ msgstr ""
 msgid ""
 "How stock is managed. Track stock: you keep the quantity up to date. Always "
 "open: buyers can order even when it is out of stock. From the supplier "
-"source: the quantity comes from your supplier."
+"source: for stock kept in your supplier's own system."
 msgstr ""
 "Come gestisci le scorte. Controlla le scorte: tieni tu la quantità "
 "aggiornata. Sempre aperto: si può ordinare anche quando è esaurito. Dalla "
-"fonte del fornitore: la quantità arriva dal tuo fornitore."
+"fonte del fornitore: per le scorte tenute nel sistema del tuo fornitore."
 
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid ""
@@ -704,11 +703,11 @@ msgstr ""
 
 #: apps/catalog/models.py
 msgid ""
-"Other products suggested next to this one, for example a better model. Leave"
-" it empty to suggest nothing."
+"Other products you want to suggest with this one, for example a better "
+"model. Optional: leave it empty to suggest nothing."
 msgstr ""
-"Altri prodotti suggeriti accanto a questo, per esempio un modello migliore. "
-"Lascialo vuoto per non suggerire nulla."
+"Altri prodotti che vuoi suggerire insieme a questo, per esempio un modello "
+"migliore. Facoltativo: lascialo vuoto per non suggerire nulla."
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Out of stock"
@@ -1024,12 +1023,10 @@ msgstr ""
 #: apps/catalog/models.py
 msgid ""
 "The barcode number (EAN, UPC or ISBN), 8 to 14 digits, for example "
-"4006381333931. If you leave it empty, your own code is used as the part "
-"number."
+"4006381333931. Leave it empty if the product has no barcode."
 msgstr ""
 "Il numero del codice a barre (EAN, UPC o ISBN), da 8 a 14 cifre, per esempio"
-" 4006381333931. Se lo lasci vuoto, come codice articolo si usa il tuo "
-"codice."
+" 4006381333931. Lascialo vuoto se il prodotto non ha un codice a barre."
 
 #: apps/catalog/taxonomy.py
 msgid "The brand logo, shown on the brand page. Optional."
@@ -1075,8 +1072,8 @@ msgid ""
 "The category or tag to place this one next to. Leave it empty to put this "
 "one at the top level of its set."
 msgstr ""
-"La categoria o etichetta accanto a cui mettere questa. Lascialo vuoto per "
-"metterla al livello più alto del suo gruppo."
+"La categoria o etichetta accanto a cui mettere questa. Lascia vuoto il campo"
+" per metterla al livello più alto del suo gruppo."
 
 #: apps/catalog/models.py
 msgid ""
@@ -1294,11 +1291,12 @@ msgstr "La comunicazione alle autorità è registrata."
 
 #: apps/catalog/models.py
 msgid ""
-"The number of the matching Google product category, for example 2638. "
-"Optional: product feeds for Google shopping use it."
+"The number of the matching category in Google's product category list, for "
+"example 2638. Optional: leave it empty if you do not know it."
 msgstr ""
-"Il numero della categoria di prodotto Google corrispondente, per esempio "
-"2638. Facoltativo: lo usano i feed prodotti per Google Shopping."
+"Il numero della categoria corrispondente nell'elenco delle categorie di "
+"prodotto di Google, per esempio 2638. Facoltativo: lascialo vuoto se non lo "
+"conosci."
 
 #: apps/catalog/models.py
 msgid ""
@@ -1506,12 +1504,12 @@ msgstr ""
 msgid ""
 "The VAT treatment of the product: Standard rate for most goods, Reduced rate"
 " for goods that qualify, Books for books under the special books regime. If "
-"you are not sure, keep Standard rate and ask your accountant."
+"you are not sure which one applies, ask your accountant."
 msgstr ""
 "Il trattamento IVA del prodotto: Aliquota standard per la maggior parte dei "
 "beni, Aliquota ridotta per i beni che ne hanno diritto, Libri per i libri "
-"con il regime speciale. Se non sei sicuro, lascia Aliquota standard e chiedi"
-" al tuo commercialista."
+"con il regime speciale. Se non sei sicuro di quale si applichi, chiedi al "
+"tuo commercialista."
 
 #: apps/accounts/decorators.py
 msgid "The verification failed. Please reload the page and try again."
@@ -1519,13 +1517,13 @@ msgstr "La verifica non è riuscita. Ricarica la pagina e riprova."
 
 #: apps/catalog/models.py
 msgid ""
-"The weight of the packed product in kilograms, for example 0.350. Required "
-"to publish a product that can be bought: shipping costs are calculated from "
-"it."
+"The weight of the packed product in kilograms, for example 0.350. Shipping "
+"costs are calculated from it: without a weight, buyers cannot get a shipping"
+" rate."
 msgstr ""
-"Il peso del prodotto imballato in chilogrammi, per esempio 0,350. "
-"Obbligatorio per pubblicare un prodotto che si può comprare: le spese di "
-"spedizione si calcolano da qui."
+"Il peso del prodotto imballato in chilogrammi, per esempio 0,350. Le spese "
+"di spedizione si calcolano da qui: senza peso, chi compra non può ottenere "
+"una tariffa di spedizione."
 
 #: apps/catalog/models.py
 msgid ""
@@ -1608,14 +1606,6 @@ msgstr ""
 "Questo venditore è sospeso o chiuso, quindi il profilo del negozio non può "
 "essere modificato. Contatta l’assistenza per farlo riaprire."
 
-#: apps/catalog/models.py
-msgid ""
-"Tick it for the version that is shown first. Only one version of a product "
-"can be the default."
-msgstr ""
-"Spuntala per la versione mostrata per prima. Solo una versione di un "
-"prodotto può essere quella predefinita."
-
 #: apps/catalog/taxonomy.py
 msgid ""
 "Tick it if categories or tags in this set can sit inside others, for example"
@@ -1649,6 +1639,14 @@ msgid ""
 msgstr ""
 "Spuntala per far restringere a chi compra un elenco di prodotti con queste "
 "categorie o etichette."
+
+#: apps/catalog/models.py
+msgid ""
+"Tick it to mark the main version of the product. Only one version of a "
+"product can be the default."
+msgstr ""
+"Spuntala per segnare la versione principale del prodotto. Solo una versione "
+"di un prodotto può essere quella predefinita."
 
 #: apps/manager/media.py
 msgid "Title"
