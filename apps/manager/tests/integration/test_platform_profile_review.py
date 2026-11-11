@@ -172,7 +172,7 @@ def test_the_reviewer_reverts_a_logo_change(
 def test_the_catalog_and_owner_roles_review_and_revert(
     client: Client, changed: AuditLog, vendor: Vendor, key: str
 ) -> None:
-    member = UserFactory.create()
+    member = UserFactory.create(staff=True)
     member.groups.add(Group.objects.get(name=roles.role(key).group))
     verified_login(client, member)
     assert client.get(PAGE).status_code == 200
@@ -182,7 +182,7 @@ def test_the_catalog_and_owner_roles_review_and_revert(
 
 @pytest.mark.parametrize("key", [roles.CONFIG, roles.FINANCE, roles.SUPPORT])
 def test_the_other_platform_roles_get_404(client: Client, changed: AuditLog, key: str) -> None:
-    member = UserFactory.create()
+    member = UserFactory.create(staff=True)
     member.groups.add(Group.objects.get(name=roles.role(key).group))
     verified_login(client, member)
     assert client.get(PAGE).status_code == 404

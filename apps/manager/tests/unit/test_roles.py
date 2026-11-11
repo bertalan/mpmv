@@ -9,10 +9,18 @@ from apps.manager import roles
 # Spelled out on purpose: a change to roles.py must change this table too.
 EXPECTED = {
     "config": {"manager.platform_config"},
-    "catalog": {"manager.platform_catalog", "vendors.view_all_vendors"},
+    "catalog": {
+        "manager.platform_catalog",
+        "vendors.view_all_vendors",
+        "vendors.revert_storefront_profile",
+    },
     "finance": {"manager.platform_finance", "vendors.view_all_vendors"},
     "support": {"manager.platform_support", "vendors.view_all_vendors"},
-    "owner": {"core.platform_owner", "vendors.view_all_vendors"},
+    "owner": {
+        "core.platform_owner",
+        "vendors.view_all_vendors",
+        "vendors.revert_storefront_profile",
+    },
 }
 
 
