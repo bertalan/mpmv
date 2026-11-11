@@ -100,11 +100,10 @@ def test_labels_are_the_directive_texts_in_italian_and_english() -> None:
 
 
 @pytest.mark.parametrize("language", ["de", "fr", "es"])
-def test_labels_in_other_languages_wait_for_counsel(language: str) -> None:
+def test_other_languages_show_english_until_counsel_verifies_them(language: str) -> None:
     labels = engine.withdrawal_labels(language)
-    assert labels.button != engine.withdrawal_labels("en").button
-    assert labels.confirm != engine.withdrawal_labels("en").confirm
-    assert not labels.verified  # CMP.6: counsel checks DE, FR, ES against each transposition
+    assert labels == engine.withdrawal_labels("en")
+    assert language in engine.PROVISIONAL_LABELS  # kept for when counsel signs off
 
 
 def test_an_unknown_language_falls_back_to_english() -> None:

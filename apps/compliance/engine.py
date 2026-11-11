@@ -518,12 +518,17 @@ class WithdrawalLabels:
     verified: bool  # False until counsel has checked the wording against the transposition
 
 
-#: The two labels of the function. EN and IT are the directive's and the decree's own words;
-#: DE, FR and ES are provisional until counsel checks them against each destination country's
-#: transposition (spec 11 CMP.6), so they are listed as not verified.
+#: The two labels of the function that may be shown. EN and IT are the directive's and the
+#: decree's own words.
 WITHDRAWAL_LABELS: Final[Mapping[str, WithdrawalLabels]] = {
     "en": WithdrawalLabels("withdraw from contract here", "confirm withdrawal", True),
     "it": WithdrawalLabels("recedere dal contratto qui", "conferma recesso", True),
+}
+
+#: DE, FR and ES are provisional translations, NOT shown: those languages get the English
+#: labels until counsel checks them against each destination country's transposition (spec 11
+#: CMP.6). To publish one, move its entry to WITHDRAWAL_LABELS with `verified=True`.
+PROVISIONAL_LABELS: Final[Mapping[str, WithdrawalLabels]] = {
     "de": WithdrawalLabels("Vertrag hier widerrufen", "Widerruf bestätigen", False),
     "fr": WithdrawalLabels("se rétracter du contrat ici", "confirmer la rétractation", False),
     "es": WithdrawalLabels("desistir del contrato aquí", "confirmar el desistimiento", False),
@@ -531,7 +536,7 @@ WITHDRAWAL_LABELS: Final[Mapping[str, WithdrawalLabels]] = {
 
 
 def withdrawal_labels(language: str) -> WithdrawalLabels:
-    """The labels in `language`; English for a language without its own."""
+    """The verified labels in `language`; English for a language without verified ones."""
     return WITHDRAWAL_LABELS.get(language, WITHDRAWAL_LABELS["en"])
 
 

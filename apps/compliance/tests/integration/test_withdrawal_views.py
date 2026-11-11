@@ -197,15 +197,34 @@ def test_a_token_for_one_order_cannot_withdraw_another_orders_vendor_order(clien
     assert not WithdrawalStatement.objects.exists()
 
 
-def test_a_double_submit_shows_that_it_was_already_recorded(client: Client) -> None:
+def test_a_token_works_once(client: Client) -> None:
     order = paid_order()
     html = identify(client, order).content.decode()
     target = order.vendor_orders.order_by("id")[0].public_id
     assert confirm(client, html, target).status_code == 302
     again = confirm(client, html, target)
-    assert again.status_code == 200
-    assert "already" in again.content.decode().lower()
+    assert again.status_code == 302
+    assert again["Location"] == reverse("withdrawal")  # the token is spent: identify again
     assert WithdrawalStatement.objects.count() == 1
+
+
+def test_a_token_is_bound_to_the_order_email(client: Client) -> None:
+    order = paid_order()
+    token = withdrawal.make_token(order)
+    assert withdrawal.read_token(token) == order
+    other = signing.dumps(
+        {"order": str(order.public_id), "email": "not-the-hash", "used": 0},
+        salt=withdrawal.TOKEN_SALT,
+    )
+    assert withdrawal.read_token(other) is None  # the order's email is not the one it names
+
+
+def test_an_error_page_keeps_the_original_token(client: Client) -> None:
+    order = paid_order()
+    html = identify(client, order).content.decode()
+    original = token_of(html)
+    response = confirm(client, html)  # nothing chosen
+    assert token_of(response.content.decode()) == original  # the 30 minutes are not extended
 
 
 # --- Protection
@@ -222,13 +241,38 @@ def test_the_captcha_is_checked_on_the_identification(client: Client, settings: 
 
 
 def test_lookups_are_rate_limited_per_address(client: Client) -> None:
-    order = paid_order()
-    for _ in range(withdrawal.LOOKUP_RATE_LIMIT):
-        identify(client, order)
-    blocked = identify(client, order)
+    for n in range(withdrawal.LOOKUP_RATE_LIMIT):
+        client.post(
+            reverse("withdrawal"),
+            {"order_number": f"2999-{n:06d}", "email": "a@example.com"},
+            REMOTE_ADDR=IP,
+        )
+    blocked = client.post(
+        reverse("withdrawal"),
+        {"order_number": "2999-000099", "email": "a@example.com"},
+        REMOTE_ADDR=IP,
+    )
     assert blocked.status_code == 429
     assert int(blocked["Retry-After"]) > 0
     assert Throttle.objects.exists()
+
+
+def test_lookups_are_rate_limited_per_order_from_many_addresses(client: Client) -> None:
+    order = paid_order()
+    for n in range(withdrawal.ORDER_LOOKUP_RATE_LIMIT):
+        client.post(
+            reverse("withdrawal"),
+            {"order_number": order.number, "email": "guess@example.com"},
+            REMOTE_ADDR=f"198.51.100.{n + 1}",
+        )
+    limited = client.post(
+        reverse("withdrawal"),
+        {"order_number": order.number, "email": order.email},  # even the right pair
+        REMOTE_ADDR="198.51.100.200",
+    )
+    assert limited.status_code == 200  # the same generic answer, not a tell-tale 429
+    assert "We could not find" in limited.content.decode()
+    assert "confirm withdrawal" not in limited.content.decode().lower()
 
 
 # --- Pre-contractual information (art. 49(1)(h))

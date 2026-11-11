@@ -154,7 +154,7 @@ def _render_lookup(request: HttpRequest, form: WithdrawalLookupForm) -> HttpResp
 
 
 def _render_choice(
-    request: HttpRequest, order: Order, *, error: str = "", status: int = 200
+    request: HttpRequest, order: Order, *, token: str = "", error: str = "", status: int = 200
 ) -> HttpResponse:
     options = withdrawal.options(order)
     response = render(
@@ -164,7 +164,7 @@ def _render_choice(
             "order": order,
             "options": options,
             "any_open": any(o.window.is_open and not o.withdrawn for o in options),
-            "token": withdrawal.make_token(order),
+            "token": token or withdrawal.make_token(order),
             "error": error,
             **_labels_context(),
         },
@@ -200,7 +200,10 @@ def withdrawal_start(request: HttpRequest) -> HttpResponse:
     if wait:
         return _too_many(wait)
     if form.is_valid():
-        order = withdrawal.find_order(form.cleaned_data["order_number"], form.cleaned_data["email"])
+        number = form.cleaned_data["order_number"]
+        # Counted on every attempt; when spent, the answer is the generic one.
+        limited = bool(withdrawal.order_lookup_retry_after(number))
+        order = None if limited else withdrawal.find_order(number, form.cleaned_data["email"])
         if order is not None:
             return _render_choice(request, order)
         form.add_error(None, _("We could not find an order with this number and email address."))
@@ -224,7 +227,8 @@ def withdrawal_start(request: HttpRequest) -> HttpResponse:
 def withdrawal_confirm(request: HttpRequest) -> HttpResponse:
     """The second step: 'confirm withdrawal'. Records one statement per chosen vendor order,
     shows the acknowledgement page; the same content goes to the buyer's email."""
-    order = withdrawal.read_token(request.POST.get("token", ""))
+    token = request.POST.get("token", "")
+    order = withdrawal.read_token(token)
     if order is None:
         return redirect("withdrawal")
     if request.user.is_authenticated:
@@ -236,7 +240,7 @@ def withdrawal_confirm(request: HttpRequest) -> HttpResponse:
             order, request.POST.getlist("vendor_orders"), ctx=ctx
         )
     except withdrawal.WithdrawalError as exc:
-        return _render_choice(request, order, error=str(_WITHDRAWAL_ERRORS[exc.code]))
+        return _render_choice(request, order, token=token, error=str(_WITHDRAWAL_ERRORS[exc.code]))
     request.session[WITHDRAWAL_SESSION_KEY] = [c.key for c in changes.changes]
     return redirect("withdrawal_done")
 

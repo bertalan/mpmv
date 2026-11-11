@@ -8,11 +8,12 @@ from collections.abc import Iterator
 from typing import Any
 
 import pytest
-from django.db import IntegrityError, transaction
+from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.utils import timezone, translation
 
 from apps.compliance import withdrawal
 from apps.compliance.models import WithdrawalStatement
+from apps.compliance.tests.factories import WithdrawalStatementFactory
 from apps.core import services as core_services
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog, OutboxEmail
@@ -275,3 +276,47 @@ def test_the_submission_does_not_change_order_states() -> None:
     order.refresh_from_db()
     assert before == [(s.pk, s.state) for s in order.vendor_orders.order_by("id")]
     assert order.state == "paid"  # the refund flow (ORD.8) moves states, not this record
+
+
+# --- Append-only in the database, not only in the model
+
+
+def _raw(sql: str, *params: int) -> None:
+    with transaction.atomic(), connection.cursor() as cursor:
+        cursor.execute(sql, params)
+
+
+def test_the_database_refuses_to_change_or_delete_a_statement() -> None:
+    statement = WithdrawalStatementFactory.create()
+    with pytest.raises(DatabaseError, match="append-only"):
+        _raw(
+            "UPDATE compliance_withdrawalstatement SET language = 'de' WHERE id = %s", statement.pk
+        )
+    with pytest.raises(DatabaseError, match="append-only"):
+        _raw(
+            "UPDATE compliance_withdrawalstatement SET submitted_at = now() WHERE id = %s",
+            statement.pk,
+        )
+    with pytest.raises(DatabaseError, match="append-only"):
+        _raw("DELETE FROM compliance_withdrawalstatement WHERE id = %s", statement.pk)
+    assert WithdrawalStatement.objects.filter(pk=statement.pk).exists()
+
+
+def test_the_acknowledgement_time_can_be_set_once_and_never_changed() -> None:
+    statement = WithdrawalStatementFactory.create()
+    _raw(
+        "UPDATE compliance_withdrawalstatement SET acknowledged_at = now() WHERE id = %s",
+        statement.pk,
+    )
+    statement.refresh_from_db()
+    assert statement.acknowledged_at is not None
+    with pytest.raises(DatabaseError, match="append-only"):
+        _raw(
+            "UPDATE compliance_withdrawalstatement SET acknowledged_at = NULL WHERE id = %s",
+            statement.pk,
+        )
+    with pytest.raises(DatabaseError, match="append-only"):
+        _raw(
+            "UPDATE compliance_withdrawalstatement SET acknowledged_at = now() WHERE id = %s",
+            statement.pk,
+        )

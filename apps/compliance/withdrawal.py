@@ -59,6 +59,7 @@ TOKEN_SALT: Final = "compliance.withdrawal"  # noqa: S105 (a signing salt, not a
 TOKEN_MAX_AGE: Final = 30 * 60  # seconds the choice page stays valid after the lookup
 
 LOOKUP_RATE_LIMIT: Final = 10
+ORDER_LOOKUP_RATE_LIMIT: Final = 5  # attempts per order number and window, from any address
 LOOKUP_RATE_WINDOW: Final = dt.timedelta(minutes=15)
 
 
@@ -93,18 +94,48 @@ def find_order(number: str, email: str) -> Order | None:
     ).first()
 
 
+def _email_hash(order: Order) -> str:
+    return keyed_hash(order.email.strip().lower(), purpose="withdrawal-token")
+
+
 def make_token(order: Order) -> str:
-    """A signed, short-lived proof that the holder identified this order a moment ago."""
-    return signing.dumps({"order": str(order.public_id)}, salt=TOKEN_SALT)
+    """A signed, short-lived proof that the holder identified this order a moment ago.
+
+    It is bound to the order's email (a keyed hash, never the address) and to the number of
+    statements the order has now: recording one spends it, so it works once."""
+    return signing.dumps(
+        {
+            "order": str(order.public_id),
+            "email": _email_hash(order),
+            "used": WithdrawalStatement.objects.filter(order=order).count(),
+        },
+        salt=TOKEN_SALT,
+    )
 
 
 def read_token(token: str, *, max_age: int = TOKEN_MAX_AGE) -> Order | None:
     try:
         data = signing.loads(token, salt=TOKEN_SALT, max_age=max_age)
         public_id = uuid.UUID(str(data["order"]))
+        email, used = str(data["email"]), int(data["used"])
     except (signing.BadSignature, KeyError, ValueError, TypeError):
         return None
-    return Order.objects.filter(public_id=public_id, privacy_status=PrivacyStatus.ACTIVE).first()
+    order = Order.objects.filter(public_id=public_id, privacy_status=PrivacyStatus.ACTIVE).first()
+    if order is None or email != _email_hash(order):
+        return None
+    if WithdrawalStatement.objects.filter(order=order).count() != used:
+        return None  # spent: a statement was recorded since the lookup
+    return order
+
+
+def order_lookup_retry_after(number: str) -> dt.timedelta:
+    """Count one lookup of this order number, from any address and valid or not, so the pair
+    cannot be guessed by spreading attempts over many addresses. Zero when allowed."""
+    return consume_rate_limit(
+        f"withdrawal:order:{keyed_hash(number.strip().lower(), purpose='withdrawal-order')}",
+        limit=ORDER_LOOKUP_RATE_LIMIT,
+        window=LOOKUP_RATE_WINDOW,
+    )
 
 
 def lookup_retry_after(ip: str | None) -> dt.timedelta:
