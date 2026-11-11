@@ -14,6 +14,11 @@ msgid_plural "%(action)s: %(count)d rows done."
 msgstr[0] "%(action)s: %(count)d riga completata."
 msgstr[1] "%(action)s: %(count)d righe completate."
 
+#: apps/manager/templates/email/manager/role_self_assigned/body.html
+#: apps/manager/templates/email/manager/role_self_assigned/body.txt
+msgid "%(actor_name)s gave themselves a platform role. The change is in the audit log."
+msgstr "%(actor_name)s si è assegnato un ruolo di piattaforma. La modifica è nel registro di audit."
+
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "%(counter)s unused."
 msgid_plural "%(counter)s unused."
@@ -34,6 +39,10 @@ msgstr "%(vendor_name)s ha spedito la sua parte dell’ordine %(order_number)s."
 msgid "%(vendor_name)s: new paid order %(order_number)s to ship:"
 msgstr "%(vendor_name)s: nuovo ordine pagato %(order_number)s da spedire:"
 
+#: apps/manager/templates/email/manager/role_self_assigned/subject.txt
+msgid "A platform owner gave themselves a role"
+msgstr "Un proprietario della piattaforma si è assegnato un ruolo"
+
 #: apps/manager/forms.py
 msgid "About the shop"
 msgstr "Informazioni sul negozio"
@@ -45,6 +54,10 @@ msgstr "Accetta l'ordine"
 #: themes/base/templates/403.html
 msgid "Access denied"
 msgstr "Accesso negato"
+
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Account"
+msgstr "Account"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Act on the content"
@@ -66,8 +79,7 @@ msgstr "Aggiungi un’app di autenticazione"
 msgid "Add another factor before removing your last one."
 msgstr "Aggiungi un altro fattore prima di rimuovere l’ultimo."
 
-#: apps/manager/templates/manager/list.html
-#: apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "All"
 msgstr "Tutti"
@@ -76,8 +88,7 @@ msgstr "Tutti"
 msgid "Anonymous"
 msgstr "Anonimo"
 
-#: apps/accounts/templates/accounts/mfa/totp.html
-#: apps/accounts/templates/accounts/mfa/verify.html
+#: apps/accounts/templates/accounts/mfa/totp.html apps/accounts/templates/accounts/mfa/verify.html
 msgid "Authentication code"
 msgstr "Codice di autenticazione"
 
@@ -85,8 +96,7 @@ msgstr "Codice di autenticazione"
 msgid "authenticator app"
 msgstr "app di autenticazione"
 
-#: apps/accounts/templates/accounts/mfa/setup.html
-#: apps/accounts/templates/accounts/mfa/totp.html
+#: apps/accounts/templates/accounts/mfa/setup.html apps/accounts/templates/accounts/mfa/totp.html
 msgid "Authenticator app"
 msgstr "App di autenticazione"
 
@@ -135,8 +145,7 @@ msgstr "Corriere"
 msgid "Carrier: %(carrier)s. Tracking number: %(tracking_number)s."
 msgstr "Corriere: %(carrier)s. Numero di tracking: %(tracking_number)s."
 
-#: apps/manager/sections.py
-#: apps/manager/templates/manager/shop/vendor_picker.html
+#: apps/manager/sections.py apps/manager/templates/manager/shop/vendor_picker.html
 msgid "Choose a vendor"
 msgstr "Scegli un venditore"
 
@@ -144,8 +153,7 @@ msgstr "Scegli un venditore"
 msgid "Choose how you will confirm it is you after your password."
 msgstr "Scegli come confermare la tua identità dopo la password."
 
-#: apps/accounts/templates/accounts/mfa/totp.html
-#: apps/manager/templates/manager/bulk_preview.html
+#: apps/accounts/templates/accounts/mfa/totp.html apps/manager/templates/manager/bulk_preview.html
 msgid "Confirm"
 msgstr "Conferma"
 
@@ -156,12 +164,8 @@ msgid "Continue"
 msgstr "Continua"
 
 #: apps/accounts/templates/accounts/action_link/continue.html
-msgid ""
-"Continue does not sign you in: the page it opens asks you to confirm who you"
-" are."
-msgstr ""
-"Continua non ti fa accedere: la pagina che si apre ti chiede di confermare "
-"la tua identità."
+msgid "Continue does not sign you in: the page it opens asks you to confirm who you are."
+msgstr "Continua non ti fa accedere: la pagina che si apre ti chiede di confermare la tua identità."
 
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid "Continue to your request"
@@ -172,15 +176,11 @@ msgid "Customer"
 msgstr "Cliente"
 
 #: apps/manager/forms.py
-msgid ""
-"Customers see this text. A change is live at once and the moderators are "
-"told."
+msgid "Customers see this text. A change is live at once and the moderators are told."
 msgstr ""
-"I clienti vedono questo testo. Una modifica è visibile subito e i moderatori"
-" vengono avvisati."
+"I clienti vedono questo testo. Una modifica è visibile subito e i moderatori vengono avvisati."
 
-#: apps/manager/sections.py
-#: apps/manager/templates/manager/platform/dashboard.html
+#: apps/manager/sections.py apps/manager/templates/manager/platform/dashboard.html
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Dashboard"
 msgstr "Dashboard"
@@ -207,16 +207,19 @@ msgstr "Bozze"
 
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 msgid ""
-"Each code signs you in once if you lose your authenticator or passkey. Store"
-" them somewhere safe now: they are shown only this time."
+"Each code signs you in once if you lose your authenticator or passkey. Store them somewhere safe "
+"now: they are shown only this time."
 msgstr ""
-"Ogni codice ti fa accedere una sola volta se perdi l’app di autenticazione o"
-" la passkey. Conservali subito in un luogo sicuro: vengono mostrati solo "
-"questa volta."
+"Ogni codice ti fa accedere una sola volta se perdi l’app di autenticazione o la passkey. "
+"Conservali subito in un luogo sicuro: vengono mostrati solo questa volta."
 
 #: apps/manager/templates/manager/login.html
 msgid "Email"
 msgstr "Email"
+
+#: apps/manager/forms.py
+msgid "Email of the account"
+msgstr "Email dell'account"
 
 #: apps/manager/forms.py
 msgid "Enter a valid carrier name."
@@ -224,8 +227,7 @@ msgstr "Inserisci un nome di corriere valido."
 
 #: apps/manager/forms.py
 msgid "Enter the tracking number: letters, digits, spaces and . / _ - only."
-msgstr ""
-"Inserisci il numero di tracciamento: solo lettere, cifre, spazi e . / _ -"
+msgstr "Inserisci il numero di tracciamento: solo lettere, cifre, spazi e . / _ -"
 
 #: themes/base/templates/components/alert.html
 msgid "Error"
@@ -243,14 +245,12 @@ msgstr "Spiegazione"
 msgid "File"
 msgstr "File"
 
-#: apps/manager/templates/manager/list.html
-#: apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Filter"
 msgstr "Filtra"
 
-#: apps/manager/templates/manager/list.html
-#: apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Filters"
 msgstr "Filtri"
@@ -273,8 +273,15 @@ msgstr "Genera nuovi codici"
 
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 msgid "Generating new codes makes every previous code stop working."
-msgstr ""
-"Generando nuovi codici, tutti i codici precedenti smettono di funzionare."
+msgstr "Generando nuovi codici, tutti i codici precedenti smettono di funzionare."
+
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Give a role"
+msgstr "Assegna un ruolo"
+
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Give the role"
+msgstr "Assegna il ruolo"
 
 #: themes/base/templates/layouts/error.html
 msgid "Go to the home page"
@@ -304,13 +311,12 @@ msgstr "Ciao,"
 
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid ""
-"If you are not signed in, Continue signs you in once with this link; you "
-"will still confirm it is you with your second factor before approving or "
-"declining anything."
+"If you are not signed in, Continue signs you in once with this link; you will still confirm it is "
+"you with your second factor before approving or declining anything."
 msgstr ""
-"Se non hai effettuato l’accesso, Continua ti fa accedere una volta con "
-"questo link; prima di approvare o rifiutare qualsiasi cosa dovrai comunque "
-"confermare la tua identità con il secondo fattore."
+"Se non hai effettuato l’accesso, Continua ti fa accedere una volta con questo link; prima di "
+"approvare o rifiutare qualsiasi cosa dovrai comunque confermare la tua identità con il secondo "
+"fattore."
 
 #: apps/manager/sections.py
 msgid "Images"
@@ -393,11 +399,10 @@ msgid "Mark as shipped"
 msgstr "Segna come spedito"
 
 #: apps/manager/templates/manager/platform/dashboard.html
-msgid ""
-"Marketplace work across vendors. The menu lists the sections you may open."
+msgid "Marketplace work across vendors. The menu lists the sections you may open."
 msgstr ""
-"Attività del marketplace che riguardano tutti i venditori. Il menu elenca le"
-" sezioni che puoi aprire."
+"Attività del marketplace che riguardano tutti i venditori. Il menu elenca le sezioni che puoi "
+"aprire."
 
 #: themes/base/templates/components/header.html
 msgid "Menu"
@@ -439,30 +444,28 @@ msgstr "nessuna registrazione di passkey in corso"
 msgid "No second factor yet."
 msgstr "Nessun secondo fattore per ora."
 
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Nobody holds a platform role yet."
+msgstr "Nessuno ha ancora un ruolo di piattaforma."
+
 #: apps/manager/views.py
 msgid "Nothing changed."
 msgstr "Nessuna modifica."
 
 #: apps/manager/views.py
 msgid "Nothing changed: this text is still a draft. Edit it to publish it."
-msgstr ""
-"Nessuna modifica: questo testo è ancora una bozza. Modificalo per "
-"pubblicarlo."
+msgstr "Nessuna modifica: questo testo è ancora una bozza. Modificalo per pubblicarlo."
 
 #: apps/manager/templates/manager/bulk_preview.html
 msgid "Nothing has changed yet. Check the changes below, then confirm."
-msgstr ""
-"Non è stato ancora modificato nulla. Controlla le modifiche qui sotto, poi "
-"conferma."
+msgstr "Non è stato ancora modificato nulla. Controlla le modifiche qui sotto, poi conferma."
 
-#: apps/manager/templates/manager/list.html
-#: apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Nothing to show."
 msgstr "Niente da mostrare."
 
-#: apps/manager/notice_views.py
-#: apps/manager/templates/manager/platform/notice_detail.html
+#: apps/manager/notice_views.py apps/manager/templates/manager/platform/notice_detail.html
 msgid "Notice"
 msgstr "Segnalazione"
 
@@ -553,20 +556,30 @@ msgstr "Password"
 msgid "Payment received for order %(order_number)s"
 msgstr "Pagamento ricevuto per l’ordine %(order_number)s"
 
-#: apps/manager/templates/manager/shop/order.html
-#: apps/manager/templates/manager/shop/orders.html
+#: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
 msgid "Placed"
 msgstr "Effettuato il"
 
 #: apps/manager/forms.py
-msgid ""
-"Plain text for people who cannot see the image, for example the shop name."
-msgstr ""
-"Testo semplice per chi non vede l’immagine, per esempio il nome del negozio."
+msgid "Plain text for people who cannot see the image, for example the shop name."
+msgstr "Testo semplice per chi non vede l’immagine, per esempio il nome del negozio."
 
 #: apps/manager/templates/manager/layout.html
 msgid "Platform"
 msgstr "Piattaforma"
+
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Platform staff"
+msgstr "Staff della piattaforma"
+
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid ""
+"Platform staff hold one or more roles. Vendor members cannot hold a platform role. Changes need "
+"operational mode and are recorded in the audit log."
+msgstr ""
+"Lo staff della piattaforma ha uno o più ruoli. I membri dei venditori non possono avere un ruolo "
+"di piattaforma. Le modifiche richiedono la modalità operativa e sono registrate nel registro di "
+"audit."
 
 #: apps/accounts/templates/accounts/admin/login.html
 msgid "Please correct the error below."
@@ -606,6 +619,8 @@ msgstr "Pubblicati"
 msgid "Quantity"
 msgstr "Quantità"
 
+#: apps/manager/forms.py apps/manager/templates/email/manager/role_self_assigned/body.html
+#: apps/manager/templates/email/manager/role_self_assigned/body.txt
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Reason"
 msgstr "Motivazione"
@@ -658,6 +673,10 @@ msgstr "Segnalato"
 msgid "required"
 msgstr "obbligatorio"
 
+#: apps/manager/forms.py
+msgid "Required when you give a role to yourself; kept in the audit log."
+msgstr "Obbligatorio quando assegni un ruolo a te stesso; resta nel registro di audit."
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Restrict and send the statement of reasons"
 msgstr "Limita e invia la motivazione"
@@ -670,6 +689,19 @@ msgstr "Ritirati"
 msgid "Returns and refunds policy"
 msgstr "Condizioni di reso e rimborso"
 
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Revoke %(role)s"
+msgstr "Revoca %(role)s"
+
+#: apps/manager/forms.py apps/manager/templates/email/manager/role_self_assigned/body.html
+#: apps/manager/templates/email/manager/role_self_assigned/body.txt
+msgid "Role"
+msgstr "Ruolo"
+
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid "Roles"
+msgstr "Ruoli"
+
 #: apps/manager/templates/manager/shop/profile.html
 msgid "Save"
 msgstr "Salva"
@@ -679,12 +711,10 @@ msgid "Save logo"
 msgstr "Salva logo"
 
 #: apps/accounts/templates/accounts/mfa/totp.html
-msgid ""
-"Scan this QR code with your authenticator app, then enter the 6-digit code "
-"it shows."
+msgid "Scan this QR code with your authenticator app, then enter the 6-digit code it shows."
 msgstr ""
-"Scansiona questo codice QR con la tua app di autenticazione, poi inserisci "
-"il codice a 6 cifre che mostra."
+"Scansiona questo codice QR con la tua app di autenticazione, poi inserisci il codice a 6 cifre che"
+" mostra."
 
 #: apps/manager/templates/manager/list.html
 msgid "Select"
@@ -736,8 +766,7 @@ msgstr "Mostra password"
 msgid "Sign in"
 msgstr "Accedi"
 
-#: apps/manager/templates/manager/forbidden.html
-#: apps/manager/templates/manager/layout.html
+#: apps/manager/templates/manager/forbidden.html apps/manager/templates/manager/layout.html
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid "Sign out"
 msgstr "Esci"
@@ -758,6 +787,10 @@ msgstr "Qualcosa è andato storto"
 msgid "Staff"
 msgstr "Staff"
 
+#: apps/manager/sections.py apps/manager/templates/manager/platform/staff_roles.html
+msgid "Staff and roles"
+msgstr "Staff e ruoli"
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Start review"
 msgstr "Avvia la revisione"
@@ -768,8 +801,7 @@ msgstr "Motivazioni"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/notices.html
-#: apps/manager/templates/manager/shop/order.html
-#: apps/manager/templates/manager/shop/orders.html
+#: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
 msgid "Status"
 msgstr "Stato"
 
@@ -798,11 +830,9 @@ msgid "Tagline"
 msgstr "Slogan"
 
 #: apps/manager/notice_views.py
-msgid ""
-"The content could not be restricted: check the notice status and target."
+msgid "The content could not be restricted: check the notice status and target."
 msgstr ""
-"Non è stato possibile limitare il contenuto: controlla lo stato e il "
-"bersaglio della segnalazione."
+"Non è stato possibile limitare il contenuto: controlla lo stato e il bersaglio della segnalazione."
 
 #: apps/manager/notice_views.py
 msgid "The content is restricted and the vendor is told."
@@ -814,28 +844,22 @@ msgstr "La decisione è registrata e il segnalante ne viene informato."
 
 #: apps/manager/templates/manager/login.html
 msgid ""
-"The email or the password is not correct, or the account is locked for a "
-"while. Please try again."
-msgstr ""
-"L’email o la password non sono corrette, oppure l’account è bloccato per un "
-"po’. Riprova."
+"The email or the password is not correct, or the account is locked for a while. Please try again."
+msgstr "L’email o la password non sono corrette, oppure l’account è bloccato per un po’. Riprova."
 
 #: themes/base/templates/403_csrf.html
-msgid ""
-"The form was sent from an old or expired page. Go back, reload the page and "
-"send it again."
+msgid "The form was sent from an old or expired page. Go back, reload the page and send it again."
 msgstr ""
-"Il modulo è stato inviato da una pagina vecchia o scaduta. Torna indietro, "
-"ricarica la pagina e invialo di nuovo."
+"Il modulo è stato inviato da una pagina vecchia o scaduta. Torna indietro, ricarica la pagina e "
+"invialo di nuovo."
 
 #: apps/manager/templates/manager/forbidden.html
 msgid ""
-"The Manager is for platform staff and for vendor members. If you need "
-"access, ask the platform staff, or sign in with another account."
+"The Manager is for platform staff and for vendor members. If you need access, ask the platform "
+"staff, or sign in with another account."
 msgstr ""
-"Il Manager è riservato allo staff della piattaforma e ai membri dei "
-"venditori. Se ti serve l’accesso, chiedilo allo staff della piattaforma "
-"oppure accedi con un altro account."
+"Il Manager è riservato allo staff della piattaforma e ai membri dei venditori. Se ti serve "
+"l’accesso, chiedilo allo staff della piattaforma oppure accedi con un altro account."
 
 #: apps/manager/notice_views.py
 msgid "The notice is under review."
@@ -844,6 +868,14 @@ msgstr "La segnalazione è in revisione."
 #: apps/manager/notice_views.py
 msgid "The notification to the authorities is recorded."
 msgstr "La comunicazione alle autorità è registrata."
+
+#: apps/manager/templates/manager/platform/staff_roles.html
+msgid ""
+"The one-person-team setting is on: one person may hold incompatible roles, such as Finance and "
+"payments with Configuration and tax. Every such grant is audited."
+msgstr ""
+"L'impostazione «team di una persona» è attiva: una persona può avere ruoli incompatibili, come "
+"Finanza e pagamenti con Configurazione e tasse. Ogni assegnazione di questo tipo è registrata."
 
 #: apps/manager/views.py
 msgid "The order was updated."
@@ -868,30 +900,29 @@ msgstr "la passkey non è stata accettata"
 
 #: themes/base/templates/400.html
 msgid "The request could not be understood. Check the address and try again."
-msgstr ""
-"Non è stato possibile comprendere la richiesta. Controlla l’indirizzo e "
-"riprova."
+msgstr "Non è stato possibile comprendere la richiesta. Controlla l’indirizzo e riprova."
 
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "The request failed."
 msgstr "La richiesta non è riuscita."
 
-#: apps/manager/templates/manager/shop/profile.html
-msgid ""
-"The text in this language is a machine draft and is not public yet. Edit and"
-" save it to publish it."
-msgstr ""
-"Il testo in questa lingua è una bozza automatica e non è ancora pubblico. "
-"Modificalo e salvalo per pubblicarlo."
+#: apps/manager/views.py
+msgid "The role change is recorded."
+msgstr "La modifica del ruolo è registrata."
 
 #: apps/manager/templates/manager/shop/profile.html
 msgid ""
-"The texts and policies customers read on the page of %(vendor)s, one "
-"language at a time."
+"The text in this language is a machine draft and is not public yet. Edit and save it to publish "
+"it."
 msgstr ""
-"I testi e le condizioni che i clienti leggono nella pagina di %(vendor)s, "
-"una lingua alla volta."
+"Il testo in questa lingua è una bozza automatica e non è ancora pubblico. Modificalo e salvalo per"
+" pubblicarlo."
+
+#: apps/manager/templates/manager/shop/profile.html
+msgid "The texts and policies customers read on the page of %(vendor)s, one language at a time."
+msgstr ""
+"I testi e le condizioni che i clienti leggono nella pagina di %(vendor)s, una lingua alla volta."
 
 #: apps/accounts/decorators.py
 msgid "The verification failed. Please reload the page and try again."
@@ -900,6 +931,10 @@ msgstr "La verifica non è riuscita. Ricarica la pagina e riprova."
 #: themes/base/templates/components/error_summary.html
 msgid "There is a problem"
 msgstr "Si è verificato un problema"
+
+#: apps/manager/views.py
+msgid "There is no account with that email."
+msgstr "Non c'è nessun account con questa email."
 
 #: apps/manager/templates/manager/bulk_preview.html
 msgid "This action changes nothing."
@@ -915,17 +950,12 @@ msgid "This content is not available in this language."
 msgstr "Questo contenuto non è disponibile in questa lingua."
 
 #: apps/accounts/templates/accounts/action_link/continue.html
-msgid ""
-"This link was sent to you by email. Press Continue to open the page it leads"
-" to."
-msgstr ""
-"Questo link ti è stato inviato per email. Premi Continua per aprire la "
-"pagina a cui porta."
+msgid "This link was sent to you by email. Press Continue to open the page it leads to."
+msgstr "Questo link ti è stato inviato per email. Premi Continua per aprire la pagina a cui porta."
 
 #: apps/manager/notice_views.py
 msgid "This step is not possible for the notice in its status."
-msgstr ""
-"Questo passaggio non è possibile per la segnalazione nel suo stato attuale."
+msgstr "Questo passaggio non è possibile per la segnalazione nel suo stato attuale."
 
 #: apps/manager/views.py
 msgid "This step is not possible in the order's current state."
@@ -933,17 +963,15 @@ msgstr "Questo passaggio non è possibile nello stato attuale dell'ordine."
 
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid "This vendor is closed, so its shop pages are no longer available."
-msgstr ""
-"Questo venditore è chiuso, quindi le pagine del suo negozio non sono più "
-"disponibili."
+msgstr "Questo venditore è chiuso, quindi le pagine del suo negozio non sono più disponibili."
 
 #: apps/manager/templates/manager/shop/profile.html
 msgid ""
-"This vendor is suspended or closed, so the storefront profile cannot be "
-"changed. Contact support to have it reopened."
+"This vendor is suspended or closed, so the storefront profile cannot be changed. Contact support "
+"to have it reopened."
 msgstr ""
-"Questo venditore è sospeso o chiuso, quindi il profilo del negozio non può "
-"essere modificato. Contatta l’assistenza per farlo riaprire."
+"Questo venditore è sospeso o chiuso, quindi il profilo del negozio non può essere modificato. "
+"Contatta l’assistenza per farlo riaprire."
 
 #: apps/manager/media.py
 msgid "Title"
@@ -951,13 +979,12 @@ msgstr "Titolo"
 
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid ""
-"To ask to reopen it, write to the platform staff. Staff reopen a closed "
-"vendor after a review; it then goes through onboarding again, including the "
-"acceptance of the contract in force."
+"To ask to reopen it, write to the platform staff. Staff reopen a closed vendor after a review; it "
+"then goes through onboarding again, including the acceptance of the contract in force."
 msgstr ""
-"Per chiederne la riapertura, scrivi allo staff della piattaforma. Lo staff "
-"riapre un venditore chiuso dopo una verifica; il venditore ripete poi "
-"l’onboarding, compresa l’accettazione del contratto in vigore."
+"Per chiederne la riapertura, scrivi allo staff della piattaforma. Lo staff riapre un venditore "
+"chiuso dopo una verifica; il venditore ripete poi l’onboarding, compresa l’accettazione del "
+"contratto in vigore."
 
 #: apps/accounts/action_link_views.py apps/accounts/decorators.py
 msgid "Too many attempts. Please try again later."
@@ -1011,11 +1038,9 @@ msgstr "Usa un codice di recupero"
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Use this device's screen lock or a security key."
-msgstr ""
-"Usa il blocco schermo di questo dispositivo o una chiave di sicurezza."
+msgstr "Usa il blocco schermo di questo dispositivo o una chiave di sicurezza."
 
-#: apps/manager/templates/manager/layout.html
-#: apps/manager/templates/manager/shop/dashboard.html
+#: apps/manager/templates/manager/layout.html apps/manager/templates/manager/shop/dashboard.html
 msgid "Vendor"
 msgstr "Venditore"
 
@@ -1037,8 +1062,7 @@ msgstr "Attenzione"
 
 #: themes/base/templates/500.html
 msgid "We could not complete your request. Please try again in a few minutes."
-msgstr ""
-"Non siamo riusciti a completare la richiesta. Riprova tra qualche minuto."
+msgstr "Non siamo riusciti a completare la richiesta. Riprova tra qualche minuto."
 
 #: apps/orders/templates/email/orders/order_received/subject.txt
 msgid "We received your order %(order_number)s"
@@ -1047,45 +1071,40 @@ msgstr "Abbiamo ricevuto il tuo ordine %(order_number)s"
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 msgid ""
-"We received your order %(order_number)s (total %(total)s EUR). We will "
-"confirm it when the payment is complete."
+"We received your order %(order_number)s (total %(total)s EUR). We will confirm it when the payment"
+" is complete."
 msgstr ""
-"Abbiamo ricevuto il tuo ordine %(order_number)s (totale %(total)s EUR). Te "
-"lo confermeremo quando il pagamento sarà completato."
+"Abbiamo ricevuto il tuo ordine %(order_number)s (totale %(total)s EUR). Te lo confermeremo quando "
+"il pagamento sarà completato."
 
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
 msgid ""
-"We received your payment of %(total)s EUR for order %(order_number)s. Each "
-"seller will prepare its part and you will get a message when it ships."
+"We received your payment of %(total)s EUR for order %(order_number)s. Each seller will prepare its"
+" part and you will get a message when it ships."
 msgstr ""
-"Abbiamo ricevuto il tuo pagamento di %(total)s EUR per l’ordine "
-"%(order_number)s. Ogni venditore preparerà la sua parte e riceverai un "
-"messaggio quando verrà spedita."
+"Abbiamo ricevuto il tuo pagamento di %(total)s EUR per l’ordine %(order_number)s. Ogni venditore "
+"preparerà la sua parte e riceverai un messaggio quando verrà spedita."
 
 #: apps/manager/templates/manager/shop/vendor_picker.html
 msgid ""
-"You are a member of several vendors. Choose the one to work on; you can "
-"switch from the header later."
+"You are a member of several vendors. Choose the one to work on; you can switch from the header "
+"later."
 msgstr ""
-"Sei membro di più venditori. Scegli quello su cui lavorare; potrai cambiarlo"
-" in seguito dall’intestazione."
+"Sei membro di più venditori. Scegli quello su cui lavorare; potrai cambiarlo in seguito "
+"dall’intestazione."
 
 #: apps/accounts/templates/accounts/admin/login.html
 msgid ""
-"You are authenticated as %(username)s, but are not authorized to access this"
-" page. Would you like to login to a different account?"
+"You are authenticated as %(username)s, but are not authorized to access this page. Would you like "
+"to login to a different account?"
 msgstr ""
-"Hai effettuato l’accesso come %(username)s, ma non sei autorizzato ad "
-"accedere a questa pagina. Vuoi accedere con un altro account?"
+"Hai effettuato l’accesso come %(username)s, ma non sei autorizzato ad accedere a questa pagina. "
+"Vuoi accedere con un altro account?"
 
 #: apps/manager/templates/manager/forbidden.html
-msgid ""
-"You are signed in as %(user)s, and you do not have access to this part of "
-"the site."
-msgstr ""
-"Hai effettuato l’accesso come %(user)s e non hai accesso a questa parte del "
-"sito."
+msgid "You are signed in as %(user)s, and you do not have access to this part of the site."
+msgstr "Hai effettuato l’accesso come %(user)s e non hai accesso a questa parte del sito."
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "You are working on %(vendor)s."

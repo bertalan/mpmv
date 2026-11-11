@@ -7,7 +7,7 @@ whose role checks CORE.18 defines.
 
 from django.utils.translation import gettext_lazy as _
 
-from .navigation import Registry, Section, anyone, vendor_action
+from .navigation import Registry, Section, anyone, platform_role, vendor_action
 from .notice_views import SECTION as NOTICES_SECTION
 from .notice_views import can_review
 from .spaces import Space
@@ -75,6 +75,14 @@ BUILT_IN = (
         "manager:platform:notices",
         order=60,
         allowed=can_review,
+    ),
+    Section(
+        "platform.staff_roles",
+        Space.PLATFORM,
+        _("Staff and roles"),
+        "manager:platform:staff_roles",
+        order=90,
+        allowed=platform_role("platform.staff_roles"),
     ),
 )
 

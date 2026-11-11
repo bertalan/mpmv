@@ -46,6 +46,7 @@ shop = (
 platform = (
     [
         path("", views.PlatformDashboardView.as_view(), name="dashboard"),
+        path("staff/", views.StaffRolesView.as_view(), name="staff_roles"),
         path("notices/", notice_views.NoticeListView.as_view(), name="notices"),
         path("notices/<uuid:public_id>/", notice_views.NoticeDetailView.as_view(), name="notice"),
     ],
