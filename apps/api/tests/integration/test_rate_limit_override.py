@@ -185,7 +185,8 @@ def test_staff_set_the_override_from_the_admin(staff_client: Client) -> None:
     api_client.refresh_from_db()
     assert api_client.rate_limit == "600/minute"
     entry = AuditLog.objects.get(action=ACTION)
-    assert entry.actor_label == "staff:staff@example.com"
+    assert entry.actor_label.startswith("staff:")
+    assert "@" not in entry.actor_label
 
 
 def test_the_detail_page_shows_the_effective_limit_and_links_the_change_page(

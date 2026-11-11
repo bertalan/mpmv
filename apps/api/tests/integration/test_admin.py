@@ -76,7 +76,8 @@ def test_the_revoke_action_revokes_through_the_audited_service(staff_client: Cli
     assert not client.is_active
     entry = AuditLog.objects.get(action="api.client.revoked")
     assert entry.vendor_key == str(client.vendor.public_id)
-    assert entry.actor_label == "staff:staff@example.com"
+    assert entry.actor_label.startswith("staff:")
+    assert "@" not in entry.actor_label
 
 
 def test_view_only_staff_cannot_revoke(client: Client) -> None:

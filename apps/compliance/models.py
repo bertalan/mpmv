@@ -15,9 +15,11 @@ for warnings, edited by staff.
 
 from typing import Any, ClassVar
 
+from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models
+from django.utils import timezone
 
 from apps.catalog.models import Product
 from apps.core.fields import CountryField, EncryptedCharField, LanguageField
@@ -286,6 +288,24 @@ class Notice(BaseModel):
 
     def __str__(self) -> str:
         return f"Notice {self.public_id} ({self.status})"
+
+
+class ErasureRequest(BaseModel):
+    """A customer's account erasure (CMP.4, D-30): accepted at once, complete when the profile is
+    anonymised, which waits for the last open order. Holds no personal data; the account is
+    reached through the user (the account row stays, anonymised)."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="erasure_request"
+    )
+    requested_at = models.DateTimeField(default=timezone.now)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["requested_at", "id"]
+
+    def __str__(self) -> str:
+        return f"erasure of user {self.user_id} ({'done' if self.completed_at else 'pending'})"
 
 
 class StatementOfReasons(BaseModel):

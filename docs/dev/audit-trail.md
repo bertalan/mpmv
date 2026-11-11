@@ -61,6 +61,7 @@ vendor's change page links to its trail (`?vendor=<public id>`).
 | Catalogue integrity (CAT.14) | `catalog.product.duplicated_to_vendor` (a product copied to another vendor, with the reason) |
 | Shipping configuration (SHP.1) | `shipping.<model>.created`, `.updated`, `.deleted` for carriers, zones, vendor rates, weight bands and pickup options, through `shipping.services.save_config` and `delete_config`; deleting a rate also audits each of its bands |
 | Compliance (CMP.3) | `compliance.gpsr_defaults.created`, `.updated` (a vendor's default GPSR data); `compliance.gpsr.created`, `.updated` (a product's GPSR data); `compliance.gpsr_text.created`, `.updated` (a per-language safety text); `compliance.country_languages.created`, `.updated` (the warnings languages of a country); `compliance.safety_case.opened`, `.closed` (staff actions on a safety case), `.overdue` (written once by the hourly `compliance.flag_overdue_safety_cases` job, actor `task:`). Through `compliance.services`, with `dry_run` |
+| GDPR (CMP.4) | `compliance.gdpr_export` (a customer's data export: the user's public id and counts per section, never the data), `compliance.gdpr_erasure` (an account erasure: public ids and flags such as active, usable password, anonymised and staff; the orders it restricts or anonymises write their own `orders.restrict` and `orders.anonymise` entries) |
 | Notice and action (CMP.5, DSA art. 16) | `compliance.notice.received` (a public report, actor `anonymous` with the client IP), `.review_started`, `.decided` (staff, with the outcome in the status), `.viewed` (staff opened a notice, which shows the notifier's name and email; the entry carries a reason, never the details). The anonymous child-abuse category stores no IP in the log. The location is kept as scheme, host and path only. The snapshot holds the target kind, location, category, status and flags only: the notifier's name, email and words stay in encrypted columns, never in the log. Through `compliance.services` (`submit_notice`, `start_review`, `decide_notice`), with `dry_run` |
 | Statement of reasons and art. 18 (CMP.5 part 3, DSA art. 17, 18) | `compliance.statement.issued` (staff restricted a product, event or storefront through the owning app's service, which writes its own entry, and the vendor was sent its statement of reasons), `compliance.restriction.lifted` (staff lifted the hold on a restricted product), `compliance.notice.authorities_notified` (staff recorded a report to the authorities: authority and time). Snapshots hold ids, kinds and flags; the facts, the redress text and the note stay in the model. The statement is immutable once sent. A pending transparency-database record is stored with it; nothing is sent. Through `compliance.services` (`issue_statement`, `notify_authorities`), with `dry_run` |
 | Order emails (ORD.9) | Not audit actions: outbox templates queued by `orders.notifications` in the order transition's transaction, one idempotency key per event: `orders.order_received`, `orders.payment_confirmed`, `orders.order_confirmation` (per vendor, non-fiscal), `orders.vendor_new_order`, `orders.vendor_order_shipped`. The context never holds payment references, commission or the buyer's tax identifiers; a vendor mail has its own lines and the ship-to address only. A refused recipient is logged (class only) and skipped, and never rolls the transition back |
@@ -154,3 +155,25 @@ add a regression test that a rate change is listed under `?target_model=tax.taxr
 old and new rate in its *Changes* table (see
 `apps/core/tests/integration/test_audit_admin.py` for the platform operator version). A
 vendor-specific shipping zone or commission rule also puts `"vendor"` in its snapshot.
+
+## Personal data in the audit trail (CMP.4)
+
+- `actor_label` is `user:<public id>` or `staff:<public id>` (`apps.core.audit.user_context`),
+  never the email. The table is append-only (database trigger), so an address written there could
+  not be removed with the account. Owner decision (lane-a answer 6784046561): customer rows
+  written before this change were rewritten to `user:<public id>` (`unknown` when the user no
+  longer exists) by the one-off migration `core/0021_audit_actor_pseudonymised`. It is the
+  single exception to the append-only rule: it disables the trigger for that one UPDATE inside
+  its transaction, enables it again, and writes one audit row with counts only. Staff rows keep
+  `staff:<email>`: the identity of staff is kept to establish and defend legal claims (GDPR
+  article 17(3)(e)) and for the order retention duties of D-29 and D-30 (article 17(3)(b)); it
+  goes no longer than those periods.
+- `ip` is kept as security-log evidence (GDPR article 6(1)(f), the platform's legitimate interest
+  in detecting abuse, and article 17(3)(e) for legal claims). It is not erased with the account.
+  A retention period for it (null the column after N months) is a CMP.4 2/2 / CMP.29 decision.
+- `before` and `after` of the GDPR actions hold public ids, flags and counts only.
+- `OutboxEmailEvent` rows are append-only too. The erasure writes the detail `account erased`;
+  provider feedback text in older rows may quote an address and is a documented residual.
+- A lockout entry's target key (`login:account:<keyed hash>`) never holds the address; the same
+  migration rewrote old ones. A former staff member keeps the `staff:<email>` label of rows
+  written while they were staff (article 17(3)(e) basis above).
