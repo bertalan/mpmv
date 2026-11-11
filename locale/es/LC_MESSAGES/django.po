@@ -119,7 +119,7 @@ msgstr "Pedido %(order_number)s: una parte de tu pedido se ha cancelado"
 
 #: apps/orders/templates/email/orders/payment_confirmed/subject.txt
 msgid "Payment received for order %(order_number)s"
-msgstr "Pago recibido del pedido %(order_number)s"
+msgstr "Pago recibido por el pedido %(order_number)s"
 
 #: apps/orders/templates/email/orders/vendor_new_order/body.html
 #: apps/orders/templates/email/orders/vendor_new_order/body.txt
@@ -155,5 +155,5 @@ msgid ""
 "We received your payment of %(total)s EUR for order %(order_number)s. Each "
 "seller will prepare its part and you will get a message when it ships."
 msgstr ""
-"Hemos recibido tu pago de %(total)s EUR del pedido %(order_number)s. Cada "
-"vendedor preparará su parte y recibirás un mensaje cuando se envíe."
+"Hemos recibido tu pago de %(total)s EUR por el pedido %(order_number)s. Cada"
+" vendedor preparará su parte y recibirás un mensaje cuando se envíe."

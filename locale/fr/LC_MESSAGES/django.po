@@ -94,7 +94,7 @@ msgstr ""
 #: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.txt
 msgid "Order %(order_number)s was cancelled. Do not ship these items:"
 msgstr ""
-"La commande %(order_number)s a été annulée. N’expédiez pas ces articles :"
+"La commande %(order_number)s a été annulée. N’expédie pas ces articles :"
 
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
@@ -115,8 +115,7 @@ msgstr "Commande %(order_number)s : confirmation de %(vendor_name)s"
 
 #: apps/orders/templates/email/orders/vendor_order_cancelled/subject.txt
 msgid "Order %(order_number)s: part of your order was cancelled"
-msgstr ""
-"Commande %(order_number)s : une partie de votre commande a été annulée"
+msgstr "Commande %(order_number)s : une partie de ta commande a été annulée"
 
 #: apps/orders/templates/email/orders/payment_confirmed/subject.txt
 msgid "Payment received for order %(order_number)s"
@@ -139,7 +138,7 @@ msgstr "Total : %(total)s EUR"
 
 #: apps/orders/templates/email/orders/order_received/subject.txt
 msgid "We received your order %(order_number)s"
-msgstr "Nous avons bien reçu votre commande %(order_number)s"
+msgstr "Nous avons bien reçu ta commande %(order_number)s"
 
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
@@ -147,8 +146,8 @@ msgid ""
 "We received your order %(order_number)s (total %(total)s EUR). We will "
 "confirm it when the payment is complete."
 msgstr ""
-"Nous avons bien reçu votre commande %(order_number)s (total : %(total)s "
-"EUR). Nous vous la confirmerons dès que le paiement sera terminé."
+"Nous avons bien reçu ta commande %(order_number)s (total : %(total)s EUR). "
+"Nous te la confirmerons dès que le paiement sera terminé."
 
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
@@ -156,6 +155,6 @@ msgid ""
 "We received your payment of %(total)s EUR for order %(order_number)s. Each "
 "seller will prepare its part and you will get a message when it ships."
 msgstr ""
-"Nous avons bien reçu votre paiement de %(total)s EUR pour la commande "
-"%(order_number)s. Chaque vendeur prépare sa partie et vous recevrez un "
-"message dès qu’elle sera expédiée."
+"Nous avons bien reçu ton paiement de %(total)s EUR pour la commande "
+"%(order_number)s. Chaque vendeur prépare sa part de la commande et tu "
+"recevras un message dès qu’elle sera expédiée."
