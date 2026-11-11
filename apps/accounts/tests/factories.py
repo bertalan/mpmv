@@ -70,6 +70,19 @@ class UserFactory(DjangoModelFactory[User]):
         obj.save(update_fields=["is_staff"])
         obj.user_permissions.add(Permission.objects.get(codename="view_all_vendors"))
 
+    @factory.post_generation
+    def platform_role(obj: User, create: bool, extracted: str | None, **kwargs: Any) -> None:
+        """`platform_role="support"`: admin login plus membership of that CORE.18 role group."""
+        if not create or not extracted:
+            return
+        from django.contrib.auth.models import Group
+
+        from apps.manager import roles
+
+        obj.is_staff = True
+        obj.save(update_fields=["is_staff"])
+        obj.groups.add(Group.objects.get(name=roles.role(extracted).group))
+
 
 class TOTPDeviceFactory(DjangoModelFactory[TOTPDevice]):
     """A confirmed authenticator-app device (django-otp). The key is random, from the model."""

@@ -2,14 +2,17 @@
 
 from django.db import migrations
 
-from apps.manager.role_groups import sync_role_groups
+from apps.manager.role_groups import refuse_adopting_populated_groups, sync_role_groups
 
 
 def seed(apps, schema_editor):  # type: ignore[no-untyped-def]
+    group = apps.get_model("auth", "Group")
+    refuse_adopting_populated_groups(group)
     sync_role_groups(
-        apps.get_model("auth", "Group"),
+        group,
         apps.get_model("auth", "Permission"),
         apps.get_model("contenttypes", "ContentType"),
+        apps.get_model,
     )
 
 

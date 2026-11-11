@@ -175,13 +175,20 @@ def check_role_drift(
     """
     from django.db import DatabaseError
 
-    from .role_groups import role_drift
+    from .role_groups import role_conflicts, role_drift
 
     try:
-        problems = role_drift()
+        problems, conflicts = role_drift(), role_conflicts()
     except DatabaseError:  # not migrated yet
         return []
     return [
+        checks.Error(
+            problem,
+            hint="Remove the user from the role group, or the vendor membership.",
+            id="manager.E005",
+        )
+        for problem in conflicts
+    ] + [
         checks.Error(
             problem,
             hint="Restore the group from apps/manager/roles.py (sync_role_groups), or change "

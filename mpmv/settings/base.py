@@ -46,7 +46,7 @@ LOCAL_APPS = [
     "apps.compliance",
     "apps.api",
     "apps.mcp",
-    "apps.manager",  # the Manager backoffice (CORE.17): an adapter like api, no models
+    "apps.manager",  # the Manager backoffice (CORE.17): an adapter like api, no tables
     "apps.seed",  # demo data seed (ARC.10): above every app, imported by none
 ]
 

@@ -23,7 +23,7 @@ from apps.core.services import is_platform_owner
 from apps.vendors.models import Vendor, VendorMember
 from apps.vendors.services import is_vendor_member
 
-from .role_groups import user_roles
+from .role_groups import in_role_group, user_roles
 from .spaces import Space
 
 type AnyUser = AbstractBaseUser | AnonymousUser
@@ -32,6 +32,8 @@ type AnyUser = AbstractBaseUser | AnonymousUser
 def is_platform_staff(user: AnyUser) -> bool:
     """Holds a dedicated platform permission; `is_staff` and superuser status do not count."""
     if not (user.is_authenticated and user.is_active):
+        return False
+    if is_vendor_member(user):  # platform roles and vendor membership never mix
         return False
     return is_platform_owner(user) or bool(user_roles(user))
 
@@ -44,10 +46,12 @@ def may_enter(space: Space, user: AnyUser) -> bool:
     """Whether `user` may enter `space` at all; the sections check the rest."""
     if not (user.is_authenticated and user.is_active):
         return False
-    staff, member = is_platform_staff(user), is_vendor_member(user)
+    member = is_vendor_member(user)
+    # Raw: a member who also holds a platform role is let into neither space.
+    holds_role = is_platform_owner(user) or in_role_group(user)
     if space is Space.SHOP:
-        return member and not staff and not _has_admin_access(user)
-    return staff and not member
+        return member and not holds_role and not _has_admin_access(user)
+    return is_platform_staff(user)
 
 
 @dataclass(frozen=True)

@@ -1,6 +1,7 @@
 """CORE.18 (part 1) done-when: seeded groups, idempotence, drift check, role membership."""
 
 import pytest
+from django.apps import apps
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 
@@ -22,7 +23,7 @@ def _perms(group: Group) -> set[str]:
 
 
 def _sync() -> list[str]:
-    return sync_role_groups(Group, Permission, ContentType)
+    return sync_role_groups(Group, Permission, ContentType, apps.get_model)
 
 
 @pytest.mark.parametrize("role", roles.ROLES, ids=lambda r: r.key)
@@ -42,7 +43,7 @@ def test_seeding_twice_changes_nothing() -> None:
 
 
 def test_seeding_repairs_a_missing_group_and_keeps_members() -> None:
-    user = UserFactory.create()
+    user = UserFactory.create(staff=True)
     group = Group.objects.get(name=roles.role("support").group)
     user.groups.add(group)
     group.permissions.clear()
@@ -72,7 +73,7 @@ def test_a_removed_permission_and_a_deleted_group_fail_the_check() -> None:
 
 
 def test_a_member_of_a_role_group_is_platform_staff_with_that_role() -> None:
-    user = UserFactory.create()
+    user = UserFactory.create(staff=True)
     user.groups.add(Group.objects.get(name=roles.role("support").group))
     assert user_roles(user) == {"support"}
     assert is_platform_staff(user)
