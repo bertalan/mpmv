@@ -13,9 +13,12 @@ from . import roles
 def _permission(models: tuple[Any, Any, Any], label: str, get_model: Any) -> Any:
     _, permission_model, content_type_model = models
     app_label, codename = label.split(".")
-    model = {"core": "platformoperator", "vendors": "vendor", "manager": "platformaccess"}[
-        app_label
-    ]
+    model = {
+        "core": "platformoperator",
+        "vendors": "vendor",
+        "manager": "platformaccess",
+        "compliance": "notice",
+    }[app_label]
     content_type, _ = content_type_model.objects.get_or_create(app_label=app_label, model=model)
     # The name is the model's Meta label, as Django's own post_migrate step would write it.
     names = dict(get_model(app_label, model)._meta.permissions)

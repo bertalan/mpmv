@@ -38,12 +38,11 @@ def held(user: User) -> frozenset[str]:
     return user_roles(User.objects.get(pk=user.pk))
 
 
-def test_a_grant_adds_the_group_sets_is_staff_and_is_audited_with_before_and_after() -> None:
-    owner, target = staff("owner"), UserFactory.create()
+def test_a_grant_adds_the_group_and_is_audited_with_before_and_after() -> None:
+    owner, target = staff("owner"), UserFactory.create(staff=True)
     changes = staff_roles.grant_role(target, "support", actor=owner, ctx=CTX)
     target.refresh_from_db()
     assert held(target) == {"support"}
-    assert target.is_staff
     assert not changes.is_empty
     entry = AuditLog.objects.get(action=staff_roles.GRANT_ACTION)
     assert entry.before is not None
@@ -53,12 +52,11 @@ def test_a_grant_adds_the_group_sets_is_staff_and_is_audited_with_before_and_aft
 
 
 def test_a_dry_run_changes_nothing_and_returns_the_change() -> None:
-    owner, target = staff("owner"), UserFactory.create()
+    owner, target = staff("owner"), UserFactory.create(staff=True)
     changes = staff_roles.grant_role(target, "support", actor=owner, ctx=CTX, dry_run=True)
     assert not changes.is_empty
     target.refresh_from_db()
     assert held(target) == frozenset()
-    assert not target.is_staff
     assert not AuditLog.objects.filter(action=staff_roles.GRANT_ACTION).exists()
 
 
@@ -69,14 +67,14 @@ def test_granting_a_role_already_held_is_a_no_op() -> None:
 
 @pytest.mark.parametrize("actor_key", [None, "config", "catalog", "finance", "support"])
 def test_only_the_platform_owner_assigns(actor_key: str | None) -> None:
-    actor, target = staff(actor_key), UserFactory.create()
+    actor, target = staff(actor_key), UserFactory.create(staff=True)
     with pytest.raises(PermissionDenied):
         staff_roles.grant_role(target, "support", actor=actor, ctx=CTX)
     assert held(target) == frozenset()
 
 
 def test_a_superuser_without_a_role_does_not_assign() -> None:
-    target = UserFactory.create()
+    target = UserFactory.create(staff=True)
     with pytest.raises(PermissionDenied):
         staff_roles.grant_role(target, "support", actor=UserFactory.create(superuser=True), ctx=CTX)
 
@@ -86,6 +84,24 @@ def test_a_vendor_member_is_refused() -> None:
     with pytest.raises(staff_roles.RoleAssignmentError):
         staff_roles.grant_role(member, "support", actor=staff("owner"), ctx=CTX)
     assert held(member) == frozenset()
+
+
+def test_a_customer_account_is_refused_a_role() -> None:
+    customer = UserFactory.create()  # not created as staff
+    with pytest.raises(staff_roles.RoleAssignmentError, match="staff"):
+        staff_roles.grant_role(customer, "support", actor=staff("owner"), ctx=CTX)
+    customer.refresh_from_db()
+    assert held(customer) == frozenset()
+    assert not customer.is_staff
+
+
+def test_an_account_with_orders_is_refused_even_when_marked_staff() -> None:
+    from apps.orders.tests.factories import OrderFactory
+
+    buyer = UserFactory.create(staff=True)
+    OrderFactory.create(customer=buyer)
+    with pytest.raises(staff_roles.RoleAssignmentError, match="customer"):
+        staff_roles.grant_role(buyer, "support", actor=staff("owner"), ctx=CTX)
 
 
 def test_an_inactive_account_is_refused() -> None:
@@ -129,12 +145,12 @@ def test_self_assignment_needs_a_reason_and_emails_the_other_owners_and_superuse
     assert recipients == {other_owner.email, superuser.email}
 
 
-def test_a_revocation_is_audited_and_clears_is_staff_with_the_last_role() -> None:
+def test_a_revocation_is_audited_and_keeps_the_staff_account() -> None:
     owner, target = staff("owner"), staff("support")
     staff_roles.revoke_role(target, "support", actor=owner, ctx=CTX)
     target.refresh_from_db()
     assert held(target) == frozenset()
-    assert not target.is_staff
+    assert target.is_staff  # the account stays a staff account, only without a role
     entry = AuditLog.objects.get(action=staff_roles.REVOKE_ACTION)
     assert entry.before is not None
     assert entry.after is not None
@@ -252,7 +268,7 @@ def test_the_owner_sees_the_staff_list(client: Client) -> None:
 def test_everyone_but_the_owner_gets_404_on_get_and_post_and_nothing_changes(
     client: Client, key: str | None
 ) -> None:
-    actor, target = staff(key), UserFactory.create()
+    actor, target = staff(key), UserFactory.create(staff=True)
     login(client, actor)
     refused = (403, 404)  # 403: the gate's explanatory page for a user with no platform role
     assert client.get(URL).status_code in refused
@@ -268,7 +284,7 @@ def test_a_vendor_member_and_a_superuser_without_a_role_get_404(client: Client) 
 
 
 def test_a_grant_through_the_page(client: Client) -> None:
-    owner, target = staff("owner"), UserFactory.create()
+    owner, target = staff("owner"), UserFactory.create(staff=True)
     login(client, owner)
     response = client.post(URL, grant_post(target.email, "support"))
     assert response.status_code == 302
@@ -276,7 +292,7 @@ def test_a_grant_through_the_page(client: Client) -> None:
 
 
 def test_a_grant_without_operational_mode_is_refused_with_an_explanation(client: Client) -> None:
-    owner, target = staff("owner"), UserFactory.create()
+    owner, target = staff("owner"), UserFactory.create(staff=True)
     login(client, owner, level=levels.RESTRICTED)
     response = client.post(URL, grant_post(target.email, "support"))
     assert response.status_code == 403
@@ -285,7 +301,7 @@ def test_a_grant_without_operational_mode_is_refused_with_an_explanation(client:
 
 
 def test_a_grant_without_a_recent_step_up_is_refused(client: Client) -> None:
-    owner, target = staff("owner"), UserFactory.create()
+    owner, target = staff("owner"), UserFactory.create(staff=True)
     login(client, owner, verified_at=1.0)
     response = client.post(URL, grant_post(target.email, "support"))
     assert response.status_code in (302, 403)
@@ -293,7 +309,7 @@ def test_a_grant_without_a_recent_step_up_is_refused(client: Client) -> None:
 
 
 def test_the_owner_role_needs_a_fresh_passkey(client: Client) -> None:
-    owner, target = staff("owner"), UserFactory.create()
+    owner, target = staff("owner"), UserFactory.create(staff=True)
     login(client, owner)  # operational, but no passkey
     response = client.post(URL, grant_post(target.email, "owner"))
     assert response.status_code == 302
@@ -342,7 +358,7 @@ def test_the_one_person_team_warning_is_permanent_while_the_setting_is_on(
 
 
 def test_the_audit_entry_of_a_grant_carries_no_email_address(client: Client) -> None:
-    owner, target = staff("owner"), UserFactory.create()
+    owner, target = staff("owner"), UserFactory.create(staff=True)
     login(client, owner)
     client.post(URL, grant_post(target.email, "support"))
     entry = AuditLog.objects.get(action=staff_roles.GRANT_ACTION)

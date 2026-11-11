@@ -17,6 +17,7 @@ from typing import Final
 
 PLATFORM_OWNER_PERMISSION: Final = "core.platform_owner"
 VIEW_ALL_VENDORS_PERMISSION: Final = "vendors.view_all_vendors"  # Q-34
+REVIEW_NOTICES_PERMISSION: Final = "compliance.review_notices"  # CMP.5, Catalog and moderation
 
 
 class Access(StrEnum):
@@ -63,7 +64,7 @@ ROLES: Final[tuple[Role, ...]] = (
         CATALOG,
         "Platform: catalog and moderation",
         "Catalog and moderation",
-        ("manager.platform_catalog", VIEW_ALL_VENDORS_PERMISSION),
+        ("manager.platform_catalog", VIEW_ALL_VENDORS_PERMISSION, REVIEW_NOTICES_PERMISSION),
     ),
     Role(
         FINANCE,
@@ -101,7 +102,10 @@ MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
     "platform.owner_settings": {CONFIG: R, OWNER: E},
     "platform.catalog": {CATALOG: E, SUPPORT: R, OWNER: R},
     "platform.moderation": {CATALOG: E, OWNER: R},
-    "platform.notices": {CATALOG: E, OWNER: R},  # CMP.5; still gated by compliance.review_notices
+    "platform.notices": {
+        CATALOG: E,
+        OWNER: R,
+    },  # CMP.5; the view also needs compliance.review_notices
     "platform.vendors": {CONFIG: R, CATALOG: R, FINANCE: R, SUPPORT: R, OWNER: E},
     "platform.vendor_approval": {CATALOG: E, OWNER: E},
     "platform.vendor_closure": {OWNER: E},

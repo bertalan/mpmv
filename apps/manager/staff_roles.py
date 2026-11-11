@@ -10,8 +10,9 @@ admin instead. Rules enforced here, whatever the adapter:
 - the last platform owner is never removed;
 - an owner giving themselves another role must state a reason, and the other platform owners and
   the superusers get an email (BO-13);
-- role holders get `is_staff` (admin access); it goes away with the last role, unless the account
-  has other groups, permissions or superuser status that need it.
+- only an account created as staff (`is_staff` or superuser already true, set in the Django admin)
+  can receive a role, and never one that has placed orders (a customer); no role assignment
+  promotes a customer, and revoking the last role leaves the staff account without a role.
 
 Step-up (`role_grant`, and `owner_role_grant` for the owner role) is a session concern and sits in
 the view, as for the Django admin. Every mutation takes `dry_run=True` and writes the AuditLog.
@@ -31,6 +32,7 @@ from apps.core.audit import AuditContext, user_context
 from apps.core.changeset import ChangeSet
 from apps.core.models import PLATFORM_OWNER_CODENAME
 from apps.core.services import enqueue_email, flag_enabled, run_mutation
+from apps.orders.models import Order
 from apps.vendors.services import is_vendor_member
 
 from . import roles
@@ -111,6 +113,15 @@ def grant_role(
     )
     if role_key in before:
         return ChangeSet()
+    if not (target.is_staff or target.is_superuser):
+        raise RoleAssignmentError(
+            "Only an account created as staff can receive a platform role; "
+            "create the staff account in the Django admin first."
+        )
+    if Order.objects.filter(customer=target).exists():
+        raise RoleAssignmentError(
+            "That account is a customer (it has placed orders), so it cannot receive a role."
+        )
     after = before | {role_key}
     pairs = roles.incompatible(after)
     if pairs and not flag_enabled(ONE_PERSON_TEAM):
@@ -127,14 +138,11 @@ def grant_role(
         USER_MODEL,
         str(target.public_id),
         _snapshot(target, before, target.is_staff),
-        _snapshot(target, after, True, reason or None),
+        _snapshot(target, after, target.is_staff, reason or None),
     )
 
     def apply() -> None:
         target.groups.add(Group.objects.get(name=roles.role(role_key).group))
-        if not target.is_staff:
-            target.is_staff = True
-            target.save(update_fields=["is_staff"])
         if self_assigned:
             _notify_self_assignment(actor, role_key, reason)
 
@@ -157,9 +165,8 @@ def revoke_role(
     Revoking the owner role removes the owner permission however it was granted (group, or
     directly as the bootstrap does), so the audit `after` is what the account really holds. The
     last-owner check and the change run in one transaction with the owner rows locked, so two
-    owners revoking each other at once leave one. Revoking the last role clears `is_staff`,
-    including for a former legacy staff account (never a superuser, and never an account that
-    still has other groups or permissions).
+    owners revoking each other at once leave one. `is_staff` is never changed: it marks
+    an account created as staff, which stays one without a role.
     """
     _authorise(actor)
     _check_role(role_key)
@@ -183,19 +190,12 @@ def revoke_role(
         if role_key == roles.OWNER and not platform_owners().exclude(pk=target.pk).exists():
             raise RoleAssignmentError("The last platform owner cannot be removed or demoted.")
         remaining = before - {role_key}
-        other_permissions = target.user_permissions.exclude(
-            codename=PLATFORM_OWNER_CODENAME if role_key == roles.OWNER else ""
-        ).exists()
-        others = target.groups.exclude(pk=group.pk).exists() or other_permissions
-        clears_staff = not remaining and not others and not target.is_superuser and target.is_staff
         changes = ChangeSet()
         changes.update(
             USER_MODEL,
             str(target.public_id),
             _snapshot(target, before, target.is_staff),
-            _snapshot(
-                target, remaining, target.is_staff and not clears_staff, reason.strip() or None
-            ),
+            _snapshot(target, remaining, target.is_staff, reason.strip() or None),
         )
 
         def apply() -> None:
@@ -204,9 +204,6 @@ def revoke_role(
                 target.user_permissions.remove(
                     *target.user_permissions.filter(codename=PLATFORM_OWNER_CODENAME)
                 )
-            if clears_staff:
-                target.is_staff = False
-                target.save(update_fields=["is_staff"])
 
         return run_mutation(
             changes, apply, ctx=_audit_context(actor, ctx), action=REVOKE_ACTION, dry_run=dry_run

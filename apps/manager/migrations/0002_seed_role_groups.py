@@ -23,5 +23,6 @@ class Migration(migrations.Migration):
         ("contenttypes", "0002_remove_content_type_name"),
         ("core", "0014_platform_owner_allowed_vendor_countries"),
         ("vendors", "0021_platform_staff_permission"),
+        ("compliance", "0005_erasure_request"),
     ]
     operations = [migrations.RunPython(seed, migrations.RunPython.noop)]

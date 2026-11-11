@@ -7,7 +7,7 @@
 | Role | Group | Permissions |
 |---|---|---|
 | Configuration and tax | Platform: configuration and tax | `manager.platform_config` |
-| Catalog and moderation | Platform: catalog and moderation | `manager.platform_catalog`, `vendors.view_all_vendors` |
+| Catalog and moderation | Platform: catalog and moderation | `manager.platform_catalog`, `vendors.view_all_vendors`, `compliance.review_notices` |
 | Finance and payments | Platform: finance and payments | `manager.platform_finance`, `vendors.view_all_vendors` |
 | Support | Platform: support | `manager.platform_support`, `vendors.view_all_vendors` |
 | Platform owner | Platform: owner | `core.platform_owner`, `vendors.view_all_vendors` |
