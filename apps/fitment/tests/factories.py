@@ -1,14 +1,14 @@
 """factory_boy factories for the fitment app (FIT.1). Synthetic values only.
 
-`FitmentLevelFactory` takes the next free position (1 to 4). `FitmentNodeFactory` adds the node
-with treebeard (`add_root`, or `add_child` of the `parent` declaration) and, unless `level` is
-given, uses the level at its depth, creating it when the scheme has none yet.
+`FitmentLevelFactory` counts positions from 1 (sequences restart in every test).
+`FitmentNodeFactory` adds the node with treebeard (`add_root`, or `add_child` of the `parent`
+declaration) and, unless `level` is given, uses the level at its depth,
+creating it when the scheme has none yet.
 """
 
 from typing import Any
 
 import factory
-from django.db.models import Max
 from factory.django import DjangoModelFactory
 
 from apps.catalog.tests.factories import CategoryFactory, TreeNodeCreation
@@ -27,14 +27,18 @@ from apps.fitment.models import (
 )
 
 
-def _next_position() -> int:
-    top = FitmentLevel.objects.aggregate(top=Max("position"))["top"]
-    return int(top or 0) + 1
-
-
 class FitmentSchemeFactory(DjangoModelFactory[FitmentScheme]):
+    """The installation's one scheme row (a database constraint): created once, then returned."""
+
     class Meta:
         model = FitmentScheme
+
+    @classmethod
+    def _create(cls, model_class: type[FitmentScheme], *args: Any, **kwargs: Any) -> FitmentScheme:
+        scheme = model_class.objects.order_by("id").first()
+        if scheme is None:
+            scheme = model_class.objects.create(*args, **kwargs)
+        return scheme
 
     garage_noun_key = "Garage"
 
@@ -44,7 +48,7 @@ class FitmentLevelFactory(DjangoModelFactory[FitmentLevel]):
         model = FitmentLevel
 
     code = factory.Sequence(lambda n: f"level-{n}")
-    position = factory.LazyFunction(_next_position)
+    position = factory.Sequence(lambda n: n + 1)  # sequences restart in every test
     translate_names = False
 
 

@@ -18,7 +18,8 @@ from typing import Any
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, models, transaction
+from django.db.models import Count
 
 from apps.catalog.models import Category
 from apps.core import translations
@@ -91,7 +92,13 @@ def current_scheme() -> FitmentScheme:
     """The installation's scheme record, created with the defaults on first use."""
     scheme = FitmentScheme.objects.order_by("id").first()
     if scheme is None:
-        scheme = FitmentScheme.objects.create()
+        try:
+            with transaction.atomic():
+                scheme = FitmentScheme.objects.create()
+        except IntegrityError:  # another request created it first: the database allows one row
+            scheme = FitmentScheme.objects.order_by("id").first()
+    if scheme is None:  # pragma: no cover - the row exists once any request has created it
+        raise FitmentError("The scheme could not be created.")
     return scheme
 
 
@@ -111,6 +118,7 @@ def save_scheme(
     unknown = sorted(set(values) - set(SCHEME_FIELDS))
     if unknown:
         raise FitmentError(f"Unknown scheme setting: {', '.join(unknown)}.")
+    _check_types(values)
     with transaction.atomic():
         scheme = _lock_scheme()
         before = _scheme_snapshot(scheme)
@@ -124,6 +132,24 @@ def save_scheme(
             FitmentScheme.objects.filter(pk=scheme.pk).update(**after)
 
         return run_mutation(changeset, apply, ctx=ctx, action=SCHEME_UPDATED, dry_run=dry_run)
+
+
+_SCHEME_TYPES: dict[str, type] = {
+    "garage_noun_key": str,
+    "year_enabled": bool,
+    "year_min": int,
+    "year_max_offset": int,
+    "contains_special_category": bool,
+    "max_profiles": int,
+}
+
+
+def _check_types(values: Mapping[str, Any]) -> None:
+    """Refuse a value of the wrong type with a `FitmentError`, never a `TypeError` later."""
+    for name, value in values.items():
+        expected = _SCHEME_TYPES[name]
+        if type(value) is not expected:  # a bool is not a number here
+            raise FitmentError(f"The setting {name} must be a {expected.__name__}.")
 
 
 def _validate_scheme(scheme: FitmentScheme) -> None:
@@ -169,10 +195,8 @@ def _labels_dict(labels: Mapping[str, LevelLabels]) -> dict[str, dict[str, str]]
 
 
 def _nodes_per_level() -> dict[str, int]:
-    counts: dict[str, int] = {}
-    for code in FitmentNode.objects.values_list("level__code", flat=True):
-        counts[code] = counts.get(code, 0) + 1
-    return counts
+    rows = FitmentNode.objects.order_by().values("level__code").annotate(total=Count("pk"))
+    return {row["level__code"]: row["total"] for row in rows}
 
 
 def _write_labels(level: FitmentLevel, labels: Mapping[str, Mapping[str, str]]) -> None:
@@ -334,12 +358,28 @@ def reorder_levels(codes: Iterable[str], *, ctx: AuditContext, dry_run: bool = F
 
 
 # --- References: what else points at a node (FIT.2 product rows, FIT.5 profiles)
+#
+# Whatever holds a foreign key to `FitmentNode` registers it, so a merge moves it and a delete is
+# refused while it exists. The registration is explicit and happens in the owning app's
+# `AppConfig.ready()` (never as an import side effect):
+#
+#     def ready(self) -> None:
+#         from apps.fitment.services import register_node_reference
+#         register_node_reference(ProductFitment, "node")
+#
+# Declare the key with `on_delete=PROTECT`: a node is merged or retired, never deleted under a
+# reference. `apps/fitment/tests/integration/test_references.py` lists every foreign key to a
+# node in the project and fails when one is not registered. A writer that inserts a reference
+# (a FIT.2 product row, a FIT.5 profile) must lock the node first (`select_for_update`) in the
+# same transaction, so a concurrent merge cannot move references past it. Relations that are not
+# plain foreign keys use `register_reference` with their own `count` and `move`.
 
 
 @dataclass(frozen=True)
 class Reference:
     count: Callable[[FitmentNode], int]
     move: Callable[[FitmentNode, FitmentNode], object]
+    field: tuple[str, str] | None = None  # (model label, field name) of a registered foreign key
 
 
 _references: dict[str, Reference] = {}
@@ -350,27 +390,48 @@ def register_reference(
     *,
     count: Callable[[FitmentNode], int],
     move: Callable[[FitmentNode, FitmentNode], object],
+    field: tuple[str, str] | None = None,
 ) -> None:
     """Declare something that points at nodes: `count` how many point at one, `move` re-point
     them from `source` to `target`. A merge moves them, a delete is refused while any exist."""
-    _references[name] = Reference(count, move)
+    if name in _references:
+        raise ValueError(f"Node reference {name!r} is already registered.")
+    _references[name] = Reference(count, move, field)
+
+
+def register_node_reference(
+    model: type[models.Model], field: str, *, name: str | None = None
+) -> None:
+    """Register `model.field`, a foreign key to `FitmentNode`, from the owning app's `ready()`."""
+    label = (model._meta.label_lower, field)
+    reference_name = name or f"{label[0]}.{field}"
+
+    def count(node: FitmentNode) -> int:
+        return model._default_manager.filter(**{field: node}).count()
+
+    def move(source: FitmentNode, target: FitmentNode) -> object:
+        return model._default_manager.filter(**{field: source}).update(**{field: target})
+
+    register_reference(reference_name, count=count, move=move, field=label)
 
 
 def unregister_reference(name: str) -> None:
     _references.pop(name, None)
 
 
+def registered_fields() -> set[tuple[str, str]]:
+    """The (model label, field) pairs registered with `register_node_reference`."""
+    return {r.field for r in _references.values() if r.field is not None}
+
+
 def reference_count(node: FitmentNode) -> int:
     return sum(reference.count(node) for reference in _references.values())
 
 
-register_reference(
-    "merged-ids",
-    count=lambda node: FitmentNodeMerge.objects.filter(into_node=node).count(),
-    move=lambda source, target: FitmentNodeMerge.objects.filter(into_node=source).update(
-        into_node=target
-    ),
-)
+def register_builtin_references() -> None:
+    """This app's own references, called from `FitmentConfig.ready()`."""
+    if ("fitment.fitmentnodemerge", "into_node") not in registered_fields():
+        register_node_reference(FitmentNodeMerge, "into_node")
 
 
 def resolve_node(node_id: int) -> FitmentNode | None:
@@ -701,15 +762,35 @@ def merge_nodes(
         moved_references = {
             name: reference.count(source) for name, reference in _references.items()
         }
+        # The source's name and aliases become aliases of the target, unless the target already
+        # answers to them or a sibling of the target uses them: those are skipped, and listed.
+        taken_by_others = _taken_names(_parent_of(target), skip=source)
+        in_use = {engine.normalize_name(name) for name in taken_by_others}
+        in_use |= {target.normalized_name}
+        in_use |= set(target.aliases.values_list("normalized", flat=True))
+        added: dict[str, str] = {}
+        skipped: list[str] = []
+        for name in [source.name, *source.aliases.values_list("alias", flat=True)]:
+            normalized = engine.normalize_name(name)
+            if normalized in added:
+                continue
+            if normalized in in_use:
+                skipped.append(normalized)
+            else:
+                added[normalized] = name
         changeset = ChangeSet()
-        changeset.delete(
+        changeset.update(
             "fitment.fitmentnode",
             str(source.public_id),
             {
                 **_node_snapshot(source),
-                "merged_into": str(target.public_id),
                 "moved_children": len(children),
                 "moved_references": moved_references,
+            },
+            {
+                "merged_into": str(target.public_id),
+                "added_aliases": list(added),
+                "skipped_aliases": skipped,
             },
         )
 
@@ -719,14 +800,8 @@ def merge_nodes(
                 child.move(FitmentNode.objects.get(pk=target.pk), pos="last-child")
             for reference in _references.values():
                 reference.move(source, target)
-            names = [source.name, *source.aliases.values_list("alias", flat=True)]
-            for name in names:
-                normalized = engine.normalize_name(name)
-                if normalized == target.normalized_name:
-                    continue
-                FitmentNodeAlias.objects.get_or_create(
-                    node=target, normalized=normalized, language=None, defaults={"alias": name}
-                )
+            for name in added.values():
+                FitmentNodeAlias.objects.create(node=target, alias=name, language=None)
             FitmentNodeMerge.objects.create(old_node_id=source.pk, into_node=target)
             FitmentNode.objects.get(pk=source.pk).delete()
 

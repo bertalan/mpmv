@@ -8,7 +8,11 @@ from apps.core.models import AuditLog
 from apps.fitment import services
 from apps.fitment.models import FitmentLevel, FitmentLevelTranslation, FitmentScheme
 from apps.fitment.services import FitmentError, LevelLabels
-from apps.fitment.tests.factories import FitmentLevelFactory, FitmentNodeFactory
+from apps.fitment.tests.factories import (
+    FitmentLevelFactory,
+    FitmentNodeFactory,
+    FitmentSchemeFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -150,6 +154,32 @@ def test_the_year_range_and_profile_limits_are_validated_and_audited() -> None:
         services.save_scheme({"year_enabled": True, "year_min": 3000}, ctx=CTX)
     with pytest.raises(FitmentError):
         services.save_scheme({"unknown_field": 1}, ctx=CTX)
+
+
+def test_a_value_of_the_wrong_type_is_a_fitment_error_not_a_type_error() -> None:
+    for bad in (
+        {"max_profiles": "five"},
+        {"max_profiles": 2.5},
+        {"max_profiles": True},
+        {"year_enabled": "yes"},
+        {"year_min": None},
+        {"garage_noun_key": 7},
+    ):
+        with pytest.raises(FitmentError):
+            services.save_scheme(bad, ctx=CTX)
+
+
+def test_there_is_only_ever_one_scheme_row() -> None:
+    scheme = services.current_scheme()
+    with pytest.raises(IntegrityError), transaction.atomic():
+        FitmentScheme.objects.create()
+    assert services.current_scheme().pk == scheme.pk
+    assert FitmentScheme.objects.count() == 1
+
+
+def test_the_scheme_factory_returns_the_one_row() -> None:
+    assert FitmentSchemeFactory.create().pk == FitmentSchemeFactory.create().pk
+    assert FitmentScheme.objects.count() == 1
 
 
 def test_a_scheme_save_dry_run_changes_nothing() -> None:

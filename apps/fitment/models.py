@@ -76,6 +76,10 @@ class FitmentScheme(BaseModel):
 
     class Meta:
         verbose_name = _("fitment scheme")
+        constraints: ClassVar[list[models.BaseConstraint]] = [
+            # A unique index on a constant: a second row cannot exist, whoever inserts it.
+            models.UniqueConstraint(models.Value(True), name="fitment_scheme_single_row")
+        ]
 
     def __str__(self) -> str:
         return str(_("Fitment scheme"))
@@ -296,7 +300,7 @@ class FitmentNodeMerge(BaseModel):
     )
     into_node = models.ForeignKey(
         FitmentNode,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="merged_from",
         help_text=_("The node that replaced it."),
     )

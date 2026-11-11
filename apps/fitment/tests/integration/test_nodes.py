@@ -208,6 +208,47 @@ def test_a_merge_moves_the_references_and_the_old_id_answers_as_the_target() -> 
     assert entry.before["moved_children"] == 1
 
 
+def test_a_merge_chain_resolves_every_old_id_to_the_last_target() -> None:
+    first = make_node("Make A")
+    second = make_node("Make B")
+    third = make_node("Make C")
+    first_pk, second_pk = first.pk, second.pk
+    services.merge_nodes(first, second, ctx=CTX)
+    services.merge_nodes(second, third, ctx=CTX)
+    assert services.resolve_node(first_pk) == third
+    assert services.resolve_node(second_pk) == third
+    assert not FitmentNodeMerge.objects.filter(into_node_id=second_pk).exists()
+
+
+@pytest.mark.parametrize("status", ["retired", "proposed"])
+def test_a_merge_into_a_retired_or_proposed_target_is_refused(status: str) -> None:
+    source = make_node("Make A")
+    target = make_node("Make B")
+    FitmentNode.objects.filter(pk=target.pk).update(status=status)
+    with pytest.raises(FitmentError):
+        services.merge_nodes(source, target, ctx=CTX)
+    assert FitmentNode.objects.filter(pk=source.pk).exists()
+
+
+def test_a_merge_skips_aliases_a_sibling_uses_and_audits_the_ones_added() -> None:
+    target = make_node("Make One")
+    make_node("Make Taken")  # a sibling of the target
+    source = make_node("Make Uno")
+    services.add_alias(source, "Taken", ctx=CTX)  # fine for the source
+    services.add_alias(target, "Uno extra", ctx=CTX)
+    services.add_alias(source, "Uno extra x", ctx=CTX)
+    make_node("Other Make").aliases.create(alias="Taken")  # makes "Taken" clash on the target level
+    services.merge_nodes(source, target, ctx=CTX)
+    copied = set(target.aliases.values_list("normalized", flat=True))
+    assert "make uno" in copied
+    assert "uno extra x" in copied
+    assert "taken" not in copied  # a sibling already answers to it
+    entry = AuditLog.objects.get(action="fitment.node.merged")
+    assert entry.after is not None
+    assert "make uno" in entry.after["added_aliases"]
+    assert "taken" in entry.after["skipped_aliases"]
+
+
 def test_a_merge_with_a_clashing_child_name_is_refused_and_changes_nothing() -> None:
     make = make_node("Make One")
     duplicate = make_node("Make Uno")
