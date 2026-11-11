@@ -425,3 +425,4 @@ class NoTinCountryFactory(DjangoModelFactory[NoTinCountry]):
 
     country = factory.Iterator(["NZ", "JP", "CH", "SG", "AU"])
     reason = "Issues no TIN to individuals."
+    valid_from = dt.date(2024, 1, 1)

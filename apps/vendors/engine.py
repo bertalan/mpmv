@@ -364,8 +364,46 @@ _ANY_TIN = re.compile(r"[A-Z0-9][A-Z0-9./-]{0,29}", re.ASCII)
 _TIN_SEPARATORS = re.compile(r"[./-]")
 # Jurisdictions that issue no TIN (in their absence DAC7 asks an individual's place of birth).
 # The live list is staff-editable data (`NoTinCountry`, VEN.27) that the service passes in; this
-# is only the list migration 0026 seeds it with (and what the pure unit tests pass in).
+# is only the list migration 0028 seeds it with (and what the pure unit tests pass in).
 SEEDED_NO_TIN_COUNTRIES: Final = frozenset({"AE", "BM", "BS", "KY", "MC", "VG"})
+
+
+@dataclasses.dataclass(frozen=True)
+class NoTinWindow:
+    """One period in which `country` issued no TIN: `[valid_from, valid_to)`, open-ended when
+    `valid_to` is None (VEN.27). Dates are business-time-zone calendar days."""
+
+    country: str
+    valid_from: dt.date
+    valid_to: dt.date | None = None
+
+
+def no_tin_windows_overlap(a: NoTinWindow, b: NoTinWindow) -> bool:
+    """Whether two windows of the same country share a day (an empty window shares none)."""
+    if a.country != b.country:
+        return False
+    for first, second in ((a, b), (b, a)):
+        if first.valid_to is not None and first.valid_to <= first.valid_from:
+            return False
+        if second.valid_to is not None and second.valid_to <= second.valid_from:
+            return False
+        if first.valid_to is not None and first.valid_to <= second.valid_from:
+            return False
+    return True
+
+
+def no_tin_countries_on(windows: Iterable[NoTinWindow], on: dt.date) -> frozenset[str]:
+    """The countries that issued no TIN on the day `on`, so a DAC7 report for a past period and a
+    payout decision can be reproduced from the dated list."""
+    return frozenset(
+        w.country for w in windows if w.valid_from <= on and (w.valid_to is None or on < w.valid_to)
+    )
+
+
+def is_no_tin_country(windows: Iterable[NoTinWindow], country: str, on: dt.date) -> bool:
+    return country in no_tin_countries_on(windows, on)
+
+
 # Member States where an entity's VAT number, without its prefix, is also its TIN: only there is
 # "same as the VAT number" offered. Elsewhere the two differ (AT "U" + 8 digits, DE, FR, NL, SE
 # "01" suffix, EE, HU, LT, LU, MT): the vendor enters the TIN. A test derives a valid TIN for

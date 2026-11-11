@@ -58,6 +58,7 @@ from .services import (
     establishment_flags,
     establishment_warning,
     legal_profile_completeness,
+    no_tin_impact,
     onboarding_checklist,
     reject_claim,
     remove_no_tin_country,
@@ -826,13 +827,19 @@ class LegalFieldRequirementAdmin(admin.ModelAdmin[LegalFieldRequirement]):
 
 @admin.register(NoTinCountry)
 class NoTinCountryAdmin(admin.ModelAdmin[NoTinCountry]):
-    """Jurisdictions that issue no TIN (VEN.27). Staff add a country with a reason; both adding
-    and removing go through the audited services. The delete page asks for the removal reason
-    and refuses an empty one. No bulk delete: it has no place to ask for a reason."""
+    """Jurisdictions that issue no TIN (VEN.27), with their dates. Staff add a country with a
+    reason (it counts from today) and end it with a reason (it stops counting today); rows are
+    never deleted, so past periods stay reproducible. Both go through the audited services. The
+    end page asks for the reason, refuses an empty one and shows how many vendors it blocks. No
+    bulk action: it has no place to ask for a reason.
+
+    A change relaxes a compliance and payout gate, so every write view needs an operational
+    session (CORE.25, D-32 group 2, action `no_tin_country`)."""
 
     delete_confirmation_template = "admin/vendors/notincountry/delete_confirmation.html"
 
-    list_display = ("country", "reason", "updated_at")
+    list_display = ("country", "reason", "valid_from", "valid_to", "removal_reason")
+    list_filter = ("country",)
     search_fields = ("country", "reason")
     fields = ("country", "reason")
     actions = None
@@ -843,20 +850,54 @@ class NoTinCountryAdmin(admin.ModelAdmin[NoTinCountry]):
         return ("country", "reason") if obj is not None else ()
 
     def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
-        return False  # to change a reason, remove the country and add it again
+        return False  # to change a reason, end the listing and add the country again
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        if obj is not None and obj.valid_to is not None:
+            return False  # an ended row is history
+        return super().has_delete_permission(request, obj)
 
     def save_model(self, request: HttpRequest, obj: NoTinCountry, form: Any, change: bool) -> None:
         add_no_tin_country(obj.country, reason=obj.reason, ctx=audit_context(request))
+
+    def add_view(
+        self, request: HttpRequest, form_url: str = "", extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        parent = super().add_view
+        return requires_level("no_tin_country")(lambda req: parent(req, form_url, extra_context))(
+            request
+        )
+
+    def change_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+        form_url: str = "",
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        parent = super().change_view
+        return requires_level("no_tin_country")(
+            lambda req: parent(req, object_id, form_url, extra_context)
+        )(request)
 
     def delete_view(
         self, request: HttpRequest, object_id: str, extra_context: dict[str, Any] | None = None
     ) -> HttpResponse:
         if not self.has_delete_permission(request):
             raise PermissionDenied
-        if request.method == "POST" and not request.POST.get("reason", "").strip():
-            messages.error(request, "A reason is required to remove a country.")
-            return redirect(request.get_full_path())
-        return super().delete_view(request, object_id, extra_context)
+        parent = super().delete_view
+
+        def view(req: HttpRequest) -> HttpResponse:
+            if req.method == "POST" and not req.POST.get("reason", "").strip():
+                messages.error(req, "A reason is required to end the listing of a country.")
+                return redirect(req.get_full_path())
+            row = self.get_object(req, unquote(object_id))
+            extra = dict(extra_context or {})
+            if row is not None:
+                extra["vendors_without_tin"] = no_tin_impact(str(row.country))
+            return parent(req, object_id, extra)
+
+        return requires_level("no_tin_country")(view)(request)
 
     def delete_model(self, request: HttpRequest, obj: NoTinCountry) -> None:
         remove_no_tin_country(

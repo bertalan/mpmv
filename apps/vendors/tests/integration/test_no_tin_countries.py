@@ -17,11 +17,14 @@ from typing import Any
 import pytest
 from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.test import Client
 from django.urls import reverse
 
+from apps.accounts import levels
 from apps.accounts.models import User
 from apps.accounts.tests.factories import UserFactory
+from apps.accounts.tests.mfa import verified_login
 from apps.core.audit import AuditContext
 from apps.core.models import AuditLog
 from apps.vendors import engine
@@ -30,6 +33,7 @@ from apps.vendors.services import (
     NO_TIN_ADDED,
     NO_TIN_REMOVED,
     add_no_tin_country,
+    business_today,
     legal_profile_completeness,
     no_tin_countries,
     onboarding_checklist,
@@ -131,7 +135,7 @@ def test_each_change_is_in_the_audit_log_with_its_reason() -> None:
     removed = AuditLog.objects.get(action=NO_TIN_REMOVED, target_key="NZ")
     assert (added.after or {})["reason"] == REASON
     assert added.actor_label == "staff:reviewer"
-    assert (removed.before or {})["removal_reason"] == "Added by mistake."
+    assert (removed.after or {})["removal_reason"] == "Added by mistake."
 
 
 def test_a_dry_run_returns_the_change_and_changes_nothing() -> None:
@@ -139,7 +143,7 @@ def test_a_dry_run_returns_the_change_and_changes_nothing() -> None:
     assert changes.summary() == {"create": 1, "update": 0, "delete": 0}
     assert not NoTinCountry.objects.filter(country="NZ").exists()
     changes = remove_no_tin_country("BS", reason=REASON, ctx=CTX, dry_run=True)
-    assert changes.summary() == {"create": 0, "update": 0, "delete": 1}
+    assert changes.summary() == {"create": 0, "update": 1, "delete": 0}
     assert NoTinCountry.objects.filter(country="BS").exists()
     assert not AuditLog.objects.filter(action__in=[NO_TIN_ADDED, NO_TIN_REMOVED]).exists()
 
@@ -288,7 +292,7 @@ def test_a_removal_in_the_admin_needs_a_reason_and_records_it(
     staff.post(url, {"post": "yes", "reason": "Accountant says it issues TINs."})
     assert "BS" not in no_tin_countries()
     removed = AuditLog.objects.get(action=NO_TIN_REMOVED, target_key="BS")
-    assert (removed.before or {})["removal_reason"] == "Accountant says it issues TINs."
+    assert (removed.after or {})["removal_reason"] == "Accountant says it issues TINs."
 
 
 def test_the_admin_has_no_bulk_delete(client: Client, superuser: User, mfa_login: Any) -> None:
@@ -300,7 +304,7 @@ def test_the_admin_has_no_bulk_delete(client: Client, superuser: User, mfa_login
 def test_a_removal_counts_the_vendors_it_blocks() -> None:
     no_tin_vendor("BS")
     changes = remove_no_tin_country("BS", reason=REASON, ctx=CTX, dry_run=True)
-    assert changes.changes[0].before["vendors_without_tin"] == 1  # type: ignore[index]
+    assert changes.changes[0].after["vendors_without_tin"] == 1  # type: ignore[index]
 
 
 def test_a_lost_add_race_is_a_validation_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -309,3 +313,127 @@ def test_a_lost_add_race_is_a_validation_error(monkeypatch: pytest.MonkeyPatch) 
     with pytest.raises(ValidationError):
         add_no_tin_country("BS", reason=REASON, ctx=CTX)  # unique violation at save
     monkeypatch.setattr(NoTinCountry, "full_clean", real_clean)
+
+
+# --- Effective dating: a removal ends the row, history stays reproducible
+
+
+def test_a_removal_ends_the_row_and_keeps_it() -> None:
+    remove_no_tin_country("BS", reason=REASON, ctx=CTX)
+    row = NoTinCountry.objects.get(country="BS")
+    assert row.valid_to == business_today()
+    assert row.removal_reason == REASON
+    assert "BS" not in no_tin_countries()
+    assert "BS" in no_tin_countries(on=dt.date(2024, 6, 1))  # the past answer is unchanged
+    assert "BS" in no_tin_countries(on=dt.date(2023, 1, 1))
+    assert "BS" not in no_tin_countries(on=dt.date(2022, 12, 31))  # before the seed date
+
+
+def test_adding_again_starts_a_new_row_from_today() -> None:
+    remove_no_tin_country("BS", reason=REASON, ctx=CTX)
+    add_no_tin_country("BS", reason="Listed again.", ctx=CTX)
+    rows = NoTinCountry.objects.filter(country="BS").order_by("valid_from")
+    assert [r.valid_to is None for r in rows] == [False, True]
+    assert "BS" in no_tin_countries()
+    assert "BS" in no_tin_countries(on=dt.date(2024, 6, 1))
+
+
+def test_a_country_cannot_be_listed_twice_for_the_same_days() -> None:
+    with pytest.raises(ValidationError):
+        add_no_tin_country("BS", reason=REASON, ctx=CTX)
+    with pytest.raises(IntegrityError), transaction.atomic():  # the database refuses it too
+        NoTinCountry.objects.create(country="BS", reason=REASON, valid_from=dt.date(2025, 1, 1))
+
+
+def test_added_and_removed_the_same_day_is_an_empty_window() -> None:
+    add_no_tin_country("NZ", reason=REASON, ctx=CTX)
+    remove_no_tin_country("NZ", reason="Mistake.", ctx=CTX)
+    row = NoTinCountry.objects.get(country="NZ")
+    assert row.valid_to == row.valid_from
+    assert "NZ" not in no_tin_countries()
+    add_no_tin_country("NZ", reason="Right this time.", ctx=CTX)
+    assert "NZ" in no_tin_countries()
+
+
+def test_the_payout_check_of_a_past_day_uses_the_list_of_that_day() -> None:
+    vendor = no_tin_vendor("BS")
+    remove_no_tin_country("BS", reason=REASON, ctx=CTX)
+    assert "tax_code" in missing(vendor)  # today
+    past = engine.payout_completeness(
+        vendor.legal_identity(), [], no_tin_countries(on=dt.date(2024, 6, 1))
+    )
+    assert "tax_code" not in past.missing
+
+
+def test_the_engine_answers_the_list_on_a_day() -> None:
+    w = [
+        engine.NoTinWindow("NZ", dt.date(2024, 1, 1), dt.date(2025, 1, 1)),
+        engine.NoTinWindow("NZ", dt.date(2025, 6, 1)),
+        engine.NoTinWindow("JP", dt.date(2024, 1, 1), dt.date(2024, 1, 1)),  # empty
+    ]
+    assert engine.is_no_tin_country(w, "NZ", dt.date(2024, 12, 31))
+    assert not engine.is_no_tin_country(w, "NZ", dt.date(2025, 1, 1))  # end day not included
+    assert not engine.is_no_tin_country(w, "NZ", dt.date(2025, 5, 31))
+    assert engine.is_no_tin_country(w, "NZ", dt.date(2025, 6, 1))
+    assert not engine.is_no_tin_country(w, "JP", dt.date(2024, 1, 1))
+    assert engine.no_tin_windows_overlap(w[0], engine.NoTinWindow("NZ", dt.date(2024, 12, 31)))
+    assert not engine.no_tin_windows_overlap(w[0], w[1])
+    assert not engine.no_tin_windows_overlap(w[0], engine.NoTinWindow("JP", dt.date(2024, 6, 1)))
+
+
+# --- CORE.25: a change needs an operational session (group 2, `no_tin_country`)
+
+
+def restricted(client: Client, mfa_login_user: User) -> Client:
+    verified_login(client, mfa_login_user, passkey=True, level=levels.RESTRICTED)
+    return client
+
+
+def staff_with_perms() -> User:
+    staff = UserFactory.create(staff=True)
+    staff.user_permissions.add(
+        *Permission.objects.filter(
+            codename__in=["add_notincountry", "delete_notincountry", "view_notincountry"]
+        )
+    )
+    return staff
+
+
+def test_a_restricted_session_is_refused_on_add_and_end(client: Client) -> None:
+    client = restricted(client, staff_with_perms())
+    row = NoTinCountry.objects.get(country="BS")
+    add = reverse("admin:vendors_notincountry_add")
+    end = reverse("admin:vendors_notincountry_delete", args=[row.pk])
+    assert client.get(add).status_code == 403
+    assert client.post(add, {"country": "NZ", "reason": REASON}).status_code == 403
+    assert client.get(end).status_code == 403
+    assert client.post(end, {"post": "yes", "reason": REASON}).status_code == 403
+    assert not NoTinCountry.objects.filter(country="NZ").exists()
+    assert NoTinCountry.objects.get(country="BS").valid_to is None
+
+
+def test_an_operational_session_may_add_and_end(client: Client) -> None:
+    verified_login(client, staff_with_perms(), passkey=True)  # operational by default
+    add = reverse("admin:vendors_notincountry_add")
+    assert client.post(add, {"country": "NZ", "reason": REASON}).status_code == 302
+    row = NoTinCountry.objects.get(country="BS")
+    end = reverse("admin:vendors_notincountry_delete", args=[row.pk])
+    assert client.post(end, {"post": "yes", "reason": REASON}).status_code == 302
+    assert "NZ" in no_tin_countries()
+    assert "BS" not in no_tin_countries()
+
+
+def test_the_end_page_shows_how_many_vendors_it_blocks(client: Client, mfa_login: Any) -> None:
+    no_tin_vendor("BS")
+    mfa_login(client, UserFactory.create(superuser=True))
+    row = NoTinCountry.objects.get(country="BS")
+    page = client.get(reverse("admin:vendors_notincountry_delete", args=[row.pk]))
+    assert b"<strong>1</strong> vendor" in page.content
+
+
+def test_an_ended_row_cannot_be_ended_again_from_the_admin(client: Client, mfa_login: Any) -> None:
+    remove_no_tin_country("BS", reason=REASON, ctx=CTX)
+    mfa_login(client, UserFactory.create(superuser=True))
+    row = NoTinCountry.objects.get(country="BS")
+    end = reverse("admin:vendors_notincountry_delete", args=[row.pk])
+    assert client.post(end, {"post": "yes", "reason": REASON}).status_code in (403, 404)
