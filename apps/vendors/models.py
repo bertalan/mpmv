@@ -16,6 +16,7 @@ from django.contrib.postgres.constraints import ExclusionConstraint
 from django.contrib.postgres.fields import DateRangeField, RangeOperators
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
+from django.utils.translation import gettext_lazy as _
 from wagtail.fields import RichTextField
 
 from apps.core.fields import (
@@ -1021,9 +1022,9 @@ class NoTinCountry(BaseModel):
     """
 
     country = CountryField(
-        help_text="The country whose authorities issue no tax identification number (TIN)."
+        help_text=_("The country whose authorities issue no tax identification number (TIN).")
     )
-    reason = models.CharField(max_length=300, help_text="Why this country issues no TIN.")
+    reason = models.CharField(max_length=300, help_text=_("Why this country issues no TIN."))
     valid_from = models.DateField(
         help_text="First day (business time zone) on which the country counts as issuing no TIN."
     )
