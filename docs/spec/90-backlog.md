@@ -6,8 +6,8 @@
 
 ## Summary
 
-- Micro-tasks: **277** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **2235 h** (P1 1790 h · P2 413 h · P3 32 h)
+- Micro-tasks: **279** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **2241 h** (P1 1793 h · P2 416 h · P3 32 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
@@ -17,8 +17,8 @@
 | ARC | Architecture and foundations | 25 | 160 | 14 | 0 | 174 |
 | CORE | Identity, permissions, API, backoffice | 22 | 164 | 4 | 6 | 174 |
 | CAT | Product catalog | 20 | 150 | 60 | 0 | 210 |
-| VEN | Vendors, commissions, ledger | 28 | 221 | 26 | 0 | 247 |
-| TAX | Tax engine | 13 | 53 | 28 | 0 | 81 |
+| VEN | Vendors, commissions, ledger | 29 | 224 | 26 | 0 | 250 |
+| TAX | Tax engine | 14 | 53 | 31 | 0 | 84 |
 | SHP | Shipping and quotes | 14 | 96 | 28 | 0 | 124 |
 | ORD | Cart, orders, returns | 12 | 102 | 14 | 0 | 116 |
 | PAY | Payments (Stripe Connect) | 4 | 40 | 0 | 0 | 40 |
@@ -33,7 +33,7 @@
 | SEC | Security | 10 | 62 | 0 | 0 | 62 |
 | OPS | Operations | 10 | 19 | 30 | 8 | 57 |
 | MIG | Migration and cutover | 15 | 121 | 23 | 0 | 144 |
-| **Total** | | **277** | **1790** | **413** | **32** | **2235** |
+| **Total** | | **279** | **1793** | **416** | **32** | **2241** |
 
 ## By phase
 
@@ -182,7 +182,7 @@
 | PAY.3 | Transfer per vendor, reverse transfer, reconciliation with the ledger | P1 | 10 | PAY.2 | 3 vendors in one order: 3 correct transfers |
 | PAY.4 | Full/partial refunds with VAT and commissions reversed | P1 | 10 | PAY.3 | Partial refund cases green |
 
-### F3 — Vendors, ledger, compliance (42 tasks, 384 h)
+### F3 — Vendors, ledger, compliance (43 tasks, 387 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -210,6 +210,7 @@
 | VEN.25 | RF20 eligibility (owner decision MQ-5): fiscal regime RF20 only for vendors established in an EU member state, with a mandatory participation number issued under the cross-border SME franchise (suffix `EX`, art. 284(3) of the VAT directive as amended by Directive (EU) 2020/285), a format check per issuing member state and the issuing country matching the establishment country; the number in the FatturaPA party data and the TAX.2 regime-change check. Owner decision MQ-17 (2026-11-09): the establishment is the registered office (seat), and a permanent establishment alone does not qualify; every RF20 tax profile stays flagged for manual review (`profile_review_notes`); the `EX` number format per member state stays open until the accountant confirms it | P1 | 3 | VEN.18, CMP.13 | RF20 is refused for a vendor established outside the EU and without an `EX` number; RF20 is refused for a vendor whose seat is outside the EU even with a permanent establishment in a member state; a malformed number or one issued by another member state is refused; a valid EU vendor saves RF20; a regime-change request to RF20 without the number is refused; every RF20 profile appears in the review list |
 | VEN.26 | Operator-owned shop (owner note 2026-11-09, spec 04 §Operator-owned shop): a VAT number, or TIN with country, matching the current `PlatformOperator` only proposes the shop (`operator_owned_proposed`, re-checked on identity save and on operator change; TIN compared by decrypting in the service, no searchable copy); the platform owner confirms or revokes `is_operator_owned` in the platform space with MFA step-up, reason and AuditLog, only for a vendor with verified identity (VEN.12, VEN.24); after confirmation an explicit 0% commission rule with reason (MQ-2 step-up) and no CMP.2 commission statement; own ledger and payouts; the operator shown as the seller with its legal notices; operator-owned vendors left out of the DAC7 reportable sellers (CMP.1) and their sales invoiced by the operator outside the platform (D-22, decided) | P1 | 6 | VEN.12, VEN.2, VEN.24, ARC.7, CORE.18 | An applicant with the operator's VAT number is proposed, not flagged, and its commission stays on the plan until the owner confirms; a confirmation without step-up or reason is refused, and one for a vendor with unverified identity is refused; a confirmed vendor computes 0 commission from the confirmation on, with the flag change in the AuditLog; a non-owner platform role cannot confirm (404); two vendors with the same name and tax code coexist; changing the operator's VAT number updates the proposal on the next check and never sets the flag by itself; a confirmed operator-owned vendor's sales are not in the DAC7 export |
 | VEN.27 | No-TIN jurisdictions as staff-editable data (owner decision MQ-16): the list of jurisdictions that issue no TIN, today the `engine.NO_TIN_COUNTRIES` constant, moves to a table seeded with the current list; staff add or remove a country through an audited service with dry-run (AuditLog entry with the reason); `dac7_check` reads the table, keeping the engine pure (the service passes the list in); the accountant's confirmation of the initial list and of the TIN formats stays an open item | P1 | 3 | VEN.23 | A data migration seeds the six current countries and the DAC7 check gives the same results as before; a country staff add makes an individual with a place of birth and no TIN complete, and removing it makes the vendor incomplete again; each change is in the AuditLog with its reason, and a dry run changes nothing; vendor members cannot edit the list; the engine has no ORM import |
+| VEN.29 | Storefront rich text (owner decision D-34, follow-up of VEN.10 and CORE.9): the description and the three policies are Wagtail `RichTextField`s with the default editor features, edited with Wagtail's Draftail widget in the Manager and the normal field in the admin, saved through the CMS.12 hook (form, admin, API, import), rendered with `\|richtext` after the allow-list runs again; the tagline stays plain text; length caps count the stored HTML; a data migration turns plain text into `<p>` paragraphs (idempotent, translation fingerprints kept); images and documents must be in the vendor's own collection tree (`engine.vendor_collection_name`), checked on save and on render, and the Wagtail choosers list only that tree for vendor members. Open follow-up: vendor members have no Wagtail admin access, so the Manager editor leaves out the image, embed and document-link features until the Manager hosts its own choosers and upload | P1 | 3 | VEN.10, CORE.9, CMS.12 | Bold, list and link render as HTML on the storefront; `<script>`, `onclick`, `<iframe>` and `javascript:` links are stripped on save and on render; crafted HTML embedding another vendor's image or document is refused and a text whose media left the collection is hidden; the vendor's own media works; a legacy plain-text policy renders as paragraphs; the migration is idempotent; an e2e screenshot of a formatted policy |
 | CMP.1 | DAC7 quarterly aggregates + annual export, reading the dataset and completeness from VEN.12; a confirmed operator-owned vendor's sales follow D-22 (not reported, VEN.26) | P1 | 12 | VEN.5, VEN.4, VEN.12 | Test export validates against the Agenzia delle Entrate DPI XML schema and is checked by the advisor; excluded sellers (under 30 sales and €2,000 or less) are left out; each reported vendor gets its data |
 | CMP.2 | Non-fiscal commission statement (pro-forma) per vendor and period from the ledger, with VEN.12 party data, as PDF per language and CSV/JSON export mappable to FatturaPA fields; no invoice issuing, no e-invoicing channel | P1 | 8 | VEN.4, VEN.12 | A seed vendor's statement and export are labelled "Documento non fiscale / Non-fiscal document, not an invoice" in all five languages, carry a stable reference ID and no invoice number sequence, and their totals match the ledger |
 | CMP.3 | `GpsrInfo` with per-vendor defaults, publication block, product page with picture, recall procedure; GPSR article 22 marketplace duties: points of contact, authority orders within 2 working days, safety notices within 3 working days, Safety Gate checks, repeat-offender suspension | P1 | 12 | CAT.1 | Product without GPSR cannot be published; a safety notice and an authority order show their working-day deadline and an overdue one alerts staff |
@@ -286,7 +287,7 @@
 | MIG.11 | Staggered product and tag URL switch (owner decisions Q-91 and D-07): per-product and per-term `url_mode` and frozen legacy paths, traffic ranking from analytics (SEO.5) or the MIG.1 legacy access-log counts, configurable batch size and cadence, batch switch and rollback as a management command and staff action with dry-run and audit, sitemap, canonical and hreflang by mode, gate on 404 rate, Search Console impressions and clicks against baseline, and errors with configurable thresholds | P1 | 6 | MIG.6, CAT.5, CAT.8 | A batch switch gives a single 301 hop and an updated sitemap; a rollback leaves no redirect loop; a legacy-mode page is 200 with a self-canonical; a switched legacy tag URL is a single 301 to `/{taxonomy}/{term}/`; the next batch is refused when a gate metric is over threshold; the MIG.6 "no URL lost" count still holds after a switch and a rollback; products and terms created after go-live start in new mode |
 | MIG.12 | Source-connector interface (owner decision 2026-11-09, spec 13 §13.2 "Source connectors"): `ShopConnector` protocol (`capabilities`, `check`, `extract`), registry by decorator and `MPMV_IMPORT_CONNECTORS`, intermediate format `mpmv-import/1` (JSON Schema and Pydantic models, an evolution of the MIG.1 JSON) read by the MIG.3 and MIG.4 loaders only; shared HTTP client `apps/core/http.py` (HTTPS only, per-connector rate limit, timeouts, backoff honouring `Retry-After`, one log line per call without credentials, SSRF guard refusing loopback, private, link-local, CGNAT and metadata addresses and redirects to them); `ingest.services.import_from_source(..., dry_run=True) -> ChangeSet` with one AuditLog entry per run and an import-origin map on `(source, source_id)`; `fetched_at` in the run manifest; RFC 9457 errors; secrets by reference from the environment or a vault; schema validation of every record (SEC.9); read-only, dry-run by default, idempotent; the MIG.1 extractor wrapped as the `wordpress_db` connector; connectors import no app models (import-linter contract) | P1 | 9 | MIG.1 | A fake connector registered from settings appears in the registry and the loaders load its output with no change to their code; a record that fails the schema is rejected with a report and nothing of it is written; a canary secret never appears in logs, output or the database; two runs on the same source give byte-identical records (the manifest aside); a source resolving to 127.0.0.1, 10.x, 169.254.x, 100.64.x or a private IPv6 address is refused, also when reached by a redirect; a run interrupted halfway resumes without duplicates; a dry run writes nothing and returns the ChangeSet; the MIG.1 output validates against `mpmv-import/1`; a connector that sends a non-GET request fails its test |
 
-### F6 — After go-live (P2) (53 tasks, 413 h)
+### F6 — After go-live (P2) (54 tasks, 416 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -306,6 +307,7 @@
 | TAX.8 | `distance_sales_eu` + `suggest_regime` from the ledger | P2 | 6 | VEN.4 | T16 green |
 | TAX.9 | Cart tax simulator in admin and API (`/tax/simulate`) | P2 | 6 | TAX.4, SHP.4 | Staff simulate a mixed cart |
 | TAX.10 | Quarterly OSS report per country and per-vendor report | P2 | 8 | ORD.4 | CSV export verified on seed orders |
+| TAX.14 | Vendor territory in `TaxContext` (follow-up of TAX.3, D-26): the context carries the vendor's territory code, so a vendor established in a territory with its own rates or outside the VAT area can sell to its mainland and abroad; TAX.3 refuses such a vendor with `UnresolvedTerritory` when `registered_postal_code` shows it | P2 | 3 | TAX.3 | A vendor established in Madeira selling to mainland Portugal and to Italy gets the rates of its own rules; the blocking error is gone; the vendor territory comes from the territory table, not from a postcode guess |
 | SHP.6 | Admin zone/rate editor with diff, impact and versions/rollback | P2 | 12 | SHP.12, CORE.8 | Rollback to a previous version works |
 | SHP.7 | Cart simulator (admin + `/shipping/simulate`) | P2 | 6 | SHP.4 | Parity with the current simulator on seed cases |
 | SHP.8 | Daily health check + report | P2 | 6 | SHP.1, ARC.9, ARC.16 | Email report with the 7 checks |
