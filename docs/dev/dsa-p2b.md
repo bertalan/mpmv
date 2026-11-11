@@ -16,3 +16,12 @@ Part 1 of CMP.5 covers the points of contact, the platform terms and the ranking
   `apps.cms.services.register_golive_check`): contact data (an official language plus English for
   authorities) and the required sections. `manage.py dsa_p2b_readiness [--language xx]` runs only
   that sub-check. The contact page answers 404 until some contact is configured.
+
+## Deployment: the public report form (`/report/`, CMP.5 part 2)
+
+The form is anonymous. On STAGE and LIVE set `CAPTCHA_ENABLED` (with the Turnstile keys) so the
+captcha is checked on every POST, and set the trusted proxy header (`MPMV_TRUSTED_PROXY_HEADER`
+with `TRUSTED_PROXIES`, see `deploy/caddy`). Without the header every visitor shares the
+proxy's address and therefore one rate-limit bucket (5 reports per hour). Receipt emails are
+also limited to 3 per day per address, so the form cannot be used to mail a third party.
+Notifier personal data has no retention job yet (follow-up, CMP.29).

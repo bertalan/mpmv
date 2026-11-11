@@ -48,6 +48,7 @@ CONTACT_FIELDS: Final = ("manufacturer_contact", "eu_responsible_contact")
 # Missing-data codes, in the order they are reported.
 PRODUCT_IDENTIFIER: Final = "product_identifier"
 
+_URL = re.compile(r"https?://[^\s\x00-\x1f\x7f/]+[^\s\x00-\x1f\x7f]*", re.IGNORECASE)
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _WEB = re.compile(r"^https?://[^\s/]+\.[^\s/]+\S*$", re.IGNORECASE)
 
@@ -319,3 +320,68 @@ def section_problems(kind: str, language: str, sections: Iterable[str]) -> list[
         for section in REQUIRED_SECTIONS.get(kind, ())
         if section not in present
     ]
+
+
+# --- Notice and action (DSA art. 16, CMP.5 part 2)
+
+NOTICE_RECEIVED: Final = "received"
+NOTICE_UNDER_REVIEW: Final = "under_review"
+NOTICE_ACTION_TAKEN: Final = "action_taken"
+NOTICE_NO_ACTION: Final = "no_action"
+NOTICE_OUTCOMES: Final = (NOTICE_ACTION_TAKEN, NOTICE_NO_ACTION)
+#: A notice of this category may be sent without the notifier's name and email (art. 16(2)(c)).
+NOTICE_ANONYMOUS_CATEGORY: Final = "child_abuse"
+
+_NOTICE_TRANSITIONS: Final = {
+    NOTICE_RECEIVED: frozenset({NOTICE_UNDER_REVIEW}),
+    NOTICE_UNDER_REVIEW: frozenset(NOTICE_OUTCOMES),
+}
+_EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+
+
+@dataclass(frozen=True)
+class NoticeProblem:
+    """One field of a notice that does not meet article 16(2)."""
+
+    code: str
+
+
+def notice_transition_allowed(current: str, new: str) -> bool:
+    """received -> under_review -> action_taken or no_action; a decision is final."""
+    return new in _NOTICE_TRANSITIONS.get(current, frozenset())
+
+
+def notice_problems(
+    *,
+    explanation: str,
+    url: str,
+    category: str,
+    notifier_name: str,
+    notifier_email: str,
+    good_faith: bool,
+) -> list[NoticeProblem]:
+    """What article 16(2) needs: an explanation, the exact location (an http or https URL), the
+    notifier's name and email (not for the anonymous category) and the good-faith statement."""
+    problems: list[NoticeProblem] = []
+    if not explanation.strip():
+        problems.append(NoticeProblem("explanation"))
+    if not _URL.fullmatch(url.strip()):
+        problems.append(NoticeProblem("url"))
+    if category != NOTICE_ANONYMOUS_CATEGORY:
+        if not notifier_name.strip():
+            problems.append(NoticeProblem("notifier_name"))
+        if not _EMAIL.fullmatch(notifier_email.strip()):
+            problems.append(NoticeProblem("notifier_email"))
+    if not good_faith:
+        problems.append(NoticeProblem("good_faith"))
+    return problems
+
+
+def decision_problems(outcome: str, reason: str) -> list[str]:
+    """A decision names a known outcome and records its reason (article 16(5))."""
+    problems: list[str] = []
+    if outcome not in NOTICE_OUTCOMES:
+        problems.append("outcome")
+    if not reason.strip():
+        problems.append("reason")
+    return problems
