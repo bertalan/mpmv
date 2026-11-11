@@ -185,3 +185,41 @@ def test_a_canonical_uuid_stays_intact_but_a_uuid_secret_does_not() -> None:
     assert ident not in redact_text(f"token={ident}")
     assert ident not in redact_text(f"password: {ident}")
     assert "ada@example.org" not in redact_text(f"{ident} ada@example.org")
+
+
+_UUID_ID = "73d91555-6306-464b-b514-bc350456c401"
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "Authorization: Bearer {u}",
+        "Bearer {u}",
+        "Token {u}",
+        "X-Api-Key {u}",
+        "X-Api-Key: {u}",
+        'data={{"token": "{u}"}}',
+        "GET /x?key={u} 200",
+        "api_key: {u}",
+        "password={u}",
+        "secret = {u}",
+        "token:{u}",
+        "session {u}",
+    ],
+)
+def test_a_uuid_shaped_credential_is_still_redacted(template: str) -> None:
+    assert _UUID_ID not in redact_text(template.format(u=_UUID_ID))
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "/reset/{u}/",
+        "{u}",
+        "case {u} overdue",
+        "Safety case {u} is overdue",
+    ],
+)
+def test_a_uuid_identifier_is_kept(template: str) -> None:
+    text = template.format(u=_UUID_ID)
+    assert redact_text(text) == text

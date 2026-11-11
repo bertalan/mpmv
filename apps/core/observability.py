@@ -115,6 +115,11 @@ _UUID: Final = re.compile(
     r"(?<![\w=-])[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(?![\w-])"
 )
 
+_SECRET_WORD_BEFORE: Final = re.compile(
+    r"(?i)(?:bearer|basic|digest|token|key|secret|passw\w*|auth\w*|credential|signature|session\w*)"
+    r"[\"']?\s*+[=:]?\s*+[\"']?$"
+)
+
 MAX_DEPTH: Final = 6
 MAX_ITEMS: Final = 50
 MAX_NODES: Final = 400
@@ -134,6 +139,9 @@ def redact_unbounded(text: str) -> str:
     kept: list[str] = []
 
     def keep(match: re.Match[str]) -> str:
+        before = match.string[max(0, match.start() - 40) : match.start()]
+        if _SECRET_WORD_BEFORE.search(before):
+            return match.group(0)  # a credential in UUID shape: the generic patterns see it as is
         kept.append(match.group(0))
         return f"\x00{len(kept) - 1}\x00"
 
