@@ -99,14 +99,35 @@ def set_site_indexing(
     )
 
 
-def golive_indexing_messages(languages: Any = None) -> list[str]:
-    """A `golive_readiness` line when the LIVE environment has indexing off for the default site.
+LOCAL_SUFFIXES = (".local", ".test", ".localhost")
+LOCAL_HOSTS = frozenset({"", "localhost", "127.0.0.1", "::1", "[::1]"})
 
-    Silent under the environment floor (STAGE, demo): indexing is meant to be off there.
+
+def golive_indexing_messages(languages: Any = None) -> list[str]:
+    """Go-live lines for a LIVE environment: indexing still off for the default site, and a main
+    site address that is local or not https.
+
+    Silent under the environment floor (STAGE, demo): both are expected there.
     """
-    if is_noindex_forced() or site_allows_indexing(None):
+    if is_noindex_forced():
         return []
-    return [
-        "Search engine indexing is still off: search engines are told to skip every page. "
-        "Turn it on in Settings > SEO when the platform opens to the public."
-    ]
+    messages: list[str] = []
+    if not site_allows_indexing(None):
+        messages.append(
+            "Search engine indexing is still off: search engines are told to skip every page. "
+            "Turn it on in Settings > SEO when the platform opens to the public."
+        )
+    site = Site.objects.filter(is_default_site=True).first()
+    if site is not None:
+        host = site.hostname.strip().lower()
+        if host in LOCAL_HOSTS or host.endswith(LOCAL_SUFFIXES):
+            messages.append(
+                f"The main site address is still {host or 'empty'!r}: search engines and shared "
+                "links would point there. Set the real address in Settings > Sites."
+            )
+        elif not site.root_url.startswith("https://"):
+            messages.append(
+                f"The main site address {site.root_url!r} is not https: visitors and search "
+                "engines would get an insecure site. Set an https address in Settings > Sites."
+            )
+    return messages

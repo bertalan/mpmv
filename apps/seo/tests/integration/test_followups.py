@@ -168,3 +168,39 @@ def test_url_and_logo_ignore_the_host_header_and_a_missing_file() -> None:
     type(logo).objects.filter(pk=logo.pk).update(file="")  # no file behind the field
     node = json.loads(LD.findall(Client().get("/", HTTP_HOST="evil.example").content.decode())[0])
     assert "logo" not in node
+
+
+ADDRESS = "main site address"
+
+
+def address_messages() -> list[str]:
+    return [m for m in golive_problems(["en"]) if ADDRESS in m]
+
+
+@pytest.mark.parametrize(
+    ("hostname", "port"),
+    [("localhost", 443), ("127.0.0.1", 443), ("::1", 443), ("shop.local", 443), ("a.test", 443)],
+)
+@override_settings(FORCE_NOINDEX=False, DEMO_MODE=False)
+def test_local_site_address_is_reported(hostname: str, port: int) -> None:
+    Site.objects.filter(is_default_site=True).update(hostname=hostname, port=port)
+    (message,) = address_messages()
+    assert "Settings > Sites" in message
+
+
+@override_settings(FORCE_NOINDEX=False, DEMO_MODE=False)
+def test_non_https_site_address_is_reported() -> None:
+    Site.objects.filter(is_default_site=True).update(hostname="shop.example.org", port=80)
+    assert len(address_messages()) == 1
+
+
+@override_settings(FORCE_NOINDEX=False, DEMO_MODE=False)
+def test_real_https_site_address_is_not_reported() -> None:
+    Site.objects.filter(is_default_site=True).update(hostname="shop.example.org", port=443)
+    assert address_messages() == []
+
+
+@override_settings(FORCE_NOINDEX=True)
+def test_site_address_not_reported_on_the_floor() -> None:
+    Site.objects.filter(is_default_site=True).update(hostname="localhost", port=80)
+    assert address_messages() == []
