@@ -6,15 +6,15 @@
 
 ## Summary
 
-- Micro-tasks: **296** in **19** macro areas
-- Estimated hours (development + automated tests, AI-assisted development): **2378 h** (P1 1907 h · P2 439 h · P3 32 h)
+- Micro-tasks: **297** in **19** macro areas
+- Estimated hours (development + automated tests, AI-assisted development): **2398 h** (P1 1927 h · P2 439 h · P3 32 h)
 - P1 critical path (schedule lower bound with full parallelism): **147 h** — ARC.1 → ARC.3 → ARC.6 → VEN.1 → VEN.5 → VEN.13 → VEN.14 → VEN.16 → CMP.10 → CMP.11
 
 ## By macro area
 
 | Macro | Area | Tasks | P1 h | P2 h | P3 h | Total h |
 |---|---|---:|---:|---:|---:|---:|
-| ARC | Architecture and foundations | 29 | 174 | 30 | 0 | 204 |
+| ARC | Architecture and foundations | 30 | 194 | 30 | 0 | 224 |
 | CORE | Identity, permissions, API, backoffice | 25 | 196 | 4 | 6 | 206 |
 | CAT | Product catalog | 20 | 150 | 60 | 0 | 210 |
 | VEN | Vendors, commissions, ledger | 31 | 246 | 26 | 0 | 272 |
@@ -33,11 +33,11 @@
 | SEC | Security | 11 | 70 | 0 | 0 | 70 |
 | OPS | Operations | 11 | 19 | 34 | 8 | 61 |
 | MIG | Migration and cutover | 15 | 121 | 23 | 0 | 144 |
-| **Total** | | **296** | **1907** | **439** | **32** | **2378** |
+| **Total** | | **297** | **1927** | **439** | **32** | **2398** |
 
 ## By phase
 
-### F0 — Foundations (61 tasks, 433 h)
+### F0 — Foundations (62 tasks, 453 h)
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---:|---|---|
@@ -66,6 +66,7 @@
 | ARC.27 | Business time zone (D-31): storage stays UTC (`USE_TZ=True`, `TIME_ZONE='UTC'`); `PlatformOperator` gets a `business_time_zone` field in the versioned configuration of ARC.7, seeded with Europe/Rome by a migration; one helper `business_tz()` next to `current_operator()` is the only reader, with a check that no code reads `BUSINESS_TIME_ZONE` directly (the setting stays a bootstrap default); fiscal year, order numbering year, retention dates, legal deadlines and scheduled jobs use it; no per-vendor time zone | P1 | 4 | ARC.7 | A seed operator in Europe/Rome puts an order at 23:30 UTC on 31 Dec in the next business year only when the local date says so; changing the field changes the helper; the import-contract check fails on a direct read of the setting; the migration seeds Europe/Rome |
 | ARC.29 | Refuse `MPMV_DEMO_MODE` and `MPMV_FORCE_NOINDEX` in the LIVE settings through a Django system check registered with a deploy tag, so a stray demo or force-noindex flag on LIVE cannot noindex the shop (finding from the SEO.8 review); the check has its own error id, a message naming the offending variable and runs under `manage.py check --deploy` | P1 | 2 | ARC.22, SEO.8 | `manage.py check --deploy` with the LIVE settings fails with the check's error id and a clear message when `MPMV_DEMO_MODE` is true, and likewise for `MPMV_FORCE_NOINDEX`; it passes with both off and with STAGE settings; a unit test covers each case |
 | ARC.30 | Plain-language help on every editor field (owner request of 2026-11-11, rule in the cross-cutting conventions "Field help"): a sweep test walks the Wagtail page and snippet models and their panels, the StreamField block definitions, the Manager forms and the Django admin forms of the editor-facing apps, and fails on any editor-facing field without `help_text`, naming the model or form and the field; a short allow-list (in one file, each entry with a reason) covers self-explanatory fields such as a title; a second check fails when a help text has no Italian entry in the catalog; the help-text guideline (what to enter, why, example or limit; what happens if a required field is empty) is written in `docs/dev` with good and bad examples. Fields that fail today are listed in the test as a counted baseline that only shrinks, removed as ARC.31 fixes them | P1 | 8 | CMS.2, I18N.9, VEN.31 | The sweep test fails on a seed model, block and Manager form field added without `help_text`; it passes for an allow-listed field and fails for an allow-list entry with no reason; a help text missing in the Italian catalog fails the catalog check; the baseline count is printed and a test fails if it grows; the guideline page exists |
+| ARC.32 | Contextual help button (owner request of 2026-11-11, placement decided by lane-a), everywhere a signed-in user can be: storefront, account, Manager, the Wagtail admin and the technical Django admin. Placement: a real button with a question mark in a circle in the top bar, right side, immediately left of the user menu, in the same spot in every space; the Wagtail admin gets it through hooks (global admin JS and CSS and a header or menu item), the Django admin through an `admin/base_site.html` override; on narrow screens it stays in the header bar, never floating over content or the cart and checkout buttons; the user menu also has a "Help" item that opens the same modal. Content: a translatable `HelpEntry` snippet (wagtail-localize) keyed by route name or page type, rich text cleaned by the CMS.12 sanitiser, editable by platform staff, with a general entry as fallback when no entry matches; vendor-facing pages may link to the vendor guide. Synergy with ARC.30: on a page with a form the modal also lists "Fields on this page" with each field's help text, read from the same form definitions. Accessibility (CMP.9, WCAG 2.2 AA): button with the accessible name "Help for this page", modal dialog with focus trap, Esc closes it, focus returns to the button, no single-key shortcut, target at least 44 px. CSP: no inline script or style; the modal body is fetched from a server endpoint or rendered server-side per language; nothing user-specific or uncached-sensitive is placed in a cached page (the button is in the signed-in chrome only, which is never cached). Shipped in parts (shared component and storefront, account and Manager, Wagtail admin, Django admin) once the ARC.30 rule exists | P1 | 20 | ARC.30, CMS.12, CMP.9, I18N.9, CORE.17 | A sweep test over the URL map of every space, both admins included, finds the button on every signed-in page and none on an anonymous page; the modal opens the entry for the route or page type and the general entry for a route without one; a page with a form lists its fields with their help texts; an a11y e2e check passes (accessible name, focus trap, Esc, focus return, 44 px, no single-key shortcut, axe clean) in each space; no CSP violation on any page with the button; a cached public page carries no help markup; e2e screenshots on desktop and on mobile width show the button in the header and the open modal |
 | CORE.1 | Custom `User`, login via email, preferred language | P1 | 6 | ARC.6 | Initial migration with custom User; a second account with the same email (any letter case) is refused with a message that suggests a second mailbox or plus addressing, and `name+shop@` is accepted as a distinct address (owner note 2026-11-09) |
 | CORE.2 | `VendorMember` with owner/staff roles, per-role permissions | P1 | 6 | CORE.1, VEN.1 | Role matrix tested |
 | CORE.3 | `VendorScopedQuerySet` + 404 helper + reusable cross-tenant test fixture | P1 | 8 | CORE.2 | Negative tests generated for every endpoint |
