@@ -13,7 +13,9 @@
 #
 # Every release image carries its own units, Caddyfile and this script under /app/deploy (ARC.23):
 # a deploy installs that set, a rollback reinstalls the previous one, so the host always runs the
-# units of the release it runs. Env files and the CA certificate are never touched. Call the
+# units of the release it runs. Quadlet units go to ~/.config/containers/systemd, the proxy's
+# socket unit (deploy/systemd) to ~/.config/systemd/user. Env files and the CA certificate are
+# never touched. Call the
 # script by its absolute path (~/.local/bin/mpmv-deploy): a non-interactive ssh session does not
 # have ~/.local/bin on PATH.
 set -eu
@@ -25,6 +27,12 @@ RELEASES="$STATE_DIR/releases"
 UNIT_SETS="$STATE_DIR/units"
 CONFIG_DIR="${MPMV_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/mpmv}"
 QUADLET_DIR="${MPMV_QUADLET_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/containers/systemd}"
+# Plain systemd user units of a release (deploy/systemd): the proxy's listening sockets.
+SYSTEMD_DIR="${MPMV_SYSTEMD_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user}"
+PROXY_SOCKET=mpmv-caddy.socket
+# Where the doctor reads the lowest port a user may bind (the socket unit binds 80 and 443).
+PROC_SYS="${MPMV_PROC_SYS:-/proc/sys}"
+PROC_NET="${MPMV_PROC_NET:-/proc/net}"
 BIN_PATH="${MPMV_BIN:-$HOME/.local/bin/mpmv-deploy}"
 # Total time the post-deploy check may take before the release counts as bad (ARC.23: detection
 # and rollback stay under a minute).
@@ -61,7 +69,8 @@ validate() {
   esac
 }
 
-# --- Unit sets: deploy/quadlet, deploy/caddy/Caddyfile and deploy/server of one release.
+# --- Unit sets: deploy/quadlet, deploy/caddy/Caddyfile, deploy/server and deploy/systemd (releases
+# from the Caddy socket switch on) of one release.
 
 # Copy the units, Caddyfile and script baked into a release image to $UNIT_SETS/<version>.
 extract() {
@@ -74,6 +83,8 @@ extract() {
   for part in quadlet caddy server; do
     podman cp "$cid:/app/deploy/$part" "$tmp/$part" >/dev/null || copied=no
   done
+  # Older releases have no systemd units: their Caddy publishes its ports itself.
+  podman cp "$cid:/app/deploy/systemd" "$tmp/systemd" >/dev/null 2>&1 || rm -rf "$tmp/systemd"
   podman rm "$cid" >/dev/null || true
   if [ "$copied" = no ] || [ ! -f "$tmp/quadlet/mpmv-app.container" ] || [ ! -f "$tmp/caddy/Caddyfile" ]; then
     rm -rf "$tmp"
@@ -92,6 +103,12 @@ snapshot_installed() {
   for f in "$QUADLET_DIR"/mpmv*; do
     if [ -f "$f" ]; then cp "$f" "$dest/quadlet/"; fi
   done
+  for f in "$SYSTEMD_DIR"/mpmv*.socket; do
+    if [ -f "$f" ]; then
+      mkdir -p "$dest/systemd"
+      cp "$f" "$dest/systemd/"
+    fi
+  done
   if [ -f "$CONFIG_DIR/Caddyfile" ]; then cp "$CONFIG_DIR/Caddyfile" "$dest/caddy/Caddyfile"; fi
   if [ -f "$BIN_PATH" ]; then cp "$BIN_PATH" "$dest/server/mpmv-deploy"; fi
 }
@@ -101,10 +118,11 @@ put() { # put <source> <target> <mode>: replace atomically, so a reader never se
 }
 
 proxy_fingerprint() {
-  cat "$CONFIG_DIR/Caddyfile" "$QUADLET_DIR/mpmv-caddy.container" 2>/dev/null | cksum
+  cat "$CONFIG_DIR/Caddyfile" "$QUADLET_DIR/mpmv-caddy.container" "$SYSTEMD_DIR/$PROXY_SOCKET" 2>/dev/null | cksum
 }
 
-# Install a unit set: Quadlet units (stale mpmv* units removed), the Caddyfile, this script.
+# Install a unit set: Quadlet units (stale mpmv* units removed), the systemd socket units (stale
+# ones disabled and removed, the set's ones enabled for boot), the Caddyfile, this script.
 install_set() {
   set_dir="$UNIT_SETS/$1"
   [ -d "$set_dir/quadlet" ] || {
@@ -115,10 +133,26 @@ install_set() {
   for f in "$QUADLET_DIR"/mpmv*; do
     if [ -f "$f" ] && [ ! -f "$set_dir/quadlet/${f##*/}" ]; then rm -f "$f"; fi
   done
+  for f in "$SYSTEMD_DIR"/mpmv*.socket; do
+    if [ -f "$f" ] && [ ! -f "$set_dir/systemd/${f##*/}" ]; then
+      # Still running until restart_proxy stops it; only its boot link and file go here.
+      systemctl --user disable --quiet "${f##*/}" >/dev/null 2>&1 || true
+      rm -f "$f"
+    fi
+  done
   for f in "$set_dir"/quadlet/*; do put "$f" "$QUADLET_DIR/${f##*/}" 0644 || return 1; done
+  sockets=""
+  for f in "$set_dir"/systemd/*.socket; do
+    [ -f "$f" ] || continue
+    mkdir -p "$SYSTEMD_DIR"
+    put "$f" "$SYSTEMD_DIR/${f##*/}" 0644 || return 1
+    sockets="$sockets ${f##*/}"
+  done
   if [ -f "$set_dir/caddy/Caddyfile" ]; then put "$set_dir/caddy/Caddyfile" "$CONFIG_DIR/Caddyfile" 0644 || return 1; fi
   if [ -f "$set_dir/server/mpmv-deploy" ]; then put "$set_dir/server/mpmv-deploy" "$BIN_PATH" 0755 || return 1; fi
   systemctl --user daemon-reload || return 1
+  # shellcheck disable=SC2086 # one word per unit
+  if [ -n "$sockets" ]; then systemctl --user enable --quiet $sockets || return 1; fi
   log "installed the units of $1"
 }
 
@@ -208,7 +242,23 @@ doctor_host() {
   if ls "$QUADLET_DIR"/mpmv*.container >/dev/null 2>&1; then
     if quadlet_dry_run "$QUADLET_DIR"; then pass "installed units convert"; else fail "installed units do not convert (quadlet -dryrun)"; fi
   fi
+  if needs_socket "$QUADLET_DIR"; then
+    if socket_ok "$SYSTEMD_DIR/$PROXY_SOCKET"; then pass "installed proxy socket unit present"; else fail "installed mpmv-caddy.container needs $PROXY_SOCKET in $SYSTEMD_DIR"; fi
+  fi
+  start="$(cat "$PROC_SYS/net/ipv4/ip_unprivileged_port_start" 2>/dev/null || true)"
+  case "$start" in
+    "") ;;
+    *[!0-9]*) fail "unreadable net.ipv4.ip_unprivileged_port_start '$start'" ;;
+    *) if [ "$start" -le 80 ]; then pass "unprivileged ports start at $start"; else fail "net.ipv4.ip_unprivileged_port_start is $start: the proxy cannot bind 80 and 443"; fi ;;
+  esac
 }
+
+# The proxy unit of a Quadlet directory takes its ports from the socket unit (socket activation).
+needs_socket() { grep -qxF "Requires=$PROXY_SOCKET" "$1/mpmv-caddy.container" 2>/dev/null; }
+
+# A socket unit file that listens on something. `systemd-analyze verify` is not used: the service
+# it activates exists only once the Quadlet generator has run, so verify reports it missing.
+socket_ok() { [ -f "$1" ] && grep -q '^ListenStream=' "$1"; }
 
 # Names only: a value is never read into a message.
 env_names() { sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$1"; }
@@ -216,6 +266,14 @@ env_names() { sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$1"; }
 doctor_release() {
   set_dir="$UNIT_SETS/$1"
   if quadlet_dry_run "$set_dir/quadlet"; then pass "units of $1 convert on this host's podman"; else fail "units of $1 do not convert on this host's podman (quadlet -dryrun)"; fi
+  if needs_socket "$set_dir/quadlet"; then
+    if socket_ok "$set_dir/systemd/$PROXY_SOCKET"; then pass "units of $1 carry the proxy socket unit"; else fail "units of $1 need $PROXY_SOCKET and do not carry it"; fi
+    # The socket unit listens on [::] too: without IPv6 it cannot start once the old proxy is gone.
+    if grep -q '^Listen[A-Za-z]*=\[::\]' "$set_dir/systemd/$PROXY_SOCKET" 2>/dev/null; then
+      v6="$(grep -c . "$PROC_NET/if_inet6" 2>/dev/null || true)"
+      if [ "${v6:-0}" -gt 0 ] 2>/dev/null; then pass "IPv6 available for the proxy socket"; else fail "the proxy socket of $1 listens on [::] but this host has no IPv6 address"; fi
+    fi
+  fi
   for name in $ENV_FILES; do
     example="$set_dir/server/$name.env.example"
     [ -f "$example" ] || continue
@@ -296,18 +354,31 @@ check() {
 
 # --- Releases.
 
-# Restart onto the image tagged current. Caddy restarts only when its Caddyfile or unit changed,
-# or when it is not running (first deploy).
+# Restart onto the image tagged current. Caddy restarts only when its Caddyfile, unit or socket
+# unit changed, or when it is not running (first deploy).
 restart_services() {
-  services="mpmv-app.service mpmv-worker.service"
-  if [ "$1" != "$(proxy_fingerprint)" ] || ! systemctl --user is-active --quiet mpmv-caddy.service; then
-    services="$services mpmv-caddy.service"
-  fi
   # A unit that hit its start limit (a crash-looping release) refuses a plain restart.
-  # shellcheck disable=SC2086 # one word per unit
-  systemctl --user reset-failed $services >/dev/null 2>&1 || true
-  # shellcheck disable=SC2086 # one word per unit
-  systemctl --user restart $services
+  systemctl --user reset-failed mpmv-app.service mpmv-worker.service >/dev/null 2>&1 || true
+  systemctl --user restart mpmv-app.service mpmv-worker.service || return 1
+  if [ "$1" != "$(proxy_fingerprint)" ] || ! systemctl --user is-active --quiet mpmv-caddy.service; then
+    restart_proxy
+  fi
+}
+
+# Caddy takes ports 80 and 443 from mpmv-caddy.socket when the installed set has it (socket
+# activation, so it sees the client address), or publishes them itself (releases before the
+# switch). Both cannot hold the ports, so the running proxy stops first, then the socket is
+# (re)bound or released, then Caddy starts. Switching between the two styles, either way, is the
+# same sequence.
+restart_proxy() {
+  systemctl --user reset-failed mpmv-caddy.service "$PROXY_SOCKET" >/dev/null 2>&1 || true
+  systemctl --user stop mpmv-caddy.service || return 1
+  if [ -f "$SYSTEMD_DIR/$PROXY_SOCKET" ]; then
+    systemctl --user restart "$PROXY_SOCKET" || return 1
+  else
+    systemctl --user stop "$PROXY_SOCKET" >/dev/null 2>&1 || true
+  fi
+  systemctl --user start mpmv-caddy.service
 }
 
 # Switch the host to a release: its units, its image, restarted. Callers test the result: a unit
@@ -334,6 +405,13 @@ deploy() {
     podman pull "$REGISTRY_IMAGE:$version" >/dev/null
   fi
   extract "$version" || die "cannot read the units of $version; nothing changed"
+  # A release can need a newer deploy script than the installed one (the Caddy socket switch did):
+  # hand the rest of the deploy to the release's own script, once. Nothing has changed yet.
+  own="$UNIT_SETS/$version/server/mpmv-deploy"
+  if [ -z "${MPMV_REEXEC:-}" ] && [ -f "$own" ] && ! cmp -s "$own" "$0"; then
+    log "continuing with the deploy script of $version"
+    MPMV_REEXEC=1 exec /bin/sh "$own" deploy "$version"
+  fi
   doctor_release "$version"
   [ "$FAILURES" -eq 0 ] || die "doctor: $version does not fit this host; nothing changed"
   if [ -n "$live" ] && [ ! -d "$UNIT_SETS/$live" ]; then snapshot_installed "$live"; fi

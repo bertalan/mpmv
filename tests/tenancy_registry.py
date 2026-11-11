@@ -31,6 +31,7 @@ from apps.cart.models import CartLine
 from apps.cart.tests.factories import CartLineFactory
 from apps.catalog.models import (
     BrandBatch,
+    PriceHistory,
     Product,
     ProductAttribute,
     ProductTranslation,
@@ -42,6 +43,7 @@ from apps.catalog.models import (
 )
 from apps.catalog.tests.factories import (
     BrandBatchFactory,
+    PriceHistoryFactory,
     ProductAttributeFactory,
     ProductFactory,
     ProductTranslationFactory,
@@ -189,6 +191,9 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
         product=ProductFactory.create(vendor=vendor)
     ),
     SlugHistory: lambda vendor: SlugHistoryFactory.create(
+        product=ProductFactory.create(vendor=vendor)
+    ),
+    PriceHistory: lambda vendor: PriceHistoryFactory.create(
         product=ProductFactory.create(vendor=vendor)
     ),
     Variant: lambda vendor: VariantFactory.create(
