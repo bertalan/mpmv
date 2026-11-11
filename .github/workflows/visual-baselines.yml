@@ -55,7 +55,8 @@ jobs:
             sleep $((attempt * 20))
           done
           if [ "$deps_ok" -ne 1 ]; then
-            echo "::warning::Playwright system dependencies could not be installed (apt mirror unreachable?); fonts may be missing"
+            echo "::error::Playwright system dependencies could not be installed (apt mirror unreachable?); refusing to render baselines without system fonts"
+            exit 1
           fi
           for attempt in 1 2 3; do
             if uv run playwright install chromium; then
