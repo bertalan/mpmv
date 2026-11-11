@@ -17,6 +17,7 @@ from apps.core.public_forms import Protection, public_form
 from apps.core.services import consume_rate_limit
 
 from .services import set_preferred_language
+from .session_language import SESSION_LANGUAGE_KEY
 
 # A visitor changes language a few times; 30 a minute per IP is generous (SEC.13).
 SWITCH_LIMIT = 30
@@ -35,7 +36,8 @@ def switch_language(request: HttpRequest) -> HttpResponseBase:
     """Language switcher: redirect to the current page in the chosen language (I18N.1).
 
     The URL prefix decides the language, so no cookie is set; a signed-in user's choice is also
-    stored as `preferred_language`. Unknown languages and off-site `next` URLs are ignored.
+    stored as `preferred_language`, an anonymous visitor's in the session. Unknown languages and
+    off-site `next` URLs are ignored.
     """
     wait = consume_rate_limit(
         f"language_switch:ip:{client_ip(request)}", limit=SWITCH_LIMIT, window=SWITCH_WINDOW
@@ -53,6 +55,9 @@ def switch_language(request: HttpRequest) -> HttpResponseBase:
         return HttpResponseRedirect(next_url)
     if request.user.is_authenticated:
         set_preferred_language(request.user, language)
+    else:  # an anonymous choice lives in the session (no cookie): unprefixed pages read it
+        if request.session.get(SESSION_LANGUAGE_KEY) != language:  # no write when unchanged
+            request.session[SESSION_LANGUAGE_KEY] = language
     exact = request.POST.get("exact") == "1"
     if exact and request.POST.get("notice") == "1":
         # The object has no translation: the visitor lands on the language's home, told once.
