@@ -17,6 +17,10 @@ from .base import *  # noqa: F403
 # OPS.5: the technical admin from loopback only, as the test client connects (empty denies all).
 ADMIN_ALLOWED_NETWORKS = ["127.0.0.1/32", "::1/128"]
 
+# Product cards keep their links in the existing tests; the production default (no CAT.7 page yet,
+# so no link) is tested in apps/catalog/tests/integration/test_no_dead_links.py.
+PRODUCT_PAGES_ROUTED = True
+
 # Feature flags: the code defaults, whatever the shell exports, read from the database on every
 # check (tests roll back their writes, so a cached value could leak into the next test).
 ALLOW_SEED = True  # the `demo_seed` fixture (ARC.10)
