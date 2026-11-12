@@ -239,8 +239,7 @@ def test_the_editor_points_at_the_manager_chooser_not_the_wagtail_admin(
     assert BASE in page
 
 
-def test_the_manager_editor_has_no_link_or_chooser_feature_it_cannot_serve() -> None:
-    assert "link" not in MANAGER_RICH_TEXT_FEATURES
+def test_the_manager_editor_has_the_image_feature() -> None:
     assert "image" in MANAGER_RICH_TEXT_FEATURES
 
 

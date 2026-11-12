@@ -30,6 +30,7 @@ from apps.api.tests.factories import ApiClientFactory, ApiRateCounterFactory
 from apps.cart.models import CartLine
 from apps.cart.tests.factories import CartLineFactory
 from apps.catalog.models import (
+    BrandBatch,
     PriceHistory,
     Product,
     ProductAttribute,
@@ -41,6 +42,7 @@ from apps.catalog.models import (
     VariantTranslation,
 )
 from apps.catalog.tests.factories import (
+    BrandBatchFactory,
     PriceHistoryFactory,
     ProductAttributeFactory,
     ProductFactory,
@@ -202,6 +204,7 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
             product=ProductFactory.create(vendor=vendor, kind=Product.Kind.VARIABLE)
         )
     ),
+    BrandBatch: lambda vendor: BrandBatchFactory.create(vendor=vendor),
     SkuAlias: lambda vendor: renamed_product_alias(vendor),
     ProductAttribute: lambda vendor: ProductAttributeFactory.create(
         product=ProductFactory.create(vendor=vendor)
@@ -278,6 +281,20 @@ OWNED_OBJECTS: dict[type[models.Model], ObjectMaker] = {
 # Models with a ForeignKey chain to Vendor that are deliberately not vendor-scoped, by label,
 # with the reason.
 NOT_VENDOR_OWNED: dict[str, str] = {
+    "vendors.CommissionRule": (
+        "Platform pricing configuration managed by staff only (VEN.2): the optional vendor is "
+        "the rule's target, not an owner; no vendor endpoint lists or edits commission rules."
+    ),
+    "catalog.Brand": (
+        "Shared catalog entity (CAT.20): approved brands are platform-wide and public; "
+        "`proposed_by` and `batch` only say who proposed a pending brand. Another vendor's "
+        "pending brand is hidden by `brands.brand_choices` and `Product.clean`, and the public "
+        "brand page serves approved brands only; vendors never edit brands."
+    ),
+    "catalog.BrandTranslation": (
+        "Storefront texts of a shared brand (CAT.20); reaches a vendor only through the brand "
+        "that vendor proposed, and is edited by staff only."
+    ),
     "catalog.Redirect": (
         "Platform SEO rule managed by staff only (CAT.6): its optional target product is where a "
         "legacy URL lands, not an owner; no vendor endpoint lists or edits redirects."
@@ -320,6 +337,25 @@ def vendor_image(vendor: Vendor) -> models.Model:
     root = Collection.get_first_root_node()
     collection = root.add_child(name=vendor_collection_name(str(vendor.public_id)))
     return MediaImageFactory.create(collection=collection)
+
+
+def vendor_document(vendor: Vendor) -> models.Model:
+    """A PDF document in the vendor's own collection (VEN.31 part 2)."""
+    from django.core.files.base import ContentFile
+    from wagtail.documents import get_document_model
+    from wagtail.models import Collection
+
+    from apps.vendors.engine import vendor_collection_name
+    from tests.upload_corpus import PDF
+
+    root = Collection.get_first_root_node()
+    collection = root.add_child(name=vendor_collection_name(str(vendor.public_id)))
+    # A title unique per vendor, so a page that echoes the caller's own document
+    # cannot be mistaken for a leak of the other vendor's (the image factory does the same).
+    document = get_document_model()(title=f"Terms {vendor.public_id}", collection=collection)
+    document.file.save("terms.pdf", ContentFile(PDF), save=False)
+    document.save()
+    return document  # type: ignore[no-any-return]
 
 
 def by_pk(obj: models.Model) -> dict[str, str]:
@@ -403,6 +439,10 @@ ENDPOINTS: dict[str, Access] = {
         "that account it shows only the generic 'link not valid' page.",
         kwargs={"user_key": "00000000-0000-0000-0000-000000000000"},
     ),
+    "help_entry": NoVendorData(
+        "Contextual help (ARC.32): the platform's help text for a screen, the same for every "
+        "signed-in caller; reads no vendor data."
+    ),
     "geocoding_find": NoVendorData(
         "Find coordinates (EVT.12): geocodes the typed address; reads no vendor data."
     ),
@@ -428,6 +468,26 @@ ENDPOINTS: dict[str, Access] = {
         "goes into the caller's own collection only; owner only, other roles get 404 "
         "(`test_staff_and_other_users_get_404...` and the upload tests in test_image_chooser)."
     ),
+    # The document chooser and the link dialog of the same editor (VEN.31 part 2).
+    "manager:shop:document_chosen": VendorScoped(make=vendor_document, kwargs=by_pk),
+    "manager:shop:document_choose": VendorScopedList(
+        make=vendor_document,
+        identify=lambda o: str(o.title),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:document_results": VendorScopedList(
+        make=vendor_document,
+        identify=lambda o: str(o.title),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:document_create": NoVendorData(
+        "The upload tab of the document chooser (VEN.31): the form and the upload answer, the "
+        "file goes into the caller's own collection only; owner only, other roles get 404 "
+        "(`test_staff_and_other_users_get_404...` in test_document_chooser)."
+    ),
+    "manager:shop:link_choose": NoVendorData(
+        "The external link dialog (VEN.31): a form that echoes an https address back to the "
+        "editor; reads and writes no vendor data; owner only "
+        "(`test_staff_and_anonymous_are_refused`)."
+    ),
     "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     # ORD.6: the vendor's own orders; another vendor's id is a 404 on the detail and every action.
     "manager:shop:orders": VendorScopedList(
@@ -451,6 +511,32 @@ ENDPOINTS: dict[str, Access] = {
     "manager:platform:notice": StaffOnly(
         "One notice of illegal content (CMP.5): platform data, not vendor-owned; needs the "
         "compliance.review_notices permission, so a vendor member gets 404.",
+        kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
+    "subprocessors": NoVendorData(
+        "Sub-processor register (CMP.4): static reviewed data, the same for every visitor."
+    ),
+    "privacy_account": NoVendorData(
+        "The signed-in user's own privacy page (CMP.4): forms only, no vendor data."
+    ),
+    "privacy_export": NoVendorData(
+        "Own-data export (CMP.4): POST only, always the signed-in user, never an id from the "
+        "input; fresh re-authentication and a rate limit guard it."
+    ),
+    "privacy_erase": NoVendorData(
+        "Own account erasure (CMP.4, D-30): POST only, always the signed-in user; fresh "
+        "re-authentication, confirmation and a rate limit guard it."
+    ),
+    "privacy_erase_done": NoVendorData(
+        "Static confirmation page after an erasure request (CMP.4): no data."
+    ),
+    "privacy_requests": StaffOnly(
+        "Erasure requests (CMP.4): platform data listed by public id; needs "
+        "compliance.change_erasurerequest, so a vendor member gets 404."
+    ),
+    "privacy_request_process": StaffOnly(
+        "Process an erasure request (CMP.4): platform data; needs "
+        "compliance.change_erasurerequest, so a vendor member gets 404.",
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
     ),
     "dsa_notice": NoVendorData(

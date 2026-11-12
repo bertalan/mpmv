@@ -144,6 +144,9 @@ jobs:
     # ARC.23: the parity smoke deploys the image with mpmv-deploy under the real Quadlet units, the
     # production Caddyfile and PostgreSQL over TLS verify-full (deploy/ci/parity-smoke.sh).
     name: Container image (${{ matrix.arch }})
+    # Draft PRs run the light jobs only (runner time, owner 2026-11-11); ready PRs, merge trains and
+    # main run everything, so nothing reaches main without this job.
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     strategy:
       fail-fast: false
       matrix:
@@ -219,12 +222,16 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       BUILD_RESULT: ${{ needs.image-build.result }}
+      IS_DRAFT: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}
     steps:
-      - name: Both architectures built and passed
-        run: test "$BUILD_RESULT" = success
+      - name: Both architectures built and passed (skipped only on a draft PR)
+        run: test "$BUILD_RESULT" = success || { test "$IS_DRAFT" = true && test "$BUILD_RESULT" = skipped; }
 
   e2e:
     name: E2E (Playwright)
+    # Draft PRs run the light jobs only (runner time, owner 2026-11-11); ready PRs, merge trains and
+    # main run everything, so nothing reaches main without this job.
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ubuntu-24.04
     services:
       postgres:

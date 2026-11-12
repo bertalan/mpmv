@@ -39,6 +39,24 @@ shop = (
             media.ManagerImageSelectFormatView.as_view(),
             name="image_select_format",
         ),
+        # Documents (VEN.31 part 2) and the external link dialog of the same editor.
+        path("media/documents/", media.ManagerDocumentChooseView.as_view(), name="document_choose"),
+        path(
+            "media/documents/results/",
+            media.ManagerDocumentResultsView.as_view(),
+            name="document_results",
+        ),
+        path(
+            "media/documents/create/",
+            media.ManagerDocumentUploadView.as_view(),
+            name="document_create",
+        ),
+        path(
+            "media/documents/chosen/<int:pk>/",
+            media.ManagerDocumentChosenView.as_view(),
+            name="document_chosen",
+        ),
+        path("media/links/", media.ManagerLinkView.as_view(), name="link_choose"),
     ],
     "shop",
 )
