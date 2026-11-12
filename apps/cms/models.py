@@ -301,6 +301,111 @@ class NavigationMenu(TranslatableMixin, models.Model):  # type: ignore[misc]
         return f"{self.get_location_display()} ({self.locale})"
 
 
+# --- Contextual help (ARC.32)
+
+HELP_FEATURES = ["h4", "bold", "italic", "ol", "ul", "link"]
+
+
+class HelpEntry(TranslatableMixin, models.Model):  # type: ignore[misc]
+    """The help text a signed-in user reads in the "Help for this page" dialog.
+
+    A translatable snippet: one copy per language. It is keyed by a route name (a screen such as
+    `catalog:brand`) or by a page type (every page of a CMS page class, such as
+    `cms.StandardPage`); one general entry per language answers a screen with neither. The body
+    goes through the CMS.12 sanitiser on every save. Platform staff edit it, by the role matrix
+    (`apps.manager.wagtail_hooks`).
+    """
+
+    class Kind(models.TextChoices):
+        ROUTE = engine.HELP_ROUTE, _("Screen (route name)")
+        PAGE_TYPE = engine.HELP_PAGE_TYPE, _("Page type")
+        GENERAL = engine.HELP_GENERAL, _("General (every other screen)")
+
+    kind = models.CharField(
+        _("applies to"),
+        max_length=16,
+        choices=Kind.choices,
+        default=Kind.ROUTE,
+        help_text=_(
+            "What the text is for: one screen, every page of one page type, or every screen "
+            "that has no text of its own. Example: choose Screen for the brand listing."
+        ),
+    )
+    key = models.CharField(
+        _("screen or page type"),
+        max_length=120,
+        blank=True,
+        help_text=_(
+            "The name of the screen (for example catalog:brand) or of the page type (for "
+            "example cms.StandardPage). Leave it empty for the general text."
+        ),
+    )
+    title = models.CharField(
+        _("title"),
+        max_length=120,
+    )
+    body = RichTextField(
+        _("help text"),
+        features=HELP_FEATURES,
+        blank=True,
+        help_text=_(
+            "What a person can do here and what to do first, in short plain sentences. "
+            "Without text the dialog shows only the title."
+        ),
+    )
+    show_vendor_guide = models.BooleanField(
+        _("link the vendor guide"),
+        default=False,
+        help_text=_(
+            "Tick it on screens for vendors, so the dialog also links the vendor guide. "
+            "It has no effect until the platform has a vendor guide address."
+        ),
+    )
+
+    panels: ClassVar[list[Any]] = [
+        FieldPanel("kind"),
+        FieldPanel("key"),
+        FieldPanel("title"),
+        FieldPanel("body"),
+        FieldPanel("show_vendor_guide"),
+    ]
+    translatable_fields: ClassVar[list[Any]] = [
+        SynchronizedField("kind"),
+        SynchronizedField("key"),
+        TranslatableField("title"),
+        TranslatableField("body"),
+        SynchronizedField("show_vendor_guide"),
+    ]
+
+    class Meta(TranslatableMixin.Meta):  # type: ignore[misc]
+        verbose_name = _("help entry")
+        verbose_name_plural = _("help entries")
+        ordering: ClassVar[list[str]] = ["kind", "key"]
+        constraints: ClassVar[list[models.BaseConstraint]] = [
+            models.UniqueConstraint(
+                fields=["locale", "kind", "key"], name="cms_one_help_entry_per_language_and_key"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(kind="general", key="")
+                | (~models.Q(kind="general") & ~models.Q(key="")),
+                name="cms_help_entry_key_fits_kind",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.title if self.kind == self.Kind.GENERAL else f"{self.key}: {self.title}"
+
+    def clean(self) -> None:
+        super().clean()
+        general = self.kind == self.Kind.GENERAL
+        if general and self.key:
+            raise ValidationError({"key": _("The general text has no screen or page type.")})
+        if not general and not engine.help_key_valid(self.key):
+            raise ValidationError(
+                {"key": _("Give the screen or page type: letters, digits and . : _ - only.")}
+            )
+
+
 # --- Legal pages (CMS.5)
 
 
