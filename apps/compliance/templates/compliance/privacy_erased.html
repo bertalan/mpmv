@@ -1,0 +1,15 @@
+{% extends "layouts/content.html" %}
+{% load i18n %}
+{% block title %}{% translate "Erasure requested" %} · {{ site_name }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block page_content %}
+  <article class="privacy-erased">
+    <h1>{% translate "Erasure requested" %}</h1>
+    {% if pending %}
+      <p>{% translate "Your account is blocked. The erasure completes automatically when your last open order closes." %}</p>
+    {% else %}
+      <p>{% translate "Your account has been erased." %}</p>
+    {% endif %}
+    <p>{% blocktranslate %}Order data is kept for {{ years }} years from the end of the fiscal year, as the law requires.{% endblocktranslate %}</p>
+  </article>
+{% endblock %}

@@ -16,14 +16,12 @@ msgstr "%(vendor_name)s ha enviado su parte del pedido %(order_number)s."
 #: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
 #: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
 msgid "%(vendor_name)s's part of order %(order_number)s was cancelled."
-msgstr ""
-"La parte del pedido %(order_number)s de %(vendor_name)s se ha cancelado."
+msgstr "La parte del pedido %(order_number)s de %(vendor_name)s se ha cancelado."
 
 #: apps/orders/templates/email/orders/vendor_order_delivered/body.html
 #: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
 msgid "%(vendor_name)s's part of order %(order_number)s was delivered."
-msgstr ""
-"La parte del pedido %(order_number)s de %(vendor_name)s se ha entregado."
+msgstr "La parte del pedido %(order_number)s de %(vendor_name)s se ha entregado."
 
 #: apps/orders/templates/email/orders/vendor_new_order/body.html
 #: apps/orders/templates/email/orders/vendor_new_order/body.txt
@@ -37,8 +35,7 @@ msgstr "%(vendor_name)s: pedido %(order_number)s cancelado, no enviar"
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Carrier: %(carrier)s. Tracking number: %(tracking_number)s."
-msgstr ""
-"Transportista: %(carrier)s. Número de seguimiento: %(tracking_number)s."
+msgstr "Transportista: %(carrier)s. Número de seguimiento: %(tracking_number)s."
 
 #: apps/orders/templates/email/orders/order_cancelled/body.html
 #: apps/orders/templates/email/orders/order_cancelled/body.txt
@@ -84,18 +81,15 @@ msgstr "El pedido %(order_number)s se ha cancelado"
 
 #: apps/orders/templates/email/orders/order_cancelled/body.html
 #: apps/orders/templates/email/orders/order_cancelled/body.txt
-msgid ""
-"Order %(order_number)s was cancelled before payment. Nothing was charged."
-msgstr ""
-"El pedido %(order_number)s se ha cancelado antes del pago. No se ha cobrado "
-"nada."
+msgid "Order %(order_number)s was cancelled before payment. Nothing was charged."
+msgstr "El pedido %(order_number)s se ha cancelado antes del pago. No se ha cobrado nada."
 
 #: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.html
 #: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.txt
 msgid "Order %(order_number)s was cancelled. Do not ship these items:"
-msgstr ""
-"El pedido %(order_number)s se ha cancelado. No envíes estos artículos:"
+msgstr "El pedido %(order_number)s se ha cancelado. No envíes estos artículos:"
 
+#: apps/orders/templates/documents/orders/vendor_confirmation.html
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Order %(order_number)s, sold by %(vendor_name)s:"
@@ -126,11 +120,13 @@ msgstr "Pago recibido por el pedido %(order_number)s"
 msgid "Ship to:"
 msgstr "Enviar a:"
 
+#: apps/orders/templates/documents/orders/vendor_confirmation.html
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Shipping: %(shipping)s EUR"
 msgstr "Envío: %(shipping)s EUR"
 
+#: apps/orders/templates/documents/orders/vendor_confirmation.html
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Total: %(total)s EUR"
@@ -143,17 +139,17 @@ msgstr "Hemos recibido tu pedido %(order_number)s"
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 msgid ""
-"We received your order %(order_number)s (total %(total)s EUR). We will "
-"confirm it when the payment is complete."
+"We received your order %(order_number)s (total %(total)s EUR). We will confirm it when the payment"
+" is complete."
 msgstr ""
-"Hemos recibido tu pedido %(order_number)s (total %(total)s EUR). Te lo "
-"confirmaremos cuando se complete el pago."
+"Hemos recibido tu pedido %(order_number)s (total %(total)s EUR). Te lo confirmaremos cuando se "
+"complete el pago."
 
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
 msgid ""
-"We received your payment of %(total)s EUR for order %(order_number)s. Each "
-"seller will prepare its part and you will get a message when it ships."
+"We received your payment of %(total)s EUR for order %(order_number)s. Each seller will prepare its"
+" part and you will get a message when it ships."
 msgstr ""
-"Hemos recibido tu pago de %(total)s EUR por el pedido %(order_number)s. Cada"
-" vendedor preparará su parte y recibirás un mensaje cuando se envíe."
+"Hemos recibido tu pago de %(total)s EUR por el pedido %(order_number)s. Cada vendedor preparará su"
+" parte y recibirás un mensaje cuando se envíe."

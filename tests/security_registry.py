@@ -65,6 +65,31 @@ PUBLIC: dict[str, str] = {
         "Thanks page after a report (CMP.5): shows only the reference kept in the visitor's "
         "own session, a 404 without one."
     ),
+    "withdrawal": (
+        "Online withdrawal function, step one (CMP.6): the page is public by design and shows "
+        "no order data; the POST is CSRF-checked, behind Turnstile and rate limited per "
+        "address, and only a matching order number and email lead to the choice page."
+    ),
+    "withdrawal_confirm": (
+        "Online withdrawal function, step two (CMP.6): a GET answers 405; the POST needs the "
+        "CSRF token and the signed 30-minute token minted by a successful lookup."
+    ),
+    "withdrawal_done": (
+        "Acknowledgement page of the withdrawal function (CMP.6): shows only the statements "
+        "kept in the visitor's own session, a 404 without one."
+    ),
+    "consumer_information": (
+        "Pre-contractual information (CMP.6, directive 2011/83/EU art. 49): the same legal text "
+        "for every visitor, public by law."
+    ),
+    "subprocessors": (
+        "Sub-processor register (CMP.4): static reviewed data, read-only, public by design "
+        "(GDPR art. 13 and 28)."
+    ),
+    "privacy_erase_done": (
+        "Static confirmation after an account erasure (CMP.4): the user is already signed out "
+        "and the account blocked, so the page cannot ask for a session; it shows no data."
+    ),
     "dsa_contact_points": (
         "DSA points of contact (CMP.5): the operator's own contact data, read-only, public by law "
         "(DSA art. 11 and 12)."
@@ -115,6 +140,10 @@ GET_WRITES_ALLOWED: frozenset[str] = frozenset({"django_session"})
 # keeps one user from reaching another's object through it.
 IDOR_REVIEWED: dict[str, str] = {
     "media": MEDIA,
+    "customer_order": (
+        "The order is looked up among the signed-in customer's own (ORD.7); a stranger's order "
+        "and a guest order answer 404 (`test_a_stranger_s_order_is_a_404_like_an_unknown_one`)."
+    ),
     "mfa:remove_device": (
         "The factor is looked up among the signed-in user's own (CORE.4); another user's factor "
         "answers 404 (`test_a_user_cannot_remove_another_users_second_factor`)."
@@ -122,6 +151,16 @@ IDOR_REVIEWED: dict[str, str] = {
     "action_link:open": (
         "The signed token is bound to one user and one object (CORE.15); a token of another "
         "user or object is refused (apps/accounts/tests/integration/test_action_links.py)."
+    ),
+    "manager:platform:profile_confirm": (
+        "Platform space, for staff holding the revert permission only (a vendor member gets 403 "
+        "from the gate); the entry is an audit entry of any vendor, which staff may review by "
+        "design."
+    ),
+    "manager:platform:profile_revert": (
+        "Platform space, for staff holding the revert permission only (a vendor member gets 403 "
+        "from the gate, `test_a_vendor_member_cannot_reach_the_page_or_the_revert`); the entry is "
+        "an audit entry of any vendor, which staff may review by design."
     ),
     "vendor_claim:claim": (
         "The page answers only for the vendor whose email-bound claim link was opened in this "

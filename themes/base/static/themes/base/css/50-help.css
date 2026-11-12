@@ -1,0 +1,125 @@
+/* Contextual help (ARC.32): the help button and user menu at the right end of the header's tools,
+   and the body of the help dialog (the dialog itself is the library's, 40-library.css).
+   Colours come from tokens only. The button is a 44 px target in the header bar on every screen
+   width: never positioned out of the flow, so it cannot cover content or the cart. */
+
+@layer components {
+  .user-tools {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+
+  .help-button,
+  .user-menu__summary,
+  .user-menu__item {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-block-size: var(--target-primary);
+    min-inline-size: var(--target-primary);
+    padding: 0 var(--space-s);
+    border: 1px solid currentcolor;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .help-button {
+    padding: 0;
+    inline-size: var(--target-primary);
+  }
+
+  .help-button[hidden],
+  .user-menu__item[hidden] {
+    display: none;
+  }
+
+  .help-button .icon {
+    inline-size: 1.5em;
+    block-size: 1.5em;
+  }
+
+  .help-button:hover,
+  .user-menu__summary:hover {
+    background: var(--color-accent-tint);
+    color: var(--color-text);
+  }
+
+  .user-menu {
+    position: relative;
+  }
+
+  .user-menu__summary {
+    list-style: none;
+  }
+
+  .user-menu__summary::-webkit-details-marker {
+    display: none;
+  }
+
+  /* The open list sits under the summary, in the flow of the header's right edge. */
+  .user-menu__list {
+    position: absolute;
+    inset-block-start: calc(100% + var(--space-xs));
+    inset-inline-end: 0;
+    z-index: 10;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    min-inline-size: 12rem;
+    padding: var(--space-xs);
+    border: 1px solid var(--color-border-control);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+    color: var(--color-text);
+    box-shadow: var(--shadow-raised);
+  }
+
+  .user-menu__list .user-menu__item {
+    inline-size: 100%;
+    justify-content: flex-start;
+    border-color: transparent;
+    color: var(--color-text);
+  }
+
+  .user-menu__list .user-menu__item:hover {
+    background: var(--color-accent-tint);
+  }
+
+  /* --- The help dialog's body. */
+
+  .help-entry__title {
+    margin-block-start: 0;
+  }
+
+  .help-fields {
+    margin-block-start: var(--space-l);
+    padding-block-start: var(--space-m);
+    border-block-start: 1px solid var(--color-border);
+  }
+
+  .help-fields__title {
+    margin-block-start: 0;
+  }
+
+  .help-fields__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .help-fields__list li {
+    margin-block-end: var(--space-s);
+  }
+
+  .help-fields__name {
+    font-weight: 700;
+  }
+
+  .help-fields__help {
+    display: block;
+    color: var(--color-text-muted);
+  }
+}

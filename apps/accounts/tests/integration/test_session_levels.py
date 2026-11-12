@@ -243,6 +243,74 @@ def test_the_banner_shows_the_mode_and_an_end_now_button(client: Client) -> None
     assert "End now" in banner
 
 
+def _restricted_banner(client: Client) -> str:
+    from django.template import Context, Template
+
+    request = client.get(reverse("test-export")).wsgi_request
+    return Template("{% load session_levels %}{% session_level_banner %}").render(
+        Context({"request": request})
+    )
+
+
+def test_the_restricted_banner_offers_the_passkey_window_to_who_may_elevate(
+    client: Client,
+) -> None:
+    user, _ = _staff_with_passkey()
+    _restricted_session(client, user)
+    banner = _restricted_banner(client)
+    assert "Sensitive actions ask for your passkey once, or open a passkey window" in banner
+    assert 'data-passkey="elevate"' in banner
+    assert "Open passkey window" in banner
+    assert reverse("levels:operational") in banner
+    assert "Passkeys need JavaScript." in banner  # the no-JavaScript fallback
+    assert "Add a passkey" not in banner
+
+
+def test_the_restricted_banner_offers_enrolment_to_who_holds_elevate_without_a_passkey(
+    client: Client,
+) -> None:
+    user = UserFactory.create(staff=True)
+    user.user_permissions.add(Permission.objects.get(codename=levels.ELEVATE_CODENAME))
+    verified_login(client, user, level=levels.RESTRICTED)
+    banner = _restricted_banner(client)
+    assert "Add a passkey" in banner
+    assert reverse("mfa:setup") in banner
+    assert "next=" in banner
+    assert 'data-passkey="elevate"' not in banner
+    assert "cannot open a passkey window" not in banner
+
+
+@pytest.mark.parametrize(
+    "group", ["Platform: owner", "Platform: support", "Platform: finance and payments"]
+)
+def test_a_non_superuser_platform_role_with_a_passkey_sees_the_passkey_window_button(
+    client: Client, group: str
+) -> None:
+    """Owner decision 2026-11-12 (D-32): owner, support and finance hold core.elevate.
+
+    The group names are spelled out: accounts never imports manager (spec 01 graph).
+    """
+    from django.contrib.auth.models import Group
+
+    user, _ = _staff_with_passkey(elevate=False)
+    assert not user.is_superuser
+    user.groups.add(Group.objects.get(name=group))
+    _restricted_session(client, user)
+    banner = _restricted_banner(client)
+    assert "Open passkey window" in banner
+    assert 'data-passkey="elevate"' in banner
+    assert "cannot open a passkey window" not in banner
+
+
+def test_the_restricted_banner_says_plainly_when_the_role_cannot_elevate(client: Client) -> None:
+    user, _ = _staff_with_passkey(elevate=False)
+    _restricted_session(client, user)
+    banner = _restricted_banner(client)
+    assert "Your role cannot open a passkey window" in banner
+    assert 'data-passkey="elevate"' not in banner
+    assert "Add a passkey" not in banner
+
+
 # --- Do it once
 
 
@@ -495,14 +563,19 @@ def test_enrolling_a_passkey_needs_a_fresh_second_factor(client: Client) -> None
 WIRED = {
     "role_grant",
     "vat_regime",
+    "commission_change",
+    "no_tin_country",
     "audit_in_clear",
     "mfa_disable",
     "owner_role_grant",
     "payout_details",
     "api_key",
+    "profile_revert",
+    "notice_decision",
+    "bulk_edit",
 }
 # Actions whose web view does not exist yet: nothing to decorate (follow-ups in the PR).
-NOT_BUILT = {"tax_in_clear", "export", "backup", "bulk_edit", "impersonation"}
+NOT_BUILT = {"tax_in_clear", "export", "backup", "impersonation"}
 # Actions that are not web views: `manage.py bootstrap_platform_owner` runs with shell access on
 # the server, outside any browser session, so session levels cannot apply to it.
 NO_SESSION = {"bootstrap_platform_owner"}
@@ -515,7 +588,8 @@ def _source_files() -> list[Path]:
 
 def _gated_actions() -> set[str]:
     """Action keys named at `requires_level`, `level_gated_action` or `level=` in app code."""
-    pattern = re.compile(r"""(?:requires_level\(|level_gated_action\(|level=)\s*["'](\w+)["']""")
+    gate = r"requires_level(?:_method)?\(|level_gated_action\(|level="
+    pattern = re.compile(rf"""(?:{gate})\s*["'](\w+)["']""")
     found: set[str] = set()
     for path in _source_files():
         found |= set(pattern.findall(path.read_text()))
@@ -542,6 +616,144 @@ def test_no_unclassified_view_looks_like_a_sensitive_action() -> None:
             if pattern.search(text) and "requires_level(" not in text and "level=" not in text:
                 hits.append(path.name)
     assert not hits, f"sensitive-looking views with no level gate: {hits}"
+
+
+# Manager views that change state in any session level on purpose: {dotted view path: why}.
+# Everything else that accepts POST, PUT, PATCH or DELETE must carry a `session_action` set by
+# `requires_level` / `requires_level_method` (CORE.25, D-32), group 1 actions included, so that
+# CORE.26 can tighten one by configuration.
+MANAGER_UNGATED: dict[str, str] = {
+    "apps.manager.views.VendorPickerView": "choosing which own vendor to work on changes no data",
+    "apps.manager.media.ManagerImageSelectFormatView": (
+        "answers with the format form and the embed of an own image already chosen: stores nothing"
+    ),
+    "apps.manager.views.LoginView": "the sign-in form itself, before any session level exists",
+    "apps.manager.views.logout": "sign-out: ends the session, nothing to protect",
+}
+MUTATING = ("post", "put", "patch", "delete")
+
+
+def _manager_views(patterns: Any = None) -> dict[str, Any]:
+    """Every view callable under the URL namespace `manager` (and its children), whatever module
+    it comes from, plus any apps.manager view mounted elsewhere (sign-in), by dotted path."""
+    from django.urls import URLPattern, URLResolver, get_resolver
+
+    found: dict[str, Any] = {}
+
+    def walk(entries: Any, inside: bool) -> None:
+        for entry in entries:
+            if isinstance(entry, URLResolver):
+                walk(entry.url_patterns, inside or entry.namespace == "manager")
+            elif isinstance(entry, URLPattern):
+                callback = entry.callback
+                target = getattr(callback, "view_class", callback)
+                if inside or target.__module__.startswith("apps.manager"):
+                    found[f"{target.__module__}.{target.__qualname__}"] = callback
+
+    walk(get_resolver().url_patterns if patterns is None else patterns, False)
+    return found
+
+
+def _ungated_mutating(views: dict[str, Any]) -> list[str]:
+    """Dotted paths of views that accept a mutating method without a session level gate."""
+    bad = []
+    for path, callback in views.items():
+        cls = getattr(callback, "view_class", None)
+        if cls is None:  # a function view: it must carry the gate itself
+            if getattr(callback, "session_action", None) is None:
+                bad.append(path)
+            continue
+        allowed = {m.lower() for m in cls.http_method_names}
+        for method in MUTATING:
+            handler = getattr(cls, method, None)
+            gated = getattr(handler, "session_action", None) is not None
+            if handler is not None and method in allowed and not gated:
+                bad.append(f"{path}.{method}")
+    return bad
+
+
+def test_every_manager_view_that_can_change_state_has_a_session_gate() -> None:
+    # Not covered here: GET (and `dispatch`) must stay free of side effects, because only the
+    # mutating methods are checked. A view that changes state on GET is a bug on its own.
+    views = _manager_views()
+    assert len(views) > 10, "the URL walk found too few Manager views"
+    ungated = [
+        item
+        for item in _ungated_mutating(views)
+        if not any(item == k or item.startswith(f"{k}.") for k in MANAGER_UNGATED)
+    ]
+    assert not ungated, f"Manager views accepting POST/PUT/PATCH/DELETE with no gate: {ungated}"
+
+
+def test_the_ungated_list_has_no_stale_entries() -> None:
+    views = _manager_views()
+    bad = _ungated_mutating(views)
+    for path, reason in MANAGER_UNGATED.items():
+        assert reason.strip()
+        assert path in views, f"{path} is not a Manager view any more: drop it from the list"
+        assert any(item == path or item.startswith(f"{path}.") for item in bad), (
+            f"{path} is gated or read only now: drop it from the list"
+        )
+
+
+def test_the_sweep_fails_on_an_ungated_view_and_passes_a_gated_one() -> None:
+    from django.http import HttpResponse
+    from django.views import View
+
+    from apps.accounts.decorators import requires_level_method
+
+    class Ungated(View):
+        def post(self, request: Any) -> HttpResponse:
+            return HttpResponse()
+
+    class Gated(View):
+        @requires_level_method("bulk_edit")
+        def post(self, request: Any) -> HttpResponse:
+            return HttpResponse()
+
+    class Overrides(Gated):
+        def post(self, request: Any) -> HttpResponse:  # drops the gate of its parent
+            return HttpResponse()
+
+    class ReadOnly(View):
+        def get(self, request: Any) -> HttpResponse:
+            return HttpResponse()
+
+    def function_view(request: Any) -> HttpResponse:
+        return HttpResponse()
+
+    views = {
+        "t.Ungated": Ungated.as_view(),
+        "t.Gated": Gated.as_view(),
+        "t.Overrides": Overrides.as_view(),
+        "t.ReadOnly": ReadOnly.as_view(),
+        "t.function_view": function_view,
+    }
+    assert sorted(_ungated_mutating(views)) == [
+        "t.Overrides.post",
+        "t.Ungated.post",
+        "t.function_view",
+    ]
+
+
+def test_a_foreign_view_mounted_under_the_manager_namespace_is_checked() -> None:
+    from django.http import HttpResponse
+    from django.urls import include, path
+    from django.views import View
+
+    class Foreign(View):  # not in apps.manager, like a Wagtail or DRF class routed there
+        def post(self, request: Any) -> HttpResponse:
+            return HttpResponse()
+
+    inner = ([path("x/", Foreign.as_view(), name="x")], "manager")
+    outside = ([path("y/", Foreign.as_view(), name="y")], "other")
+    patterns = [
+        path("manager/", include(inner, namespace="manager")),
+        path("other/", include(outside, namespace="other")),
+    ]
+    views = _manager_views(patterns)
+    assert len(views) == 1  # only the one under the namespace `manager`
+    assert [p.rsplit(".", 1)[-1] for p in _ungated_mutating(views)] == ["post"]
 
 
 # --- Security review fixes (PR 234)
