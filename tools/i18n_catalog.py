@@ -40,6 +40,10 @@ SCOPES = (
     # Brand review models (CAT.20): the rest of the catalog app joins with the storefront I18N.
     "apps/catalog/taxonomy.py",
     "apps/catalog/taxonomy_admin.py",
+    # The product page and what it includes (CAT.7); the listings join with the storefront I18N.
+    "apps/catalog/templates/catalog/product.html",
+    "apps/catalog/templates/catalog/includes/stock_status.html",
+    "apps/catalog/templates/catalog/includes/product_card.html",
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).
 EXTRA_FILES = ("apps/vendors/services.py",)

@@ -50,6 +50,7 @@ PUBLIC: dict[str, str] = {
     "home": "Public home page.",
     "media": MEDIA,
     "catalog:category": PUBLIC_CATALOG,
+    "catalog:product": PUBLIC_CATALOG,
     "catalog:brand": PUBLIC_CATALOG,
     "catalog:term": PUBLIC_CATALOG,
     "catalog:vendor": PUBLIC_CATALOG,
@@ -147,6 +148,10 @@ IDOR_REVIEWED: dict[str, str] = {
         "(`test_the_confirm_page_gives_nothing_away_for_a_random_key`)."
     ),
     "catalog:category": "Public listing: the slugs name public categories.",
+    "catalog:product": (
+        "Public product page (CAT.7): the slug names a published product of an active vendor; "
+        "a draft, a hidden product and an inactive vendor answer 404."
+    ),
     "catalog:brand": "Public listing: the slug names a public brand.",
     "catalog:vendor": "Public storefront: the slug names an active vendor's public shop.",
     "catalog:term": "Public listing: the slugs name public taxonomy terms.",

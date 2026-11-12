@@ -384,6 +384,12 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "home": NoVendorData("Public home page."),
     "catalog:category": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "product-category"}),
+    "catalog:product": NoVendorData(
+        "Public product page (CAT.7): only the published fields of a published product of an "
+        "active vendor, the same for every visitor; Vendor B is not active, so its products are "
+        "a 404.",
+        kwargs={"segment": "product"},
+    ),
     "catalog:brand": NoVendorData(PUBLIC_LISTING, kwargs={"segment": "brand"}),
     "catalog:term": NoVendorData(PUBLIC_LISTING, login=member_with_landing_taxonomy),
     "catalog:vendor": NoVendorData(
