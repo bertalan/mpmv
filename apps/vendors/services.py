@@ -19,7 +19,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.sessions.backends.base import SessionBase
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, connection, transaction
-from django.db.models import OuterRef, ProtectedError, QuerySet, Subquery
+from django.db.models import OuterRef, ProtectedError, Q, QuerySet, Subquery
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.module_loading import import_string
@@ -62,9 +62,11 @@ from apps.core.services import (
 )
 from apps.core.throttling import ip_bucket
 from apps.core.uploads import UploadRefused, check_document
+from apps.core.validity import next_start_error
 
 from . import engine
 from .models import (
+    CommissionRule,
     ContractAcceptance,
     CrossVendorConsent,
     LegalFieldRequirement,
@@ -77,6 +79,7 @@ from .models import (
     VendorContractTranslation,
     VendorFeatureFlag,
     VendorMember,
+    VendorPlan,
     VendorTranslation,
 )
 from .vies import VatNumberValidator
@@ -819,6 +822,154 @@ def delete_requirement(
         requirement.delete()
 
     return run_mutation(changes, apply, ctx=ctx, action=REQUIREMENT_DELETED, dry_run=dry_run)
+
+
+# --- Plans and commission rules (VEN.2, D-04: at launch plans are only commission and limits)
+
+PLAN_MODEL = "vendors.vendorplan"
+PLAN_SAVED = "vendor.plan_saved"
+PLAN_FIELDS = ("code", "name", "max_products", "features", "monthly_fee")
+COMMISSION_RULE_MODEL = "vendors.commissionrule"
+COMMISSION_RULE_ADDED = "vendor.commission_rule_added"
+COMMISSION_RULE_FIELDS = (
+    "vendor",
+    "plan",
+    "version",
+    "percent",
+    "base",
+    "fee_percent",
+    "fee_fixed",
+    "fee_base",
+    "promo_label",
+    "valid_from",
+    "valid_to",
+)
+
+
+def plan_snapshot(plan: VendorPlan) -> dict[str, Any]:
+    return {name: getattr(plan, name) for name in PLAN_FIELDS}
+
+
+def save_plan(plan: VendorPlan, *, ctx: AuditContext, dry_run: bool = False) -> ChangeSet:
+    """Create or change a plan (validated, audited). Raises `ValidationError`."""
+    plan.full_clean(exclude=["public_id"])
+    return save_audited(
+        plan,
+        plan_snapshot,
+        key=str(plan.public_id),
+        ctx=ctx,
+        created=PLAN_SAVED,
+        updated=PLAN_SAVED,
+        dry_run=dry_run,
+    )
+
+
+def commission_rule_snapshot(rule: CommissionRule) -> dict[str, Any]:
+    values = {name: getattr(rule, name) for name in COMMISSION_RULE_FIELDS}
+    values["vendor"] = str(rule.vendor.public_id) if rule.vendor is not None else None
+    values["plan"] = rule.plan.code if rule.plan is not None else None
+    return values
+
+
+def _rules_of_scope(rule: CommissionRule) -> "QuerySet[CommissionRule]":
+    return CommissionRule.objects.filter(vendor=rule.vendor, plan=rule.plan)
+
+
+BACKDATE_TOLERANCE = dt.timedelta(minutes=1)  # a caller's "now" computed a moment earlier
+
+
+def add_commission_rule(
+    new: CommissionRule,
+    *,
+    ctx: AuditContext,
+    dry_run: bool = False,
+    backdate: bool = False,
+    backdate_reason: str = "",
+) -> ChangeSet:
+    """Add a rule from `new.valid_from`, closing the open one of its scope; the version counts up.
+
+    Existing rules are never edited: orders freeze the rule they were computed with. Raises
+    `ValidationError` for invalid rates (a 0% rule needs a promo label), a start that does not
+    follow the latest rule of the scope (a closed latest rule must be followed with no gap), or a
+    scope of both vendor and plan.
+
+    A rule starting in the past is refused: closing the open rule retroactively would change
+    which rule a re-pricing or a statement finds for an old order. Only an import of historical
+    rules (MIG) passes `backdate=True` with a non-empty `backdate_reason`, which is audited.
+    The admin never offers it.
+    """
+    if new.pk is not None:
+        raise ValueError("Pass a new, unsaved CommissionRule")
+    new.promo_label = new.promo_label.strip()
+    new.valid_to = None
+    reason = backdate_reason.strip()
+    if backdate and not reason:
+        raise ValidationError({"valid_from": "Backdating a rule needs a reason."})
+    if not backdate and new.valid_from < timezone.now() - BACKDATE_TOLERANCE:
+        raise ValidationError(
+            {"valid_from": "A commission rule cannot start in the past; use now or later."}
+        )
+    with transaction.atomic():
+        latest = _rules_of_scope(new).select_for_update().order_by("-version").first()
+        new.version = 1 if latest is None else latest.version + 1
+        new.full_clean(exclude=["public_id"], validate_constraints=False)  # the database decides
+        error = next_start_error(new.valid_from, latest)
+        gap = (
+            latest is not None and latest.valid_to is not None and new.valid_from != latest.valid_to
+        )
+        if error is None and gap and latest is not None:
+            # A gap would silently fall back to another level's rule.
+            error = f"Must start at {latest.valid_to}, the end of the latest rule."
+        if error is not None:
+            raise ValidationError({"valid_from": error})
+
+        changeset = ChangeSet()
+        closing = latest if latest is not None and latest.valid_to is None else None
+        if closing is not None:
+            before = commission_rule_snapshot(closing)
+            changeset.update(
+                COMMISSION_RULE_MODEL,
+                str(closing.public_id),
+                before,
+                {**before, "valid_to": new.valid_from},
+            )
+        changeset.create(
+            COMMISSION_RULE_MODEL,
+            str(new.public_id),
+            {**commission_rule_snapshot(new), **({"backdate_reason": reason} if backdate else {})},
+            supersedes=commission_rule_snapshot(latest) if latest is not None else None,
+        )
+
+        def apply() -> None:
+            try:
+                with transaction.atomic():
+                    if closing is not None:
+                        closing.valid_to = new.valid_from
+                        closing.save(update_fields=["valid_to", "updated_at"])
+                    new.save()
+            except IntegrityError:
+                # Two first rules of an empty scope have no row to lock: the constraint (unique
+                # version, no overlap) refuses the loser, who gets a form error, not a 500.
+                raise ValidationError(
+                    {"valid_from": "Another rule was added for this scope at the same time."}
+                ) from None
+
+        return run_mutation(
+            changeset, apply, ctx=ctx, action=COMMISSION_RULE_ADDED, dry_run=dry_run
+        )
+
+
+def commission_rule_for(
+    vendor: Vendor, *, at: dt.datetime, plan: VendorPlan | None = None
+) -> CommissionRule:
+    """The rule that applies to `vendor` at `at`: its own, else its plan's, else the platform
+    default. Raises `engine.NoCommissionRule` (never a silent 0%)."""
+    plan_id = plan.pk if plan is not None else None
+    scope = Q(vendor=vendor) | Q(vendor__isnull=True, plan__isnull=True)
+    if plan_id is not None:
+        scope |= Q(vendor__isnull=True, plan_id=plan_id)
+    rules = CommissionRule.objects.filter(scope)
+    return engine.select_rule(rules, vendor_id=vendor.pk, plan_id=plan_id, at=at)
 
 
 # --- No-TIN jurisdictions (VEN.27, owner decision MQ-16): a staff-edited, audited list.

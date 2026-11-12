@@ -199,6 +199,14 @@ msgstr ""
 "cifre, trattini o _. Le importazioni lo usano, quindi non cambiarlo dopo; chi compra non lo vede "
 "mai."
 
+#: apps/vendors/admin.py
+msgid ""
+"A short identifier in lowercase letters, digits and hyphens, for example 'standard'. Rules and "
+"limits refer to the plan by it."
+msgstr ""
+"Un identificativo breve con lettere minuscole, cifre e trattini, per esempio «standard». Le regole"
+" e i limiti si riferiscono al piano tramite questo codice."
+
 #: apps/catalog/taxonomy.py
 msgid ""
 "A short label of the import run. It tells reviewers where the brands come from. Example: 'spring "
@@ -254,6 +262,14 @@ msgstr ""
 #: apps/shipping/models.py
 msgid "A short name without spaces that is unique, for example 'dhl'."
 msgstr "Un nome breve senza spazi e unico, per esempio 'dhl'."
+
+#: apps/vendors/admin.py
+msgid ""
+"A short reason shown to staff when the commission is zero, for example 'Launch promo'. Leave it "
+"empty for a normal rule."
+msgstr ""
+"Un breve motivo mostrato allo staff quando la commissione è zero, per esempio «Promo di lancio». "
+"Lascialo vuoto per una regola normale."
 
 #: apps/catalog/models.py
 msgid ""
@@ -831,6 +847,12 @@ msgstr ""
 "Come gestisci le scorte. Controlla le scorte: tieni tu la quantità aggiornata. Sempre aperto: si "
 "può ordinare anche quando è esaurito. Dalla fonte del fornitore: per le scorte tenute nel sistema "
 "del tuo fornitore."
+
+#: apps/vendors/admin.py
+msgid "How the payment fee is shared between vendors. The default follows the gross amount paid."
+msgstr ""
+"Come la commissione di pagamento è ripartita tra i venditori. Il valore predefinito segue "
+"l’importo lordo pagato."
 
 #: apps/core/models.py
 msgid ""
@@ -1502,6 +1524,22 @@ msgid ""
 msgstr ""
 "Scegli una password che non usi altrove. La userai insieme al tuo indirizzo email per accedere. "
 "Obbligatorio: senza non creiamo il tuo account."
+
+#: apps/vendors/admin.py
+msgid ""
+"Pick a plan to give only the vendors on that plan this rule. Leave it empty for a rule that does "
+"not depend on the plan."
+msgstr ""
+"Scegli un piano per applicare questa regola solo ai venditori di quel piano. Lascialo vuoto per "
+"una regola che non dipende dal piano."
+
+#: apps/vendors/admin.py
+msgid ""
+"Pick a vendor to give only that vendor this rule. Leave it empty, with the plan also empty, for "
+"the platform default."
+msgstr ""
+"Scegli un venditore per applicare questa regola solo a lui. Lascialo vuoto, con anche il piano "
+"vuoto, per il valore predefinito della piattaforma."
 
 #: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
 msgid "Placed"
@@ -2236,6 +2274,14 @@ msgstr ""
 msgid "The country whose authorities issue no tax identification number (TIN)."
 msgstr "Il paese le cui autorità non rilasciano un codice fiscale estero (TIN)."
 
+#: apps/vendors/admin.py
+msgid ""
+"The date and time the rule starts to apply, in Rome time. The rule before it ends at this moment. "
+"A rule is never edited: add a new one to change a rate."
+msgstr ""
+"La data e l’ora da cui la regola si applica, in ora di Roma. La regola precedente termina in quel "
+"momento. Una regola non si modifica: per cambiare un’aliquota se ne aggiunge una nuova."
+
 #: apps/catalog/models.py
 msgid "The day and time the rule stops applying. Leave it empty and the rule never expires."
 msgstr ""
@@ -2557,9 +2603,22 @@ msgstr ""
 "Il modello, il tipo o il riferimento che identifica il prodotto, per esempio il numero stampato "
 "sull'etichetta."
 
+#: apps/vendors/admin.py
+msgid ""
+"The monthly fee in euro. Nothing is charged before paid plans open, so leave it empty for now."
+msgstr ""
+"Il canone mensile in euro. Non si addebita nulla prima dell’apertura dei piani a pagamento, quindi"
+" per ora lascialo vuoto."
+
 #: apps/shipping/models.py
 msgid "The most days a delivery takes. It is only an estimate. Not shown to buyers yet."
 msgstr "Il massimo di giorni per la consegna. È solo una stima. Non ancora mostrato ai clienti."
+
+#: apps/vendors/admin.py
+msgid "The most products a vendor on this plan can list. Leave it empty for no limit."
+msgstr ""
+"Il numero massimo di prodotti che un venditore di questo piano può pubblicare. Lascialo vuoto per "
+"nessun limite."
 
 #: apps/catalog/attributes.py
 msgid ""
@@ -2777,6 +2836,21 @@ msgstr "La passkey non ha funzionato."
 msgid "the passkey was not accepted"
 msgstr "la passkey non è stata accettata"
 
+#: apps/vendors/admin.py
+msgid ""
+"The payment provider's fixed fee per payment, in euro, for example 2.00. Enter 0 if there is none."
+msgstr ""
+"La commissione fissa del fornitore di pagamenti per ogni pagamento, in euro, per esempio 2.00. "
+"Inserisci 0 se non c’è."
+
+#: apps/vendors/admin.py
+msgid ""
+"The payment provider's percentage fee, for example 4.00. It is split between vendors by the fee "
+"base below."
+msgstr ""
+"La commissione percentuale del fornitore di pagamenti, per esempio 4.00. È ripartita tra i "
+"venditori secondo la base qui sotto."
+
 #: apps/compliance/models.py
 msgid ""
 "The person or company in the EU who answers for the product when the manufacturer is outside the "
@@ -2802,6 +2876,24 @@ msgid ""
 msgstr ""
 "Il valore semplice a cui corrisponde il termine, per esempio il nome di un colore. Usalo quando "
 "non c'è un oggetto del catalogo."
+
+#: apps/vendors/admin.py
+msgid "The plan's name as staff see it, for example 'Standard'."
+msgstr "Il nome del piano come lo vede lo staff, per esempio «Standard»."
+
+#: apps/vendors/admin.py
+msgid "The plan's options as a JSON object, for example {\"featured\": true}. Leave it as {} for none."
+msgstr ""
+"Le opzioni del piano come oggetto JSON, per esempio {\"featured\": true}. Lascia {} se non ce ne "
+"sono."
+
+#: apps/vendors/admin.py
+msgid ""
+"The platform's commission, as a percentage of the base below, for example 20.00. A zero needs a "
+"promo label."
+msgstr ""
+"La commissione della piattaforma, in percentuale della base qui sotto, per esempio 20.00. Se è "
+"zero serve un’etichetta promo."
 
 #: apps/compliance/models.py
 msgid "The postal address of the EU responsible person."
@@ -3652,6 +3744,13 @@ msgstr ""
 #: apps/compliance/models.py
 msgid "What the authority asks or what the notice reports, in a few sentences. Required."
 msgstr "Che cosa chiede l'autorità o che cosa segnala l'avviso, in poche frasi. Obbligatorio."
+
+#: apps/vendors/admin.py
+msgid ""
+"What the commission percentage is applied to. It is frozen on every order at the time of purchase."
+msgstr ""
+"Su cosa si applica la percentuale di commissione. Viene congelata su ogni ordine al momento "
+"dell’acquisto."
 
 #: apps/vendors/models.py
 msgid "What the field is needed for: a payout request or the activation of the vendor."
