@@ -202,6 +202,9 @@ VENDOR_APPLICATION_RATE_LIMIT = 20
 # are deleted this many days after the request, and one reminder goes out after this many hours.
 VENDOR_APPLICATION_RETENTION_DAYS = 3
 VENDOR_APPLICATION_REMINDER_HOURS = 48
+# Review window for storefront logo changes (CORE.9, owner decision Q1): the previous logo file is
+# kept this many days so staff can restore it with a revert; then a job deletes it.
+VENDOR_LOGO_REVIEW_DAYS = 14
 MFA_ISSUER = "MPMV"  # name shown in authenticator apps and passkey prompts
 OTP_TOTP_ISSUER = MFA_ISSUER
 OTP_ADMIN_HIDE_SENSITIVE_DATA = True

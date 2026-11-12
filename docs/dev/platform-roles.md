@@ -7,10 +7,10 @@
 | Role | Group | Permissions |
 |---|---|---|
 | Configuration and tax | Platform: configuration and tax | `manager.platform_config` |
-| Catalog and moderation | Platform: catalog and moderation | `manager.platform_catalog`, `vendors.view_all_vendors`, `wagtailadmin.access_admin` |
+| Catalog and moderation | Platform: catalog and moderation | `manager.platform_catalog`, `vendors.view_all_vendors`, `vendors.revert_storefront_profile`, `wagtailadmin.access_admin` |
 | Finance and payments | Platform: finance and payments | `manager.platform_finance`, `vendors.view_all_vendors`, `core.elevate` |
 | Support | Platform: support | `manager.platform_support`, `vendors.view_all_vendors`, `core.elevate` |
-| Platform owner | Platform: owner | `core.platform_owner`, `vendors.view_all_vendors`, `wagtailadmin.access_admin`, `core.elevate` |
+| Platform owner | Platform: owner | `core.platform_owner`, `vendors.view_all_vendors`, `vendors.revert_storefront_profile`, `wagtailadmin.access_admin`, `core.elevate` |
 
 Incompatible pairs (refused unless the one-person-team setting is on): Configuration and tax + Finance and payments.
 
@@ -26,6 +26,7 @@ E edit, R read only, A audited support action, I impersonation within the policy
 | Platform: catalog, categories, attributes, taxonomies, imports |  | E |  | R | R |  |
 | Platform: moderation (vendor events, storefront changes, content) |  | E |  |  | R |  |
 | Platform: notices of illegal content (CMP.5) |  | E |  |  | R |  |
+| Platform: storefront profile changes, history and revert (CORE.9) |  | E |  |  | E |  |
 | Platform: vendors (applications, plans) | R | R | R | R | E |  |
 | Platform: approve or suspend a vendor (step-up, reason) |  | E |  |  | E |  |
 | Platform: close a vendor definitively |  |  |  |  | E |  |

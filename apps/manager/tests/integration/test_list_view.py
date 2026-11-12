@@ -14,6 +14,7 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 
+from apps.accounts import levels
 from apps.accounts.models import User
 from apps.accounts.tests.mfa import verified_login
 from apps.manager.navigation import registry
@@ -238,3 +239,15 @@ def test_a_list_that_forgets_scoping_refuses_ids_of_another_vendor(
             data["confirm"] = "1"
         assert client.post(UNSCOPED, data).status_code == 404
     assert views.CALLS == []
+
+
+def test_a_bulk_action_is_a_group_2_action_so_a_restricted_session_is_refused(
+    client: Client, owner: User, members: list[VendorMember]
+) -> None:
+    data = {"action": "touch", "selected": _ids(members[1]), "confirm": "1"}
+    verified_login(client, owner, level=levels.RESTRICTED)
+    assert client.post(LIST, data).status_code == 403
+    assert views.CALLS == []
+    verified_login(client, owner, level=levels.OPERATIONAL)
+    assert client.post(LIST, data).status_code == 302
+    assert [("touch", _ids(members[1]), False)] == views.CALLS
