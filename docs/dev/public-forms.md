@@ -26,6 +26,7 @@ a one-time signed token (CORE.15), or an allow-list entry with its reason.
 | `switch_language` | `/i18n/switch/` | `apps.accounts.views.switch_language` | Language switcher (redirect to the same page in another language) | allow-list: stores nothing for an anonymous visitor and redirects only to this host | per IP, generous | I18N.1 |
 | `vendor_claim:claim` | `/vendor/claim/<str:vendor_key>/` | `apps.vendors.views.claim` | Claim an imported vendor: identity, then sign in or create the account | signed token: the signed claim link must have been opened in this session first, then the claim lock; only the sign-in step also runs the captcha (through authenticate()) | per IP (claim throttle) and the claim lock | VEN.24 |
 | `email_webhook` | `/webhooks/email/` | `apps.core.views.email_webhook` | Email provider delivery feedback (bounces, complaints) | allow-list: machine to machine: the provider's signature and a replay window are checked first | none: an unsigned request is refused before any work; off (404) with no secret | ARC.16 |
+| `payments_webhook` | `/webhooks/payments/` | `apps.payments.views.payment_webhook` | Payment provider events (payment succeeded) | allow-list: machine to machine: the provider's signature and a timestamp tolerance are checked first; a replayed event id does nothing | none: an unsigned request is refused before any work; off (404) with no provider | PAY.2 |
 
 ## Signed in, second factor not verified yet
 

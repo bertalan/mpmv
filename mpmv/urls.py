@@ -46,6 +46,7 @@ urlpatterns = [
     path("readyz", readyz, name="readyz"),
     path("robots.txt", robots_view, name="robots_txt"),  # SEO.8
     path("webhooks/email/", email_webhook, name="email_webhook"),
+    path("webhooks/payments/", include("apps.payments.urls")),  # PAY.2
     # Uploaded images and renditions, as images only (THM.12, apps.core.media).
     path("media/<path:path>", serve_media, name="media"),
     path("django-admin/", admin.site.urls),

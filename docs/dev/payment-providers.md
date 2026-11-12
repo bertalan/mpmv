@@ -71,3 +71,16 @@ per line.
 - CMP.5: the customer and vendor terms name the provider and the discharge and set-off clauses.
 - Human review of the PR (money, payments, ledger), regression tests from the spec, and the
   tenancy and audit registries updated if the adapter adds models.
+
+## The Stripe provider (PAY.1, PAY.2)
+
+`apps/payments/stripe_provider.py` is the only registered provider. Stripe Connect, separate
+charges and transfers: one PaymentIntent per order with `transfer_group` = the order reference,
+then one transfer per vendor with `source_transaction` = the order's charge. The platform fee is
+what stays on the platform's Stripe balance. Everything goes through the `StripeClient` interface
+(`stripe_client.py`); tests use `apps/payments/tests/fake_stripe.py` and never touch the network.
+Keys: `MPMV_STRIPE_SECRET_KEY`, `MPMV_STRIPE_WEBHOOK_SECRET` (empty by default; `payments.E003`
+refuses an empty one on LIVE and STAGE). Webhook: `POST /webhooks/payments/`, CSRF-exempt, signature
+and 300 s timestamp tolerance checked first, event ids stored in `ProcessedEvent` (a replay does
+nothing), then the `on_payment_succeeded` signal (`apps/payments/signals.py`) inside the same
+transaction. Ledger posting (PAY.3, needs VEN.4) and the order state change connect to that signal.
