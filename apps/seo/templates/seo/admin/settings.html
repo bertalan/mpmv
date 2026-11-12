@@ -1,0 +1,25 @@
+{% extends "wagtailadmin/generic/base.html" %}
+{% load i18n wagtailadmin_tags %}
+{% block main_content %}
+  {% if floor %}
+    <div class="help-block help-warning" role="status">
+      <p>{% translate "Indexing is forced off by the server (MPMV_FORCE_NOINDEX or demo mode). Every page is noindex and this switch cannot be turned on here." %}</p>
+    </div>
+  {% endif %}
+  {% if form.non_field_errors %}
+    <div class="messages" role="alert">
+      <ul>
+        {% for error in form.non_field_errors %}<li class="error">{{ error }}</li>{% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+  <form action="{{ request.get_full_path }}" method="post">
+    {% csrf_token %}
+    {% for field in form %}{% formattedfield field %}{% endfor %}
+    {% if not floor %}
+      <div>
+        <button class="button" type="submit">{{ submit_label }}</button>
+      </div>
+    {% endif %}
+  </form>
+{% endblock %}

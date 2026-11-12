@@ -1,0 +1,3 @@
+{% load i18n %}{% if customer_name %}{% blocktranslate %}Hello {{ customer_name }},{% endblocktranslate %}{% else %}{% translate "Hello," %}{% endif %}
+
+{% blocktranslate %}Order {{ order_number }} was cancelled before payment. Nothing was charged.{% endblocktranslate %}

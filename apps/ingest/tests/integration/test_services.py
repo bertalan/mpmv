@@ -1,5 +1,6 @@
 """ING.1: run status machine, blocking review items for ambiguous SKU matches, mappings."""
 
+import secrets
 import threading
 
 import pytest
@@ -320,7 +321,7 @@ def test_a_pending_blocking_item_stops_the_run() -> None:
 
 
 def test_the_audit_trail_keeps_config_keys_never_values() -> None:
-    secret = "token-" + "x" * 8
+    secret = secrets.token_urlsafe()
     source = SupplierSourceFactory.build(
         vendor=VendorFactory.create(), config={"feed_url": secret, "auth_env": "FEED_AUTH"}
     )
