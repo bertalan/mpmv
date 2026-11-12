@@ -1133,14 +1133,14 @@ class TermLandingPage(Page):  # type: ignore[misc]
         null=True,
         on_delete=models.SET_NULL,
         related_name="+",
-        help_text=_("A term of a taxonomy with term pages."),
+        help_text=_("A category or tag that has its own pages."),
     )
     body = body_field(
         _("introduction"),
         products=True,
         help_text=_(
-            "A short text shown above the products of this term. "
-            "If you add none, the term page starts with its products."
+            "A short text shown above the products of this category or tag. "
+            "If you add none, the page starts with its products."
         ),
     )
     category_products = models.PositiveSmallIntegerField(

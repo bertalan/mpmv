@@ -828,7 +828,8 @@ class ProductGridBlock(blocks.StructBlock):  # type: ignore[misc]
             (
                 "term",
                 TermChooserBlock(
-                    label=_("Term"), help_text=_("Show the newest products with this tag.")
+                    label=_("Term"),
+                    help_text=_("Show the newest products of this category or tag."),
                 ),
             ),
             (
