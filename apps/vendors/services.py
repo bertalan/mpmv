@@ -8,7 +8,7 @@ import dataclasses
 import datetime as dt
 import hashlib
 import logging
-from collections.abc import Callable, Collection, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping
 from typing import Any
 
 from django.conf import settings
@@ -2930,3 +2930,76 @@ def purge_unconfirmed_applications(
                 {"deleted": deleted, "retention_days": settings.VENDOR_APPLICATION_RETENTION_DAYS},
             )
     return changes
+
+
+# --- Legacy store reviews and enquiries export (MIG.21)
+
+LEGACY_EXPORT_DOWNLOADED = "vendor.legacy_export.downloaded"
+LEGACY_EXPORT_REFUSED = "vendor.legacy_export.refused"
+LEGACY_EXPORT_REQUESTED_MAX = 64
+
+
+def no_legacy_export_rows() -> Iterable[Mapping[str, Any]]:
+    """The default source: no rows, until the MIG.1 extractor provides some."""
+    return ()
+
+
+@dataclasses.dataclass(frozen=True)
+class LegacyExportFile:
+    filename: str
+    content: bytes
+    rows: int
+    reviews: int
+    enquiries: int
+
+
+def build_legacy_export(
+    vendor: Vendor, *, ctx: AuditContext, on_behalf: bool = False
+) -> LegacyExportFile:
+    """The CSV of `vendor`'s own legacy store reviews and enquiries; audited.
+
+    The rows come from `settings.LEGACY_EXPORT_SOURCE` and are narrowed to the vendor's legacy id
+    (`legacy_wp_user_id`) before anything is written: a vendor without one gets the header row
+    only. Nothing is stored in the new system. The audit entry holds the counts and whether staff
+    generated it on the vendor's behalf, never a row or a name. Read-only apart from the audit
+    entry, so there is no `dry_run`.
+    """
+    source: Callable[[], Iterable[Mapping[str, Any]]] = import_string(settings.LEGACY_EXPORT_SOURCE)
+    own = engine.legacy_rows_of_vendor(source(), vendor.legacy_wp_user_id)
+    reviews, enquiries = engine.legacy_export_counts(own)
+    record(
+        ctx,
+        LEGACY_EXPORT_DOWNLOADED,
+        MODEL_LABEL,
+        str(vendor.public_id),
+        None,
+        {
+            "rows": len(own),
+            "store_reviews": reviews,
+            "enquiries": enquiries,
+            "on_behalf": on_behalf,
+        },
+    )
+    stamp = timezone.now().strftime("%Y%m%d")
+    return LegacyExportFile(
+        filename=f"legacy-reviews-enquiries-{vendor.public_id}-{stamp}.csv",
+        content=engine.legacy_export_csv(own),
+        rows=len(own),
+        reviews=reviews,
+        enquiries=enquiries,
+    )
+
+
+def refuse_legacy_export(vendor: Vendor, *, ctx: AuditContext, requested: str) -> None:
+    """A member named another vendor (or a missing one) in the export request: audited.
+
+    `vendor` is the caller's own vendor; the named value is cut short and never trusted.
+    """
+    record(
+        ctx,
+        LEGACY_EXPORT_REFUSED,
+        MODEL_LABEL,
+        str(vendor.public_id),
+        None,
+        {"requested": requested[:LEGACY_EXPORT_REQUESTED_MAX]},
+    )

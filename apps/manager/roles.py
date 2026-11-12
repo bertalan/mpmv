@@ -113,6 +113,7 @@ MATRIX: Final[Mapping[str, Mapping[str, Access]]] = {
     "platform.one_person_team": {OWNER: R, SUPERUSER: E},
     "platform.finance": {FINANCE: E, OWNER: R},
     "platform.tax_reports": {FINANCE: E, OWNER: R},
+    "platform.vendor_legacy_export": {SUPPORT: A, OWNER: A},
     "platform.staff_roles": {OWNER: E},
 }
 
@@ -134,6 +135,7 @@ SECTION_LABELS: Final[Mapping[str, str]] = {
     "platform.one_person_team": "Platform: one-person-team setting (BO-13)",
     "platform.finance": "Platform: finance (payouts, balances, refunds, reconciliation)",
     "platform.tax_reports": "Platform: tax and DAC7 reports",
+    "platform.vendor_legacy_export": "Platform: legacy export for a vendor (MIG.21)",
     "platform.staff_roles": "Platform: staff and roles",
 }
 

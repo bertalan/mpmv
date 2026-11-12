@@ -37,4 +37,5 @@ E edit, R read only, A audited support action, I impersonation within the policy
 | Platform: one-person-team setting (BO-13) |  |  |  |  | R | E |
 | Platform: finance (payouts, balances, refunds, reconciliation) |  |  | E |  | R |  |
 | Platform: tax and DAC7 reports |  |  | E |  | R |  |
+| Platform: legacy export for a vendor (MIG.21) |  |  |  | A | A |  |
 | Platform: staff and roles |  |  |  |  | E |  |

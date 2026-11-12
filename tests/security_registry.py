@@ -158,6 +158,9 @@ OBJECT_PATHS: dict[str, ObjectKwargs] = {
     },
     "vendor_claim:claim": lambda tenants: {"vendor_key": str(tenants.b.vendor.public_id)},
     "manager:platform:notice": lambda tenants: {"public_id": str(NoticeFactory.create().public_id)},
+    "manager:platform:vendor_legacy_export": lambda tenants: {
+        "vendor_public_id": str(tenants.b.vendor.public_id)
+    },
     "vendors:apply_confirm": lambda tenants: {"user_key": str(tenants.b.owner.public_id)},
     "vendors:apply_cancel": lambda tenants: {"user_key": str(tenants.b.owner.public_id)},
 }

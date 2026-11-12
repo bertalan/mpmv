@@ -2,10 +2,12 @@
 permissions, and the legal and e-invoicing identity (validators, required fields, FatturaPA
 party block, RF20 eligibility), onboarding and the establishment gate (CMP.13)."""
 
+import csv
 import dataclasses
 import datetime as dt
 import hashlib
 import hmac
+import io
 import re
 from collections.abc import Collection, Container, Iterable, Mapping, Sequence
 from decimal import Decimal
@@ -151,6 +153,7 @@ class VendorAction(StrEnum):
     MEMBERS = "members"  # add and remove members, change roles
     API_KEYS = "api_keys"  # issue vendor-bound API keys, which act for the whole vendor (CORE.13)
     EVENTS = "events"  # the vendor's event pages: drafts, submit, cancel (spec 15, EVT.3)
+    LEGACY_EXPORT = "legacy_export"  # download the legacy store reviews and enquiries (MIG.21)
 
 
 # The role matrix. Owner: everything about their own vendor, financial settings included.
@@ -1902,3 +1905,77 @@ def logo_alt_errors(alt: str) -> str | None:
     if _HTML_MARKUP.search(alt):
         return "Write plain text: HTML tags are not accepted."
     return None
+
+
+# --- Legacy store reviews and enquiries export (MIG.21, owner decision 2026-11-11)
+#
+# Store reviews and product enquiries of the legacy marketplace tables are not migrated: each
+# vendor downloads its own as a CSV file. Rows are plain dicts, as the MIG.1 extractor yields
+# them: `kind` ("store_review" or "enquiry"), `legacy_vendor_id` (the vendor's legacy user id,
+# `Vendor.legacy_wp_user_id`), `date`, `rating` (reviews only), `author_name`, `author_email`,
+# `subject`, `message`, `reply` and `product` (a SKU or title, enquiries only).
+
+LEGACY_EXPORT_COLUMNS: Final = (
+    "kind",
+    "date",
+    "rating",
+    "author_name",
+    "author_email",
+    "subject",
+    "message",
+    "reply",
+    "product",
+)
+LEGACY_STORE_REVIEW: Final = "store_review"
+# A cell starting with one of these is read as a formula by a spreadsheet (CSV injection). Tab and
+# carriage return are included: some programs skip them and then see the formula.
+FORMULA_LEADS: Final = ("=", "+", "-", "@", "\t", "\r")
+
+
+def neutralise_cell(value: object) -> str:
+    """The cell as text, with a leading apostrophe when a spreadsheet would run it as a formula."""
+    text = "" if value is None else str(value)
+    return "'" + text if text.startswith(FORMULA_LEADS) else text
+
+
+def _legacy_id(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.isascii() and value.isdigit():
+        return int(value)
+    return None
+
+
+def legacy_rows_of_vendor(
+    rows: Iterable[Mapping[str, Any]], legacy_vendor_id: int | None
+) -> list[Mapping[str, Any]]:
+    """The rows whose `legacy_vendor_id` is exactly this vendor's; none for a vendor without one.
+
+    A row with a missing or malformed vendor id belongs to nobody, so it is never exported.
+    """
+    if legacy_vendor_id is None:
+        return []
+    return [row for row in rows if _legacy_id(row.get("legacy_vendor_id")) == legacy_vendor_id]
+
+
+def legacy_export_counts(rows: Iterable[Mapping[str, Any]]) -> tuple[int, int]:
+    """(store reviews, enquiries) in `rows`."""
+    reviews = enquiries = 0
+    for row in rows:
+        if row.get("kind") == LEGACY_STORE_REVIEW:
+            reviews += 1
+        else:
+            enquiries += 1
+    return reviews, enquiries
+
+
+def legacy_export_csv(rows: Iterable[Mapping[str, Any]]) -> bytes:
+    """The CSV file: a header row, then one row per entry; UTF-8, no byte-order mark."""
+    out = io.StringIO(newline="")
+    writer = csv.writer(out)
+    writer.writerow(LEGACY_EXPORT_COLUMNS)
+    for row in rows:
+        writer.writerow([neutralise_cell(row.get(column)) for column in LEGACY_EXPORT_COLUMNS])
+    return out.getvalue().encode("utf-8")

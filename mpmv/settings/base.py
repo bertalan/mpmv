@@ -214,6 +214,10 @@ VENDOR_CLOSURE_HOOKS: list[str] = [
     "apps.api.services.revoke_vendor_keys",  # the vendor's API keys
 ]
 
+# Legacy store reviews and enquiries (MIG.21): a dotted path to a callable returning the rows the
+# MIG.1 extractor yields (plain dicts, see `apps.vendors.engine`); each vendor downloads its own.
+LEGACY_EXPORT_SOURCE = "apps.vendors.services.no_legacy_export_rows"
+
 # Allowed vendor countries (CMP.13): `core` cannot import `vendors`, so this names the function
 # that lists the active vendors established outside a new allowed set.
 VENDORS_OUTSIDE_COUNTRIES_HOOK = "apps.vendors.services.active_vendors_outside"

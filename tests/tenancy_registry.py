@@ -441,6 +441,20 @@ ENDPOINTS: dict[str, Access] = {
         methods=("POST",),
         sample={"public_id": NIL_UUID},
     ),
+    # MIG.21: rows come from the MIG.1 extractor's input (plain dicts, no vendor-owned model), so
+    # the generic check has no object to seed; the isolation proof is in
+    # apps/manager/tests/integration/test_legacy_export.py (own rows only, another vendor's id in
+    # the query string gives 404 and an audit entry, staff 404).
+    "manager:shop:legacy_export": NoVendorData(
+        "Legacy store reviews and enquiries export (MIG.21): the selected vendor's own rows from "
+        "the extractor input, never a vendor named in the request; owner only. Isolation is "
+        "tested in apps/manager/tests/integration/test_legacy_export.py."
+    ),
+    "manager:platform:vendor_legacy_export": StaffOnly(
+        "Legacy export generated on a vendor's behalf (MIG.21): support and the platform owner "
+        "only; a vendor member gets 404.",
+        kwargs={"vendor_public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."
     ),

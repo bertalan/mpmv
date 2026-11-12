@@ -36,6 +36,7 @@ EXPECTED: dict[str, dict[VendorAction, bool]] = {
         VendorAction.MEMBERS: True,
         VendorAction.API_KEYS: True,
         VendorAction.EVENTS: True,
+        VendorAction.LEGACY_EXPORT: True,
     },
     STAFF: {
         VendorAction.ORDERS: True,
@@ -48,6 +49,7 @@ EXPECTED: dict[str, dict[VendorAction, bool]] = {
         VendorAction.MEMBERS: False,
         VendorAction.API_KEYS: False,
         VendorAction.EVENTS: True,
+        VendorAction.LEGACY_EXPORT: False,
     },
 }
 

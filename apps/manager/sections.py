@@ -7,6 +7,9 @@ whose role checks CORE.18 defines.
 
 from django.utils.translation import gettext_lazy as _
 
+from .legacy_export_views import PLATFORM_SECTION as LEGACY_EXPORT_PLATFORM_SECTION
+from .legacy_export_views import SHOP_SECTION as LEGACY_EXPORT_SHOP_SECTION
+from .legacy_export_views import can_export_for_vendor
 from .navigation import Registry, Section, anyone, vendor_action
 from .notice_views import SECTION as NOTICES_SECTION
 from .notice_views import can_review
@@ -49,6 +52,16 @@ BUILT_IN = (
         order=30,
         allowed=vendor_action("orders"),
     ),
+    # MIG.21: owners download their legacy store reviews and enquiries (a file, not a page).
+    Section(
+        LEGACY_EXPORT_SHOP_SECTION,
+        Space.SHOP,
+        _("Legacy reviews and enquiries"),
+        "manager:shop:legacy_export",
+        order=90,
+        in_menu=False,
+        allowed=vendor_action("legacy_export"),
+    ),
     # The vendor picker: reached from the header, so not in the menu, and before any choice.
     Section(
         "shop.vendor",
@@ -67,6 +80,16 @@ BUILT_IN = (
         "manager:platform:dashboard",
         order=10,
         allowed=anyone,
+    ),
+    # MIG.21: support and the owner generate a vendor's export on its behalf (a file, not a page).
+    Section(
+        LEGACY_EXPORT_PLATFORM_SECTION,
+        Space.PLATFORM,
+        _("Legacy reviews and enquiries"),
+        "manager:platform:vendor_legacy_export",
+        order=70,
+        in_menu=False,
+        allowed=can_export_for_vendor,
     ),
     Section(
         NOTICES_SECTION,

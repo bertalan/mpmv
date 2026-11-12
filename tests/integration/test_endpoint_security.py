@@ -468,6 +468,7 @@ OWNER_ONLY_WEB = frozenset(
         "manager:shop:image_results",
         "manager:shop:image_chosen",
         "manager:shop:image_select_format",
+        "manager:shop:legacy_export",  # MIG.21
     }
 )
 
