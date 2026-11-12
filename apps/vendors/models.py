@@ -191,6 +191,17 @@ class Vendor(BaseModel):
             "+39 06 1234 5678. Optional, up to 32 characters."
         ),
     )
+    # ORD.16: the language of the vendor's order emails (new order, cancelled order). Empty means
+    # the platform language (`settings.LANGUAGE_CODE`); a language that is no longer configured
+    # falls back to it as well (`core.services.email_language`).
+    mail_language = LanguageField(
+        _("Email language"),
+        blank=True,
+        help_text=_(
+            "The language of the order emails we send you, for example a new order to ship. "
+            "Leave it empty to receive them in English."
+        ),
+    )
     sales_mode_default = models.CharField(
         max_length=16,
         choices=SalesMode.choices,
