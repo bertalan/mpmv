@@ -18,6 +18,7 @@ from apps.core.services import NoPlatformOperator
 from apps.orders.models import Order
 
 from . import engine, services, withdrawal
+from . import subprocessors as subprocessors_register
 from .forms import URL_MAX, NoticeForm, WithdrawalLookupForm
 from .models import Notice, WithdrawalStatement
 
@@ -43,6 +44,18 @@ def contact_points(request: HttpRequest) -> HttpResponse:
             "authority_languages": [services.language_name(c) for c in points.authority_languages],
             "user_languages": [services.language_name(c) for c in points.user_languages],
         },
+    )
+
+
+@require_GET
+@cache_control(public=True, max_age=300)
+def subprocessors(request: HttpRequest) -> HttpResponse:
+    """The sub-processor register (CMP.4): who receives personal data, why, where, under which
+    safeguard. Static, reviewed data."""
+    return render(
+        request,
+        "compliance/subprocessors.html",
+        {"entries": subprocessors_register.public_register()},
     )
 
 

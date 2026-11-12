@@ -11,7 +11,7 @@ import apps.core.i18n
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("compliance", "0005_erasure_request"),
+        ("compliance", "0006_field_help_texts"),
         ("orders", "0011_stock_reservation"),
     ]
 

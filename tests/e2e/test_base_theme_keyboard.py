@@ -32,6 +32,7 @@ MARK_CONTROLS = """
     + ' select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
   const controls = [...document.querySelectorAll(selector)].filter((el) =>
     !el.closest('[hidden]') && el.getClientRects().length > 0
+    && !el.closest('details:not([open]) > :not(summary)')
     && getComputedStyle(el).visibility !== 'hidden');
   controls.forEach((el, index) => el.setAttribute('data-kbd', String(index)));
   return controls.length;

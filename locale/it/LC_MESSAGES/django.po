@@ -48,6 +48,383 @@ msgstr "%(vendor_name)s: nuovo ordine pagato %(order_number)s da spedire:"
 msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
 msgstr "%(vendor_name)s: ordine %(order_number)s annullato, non spedire"
 
+#: apps/core/models.py
+msgid ""
+"'Default' follows the setting of this environment, or the default of the code if there is none. "
+"'On' and 'Off' switch the feature on or off."
+msgstr ""
+"'Predefinito' segue l'impostazione di questo ambiente, o il valore predefinito del codice se "
+"manca. 'Acceso' e 'Spento' accendono o spengono la funzione."
+
+#: apps/core/translation_fields.py
+msgid ""
+"'Machine draft' was made automatically and needs a person to check it. 'Reviewed' was checked by a"
+" person. 'Published' is shown to visitors. If the English text changes, reviewed and published "
+"translations go back to 'Machine draft'."
+msgstr ""
+"'Bozza automatica' è stata fatta in automatico e deve essere controllata da una persona. 'Rivista'"
+" è stata controllata da una persona. 'Pubblicata' viene mostrata ai visitatori. Se il testo "
+"inglese cambia, le traduzioni riviste e pubblicate tornano a 'Bozza automatica'."
+
+#: apps/catalog/taxonomy_admin.py
+msgid "-- root --"
+msgstr "-- radice --"
+
+#: apps/ingest/models.py
+msgid "A blocking case stops its run from ending as succeeded until it is decided."
+msgstr ""
+"Un caso bloccante impedisce all'esecuzione di concludersi come riuscita finché non viene deciso."
+
+#: apps/cms/models.py
+msgid "A category or tag that has its own pages."
+msgstr "Una categoria o etichetta che ha pagine dedicate."
+
+#: apps/cms/blocks.py apps/cms/models.py
+msgid "A clear, short answer. It opens when the visitor clicks the question. Required."
+msgstr ""
+"Una risposta chiara e breve. Si apre quando il visitatore clicca sulla domanda. Obbligatoria."
+
+#: apps/ingest/models.py
+msgid ""
+"A dry run only shows what would change. A run that writes is possible only if the source allows "
+"it."
+msgstr ""
+"Una prova mostra solo che cosa cambierebbe. Un'esecuzione che scrive è possibile solo se la fonte "
+"lo permette."
+
+#: apps/cms/models.py
+msgid ""
+"A few sentences about the author, shown on the author's page. If you leave it empty, the page "
+"shows only the name."
+msgstr ""
+"Poche frasi sull'autore, mostrate nella sua pagina. Se lo lasci vuoto, la pagina mostra solo il "
+"nome."
+
+#: apps/catalog/models.py
+msgid ""
+"A few words about this version only, for example 'Matt finish, fits the large tray'. Optional."
+msgstr ""
+"Poche parole solo su questa versione, per esempio 'Finitura opaca, adatta al vassoio grande'. "
+"Facoltativo."
+
+#: apps/cms/models.py
+msgid ""
+"A few words shown at the top of the blog, above the list of articles. If you leave it empty, the "
+"list starts right under the title."
+msgstr ""
+"Poche parole mostrate in cima al blog, sopra l'elenco degli articoli. Se lo lasci vuoto, l'elenco "
+"parte subito sotto il titolo."
+
+#: apps/events/models.py
+msgid ""
+"A few words shown at the top of the events list. If you leave it empty, the list starts right "
+"under the title."
+msgstr ""
+"Poche parole mostrate in cima all'elenco degli eventi. Se lo lasci vuoto, l'elenco parte subito "
+"sotto il titolo."
+
+#: apps/vendors/models.py
+msgid ""
+"A fingerprint (SHA-256) of the exact text that was accepted, to prove later that it has not "
+"changed."
+msgstr ""
+"Un'impronta (SHA-256) del testo esatto che è stato accettato, per dimostrare in seguito che non è "
+"cambiato."
+
+#: apps/ingest/models.py
+msgid "A fingerprint of the data. The same data is stored once per item."
+msgstr "Un'impronta dei dati. Gli stessi dati vengono salvati una sola volta per articolo."
+
+#: apps/core/models.py
+msgid "A link to the text of the licence. Optional."
+msgstr "Un link al testo della licenza. Facoltativo."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"A list of https links to the same brand elsewhere: Wikipedia in each language, official profiles. "
+"The Wikidata link is added from the ID above. Example: [\"https://en.wikipedia.org/wiki/Acme\"]."
+msgstr ""
+"Un elenco di link https allo stesso marchio altrove: Wikipedia in ogni lingua, profili ufficiali. "
+"Il link a Wikidata viene aggiunto a partire dall'ID qui sopra. Esempio: "
+"[\"https://it.wikipedia.org/wiki/Acme\"]."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"A list of https links to the same company elsewhere: Wikidata, Wikipedia, official profiles. "
+"Search engines use them to recognise the company. Example: [\"https://www.wikidata.org/wiki/Q7\"]."
+msgstr ""
+"Un elenco di link https alla stessa azienda altrove: Wikidata, Wikipedia, profili ufficiali. I "
+"motori di ricerca li usano per riconoscere l'azienda. Esempio: "
+"[\"https://www.wikidata.org/wiki/Q7\"]."
+
+#: apps/ingest/models.py
+msgid "A note on the decision."
+msgstr "Una nota sulla decisione."
+
+#: apps/shipping/models.py
+msgid "A number from 1 to 999. When several zones fit an address, the lowest number wins."
+msgstr ""
+"Un numero da 1 a 999. Quando più zone vanno bene per un indirizzo, vince il numero più basso."
+
+#: apps/manager/media.py
+msgid ""
+"A PDF document, for example your return policy. It is stored in your own shop collection and no "
+"other shop can see it."
+msgstr ""
+"Un documento PDF, per esempio la tua politica di reso. Viene salvato nella raccolta del tuo "
+"negozio e nessun altro negozio può vederlo."
+
+#: apps/vendors/models.py
+msgid ""
+"A phone number where we can reach you, with the country prefix, for example +39 06 1234 5678. "
+"Optional, up to 32 characters."
+msgstr ""
+"Un numero di telefono a cui possiamo chiamarti, con il prefisso internazionale, per esempio +39 06"
+" 1234 5678. Facoltativo, al massimo 32 caratteri."
+
+#: apps/cms/blocks.py
+msgid "A picture for the banner. If you leave it empty, the banner has no picture."
+msgstr "Un'immagine per il banner. Se la lasci vuota, il banner non ha immagine."
+
+#: apps/cms/models.py
+msgid ""
+"A portrait of the author, shown on the author's page. If you leave it empty, no photo is shown."
+msgstr ""
+"Un ritratto dell'autore, mostrato nella sua pagina. Se lo lasci vuoto, non viene mostrata alcuna "
+"foto."
+
+#: apps/catalog/models.py
+msgid ""
+"A price in euros without VAT for this version only, for example 24.00. Leave it empty and the "
+"version costs the same as the product."
+msgstr ""
+"Un prezzo in euro, IVA esclusa, solo per questa versione, per esempio 24,00. Se lo lasci vuoto, la"
+" versione costa come il prodotto."
+
+#: apps/catalog/models.py
+msgid "A private reminder of why the rule exists, up to 200 characters. Visitors never see it."
+msgstr ""
+"Un promemoria privato sul perché esiste la regola, fino a 200 caratteri. I visitatori non lo "
+"vedono mai."
+
+#: apps/cms/models.py
+msgid ""
+"A question a new seller would ask, for example 'How much does it cost?'. Required: the question "
+"cannot be saved without it."
+msgstr ""
+"Una domanda che farebbe un nuovo venditore, per esempio 'Quanto costa?'. Obbligatoria: senza non "
+"si può salvare la domanda."
+
+#: apps/cms/blocks.py
+msgid ""
+"A sentence or two about the launch, up to 400 characters. If you leave it empty, only the title "
+"and the clock are shown."
+msgstr ""
+"Una o due frasi sul lancio, fino a 400 caratteri. Se lo lasci vuoto, si vedono solo il titolo e il"
+" conto alla rovescia."
+
+#: apps/cms/blocks.py
+msgid ""
+"A sentence or two that says why to click, up to 400 characters. If you leave it empty, only the "
+"title and the button are shown."
+msgstr ""
+"Una o due frasi che spiegano perché cliccare, fino a 400 caratteri. Se lo lasci vuoto, si vedono "
+"solo il titolo e il pulsante."
+
+#: apps/core/models.py
+msgid "A short code that is unique, for example 'CC-BY-4.0'."
+msgstr "Un codice breve e unico, per esempio 'CC-BY-4.0'."
+
+#: apps/tax/models.py
+msgid "A short code that is unique, for example 'ES-CN' for the Canary Islands."
+msgstr "Un codice breve e unico, per esempio 'ES-CN' per le Canarie."
+
+#: apps/catalog/attributes.py
+msgid ""
+"A short fixed name for this attribute, for example 'size'. Required: lower case letters, digits "
+"and _, starting with a letter. Imports use it, so do not change it later; buyers never see it."
+msgstr ""
+"Un nome breve e fisso per questo attributo, per esempio 'taglia'. Obbligatorio: lettere minuscole,"
+" cifre e _, a partire da una lettera. Le importazioni lo usano, quindi non cambiarlo dopo; chi "
+"compra non lo vede mai."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"A short fixed name for this set of categories or tags, for example 'season'. Required: lower case "
+"letters, digits and _, starting with a letter. Imports use it, so do not change it later; buyers "
+"never see it."
+msgstr ""
+"Un nome breve e fisso per questo gruppo di categorie o etichette, per esempio 'stagione'. "
+"Obbligatorio: lettere minuscole, cifre e _, a partire da una lettera. Le importazioni lo usano, "
+"quindi non cambiarlo dopo; chi compra non lo vede mai."
+
+#: apps/catalog/attributes.py
+msgid ""
+"A short fixed name for this value, for example 'red'. Required: lower case letters, digits, "
+"hyphens or _. Imports use it, so do not change it later; buyers never see it."
+msgstr ""
+"Un nome breve e fisso per questo valore, per esempio 'rosso'. Obbligatorio: lettere minuscole, "
+"cifre, trattini o _. Le importazioni lo usano, quindi non cambiarlo dopo; chi compra non lo vede "
+"mai."
+
+#: apps/vendors/admin.py
+msgid ""
+"A short identifier in lowercase letters, digits and hyphens, for example 'standard'. Rules and "
+"limits refer to the plan by it."
+msgstr ""
+"Un identificativo breve con lettere minuscole, cifre e trattini, per esempio «standard». Le regole"
+" e i limiti si riferiscono al piano tramite questo codice."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"A short label of the import run. It tells reviewers where the brands come from. Example: 'spring "
+"price list, import of 2026-11-02'."
+msgstr ""
+"Un'etichetta breve dell'importazione. Dice ai revisori da dove arrivano i marchi. Esempio: "
+"'listino di primavera, importazione del 02/11/2026'."
+
+#: apps/cms/models.py
+msgid ""
+"A short line shown under the main picture, up to 250 characters. If you leave it empty, no caption"
+" is shown."
+msgstr ""
+"Una breve riga mostrata sotto l'immagine principale, fino a 250 caratteri. Se la lasci vuota, non "
+"viene mostrata alcuna didascalia."
+
+#: apps/cms/blocks.py
+msgid ""
+"A short line shown under the picture, up to 250 characters. If you leave it empty, no caption is "
+"shown."
+msgstr ""
+"Una breve riga mostrata sotto l'immagine, fino a 250 caratteri. Se la lasci vuota, non viene "
+"mostrata alcuna didascalia."
+
+#: apps/cms/blocks.py
+msgid ""
+"A short line under the title, up to 250 characters. If you leave it empty, the card uses the short"
+" text of what it points to, if any."
+msgstr ""
+"Una breve riga sotto il titolo, fino a 250 caratteri. Se la lasci vuota, la scheda usa il testo "
+"breve di ciò a cui rimanda, se c'è."
+
+#: apps/vendors/models.py
+msgid ""
+"A short line under your shop name, up to 200 characters, for example 'Handmade ceramics from "
+"Umbria'. Leave it empty to show none."
+msgstr ""
+"Una breve frase sotto il nome del negozio, al massimo 200 caratteri, per esempio 'Ceramiche fatte "
+"a mano in Umbria'. Lasciala vuota se non ne vuoi una."
+
+#: apps/shipping/models.py
+msgid ""
+"A short name in lower case that is unique, for example 'eu' or 'dach'. Zones refer to a group by "
+"this code, so a group that a zone uses keeps its code and cannot be deleted."
+msgstr ""
+"Un nome breve in minuscolo e unico, per esempio 'eu' o 'dach'. Le zone si riferiscono a un gruppo "
+"con questo codice, quindi un gruppo usato da una zona mantiene il suo codice e non si può "
+"cancellare."
+
+#: apps/shipping/models.py
+msgid "A short name in lower case that is unique, for example 'it-sardinia'."
+msgstr "Un nome breve in minuscolo e unico, per esempio 'it-sardinia'."
+
+#: apps/shipping/models.py
+msgid "A short name without spaces for the zone. The same vendor cannot use it twice."
+msgstr "Un nome breve senza spazi per la zona. Lo stesso venditore non può usarlo due volte."
+
+#: apps/ingest/models.py
+msgid "A short name without spaces for this feed. Two feeds of the same vendor cannot share it."
+msgstr ""
+"Un nome breve senza spazi per questo flusso. Due flussi dello stesso venditore non possono averlo "
+"uguale."
+
+#: apps/shipping/models.py
+msgid ""
+"A short name without spaces for this method. The same vendor cannot use it twice in the same zone."
+msgstr ""
+"Un nome breve senza spazi per questo metodo. Lo stesso venditore non può usarlo due volte nella "
+"stessa zona."
+
+#: apps/shipping/models.py
+msgid "A short name without spaces for this pickup point. The same vendor cannot use it twice."
+msgstr ""
+"Un nome breve senza spazi per questo punto di ritiro. Lo stesso venditore non può usarlo due "
+"volte."
+
+#: apps/shipping/models.py
+msgid "A short name without spaces that is unique, for example 'dhl'."
+msgstr "Un nome breve senza spazi e unico, per esempio 'dhl'."
+
+#: apps/vendors/admin.py
+msgid ""
+"A short reason shown to staff when the commission is zero, for example 'Launch promo'. Leave it "
+"empty for a normal rule."
+msgstr ""
+"Un breve motivo mostrato allo staff quando la commissione è zero, per esempio «Promo di lancio». "
+"Lascialo vuoto per una regola normale."
+
+#: apps/catalog/models.py
+msgid ""
+"A short teaser of one or two sentences, for example 'Hand-made ceramic mug, 300 ml'. Optional: you"
+" can leave it empty."
+msgstr ""
+"Un breve riassunto di una o due frasi, per esempio 'Tazza in ceramica fatta a mano, 300 ml'. "
+"Facoltativo: puoi lasciarlo vuoto."
+
+#: apps/cms/models.py
+msgid ""
+"A short teaser shown in the blog list, up to 300 characters. If you leave it empty, the list shows"
+" no teaser."
+msgstr ""
+"Un breve riassunto mostrato nell'elenco del blog, fino a 300 caratteri. Se lo lasci vuoto, "
+"l'elenco non mostra alcun riassunto."
+
+#: apps/cms/models.py
+msgid ""
+"A short text shown above the products of this category or tag. If you add none, the page starts "
+"with its products."
+msgstr ""
+"Un breve testo mostrato sopra i prodotti di questa categoria o etichetta. Se non ne aggiungi, la "
+"pagina parte direttamente dai prodotti."
+
+#: apps/cms/blocks.py
+msgid ""
+"A title above the cards, for example 'You may also like'. If you leave it empty, the cards have no"
+" title."
+msgstr ""
+"Un titolo sopra le schede, per esempio 'Potrebbe piacerti anche'. Se lo lasci vuoto, le schede non"
+" hanno titolo."
+
+#: apps/cms/blocks.py
+msgid ""
+"A title above the products, up to 120 characters. If you leave it empty, the title is the name of "
+"the chosen category, tag, brand or shop."
+msgstr ""
+"Un titolo sopra i prodotti, fino a 120 caratteri. Se lo lasci vuoto, il titolo è il nome della "
+"categoria, dell'etichetta, della marca o del negozio scelti."
+
+#: apps/cms/blocks.py
+msgid ""
+"A title above the questions, for example 'Questions and answers'. If you leave it empty, the "
+"questions have no title."
+msgstr ""
+"Un titolo sopra le domande, per esempio 'Domande e risposte'. Se lo lasci vuoto, le domande non "
+"hanno titolo."
+
+#: apps/cms/blocks.py
+msgid ""
+"A title shown above the products, for example 'Our favourites'. Up to 120 characters. If you leave"
+" it empty, no title is shown."
+msgstr ""
+"Un titolo mostrato sopra i prodotti, per esempio 'I nostri preferiti'. Fino a 120 caratteri. Se lo"
+" lasci vuoto, non viene mostrato nessun titolo."
+
+#: apps/events/admin_views.py apps/events/models.py
+msgid "A vendor's first events up to this number go through review."
+msgstr ""
+"I primi eventi di un venditore, fino a questo numero, vengono controllati prima di andare online. "
+"Esempio: 3. Obbligatorio."
+
 #: apps/manager/forms.py
 msgid "About the shop"
 msgstr "Informazioni sul negozio"
@@ -59,6 +436,10 @@ msgstr "Accetta l'ordine"
 #: themes/base/templates/403.html
 msgid "Access denied"
 msgstr "Accesso negato"
+
+#: themes/base/templates/components/user_tools.html
+msgid "Account"
+msgstr "Account"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Act on the content"
@@ -76,18 +457,113 @@ msgstr "Aggiungi un fattore"
 msgid "Add an authenticator app"
 msgstr "Aggiungi un’app di autenticazione"
 
+#: apps/manager/templates/manager/shop/link_dialog.html
+msgid "Add an external link"
+msgstr "Aggiungi un link esterno"
+
 #: apps/accounts/mfa_views.py
 msgid "Add another factor before removing your last one."
 msgstr "Aggiungi un altro fattore prima di rimuovere l’ultimo."
+
+#: apps/cms/blocks.py
+msgid "Add at least one question. They show as a list that opens one answer at a time."
+msgstr "Aggiungi almeno una domanda. Si vedono come un elenco che apre una risposta alla volta."
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "All"
 msgstr "Tutti"
 
+#: apps/compliance/models.py
+msgid ""
+"An authority order must be acted on within 2 working days, a product safety notice within 3. The "
+"days are counted from the day it was received, Monday to Friday."
+msgstr ""
+"Un ordine di un'autorità va gestito entro 2 giorni lavorativi, una segnalazione di sicurezza entro"
+" 3. I giorni si contano dal giorno di ricezione, dal lunedì al venerdì."
+
+#: apps/compliance/models.py
+msgid "An email address or a web address (starting with https://) of the EU responsible person."
+msgstr "Un indirizzo email o un indirizzo web (che inizia con https://) del responsabile UE."
+
+#: apps/compliance/models.py
+msgid ""
+"An email address or a web address (starting with https://) where buyers can ask safety questions."
+msgstr ""
+"Un indirizzo email o un indirizzo web (che inizia con https://) a cui chi compra può fare domande "
+"sulla sicurezza."
+
+#: apps/shipping/models.py
+msgid "An extra amount added to the price of the band, without VAT. Use 0 for none."
+msgstr "Un importo in più aggiunto al prezzo della fascia, IVA esclusa. Usa 0 se non c'è."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"An introduction shown on the category page, for example what you find in it. Basic formatting is "
+"allowed. Optional."
+msgstr ""
+"Un'introduzione mostrata nella pagina della categoria, per esempio cosa si trova al suo interno. "
+"Puoi usare una formattazione semplice. Facoltativo."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"An introduction shown on the page of this category or tag. Basic formatting is allowed. Optional."
+msgstr ""
+"Un'introduzione mostrata nella pagina di questa categoria o etichetta. Puoi usare una "
+"formattazione semplice. Facoltativo."
+
+#: apps/catalog/models.py
+msgid ""
+"An optional lower price in euros without VAT, for example 15.00. It must be below the normal "
+"price. Leave it empty when there is no sale."
+msgstr ""
+"Un prezzo più basso facoltativo in euro, IVA esclusa, per esempio 15,00. Deve essere inferiore al "
+"prezzo normale. Lascialo vuoto quando non ci sono saldi."
+
+#: apps/compliance/forms.py
+msgid "An optional note. It is kept with the notice and is not written in the audit log."
+msgstr ""
+"Una nota facoltativa. Viene conservata con la segnalazione e non viene scritta nel registro delle "
+"modifiche."
+
+#: apps/core/models.py
+msgid "An optional web form for users, next to the support email. It must start with https://."
+msgstr ""
+"Un modulo web facoltativo per gli utenti, accanto all'email di assistenza. Deve iniziare con "
+"https://."
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Anonymous"
 msgstr "Anonimo"
+
+#: apps/catalog/models.py
+msgid ""
+"Another product of yours that is meant to be bought together with this one, for example the "
+"battery for a toy. Leave it empty if there is none."
+msgstr ""
+"Un altro tuo prodotto pensato per essere comprato insieme a questo, per esempio la batteria di un "
+"giocattolo. Lascialo vuoto se non ce n'è."
+
+#: apps/cms/models.py
+msgid "applies to"
+msgstr "si applica a"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Approve all brands of the selected batches"
+msgstr "Approva tutti i marchi dei lotti selezionati"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Approve the selected proposals"
+msgstr "Approva le proposte selezionate"
+
+#: apps/catalog/taxonomy.py
+msgid "Approved"
+msgstr "Approvata"
+
+#: apps/cms/models.py
+msgid "Articles or pages to suggest under the products. If you add none, nothing is suggested."
+msgstr ""
+"Articoli o pagine da suggerire sotto i prodotti. Se non ne aggiungi, non viene suggerito nulla."
 
 #: apps/accounts/templates/accounts/mfa/totp.html apps/accounts/templates/accounts/mfa/verify.html
 msgid "Authentication code"
@@ -125,9 +601,21 @@ msgstr "Torna alle impostazioni della verifica in due passaggi"
 msgid "Bad request"
 msgstr "Richiesta non valida"
 
+#: apps/catalog/taxonomy.py
+msgid "brand batch"
+msgstr "lotto di marchi"
+
+#: apps/catalog/taxonomy.py
+msgid "brand batches"
+msgstr "lotti di marchi"
+
 #: apps/manager/templates/manager/bulk_preview.html
 msgid "Cancel"
 msgstr "Annulla"
+
+#: apps/vendors/services.py
+msgid "Cancellation"
+msgstr "Annullamento"
 
 #: apps/manager/forms.py
 msgid "Cancellation policy"
@@ -146,6 +634,26 @@ msgstr "Corriere"
 msgid "Carrier: %(carrier)s. Tracking number: %(tracking_number)s."
 msgstr "Corriere: %(carrier)s. Numero di tracking: %(tracking_number)s."
 
+#: apps/compliance/forms.py
+msgid "Choose 'Action taken' if the content was restricted, or 'No action' if it was left as it is."
+msgstr ""
+"Scegli 'Azione intrapresa' se il contenuto è stato limitato, oppure 'Nessuna azione' se è stato "
+"lasciato com'è."
+
+#: apps/compliance/forms.py
+msgid ""
+"Choose 'Illegal content' for most reports. A report of child sexual abuse material can be sent "
+"without your name and email address."
+msgstr ""
+"Scegli 'Contenuto illegale' per la maggior parte delle segnalazioni. Una segnalazione di materiale"
+" pedopornografico può essere inviata senza nome e indirizzo email."
+
+#: apps/cms/blocks.py
+msgid "Choose a page of this site to link to. Fill in this or the web address below, not both."
+msgstr ""
+"Scegli una pagina di questo sito a cui rimandare. Compila questo campo oppure l'indirizzo web qui "
+"sotto, non entrambi."
+
 #: apps/manager/sections.py apps/manager/templates/manager/shop/vendor_picker.html
 msgid "Choose a vendor"
 msgstr "Scegli un venditore"
@@ -153,6 +661,89 @@ msgstr "Scegli un venditore"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Choose how you will confirm it is you after your password."
 msgstr "Scegli come confermare la tua identità dopo la password."
+
+#: apps/cms/blocks.py
+msgid "Choose the category or tag the card leads to. A card to a hidden one is left out."
+msgstr ""
+"Scegli la categoria o l'etichetta a cui porta la scheda. Una scheda verso una non visibile viene "
+"omessa."
+
+#: apps/cms/models.py
+msgid "Choose the page of this site the menu entry leads to. Required."
+msgstr "Scegli la pagina di questo sito a cui porta la voce del menu. Obbligatorio."
+
+#: apps/cms/blocks.py
+msgid "Choose the page the card leads to. If the page is not live, the card is left out."
+msgstr ""
+"Scegli la pagina a cui porta la scheda. Se la pagina non è pubblicata, la scheda viene omessa."
+
+#: apps/cms/blocks.py
+msgid "Choose the product the card leads to. A card to a product that is not on sale is left out."
+msgstr ""
+"Scegli il prodotto a cui porta la scheda. Una scheda verso un prodotto non in vendita viene "
+"omessa."
+
+#: apps/cms/blocks.py
+msgid "Choose the shop the card leads to. A card to a shop that is not open is left out."
+msgstr ""
+"Scegli il negozio a cui porta la scheda. Una scheda verso un negozio non aperto viene omessa."
+
+#: apps/events/models.py
+msgid ""
+"Choose what kind of event it is: a promotion (an offer, with no place), a trade fair or meeting, "
+"or something else. Required."
+msgstr ""
+"Scegli che tipo di evento è: una promozione (un'offerta, senza luogo), una fiera o un incontro, "
+"oppure altro. Obbligatorio."
+
+#: apps/compliance/forms.py
+msgid ""
+"Choose what you are reporting: a product, an event, a vendor shop or other content of the site."
+msgstr ""
+"Scegli che cosa stai segnalando: un prodotto, un evento, il negozio di un venditore o altri "
+"contenuti del sito."
+
+#: apps/cms/blocks.py
+msgid "Choose where the products come from: one category, tag, brand or shop."
+msgstr "Scegli da dove vengono i prodotti: una categoria, un'etichetta, una marca o un negozio."
+
+#: apps/vendors/models.py
+msgid ""
+"Companies only: LS if your company is in liquidation, LN if it is not, as in the company register."
+msgstr ""
+"Solo società: LS se la tua società è in liquidazione, LN se non lo è, come risulta al registro "
+"delle imprese."
+
+#: apps/vendors/models.py
+msgid ""
+"Companies only: SU if one person owns all the shares, SM if there are several shareholders. Not "
+"sure? Ask your accountant."
+msgstr ""
+"Solo società: SU se un solo socio possiede tutte le quote, SM se i soci sono più di uno. Non sei "
+"sicuro? Chiedi al tuo commercialista."
+
+#: apps/vendors/models.py
+msgid ""
+"Companies only: the number from the company register (in Italy, the REA number), if you have one. "
+"It is asked for the platform's yearly DAC7 reporting duty."
+msgstr ""
+"Solo società: il numero del registro delle imprese (in Italia, il numero REA), se ce l'hai. Ci "
+"viene richiesto per l'obbligo di comunicazione annuale DAC7 della piattaforma."
+
+#: apps/vendors/models.py
+msgid "Companies only: the share capital as in the company register, for example 10000.00."
+msgstr ""
+"Solo società: il capitale sociale come risulta al registro delle imprese, per esempio 10000.00."
+
+#: apps/vendors/models.py
+msgid ""
+"Companies only: tick it if your tax identification number is the same as your VAT number. In the "
+"countries where this is allowed we fill it in once VIES confirms the VAT number. Not sure? Ask "
+"your accountant."
+msgstr ""
+"Solo società: spuntala se il tuo numero di identificazione fiscale coincide con la partita IVA. "
+"Nei paesi in cui è previsto lo compiliamo noi quando VIES conferma la partita IVA. Non sei sicuro?"
+" Chiedi al tuo commercialista."
 
 #: apps/accounts/templates/accounts/mfa/totp.html apps/manager/templates/manager/bulk_preview.html
 msgid "Confirm"
@@ -172,6 +763,18 @@ msgstr "Continua non ti fa accedere: la pagina che si apre ti chiede di conferma
 msgid "Continue to your request"
 msgstr "Continua con la tua richiesta"
 
+#: apps/catalog/taxonomy.py
+msgid "country"
+msgstr "paese"
+
+#: apps/events/models.py
+msgid ""
+"Counts how many times the date, time or place changed after publishing, so that people's calendar "
+"apps update their copy. The platform fills it in."
+msgstr ""
+"Conta quante volte data, ora o luogo sono cambiati dopo la pubblicazione, così che i calendari "
+"delle persone aggiornino la loro copia. Lo compila la piattaforma."
+
 #: apps/manager/templates/manager/shop/order.html
 msgid "Customer"
 msgstr "Cliente"
@@ -186,13 +789,81 @@ msgstr ""
 msgid "Dashboard"
 msgstr "Dashboard"
 
+#: apps/events/models.py
+msgid ""
+"Dates and times of a repeating event that are skipped, for example a holiday. If you leave it "
+"empty, nothing is skipped."
+msgstr ""
+"Date e orari di un evento ripetuto che vengono saltati, per esempio un giorno festivo. Se lo lasci"
+" vuoto, non si salta nulla."
+
+#: apps/shipping/models.py
+msgid "Days added to the method's estimated delivery time in this area."
+msgstr "Giorni aggiunti al tempo di consegna stimato del metodo in quest'area."
+
+#: apps/events/models.py
+msgid ""
+"Days of a repeating all-day event that are skipped, for example a holiday. If you leave it empty, "
+"no day is skipped."
+msgstr ""
+"Giorni di un evento ripetuto che dura tutto il giorno e che vengono saltati, per esempio un giorno"
+" festivo. Se lo lasci vuoto, non si salta nessun giorno."
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Decided"
 msgstr "Deciso"
 
+#: apps/cms/models.py
+msgid "Defaults to 'Apply now'."
+msgstr "Se lo lasci vuoto, il pulsante dice 'Candidati ora'."
+
 #: apps/accounts/admin.py
 msgid "Delete selected %(verbose_name_plural)s"
 msgstr "Elimina %(verbose_name_plural)s selezionati"
+
+#: apps/cms/models.py
+msgid ""
+"Describe the main picture in a few words, for people who cannot see it. Example: 'Fresh bread on a"
+" cloth'. Required when you choose a picture."
+msgstr ""
+"Descrivi l'immagine principale in poche parole, per chi non può vederla. Esempio: 'Pane fresco su "
+"un canovaccio'. Obbligatorio quando scegli un'immagine."
+
+#: apps/cms/models.py
+msgid ""
+"Describe the main picture in a few words, for people who cannot see it. Example: 'Our workshop in "
+"spring'. Required when you choose a picture."
+msgstr ""
+"Descrivi l'immagine principale in poche parole, per chi non può vederla. Esempio: 'Il nostro "
+"laboratorio in primavera'. Obbligatorio quando scegli un'immagine."
+
+#: apps/cms/models.py
+msgid ""
+"Describe the photo in a few words, for people who cannot see it. Example: 'Maria Rossi smiling in "
+"her workshop'. Required when you choose a photo."
+msgstr ""
+"Descrivi la foto in poche parole, per chi non può vederla. Esempio: 'Maria Rossi sorride nel suo "
+"laboratorio'. Obbligatorio quando scegli una foto."
+
+#: apps/cms/blocks.py
+msgid ""
+"Describe the picture in a few words, for people who cannot see it. Example: 'Potter shaping a "
+"bowl'. Required when you choose a picture."
+msgstr ""
+"Descrivi l'immagine in poche parole, per chi non può vederla. Esempio: 'Ceramista che modella una "
+"ciotola'. Obbligatorio quando scegli un'immagine."
+
+#: apps/cms/blocks.py
+msgid ""
+"Describe the picture in a few words, for people who cannot see it. Example: 'Red ceramic mug on a "
+"wooden table'. Required: the picture cannot be saved without it."
+msgstr ""
+"Descrivi l'immagine in poche parole, per chi non può vederla. Esempio: 'Tazza di ceramica rossa su"
+" un tavolo di legno'. Obbligatorio: senza non si può salvare l'immagine."
+
+#: apps/catalog/taxonomy.py
+msgid "description"
+msgstr "descrizione"
 
 #: apps/manager/forms.py
 msgid "Description of the logo"
@@ -222,9 +893,21 @@ msgstr "Email"
 msgid "Email address of the order"
 msgstr "Indirizzo email dell’ordine"
 
+#: apps/accounts/admin.py
+msgid ""
+"Enabled: you set a password now. Disabled: the account is created without a password and cannot "
+"sign in with a password until one is set."
+msgstr ""
+"Abilitata: imposti subito una password. Disabilitata: l'account viene creato senza password e non "
+"può accedere con una password finché non ne viene impostata una."
+
 #: apps/manager/forms.py
 msgid "Enter a valid carrier name."
 msgstr "Inserisci un nome di corriere valido."
+
+#: apps/manager/media.py
+msgid "Enter a valid web address starting with https://"
+msgstr "Inserisci un indirizzo web valido che inizi con https://"
 
 #: apps/manager/forms.py
 msgid "Enter the tracking number: letters, digits, spaces and . / _ - only."
@@ -241,6 +924,20 @@ msgstr "Posizione esatta"
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Explanation"
 msgstr "Spiegazione"
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"Extra details to record for each category or tag, written as a list, for example [{\"code\": "
+"\"model_year\", \"kind\": \"number\", \"required\": false, \"label\": \"Model year\"}]. Leave it "
+"empty for none. The kind is one of: text, number, boolean."
+msgstr ""
+"Dettagli in più da registrare per ogni categoria o etichetta, scritti come elenco, per esempio "
+"[{\"code\": \"model_year\", \"kind\": \"number\", \"required\": false, \"label\": \"Anno del "
+"modello\"}]. Lascialo vuoto se non servono. Il tipo è uno tra: text, number, boolean."
+
+#: themes/base/templates/components/user_tools.html
+msgid "Fields on this page"
+msgstr "Campi di questa pagina"
 
 #: apps/manager/media.py
 msgid "File"
@@ -268,6 +965,10 @@ msgstr "Hai dimenticato le credenziali di accesso?"
 msgid "Form expired"
 msgstr "Modulo scaduto"
 
+#: apps/cms/models.py
+msgid "General (every other screen)"
+msgstr "Generale (ogni altra schermata)"
+
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 msgid "Generate new codes"
 msgstr "Genera nuovi codici"
@@ -276,9 +977,29 @@ msgstr "Genera nuovi codici"
 msgid "Generating new codes makes every previous code stop working."
 msgstr "Generando nuovi codici, tutti i codici precedenti smettono di funzionare."
 
+#: apps/cms/models.py
+msgid "Give the screen or page type: letters, digits and . : _ - only."
+msgstr "Indica la schermata o il tipo di pagina: solo lettere, cifre e . : _ -"
+
 #: themes/base/templates/layouts/error.html
 msgid "Go to the home page"
 msgstr "Vai alla home page"
+
+#: apps/cms/blocks.py
+msgid ""
+"Grid shows the products in rows and columns. Row puts them on one line that the visitor can scroll"
+" sideways."
+msgstr ""
+"La griglia mostra i prodotti in righe e colonne. La riga li mette su una sola linea che il "
+"visitatore può far scorrere di lato."
+
+#: apps/shipping/models.py
+msgid ""
+"Groups of countries to add to the zone, by their codes such as 'eu' or 'europe', separated by "
+"commas."
+msgstr ""
+"Gruppi di paesi da aggiungere alla zona, con i loro codici, per esempio 'eu' o 'europe', separati "
+"da virgole."
 
 #: apps/orders/templates/email/orders/order_cancelled/body.html
 #: apps/orders/templates/email/orders/order_cancelled/body.txt
@@ -314,6 +1035,214 @@ msgstr "Ciao %(customer_name)s,"
 msgid "Hello,"
 msgstr "Ciao,"
 
+#: themes/base/templates/components/user_tools.html
+msgid "Help"
+msgstr "Aiuto"
+
+#: apps/cms/models.py
+msgid "help entries"
+msgstr "testi di aiuto"
+
+#: apps/cms/models.py
+msgid "help entry"
+msgstr "testo di aiuto"
+
+#: themes/base/templates/components/user_tools.html
+msgid "Help for this page"
+msgstr "Aiuto per questa pagina"
+
+#: apps/cms/models.py
+msgid "help text"
+msgstr "testo di aiuto"
+
+#: apps/manager/wagtail_hooks.py
+msgid "Help texts"
+msgstr "Testi di aiuto"
+
+#: apps/manager/forms.py
+msgid ""
+"How and when you ship. Customers see it in the 'Shipping' section of your shop page. Leave it "
+"empty and the section is not shown. Up to about 5,000 characters including formatting."
+msgstr ""
+"Come e quando spedisci. I clienti la vedono nella sezione ‘Spedizione’ della pagina del tuo "
+"negozio. Se la lasci vuota, la sezione non viene mostrata. Fino a circa 5.000 caratteri, "
+"formattazione compresa."
+
+#: apps/catalog/models.py
+msgid ""
+"How buyers get this product. Buy: they order and pay on the site, so it needs a price. Catalog "
+"only: it is shown but cannot be bought. On request: buyers ask you about it."
+msgstr ""
+"Come chi compra ottiene questo prodotto. Acquisto: ordina e paga sul sito, quindi serve un prezzo."
+" Solo catalogo: è mostrato ma non si può comprare. Su richiesta: chi compra ti contatta per "
+"averlo."
+
+#: apps/events/models.py
+msgid ""
+"How exact the position found from the address is, for example a street or a town. Filled in for "
+"you."
+msgstr ""
+"Quanto è precisa la posizione trovata dall'indirizzo, per esempio una via o una città. Compilato "
+"per te."
+
+#: apps/shipping/models.py
+msgid "How fast or how costly the service is: standard, express, economy or other."
+msgstr "Quanto è veloce o costoso il servizio: standard, express, economico o altro."
+
+#: apps/events/admin_views.py
+msgid ""
+"How many days a cancelled event stays in the calendar feeds, marked as cancelled, so that people's"
+" calendars learn about it. Example: 30. Required."
+msgstr ""
+"Per quanti giorni un evento annullato resta nei calendari, segnato come annullato, così che i "
+"calendari delle persone lo sappiano. Esempio: 30. Obbligatorio."
+
+#: apps/ingest/models.py
+msgid "How many items failed."
+msgstr "Quanti articoli hanno dato errore."
+
+#: apps/ingest/models.py
+msgid "How many items had changed."
+msgstr "Quanti articoli erano cambiati."
+
+#: apps/ingest/models.py
+msgid "How many items had not changed."
+msgstr "Quanti articoli non erano cambiati."
+
+#: apps/ingest/models.py
+msgid "How many items the run found in the feed."
+msgstr "Quanti articoli l'esecuzione ha trovato nel flusso."
+
+#: apps/ingest/models.py
+msgid "How many items the run left out."
+msgstr "Quanti articoli l'esecuzione ha lasciato fuori."
+
+#: apps/ingest/models.py
+msgid "How many items were new."
+msgstr "Quanti articoli erano nuovi."
+
+#: apps/cms/blocks.py
+msgid ""
+"How many products to show, from 1 up to the maximum allowed. If you leave it empty, the default "
+"number is used."
+msgstr ""
+"Quanti prodotti mostrare, da 1 fino al massimo consentito. Se lo lasci vuoto, si usa il numero "
+"predefinito."
+
+#: apps/catalog/models.py
+msgid "How many units of this version you have now, for example 5. Not negative."
+msgstr "Quante unità di questa versione hai adesso, per esempio 5. Non può essere negativo."
+
+#: apps/catalog/models.py
+msgid ""
+"How many units you have now, for example 12. It cannot be negative. Variable products keep the "
+"quantity on each variant."
+msgstr ""
+"Quante unità hai adesso, per esempio 12. Non può essere negativo. I prodotti variabili tengono la "
+"quantità su ogni variante."
+
+#: apps/events/models.py
+msgid ""
+"How people take part: in person, online or both. Required for every event except a promotion, "
+"which has no place."
+msgstr ""
+"Come si partecipa: di persona, online o in entrambi i modi. Obbligatorio per ogni evento tranne la"
+" promozione, che non ha un luogo."
+
+#: apps/catalog/models.py
+msgid ""
+"How stock is managed. Track stock: you keep the quantity up to date. Always open: buyers can order"
+" even when it is out of stock. From the supplier source: for stock kept in your supplier's own "
+"system."
+msgstr ""
+"Come gestisci le scorte. Controlla le scorte: tieni tu la quantità aggiornata. Sempre aperto: si "
+"può ordinare anche quando è esaurito. Dalla fonte del fornitore: per le scorte tenute nel sistema "
+"del tuo fornitore."
+
+#: apps/events/models.py
+msgid ""
+"How sure the service is about the position, from 0 (not sure) to 1 (very sure). Filled in for you."
+msgstr ""
+"Quanto il servizio è sicuro della posizione, da 0 (non sicuro) a 1 (molto sicuro). Compilato per "
+"te."
+
+#: apps/vendors/admin.py
+msgid "How the payment fee is shared between vendors. The default follows the gross amount paid."
+msgstr ""
+"Come la commissione di pagamento è ripartita tra i venditori. Il valore predefinito segue "
+"l’importo lordo pagato."
+
+#: apps/core/models.py
+msgid ""
+"How the platform itself is treated for VAT: the standard regime, or the small-business (flat-rate)"
+" scheme with no VAT charged. Ask your accountant if you are not sure."
+msgstr ""
+"Come viene trattata la piattaforma stessa ai fini IVA: il regime ordinario, oppure il regime "
+"forfettario per le piccole imprese, senza IVA addebitata. Se non sei sicuro, chiedi al tuo "
+"commercialista."
+
+#: apps/events/models.py
+msgid ""
+"How the position was found: from the address, placed on the map or typed by hand. It is filled in "
+"for you."
+msgstr ""
+"Come è stata trovata la posizione: dall'indirizzo, indicata sulla mappa o scritta a mano. "
+"Compilato per te."
+
+#: apps/cms/models.py
+msgid ""
+"How the price reads to visitors, for example 'No monthly fee'. If you leave it empty, no price is "
+"shown."
+msgstr ""
+"Come viene scritto il prezzo per i visitatori, per esempio 'Nessun canone mensile'. Se lo lasci "
+"vuoto, non viene mostrato alcun prezzo."
+
+#: apps/shipping/models.py
+msgid ""
+"How the surcharge is counted: a fixed amount, a percent of the method's cost, or an amount per kg."
+" Needed for a rate with a surcharge."
+msgstr ""
+"Come si conta il supplemento: un importo fisso, una percentuale del costo del metodo, oppure un "
+"importo per kg. Serve per una tariffa con supplemento."
+
+#: apps/tax/models.py
+msgid ""
+"How the vendor charges VAT: OSS (VAT of the buyer's country for EU consumers), domestic only (VAT "
+"of the vendor's own country) or exempt (no VAT charged). Ask your accountant if you are not sure."
+msgstr ""
+"Come il venditore applica l'IVA: OSS (IVA del paese di chi compra per i consumatori UE), solo "
+"nazionale (IVA del paese del venditore) oppure esente (nessuna IVA addebitata). Se non sei sicuro,"
+" chiedi al tuo commercialista."
+
+#: apps/events/admin_views.py
+msgid ""
+"How this shop's events are checked before they go live: by the usual rule, always, or never "
+"because you trust the shop. Required."
+msgstr ""
+"Come vengono controllati gli eventi di questo negozio prima di andare online: con la regola "
+"abituale, sempre, oppure mai perché ti fidi del negozio. Obbligatorio."
+
+#: apps/compliance/models.py
+msgid "How to use, assemble, maintain and dispose of the product safely, in this language."
+msgstr "Come usare, montare, mantenere e smaltire il prodotto in sicurezza, in questa lingua."
+
+#: apps/shipping/models.py
+msgid ""
+"How VAT is applied to the shipping price. Today only the choice that follows the goods works; the "
+"other choices are saved but block the shipping quote. Ask your accountant if you are not sure."
+msgstr ""
+"Come si applica l'IVA al prezzo della spedizione. Oggi funziona solo la scelta che segue la merce;"
+" le altre vengono salvate ma bloccano il preventivo di spedizione. Se non sei sicuro, chiedi al "
+"tuo commercialista."
+
+#: apps/vendors/models.py
+msgid ""
+"How your products are sold unless a product says otherwise: buyers order and pay online, or they "
+"first send you an enquiry."
+msgstr ""
+"Come vendi i tuoi prodotti, salvo diversa indicazione sul singolo prodotto: i clienti ordinano e "
+"pagano online, oppure ti inviano prima una richiesta."
+
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid ""
 "If you are not signed in, Continue signs you in once with this link; you will still confirm it is "
@@ -327,9 +1256,31 @@ msgstr ""
 msgid "Images"
 msgstr "Immagini"
 
+#: apps/catalog/taxonomy.py
+msgid "import batch"
+msgstr "lotto di importazione"
+
+#: apps/shipping/models.py
+msgid ""
+"In the rate calculation, shipping is free when the goods in the package are worth at least this "
+"amount, without VAT. Leave it empty for no free shipping."
+msgstr ""
+"Nel calcolo delle tariffe la spedizione è gratuita quando la merce nel pacco vale almeno questo "
+"importo, IVA esclusa. Lascialo vuoto se non vuoi la spedizione gratuita."
+
 #: themes/base/templates/components/alert.html
 msgid "Information"
 msgstr "Informazione"
+
+#: apps/manager/templates/manager/shop/link_dialog.html
+msgid "Insert link"
+msgstr "Inserisci link"
+
+#: apps/vendors/models.py
+msgid "Internal note on what changed in this version. Vendors do not see it. Up to 200 characters."
+msgstr ""
+"Nota interna su cosa è cambiato in questa versione. I venditori non la vedono. Al massimo 200 "
+"caratteri."
 
 #: apps/accounts/mfa_views.py
 msgid "Invalid code. Check the time on your device and try again."
@@ -338,6 +1289,39 @@ msgstr "Codice non valido. Controlla l’ora del tuo dispositivo e riprova."
 #: apps/accounts/mfa_views.py
 msgid "Invalid code. Try again."
 msgstr "Codice non valido. Riprova."
+
+#: apps/vendors/models.py
+msgid ""
+"Italy only: the ATECO code of your business activity, for example 47.91.10. It is on your VAT "
+"registration; if you do not know it, ask your accountant."
+msgstr ""
+"Solo Italia: il codice ATECO della tua attività, per esempio 47.91.10. Lo trovi nella tua apertura"
+" di partita IVA; se non lo conosci, chiedilo al tuo commercialista."
+
+#: apps/vendors/models.py
+msgid ""
+"Italy only: the province of the company register office (REA) where your company is registered, "
+"for example RM."
+msgstr ""
+"Solo Italia: la provincia dell'ufficio del registro delle imprese (REA) in cui è iscritta la tua "
+"società, per esempio RM."
+
+#: apps/vendors/models.py
+msgid "Italy only: your REA number from the company register, for example 123456."
+msgstr "Solo Italia: il tuo numero REA del registro delle imprese, per esempio 123456."
+
+#: apps/vendors/models.py
+msgid "Italy: the 2-letter province code, for example RM. Elsewhere: the state or region."
+msgstr ""
+"Italia: la sigla di 2 lettere della provincia, per esempio RM. Altrove: lo stato o la regione."
+
+#: apps/vendors/models.py
+msgid ""
+"Italy: your codice fiscale, 16 characters for a person or 11 digits for a company. Elsewhere: your"
+" national tax identification number (TIN). It is stored encrypted."
+msgstr ""
+"Italia: il tuo codice fiscale, 16 caratteri per una persona o 11 cifre per una società. Altrove: "
+"il tuo numero di identificazione fiscale nazionale (TIN). Viene conservato cifrato."
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Items"
@@ -351,17 +1335,57 @@ msgstr "Lingua"
 msgid "Language of the texts"
 msgstr "Lingua dei testi"
 
+#: apps/shipping/models.py
+msgid ""
+"Leave it empty for a zone that every vendor can use. Choose a vendor for a zone that belongs to "
+"that vendor only."
+msgstr ""
+"Lascialo vuoto per una zona che possono usare tutti i venditori. Scegli un venditore per una zona "
+"che appartiene solo a lui."
+
+#: apps/ingest/models.py
+msgid ""
+"Leave it empty for an entry that holds for every vendor. A vendor's own entry wins over an entry "
+"for every vendor."
+msgstr ""
+"Lascialo vuoto per una voce valida per tutti i venditori. La voce propria di un venditore vince su"
+" una voce per tutti."
+
+#: apps/vendors/models.py
+msgid ""
+"Leave it empty for every region, or choose EU or non-EU to apply the rule to every vendor "
+"established there."
+msgstr ""
+"Lascialo vuoto per tutte le aree, oppure scegli UE o extra UE per applicare la regola a tutti i "
+"venditori con sede lì."
+
 #: themes/base/templates/components/footer.html
 msgid "Legal"
 msgstr "Note legali"
+
+#: apps/catalog/taxonomy.py
+msgid "legal name"
+msgstr "ragione sociale"
 
 #: apps/manager/forms.py
 msgid "Letters, digits, spaces and . / _ - only."
 msgstr "Solo lettere, cifre, spazi e . / _ -"
 
+#: apps/manager/media.py
+msgid "Link text"
+msgstr "Testo del link"
+
+#: apps/cms/models.py
+msgid "link the vendor guide"
+msgstr "collega la guida per i venditori"
+
 #: themes/base/templates/components/button.html
 msgid "Loading"
 msgstr "Caricamento"
+
+#: themes/base/templates/components/user_tools.html
+msgid "Loading help…"
+msgstr "Caricamento dell’aiuto…"
 
 #: apps/accounts/templates/accounts/admin/login.html
 msgid "Log in"
@@ -371,13 +1395,41 @@ msgstr "Accedi"
 msgid "Logo"
 msgstr "Logo"
 
+#: apps/catalog/taxonomy.py
+msgid "logo"
+msgstr "logo"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Logo author or rights holder"
+msgstr "Autore o titolare dei diritti del logo"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Logo credit line"
+msgstr "Riga di credito del logo"
+
+#: apps/catalog/taxonomy.py
+msgid "logo description"
+msgstr "descrizione del logo"
+
 #: apps/manager/forms.py
 msgid "Logo image"
 msgstr "Immagine del logo"
 
+#: apps/catalog/taxonomy_admin.py
+msgid "Logo licence"
+msgstr "Licenza del logo"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Logo permission reference"
+msgstr "Riferimento del permesso per il logo"
+
 #: apps/manager/views.py
 msgid "Logo saved."
 msgstr "Logo salvato."
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Logo source URL"
+msgstr "URL della fonte del logo"
 
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Lost your device?"
@@ -394,6 +1446,10 @@ msgstr "Gestisci i codici di recupero"
 #: apps/manager/templates/manager/layout.html
 msgid "Manager sections"
 msgstr "Sezioni del Manager"
+
+#: apps/catalog/taxonomy.py
+msgid "manufacturer"
+msgstr "produttore"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Mark as delivered"
@@ -412,6 +1468,26 @@ msgstr ""
 #: themes/base/templates/components/header.html
 msgid "Menu"
 msgstr "Menu"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Merge brands"
+msgstr "Unisci marchi"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Merge into"
+msgstr "Unisci in"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Merge the selected brands into another brand"
+msgstr "Unisci i marchi selezionati in un altro marchio"
+
+#: apps/catalog/taxonomy.py
+msgid "name"
+msgstr "nome"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "New logo file"
+msgstr "Nuovo file del logo"
 
 #: apps/orders/templates/email/orders/vendor_new_order/subject.txt
 msgid "New paid order %(order_number)s"
@@ -449,6 +1525,70 @@ msgstr "nessuna registrazione di passkey in corso"
 msgid "No second factor yet."
 msgstr "Nessun secondo fattore per ora."
 
+#: apps/shipping/models.py
+msgid ""
+"Not used yet at checkout: marks the method to preselect once checkout uses shipping rates. A "
+"vendor can have only one default method per zone."
+msgstr ""
+"Non ancora usato al checkout: indica il metodo da preselezionare quando il checkout userà le "
+"tariffe di spedizione. Un venditore può avere un solo metodo predefinito per zona."
+
+#: apps/ingest/models.py
+msgid ""
+"Not used yet: saved for a future feature. Settings of the reader, as a JSON object. Leave '{}' if "
+"it needs none."
+msgstr ""
+"Non ancora usato: viene salvato per una funzione futura. Impostazioni del lettore, come oggetto "
+"JSON. Lascia '{}' se non ne servono."
+
+#: apps/shipping/models.py
+msgid ""
+"Not used yet: saved for a future feature. The carrier's tracking link, with {tracking_number} "
+"where the parcel number goes. Leave it empty if there is none."
+msgstr ""
+"Non ancora usato: viene salvato per una funzione futura. Il link di tracciamento del corriere, con"
+" {tracking_number} al posto del numero del pacco. Lascialo vuoto se non c'è."
+
+#: apps/ingest/models.py
+msgid ""
+"Not used yet: saved for a future feature. The code of the reader that understands this supplier's "
+"feed."
+msgstr ""
+"Non ancora usato: viene salvato per una funzione futura. Il codice del lettore che capisce il "
+"flusso di questo fornitore."
+
+#: apps/core/models.py
+msgid ""
+"Not used yet: saved for a future feature. The EU country whose tax authority will get the DAC7 "
+"report. Ask your accountant if you are not sure."
+msgstr ""
+"Non ancora usato: viene salvato per una funzione futura. Il paese UE la cui autorità fiscale "
+"riceverà il report DAC7. Chiedi al tuo commercialista se non sei sicuro."
+
+#: apps/shipping/models.py
+msgid ""
+"Not used yet: saved for a future feature. Tick it if the carrier offers labels and tracking "
+"through an API."
+msgstr ""
+"Non ancora usato: viene salvato per una funzione futura. Spunta se il corriere offre etichette e "
+"tracciamento tramite API."
+
+#: apps/ingest/models.py
+msgid ""
+"Not used yet: saved for a future feature. Untick it to retire the source. Sources are never "
+"deleted."
+msgstr ""
+"Non ancora usato: viene salvato per una funzione futura. Togli la spunta per mettere a riposo la "
+"fonte. Le fonti non si cancellano mai."
+
+#: apps/ingest/models.py
+msgid ""
+"Not used yet: saved for a future feature. When the feed should be read, as a cron expression such "
+"as '0 3 * * *' (every day at 3:00). Leave it empty for none."
+msgstr ""
+"Non ancora usato: viene salvato per una funzione futura. Quando leggere il flusso, come "
+"espressione cron, per esempio '0 3 * * *' (ogni giorno alle 3:00). Lascia vuoto se non serve."
+
 #: apps/manager/views.py
 msgid "Nothing changed."
 msgstr "Nessuna modifica."
@@ -478,9 +1618,140 @@ msgstr "Segnalazioni"
 msgid "Notifier"
 msgstr "Segnalante"
 
+#: apps/catalog/taxonomy.py
+msgid "official URL"
+msgstr "URL ufficiale"
+
 #: apps/manager/forms.py
 msgid "One line under the shop name. Plain text."
 msgstr "Una riga sotto il nome del negozio. Testo semplice."
+
+#: apps/events/models.py
+msgid ""
+"One or two sentences that tell what the event is, up to 300 characters. They are shown in the "
+"events list, in calendar feeds and in search results. Required: the event cannot be saved without "
+"it."
+msgstr ""
+"Una o due frasi che dicono che cos'è l'evento, fino a 300 caratteri. Si vedono nell'elenco degli "
+"eventi, nei calendari e nei risultati di ricerca. Obbligatorio: senza non si può salvare l'evento."
+
+#: apps/cms/blocks.py
+msgid ""
+"One or two sentences under the title, up to 400 characters. If you leave it empty, only the title "
+"is shown."
+msgstr ""
+"Una o due frasi sotto il titolo, fino a 400 caratteri. Se le lasci vuote, si vede solo il titolo."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"Only approved brands have a public page and can be picked by every vendor. Use the approve, reject"
+" and merge actions to review a proposal. Example: Approved."
+msgstr ""
+"Solo i marchi approvati hanno una pagina pubblica e possono essere scelti da ogni venditore. Per "
+"rivedere una proposta usa le azioni di approvazione, rifiuto e unione. Esempio: Approvata."
+
+#: apps/shipping/models.py
+msgid ""
+"Only for a territory with its own VAT rules: the code of its tax territory, for example 'ES-CN'."
+msgstr ""
+"Solo per un territorio con regole IVA proprie: il codice del suo territorio fiscale, per esempio "
+"'ES-CN'."
+
+#: apps/tax/models.py
+msgid ""
+"Only for an 'Other' exemption: the country of the law named in the legal note, as a two-letter "
+"code. It must be the country of the vendor's VAT number. Ask your accountant if you are not sure."
+msgstr ""
+"Solo per un'esenzione 'Altro': il paese della legge citata nella nota legale, come codice di due "
+"lettere. Deve essere il paese della partita IVA del venditore. Se non sei sicuro, chiedi al tuo "
+"commercialista."
+
+#: apps/tax/models.py
+msgid ""
+"Only for an 'Other' exemption: the nature code that the e-invoice needs. Ask your accountant which"
+" one applies."
+msgstr ""
+"Solo per un'esenzione 'Altro': il codice natura richiesto dalla fattura elettronica. Chiedi al tuo"
+" commercialista quale vale."
+
+#: apps/events/models.py
+msgid ""
+"Only for an event that repeats. Write the rule, for example FREQ=YEARLY;COUNT=3 repeats it every "
+"year, three times. If you leave it empty, the event happens once."
+msgstr ""
+"Solo per un evento che si ripete. Scrivi la regola: per esempio FREQ=YEARLY;COUNT=3 lo ripete ogni"
+" anno, per tre volte. Se la lasci vuota, l'evento si svolge una sola volta."
+
+#: apps/vendors/models.py
+msgid ""
+"Only for regime RF20: the number ending in EX that your country of establishment issued for the "
+"cross-border VAT franchise, for example DE123456789EX."
+msgstr ""
+"Solo per il regime RF20: il numero che termina con EX rilasciato dal tuo paese di stabilimento per"
+" il regime di franchigia IVA transfrontaliera, per esempio DE123456789EX."
+
+#: apps/tax/models.py
+msgid ""
+"Only for the exempt regime: why the vendor charges no VAT, the flat-rate scheme or another reason."
+" Ask your accountant if you are not sure."
+msgstr ""
+"Solo per il regime esente: perché il venditore non applica l'IVA, il regime forfettario o un altro"
+" motivo. Se non sei sicuro, chiedi al tuo commercialista."
+
+#: apps/tax/models.py
+msgid "Only for the OSS regime: the date the vendor registered for OSS."
+msgstr "Solo per il regime OSS: la data in cui il venditore si è registrato all'OSS."
+
+#: apps/tax/models.py
+msgid "Only for the rate of a territory of the country. Leave it empty for the country's own rate."
+msgstr ""
+"Solo per l'aliquota di un territorio del paese. Lascialo vuoto per l'aliquota del paese stesso."
+
+#: apps/vendors/models.py
+msgid ""
+"Only if the bank account is not in the name of your business: the name of the account holder. It "
+"is asked for the platform's yearly DAC7 reporting duty."
+msgstr ""
+"Solo se il conto bancario non è intestato alla tua attività: il nome dell'intestatario. Ci viene "
+"richiesto per l'obbligo di comunicazione annuale DAC7 della piattaforma."
+
+#: apps/vendors/models.py
+msgid ""
+"Only if you are established outside the EU and have appointed a fiscal representative in Italy: "
+"their name, as in the appointment. Otherwise leave it empty."
+msgstr ""
+"Solo se hai sede fuori dall'UE e hai nominato un rappresentante fiscale in Italia: il suo nome, "
+"come nella nomina. Altrimenti lascialo vuoto."
+
+#: apps/vendors/models.py
+msgid ""
+"Only if you have a permanent establishment (a branch or fixed place of business) apart from your "
+"registered office: its street, without the number. Otherwise leave the whole address empty; if "
+"unsure, ask your accountant."
+msgstr ""
+"Solo se hai una stabile organizzazione (una filiale o una sede fissa) diversa dalla sede legale: "
+"la sua via, senza il numero civico. Altrimenti lascia vuoto tutto l'indirizzo; se non sei sicuro, "
+"chiedi al tuo commercialista."
+
+#: apps/events/admin_views.py
+msgid "Only when the event is hidden after a notice."
+msgstr "Solo quando l'evento viene nascosto in seguito a una segnalazione."
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Optional text that replaces the generated credit line. Example: 'Logo: Acme Ltd'."
+msgstr "Testo facoltativo che sostituisce la riga di credito generata. Esempio: 'Logo: Acme Ltd'."
+
+#: apps/themes/styleguide.py
+msgid "Optional, charged at checkout."
+msgstr "Facoltativo, addebitato alla cassa."
+
+#: apps/manager/forms.py
+msgid ""
+"Optional. The name of the courier, for example the one on the parcel. The customer gets it in the "
+"shipping email together with the tracking number."
+msgstr ""
+"Facoltativo. Il nome del corriere, per esempio quello scritto sul pacco. Il cliente lo riceve "
+"nell’email di spedizione insieme al numero di tracking."
 
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Order"
@@ -534,6 +1805,30 @@ msgstr "Numero d’ordine"
 msgid "Orders"
 msgstr "Ordini"
 
+#: apps/ingest/models.py
+msgid "Other addresses the same item had in the feed, as a JSON list."
+msgstr "Altri indirizzi che lo stesso articolo ha avuto nel flusso, come elenco JSON."
+
+#: apps/catalog/models.py
+msgid ""
+"Other categories where buyers may look for this product. Optional: the main category is enough for"
+" most products."
+msgstr ""
+"Altre categorie dove chi compra può cercare questo prodotto. Facoltativo: per la maggior parte dei"
+" prodotti basta la categoria principale."
+
+#: apps/catalog/models.py
+msgid ""
+"Other products you want to suggest with this one, for example a better model. Optional: leave it "
+"empty to suggest nothing."
+msgstr ""
+"Altri prodotti che vuoi suggerire insieme a questo, per esempio un modello migliore. Facoltativo: "
+"lascialo vuoto per non suggerire nulla."
+
+#: apps/ingest/models.py
+msgid "Other ways the supplier writes the same term, as a JSON list."
+msgstr "Altri modi in cui il fornitore scrive lo stesso termine, come elenco JSON."
+
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Out of stock"
 msgstr "Esaurito"
@@ -553,6 +1848,10 @@ msgstr "Pagina %(page)s di %(count)s"
 #: themes/base/templates/404.html
 msgid "Page not found"
 msgstr "Pagina non trovata"
+
+#: apps/cms/models.py
+msgid "Page type"
+msgstr "Tipo di pagina"
 
 #: themes/base/templates/components/pagination.html
 msgid "Pagination"
@@ -584,9 +1883,61 @@ msgstr "Password"
 msgid "Payment received for order %(order_number)s"
 msgstr "Pagamento ricevuto per l’ordine %(order_number)s"
 
+#: apps/themes/styleguide.py
+msgid "PDF or image, 5 MB at most."
+msgstr "PDF o immagine, al massimo 5 MB."
+
+#: apps/catalog/taxonomy.py
+msgid "Pending review"
+msgstr "In attesa di revisione"
+
+#: apps/cms/blocks.py
+msgid ""
+"Pick a language to show this picture only to visitors reading in it. Leave it on 'All languages' "
+"to show it to everyone."
+msgstr ""
+"Scegli una lingua per mostrare questa immagine solo ai visitatori che leggono in quella lingua. "
+"Lascia 'Tutte le lingue' per mostrarla a tutti."
+
+#: apps/vendors/forms.py
+msgid ""
+"Pick a password you do not use anywhere else. You will use it with your email address to log in. "
+"Required: without it your account is not created."
+msgstr ""
+"Scegli una password che non usi altrove. La userai insieme al tuo indirizzo email per accedere. "
+"Obbligatorio: senza non creiamo il tuo account."
+
+#: apps/vendors/admin.py
+msgid ""
+"Pick a plan to give only the vendors on that plan this rule. Leave it empty for a rule that does "
+"not depend on the plan."
+msgstr ""
+"Scegli un piano per applicare questa regola solo ai venditori di quel piano. Lascialo vuoto per "
+"una regola che non dipende dal piano."
+
+#: apps/vendors/admin.py
+msgid ""
+"Pick a vendor to give only that vendor this rule. Leave it empty, with the plan also empty, for "
+"the platform default."
+msgstr ""
+"Scegli un venditore per applicare questa regola solo a lui. Lascialo vuoto, con anche il piano "
+"vuoto, per il valore predefinito della piattaforma."
+
+#: apps/cms/blocks.py
+msgid "Pick the picture from the library or upload a new one. Required."
+msgstr "Scegli l'immagine dalla libreria o caricane una nuova. Obbligatoria."
+
 #: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
 msgid "Placed"
 msgstr "Effettuato il"
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"Plain text describing the logo for people who cannot see it. Required with a logo. Example: 'Acme,"
+" an anvil in a red circle'."
+msgstr ""
+"Testo semplice che descrive il logo per chi non lo può vedere. Obbligatorio se c'è un logo. "
+"Esempio: 'Acme, un'incudine in un cerchio rosso'."
 
 #: apps/manager/forms.py
 msgid "Plain text for people who cannot see the image, for example the shop name."
@@ -605,6 +1956,18 @@ msgstr[1] "Correggi gli errori qui sotto."
 #: apps/manager/forms.py
 msgid "PNG, JPEG or WebP. Leave empty to keep the current image."
 msgstr "PNG, JPEG o WebP. Lascia vuoto per mantenere l’immagine attuale."
+
+#: apps/manager/media.py
+msgid ""
+"PNG, JPEG, WebP or GIF (SVG is not accepted). The image is checked and saved again without its "
+"hidden data. It goes into your own images only."
+msgstr ""
+"PNG, JPEG, WebP o GIF (gli SVG non sono accettati). L’immagine viene controllata e salvata di "
+"nuovo senza i suoi dati nascosti. Finisce solo tra le tue immagini."
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Position"
+msgstr "Posizione"
 
 #: apps/manager/templates/manager/list.html
 msgid "Preview"
@@ -625,6 +1988,10 @@ msgstr "Prodotto"
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Products"
 msgstr "Prodotti"
+
+#: apps/catalog/taxonomy.py
+msgid "proposed by"
+msgstr "proposto da"
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Published"
@@ -665,9 +2032,33 @@ msgstr "Codici di recupero"
 msgid "Reference"
 msgstr "Riferimento"
 
+#: apps/catalog/taxonomy_admin.py
+msgid ""
+"Reference of the stored written permission, when the licence needs one. Example: "
+"'permission-2026-11-acme.pdf'."
+msgstr ""
+"Riferimento del permesso scritto conservato, quando la licenza lo richiede. Esempio: "
+"'permission-2026-11-acme.pdf'."
+
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 msgid "Register a passkey"
 msgstr "Registra una passkey"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Reject all brands of the selected batches"
+msgstr "Rifiuta tutti i marchi dei lotti selezionati"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Reject the selected proposals"
+msgstr "Rifiuta le proposte selezionate"
+
+#: apps/catalog/taxonomy.py
+msgid "Rejected"
+msgstr "Rifiutata"
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Relative to"
+msgstr "Rispetto a"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Remove"
@@ -694,9 +2085,17 @@ msgstr "Limita e invia la motivazione"
 msgid "Retired"
 msgstr "Ritirati"
 
+#: apps/vendors/services.py
+msgid "Returns and refunds"
+msgstr "Resi e rimborsi"
+
 #: apps/manager/forms.py
 msgid "Returns and refunds policy"
 msgstr "Condizioni di reso e rimborso"
+
+#: apps/catalog/taxonomy.py
+msgid "sameAs links"
+msgstr "Link sameAs"
 
 #: apps/manager/templates/manager/shop/profile.html
 msgid "Save"
@@ -706,11 +2105,27 @@ msgstr "Salva"
 msgid "Save logo"
 msgstr "Salva logo"
 
+#: apps/compliance/forms.py
+msgid "Say whether the content is illegal or only against the platform terms."
+msgstr "Indica se il contenuto è illegale o va solo contro i termini della piattaforma."
+
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Scan this QR code with your authenticator app, then enter the 6-digit code it shows."
 msgstr ""
 "Scansiona questo codice QR con la tua app di autenticazione, poi inserisci il codice a 6 cifre che"
 " mostra."
+
+#: apps/cms/models.py
+msgid "Screen (route name)"
+msgstr "Schermata (nome della route)"
+
+#: apps/cms/models.py
+msgid "screen or page type"
+msgstr "schermata o tipo di pagina"
+
+#: apps/cms/blocks.py
+msgid "Search by name, SKU, brand or vendor, then click the product."
+msgstr "Cerca per nome, SKU, marchio o venditore, poi clicca sul prodotto."
 
 #: apps/manager/templates/manager/list.html
 msgid "Select"
@@ -719,6 +2134,14 @@ msgstr "Seleziona"
 #: apps/manager/lists.py
 msgid "Select at least one row."
 msgstr "Seleziona almeno una riga."
+
+#: apps/catalog/taxonomy.py
+msgid "SEO description"
+msgstr "Descrizione SEO"
+
+#: apps/catalog/taxonomy.py
+msgid "SEO title"
+msgstr "Titolo SEO"
 
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Set up an authenticator app"
@@ -730,7 +2153,7 @@ msgstr "Configura la verifica in due passaggi"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Ship the order"
-msgstr "Spedisci l'ordine"
+msgstr "Spedisci l’ordine"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Ship to"
@@ -740,6 +2163,10 @@ msgstr "Spedire a"
 #: apps/orders/templates/email/orders/vendor_new_order/body.txt
 msgid "Ship to:"
 msgstr "Spedire a:"
+
+#: apps/vendors/services.py
+msgid "Shipping"
+msgstr "Spedizione"
 
 #: apps/manager/forms.py
 msgid "Shipping policy"
@@ -754,9 +2181,45 @@ msgstr "Spedizione: %(shipping)s EUR"
 msgid "Shop"
 msgstr "Negozio"
 
+#: apps/cms/choosers.py
+msgid "Show only the products of one brand."
+msgstr "Mostra solo i prodotti di un marchio."
+
+#: apps/cms/choosers.py
+msgid "Show only the products of one category and the categories below it."
+msgstr "Mostra solo i prodotti di una categoria e delle categorie sotto di essa."
+
+#: apps/cms/choosers.py
+msgid "Show only the products of one vendor."
+msgstr "Mostra solo i prodotti di un venditore."
+
 #: apps/accounts/forms.py apps/manager/templates/manager/login.html
 msgid "Show password"
 msgstr "Mostra password"
+
+#: apps/cms/blocks.py
+msgid "Show the newest products of this brand."
+msgstr "Mostra i prodotti più recenti di questa marca."
+
+#: apps/cms/blocks.py
+msgid "Show the newest products of this category or tag."
+msgstr "Mostra i prodotti più recenti di questa categoria o etichetta."
+
+#: apps/cms/blocks.py
+msgid "Show the newest products of this category."
+msgstr "Mostra i prodotti più recenti di questa categoria."
+
+#: apps/cms/blocks.py
+msgid "Show the newest products of this shop."
+msgstr "Mostra i prodotti più recenti di questo negozio."
+
+#: apps/cms/models.py
+msgid "Shown on the article; a migrated article keeps its original date."
+msgstr "Mostrata sull'articolo. Un articolo importato mantiene la sua data originale."
+
+#: apps/events/admin_views.py
+msgid "Shown to the vendor and kept in the audit log."
+msgstr "Viene mostrato al venditore e conservato nel registro delle operazioni."
 
 #: apps/manager/templates/manager/login.html
 msgid "Sign in"
@@ -764,8 +2227,21 @@ msgstr "Accedi"
 
 #: apps/manager/templates/manager/forbidden.html apps/manager/templates/manager/layout.html
 #: apps/manager/templates/manager/shop/vendor_closed.html
+#: themes/base/templates/components/user_tools.html
 msgid "Sign out"
 msgstr "Esci"
+
+#: apps/catalog/models.py
+msgid ""
+"Simple is one product with one price and one stock. Variable comes in versions, such as sizes or "
+"colours, that you add one by one as variants."
+msgstr ""
+"Semplice è un prodotto con un solo prezzo e una sola scorta. Variabile esiste in più versioni, "
+"come taglie o colori, che aggiungi una per una come varianti."
+
+#: apps/ingest/models.py
+msgid "Since when the item is no longer in the feed. Empty while it is there."
+msgstr "Da quando l'articolo non è più nel flusso. Vuoto finché c'è."
 
 #: themes/base/templates/components/skip_link.html
 msgid "Skip to main content"
@@ -775,13 +2251,68 @@ msgstr "Vai al contenuto principale"
 msgid "SKU"
 msgstr "SKU"
 
+#: apps/vendors/models.py
+msgid ""
+"Sole traders only: if your country issues no tax identification number, the city and country where"
+" you were born. It is asked for the platform's yearly DAC7 reporting duty and stored encrypted. "
+"Not sure? Ask your accountant."
+msgstr ""
+"Solo ditte individuali: se il tuo paese non rilascia un numero di identificazione fiscale, la "
+"città e il paese in cui sei nato. Ci viene richiesto per l'obbligo di comunicazione annuale DAC7 "
+"della piattaforma e viene conservato cifrato. Non sei sicuro? Chiedi al tuo commercialista."
+
+#: apps/vendors/models.py
+msgid ""
+"Sole traders only: your date of birth. It is asked for the platform's yearly DAC7 reporting duty, "
+"and it is stored encrypted."
+msgstr ""
+"Solo ditte individuali: la tua data di nascita. Ci viene richiesta per l'obbligo di comunicazione "
+"annuale DAC7 della piattaforma e viene conservata cifrata."
+
+#: apps/vendors/models.py
+msgid ""
+"Sole traders only: your first name, as on your identity document. It goes on the invoices we issue"
+" to you."
+msgstr ""
+"Solo ditte individuali: il tuo nome, come sul documento d'identità. Compare nelle fatture che ti "
+"emettiamo."
+
+#: apps/vendors/models.py
+msgid ""
+"Sole traders only: your last name, as on your identity document. It goes on the invoices we issue "
+"to you."
+msgstr ""
+"Solo ditte individuali: il tuo cognome, come sul documento d'identità. Compare nelle fatture che "
+"ti emettiamo."
+
 #: themes/base/templates/500.html
 msgid "Something went wrong"
 msgstr "Qualcosa è andato storto"
 
+#: apps/catalog/taxonomy.py
+msgid "source"
+msgstr "origine"
+
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Staff"
 msgstr "Staff"
+
+#: apps/vendors/models.py
+msgid ""
+"Staff only: the vendor's user number in the old system, kept to link migrated data. Leave it as it"
+" is."
+msgstr ""
+"Solo per lo staff: il numero utente del venditore nel vecchio sistema, conservato per collegare i "
+"dati migrati. Lascialo com'è."
+
+#: apps/core/models.py
+msgid ""
+"Staff session settings that replace the defaults: timers and lists of actions. Leave it empty to "
+"keep the defaults. A value that does not fit is refused when you save."
+msgstr ""
+"Impostazioni delle sessioni del personale che sostituiscono quelle predefinite: tempi ed elenchi "
+"di azioni. Lascialo vuoto per tenere i valori predefiniti. Un valore che non va bene viene "
+"rifiutato al salvataggio."
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Start review"
@@ -796,6 +2327,10 @@ msgstr "Motivazioni"
 #: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
 msgid "Status"
 msgstr "Stato"
+
+#: apps/catalog/taxonomy.py
+msgid "status"
+msgstr "stato"
 
 #: apps/manager/sections.py apps/manager/templates/manager/shop/profile.html
 msgid "Storefront profile"
@@ -821,6 +2356,86 @@ msgstr "Cambia"
 msgid "Tagline"
 msgstr "Slogan"
 
+#: apps/vendors/models.py
+msgid ""
+"Tell buyers about your shop: who you are and what you make or sell. Leave it empty and your shop "
+"page has no description."
+msgstr ""
+"Racconta ai clienti il tuo negozio: chi sei e cosa produci o vendi. Se la lasci vuota, la pagina "
+"del tuo negozio non ha descrizione."
+
+#: apps/vendors/models.py
+msgid ""
+"Tell buyers how and when you ship, and what it costs. Buyers read it in your shop before they "
+"order."
+msgstr ""
+"Spiega ai clienti come e quando spedisci e quanto costa. I clienti la leggono nel tuo negozio "
+"prima di ordinare."
+
+#: apps/vendors/models.py
+msgid ""
+"Tell buyers how to ask for a refund, how long it takes and who pays the return shipping. Buyers "
+"read it in your shop before they order."
+msgstr ""
+"Spiega ai clienti come chiedere un rimborso, quanto tempo richiede e chi paga la spedizione del "
+"reso. I clienti la leggono nel tuo negozio prima di ordinare."
+
+#: apps/vendors/models.py
+msgid ""
+"Tell buyers until when they can cancel an order and how, for example 'before the parcel is handed "
+"to the courier'. Buyers read it in your shop before they order."
+msgstr ""
+"Spiega ai clienti fino a quando possono annullare un ordine e come, per esempio 'prima che il "
+"pacco sia consegnato al corriere'. I clienti la leggono nel tuo negozio prima di ordinare."
+
+#: apps/compliance/forms.py
+msgid "Tell us why you think the content is illegal. Required."
+msgstr "Spiegaci perché ritieni che il contenuto sia illegale. Obbligatorio."
+
+#: apps/vendors/models.py
+msgid ""
+"The 7-character code of the SDI channel (the Italian tax system) that receives e-invoices "
+"addressed to you. 0000000 is used together with a PEC address, which you give in the PEC field; "
+"XXXXXXX is for businesses established outside Italy. Your accountant or invoicing software can "
+"tell you the code."
+msgstr ""
+"Il codice di 7 caratteri del canale SDI (il Sistema di Interscambio) che riceve le fatture "
+"elettroniche a te intestate. 0000000 si usa insieme a un indirizzo PEC, che indichi nel campo PEC;"
+" XXXXXXX è per le imprese con sede fuori dall'Italia. Il codice te lo può dire il tuo "
+"commercialista o il tuo programma di fatturazione."
+
+#: apps/ingest/models.py
+msgid "The address of the item in the supplier's feed. It identifies the item in that feed."
+msgstr "L'indirizzo dell'articolo nel flusso del fornitore. Identifica l'articolo in quel flusso."
+
+#: apps/accounts/models.py
+msgid "The address this person signs in with. It must be unique: two accounts cannot share it."
+msgstr ""
+"L'indirizzo con cui questa persona accede. Deve essere unico: due account non possono usarlo "
+"insieme."
+
+#: apps/core/models.py
+msgid "The address users can write to for help. It is published on the public contact page."
+msgstr ""
+"L'indirizzo a cui gli utenti possono scrivere per avere aiuto. Viene pubblicato nella pagina "
+"pubblica dei contatti."
+
+#: apps/shipping/models.py
+msgid ""
+"The address where buyers will collect their order, with street, number, town and postcode. Not "
+"shown to buyers yet."
+msgstr ""
+"L'indirizzo dove i clienti ritireranno l'ordine, con via, numero, città e CAP. Non ancora mostrato"
+" ai clienti."
+
+#: apps/vendors/forms.py
+msgid ""
+"The address where we send the link to confirm your application. Required: without a working "
+"address you cannot continue."
+msgstr ""
+"L'indirizzo a cui mandiamo il link per confermare la candidatura. Obbligatorio: senza un indirizzo"
+" funzionante non puoi proseguire."
+
 #: apps/compliance/forms.py
 msgid ""
 "The address you gave when you ordered. It proves the order is yours, and the confirmation of your "
@@ -828,6 +2443,202 @@ msgid ""
 msgstr ""
 "L’indirizzo che hai indicato quando hai ordinato. Dimostra che l’ordine è tuo e la conferma del "
 "tuo recesso viene inviata lì. Obbligatorio."
+
+#: apps/catalog/taxonomy_admin.py
+msgid ""
+"The approved brand that keeps the products and takes over the old page address. Example: merge the"
+" proposal 'Acmee' into the existing brand 'Acme'."
+msgstr ""
+"Il marchio approvato che tiene i prodotti e prende l'indirizzo della vecchia pagina. Esempio: "
+"unisci la proposta 'Acmee' nel marchio esistente 'Acme'."
+
+#: apps/cms/models.py
+msgid ""
+"The article, built from blocks: text, pictures, galleries, questions and links. Drag blocks to "
+"reorder them."
+msgstr ""
+"L'articolo, costruito a blocchi: testo, immagini, gallerie, domande e link. Trascina i blocchi per"
+" cambiarne l'ordine."
+
+#: apps/catalog/attributes.py
+msgid ""
+"The attribute this value belongs to, for example 'size'. Required. Only choice attributes have "
+"values."
+msgstr ""
+"L'attributo a cui appartiene questo valore, per esempio 'taglia'. Obbligatorio. Solo gli attributi"
+" a scelta hanno dei valori."
+
+#: apps/cms/models.py
+msgid "The author page's address; made from the name when left empty."
+msgstr "L'indirizzo della pagina dell'autore. Se lo lasci vuoto, viene ricavato dal nome."
+
+#: apps/cms/models.py
+msgid "The author's profiles elsewhere (a social network, a personal site)."
+msgstr "I profili dell'autore altrove (un social network, un sito personale)."
+
+#: apps/compliance/models.py
+msgid "The authority that issued the order. Leave it empty for a safety notice."
+msgstr "L'autorità che ha emesso l'ordine. Lascialo vuoto per una segnalazione di sicurezza."
+
+#: apps/shipping/models.py
+msgid ""
+"The band starts above this weight, in kg. A parcel of exactly this weight belongs to the band "
+"before."
+msgstr ""
+"La fascia inizia sopra questo peso, in kg. Un pacco di questo peso esatto appartiene alla fascia "
+"precedente."
+
+#: apps/catalog/models.py
+msgid ""
+"The barcode number (EAN, UPC or ISBN), 8 to 14 digits, for example 4006381333931. Leave it empty "
+"if the product has no barcode."
+msgstr ""
+"Il numero del codice a barre (EAN, UPC o ISBN), da 8 a 14 cifre, per esempio 4006381333931. "
+"Lascialo vuoto se il prodotto non ha un codice a barre."
+
+#: apps/compliance/models.py
+msgid ""
+"The batch or serial number of the product, if it has one. Leave it empty when every unit is the "
+"same."
+msgstr ""
+"Il numero di lotto o di serie del prodotto, se ce l'ha. Lascialo vuoto quando tutte le unità sono "
+"uguali."
+
+#: apps/vendors/models.py
+msgid "The BIC (SWIFT) code of your bank, 8 or 11 characters, if you have it."
+msgstr "Il codice BIC (SWIFT) della tua banca, di 8 o 11 caratteri, se lo hai."
+
+#: apps/cms/blocks.py
+msgid ""
+"The big title at the top of the page, up to 120 characters. Required: the banner cannot be saved "
+"without it."
+msgstr ""
+"Il grande titolo in cima alla pagina, fino a 120 caratteri. Obbligatorio: senza non si può salvare"
+" il banner."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The brand as customers know it; it is the same in every language. Names that differ only in case, "
+"accents or punctuation count as duplicates. Example: 'Acme'."
+msgstr ""
+"Il marchio come lo conoscono i clienti; è uguale in ogni lingua. I nomi che differiscono solo per "
+"maiuscole, accenti o punteggiatura contano come duplicati. Esempio: 'Acme'."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The brand logo shown on its page. Upload a new one with the file fields below, or pick an image "
+"from the library that already has its licence and author. Example: the official logo as PNG or "
+"SVG."
+msgstr ""
+"Il logo del marchio mostrato sulla sua pagina. Caricane uno nuovo con i campi file qui sotto, "
+"oppure scegli un'immagine della libreria che ha già licenza e autore. Esempio: il logo ufficiale "
+"in PNG o SVG."
+
+#: apps/catalog/models.py
+msgid ""
+"The brand of the maker, for example 'Acme'. Pick it from the list; leave it empty if the product "
+"has no brand."
+msgstr ""
+"Il marchio del produttore, per esempio 'Acme'. Sceglilo dall'elenco; lascialo vuoto se il prodotto"
+" non ha un marchio."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The brand's item on Wikidata. It links the brand to one world-wide identity and is how duplicates "
+"are found. Only the format is checked, nothing is fetched. Example: Q42."
+msgstr ""
+"La voce del marchio su Wikidata. Collega il marchio a un'unica identità mondiale ed è il modo in "
+"cui si trovano i duplicati. Viene controllato solo il formato, non viene scaricato nulla. Esempio:"
+" Q42."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The brand's own website, an https address. It is linked from the brand page and given to search "
+"engines. Example: https://acme.example/."
+msgstr ""
+"Il sito web del marchio, un indirizzo https. È collegato dalla pagina del marchio e comunicato ai "
+"motori di ricerca. Esempio: https://acme.example/."
+
+#: apps/cms/blocks.py
+msgid "The button visitors click. Required."
+msgstr "Il pulsante su cui clicca il visitatore. Obbligatorio."
+
+#: apps/shipping/models.py
+msgid "The carrier that carries the parcels with this method."
+msgstr "Il corriere che trasporta i pacchi con questo metodo."
+
+#: apps/shipping/models.py
+msgid ""
+"The carrier's name in this language, for example 'Standard courier'. Buyers will see it once "
+"checkout uses shipping."
+msgstr ""
+"Il nome del corriere in questa lingua, per esempio 'Corriere standard'. Compare ai clienti quando "
+"il checkout userà la spedizione."
+
+#: apps/ingest/models.py
+msgid "The catalogue product the case is about, if it is about one."
+msgstr "Il prodotto del catalogo a cui si riferisce il caso, se riguarda un prodotto."
+
+#: apps/catalog/models.py
+msgid ""
+"The categories or tags that describe the product, for example a season or an occasion. Pick the "
+"most specific ones: the broader ones are added for you."
+msgstr ""
+"Le categorie o etichette che descrivono il prodotto, per esempio una stagione o un'occasione. "
+"Scegli quelle più precise: quelle più generali le aggiungiamo noi."
+
+#: apps/cms/blocks.py
+msgid ""
+"The category being launched. The buttons lead to it. Choose a product or a category, not both."
+msgstr ""
+"La categoria che viene lanciata. I pulsanti portano a lei. Scegli un prodotto oppure una "
+"categoria, non entrambi."
+
+#: apps/catalog/taxonomy_admin.py
+msgid ""
+"The category or tag to place this one next to. Leave it empty to put this one at the top level of "
+"its set."
+msgstr ""
+"La categoria o etichetta accanto a cui mettere questa. Lascia vuoto il campo per metterla al "
+"livello più alto del suo gruppo."
+
+#: apps/catalog/models.py
+msgid "The category or tag visitors are sent to. Fill it only when the target is a category or tag."
+msgstr ""
+"La categoria o etichetta a cui mandare i visitatori. Compilalo solo quando la destinazione è una "
+"categoria o etichetta."
+
+#: apps/vendors/models.py
+msgid "The city of your permanent establishment."
+msgstr "La città della tua stabile organizzazione."
+
+#: apps/vendors/models.py
+msgid "The city of your registered office."
+msgstr "La città della tua sede legale."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The company that makes the brand's products, when it is not the brand itself. It is shown on the "
+"brand page and in the structured data. Example: 'Acme Holdings Ltd'."
+msgstr ""
+"L'azienda che produce i prodotti del marchio, quando non è il marchio stesso. Viene mostrata sulla"
+" pagina del marchio e nei dati strutturati. Esempio: 'Acme Holdings Ltd'."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The company's own website, an https address. It tells search engines which company this is. "
+"Example: https://holdings.example/."
+msgstr ""
+"Il sito web dell'azienda, un indirizzo https. Dice ai motori di ricerca di quale azienda si "
+"tratta. Esempio: https://holdings.example/."
+
+#: apps/core/models.py
+msgid ""
+"The company's VAT number, starting with the country letters. Ask your accountant if you are not "
+"sure."
+msgstr ""
+"La partita IVA dell'azienda, che inizia con le lettere del paese. Se non sei sicuro, chiedi al tuo"
+" commercialista."
 
 #: apps/manager/notice_views.py
 msgid "The content could not be restricted: check the notice status and target."
@@ -838,20 +2649,530 @@ msgstr ""
 msgid "The content is restricted and the vendor is told."
 msgstr "Il contenuto è limitato e il venditore ne è informato."
 
+#: apps/cms/models.py
+msgid ""
+"The content of the page, built from blocks: add a block, fill it in, and drag blocks to reorder "
+"them. If you add none, the page shows only its title."
+msgstr ""
+"Il contenuto della pagina, costruito a blocchi: aggiungi un blocco, compilalo e trascina i blocchi"
+" per cambiarne l'ordine. Se non ne aggiungi, la pagina mostra solo il titolo."
+
+#: apps/vendors/models.py
+msgid "The contract version that was accepted."
+msgstr "La versione del contratto che è stata accettata."
+
+#: apps/shipping/models.py
+msgid ""
+"The countries of the group: two-letter country codes such as 'IT' or 'DE', separated by commas."
+msgstr ""
+"I paesi del gruppo: codici paese di due lettere, per esempio 'IT' o 'DE', separati da virgole."
+
+#: apps/shipping/models.py
+msgid ""
+"The countries of the zone: two-letter country codes such as 'IT' or 'DE', separated by commas. "
+"Write '*' for the rest of the world."
+msgstr ""
+"I paesi della zona: codici paese di due lettere, per esempio 'IT' o 'DE', separati da virgole. "
+"Scrivi '*' per il resto del mondo."
+
+#: apps/shipping/models.py
+msgid ""
+"The countries where the postcodes and provinces below apply: two-letter country codes such as 'IT'"
+" or 'DE', separated by commas."
+msgstr ""
+"I paesi in cui valgono i CAP e le province qui sotto: codici paese di due lettere, per esempio "
+"'IT' o 'DE', separati da virgole."
+
+#: apps/events/models.py
+msgid "The country of the place. It helps find the right spot on the map."
+msgstr "Il paese del luogo. Aiuta a trovare il punto giusto sulla mappa."
+
+#: apps/catalog/taxonomy.py
+msgid "The country of the registered office. It is part of the structured data. Example: Italy."
+msgstr "Il paese della sede legale. Fa parte dei dati strutturati. Esempio: Italia."
+
+#: apps/vendors/models.py
+msgid "The country of your permanent establishment."
+msgstr "Il paese della tua stabile organizzazione."
+
+#: apps/vendors/models.py
+msgid "The country of your registered office."
+msgstr "Il paese della tua sede legale."
+
+#: apps/vendors/models.py
+msgid ""
+"The country that issued your tax identification number. We check the format for that country. It "
+"is asked for the platform's yearly DAC7 reporting duty."
+msgstr ""
+"Il paese che ha rilasciato il tuo numero di identificazione fiscale. Ne controlliamo il formato "
+"per quel paese. Ci viene richiesto per l'obbligo di comunicazione annuale DAC7 della piattaforma."
+
+#: apps/tax/models.py
+msgid "The country the rate applies to, as a two-letter code such as 'IT'."
+msgstr "Il paese a cui si applica l'aliquota, come codice di due lettere, per esempio 'IT'."
+
+#: apps/tax/models.py
+msgid "The country the territory belongs to, as a two-letter code such as 'ES'."
+msgstr "Il paese a cui appartiene il territorio, come codice di due lettere, per esempio 'ES'."
+
+#: apps/core/models.py
+msgid "The country where the company is established, as a two-letter code such as 'IT'."
+msgstr "Il paese in cui ha sede l'azienda, come codice di due lettere, per esempio 'IT'."
+
+#: apps/compliance/models.py
+msgid ""
+"The country where the manufacturer is established, as a two-letter code such as 'IT'. For a "
+"country outside the EU you must also fill in the EU responsible person."
+msgstr ""
+"Il paese in cui ha sede il produttore, come codice di due lettere, per esempio 'IT'. Se è fuori "
+"dall'UE devi compilare anche il responsabile UE."
+
+#: apps/vendors/models.py
+msgid ""
+"The country where you are resident for tax. It is asked for the platform's yearly DAC7 reporting "
+"duty. Not sure? Ask your accountant."
+msgstr ""
+"Il paese in cui hai la residenza fiscale. Ci viene richiesto per l'obbligo di comunicazione "
+"annuale DAC7 della piattaforma. Non sei sicuro? Chiedi al tuo commercialista."
+
+#: apps/vendors/models.py
+msgid ""
+"The country where your business is established, as in the company register. It decides which legal"
+" details we ask you for. Required: the profile cannot be saved without it."
+msgstr ""
+"Il paese in cui ha sede la tua attività, come risulta al registro delle imprese. Decide quali dati"
+" legali ti chiediamo. Obbligatorio: senza non puoi salvare il profilo."
+
+#: apps/vendors/forms.py
+msgid ""
+"The country where your business is established. Only the countries we accept at the moment are "
+"listed. Required: it decides which details we ask you for later."
+msgstr ""
+"Il paese in cui ha sede la tua attività. Sono elencati solo i paesi che accettiamo al momento. "
+"Obbligatorio: decide quali dati ti chiediamo più avanti."
+
+#: apps/vendors/models.py
+msgid "The country whose authorities issue no tax identification number (TIN)."
+msgstr "Il paese le cui autorità non rilasciano un codice fiscale estero (TIN)."
+
+#: apps/vendors/admin.py
+msgid ""
+"The date and time the rule starts to apply, in Rome time. The rule before it ends at this moment. "
+"A rule is never edited: add a new one to change a rate."
+msgstr ""
+"La data e l’ora da cui la regola si applica, in ora di Roma. La regola precedente termina in quel "
+"momento. Una regola non si modifica: per cambiare un’aliquota se ne aggiunge una nuova."
+
+#: apps/events/models.py
+msgid ""
+"The day and hour the event begins, in the time zone below. Required unless the event lasts all "
+"day."
+msgstr ""
+"Il giorno e l'ora in cui inizia l'evento, nel fuso orario indicato sotto. Obbligatorio, a meno che"
+" l'evento duri tutto il giorno."
+
+#: apps/events/models.py
+msgid ""
+"The day and hour the event ends. It must be after the start. Required unless the event lasts all "
+"day."
+msgstr ""
+"Il giorno e l'ora in cui finisce l'evento. Deve essere dopo l'inizio. Obbligatorio, a meno che "
+"l'evento duri tutto il giorno."
+
+#: apps/catalog/models.py
+msgid "The day and time the rule stops applying. Leave it empty and the rule never expires."
+msgstr ""
+"Il giorno e l'ora in cui la regola smette di valere. Se lo lasci vuoto, la regola non scade mai."
+
+#: apps/catalog/models.py
+msgid ""
+"The day and time the sale ends; it must be after the start. It needs a sale price. Leave it empty "
+"if the sale has no end date."
+msgstr ""
+"Il giorno e l'ora in cui finiscono i saldi; deve essere dopo l'inizio. Serve un prezzo scontato. "
+"Lascialo vuoto se i saldi non hanno una data di fine."
+
+#: apps/catalog/models.py
+msgid ""
+"The day and time the sale starts. It needs a sale price. Leave it empty if the sale has no start "
+"date."
+msgstr ""
+"Il giorno e l'ora in cui iniziano i saldi. Serve un prezzo scontato. Lascialo vuoto se i saldi non"
+" hanno una data di inizio."
+
+#: apps/cms/models.py
+msgid ""
+"The day this text starts to apply, for example 2026-12-01. It cannot be earlier than the date of "
+"the previous version. Required."
+msgstr ""
+"Il giorno da cui questo testo vale, per esempio 2026-12-01. Non può essere precedente alla data "
+"della versione precedente. Obbligatorio."
+
 #: apps/manager/notice_views.py
 msgid "The decision is recorded and the notifier is told."
 msgstr "La decisione è registrata e il segnalante ne viene informato."
+
+#: apps/ingest/models.py
+msgid "The decision: pending, accepted, rejected or deferred."
+msgstr "La decisione: in attesa, accettato, rifiutato o rimandato."
+
+#: apps/compliance/models.py
+msgid "The destination country, as a two-letter code such as 'IT'. Each country has one row."
+msgstr ""
+"Il paese di destinazione, come codice di due lettere, per esempio 'IT'. Ogni paese ha una sola "
+"riga."
+
+#: apps/events/models.py
+msgid ""
+"The east-west position of the place, a number from -180 to 180, for example 9.190000. Click the "
+"map to fill it in. Give both latitude and longitude, or neither."
+msgstr ""
+"La posizione est-ovest del luogo, un numero da -180 a 180, per esempio 9.190000. Clicca sulla "
+"mappa per compilarlo. Indica sia la latitudine sia la longitudine, oppure nessuna delle due."
+
+#: apps/vendors/models.py
+msgid ""
+"The email address where the platform writes to you about your shop. Required: without it we cannot"
+" reach you."
+msgstr ""
+"L'indirizzo email a cui la piattaforma ti scrive per il tuo negozio. Obbligatorio: senza non "
+"possiamo contattarti."
 
 #: apps/manager/templates/manager/login.html
 msgid ""
 "The email or the password is not correct, or the account is locked for a while. Please try again."
 msgstr "L’email o la password non sono corrette, oppure l’account è bloccato per un po’. Riprova."
 
+#: apps/compliance/forms.py
+msgid "The facts and circumstances you relied on to decide. The vendor sees this text."
+msgstr "I fatti e le circostanze su cui ti sei basato per decidere. Il venditore vede questo testo."
+
+#: apps/ingest/models.py
+msgid "The facts of the case, as JSON."
+msgstr "I dati del caso, in JSON."
+
+#: apps/vendors/models.py
+msgid "The feature to switch on or off for this vendor."
+msgstr "La funzione da attivare o disattivare per questo venditore."
+
+#: apps/shipping/models.py
+msgid "The fewest days a delivery takes. It is only an estimate. Not shown to buyers yet."
+msgstr "Il minimo di giorni per la consegna. È solo una stima. Non ancora mostrato ai clienti."
+
+#: apps/events/models.py
+msgid "The first day of an all-day event. Required when 'All day' is ticked."
+msgstr ""
+"Il primo giorno di un evento che dura tutto il giorno. Obbligatorio quando 'Tutto il giorno' è "
+"spuntato."
+
 #: themes/base/templates/403_csrf.html
 msgid "The form was sent from an old or expired page. Go back, reload the page and send it again."
 msgstr ""
 "Il modulo è stato inviato da una pagina vecchia o scaduta. Torna indietro, ricarica la pagina e "
 "invialo di nuovo."
+
+#: apps/cms/blocks.py
+msgid ""
+"The full address of another website, for example 'https://example.com'. Fill in this or the page "
+"above, not both."
+msgstr ""
+"L'indirizzo completo di un altro sito, per esempio 'https://example.com'. Compila questo campo "
+"oppure la pagina qui sopra, non entrambi."
+
+#: apps/cms/models.py
+msgid "The full address of one profile, for example 'https://example.com/maria'."
+msgstr "L'indirizzo completo di un profilo, per esempio 'https://example.com/maria'."
+
+#: apps/cms/models.py
+msgid "The full address of the other website, for example 'https://example.com'. Required."
+msgstr "L'indirizzo completo dell'altro sito, per esempio 'https://example.com'. Obbligatorio."
+
+#: apps/manager/media.py
+msgid ""
+"The full address of the page to open, starting with https://, for example "
+"https://www.example.com/guide. Required: the link has nowhere to go without it."
+msgstr ""
+"L’indirizzo completo della pagina da aprire, che inizia con https://, per esempio "
+"https://www.example.com/guide. Obbligatorio: senza di esso il link non porta da nessuna parte."
+
+#: apps/events/models.py
+msgid ""
+"The full description of the event, built from blocks: text, pictures, questions and a countdown. "
+"Drag blocks to reorder them. If you add none, only the summary is shown."
+msgstr ""
+"La descrizione completa dell'evento, costruita a blocchi: testo, immagini, domande e un conto alla"
+" rovescia. Trascina i blocchi per cambiarne l'ordine. Se non ne aggiungi, si vede solo il "
+"riassunto."
+
+#: apps/vendors/models.py
+msgid ""
+"The full legal name of your business as in the company register, or your own first and last name "
+"if you are a sole trader. It appears on invoices and contracts. Required: the profile cannot be "
+"saved without it."
+msgstr ""
+"La denominazione legale della tua attività come risulta al registro delle imprese, oppure il tuo "
+"nome e cognome se sei ditta individuale. Compare su fatture e contratti. Obbligatorio: senza non "
+"puoi salvare il profilo."
+
+#: apps/vendors/models.py
+msgid ""
+"The full text of the contract in this language. Required. Once a vendor has accepted the version "
+"it is final: new terms need a new version."
+msgstr ""
+"Il testo completo del contratto in questa lingua. Obbligatorio. Dopo l'accettazione di un "
+"venditore è definitivo: nuove condizioni richiedono una nuova versione."
+
+#: apps/catalog/models.py
+msgid ""
+"The full text of the product page: materials, sizes, what is in the box. Basic formatting is "
+"allowed. Optional, but buyers decide faster with a clear text."
+msgstr ""
+"Il testo completo della pagina del prodotto: materiali, misure, cosa c'è nella confezione. Puoi "
+"usare una formattazione semplice. Facoltativo, ma con un testo chiaro chi compra decide più in "
+"fretta."
+
+#: apps/compliance/forms.py
+msgid ""
+"The full web address of the page that shows the content, starting with http:// or https://. "
+"Required."
+msgstr ""
+"L'indirizzo web completo della pagina che mostra il contenuto, che inizia con http:// o https://. "
+"Obbligatorio."
+
+#: apps/cms/models.py
+msgid "The general text has no screen or page type."
+msgstr "Il testo generale non ha una schermata né un tipo di pagina."
+
+#: apps/shipping/models.py
+msgid "The heaviest parcel of the band, in kg, included. Leave it empty for no upper limit."
+msgstr ""
+"Il pacco più pesante della fascia, in kg, compreso. Lascialo vuoto se non c'è un limite massimo."
+
+#: apps/catalog/models.py
+msgid "The height of the packed product in centimetres, for example 10. Optional."
+msgstr "L'altezza del prodotto imballato in centimetri, per esempio 10. Facoltativo."
+
+#: themes/base/templates/components/user_tools.html
+msgid "The help text could not be loaded. Try again."
+msgstr "Non è stato possibile caricare il testo di aiuto. Riprova."
+
+#: apps/vendors/models.py
+msgid ""
+"The IBAN of the bank account that receives your payouts. Check it carefully: a wrong IBAN can "
+"delay your payment. It is stored encrypted."
+msgstr ""
+"L'IBAN del conto bancario su cui ricevi i tuoi pagamenti. Controllalo con attenzione: un IBAN "
+"sbagliato può ritardare il pagamento. Viene conservato cifrato."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The import run that brought this brand, when it was not proposed by hand. Brands of a batch are "
+"reviewed together and do not count against the vendor's limit on manual proposals. Example: "
+"'spring price list'."
+msgstr ""
+"L'importazione che ha portato questo marchio, quando non è stato proposto a mano. I marchi di un "
+"lotto vengono rivisti insieme e non contano nel limite di proposte manuali del venditore. Esempio:"
+" 'listino di primavera'."
+
+#: apps/cms/blocks.py
+msgid ""
+"The invitation, for example 'Visit our workshop'. Up to 120 characters. Required: the block cannot"
+" be saved without it."
+msgstr ""
+"L'invito, per esempio 'Vieni a trovarci in laboratorio'. Fino a 120 caratteri. Obbligatorio: senza"
+" non si può salvare il blocco."
+
+#: apps/vendors/models.py
+msgid "The IP address the acceptance came from, kept as evidence. Empty if it was not known."
+msgstr ""
+"L'indirizzo IP da cui è arrivata l'accettazione, conservato come prova. Vuoto se non era noto."
+
+#: apps/vendors/models.py
+msgid ""
+"The Italian VAT number of your fiscal representative (11 digits). Leave it empty if you have none."
+msgstr ""
+"La partita IVA italiana del tuo rappresentante fiscale (11 cifre). Lasciala vuota se non ne hai "
+"uno."
+
+#: apps/ingest/models.py
+msgid "The item this record is about."
+msgstr "L'articolo a cui si riferisce questo record."
+
+#: apps/catalog/taxonomy_admin.py
+msgid ""
+"The item to place this one next to. Leave it empty to put this one at the top level of the list."
+msgstr ""
+"L'elemento accanto a cui mettere questo. Lascialo vuoto per metterlo al livello più alto "
+"dell'elenco."
+
+#: apps/ingest/models.py
+msgid ""
+"The kind of catalogue object this term stands for. Leave it empty when the term stands for a plain"
+" value."
+msgstr ""
+"Il tipo di oggetto del catalogo a cui corrisponde il termine. Lascialo vuoto quando il termine "
+"corrisponde a un valore semplice."
+
+#: apps/vendors/models.py
+msgid "The language of the text that was shown when the contract was accepted."
+msgstr "La lingua del testo mostrato al momento dell'accettazione del contratto."
+
+#: apps/core/translation_fields.py
+msgid "The language of this translation. Each language has one row for the same item."
+msgstr "La lingua di questa traduzione. Ogni lingua ha una sola riga per lo stesso elemento."
+
+#: apps/events/models.py
+msgid ""
+"The language the event was first written in. It is set when the event is created and you cannot "
+"change it."
+msgstr ""
+"La lingua in cui l'evento è stato scritto per la prima volta. Viene impostata alla creazione "
+"dell'evento e non si può cambiare."
+
+#: apps/compliance/models.py
+msgid "The language these texts are written in. A product has one text per language."
+msgstr "La lingua in cui sono scritti questi testi. Un prodotto ha un testo per ogni lingua."
+
+#: apps/vendors/admin.py
+msgid ""
+"The language these texts are written in. Required. Add one set of texts per language: visitors see"
+" the one in their language, or the English one when theirs is not published."
+msgstr ""
+"La lingua in cui sono scritti questi testi. Obbligatorio. Aggiungi un gruppo di testi per lingua: "
+"i visitatori vedono quello nella loro lingua, oppure quello inglese se il loro non è pubblicato."
+
+#: apps/catalog/fields.py
+msgid ""
+"The language this text is written in. Required: choose one language for each text; a language can "
+"be used only once for the same item."
+msgstr ""
+"La lingua in cui è scritto questo testo. Obbligatorio: scegli una lingua per ogni testo; per lo "
+"stesso elemento puoi usare una lingua una volta sola."
+
+#: apps/core/models.py
+msgid ""
+"The languages authorities may write in, as codes such as 'en' or 'it', separated by commas. Give "
+"an official language of the country and one that many people understand."
+msgstr ""
+"Le lingue in cui le autorità possono scrivere, come codici tipo 'en' o 'it', separati da virgole. "
+"Indica una lingua ufficiale del paese e una che molte persone capiscono."
+
+#: apps/compliance/admin.py
+msgid ""
+"The languages in which this country accepts product warnings, as two-letter codes such as 'fr, nl,"
+" de', separated by commas. Warnings in any one of them are enough to sell the product into the "
+"country."
+msgstr ""
+"Le lingue in cui questo paese accetta le avvertenze dei prodotti, come codici di due lettere, per "
+"esempio 'fr, nl, de', separati da virgole. Basta una qualsiasi di queste lingue per vendere il "
+"prodotto nel paese."
+
+#: apps/compliance/models.py
+msgid ""
+"The languages in which this country accepts product warnings, as two-letter codes such as 'it' or "
+"'de', separated by commas. Warnings in any one of them are enough. Without a row, the country's "
+"official languages apply."
+msgstr ""
+"Le lingue in cui questo paese accetta le avvertenze dei prodotti, come codici di due lettere, per "
+"esempio 'it' o 'de', separati da virgole. Basta una qualsiasi di queste lingue. Senza una riga "
+"valgono le lingue ufficiali del paese."
+
+#: apps/core/models.py
+msgid ""
+"The languages the support team answers in, as codes such as 'en' or 'it', separated by commas."
+msgstr "Le lingue in cui risponde l'assistenza, come codici tipo 'en' o 'it', separati da virgole."
+
+#: apps/events/models.py
+msgid ""
+"The last day of an all-day event, included. Use the same day as the first day for a one-day event."
+" Required when 'All day' is ticked."
+msgstr ""
+"L'ultimo giorno di un evento che dura tutto il giorno, compreso. Per un evento di un solo giorno "
+"usa lo stesso giorno del primo. Obbligatorio quando 'Tutto il giorno' è spuntato."
+
+#: apps/compliance/forms.py
+msgid "The last day of the restriction. Leave it empty when the restriction has no end date."
+msgstr ""
+"L'ultimo giorno della limitazione. Lascialo vuoto se la limitazione non ha una data di fine."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The last part of the web address in this language, for example 'summer-bags'. Required: use lower "
+"case letters, digits and single hyphens. It must differ from the others at the same level."
+msgstr ""
+"L'ultima parte dell'indirizzo web in questa lingua, per esempio 'borse-estate'. Obbligatorio: usa "
+"lettere minuscole, cifre e trattini singoli. Deve essere diversa dalle altre dello stesso livello."
+
+#: apps/events/models.py
+msgid "The last time a change that matters to calendars was published. The platform fills it in."
+msgstr ""
+"L'ultima volta in cui è stata pubblicata una modifica che conta per i calendari. La compila la "
+"piattaforma."
+
+#: apps/compliance/forms.py
+msgid ""
+"The law or the term of the platform terms you relied on, for example the article and the name of "
+"the law."
+msgstr ""
+"La legge o la clausola dei termini della piattaforma su cui ti sei basato, per esempio l'articolo "
+"e il nome della legge."
+
+#: apps/vendors/models.py
+msgid ""
+"The legal form of your business, as in the company register. Not sure which one you are? Ask your "
+"accountant."
+msgstr ""
+"La forma giuridica della tua attività, come risulta al registro delle imprese. Non sei sicuro di "
+"quale sia? Chiedi al tuo commercialista."
+
+#: apps/core/models.py
+msgid "The legal name of the company that runs the platform."
+msgstr "La ragione sociale dell'azienda che gestisce la piattaforma."
+
+#: apps/tax/models.py
+msgid ""
+"The legal note printed on order documents for this regime, in this language. Ask your accountant "
+"for the exact wording."
+msgstr ""
+"La nota legale stampata sui documenti d'ordine per questo regime, in questa lingua. Chiedi al tuo "
+"commercialista la formulazione esatta."
+
+#: apps/cms/models.py
+msgid ""
+"The legal text, built from blocks. Add the sections the law asks for and write the text your legal"
+" adviser approved. Each change you publish is kept as a new version."
+msgstr ""
+"Il testo legale, costruito a blocchi. Aggiungi le sezioni richieste dalla legge e scrivi il testo "
+"approvato dal tuo consulente legale. Ogni modifica che pubblichi viene conservata come nuova "
+"versione."
+
+#: apps/catalog/taxonomy_admin.py
+msgid ""
+"The licence the logo is used under; only licences that allow commercial use are listed. Needed "
+"with a new file. Example: 'Own work' for a logo the brand gave us."
+msgstr ""
+"La licenza con cui si usa il logo; sono elencate solo le licenze che consentono l'uso commerciale."
+" Serve con un nuovo file. Esempio: 'Opera propria' per un logo che ci ha dato il marchio."
+
+#: apps/cms/models.py
+msgid ""
+"The links of the menu, in the order shown. Add a page of this site or a link to another website. "
+"If you add none, the menu stays empty."
+msgstr ""
+"I link del menu, nell'ordine in cui compaiono. Aggiungi una pagina di questo sito o un link a un "
+"altro sito. Se non ne aggiungi, il menu resta vuoto."
+
+#: apps/catalog/models.py
+msgid "The longest side of the packed product in centimetres, for example 30. Optional."
+msgstr "Il lato più lungo del prodotto imballato in centimetri, per esempio 30. Facoltativo."
+
+#: apps/catalog/models.py
+msgid ""
+"The main category of the product. It shows in the path above the product, so buyers can find it. "
+"You can leave it empty while the product is a draft."
+msgstr ""
+"La categoria principale del prodotto. Compare nel percorso sopra il prodotto, così chi compra lo "
+"trova. Puoi lasciarla vuota finché il prodotto è una bozza."
 
 #: apps/manager/templates/manager/forbidden.html
 msgid ""
@@ -861,6 +3182,184 @@ msgstr ""
 "Il Manager è riservato allo staff della piattaforma e ai membri dei venditori. Se ti serve "
 "l’accesso, chiedilo allo staff della piattaforma oppure accedi con un altro account."
 
+#: apps/compliance/models.py
+msgid "The manufacturer's postal address, with street, town and country."
+msgstr "L'indirizzo postale del produttore, con via, città e paese."
+
+#: apps/compliance/models.py
+msgid ""
+"The model, type or reference that identifies the product, for example the number printed on the "
+"label."
+msgstr ""
+"Il modello, il tipo o il riferimento che identifica il prodotto, per esempio il numero stampato "
+"sull'etichetta."
+
+#: apps/vendors/admin.py
+msgid ""
+"The monthly fee in euro. Nothing is charged before paid plans open, so leave it empty for now."
+msgstr ""
+"Il canone mensile in euro. Non si addebita nulla prima dell’apertura dei piani a pagamento, quindi"
+" per ora lascialo vuoto."
+
+#: apps/shipping/models.py
+msgid "The most days a delivery takes. It is only an estimate. Not shown to buyers yet."
+msgstr "Il massimo di giorni per la consegna. È solo una stima. Non ancora mostrato ai clienti."
+
+#: apps/vendors/admin.py
+msgid "The most products a vendor on this plan can list. Leave it empty for no limit."
+msgstr ""
+"Il numero massimo di prodotti che un venditore di questo piano può pubblicare. Lascialo vuoto per "
+"nessun limite."
+
+#: apps/catalog/attributes.py
+msgid ""
+"The name buyers see for the attribute in this language, for example 'Colour'. Required: without it"
+" the attribute has no name in this language."
+msgstr ""
+"Il nome che chi compra vede per l'attributo in questa lingua, per esempio 'Colore'. Obbligatorio: "
+"senza, l'attributo non ha un nome in questa lingua."
+
+#: apps/catalog/models.py
+msgid ""
+"The name buyers see for this version, for example 'Red, size M'. Required: without it the version "
+"has no name in this language."
+msgstr ""
+"Il nome che chi compra vede per questa versione, per esempio 'Rosso, taglia M'. Obbligatorio: "
+"senza, la versione non ha un nome in questa lingua."
+
+#: apps/themes/admin.py apps/themes/models.py
+msgid "The name of an installed theme. Leave it empty to use the default theme of the environment."
+msgstr "Il nome di un tema installato. Lascialo vuoto per usare il tema predefinito dell'ambiente."
+
+#: apps/shipping/models.py
+msgid "The name of the area, for example 'Sardinia'."
+msgstr "Il nome dell'area, per esempio 'Sardegna'."
+
+#: apps/compliance/forms.py
+msgid "The name of the authority you told about a suspected threat to life or safety. Required."
+msgstr ""
+"Il nome dell'autorità che hai avvisato di un sospetto pericolo per la vita o la sicurezza. "
+"Obbligatorio."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The name of the category in this language, for example 'Bags'. Required: without it the category "
+"has no name for buyers."
+msgstr ""
+"Il nome della categoria in questa lingua, per esempio 'Borse'. Obbligatorio: senza, la categoria "
+"non ha un nome per chi compra."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The name of the category or tag in this language, for example 'Summer'. Required: without it it "
+"has no name for buyers."
+msgstr ""
+"Il nome della categoria o etichetta in questa lingua, per esempio 'Estate'. Obbligatorio: senza, "
+"non ha un nome per chi compra."
+
+#: apps/core/models.py
+msgid "The name of the feature switch, exactly as it is registered in the code."
+msgstr "Il nome dell'interruttore della funzione, esattamente come è registrato nel codice."
+
+#: apps/shipping/models.py
+msgid "The name of the group in this language, for example 'German-speaking countries'."
+msgstr "Il nome del gruppo in questa lingua, per esempio 'Paesi di lingua tedesca'."
+
+#: apps/shipping/models.py
+msgid ""
+"The name of the method in this language, for example 'Standard delivery'. Buyers will see it once "
+"checkout uses shipping."
+msgstr ""
+"Il nome del metodo in questa lingua, per esempio 'Consegna standard'. Compare ai clienti quando il"
+" checkout userà la spedizione."
+
+#: apps/shipping/models.py
+msgid ""
+"The name of the pickup point in this language, for example 'Pick up at the workshop'. Buyers will "
+"see it once checkout uses shipping."
+msgstr ""
+"Il nome del punto di ritiro in questa lingua, per esempio 'Ritiro in laboratorio'. Compare ai "
+"clienti quando il checkout userà la spedizione."
+
+#: apps/events/models.py
+msgid ""
+"The name of the place, for example 'Fiera di Milano'. If you leave it empty, only the address is "
+"shown."
+msgstr ""
+"Il nome del luogo, per esempio 'Fiera di Milano'. Se lo lasci vuoto, si vede solo l'indirizzo."
+
+#: apps/cms/models.py
+msgid ""
+"The name of the plan, for example 'Starter'. Up to 80 characters. Required: the plan cannot be "
+"saved without it."
+msgstr ""
+"Il nome del piano, per esempio 'Base'. Fino a 80 caratteri. Obbligatorio: senza non si può salvare"
+" il piano."
+
+#: apps/cms/models.py
+msgid ""
+"The name of the screen (for example catalog:brand) or of the page type (for example "
+"cms.StandardPage). Leave it empty for the general text."
+msgstr ""
+"Il nome della schermata (per esempio catalog:brand) o del tipo di pagina (per esempio "
+"cms.StandardPage). Lascialo vuoto per il testo generale."
+
+#: apps/tax/models.py
+msgid "The name of the territory, for example 'Canary Islands'."
+msgstr "Il nome del territorio, per esempio 'Isole Canarie'."
+
+#: apps/shipping/models.py
+msgid "The name of the zone, for example 'Italy, mainland'."
+msgstr "Il nome della zona, per esempio 'Italia, terraferma'."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The name of this set of categories or tags in this language, for example 'Season'. Required: "
+"without it the set has no name for buyers."
+msgstr ""
+"Il nome di questo gruppo di categorie o etichette in questa lingua, per esempio 'Stagione'. "
+"Obbligatorio: senza, il gruppo non ha un nome per chi compra."
+
+#: apps/vendors/models.py
+msgid "The name of your bank. Optional: it helps us recognise the account."
+msgstr "Il nome della tua banca. Facoltativo: ci aiuta a riconoscere il conto."
+
+#: apps/vendors/forms.py
+msgid ""
+"The name of your business or shop, for example 'Rossi Ceramics'. Required: the application needs "
+"it."
+msgstr ""
+"Il nome della tua attività o del tuo negozio, per esempio 'Ceramiche Rossi'. Obbligatorio: la "
+"candidatura lo richiede."
+
+#: apps/cms/models.py
+msgid ""
+"The name printed under the articles, for example 'Maria Rossi'. Up to 120 characters. Required: "
+"the author cannot be saved without it."
+msgstr ""
+"Il nome scritto sotto gli articoli, per esempio 'Maria Rossi'. Fino a 120 caratteri. Obbligatorio:"
+" senza non si può salvare l'autore."
+
+#: apps/core/models.py
+msgid "The name shown in image credits, for example 'CC BY 4.0'."
+msgstr "Il nome mostrato nei crediti delle immagini, per esempio 'CC BY 4.0'."
+
+#: apps/catalog/models.py
+msgid ""
+"The new address on this site, for example /it/. Never another website. Fill it only when the "
+"target is a path."
+msgstr ""
+"Il nuovo indirizzo su questo sito, per esempio /it/. Mai un altro sito web. Compilalo solo quando "
+"la destinazione è un percorso."
+
+#: apps/events/models.py
+msgid ""
+"The north-south position of the place, a number from -90 to 90, for example 45.464200. Click the "
+"map to fill it in. Give both latitude and longitude, or neither."
+msgstr ""
+"La posizione nord-sud del luogo, un numero da -90 a 90, per esempio 45.464200. Clicca sulla mappa "
+"per compilarlo. Indica sia la latitudine sia la longitudine, oppure nessuna delle due."
+
 #: apps/manager/notice_views.py
 msgid "The notice is under review."
 msgstr "La segnalazione è in revisione."
@@ -869,6 +3368,75 @@ msgstr "La segnalazione è in revisione."
 msgid "The notification to the authorities is recorded."
 msgstr "La comunicazione alle autorità è registrata."
 
+#: apps/ingest/models.py
+msgid "The number of the catalogue object this term stands for."
+msgstr "Il numero dell'oggetto del catalogo a cui corrisponde il termine."
+
+#: apps/catalog/models.py
+msgid ""
+"The number of the matching category in Google's product category list, for example 2638. Optional:"
+" leave it empty if you do not know it."
+msgstr ""
+"Il numero della categoria corrispondente nell'elenco delle categorie di prodotto di Google, per "
+"esempio 2638. Facoltativo: lascialo vuoto se non lo conosci."
+
+#: apps/catalog/models.py
+msgid ""
+"The number this product had in the English pages of the old site. Used only when moving old data; "
+"leave it empty for new products."
+msgstr ""
+"Il numero che questo prodotto aveva nelle pagine in inglese del vecchio sito. Serve solo per "
+"spostare i dati vecchi; lascialo vuoto per i prodotti nuovi."
+
+#: apps/catalog/models.py
+msgid ""
+"The number this product had in the Italian pages of the old site. Used only when moving old data; "
+"leave it empty for new products."
+msgstr ""
+"Il numero che questo prodotto aveva nelle pagine in italiano del vecchio sito. Serve solo per "
+"spostare i dati vecchi; lascialo vuoto per i prodotti nuovi."
+
+#: apps/catalog/models.py
+msgid ""
+"The old address visitors still use, starting with a slash, for example /tag-product/old-tag/. "
+"Required: without it the rule has nothing to match. Each address can have only one rule."
+msgstr ""
+"Il vecchio indirizzo che i visitatori usano ancora, che inizia con una barra, per esempio /tag-"
+"product/vecchia-etichetta/. Obbligatorio: senza, la regola non ha nulla da riconoscere. Ogni "
+"indirizzo può avere una sola regola."
+
+#: apps/cms/models.py
+msgid ""
+"The opening of the page, built from blocks: say why a seller should join you. If you add none, the"
+" page starts with the plans."
+msgstr ""
+"L'apertura della pagina, costruita a blocchi: spiega perché un venditore dovrebbe unirsi a voi. Se"
+" non ne aggiungi, la pagina parte dai piani."
+
+#: apps/catalog/attributes.py
+msgid ""
+"The order in which a product lists its attributes: lower numbers come first. Leave 0 if the order "
+"does not matter."
+msgstr ""
+"L'ordine in cui un prodotto elenca i suoi attributi: i numeri più bassi vengono prima. Lascia 0 se"
+" l'ordine non conta."
+
+#: apps/catalog/attributes.py
+msgid ""
+"The order of the values, for example 1 for S, 2 for M, 3 for L. Lower numbers come first, and the "
+"variants of a product follow the same order."
+msgstr ""
+"L'ordine dei valori, per esempio 1 per S, 2 per M, 3 per L. I numeri più bassi vengono prima e le "
+"varianti di un prodotto seguono lo stesso ordine."
+
+#: apps/catalog/models.py
+msgid ""
+"The order of the versions: lower numbers come first, for example 1, 2, 3. Leave 0 to keep the "
+"order they were added in."
+msgstr ""
+"L'ordine delle versioni: i numeri più bassi vengono prima, per esempio 1, 2, 3. Lascia 0 per "
+"mantenere l'ordine in cui sono state aggiunte."
+
 #: apps/manager/views.py
 msgid "The order was updated."
 msgstr "L'ordine è stato aggiornato."
@@ -876,6 +3444,14 @@ msgstr "L'ordine è stato aggiornato."
 #: themes/base/templates/404.html
 msgid "The page you asked for does not exist or has moved."
 msgstr "La pagina richiesta non esiste o è stata spostata."
+
+#: apps/catalog/models.py
+msgid ""
+"The part number the maker gave this article, up to 70 characters. Together with the brand it lets "
+"the shop recognise the same article sold by different vendors."
+msgstr ""
+"Il codice articolo che il produttore ha dato a questo articolo, fino a 70 caratteri. Insieme al "
+"marchio permette al negozio di riconoscere lo stesso articolo venduto da venditori diversi."
 
 #: apps/accounts/mfa_views.py
 msgid "the passkey could not be registered"
@@ -890,6 +3466,221 @@ msgstr "La passkey non ha funzionato."
 msgid "the passkey was not accepted"
 msgstr "la passkey non è stata accettata"
 
+#: apps/vendors/admin.py
+msgid ""
+"The payment provider's fixed fee per payment, in euro, for example 2.00. Enter 0 if there is none."
+msgstr ""
+"La commissione fissa del fornitore di pagamenti per ogni pagamento, in euro, per esempio 2.00. "
+"Inserisci 0 se non c’è."
+
+#: apps/vendors/admin.py
+msgid ""
+"The payment provider's percentage fee, for example 4.00. It is split between vendors by the fee "
+"base below."
+msgstr ""
+"La commissione percentuale del fornitore di pagamenti, per esempio 4.00. È ripartita tra i "
+"venditori secondo la base qui sotto."
+
+#: apps/compliance/models.py
+msgid ""
+"The person or company in the EU who answers for the product when the manufacturer is outside the "
+"EU. Fill the three EU responsible fields together; leave all three empty to use the defaults of "
+"the vendor."
+msgstr ""
+"La persona o l'azienda nell'UE che risponde del prodotto quando il produttore è fuori dall'UE. "
+"Compila insieme i tre campi del responsabile UE; lasciali tutti vuoti per usare i valori "
+"predefiniti del venditore."
+
+#: apps/vendors/models.py
+msgid "The person who accepted the contract on behalf of the vendor."
+msgstr "La persona che ha accettato il contratto a nome del venditore."
+
+#: apps/ingest/models.py
+msgid "The person who decided the case."
+msgstr "La persona che ha deciso il caso."
+
+#: apps/cms/models.py
+msgid ""
+"The picture at the top of the article and in the blog list. If you leave it empty, the article has"
+" no top picture."
+msgstr ""
+"L'immagine in cima all'articolo e nell'elenco del blog. Se la lasci vuota, l'articolo non ha "
+"un'immagine in cima."
+
+#: apps/cms/models.py
+msgid "The picture at the top of the page. If you leave it empty, the page has no top picture."
+msgstr "L'immagine in cima alla pagina. Se la lasci vuota, la pagina non ha un'immagine in cima."
+
+#: apps/events/models.py
+msgid ""
+"The picture shown next to the event in lists and feeds. If you leave it empty, the event is listed"
+" without a picture."
+msgstr ""
+"L'immagine mostrata accanto all'evento negli elenchi e nei calendari. Se la lasci vuota, l'evento "
+"compare senza immagine."
+
+#: apps/ingest/models.py
+msgid ""
+"The plain value this term stands for, for example a colour name. Use it when there is no catalogue"
+" object."
+msgstr ""
+"Il valore semplice a cui corrisponde il termine, per esempio il nome di un colore. Usalo quando "
+"non c'è un oggetto del catalogo."
+
+#: apps/vendors/admin.py
+msgid "The plan's name as staff see it, for example 'Standard'."
+msgstr "Il nome del piano come lo vede lo staff, per esempio «Standard»."
+
+#: apps/vendors/admin.py
+msgid "The plan's options as a JSON object, for example {\"featured\": true}. Leave it as {} for none."
+msgstr ""
+"Le opzioni del piano come oggetto JSON, per esempio {\"featured\": true}. Lascia {} se non ce ne "
+"sono."
+
+#: apps/cms/models.py
+msgid ""
+"The plans a new seller can choose from, side by side. If you add none, the page shows no plans."
+msgstr ""
+"I piani tra cui può scegliere un nuovo venditore, affiancati. Se non ne aggiungi, la pagina non "
+"mostra piani."
+
+#: apps/vendors/admin.py
+msgid ""
+"The platform's commission, as a percentage of the base below, for example 20.00. A zero needs a "
+"promo label."
+msgstr ""
+"La commissione della piattaforma, in percentuale della base qui sotto, per esempio 20.00. Se è "
+"zero serve un’etichetta promo."
+
+#: apps/compliance/models.py
+msgid "The postal address of the EU responsible person."
+msgstr "L'indirizzo postale del responsabile UE."
+
+#: apps/events/models.py
+msgid "The postal code of the place, for example '20121'."
+msgstr "Il CAP del luogo, per esempio '20121'."
+
+#: apps/vendors/models.py
+msgid "The postal code of your permanent establishment, for example 00184."
+msgstr "Il CAP della tua stabile organizzazione, per esempio 00184."
+
+#: apps/vendors/models.py
+msgid "The postal code of your registered office, for example 00184."
+msgstr "Il CAP della tua sede legale, per esempio 00184."
+
+#: apps/shipping/models.py
+msgid ""
+"The postcodes in the area, separated by commas: a prefix such as '07*', a range such as "
+"'90000..98999' or an exact postcode."
+msgstr ""
+"I CAP dell'area, separati da virgole: un prefisso come '07*', un intervallo come '90000..98999' o "
+"un CAP esatto."
+
+#: apps/tax/models.py
+msgid ""
+"The postcodes in the territory, separated by commas: an exact postcode such as '23041', a prefix "
+"such as '35*' or a range such as '22100..22199'."
+msgstr ""
+"I CAP del territorio, separati da virgole: un CAP esatto come '23041', un prefisso come '35*' o un"
+" intervallo come '22100..22199'."
+
+#: apps/catalog/models.py
+msgid ""
+"The price in euros without VAT, for example 19.90. Needed to sell the product: with the Buy mode, "
+"an empty price is refused. It cannot be 0.00; leave it empty instead."
+msgstr ""
+"Il prezzo in euro, IVA esclusa, per esempio 19,90. Serve per vendere il prodotto: con la modalità "
+"Acquisto, un prezzo vuoto viene rifiutato. Non può essere 0,00: lascialo vuoto."
+
+#: apps/cms/blocks.py
+msgid ""
+"The product being launched. The buttons lead to it. Choose a product or a category, not both."
+msgstr ""
+"Il prodotto che viene lanciato. I pulsanti portano a lui. Scegli un prodotto oppure una categoria,"
+" non entrambi."
+
+#: apps/events/models.py
+msgid ""
+"The product categories the event is about, so visitors can find it from them. Leave it empty if "
+"none applies."
+msgstr ""
+"Le categorie di prodotti di cui parla l'evento, così i visitatori lo trovano da lì. Lascia vuoto "
+"se non ce n'è nessuna."
+
+#: apps/ingest/models.py
+msgid "The product data the import pulled out of the supplier's data, as JSON."
+msgstr "I dati del prodotto che l'importazione ha ricavato dai dati del fornitore, in JSON."
+
+#: apps/ingest/models.py
+msgid "The product of the catalogue this item is matched to. Empty while it is not matched."
+msgstr "Il prodotto del catalogo a cui è abbinato questo articolo. Vuoto finché non è abbinato."
+
+#: apps/compliance/models.py
+msgid ""
+"The product the order or notice is about, if it is about one. If the product is deleted later, its"
+" SKU stays on the case."
+msgstr ""
+"Il prodotto a cui si riferisce l'ordine o la segnalazione, se riguarda un prodotto. Se il prodotto"
+" viene cancellato dopo, il suo SKU resta sul caso."
+
+#: apps/compliance/models.py
+msgid "The product these warnings are about."
+msgstr "Il prodotto a cui si riferiscono queste avvertenze."
+
+#: apps/compliance/models.py
+msgid "The product this safety data is about. A product has one record."
+msgstr "Il prodotto a cui si riferiscono questi dati di sicurezza. Ogni prodotto ha un solo record."
+
+#: apps/catalog/models.py
+msgid "The product visitors are sent to. Fill it only when the target is a product."
+msgstr ""
+"Il prodotto a cui mandare i visitatori. Compilalo solo quando la destinazione è un prodotto."
+
+#: apps/cms/blocks.py
+msgid ""
+"The products to show, in this order. Add at least one and at most 12. A product that is no longer "
+"for sale, or has no text in the page language, is left out by itself."
+msgstr ""
+"I prodotti da mostrare, in questo ordine. Aggiungine almeno uno e al massimo 12. Un prodotto che "
+"non è più in vendita, o che non ha testo nella lingua della pagina, viene escluso da solo."
+
+#: apps/events/models.py
+msgid ""
+"The products you bring or put on offer at this event. You can only choose your own products. Leave"
+" it empty if none applies."
+msgstr ""
+"I prodotti che porti o metti in offerta a questo evento. Puoi scegliere solo i tuoi prodotti. "
+"Lascia vuoto se non ce n'è nessuno."
+
+#: apps/shipping/models.py
+msgid "The provinces or states in the area, as codes separated by commas, for example 'SS' or 'NU'."
+msgstr ""
+"Le province o gli stati dell'area, come codici separati da virgole, per esempio 'SS' o 'NU'."
+
+#: apps/compliance/forms.py
+msgid ""
+"The public id of the content, as shown in the Manager (a long code with letters, numbers and "
+"dashes)."
+msgstr ""
+"L'id pubblico del contenuto, come compare nel Manager (un lungo codice con lettere, numeri e "
+"trattini)."
+
+#: apps/cms/blocks.py
+msgid ""
+"The question as a customer would ask it, for example 'How long does delivery take?'. Required: the"
+" question cannot be saved without it."
+msgstr ""
+"La domanda come la farebbe un cliente, per esempio 'Quanto tempo ci vuole per la consegna?'. "
+"Obbligatoria: senza non si può salvare la domanda."
+
+#: apps/cms/models.py
+msgid ""
+"The questions new sellers ask most, with your answers. If you add none, the page shows no "
+"questions."
+msgstr ""
+"Le domande che i nuovi venditori fanno più spesso, con le tue risposte. Se non ne aggiungi, la "
+"pagina non mostra domande."
+
 #: apps/compliance/forms.py
 msgid ""
 "The reference from your order confirmation email, for example 2027-000123. Required: without it we"
@@ -897,6 +3688,33 @@ msgid ""
 msgstr ""
 "Il riferimento riportato nell’email di conferma dell’ordine, per esempio 2027-000123. "
 "Obbligatorio: senza non riusciamo a trovare il tuo ordine."
+
+#: apps/compliance/models.py
+msgid ""
+"The reference number the authority or the notice gave this case. Leave it empty if there is none."
+msgstr ""
+"Il numero di riferimento che l'autorità o la segnalazione ha dato a questo caso. Lascialo vuoto se"
+" non c'è."
+
+#: apps/events/models.py
+msgid ""
+"The reference of the report that led to hiding the event, if there was one. The platform fills it "
+"in."
+msgstr ""
+"Il riferimento della segnalazione che ha portato a nascondere l'evento, se c'è stata. La compila "
+"la piattaforma."
+
+#: apps/events/models.py
+msgid "The region or province of the place, for example 'Lombardia'. Optional."
+msgstr "La regione o la provincia del luogo, per esempio 'Lombardia'. Facoltativo."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The registered name of the company that makes the products. It is shown on the brand page and in "
+"its structured data. Example: 'Acme Holdings Ltd'."
+msgstr ""
+"La ragione sociale dell'azienda che produce i prodotti. Viene mostrata sulla pagina del marchio e "
+"nei suoi dati strutturati. Esempio: 'Acme Holdings Ltd'."
 
 #: themes/base/templates/400.html
 msgid "The request could not be understood. Check the address and try again."
@@ -907,6 +3725,197 @@ msgstr "Non è stato possibile comprendere la richiesta. Controlla l’indirizzo
 msgid "The request failed."
 msgstr "La richiesta non è riuscita."
 
+#: apps/vendors/models.py
+msgid "The rule applies to vendors established in this country. Leave it empty for every country."
+msgstr "La regola vale per i venditori con sede in questo paese. Lascialo vuoto per tutti i paesi."
+
+#: apps/vendors/models.py
+msgid "The rule applies to vendors with this legal form. Leave it empty for every legal form."
+msgstr ""
+"La regola vale per i venditori con questa forma giuridica. Lascialo vuoto per tutte le forme "
+"giuridiche."
+
+#: apps/ingest/models.py
+msgid "The run that opened this case."
+msgstr "L'esecuzione che ha aperto questo caso."
+
+#: apps/ingest/models.py
+msgid "The run's report, in plain text."
+msgstr "Il resoconto dell'esecuzione, in testo semplice."
+
+#: apps/events/models.py
+msgid "The service that found the position from the address. Filled in for you."
+msgstr "Il servizio che ha trovato la posizione dall'indirizzo. Compilato per te."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The set of categories or tags this one belongs to, for example 'season'. Required. It cannot be "
+"changed afterwards."
+msgstr ""
+"Il gruppo di categorie o etichette a cui appartiene questa, per esempio 'stagione'. Obbligatorio. "
+"Non si può cambiare dopo."
+
+#: apps/shipping/models.py
+msgid "The shipping price for this band, without VAT."
+msgstr "Il prezzo della spedizione per questa fascia, IVA esclusa."
+
+#: apps/vendors/models.py
+msgid ""
+"The shop name your buyers see, for example 'Rossi Ceramics'. Required: the shop cannot be shown "
+"without a name."
+msgstr ""
+"Il nome del negozio che i clienti vedono, per esempio 'Ceramiche Rossi'. Obbligatorio: senza nome "
+"il negozio non può essere mostrato."
+
+#: apps/events/models.py
+msgid ""
+"The shop that organises the event. Leave it empty for an event of the platform itself, which only "
+"the platform staff can see and edit."
+msgstr ""
+"Il negozio che organizza l'evento. Lascia vuoto per un evento della piattaforma stessa, che solo "
+"il personale della piattaforma può vedere e modificare."
+
+#: apps/catalog/models.py
+msgid ""
+"The shop that sells this product. Required: the product cannot be saved without it, and it cannot "
+"be changed afterwards."
+msgstr ""
+"Il negozio che vende questo prodotto. Obbligatorio: senza non puoi salvare il prodotto e non si "
+"può cambiare dopo."
+
+#: apps/cms/models.py
+msgid ""
+"The shop this page tells the story of. Required: the page is not shown without it, and each "
+"language can have only one page per shop."
+msgstr ""
+"Il negozio di cui questa pagina racconta la storia. Obbligatorio: senza, la pagina non viene "
+"mostrata, e ogni lingua può avere una sola pagina per negozio."
+
+#: apps/events/admin_views.py
+msgid "The shop whose events rule you want to change."
+msgstr "Il negozio di cui vuoi cambiare la regola sugli eventi."
+
+#: apps/vendors/models.py
+msgid ""
+"The short name in your shop's web address, for example 'rossi-ceramics'. Leave it empty and we "
+"make it from the shop name. Changing it later breaks the links people already have."
+msgstr ""
+"Il nome breve nell'indirizzo web del tuo negozio, per esempio 'ceramiche-rossi'. Se lo lasci vuoto"
+" lo ricaviamo dal nome del negozio. Se lo cambi dopo, i link che le persone hanno già smettono di "
+"funzionare."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The short text search engines show under the title. Example: 'Buy Acme anvils from independent "
+"shops.'"
+msgstr ""
+"Il testo breve che i motori di ricerca mostrano sotto il titolo. Esempio: 'Compra le incudini Acme"
+" dai negozi indipendenti.'"
+
+#: apps/catalog/fields.py
+msgid ""
+"The short text you want search engines to show under the title, ideally under 160 characters. "
+"Optional: you can leave it empty."
+msgstr ""
+"Il testo breve che vuoi far mostrare ai motori di ricerca sotto il titolo, meglio sotto i 160 "
+"caratteri. Facoltativo: puoi lasciarlo vuoto."
+
+#: apps/core/models.py
+msgid ""
+"The single contact address for authorities. The law (DSA article 11) asks for one; it is published"
+" on the public contact page."
+msgstr ""
+"L'unico indirizzo di contatto per le autorità. La legge (DSA articolo 11) ne chiede uno; viene "
+"pubblicato nella pagina pubblica dei contatti."
+
+#: apps/themes/models.py
+msgid "The site this theme is for. Each site has one theme."
+msgstr "Il sito a cui si applica questo tema. Ogni sito ha un solo tema."
+
+#: apps/shipping/models.py
+msgid "The special area this treatment is for. A method has one treatment per area."
+msgstr ""
+"L'area speciale a cui si applica questo trattamento. Un metodo ha un solo trattamento per area."
+
+#: apps/events/models.py
+msgid "The staff member who hid the event. The platform fills it in."
+msgstr "Il membro del personale che ha nascosto l'evento. Lo compila la piattaforma."
+
+#: apps/cms/models.py
+msgid ""
+"The story of the shop, built from blocks: its history, its workshop, its pictures. If you add "
+"none, the page shows only the title."
+msgstr ""
+"La storia del negozio, costruita a blocchi: la sua storia, il suo laboratorio, le sue immagini. Se"
+" non ne aggiungi, la pagina mostra solo il titolo."
+
+#: apps/events/models.py
+msgid ""
+"The street and number, for example 'Via Roma 12'. It is also used to find the place on the map."
+msgstr ""
+"La via e il numero civico, per esempio 'Via Roma 12'. Serve anche a trovare il luogo sulla mappa."
+
+#: apps/vendors/models.py
+msgid "The street number of your permanent establishment, for example 12/B."
+msgstr "Il numero civico della tua stabile organizzazione, per esempio 12/B."
+
+#: apps/vendors/models.py
+msgid "The street number of your registered office, for example 12/B."
+msgstr "Il numero civico della tua sede legale, per esempio 12/B."
+
+#: apps/vendors/models.py
+msgid ""
+"The street of your registered office (sede legale), as in the company register, without the "
+"number."
+msgstr ""
+"La via della tua sede legale, come risulta al registro delle imprese, senza il numero civico."
+
+#: apps/ingest/models.py
+msgid "The supplier feed this item comes from."
+msgstr "Il flusso del fornitore da cui arriva questo articolo."
+
+#: apps/ingest/models.py
+msgid "The supplier feed this run read."
+msgstr "Il flusso del fornitore letto da questa esecuzione."
+
+#: apps/ingest/models.py
+msgid "The supplier item the case is about, if it is about one."
+msgstr "L'articolo del fornitore a cui si riferisce il caso, se riguarda un articolo."
+
+#: apps/ingest/models.py
+msgid "The supplier item this draft was made from. An item has one draft."
+msgstr "L'articolo del fornitore da cui è stata fatta questa bozza. Un articolo ha una sola bozza."
+
+#: apps/ingest/models.py
+msgid "The supplier's code for the item. It is used to match the item to a product of the vendor."
+msgstr ""
+"Il codice dell'articolo del fornitore. Serve ad abbinare l'articolo a un prodotto del venditore."
+
+#: apps/ingest/models.py
+msgid "The supplier's term, as the supplier writes it. Upper and lower case do not matter."
+msgstr "Il termine del fornitore, come lo scrive il fornitore. Maiuscole e minuscole non contano."
+
+#: apps/shipping/models.py
+msgid "The surcharge: an amount without VAT for a fixed or per-kg surcharge, or a percentage."
+msgstr ""
+"Il supplemento: un importo IVA esclusa per un supplemento fisso o al kg, oppure una percentuale."
+
+#: apps/vendors/models.py
+msgid ""
+"The tax regime that applies to your business, chosen from the official FatturaPA list (RF19 is the"
+" flat-rate regime, forfettario). Not sure which one applies? Ask your accountant: we cannot choose"
+" it for you."
+msgstr ""
+"Il regime fiscale che riguarda la tua attività, scelto dall'elenco ufficiale FatturaPA (RF19 è il "
+"regime forfettario). Non sai quale ti riguarda? Chiedi al tuo commercialista: non possiamo "
+"sceglierlo noi per te."
+
+#: apps/cms/models.py
+msgid "The term's newest products shown for each category; 0 shows no category sections."
+msgstr ""
+"I prodotti più recenti dell'etichetta mostrati per ogni categoria. Con 0 non si mostra nessuna "
+"sezione per categoria."
+
 #: apps/manager/templates/manager/shop/profile.html
 msgid ""
 "The text in this language is a machine draft and is not public yet. Edit and save it to publish "
@@ -915,18 +3924,302 @@ msgstr ""
 "Il testo in questa lingua è una bozza automatica e non è ancora pubblico. Modificalo e salvalo per"
 " pubblicarlo."
 
+#: apps/cms/blocks.py
+msgid "The text of the section. Write it as your legal adviser approved it. Required."
+msgstr ""
+"Il testo della sezione. Scrivilo come lo ha approvato il tuo consulente legale. Obbligatorio."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The text on the brand page, in this language only: a language without one shows no description, "
+"never another language's. Basic formatting is kept. Example: 'Anvils and forging tools made in "
+"Bergamo since 1949.'"
+msgstr ""
+"Il testo sulla pagina del marchio, solo in questa lingua: una lingua senza testo non mostra "
+"nessuna descrizione, mai quella di un'altra lingua. La formattazione di base viene mantenuta. "
+"Esempio: 'Incudini e attrezzi da forgia prodotti a Bergamo dal 1949.'"
+
 #: apps/manager/templates/manager/shop/profile.html
 msgid "The texts and policies customers read on the page of %(vendor)s, one language at a time."
 msgstr ""
 "I testi e le condizioni che i clienti leggono nella pagina di %(vendor)s, una lingua alla volta."
 
+#: apps/ingest/models.py
+msgid "The texts written for the product, one set per language, as JSON."
+msgstr "I testi scritti per il prodotto, un gruppo per ogni lingua, in JSON."
+
+#: apps/events/models.py
+msgid ""
+"The time zone where the event takes place, for example 'Europe/Rome'. The start and end times "
+"above are read in it."
+msgstr ""
+"Il fuso orario in cui si svolge l'evento, per esempio 'Europe/Rome'. Gli orari di inizio e fine "
+"qui sopra sono letti in questo fuso."
+
+#: apps/cms/blocks.py
+msgid "The title above the countdown, for example 'New collection'. Up to 120 characters. Required."
+msgstr ""
+"Il titolo sopra il conto alla rovescia, per esempio 'Nuova collezione'. Fino a 120 caratteri. "
+"Obbligatorio."
+
+#: apps/cms/blocks.py
+msgid "The title of the section as visitors read it, up to 160 characters. Required."
+msgstr "Il titolo della sezione come lo leggono i visitatori, fino a 160 caratteri. Obbligatorio."
+
+#: apps/cms/blocks.py
+msgid ""
+"The title on the card, up to 100 characters. If you leave it empty, the card uses the name of what"
+" it points to."
+msgstr ""
+"Il titolo sulla scheda, fino a 100 caratteri. Se lo lasci vuoto, la scheda usa il nome di ciò a "
+"cui rimanda."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The title search engines show for the brand page. Optional. Example: 'Acme anvils and forging "
+"tools'."
+msgstr ""
+"Il titolo che i motori di ricerca mostrano per la pagina del marchio. Facoltativo. Esempio: "
+"'Incudini e attrezzi da forgia Acme'."
+
+#: apps/catalog/fields.py
+msgid ""
+"The title you want search engines to show for this page, ideally under 60 characters. Optional: "
+"you can leave it empty."
+msgstr ""
+"Il titolo che vuoi far mostrare ai motori di ricerca per questa pagina, meglio sotto i 60 "
+"caratteri. Facoltativo: puoi lasciarlo vuoto."
+
+#: apps/events/models.py
+msgid "The town or city of the place, for example 'Milano'."
+msgstr "Il paese o la città del luogo, per esempio 'Milano'."
+
+#: apps/catalog/attributes.py
+msgid ""
+"The unit of a number attribute, for example cm, kg or ml. Leave it empty for choice and text "
+"attributes."
+msgstr ""
+"L'unità di un attributo numerico, per esempio cm, kg o ml. Lasciala vuota per gli attributi a "
+"scelta e di testo."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The values of the extra details its set asks for, written as code and value, for example "
+"{\"model_year\": 2020}. Leave it empty if the set asks for none."
+msgstr ""
+"I valori dei dettagli in più che chiede il suo gruppo, scritti come codice e valore, per esempio "
+"{\"model_year\": 2020}. Lascialo vuoto se il gruppo non ne chiede."
+
+#: apps/catalog/models.py
+msgid ""
+"The variable product this version belongs to. Required: a variant cannot exist without its "
+"product."
+msgstr ""
+"Il prodotto variabile a cui appartiene questa versione. Obbligatorio: una variante non può "
+"esistere senza il suo prodotto."
+
+#: apps/tax/models.py
+msgid "The VAT percentage, for example 25.5 for 25.5%. Ask your accountant if you are not sure."
+msgstr ""
+"La percentuale di IVA, per esempio 25,5 per il 25,5%. Se non sei sicuro, chiedi al tuo "
+"commercialista."
+
+#: apps/tax/models.py
+msgid "The VAT regime this note belongs to."
+msgstr "Il regime IVA a cui appartiene questa nota."
+
+#: apps/catalog/models.py
+msgid ""
+"The VAT treatment of the product: Standard rate for most goods, Reduced rate for goods that "
+"qualify, Books for books under the special books regime. If you are not sure which one applies, "
+"ask your accountant."
+msgstr ""
+"Il trattamento IVA del prodotto: Aliquota standard per la maggior parte dei beni, Aliquota ridotta"
+" per i beni che ne hanno diritto, Libri per i libri con il regime speciale. Se non sei sicuro di "
+"quale si applichi, chiedi al tuo commercialista."
+
+#: apps/vendors/models.py
+msgid "The vendor profile field that must be filled in. Required: a rule needs a field."
+msgstr ""
+"Il campo del profilo venditore che deve essere compilato. Obbligatorio: una regola richiede un "
+"campo."
+
+#: apps/vendors/models.py
+msgid "The vendor that accepted the contract."
+msgstr "Il venditore che ha accettato il contratto."
+
+#: apps/shipping/models.py
+msgid "The vendor that offers this way of shipping."
+msgstr "Il venditore che offre questo modo di spedire."
+
+#: apps/ingest/models.py
+msgid "The vendor that owns the item."
+msgstr "Il venditore proprietario dell'articolo."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The vendor that suggested this brand. While the brand is pending only this vendor can use it, and "
+"the review team knows whom to ask. Empty for brands staff created. Example: the vendor that sells "
+"it."
+msgstr ""
+"Il venditore che ha suggerito questo marchio. Finché il marchio è in attesa solo questo venditore "
+"può usarlo e il team di revisione sa a chi chiedere. Vuoto per i marchi creati dallo staff. "
+"Esempio: il venditore che lo vende."
+
+#: apps/compliance/models.py
+msgid "The vendor the order or notice is about."
+msgstr "Il venditore a cui si riferisce l'ordine o la segnalazione."
+
+#: apps/compliance/models.py
+msgid "The vendor these defaults belong to. A vendor has one set of defaults."
+msgstr ""
+"Il venditore a cui appartengono questi valori. Ogni venditore ha un solo gruppo di valori "
+"predefiniti."
+
+#: apps/vendors/models.py
+msgid "The vendor this consent belongs to."
+msgstr "Il venditore a cui appartiene questo consenso."
+
+#: apps/vendors/models.py
+msgid "The vendor this setting applies to."
+msgstr "Il venditore a cui si applica questa impostazione."
+
+#: apps/tax/models.py
+msgid "The vendor this VAT regime belongs to."
+msgstr "Il venditore a cui appartiene questo regime IVA."
+
+#: apps/shipping/models.py
+msgid "The vendor whose address the parcel is collected from."
+msgstr "Il venditore al cui indirizzo si ritira il pacco."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"The vendor whose feed or import brought these brands. It lets the review team ask the right "
+"person. Example: the vendor that uploaded the product file."
+msgstr ""
+"Il venditore il cui feed o la cui importazione ha portato questi marchi. Permette al team di "
+"revisione di chiedere alla persona giusta. Esempio: il venditore che ha caricato il file dei "
+"prodotti."
+
+#: apps/ingest/models.py
+msgid "The vendor whose supplier feed this is."
+msgstr "Il venditore a cui appartiene questo flusso del fornitore."
+
+#: apps/cms/models.py
+msgid "The vendor's newest products shown after the story; 0 shows none."
+msgstr ""
+"I prodotti più recenti del venditore mostrati dopo la storia. Con 0 non se ne mostra nessuno."
+
 #: apps/accounts/decorators.py
 msgid "The verification failed. Please reload the page and try again."
 msgstr "La verifica non è riuscita. Ricarica la pagina e riprova."
 
+#: apps/compliance/models.py
+msgid ""
+"The warnings that come with the product, in this language. A product with warnings is not sold "
+"into a country until they exist in one of that country's languages."
+msgstr ""
+"Le avvertenze che accompagnano il prodotto, in questa lingua. Un prodotto con avvertenze non viene"
+" venduto in un paese finché non esistono in una lingua di quel paese."
+
+#: apps/events/admin_views.py
+msgid "The website whose events settings you are changing."
+msgstr "Il sito di cui stai cambiando le impostazioni degli eventi."
+
+#: apps/catalog/models.py
+msgid ""
+"The weight of the packed product in kilograms, for example 0.350. Shipping costs are calculated "
+"from it: without a weight, buyers cannot get a shipping rate."
+msgstr ""
+"Il peso del prodotto imballato in chilogrammi, per esempio 0,350. Le spese di spedizione si "
+"calcolano da qui: senza peso, chi compra non può ottenere una tariffa di spedizione."
+
+#: apps/catalog/models.py
+msgid ""
+"The weight of this version in kilograms, for example 0.450, when it differs from the product. "
+"Leave it empty to use the product's weight."
+msgstr ""
+"Il peso di questa versione in chilogrammi, per esempio 0,450, quando è diverso da quello del "
+"prodotto. Lascialo vuoto per usare il peso del prodotto."
+
+#: apps/catalog/models.py
+msgid "The width of the packed product in centimetres, for example 20. Optional."
+msgstr "La larghezza del prodotto imballato in centimetri, per esempio 20. Facoltativo."
+
+#: apps/catalog/attributes.py
+msgid ""
+"The word buyers see for this value in this language, for example 'Red'. Required: without it the "
+"value has no name in this language."
+msgstr ""
+"La parola che chi compra vede per questo valore in questa lingua, per esempio 'Rosso'. "
+"Obbligatorio: senza, il valore non ha un nome in questa lingua."
+
+#: apps/manager/media.py
+msgid ""
+"The words buyers click on. If you leave it empty, the words you selected are used, or the address "
+"itself when nothing is selected."
+msgstr ""
+"Le parole su cui cliccano i clienti. Se lo lasci vuoto, vengono usate le parole che hai "
+"selezionato, oppure l’indirizzo stesso se non hai selezionato nulla."
+
+#: apps/cms/blocks.py
+msgid ""
+"The words on the button before the launch, for example 'Get notified'. If you leave it empty, "
+"there is no button."
+msgstr ""
+"Le parole sul pulsante prima del lancio, per esempio 'Avvisami'. Se le lasci vuote, non c'è alcun "
+"pulsante."
+
+#: apps/cms/models.py
+msgid ""
+"The words shown in the menu, for example 'About us'. If you leave it empty, the menu shows the "
+"title of the page."
+msgstr ""
+"Le parole mostrate nel menu, per esempio 'Chi siamo'. Se le lasci vuote, il menu mostra il titolo "
+"della pagina."
+
+#: apps/cms/models.py
+msgid ""
+"The words shown in the menu, for example 'Our blog'. Required: the entry cannot be saved without "
+"it."
+msgstr ""
+"Le parole mostrate nel menu, per esempio 'Il nostro blog'. Obbligatorie: senza non si può salvare "
+"la voce."
+
+#: apps/cms/blocks.py
+msgid ""
+"The words shown once the launch has passed, up to 120 characters. If you leave it empty, visitors "
+"read 'Available now'."
+msgstr ""
+"Le parole mostrate dopo il lancio, fino a 120 caratteri. Se le lasci vuote, i visitatori leggono "
+"'Disponibile ora'."
+
+#: apps/catalog/models.py
+msgid ""
+"The words to search for, for example 'ceramic mug'. Fill them only when the target is a search."
+msgstr ""
+"Le parole da cercare, per esempio 'tazza in ceramica'. Compilale solo quando la destinazione è una"
+" ricerca."
+
+#: apps/cms/blocks.py
+msgid ""
+"The words visitors click, for example 'Read more'. Required: without it the link cannot be saved."
+msgstr ""
+"Le parole su cui clicca il visitatore, per esempio 'Scopri di più'. Obbligatorie: senza non si può"
+" salvare il link."
+
+#: apps/shipping/models.py
+msgid "The zone this method ships to. A vendor can offer several methods to the same zone."
+msgstr ""
+"La zona in cui spedisce questo metodo. Un venditore può offrire più metodi per la stessa zona."
+
 #: themes/base/templates/components/error_summary.html
 msgid "There is a problem"
 msgstr "Si è verificato un problema"
+
+#: themes/base/templates/components/help_entry.html
+msgid "There is no help text for this page yet."
+msgstr "Per questa pagina non c’è ancora un testo di aiuto."
 
 #: apps/manager/templates/manager/bulk_preview.html
 msgid "This action changes nothing."
@@ -965,9 +4258,151 @@ msgstr ""
 "Questo venditore è sospeso o chiuso, quindi il profilo del negozio non può essere modificato. "
 "Contatta l’assistenza per farlo riaprire."
 
+#: apps/manager/forms.py
+msgid ""
+"Tick it and save to delete the current logo. A new image and the description above are then "
+"ignored."
+msgstr ""
+"Spunta e salva per eliminare il logo attuale. Un’eventuale nuova immagine e la descrizione qui "
+"sopra vengono ignorate."
+
+#: apps/events/models.py
+msgid ""
+"Tick it for an event with no set hours, such as a sale lasting several days. You then give the "
+"first and last day instead of the start and end times."
+msgstr ""
+"Spuntalo per un evento senza orari fissi, come un saldo che dura più giorni. Indicherai il primo e"
+" l'ultimo giorno invece degli orari di inizio e fine."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"Tick it if categories or tags in this set can sit inside others, for example maker and then model."
+" Leave it unticked for a flat list."
+msgstr ""
+"Spuntala se le categorie o etichette di questo gruppo possono stare dentro altre, per esempio "
+"prima il produttore e poi il modello. Lasciala senza spunta per un elenco semplice."
+
+#: apps/compliance/forms.py
+msgid "Tick it if software helped to find the content."
+msgstr "Spunta se un software ha aiutato a trovare il contenuto."
+
+#: apps/compliance/forms.py
+msgid "Tick it if software took the decision."
+msgstr "Spunta se la decisione è stata presa da un software."
+
+#: apps/vendors/models.py
+msgid ""
+"Tick it if you want to accept enquiries from buyers about your products. Unticked: you do not take"
+" enquiries."
+msgstr ""
+"Spunta la casella se vuoi ricevere richieste di informazioni dai clienti sui tuoi prodotti. Senza "
+"spunta non ricevi richieste."
+
+#: apps/cms/models.py
+msgid ""
+"Tick it on screens for vendors, so the dialog also links the vendor guide. It has no effect until "
+"the platform has a vendor guide address."
+msgstr ""
+"Selezionalo sulle schermate per i venditori, così la finestra rimanda anche alla guida per i "
+"venditori. Non ha effetto finché la piattaforma non ha un indirizzo della guida per i venditori."
+
+#: apps/ingest/models.py
+msgid ""
+"Tick it to allow runs that write. Without it, every run of this source is a dry run that changes "
+"nothing."
+msgstr ""
+"Spunta per permettere le esecuzioni che scrivono. Senza, ogni esecuzione di questa fonte è una "
+"prova che non cambia nulla."
+
+#: apps/catalog/models.py
+msgid ""
+"Tick it to apply the rule to every address that starts with this one, for example /author/ also "
+"covers /author/anyone/. Leave it unticked to match only this address."
+msgstr ""
+"Spuntala per applicare la regola a ogni indirizzo che inizia così, per esempio /author/ vale anche"
+" per /author/chiunque/. Lasciala senza spunta per riconoscere solo questo indirizzo."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"Tick it to give each category or tag of this set its own page that buyers can open and share."
+msgstr ""
+"Spuntala per dare a ogni categoria o etichetta di questo gruppo una pagina sua, che chi compra può"
+" aprire e condividere."
+
+#: apps/catalog/taxonomy.py
+msgid "Tick it to let buyers narrow a product list by these categories or tags."
+msgstr ""
+"Spuntala per far restringere a chi compra un elenco di prodotti con queste categorie o etichette."
+
+#: apps/vendors/models.py
+msgid ""
+"Tick it to let other vendors suggest your products next to theirs. Unticked: your products are not"
+" suggested by others."
+msgstr ""
+"Spunta la casella per permettere ad altri venditori di suggerire i tuoi prodotti accanto ai loro. "
+"Senza spunta i tuoi prodotti non vengono suggeriti da altri."
+
+#: apps/vendors/models.py
+msgid ""
+"Tick it to let others include your products in the bundles they create. Unticked: they cannot."
+msgstr ""
+"Spunta la casella per permettere ad altri di includere i tuoi prodotti nei pacchetti che creano. "
+"Senza spunta non possono farlo."
+
+#: apps/catalog/models.py
+msgid ""
+"Tick it to mark the main version of the product. Only one version of a product can be the default."
+msgstr ""
+"Spuntala per segnare la versione principale del prodotto. Solo una versione di un prodotto può "
+"essere quella predefinita."
+
+#: apps/core/models.py
+msgid "Tick it when images under this licence must show a credit."
+msgstr "Spunta quando le immagini con questa licenza devono mostrare un credito."
+
+#: apps/core/models.py
+msgid ""
+"Tick it when images under this licence need a reference to a written permission that is stored."
+msgstr ""
+"Spunta quando le immagini con questa licenza richiedono il riferimento a un permesso scritto "
+"conservato."
+
+#: apps/core/models.py
+msgid "Tick it when images under this licence need the web address they come from."
+msgstr "Spunta quando le immagini con questa licenza richiedono l'indirizzo web da cui provengono."
+
+#: apps/compliance/forms.py
+msgid "Tick the box to confirm the statement. Without it the report cannot be sent."
+msgstr ""
+"Spunta la casella per confermare la dichiarazione. Senza non si può inviare la segnalazione."
+
+#: apps/cms/blocks.py
+msgid "Tick to add a 'See all' link under the products, to the full list."
+msgstr "Spunta per aggiungere sotto i prodotti un link 'Vedi tutti', verso l'elenco completo."
+
+#: apps/cms/models.py
+msgid "Tick to mark this plan as the one we suggest. It is shown with a highlight."
+msgstr "Spunta per segnare questo piano come quello consigliato. Viene mostrato in evidenza."
+
+#: apps/vendors/models.py
+msgid ""
+"Ticked: the feature is on for this vendor. Unticked: it is off, whatever the platform setting is. "
+"An emergency switch can only be turned off here."
+msgstr ""
+"Con la spunta la funzione è attiva per questo venditore. Senza spunta è disattivata, qualunque sia"
+" l'impostazione della piattaforma. Un interruttore di emergenza qui si può solo disattivare."
+
+#: apps/events/panels.py
+msgid "Times above are read in this time zone, e.g. Europe/Rome."
+msgstr "Gli orari qui sopra sono letti in questo fuso orario, per esempio Europe/Rome."
+
 #: apps/manager/media.py
 msgid "Title"
 msgstr "Titolo"
+
+#: apps/cms/models.py
+msgid "title"
+msgstr "titolo"
 
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid ""
@@ -977,6 +4412,22 @@ msgstr ""
 "Per chiederne la riapertura, scrivi allo staff della piattaforma. Lo staff riapre un venditore "
 "chiuso dopo una verifica; il venditore ripete poi l’onboarding, compresa l’accettazione del "
 "contratto in vigore."
+
+#: apps/shipping/models.py
+msgid ""
+"To limit the zone to some postcodes, list them separated by commas: a prefix such as 'BT*', a "
+"range such as '70000..74999' or an exact postcode."
+msgstr ""
+"Per limitare la zona ad alcuni CAP, elencali separati da virgole: un prefisso come 'BT*', un "
+"intervallo come '70000..74999' o un CAP esatto."
+
+#: apps/shipping/models.py
+msgid ""
+"To limit the zone to some provinces or states, list their codes separated by commas, for example "
+"'SS' or 'CA'."
+msgstr ""
+"Per limitare la zona ad alcune province o stati, elenca i loro codici separati da virgole, per "
+"esempio 'SS' o 'CA'."
 
 #: apps/accounts/action_link_views.py apps/accounts/decorators.py
 msgid "Too many attempts. Please try again later."
@@ -1008,9 +4459,35 @@ msgstr "La verifica in due passaggi è attiva"
 msgid "Two-factor settings"
 msgstr "Impostazioni della verifica in due passaggi"
 
+#: apps/cms/choosers.py
+msgid "Type part of a product name, SKU, brand or vendor name."
+msgstr "Scrivi una parte del nome del prodotto, dello SKU, del marchio o del nome del venditore."
+
+#: apps/vendors/models.py
+msgid "Untick it to stop applying the rule without deleting it."
+msgstr "Togli la spunta per smettere di applicare la regola senza eliminarla."
+
+#: apps/shipping/models.py
+msgid "Untick it to switch the carrier off: an inactive carrier offers no rates at all."
+msgstr "Togli la spunta per spegnere il corriere: un corriere non attivo non offre nessuna tariffa."
+
+#: apps/cms/blocks.py
+msgid "Up to two buttons under the text. If you add none, the banner has no buttons."
+msgstr "Fino a due pulsanti sotto il testo. Se non ne aggiungi, il banner non ha pulsanti."
+
 #: apps/manager/media.py
 msgid "Upload"
 msgstr "Carica"
+
+#: apps/catalog/taxonomy_admin.py
+msgid ""
+"Upload a logo to replace the current one: PNG, JPEG, WebP or SVG, checked and re-encoded without "
+"metadata. It is shown on the brand page and in its structured data. Example: the brand's official "
+"logo."
+msgstr ""
+"Carica un logo per sostituire quello attuale: PNG, JPEG, WebP o SVG, controllato e ricodificato "
+"senza metadati. Viene mostrato sulla pagina del marchio e nei suoi dati strutturati. Esempio: il "
+"logo ufficiale del marchio."
 
 #: apps/manager/media.py
 msgid "Uploading…"
@@ -1036,9 +4513,17 @@ msgstr "Usa il blocco schermo di questo dispositivo o una chiave di sicurezza."
 msgid "Vendor"
 msgstr "Venditore"
 
+#: apps/catalog/taxonomy.py
+msgid "vendor"
+msgstr "venditore"
+
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid "Vendor closed"
 msgstr "Venditore chiuso"
+
+#: themes/base/templates/components/help_entry.html
+msgid "Vendor guide"
+msgstr "Guida per i venditori"
 
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Verify"
@@ -1051,6 +4536,16 @@ msgstr "Verifica la tua identità"
 #: themes/base/templates/components/alert.html
 msgid "Warning"
 msgstr "Attenzione"
+
+#: apps/compliance/forms.py
+msgid ""
+"Warning: this text is meant for the EU transparency database (the submission is not built yet, so "
+"for now it is only stored). At most 2000 characters. Write no personal data, no names, no email "
+"addresses or web addresses."
+msgstr ""
+"Attenzione: questo testo è pensato per il database di trasparenza dell'UE (l'invio non c'è ancora,"
+" per ora viene solo salvato). Al massimo 2000 caratteri. Non scrivere dati personali, nomi, "
+"indirizzi email o indirizzi web."
 
 #: themes/base/templates/500.html
 msgid "We could not complete your request. Please try again in a few minutes."
@@ -1077,6 +4572,460 @@ msgid ""
 msgstr ""
 "Abbiamo ricevuto il tuo pagamento di %(total)s EUR per l’ordine %(order_number)s. Ogni venditore "
 "preparerà la sua parte e riceverai un messaggio quando verrà spedita."
+
+#: apps/themes/styleguide.py
+msgid "We send the order confirmation here."
+msgstr "Qui ti mandiamo la conferma dell'ordine."
+
+#: apps/manager/media.py
+msgid "Web address"
+msgstr "Indirizzo web"
+
+#: apps/cms/models.py
+msgid ""
+"What a person can do here and what to do first, in short plain sentences. Without text the dialog "
+"shows only the title."
+msgstr ""
+"Che cosa si può fare qui e da dove iniziare, in frasi brevi e semplici. Senza testo la finestra "
+"mostra solo il titolo."
+
+#: apps/catalog/models.py
+msgid "What buyers see for this version: in stock, out of stock or on backorder."
+msgstr "Cosa vede chi compra per questa versione: disponibile, esaurito o in ordine al fornitore."
+
+#: apps/catalog/models.py
+msgid ""
+"What buyers see: in stock, out of stock or on backorder. Backorder only works with the always-open"
+" stock policy."
+msgstr ""
+"Cosa vede chi compra: disponibile, esaurito o in ordine al fornitore. L'ordine al fornitore "
+"funziona solo con la gestione scorte sempre aperta."
+
+#: apps/compliance/forms.py
+msgid "What is restricted, where and for how long, in plain words. The vendor sees this text."
+msgstr ""
+"Che cosa viene limitato, dove e per quanto tempo, in parole semplici. Il venditore vede questo "
+"testo."
+
+#: apps/shipping/models.py
+msgid "What kind of area it is: an island, a remote area or a territory with its own VAT rules."
+msgstr "Che tipo di area è: un'isola, una zona remota o un territorio con regole IVA proprie."
+
+#: apps/ingest/models.py
+msgid "What kind of term this is: category, taxonomy term, colour, material, brand or other."
+msgstr "Che tipo di termine è: categoria, termine di tassonomia, colore, materiale, marca o altro."
+
+#: apps/shipping/models.py
+msgid "What pickup costs, without VAT. Use 0 for free pickup."
+msgstr "Quanto costa il ritiro, IVA esclusa. Usa 0 per il ritiro gratuito."
+
+#: apps/catalog/attributes.py
+msgid ""
+"What the attribute holds. Choice: one or more values from a list you define, for example sizes. "
+"Number: a measure, for example a width. Text: a free text, for example an author. Required."
+msgstr ""
+"Cosa contiene l'attributo. Scelta: uno o più valori da un elenco che definisci, per esempio le "
+"taglie. Numero: una misura, per esempio una larghezza. Testo: un testo libero, per esempio un "
+"autore. Obbligatorio."
+
+#: apps/cms/models.py
+msgid ""
+"What the author does, for example 'Master potter'. Up to 120 characters. If you leave it empty, no"
+" title is shown."
+msgstr ""
+"Che cosa fa l'autore, per esempio 'Maestro ceramista'. Fino a 120 caratteri. Se lo lasci vuoto, "
+"non viene mostrata alcuna qualifica."
+
+#: apps/compliance/models.py
+msgid "What the authority asks or what the notice reports, in a few sentences. Required."
+msgstr "Che cosa chiede l'autorità o che cosa segnala l'avviso, in poche frasi. Obbligatorio."
+
+#: apps/vendors/admin.py
+msgid ""
+"What the commission percentage is applied to. It is frozen on every order at the time of purchase."
+msgstr ""
+"Su cosa si applica la percentuale di commissione. Viene congelata su ogni ordine al momento "
+"dell’acquisto."
+
+#: apps/vendors/models.py
+msgid "What the field is needed for: a payout request or the activation of the vendor."
+msgstr "A cosa serve il campo: una richiesta di pagamento o l'attivazione del venditore."
+
+#: apps/cms/models.py
+msgid ""
+"What the plan includes, one short line each, for example 'Your own shop page'. If you add none, no"
+" list is shown."
+msgstr ""
+"Che cosa include il piano, una breve riga per voce, per esempio 'La tua pagina negozio'. Se non ne"
+" aggiungi, non viene mostrato alcun elenco."
+
+#: apps/shipping/models.py
+msgid ""
+"What the rate calculation does for this method in this area: an estimated cost that needs a quote,"
+" a rate with a surcharge, quote only, not offered, or blocked. Without a treatment it gives an "
+"estimated cost that needs a quote."
+msgstr ""
+"Che cosa fa il calcolo delle tariffe per questo metodo in quest'area: un costo stimato da "
+"confermare con un preventivo, una tariffa con supplemento, solo preventivo, non offerto oppure "
+"bloccato. Senza un trattamento dà un costo stimato da confermare con un preventivo."
+
+#: apps/shipping/models.py
+msgid ""
+"What the rate calculation should do for a parcel heavier than the last weight band: charge the "
+"last band, ask for a quote or block the checkout. Leave it empty to follow the platform default, "
+"which is to ask for a quote."
+msgstr ""
+"Che cosa dovrebbe fare il calcolo delle tariffe per un pacco più pesante dell'ultima fascia di "
+"peso: addebitare l'ultima fascia, chiedere un preventivo oppure bloccare la cassa. Lascialo vuoto "
+"per seguire il valore predefinito della piattaforma, che è chiedere un preventivo."
+
+#: apps/ingest/models.py
+msgid "What the run does: scrape, stock, price, images or publish."
+msgstr "Che cosa fa l'esecuzione: lettura del sito, giacenze, prezzi, immagini o pubblicazione."
+
+#: apps/ingest/models.py
+msgid "What the supplier published for the item, as it was read."
+msgstr "Quello che il fornitore ha pubblicato per l'articolo, così come è stato letto."
+
+#: apps/cms/models.py
+msgid ""
+"What the text is for: one screen, every page of one page type, or every screen that has no text of"
+" its own. Example: choose Screen for the brand listing."
+msgstr ""
+"A che cosa serve il testo: una schermata, ogni pagina di un tipo di pagina, o ogni schermata che "
+"non ha un testo proprio. Esempio: scegli Schermata per l’elenco dei marchi."
+
+#: apps/catalog/models.py
+msgid ""
+"What visitors get: 301 sends them to a new address, 410 tells them the page is gone for good. A "
+"410 has no target."
+msgstr ""
+"Cosa ottengono i visitatori: 301 li manda a un nuovo indirizzo, 410 dice che la pagina non esiste "
+"più. Un 410 non ha destinazione."
+
+#: apps/compliance/forms.py
+msgid "What you restrict: a product is unpublished, an event is hidden, a vendor shop is suspended."
+msgstr ""
+"Che cosa limiti: un prodotto viene rimosso dalla pubblicazione, un evento viene nascosto, il "
+"negozio di un venditore viene sospeso."
+
+#: apps/ingest/models.py
+msgid "When a run last found the item in the feed."
+msgstr "Quando un'esecuzione ha trovato l'articolo nel flusso l'ultima volta."
+
+#: apps/manager/forms.py
+msgid ""
+"When and how a customer can cancel an order. Customers see it in the 'Cancellation' section of "
+"your shop page. Leave it empty and the section is not shown. Up to about 5,000 characters "
+"including formatting. If you are unsure what the law requires, ask a legal adviser."
+msgstr ""
+"Quando e come un cliente può annullare un ordine. I clienti la vedono nella sezione ‘Annullamento’"
+" della pagina del tuo negozio. Se la lasci vuota, la sezione non viene mostrata. Fino a circa "
+"5.000 caratteri, formattazione compresa. Se non sei sicuro di cosa preveda la legge, chiedi a un "
+"consulente legale."
+
+#: apps/ingest/models.py
+msgid "When the case was decided."
+msgstr "Quando il caso è stato deciso."
+
+#: apps/vendors/models.py
+msgid "When the contract was accepted."
+msgstr "Quando il contratto è stato accettato."
+
+#: apps/events/models.py
+msgid ""
+"When the event was cancelled. Empty for an event that is going ahead. The platform fills it in."
+msgstr ""
+"Quando l'evento è stato annullato. Vuoto per un evento che si svolge. Lo compila la piattaforma."
+
+#: apps/cms/blocks.py
+msgid ""
+"When the launch happens, in the platform's local time. Example: 2026-12-01 09:00. Required: the "
+"countdown cannot run without it."
+msgstr ""
+"Quando avviene il lancio, nell'ora locale della piattaforma. Esempio: 2026-12-01 09:00. "
+"Obbligatorio: senza non può partire il conto alla rovescia."
+
+#: apps/compliance/models.py
+msgid ""
+"When the order or notice arrived. The deadline is calculated from this date and does not move "
+"afterwards."
+msgstr ""
+"Quando è arrivato l'ordine o la segnalazione. La scadenza si calcola da questa data e dopo non si "
+"sposta."
+
+#: apps/events/models.py
+msgid ""
+"When the platform staff hid the event from the public. Empty for a visible event. The platform "
+"fills it in."
+msgstr ""
+"Quando il personale della piattaforma ha nascosto l'evento al pubblico. Vuoto per un evento "
+"visibile. Lo compila la piattaforma."
+
+#: apps/events/models.py
+msgid "When the position was found from the address. Filled in for you."
+msgstr "Quando è stata trovata la posizione dall'indirizzo. Compilato per te."
+
+#: apps/ingest/models.py
+msgid "When the run ended, whatever the result."
+msgstr "Quando l'esecuzione è finita, qualunque sia il risultato."
+
+#: apps/ingest/models.py
+msgid "When the run started."
+msgstr "Quando l'esecuzione è iniziata."
+
+#: apps/ingest/models.py
+msgid "When the supplier's data was read."
+msgstr "Quando i dati del fornitore sono stati letti."
+
+#: apps/vendors/models.py
+msgid ""
+"When this version replaces the previous one. Required. Once a vendor has accepted the version it "
+"can no longer be changed."
+msgstr ""
+"Da quando questa versione sostituisce la precedente. Obbligatorio. Dopo l'accettazione di un "
+"venditore la versione non si può più modificare."
+
+#: apps/core/models.py
+msgid ""
+"When this version starts to apply. A change is a new version from a date; the service that adds it"
+" closes the previous one."
+msgstr ""
+"Da quando vale questa versione. Una modifica è una nuova versione da una data; il servizio che la "
+"aggiunge chiude la precedente."
+
+#: apps/catalog/models.py
+msgid ""
+"Where a 301 sends visitors: a path on this site, a product, a category or tag, or a search. "
+"Required for a 301; leave it empty for a 410."
+msgstr ""
+"Dove un 301 manda i visitatori: un percorso su questo sito, un prodotto, una categoria o "
+"etichetta, oppure una ricerca. Obbligatorio per un 301; lascialo vuoto per un 410."
+
+#: apps/core/models.py
+msgid ""
+"Where compliance alerts go, for example an overdue safety case. Leave it empty to send them to the"
+" support address."
+msgstr ""
+"Dove arrivano gli avvisi di conformità, per esempio un caso di sicurezza in ritardo. Lascialo "
+"vuoto per mandarli all'indirizzo di assistenza."
+
+#: apps/events/models.py
+msgid ""
+"Where people join an online event, starting with https://. Only for online or mixed events; leave "
+"it empty for the others."
+msgstr ""
+"Dove si entra in un evento online, con indirizzo che inizia per https://. Solo per eventi online o"
+" misti; lascia vuoto per gli altri."
+
+#: apps/cms/blocks.py
+msgid ""
+"Where the button leads, for example 'https://example.com/launch'. If you leave it empty, it leads "
+"to the chosen product or category."
+msgstr ""
+"Dove porta il pulsante, per esempio 'https://example.com/lancio'. Se lo lasci vuoto, porta al "
+"prodotto o alla categoria scelti."
+
+#: apps/ingest/models.py
+msgid "Where the draft stands: new, ready, needs review, published or rejected."
+msgstr "A che punto è la bozza: nuova, pronta, da rivedere, pubblicata o rifiutata."
+
+#: apps/cms/blocks.py
+msgid ""
+"Where the link leads once the launch has passed. If you leave it empty, it leads to the chosen "
+"product or category."
+msgstr ""
+"Dove porta il link dopo il lancio. Se lo lasci vuoto, porta al prodotto o alla categoria scelti."
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Where the logo comes from; some licences require it. Example: the brand's press page."
+msgstr ""
+"Da dove arriva il logo; alcune licenze lo richiedono. Esempio: la pagina stampa del marchio."
+
+#: apps/tax/models.py
+msgid ""
+"Where the rate comes from: the European Commission rate database (EC TEDB) or entered by hand."
+msgstr ""
+"Da dove viene l'aliquota: la banca dati delle aliquote della Commissione europea (EC TEDB) oppure "
+"inserita a mano."
+
+#: apps/catalog/taxonomy.py
+msgid ""
+"Where the review stands. Set by the approve and reject actions, never by hand. Example: Pending "
+"review."
+msgstr ""
+"A che punto è la revisione. Lo impostano le azioni di approvazione e rifiuto, mai a mano. Esempio:"
+" In attesa di revisione."
+
+#: apps/ingest/models.py
+msgid "Where the run stands: queued, running, succeeded, failed or cancelled."
+msgstr "A che punto è l'esecuzione: in coda, in corso, riuscita, fallita o annullata."
+
+#: apps/catalog/fields.py
+msgid ""
+"Where the text is in its review. A machine draft needs a person to read it; reviewed means it was "
+"checked; only a published text is shown to buyers."
+msgstr ""
+"A che punto è la revisione del testo. Una bozza automatica deve essere letta da una persona; "
+"revisionato vuol dire controllato; solo un testo pubblicato è mostrato a chi compra."
+
+#: apps/cms/models.py
+msgid ""
+"Where this menu appears: at the top of every page (header) or at the bottom (footer). Each "
+"language has one menu for each place."
+msgstr ""
+"Dove compare questo menu: in cima a ogni pagina (intestazione) o in fondo (piè di pagina). Ogni "
+"lingua ha un menu per ciascuna posizione."
+
+#: apps/vendors/admin.py
+msgid ""
+"Where this version is in the review: a machine draft still needs checking, reviewed is checked, "
+"published is shown to visitors. Only published texts are shown."
+msgstr ""
+"A che punto è questa versione nella revisione: una bozza automatica va ancora controllata, "
+"'Reviewed' è controllata, 'Published' è mostrata ai visitatori. Si mostrano solo i testi "
+"pubblicati."
+
+#: apps/events/models.py
+msgid ""
+"Where to find you inside a fair, for example 'Hall 3, stand B12'. If you leave it empty, no stand "
+"is shown."
+msgstr ""
+"Dove trovarti dentro una fiera, per esempio 'Padiglione 3, stand B12'. Se lo lasci vuoto, non "
+"viene mostrato alcuno stand."
+
+#: apps/catalog/taxonomy_admin.py
+msgid ""
+"Where to place this item next to the one chosen below: first inside it, before it or after it. "
+"Required."
+msgstr ""
+"Dove mettere questo elemento rispetto a quello scelto sotto: dentro di lui come primo, prima o "
+"dopo. Obbligatorio."
+
+#: apps/tax/models.py
+msgid ""
+"Whether the territory is outside the EU VAT area, inside it with rates of its own, or special and "
+"handled by its own rule. Ask your accountant if you are not sure."
+msgstr ""
+"Se il territorio è fuori dall'area IVA dell'UE, dentro con aliquote proprie, oppure speciale e "
+"gestito da una regola a parte. Se non sei sicuro, chiedi al tuo commercialista."
+
+#: apps/core/models.py
+msgid ""
+"Whether VAT is added to the platform's commissions and fees. Ask your accountant if you are not "
+"sure."
+msgstr ""
+"Se l'IVA viene aggiunta alle commissioni e ai costi della piattaforma. Se non sei sicuro, chiedi "
+"al tuo commercialista."
+
+#: apps/tax/models.py
+msgid "Which kind of goods the rate is for: standard, reduced, super-reduced, zero or books."
+msgstr "Per quale tipo di merce è l'aliquota: ordinaria, ridotta, super ridotta, zero o libri."
+
+#: apps/cms/models.py
+msgid ""
+"Which legal text this page is, for example 'Privacy policy'. The site links to it from the places "
+"where that text is needed."
+msgstr ""
+"Quale testo legale è questa pagina, per esempio 'Informativa sulla privacy'. Il sito la collega "
+"nei punti in cui serve quel testo."
+
+#: apps/cms/blocks.py
+msgid ""
+"Which section the law asks for this text to be. The platform checks that every required section "
+"exists, whatever the title says."
+msgstr ""
+"Quale sezione richiesta dalla legge è questo testo. La piattaforma controlla che ogni sezione "
+"richiesta esista, qualunque sia il titolo."
+
+#: apps/cms/models.py
+msgid "Who did it: a person, a firm or a tool."
+msgstr "Chi l'ha fatto: una persona, uno studio o uno strumento."
+
+#: apps/compliance/models.py
+msgid ""
+"Who makes the product: the name, registered trade name or trade mark. Fill the four manufacturer "
+"fields together: a product that leaves all four empty uses the defaults of its vendor."
+msgstr ""
+"Chi produce il prodotto: nome, ragione sociale o marchio. Compila insieme i quattro campi del "
+"produttore: un prodotto che li lascia tutti vuoti usa i valori predefiniti del suo venditore."
+
+#: apps/cms/models.py
+msgid ""
+"Who the plan is for, in a sentence or two, up to 300 characters. If you leave it empty, only the "
+"name and the price are shown."
+msgstr ""
+"A chi è rivolto il piano, in una o due frasi, fino a 300 caratteri. Se lo lasci vuoto, si vedono "
+"solo il nome e il prezzo."
+
+#: apps/catalog/taxonomy_admin.py
+msgid "Who to credit for the logo. Needed with a new file. Example: the brand's name."
+msgstr "Chi citare come autore del logo. Serve con un nuovo file. Esempio: il nome del marchio."
+
+#: apps/cms/models.py
+msgid ""
+"Who wrote the article. The name appears under the title and links to the author's page. If you "
+"leave it empty, no author is shown."
+msgstr ""
+"Chi ha scritto l'articolo. Il nome compare sotto il titolo e rimanda alla pagina dell'autore. Se "
+"lo lasci vuoto, non viene mostrato alcun autore."
+
+#: apps/ingest/models.py
+msgid ""
+"Why a person must look: price jump, sale, identity change, stale item or ambiguous SKU match."
+msgstr ""
+"Perché serve una persona: salto di prezzo, saldo, cambio di identità, articolo vecchio o SKU "
+"ambiguo."
+
+#: apps/vendors/models.py
+msgid "Why it was switched, for example the incident or request reference. Up to 200 characters."
+msgstr ""
+"Perché è stata cambiata, per esempio il riferimento dell'incidente o della richiesta. Al massimo "
+"200 caratteri."
+
+#: apps/events/models.py
+msgid "Why the event was hidden. The vendor can read it. The platform fills it in."
+msgstr "Perché l'evento è stato nascosto. Il venditore può leggerlo. Lo compila la piattaforma."
+
+#: apps/vendors/models.py
+msgid "Why the field is required, for the record. Up to 200 characters."
+msgstr "Perché il campo è obbligatorio, per memoria. Al massimo 200 caratteri."
+
+#: apps/catalog/models.py
+msgid ""
+"Why the rule exists, for example a retired product code. It is only a label for you and your "
+"colleagues: it changes nothing for visitors."
+msgstr ""
+"Perché esiste la regola, per esempio un codice prodotto ritirato. È solo un'etichetta per te e i "
+"tuoi colleghi: non cambia nulla per i visitatori."
+
+#: apps/vendors/models.py
+msgid "Why this country issues no TIN."
+msgstr "Perché questo paese non rilascia il TIN."
+
+#: apps/core/models.py
+msgid ""
+"Why you changed it, for example an incident reference. It helps the next person who looks at it."
+msgstr ""
+"Perché l'hai cambiato, per esempio il riferimento a un incidente. Aiuta la prossima persona che lo"
+" guarda."
+
+#: apps/compliance/forms.py
+msgid "Why you decided this way. The notifier receives this text with the decision. Required."
+msgstr ""
+"Perché hai deciso così. Chi ha segnalato riceve questo testo insieme alla decisione. Obbligatorio."
+
+#: apps/catalog/taxonomy.py
+msgid "Wikidata item ID"
+msgstr "ID della voce Wikidata"
+
+#: apps/cms/blocks.py
+msgid ""
+"Write your text here. Use the toolbar for headings, bold, lists and links. A heading makes the "
+"page easier to scan."
+msgstr ""
+"Scrivi qui il tuo testo. Usa la barra degli strumenti per titoli, grassetto, elenchi e link. Un "
+"titolo rende la pagina più facile da leggere."
 
 #: apps/manager/templates/manager/shop/vendor_picker.html
 msgid ""
@@ -1112,9 +5061,63 @@ msgid_plural "You have %(counter)s unused recovery codes."
 msgstr[0] "Hai %(counter)s codice di recupero non usato."
 msgstr[1] "Hai %(counter)s codici di recupero non usati."
 
+#: apps/vendors/models.py
+msgid ""
+"Your certified email (PEC) address, if you have one. It is required when the SDI recipient code is"
+" 0000000."
+msgstr ""
+"Il tuo indirizzo di posta elettronica certificata (PEC), se ce l'hai. È obbligatorio quando il "
+"codice destinatario SDI è 0000000."
+
+#: apps/compliance/forms.py
+msgid ""
+"Your email address. We confirm that we received the report and tell you our decision there. "
+"Required, except for a report of child sexual abuse material."
+msgstr ""
+"Il tuo indirizzo email. Lì ti confermiamo la ricezione della segnalazione e ti comunichiamo la "
+"nostra decisione. Obbligatorio, tranne per una segnalazione di materiale pedopornografico."
+
+#: apps/vendors/models.py
+msgid ""
+"Your EORI number, the customs identification number for businesses that move goods in or out of "
+"the EU. Leave it empty if you do not have one."
+msgstr ""
+"Il tuo numero EORI, il codice doganale delle imprese che spostano merci da o verso l'UE. Lascialo "
+"vuoto se non ne hai uno."
+
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Your factors"
 msgstr "I tuoi fattori"
+
+#: apps/vendors/forms.py
+msgid ""
+"Your first and last name. We use it to greet you and to set up your account. Required: we cannot "
+"process the application without it."
+msgstr ""
+"Il tuo nome e cognome. Lo usiamo per rivolgerci a te e per creare il tuo account. Obbligatorio: "
+"senza non possiamo elaborare la candidatura."
+
+#: apps/compliance/forms.py
+msgid "Your name. Required, except for a report of child sexual abuse material."
+msgstr "Il tuo nome. Obbligatorio, tranne per una segnalazione di materiale pedopornografico."
+
+#: apps/catalog/models.py
+msgid ""
+"Your own code for this product, for example 'MUG-RED-01'. Required. Use each code once in your "
+"shop: capital letters and spaces do not make two codes different."
+msgstr ""
+"Il tuo codice per questo prodotto, per esempio 'TAZZA-ROSSA-01'. Obbligatorio. Usa ogni codice una"
+" sola volta nel tuo negozio: maiuscole e spazi non rendono diversi due codici."
+
+#: apps/catalog/models.py
+msgid ""
+"Your own code for this version, for example 'MUG-RED-01-L'. Required. It must differ from the code"
+" of the product and of every other product or variant of yours: capital letters and spaces do not "
+"make two codes different."
+msgstr ""
+"Il tuo codice per questa versione, per esempio 'TAZZA-ROSSA-01-L'. Obbligatorio. Deve essere "
+"diverso dal codice del prodotto e da quello di ogni altro tuo prodotto o variante: maiuscole e "
+"spazi non rendono diversi due codici."
 
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 msgid "Your recovery codes"
@@ -1127,3 +5130,20 @@ msgstr "Il tuo ruolo"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your role requires a second factor before you can continue."
 msgstr "Il tuo ruolo richiede un secondo fattore prima di poter continuare."
+
+#: apps/manager/forms.py
+msgid ""
+"Your story, shown on your shop page in the language selected above. Up to about 10,000 characters "
+"including formatting. Only the formatting the editor offers is kept."
+msgstr ""
+"La tua storia, mostrata nella pagina del tuo negozio nella lingua scelta qui sopra. Fino a circa "
+"10.000 caratteri, formattazione compresa. Viene mantenuta solo la formattazione che offre "
+"l’editor."
+
+#: apps/vendors/models.py
+msgid ""
+"Your VAT number, with or without the country prefix, for example IT12345678901. We check it in the"
+" EU VIES register. Not sure if you have one? Ask your accountant."
+msgstr ""
+"La tua partita IVA, con o senza il prefisso del paese, per esempio IT12345678901. La verifichiamo "
+"nel registro europeo VIES. Non sai se ne hai una? Chiedi al tuo commercialista."

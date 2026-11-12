@@ -34,7 +34,29 @@ SCOPES = (
     "apps/accounts",
     "apps/orders/templates",
     "apps/compliance/forms.py",  # WithdrawalLookupForm (CMP.6): its help texts are translated
+    "apps/vendors/admin.py",  # help texts of the plan and commission rule forms (ARC.30)
+    "apps/cms/models.py",  # HelpEntry (ARC.32): its help texts are translated
+    "apps/vendors/models.py",
     "themes/base/templates/layouts",
+    # Brand review models (CAT.20): the rest of the catalog app joins with the storefront I18N.
+    "apps/catalog/taxonomy.py",
+    "apps/catalog/taxonomy_admin.py",
+)
+# Single storefront modules whose strings the Manager texts quote (shop policy headings).
+EXTRA_FILES = ("apps/vendors/services.py",)
+# Apps scanned for `help_text=` strings only (ARC.31: field help is translated; the rest of these
+# apps joins SCOPES with I18N.7). Python files, each string inside a `help_text=` argument.
+HELP_TEXT_SCOPES = (
+    "apps/catalog",
+    "apps/cms",
+    "apps/compliance",
+    "apps/core",
+    "apps/events",
+    "apps/ingest",
+    "apps/shipping",
+    "apps/tax",
+    "apps/themes",
+    "apps/vendors",
 )
 # Theme files rendered by the Manager and account pages (the rest of the theme is storefront).
 THEME_FILES = (
@@ -53,16 +75,21 @@ THEME_FILES = (
             "field",
             "footer",
             "header",
+            "help_entry",
             "icon",
             "language_switcher",
             "pagination",
             "skip_link",
             "table",
+            "user_tools",
         )
     ),
 )
 # A single-file scope may be narrowed to the classes whose strings the catalog translates.
-ONLY_CLASSES = {"apps/compliance/forms.py": ("WithdrawalLookupForm",)}
+ONLY_CLASSES = {
+    "apps/compliance/forms.py": ("WithdrawalLookupForm",),
+    "apps/cms/models.py": ("HelpEntry",),
+}
 SKIP_PARTS = {"tests", "migrations", "static", "node_modules"}
 
 SIMPLE = {"gettext", "gettext_lazy", "gettext_noop", "_", "ugettext"}
@@ -79,6 +106,8 @@ def _files() -> Iterator[Path]:
             if SKIP_PARTS & set(rel.parts) or path.suffix not in {".py", ".html", ".txt"}:
                 continue
             yield path
+    for extra in EXTRA_FILES:
+        yield ROOT / extra
     for name in THEME_FILES:
         yield ROOT / "themes/base/templates" / name
 
@@ -159,11 +188,40 @@ def _entries(path: Path) -> Iterator[tuple[str, str | None, str | None, int]]:
             yield args[1], args[0], args[2], node.lineno
 
 
+def _help_files() -> Iterator[Path]:
+    for scope in HELP_TEXT_SCOPES:
+        for path in sorted((ROOT / scope).rglob("*.py")):
+            if not SKIP_PARTS & set(path.relative_to(ROOT).parts):
+                yield path
+
+
+def _help_entries(path: Path) -> Iterator[tuple[str, str | None, str | None, int]]:
+    """The gettext calls inside a `help_text=` argument of `path`, and nothing else."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    inside: list[ast.AST] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            inside.extend(kw.value for kw in node.keywords if kw.arg == "help_text")
+    seen: set[int] = set()
+    for root in inside:
+        for node in ast.walk(root):
+            if not isinstance(node, ast.Call) or id(node) in seen:
+                continue
+            seen.add(id(node))
+            func = node.func
+            name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", "")
+            args = [_const(a) for a in node.args]
+            if name in SIMPLE and args and args[0]:
+                yield args[0], None, None, node.lineno
+
+
 def collect() -> dict[tuple[str, str | None], tuple[str | None, list[str]]]:
     found: dict[tuple[str, str | None], tuple[str | None, list[str]]] = {}
-    for path in _files():
+    sources = [(path, _entries) for path in _files()]
+    sources += [(path, _help_entries) for path in _help_files()]
+    for path, read in sources:
         rel = str(path.relative_to(ROOT))
-        for msgid, ctx, plural, _line in _entries(path):
+        for msgid, ctx, plural, _line in read(path):
             plural0, places = found.get((msgid, ctx), (plural, []))
             if rel not in places:
                 places.append(rel)

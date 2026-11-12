@@ -33,6 +33,6 @@ DROP FUNCTION IF EXISTS compliance_withdrawalstatement_append_only();
 
 
 class Migration(migrations.Migration):
-    dependencies = [("compliance", "0006_withdrawal_statement")]
+    dependencies = [("compliance", "0007_withdrawal_statement")]
 
     operations = [migrations.RunSQL(FORBID, reverse_sql=ALLOW)]

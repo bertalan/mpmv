@@ -8,6 +8,7 @@ from django.contrib.auth.models import PermissionsMixin
 from django.db import models
 from django.db.models.functions import Lower
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from django_otp.models import Device, ThrottlingMixin
 
 from apps.core.fields import LanguageField
@@ -51,7 +52,14 @@ class UserManager(BaseUserManager["User"]):
 
 
 class User(BaseModel, AbstractBaseUser, PermissionsMixin):
-    email = models.EmailField(max_length=254, unique=True)
+    email = models.EmailField(
+        max_length=254,
+        unique=True,
+        help_text=_(
+            "The address this person signs in with. It must be unique: two accounts cannot "
+            "share it."
+        ),
+    )
     full_name = models.CharField(max_length=150, blank=True)
     preferred_language = LanguageField(default=settings.LANGUAGE_CODE)
     is_active = models.BooleanField(default=True)
