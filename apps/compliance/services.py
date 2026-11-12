@@ -39,7 +39,7 @@ from django.utils.translation import gettext_lazy as _
 
 from apps.catalog.models import Product, ProductStatus
 from apps.catalog.services import save_product
-from apps.cms.services import legal_section_tags, legal_section_texts
+from apps.cms.services import legal_page_plain_text, legal_section_tags, legal_section_texts
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import ChangeSet
 from apps.core.countries import OFFICIAL_LANGUAGES, InvalidCountry, normalize_country
@@ -59,11 +59,12 @@ from apps.events.models import EventPage
 from apps.events.services import hide_event
 from apps.vendors.engine import SUSPENDED as _SUSPENDED
 from apps.vendors.engine import InvalidTransition
-from apps.vendors.models import Vendor
+from apps.vendors.models import Vendor, VendorContract, VendorContractTranslation
 from apps.vendors.scoping import is_platform_staff
 from apps.vendors.services import change_status as change_vendor_status
+from apps.vendors.services import current_contract, save_contract
 
-from . import engine
+from . import engine, terms_clauses
 from .models import (
     CountryWarningLanguages,
     GpsrInfo,
@@ -1632,3 +1633,82 @@ def lift_restriction(
         row.save(update_fields=["lifted_at", "lift_reason", "updated_at"])
         audit_changes(changes, ctx=ctx, action=RESTRICTION_LIFTED)
     return changes
+
+
+# --- CMP.5 contract clauses (a) to (h) as versioned terms
+
+CLAUSES_NOTE: Final = "CMP.5 clauses (a) to (h): payment discharge, Stripe, set-off, refund fee"
+
+
+def publish_vendor_terms(
+    *, valid_from: dt.datetime, ctx: AuditContext, dry_run: bool = False
+) -> ChangeSet:
+    """Publish the next vendor contract version with clauses (d) to (h) in every drafted language.
+
+    Each text keeps the previous version's text in that language (without its older clause
+    block) and ends with the current block. The vendors' acceptance of the version in force then
+    applies as for any version (VEN.5): an old acceptance does not cover the new one, so every
+    vendor accepts it before activation. Audited through `save_contract`; the texts are draft
+    wording until counsel approves them (CMP.24). Raises what `save_contract` raises.
+    """
+    previous = VendorContract.objects.order_by("-version").first()
+    contract = VendorContract(valid_from=valid_from, note=CLAUSES_NOTE)
+    with transaction.atomic():
+        changes = save_contract(contract, ctx=ctx, dry_run=dry_run)
+        if dry_run:
+            return changes
+        for language in terms_clauses.LANGUAGES:
+            old = previous.translations.filter(language=language).first() if previous else None
+            title = old.title if old else _VENDOR_TERMS_TITLES[language]
+            row = VendorContractTranslation(
+                contract=contract,
+                language=language,
+                title=title,
+                body=terms_clauses.with_clauses(
+                    terms_clauses.VENDOR, language, old.body if old else ""
+                ),
+                status=VendorContractTranslation.Status.PUBLISHED,
+            )
+            row.full_clean()
+            row.save()
+    return changes
+
+
+_VENDOR_TERMS_TITLES: Final = {"en": "Vendor terms", "it": "Condizioni per i venditori"}
+
+
+def vendor_terms_problems(contract: VendorContract | None = None) -> list[str]:
+    """What is missing in the vendor contract version in force: a message per language and
+    missing clause letter, plus one when no version is in force. Languages checked are the ones
+    with a drafted wording."""
+    contract = contract or current_contract()
+    if contract is None:
+        return ["vendor_terms_missing"]
+    problems: list[str] = []
+    for language in terms_clauses.LANGUAGES:
+        text = contract.translations.filter(language=language).first()
+        body = text.body if text else ""
+        problems += [
+            f"vendor_terms_clause_missing:{language}:{letter}"
+            for letter in terms_clauses.missing_clauses(terms_clauses.VENDOR, body, language)
+        ]
+    return problems
+
+
+def customer_terms_problems(languages: Iterable[str] | None = None) -> list[str]:
+    """What is missing in the live customer terms page per language: clauses (a) to (c).
+
+    A language without a drafted wording is checked against the English one. A language
+    without a live terms page reports `customer_terms_missing:<language>`.
+    """
+    problems: list[str] = []
+    for language in languages or terms_clauses.LANGUAGES:
+        text = legal_page_plain_text("terms", language)
+        if text is None:
+            problems.append(f"customer_terms_missing:{language}")
+            continue
+        problems += [
+            f"customer_terms_clause_missing:{language}:{letter}"
+            for letter in terms_clauses.missing_clauses(terms_clauses.CUSTOMER, text, language)
+        ]
+    return problems
