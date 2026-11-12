@@ -246,3 +246,28 @@ def test_the_manager_language_switcher_changes_the_language(
 
     page.locator('button[value="en"]').click()
     expect(page.locator("html")).to_have_attribute("lang", "en")
+
+
+def test_the_storefront_profile_shows_italian_help_text(
+    page: Page, live_server: LiveServer, shot: Callable[[str], Path]
+) -> None:
+    """ARC.31: a Manager form shows its help text, in the Italian interface."""
+    password = secrets.token_urlsafe(16)  # generated: no credential literals in git
+    owner = UserFactory.create(email="owner-it@example.com", password=password)
+    device = TOTPDeviceFactory.create(user=owner)
+    shop = VendorFactory.create(display_name="Shop Nord", status="active")
+    VendorMemberFactory.create(vendor=shop, user=owner, role="owner")
+    page.add_init_script(RECORD_CSP_VIOLATIONS)
+
+    _login(page, live_server.url, "owner-it@example.com", password)
+    verify_with_totp(page, totp_token(device))
+    expect(page).to_have_url(re.compile(r"/manager/shop/"))
+    page.locator('button[value="it"]').click()
+    expect(page.locator("html")).to_have_attribute("lang", "it")
+
+    page.goto(f"{live_server.url}/manager/shop/profile/")
+    expect(page.locator("html")).to_have_attribute("lang", "it")
+    help_text = page.get_by_text("Una riga sotto il nome del negozio. Testo semplice.")
+    expect(help_text).to_be_visible()
+    expect(page.get_by_text("One line under the shop name")).to_have_count(0)
+    shot("profile-form-help-it")

@@ -474,7 +474,8 @@ def _has_valid_id(kind: str, value: Any, id_kinds: frozenset[str]) -> bool:
 
 
 _TAG_RE = re.compile(r"<[^>]*>?")
-EXTERNAL_LINK_REL = "noopener noreferrer"
+# `nofollow ugc`: the links are written by vendors and editors, never an endorsement.
+EXTERNAL_LINK_REL = "noopener noreferrer nofollow ugc"
 _EXTERNAL_PREFIXES = ("http://", "https://", "//")
 
 
