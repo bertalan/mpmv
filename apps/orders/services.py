@@ -685,6 +685,20 @@ class CheckoutPreview:
     customer_tax_id: str = ""
     customer_tax_status: str = "b2c"
     vat_validation: dict[str, Any] | None = None
+    # ORD.3: every vendor package as shown (also the ones that cannot be placed), the blocking
+    # messages and the totals of the ready packages. `vendors` holds the ready packages only.
+    packages: Sequence[engine.PackageSummary] = ()
+    blocks: Sequence[engine.Block] = ()
+    totals: engine.Totals | None = None
+
+    @property
+    def placeable(self) -> bool:
+        """True when nothing blocks the checkout and at least one package is ready."""
+        return not self.blocks and bool(self.vendors)
+
+    @property
+    def needs_quote(self) -> bool:
+        return any(b.code == engine.NEEDS_QUOTE for b in self.blocks)
 
 
 @dataclass(frozen=True)
