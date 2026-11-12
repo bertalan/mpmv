@@ -78,15 +78,57 @@ def test_the_instance_checks_follow_the_same_rule() -> None:
     assert support not in editors
 
 
-def test_the_snippet_list_opens_for_the_catalog_role_in_the_editors_admin() -> None:
-    user = _with_role("catalog", permissions=["wagtailadmin.access_admin"])
+ADMIN_ACCESS = "wagtailadmin.access_admin"
+ACCESS_ROLES = ("catalog", "owner")  # lane-a, #86: the roles that edit or read the help texts
+
+
+def test_the_roles_of_the_help_section_hold_the_editors_admin_access() -> None:
+    for key in roles.ROLE_KEYS:
+        assert (ADMIN_ACCESS in roles.role(key).permissions) is (key in ACCESS_ROLES), key
+
+
+def test_the_data_migration_adds_the_access_to_an_existing_database() -> None:
+    """A database seeded before this change: the migration's sync adds it, touches nothing else."""
+    import importlib
+
+    from django.apps import apps
+    from django.contrib.auth.models import Permission
+
+    from apps.manager.role_groups import role_drift
+
+    access = Permission.objects.get(content_type__app_label="wagtailadmin", codename="access_admin")
+    group = Group.objects.get(name=roles.role("catalog").group)
+    group.permissions.remove(access)
+    assert role_drift()  # the drift check sees the missing permission
+    migration = importlib.import_module("apps.manager.migrations.0003_role_groups_admin_access")
+    migration.sync(apps, None)
+    assert role_drift() == []
+    assert access in group.permissions.all()
+
+
+@pytest.mark.parametrize("key", ACCESS_ROLES)
+def test_a_role_with_the_help_section_reaches_the_editors_admin_help(key: str) -> None:
+    """Through the role group alone: no permission is added to the user."""
     client = Client()
-    verified_login(client, user)
+    verified_login(client, _with_role(key))
+    response = client.get("/admin/")
+    assert response.status_code == 200
+    assert "data-admin-help-open" in response.content.decode()
     assert client.get("/admin/snippets/cms/helpentry/").status_code == 200
 
 
-def test_the_snippet_list_is_refused_to_another_role_in_the_editors_admin() -> None:
-    user = _with_role("support", permissions=["wagtailadmin.access_admin"])
+@pytest.mark.parametrize("key", [k for k in roles.ROLE_KEYS if k not in ACCESS_ROLES])
+def test_the_other_roles_do_not_reach_the_editors_admin(key: str) -> None:
+    client = Client()
+    verified_login(client, _with_role(key))
+    for path in ("/admin/", "/admin/snippets/cms/helpentry/"):
+        response = client.get(path)
+        assert response.status_code != 200, (key, path)
+        assert "data-admin-help-open" not in response.content.decode()
+
+
+def test_the_snippet_list_is_refused_to_a_role_the_matrix_denies_even_with_admin_access() -> None:
+    user = _with_role("support", permissions=[ADMIN_ACCESS])
     client = Client()
     verified_login(client, user)
     assert client.get("/admin/snippets/cms/helpentry/").status_code != 200
