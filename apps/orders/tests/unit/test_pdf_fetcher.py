@@ -320,6 +320,27 @@ def _run_limited(body: str) -> int:
     ).returncode
 
 
+def test_the_parent_process_never_imports_weasyprint() -> None:
+    """Only the child imports WeasyPrint; the upload guard's security argument relies on it."""
+    code = (
+        "import sys, django\n"
+        "django.setup()\n"
+        "import apps.orders.documents\n"
+        "assert 'weasyprint' not in sys.modules\n"
+    )
+    env = {**os.environ, "DJANGO_SETTINGS_MODULE": "mpmv.settings.test"}
+    result = subprocess.run(  # noqa: S603
+        [sys.executable, "-c", code],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
 def test_a_memory_hog_hits_the_address_space_limit() -> None:
     assert _run_limited("x = bytearray(400_000_000)") != 0
     assert _run_limited("x = bytearray(1_000_000)") == 0

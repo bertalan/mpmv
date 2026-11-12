@@ -394,8 +394,6 @@ class ServiceLevel(models.TextChoices):
 
 class ShippingTaxTreatment(models.TextChoices):
     FOLLOWS_GOODS = engine.FOLLOWS_GOODS, "Follows the goods (ancillary supply)"
-    STANDARD_RATE = engine.STANDARD_RATE, "Standard rate"
-    EXEMPT = engine.EXEMPT, "Exempt"
 
 
 class ShippingMethod(BaseModel):
@@ -478,16 +476,22 @@ class ShippingMethod(BaseModel):
             "least this amount, without VAT. Leave it empty for no free shipping."
         ),
     )
-    # Stored only (SHP.12): the tax engine applies it (TAX.4); D-03 is open.
+    # Shipping VAT always follows the goods (TAX.17, D-03 decided): the only value is
+    # `follows_goods`; the tax engine splits the charge over the goods' decisions (TAX.4).
     tax_treatment = models.CharField(
         "VAT treatment",
         max_length=16,
         choices=ShippingTaxTreatment.choices,
         default=engine.DEFAULT_TAX_TREATMENT,
+        error_messages={
+            "invalid_choice": (
+                "Shipping VAT always follows the goods; %(value)r is not accepted "
+                "(only 'follows_goods')."
+            )
+        },
         help_text=_(
-            "How VAT is applied to the shipping price. Today only the choice that follows the "
-            "goods works; the other choices are saved but block the shipping quote. Ask your "
-            "accountant if you are not sure."
+            "How VAT is applied to the shipping price. It always follows the goods in the "
+            "basket, split in proportion to their value without VAT. Nothing to choose here."
         ),
     )
     # Hook for D-06 (open): empty means "no policy of its own"; SHP.3 then applies the platform

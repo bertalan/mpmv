@@ -95,7 +95,7 @@ def test_factories_build_a_band_a_method_and_a_zone_without_the_database() -> No
 
 def test_service_levels_and_tax_treatments_are_the_listed_choices() -> None:
     assert set(ShippingMethod.ServiceLevel.values) == {"standard", "express", "economy", "other"}
-    assert set(ShippingMethod.TaxTreatment.values) == {"follows_goods", "standard_rate", "exempt"}
+    assert set(ShippingMethod.TaxTreatment.values) == {"follows_goods"}
     # Default: shipping follows the VAT of the goods (EU ancillary-supply rule). D-03 is open:
     # the treatment is stored, the tax engine (TAX.4) applies it.
     assert engine.DEFAULT_TAX_TREATMENT == engine.FOLLOWS_GOODS == "follows_goods"

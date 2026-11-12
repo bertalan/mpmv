@@ -885,6 +885,20 @@ msgstr "Conferma"
 msgid "Confirm and delete the old logo"
 msgstr "Conferma ed elimina il vecchio logo"
 
+#: apps/accounts/templates/accounts/levels/prompt.html
+msgid "Confirm with your passkey to allow this one action. No passkey window opens."
+msgstr ""
+"Conferma con la tua passkey per consentire solo questa azione. Non si apre nessuna finestra "
+"passkey."
+
+#: apps/accounts/templates/accounts/levels/prompt.html
+msgid ""
+"Confirm with your passkey to open a passkey window: it covers several sensitive actions in a row. "
+"It closes when you sign out, after a period of inactivity or at a maximum duration."
+msgstr ""
+"Conferma con la tua passkey per aprire una finestra passkey: copre diverse azioni sensibili di "
+"seguito. Si chiude quando esci, dopo un periodo di inattività o alla durata massima."
+
 #: apps/accounts/templates/accounts/action_link/continue.html
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 #: apps/accounts/templates/accounts/mfa/recovery_codes_new.html
@@ -1029,6 +1043,10 @@ msgstr "Sviluppo e sistema"
 msgid "Dismiss"
 msgstr "Chiudi"
 
+#: apps/accounts/templates/accounts/levels/prompt.html
+msgid "Do it once"
+msgstr "Fallo una volta"
+
 #: apps/orders/customer_views.py
 msgid "done"
 msgstr "completato"
@@ -1060,6 +1078,10 @@ msgstr "Email"
 #: apps/compliance/forms.py
 msgid "Email address of the order"
 msgstr "Indirizzo email dell’ordine"
+
+#: apps/vendors/models.py
+msgid "Email language"
+msgstr "Lingua delle email"
 
 #: apps/accounts/admin.py
 msgid ""
@@ -1409,12 +1431,11 @@ msgstr "Come usare, montare, mantenere e smaltire il prodotto in sicurezza, in q
 
 #: apps/shipping/models.py
 msgid ""
-"How VAT is applied to the shipping price. Today only the choice that follows the goods works; the "
-"other choices are saved but block the shipping quote. Ask your accountant if you are not sure."
+"How VAT is applied to the shipping price. It always follows the goods in the basket, split in "
+"proportion to their value without VAT. Nothing to choose here."
 msgstr ""
-"Come si applica l'IVA al prezzo della spedizione. Oggi funziona solo la scelta che segue la merce;"
-" le altre vengono salvate ma bloccano il preventivo di spedizione. Se non sei sicuro, chiedi al "
-"tuo commercialista."
+"Come si applica l'IVA al prezzo della spedizione. Segue sempre la merce nel carrello, ripartita in"
+" proporzione al loro valore senza IVA. Non c'è nulla da scegliere."
 
 #: apps/vendors/models.py
 msgid ""
@@ -1478,6 +1499,12 @@ msgstr "Codice non valido. Riprova."
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid "It also closes when you sign out or after inactivity."
 msgstr "Si chiude anche quando esci o dopo un periodo di inattività."
+
+#: apps/accounts/templates/accounts/levels/prompt.html
+msgid "It is critical: it asks for a passkey of its own each time, even with a passkey window open."
+msgstr ""
+"È un'azione critica: chiede ogni volta una passkey dedicata, anche con una finestra passkey "
+"aperta."
 
 #: apps/vendors/models.py
 msgid ""
@@ -1987,6 +2014,7 @@ msgid "Only when the event is hidden after a notice."
 msgstr "Solo quando l'evento viene nascosto in seguito a una segnalazione."
 
 #: apps/accounts/templates/accounts/levels/_banner.html
+#: apps/accounts/templates/accounts/levels/prompt.html
 msgid "Open passkey window"
 msgstr "Apri la finestra passkey"
 
@@ -2138,11 +2166,20 @@ msgstr "passkey"
 msgid "Passkey name"
 msgstr "Nome della passkey"
 
+#: apps/accounts/templates/accounts/levels/prompt.html
+msgid "Passkey needed"
+msgstr "Serve la passkey"
+
+#: apps/accounts/templates/accounts/levels/prompt.html
+msgid "Passkey window"
+msgstr "Finestra passkey"
+
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid "Passkey window open: %(minutes_left)s min left"
 msgstr "Finestra passkey aperta: ancora %(minutes_left)s min"
 
 #: apps/accounts/templates/accounts/levels/_banner.html
+#: apps/accounts/templates/accounts/levels/prompt.html
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Passkeys need JavaScript."
@@ -3496,6 +3533,14 @@ msgstr ""
 "corrisponde a un valore semplice."
 
 #: apps/vendors/models.py
+msgid ""
+"The language of the order emails we send you, for example a new order to ship. Leave it empty to "
+"receive them in English."
+msgstr ""
+"La lingua delle email sugli ordini che ti inviamo, per esempio un nuovo ordine da spedire. "
+"Lasciala vuota per riceverle in inglese."
+
+#: apps/vendors/models.py
 msgid "The language of the text that was shown when the contract was accepted."
 msgstr "La lingua del testo mostrato al momento dell'accettazione del contratto."
 
@@ -4711,6 +4756,13 @@ msgstr "Si è verificato un problema"
 msgid "There is no help text for this page yet."
 msgstr "Per questa pagina non c’è ancora un testo di aiuto."
 
+#: apps/accounts/templates/accounts/levels/prompt.html
+msgid ""
+"This action (%(action)s) is sensitive: confirm it with your passkey, once or for a few minutes."
+msgstr ""
+"Questa azione (%(action)s) è sensibile: confermala con la tua passkey, una volta o per qualche "
+"minuto."
+
 #: apps/manager/templates/manager/bulk_preview.html
 msgid "This action changes nothing."
 msgstr "Questa azione non modifica nulla."
@@ -4732,6 +4784,10 @@ msgstr ""
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid "This link was sent to you by email. Press Continue to open the page it leads to."
 msgstr "Questo link ti è stato inviato per email. Premi Continua per aprire la pagina a cui porta."
+
+#: apps/accounts/templates/accounts/levels/prompt.html
+msgid "This needs your passkey"
+msgstr "Serve la tua passkey"
 
 #: apps/catalog/templates/catalog/product.html
 msgid "This page is not available in your language yet."
@@ -5601,6 +5657,14 @@ msgstr "Non hai ancora ordini"
 msgid "You may also like"
 msgstr "Potrebbe piacerti anche"
 
+#: apps/accounts/templates/accounts/levels/prompt.html
+msgid ""
+"Your account has no passkey yet. <a href=\"%(overview_url)s\">Add a passkey</a> to be able to "
+"confirm this."
+msgstr ""
+"Il tuo account non ha ancora una passkey. <a href=\"%(overview_url)s\">Aggiungi una passkey</a> "
+"per poter confermare questa azione."
+
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your account is protected with a passkey."
 msgstr "Il tuo account è protetto con una passkey."
@@ -5686,6 +5750,12 @@ msgstr "Il tuo ruolo"
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid "Your role cannot open a passkey window."
 msgstr "Il tuo ruolo non può aprire una finestra passkey."
+
+#: apps/accounts/templates/accounts/levels/prompt.html
+msgid "Your role may not open a passkey window or do this once. Ask a platform owner."
+msgstr ""
+"Il tuo ruolo potrebbe non poter aprire una finestra passkey né fare questa azione una volta. "
+"Chiedi a un titolare della piattaforma."
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Your role requires a second factor before you can continue."
