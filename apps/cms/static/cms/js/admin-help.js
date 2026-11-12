@@ -104,7 +104,9 @@
     body.className = "admin-help__body dialog__body";
     element.append(header, body);
     element.addEventListener("close", () => {
-      if (controller) {
+      // The close event is queued: if the dialog was reopened meanwhile, the load now running
+      // belongs to the new opening and must not be cancelled.
+      if (controller && !element.open) {
         controller.abort();
       }
       // Wagtail redraws its sidebar, so the opener may be gone: the Help item that is there now,
