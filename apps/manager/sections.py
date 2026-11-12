@@ -7,6 +7,7 @@ whose role checks CORE.18 defines.
 
 from django.utils.translation import gettext_lazy as _
 
+from .money_views import SECTION as MONEY_SECTION
 from .navigation import Registry, Section, anyone, vendor_action
 from .notice_views import SECTION as NOTICES_SECTION
 from .notice_views import can_review
@@ -48,6 +49,16 @@ BUILT_IN = (
         "manager:shop:orders",
         order=30,
         allowed=vendor_action("orders"),
+    ),
+    # Balance, transactions, payouts and statements (VEN.9): `payouts` is an owner right in the
+    # role matrix, so staff get no menu entry and a 404.
+    Section(
+        MONEY_SECTION,
+        Space.SHOP,
+        _("Money"),
+        "manager:shop:money",
+        order=40,
+        allowed=vendor_action("payouts"),
     ),
     # The vendor picker: reached from the header, so not in the menu, and before any choice.
     Section(

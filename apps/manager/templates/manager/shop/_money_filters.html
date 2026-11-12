@@ -1,0 +1,23 @@
+{% load i18n %}
+{% comment %}Period (and optionally kind) filters for the money pages (VEN.9).{% endcomment %}
+{% if filter_error %}{% include "components/alert.html" with level="warning" message=filter_error live="assertive" only %}{% endif %}
+<form method="get" action="{{ form_action }}" class="manager-filters" role="search" aria-label="{% translate 'Filters' %}">
+  <div class="field">
+    <label for="filter-from">{% translate "From" %}</label>
+    <input id="filter-from" type="date" name="from" value="{{ filters.first|date:'Y-m-d' }}">
+  </div>
+  <div class="field">
+    <label for="filter-to">{% translate "To" %}</label>
+    <input id="filter-to" type="date" name="to" value="{{ filters.last|date:'Y-m-d' }}">
+  </div>
+  {% if kinds and show_kind %}
+  <div class="field">
+    <label for="filter-kind">{% translate "Type" %}</label>
+    <select id="filter-kind" name="kind">
+      <option value="">{% translate "All" %}</option>
+      {% for value, label in kinds %}<option value="{{ value }}"{% if value == filters.kind %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  {% include "components/button.html" with label=_("Filter") type="submit" variant="secondary" only %}
+</form>

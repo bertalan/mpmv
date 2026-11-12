@@ -74,6 +74,12 @@ msgstr ""
 "motori di ricerca li usano per riconoscere l'azienda. Esempio: "
 "[\"https://www.wikidata.org/wiki/Q7\"]."
 
+#: apps/manager/templates/manager/shop/money.html
+msgid "A negative balance means you owe the platform: it is set off against your next sales."
+msgstr ""
+"Un saldo negativo significa che devi dei soldi alla piattaforma: viene compensato con le tue "
+"prossime vendite."
+
 #: apps/vendors/models.py
 msgid ""
 "A phone number where we can reach you, with the country prefix, for example +39 06 1234 5678. "
@@ -130,10 +136,27 @@ msgstr "Aggiungi un’app di autenticazione"
 msgid "Add another factor before removing your last one."
 msgstr "Aggiungi un altro fattore prima di rimuovere l’ultimo."
 
+#: apps/manager/money_views.py
+msgid "Adjustment"
+msgstr "Rettifica"
+
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/shop/_money_filters.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "All"
 msgstr "Tutti"
+
+#: apps/manager/templates/manager/shop/money.html
+msgid "All payouts"
+msgstr "Tutti i pagamenti"
+
+#: apps/manager/templates/manager/shop/money.html
+msgid "All transactions"
+msgstr "Tutte le transazioni"
+
+#: apps/manager/templates/manager/shop/_money_table.html
+msgid "Amount (EUR)"
+msgstr "Importo (EUR)"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Anonymous"
@@ -187,6 +210,14 @@ msgstr "Torna alle impostazioni della verifica in due passaggi"
 msgid "Bad request"
 msgstr "Richiesta non valida"
 
+#: apps/manager/templates/manager/shop/_money_nav.html
+msgid "Balance"
+msgstr "Saldo"
+
+#: apps/manager/templates/manager/shop/_money_table.html
+msgid "Balance (EUR)"
+msgstr "Saldo (EUR)"
+
 #: apps/catalog/taxonomy.py
 msgid "brand batch"
 msgstr "lotto di marchi"
@@ -194,6 +225,14 @@ msgstr "lotto di marchi"
 #: apps/catalog/taxonomy.py
 msgid "brand batches"
 msgstr "lotti di marchi"
+
+#: apps/manager/money_views.py
+msgid "Bundle discount funded by the platform"
+msgstr "Sconto bundle a carico della piattaforma"
+
+#: apps/manager/money_views.py
+msgid "Bundle discount funded by you"
+msgstr "Sconto bundle a tuo carico"
 
 #: apps/manager/templates/manager/bulk_preview.html
 msgid "Cancel"
@@ -223,6 +262,18 @@ msgstr "Scegli un venditore"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Choose how you will confirm it is you after your password."
 msgstr "Scegli come confermare la tua identità dopo la password."
+
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Closing balance"
+msgstr "Saldo finale"
+
+#: apps/manager/money_views.py
+msgid "Commission"
+msgstr "Commissione"
+
+#: apps/manager/money_views.py
+msgid "Commission reversal"
+msgstr "Storno commissione"
 
 #: apps/vendors/models.py
 msgid ""
@@ -284,6 +335,14 @@ msgstr "Continua con la tua richiesta"
 msgid "country"
 msgstr "paese"
 
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Credits"
+msgstr "Accrediti"
+
+#: apps/manager/templates/manager/shop/money.html
+msgid "Current balance"
+msgstr "Saldo attuale"
+
 #: apps/manager/templates/manager/shop/order.html
 msgid "Customer"
 msgstr "Cliente"
@@ -298,6 +357,14 @@ msgstr ""
 msgid "Dashboard"
 msgstr "Dashboard"
 
+#: apps/manager/templates/manager/shop/_money_table.html
+msgid "Date"
+msgstr "Data"
+
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Debits"
+msgstr "Addebiti"
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Decided"
 msgstr "Deciso"
@@ -305,6 +372,10 @@ msgstr "Deciso"
 #: apps/accounts/admin.py
 msgid "Delete selected %(verbose_name_plural)s"
 msgstr "Elimina %(verbose_name_plural)s selezionati"
+
+#: apps/manager/templates/manager/shop/_money_table.html
+msgid "Description"
+msgstr "Descrizione"
 
 #: apps/catalog/taxonomy.py
 msgid "description"
@@ -354,16 +425,26 @@ msgstr "Posizione esatta"
 msgid "Explanation"
 msgstr "Spiegazione"
 
+#: apps/manager/templates/manager/shop/money_transactions.html
+msgid "Export"
+msgstr "Esporta"
+
+#: apps/manager/templates/manager/shop/money_transactions.html
+msgid "Export as CSV"
+msgstr "Esporta in CSV"
+
 #: apps/manager/media.py
 msgid "File"
 msgstr "File"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/shop/_money_filters.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Filter"
 msgstr "Filtra"
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/shop/_money_filters.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Filters"
 msgstr "Filtri"
@@ -379,6 +460,10 @@ msgstr "Hai dimenticato le credenziali di accesso?"
 #: themes/base/templates/403_csrf.html
 msgid "Form expired"
 msgstr "Modulo scaduto"
+
+#: apps/manager/templates/manager/shop/_money_filters.html
+msgid "From"
+msgstr "Dal"
 
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 msgid "Generate new codes"
@@ -514,6 +599,14 @@ msgstr "Lingua"
 msgid "Language of the texts"
 msgstr "Lingua dei testi"
 
+#: apps/manager/templates/manager/shop/money.html
+msgid "Latest payouts"
+msgstr "Ultimi pagamenti"
+
+#: apps/manager/templates/manager/shop/money.html
+msgid "Latest transactions"
+msgstr "Ultime transazioni"
+
 #: apps/vendors/models.py
 msgid ""
 "Leave it empty for every region, or choose EU or non-EU to apply the rule to every vendor "
@@ -632,6 +725,14 @@ msgstr "Unisci in"
 msgid "Merge the selected brands into another brand"
 msgstr "Unisci i marchi selezionati in un altro marchio"
 
+#: apps/manager/sections.py apps/manager/templates/manager/shop/money.html
+msgid "Money"
+msgstr "Denaro"
+
+#: apps/manager/templates/manager/shop/_money_nav.html
+msgid "Money pages"
+msgstr "Pagine del denaro"
+
 #: apps/catalog/taxonomy.py
 msgid "name"
 msgstr "nome"
@@ -659,6 +760,10 @@ msgstr "Nessun accesso"
 #: apps/manager/templates/manager/shop/profile.html
 msgid "No logo yet."
 msgstr "Nessun logo per ora."
+
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "No movements in this period."
+msgstr "Nessun movimento in questo periodo."
 
 #: apps/accounts/mfa_views.py
 msgid "no passkey registered"
@@ -689,6 +794,7 @@ msgid "Nothing has changed yet. Check the changes below, then confirm."
 msgstr "Non è stato ancora modificato nulla. Controlla le modifiche qui sotto, poi conferma."
 
 #: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/shop/_money_table.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Nothing to show."
 msgstr "Niente da mostrare."
@@ -755,10 +861,15 @@ msgstr ""
 "la sua via, senza il numero civico. Altrimenti lascia vuoto tutto l'indirizzo; se non sei sicuro, "
 "chiedi al tuo commercialista."
 
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Opening balance"
+msgstr "Saldo iniziale"
+
 #: apps/catalog/taxonomy_admin.py
 msgid "Optional text that replaces the generated credit line. Example: 'Logo: Acme Ltd'."
 msgstr "Testo facoltativo che sostituisce la riga di credito generata. Esempio: 'Logo: Acme Ltd'."
 
+#: apps/manager/templates/manager/shop/_money_table.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Order"
 msgstr "Ordine"
@@ -853,9 +964,22 @@ msgstr "Le passkey richiedono JavaScript."
 msgid "Password"
 msgstr "Password"
 
+#: apps/manager/money_views.py
+msgid "Payment fee"
+msgstr "Commissione di pagamento"
+
 #: apps/orders/templates/email/orders/payment_confirmed/subject.txt
 msgid "Payment received for order %(order_number)s"
 msgstr "Pagamento ricevuto per l’ordine %(order_number)s"
+
+#: apps/manager/money_views.py
+msgid "Payout"
+msgstr "Pagamento"
+
+#: apps/manager/templates/manager/shop/_money_nav.html
+#: apps/manager/templates/manager/shop/money_payouts.html
+msgid "Payouts"
+msgstr "Pagamenti"
 
 #: apps/catalog/taxonomy.py
 msgid "Pending review"
@@ -884,6 +1008,10 @@ msgstr ""
 #: apps/manager/forms.py
 msgid "Plain text for people who cannot see the image, for example the shop name."
 msgstr "Testo semplice per chi non vede l’immagine, per esempio il nome del negozio."
+
+#: apps/manager/money_views.py
+msgid "Plan fee"
+msgstr "Costo del piano"
 
 #: apps/manager/templates/manager/layout.html
 msgid "Platform"
@@ -970,6 +1098,14 @@ msgstr ""
 "Riferimento del permesso scritto conservato, quando la licenza lo richiede. Esempio: "
 "'permission-2026-11-acme.pdf'."
 
+#: apps/manager/money_views.py
+msgid "Refund"
+msgstr "Rimborso"
+
+#: apps/manager/money_views.py
+msgid "Refund fee"
+msgstr "Commissione di rimborso"
+
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 msgid "Register a passkey"
 msgstr "Registra una passkey"
@@ -1014,6 +1150,10 @@ msgstr "Ritirati"
 #: apps/manager/forms.py
 msgid "Returns and refunds policy"
 msgstr "Condizioni di reso e rimborso"
+
+#: apps/manager/money_views.py
+msgid "Sale"
+msgstr "Vendita"
 
 #: apps/catalog/taxonomy.py
 msgid "sameAs links"
@@ -1069,6 +1209,10 @@ msgstr "Spedire a"
 #: apps/orders/templates/email/orders/vendor_new_order/body.txt
 msgid "Ship to:"
 msgstr "Spedire a:"
+
+#: apps/manager/money_views.py
+msgid "Shipping"
+msgstr "Spedizione"
 
 #: apps/manager/forms.py
 msgid "Shipping policy"
@@ -1161,6 +1305,15 @@ msgstr ""
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Start review"
 msgstr "Avvia la revisione"
+
+#: apps/manager/templates/manager/shop/_money_nav.html
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Statement"
+msgstr "Estratto conto"
+
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Statement of %(vendor)s from %(first)s to %(last)s."
+msgstr "Estratto conto di %(vendor)s dal %(first)s al %(last)s."
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Statements of reasons"
@@ -1397,6 +1550,10 @@ msgid ""
 "The email or the password is not correct, or the account is locked for a while. Please try again."
 msgstr "L’email o la password non sono corrette, oppure l’account è bloccato per un po’. Riprova."
 
+#: apps/manager/templates/manager/shop/money_transactions.html
+msgid "The export covers the period above (the current month if you set none)."
+msgstr "L'esportazione copre il periodo qui sopra (il mese corrente se non ne imposti uno)."
+
 #: apps/vendors/models.py
 msgid "The feature to switch on or off for this vendor."
 msgstr "La funzione da attivare o disattivare per questo venditore."
@@ -1596,6 +1753,10 @@ msgstr ""
 "Il testo breve che i motori di ricerca mostrano sotto il titolo. Esempio: 'Compra le incudini Acme"
 " dai negozi indipendenti.'"
 
+#: apps/manager/money_views.py
+msgid "The start date is after the end date. The filter was ignored."
+msgstr "La data di inizio è dopo la data di fine. Il filtro è stato ignorato."
+
 #: apps/vendors/models.py
 msgid "The street number of your permanent establishment, for example 12/B."
 msgstr "Il numero civico della tua stabile organizzazione, per esempio 12/B."
@@ -1710,6 +1871,10 @@ msgstr "Questo browser non supporta le passkey."
 msgid "This content is not available in this language."
 msgstr "Questo contenuto non è disponibile in questa lingua."
 
+#: apps/manager/templates/manager/shop/money.html
+msgid "This is what the platform owes you right now."
+msgstr "Questo è quanto la piattaforma ti deve in questo momento."
+
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid "This link was sent to you by email. Press Continue to open the page it leads to."
 msgstr "Questo link ti è stato inviato per email. Premi Continua per aprire la pagina a cui porta."
@@ -1769,6 +1934,10 @@ msgstr ""
 msgid "Title"
 msgstr "Titolo"
 
+#: apps/manager/templates/manager/shop/_money_filters.html
+msgid "To"
+msgstr "Al"
+
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid ""
 "To ask to reopen it, write to the platform staff. Staff reopen a closed vendor after a review; it "
@@ -1786,14 +1955,31 @@ msgstr "Troppi tentativi. Riprova più tardi."
 msgid "Total"
 msgstr "Totale"
 
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Total (EUR)"
+msgstr "Totale (EUR)"
+
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Total: %(total)s EUR"
 msgstr "Totale: %(total)s EUR"
 
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Totals by type"
+msgstr "Totali per tipo"
+
 #: apps/manager/forms.py apps/manager/templates/manager/shop/order.html
 msgid "Tracking number"
 msgstr "Numero di tracciamento"
+
+#: apps/manager/templates/manager/shop/_money_nav.html
+#: apps/manager/templates/manager/shop/money_transactions.html
+msgid "Transactions"
+msgstr "Transazioni"
+
+#: apps/manager/money_views.py
+msgid "Transfer"
+msgstr "Trasferimento"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
 #: apps/accounts/templates/accounts/mfa/setup.html
@@ -1807,6 +1993,12 @@ msgstr "La verifica in due passaggi è attiva"
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Two-factor settings"
 msgstr "Impostazioni della verifica in due passaggi"
+
+#: apps/manager/templates/manager/shop/_money_filters.html
+#: apps/manager/templates/manager/shop/_money_table.html
+#: apps/manager/templates/manager/shop/money_statement.html
+msgid "Type"
+msgstr "Tipo"
 
 #: apps/vendors/models.py
 msgid "Untick it to stop applying the rule without deleting it."
@@ -1837,6 +2029,10 @@ msgstr "Usa una passkey"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Use an authenticator app"
 msgstr "Usa un’app di autenticazione"
+
+#: apps/manager/money_views.py
+msgid "Use dates like 2026-03-31. The filter was ignored."
+msgstr "Usa date come 2026-03-31. Il filtro è stato ignorato."
 
 #: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Use recovery code"

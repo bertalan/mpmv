@@ -5,6 +5,8 @@ accounting (spec 04): amounts are signed from the vendor's side, positive for a 
 vendor and negative for a debit, always in EUR, rounded `ROUND_HALF_UP` to the cent.
 """
 
+import datetime as dt
+import unicodedata
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
@@ -109,3 +111,54 @@ def build_statement(opening: Decimal, by_kind: Mapping[str, Decimal]) -> Stateme
         closing=money(opening + credits + debits),
         by_kind=dict(by_kind),
     )
+
+
+# --- Vendor-facing views (VEN.9): periods, the payout kinds and CSV safety
+
+PAYOUT_KINDS = (PAYOUT, TRANSFER)
+CSV_APOSTROPHE = "'"
+_FORMULA_SIGNS = ("=", "+", "-", "@")
+
+
+def parse_date(text: str) -> dt.date | None:
+    """A `YYYY-MM-DD` date, or None for blank or invalid input."""
+    try:
+        return dt.date.fromisoformat(text.strip()) if text.strip() else None
+    except ValueError:
+        return None
+
+
+def month_bounds(today: dt.date) -> tuple[dt.date, dt.date]:
+    """First and last day of the month of `today`."""
+    first = today.replace(day=1)
+    following = (first + dt.timedelta(days=32)).replace(day=1)
+    return first, following - dt.timedelta(days=1)
+
+
+def period_bounds(
+    first: dt.date | None, last: dt.date | None, tz: dt.tzinfo
+) -> tuple[dt.datetime | None, dt.datetime | None]:
+    """Instants for an inclusive date range in `tz`: `start` inclusive, `end` exclusive (the day
+    after `last`). A missing side stays open."""
+    start = dt.datetime.combine(first, dt.time.min, tzinfo=tz) if first else None
+    end = dt.datetime.combine(last + dt.timedelta(days=1), dt.time.min, tzinfo=tz) if last else None
+    return start, end
+
+
+def csv_safe(cell: str) -> str:
+    """A text cell a spreadsheet cannot read as a formula: one that starts (after whitespace, in
+    NFKC form) with `=`, `+`, `-` or `@`, or with a tab or CR, gets a leading apostrophe. Amounts
+    are written as plain numbers elsewhere and never go through here."""
+    if not cell:
+        return cell
+    if cell.startswith(("\t", "\r", CSV_APOSTROPHE)):
+        return CSV_APOSTROPHE + cell
+    text = cell.lstrip()
+    if text and unicodedata.normalize("NFKC", text[0])[:1] in _FORMULA_SIGNS:
+        return CSV_APOSTROPHE + cell
+    return cell
+
+
+def signed(amount: Decimal) -> str:
+    """`+12.50` / `-3.00`: an amount with its sign, for the CSV."""
+    return f"{money(amount):+.2f}"

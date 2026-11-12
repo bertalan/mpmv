@@ -468,6 +468,11 @@ OWNER_ONLY_WEB = frozenset(
         "manager:shop:image_results",
         "manager:shop:image_chosen",
         "manager:shop:image_select_format",
+        "manager:shop:money",  # VEN.9
+        "manager:shop:money_transactions",
+        "manager:shop:money_payouts",
+        "manager:shop:money_statement",
+        "manager:shop:money_export",
     }
 )
 

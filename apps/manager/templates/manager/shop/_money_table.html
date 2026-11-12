@@ -1,0 +1,26 @@
+{% load i18n %}
+{% comment %}Ledger rows (VEN.9): signed amounts and the running balance. Partial; no script or style.{% endcomment %}
+<div class="table-scroll" role="region" aria-labelledby="{{ caption_id }}" tabindex="0">
+  <table class="table">
+    <caption id="{{ caption_id }}">{{ caption }}</caption>
+    <thead><tr>
+      <th scope="col">{% translate "Date" %}</th>
+      <th scope="col">{% translate "Type" %}</th>
+      <th scope="col">{% translate "Order" %}</th>
+      <th scope="col">{% translate "Description" %}</th>
+      <th scope="col" class="numeric">{% translate "Amount (EUR)" %}</th>
+      <th scope="col" class="numeric">{% translate "Balance (EUR)" %}</th>
+    </tr></thead>
+    <tbody>
+      {% for row in rows %}<tr>
+        <th scope="row"><time datetime="{{ row.when|date:'c' }}">{{ row.when|date:"SHORT_DATETIME_FORMAT" }}</time></th>
+        <td>{{ row.kind }}</td>
+        <td>{{ row.order }}</td>
+        <td>{{ row.memo }}{% if row.reference %} ({{ row.reference }}){% endif %}</td>
+        <td class="numeric" data-amount>{% if row.amount > 0 %}+{% endif %}{{ row.amount|floatformat:"2g" }}</td>
+        <td class="numeric">{{ row.balance_after|floatformat:"2g" }}</td>
+      </tr>
+      {% empty %}<tr><td colspan="6">{% translate "Nothing to show." %}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>

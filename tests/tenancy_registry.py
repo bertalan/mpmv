@@ -21,6 +21,8 @@ The Django admin is classified as a whole: staff only, with the object pages of 
 models tested on Vendor B's objects.
 """
 
+from decimal import Decimal
+
 from django.contrib import admin
 from django.db import models
 from django.test import Client
@@ -326,6 +328,41 @@ def manager_vendor(vendor: Vendor) -> Vendor:
     return vendor
 
 
+def _ledger_entry(vendor: Vendor, kind: str, amount: str) -> models.Model:
+    import secrets
+
+    from apps.core.audit import AuditContext
+    from apps.ledger.models import LedgerEntry
+    from apps.ledger.services import record_entry
+    from apps.ledger.tests.factories import _open_operator
+
+    key = secrets.token_urlsafe(8)
+    ctx = AuditContext(actor_label="system:test", source="system")
+    record_entry(
+        vendor,
+        kind=kind,
+        amount=Decimal(amount),
+        idempotency_key=key,
+        ctx=ctx,
+        memo=f"memo-{secrets.token_hex(6)}",
+        platform_entity=_open_operator(),
+    )
+    return LedgerEntry.objects.get(idempotency_key=key)
+
+
+def ledger_sale(vendor: Vendor) -> models.Model:
+    """A ledger entry with a unique memo, shown on the vendor's money pages (VEN.9)."""
+    return _ledger_entry(vendor, "sale", "10.00")
+
+
+def ledger_payout(vendor: Vendor) -> models.Model:
+    return _ledger_entry(vendor, "payout", "-5.00")
+
+
+def entry_memo(obj: models.Model) -> str:
+    return str(obj.memo)  # type: ignore[attr-defined]
+
+
 def vendor_image(vendor: Vendor) -> models.Model:
     """An image in the vendor's own collection (VEN.31)."""
     from wagtail.models import Collection
@@ -456,6 +493,16 @@ ENDPOINTS: dict[str, Access] = {
         kwargs=lambda obj: {**by_public_id(obj), "action": "accept"},
         methods=("POST",),
         sample={"public_id": NIL_UUID},
+    ),
+    # VEN.9: the vendor's own ledger; another vendor's entries never show, on any page or export.
+    "manager:shop:money": VendorScopedList(make=ledger_payout, identify=entry_memo),
+    "manager:shop:money_transactions": VendorScopedList(make=ledger_sale, identify=entry_memo),
+    "manager:shop:money_payouts": VendorScopedList(make=ledger_payout, identify=entry_memo),
+    "manager:shop:money_statement": VendorScopedList(
+        make=manager_vendor, identify=vendor_display_name
+    ),
+    "manager:shop:money_export": VendorScopedList(
+        make=ledger_sale, identify=entry_memo, methods=("POST",)
     ),
     "manager:platform:dashboard": StaffOnly(
         "Manager platform space: platform staff only; a vendor member gets 404 (CORE.17)."

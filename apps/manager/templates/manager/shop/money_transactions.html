@@ -1,0 +1,18 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}Vendor transactions (VEN.9): paginated ledger entries, filters by period and type, CSV export of the period. No inline script or style.{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Transactions" %}</h1>
+  {% include "manager/shop/_money_nav.html" with money_page="transactions" only %}
+  {% include "manager/shop/_money_filters.html" with show_kind=True %}
+  {% include "manager/shop/_money_table.html" with caption=_("Transactions") caption_id="money-transactions-caption" %}
+  {% include "components/pagination.html" with page=page_obj.number page_count=page_obj.paginator.num_pages previous_url=previous_url next_url=next_url only %}
+  <form method="post" action="{{ export_url }}" class="manager-filters" aria-label="{% translate 'Export' %}">
+    {% csrf_token %}
+    <input type="hidden" name="from" value="{{ filters.first|date:'Y-m-d' }}">
+    <input type="hidden" name="to" value="{{ filters.last|date:'Y-m-d' }}">
+    <input type="hidden" name="kind" value="{{ filters.kind }}">
+    <p>{% translate "The export covers the period above (the current month if you set none)." %}</p>
+    {% include "components/button.html" with label=_("Export as CSV") type="submit" variant="secondary" only %}
+  </form>
+{% endblock %}

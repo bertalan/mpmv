@@ -1,0 +1,22 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}Vendor money overview (VEN.9): the balance, the latest payouts and movements. No inline script or style.{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Money" %}</h1>
+  {% include "manager/shop/_money_nav.html" with money_page="overview" only %}
+  <section aria-labelledby="balance-heading">
+    <h2 id="balance-heading">{% translate "Current balance" %}</h2>
+    <p class="manager-lead"><strong data-balance>{{ balance|floatformat:"2g" }}</strong> {{ currency }}</p>
+    <p>{% if balance < 0 %}{% translate "A negative balance means you owe the platform: it is set off against your next sales." %}{% else %}{% translate "This is what the platform owes you right now." %}{% endif %}</p>
+  </section>
+  <section aria-labelledby="payouts-heading">
+    <h2 id="payouts-heading">{% translate "Latest payouts" %}</h2>
+    {% include "manager/shop/_money_table.html" with rows=recent_payouts caption=_("Latest payouts") caption_id="money-payouts-caption" only %}
+    <p><a href="{% url 'manager:shop:money_payouts' %}">{% translate "All payouts" %}</a></p>
+  </section>
+  <section aria-labelledby="recent-heading">
+    <h2 id="recent-heading">{% translate "Latest transactions" %}</h2>
+    {% include "manager/shop/_money_table.html" with rows=recent caption=_("Latest transactions") caption_id="money-recent-caption" only %}
+    <p><a href="{% url 'manager:shop:money_transactions' %}">{% translate "All transactions" %}</a></p>
+  </section>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}Vendor payouts (VEN.9): ledger entries of type payout and transfer. No inline script or style.{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Payouts" %}</h1>
+  {% include "manager/shop/_money_nav.html" with money_page="payouts" only %}
+  {% include "manager/shop/_money_filters.html" with show_kind=False %}
+  {% include "manager/shop/_money_table.html" with caption=_("Payouts") caption_id="money-payouts-caption" %}
+  {% include "components/pagination.html" with page=page_obj.number page_count=page_obj.paginator.num_pages previous_url=previous_url next_url=next_url only %}
+{% endblock %}

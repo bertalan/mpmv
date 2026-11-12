@@ -1,0 +1,37 @@
+{% extends "manager/layout.html" %}
+{% load i18n %}
+{% comment %}
+Vendor period statement (VEN.9): opening balance, totals by type, closing balance, built from the
+ledger. `extras` is the hook for the statement lines of CMP.2. No inline script or style.
+{% endcomment %}
+{% block manager_content %}
+  <h1>{% translate "Statement" %}</h1>
+  {% include "manager/shop/_money_nav.html" with money_page="statement" only %}
+  {% include "manager/shop/_money_filters.html" with show_kind=False %}
+  <p class="manager-lead">{% blocktranslate with vendor=manager.vendor.display_name first=filters.first|date:"SHORT_DATE_FORMAT" last=filters.last|date:"SHORT_DATE_FORMAT" %}Statement of {{ vendor }} from {{ first }} to {{ last }}.{% endblocktranslate %}</p>
+  <dl class="manager-facts">
+    <dt>{% translate "Opening balance" %}</dt><dd data-statement="opening">{{ statement.opening|floatformat:"2g" }} {{ currency }}</dd>
+    <dt>{% translate "Credits" %}</dt><dd data-statement="credits">{{ statement.credits|floatformat:"2g" }} {{ currency }}</dd>
+    <dt>{% translate "Debits" %}</dt><dd data-statement="debits">{{ statement.debits|floatformat:"2g" }} {{ currency }}</dd>
+    <dt>{% translate "Closing balance" %}</dt><dd data-statement="closing">{{ statement.closing|floatformat:"2g" }} {{ currency }}</dd>
+  </dl>
+  <div class="table-scroll" role="region" aria-labelledby="money-statement-caption" tabindex="0">
+    <table class="table">
+      <caption id="money-statement-caption">{% translate "Totals by type" %}</caption>
+      <thead><tr>
+        <th scope="col">{% translate "Type" %}</th>
+        <th scope="col" class="numeric">{% translate "Total (EUR)" %}</th>
+      </tr></thead>
+      <tbody>
+        {% for row in by_kind %}<tr>
+          <th scope="row">{{ row.kind }}</th>
+          <td class="numeric">{% if row.total > 0 %}+{% endif %}{{ row.total|floatformat:"2g" }}</td>
+        </tr>
+        {% empty %}<tr><td colspan="2">{% translate "No movements in this period." %}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% for section in extras %}
+    <section aria-labelledby="extra-{{ forloop.counter }}"><h2 id="extra-{{ forloop.counter }}">{{ section.title }}</h2></section>
+  {% endfor %}
+{% endblock %}

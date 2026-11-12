@@ -6,11 +6,13 @@ anywhere else; the running `balance_after` of each row is set by the database.
 """
 
 import datetime as dt
+from collections.abc import Iterable, Iterator
 from decimal import Decimal
 
 from django.db import IntegrityError, transaction
-from django.db.models import Sum
+from django.db.models import QuerySet, Sum
 
+from apps.core import audit
 from apps.core.audit import AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.models import PlatformOperator
@@ -140,3 +142,80 @@ def vendor_statement(vendor: Vendor, start: dt.datetime, end: dt.datetime) -> en
         .annotate(total=Sum("amount"))
     )
     return engine.build_statement(opening, {row["kind"]: row["total"] for row in rows})
+
+
+# --- Vendor-facing reads (VEN.9)
+
+EXPORT_CSV = "ledger.export_csv"
+VENDOR_MODEL = "vendors.vendor"
+CSV_HEADER = (
+    "date",
+    "kind",
+    "amount",
+    "currency",
+    "balance_after",
+    "order",
+    "reference",
+    "memo",
+)
+
+
+def filter_entries(
+    entries: QuerySet[LedgerEntry],
+    *,
+    start: dt.datetime | None = None,
+    end: dt.datetime | None = None,
+    kinds: Iterable[str] | None = None,
+) -> QuerySet[LedgerEntry]:
+    """`entries` narrowed to a period (`start` inclusive, `end` exclusive) and/or kinds, newest
+    first. Callers pass an already vendor-scoped queryset."""
+    if start is not None:
+        entries = entries.filter(created_at__gte=start)
+    if end is not None:
+        entries = entries.filter(created_at__lt=end)
+    if kinds is not None:
+        entries = entries.filter(kind__in=list(kinds))
+    return entries.select_related("vendor_order__order").order_by("-id")
+
+
+def csv_rows(entries: Iterable[LedgerEntry]) -> Iterator[list[str]]:
+    """The export: header, then one row per entry. Text cells are formula-safe; amounts are plain
+    signed numbers."""
+    yield list(CSV_HEADER)
+    for entry in entries:
+        order = entry.vendor_order.order.number if entry.vendor_order else ""
+        yield [
+            entry.created_at.isoformat(timespec="seconds"),
+            entry.kind,
+            engine.signed(entry.amount),
+            entry.currency,
+            f"{entry.balance_after:.2f}",
+            engine.csv_safe(order),
+            engine.csv_safe(entry.external_ref),
+            engine.csv_safe(entry.memo),
+        ]
+
+
+def record_export(
+    vendor: Vendor,
+    *,
+    ctx: AuditContext,
+    rows: int,
+    start: dt.date | None,
+    end: dt.date | None,
+    kinds: Iterable[str] | None,
+) -> None:
+    """Audit one CSV export of the vendor's ledger (counts and filters only, never the rows)."""
+    audit.record(
+        ctx,
+        EXPORT_CSV,
+        VENDOR_MODEL,
+        str(vendor.public_id),
+        None,
+        {
+            "rows": rows,
+            "from": start.isoformat() if start else None,
+            "to": end.isoformat() if end else None,
+            "kinds": sorted(kinds) if kinds else None,
+        },
+    )

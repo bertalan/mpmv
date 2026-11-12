@@ -1,0 +1,9 @@
+{% load i18n %}
+<nav aria-label="{% translate 'Money pages' %}" class="manager-languages">
+  <ul>
+    <li><a href="{% url 'manager:shop:money' %}"{% if money_page == "overview" %} aria-current="page"{% endif %}>{% translate "Balance" %}</a></li>
+    <li><a href="{% url 'manager:shop:money_transactions' %}"{% if money_page == "transactions" %} aria-current="page"{% endif %}>{% translate "Transactions" %}</a></li>
+    <li><a href="{% url 'manager:shop:money_payouts' %}"{% if money_page == "payouts" %} aria-current="page"{% endif %}>{% translate "Payouts" %}</a></li>
+    <li><a href="{% url 'manager:shop:money_statement' %}"{% if money_page == "statement" %} aria-current="page"{% endif %}>{% translate "Statement" %}</a></li>
+  </ul>
+</nav>
