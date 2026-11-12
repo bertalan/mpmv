@@ -280,6 +280,28 @@ def test_the_restricted_banner_offers_enrolment_to_who_holds_elevate_without_a_p
     assert "cannot open a passkey window" not in banner
 
 
+@pytest.mark.parametrize(
+    "group", ["Platform: owner", "Platform: support", "Platform: finance and payments"]
+)
+def test_a_non_superuser_platform_role_with_a_passkey_sees_the_passkey_window_button(
+    client: Client, group: str
+) -> None:
+    """Owner decision 2026-11-12 (D-32): owner, support and finance hold core.elevate.
+
+    The group names are spelled out: accounts never imports manager (spec 01 graph).
+    """
+    from django.contrib.auth.models import Group
+
+    user, _ = _staff_with_passkey(elevate=False)
+    assert not user.is_superuser
+    user.groups.add(Group.objects.get(name=group))
+    _restricted_session(client, user)
+    banner = _restricted_banner(client)
+    assert "Open passkey window" in banner
+    assert 'data-passkey="elevate"' in banner
+    assert "cannot open a passkey window" not in banner
+
+
 def test_the_restricted_banner_says_plainly_when_the_role_cannot_elevate(client: Client) -> None:
     user, _ = _staff_with_passkey(elevate=False)
     _restricted_session(client, user)

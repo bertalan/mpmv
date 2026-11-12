@@ -33,6 +33,7 @@ SCOPES = (
     "apps/manager",
     "apps/accounts",
     "apps/orders/templates",
+    "apps/orders/customer_views.py",  # the customer area labels (ORD.7)
     "apps/compliance/forms.py",  # WithdrawalLookupForm (CMP.6): its help texts are translated
     "apps/vendors/admin.py",  # help texts of the plan and commission rule forms (ARC.30)
     "apps/cms/models.py",  # HelpEntry (ARC.32): its help texts are translated

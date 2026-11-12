@@ -539,6 +539,17 @@ ENDPOINTS: dict[str, Access] = {
     "privacy_erase_done": NoVendorData(
         "Static confirmation page after an erasure request (CMP.4): no data."
     ),
+    "customer_orders": NoVendorData(
+        "The signed-in customer's own orders (ORD.7): the queryset starts from the caller's "
+        "orders (`test_the_list_shows_only_the_callers_orders`); a vendor part shows the vendor's "
+        "public display name only, never its members, commission or notes."
+    ),
+    "customer_order": NoVendorData(
+        "One of the signed-in customer's own orders (ORD.7): a stranger's order, a guest order "
+        "and an unknown id all answer 404 "
+        "(`test_a_stranger_s_order_is_a_404_like_an_unknown_one`).",
+        kwargs={"public_id": NIL_UUID},
+    ),
     "privacy_requests": StaffOnly(
         "Erasure requests (CMP.4): platform data listed by public id; needs "
         "compliance.change_erasurerequest, so a vendor member gets 404."

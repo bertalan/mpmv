@@ -49,6 +49,8 @@ VENDOR_ORDER_DELIVERED = "orders.vendor_order_delivered"
 ORDER_CANCELLED = "orders.order_cancelled"
 VENDOR_ORDER_CANCELLED = "orders.vendor_order_cancelled"
 VENDOR_ORDER_CANCELLED_NOTICE = "orders.vendor_order_cancelled_notice"
+#: The outbox attachment kind of the non-fiscal PDF (documents.py builds it at send time).
+CONFIRMATION_PDF_KIND = "orders:vendor_confirmation_pdf"
 
 #: The shipping address lines a vendor needs to ship; nothing else of the buyer's data.
 _SHIP_TO_KEYS = ("name", "line1", "line2", "postal_code", "city", "region")
@@ -129,6 +131,8 @@ def notify_order_paid(order: Order) -> None:
                 "lines": _lines(sub),
                 "shipping": _money(sub.shipping_net + sub.shipping_tax_amount),
                 "total": _money(sub.gross_total),
+                # The non-fiscal PDF is built when the email is sent (documents.py), not stored.
+                "attachment": {"kind": CONFIRMATION_PDF_KIND, "ref": str(sub.public_id)},
             },
         )
         if sub.vendor.contact_email:
