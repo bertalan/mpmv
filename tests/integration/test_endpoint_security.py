@@ -468,6 +468,10 @@ OWNER_ONLY_WEB = frozenset(
         "manager:shop:image_results",
         "manager:shop:image_chosen",
         "manager:shop:image_select_format",
+        "manager:shop:document_choose",  # VEN.31 part 2
+        "manager:shop:document_results",
+        "manager:shop:document_chosen",
+        "manager:shop:link_choose",
     }
 )
 

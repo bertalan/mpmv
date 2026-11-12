@@ -10,6 +10,7 @@ from collections.abc import Callable
 from typing import Any, cast
 
 from django import forms
+from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.admin.utils import unquote
 from django.core.exceptions import FieldDoesNotExist, PermissionDenied, ValidationError
@@ -18,8 +19,10 @@ from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import URLPattern, path, reverse
+from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.http import urlencode
+from django.utils.module_loading import import_string
 from django.utils.safestring import SafeString
 from django.utils.translation import gettext_lazy as _
 
@@ -27,25 +30,31 @@ from apps.accounts.decorators import level_gated_action, requires_level, step_up
 from apps.accounts.mfa_session import is_recently_verified
 from apps.accounts.models import User
 from apps.core.admin import step_up
-from apps.core.audit import audit_context
+from apps.core.audit import AuditContext, audit_context
 from apps.core.changeset import ChangeSet
+from apps.core.tasks import business_tz
 from apps.core.text import ascii_int
 
 from . import engine
 from .models import (
+    CommissionRule,
     ContractAcceptance,
     CrossVendorConsent,
     LegalFieldRequirement,
+    NoTinCountry,
     Vendor,
     VendorClaim,
     VendorContract,
     VendorContractTranslation,
     VendorFeatureFlag,
+    VendorPlan,
     VendorStatus,
     VendorTranslation,
     legal_field_label,
 )
 from .services import (
+    add_commission_rule,
+    add_no_tin_country,
     approve_claim,
     can_reopen,
     change_status,
@@ -57,10 +66,13 @@ from .services import (
     establishment_flags,
     establishment_warning,
     legal_profile_completeness,
+    no_tin_impact,
     onboarding_checklist,
     reject_claim,
+    remove_no_tin_country,
     reopen_vendor,
     save_contract,
+    save_plan,
     save_requirement,
     save_vendor,
     save_vendor_flag,
@@ -332,7 +344,7 @@ CLAIM_ACTIONS = (
         "approve_claim",
         "Approve the submitted claim",
         decision_action("approve_claim"),
-        level="owner_role_grant",  # D-32 group 3: it grants the owner role
+        level="owner_role_grant",  # D-32 critical: it grants the owner role
     ),
     _claim_admin_action(
         "reject_claim", "Reject the submitted claim", decision_action("reject_claim")
@@ -448,7 +460,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
             "Invoicing bank details",
             {"fields": BANK_FIELDS},
         ),
-        ("Contact", {"fields": ("contact_email", "phone")}),
+        ("Contact", {"fields": ("contact_email", "phone", "mail_language")}),
         ("Sales", {"fields": ("sales_mode_default", "enquiries_enabled")}),
         ("Migration", {"fields": ("legacy_wp_user_id",)}),
         ("Dates", {"fields": ("created_at", "updated_at")}),
@@ -548,7 +560,7 @@ class VendorAdmin(admin.ModelAdmin[Vendor]):
         form_url: str = "",
         extra_context: dict[str, Any] | None = None,
     ) -> HttpResponse:
-        """Changing the invoicing bank details needs a per-action passkey (D-32 group 3,
+        """Changing the invoicing bank details needs a per-action passkey (D-32 critical,
         `payout_details`); other edits do not."""
         parent = super().changeform_view
 
@@ -843,6 +855,291 @@ class LegalFieldRequirementAdmin(admin.ModelAdmin[LegalFieldRequirement]):
         ctx = audit_context(request)
         for requirement in queryset:
             delete_requirement(requirement, ctx=ctx)
+
+
+def _section_allowed(request: HttpRequest, section: str, *, write: bool) -> bool:
+    """Role membership from the CORE.18 matrix (`apps/manager/roles.py`), never `has_perm`.
+
+    The check lives in the Manager app, which sits above this one in the dependency graph, so it
+    is reached through `settings.PLATFORM_SECTION_CHECK` (like the CORE.25 level decorator)."""
+    check = import_string(settings.PLATFORM_SECTION_CHECK)
+    return bool(check(request.user, section, write=write))
+
+
+class VendorPlanForm(forms.ModelForm[VendorPlan]):
+    class Meta:
+        model = VendorPlan
+        fields = ("code", "name", "max_products", "features", "monthly_fee")
+        help_texts = {
+            "code": _(
+                "A short identifier in lowercase letters, digits and hyphens, for example "
+                "'standard'. Rules and limits refer to the plan by it."
+            ),
+            "name": _("The plan's name as staff see it, for example 'Standard'."),
+            "max_products": _(
+                "The most products a vendor on this plan can list. Leave it empty for no limit."
+            ),
+            "features": _(
+                'The plan\'s options as a JSON object, for example {"featured": true}. Leave '
+                "it as {} for none."
+            ),
+            "monthly_fee": _(
+                "The monthly fee in euro. Nothing is charged before paid plans open, so leave "
+                "it empty for now."
+            ),
+        }
+
+
+@admin.register(VendorPlan)
+class VendorPlanAdmin(admin.ModelAdmin[VendorPlan]):
+    """Plans are data (VEN.2). Rules point at plans (PROTECT), so a plan is changed, never
+    deleted. At launch a plan only scopes a commission rule and sets limits (D-04)."""
+
+    form = VendorPlanForm
+    list_display = ("code", "name", "max_products", "monthly_fee")
+    search_fields = ("code", "name")
+    fields = ("code", "name", "max_products", "features", "monthly_fee")
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+    # The matrix row "Platform: vendors (applications, plans)": the platform owner edits plans,
+    # the other platform roles read them.
+    def has_view_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return _section_allowed(request, "platform.vendors", write=False)
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return _section_allowed(request, "platform.vendors", write=True)
+
+    def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return _section_allowed(request, "platform.vendors", write=True)
+
+    def save_model(self, request: HttpRequest, obj: VendorPlan, form: Any, change: bool) -> None:
+        save_plan(obj, ctx=audit_context(request))
+
+    def changeform_view(
+        self,
+        request: HttpRequest,
+        object_id: str | None = None,
+        form_url: str = "",
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        """A plan sets limits and scopes commission rules: a passkey or an open window (CORE.25)."""
+        parent = super().changeform_view
+        return requires_level("commission_change")(
+            lambda req: parent(req, object_id, form_url, extra_context)
+        )(request)
+
+
+class CommissionRuleForm(forms.ModelForm[CommissionRule]):
+    """Runs the service's rules (a dry run) so a refusal is a form error, not a crash."""
+
+    class Meta:
+        model = CommissionRule
+        fields = (
+            "vendor",
+            "plan",
+            "percent",
+            "base",
+            "fee_percent",
+            "fee_fixed",
+            "fee_base",
+            "promo_label",
+            "valid_from",
+        )
+        help_texts = {
+            "vendor": _(
+                "Pick a vendor to give only that vendor this rule. Leave it empty, with the plan "
+                "also empty, for the platform default."
+            ),
+            "plan": _(
+                "Pick a plan to give only the vendors on that plan this rule. Leave it empty for "
+                "a rule that does not depend on the plan."
+            ),
+            "percent": _(
+                "The platform's commission, as a percentage of the base below, for example 20.00. "
+                "A zero needs a promo label."
+            ),
+            "base": _(
+                "What the commission percentage is applied to. It is frozen on every order at "
+                "the time of purchase."
+            ),
+            "fee_percent": _(
+                "The payment provider's percentage fee, for example 4.00. It is split between "
+                "vendors by the fee base below."
+            ),
+            "fee_fixed": _(
+                "The payment provider's fixed fee per payment, in euro, for example 2.00. "
+                "Enter 0 if there is none."
+            ),
+            "fee_base": _(
+                "How the payment fee is shared between vendors. The default follows the gross "
+                "amount paid."
+            ),
+            "promo_label": _(
+                "A short reason shown to staff when the commission is zero, for example "
+                "'Launch promo'. Leave it empty for a normal rule."
+            ),
+            "valid_from": _(
+                "The date and time the rule starts to apply, in Rome time. The rule before it "
+                "ends at this moment. A rule is never edited: add a new one to change a rate."
+            ),
+        }
+
+    def validate_unique(self) -> None:
+        super().validate_unique()
+        if self.instance.pk is not None or self.errors:
+            return
+        try:
+            add_commission_rule(
+                self.instance,
+                ctx=AuditContext(actor_label="form", source="admin"),
+                dry_run=True,
+            )
+        except ValidationError as exc:
+            self.add_error(None, exc)
+
+
+@admin.register(CommissionRule)
+class CommissionRuleAdmin(admin.ModelAdmin[CommissionRule]):
+    """Commission rules (VEN.2): add a version, never edit or delete one (a database trigger
+    enforces it). The add page asks for a fresh second factor like any rate change."""
+
+    form = CommissionRuleForm
+    list_display = (
+        "scope",
+        "version",
+        "percent",
+        "base",
+        "fee_percent",
+        "fee_fixed",
+        "promo_label",
+        "valid_from",
+        "valid_to",
+    )
+    list_filter = ("base",)
+    list_select_related = ("vendor", "plan")
+    readonly_fields = ("version", "valid_to", "public_id", "created_at")
+    actions = None
+
+    @admin.display(description="Scope")
+    def scope(self, obj: CommissionRule) -> str:
+        return str(obj.vendor or obj.plan or "platform default")
+
+    def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False
+
+    # Commission rules are configuration (spec 02 line 55, matrix row "Platform: configuration"):
+    # the Configuration and tax role adds them, the platform owner reads them.
+    def has_view_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return _section_allowed(request, "platform.config", write=False)
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return _section_allowed(request, "platform.config", write=True)
+
+    def save_model(
+        self, request: HttpRequest, obj: CommissionRule, form: Any, change: bool
+    ) -> None:
+        add_commission_rule(obj, ctx=audit_context(request))
+
+    def add_view(
+        self, request: HttpRequest, form_url: str = "", extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        parent = super().add_view
+
+        def in_business_time(req: HttpRequest) -> HttpResponse:
+            # A naive "from" typed by staff is read in Rome time, not UTC.
+            with timezone.override(business_tz()):
+                return parent(req, form_url, extra_context)
+
+        return requires_level("commission_change")(step_up(in_business_time))(request)
+
+
+@admin.register(NoTinCountry)
+class NoTinCountryAdmin(admin.ModelAdmin[NoTinCountry]):
+    """Jurisdictions that issue no TIN (VEN.27), with their dates. Staff add a country with a
+    reason (it counts from today) and end it with a reason (it stops counting today); rows are
+    never deleted, so past periods stay reproducible. Both go through the audited services. The
+    end page asks for the reason, refuses an empty one and shows how many vendors it blocks. No
+    bulk action: it has no place to ask for a reason.
+
+    A change relaxes a compliance and payout gate, so every write view needs a passkey
+    or an open passkey window (CORE.25, D-32 sensitive, action `no_tin_country`)."""
+
+    delete_confirmation_template = "admin/vendors/notincountry/delete_confirmation.html"
+
+    list_display = ("country", "reason", "valid_from", "valid_to", "removal_reason")
+    list_filter = ("country",)
+    search_fields = ("country", "reason")
+    fields = ("country", "reason")
+    actions = None
+
+    def get_readonly_fields(
+        self, request: HttpRequest, obj: NoTinCountry | None = None
+    ) -> tuple[str, ...]:
+        return ("country", "reason") if obj is not None else ()
+
+    def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return False  # to change a reason, end the listing and add the country again
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        if obj is not None and obj.valid_to is not None:
+            return False  # an ended row is history
+        return super().has_delete_permission(request, obj)
+
+    def save_model(self, request: HttpRequest, obj: NoTinCountry, form: Any, change: bool) -> None:
+        add_no_tin_country(obj.country, reason=obj.reason, ctx=audit_context(request))
+
+    def add_view(
+        self, request: HttpRequest, form_url: str = "", extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        parent = super().add_view
+        return requires_level("no_tin_country")(lambda req: parent(req, form_url, extra_context))(
+            request
+        )
+
+    def change_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+        form_url: str = "",
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        parent = super().change_view
+        return requires_level("no_tin_country")(
+            lambda req: parent(req, object_id, form_url, extra_context)
+        )(request)
+
+    def delete_view(
+        self, request: HttpRequest, object_id: str, extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        if not self.has_delete_permission(request):
+            raise PermissionDenied
+        parent = super().delete_view
+
+        def view(req: HttpRequest) -> HttpResponse:
+            if req.method == "POST" and not req.POST.get("reason", "").strip():
+                messages.error(req, "A reason is required to end the listing of a country.")
+                return redirect(req.get_full_path())
+            row = self.get_object(req, unquote(object_id))
+            extra = dict(extra_context or {})
+            if row is not None:
+                extra["vendors_without_tin"] = no_tin_impact(str(row.country))
+            return parent(req, object_id, extra)
+
+        return requires_level("no_tin_country")(view)(request)
+
+    def delete_model(self, request: HttpRequest, obj: NoTinCountry) -> None:
+        remove_no_tin_country(
+            obj.country, reason=request.POST.get("reason", ""), ctx=audit_context(request)
+        )
+
+    def delete_queryset(self, request: HttpRequest, queryset: QuerySet[NoTinCountry]) -> None:
+        for row in queryset:  # unreachable (no bulk actions); kept on the audited path
+            self.delete_model(request, row)
 
 
 def _overrides_kill_switch(override: VendorFeatureFlag | None) -> bool:

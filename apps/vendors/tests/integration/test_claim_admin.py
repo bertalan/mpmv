@@ -36,7 +36,7 @@ CHANGELIST = "admin:vendors_vendor_changelist"
 
 @pytest.fixture
 def staff_client(client: Client, superuser: User) -> Client:
-    # Approving a claim grants the owner role: D-32 group 3, so the session has a fresh passkey.
+    # Approving a claim grants the owner role: D-32 critical, so the session has a fresh passkey.
     verified_login(client, superuser, passkey=True)
     return client
 
@@ -324,7 +324,7 @@ def test_each_claim_action_checks_the_step_up_itself(
     action = cast(Any, model_admin.get_actions(request)[name])[0]
     response = action(model_admin, request, Vendor.objects.filter(pk=vendor.pk))
     assert response is not None
-    if name == "approve_claim":  # group 3: a session with no operational mode is refused
+    if name == "approve_claim":  # critical: a session with no the passkey window is refused
         assert response.status_code == 403
         return
     assert response.status_code == 302

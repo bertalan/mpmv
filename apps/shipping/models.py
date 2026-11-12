@@ -28,10 +28,12 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models.functions import Lower
+from django.utils.translation import gettext_lazy as _
 
 from apps.core.fields import MoneyField
 from apps.core.models import BaseModel, TranslationModel, resolve_translation
 from apps.core.postcodes import split_country_qualifier
+from apps.core.translation_fields import translation_language_field, translation_status_field
 from apps.core.translations import Resolved
 from apps.vendors.scoping import VendorScopedManager
 
@@ -59,15 +61,32 @@ class Carrier(BaseModel):
     An inactive carrier offers no rates at all (spec 06 §6.3 case 10, SHP.3).
     """
 
-    code = models.SlugField(max_length=50, unique=True)
-    is_active = models.BooleanField(default=True)
+    code = models.SlugField(
+        max_length=50,
+        unique=True,
+        help_text=_("A short name without spaces that is unique, for example 'dhl'."),
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text=_(
+            "Untick it to switch the carrier off: an inactive carrier offers no rates at all."
+        ),
+    )
     tracking_url_template = models.CharField(
         max_length=500,
         blank=True,
-        help_text="Tracking link, with {tracking_number} where the number goes.",
+        help_text=_(
+            "Not used yet: saved for a future feature. The carrier's tracking link, with "
+            "{tracking_number} where the parcel number goes. Leave it empty if there is none."
+        ),
     )
     supports_api = models.BooleanField(
-        "supports API", default=False, help_text="Labels and tracking through the carrier API."
+        "supports API",
+        default=False,
+        help_text=_(
+            "Not used yet: saved for a future feature. Tick it if the carrier offers labels and "
+            "tracking through an API."
+        ),
     )
 
     class Meta:
@@ -85,8 +104,17 @@ class CarrierTranslation(TranslationModel):
     translation_of = "carrier"
     translated_fields = ("label",)
 
+    language = translation_language_field()
+    status = translation_status_field()
+
     carrier = models.ForeignKey(Carrier, on_delete=models.CASCADE, related_name="translations")
-    label = models.CharField(max_length=100)
+    label = models.CharField(
+        max_length=100,
+        help_text=_(
+            "The carrier's name in this language, for example 'Standard courier'. "
+            "Buyers will see it once checkout uses shipping."
+        ),
+    )
 
     class Meta(TranslationModel.Meta):
         ordering = ["carrier", "language"]
@@ -111,8 +139,21 @@ class CountryGroup(BaseModel):
     capitals.
     """
 
-    code = models.SlugField(max_length=50, unique=True, help_text="Lower case, e.g. eu or dach.")
-    countries = ZoneCountriesField(help_text="ISO country codes of the members, comma separated.")
+    code = models.SlugField(
+        max_length=50,
+        unique=True,
+        help_text=_(
+            "A short name in lower case that is unique, for example 'eu' or 'dach'. Zones "
+            "refer to a group by this code, so a group that a zone uses keeps its code and "
+            "cannot be deleted."
+        ),
+    )
+    countries = ZoneCountriesField(
+        help_text=_(
+            "The countries of the group: two-letter country codes such as 'IT' or 'DE', "
+            "separated by commas."
+        )
+    )
 
     class Meta:
         ordering = ["code"]
@@ -154,10 +195,18 @@ class CountryGroupTranslation(TranslationModel):
     translation_of = "country_group"
     translated_fields = ("name",)
 
+    language = translation_language_field()
+    status = translation_status_field()
+
     country_group = models.ForeignKey(
         CountryGroup, on_delete=models.CASCADE, related_name="translations"
     )
-    name = models.CharField(max_length=100)
+    name = models.CharField(
+        max_length=100,
+        help_text=_(
+            "The name of the group in this language, for example 'German-speaking countries'."
+        ),
+    )
 
     class Meta(TranslationModel.Meta):
         ordering = ["country_group", "language"]
@@ -196,33 +245,57 @@ class ShippingZone(BaseModel):
         null=True,
         blank=True,
         related_name="shipping_zones",
-        help_text="Empty: a platform zone for every vendor. Set: that vendor's own zone.",
+        help_text=_(
+            "Leave it empty for a zone that every vendor can use. Choose a vendor for a "
+            "zone that belongs to that vendor only."
+        ),
     )
-    code = models.SlugField(max_length=50)
-    name = models.CharField(max_length=100)
+    code = models.SlugField(
+        max_length=50,
+        help_text=_(
+            "A short name without spaces for the zone. The same vendor cannot use it twice."
+        ),
+    )
+    name = models.CharField(
+        max_length=100, help_text=_("The name of the zone, for example 'Italy, mainland'.")
+    )
     priority = models.PositiveSmallIntegerField(
         validators=[MinValueValidator(MIN_PRIORITY), MaxValueValidator(MAX_PRIORITY)],
-        help_text="1 to 999; the lowest matching priority wins.",
+        help_text=_(
+            "A number from 1 to 999. When several zones fit an address, the lowest number wins."
+        ),
     )
     countries = ZoneCountriesField(
         default=list,
         blank=True,
-        help_text='ISO country codes, comma separated, or "*" for the rest of the world.',
+        help_text=_(
+            "The countries of the zone: two-letter country codes such as 'IT' or 'DE', "
+            "separated by commas. Write '*' for the rest of the world."
+        ),
     )
     country_groups = CountryGroupCodesField(
         default=list,
         blank=True,
-        help_text="Country group codes (eu, europe, africa…), comma separated.",
+        help_text=_(
+            "Groups of countries to add to the zone, by their codes such as 'eu' or "
+            "'europe', separated by commas."
+        ),
     )
     postcode_patterns = PostcodePatternsField(
         default=list,
         blank=True,
-        help_text='Prefix "BT*", range "70000..74999" or exact postcode, comma separated.',
+        help_text=_(
+            "To limit the zone to some postcodes, list them separated by commas: a prefix "
+            "such as 'BT*', a range such as '70000..74999' or an exact postcode."
+        ),
     )
     states = StatesField(
         default=list,
         blank=True,
-        help_text="Province or state codes (SS, CA…), comma separated.",
+        help_text=_(
+            "To limit the zone to some provinces or states, list their codes separated by "
+            "commas, for example 'SS' or 'CA'."
+        ),
     )
 
     class Meta:
@@ -341,29 +414,67 @@ class ShippingMethod(BaseModel):
     objects = VendorScopedManager()
 
     vendor = models.ForeignKey(
-        "vendors.Vendor", on_delete=models.PROTECT, related_name="shipping_methods"
+        "vendors.Vendor",
+        on_delete=models.PROTECT,
+        related_name="shipping_methods",
+        help_text=_("The vendor that offers this way of shipping."),
     )
-    zone = models.ForeignKey(ShippingZone, on_delete=models.PROTECT, related_name="methods")
-    carrier = models.ForeignKey(Carrier, on_delete=models.PROTECT, related_name="methods")
+    zone = models.ForeignKey(
+        ShippingZone,
+        on_delete=models.PROTECT,
+        related_name="methods",
+        help_text=_(
+            "The zone this method ships to. A vendor can offer several methods to the same zone."
+        ),
+    )
+    carrier = models.ForeignKey(
+        Carrier,
+        on_delete=models.PROTECT,
+        related_name="methods",
+        help_text=_("The carrier that carries the parcels with this method."),
+    )
     key = models.SlugField(
-        max_length=50, default=engine.STANDARD, help_text="Unique per vendor and zone."
+        max_length=50,
+        default=engine.STANDARD,
+        help_text=_(
+            "A short name without spaces for this method. The same vendor cannot use it "
+            "twice in the same zone."
+        ),
     )
     service_level = models.CharField(
-        max_length=16, choices=ServiceLevel.choices, default=engine.STANDARD
+        max_length=16,
+        choices=ServiceLevel.choices,
+        default=engine.STANDARD,
+        help_text=_("How fast or how costly the service is: standard, express, economy or other."),
     )
     min_delivery_days = models.PositiveSmallIntegerField(
-        null=True, blank=True, help_text="Indicative, shown to the buyer."
+        null=True,
+        blank=True,
+        help_text=_(
+            "The fewest days a delivery takes. It is only an estimate. Not shown to buyers yet."
+        ),
     )
     max_delivery_days = models.PositiveSmallIntegerField(
-        null=True, blank=True, help_text="Indicative, shown to the buyer."
+        null=True,
+        blank=True,
+        help_text=_(
+            "The most days a delivery takes. It is only an estimate. Not shown to buyers yet."
+        ),
     )
     is_default = models.BooleanField(
-        default=False, help_text="Preselected at checkout; at most one per vendor and zone."
+        default=False,
+        help_text=_(
+            "Not used yet at checkout: marks the method to preselect once checkout uses shipping "
+            "rates. A vendor can have only one default method per zone."
+        ),
     )
     free_shipping_threshold = MoneyField(
         null=True,
         blank=True,
-        help_text="Net goods value of the package from which shipping is free. Empty: never.",
+        help_text=_(
+            "In the rate calculation, shipping is free when the goods in the package are worth at "
+            "least this amount, without VAT. Leave it empty for no free shipping."
+        ),
     )
     # Shipping VAT always follows the goods (TAX.17, D-03 decided): the only value is
     # `follows_goods`; the tax engine splits the charge over the goods' decisions (TAX.4).
@@ -378,6 +489,10 @@ class ShippingMethod(BaseModel):
                 "(only 'follows_goods')."
             )
         },
+        help_text=_(
+            "How VAT is applied to the shipping price. It always follows the goods in the "
+            "basket, split in proportion to their value without VAT. Nothing to choose here."
+        ),
     )
     # Hook for D-06 (open): empty means "no policy of its own"; SHP.3 then applies the platform
     # default that D-06 decides. No policy is implemented here.
@@ -387,7 +502,11 @@ class ShippingMethod(BaseModel):
         choices=OverMaxWeight.choices,
         blank=True,
         default=engine.PLATFORM_DEFAULT,
-        help_text="Empty: the platform default applies (decision D-06).",
+        help_text=_(
+            "What the rate calculation should do for a parcel heavier than the last weight band: "
+            "charge the last band, ask for a quote or block the checkout. Leave it empty to "
+            "follow the platform default, which is to ask for a quote."
+        ),
     )
 
     class Meta:
@@ -450,13 +569,22 @@ class ShippingMethodTranslation(TranslationModel):
     translation_of = "method"
     translated_fields = ("name",)
 
+    language = translation_language_field()
+    status = translation_status_field()
+
     vendor_scope: ClassVar[str] = "method__vendor"
     objects = VendorScopedManager()
 
     method = models.ForeignKey(
         ShippingMethod, on_delete=models.CASCADE, related_name="translations"
     )
-    name = models.CharField(max_length=100)
+    name = models.CharField(
+        max_length=100,
+        help_text=_(
+            "The name of the method in this language, for example "
+            "'Standard delivery'. Buyers will see it once checkout uses shipping."
+        ),
+    )
 
     class Meta(TranslationModel.Meta):
         ordering = ["method", "language"]
@@ -490,10 +618,25 @@ class WeightBand(BaseModel):
     objects = VendorScopedManager()
 
     method = models.ForeignKey(ShippingMethod, on_delete=models.CASCADE, related_name="bands")
-    from_kg = weight_field(default=0, help_text="Excluded: the band starts above this weight.")
-    to_kg = weight_field(null=True, blank=True, help_text="Included. Empty: no upper limit.")
-    cost_net = MoneyField(help_text="Net of VAT.")
-    surcharge_net = MoneyField(default=0, help_text="Net of VAT.")
+    from_kg = weight_field(
+        default=0,
+        help_text=_(
+            "The band starts above this weight, in kg. A parcel of exactly this weight "
+            "belongs to the band before."
+        ),
+    )
+    to_kg = weight_field(
+        null=True,
+        blank=True,
+        help_text=_(
+            "The heaviest parcel of the band, in kg, included. Leave it empty for no upper limit."
+        ),
+    )
+    cost_net = MoneyField(help_text=_("The shipping price for this band, without VAT."))
+    surcharge_net = MoneyField(
+        default=0,
+        help_text=_("An extra amount added to the price of the band, without VAT. Use 0 for none."),
+    )
 
     class Meta:
         ordering = ["method", "from_kg"]
@@ -544,24 +687,51 @@ class SpecialArea(BaseModel):
 
     Kind = SpecialAreaKind
 
-    code = models.SlugField(max_length=50, unique=True, help_text="Lower case, e.g. it-sardinia.")
-    name = models.CharField(max_length=100)
-    kind = models.CharField(max_length=16, choices=SpecialAreaKind.choices)
+    code = models.SlugField(
+        max_length=50,
+        unique=True,
+        help_text=_("A short name in lower case that is unique, for example 'it-sardinia'."),
+    )
+    name = models.CharField(
+        max_length=100, help_text=_("The name of the area, for example 'Sardinia'.")
+    )
+    kind = models.CharField(
+        max_length=16,
+        choices=SpecialAreaKind.choices,
+        help_text=_(
+            "What kind of area it is: an island, a remote area or a territory with its own "
+            "VAT rules."
+        ),
+    )
     countries = ZoneCountriesField(
-        help_text="ISO country codes, comma separated: where the postcodes and provinces apply."
+        help_text=_(
+            "The countries where the postcodes and provinces below apply: two-letter "
+            "country codes such as 'IT' or 'DE', separated by commas."
+        )
     )
     postcode_patterns = PostcodePatternsField(
         default=list,
         blank=True,
-        help_text='Prefix "07*", range "90000..98999" or exact postcode, comma separated.',
+        help_text=_(
+            "The postcodes in the area, separated by commas: a prefix such as '07*', a "
+            "range such as '90000..98999' or an exact postcode."
+        ),
     )
     states = StatesField(
-        default=list, blank=True, help_text="Province or state codes (SS, NU…), comma separated."
+        default=list,
+        blank=True,
+        help_text=_(
+            "The provinces or states in the area, as codes separated by commas, for example"
+            " 'SS' or 'NU'."
+        ),
     )
     territory_code = TerritoryCodeField(
         blank=True,
         default="",
-        help_text="Extra-VAT areas only: the code of the tax territory, e.g. ES-CN.",
+        help_text=_(
+            "Only for a territory with its own VAT rules: the code of its tax territory, "
+            "for example 'ES-CN'."
+        ),
     )
 
     class Meta:
@@ -649,21 +819,42 @@ class SpecialAreaTreatment(BaseModel):
     method = models.ForeignKey(
         ShippingMethod, on_delete=models.CASCADE, related_name="area_treatments"
     )
-    area = models.ForeignKey(SpecialArea, on_delete=models.PROTECT, related_name="treatments")
+    area = models.ForeignKey(
+        SpecialArea,
+        on_delete=models.PROTECT,
+        related_name="treatments",
+        help_text=_("The special area this treatment is for. A method has one treatment per area."),
+    )
     mode = models.CharField(
-        max_length=16, choices=AreaTreatmentMode.choices, default=engine.DEFAULT_TREATMENT_MODE
+        max_length=16,
+        choices=AreaTreatmentMode.choices,
+        default=engine.DEFAULT_TREATMENT_MODE,
+        help_text=_(
+            "What the rate calculation does for this method in this area: an estimated cost that "
+            "needs a quote, a rate with a surcharge, quote only, not offered, or blocked. "
+            "Without a treatment it gives an estimated cost that needs a quote."
+        ),
     )
     surcharge_type = models.CharField(
-        max_length=16, choices=SurchargeType.choices, blank=True, default=engine.NO_SURCHARGE
+        max_length=16,
+        choices=SurchargeType.choices,
+        blank=True,
+        default=engine.NO_SURCHARGE,
+        help_text=_(
+            "How the surcharge is counted: a fixed amount, a percent of the method's cost, "
+            "or an amount per kg. Needed for a rate with a surcharge."
+        ),
     )
     surcharge = models.DecimalField(
         max_digits=12,
         decimal_places=2,
         default=engine.ZERO_AMOUNT,
-        help_text="Net of VAT: an amount (fixed, per kg) or a percentage.",
+        help_text=_(
+            "The surcharge: an amount without VAT for a fixed or per-kg surcharge, or a percentage."
+        ),
     )
     extra_days = models.PositiveSmallIntegerField(
-        default=0, help_text="Added to the method's indicative delivery time."
+        default=0, help_text=_("Days added to the method's estimated delivery time in this area.")
     )
 
     class Meta:
@@ -728,11 +919,27 @@ class PickupOption(BaseModel):
     objects = VendorScopedManager()
 
     vendor = models.ForeignKey(
-        "vendors.Vendor", on_delete=models.PROTECT, related_name="pickup_options"
+        "vendors.Vendor",
+        on_delete=models.PROTECT,
+        related_name="pickup_options",
+        help_text=_("The vendor whose address the parcel is collected from."),
     )
-    key = models.SlugField(max_length=50)
-    cost_net = MoneyField(default=0, help_text="Net of VAT.")
-    address = models.TextField()
+    key = models.SlugField(
+        max_length=50,
+        help_text=_(
+            "A short name without spaces for this pickup point. The same vendor cannot use "
+            "it twice."
+        ),
+    )
+    cost_net = MoneyField(
+        default=0, help_text=_("What pickup costs, without VAT. Use 0 for free pickup.")
+    )
+    address = models.TextField(
+        help_text=_(
+            "The address where buyers will collect their order, with street, number, town and "
+            "postcode. Not shown to buyers yet."
+        )
+    )
 
     class Meta:
         ordering = ["vendor", "key"]
@@ -754,13 +961,22 @@ class PickupOptionTranslation(TranslationModel):
     translation_of = "pickup_option"
     translated_fields = ("label",)
 
+    language = translation_language_field()
+    status = translation_status_field()
+
     vendor_scope: ClassVar[str] = "pickup_option__vendor"
     objects = VendorScopedManager()
 
     pickup_option = models.ForeignKey(
         PickupOption, on_delete=models.CASCADE, related_name="translations"
     )
-    label = models.CharField(max_length=100)
+    label = models.CharField(
+        max_length=100,
+        help_text=_(
+            "The name of the pickup point in this language, for example "
+            "'Pick up at the workshop'. Buyers will see it once checkout uses shipping."
+        ),
+    )
 
     class Meta(TranslationModel.Meta):
         ordering = ["pickup_option", "language"]

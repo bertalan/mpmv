@@ -32,7 +32,7 @@ def _sign_in(page: Page, live_server: LiveServer) -> None:
     device = TOTPDeviceFactory.create(user=user)
     page.add_init_script(RECORD_CSP_VIOLATIONS)
     admin_login(page, live_server.url, "seo-staff@example.com", password)
-    verify_with_totp(page, totp_token(device), operational=True)
+    verify_with_totp(page, totp_token(device), window=True)
 
 
 def test_on_stage_the_indexing_switch_is_read_only_and_says_why(
