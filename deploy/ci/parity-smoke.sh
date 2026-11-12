@@ -8,6 +8,15 @@
 #
 #   deploy/ci/parity-smoke.sh <docker image>      e.g. mpmv-app:ci
 #
+# Upgrade path (OPS.11): when the repository has an earlier release tag, its published image is
+# deployed first, with its own mpmv-deploy, migrations and seed; then the candidate goes over the
+# same database, started by the previous release's script (which hands over to the candidate's).
+# MPMV_PARITY_PREVIOUS_IMAGE overrides the registry repository the previous image is pulled from
+# (default ghcr.io/<owner>/mpmv-app, anonymous pull). Without a previous tag, or when its image
+# cannot be pulled, a pull request runs the candidate on an empty database and logs a warning; on
+# main and on release tags (upgrade-policy.sh) those two cases fail the job. The very first
+# release, with no earlier tag at all, runs on an empty database everywhere.
+#
 # Every secret is generated here, for this run only. The script changes the runner (sysctl,
 # lingering, apt packages) and OVERWRITES the runner user's ~/.config/mpmv env files, CA, units
 # and ~/.local/bin/mpmv-deploy. It leaves all of that behind, so it refuses to run anywhere but a
@@ -173,13 +182,81 @@ expect_status() { # expect_status <path> <code>
   echo "GET $1 -> $got"
 }
 
-group "Install mpmv-deploy from the image, then deploy it (doctor, units, migrate, restart, check)"
-mkdir -p "$(dirname "$deployer")"
-podman run --rm --network none --entrypoint cat "$registry:$good" /app/deploy/server/mpmv-deploy >"$deployer"
-chmod 755 "$deployer"
+install_deployer() { # install_deployer <image tag>: the deploy script that image carries
+  mkdir -p "$(dirname "$deployer")"
+  podman run --rm --network none --entrypoint cat "$registry:$1" /app/deploy/server/mpmv-deploy >"$deployer"
+  chmod 755 "$deployer"
+}
+
+# OPS.11: a release that migrates over the previous release's data, started by the previous
+# release's own deploy script, is what a server does. Deploy the previous tag first (its published
+# image, its script, its migrations and seed), then the candidate over the same database. The
+# previous tag comes from the repository's tags; the build's own tag is left out. Without one, or
+# when its image cannot be pulled, the smoke deploys the candidate on an empty database and says so.
+# On main and on release tags the upgrade run is required (deploy/ci/upgrade-policy.sh): an
+# unreadable tag list or an unpullable previous image fails the job there. Pull requests warn.
+skip_upgrade() {
+  if [ "$("$repo/deploy/ci/upgrade-policy.sh")" = required ]; then
+    echo "::error::parity smoke: $1, and the upgrade path is required on main and release tags"
+    exit 1
+  fi
+  echo "::warning::parity smoke: $1; deploying the candidate on an empty database"
+}
+previous=""
+building=""
+if [ "${GITHUB_REF_TYPE:-}" = tag ]; then building="${GITHUB_REF_NAME:-}"; fi
+if previous="$("$repo/deploy/ci/previous-release.sh" "$repo" "$building")"; then
+  if [ -z "$previous" ]; then
+    echo "::notice::parity smoke: no previous release tag; deploying the candidate on an empty database"
+  fi
+else
+  skip_upgrade "the repository's tags could not be read"
+  previous=""
+fi
+if [ -n "$previous" ]; then
+  previous_image="${MPMV_PARITY_PREVIOUS_IMAGE:-ghcr.io/${GITHUB_REPOSITORY_OWNER:-bertalan}/mpmv-app}"
+  previous_image="${previous_image,,}"
+  group "Previous release $previous from $previous_image: published image, its own script, migrations and seed"
+  if podman pull -q "$previous_image:$previous" >/dev/null; then
+    podman tag "$previous_image:$previous" "$registry:$previous"
+    install_deployer "$previous"
+    t0=$SECONDS
+    "$deployer" deploy "$previous" || fail "the previous release $previous did not deploy on an empty database"
+    echo "previous release $previous deployed in $((SECONDS - t0)) s"
+    podman exec -e MPMV_ALLOW_SEED=1 mpmv-app python manage.py seed | tail -n 1
+    "$deployer" check || fail "the previous release $previous does not pass its own check"
+  else
+    skip_upgrade "cannot pull $previous_image:$previous"
+    previous=""
+  fi
+  endgroup
+fi
+
+if [ -n "$previous" ]; then
+  group "Upgrade: previous release $previous, candidate $good, same database (doctor, units, migrate, restart, check)"
+  # The previous release's script runs first; it hands over to the candidate's when they differ.
+  # A script from before the hand-over would install the candidate's units its own old way: the
+  # documented one-time refresh (docs/dev/release.md) installs the candidate's script first.
+  if ! "$repo/deploy/ci/hands-over.sh" "$deployer"; then
+    echo "::notice::previous release predates the re-exec; applying the one-time script refresh (release.md)"
+    install_deployer "$good"
+  fi
+else
+  group "Install mpmv-deploy from the image, then deploy it (doctor, units, migrate, restart, check)"
+  install_deployer "$good"
+fi
 t0=$SECONDS
-"$deployer" deploy "$good" || fail "deploy of the release failed"
+"$deployer" deploy "$good" || fail "deploy of the candidate failed${previous:+ over the data of release $previous}"
 echo "deploy took $((SECONDS - t0)) s"
+cmp -s "$repo/deploy/server/mpmv-deploy" "$deployer" || fail "the installed mpmv-deploy is not the candidate's"
+if [ -n "$previous" ]; then
+  release_status="$("$deployer" status)"
+  grep -qx "previous: $previous" <<<"$release_status" || fail "the history does not show $previous before $good"
+  echo "upgraded $previous -> $good"
+  if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+    echo "Parity smoke ($(uname -m)): upgrade path $previous -> candidate" >>"$GITHUB_STEP_SUMMARY"
+  fi
+fi
 cmp -s "$repo/deploy/caddy/Caddyfile" "$config/Caddyfile" || fail "the installed Caddyfile is not the release's"
 for unit in "$repo"/deploy/quadlet/*; do
   cmp -s "$unit" "$units/${unit##*/}" || fail "installed ${unit##*/} differs from the release"

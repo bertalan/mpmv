@@ -1,0 +1,4 @@
+{% load i18n %}{% blocktranslate %}Order {{ order_number }} was cancelled. Do not ship these items:{% endblocktranslate %}
+
+{% for line in lines %}- {{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %} x {{ line.quantity }}
+{% endfor %}

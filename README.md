@@ -22,7 +22,7 @@ docs/
   spec/        Functional and technical specification; README.md is the entry point,
                90-backlog.md and backlog.csv are GENERATED
   adr/         Architecture Decision Records, one file per decision
-  dev/         Developer guides (background jobs, audit trail, email, themes, parallel lanes...)
+  dev/         Developer guides (background jobs, audit trail, email, themes, the Manager, parallel lanes...)
 tools/
   build_docs.py  Builds the backlog and the HTML spec, validates task IDs/deps/cycles
 build/         Generated output, not versioned (HTML spec)
