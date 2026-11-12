@@ -1,0 +1,22 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<head>
+<meta charset="utf-8">
+<title>{% include "email/orders/_non_fiscal.txt" %} - {{ order_number }}</title>
+<style>
+@page { size: A4; margin: 20mm 18mm 22mm 18mm; @bottom-center { content: counter(page) " / " counter(pages); font-size: 8pt; color: #444; } }
+body { font-family: "DejaVu Sans", sans-serif; font-size: 10pt; line-height: 1.4; color: #111; }
+h1 { font-size: 16pt; margin: 0 0 8mm 0; }
+ul { padding-left: 5mm; }
+li { margin-bottom: 2mm; }
+</style>
+</head>
+<body>
+<h1>{% include "email/orders/_non_fiscal.txt" %}</h1>
+<p>{% blocktranslate %}Order {{ order_number }}, sold by {{ vendor_name }}:{% endblocktranslate %}</p>
+<ul>
+{% for line in lines %}<li>{{ line.title }}{% if line.variant %} ({{ line.variant }}){% endif %} x {{ line.quantity }}: {{ line.total }} EUR</li>
+{% endfor %}</ul>
+<p>{% blocktranslate %}Shipping: {{ shipping }} EUR{% endblocktranslate %}<br>{% blocktranslate %}Total: {{ total }} EUR{% endblocktranslate %}</p>
+</body>
+</html>

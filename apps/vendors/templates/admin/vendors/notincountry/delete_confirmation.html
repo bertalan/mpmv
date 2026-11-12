@@ -1,0 +1,20 @@
+{% extends "admin/delete_confirmation.html" %}
+{% load i18n %}
+{% block delete_confirm %}
+  <p>End the no-TIN listing of {{ escaped_object }} from today? Individuals from this country will
+  need a TIN again, and vendors that relied on the list will fail the payout check. The row is
+  kept with its end date, so past reports stay reproducible.</p>
+  <p><strong>{{ vendors_without_tin }}</strong> vendor{{ vendors_without_tin|pluralize }} of this
+  TIN country with no TIN would be blocked.</p>
+  <form method="post">{% csrf_token %}
+  <div>
+  <input type="hidden" name="post" value="yes">
+  <p>
+    <label for="id_reason">Reason (kept in the audit log)</label><br>
+    <textarea name="reason" id="id_reason" rows="3" cols="60" required></textarea>
+  </p>
+  <input type="submit" value="{% translate 'Yes, I’m sure' %}">
+  <a role="button" href="#" class="button cancel-link">{% translate "No, take me back" %}</a>
+  </div>
+  </form>
+{% endblock %}
