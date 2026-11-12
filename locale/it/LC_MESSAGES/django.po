@@ -1899,6 +1899,7 @@ msgstr ""
 msgid "Order %(order_number)s was cancelled. Do not ship these items:"
 msgstr "L’ordine %(order_number)s è stato annullato. Non spedire questi articoli:"
 
+#: apps/orders/templates/documents/orders/vendor_confirmation.html
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Order %(order_number)s, sold by %(vendor_name)s:"
@@ -2353,6 +2354,7 @@ msgstr "Spedizione"
 msgid "Shipping policy"
 msgstr "Condizioni di spedizione"
 
+#: apps/orders/templates/documents/orders/vendor_confirmation.html
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Shipping: %(shipping)s EUR"
@@ -4654,6 +4656,7 @@ msgstr "Troppi tentativi. Riprova più tardi."
 msgid "Total"
 msgstr "Totale"
 
+#: apps/orders/templates/documents/orders/vendor_confirmation.html
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Total: %(total)s EUR"
