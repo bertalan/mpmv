@@ -40,9 +40,15 @@ SCOPES = (
     # Brand review models (CAT.20): the rest of the catalog app joins with the storefront I18N.
     "apps/catalog/taxonomy.py",
     "apps/catalog/taxonomy_admin.py",
+    # Temporary staff "Site links" page (OPS.12); remove before LIVE.
+    "apps/seo/site_links.py",
+    "apps/seo/templates/seo/site_links.html",
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).
-EXTRA_FILES = ("apps/vendors/services.py",)
+EXTRA_FILES = (
+    "apps/vendors/services.py",
+    "apps/cms/templatetags/cms_tags.py",  # the header's "Site links" item (OPS.12)
+)
 # Apps scanned for `help_text=` strings only (ARC.31: field help is translated; the rest of these
 # apps joins SCOPES with I18N.7). Python files, each string inside a `help_text=` argument.
 HELP_TEXT_SCOPES = (

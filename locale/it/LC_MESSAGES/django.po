@@ -387,6 +387,14 @@ msgstr ""
 "Un breve testo mostrato sopra i prodotti di questa categoria o etichetta. Se non ne aggiungi, la "
 "pagina parte direttamente dai prodotti."
 
+#: apps/seo/templates/seo/site_links.html
+msgid ""
+"A temporary list of every page you can open on this site, for testing. Only staff see it; it will "
+"be removed before the site goes live."
+msgstr ""
+"Un elenco temporaneo di tutte le pagine che puoi aprire su questo sito, per i test. Lo vede solo "
+"lo staff; verrà rimosso prima della messa online del sito."
+
 #: apps/cms/blocks.py
 msgid ""
 "A title above the cards, for example 'You may also like'. If you leave it empty, the cards have no"
@@ -437,7 +445,7 @@ msgstr "Accetta l'ordine"
 msgid "Access denied"
 msgstr "Accesso negato"
 
-#: themes/base/templates/components/user_tools.html
+#: apps/seo/site_links.py themes/base/templates/components/user_tools.html
 msgid "Account"
 msgstr "Account"
 
@@ -532,6 +540,12 @@ msgstr ""
 "Un modulo web facoltativo per gli utenti, accanto all'email di assistenza. Deve iniziare con "
 "https://."
 
+#: apps/seo/templates/seo/site_links.html
+msgid "And %(counter)s more."
+msgid_plural "And %(counter)s more."
+msgstr[0] "E ancora %(counter)s."
+msgstr[1] "E altri %(counter)s."
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Anonymous"
 msgstr "Anonimo"
@@ -543,6 +557,10 @@ msgid ""
 msgstr ""
 "Un altro tuo prodotto pensato per essere comprato insieme a questo, per esempio la batteria di un "
 "giocattolo. Lascialo vuoto se non ce n'è."
+
+#: apps/seo/site_links.py
+msgid "API documentation"
+msgstr "Documentazione dell'API"
 
 #: apps/cms/models.py
 msgid "applies to"
@@ -580,6 +598,10 @@ msgstr "App di autenticazione"
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Authorities told: %(authority)s, %(at)s."
 msgstr "Autorità informate: %(authority)s, %(at)s."
+
+#: apps/seo/site_links.py
+msgid "Back office"
+msgstr "Back office"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Back to the notices"
@@ -633,6 +655,22 @@ msgstr "Corriere"
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Carrier: %(carrier)s. Tracking number: %(tracking_number)s."
 msgstr "Corriere: %(carrier)s. Numero di tracking: %(tracking_number)s."
+
+#: apps/seo/site_links.py
+msgid "Catalogue: %(taxonomy)s"
+msgstr "Catalogo: %(taxonomy)s"
+
+#: apps/seo/site_links.py
+msgid "Catalogue: brands"
+msgstr "Catalogo: marchi"
+
+#: apps/seo/site_links.py
+msgid "Catalogue: categories"
+msgstr "Catalogo: categorie"
+
+#: apps/seo/site_links.py
+msgid "Catalogue: products"
+msgstr "Catalogo: prodotti"
 
 #: apps/compliance/forms.py
 msgid "Choose 'Action taken' if the content was restricted, or 'No action' if it was left as it is."
@@ -869,6 +907,10 @@ msgstr "descrizione"
 msgid "Description of the logo"
 msgstr "Descrizione del logo"
 
+#: apps/seo/site_links.py
+msgid "Developer and system"
+msgstr "Sviluppo e sistema"
+
 #: themes/base/templates/components/alert.html
 msgid "Dismiss"
 msgstr "Chiudi"
@@ -877,6 +919,10 @@ msgstr "Chiudi"
 msgid "Drafts"
 msgstr "Bozze"
 
+#: apps/seo/site_links.py
+msgid "DSA points of contact"
+msgstr "Punti di contatto DSA"
+
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 msgid ""
 "Each code signs you in once if you lose your authenticator or passkey. Store them somewhere safe "
@@ -884,6 +930,10 @@ msgid ""
 msgstr ""
 "Ogni codice ti fa accedere una sola volta se perdi l’app di autenticazione o la passkey. "
 "Conservali subito in un luogo sicuro: vengono mostrati solo questa volta."
+
+#: apps/seo/site_links.py
+msgid "Editors' admin (Wagtail)"
+msgstr "Amministrazione dei redattori (Wagtail)"
 
 #: apps/manager/templates/manager/login.html
 msgid "Email"
@@ -908,6 +958,10 @@ msgstr "Inserisci un indirizzo web valido che inizi con https://"
 #: apps/manager/forms.py
 msgid "Enter the tracking number: letters, digits, spaces and . / _ - only."
 msgstr "Inserisci il numero di tracciamento: solo lettere, cifre, spazi e . / _ -"
+
+#: apps/seo/site_links.py
+msgid "Erase your account (asks for confirmation)"
+msgstr "Cancella il tuo account (chiede conferma)"
 
 #: themes/base/templates/components/alert.html
 msgid "Error"
@@ -1375,6 +1429,10 @@ msgstr "Testo del link"
 msgid "link the vendor guide"
 msgstr "collega la guida per i venditori"
 
+#: apps/seo/site_links.py
+msgid "Liveness probe"
+msgstr "Controllo di attività"
+
 #: themes/base/templates/components/button.html
 msgid "Loading"
 msgstr "Caricamento"
@@ -1438,6 +1496,10 @@ msgstr "Principale"
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Manage recovery codes"
 msgstr "Gestisci i codici di recupero"
+
+#: apps/seo/site_links.py
+msgid "Manager"
+msgstr "Manager"
 
 #: apps/manager/templates/manager/layout.html
 msgid "Manager sections"
@@ -1602,6 +1664,10 @@ msgstr "Non è stato ancora modificato nulla. Controlla le modifiche qui sotto, 
 msgid "Nothing to show."
 msgstr "Niente da mostrare."
 
+#: apps/seo/templates/seo/site_links.html
+msgid "Nothing yet."
+msgstr "Ancora niente."
+
 #: apps/manager/notice_views.py apps/manager/templates/manager/platform/notice_detail.html
 msgid "Notice"
 msgstr "Segnalazione"
@@ -1617,6 +1683,10 @@ msgstr "Segnalante"
 #: apps/catalog/taxonomy.py
 msgid "official URL"
 msgstr "URL ufficiale"
+
+#: apps/seo/site_links.py
+msgid "On STAGE and LIVE these may answer only from the server's own network."
+msgstr "Su STAGE e LIVE queste pagine possono rispondere solo dalla rete del server."
 
 #: apps/manager/forms.py
 msgid "One line under the shop name. Plain text."
@@ -1939,6 +2009,14 @@ msgstr "Testo semplice per chi non vede l’immagine, per esempio il nome del ne
 msgid "Platform"
 msgstr "Piattaforma"
 
+#: apps/seo/site_links.py
+msgid "Platform space: content reports"
+msgstr "Spazio piattaforma: segnalazioni"
+
+#: apps/seo/site_links.py
+msgid "Platform space: dashboard"
+msgstr "Spazio piattaforma: cruscotto"
+
 #: apps/accounts/templates/accounts/admin/login.html
 msgid "Please correct the error below."
 msgid_plural "Please correct the errors below."
@@ -1973,9 +2051,25 @@ msgstr "Anteprima: %(action)s"
 msgid "Previous"
 msgstr "Indietro"
 
+#: apps/seo/site_links.py
+msgid "Privacy and your data"
+msgstr "Privacy e i tuoi dati"
+
+#: apps/seo/site_links.py
+msgid "Privacy requests (staff)"
+msgstr "Richieste privacy (staff)"
+
+#: apps/seo/site_links.py
+msgid "Privacy sub-processors"
+msgstr "Sub-responsabili del trattamento"
+
 #: apps/manager/templates/manager/shop/order.html
 msgid "Product"
 msgstr "Prodotto"
+
+#: apps/seo/site_links.py
+msgid "Product pages are not built yet (CAT.7): products are listed once they are."
+msgstr "Le pagine prodotto non esistono ancora (CAT.7): i prodotti compariranno quando ci saranno."
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Products"
@@ -1992,6 +2086,10 @@ msgstr "Pubblicati"
 #: apps/manager/templates/manager/shop/order.html
 msgid "Quantity"
 msgstr "Quantità"
+
+#: apps/seo/site_links.py
+msgid "Readiness probe"
+msgstr "Controllo di prontezza"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Reason"
@@ -2060,6 +2158,10 @@ msgstr "Rimuovi"
 msgid "Remove the logo"
 msgstr "Rimuovi il logo"
 
+#: apps/seo/site_links.py
+msgid "Report illegal content (DSA)"
+msgstr "Segnala contenuti illegali (DSA)"
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/notices.html
 msgid "Reported"
@@ -2084,6 +2186,10 @@ msgstr "Resi e rimborsi"
 #: apps/manager/forms.py
 msgid "Returns and refunds policy"
 msgstr "Condizioni di reso e rimborso"
+
+#: apps/seo/site_links.py
+msgid "robots.txt"
+msgstr "robots.txt"
 
 #: apps/catalog/taxonomy.py
 msgid "sameAs links"
@@ -2127,6 +2233,10 @@ msgstr "Seleziona"
 msgid "Select at least one row."
 msgstr "Seleziona almeno una riga."
 
+#: apps/seo/site_links.py
+msgid "Sell with us (vendor application)"
+msgstr "Vendi con noi (candidatura venditore)"
+
 #: apps/catalog/taxonomy.py
 msgid "SEO description"
 msgstr "Descrizione SEO"
@@ -2139,7 +2249,7 @@ msgstr "Titolo SEO"
 msgid "Set up an authenticator app"
 msgstr "Configura un’app di autenticazione"
 
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html apps/seo/site_links.py
 msgid "Set up two-factor authentication"
 msgstr "Configura la verifica in due passaggi"
 
@@ -2172,6 +2282,26 @@ msgstr "Spedizione: %(shipping)s EUR"
 #: apps/manager/templates/manager/layout.html
 msgid "Shop"
 msgstr "Negozio"
+
+#: apps/seo/site_links.py
+msgid "Shop space: choose the shop"
+msgstr "Spazio negozio: scegli il negozio"
+
+#: apps/seo/site_links.py
+msgid "Shop space: dashboard"
+msgstr "Spazio negozio: cruscotto"
+
+#: apps/seo/site_links.py
+msgid "Shop space: orders"
+msgstr "Spazio negozio: ordini"
+
+#: apps/seo/site_links.py
+msgid "Shop space: storefront profile"
+msgstr "Spazio negozio: profilo del negozio"
+
+#: apps/seo/site_links.py
+msgid "Shops"
+msgstr "Negozi"
 
 #: apps/cms/choosers.py
 msgid "Show only the products of one brand."
@@ -2213,7 +2343,7 @@ msgstr "Mostrata sull'articolo. Un articolo importato mantiene la sua data origi
 msgid "Shown to the vendor and kept in the audit log."
 msgstr "Viene mostrato al venditore e conservato nel registro delle operazioni."
 
-#: apps/manager/templates/manager/login.html
+#: apps/manager/templates/manager/login.html apps/seo/site_links.py
 msgid "Sign in"
 msgstr "Accedi"
 
@@ -2234,6 +2364,10 @@ msgstr ""
 #: apps/ingest/models.py
 msgid "Since when the item is no longer in the feed. Empty while it is there."
 msgstr "Da quando l'articolo non è più nel flusso. Vuoto finché c'è."
+
+#: apps/cms/templatetags/cms_tags.py apps/seo/templates/seo/site_links.html
+msgid "Site links"
+msgstr "Link del sito"
 
 #: themes/base/templates/components/skip_link.html
 msgid "Skip to main content"
@@ -2324,6 +2458,10 @@ msgstr "Stato"
 msgid "status"
 msgstr "stato"
 
+#: apps/seo/site_links.py
+msgid "Storefront pages: %(language)s"
+msgstr "Pagine del negozio: %(language)s"
+
 #: apps/manager/sections.py apps/manager/templates/manager/shop/profile.html
 msgid "Storefront profile"
 msgstr "Profilo del negozio"
@@ -2331,6 +2469,10 @@ msgstr "Profilo del negozio"
 #: apps/manager/views.py
 msgid "Storefront profile saved."
 msgstr "Profilo del negozio salvato."
+
+#: apps/seo/site_links.py
+msgid "Styleguide"
+msgstr "Guida di stile"
 
 #: themes/base/templates/components/alert.html
 msgid "Success"
@@ -2347,6 +2489,10 @@ msgstr "Cambia"
 #: apps/manager/forms.py
 msgid "Tagline"
 msgstr "Slogan"
+
+#: apps/seo/site_links.py
+msgid "Technical admin (Django)"
+msgstr "Amministrazione tecnica (Django)"
 
 #: apps/vendors/models.py
 msgid ""
@@ -4423,7 +4569,7 @@ msgid "Tracking number"
 msgstr "Numero di tracciamento"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
-#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/setup.html apps/seo/site_links.py
 msgid "Two-factor authentication"
 msgstr "Verifica in due passaggi"
 
