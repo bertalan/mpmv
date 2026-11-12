@@ -34,6 +34,7 @@ SCOPES = (
     "apps/accounts",
     "apps/orders/templates",
     "apps/vendors/admin.py",  # help texts of the plan and commission rule forms (ARC.30)
+    "apps/cms/models.py",  # HelpEntry (ARC.32): its help texts are translated
     "apps/vendors/models.py",
     "themes/base/templates/layouts",
     # Brand review models (CAT.20): the rest of the catalog app joins with the storefront I18N.
@@ -62,14 +63,18 @@ THEME_FILES = (
             "field",
             "footer",
             "header",
+            "help_entry",
             "icon",
             "language_switcher",
             "pagination",
             "skip_link",
             "table",
+            "user_tools",
         )
     ),
 )
+# A single-file scope may be narrowed to the classes whose strings the catalog translates.
+ONLY_CLASSES = {"apps/cms/models.py": ("HelpEntry",)}
 SKIP_PARTS = {"tests", "migrations", "static", "node_modules"}
 
 SIMPLE = {"gettext", "gettext_lazy", "gettext_noop", "_", "ugettext"}
@@ -148,7 +153,11 @@ def _entries(path: Path) -> Iterator[tuple[str, str | None, str | None, int]]:
         yield from _template_entries(path)
         return
     tree = ast.parse(path.read_text(encoding="utf-8"))
-    for node in ast.walk(tree):
+    only = ONLY_CLASSES.get(str(path.relative_to(ROOT)))
+    roots: list[ast.AST] = (
+        [n for n in tree.body if isinstance(n, ast.ClassDef) and n.name in only] if only else [tree]
+    )
+    for node in (n for root in roots for n in ast.walk(root)):
         if not isinstance(node, ast.Call):
             continue
         func = node.func
