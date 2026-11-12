@@ -165,6 +165,24 @@ def test_shipping_vat_follows_goods_rate_of_a_reduced_package() -> None:
     ]
 
 
+def test_mixed_rate_shipping_vat_is_split_by_net_goods_and_the_cent_goes_on_the_largest() -> None:
+    """TAX.17 / D-03 through `build_checkout`: 10.00 at 22% and 30.00 at 10% from one vendor,
+    shipping 9.90. Shares are 2.475 and 7.425: 2.48 rounds half up, so the largest base (the 10%
+    goods) takes 7.42 and the portions still add up to 9.90."""
+    cart = CartFactory.create()
+    seller = vendor()
+    add(cart, seller, "10.00")
+    add(cart, seller, "30.00", fiscal_category=Product.FiscalCategory.REDUCED)
+    (package,) = preview(cart).packages
+    assert [(p.net, p.rate, p.tax) for p in package.shipping_portions] == [
+        (D("2.48"), D("22.0000"), D("0.55")),
+        (D("7.42"), D("10.0000"), D("0.74")),
+    ]
+    assert sum((p.net for p in package.shipping_portions), start=D("0")) == D("9.90")
+    assert package.totals is not None
+    assert package.totals.tax_total == D("2.20") + D("3.00") + D("1.29")
+
+
 def test_weight_above_the_last_band_needs_a_quote_not_the_last_band_price() -> None:
     cart = CartFactory.create()
     seller = vendor()
