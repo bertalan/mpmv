@@ -20,7 +20,11 @@ from django.contrib.admin.actions import delete_selected as django_delete_select
 from django.contrib.admin.utils import unquote
 from django.contrib.auth.admin import GroupAdmin as DjangoGroupAdmin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
-from django.contrib.auth.forms import AdminPasswordChangeForm
+from django.contrib.auth.forms import (
+    AdminPasswordChangeForm,
+    AdminUserCreationForm,
+    SetUnusablePasswordMixin,
+)
 from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q, QuerySet
@@ -54,6 +58,17 @@ class AuditedPasswordChangeForm(AdminPasswordChangeForm[User]):
     def __init__(self, user: User, *args: Any, **kwargs: Any) -> None:
         self.had_usable_password = user.has_usable_password()
         super().__init__(user, *args, **kwargs)
+
+
+class StaffCreationForm(AdminUserCreationForm):  # type: ignore[type-arg]
+    """Django's add-user form with help text we own and translate."""
+
+    usable_password = SetUnusablePasswordMixin.create_usable_password_field(
+        help_text=gettext_lazy(
+            "Enabled: you set a password now. Disabled: the account is created without a "
+            "password and cannot sign in with a password until one is set."
+        )
+    )
 
 
 # Fields that grant access: only a superuser may change them.
@@ -99,6 +114,7 @@ admin.site.login_form = StaffLoginForm
 
 @admin.register(User)
 class UserAdmin(DjangoUserAdmin[User]):
+    add_form = StaffCreationForm
     ordering = ("email",)
     list_display = ("email", "full_name", "is_staff", "is_active", "preferred_language", "mfa")
     search_fields = ("email", "full_name")

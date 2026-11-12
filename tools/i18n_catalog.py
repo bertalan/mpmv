@@ -44,7 +44,16 @@ SCOPES = (
 EXTRA_FILES = ("apps/vendors/services.py",)
 # Apps scanned for `help_text=` strings only (ARC.31: field help is translated; the rest of these
 # apps joins SCOPES with I18N.7). Python files, each string inside a `help_text=` argument.
-HELP_TEXT_SCOPES = ("apps/catalog", "apps/vendors")
+HELP_TEXT_SCOPES = (
+    "apps/catalog",
+    "apps/compliance",
+    "apps/core",
+    "apps/ingest",
+    "apps/shipping",
+    "apps/tax",
+    "apps/themes",
+    "apps/vendors",
+)
 # Theme files rendered by the Manager and account pages (the rest of the theme is storefront).
 THEME_FILES = (
     "400.html",
