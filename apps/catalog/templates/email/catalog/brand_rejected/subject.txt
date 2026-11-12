@@ -1,0 +1,1 @@
+{% load i18n %}{% translate "Brand not approved: your products need another brand" %}
