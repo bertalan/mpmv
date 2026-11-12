@@ -71,6 +71,7 @@ def test_the_image_carries_the_units_caddyfile_and_deploy_script() -> None:
         "deploy/quadlet/mpmv-app.container",
         "deploy/quadlet/mpmv-media.volume",
         "deploy/caddy/Caddyfile",
+        "deploy/systemd/mpmv-caddy.socket",
         "deploy/server/mpmv-deploy",
         "deploy/server/mpmv.env.example",
         "deploy/container/entrypoint.sh",
@@ -198,6 +199,195 @@ def test_the_smoke_checks_pages_media_health_and_rollback() -> None:
         "trap on_exit EXIT",
     ):
         assert needle in text, needle
+
+
+# --- The upgrade path (OPS.11): the previous release first, then the candidate over its data.
+
+PREVIOUS = ROOT / "deploy" / "ci" / "previous-release.sh"
+
+
+def git(*args: str, cwd: Path) -> None:
+    subprocess.run(  # noqa: S603 (fixed git calls in a temporary repository)
+        ["git", *args],  # noqa: S607
+        cwd=cwd,
+        check=True,
+        capture_output=True,
+        env={
+            "PATH": os.environ["PATH"],
+            "HOME": str(cwd),
+            "GIT_AUTHOR_NAME": "t",
+            "GIT_AUTHOR_EMAIL": "t@example.invalid",
+            "GIT_COMMITTER_NAME": "t",
+            "GIT_COMMITTER_EMAIL": "t@example.invalid",
+        },
+    )
+
+
+def clone_with_tags(tmp_path: Path, tags: list[str]) -> Path:
+    """A clone whose origin carries `tags`; the clone itself has none (a CI checkout)."""
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    git("init", "-q", "-b", "main", cwd=origin)
+    git("commit", "-q", "--allow-empty", "-m", "x", cwd=origin)
+    for tag in tags:
+        git("tag", tag, cwd=origin)
+    clone = tmp_path / "clone"
+    git("clone", "-q", "--no-tags", str(origin), str(clone), cwd=tmp_path)
+    return clone
+
+
+def previous_release(clone: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(  # noqa: S603 (fixed script path)
+        ["bash", str(PREVIOUS), str(clone), *args],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=False,
+        env={"PATH": os.environ["PATH"], "HOME": str(clone)},
+    )
+
+
+def test_the_previous_release_is_the_highest_release_tag_of_the_repository(
+    tmp_path: Path,
+) -> None:
+    # Version order, not text order; pre-release and unrelated tags never count.
+    tags = ["v0.1.9", "v0.1.10", "v0.1.2", "v0.2.0-rc.1", "stage-2026", "v1.0"]
+    clone = clone_with_tags(tmp_path, tags)
+
+    result = previous_release(clone)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "0.1.10\n"
+
+
+def test_the_previous_release_of_a_tag_build_is_the_tag_before_it(tmp_path: Path) -> None:
+    clone = clone_with_tags(tmp_path, ["v0.1.5", "v0.1.6", "v0.1.7"])
+
+    assert previous_release(clone, "v0.1.7").stdout == "0.1.6\n"
+    assert previous_release(clone, "v0.1.5").stdout == ""
+
+
+def test_the_previous_release_of_a_pre_release_tag_is_the_release_below_its_version(
+    tmp_path: Path,
+) -> None:
+    # A candidate v0.2.0-rc.1 upgrades from 0.1.9, never from a release above its version.
+    clone = clone_with_tags(tmp_path, ["v0.1.9", "v0.2.0-rc.1", "v0.2.0", "v0.3.0", "v0.1.10"])
+
+    assert previous_release(clone, "v0.2.0-rc.1").stdout == "0.1.10\n"
+    assert previous_release(clone, "v0.2.0-rc.2").stdout == "0.1.10\n"
+    assert previous_release(clone, "v0.2.0").stdout == "0.1.10\n"
+    assert previous_release(clone, "v0.3.0-beta").stdout == "0.2.0\n"
+    # A tag build whose name is not a version (not a release tag) keeps the pull request answer.
+    assert previous_release(clone, "stage-2026").stdout == "0.3.0\n"
+    assert previous_release(clone, "refs/pull/1/merge").stdout == "0.3.0\n"
+
+
+def test_with_no_release_tag_there_is_no_previous_release(tmp_path: Path) -> None:
+    clone = clone_with_tags(tmp_path, ["not-a-release"])
+
+    result = previous_release(clone)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
+
+
+def test_an_unreachable_origin_is_an_error_not_an_empty_answer(tmp_path: Path) -> None:
+    clone = clone_with_tags(tmp_path, ["v0.1.0"])
+    git("remote", "set-url", "origin", str(tmp_path / "gone"), cwd=clone)
+
+    result = previous_release(clone)
+
+    assert result.returncode != 0
+    assert result.stdout == ""
+
+
+POLICY = ROOT / "deploy" / "ci" / "upgrade-policy.sh"
+
+
+@pytest.mark.parametrize(
+    ("event", "ref", "expected"),
+    [
+        ("push", "refs/heads/main", "required"),
+        ("push", "refs/tags/v0.2.0", "required"),
+        ("pull_request", "refs/pull/295/merge", "optional"),
+        ("push", "refs/heads/lane-b/some-branch", "optional"),
+        ("workflow_dispatch", "refs/heads/main", "optional"),
+        ("", "", "optional"),
+    ],
+)
+def test_the_upgrade_path_is_required_on_main_and_release_tags_only(
+    event: str, ref: str, expected: str
+) -> None:
+    result = subprocess.run(  # noqa: S603 (fixed script path)
+        ["bash", str(POLICY)],  # noqa: S607
+        env={"PATH": os.environ["PATH"], "GITHUB_EVENT_NAME": event, "GITHUB_REF": ref},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == f"{expected}\n"
+
+
+HANDS_OVER = ROOT / "deploy" / "ci" / "hands-over.sh"
+
+
+def hands_over(script: Path) -> int:
+    return subprocess.run(  # noqa: S603 (fixed script path)
+        ["bash", str(HANDS_OVER), str(script)],  # noqa: S607
+        capture_output=True,
+        check=False,
+    ).returncode
+
+
+def test_a_script_with_the_re_exec_is_used_as_it_is_and_an_older_one_is_refreshed(
+    tmp_path: Path,
+) -> None:
+    current = ROOT / "deploy" / "server" / "mpmv-deploy"
+    assert hands_over(current) == 0
+    # A script from before the hand-over: the same script without it.
+    older = tmp_path / "mpmv-deploy"
+    older.write_text(current.read_text().replace("continuing with the deploy script of", "x"))
+    assert hands_over(older) == 1
+
+
+def test_the_smoke_refreshes_the_script_first_when_the_previous_one_predates_the_re_exec() -> None:
+    text = SMOKE.read_text()
+    assert "hands-over.sh" in text
+    assert (
+        "::notice::previous release predates the re-exec; "
+        "applying the one-time script refresh (release.md)"
+    ) in text
+    refresh = text.index("applying the one-time script refresh")
+    assert text.index('"$deployer" deploy "$previous"') < refresh
+    assert refresh < text.index('"$deployer" deploy "$good"')
+    assert 'install_deployer "$good"' in text[refresh:]
+
+
+def test_the_smoke_fails_a_required_context_that_cannot_upgrade_and_only_warns_otherwise() -> None:
+    text = SMOKE.read_text()
+    assert "upgrade-policy.sh" in text
+    assert "::error::parity smoke:" in text
+    assert text.count("skip_upgrade ") == 2  # unreadable tag list, unpullable image
+    # The first release (no earlier tag) stays allowed everywhere: a notice, not a failure.
+    assert "::notice::parity smoke: no previous release tag" in text
+
+
+def test_the_smoke_deploys_the_previous_release_then_upgrades_to_the_candidate() -> None:
+    text = SMOKE.read_text()
+    assert "previous-release.sh" in text
+    # Both versions are named in the log, and the previous one is deployed with its own script
+    # and images before the candidate goes over the same database.
+    assert "previous release $previous" in text
+    assert '"$deployer" deploy "$previous"' in text
+    assert '"$deployer" deploy "$good"' in text
+    assert text.index('"$deployer" deploy "$previous"') < text.index('"$deployer" deploy "$good"')
+    # Upgrade path: the candidate's script replaces the previous one on the host.
+    assert 'cmp -s "$repo/deploy/server/mpmv-deploy" "$deployer"' in text
+    # No previous tag (or no readable image): the old path, said out loud.
+    assert "no previous release" in text
+    assert "::notice::" in text or "::warning::" in text
+    assert "ghcr.io/" in text
+    assert not CREDENTIAL_LITERAL.search(text)
 
 
 def test_the_production_caddyfile_has_no_test_branches() -> None:

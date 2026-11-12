@@ -34,10 +34,24 @@ msgstr "%(name)s rimosso."
 msgid "%(vendor_name)s shipped its part of order %(order_number)s."
 msgstr "%(vendor_name)s ha spedito la sua parte dell’ordine %(order_number)s."
 
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+msgid "%(vendor_name)s's part of order %(order_number)s was cancelled."
+msgstr "La parte dell’ordine %(order_number)s di %(vendor_name)s è stata annullata."
+
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
+msgid "%(vendor_name)s's part of order %(order_number)s was delivered."
+msgstr "La parte dell’ordine %(order_number)s di %(vendor_name)s è stata consegnata."
+
 #: apps/orders/templates/email/orders/vendor_new_order/body.html
 #: apps/orders/templates/email/orders/vendor_new_order/body.txt
 msgid "%(vendor_name)s: new paid order %(order_number)s to ship:"
 msgstr "%(vendor_name)s: nuovo ordine pagato %(order_number)s da spedire:"
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/subject.txt
+msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
+msgstr "%(vendor_name)s: ordine %(order_number)s annullato, non spedire"
 
 #: apps/manager/templates/email/manager/role_self_assigned/subject.txt
 msgid "A platform owner gave themselves a role"
@@ -287,23 +301,35 @@ msgstr "Assegna il ruolo"
 msgid "Go to the home page"
 msgstr "Vai alla home page"
 
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Hello %(customer_name)s,"
 msgstr "Ciao %(customer_name)s,"
 
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Hello,"
@@ -489,6 +515,21 @@ msgstr "Ordine"
 msgid "Order %(number)s"
 msgstr "Ordine %(number)s"
 
+#: apps/orders/templates/email/orders/order_cancelled/subject.txt
+msgid "Order %(order_number)s was cancelled"
+msgstr "L’ordine %(order_number)s è stato annullato"
+
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
+msgid "Order %(order_number)s was cancelled before payment. Nothing was charged."
+msgstr ""
+"L’ordine %(order_number)s è stato annullato prima del pagamento. Non è stato addebitato nulla."
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.txt
+msgid "Order %(order_number)s was cancelled. Do not ship these items:"
+msgstr "L’ordine %(order_number)s è stato annullato. Non spedire questi articoli:"
+
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 msgid "Order %(order_number)s, sold by %(vendor_name)s:"
@@ -498,9 +539,17 @@ msgstr "Ordine %(order_number)s, venduto da %(vendor_name)s:"
 msgid "Order %(order_number)s: a shipment is on its way"
 msgstr "Ordine %(order_number)s: una spedizione è in arrivo"
 
+#: apps/orders/templates/email/orders/vendor_order_delivered/subject.txt
+msgid "Order %(order_number)s: a shipment was delivered"
+msgstr "Ordine %(order_number)s: una spedizione è stata consegnata"
+
 #: apps/orders/templates/email/orders/order_confirmation/subject.txt
 msgid "Order %(order_number)s: confirmation from %(vendor_name)s"
 msgstr "Ordine %(order_number)s: conferma di %(vendor_name)s"
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled/subject.txt
+msgid "Order %(order_number)s: part of your order was cancelled"
+msgstr "Ordine %(order_number)s: una parte del tuo ordine è stata annullata"
 
 #: apps/manager/sections.py apps/manager/templates/manager/shop/orders.html
 msgid "Orders"
@@ -842,6 +891,10 @@ msgstr "Il contenuto è limitato e il venditore ne è informato."
 msgid "The decision is recorded and the notifier is told."
 msgstr "La decisione è registrata e il segnalante ne viene informato."
 
+#: apps/manager/forms.py
+msgid "The email of an existing account. Capitals do not matter."
+msgstr "L’email di un account esistente. Le maiuscole non contano."
+
 #: apps/manager/templates/manager/login.html
 msgid ""
 "The email or the password is not correct, or the account is locked for a while. Please try again."
@@ -897,6 +950,10 @@ msgstr "La passkey non ha funzionato."
 #: apps/accounts/mfa_views.py
 msgid "the passkey was not accepted"
 msgstr "la passkey non è stata accettata"
+
+#: apps/manager/forms.py
+msgid "The platform role to give to that account or to take away from it."
+msgstr "Il ruolo della piattaforma da assegnare a quell’account o da togliergli."
 
 #: themes/base/templates/400.html
 msgid "The request could not be understood. Check the address and try again."

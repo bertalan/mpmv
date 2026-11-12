@@ -137,8 +137,14 @@ class StaffRoleForm(forms.Form):
     ACTIONS = (("grant", "grant"), ("revoke", "revoke"))
 
     action = forms.ChoiceField(choices=ACTIONS, widget=forms.HiddenInput)
-    email = forms.EmailField(label=_("Email of the account"))
-    role = forms.ChoiceField(label=_("Role"))
+    email = forms.EmailField(
+        label=_("Email of the account"),
+        help_text=_("The email of an existing account. Capitals do not matter."),
+    )
+    role = forms.ChoiceField(
+        label=_("Role"),
+        help_text=_("The platform role to give to that account or to take away from it."),
+    )
     reason = forms.CharField(
         label=_("Reason"),
         required=False,
