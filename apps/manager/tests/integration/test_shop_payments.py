@@ -29,7 +29,7 @@ def stripe(monkeypatch: pytest.MonkeyPatch) -> FakeStripeClient:
 def test_the_owner_connects_and_is_sent_to_the_provider(
     client: Client, owner: User, vendor: Vendor, stripe: FakeStripeClient
 ) -> None:
-    verified_login(client, owner)
+    verified_login(client, owner, passkey=True)
     assert "On request" in client.get(PAGE).text or "Not connected" in client.get(PAGE).text
     response = client.post(PAGE)
     assert response.status_code == 302
@@ -41,7 +41,7 @@ def test_the_owner_connects_and_is_sent_to_the_provider(
 def test_the_return_from_the_provider_refreshes_the_own_account(
     client: Client, owner: User, vendor: Vendor, stripe: FakeStripeClient
 ) -> None:
-    verified_login(client, owner)
+    verified_login(client, owner, passkey=True)
     client.post(PAGE)
     account = ConnectedAccount.objects.get(vendor=vendor)
     from apps.payments.stripe_client import StripeAccount
@@ -70,7 +70,7 @@ def test_a_vendor_never_sees_or_uses_another_vendors_account(
     client: Client, owner: User, vendor: Vendor, other_vendor: Vendor, stripe: FakeStripeClient
 ) -> None:
     theirs = ConnectedAccountFactory.create(vendor=other_vendor)
-    verified_login(client, owner)
+    verified_login(client, owner, passkey=True)
     assert theirs.account_ref not in client.get(PAGE).text
     client.post(PAGE)
     assert ConnectedAccount.objects.get(vendor=other_vendor).pk == theirs.pk

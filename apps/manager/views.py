@@ -599,6 +599,7 @@ class PaymentsView(ManagerView):
             return HttpResponseRedirect(reverse("manager:shop:payments"))
         return super().get(request, *args, **kwargs)
 
+    @requires_level_method("payout_details")  # strictest group (CORE.25): the payout account
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         vendor, actor = self._vendor_actor()
         ctx = replace(audit_context(request), source=AuditLog.Source.VENDOR)
