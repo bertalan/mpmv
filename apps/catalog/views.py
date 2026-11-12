@@ -222,7 +222,7 @@ def _listing(
         "canonical_url": canonical_url,
         "alternates": alternates,
         "language_urls": language_urls,
-        "robots": listings.listing_robots(params, total=window.total),
+        "robots": listings.listing_robots(params, total=window.total, request=request),
         "previous_url": (
             listings.listing_url(location, params.with_page(window.previous_page))
             if window.previous_page

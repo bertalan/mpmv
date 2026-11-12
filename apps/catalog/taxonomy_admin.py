@@ -385,7 +385,9 @@ class BrandForm(forms.ModelForm[Brand]):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.fields["status"].required = False
+        # Read-only on an existing brand (BrandAdmin), so the field may be absent.
+        if "status" in self.fields:
+            self.fields["status"].required = False
         # Only the platform's logos collection (a vendor's or a page's image is not offered).
         cast(
             "forms.ModelChoiceField[MediaImage]", self.fields["logo"]
@@ -470,6 +472,13 @@ class BrandAdmin(admin.ModelAdmin[Brand]):
     autocomplete_fields = ("manufacturer",)
     inlines = (BrandTranslationInline,)
     actions = ("approve_selected", "reject_selected", "merge_selected")
+
+    def get_readonly_fields(self, request: HttpRequest, obj: Brand | None = None) -> Any:
+        """The status of an existing brand changes only through the approve, reject and merge
+        actions: they release products, notify the vendor and write the right audit entry."""
+        if obj is not None:
+            return (*self.readonly_fields, "status")
+        return self.readonly_fields
 
     def has_merge_permission(self, request: HttpRequest) -> bool:
         """A merge deletes brands and rewrites redirects: it needs both permissions (Django

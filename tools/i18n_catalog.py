@@ -34,6 +34,8 @@ SCOPES = (
     "apps/accounts",
     "apps/orders/templates",
     "themes/base/templates/layouts",
+    # Brand review models (CAT.20): the rest of the catalog app joins with the storefront I18N.
+    "apps/catalog/taxonomy.py",
 )
 # Theme files rendered by the Manager and account pages (the rest of the theme is storefront).
 THEME_FILES = (
@@ -70,7 +72,8 @@ CONTEXT_PLURAL = {"npgettext", "npgettext_lazy"}
 
 def _files() -> Iterator[Path]:
     for scope in SCOPES:
-        for path in sorted((ROOT / scope).rglob("*")):
+        base = ROOT / scope
+        for path in [base] if base.is_file() else sorted(base.rglob("*")):
             rel = path.relative_to(ROOT)
             if SKIP_PARTS & set(rel.parts) or path.suffix not in {".py", ".html", ".txt"}:
                 continue
