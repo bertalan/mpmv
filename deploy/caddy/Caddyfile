@@ -27,6 +27,24 @@
 # Django admin (OPS.5): MPMV_ADMIN_ALLOWED_NETWORKS in caddy.env lists the networks (space
 # separated CIDR or addresses) that may reach /django-admin/; the rest get 404.
 #
+# Listening sockets (OPS.5 follow-up): Caddy opens no port itself. systemd opens 80 and 443 on the
+# host (deploy/systemd/mpmv-caddy.socket) and hands them to the container by socket activation,
+# so {client_ip} is the real client address: 127.0.0.1 through an SSH tunnel to the host's
+# loopback. The sites bind them by file descriptor, in the order of the socket unit's Listen lines:
+#   fd/3      TCP 0.0.0.0:80   plain HTTP (redirect, ACME HTTP-01 challenges)
+#   fd/4      TCP [::]:80
+#   fd/5      TCP 0.0.0.0:443  HTTPS, HTTP/1.1 and HTTP/2 (and ACME TLS-ALPN-01 challenges)
+#   fd/6      TCP [::]:443
+#   fdgram/7  UDP 0.0.0.0:443  HTTPS, HTTP/3
+#   fdgram/8  UDP [::]:443
+# Change both files together (tests/unit/test_quadlets.py checks that they agree).
+#
+# Certificates: every Caddy HTTP server answers ACME HTTP-01 challenges before any route runs, so
+# the plain-HTTP sites on fd/3 and fd/4 answer them, and TLS-ALPN-01 is answered in the TLS
+# handshake on fd/5 and fd/6. `auto_https disable_redirects` stops Caddy from opening its own
+# redirect listener on port 80 inside the container, where no client can reach it; the site's
+# redirect is the http://{$MPMV_SITE_ADDRESS} block below.
+#
 # Security headers (SEC.3, SEC.5): Caddy answers some requests itself (public media, the /media/
 # 404, its error pages, the HTTP-to-HTTPS redirect), so every site and handle_errors imports the
 # `security_headers` snippet. Its headers are defaults (`?`): a value the app already sent is kept,
@@ -35,6 +53,7 @@
 # `-Server` drops Caddy's own `Server` header and gunicorn's, passed through reverse_proxy;
 # `-Via` drops the `Via: 1.0 Caddy` that reverse_proxy adds.
 {
+	auto_https disable_redirects
 	servers {
 		strict_sni_host on
 	}
@@ -57,6 +76,12 @@
 
 {$MPMV_SITE_ADDRESS} {
 	import security_headers
+	bind fd/5 fd/6 {
+		protocols h1 h2
+	}
+	bind fdgram/7 fdgram/8 {
+		protocols h3
+	}
 
 	# Request bodies (SEC.2): one image of up to 25 MiB (WAGTAILIMAGES_MAX_UPLOAD_SIZE) plus its
 	# multipart form. A larger body gets 413 here instead of being spooled to disk by the app.
@@ -99,7 +124,8 @@
 	# The technical Django admin (OPS.5, owner decision Q-18): only from MPMV_ADMIN_ALLOWED_NETWORKS
 	# (space separated; the app has its own comma separated copy, settings ADMIN_ALLOWED_NETWORKS).
 	# Anybody else gets the app's own 404 for an unknown address (the request is rewritten to a
-	# path that does not exist), so body and headers match any other 404. `client_ip` honours the
+	# path that does not exist; it ends with a slash, so the app's APPEND_SLASH answers no redirect
+	# first), so body and headers match any other 404. `client_ip` honours the
 	# trusted proxies of the global options (a CDN in front); without them it is the connecting
 	# address. Unset means loopback only, so a missing variable closes the admin. Caddy counts a
 	# variable that is set but empty as set, and `not client_ip` with no argument fails to load:
@@ -109,7 +135,7 @@
 		not client_ip {$MPMV_ADMIN_ALLOWED_NETWORKS:127.0.0.1/32}
 	}
 	handle @admin_denied {
-		rewrite * /__not-found__
+		rewrite * /__not-found__/
 		reverse_proxy mpmv-app:8000 {
 			header_up X-Real-IP {client_ip}
 		}
@@ -136,6 +162,9 @@
 # automatic redirect sends none). ACME HTTP challenges are still answered before this block.
 http://{$MPMV_SITE_ADDRESS} {
 	import security_headers
+	bind fd/3 fd/4 {
+		protocols h1
+	}
 	# The configured host, not the client's Host spelling: the target is fixed by construction.
 	redir https://{$MPMV_SITE_ADDRESS}{uri} 308
 }
@@ -143,5 +172,8 @@ http://{$MPMV_SITE_ADDRESS} {
 # Any other host name or a bare IP over plain HTTP: close the connection, serve nothing.
 # The site's own host name has its own block above; ACME HTTP challenges are answered first.
 http:// {
+	bind fd/3 fd/4 {
+		protocols h1
+	}
 	abort
 }

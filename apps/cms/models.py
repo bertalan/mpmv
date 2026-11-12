@@ -343,10 +343,6 @@ class HelpEntry(TranslatableMixin, models.Model):  # type: ignore[misc]
     title = models.CharField(
         _("title"),
         max_length=120,
-        help_text=_(
-            "The heading of the help text, in a few words that say what the screen is for. "
-            "Example: Your orders."
-        ),
     )
     body = RichTextField(
         _("help text"),

@@ -33,6 +33,7 @@ SCOPES = (
     "apps/manager",
     "apps/accounts",
     "apps/orders/templates",
+    "apps/cms/models.py",  # HelpEntry (ARC.32): its help texts are translated
     "themes/base/templates/layouts",
 )
 # Theme files rendered by the Manager and account pages (the rest of the theme is storefront).
@@ -62,6 +63,8 @@ THEME_FILES = (
         )
     ),
 )
+# A single-file scope may be narrowed to the classes whose strings the catalog translates.
+ONLY_CLASSES = {"apps/cms/models.py": ("HelpEntry",)}
 SKIP_PARTS = {"tests", "migrations", "static", "node_modules"}
 
 SIMPLE = {"gettext", "gettext_lazy", "gettext_noop", "_", "ugettext"}
@@ -72,7 +75,8 @@ CONTEXT_PLURAL = {"npgettext", "npgettext_lazy"}
 
 def _files() -> Iterator[Path]:
     for scope in SCOPES:
-        for path in sorted((ROOT / scope).rglob("*")):
+        base = ROOT / scope
+        for path in [base] if base.is_file() else sorted(base.rglob("*")):
             rel = path.relative_to(ROOT)
             if SKIP_PARTS & set(rel.parts) or path.suffix not in {".py", ".html", ".txt"}:
                 continue
@@ -137,7 +141,11 @@ def _entries(path: Path) -> Iterator[tuple[str, str | None, str | None, int]]:
         yield from _template_entries(path)
         return
     tree = ast.parse(path.read_text(encoding="utf-8"))
-    for node in ast.walk(tree):
+    only = ONLY_CLASSES.get(str(path.relative_to(ROOT)))
+    roots: list[ast.AST] = (
+        [n for n in tree.body if isinstance(n, ast.ClassDef) and n.name in only] if only else [tree]
+    )
+    for node in (n for root in roots for n in ast.walk(root)):
         if not isinstance(node, ast.Call):
             continue
         func = node.func
