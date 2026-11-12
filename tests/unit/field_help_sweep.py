@@ -216,6 +216,7 @@ def _staff_request() -> Any:
         is_staff=True,
         is_superuser=True,
         pk=1,
+        holds_all_platform_roles=True,  # CORE.18 section checks answer without a database
         has_perm=lambda *a, **k: True,
         has_perms=lambda *a, **k: True,
         has_module_perms=lambda *a, **k: True,
@@ -305,13 +306,15 @@ def untranslated(items: Iterable[FieldHelp]) -> list[str]:
     """Keys whose help text is not marked for translation or has no Italian entry.
 
     Marked means lazy (`gettext_lazy`); in the catalog means the msgid has a non-empty msgstr in
-    each `tools/i18n_catalog.py` language. A string another catalog already translates (a Django
-    help text on a field we inherit) also counts.
+    the Italian catalog (`tools/i18n_catalog.py`). A string another catalog already translates (a
+    Django help text on a field we inherit) also counts.
     """
     from django.utils import translation
 
     catalogs = {}
-    for lang in catalog.LANGUAGES:
+    # Italian is the operator language of the Manager and the admin; German, French and Spanish
+    # catalogs only cover the order emails (ORD.16), so they are not part of this rule.
+    for lang in ("it",):
         po = polib.pofile(str(catalog._po_path(lang)))
         catalogs[lang] = {e.msgid for e in po if e.msgstr}
     bad = set()

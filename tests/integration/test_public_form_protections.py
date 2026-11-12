@@ -17,6 +17,7 @@ from apps.accounts.captcha import TOKEN_FIELD
 from apps.accounts.tests.factories import UserFactory
 from apps.accounts.tests.fakes import FakeCaptchaVerifier
 from apps.compliance.models import Notice
+from apps.compliance.tests.integration.test_withdrawal_views import paid_order
 from apps.core.public_forms import Protection, public_form_report
 
 pytestmark = pytest.mark.django_db
@@ -84,6 +85,19 @@ def test_the_dsa_notice_form_refuses_a_failed_captcha(client: Client) -> None:
     assert FakeCaptchaVerifier.calls  # the verifier was asked
 
 
+def test_the_withdrawal_lookup_refuses_a_failed_captcha(client: Client) -> None:
+    order = paid_order()
+    data = {"order_number": order.number, "email": order.email}
+    refused = client.post(reverse("withdrawal"), {**data, TOKEN_FIELD: "wrong"})
+    assert refused.status_code == 200
+    assert "confirm withdrawal" not in refused.content.decode().lower()  # no choice page
+    assert FakeCaptchaVerifier.calls  # the verifier was asked
+    accepted = client.post(
+        reverse("withdrawal"), {**data, TOKEN_FIELD: FakeCaptchaVerifier.VALID_TOKEN}
+    )
+    assert "confirm withdrawal" in accepted.content.decode().lower()
+
+
 def test_every_captcha_declaration_is_tested() -> None:
     declared = {
         row.leaf.name
@@ -93,6 +107,7 @@ def test_every_captcha_declaration_is_tested() -> None:
     assert declared == set(CAPTCHA_LOGINS) | {
         "vendors:apply",
         "dsa_notice",
+        "withdrawal",
         "wagtailcore_authenticate_with_password",  # tested in apps/cms (SEC.14)
         "orders:checkout",  # tested in apps/orders (ORD.5)
         "orders:review",  # tested in apps/orders (ORD.5)
@@ -131,6 +146,22 @@ def test_vendor_claim_refuses_a_link_not_opened_in_this_session(client: Client) 
         assert response.status_code == 403
 
 
+def test_withdrawal_confirm_refuses_a_missing_or_bad_token(client: Client) -> None:
+    from apps.compliance.models import WithdrawalStatement
+
+    order = paid_order()
+    sub = order.vendor_orders.first()
+    assert sub is not None
+    for token in ("", "garbage", secrets.token_urlsafe(24)):
+        response = client.post(
+            reverse("withdrawal_confirm"),
+            {"token": token, "vendor_orders": [str(sub.public_id)]},
+        )
+        assert response.status_code == 302
+        assert response["Location"] == reverse("withdrawal")
+    assert not WithdrawalStatement.objects.exists()
+
+
 def test_every_signed_token_declaration_is_tested() -> None:
     declared = {
         row.leaf.name
@@ -142,6 +173,7 @@ def test_every_signed_token_declaration_is_tested() -> None:
         "vendors:apply_confirm",
         "vendors:apply_cancel",
         "vendor_claim:claim",
+        "withdrawal_confirm",
     }
 
 

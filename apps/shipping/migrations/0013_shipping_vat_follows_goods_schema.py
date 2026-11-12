@@ -6,7 +6,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("shipping", "0011_shipping_vat_follows_goods_data"),
+        ("shipping", "0012_shipping_vat_follows_goods_data"),
         ("vendors", "0026_storefront_rich_text"),
     ]
 
@@ -24,6 +24,7 @@ class Migration(migrations.Migration):
                 error_messages={
                     "invalid_choice": "Shipping VAT always follows the goods; %(value)r is not accepted (only 'follows_goods')."
                 },
+                help_text="How VAT is applied to the shipping price. It always follows the goods in the basket, split in proportion to their value without VAT. Nothing to choose here.",
                 max_length=16,
                 verbose_name="VAT treatment",
             ),

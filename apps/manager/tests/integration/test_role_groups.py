@@ -127,3 +127,26 @@ def test_before_the_seed_migration_missing_groups_do_not_block_migrate() -> None
     MigrationRecorder.Migration.objects.filter(app=app, name=name).delete()
     Group.objects.filter(name__in=[r.group for r in roles.ROLES]).delete()
     assert check_role_drift() == []
+
+
+def test_upgrading_from_the_previous_release_does_not_block_migrate() -> None:
+    """A database at manager 0002 (0.1.7) has seeded groups that lack a permission a pending manager
+    migration adds: `migrate` runs the checks first, so E004 must stay quiet until that migration
+    has run, then fire again on drift, and the migration must leave the groups in sync."""
+    from django.db.migrations.recorder import MigrationRecorder
+
+    admin_access = Permission.objects.get(
+        content_type__app_label="wagtailadmin", codename="access_admin"
+    )
+    for key in ("catalog", "owner"):
+        Group.objects.get(name=roles.role(key).group).permissions.remove(admin_access)
+    assert check_role_drift()  # drifted on a fully migrated database
+    MigrationRecorder.Migration.objects.filter(
+        app="manager", name="0003_role_groups_admin_access"
+    ).delete()
+    assert check_role_drift() == []  # pending manager migration: do not block migrate
+    assert _sync()  # what the migration does
+    MigrationRecorder.Migration.objects.create(app="manager", name="0003_role_groups_admin_access")
+    assert check_role_drift() == []
+    for key in ("catalog", "owner"):
+        assert "wagtailadmin.access_admin" in _perms(Group.objects.get(name=roles.role(key).group))

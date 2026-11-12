@@ -36,6 +36,6 @@ def follow_the_goods(apps, schema_editor):  # type: ignore[no-untyped-def]
 
 
 class Migration(migrations.Migration):
-    dependencies = [("shipping", "0010_seed_special_areas")]
+    dependencies = [("shipping", "0011_field_help_texts")]
 
     operations = [migrations.RunPython(follow_the_goods, migrations.RunPython.noop)]
