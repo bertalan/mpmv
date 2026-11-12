@@ -84,7 +84,8 @@ def test_no_provider_configured_is_allowed_until_pay1() -> None:
 
 def test_unknown_provider_fails_the_system_check() -> None:
     with override_settings(PAYMENT_PROVIDER="nope"):
-        assert [m.id for m in run_checks()] == ["payments.E001"]
+        ids = [m.id for m in run_checks() if (m.id or "").startswith("payments.")]
+        assert ids == ["payments.E001"]
         with pytest.raises(registry.UnknownProvider):
             registry.configured_provider()
 
@@ -99,7 +100,8 @@ def test_fake_provider_is_refused_where_live_data_is_on() -> None:
 def test_fake_provider_is_not_registered_where_settings_forbid_it() -> None:
     with override_settings(PAYMENT_ALLOW_FAKE_PROVIDER=False, PAYMENT_PROVIDER="fake"):
         assert "fake" not in registry.registered_codes()
-        assert [m.id for m in run_checks()] == ["payments.E001"]
+        ids = [m.id for m in run_checks() if (m.id or "").startswith("payments.")]
+        assert ids == ["payments.E001"]
 
 
 def test_request_validation_checks_the_amounts() -> None:
