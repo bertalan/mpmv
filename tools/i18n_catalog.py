@@ -35,6 +35,8 @@ SCOPES = (
     "apps/orders/templates",
     "themes/base/templates/layouts",
 )
+# Single Python modules scanned in full: customer-facing messages of apps that are not in SCOPES.
+FILES = ("apps/orders/messages.py",)
 # Apps scanned for `help_text=` strings only (ARC.31: field help is translated; the rest of these
 # apps joins SCOPES with I18N.7). Python files, each string inside a `help_text=` argument.
 HELP_TEXT_SCOPES = ("apps/vendors",)
@@ -78,6 +80,8 @@ def _files() -> Iterator[Path]:
             if SKIP_PARTS & set(rel.parts) or path.suffix not in {".py", ".html", ".txt"}:
                 continue
             yield path
+    for name in FILES:
+        yield ROOT / name
     for name in THEME_FILES:
         yield ROOT / "themes/base/templates" / name
 

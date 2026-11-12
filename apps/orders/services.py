@@ -17,19 +17,22 @@ from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.db import connection, transaction
 from django.db.models import Sum
 from django.utils import timezone
+from django.utils.functional import Promise
 
 from apps.accounts.models import User
 from apps.cart import engine as cart_engine
 from apps.cart.models import Cart
 from apps.catalog.models import Product, Variant
+from apps.core import flags
 from apps.core.audit import VENDOR_FIELD, AuditContext
 from apps.core.changeset import ChangeSet
 from apps.core.money import CENT
-from apps.core.services import audit_changes
+from apps.core.services import audit_changes, flag_enabled
 from apps.vendors.models import Vendor
 from apps.vendors.services import has_vendor_permission
 
 from . import engine, notifications
+from .messages import CLOSED_SITE, CLOSED_VENDOR
 from .models import Order, OrderLine, OrderNumberSequence, StockReservation, VendorOrder
 from .tz import business_tz
 
@@ -702,6 +705,39 @@ class OrderRefused(Exception):
         super().__init__("; ".join(f"{r.code}: {r.detail}" for r in self.reasons))
 
 
+CLOSING_SWITCHES = (flags.CHECKOUT, flags.PAYMENTS)
+
+
+class CheckoutClosed(Exception):
+    """A kill switch (ARC.8) is off: no new order is placed and no payment starts (ORD.10).
+
+    `scope` is "site" when the platform value is off, "vendor" when only the listed vendors'
+    overrides are. `customer_message` is safe to show: it names no vendor. Orders already placed
+    or paid are never touched by the switch."""
+
+    def __init__(self, flag: str, scope: str, vendors: Sequence[int] = ()) -> None:
+        self.flag = flag
+        self.scope = scope
+        self.vendors = list(vendors)
+        super().__init__(f"{flag} switched off ({scope})")
+
+    @property
+    def customer_message(self) -> Promise:
+        return CLOSED_SITE if self.scope == "site" else CLOSED_VENDOR
+
+
+def ensure_checkout_open(vendors: Sequence[Vendor]) -> None:
+    """Raise `CheckoutClosed` unless both the checkout and the payments switches are on for the
+    platform and for every vendor of the order. Call it before an order or a payment intent is
+    created (PAY.1 calls it before it starts a payment)."""
+    for name in CLOSING_SWITCHES:
+        if not flag_enabled(name):
+            raise CheckoutClosed(name, "site")
+        closed = [v.pk for v in vendors if not flag_enabled(name, vendor=v)]
+        if closed:
+            raise CheckoutClosed(name, "vendor", closed)
+
+
 @dataclass(frozen=True)
 class _NoTax:
     rate: Decimal = Decimal("0")
@@ -828,7 +864,9 @@ def place_order(
     returns the change set without saving or holding anything.
 
     The payment (PAY.1) starts only after this transaction commits (`transaction.on_commit`).
+    Raises `CheckoutClosed` before anything is read or saved when a kill switch is off (ORD.10).
     """
+    ensure_checkout_open([item.vendor for item in preview.vendors])
     now = now or timezone.now()
     with transaction.atomic():
         products, variants, holds = _verify(preview, now=now)
