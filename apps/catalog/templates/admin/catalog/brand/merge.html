@@ -1,0 +1,19 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block extrahead %}{{ block.super }}{{ form.media }}{% endblock %}
+
+{% block content %}
+<p>{% translate "These brands are removed. Their products move to the brand you choose, and their old page addresses redirect to it." %}</p>
+<ul>
+  {% for brand in brands %}<li>{{ brand.name }} ({{ brand.get_status_display }})</li>{% endfor %}
+</ul>
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="{{ action }}">
+  <input type="hidden" name="confirm" value="1">
+  {% for pk in selected %}<input type="hidden" name="_selected_action" value="{{ pk }}">{% endfor %}
+  {{ form.as_p }}
+  <input type="submit" value="{% translate 'Merge' %}">
+</form>
+{% endblock %}

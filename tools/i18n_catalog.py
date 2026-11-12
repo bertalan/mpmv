@@ -34,9 +34,15 @@ SCOPES = (
     "apps/accounts",
     "apps/orders/templates",
     "themes/base/templates/layouts",
+    # Brand review models (CAT.20): the rest of the catalog app joins with the storefront I18N.
+    "apps/catalog/taxonomy.py",
+    "apps/catalog/taxonomy_admin.py",
 )
 # Single storefront modules whose strings the Manager texts quote (shop policy headings).
 EXTRA_FILES = ("apps/vendors/services.py",)
+# Apps scanned for `help_text=` strings only (ARC.31: field help is translated; the rest of these
+# apps joins SCOPES with I18N.7). Python files, each string inside a `help_text=` argument.
+HELP_TEXT_SCOPES = ("apps/vendors",)
 # Theme files rendered by the Manager and account pages (the rest of the theme is storefront).
 THEME_FILES = (
     "400.html",
@@ -72,7 +78,8 @@ CONTEXT_PLURAL = {"npgettext", "npgettext_lazy"}
 
 def _files() -> Iterator[Path]:
     for scope in SCOPES:
-        for path in sorted((ROOT / scope).rglob("*")):
+        base = ROOT / scope
+        for path in [base] if base.is_file() else sorted(base.rglob("*")):
             rel = path.relative_to(ROOT)
             if SKIP_PARTS & set(rel.parts) or path.suffix not in {".py", ".html", ".txt"}:
                 continue
@@ -155,11 +162,40 @@ def _entries(path: Path) -> Iterator[tuple[str, str | None, str | None, int]]:
             yield args[1], args[0], args[2], node.lineno
 
 
+def _help_files() -> Iterator[Path]:
+    for scope in HELP_TEXT_SCOPES:
+        for path in sorted((ROOT / scope).rglob("*.py")):
+            if not SKIP_PARTS & set(path.relative_to(ROOT).parts):
+                yield path
+
+
+def _help_entries(path: Path) -> Iterator[tuple[str, str | None, str | None, int]]:
+    """The gettext calls inside a `help_text=` argument of `path`, and nothing else."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    inside: list[ast.AST] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            inside.extend(kw.value for kw in node.keywords if kw.arg == "help_text")
+    seen: set[int] = set()
+    for root in inside:
+        for node in ast.walk(root):
+            if not isinstance(node, ast.Call) or id(node) in seen:
+                continue
+            seen.add(id(node))
+            func = node.func
+            name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", "")
+            args = [_const(a) for a in node.args]
+            if name in SIMPLE and args and args[0]:
+                yield args[0], None, None, node.lineno
+
+
 def collect() -> dict[tuple[str, str | None], tuple[str | None, list[str]]]:
     found: dict[tuple[str, str | None], tuple[str | None, list[str]]] = {}
-    for path in _files():
+    sources = [(path, _entries) for path in _files()]
+    sources += [(path, _help_entries) for path in _help_files()]
+    for path, read in sources:
         rel = str(path.relative_to(ROOT))
-        for msgid, ctx, plural, _line in _entries(path):
+        for msgid, ctx, plural, _line in read(path):
             plural0, places = found.get((msgid, ctx), (plural, []))
             if rel not in places:
                 places.append(rel)
