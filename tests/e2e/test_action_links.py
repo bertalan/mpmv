@@ -89,6 +89,6 @@ def test_a_used_link_sends_to_the_normal_login(
     page.context.clear_cookies()
     page.goto(link)
     page.get_by_role("button", name="Continue").click()
-    expect(page).to_have_url(re.compile(r"/django-admin/login/\?next="))
+    expect(page).to_have_url(re.compile(r"/account/login/\?next="))
     shot("used-link-login")
     assert AuditLog.objects.filter(action=services.ACTION_LINK_REFUSED).count() == 1

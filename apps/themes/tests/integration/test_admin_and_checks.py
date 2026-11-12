@@ -104,7 +104,8 @@ def test_known_stored_themes_pass_the_database_check() -> None:
 def _themes_migration_unapplied() -> None:
     from django.db.migrations.recorder import MigrationRecorder
 
-    MigrationRecorder.Migration.objects.filter(app="themes", name="0001_initial").delete()
+    # Every themes migration: a later one depends on 0001.
+    MigrationRecorder.Migration.objects.filter(app="themes").delete()
 
 
 def _drop_theme_column() -> None:
