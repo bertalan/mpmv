@@ -46,6 +46,10 @@ msgstr "Accetta l'ordine"
 msgid "Access denied"
 msgstr "Accesso negato"
 
+#: apps/accounts/templates/accounts/activation/done.html
+msgid "Account activated"
+msgstr "Account attivato"
+
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Act on the content"
 msgstr "Interveni sul contenuto"
@@ -53,6 +57,15 @@ msgstr "Interveni sul contenuto"
 #: apps/manager/templates/manager/list.html
 msgid "Action on the selected rows"
 msgstr "Azione sulle righe selezionate"
+
+#: apps/accounts/templates/accounts/activation/set_password.html
+msgid "Activate my account"
+msgstr "Attiva il mio account"
+
+#: apps/accounts/templates/accounts/activation/invalid.html
+#: apps/accounts/templates/accounts/activation/request.html
+msgid "Activate your account"
+msgstr "Attiva il tuo account"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Add a factor"
@@ -135,6 +148,19 @@ msgstr "Corriere"
 msgid "Carrier: %(carrier)s. Tracking number: %(tracking_number)s."
 msgstr "Corriere: %(carrier)s. Numero di tracking: %(tracking_number)s."
 
+#: apps/accounts/templates/accounts/activation/sent.html
+msgid "Check your email"
+msgstr "Controlla la tua email"
+
+#: apps/accounts/forms.py
+msgid "Choose a password"
+msgstr "Scegli una password"
+
+#: apps/accounts/templates/accounts/activation/set_password.html
+msgid "Choose a password to activate your account. You then sign in with it."
+msgstr ""
+"Scegli una password per attivare il tuo account. Poi accedi con quella."
+
 #: apps/manager/sections.py
 #: apps/manager/templates/manager/shop/vendor_picker.html
 msgid "Choose a vendor"
@@ -143,6 +169,14 @@ msgstr "Scegli un venditore"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Choose how you will confirm it is you after your password."
 msgstr "Scegli come confermare la tua identità dopo la password."
+
+#: apps/accounts/templates/email/accounts/activation_link/body.html
+msgid "Choose my password"
+msgstr "Scegli la mia password"
+
+#: apps/accounts/templates/accounts/activation/set_password.html
+msgid "Choose your password"
+msgstr "Scegli la tua password"
 
 #: apps/accounts/templates/accounts/mfa/totp.html
 #: apps/manager/templates/manager/bulk_preview.html
@@ -218,6 +252,10 @@ msgstr ""
 msgid "Email"
 msgstr "Email"
 
+#: apps/accounts/forms.py
+msgid "Email address"
+msgstr "Indirizzo email"
+
 #: apps/manager/forms.py
 msgid "Enter a valid carrier name."
 msgstr "Inserisci un nome di corriere valido."
@@ -291,6 +329,8 @@ msgstr "Vai alla home page"
 msgid "Hello %(customer_name)s,"
 msgstr "Ciao %(customer_name)s,"
 
+#: apps/accounts/templates/email/accounts/activation_notice/body.html
+#: apps/accounts/templates/email/accounts/activation_notice/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 #: apps/orders/templates/email/orders/order_received/body.html
@@ -301,6 +341,15 @@ msgstr "Ciao %(customer_name)s,"
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Hello,"
 msgstr "Ciao,"
+
+#: apps/accounts/templates/accounts/activation/sent.html
+msgid ""
+"If this address belongs to an account that is waiting to be activated, we "
+"sent it a link to choose a new password. The link works once."
+msgstr ""
+"Se questo indirizzo appartiene a un account in attesa di attivazione, gli "
+"abbiamo inviato un link per scegliere una nuova password. Il link funziona "
+"una sola volta."
 
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid ""
@@ -347,6 +396,10 @@ msgstr "Note legali"
 #: apps/manager/forms.py
 msgid "Letters, digits, spaces and . / _ - only."
 msgstr "Solo lettere, cifre, spazi e . / _ -"
+
+#: apps/accounts/templates/accounts/activation/invalid.html
+msgid "Link not valid"
+msgstr "Link non valido"
 
 #: themes/base/templates/components/button.html
 msgid "Loading"
@@ -438,6 +491,11 @@ msgstr "nessuna registrazione di passkey in corso"
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "No second factor yet."
 msgstr "Nessun secondo fattore per ora."
+
+#: apps/accounts/templates/accounts/activation/sent.html
+msgid "Nothing arrived after a few minutes? Check your spam folder."
+msgstr ""
+"Dopo qualche minuto non è arrivato nulla? Controlla la cartella dello spam."
 
 #: apps/manager/views.py
 msgid "Nothing changed."
@@ -694,6 +752,10 @@ msgstr "Seleziona"
 msgid "Select at least one row."
 msgstr "Seleziona almeno una riga."
 
+#: apps/accounts/templates/accounts/activation/request.html
+msgid "Send me the link"
+msgstr "Inviami il link"
+
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Set up an authenticator app"
 msgstr "Configura un’app di autenticazione"
@@ -732,9 +794,14 @@ msgstr "Negozio"
 msgid "Show password"
 msgstr "Mostra password"
 
+#: apps/accounts/templates/accounts/activation/done.html
 #: apps/manager/templates/manager/login.html
 msgid "Sign in"
 msgstr "Accedi"
+
+#: apps/accounts/templates/accounts/activation/done.html
+msgid "Sign in with the password you just chose."
+msgstr "Accedi con la password che hai appena scelto."
 
 #: apps/manager/templates/manager/forbidden.html
 #: apps/manager/templates/manager/layout.html
@@ -749,6 +816,15 @@ msgstr "Vai al contenuto principale"
 #: apps/manager/templates/manager/shop/order.html
 msgid "SKU"
 msgstr "SKU"
+
+#: apps/accounts/templates/email/accounts/activation_link/body.html
+#: apps/accounts/templates/email/accounts/activation_link/body.txt
+msgid ""
+"Someone asked to activate the account for this email address. To choose a "
+"password and start using it, open this link."
+msgstr ""
+"Qualcuno ha chiesto di attivare l’account per questo indirizzo email. Per "
+"scegliere una password e iniziare a usarlo, apri questo link."
 
 #: themes/base/templates/500.html
 msgid "Something went wrong"
@@ -828,6 +904,23 @@ msgstr ""
 "Il modulo è stato inviato da una pagina vecchia o scaduta. Torna indietro, "
 "ricarica la pagina e invialo di nuovo."
 
+#: apps/accounts/templates/accounts/activation/invalid.html
+msgid ""
+"The link was already used, has expired or was replaced. You can ask for a "
+"new one."
+msgstr ""
+"Il link è già stato usato, è scaduto o è stato sostituito. Puoi chiederne "
+"uno nuovo."
+
+#: apps/accounts/templates/email/accounts/activation_link/body.html
+#: apps/accounts/templates/email/accounts/activation_link/body.txt
+msgid ""
+"The link works once and expires on %(expires)s (UTC). If it was not you, "
+"ignore this email: nothing changes."
+msgstr ""
+"Il link funziona una sola volta e scade il %(expires)s (UTC). Se non sei "
+"stato tu, ignora questa email: non cambia nulla."
+
 #: apps/manager/templates/manager/forbidden.html
 msgid ""
 "The Manager is for platform staff and for vendor members. If you need "
@@ -877,6 +970,14 @@ msgstr ""
 msgid "The request failed."
 msgstr "La richiesta non è riuscita."
 
+#: apps/accounts/templates/accounts/activation/request.html
+msgid ""
+"The site has changed. Enter the email address of your account and, if it is "
+"waiting to be activated, we send you a link to choose a new password."
+msgstr ""
+"Il sito è cambiato. Inserisci l’indirizzo email del tuo account e, se è in "
+"attesa di attivazione, ti inviamo un link per scegliere una nuova password."
+
 #: apps/manager/templates/manager/shop/profile.html
 msgid ""
 "The text in this language is a machine draft and is not public yet. Edit and"
@@ -913,6 +1014,19 @@ msgstr "Questo browser non supporta le passkey."
 #: apps/accounts/views.py
 msgid "This content is not available in this language."
 msgstr "Questo contenuto non è disponibile in questa lingua."
+
+#: apps/accounts/templates/email/accounts/activation_notice/body.html
+#: apps/accounts/templates/email/accounts/activation_notice/body.txt
+msgid ""
+"This is a service message about your account. It contains no offers or "
+"promotions."
+msgstr ""
+"Questo è un messaggio di servizio sul tuo account. Non contiene offerte né "
+"promozioni."
+
+#: apps/accounts/templates/accounts/activation/invalid.html
+msgid "This link is not valid"
+msgstr "Questo link non è valido"
 
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid ""
@@ -1040,6 +1154,20 @@ msgid "We could not complete your request. Please try again in a few minutes."
 msgstr ""
 "Non siamo riusciti a completare la richiesta. Riprova tra qualche minuto."
 
+#: apps/accounts/templates/email/accounts/activation_notice/body.html
+#: apps/accounts/templates/email/accounts/activation_notice/body.txt
+msgid ""
+"We have moved to a new website. Your account and your order history came "
+"with us. For your security we did not carry over your old password."
+msgstr ""
+"Siamo passati a un nuovo sito. Il tuo account e lo storico dei tuoi ordini "
+"sono arrivati con noi. Per la tua sicurezza non abbiamo trasferito la tua "
+"vecchia password."
+
+#: apps/accounts/templates/email/accounts/activation_notice/subject.txt
+msgid "We have moved to a new website: your account came with us"
+msgstr "Siamo passati a un nuovo sito: il tuo account è con noi"
+
 #: apps/orders/templates/email/orders/order_received/subject.txt
 msgid "We received your order %(order_number)s"
 msgstr "Abbiamo ricevuto il tuo ordine %(order_number)s"
@@ -1095,15 +1223,34 @@ msgstr "Stai lavorando su %(vendor)s."
 msgid "You do not have permission to open this page."
 msgstr "Non hai il permesso di aprire questa pagina."
 
+#: apps/accounts/templates/email/accounts/activation_notice/body.html
+#: apps/accounts/templates/email/accounts/activation_notice/body.txt
+msgid ""
+"You do not have to do anything now. When you want to use your account, open "
+"our website, go to the page “Activate your account” and enter this email "
+"address: we then send you a link to choose a new password."
+msgstr ""
+"Per ora non devi fare nulla. Quando vorrai usare il tuo account, apri il "
+"nostro sito, vai alla pagina “Attiva il tuo account” e inserisci questo "
+"indirizzo email: ti invieremo un link per scegliere una nuova password."
+
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 msgid "You have %(counter)s unused recovery code."
 msgid_plural "You have %(counter)s unused recovery codes."
 msgstr[0] "Hai %(counter)s codice di recupero non usato."
 msgstr[1] "Hai %(counter)s codici di recupero non usati."
 
+#: apps/accounts/templates/accounts/activation/done.html
+msgid "Your account is active"
+msgstr "Il tuo account è attivo"
+
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Your factors"
 msgstr "I tuoi fattori"
+
+#: apps/accounts/templates/email/accounts/activation_link/subject.txt
+msgid "Your link to choose a new password"
+msgstr "Il tuo link per scegliere una nuova password"
 
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 msgid "Your recovery codes"

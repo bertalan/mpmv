@@ -57,6 +57,7 @@ urlpatterns = [
     path("account/mfa/", include("apps.accounts.urls")),
     path("account/level/", include("apps.accounts.level_urls")),  # CORE.25 (D-32)
     path("account/link/", include("apps.accounts.action_link_urls")),  # CORE.15
+    path("account/activate/", include("apps.accounts.activation_urls")),  # CORE.19
     path("account/", include("apps.manager.account_urls")),  # Manager sign-in (CORE.17)
     path("manager/", include("apps.manager.urls")),  # the Manager's two spaces (CORE.17)
     path("vendor/claim/", include("apps.vendors.urls")),  # claim an imported vendor (VEN.24)

@@ -42,3 +42,27 @@ class StaffLoginForm(AccessibleLoginMixin, AdminAuthenticationForm):
 
 class ManagerLoginForm(AccessibleLoginMixin, AuthenticationForm):
     """The Manager login (`manager.views.LoginView`): the same tokens, toggle and error ties."""
+
+
+class ActivationRequestForm(forms.Form):
+    """ "Activate your account" (CORE.19): the address of a migrated account, nothing else."""
+
+    email = forms.EmailField(
+        label=_("Email address"),
+        max_length=254,
+        widget=forms.EmailInput(attrs={"autocomplete": "email"}),
+    )
+
+
+class ActivationPasswordForm(forms.Form):
+    """The page the activation link leads to: the holder chooses the password (asked once,
+    WCAG 2.2 SC 3.3.7; not stripped: a password may start or end with a space)."""
+
+    password = forms.CharField(
+        label=_("Choose a password"),
+        max_length=128,
+        strip=False,
+        widget=forms.PasswordInput(
+            attrs={"autocomplete": "new-password", "data-password-toggle": _("Show password")}
+        ),
+    )

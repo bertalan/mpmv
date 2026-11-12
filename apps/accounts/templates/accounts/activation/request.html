@@ -1,0 +1,18 @@
+{% extends "layouts/base.html" %}
+{% load i18n captcha %}
+{% block title %}{% translate "Activate your account" %} · {{ site_name }}{% endblock %}
+{% block head %}{% robots_meta "noindex, nofollow" %}
+{% captcha_script %}{% endblock %}
+{% block content %}
+<article class="apply">
+  <h1>{% translate "Activate your account" %}</h1>
+  <p>{% translate "The site has changed. Enter the email address of your account and, if it is waiting to be activated, we send you a link to choose a new password." %}</p>
+  {% include "components/error_summary.html" with form=form autofocus=True only %}
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% for field in form %}{% include "components/field.html" with field=field only %}{% endfor %}
+    {% captcha_widget %}
+    {% include "components/button.html" with label=_("Send me the link") type="submit" only %}
+  </form>
+</article>
+{% endblock %}

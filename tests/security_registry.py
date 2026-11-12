@@ -69,6 +69,12 @@ PUBLIC: dict[str, str] = {
         "DSA points of contact (CMP.5): the operator's own contact data, read-only, public by law "
         "(DSA art. 11 and 12)."
     ),
+    "activation:request": (
+        "Public 'Activate your account' form (CORE.19): the page is public by design; the POST "
+        "is CSRF-checked, rate limited per IP and per address, behind Turnstile, and answers "
+        "the same whatever the address; the link goes only to the address of record."
+    ),
+    "activation:sent": "Static 'check your email' page of the activation request (CORE.19).",
     "vendors:apply": (
         "Public 'Sell with us' application form (VEN.22): the page is public by design; the POST "
         "is CSRF-checked, rate limited per IP and behind Turnstile, and it creates an inactive "
@@ -128,6 +134,11 @@ IDOR_REVIEWED: dict[str, str] = {
         "session (VEN.24); another vendor's public id is refused with 403 "
         "(`test_a_claim_link_opens_only_its_own_vendor`)."
     ),
+    "activation:set_password": (
+        "The page answers only for the account whose email-bound activation link was opened in "
+        "this session (CORE.19); any other key is refused with 403 "
+        "(`test_the_set_password_page_gives_nothing_away_for_a_random_key`)."
+    ),
     "vendors:apply_cancel": (
         "Acts only for the account whose email-bound cancel link was opened in this session "
         "(VEN.22); any other key gets the same neutral page and nothing changes "
@@ -158,6 +169,7 @@ OBJECT_PATHS: dict[str, ObjectKwargs] = {
     },
     "vendor_claim:claim": lambda tenants: {"vendor_key": str(tenants.b.vendor.public_id)},
     "manager:platform:notice": lambda tenants: {"public_id": str(NoticeFactory.create().public_id)},
+    "activation:set_password": lambda tenants: {"user_key": str(tenants.b.owner.public_id)},
     "vendors:apply_confirm": lambda tenants: {"user_key": str(tenants.b.owner.public_id)},
     "vendors:apply_cancel": lambda tenants: {"user_key": str(tenants.b.owner.public_id)},
 }

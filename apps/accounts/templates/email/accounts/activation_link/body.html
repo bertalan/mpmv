@@ -1,0 +1,8 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ email_language }}">
+<body>
+<p>{% translate "Someone asked to activate the account for this email address. To choose a password and start using it, open this link." %}</p>
+<p><a href="{{ action_url }}">{% translate "Choose my password" %}</a></p>
+<p>{% blocktranslate with expires=action_link_expires_at %}The link works once and expires on {{ expires }} (UTC). If it was not you, ignore this email: nothing changes.{% endblocktranslate %}</p>
+</body>
+</html>

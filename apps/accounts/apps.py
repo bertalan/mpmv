@@ -23,6 +23,7 @@ class AccountsConfig(AppConfig):
     def ready(self) -> None:
         from django.contrib.auth.signals import user_logged_in, user_login_failed
 
+        from . import activation
         from .checks import check_captcha_settings, check_mfa_middleware
         from .signals import count_failed_login, reset_after_login, seed_language_on_login
 
@@ -31,3 +32,4 @@ class AccountsConfig(AppConfig):
         user_logged_in.connect(seed_language_on_login, dispatch_uid="accounts.seed_language")
         checks.register(check_captcha_settings, checks.Tags.security)
         checks.register(check_mfa_middleware, checks.Tags.security)
+        activation.register_activation_purpose()  # CORE.19: the on-demand activation link

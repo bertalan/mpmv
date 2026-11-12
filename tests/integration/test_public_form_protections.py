@@ -77,6 +77,12 @@ def test_sell_with_us_refuses_a_failed_captcha(client: Client) -> None:
     assert FakeCaptchaVerifier.calls  # the verifier was asked
 
 
+def test_activation_request_refuses_a_failed_captcha(client: Client) -> None:
+    response = client.post("/account/activate/", {"email": "a@example.com", TOKEN_FIELD: "wrong"})
+    assert response.status_code == 400
+    assert FakeCaptchaVerifier.calls
+
+
 def test_the_dsa_notice_form_refuses_a_failed_captcha(client: Client) -> None:
     response = client.post(reverse("dsa_notice"), {"explanation": "x", TOKEN_FIELD: "wrong"})
     assert response.status_code == 200  # the form again, nothing recorded
@@ -91,6 +97,7 @@ def test_every_captcha_declaration_is_tested() -> None:
         if row.spec.protection is Protection.CAPTCHA
     }
     assert declared == set(CAPTCHA_LOGINS) | {
+        "activation:request",
         "vendors:apply",
         "dsa_notice",
         "wagtailcore_authenticate_with_password",  # tested in apps/cms (SEC.14)
@@ -106,6 +113,16 @@ def test_the_action_link_continue_refuses_a_missing_or_bad_token(client: Client)
         assert response.status_code == 302
         assert "login" in response["Location"]
         assert not _signed_in(client)
+
+
+def test_activation_set_password_refuses_a_link_not_opened_in_this_session(
+    client: Client,
+) -> None:
+    response = client.post(
+        "/account/activate/set/" + secrets.token_urlsafe(8) + "/",
+        {"password": secrets.token_urlsafe(16)},
+    )
+    assert response.status_code == 403
 
 
 def test_application_confirm_refuses_a_link_not_opened_in_this_session(client: Client) -> None:
@@ -137,6 +154,7 @@ def test_every_signed_token_declaration_is_tested() -> None:
     }
     assert declared == {
         "action_link:continue",
+        "activation:set_password",
         "vendors:apply_confirm",
         "vendors:apply_cancel",
         "vendor_claim:claim",

@@ -1,0 +1,1 @@
+{% load i18n %}{% translate "We have moved to a new website: your account came with us" %}

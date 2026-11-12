@@ -388,6 +388,16 @@ ENDPOINTS: dict[str, Access] = {
         "it shows only the generic 'link not valid' page, whoever is signed in.",
         kwargs={"vendor_key": "00000000-0000-0000-0000-000000000000"},
     ),
+    "activation:request": NoVendorData(
+        "Public 'Activate your account' form (CORE.19): reads and changes only the typed "
+        "address's own account; shows no vendor data."
+    ),
+    "activation:sent": NoVendorData("Static 'check your email' page (CORE.19)."),
+    "activation:set_password": NoVendorData(
+        "Activation password page (CORE.19): without a link opened in the session for that "
+        "account it shows only the generic 'link not valid' page.",
+        kwargs={"user_key": "00000000-0000-0000-0000-000000000000"},
+    ),
     "vendors:apply": NoVendorData(
         "Public 'Sell with us' application (VEN.22): shows a form and creates only the "
         "applicant's own new records; it reads no vendor data."
