@@ -39,6 +39,15 @@ class RenderedEmail:
 
 
 @dataclass(frozen=True)
+class Attachment:
+    """A file sent with an email (ORD.9 3/3: the non-fiscal confirmation PDF)."""
+
+    filename: str
+    content_type: str
+    content: bytes = field(repr=False)
+
+
+@dataclass(frozen=True)
 class OutgoingEmail:
     recipient: str
     from_address: str
@@ -47,6 +56,7 @@ class OutgoingEmail:
     html_body: str
     #: Stable per outbox row: providers that accept an idempotency key drop a repeated send.
     idempotency_key: str
+    attachments: tuple[Attachment, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -107,9 +117,13 @@ class ConsoleEmailSender:
 
     def send(self, email: OutgoingEmail) -> SendResult:
         out = self.stream or sys.stdout
+        files = "".join(
+            f"Attachment: {a.filename} ({a.content_type}, {len(a.content)} bytes)\n"
+            for a in email.attachments
+        )
         out.write(
             f"From: {email.from_address}\nTo: {email.recipient}\nSubject: {email.subject}\n"
-            f"Idempotency-Key: {email.idempotency_key}\n\n{email.text_body}\n{'-' * 72}\n"
+            f"Idempotency-Key: {email.idempotency_key}\n{files}\n{email.text_body}\n{'-' * 72}\n"
         )
         out.flush()
         return SendResult(provider_message_id=f"console-{email.idempotency_key}")

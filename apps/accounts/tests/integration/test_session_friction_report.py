@@ -45,3 +45,13 @@ def test_the_report_counts_prompts_per_user_per_day() -> None:
     # columns: day, user, prompts, elevations
     assert row_first[-2:] == ["3", "1"]
     assert row_second[-2:] == ["1", "0"]
+
+
+def test_the_report_still_counts_windows_stored_under_the_old_action_name() -> None:
+    user = UserFactory.create(staff=True)
+    for action in (levels.LEGACY_SESSION_STARTED, levels.SESSION_STARTED):
+        record(_ctx(user.pk, user.email), action, "accounts.user", "k", None, {"kind": "session"})
+    out = io.StringIO()
+    call_command("session_friction_report", stdout=out)
+    row = next(line for line in out.getvalue().splitlines() if user.email in line).split()
+    assert row[-2:] == ["0", "2"]

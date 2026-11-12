@@ -19,6 +19,8 @@ from apps.core.translations import (
     source_language,
 )
 
+pytestmark = pytest.mark.usefixtures("default_languages")
+
 
 @dataclass
 class Row:
