@@ -88,7 +88,7 @@ class Territory(BaseModel):
     Åland, Northern Ireland…), recognised by postcode (TAX.7).
 
     Data only: what each status means for a sale is the tax engine's job (TAX.3, TAX.7). The
-    `special` status stores territories whose rule is an open decision (D-02 for `XI`).
+    `special` status stores territories whose rule is an explicit engine rule.
     """
 
     VatStatus = TerritoryVatStatus
