@@ -1,7 +1,7 @@
 """I18N.15: the site languages come from MPMV_LANGUAGES and are checked at startup.
 
 `mpmv/settings/languages.py` turns the ordered list into LANGUAGE_CODE and LANGUAGES (the first
-code is the primary language); `core.E901` to `core.E903` and `core.W901` refuse or flag a bad
+code is the primary language); `core.E911` to `core.E913` and `core.W911` refuse or flag a bad
 list. Nothing here assumes English is among the languages.
 """
 
@@ -54,18 +54,18 @@ def test_an_unknown_code_is_kept_for_the_check_to_refuse() -> None:
 def test_an_unknown_language_code_is_refused() -> None:
     errors = [m for m in check_language_settings(None) if isinstance(m, Error)]
 
-    assert _ids(errors) == ["core.E901"]
+    assert _ids(errors) == ["core.E911"]
     assert "xx" in errors[0].msg
 
 
 @override_settings(LANGUAGE_CODE="it", LANGUAGES=[("it", "Italiano"), ("it", "Italiano")])
 def test_a_repeated_language_code_is_refused() -> None:
-    assert "core.E902" in _ids(check_language_settings(None))
+    assert "core.E912" in _ids(check_language_settings(None))
 
 
 @override_settings(LANGUAGE_CODE="de", LANGUAGES=[("it", "Italiano"), ("de", "Deutsch")])
 def test_the_primary_language_is_the_first_one() -> None:
-    assert "core.E903" in _ids(check_language_settings(None))
+    assert "core.E913" in _ids(check_language_settings(None))
 
 
 def test_a_missing_catalog_warns_for_a_language_outside_the_default_set(tmp_path: Path) -> None:
@@ -77,7 +77,7 @@ def test_a_missing_catalog_warns_for_a_language_outside_the_default_set(tmp_path
         messages = check_language_settings(None)
 
     assert [type(m) for m in messages] == [Warning]
-    assert messages[0].id == "core.W901"
+    assert messages[0].id == "core.W911"
     assert "pt" in messages[0].msg
 
 
@@ -91,7 +91,7 @@ def test_an_incomplete_catalog_warns_with_the_gap(tmp_path: Path) -> None:
     ):
         messages = check_language_settings(None)
 
-    assert _ids(messages) == ["core.W901", "core.W901"]
+    assert _ids(messages) == ["core.W911", "core.W911"]
     assert "1 of 2" in messages[0].msg
     assert "1 of 1" in messages[1].msg
 
@@ -121,7 +121,7 @@ def test_languages_still_waiting_for_i18n7_are_an_info_not_a_warning(tmp_path: P
     ):
         messages = check_language_settings(None)
 
-    assert _ids(messages) == ["core.I901"]
+    assert _ids(messages) == ["core.I911"]
     assert [type(m) for m in messages] == [Info]
 
 

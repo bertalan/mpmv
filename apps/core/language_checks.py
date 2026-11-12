@@ -1,9 +1,9 @@
 """System checks for the site languages (I18N.15, spec 09).
 
-- core.E901: a language code the product does not know (`mpmv.settings.languages`).
-- core.E902: a language listed twice.
-- core.E903: LANGUAGE_CODE is not the first language (the primary language is the first one).
-- core.W901 (core.I901 when informational): the gettext catalog of a non-English language is
+- core.E911: a language code the product does not know (`mpmv.settings.languages`).
+- core.E912: a language listed twice.
+- core.E913: LANGUAGE_CODE is not the first language (the primary language is the first one).
+- core.W911 (core.I911 when informational): the gettext catalog of a non-English language is
   missing or incomplete. The msgids
   are English, so every gap would show English text on that language's pages. English needs no
   catalog. German, French and Spanish are still waiting for their catalogs (I18N.7): for them the
@@ -49,17 +49,17 @@ def check_language_settings(
             checks.Error(
                 f"MPMV_LANGUAGES: unknown language code {code!r}.",
                 hint="Known codes: " + ", ".join(KNOWN_LANGUAGES) + ".",
-                id="core.E901",
+                id="core.E911",
             )
         )
     for code in sorted({c for c in codes if codes.count(c) > 1}):
-        messages.append(checks.Error(f"MPMV_LANGUAGES: {code!r} is listed twice.", id="core.E902"))
+        messages.append(checks.Error(f"MPMV_LANGUAGES: {code!r} is listed twice.", id="core.E912"))
     if codes and codes[0] != settings.LANGUAGE_CODE:
         messages.append(
             checks.Error(
                 f"LANGUAGE_CODE {settings.LANGUAGE_CODE!r} is not the first language "
                 f"({codes[0]!r}): the primary language is the first of MPMV_LANGUAGES.",
-                id="core.E903",
+                id="core.E913",
             )
         )
     for code in dict.fromkeys(codes):
@@ -76,13 +76,13 @@ def check_language_settings(
             f"Language {code!r} {problem}: its pages would show English text where it is missing."
         )
         if code in CATALOG_PENDING:
-            messages.append(checks.Info(message, hint="Delivered by I18N.7.", id="core.I901"))
+            messages.append(checks.Info(message, hint="Delivered by I18N.7.", id="core.I911"))
         else:
             messages.append(
                 checks.Warning(
                     message,
                     hint=f"Translate locale/{code}/LC_MESSAGES/django.po, then compilemessages.",
-                    id="core.W901",
+                    id="core.W911",
                 )
             )
     return messages

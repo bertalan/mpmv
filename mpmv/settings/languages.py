@@ -6,13 +6,13 @@ URL prefix; the others get `/<code>/`. The list feeds `LANGUAGES`, `LANGUAGE_COD
 Spanish. This module is imported by `base.py` and imports nothing from Django or the apps.
 
 Unknown codes are not rejected here: a settings module that raises hides the reason behind a
-traceback, so the code is kept (named by itself) and the `core.E901` system check refuses it.
+traceback, so the code is kept (named by itself) and the `core.E911` system check refuses it.
 """
 
 from collections.abc import Sequence
 
 # Languages the product knows by name (in their own language). A code outside this table is
-# refused by core.E901; adding a language to the product means adding it here and a catalog.
+# refused by core.E911; adding a language to the product means adding it here and a catalog.
 KNOWN_LANGUAGES: dict[str, str] = {
     "en": "English",
     "it": "Italiano",
