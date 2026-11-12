@@ -1530,12 +1530,13 @@ msgstr "Principale"
 msgid "Manage recovery codes"
 msgstr "Gestisci i codici di recupero"
 
-#: apps/seo/site_links.py
-msgid "Manager"
-msgstr "Manager"
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Manage two-factor settings and recovery codes"
 msgstr "Gestisci la verifica in due passaggi e i codici di recupero"
+
+#: apps/seo/site_links.py
+msgid "Manager"
+msgstr "Manager"
 
 #: apps/manager/templates/manager/layout.html
 msgid "Manager sections"
@@ -1728,12 +1729,13 @@ msgstr "non attiva"
 msgid "official URL"
 msgstr "URL ufficiale"
 
-#: apps/seo/site_links.py
-msgid "On STAGE and LIVE these may answer only from the server's own network."
-msgstr "Su STAGE e LIVE queste pagine possono rispondere solo dalla rete del server."
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "on"
 msgstr "attiva"
+
+#: apps/seo/site_links.py
+msgid "On STAGE and LIVE these may answer only from the server's own network."
+msgstr "Su STAGE e LIVE queste pagine possono rispondere solo dalla rete del server."
 
 #: apps/manager/forms.py
 msgid "One line under the shop name. Plain text."
@@ -2306,6 +2308,7 @@ msgstr "Seleziona almeno una riga."
 #: apps/seo/site_links.py
 msgid "Sell with us (vendor application)"
 msgstr "Vendi con noi (candidatura venditore)"
+
 #: apps/accounts/templates/accounts/levels/_banner.html
 msgid ""
 "Sensitive actions ask for your passkey once, or open a passkey window to cover several in a row."
@@ -4660,8 +4663,7 @@ msgstr "Totale: %(total)s EUR"
 msgid "Tracking number"
 msgstr "Numero di tracciamento"
 
-#: apps/accounts/templates/accounts/mfa/overview.html
-#: apps/accounts/templates/accounts/mfa/setup.html apps/seo/site_links.py
+#: apps/accounts/templates/accounts/mfa/overview.html apps/seo/site_links.py
 msgid "Two-factor authentication"
 msgstr "Verifica in due passaggi"
 
