@@ -54,7 +54,7 @@ def test_staff_publishes_an_event_and_visitors_see_it(
     page.locator("#id_country").fill("IT")
     # An open date picker stays over the footer actions and swallows the Publish click: close
     # them with a click outside, as a user would.
-    page.get_by_text("Shown in listings, feeds and search results.").click()
+    page.get_by_text("One or two sentences that tell what the event is").click()
     expect(page.locator(".xdsoft_datetimepicker:visible")).to_have_count(0)
     shot("admin-add-event")
     page.get_by_role("button", name="More actions").click()
