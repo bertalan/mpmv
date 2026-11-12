@@ -1431,12 +1431,11 @@ msgstr "Come usare, montare, mantenere e smaltire il prodotto in sicurezza, in q
 
 #: apps/shipping/models.py
 msgid ""
-"How VAT is applied to the shipping price. Today only the choice that follows the goods works; the "
-"other choices are saved but block the shipping quote. Ask your accountant if you are not sure."
+"How VAT is applied to the shipping price. It always follows the goods in the basket, split in "
+"proportion to their value without VAT. Nothing to choose here."
 msgstr ""
-"Come si applica l'IVA al prezzo della spedizione. Oggi funziona solo la scelta che segue la merce;"
-" le altre vengono salvate ma bloccano il preventivo di spedizione. Se non sei sicuro, chiedi al "
-"tuo commercialista."
+"Come si applica l'IVA al prezzo della spedizione. Segue sempre la merce nel carrello, ripartita in"
+" proporzione al loro valore senza IVA. Non c'è nulla da scegliere."
 
 #: apps/vendors/models.py
 msgid ""
