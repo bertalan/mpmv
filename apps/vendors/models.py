@@ -12,6 +12,8 @@ import dataclasses
 from typing import Any, ClassVar
 
 from django.conf import settings
+from django.contrib.postgres.constraints import ExclusionConstraint
+from django.contrib.postgres.fields import DateRangeField, RangeOperators
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
@@ -1391,3 +1393,65 @@ class VendorApplication(BaseModel):
 
     def __str__(self) -> str:
         return f"application of {self.user_id} (link v{self.version})"
+
+
+class DateRangeExpr(models.Func):
+    """PostgreSQL `daterange(lower, upper)` (`[)`); a NULL upper bound means open-ended."""
+
+    function = "DATERANGE"
+    output_field = DateRangeField()
+
+
+class NoTinCountry(BaseModel):
+    """A jurisdiction that issues no TIN (VEN.27, owner decision MQ-16).
+
+    For an individual whose TIN country is listed, the DAC7 check accepts the place of birth
+    instead of a TIN (`engine.dac7_check`). Staff-editable data with history: a row is valid over
+    the calendar days `[valid_from, valid_to)` (business time zone), a removal only sets
+    `valid_to`, and an addition starts a new row, so "was X a no-TIN country on day D" has one
+    answer forever. Changes go through `services.add_no_tin_country` and
+    `remove_no_tin_country`, which audit them with a reason. Migration 0028 seeds the six
+    countries that were a code constant.
+    """
+
+    country = CountryField(
+        help_text=_("The country whose authorities issue no tax identification number (TIN).")
+    )
+    reason = models.CharField(max_length=300, help_text=_("Why this country issues no TIN."))
+    valid_from = models.DateField(
+        help_text="First day (business time zone) on which the country counts as issuing no TIN."
+    )
+    valid_to = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Day on which it stops counting (not included); empty while it still counts.",
+    )
+    removal_reason = models.CharField(
+        max_length=300, blank=True, help_text="Why staff removed the country; empty while listed."
+    )
+
+    class Meta:
+        ordering = ["country", "-valid_from"]
+        verbose_name = "no-TIN country"
+        verbose_name_plural = "no-TIN countries"
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(valid_to__isnull=True)
+                | models.Q(valid_to__gte=models.F("valid_from")),
+                name="vendors_notincountry_valid_period",
+            ),
+            ExclusionConstraint(
+                name="vendors_notincountry_no_overlap",
+                expressions=[
+                    ("country", RangeOperators.EQUAL),
+                    (DateRangeExpr("valid_from", "valid_to"), RangeOperators.OVERLAPS),
+                ],
+                violation_error_message="This country is already on the list for those days.",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return str(self.country)
+
+    def window(self) -> "engine.NoTinWindow":
+        return engine.NoTinWindow(str(self.country), self.valid_from, self.valid_to)

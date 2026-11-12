@@ -33,6 +33,7 @@ SCOPES = (
     "apps/manager",
     "apps/accounts",
     "apps/orders/templates",
+    "apps/vendors/models.py",
     "themes/base/templates/layouts",
     # Brand review models (CAT.20): the rest of the catalog app joins with the storefront I18N.
     "apps/catalog/taxonomy.py",
