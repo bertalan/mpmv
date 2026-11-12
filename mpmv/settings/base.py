@@ -39,6 +39,7 @@ LOCAL_APPS = [
     "apps.payments",
     "apps.ledger",
     "apps.ingest",
+    "apps.fitment",  # scheme and nodes of the garage (FIT.1, spec 17): above catalog, below cms
     "apps.cms",
     "apps.events",  # event pages (EVT.1, spec 15): after cms, whose locales its indexes need
     "apps.themes",  # frontend themes (THM.1, spec 14): imports only core and Wagtail

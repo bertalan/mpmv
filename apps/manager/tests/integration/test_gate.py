@@ -182,6 +182,16 @@ def test_a_platform_owner_outside_the_mfa_policies_is_still_sent_to_enrolment(
     assert _location(response) == (reverse("mfa:setup"), PLATFORM)
 
 
+def test_a_post_to_the_manager_without_mfa_returns_to_a_safe_referer(client: Client) -> None:
+    owner = UserFactory.create(permissions=["core.platform_owner"])
+    TOTPDeviceFactory.create(user=owner)
+    password_login(client, owner)
+    good = client.post(PLATFORM, {}, headers={"Referer": f"http://testserver{SHOP}"})
+    assert _location(good) == (reverse("mfa:verify"), SHOP)
+    bad = client.post(PLATFORM, {}, headers={"Referer": "https://evil.example/"})
+    assert _location(bad) == (reverse("mfa:verify"), "/")
+
+
 def test_a_customer_is_not_told_about_enrolment(client: Client, customer: User) -> None:
     """The space check comes first: a customer gets 403, never an MFA redirect."""
     password_login(client, customer)
