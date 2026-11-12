@@ -34,8 +34,14 @@ from apps.vendors.tests.factories import VendorFactory, VendorMemberFactory
 pytestmark = pytest.mark.django_db
 
 ACCOUNT_ROUTES = ("mfa:overview", "mfa:setup", "mfa:totp")
-# The storefront editor's image chooser answers Wagtail's modal protocol, not a page.
+# The storefront editor's image, document and link choosers answer Wagtail's modal protocol:
+# they return modal fragments without the page layout, so there is no help button.
 MODAL_FRAGMENTS = (
+    "manager:shop:document_choose",
+    "manager:shop:document_chosen",
+    "manager:shop:document_create",
+    "manager:shop:document_results",
+    "manager:shop:link_choose",
     "manager:shop:image_choose",
     "manager:shop:image_results",
     "manager:shop:image_create",
