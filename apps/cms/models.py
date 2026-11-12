@@ -81,6 +81,7 @@ from .blocks import (
     ProductCardsBlock,
     ProductGridBlock,
     countdown_targets,
+    paragraph_block,
 )
 from .choosers import term_chooser, vendor_chooser
 
@@ -91,6 +92,7 @@ def body_field(
     countdown: bool = False,
     products: bool = False,
     legal_sections: bool = False,
+    help_text: Any = "",
 ) -> StreamField:
     """A page body. `countdown`: also offer the launch countdown (CMS.9: home and standard
     pages; the page class then needs `CountdownCacheMixin`). `products`: also offer the product
@@ -105,7 +107,7 @@ def body_field(
     return StreamField(
         [
             ("hero", HeroBlock()),
-            ("paragraph", blocks.RichTextBlock(features=RICH_TEXT_FEATURES, label=_("Rich text"))),
+            ("paragraph", paragraph_block()),
             ("figure", FigureBlock()),
             ("gallery", GalleryBlock()),
             ("cta", CallToActionBlock()),
@@ -117,6 +119,11 @@ def body_field(
         ],
         blank=True,
         verbose_name=verbose_name or _("body"),
+        help_text=help_text
+        or _(
+            "The content of the page, built from blocks: add a block, fill it in, "
+            "and drag blocks to reorder them. If you add none, the page shows only its title."
+        ),
     )
 
 
@@ -203,14 +210,29 @@ class StandardPage(CountdownCacheMixin, Page):  # type: ignore[misc]
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
+        help_text=_(
+            "The picture at the top of the page. If you leave it empty, the page has no top "
+            "picture."
+        ),
     )
     image_alt_text = models.CharField(
         _("alt text"),
         max_length=250,
         blank=True,
-        help_text=_("Describes the main image for people who cannot see it."),
+        help_text=_(
+            "Describe the main picture in a few words, for people who cannot see it. "
+            "Example: 'Our workshop in spring'. Required when you choose a picture."
+        ),
     )
-    image_caption = models.CharField(_("caption"), max_length=250, blank=True)
+    image_caption = models.CharField(
+        _("caption"),
+        max_length=250,
+        blank=True,
+        help_text=_(
+            "A short line shown under the main picture, up to 250 characters. "
+            "If you leave it empty, no caption is shown."
+        ),
+    )
     body = body_field(countdown=True, products=True)
 
     content_panels: ClassVar[list[Any]] = [
@@ -242,9 +264,16 @@ class StandardPage(CountdownCacheMixin, Page):  # type: ignore[misc]
 
 
 class PageLinkBlock(blocks.StructBlock):  # type: ignore[misc]
-    page = blocks.PageChooserBlock()
+    page = blocks.PageChooserBlock(
+        help_text=_("Choose the page of this site the menu entry leads to. Required.")
+    )
     label = blocks.CharBlock(
-        required=False, max_length=100, help_text=_("Defaults to the page title.")
+        required=False,
+        max_length=100,
+        help_text=_(
+            "The words shown in the menu, for example 'About us'. "
+            "If you leave it empty, the menu shows the title of the page."
+        ),
     )
 
     class Meta:
@@ -253,8 +282,18 @@ class PageLinkBlock(blocks.StructBlock):  # type: ignore[misc]
 
 
 class ExternalLinkBlock(blocks.StructBlock):  # type: ignore[misc]
-    url = blocks.URLBlock()
-    label = blocks.CharBlock(max_length=100)
+    url = blocks.URLBlock(
+        help_text=_(
+            "The full address of the other website, for example 'https://example.com'. Required."
+        )
+    )
+    label = blocks.CharBlock(
+        max_length=100,
+        help_text=_(
+            "The words shown in the menu, for example 'Our blog'. Required: "
+            "the entry cannot be saved without it."
+        ),
+    )
 
     class Meta:
         icon = "link"
@@ -280,11 +319,23 @@ class NavigationMenu(TranslatableMixin, models.Model):  # type: ignore[misc]
         HEADER = "header", _("Header")
         FOOTER = "footer", _("Footer")
 
-    location = models.CharField(_("location"), max_length=16, choices=Location.choices)
+    location = models.CharField(
+        _("location"),
+        max_length=16,
+        choices=Location.choices,
+        help_text=_(
+            "Where this menu appears: at the top of every page (header) or at the bottom (footer). "
+            "Each language has one menu for each place."
+        ),
+    )
     links = StreamField(
         [("page", PageLinkBlock()), ("external", ExternalLinkBlock())],
         blank=True,
         verbose_name=_("links"),
+        help_text=_(
+            "The links of the menu, in the order shown. Add a page of this site or a link to "
+            "another website. If you add none, the menu stays empty."
+        ),
     )
 
     panels: ClassVar[list[Any]] = [FieldPanel("location"), FieldPanel("links")]
@@ -455,12 +506,29 @@ class LegalPage(RoutablePageMixin, Page):  # type: ignore[misc]
     # Read by the visitor-content fallback (spec 09 §9.2) when it comes: legal pages opt out.
     language_fallback: ClassVar[bool] = False
 
-    kind = models.CharField(_("kind"), max_length=16, choices=Kind.choices)
+    kind = models.CharField(
+        _("kind"),
+        max_length=16,
+        choices=Kind.choices,
+        help_text=_(
+            "Which legal text this page is, for example 'Privacy policy'. "
+            "The site links to it from the places where that text is needed."
+        ),
+    )
     effective_date = models.DateField(
         _("effective date"),
-        help_text=_("Applies from this date; not before the last version's."),
+        help_text=_(
+            "The day this text starts to apply, for example 2026-12-01. "
+            "It cannot be earlier than the date of the previous version. Required."
+        ),
     )
-    body = body_field(legal_sections=True)
+    body = body_field(
+        legal_sections=True,
+        help_text=_(
+            "The legal text, built from blocks. Add the sections the law asks for and write the "
+            "text your legal adviser approved. Each change you publish is kept as a new version."
+        ),
+    )
 
     content_panels: ClassVar[list[Any]] = [
         *Page.content_panels,
@@ -644,13 +712,41 @@ class LegalPageReview(models.Model):
 class PlanBlock(blocks.StructBlock):  # type: ignore[misc]
     """A plan as shown to prospective vendors. The plans themselves are VEN.2 `VendorPlan`."""
 
-    name = blocks.CharBlock(max_length=80)
-    price = blocks.CharBlock(
-        required=False, max_length=80, help_text=_("How the fee reads, e.g. 'No monthly fee'.")
+    name = blocks.CharBlock(
+        max_length=80,
+        help_text=_(
+            "The name of the plan, for example 'Starter'. Up to 80 characters. "
+            "Required: the plan cannot be saved without it."
+        ),
     )
-    summary = blocks.TextBlock(required=False, max_length=300)
-    features = blocks.ListBlock(blocks.CharBlock(max_length=120), default=[])
-    highlighted = blocks.BooleanBlock(required=False)
+    price = blocks.CharBlock(
+        required=False,
+        max_length=80,
+        help_text=_(
+            "How the price reads to visitors, for example 'No monthly fee'. "
+            "If you leave it empty, no price is shown."
+        ),
+    )
+    summary = blocks.TextBlock(
+        required=False,
+        max_length=300,
+        help_text=_(
+            "Who the plan is for, in a sentence or two, up to 300 characters. "
+            "If you leave it empty, only the name and the price are shown."
+        ),
+    )
+    features = blocks.ListBlock(
+        blocks.CharBlock(max_length=120),
+        default=[],
+        help_text=_(
+            "What the plan includes, one short line each, for example 'Your own shop page'. "
+            "If you add none, no list is shown."
+        ),
+    )
+    highlighted = blocks.BooleanBlock(
+        required=False,
+        help_text=_("Tick to mark this plan as the one we suggest. It is shown with a highlight."),
+    )
 
     class Meta:
         icon = "tag"
@@ -658,8 +754,19 @@ class PlanBlock(blocks.StructBlock):  # type: ignore[misc]
 
 
 class FAQItemBlock(blocks.StructBlock):  # type: ignore[misc]
-    question = blocks.CharBlock(max_length=200)
-    answer = blocks.RichTextBlock(features=RICH_TEXT_FEATURES)
+    question = blocks.CharBlock(
+        max_length=200,
+        help_text=_(
+            "A question a new seller would ask, for example 'How much does it cost?'. "
+            "Required: the question cannot be saved without it."
+        ),
+    )
+    answer = blocks.RichTextBlock(
+        features=RICH_TEXT_FEATURES,
+        help_text=_(
+            "A clear, short answer. It opens when the visitor clicks the question. Required."
+        ),
+    )
 
     class Meta:
         icon = "help"
@@ -669,9 +776,31 @@ class FAQItemBlock(blocks.StructBlock):  # type: ignore[misc]
 class VendorRecruitmentPage(Page):  # type: ignore[misc]
     """ "Sell with us": the plans, a FAQ and the call to apply (VEN.22's public form)."""
 
-    intro = body_field(_("introduction"))
-    plans = StreamField([("plan", PlanBlock())], blank=True, verbose_name=_("plans"))
-    faq = StreamField([("question", FAQItemBlock())], blank=True, verbose_name=_("FAQ"))
+    intro = body_field(
+        _("introduction"),
+        help_text=_(
+            "The opening of the page, built from blocks: say why a seller should join you. "
+            "If you add none, the page starts with the plans."
+        ),
+    )
+    plans = StreamField(
+        [("plan", PlanBlock())],
+        blank=True,
+        verbose_name=_("plans"),
+        help_text=_(
+            "The plans a new seller can choose from, side by side. "
+            "If you add none, the page shows no plans."
+        ),
+    )
+    faq = StreamField(
+        [("question", FAQItemBlock())],
+        blank=True,
+        verbose_name=_("FAQ"),
+        help_text=_(
+            "The questions new sellers ask most, with your answers. "
+            "If you add none, the page shows no questions."
+        ),
+    )
     cta_label = models.CharField(
         _("call to action"), max_length=80, blank=True, help_text=_("Defaults to 'Apply now'.")
     )
@@ -712,14 +841,29 @@ class BlogAuthor(TranslatableMixin, models.Model):  # type: ignore[misc]  # Wagt
     bio, a photo and an author page. A translatable snippet: each language has its own copy, the
     bio and the photo's alt text are translated, the name, slug and photo are the source's."""
 
-    name = models.CharField(_("name"), max_length=120)
+    name = models.CharField(
+        _("name"),
+        max_length=120,
+        help_text=_(
+            "The name printed under the articles, for example 'Maria Rossi'. Up to 120 characters. "
+            "Required: the author cannot be saved without it."
+        ),
+    )
     slug = models.SlugField(
         _("slug"),
         max_length=120,
         blank=True,
         help_text=_("The author page's address; made from the name when left empty."),
     )
-    bio = RichTextField(_("bio"), features=AUTHOR_BIO_FEATURES, blank=True)
+    bio = RichTextField(
+        _("bio"),
+        features=AUTHOR_BIO_FEATURES,
+        blank=True,
+        help_text=_(
+            "A few sentences about the author, shown on the author's page. "
+            "If you leave it empty, the page shows only the name."
+        ),
+    )
     photo = models.ForeignKey(
         get_image_model_string(),
         verbose_name=_("photo"),
@@ -727,16 +871,42 @@ class BlogAuthor(TranslatableMixin, models.Model):  # type: ignore[misc]  # Wagt
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
+        help_text=_(
+            "A portrait of the author, shown on the author's page. "
+            "If you leave it empty, no photo is shown."
+        ),
     )
     photo_alt_text = models.CharField(
         _("photo alt text"),
         max_length=250,
         blank=True,
-        help_text=_("Describes the photo for people who cannot see it."),
+        help_text=_(
+            "Describe the photo in a few words, for people who cannot see it. "
+            "Example: 'Maria Rossi smiling in her workshop'. Required when you choose a photo."
+        ),
     )
-    job_title = models.CharField(_("job title"), max_length=120, blank=True)
+    job_title = models.CharField(
+        _("job title"),
+        max_length=120,
+        blank=True,
+        help_text=_(
+            "What the author does, for example 'Master potter'. Up to 120 characters. "
+            "If you leave it empty, no title is shown."
+        ),
+    )
     same_as = StreamField(
-        [("url", blocks.URLBlock(label=_("Profile URL"), validators=[PROFILE_URL]))],
+        [
+            (
+                "url",
+                blocks.URLBlock(
+                    label=_("Profile URL"),
+                    validators=[PROFILE_URL],
+                    help_text=_(
+                        "The full address of one profile, for example 'https://example.com/maria'."
+                    ),
+                ),
+            )
+        ],
         blank=True,
         verbose_name=_("profile links"),
         help_text=_("The author's profiles elsewhere (a social network, a personal site)."),
@@ -814,7 +984,15 @@ class BlogIndexPage(RoutablePageMixin, Page):  # type: ignore[misc]
 
     PER_PAGE = 12
 
-    intro = RichTextField(_("introduction"), features=RICH_TEXT_FEATURES, blank=True)
+    intro = RichTextField(
+        _("introduction"),
+        features=RICH_TEXT_FEATURES,
+        blank=True,
+        help_text=_(
+            "A few words shown at the top of the blog, above the list of articles. "
+            "If you leave it empty, the list starts right under the title."
+        ),
+    )
 
     content_panels: ClassVar[list[Any]] = [*Page.content_panels, FieldPanel("intro")]
     parent_page_types: ClassVar[list[str]] = ["cms.HomePage"]
@@ -919,9 +1097,20 @@ class BlogPostPage(Page):  # type: ignore[misc]
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
+        help_text=_(
+            "Who wrote the article. The name appears under the title and links to the author's "
+            "page. "
+            "If you leave it empty, no author is shown."
+        ),
     )
     summary = models.TextField(
-        _("summary"), max_length=300, blank=True, help_text=_("Shown on the blog index.")
+        _("summary"),
+        max_length=300,
+        blank=True,
+        help_text=_(
+            "A short teaser shown in the blog list, up to 300 characters. "
+            "If you leave it empty, the list shows no teaser."
+        ),
     )
     image = models.ForeignKey(
         get_image_model_string(),
@@ -930,17 +1119,32 @@ class BlogPostPage(Page):  # type: ignore[misc]
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
+        help_text=_(
+            "The picture at the top of the article and in the blog list. "
+            "If you leave it empty, the article has no top picture."
+        ),
     )
     image_alt_text = models.CharField(
         _("alt text"),
         max_length=250,
         blank=True,
-        help_text=_("Describes the main image for people who cannot see it."),
+        help_text=_(
+            "Describe the main picture in a few words, for people who cannot see it. "
+            "Example: 'Fresh bread on a cloth'. Required when you choose a picture."
+        ),
     )
-    image_caption = models.CharField(_("caption"), max_length=250, blank=True)
+    image_caption = models.CharField(
+        _("caption"),
+        max_length=250,
+        blank=True,
+        help_text=_(
+            "A short line shown under the main picture, up to 250 characters. "
+            "If you leave it empty, no caption is shown."
+        ),
+    )
     body = StreamField(
         [
-            ("paragraph", blocks.RichTextBlock(features=RICH_TEXT_FEATURES, label=_("Rich text"))),
+            ("paragraph", paragraph_block()),
             ("figure", FigureBlock()),
             ("gallery", GalleryBlock()),
             ("cta", CallToActionBlock()),
@@ -951,6 +1155,10 @@ class BlogPostPage(Page):  # type: ignore[misc]
         ],
         blank=True,
         verbose_name=_("body"),
+        help_text=_(
+            "The article, built from blocks: text, pictures, galleries, questions and links. "
+            "Drag blocks to reorder them."
+        ),
     )
 
     content_panels: ClassVar[list[Any]] = [
@@ -1030,9 +1238,16 @@ class TermLandingPage(Page):  # type: ignore[misc]
         null=True,
         on_delete=models.SET_NULL,
         related_name="+",
-        help_text=_("A term of a taxonomy with term pages."),
+        help_text=_("A category or tag that has its own pages."),
     )
-    body = body_field(_("introduction"), products=True)
+    body = body_field(
+        _("introduction"),
+        products=True,
+        help_text=_(
+            "A short text shown above the products of this category or tag. "
+            "If you add none, the page starts with its products."
+        ),
+    )
     category_products = models.PositiveSmallIntegerField(
         _("products per category"),
         default=engine.LANDING_CATEGORY_DEFAULT,
@@ -1042,7 +1257,13 @@ class TermLandingPage(Page):  # type: ignore[misc]
         ),
     )
     related = StreamField(
-        [("page", PageCardBlock())], blank=True, verbose_name=_("related articles")
+        [("page", PageCardBlock())],
+        blank=True,
+        verbose_name=_("related articles"),
+        help_text=_(
+            "Articles or pages to suggest under the products. If you add none, nothing is "
+            "suggested."
+        ),
     )
 
     content_panels: ClassVar[list[Any]] = [
@@ -1137,8 +1358,19 @@ class VendorLandingPage(Page):  # type: ignore[misc]
         null=True,
         on_delete=models.SET_NULL,
         related_name="+",
+        help_text=_(
+            "The shop this page tells the story of. Required: the page is not shown without it, "
+            "and each language can have only one page per shop."
+        ),
     )
-    body = body_field(_("story"), products=True)
+    body = body_field(
+        _("story"),
+        products=True,
+        help_text=_(
+            "The story of the shop, built from blocks: its history, its workshop, its pictures. "
+            "If you add none, the page shows only the title."
+        ),
+    )
     featured_products = models.PositiveSmallIntegerField(
         _("featured products"),
         default=engine.PRODUCT_GRID_DEFAULT,
