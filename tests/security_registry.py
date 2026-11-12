@@ -65,6 +65,23 @@ PUBLIC: dict[str, str] = {
         "Thanks page after a report (CMP.5): shows only the reference kept in the visitor's "
         "own session, a 404 without one."
     ),
+    "withdrawal": (
+        "Online withdrawal function, step one (CMP.6): the page is public by design and shows "
+        "no order data; the POST is CSRF-checked, behind Turnstile and rate limited per "
+        "address, and only a matching order number and email lead to the choice page."
+    ),
+    "withdrawal_confirm": (
+        "Online withdrawal function, step two (CMP.6): a GET answers 405; the POST needs the "
+        "CSRF token and the signed 30-minute token minted by a successful lookup."
+    ),
+    "withdrawal_done": (
+        "Acknowledgement page of the withdrawal function (CMP.6): shows only the statements "
+        "kept in the visitor's own session, a 404 without one."
+    ),
+    "consumer_information": (
+        "Pre-contractual information (CMP.6, directive 2011/83/EU art. 49): the same legal text "
+        "for every visitor, public by law."
+    ),
     "subprocessors": (
         "Sub-processor register (CMP.4): static reviewed data, read-only, public by design "
         "(GDPR art. 13 and 28)."

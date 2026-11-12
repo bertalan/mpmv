@@ -1,0 +1,6 @@
+{% load i18n %}<section class="withdrawal-other-ways">
+  <h2>{% translate "Other ways to withdraw" %}</h2>
+  <p>{% translate "You can also withdraw by sending a clear statement that you withdraw from the contract, with your order number, to the seller by email or post, or by using the model withdrawal form. The seller's contact details are in your order confirmation." %}</p>
+  {% if vendor_contacts %}<ul>{% for name, email in vendor_contacts %}<li>{{ name }}: {{ email }}</li>{% endfor %}</ul>{% endif %}
+  {% if platform_email %}<p>{% blocktranslate %}If you cannot reach the seller, write to the platform at {{ platform_email }}.{% endblocktranslate %}</p>{% endif %}
+</section>

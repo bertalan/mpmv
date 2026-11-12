@@ -9,6 +9,9 @@ note for users who may switch. Nothing for anonymous visitors and customers.
 
 from django import template
 from django.http import HttpRequest
+from django.middleware.csrf import get_token
+from django.urls import reverse
+from django.utils.http import urlencode
 
 from apps.accounts import levels
 
@@ -29,5 +32,18 @@ def session_level_banner(context: template.Context) -> dict[str, object]:
             "request": request,
         }
     if user.is_staff or levels.may_elevate(user):
-        return {"mode": levels.RESTRICTED, "request": request}
+        security = (
+            reverse("mfa:setup")
+            + "?"
+            + urlencode({"next": request.get_full_path(), "from": "security"})
+        )
+        return {
+            "mode": levels.RESTRICTED,
+            "request": request,
+            "may_elevate": levels.may_elevate(user),
+            "can_elevate": user.has_perm(f"core.{levels.ELEVATE_CODENAME}"),
+            "security_url": security,
+            "csrf_token": get_token(request),
+            "csp_nonce": context.get("csp_nonce", ""),
+        }
     return {"mode": None}
