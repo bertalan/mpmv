@@ -40,6 +40,10 @@ own responsibility (CMP.10).
   payout for every vendor, non-EU sellers included, and `engine.dac7_missing()` reports what is
   missing. CMP.1 does not collect or validate them again; it reads them.
 - Aggregation per vendor and quarter from the ledger (consideration, commissions, number of transactions).
+- `Consideration` (T-6, adviser opinion 2026-11-11) is the amount paid or credited to the vendor **net of the
+  platform's fees and taxes**; the fees go in the separate `Fees` field. On a 100 order with a 10
+  coupon and platform fees of 15 before the coupon: a vendor coupon gives Consideration 75 and Fees
+  15; a Q-90 platform coupon (commission reduced by the coupon) gives Consideration 85 and Fees 5.
 - Annual export in the format of the authority of the **platform's country of establishment**
   (`PlatformOperator`). For Italy (legislative decree 32/2023): XML schema DPI 1.0 sent to the
   Agenzia delle Entrate by 31 January of the following year, and the same information given to
@@ -63,6 +67,15 @@ own responsibility (CMP.10).
   commission VAT mode of the `PlatformOperator` only as information.
 - Invoices and receipts to customers are the vendor's (ORD.9 sends a non-fiscal order
   confirmation). ⚖️ The vendor contract states the boundary.
+- Statement lines (adviser opinion 2026-11-11): the refund fee is a platform service with the commission's VAT
+  treatment, on a line of its own (T-8). Commission given back before the period is invoiced shows
+  as the gross commission line plus a negative "commission on refunded orders" line; after it is
+  invoiced, either a credit note or a negative line on the next periodic statement referencing the
+  earlier one. A platform coupon or platform-paid free shipping (Q-90 model, T-1 and T-5) reduces
+  the commission; an excess over the order's commission is netted against the vendor's
+  commissions of the period. The total of a period never goes below zero: an excess larger than
+  the vendor's commissions of the whole period carries over to the next period as a vendor credit
+  against future commissions, and no cash is paid out (owner, 2026-11-11).
 
 ### CMP.3 — GPSR `[P1]`
 ```python
@@ -306,8 +319,10 @@ class CountryWarningLanguages(Model):   # platform data: country -> accepted war
     price is converted at display time with the same tax decision as the price shown.
 
 ### CMP.7 — European Accessibility Act `[P1]`
-- E-commerce services fall under the EAA. ⚖️ Service **microenterprises** (fewer than 10 employees
-  and turnover or balance sheet ≤ €2M) are exempt: verify the platform's status.
+- E-commerce services fall under the EAA. Service **microenterprises** (fewer than 10 employees
+  and turnover or balance sheet ≤ €2M) are exempt (D-15, decided: adviser opinion 2026-11-11), so a micro-enterprise
+  operator is exempt; the platform keeps WCAG 2.2 AA anyway because non-micro vendors have their
+  own duties, and the vendor terms make vendors provide accessible descriptions and attachments (CMP.5).
 - Recommendation: design to **WCAG 2.2 AA (EN 301 549 V4.1.1)** anyway. It costs little if done
   from the start, it is a de facto requirement for growth, and vendors with more than 10 employees may
   ask for it. Published accessibility statement.
@@ -484,7 +499,7 @@ answers to Q-65 and Q-66):
 ### CMP.14 — UK low-value consumer orders as vendor requests `[P1]`
 - Scope: buyers in Great Britain who are not businesses, for each vendor consignment (the
   `VendorOrder` package) whose goods are worth £135 or less (intrinsic value, without transport
-  and insurance unless they are part of the price). Northern Ireland follows D-02. The value is
+  and insurance unless they are part of the price). Northern Ireland (`BT` postcodes) follows D-02 (EU goods rules, TAX.18) and is outside this rule. The value is
   converted from EUR at the HMRC monthly exchange rate, kept as data. A buyer is B2B when a UK
   VAT number passes the HMRC check, through a client behind the same interface as the VIES client
   of TAX.5.
@@ -609,7 +624,8 @@ regulatory check and when the platform grows.
   connected products have distributor duties from 2027-12-11 (a CMP.10 item to add then).
 - DAC8 (directive (EU) 2023/2226): crypto-asset service providers only. Not applicable.
 - PSD3 and the Payment Services Regulation: provisionally agreed on 2025-11-27, not yet published;
-  application about 21 months after publication. Stripe is the licensed provider; D-08 stays open.
+  application about 21 months after publication. Stripe is the licensed provider; D-08 is decided
+  (adviser opinion 2026-11-11): no PSD2 licence while every customer payment goes through Stripe Connect.
 - ViDA (directive (EU) 2025/516): Single VAT Registration from 2028-07-01, intra-EU digital
   reporting and e-invoicing from 2030-07-01, both vendor duties. The article 14a change from
   2027-01-01 does not apply at go-live, since CMP.13 admits only EU-established vendors; CMP.18
@@ -623,13 +639,13 @@ regulatory check and when the platform grows.
 
 | ID | Micro-task | Pri | Hours | Depends on | Done when |
 |---|---|---|---|---|---|
-| CMP.1 | DAC7 quarterly aggregates + annual export, reading the dataset and completeness from VEN.12; a confirmed operator-owned vendor's sales follow D-22 (not reported, VEN.26) | P1 | 12 | VEN.5, VEN.4, VEN.12 | Test export validates against the Agenzia delle Entrate DPI XML schema and is checked by the advisor; excluded sellers (under 30 sales and €2,000 or less) are left out; each reported vendor gets its data |
-| CMP.2 | Non-fiscal commission statement (pro-forma) per vendor and period from the ledger, with VEN.12 party data, as PDF per language and CSV/JSON export mappable to FatturaPA fields; no invoice issuing, no e-invoicing channel | P1 | 8 | VEN.4, VEN.12 | A seed vendor's statement and export are labelled "Documento non fiscale / Non-fiscal document, not an invoice" in all five languages, carry a stable reference ID and no invoice number sequence, and their totals match the ledger |
+| CMP.1 | DAC7 quarterly aggregates + annual export, reading the dataset and completeness from VEN.12; a confirmed operator-owned vendor's sales follow D-22 (not reported, VEN.26); `Consideration` (T-6, adviser opinion 2026-11-11) is the amount paid or credited to the vendor net of the platform's fees and taxes, and the fees go in the separate `Fees` field; the PR is flagged for human review (DAC7) | P1 | 12 | VEN.5, VEN.4, VEN.12 | Test export validates against the Agenzia delle Entrate DPI XML schema and is checked by the advisor; excluded sellers (under 30 sales and €2,000 or less) are left out; each reported vendor gets its data; regression cases (T-6): on a 100 order with a 10 coupon and fees of 15 before the coupon, a vendor coupon reports Consideration 75 and Fees 15, and a Q-90 platform coupon reports Consideration 85 and Fees 5 |
+| CMP.2 | Non-fiscal commission statement (pro-forma) per vendor and period from the ledger, with VEN.12 party data, as PDF per language and CSV/JSON export mappable to FatturaPA fields; no invoice issuing, no e-invoicing channel; statement lines (adviser opinion 2026-11-11, T-8, T-1, T-5): the refund fee as a platform service line of its own with the commission's VAT treatment; commission given back before the period is invoiced as the gross line plus a negative "commission on refunded orders" line; after invoicing, a credit note or a negative line on the next statement referencing the earlier one, both supported; a platform coupon or platform-paid free shipping reduces the commission and an excess over an order's commission is netted against the vendor's commissions of the period; the total of a period never goes below zero, and an excess larger than the whole period's commissions carries over to the next period as a vendor credit against future commissions, never paid out in cash (owner, 2026-11-11) | P1 | 8 | VEN.4, VEN.12 | A seed vendor's statement and export are labelled "Documento non fiscale / Non-fiscal document, not an invoice" in all five languages, carry a stable reference ID and no invoice number sequence, and their totals match the ledger; a refund before invoicing gives a gross commission line and a negative "commission on refunded orders" line; a refund after invoicing can produce either a credit note or a negative line that references the earlier statement; the refund fee is a separate line; a platform coupon larger than its order's commission reduces the other commissions of the period; no period total is negative; regression case: an excess larger than a period's commissions leaves that period at zero, is carried as a vendor credit, reduces the next period's total by the remainder, no payout or cash line is created, and no period total is negative |
 | CMP.3 | `GpsrInfo` with per-vendor defaults, publication block, product page with picture, recall procedure; GPSR article 22 marketplace duties: points of contact, authority orders within 2 working days, safety notices within 3 working days, Safety Gate checks, repeat-offender suspension | P1 | 12 | CAT.1 | Product without GPSR cannot be published; a safety notice and an authority order show their working-day deadline and an overdue one alerts staff |
 | CMP.4 | GDPR: customer export and erasure that anonymises the profile and non-fiscal data and never touches concluded orders (D-29), sub-processor register, retention job; erasure for a closed vendor's owner as restriction plus deletion of the data not under a retention duty (Q-16) | P1 | 12 | ORD.2 | Erasure request on a seed order; an erasure request from a closed vendor's owner keeps the membership, contract evidence, DAC7, ledger and order records, deletes the rest, and the retention job anonymises the kept data once the period ends (test with a frozen clock) |
-| CMP.5 | DSA duties of every platform (points of contact, terms, notice and action, statement of reasons, criminal offence notification) and P2B (reasons for restrictions, 30 days' notice of termination, ranking page, differentiated treatment and data access in the terms); vendor terms acceptance is VEN.5, VEN.13 to VEN.16 | P1 | 10 | VEN.5 | A notice gets a tracked outcome and the vendor a statement of reasons; a termination cannot take effect before 30 days from its notice |
+| CMP.5 | DSA duties of every platform (points of contact, terms, notice and action, statement of reasons, criminal offence notification) and P2B (reasons for restrictions, 30 days' notice of termination, ranking page, differentiated treatment and data access in the terms); vendor terms acceptance is VEN.5, VEN.13 to VEN.16; contract clauses (adviser opinion 2026-11-11; owner, 2026-11-11), each stated in the terms as a requirement: customer terms (a) payment through the platform discharges the customer's debt towards the vendor (Italian civil code art. 1188, D-08); (b) compatibility data of the garage is declared by the vendor and an incompatibility is a conformity defect (Codice del consumo art. 129 and following) borne by the vendor (Q-G8); (c) a description of the Garage filter (Q-G2); vendor terms (d) Stripe provides the payment service under its Connected Account Agreement (D-08); (e) the vendor agrees to contractual set-off of fees and refund fees against transfers (art. 1252), with SEPA debit under its mandate for a negative balance (D-08); (f) the refund-fee clause of VEN.33 with the exact EUR 2.00 fixed part, the platform-error exception and 15 days' notice of a change (L-10); (g) vendors provide accessible descriptions and attachments (D-15); (h) the vendor answers for its declared compatibility (Q-G8); the "How we rank results" page describes the Garage filter (Q-G2) | P1 | 10 | VEN.5 | A notice gets a tracked outcome and the vendor a statement of reasons; a termination cannot take effect before 30 days from its notice; the customer and vendor terms versions in force carry clauses (a) to (h) in the five languages, each with its CMP.24 approval record; the ranking page describes the Garage filter |
 | CMP.6 | Online withdrawal, 30-day price history (Omnibus), pre-contractual information, marketplace information (art. 49-bis Codice del Consumo), harmonised legal guarantee notice | P1 | 10 | ORD.2, CAT.1 | Correct strikethrough price in tests; every offer shows the vendor's trader status and the split of obligations; checkout shows the harmonised legal guarantee notice |
-| CMP.7 | Automated accessibility audit in CI (axe, WCAG 2.2 AA tags) + manual review + statement | P1 | 8 | THM.5 | Zero axe violations with the `wcag22aa` tag on key pages; manual review recorded; statement published |
+| CMP.7 | Automated accessibility audit in CI (axe, WCAG 2.2 AA tags) + manual review + statement; D-15 decided (adviser opinion 2026-11-11): a micro-enterprise operator is exempt from the EAA and the platform keeps WCAG 2.2 AA anyway; the vendor accessibility clause is in CMP.5 | P1 | 8 | THM.5 | Zero axe violations with the `wcag22aa` tag on key pages; manual review recorded; statement published |
 | CMP.8 | AI Act transparency: "AI generated" or "AI edited" label and metadata flag on AI-produced product images, origin tracking of AI text, staff AI literacy briefing | P1 | 4 | CAT.4, ING.5 | An AI-edited image shows its label on the product page and in its metadata; unreviewed machine text cannot be published as reviewed |
 | CMP.9 | WCAG 2.2 SC 3.3.8 (accessible authentication) on the authentication templates of CORE.4 and CORE.5: paste allowed in every password and code field, `autocomplete` tokens (`current-password`, `new-password`, `one-time-code`, `username webauthn`), passkeys offered, Turnstile without a puzzle | P1 | 3 | CORE.4, CORE.5, THM.3 | e2e test pastes a password and a TOTP code; the template lint finds the `autocomplete` tokens; Turnstile runs in managed or invisible mode |
 | CMP.10 | Vendor obligations checklist with self-attestation: versioned `VendorObligation` data with applicability rules, three answers (yes, no, in progress with date) as append-only attestations, date-based and "no" reminders with one-click links, staff flags after N unanswered reminders, optional VEN.16 consequence per obligation, staff view of open answers, seed obligations; email wording approved by counsel through CMP.24 (L); reminder emails link through CORE.15 secure action links | P1 | 24 | VEN.12, VEN.16, ARC.16, ARC.9, CORE.9, SEC.4, CORE.15 | A seed vendor sees only the obligations that apply to it; an "in progress" answer without a date is refused; changing an answer adds a row and an AuditLog entry; a "no" answer sends reminders at the configured cadence that stop when the answer becomes "in progress" or "yes"; an overdue date and N unanswered reminders flag the vendor to staff; every reminder is in the audit log and the outbox; suspension is mentioned only when a consequence is configured |

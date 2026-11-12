@@ -1,5 +1,5 @@
-# count: 624
-# Editor-facing fields without help text (ARC.30); ARC.31 backfills them.
+# count: 569
+# editor-facing fields have no help text
 # Only shrinks: delete a line when its field is fixed.
 admin:accounts.user.email
 admin:catalog.attribute.kind
@@ -195,56 +195,6 @@ admin:tax.vendortaxprofiletranslation.profile
 admin:tax.vendortaxprofiletranslation.status
 admin:themes.themesettings.site
 admin:themes.themesettings.theme
-admin:vendors.contractacceptance.accepted_at
-admin:vendors.contractacceptance.contract
-admin:vendors.contractacceptance.ip
-admin:vendors.contractacceptance.language
-admin:vendors.contractacceptance.user
-admin:vendors.contractacceptance.vendor
-admin:vendors.crossvendorconsent.vendor
-admin:vendors.legalfieldrequirement.field_name
-admin:vendors.legalfieldrequirement.purpose
-admin:vendors.vendor.ateco_code
-admin:vendors.vendor.bank_name
-admin:vendors.vendor.bic
-admin:vendors.vendor.contact_email
-admin:vendors.vendor.display_name
-admin:vendors.vendor.enquiries_enabled
-admin:vendors.vendor.eori
-admin:vendors.vendor.establishment_city
-admin:vendors.vendor.establishment_country
-admin:vendors.vendor.establishment_postal_code
-admin:vendors.vendor.establishment_street
-admin:vendors.vendor.establishment_street_number
-admin:vendors.vendor.fiscal_representative_vat_number
-admin:vendors.vendor.iban
-admin:vendors.vendor.legal_form
-admin:vendors.vendor.legal_name
-admin:vendors.vendor.liquidation_status
-admin:vendors.vendor.phone
-admin:vendors.vendor.rea_number
-admin:vendors.vendor.rea_office
-admin:vendors.vendor.registered_city
-admin:vendors.vendor.registered_country
-admin:vendors.vendor.registered_postal_code
-admin:vendors.vendor.registered_street
-admin:vendors.vendor.registered_street_number
-admin:vendors.vendor.sales_mode_default
-admin:vendors.vendor.share_capital
-admin:vendors.vendor.sole_shareholder
-admin:vendors.vendor.vat_number
-admin:vendors.vendorcontracttranslation.body
-admin:vendors.vendorcontracttranslation.language
-admin:vendors.vendorcontracttranslation.status
-admin:vendors.vendorfeatureflag.flag
-admin:vendors.vendorfeatureflag.vendor
-admin:vendors.vendortranslation.cancellation_policy
-admin:vendors.vendortranslation.description
-admin:vendors.vendortranslation.language
-admin:vendors.vendortranslation.refund_policy
-admin:vendors.vendortranslation.shipping_policy
-admin:vendors.vendortranslation.status
-admin:vendors.vendortranslation.tagline
 block:cms.blogauthor.same_as.url
 block:cms.blogpostpage.body.cta.heading
 block:cms.blogpostpage.body.cta.link.label
@@ -558,11 +508,6 @@ form:apps.manager.forms.StorefrontProfileForm.description
 form:apps.manager.forms.StorefrontProfileForm.shipping_policy
 form:apps.manager.forms.VendorLogoForm.remove
 form:apps.manager.media.ImageUploadForm.file
-form:apps.vendors.forms.ApplicationForm.business_name
-form:apps.vendors.forms.ApplicationForm.country
-form:apps.vendors.forms.ApplicationForm.email
-form:apps.vendors.forms.ApplicationForm.full_name
-form:apps.vendors.forms.ConfirmForm.password
 wagtail:cms.blogauthor.bio
 wagtail:cms.blogauthor.job_title
 wagtail:cms.blogauthor.name

@@ -88,9 +88,9 @@ own weight bands, free-shipping threshold and delivery time.
 
 **VAT treatment per method.** `tax_treatment` is stored per method and applied by the tax engine
 (`resolve_shipping_tax`, TAX.4): `follows_goods` (default) treats shipping as ancillary to the goods
-and splits its VAT like the goods ([05](05-tax.md)); `standard_rate` and `exempt` are recorded for the
-cases the tax advisor confirms. Their exact computation belongs to TAX.4 and depends on D-03, which
-is open: SHP.12 only stores the choice.
+and splits its VAT like the goods ([05](05-tax.md)); `standard_rate` and `exempt` were recorded for the
+cases the tax advisor might confirm. D-03 is decided (adviser opinion 2026-11-11): shipping always follows the goods,
+so TAX.17 removes the other two values.
 
 ### Zones: vendor zones, country groups and postcodes
 
@@ -242,7 +242,7 @@ files are still read (they hold neither), and files are always written in versio
 
 Amounts and weights are decimal strings (`"9.90"`, `"5.000"`), never floats. Lists hold text.
 `tax_treatment` and `over_max_weight` travel as stored data only: their meaning depends on D-03
-(TAX.4) and D-06 (SHP.3). Translated names (method and group names, pickup labels) are not part of
+(TAX.4; after TAX.17 only `follows_goods` is accepted) and D-06 (SHP.3). Translated names (method and group names, pickup labels) are not part of
 the format: they stay with the translation workflow.
 
 **CSV**: the same rows, one per line, with the header `record, code, version, name, priority,
@@ -399,7 +399,7 @@ and `apps.shipping` from importing `apps.events` (VEN.20, EVT.1).
 |---|---|---|---|---|---|
 | SHP.1 | Carrier, Zone, VendorZoneRate, WeightBand (exclusion constraint), PickupOption, ConfigVersion models | P1 | 10 | VEN.1 | DB constraints tested |
 | SHP.2 | Legacy cases 1–7 against the `match_postcode` and `resolve_zone` pure functions that SHP.12 built; destination country normalised before matching (`EL` → `GR`, `UK` → `GB`), postcode patterns parsed once per zone, a spaced dash range (`70000 - 74999`) refused like the old range form | P1 | 6 | SHP.12 | Cases 1–7 green; an `EL` destination matches a `GR` zone; `70000 - 74999` is refused with the `..` hint |
-| SHP.3 | `quote_shipping` with Rates/IndicativeRates/NeedsQuote/Blocked outcomes, over-band policy, pickup, free-shipping threshold per method | P1 | 8 | SHP.2, SHP.12, SHP.14 | Cases 8–13 green |
+| SHP.3 | `quote_shipping` with Rates/IndicativeRates/NeedsQuote/Blocked outcomes, over-band policy, pickup, free-shipping threshold per method; over-band policy (owner decision D-06, 2026-11-11): a weight above the last band of a method answers `NeedsQuote`, the default `over_max_weight` is `quote`, and `last_band` and `block` stay as per-method options | P1 | 8 | SHP.2, SHP.12, SHP.14 | Cases 8–13 green; a package heavier than the last band of a method with the default policy returns `NeedsQuote` (not the last band price, not `Blocked`); a method set to `last_band` or `block` keeps its own outcome; the default of a new method is `quote` |
 | SHP.4 | Cart integration: package per vendor, VAT via the tax engine | P1 | 6 | SHP.3, TAX.4, ORD.1 | Correct cart totals in mixed tests |
 | SHP.5 | Import of the LIVE v2 config (JSON) into the new models with a parity report; the legacy rate tables are mapped onto country-qualified zones (`CC:` patterns), without the legacy cross-country postcode match (owner decision MQ-8) | P1 | 6 | SHP.1 | Same rates on 200 sample combinations, except the addresses the legacy system mis-zoned; the parity report lists every address whose rate changes, with the old and the new rate |
 | SHP.6 | Admin zone/rate editor with diff, impact and versions/rollback | P2 | 12 | SHP.12, CORE.8 | Rollback to a previous version works |
