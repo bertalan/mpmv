@@ -35,6 +35,8 @@ SCOPES = (
     "apps/orders/templates",
     "themes/base/templates/layouts",
 )
+# Single files outside the scopes: strings the sweep needs in the catalog (ARC.32 help entry).
+EXTRA_FILES = ("apps/cms/help_texts.py",)
 # Theme files rendered by the Manager and account pages (the rest of the theme is storefront).
 THEME_FILES = (
     "400.html",
@@ -77,6 +79,8 @@ def _files() -> Iterator[Path]:
             if SKIP_PARTS & set(rel.parts) or path.suffix not in {".py", ".html", ".txt"}:
                 continue
             yield path
+    for extra in EXTRA_FILES:
+        yield ROOT / extra
     for name in THEME_FILES:
         yield ROOT / "themes/base/templates" / name
 

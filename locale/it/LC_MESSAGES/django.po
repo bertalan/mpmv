@@ -1189,3 +1189,45 @@ msgstr "Ordine %(order_number)s: una spedizione è stata consegnata"
 #: apps/orders/templates/email/orders/vendor_order_cancelled/subject.txt
 msgid "Order %(order_number)s: part of your order was cancelled"
 msgstr "Ordine %(order_number)s: una parte del tuo ordine è stata annullata"
+
+#: apps/cms/help_texts.py
+msgid ""
+"What the text is for: one screen, every page of one page type, or every screen "
+"that has no text of its own. Example: choose Screen for the brand listing."
+msgstr ""
+"A cosa serve il testo: una schermata, tutte le pagine di un tipo di pagina o "
+"tutte le schermate che non hanno un testo proprio. Esempio: scegli Schermata "
+"per l’elenco dei marchi."
+
+#: apps/cms/help_texts.py
+msgid ""
+"The name of the screen (for example catalog:brand) or of the page type (for "
+"example cms.StandardPage). Leave it empty for the general text."
+msgstr ""
+"Il nome della schermata (per esempio catalog:brand) o del tipo di pagina (per "
+"esempio cms.StandardPage). Lascialo vuoto per il testo generale."
+
+#: apps/cms/help_texts.py
+msgid ""
+"The heading of the help text, in a few words that say what the screen is for. "
+"Example: Your orders."
+msgstr ""
+"Il titolo del testo di aiuto, in poche parole che dicono a cosa serve la "
+"schermata. Esempio: I tuoi ordini."
+
+#: apps/cms/help_texts.py
+msgid ""
+"What a person can do here and what to do first, in short plain sentences. "
+"Without text the dialog shows only the title."
+msgstr ""
+"Cosa si può fare qui e cosa fare per prima cosa, in frasi brevi e semplici. "
+"Senza testo la finestra mostra solo il titolo."
+
+#: apps/cms/help_texts.py
+msgid ""
+"Tick it on screens for vendors, so the dialog also links the vendor guide. "
+"It has no effect until the platform has a vendor guide address."
+msgstr ""
+"Spuntalo sulle schermate per i venditori, così la finestra rimanda anche alla "
+"guida venditori. Non ha effetto finché la piattaforma non ha l’indirizzo di "
+"una guida venditori."
