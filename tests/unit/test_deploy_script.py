@@ -207,6 +207,11 @@ class Host:
         return last.removeprefix("# release ")
 
     def run(self, *args: str, **extra: str) -> subprocess.CompletedProcess[str]:
+        return self.run_script(SCRIPT, *args, **extra)
+
+    def run_script(
+        self, script: Path, *args: str, **extra: str
+    ) -> subprocess.CompletedProcess[str]:
         (self.root / "log").unlink(missing_ok=True)
         # A host that may bind 80/443 unless a test says otherwise: never read the runner's own
         # /proc/sys (GitHub runners keep the kernel default 1024, a workstation has no /proc).
@@ -233,7 +238,7 @@ class Host:
             **extra,
         }
         return subprocess.run(  # noqa: S603 (fixed script path, test-controlled arguments)
-            ["/bin/sh", str(SCRIPT), *args], env=env, capture_output=True, text=True, check=False
+            ["/bin/sh", str(script), *args], env=env, capture_output=True, text=True, check=False
         )
 
 
@@ -734,10 +739,54 @@ def test_deploy_continues_with_the_release_own_script(host: Host) -> None:
     """An older installed script hands the deploy to the release's script (socket switch)."""
     own = host.root / "images" / "1.0.0" / "server" / "mpmv-deploy"
     marker = host.root / "reexec-marker"
-    own.write_text(f'#!/bin/sh\necho "$MPMV_REEXEC $*" > "{marker}"\n')
+    own.write_text(f'#!/bin/sh\necho "$*" > "{marker}"\n')
 
     result = host.run("deploy", "1.0.0")
 
     assert result.returncode == 0, result.stderr
-    assert marker.read_text().strip() == "1 deploy 1.0.0"
+    assert marker.read_text().strip() == "deploy 1.0.0"
     assert "continuing with the deploy script of 1.0.0" in result.stderr
+
+
+def test_the_script_has_no_reexec_environment_bypass() -> None:
+    """The cmp against the release's script ends the hand-over: no variable is needed."""
+    assert "MPMV_REEXEC" not in SCRIPT.read_text()
+
+
+def marked(text: str, line: str) -> str:
+    """The deploy script with one extra log line right after `set -eu`."""
+    assert text.count("\nset -eu\n") == 1
+    return text.replace("\nset -eu\n", f"\nset -eu\n{line}\n")
+
+
+def test_the_previous_scripts_deploy_re_execs_the_candidate_script(host: Host) -> None:
+    """Old to new: the previous release's script deploys the candidate, then runs the candidate's
+    own script (once), which finishes the deploy and installs itself as the host's script."""
+    text = SCRIPT.read_text()
+    old = host.root / "old-mpmv-deploy"
+    old.write_text(marked(text, 'echo "ran the previous script" >&2'))
+    candidate = host.root / "images" / "1.2.0" / "server" / "mpmv-deploy"
+    candidate.write_text(marked(text, 'echo "ran the candidate script $0" >&2'))
+    assert old.read_text() != candidate.read_text()
+
+    result = host.run_script(old, "deploy", "1.2.0")
+
+    assert result.returncode == 0, result.stderr
+    lines = result.stderr.splitlines()
+    assert lines.count("ran the previous script") == 1
+    assert lines.count("mpmv-deploy: continuing with the deploy script of 1.2.0") == 1
+    own = str(host.root / "state" / "units" / "1.2.0" / "server" / "mpmv-deploy")
+    assert lines.count(f"ran the candidate script {own}") == 1
+    # The hand-over came before any change, and the candidate's script did the rest.
+    assert lines.index("ran the previous script") < lines.index(f"ran the candidate script {own}")
+    assert "mpmv-deploy: release 1.2.0 is live" in lines
+    assert host.releases == ["1.2.0"]
+    assert host.script.read_bytes() == candidate.read_bytes()
+    assert host.log.count(f"podman pull {REGISTRY}:1.2.0") == 1
+
+
+def test_a_script_equal_to_the_release_script_does_not_re_exec(host: Host) -> None:
+    result = host.run("deploy", "1.2.0")
+
+    assert result.returncode == 0, result.stderr
+    assert "continuing with the deploy script" not in result.stderr
