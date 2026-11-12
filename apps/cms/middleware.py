@@ -55,6 +55,10 @@ class WagtailAdminPickerNonceMiddleware:
             html = strip_assets(html)  # the help script is for the signed-in admin only (ARC.32)
         if html != original:
             response.content = html.encode(response.charset)
+            if response.has_header("Content-Length"):
+                # The body changed size: a stale length makes the browser wait for bytes that
+                # never come, and the page's load event never fires.
+                response["Content-Length"] = str(len(response.content))
         return response
 
 
