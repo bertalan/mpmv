@@ -466,6 +466,32 @@ ENDPOINTS: dict[str, Access] = {
         "compliance.review_notices permission, so a vendor member gets 404.",
         kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
     ),
+    "subprocessors": NoVendorData(
+        "Sub-processor register (CMP.4): static reviewed data, the same for every visitor."
+    ),
+    "privacy_account": NoVendorData(
+        "The signed-in user's own privacy page (CMP.4): forms only, no vendor data."
+    ),
+    "privacy_export": NoVendorData(
+        "Own-data export (CMP.4): POST only, always the signed-in user, never an id from the "
+        "input; fresh re-authentication and a rate limit guard it."
+    ),
+    "privacy_erase": NoVendorData(
+        "Own account erasure (CMP.4, D-30): POST only, always the signed-in user; fresh "
+        "re-authentication, confirmation and a rate limit guard it."
+    ),
+    "privacy_erase_done": NoVendorData(
+        "Static confirmation page after an erasure request (CMP.4): no data."
+    ),
+    "privacy_requests": StaffOnly(
+        "Erasure requests (CMP.4): platform data listed by public id; needs "
+        "compliance.change_erasurerequest, so a vendor member gets 404."
+    ),
+    "privacy_request_process": StaffOnly(
+        "Process an erasure request (CMP.4): platform data; needs "
+        "compliance.change_erasurerequest, so a vendor member gets 404.",
+        kwargs={"public_id": "00000000-0000-0000-0000-000000000000"},
+    ),
     "dsa_notice": NoVendorData(
         "Public report form for illegal content (DSA art. 16, CMP.5): no vendor data is shown, "
         "the form only stores a notice; captcha and a rate limit guard the POST."

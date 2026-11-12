@@ -11,7 +11,9 @@ from typing import Any
 
 import pytest
 from bs4 import BeautifulSoup
+from django.apps import apps
 from django.test import Client, override_settings
+from wagtail.models import Site
 
 from apps.catalog import brands, services
 from apps.catalog.models import Brand, Product
@@ -26,6 +28,15 @@ from apps.core.audit import AuditContext
 from apps.vendors.tests.factories import VendorFactory
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def _site_allows_indexing() -> None:
+    """The site has turned its indexing switch on (SEO settings)."""
+    apps.get_model("seo", "SeoSettings").objects.create(
+        site=Site.objects.get(is_default_site=True), allow_indexing=True
+    )
+
 
 PUBLISHED = "published"
 CTX = AuditContext(actor_id=1, actor_label="staff:catalog", source="admin", ip="127.0.0.1")
