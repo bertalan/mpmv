@@ -1061,6 +1061,10 @@ msgstr "Email"
 msgid "Email address of the order"
 msgstr "Indirizzo email dell’ordine"
 
+#: apps/vendors/models.py
+msgid "Email language"
+msgstr "Lingua delle email"
+
 #: apps/accounts/admin.py
 msgid ""
 "Enabled: you set a password now. Disabled: the account is created without a password and cannot "
@@ -3494,6 +3498,14 @@ msgid ""
 msgstr ""
 "Il tipo di oggetto del catalogo a cui corrisponde il termine. Lascialo vuoto quando il termine "
 "corrisponde a un valore semplice."
+
+#: apps/vendors/models.py
+msgid ""
+"The language of the order emails we send you, for example a new order to ship. Leave it empty to "
+"receive them in English."
+msgstr ""
+"La lingua delle email sugli ordini che ti inviamo, per esempio un nuovo ordine da spedire. "
+"Lasciala vuota per riceverle in inglese."
 
 #: apps/vendors/models.py
 msgid "The language of the text that was shown when the contract was accepted."
