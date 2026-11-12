@@ -29,34 +29,56 @@ msgstr "%(name)s rimosso."
 msgid "%(vendor_name)s shipped its part of order %(order_number)s."
 msgstr "%(vendor_name)s ha spedito la sua parte dell’ordine %(order_number)s."
 
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+msgid "%(vendor_name)s's part of order %(order_number)s was cancelled."
+msgstr ""
+"La parte dell’ordine %(order_number)s di %(vendor_name)s è stata annullata."
+
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
+msgid "%(vendor_name)s's part of order %(order_number)s was delivered."
+msgstr ""
+"La parte dell’ordine %(order_number)s di %(vendor_name)s è stata consegnata."
+
 #: apps/orders/templates/email/orders/vendor_new_order/body.html
 #: apps/orders/templates/email/orders/vendor_new_order/body.txt
 msgid "%(vendor_name)s: new paid order %(order_number)s to ship:"
 msgstr "%(vendor_name)s: nuovo ordine pagato %(order_number)s da spedire:"
 
-#: apps/vendors/models.py
-msgid ""
-"A fingerprint (SHA-256) of the exact text that was accepted, to prove later that it has not "
-"changed."
-msgstr ""
-"Un'impronta (SHA-256) del testo esatto che è stato accettato, per dimostrare in seguito che non è "
-"cambiato."
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/subject.txt
+msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
+msgstr "%(vendor_name)s: ordine %(order_number)s annullato, non spedire"
+
+#: apps/orders/templates/orders/customer_order.html
+msgid "(opens the carrier's site)"
+msgstr "(si apre il sito del corriere)"
 
 #: apps/vendors/models.py
 msgid ""
-"A phone number where we can reach you, with the country prefix, for example +39 06 1234 5678. "
-"Optional, up to 32 characters."
+"A fingerprint (SHA-256) of the exact text that was accepted, to prove later "
+"that it has not changed."
 msgstr ""
-"Un numero di telefono a cui possiamo chiamarti, con il prefisso internazionale, per esempio +39 06"
-" 1234 5678. Facoltativo, al massimo 32 caratteri."
+"Un'impronta (SHA-256) del testo esatto che è stato accettato, per dimostrare"
+" in seguito che non è cambiato."
 
 #: apps/vendors/models.py
 msgid ""
-"A short line under your shop name, up to 200 characters, for example 'Handmade ceramics from "
-"Umbria'. Leave it empty to show none."
+"A phone number where we can reach you, with the country prefix, for example "
+"+39 06 1234 5678. Optional, up to 32 characters."
 msgstr ""
-"Una breve frase sotto il nome del negozio, al massimo 200 caratteri, per esempio 'Ceramiche fatte "
-"a mano in Umbria'. Lasciala vuota se non ne vuoi una."
+"Un numero di telefono a cui possiamo chiamarti, con il prefisso "
+"internazionale, per esempio +39 06 1234 5678. Facoltativo, al massimo 32 "
+"caratteri."
+
+#: apps/vendors/models.py
+msgid ""
+"A short line under your shop name, up to 200 characters, for example "
+"'Handmade ceramics from Umbria'. Leave it empty to show none."
+msgstr ""
+"Una breve frase sotto il nome del negozio, al massimo 200 caratteri, per "
+"esempio 'Ceramiche fatte a mano in Umbria'. Lasciala vuota se non ne vuoi "
+"una."
 
 #: apps/manager/forms.py
 msgid "About the shop"
@@ -65,6 +87,10 @@ msgstr "Informazioni sul negozio"
 #: apps/manager/templates/manager/shop/order.html
 msgid "Accept the order"
 msgstr "Accetta l'ordine"
+
+#: apps/orders/customer_views.py
+msgid "Accepted by the seller"
+msgstr "Accettato dal venditore"
 
 #: themes/base/templates/403.html
 msgid "Access denied"
@@ -90,7 +116,8 @@ msgstr "Aggiungi un’app di autenticazione"
 msgid "Add another factor before removing your last one."
 msgstr "Aggiungi un altro fattore prima di rimuovere l’ultimo."
 
-#: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/list.html
+#: apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "All"
 msgstr "Tutti"
@@ -99,7 +126,8 @@ msgstr "Tutti"
 msgid "Anonymous"
 msgstr "Anonimo"
 
-#: apps/accounts/templates/accounts/mfa/totp.html apps/accounts/templates/accounts/mfa/verify.html
+#: apps/accounts/templates/accounts/mfa/totp.html
+#: apps/accounts/templates/accounts/mfa/verify.html
 msgid "Authentication code"
 msgstr "Codice di autenticazione"
 
@@ -107,13 +135,18 @@ msgstr "Codice di autenticazione"
 msgid "authenticator app"
 msgstr "app di autenticazione"
 
-#: apps/accounts/templates/accounts/mfa/setup.html apps/accounts/templates/accounts/mfa/totp.html
+#: apps/accounts/templates/accounts/mfa/setup.html
+#: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Authenticator app"
 msgstr "App di autenticazione"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Authorities told: %(authority)s, %(at)s."
 msgstr "Autorità informate: %(authority)s, %(at)s."
+
+#: apps/orders/templates/orders/customer_order.html
+msgid "Back to my orders"
+msgstr "Torna ai miei ordini"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Back to the notices"
@@ -135,6 +168,10 @@ msgstr "Torna alle impostazioni della verifica in due passaggi"
 msgid "Bad request"
 msgstr "Richiesta non valida"
 
+#: apps/orders/customer_views.py
+msgid "Being prepared"
+msgstr "In preparazione"
+
 #: apps/manager/templates/manager/bulk_preview.html
 msgid "Cancel"
 msgstr "Annulla"
@@ -142,6 +179,10 @@ msgstr "Annulla"
 #: apps/manager/forms.py
 msgid "Cancellation policy"
 msgstr "Condizioni di annullamento"
+
+#: apps/orders/customer_views.py
+msgid "Cancelled"
+msgstr "Annullato"
 
 #: apps/accounts/templates/accounts/mfa/totp.html
 msgid "Cannot scan? Enter this key:"
@@ -151,12 +192,17 @@ msgstr "Non riesci a scansionare? Inserisci questa chiave:"
 msgid "Carrier"
 msgstr "Corriere"
 
+#: apps/orders/templates/orders/customer_order.html
+msgid "Carrier: %(carrier)s"
+msgstr "Corriere: %(carrier)s"
+
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Carrier: %(carrier)s. Tracking number: %(tracking_number)s."
 msgstr "Corriere: %(carrier)s. Numero di tracking: %(tracking_number)s."
 
-#: apps/manager/sections.py apps/manager/templates/manager/shop/vendor_picker.html
+#: apps/manager/sections.py
+#: apps/manager/templates/manager/shop/vendor_picker.html
 msgid "Choose a vendor"
 msgstr "Scegli un venditore"
 
@@ -166,43 +212,54 @@ msgstr "Scegli come confermare la tua identità dopo la password."
 
 #: apps/vendors/models.py
 msgid ""
-"Companies only: LS if your company is in liquidation, LN if it is not, as in the company register."
+"Companies only: LS if your company is in liquidation, LN if it is not, as in"
+" the company register."
 msgstr ""
-"Solo società: LS se la tua società è in liquidazione, LN se non lo è, come risulta al registro "
-"delle imprese."
+"Solo società: LS se la tua società è in liquidazione, LN se non lo è, come "
+"risulta al registro delle imprese."
 
 #: apps/vendors/models.py
 msgid ""
-"Companies only: SU if one person owns all the shares, SM if there are several shareholders. Not "
-"sure? Ask your accountant."
+"Companies only: SU if one person owns all the shares, SM if there are "
+"several shareholders. Not sure? Ask your accountant."
 msgstr ""
-"Solo società: SU se un solo socio possiede tutte le quote, SM se i soci sono più di uno. Non sei "
-"sicuro? Chiedi al tuo commercialista."
+"Solo società: SU se un solo socio possiede tutte le quote, SM se i soci sono"
+" più di uno. Non sei sicuro? Chiedi al tuo commercialista."
 
 #: apps/vendors/models.py
 msgid ""
-"Companies only: the number from the company register (in Italy, the REA number), if you have one. "
-"It is asked for the platform's yearly DAC7 reporting duty."
+"Companies only: the number from the company register (in Italy, the REA "
+"number), if you have one. It is asked for the platform's yearly DAC7 "
+"reporting duty."
 msgstr ""
-"Solo società: il numero del registro delle imprese (in Italia, il numero REA), se ce l'hai. Ci "
-"viene richiesto per l'obbligo di comunicazione annuale DAC7 della piattaforma."
-
-#: apps/vendors/models.py
-msgid "Companies only: the share capital as in the company register, for example 10000.00."
-msgstr ""
-"Solo società: il capitale sociale come risulta al registro delle imprese, per esempio 10000.00."
+"Solo società: il numero del registro delle imprese (in Italia, il numero "
+"REA), se ce l'hai. Ci viene richiesto per l'obbligo di comunicazione annuale"
+" DAC7 della piattaforma."
 
 #: apps/vendors/models.py
 msgid ""
-"Companies only: tick it if your tax identification number is the same as your VAT number. In the "
-"countries where this is allowed we fill it in once VIES confirms the VAT number. Not sure? Ask "
-"your accountant."
+"Companies only: the share capital as in the company register, for example "
+"10000.00."
 msgstr ""
-"Solo società: spuntala se il tuo numero di identificazione fiscale coincide con la partita IVA. "
-"Nei paesi in cui è previsto lo compiliamo noi quando VIES conferma la partita IVA. Non sei sicuro?"
-" Chiedi al tuo commercialista."
+"Solo società: il capitale sociale come risulta al registro delle imprese, "
+"per esempio 10000.00."
 
-#: apps/accounts/templates/accounts/mfa/totp.html apps/manager/templates/manager/bulk_preview.html
+#: apps/vendors/models.py
+msgid ""
+"Companies only: tick it if your tax identification number is the same as "
+"your VAT number. In the countries where this is allowed we fill it in once "
+"VIES confirms the VAT number. Not sure? Ask your accountant."
+msgstr ""
+"Solo società: spuntala se il tuo numero di identificazione fiscale coincide "
+"con la partita IVA. Nei paesi in cui è previsto lo compiliamo noi quando "
+"VIES conferma la partita IVA. Non sei sicuro? Chiedi al tuo commercialista."
+
+#: apps/orders/customer_views.py
+msgid "Completed"
+msgstr "Completato"
+
+#: apps/accounts/templates/accounts/mfa/totp.html
+#: apps/manager/templates/manager/bulk_preview.html
 msgid "Confirm"
 msgstr "Conferma"
 
@@ -213,26 +270,42 @@ msgid "Continue"
 msgstr "Continua"
 
 #: apps/accounts/templates/accounts/action_link/continue.html
-msgid "Continue does not sign you in: the page it opens asks you to confirm who you are."
-msgstr "Continua non ti fa accedere: la pagina che si apre ti chiede di confermare la tua identità."
+msgid ""
+"Continue does not sign you in: the page it opens asks you to confirm who you"
+" are."
+msgstr ""
+"Continua non ti fa accedere: la pagina che si apre ti chiede di confermare "
+"la tua identità."
 
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid "Continue to your request"
 msgstr "Continua con la tua richiesta"
+
+#: apps/orders/customer_views.py
+msgid "current step"
+msgstr "passaggio attuale"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Customer"
 msgstr "Cliente"
 
 #: apps/manager/forms.py
-msgid "Customers see this text. A change is live at once and the moderators are told."
+msgid ""
+"Customers see this text. A change is live at once and the moderators are "
+"told."
 msgstr ""
-"I clienti vedono questo testo. Una modifica è visibile subito e i moderatori vengono avvisati."
+"I clienti vedono questo testo. Una modifica è visibile subito e i moderatori"
+" vengono avvisati."
 
-#: apps/manager/sections.py apps/manager/templates/manager/platform/dashboard.html
+#: apps/manager/sections.py
+#: apps/manager/templates/manager/platform/dashboard.html
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Dashboard"
 msgstr "Dashboard"
+
+#: apps/orders/templates/orders/customer_orders.html
+msgid "Date"
+msgstr "Data"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Decided"
@@ -242,6 +315,10 @@ msgstr "Deciso"
 msgid "Delete selected %(verbose_name_plural)s"
 msgstr "Elimina %(verbose_name_plural)s selezionati"
 
+#: apps/orders/customer_views.py
+msgid "Delivered"
+msgstr "Consegnato"
+
 #: apps/manager/forms.py
 msgid "Description of the logo"
 msgstr "Descrizione del logo"
@@ -250,17 +327,22 @@ msgstr "Descrizione del logo"
 msgid "Dismiss"
 msgstr "Chiudi"
 
+#: apps/orders/customer_views.py
+msgid "done"
+msgstr "completato"
+
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "Drafts"
 msgstr "Bozze"
 
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 msgid ""
-"Each code signs you in once if you lose your authenticator or passkey. Store them somewhere safe "
-"now: they are shown only this time."
+"Each code signs you in once if you lose your authenticator or passkey. Store"
+" them somewhere safe now: they are shown only this time."
 msgstr ""
-"Ogni codice ti fa accedere una sola volta se perdi l’app di autenticazione o la passkey. "
-"Conservali subito in un luogo sicuro: vengono mostrati solo questa volta."
+"Ogni codice ti fa accedere una sola volta se perdi l’app di autenticazione o"
+" la passkey. Conservali subito in un luogo sicuro: vengono mostrati solo "
+"questa volta."
 
 #: apps/manager/templates/manager/login.html
 msgid "Email"
@@ -272,7 +354,8 @@ msgstr "Inserisci un nome di corriere valido."
 
 #: apps/manager/forms.py
 msgid "Enter the tracking number: letters, digits, spaces and . / _ - only."
-msgstr "Inserisci il numero di tracciamento: solo lettere, cifre, spazi e . / _ -"
+msgstr ""
+"Inserisci il numero di tracciamento: solo lettere, cifre, spazi e . / _ -"
 
 #: themes/base/templates/components/alert.html
 msgid "Error"
@@ -290,12 +373,14 @@ msgstr "Spiegazione"
 msgid "File"
 msgstr "File"
 
-#: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/list.html
+#: apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Filter"
 msgstr "Filtra"
 
-#: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/list.html
+#: apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Filters"
 msgstr "Filtri"
@@ -318,29 +403,42 @@ msgstr "Genera nuovi codici"
 
 #: apps/accounts/templates/accounts/mfa/recovery_codes.html
 msgid "Generating new codes makes every previous code stop working."
-msgstr "Generando nuovi codici, tutti i codici precedenti smettono di funzionare."
+msgstr ""
+"Generando nuovi codici, tutti i codici precedenti smettono di funzionare."
 
 #: themes/base/templates/layouts/error.html
 msgid "Go to the home page"
 msgstr "Vai alla home page"
 
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Hello %(customer_name)s,"
 msgstr "Ciao %(customer_name)s,"
 
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
+#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.html
 #: apps/orders/templates/email/orders/vendor_order_shipped/body.txt
 msgid "Hello,"
@@ -348,20 +446,21 @@ msgstr "Ciao,"
 
 #: apps/vendors/models.py
 msgid ""
-"How your products are sold unless a product says otherwise: buyers order and pay online, or they "
-"first send you an enquiry."
+"How your products are sold unless a product says otherwise: buyers order and"
+" pay online, or they first send you an enquiry."
 msgstr ""
-"Come vendi i tuoi prodotti, salvo diversa indicazione sul singolo prodotto: i clienti ordinano e "
-"pagano online, oppure ti inviano prima una richiesta."
+"Come vendi i tuoi prodotti, salvo diversa indicazione sul singolo prodotto: "
+"i clienti ordinano e pagano online, oppure ti inviano prima una richiesta."
 
 #: apps/accounts/templates/accounts/action_link/continue.html
 msgid ""
-"If you are not signed in, Continue signs you in once with this link; you will still confirm it is "
-"you with your second factor before approving or declining anything."
+"If you are not signed in, Continue signs you in once with this link; you "
+"will still confirm it is you with your second factor before approving or "
+"declining anything."
 msgstr ""
-"Se non hai effettuato l’accesso, Continua ti fa accedere una volta con questo link; prima di "
-"approvare o rifiutare qualsiasi cosa dovrai comunque confermare la tua identità con il secondo "
-"fattore."
+"Se non hai effettuato l’accesso, Continua ti fa accedere una volta con "
+"questo link; prima di approvare o rifiutare qualsiasi cosa dovrai comunque "
+"confermare la tua identità con il secondo fattore."
 
 #: apps/manager/sections.py
 msgid "Images"
@@ -372,10 +471,12 @@ msgid "Information"
 msgstr "Informazione"
 
 #: apps/vendors/models.py
-msgid "Internal note on what changed in this version. Vendors do not see it. Up to 200 characters."
+msgid ""
+"Internal note on what changed in this version. Vendors do not see it. Up to "
+"200 characters."
 msgstr ""
-"Nota interna su cosa è cambiato in questa versione. I venditori non la vedono. Al massimo 200 "
-"caratteri."
+"Nota interna su cosa è cambiato in questa versione. I venditori non la "
+"vedono. Al massimo 200 caratteri."
 
 #: apps/accounts/mfa_views.py
 msgid "Invalid code. Check the time on your device and try again."
@@ -387,36 +488,49 @@ msgstr "Codice non valido. Riprova."
 
 #: apps/vendors/models.py
 msgid ""
-"Italy only: the ATECO code of your business activity, for example 47.91.10. It is on your VAT "
-"registration; if you do not know it, ask your accountant."
+"Italy only: the ATECO code of your business activity, for example 47.91.10. "
+"It is on your VAT registration; if you do not know it, ask your accountant."
 msgstr ""
-"Solo Italia: il codice ATECO della tua attività, per esempio 47.91.10. Lo trovi nella tua apertura"
-" di partita IVA; se non lo conosci, chiedilo al tuo commercialista."
+"Solo Italia: il codice ATECO della tua attività, per esempio 47.91.10. Lo "
+"trovi nella tua apertura di partita IVA; se non lo conosci, chiedilo al tuo "
+"commercialista."
 
 #: apps/vendors/models.py
 msgid ""
-"Italy only: the province of the company register office (REA) where your company is registered, "
-"for example RM."
+"Italy only: the province of the company register office (REA) where your "
+"company is registered, for example RM."
 msgstr ""
-"Solo Italia: la provincia dell'ufficio del registro delle imprese (REA) in cui è iscritta la tua "
-"società, per esempio RM."
-
-#: apps/vendors/models.py
-msgid "Italy only: your REA number from the company register, for example 123456."
-msgstr "Solo Italia: il tuo numero REA del registro delle imprese, per esempio 123456."
-
-#: apps/vendors/models.py
-msgid "Italy: the 2-letter province code, for example RM. Elsewhere: the state or region."
-msgstr ""
-"Italia: la sigla di 2 lettere della provincia, per esempio RM. Altrove: lo stato o la regione."
+"Solo Italia: la provincia dell'ufficio del registro delle imprese (REA) in "
+"cui è iscritta la tua società, per esempio RM."
 
 #: apps/vendors/models.py
 msgid ""
-"Italy: your codice fiscale, 16 characters for a person or 11 digits for a company. Elsewhere: your"
-" national tax identification number (TIN). It is stored encrypted."
+"Italy only: your REA number from the company register, for example 123456."
 msgstr ""
-"Italia: il tuo codice fiscale, 16 caratteri per una persona o 11 cifre per una società. Altrove: "
-"il tuo numero di identificazione fiscale nazionale (TIN). Viene conservato cifrato."
+"Solo Italia: il tuo numero REA del registro delle imprese, per esempio "
+"123456."
+
+#: apps/vendors/models.py
+msgid ""
+"Italy: the 2-letter province code, for example RM. Elsewhere: the state or "
+"region."
+msgstr ""
+"Italia: la sigla di 2 lettere della provincia, per esempio RM. Altrove: lo "
+"stato o la regione."
+
+#: apps/vendors/models.py
+msgid ""
+"Italy: your codice fiscale, 16 characters for a person or 11 digits for a "
+"company. Elsewhere: your national tax identification number (TIN). It is "
+"stored encrypted."
+msgstr ""
+"Italia: il tuo codice fiscale, 16 caratteri per una persona o 11 cifre per "
+"una società. Altrove: il tuo numero di identificazione fiscale nazionale "
+"(TIN). Viene conservato cifrato."
+
+#: apps/orders/templates/orders/customer_order.html
+msgid "Item"
+msgstr "Articolo"
 
 #: apps/manager/templates/manager/shop/order.html
 msgid "Items"
@@ -432,11 +546,11 @@ msgstr "Lingua dei testi"
 
 #: apps/vendors/models.py
 msgid ""
-"Leave it empty for every region, or choose EU or non-EU to apply the rule to every vendor "
-"established there."
+"Leave it empty for every region, or choose EU or non-EU to apply the rule to"
+" every vendor established there."
 msgstr ""
-"Lascialo vuoto per tutte le aree, oppure scegli UE o extra UE per applicare la regola a tutti i "
-"venditori con sede lì."
+"Lascialo vuoto per tutte le aree, oppure scegli UE o extra UE per applicare "
+"la regola a tutti i venditori con sede lì."
 
 #: themes/base/templates/components/footer.html
 msgid "Legal"
@@ -491,14 +605,19 @@ msgid "Mark as shipped"
 msgstr "Segna come spedito"
 
 #: apps/manager/templates/manager/platform/dashboard.html
-msgid "Marketplace work across vendors. The menu lists the sections you may open."
+msgid ""
+"Marketplace work across vendors. The menu lists the sections you may open."
 msgstr ""
-"Attività del marketplace che riguardano tutti i venditori. Il menu elenca le sezioni che puoi "
-"aprire."
+"Attività del marketplace che riguardano tutti i venditori. Il menu elenca le"
+" sezioni che puoi aprire."
 
 #: themes/base/templates/components/header.html
 msgid "Menu"
 msgstr "Menu"
+
+#: apps/orders/templates/orders/customer_orders.html
+msgid "My orders"
+msgstr "I miei ordini"
 
 #: apps/orders/templates/email/orders/vendor_new_order/subject.txt
 msgid "New paid order %(order_number)s"
@@ -536,24 +655,34 @@ msgstr "nessuna registrazione di passkey in corso"
 msgid "No second factor yet."
 msgstr "Nessun secondo fattore per ora."
 
+#: apps/orders/customer_views.py
+msgid "not yet"
+msgstr "non ancora"
+
 #: apps/manager/views.py
 msgid "Nothing changed."
 msgstr "Nessuna modifica."
 
 #: apps/manager/views.py
 msgid "Nothing changed: this text is still a draft. Edit it to publish it."
-msgstr "Nessuna modifica: questo testo è ancora una bozza. Modificalo per pubblicarlo."
+msgstr ""
+"Nessuna modifica: questo testo è ancora una bozza. Modificalo per "
+"pubblicarlo."
 
 #: apps/manager/templates/manager/bulk_preview.html
 msgid "Nothing has changed yet. Check the changes below, then confirm."
-msgstr "Non è stato ancora modificato nulla. Controlla le modifiche qui sotto, poi conferma."
+msgstr ""
+"Non è stato ancora modificato nulla. Controlla le modifiche qui sotto, poi "
+"conferma."
 
-#: apps/manager/templates/manager/list.html apps/manager/templates/manager/platform/notices.html
+#: apps/manager/templates/manager/list.html
+#: apps/manager/templates/manager/platform/notices.html
 #: apps/manager/templates/manager/shop/orders.html
 msgid "Nothing to show."
 msgstr "Niente da mostrare."
 
-#: apps/manager/notice_views.py apps/manager/templates/manager/platform/notice_detail.html
+#: apps/manager/notice_views.py
+#: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Notice"
 msgstr "Segnalazione"
 
@@ -571,45 +700,71 @@ msgstr "Una riga sotto il nome del negozio. Testo semplice."
 
 #: apps/vendors/models.py
 msgid ""
-"Only for regime RF20: the number ending in EX that your country of establishment issued for the "
-"cross-border VAT franchise, for example DE123456789EX."
+"Only for regime RF20: the number ending in EX that your country of "
+"establishment issued for the cross-border VAT franchise, for example "
+"DE123456789EX."
 msgstr ""
-"Solo per il regime RF20: il numero che termina con EX rilasciato dal tuo paese di stabilimento per"
-" il regime di franchigia IVA transfrontaliera, per esempio DE123456789EX."
+"Solo per il regime RF20: il numero che termina con EX rilasciato dal tuo "
+"paese di stabilimento per il regime di franchigia IVA transfrontaliera, per "
+"esempio DE123456789EX."
 
 #: apps/vendors/models.py
 msgid ""
-"Only if the bank account is not in the name of your business: the name of the account holder. It "
-"is asked for the platform's yearly DAC7 reporting duty."
+"Only if the bank account is not in the name of your business: the name of "
+"the account holder. It is asked for the platform's yearly DAC7 reporting "
+"duty."
 msgstr ""
-"Solo se il conto bancario non è intestato alla tua attività: il nome dell'intestatario. Ci viene "
-"richiesto per l'obbligo di comunicazione annuale DAC7 della piattaforma."
+"Solo se il conto bancario non è intestato alla tua attività: il nome "
+"dell'intestatario. Ci viene richiesto per l'obbligo di comunicazione annuale"
+" DAC7 della piattaforma."
 
 #: apps/vendors/models.py
 msgid ""
-"Only if you are established outside the EU and have appointed a fiscal representative in Italy: "
-"their name, as in the appointment. Otherwise leave it empty."
+"Only if you are established outside the EU and have appointed a fiscal "
+"representative in Italy: their name, as in the appointment. Otherwise leave "
+"it empty."
 msgstr ""
-"Solo se hai sede fuori dall'UE e hai nominato un rappresentante fiscale in Italia: il suo nome, "
-"come nella nomina. Altrimenti lascialo vuoto."
+"Solo se hai sede fuori dall'UE e hai nominato un rappresentante fiscale in "
+"Italia: il suo nome, come nella nomina. Altrimenti lascialo vuoto."
 
 #: apps/vendors/models.py
 msgid ""
-"Only if you have a permanent establishment (a branch or fixed place of business) apart from your "
-"registered office: its street, without the number. Otherwise leave the whole address empty; if "
-"unsure, ask your accountant."
+"Only if you have a permanent establishment (a branch or fixed place of "
+"business) apart from your registered office: its street, without the number."
+" Otherwise leave the whole address empty; if unsure, ask your accountant."
 msgstr ""
-"Solo se hai una stabile organizzazione (una filiale o una sede fissa) diversa dalla sede legale: "
-"la sua via, senza il numero civico. Altrimenti lascia vuoto tutto l'indirizzo; se non sei sicuro, "
-"chiedi al tuo commercialista."
+"Solo se hai una stabile organizzazione (una filiale o una sede fissa) "
+"diversa dalla sede legale: la sua via, senza il numero civico. Altrimenti "
+"lascia vuoto tutto l'indirizzo; se non sei sicuro, chiedi al tuo "
+"commercialista."
 
 #: apps/manager/templates/manager/shop/orders.html
+#: apps/orders/templates/orders/customer_orders.html
 msgid "Order"
 msgstr "Ordine"
 
 #: apps/manager/templates/manager/shop/order.html
+#: apps/orders/templates/orders/customer_order.html
 msgid "Order %(number)s"
 msgstr "Ordine %(number)s"
+
+#: apps/orders/templates/email/orders/order_cancelled/subject.txt
+msgid "Order %(order_number)s was cancelled"
+msgstr "L’ordine %(order_number)s è stato annullato"
+
+#: apps/orders/templates/email/orders/order_cancelled/body.html
+#: apps/orders/templates/email/orders/order_cancelled/body.txt
+msgid ""
+"Order %(order_number)s was cancelled before payment. Nothing was charged."
+msgstr ""
+"L’ordine %(order_number)s è stato annullato prima del pagamento. Non è stato"
+" addebitato nulla."
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.html
+#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.txt
+msgid "Order %(order_number)s was cancelled. Do not ship these items:"
+msgstr ""
+"L’ordine %(order_number)s è stato annullato. Non spedire questi articoli:"
 
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
@@ -620,9 +775,21 @@ msgstr "Ordine %(order_number)s, venduto da %(vendor_name)s:"
 msgid "Order %(order_number)s: a shipment is on its way"
 msgstr "Ordine %(order_number)s: una spedizione è in arrivo"
 
+#: apps/orders/templates/email/orders/vendor_order_delivered/subject.txt
+msgid "Order %(order_number)s: a shipment was delivered"
+msgstr "Ordine %(order_number)s: una spedizione è stata consegnata"
+
 #: apps/orders/templates/email/orders/order_confirmation/subject.txt
 msgid "Order %(order_number)s: confirmation from %(vendor_name)s"
 msgstr "Ordine %(order_number)s: conferma di %(vendor_name)s"
+
+#: apps/orders/templates/email/orders/vendor_order_cancelled/subject.txt
+msgid "Order %(order_number)s: part of your order was cancelled"
+msgstr "Ordine %(order_number)s: una parte del tuo ordine è stata annullata"
+
+#: apps/orders/customer_views.py
+msgid "Order placed"
+msgstr "Ordine effettuato"
 
 #: apps/manager/sections.py apps/manager/templates/manager/shop/orders.html
 msgid "Orders"
@@ -652,6 +819,14 @@ msgstr "Pagina non trovata"
 msgid "Pagination"
 msgstr "Paginazione"
 
+#: apps/orders/customer_views.py
+msgid "Paid"
+msgstr "Pagato"
+
+#: apps/orders/customer_views.py
+msgid "Partly refunded"
+msgstr "Rimborsato in parte"
+
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Passkey"
@@ -674,25 +849,36 @@ msgstr "Le passkey richiedono JavaScript."
 msgid "Password"
 msgstr "Password"
 
+#: apps/orders/customer_views.py
+msgid "Payment received"
+msgstr "Pagamento ricevuto"
+
 #: apps/orders/templates/email/orders/payment_confirmed/subject.txt
 msgid "Payment received for order %(order_number)s"
 msgstr "Pagamento ricevuto per l’ordine %(order_number)s"
 
 #: apps/vendors/forms.py
 msgid ""
-"Pick a password you do not use anywhere else. You will use it with your email address to log in. "
-"Required: without it your account is not created."
+"Pick a password you do not use anywhere else. You will use it with your "
+"email address to log in. Required: without it your account is not created."
 msgstr ""
-"Scegli una password che non usi altrove. La userai insieme al tuo indirizzo email per accedere. "
-"Obbligatorio: senza non creiamo il tuo account."
+"Scegli una password che non usi altrove. La userai insieme al tuo indirizzo "
+"email per accedere. Obbligatorio: senza non creiamo il tuo account."
 
-#: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
+#: apps/manager/templates/manager/shop/order.html
+#: apps/manager/templates/manager/shop/orders.html
 msgid "Placed"
 msgstr "Effettuato il"
 
+#: apps/orders/templates/orders/customer_order.html
+msgid "Placed on"
+msgstr "Effettuato il"
+
 #: apps/manager/forms.py
-msgid "Plain text for people who cannot see the image, for example the shop name."
-msgstr "Testo semplice per chi non vede l’immagine, per esempio il nome del negozio."
+msgid ""
+"Plain text for people who cannot see the image, for example the shop name."
+msgstr ""
+"Testo semplice per chi non vede l’immagine, per esempio il nome del negozio."
 
 #: apps/manager/templates/manager/layout.html
 msgid "Platform"
@@ -720,6 +906,10 @@ msgstr "Anteprima: %(action)s"
 msgid "Previous"
 msgstr "Indietro"
 
+#: apps/orders/templates/orders/customer_order.html
+msgid "Price with VAT"
+msgstr "Prezzo con IVA"
+
 #: apps/manager/templates/manager/shop/order.html
 msgid "Product"
 msgstr "Prodotto"
@@ -733,8 +923,13 @@ msgid "Published"
 msgstr "Pubblicati"
 
 #: apps/manager/templates/manager/shop/order.html
+#: apps/orders/templates/orders/customer_order.html
 msgid "Quantity"
 msgstr "Quantità"
+
+#: apps/orders/customer_views.py
+msgid "Quote requested"
+msgstr "Preventivo richiesto"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Reason"
@@ -766,6 +961,10 @@ msgstr "Codici di recupero"
 #: apps/manager/templates/manager/platform/notices.html
 msgid "Reference"
 msgstr "Riferimento"
+
+#: apps/orders/customer_views.py
+msgid "Refunded"
+msgstr "Rimborsato"
 
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 msgid "Register a passkey"
@@ -809,10 +1008,12 @@ msgid "Save logo"
 msgstr "Salva logo"
 
 #: apps/accounts/templates/accounts/mfa/totp.html
-msgid "Scan this QR code with your authenticator app, then enter the 6-digit code it shows."
+msgid ""
+"Scan this QR code with your authenticator app, then enter the 6-digit code "
+"it shows."
 msgstr ""
-"Scansiona questo codice QR con la tua app di autenticazione, poi inserisci il codice a 6 cifre che"
-" mostra."
+"Scansiona questo codice QR con la tua app di autenticazione, poi inserisci "
+"il codice a 6 cifre che mostra."
 
 #: apps/manager/templates/manager/list.html
 msgid "Select"
@@ -843,9 +1044,17 @@ msgstr "Spedire a"
 msgid "Ship to:"
 msgstr "Spedire a:"
 
+#: apps/orders/customer_views.py
+msgid "Shipped"
+msgstr "Spedito"
+
 #: apps/manager/forms.py
 msgid "Shipping policy"
 msgstr "Condizioni di spedizione"
+
+#: apps/orders/templates/orders/customer_order.html
+msgid "Shipping with VAT"
+msgstr "Spedizione con IVA"
 
 #: apps/orders/templates/email/orders/order_confirmation/body.html
 #: apps/orders/templates/email/orders/order_confirmation/body.txt
@@ -864,7 +1073,8 @@ msgstr "Mostra password"
 msgid "Sign in"
 msgstr "Accedi"
 
-#: apps/manager/templates/manager/forbidden.html apps/manager/templates/manager/layout.html
+#: apps/manager/templates/manager/forbidden.html
+#: apps/manager/templates/manager/layout.html
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid "Sign out"
 msgstr "Esci"
@@ -877,39 +1087,45 @@ msgstr "Vai al contenuto principale"
 msgid "SKU"
 msgstr "SKU"
 
-#: apps/vendors/models.py
-msgid ""
-"Sole traders only: if your country issues no tax identification number, the city and country where"
-" you were born. It is asked for the platform's yearly DAC7 reporting duty and stored encrypted. "
-"Not sure? Ask your accountant."
-msgstr ""
-"Solo ditte individuali: se il tuo paese non rilascia un numero di identificazione fiscale, la "
-"città e il paese in cui sei nato. Ci viene richiesto per l'obbligo di comunicazione annuale DAC7 "
-"della piattaforma e viene conservato cifrato. Non sei sicuro? Chiedi al tuo commercialista."
+#: apps/orders/templates/orders/customer_order.html
+msgid "Sold by %(name)s"
+msgstr "Venduto da %(name)s"
 
 #: apps/vendors/models.py
 msgid ""
-"Sole traders only: your date of birth. It is asked for the platform's yearly DAC7 reporting duty, "
-"and it is stored encrypted."
+"Sole traders only: if your country issues no tax identification number, the "
+"city and country where you were born. It is asked for the platform's yearly "
+"DAC7 reporting duty and stored encrypted. Not sure? Ask your accountant."
 msgstr ""
-"Solo ditte individuali: la tua data di nascita. Ci viene richiesta per l'obbligo di comunicazione "
-"annuale DAC7 della piattaforma e viene conservata cifrata."
+"Solo ditte individuali: se il tuo paese non rilascia un numero di "
+"identificazione fiscale, la città e il paese in cui sei nato. Ci viene "
+"richiesto per l'obbligo di comunicazione annuale DAC7 della piattaforma e "
+"viene conservato cifrato. Non sei sicuro? Chiedi al tuo commercialista."
 
 #: apps/vendors/models.py
 msgid ""
-"Sole traders only: your first name, as on your identity document. It goes on the invoices we issue"
-" to you."
+"Sole traders only: your date of birth. It is asked for the platform's yearly"
+" DAC7 reporting duty, and it is stored encrypted."
 msgstr ""
-"Solo ditte individuali: il tuo nome, come sul documento d'identità. Compare nelle fatture che ti "
-"emettiamo."
+"Solo ditte individuali: la tua data di nascita. Ci viene richiesta per "
+"l'obbligo di comunicazione annuale DAC7 della piattaforma e viene conservata"
+" cifrata."
 
 #: apps/vendors/models.py
 msgid ""
-"Sole traders only: your last name, as on your identity document. It goes on the invoices we issue "
-"to you."
+"Sole traders only: your first name, as on your identity document. It goes on"
+" the invoices we issue to you."
 msgstr ""
-"Solo ditte individuali: il tuo cognome, come sul documento d'identità. Compare nelle fatture che "
-"ti emettiamo."
+"Solo ditte individuali: il tuo nome, come sul documento d'identità. Compare "
+"nelle fatture che ti emettiamo."
+
+#: apps/vendors/models.py
+msgid ""
+"Sole traders only: your last name, as on your identity document. It goes on "
+"the invoices we issue to you."
+msgstr ""
+"Solo ditte individuali: il tuo cognome, come sul documento d'identità. "
+"Compare nelle fatture che ti emettiamo."
 
 #: themes/base/templates/500.html
 msgid "Something went wrong"
@@ -921,11 +1137,11 @@ msgstr "Staff"
 
 #: apps/vendors/models.py
 msgid ""
-"Staff only: the vendor's user number in the old system, kept to link migrated data. Leave it as it"
-" is."
+"Staff only: the vendor's user number in the old system, kept to link "
+"migrated data. Leave it as it is."
 msgstr ""
-"Solo per lo staff: il numero utente del venditore nel vecchio sistema, conservato per collegare i "
-"dati migrati. Lascialo com'è."
+"Solo per lo staff: il numero utente del venditore nel vecchio sistema, "
+"conservato per collegare i dati migrati. Lascialo com'è."
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 msgid "Start review"
@@ -937,9 +1153,16 @@ msgstr "Motivazioni"
 
 #: apps/manager/templates/manager/platform/notice_detail.html
 #: apps/manager/templates/manager/platform/notices.html
-#: apps/manager/templates/manager/shop/order.html apps/manager/templates/manager/shop/orders.html
+#: apps/manager/templates/manager/shop/order.html
+#: apps/manager/templates/manager/shop/orders.html
+#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_orders.html
 msgid "Status"
 msgstr "Stato"
+
+#: apps/orders/templates/orders/customer_order.html
+msgid "Status history"
+msgstr "Cronologia dello stato"
 
 #: apps/manager/sections.py apps/manager/templates/manager/shop/profile.html
 msgid "Storefront profile"
@@ -967,59 +1190,65 @@ msgstr "Slogan"
 
 #: apps/vendors/models.py
 msgid ""
-"Tell buyers about your shop: who you are and what you make or sell. Leave it empty and your shop "
-"page has no description."
+"Tell buyers about your shop: who you are and what you make or sell. Leave it"
+" empty and your shop page has no description."
 msgstr ""
-"Racconta ai clienti il tuo negozio: chi sei e cosa produci o vendi. Se la lasci vuota, la pagina "
-"del tuo negozio non ha descrizione."
+"Racconta ai clienti il tuo negozio: chi sei e cosa produci o vendi. Se la "
+"lasci vuota, la pagina del tuo negozio non ha descrizione."
 
 #: apps/vendors/models.py
 msgid ""
-"Tell buyers how and when you ship, and what it costs. Buyers read it in your shop before they "
-"order."
+"Tell buyers how and when you ship, and what it costs. Buyers read it in your"
+" shop before they order."
 msgstr ""
-"Spiega ai clienti come e quando spedisci e quanto costa. I clienti la leggono nel tuo negozio "
-"prima di ordinare."
+"Spiega ai clienti come e quando spedisci e quanto costa. I clienti la "
+"leggono nel tuo negozio prima di ordinare."
 
 #: apps/vendors/models.py
 msgid ""
-"Tell buyers how to ask for a refund, how long it takes and who pays the return shipping. Buyers "
-"read it in your shop before they order."
+"Tell buyers how to ask for a refund, how long it takes and who pays the "
+"return shipping. Buyers read it in your shop before they order."
 msgstr ""
-"Spiega ai clienti come chiedere un rimborso, quanto tempo richiede e chi paga la spedizione del "
-"reso. I clienti la leggono nel tuo negozio prima di ordinare."
+"Spiega ai clienti come chiedere un rimborso, quanto tempo richiede e chi "
+"paga la spedizione del reso. I clienti la leggono nel tuo negozio prima di "
+"ordinare."
 
 #: apps/vendors/models.py
 msgid ""
-"Tell buyers until when they can cancel an order and how, for example 'before the parcel is handed "
-"to the courier'. Buyers read it in your shop before they order."
+"Tell buyers until when they can cancel an order and how, for example 'before"
+" the parcel is handed to the courier'. Buyers read it in your shop before "
+"they order."
 msgstr ""
-"Spiega ai clienti fino a quando possono annullare un ordine e come, per esempio 'prima che il "
-"pacco sia consegnato al corriere'. I clienti la leggono nel tuo negozio prima di ordinare."
+"Spiega ai clienti fino a quando possono annullare un ordine e come, per "
+"esempio 'prima che il pacco sia consegnato al corriere'. I clienti la "
+"leggono nel tuo negozio prima di ordinare."
 
 #: apps/vendors/models.py
 msgid ""
-"The 7-character code of the SDI channel (the Italian tax system) that receives e-invoices "
-"addressed to you. 0000000 is used together with a PEC address, which you give in the PEC field; "
-"XXXXXXX is for businesses established outside Italy. Your accountant or invoicing software can "
-"tell you the code."
+"The 7-character code of the SDI channel (the Italian tax system) that "
+"receives e-invoices addressed to you. 0000000 is used together with a PEC "
+"address, which you give in the PEC field; XXXXXXX is for businesses "
+"established outside Italy. Your accountant or invoicing software can tell "
+"you the code."
 msgstr ""
-"Il codice di 7 caratteri del canale SDI (il Sistema di Interscambio) che riceve le fatture "
-"elettroniche a te intestate. 0000000 si usa insieme a un indirizzo PEC, che indichi nel campo PEC;"
-" XXXXXXX è per le imprese con sede fuori dall'Italia. Il codice te lo può dire il tuo "
-"commercialista o il tuo programma di fatturazione."
+"Il codice di 7 caratteri del canale SDI (il Sistema di Interscambio) che "
+"riceve le fatture elettroniche a te intestate. 0000000 si usa insieme a un "
+"indirizzo PEC, che indichi nel campo PEC; XXXXXXX è per le imprese con sede "
+"fuori dall'Italia. Il codice te lo può dire il tuo commercialista o il tuo "
+"programma di fatturazione."
 
 #: apps/vendors/forms.py
 msgid ""
-"The address where we send the link to confirm your application. Required: without a working "
-"address you cannot continue."
+"The address where we send the link to confirm your application. Required: "
+"without a working address you cannot continue."
 msgstr ""
-"L'indirizzo a cui mandiamo il link per confermare la candidatura. Obbligatorio: senza un indirizzo"
-" funzionante non puoi proseguire."
+"L'indirizzo a cui mandiamo il link per confermare la candidatura. "
+"Obbligatorio: senza un indirizzo funzionante non puoi proseguire."
 
 #: apps/vendors/models.py
 msgid "The BIC (SWIFT) code of your bank, 8 or 11 characters, if you have it."
-msgstr "Il codice BIC (SWIFT) della tua banca, di 8 o 11 caratteri, se lo hai."
+msgstr ""
+"Il codice BIC (SWIFT) della tua banca, di 8 o 11 caratteri, se lo hai."
 
 #: apps/vendors/models.py
 msgid "The city of your permanent establishment."
@@ -1030,9 +1259,11 @@ msgid "The city of your registered office."
 msgstr "La città della tua sede legale."
 
 #: apps/manager/notice_views.py
-msgid "The content could not be restricted: check the notice status and target."
+msgid ""
+"The content could not be restricted: check the notice status and target."
 msgstr ""
-"Non è stato possibile limitare il contenuto: controlla lo stato e il bersaglio della segnalazione."
+"Non è stato possibile limitare il contenuto: controlla lo stato e il "
+"bersaglio della segnalazione."
 
 #: apps/manager/notice_views.py
 msgid "The content is restricted and the vendor is told."
@@ -1052,35 +1283,41 @@ msgstr "Il paese della tua sede legale."
 
 #: apps/vendors/models.py
 msgid ""
-"The country that issued your tax identification number. We check the format for that country. It "
-"is asked for the platform's yearly DAC7 reporting duty."
+"The country that issued your tax identification number. We check the format "
+"for that country. It is asked for the platform's yearly DAC7 reporting duty."
 msgstr ""
-"Il paese che ha rilasciato il tuo numero di identificazione fiscale. Ne controlliamo il formato "
-"per quel paese. Ci viene richiesto per l'obbligo di comunicazione annuale DAC7 della piattaforma."
+"Il paese che ha rilasciato il tuo numero di identificazione fiscale. Ne "
+"controlliamo il formato per quel paese. Ci viene richiesto per l'obbligo di "
+"comunicazione annuale DAC7 della piattaforma."
 
 #: apps/vendors/models.py
 msgid ""
-"The country where you are resident for tax. It is asked for the platform's yearly DAC7 reporting "
-"duty. Not sure? Ask your accountant."
+"The country where you are resident for tax. It is asked for the platform's "
+"yearly DAC7 reporting duty. Not sure? Ask your accountant."
 msgstr ""
-"Il paese in cui hai la residenza fiscale. Ci viene richiesto per l'obbligo di comunicazione "
-"annuale DAC7 della piattaforma. Non sei sicuro? Chiedi al tuo commercialista."
+"Il paese in cui hai la residenza fiscale. Ci viene richiesto per l'obbligo "
+"di comunicazione annuale DAC7 della piattaforma. Non sei sicuro? Chiedi al "
+"tuo commercialista."
 
 #: apps/vendors/models.py
 msgid ""
-"The country where your business is established, as in the company register. It decides which legal"
-" details we ask you for. Required: the profile cannot be saved without it."
+"The country where your business is established, as in the company register. "
+"It decides which legal details we ask you for. Required: the profile cannot "
+"be saved without it."
 msgstr ""
-"Il paese in cui ha sede la tua attività, come risulta al registro delle imprese. Decide quali dati"
-" legali ti chiediamo. Obbligatorio: senza non puoi salvare il profilo."
+"Il paese in cui ha sede la tua attività, come risulta al registro delle "
+"imprese. Decide quali dati legali ti chiediamo. Obbligatorio: senza non puoi"
+" salvare il profilo."
 
 #: apps/vendors/forms.py
 msgid ""
-"The country where your business is established. Only the countries we accept at the moment are "
-"listed. Required: it decides which details we ask you for later."
+"The country where your business is established. Only the countries we accept"
+" at the moment are listed. Required: it decides which details we ask you for"
+" later."
 msgstr ""
-"Il paese in cui ha sede la tua attività. Sono elencati solo i paesi che accettiamo al momento. "
-"Obbligatorio: decide quali dati ti chiediamo più avanti."
+"Il paese in cui ha sede la tua attività. Sono elencati solo i paesi che "
+"accettiamo al momento. Obbligatorio: decide quali dati ti chiediamo più "
+"avanti."
 
 #: apps/manager/notice_views.py
 msgid "The decision is recorded and the notifier is told."
@@ -1088,104 +1325,121 @@ msgstr "La decisione è registrata e il segnalante ne viene informato."
 
 #: apps/vendors/models.py
 msgid ""
-"The email address where the platform writes to you about your shop. Required: without it we cannot"
-" reach you."
+"The email address where the platform writes to you about your shop. "
+"Required: without it we cannot reach you."
 msgstr ""
-"L'indirizzo email a cui la piattaforma ti scrive per il tuo negozio. Obbligatorio: senza non "
-"possiamo contattarti."
+"L'indirizzo email a cui la piattaforma ti scrive per il tuo negozio. "
+"Obbligatorio: senza non possiamo contattarti."
 
 #: apps/manager/templates/manager/login.html
 msgid ""
-"The email or the password is not correct, or the account is locked for a while. Please try again."
-msgstr "L’email o la password non sono corrette, oppure l’account è bloccato per un po’. Riprova."
+"The email or the password is not correct, or the account is locked for a "
+"while. Please try again."
+msgstr ""
+"L’email o la password non sono corrette, oppure l’account è bloccato per un "
+"po’. Riprova."
 
 #: apps/vendors/models.py
 msgid "The feature to switch on or off for this vendor."
 msgstr "La funzione da attivare o disattivare per questo venditore."
 
 #: themes/base/templates/403_csrf.html
-msgid "The form was sent from an old or expired page. Go back, reload the page and send it again."
+msgid ""
+"The form was sent from an old or expired page. Go back, reload the page and "
+"send it again."
 msgstr ""
-"Il modulo è stato inviato da una pagina vecchia o scaduta. Torna indietro, ricarica la pagina e "
-"invialo di nuovo."
+"Il modulo è stato inviato da una pagina vecchia o scaduta. Torna indietro, "
+"ricarica la pagina e invialo di nuovo."
 
 #: apps/vendors/models.py
 msgid ""
-"The full legal name of your business as in the company register, or your own first and last name "
-"if you are a sole trader. It appears on invoices and contracts. Required: the profile cannot be "
-"saved without it."
+"The full legal name of your business as in the company register, or your own"
+" first and last name if you are a sole trader. It appears on invoices and "
+"contracts. Required: the profile cannot be saved without it."
 msgstr ""
-"La denominazione legale della tua attività come risulta al registro delle imprese, oppure il tuo "
-"nome e cognome se sei ditta individuale. Compare su fatture e contratti. Obbligatorio: senza non "
-"puoi salvare il profilo."
+"La denominazione legale della tua attività come risulta al registro delle "
+"imprese, oppure il tuo nome e cognome se sei ditta individuale. Compare su "
+"fatture e contratti. Obbligatorio: senza non puoi salvare il profilo."
 
 #: apps/vendors/models.py
 msgid ""
-"The full text of the contract in this language. Required. Once a vendor has accepted the version "
-"it is final: new terms need a new version."
+"The full text of the contract in this language. Required. Once a vendor has "
+"accepted the version it is final: new terms need a new version."
 msgstr ""
-"Il testo completo del contratto in questa lingua. Obbligatorio. Dopo l'accettazione di un "
-"venditore è definitivo: nuove condizioni richiedono una nuova versione."
+"Il testo completo del contratto in questa lingua. Obbligatorio. Dopo "
+"l'accettazione di un venditore è definitivo: nuove condizioni richiedono una"
+" nuova versione."
 
 #: apps/vendors/models.py
 msgid ""
-"The IBAN of the bank account that receives your payouts. Check it carefully: a wrong IBAN can "
-"delay your payment. It is stored encrypted."
+"The IBAN of the bank account that receives your payouts. Check it carefully:"
+" a wrong IBAN can delay your payment. It is stored encrypted."
 msgstr ""
-"L'IBAN del conto bancario su cui ricevi i tuoi pagamenti. Controllalo con attenzione: un IBAN "
-"sbagliato può ritardare il pagamento. Viene conservato cifrato."
-
-#: apps/vendors/models.py
-msgid "The IP address the acceptance came from, kept as evidence. Empty if it was not known."
-msgstr ""
-"L'indirizzo IP da cui è arrivata l'accettazione, conservato come prova. Vuoto se non era noto."
+"L'IBAN del conto bancario su cui ricevi i tuoi pagamenti. Controllalo con "
+"attenzione: un IBAN sbagliato può ritardare il pagamento. Viene conservato "
+"cifrato."
 
 #: apps/vendors/models.py
 msgid ""
-"The Italian VAT number of your fiscal representative (11 digits). Leave it empty if you have none."
+"The IP address the acceptance came from, kept as evidence. Empty if it was "
+"not known."
 msgstr ""
-"La partita IVA italiana del tuo rappresentante fiscale (11 cifre). Lasciala vuota se non ne hai "
-"uno."
+"L'indirizzo IP da cui è arrivata l'accettazione, conservato come prova. "
+"Vuoto se non era noto."
 
 #: apps/vendors/models.py
-msgid "The language of the text that was shown when the contract was accepted."
-msgstr "La lingua del testo mostrato al momento dell'accettazione del contratto."
+msgid ""
+"The Italian VAT number of your fiscal representative (11 digits). Leave it "
+"empty if you have none."
+msgstr ""
+"La partita IVA italiana del tuo rappresentante fiscale (11 cifre). Lasciala "
+"vuota se non ne hai uno."
+
+#: apps/vendors/models.py
+msgid ""
+"The language of the text that was shown when the contract was accepted."
+msgstr ""
+"La lingua del testo mostrato al momento dell'accettazione del contratto."
 
 #: apps/vendors/admin.py
 msgid ""
-"The language these texts are written in. Required. Add one set of texts per language: visitors see"
-" the one in their language, or the English one when theirs is not published."
+"The language these texts are written in. Required. Add one set of texts per "
+"language: visitors see the one in their language, or the English one when "
+"theirs is not published."
 msgstr ""
-"La lingua in cui sono scritti questi testi. Obbligatorio. Aggiungi un gruppo di testi per lingua: "
-"i visitatori vedono quello nella loro lingua, oppure quello inglese se il loro non è pubblicato."
+"La lingua in cui sono scritti questi testi. Obbligatorio. Aggiungi un gruppo"
+" di testi per lingua: i visitatori vedono quello nella loro lingua, oppure "
+"quello inglese se il loro non è pubblicato."
 
 #: apps/vendors/models.py
 msgid ""
-"The legal form of your business, as in the company register. Not sure which one you are? Ask your "
-"accountant."
+"The legal form of your business, as in the company register. Not sure which "
+"one you are? Ask your accountant."
 msgstr ""
-"La forma giuridica della tua attività, come risulta al registro delle imprese. Non sei sicuro di "
-"quale sia? Chiedi al tuo commercialista."
+"La forma giuridica della tua attività, come risulta al registro delle "
+"imprese. Non sei sicuro di quale sia? Chiedi al tuo commercialista."
 
 #: apps/manager/templates/manager/forbidden.html
 msgid ""
-"The Manager is for platform staff and for vendor members. If you need access, ask the platform "
-"staff, or sign in with another account."
+"The Manager is for platform staff and for vendor members. If you need "
+"access, ask the platform staff, or sign in with another account."
 msgstr ""
-"Il Manager è riservato allo staff della piattaforma e ai membri dei venditori. Se ti serve "
-"l’accesso, chiedilo allo staff della piattaforma oppure accedi con un altro account."
+"Il Manager è riservato allo staff della piattaforma e ai membri dei "
+"venditori. Se ti serve l’accesso, chiedilo allo staff della piattaforma "
+"oppure accedi con un altro account."
 
 #: apps/vendors/models.py
 msgid "The name of your bank. Optional: it helps us recognise the account."
-msgstr "Il nome della tua banca. Facoltativo: ci aiuta a riconoscere il conto."
+msgstr ""
+"Il nome della tua banca. Facoltativo: ci aiuta a riconoscere il conto."
 
 #: apps/vendors/forms.py
 msgid ""
-"The name of your business or shop, for example 'Rossi Ceramics'. Required: the application needs "
-"it."
+"The name of your business or shop, for example 'Rossi Ceramics'. Required: "
+"the application needs it."
 msgstr ""
-"Il nome della tua attività o del tuo negozio, per esempio 'Ceramiche Rossi'. Obbligatorio: la "
-"candidatura lo richiede."
+"Il nome della tua attività o del tuo negozio, per esempio 'Ceramiche Rossi'."
+" Obbligatorio: la candidatura lo richiede."
 
 #: apps/manager/notice_views.py
 msgid "The notice is under review."
@@ -1230,7 +1484,9 @@ msgstr "Il CAP della tua sede legale, per esempio 00184."
 
 #: themes/base/templates/400.html
 msgid "The request could not be understood. Check the address and try again."
-msgstr "Non è stato possibile comprendere la richiesta. Controlla l’indirizzo e riprova."
+msgstr ""
+"Non è stato possibile comprendere la richiesta. Controlla l’indirizzo e "
+"riprova."
 
 #: apps/accounts/templates/accounts/mfa/_passkey_register_form.html
 #: apps/accounts/templates/accounts/mfa/verify.html
@@ -1238,31 +1494,38 @@ msgid "The request failed."
 msgstr "La richiesta non è riuscita."
 
 #: apps/vendors/models.py
-msgid "The rule applies to vendors established in this country. Leave it empty for every country."
-msgstr "La regola vale per i venditori con sede in questo paese. Lascialo vuoto per tutti i paesi."
-
-#: apps/vendors/models.py
-msgid "The rule applies to vendors with this legal form. Leave it empty for every legal form."
+msgid ""
+"The rule applies to vendors established in this country. Leave it empty for "
+"every country."
 msgstr ""
-"La regola vale per i venditori con questa forma giuridica. Lascialo vuoto per tutte le forme "
-"giuridiche."
+"La regola vale per i venditori con sede in questo paese. Lascialo vuoto per "
+"tutti i paesi."
 
 #: apps/vendors/models.py
 msgid ""
-"The shop name your buyers see, for example 'Rossi Ceramics'. Required: the shop cannot be shown "
-"without a name."
+"The rule applies to vendors with this legal form. Leave it empty for every "
+"legal form."
 msgstr ""
-"Il nome del negozio che i clienti vedono, per esempio 'Ceramiche Rossi'. Obbligatorio: senza nome "
-"il negozio non può essere mostrato."
+"La regola vale per i venditori con questa forma giuridica. Lascialo vuoto "
+"per tutte le forme giuridiche."
 
 #: apps/vendors/models.py
 msgid ""
-"The short name in your shop's web address, for example 'rossi-ceramics'. Leave it empty and we "
-"make it from the shop name. Changing it later breaks the links people already have."
+"The shop name your buyers see, for example 'Rossi Ceramics'. Required: the "
+"shop cannot be shown without a name."
 msgstr ""
-"Il nome breve nell'indirizzo web del tuo negozio, per esempio 'ceramiche-rossi'. Se lo lasci vuoto"
-" lo ricaviamo dal nome del negozio. Se lo cambi dopo, i link che le persone hanno già smettono di "
-"funzionare."
+"Il nome del negozio che i clienti vedono, per esempio 'Ceramiche Rossi'. "
+"Obbligatorio: senza nome il negozio non può essere mostrato."
+
+#: apps/vendors/models.py
+msgid ""
+"The short name in your shop's web address, for example 'rossi-ceramics'. "
+"Leave it empty and we make it from the shop name. Changing it later breaks "
+"the links people already have."
+msgstr ""
+"Il nome breve nell'indirizzo web del tuo negozio, per esempio 'ceramiche-"
+"rossi'. Se lo lasci vuoto lo ricaviamo dal nome del negozio. Se lo cambi "
+"dopo, i link che le persone hanno già smettono di funzionare."
 
 #: apps/vendors/models.py
 msgid "The street number of your permanent establishment, for example 12/B."
@@ -1274,39 +1537,45 @@ msgstr "Il numero civico della tua sede legale, per esempio 12/B."
 
 #: apps/vendors/models.py
 msgid ""
-"The street of your registered office (sede legale), as in the company register, without the "
-"number."
+"The street of your registered office (sede legale), as in the company "
+"register, without the number."
 msgstr ""
-"La via della tua sede legale, come risulta al registro delle imprese, senza il numero civico."
+"La via della tua sede legale, come risulta al registro delle imprese, senza "
+"il numero civico."
 
 #: apps/vendors/models.py
 msgid ""
-"The tax regime that applies to your business, chosen from the official FatturaPA list (RF19 is the"
-" flat-rate regime, forfettario). Not sure which one applies? Ask your accountant: we cannot choose"
-" it for you."
+"The tax regime that applies to your business, chosen from the official "
+"FatturaPA list (RF19 is the flat-rate regime, forfettario). Not sure which "
+"one applies? Ask your accountant: we cannot choose it for you."
 msgstr ""
-"Il regime fiscale che riguarda la tua attività, scelto dall'elenco ufficiale FatturaPA (RF19 è il "
-"regime forfettario). Non sai quale ti riguarda? Chiedi al tuo commercialista: non possiamo "
-"sceglierlo noi per te."
+"Il regime fiscale che riguarda la tua attività, scelto dall'elenco ufficiale"
+" FatturaPA (RF19 è il regime forfettario). Non sai quale ti riguarda? Chiedi"
+" al tuo commercialista: non possiamo sceglierlo noi per te."
 
 #: apps/manager/templates/manager/shop/profile.html
 msgid ""
-"The text in this language is a machine draft and is not public yet. Edit and save it to publish "
-"it."
+"The text in this language is a machine draft and is not public yet. Edit and"
+" save it to publish it."
 msgstr ""
-"Il testo in questa lingua è una bozza automatica e non è ancora pubblico. Modificalo e salvalo per"
-" pubblicarlo."
+"Il testo in questa lingua è una bozza automatica e non è ancora pubblico. "
+"Modificalo e salvalo per pubblicarlo."
 
 #: apps/manager/templates/manager/shop/profile.html
-msgid "The texts and policies customers read on the page of %(vendor)s, one language at a time."
+msgid ""
+"The texts and policies customers read on the page of %(vendor)s, one "
+"language at a time."
 msgstr ""
-"I testi e le condizioni che i clienti leggono nella pagina di %(vendor)s, una lingua alla volta."
+"I testi e le condizioni che i clienti leggono nella pagina di %(vendor)s, "
+"una lingua alla volta."
 
 #: apps/vendors/models.py
-msgid "The vendor profile field that must be filled in. Required: a rule needs a field."
+msgid ""
+"The vendor profile field that must be filled in. Required: a rule needs a "
+"field."
 msgstr ""
-"Il campo del profilo venditore che deve essere compilato. Obbligatorio: una regola richiede un "
-"campo."
+"Il campo del profilo venditore che deve essere compilato. Obbligatorio: una "
+"regola richiede un campo."
 
 #: apps/vendors/models.py
 msgid "The vendor that accepted the contract."
@@ -1341,13 +1610,26 @@ msgstr "Questo browser non supporta le passkey."
 msgid "This content is not available in this language."
 msgstr "Questo contenuto non è disponibile in questa lingua."
 
+#: apps/orders/templates/orders/customer_order.html
+msgid ""
+"This is your order reference, not an invoice. Each seller issues its own "
+"invoice."
+msgstr ""
+"Questo è il riferimento del tuo ordine, non una fattura. Ogni venditore "
+"emette la propria fattura."
+
 #: apps/accounts/templates/accounts/action_link/continue.html
-msgid "This link was sent to you by email. Press Continue to open the page it leads to."
-msgstr "Questo link ti è stato inviato per email. Premi Continua per aprire la pagina a cui porta."
+msgid ""
+"This link was sent to you by email. Press Continue to open the page it leads"
+" to."
+msgstr ""
+"Questo link ti è stato inviato per email. Premi Continua per aprire la "
+"pagina a cui porta."
 
 #: apps/manager/notice_views.py
 msgid "This step is not possible for the notice in its status."
-msgstr "Questo passaggio non è possibile per la segnalazione nel suo stato attuale."
+msgstr ""
+"Questo passaggio non è possibile per la segnalazione nel suo stato attuale."
 
 #: apps/manager/views.py
 msgid "This step is not possible in the order's current state."
@@ -1355,46 +1637,51 @@ msgstr "Questo passaggio non è possibile nello stato attuale dell'ordine."
 
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid "This vendor is closed, so its shop pages are no longer available."
-msgstr "Questo venditore è chiuso, quindi le pagine del suo negozio non sono più disponibili."
+msgstr ""
+"Questo venditore è chiuso, quindi le pagine del suo negozio non sono più "
+"disponibili."
 
 #: apps/manager/templates/manager/shop/profile.html
 msgid ""
-"This vendor is suspended or closed, so the storefront profile cannot be changed. Contact support "
-"to have it reopened."
+"This vendor is suspended or closed, so the storefront profile cannot be "
+"changed. Contact support to have it reopened."
 msgstr ""
-"Questo venditore è sospeso o chiuso, quindi il profilo del negozio non può essere modificato. "
-"Contatta l’assistenza per farlo riaprire."
+"Questo venditore è sospeso o chiuso, quindi il profilo del negozio non può "
+"essere modificato. Contatta l’assistenza per farlo riaprire."
 
 #: apps/vendors/models.py
 msgid ""
-"Tick it if you want to accept enquiries from buyers about your products. Unticked: you do not take"
-" enquiries."
+"Tick it if you want to accept enquiries from buyers about your products. "
+"Unticked: you do not take enquiries."
 msgstr ""
-"Spunta la casella se vuoi ricevere richieste di informazioni dai clienti sui tuoi prodotti. Senza "
-"spunta non ricevi richieste."
+"Spunta la casella se vuoi ricevere richieste di informazioni dai clienti sui"
+" tuoi prodotti. Senza spunta non ricevi richieste."
 
 #: apps/vendors/models.py
 msgid ""
-"Tick it to let other vendors suggest your products next to theirs. Unticked: your products are not"
-" suggested by others."
+"Tick it to let other vendors suggest your products next to theirs. Unticked:"
+" your products are not suggested by others."
 msgstr ""
-"Spunta la casella per permettere ad altri venditori di suggerire i tuoi prodotti accanto ai loro. "
-"Senza spunta i tuoi prodotti non vengono suggeriti da altri."
+"Spunta la casella per permettere ad altri venditori di suggerire i tuoi "
+"prodotti accanto ai loro. Senza spunta i tuoi prodotti non vengono suggeriti"
+" da altri."
 
 #: apps/vendors/models.py
 msgid ""
-"Tick it to let others include your products in the bundles they create. Unticked: they cannot."
+"Tick it to let others include your products in the bundles they create. "
+"Unticked: they cannot."
 msgstr ""
-"Spunta la casella per permettere ad altri di includere i tuoi prodotti nei pacchetti che creano. "
-"Senza spunta non possono farlo."
+"Spunta la casella per permettere ad altri di includere i tuoi prodotti nei "
+"pacchetti che creano. Senza spunta non possono farlo."
 
 #: apps/vendors/models.py
 msgid ""
-"Ticked: the feature is on for this vendor. Unticked: it is off, whatever the platform setting is. "
-"An emergency switch can only be turned off here."
+"Ticked: the feature is on for this vendor. Unticked: it is off, whatever the"
+" platform setting is. An emergency switch can only be turned off here."
 msgstr ""
-"Con la spunta la funzione è attiva per questo venditore. Senza spunta è disattivata, qualunque sia"
-" l'impostazione della piattaforma. Un interruttore di emergenza qui si può solo disattivare."
+"Con la spunta la funzione è attiva per questo venditore. Senza spunta è "
+"disattivata, qualunque sia l'impostazione della piattaforma. Un interruttore"
+" di emergenza qui si può solo disattivare."
 
 #: apps/manager/media.py
 msgid "Title"
@@ -1402,18 +1689,21 @@ msgstr "Titolo"
 
 #: apps/manager/templates/manager/shop/vendor_closed.html
 msgid ""
-"To ask to reopen it, write to the platform staff. Staff reopen a closed vendor after a review; it "
-"then goes through onboarding again, including the acceptance of the contract in force."
+"To ask to reopen it, write to the platform staff. Staff reopen a closed "
+"vendor after a review; it then goes through onboarding again, including the "
+"acceptance of the contract in force."
 msgstr ""
-"Per chiederne la riapertura, scrivi allo staff della piattaforma. Lo staff riapre un venditore "
-"chiuso dopo una verifica; il venditore ripete poi l’onboarding, compresa l’accettazione del "
-"contratto in vigore."
+"Per chiederne la riapertura, scrivi allo staff della piattaforma. Lo staff "
+"riapre un venditore chiuso dopo una verifica; il venditore ripete poi "
+"l’onboarding, compresa l’accettazione del contratto in vigore."
 
 #: apps/accounts/action_link_views.py apps/accounts/decorators.py
 msgid "Too many attempts. Please try again later."
 msgstr "Troppi tentativi. Riprova più tardi."
 
 #: apps/manager/templates/manager/shop/orders.html
+#: apps/orders/templates/orders/customer_order.html
+#: apps/orders/templates/orders/customer_orders.html
 msgid "Total"
 msgstr "Totale"
 
@@ -1422,9 +1712,21 @@ msgstr "Totale"
 msgid "Total: %(total)s EUR"
 msgstr "Totale: %(total)s EUR"
 
+#: apps/orders/templates/orders/customer_order.html
+msgid "Track the parcel"
+msgstr "Segui il pacco"
+
+#: apps/orders/templates/orders/customer_order.html
+msgid "Tracking"
+msgstr "Tracciamento"
+
 #: apps/manager/forms.py apps/manager/templates/manager/shop/order.html
 msgid "Tracking number"
 msgstr "Numero di tracciamento"
+
+#: apps/orders/templates/orders/customer_order.html
+msgid "Tracking number: %(number)s"
+msgstr "Numero di tracciamento: %(number)s"
 
 #: apps/accounts/templates/accounts/mfa/overview.html
 #: apps/accounts/templates/accounts/mfa/setup.html
@@ -1465,9 +1767,11 @@ msgstr "Usa un codice di recupero"
 
 #: apps/accounts/templates/accounts/mfa/setup.html
 msgid "Use this device's screen lock or a security key."
-msgstr "Usa il blocco schermo di questo dispositivo o una chiave di sicurezza."
+msgstr ""
+"Usa il blocco schermo di questo dispositivo o una chiave di sicurezza."
 
-#: apps/manager/templates/manager/layout.html apps/manager/templates/manager/shop/dashboard.html
+#: apps/manager/templates/manager/layout.html
+#: apps/manager/templates/manager/shop/dashboard.html
 msgid "Vendor"
 msgstr "Venditore"
 
@@ -1483,13 +1787,22 @@ msgstr "Verifica"
 msgid "Verify it is you"
 msgstr "Verifica la tua identità"
 
+#: apps/orders/customer_views.py
+msgid "Waiting for payment"
+msgstr "In attesa di pagamento"
+
+#: apps/orders/customer_views.py
+msgid "Waiting for the seller"
+msgstr "In attesa del venditore"
+
 #: themes/base/templates/components/alert.html
 msgid "Warning"
 msgstr "Attenzione"
 
 #: themes/base/templates/500.html
 msgid "We could not complete your request. Please try again in a few minutes."
-msgstr "Non siamo riusciti a completare la richiesta. Riprova tra qualche minuto."
+msgstr ""
+"Non siamo riusciti a completare la richiesta. Riprova tra qualche minuto."
 
 #: apps/orders/templates/email/orders/order_received/subject.txt
 msgid "We received your order %(order_number)s"
@@ -1498,24 +1811,33 @@ msgstr "Abbiamo ricevuto il tuo ordine %(order_number)s"
 #: apps/orders/templates/email/orders/order_received/body.html
 #: apps/orders/templates/email/orders/order_received/body.txt
 msgid ""
-"We received your order %(order_number)s (total %(total)s EUR). We will confirm it when the payment"
-" is complete."
+"We received your order %(order_number)s (total %(total)s EUR). We will "
+"confirm it when the payment is complete."
 msgstr ""
-"Abbiamo ricevuto il tuo ordine %(order_number)s (totale %(total)s EUR). Te lo confermeremo quando "
-"il pagamento sarà completato."
+"Abbiamo ricevuto il tuo ordine %(order_number)s (totale %(total)s EUR). Te "
+"lo confermeremo quando il pagamento sarà completato."
 
 #: apps/orders/templates/email/orders/payment_confirmed/body.html
 #: apps/orders/templates/email/orders/payment_confirmed/body.txt
 msgid ""
-"We received your payment of %(total)s EUR for order %(order_number)s. Each seller will prepare its"
-" part and you will get a message when it ships."
+"We received your payment of %(total)s EUR for order %(order_number)s. Each "
+"seller will prepare its part and you will get a message when it ships."
 msgstr ""
-"Abbiamo ricevuto il tuo pagamento di %(total)s EUR per l’ordine %(order_number)s. Ogni venditore "
-"preparerà la sua parte e riceverai un messaggio quando verrà spedita."
+"Abbiamo ricevuto il tuo pagamento di %(total)s EUR per l’ordine "
+"%(order_number)s. Ogni venditore preparerà la sua parte e riceverai un "
+"messaggio quando verrà spedita."
 
 #: apps/vendors/models.py
-msgid "What the field is needed for: a payout request or the activation of the vendor."
-msgstr "A cosa serve il campo: una richiesta di pagamento o l'attivazione del venditore."
+msgid ""
+"What the field is needed for: a payout request or the activation of the "
+"vendor."
+msgstr ""
+"A cosa serve il campo: una richiesta di pagamento o l'attivazione del "
+"venditore."
+
+#: apps/orders/templates/orders/customer_order.html
+msgid "What you bought from %(name)s"
+msgstr "Cosa hai acquistato da %(name)s"
 
 #: apps/vendors/models.py
 msgid "When the contract was accepted."
@@ -1523,50 +1845,63 @@ msgstr "Quando il contratto è stato accettato."
 
 #: apps/vendors/models.py
 msgid ""
-"When this version replaces the previous one. Required. Once a vendor has accepted the version it "
-"can no longer be changed."
+"When this version replaces the previous one. Required. Once a vendor has "
+"accepted the version it can no longer be changed."
 msgstr ""
-"Da quando questa versione sostituisce la precedente. Obbligatorio. Dopo l'accettazione di un "
-"venditore la versione non si può più modificare."
+"Da quando questa versione sostituisce la precedente. Obbligatorio. Dopo "
+"l'accettazione di un venditore la versione non si può più modificare."
+
+#: apps/orders/templates/orders/customer_orders.html
+msgid "When you buy something, you find it here with its status and tracking."
+msgstr ""
+"Quando acquisti qualcosa, lo trovi qui con il suo stato e il tracciamento."
 
 #: apps/vendors/admin.py
 msgid ""
-"Where this version is in the review: a machine draft still needs checking, reviewed is checked, "
-"published is shown to visitors. Only published texts are shown."
+"Where this version is in the review: a machine draft still needs checking, "
+"reviewed is checked, published is shown to visitors. Only published texts "
+"are shown."
 msgstr ""
-"A che punto è questa versione nella revisione: una bozza automatica va ancora controllata, "
-"'Reviewed' è controllata, 'Published' è mostrata ai visitatori. Si mostrano solo i testi "
-"pubblicati."
+"A che punto è questa versione nella revisione: una bozza automatica va "
+"ancora controllata, 'Reviewed' è controllata, 'Published' è mostrata ai "
+"visitatori. Si mostrano solo i testi pubblicati."
 
 #: apps/vendors/models.py
-msgid "Why it was switched, for example the incident or request reference. Up to 200 characters."
+msgid ""
+"Why it was switched, for example the incident or request reference. Up to "
+"200 characters."
 msgstr ""
-"Perché è stata cambiata, per esempio il riferimento dell'incidente o della richiesta. Al massimo "
-"200 caratteri."
+"Perché è stata cambiata, per esempio il riferimento dell'incidente o della "
+"richiesta. Al massimo 200 caratteri."
 
 #: apps/vendors/models.py
 msgid "Why the field is required, for the record. Up to 200 characters."
-msgstr "Perché il campo è obbligatorio, per memoria. Al massimo 200 caratteri."
+msgstr ""
+"Perché il campo è obbligatorio, per memoria. Al massimo 200 caratteri."
 
 #: apps/manager/templates/manager/shop/vendor_picker.html
 msgid ""
-"You are a member of several vendors. Choose the one to work on; you can switch from the header "
-"later."
+"You are a member of several vendors. Choose the one to work on; you can "
+"switch from the header later."
 msgstr ""
-"Sei membro di più venditori. Scegli quello su cui lavorare; potrai cambiarlo in seguito "
-"dall’intestazione."
+"Sei membro di più venditori. Scegli quello su cui lavorare; potrai cambiarlo"
+" in seguito dall’intestazione."
 
 #: apps/accounts/templates/accounts/admin/login.html
 msgid ""
-"You are authenticated as %(username)s, but are not authorized to access this page. Would you like "
-"to login to a different account?"
+"You are authenticated as %(username)s, but are not authorized to access this"
+" page. Would you like to login to a different account?"
 msgstr ""
-"Hai effettuato l’accesso come %(username)s, ma non sei autorizzato ad accedere a questa pagina. "
-"Vuoi accedere con un altro account?"
+"Hai effettuato l’accesso come %(username)s, ma non sei autorizzato ad "
+"accedere a questa pagina. Vuoi accedere con un altro account?"
 
 #: apps/manager/templates/manager/forbidden.html
-msgid "You are signed in as %(user)s, and you do not have access to this part of the site."
-msgstr "Hai effettuato l’accesso come %(user)s e non hai accesso a questa parte del sito."
+msgid ""
+"You are signed in as %(user)s, and you do not have access to this part of "
+"the site."
+msgstr ""
+"Hai effettuato l’accesso come %(user)s e non hai accesso a questa parte del "
+"sito."
 
 #: apps/manager/templates/manager/shop/dashboard.html
 msgid "You are working on %(vendor)s."
@@ -1582,21 +1917,25 @@ msgid_plural "You have %(counter)s unused recovery codes."
 msgstr[0] "Hai %(counter)s codice di recupero non usato."
 msgstr[1] "Hai %(counter)s codici di recupero non usati."
 
-#: apps/vendors/models.py
-msgid ""
-"Your certified email (PEC) address, if you have one. It is required when the SDI recipient code is"
-" 0000000."
-msgstr ""
-"Il tuo indirizzo di posta elettronica certificata (PEC), se ce l'hai. È obbligatorio quando il "
-"codice destinatario SDI è 0000000."
+#: apps/orders/templates/orders/customer_orders.html
+msgid "You have no orders yet"
+msgstr "Non hai ancora ordini"
 
 #: apps/vendors/models.py
 msgid ""
-"Your EORI number, the customs identification number for businesses that move goods in or out of "
-"the EU. Leave it empty if you do not have one."
+"Your certified email (PEC) address, if you have one. It is required when the"
+" SDI recipient code is 0000000."
 msgstr ""
-"Il tuo numero EORI, il codice doganale delle imprese che spostano merci da o verso l'UE. Lascialo "
-"vuoto se non ne hai uno."
+"Il tuo indirizzo di posta elettronica certificata (PEC), se ce l'hai. È "
+"obbligatorio quando il codice destinatario SDI è 0000000."
+
+#: apps/vendors/models.py
+msgid ""
+"Your EORI number, the customs identification number for businesses that move"
+" goods in or out of the EU. Leave it empty if you do not have one."
+msgstr ""
+"Il tuo numero EORI, il codice doganale delle imprese che spostano merci da o"
+" verso l'UE. Lascialo vuoto se non ne hai uno."
 
 #: apps/accounts/templates/accounts/mfa/overview.html
 msgid "Your factors"
@@ -1604,11 +1943,15 @@ msgstr "I tuoi fattori"
 
 #: apps/vendors/forms.py
 msgid ""
-"Your first and last name. We use it to greet you and to set up your account. Required: we cannot "
-"process the application without it."
+"Your first and last name. We use it to greet you and to set up your account."
+" Required: we cannot process the application without it."
 msgstr ""
-"Il tuo nome e cognome. Lo usiamo per rivolgerci a te e per creare il tuo account. Obbligatorio: "
-"senza non possiamo elaborare la candidatura."
+"Il tuo nome e cognome. Lo usiamo per rivolgerci a te e per creare il tuo "
+"account. Obbligatorio: senza non possiamo elaborare la candidatura."
+
+#: apps/orders/templates/orders/customer_orders.html
+msgid "Your orders, newest first"
+msgstr "I tuoi ordini, dal più recente"
 
 #: apps/accounts/templates/accounts/mfa/_recovery_codes_list.html
 msgid "Your recovery codes"
@@ -1624,44 +1967,10 @@ msgstr "Il tuo ruolo richiede un secondo fattore prima di poter continuare."
 
 #: apps/vendors/models.py
 msgid ""
-"Your VAT number, with or without the country prefix, for example IT12345678901. We check it in the"
-" EU VIES register. Not sure if you have one? Ask your accountant."
+"Your VAT number, with or without the country prefix, for example "
+"IT12345678901. We check it in the EU VIES register. Not sure if you have "
+"one? Ask your accountant."
 msgstr ""
-"La tua partita IVA, con o senza il prefisso del paese, per esempio IT12345678901. La verifichiamo "
-"nel registro europeo VIES. Non sai se ne hai una? Chiedi al tuo commercialista."
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled/body.html
-#: apps/orders/templates/email/orders/vendor_order_cancelled/body.txt
-msgid "%(vendor_name)s's part of order %(order_number)s was cancelled."
-msgstr "La parte dell’ordine %(order_number)s di %(vendor_name)s è stata annullata."
-
-#: apps/orders/templates/email/orders/vendor_order_delivered/body.html
-#: apps/orders/templates/email/orders/vendor_order_delivered/body.txt
-msgid "%(vendor_name)s's part of order %(order_number)s was delivered."
-msgstr "La parte dell’ordine %(order_number)s di %(vendor_name)s è stata consegnata."
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/subject.txt
-msgid "%(vendor_name)s: order %(order_number)s cancelled, do not ship"
-msgstr "%(vendor_name)s: ordine %(order_number)s annullato, non spedire"
-
-#: apps/orders/templates/email/orders/order_cancelled/subject.txt
-msgid "Order %(order_number)s was cancelled"
-msgstr "L’ordine %(order_number)s è stato annullato"
-
-#: apps/orders/templates/email/orders/order_cancelled/body.html
-#: apps/orders/templates/email/orders/order_cancelled/body.txt
-msgid "Order %(order_number)s was cancelled before payment. Nothing was charged."
-msgstr "L’ordine %(order_number)s è stato annullato prima del pagamento. Non è stato addebitato nulla."
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.html
-#: apps/orders/templates/email/orders/vendor_order_cancelled_notice/body.txt
-msgid "Order %(order_number)s was cancelled. Do not ship these items:"
-msgstr "L’ordine %(order_number)s è stato annullato. Non spedire questi articoli:"
-
-#: apps/orders/templates/email/orders/vendor_order_delivered/subject.txt
-msgid "Order %(order_number)s: a shipment was delivered"
-msgstr "Ordine %(order_number)s: una spedizione è stata consegnata"
-
-#: apps/orders/templates/email/orders/vendor_order_cancelled/subject.txt
-msgid "Order %(order_number)s: part of your order was cancelled"
-msgstr "Ordine %(order_number)s: una parte del tuo ordine è stata annullata"
+"La tua partita IVA, con o senza il prefisso del paese, per esempio "
+"IT12345678901. La verifichiamo nel registro europeo VIES. Non sai se ne hai "
+"una? Chiedi al tuo commercialista."
