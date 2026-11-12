@@ -18,6 +18,7 @@ from django.db import models
 
 from apps.catalog.models import Product, Variant
 from apps.core.fields import CountryField, LanguageField, MoneyField
+from apps.core.i18n import primary_language
 from apps.core.models import BaseModel
 from apps.vendors.scoping import VendorScopedManager
 
@@ -36,7 +37,7 @@ class Cart(BaseModel):
         blank=True,
         help_text="The guest's session key when the cart was created; empty for a user's cart.",
     )
-    language = LanguageField(default=settings.LANGUAGE_CODE)
+    language = LanguageField(default=primary_language)
     country_hint = CountryField(
         blank=True, help_text="Where the visitor said they ship to, for early estimates."
     )

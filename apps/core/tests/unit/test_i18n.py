@@ -9,8 +9,14 @@ from typing import Any
 
 import pytest
 from django.conf import settings
+from django.test import override_settings
 
-from apps.core.i18n import configured_languages, language_choices, translate_path
+from apps.core.i18n import (
+    configured_languages,
+    language_choices,
+    primary_language,
+    translate_path,
+)
 
 
 def _primary() -> str:
@@ -79,3 +85,10 @@ def test_language_choices_follow_settings_at_runtime(settings: Any) -> None:
 
     assert [code for code, _name in language_choices()] == [*configured_languages()]
     assert configured_languages()[-1] == "pt"
+
+
+def test_the_primary_language_default_follows_the_setting_at_call_time() -> None:
+    with override_settings(LANGUAGE_CODE="it"):
+        assert primary_language() == "it"
+    with override_settings(LANGUAGE_CODE="de"):
+        assert primary_language() == "de"

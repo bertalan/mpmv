@@ -120,6 +120,11 @@ jobs:
         env:
           MPMV_LANGUAGES: it,de
         run: uv run pytest -n auto -m unit
+      # I18N.15: model defaults must not freeze the primary language: no migration drift either.
+      - name: Missing migrations (MPMV_LANGUAGES=it,de)
+        env:
+          MPMV_LANGUAGES: it,de
+        run: uv run python manage.py makemigrations --check --dry-run
       # CORE.18 follow-up: an upgrade from the previous release runs the database checks before
       # `migrate` applies anything. Migrate fully, step the manager app back and drop the role
       # groups, then migrate again with the checks on (no --skip-checks): it must exit 0.

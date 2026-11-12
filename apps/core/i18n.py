@@ -25,6 +25,15 @@ def language_choices() -> list[tuple[str, str]]:
     return [(str(code), str(name)) for code, name in settings.LANGUAGES]
 
 
+def primary_language() -> str:
+    """The primary language, read from settings when called.
+
+    Model fields use this callable as `default`: a literal `settings.LANGUAGE_CODE` would be
+    frozen at import and migrations would drift when MPMV_LANGUAGES changes.
+    """
+    return str(settings.LANGUAGE_CODE)
+
+
 def configured_languages() -> list[str]:
     """Language codes in the configured order (primary first)."""
     return [code for code, _name in settings.LANGUAGES]
