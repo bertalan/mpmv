@@ -113,6 +113,35 @@ def test_the_refusal_offers_do_it_once_and_switching(client: Client) -> None:
         assert old not in text
 
 
+def test_the_refusal_page_is_in_italian_when_italian_is_active(client: Client) -> None:
+    user, _ = _staff_with_passkey()
+    user.preferred_language = "it"
+    user.save(update_fields=["preferred_language"])
+    _no_window_session(client, user)
+    text = client.get(reverse("test-export")).content.decode()
+    assert "Serve la tua passkey" in text
+    assert "Fallo una volta" in text
+    assert "Apri la finestra passkey" in text
+    assert "Finestra passkey" in text
+    for english in (
+        "This needs your passkey",
+        "is sensitive: confirm it with your passkey",
+        "Do it once",
+        "Open passkey window",
+        "Confirm with your passkey",
+        "Passkeys need JavaScript",
+    ):
+        assert english not in text
+
+
+def test_the_refusal_without_a_passkey_is_in_italian(client: Client) -> None:
+    user = UserFactory.create(staff=True, preferred_language="it")
+    _no_window_session(client, user)
+    text = client.get(reverse("test-export")).content.decode()
+    assert "non ha ancora una passkey" in text
+    assert "Your account has no passkey yet" not in text
+
+
 def test_json_clients_get_a_machine_readable_refusal(client: Client) -> None:
     user, _ = _staff_with_passkey()
     _no_window_session(client, user)
