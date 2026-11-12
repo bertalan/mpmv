@@ -17,6 +17,9 @@ from typing import Final
 
 PLATFORM_OWNER_PERMISSION: Final = "core.platform_owner"
 VIEW_ALL_VENDORS_PERMISSION: Final = "vendors.view_all_vendors"  # Q-34
+# Wagtail's access to the editors' admin: the roles that edit or read the help texts (ARC.32,
+# lane-a on #86) hold it, so the Help item and the "Help texts" snippet are reachable.
+EDITORS_ADMIN_PERMISSION: Final = "wagtailadmin.access_admin"
 
 
 class Access(StrEnum):
@@ -63,7 +66,7 @@ ROLES: Final[tuple[Role, ...]] = (
         CATALOG,
         "Platform: catalog and moderation",
         "Catalog and moderation",
-        ("manager.platform_catalog", VIEW_ALL_VENDORS_PERMISSION),
+        ("manager.platform_catalog", VIEW_ALL_VENDORS_PERMISSION, EDITORS_ADMIN_PERMISSION),
     ),
     Role(
         FINANCE,
@@ -81,7 +84,7 @@ ROLES: Final[tuple[Role, ...]] = (
         OWNER,
         "Platform: owner",
         "Platform owner",
-        (PLATFORM_OWNER_PERMISSION, VIEW_ALL_VENDORS_PERMISSION),
+        (PLATFORM_OWNER_PERMISSION, VIEW_ALL_VENDORS_PERMISSION, EDITORS_ADMIN_PERMISSION),
     ),
 )
 
