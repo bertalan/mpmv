@@ -1011,9 +1011,11 @@ def _resolve_northern_ireland(ctx: TaxContext, category: FiscalCategory) -> TaxD
     """Goods delivered to Northern Ireland follow the EU rules for goods (D-02, TAX.18).
 
     A business with a VIES-valid number with prefix `XI` buys an intra-EU exempt supply (N3.2,
-    Intrastat `XI`; the vendor keeps proof of delivery). Every other customer, a GB-only number
-    included, is a consumer: an EU distance sale at the vendor country's rate while the vendor is
-    under the EUR 10,000 EU threshold, and at the UK rate, reported through the vendor's EU OSS
+    Intrastat `XI`; the vendor keeps proof of delivery).
+    A business with a number of the vendor's own country pays the vendor country's VAT (D-26).
+    Every other customer, a GB-only number included,
+    is a consumer: an EU distance sale at the vendor country's rate while the vendor is under
+    the EUR 10,000 EU threshold, and above it at the UK rate, reported through the vendor's EU OSS
     under code `XI` with no UK registration. A vendor outside the OSS regime (the DOMESTIC profile,
     below the threshold) charges its own country's rate. The UK rate is the `XI` rate, else the
     `GB` rate; a missing one raises `MissingTaxRate`.
@@ -1023,6 +1025,14 @@ def _resolve_northern_ireland(ctx: TaxContext, category: FiscalCategory) -> TaxD
     if customer != "b2c" and customer.vat_country == NORTHERN_IRELAND_CODE:
         decision = _zero(REASON_REVERSE_CHARGE, NOTE_REVERSE_CHARGE)
         return replace(decision, intrastat_country=INTRASTAT_NORTHERN_IRELAND)
+    if customer != "b2c" and customer.vat_country == vendor_country:
+        # D-26: a number of the vendor's own country cannot take the intra-community exemption
+        # (art. 138): vendor-country VAT, as for any other delivery abroad.
+        return _taxed(
+            ctx.rates.rate(vendor_country, category),
+            REASON_DOMESTIC_VENDOR_COUNTRY,
+            vendor_country,
+        )
     if ctx.vendor_profile.regime == OSS:
         table = ctx.rates.rates
         code = NORTHERN_IRELAND_CODE if (NORTHERN_IRELAND_CODE, category) in table else "GB"

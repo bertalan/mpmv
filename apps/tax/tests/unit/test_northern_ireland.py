@@ -48,6 +48,7 @@ def test_other_postcodes_are_not_northern_ireland(country: str, postcode: str | 
 
 
 def test_an_oss_vendor_gets_the_uk_rate_with_oss_code_xi() -> None:
+    # A stored special XI territory row changes nothing: no blocking error either.
     d = engine.resolve_goods_tax(ni(), engine.STANDARD)
     assert (d.rate, d.reason, d.country_of_taxation) == (D("20"), "standard_destination", "XI")
 
@@ -73,7 +74,7 @@ def test_b2b_with_a_valid_xi_number_is_an_intra_eu_exempt_supply() -> None:
     assert d.country_of_taxation is None
 
 
-@pytest.mark.parametrize("country", ["GB", "FR", "IT"])
+@pytest.mark.parametrize("country", ["GB", "FR"])
 def test_b2b_without_an_xi_number_is_treated_as_b2c(country: str) -> None:
     d = engine.resolve_goods_tax(ni(customer=b2b(country)), engine.STANDARD)
     assert (d.rate, d.reason, d.intrastat_country) == (D("20"), "standard_destination", None)
@@ -84,15 +85,15 @@ def test_a_gb_number_gets_the_uk_rate_as_a_consumer() -> None:
     assert (d.rate, d.country_of_taxation) == (D("20"), "XI")
 
 
+def test_a_business_with_a_vendor_country_number_pays_the_vendor_country_vat() -> None:
+    d = engine.resolve_goods_tax(ni(customer=b2b("IT")), engine.STANDARD)
+    assert (d.rate, d.reason, d.country_of_taxation) == (D("22"), "domestic_vendor_country", "IT")
+
+
 def test_an_xi_number_elsewhere_is_not_reverse_charged() -> None:
     c = ctx(destination="DE", customer=b2b("XI"))
     d = engine.resolve_goods_tax(c, engine.STANDARD)
     assert (d.rate, d.reason) == (D("19"), "standard_destination")
-
-
-def test_the_blocking_error_is_gone_and_a_stored_special_xi_row_changes_nothing() -> None:
-    d = engine.resolve_goods_tax(ni(), engine.STANDARD)
-    assert d.reason == "standard_destination"
 
 
 def test_great_britain_outside_bt_stays_an_export() -> None:

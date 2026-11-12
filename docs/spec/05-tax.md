@@ -156,7 +156,7 @@ Intended differences from today:
 - **Special territories** handled by postcode; Northern Ireland (`XI`) follows EU goods rules (D-02,
   decided: adviser opinion 2026-11-11; owner, 2026-11-11). A delivery to GB whose normalised postcode matches `^BT[0-9]`
   is jurisdiction `XI`. B2C is an EU distance sale counted in the vendor's EUR 10,000 EU threshold;
-  above it (or by the vendor's option) the UK rate applies, reported through the vendor's EU OSS
+  above it (or by the vendor's option; vendor regime `oss`) the UK rate applies, reported through the vendor's EU OSS
   under code `XI`, with no UK registration. B2B with a VIES-valid `XI` number is an intra-EU exempt
   supply (`N3.2`, Intrastat `XI`) with proof of delivery kept; a GB-only number is B2C (TAX.18).
 - **Outside-VAT-territory dataset** (TAX.7, needs human review): each territory is matched by an ISO-code form and by a French postcode form, because a buyer may supply either. Legal basis: Directive 2006/112/EC art. 6 (territories excluded from the Union VAT territory).
@@ -169,7 +169,6 @@ Intended differences from today:
   basis is the named constant `GOODS_COUNTRY_BASIS` in the tax engine.
 - Fail closed until built: a sale to a `special` territory raises a blocking error, and so does a
   vendor established in such a territory (not supported: the context has no vendor territory).
-  Northern Ireland (`XI`) also raises it until TAX.18 replaces the error with the D-02 rules.
 - The carrier `force_vat` flag goes away (D-03, decided: adviser opinion 2026-11-11): shipping charged by the vendor
   always follows the goods' VAT treatment, and no "force VAT" or other treatment option is offered
   (TAX.17). The pro-rata split across rates, with the rounding cent on the largest base, is final.
