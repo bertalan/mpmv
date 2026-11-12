@@ -12,6 +12,7 @@ from django.urls import NoReverseMatch, reverse
 from django.utils import translation
 from django.utils.html import format_html_join
 from django.utils.safestring import SafeString, mark_safe
+from django.utils.translation import gettext
 from wagtail.models import Locale, Page
 
 from apps.core.i18n import (
@@ -51,13 +52,28 @@ def _menu(location: str) -> NavigationMenu | None:
 def navigation_links(context: dict[str, Any], location: str) -> list[MenuLink]:
     """The links of the header or footer menu; pages are shown in the active language.
 
-    Links to deleted or unpublished pages are left out.
+    Links to deleted or unpublished pages are left out. The header menu ends with the
+    temporary "Site links" item (OPS.12; remove before LIVE).
     """
-    request: HttpRequest | None = context.get("request")
-    menu = _menu(location)
-    if menu is None:
+    links = _menu_links(context.get("request"), _menu(location))
+    if location == NavigationMenu.Location.HEADER:
+        links.extend(_site_links_item())
+    return links
+
+
+def _site_links_item() -> list[MenuLink]:
+    """The temporary staff "Site links" page (OPS.12), shown to everyone so the owner can test
+    its protection on STAGE; remove before LIVE."""
+    try:
+        return [MenuLink(label=gettext("Site links"), url=reverse("site_links"))]
+    except NoReverseMatch:  # a test URLconf without the route
         return []
+
+
+def _menu_links(request: HttpRequest | None, menu: NavigationMenu | None) -> list[MenuLink]:
     links: list[MenuLink] = []
+    if menu is None:
+        return links
     for block in menu.links:
         value = block.value
         if block.block_type == "external":

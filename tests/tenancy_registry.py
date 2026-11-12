@@ -398,6 +398,10 @@ ENDPOINTS: dict[str, Access] = {
     ),
     "switch_language": NoVendorData("Stores the visitor's language choice."),
     "themes:styleguide": StaffOnly("Component samples of the active theme (THM.4), staff only."),
+    "site_links": StaffOnly(
+        "Temporary list of the site's pages for STAGE testing (OPS.12), staff only; a signed-in "
+        "non-staff user gets 404."
+    ),
     "levels:options": NoVendorData(OWN_ACCOUNT),
     "levels:operational": NoVendorData(OWN_ACCOUNT),
     "levels:once_options": NoVendorData(OWN_ACCOUNT),
