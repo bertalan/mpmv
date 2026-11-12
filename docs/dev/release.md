@@ -218,6 +218,9 @@ Launch prerequisite: before the first LIVE launch, and before the account activa
 CORE.19 start, the sending domain has SPF, DKIM and DMARC records in place and verified (ARC.19,
 [transactional email](transactional-email.md)).
 
+Temporary STAGE tooling: before the first LIVE launch, remove the staff "Site links" page
+(OPS.12, `/_links/`) and its storefront header menu item. It exists for STAGE testing only.
+
 ## Security schedule
 
 The security checks run at three cadences (SEC.5, owner request of 2026-11-09).
