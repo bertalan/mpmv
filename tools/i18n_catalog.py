@@ -40,9 +40,11 @@ SCOPES = (
     "apps/catalog/taxonomy.py",
     "apps/catalog/taxonomy_admin.py",
 )
+# Single storefront modules whose strings the Manager texts quote (shop policy headings).
+EXTRA_FILES = ("apps/vendors/services.py",)
 # Apps scanned for `help_text=` strings only (ARC.31: field help is translated; the rest of these
 # apps joins SCOPES with I18N.7). Python files, each string inside a `help_text=` argument.
-HELP_TEXT_SCOPES = ("apps/vendors",)
+HELP_TEXT_SCOPES = ("apps/catalog", "apps/vendors")
 # Theme files rendered by the Manager and account pages (the rest of the theme is storefront).
 THEME_FILES = (
     "400.html",
@@ -84,6 +86,8 @@ def _files() -> Iterator[Path]:
             if SKIP_PARTS & set(rel.parts) or path.suffix not in {".py", ".html", ".txt"}:
                 continue
             yield path
+    for extra in EXTRA_FILES:
+        yield ROOT / extra
     for name in THEME_FILES:
         yield ROOT / "themes/base/templates" / name
 

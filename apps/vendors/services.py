@@ -47,6 +47,7 @@ from apps.accounts.services import (
 )
 from apps.core.audit import AuditContext, record
 from apps.core.changeset import Change, ChangeSet
+from apps.core.fields import read_upload
 from apps.core.models import AuditLog, ImageLicence, MediaImage, resolve_translation
 from apps.core.services import (
     NoPlatformOperator,
@@ -60,6 +61,7 @@ from apps.core.services import (
     save_audited,
 )
 from apps.core.throttling import ip_bucket
+from apps.core.uploads import UploadRefused, check_document
 from apps.core.validity import next_start_error
 
 from . import engine
@@ -139,29 +141,34 @@ def _clean_rich_text(html: str) -> str:
 
 
 def media_problem(vendor: Vendor, html: str) -> str | None:
-    """Why a stored rich text may not be published for `vendor`, or None: every image it embeds
-    and every document it links must be in the vendor's own collection (depth 2, named by
-    `engine.vendor_collection_name`) or below it. A foreign, missing or non-numeric id is a
-    problem, so crafted HTML cannot reach another vendor's files (D-34)."""
+    """Why a stored rich text may not be published for `vendor`, or None: its links are https
+    addresses, it links no document (waits for ARC.15), and every image it embeds is in the
+    vendor's own collection (depth 2, named by `engine.vendor_collection_name`) or below it. A
+    foreign, missing or non-numeric id is a problem, so crafted HTML cannot reach another
+    vendor's files (D-34)."""
     if engine.has_page_link(html):
         return "Links to other pages of the site are not allowed here."
+    if engine.has_unsafe_link(html):
+        return "Links must be web addresses starting with https://"
     images, documents = engine.media_references(html)
-    if not images and not documents:
+    if documents:
+        # A vendor PDF would be public by URL: no document link until ARC.15 (private storage).
+        return "Links to documents are not available yet."
+    if not images:
         return None
-    if not all(ref.isdecimal() for ref in (*images, *documents)):
-        return "Choose images and documents from your own library."
+    if not all(ref.isdecimal() for ref in images):
+        return "Choose images from your own library."
     own = ImageCollection.objects.filter(
         depth=2, name=engine.vendor_collection_name(str(vendor.public_id))
     ).first()
     if own is None:
-        return "Choose images and documents from your own library."
+        return "Choose images from your own library."
     allowed = ImageCollection.objects.descendant_of(own, inclusive=True)
-    for model, refs in ((get_image_model(), images), (get_document_model(), documents)):
-        wanted = {int(ref) for ref in refs}
-        if wanted and model.objects.filter(pk__in=wanted, collection__in=allowed).count() != len(
-            wanted
-        ):
-            return "Choose images and documents from your own library."
+    wanted = {int(ref) for ref in images}
+    if get_image_model().objects.filter(pk__in=wanted, collection__in=allowed).count() != len(
+        wanted
+    ):
+        return "Choose images from your own library."
     return None
 
 
@@ -2625,6 +2632,85 @@ def upload_storefront_image(
             stored[0].delete(stored[1])
         raise
     return image
+
+
+def vendor_media_documents(vendor: Vendor) -> QuerySet[Any]:
+    """The documents the vendor may list and choose: its collection and the ones below it."""
+    own = vendor_media_collection(vendor)
+    documents: QuerySet[Any] = get_document_model().objects.all()
+    if own is None:
+        return documents.none()
+    allowed = ImageCollection.objects.descendant_of(own, inclusive=True)
+    found: QuerySet[Any] = documents.filter(collection__in=allowed)
+    return found
+
+
+def upload_storefront_document(
+    vendor: Vendor,
+    *,
+    upload: Any,
+    title: str,
+    actor: User,
+    ctx: AuditContext,
+    dry_run: bool = False,
+) -> Any:
+    """The vendor owner uploads a PDF from the storefront editor, into the vendor's own
+    collection only (the caller cannot name another). The SEC.2 document checks apply (PDF by
+    content, size cap, no HTML or archive polyglot, a name the app makes). Owner only, and not
+    for a suspended or closed vendor (`PermissionDenied`). Shares the hourly upload limit of the
+    images; one `vendor.media_uploaded` audit entry (`after.document`). Raises
+    `ValidationError({"file": [...]})` for a refused file. With `dry_run` the file is checked and
+    the unsaved document returned: nothing is written, counted or audited."""
+    if not has_vendor_permission(actor, vendor, "profile"):
+        raise PermissionDenied("Only the vendor owner uploads storefront documents.")
+    wait = (
+        None
+        if dry_run
+        else consume_rate_limit(
+            f"vendor-media:user:{actor.pk}", limit=MEDIA_UPLOAD_LIMIT, window=PROFILE_RATE_WINDOW
+        )
+    )
+    if wait:
+        minutes = max(1, int(wait.total_seconds() // 60))
+        raise ValidationError({"file": f"Too many uploads: try again in {minutes} minutes."})
+    limit = settings.WAGTAILDOCS_MAX_UPLOAD_SIZE
+    try:
+        upload.name = check_document(read_upload(upload, limit), upload.name, max_bytes=limit)
+    except UploadRefused as refusal:
+        raise ValidationError({"file": refusal.message}) from None
+    stored: tuple[Any, str] | None = None
+    try:
+        with transaction.atomic():
+            locked = _lock_profile_vendor(vendor, actor)
+            root = ImageCollection.get_first_root_node()
+            target = root if dry_run else vendor_logo_collection(locked)
+            document = get_document_model()(
+                title=(title.strip() or "Document")[:255],
+                file=upload,
+                collection=target,
+                uploaded_by_user=actor,
+            )
+            if dry_run:
+                return document
+            document.save()
+            stored = (document.file.storage, document.file.name)
+            record(
+                ctx,
+                MEDIA_UPLOADED,
+                MODEL_LABEL,
+                str(vendor.public_id),
+                None,
+                {
+                    "document": f"document:{document.pk}",
+                    "title": document.title,
+                    "vendor": str(vendor.public_id),
+                },
+            )
+    except BaseException:
+        if stored is not None:  # the row rolls back; the file would stay on disk
+            stored[0].delete(stored[1])
+        raise
+    return document
 
 
 class _PendingImage:

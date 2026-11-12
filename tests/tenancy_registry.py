@@ -339,6 +339,25 @@ def vendor_image(vendor: Vendor) -> models.Model:
     return MediaImageFactory.create(collection=collection)
 
 
+def vendor_document(vendor: Vendor) -> models.Model:
+    """A PDF document in the vendor's own collection (VEN.31 part 2)."""
+    from django.core.files.base import ContentFile
+    from wagtail.documents import get_document_model
+    from wagtail.models import Collection
+
+    from apps.vendors.engine import vendor_collection_name
+    from tests.upload_corpus import PDF
+
+    root = Collection.get_first_root_node()
+    collection = root.add_child(name=vendor_collection_name(str(vendor.public_id)))
+    # A title unique per vendor, so a page that echoes the caller's own document
+    # cannot be mistaken for a leak of the other vendor's (the image factory does the same).
+    document = get_document_model()(title=f"Terms {vendor.public_id}", collection=collection)
+    document.file.save("terms.pdf", ContentFile(PDF), save=False)
+    document.save()
+    return document  # type: ignore[no-any-return]
+
+
 def by_pk(obj: models.Model) -> dict[str, str]:
     return {"pk": str(obj.pk)}
 
@@ -444,6 +463,26 @@ ENDPOINTS: dict[str, Access] = {
         "The upload tab of the image chooser (VEN.31): the form and the upload answer, the file "
         "goes into the caller's own collection only; owner only, other roles get 404 "
         "(`test_staff_and_other_users_get_404...` and the upload tests in test_image_chooser)."
+    ),
+    # The document chooser and the link dialog of the same editor (VEN.31 part 2).
+    "manager:shop:document_chosen": VendorScoped(make=vendor_document, kwargs=by_pk),
+    "manager:shop:document_choose": VendorScopedList(
+        make=vendor_document,
+        identify=lambda o: str(o.title),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:document_results": VendorScopedList(
+        make=vendor_document,
+        identify=lambda o: str(o.title),  # type: ignore[attr-defined]
+    ),
+    "manager:shop:document_create": NoVendorData(
+        "The upload tab of the document chooser (VEN.31): the form and the upload answer, the "
+        "file goes into the caller's own collection only; owner only, other roles get 404 "
+        "(`test_staff_and_other_users_get_404...` in test_document_chooser)."
+    ),
+    "manager:shop:link_choose": NoVendorData(
+        "The external link dialog (VEN.31): a form that echoes an https address back to the "
+        "editor; reads and writes no vendor data; owner only "
+        "(`test_staff_and_anonymous_are_refused`)."
     ),
     "manager:shop:vendor": VendorScopedList(make=manager_vendor, identify=vendor_display_name),
     # ORD.6: the vendor's own orders; another vendor's id is a 404 on the detail and every action.
